@@ -372,6 +372,7 @@ private:
     std::optional<std::string> ImportImageImpl(
         DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle, IImageLoadCallback* LoadCallback = nullptr);
     void RecoverExistingContainers();
+    void CompleteExistingContainerRecovery() noexcept;
     void RecoverExistingNetworks();
 
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent);
@@ -395,6 +396,7 @@ private:
     // WSLCVolumes has its own internal srwlock and does not require the runtime lock.
     std::mutex m_containersLock;
     std::unordered_map<std::string, std::shared_ptr<WSLCContainerImpl>> m_containers;
+    __guarded_by(m_containersLock) std::vector<std::shared_ptr<WSLCContainerImpl>> m_pendingContainerRecovery;
     std::mutex m_networksLock;
     std::unordered_map<std::string, NetworkEntry> m_networks;
     wil::shared_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};

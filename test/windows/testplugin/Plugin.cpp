@@ -30,6 +30,7 @@ std::optional<GUID> g_distroGuid;
 
 const WSLPluginAPIV1* g_api = nullptr;
 PluginTestType g_testType = PluginTestType::Invalid;
+std::atomic<size_t> g_wslcContainerStartCount = 0;
 
 // Process deliberately left running across OnWslcVmStopping by the WslcVmStopCommitted test, to
 // prove the announced teardown happens anyway. Never released: it dies with the VM.
@@ -631,13 +632,45 @@ try
 {
     auto container = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(InspectJson);
 
-    g_logfile << "WSLC Container started, session=" << Session->SessionId << ", id=" << container.Id << ", name=" << container.Name
+    g_logfile << "WSLC Container starting, session=" << Session->SessionId << ", id=" << container.Id << ", name=" << container.Name
               << ", image=" << container.Config.Image << ", state=" << container.State.Status << std::endl;
 
     if (g_testType == PluginTestType::WslcContainerRejected)
     {
         g_logfile << "OnWslcContainerStarted: ERROR_ACCESS_DENIED" << std::endl;
         return HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED);
+    }
+
+    if (g_testType == PluginTestType::WslcContainerRestartAuthorizationRequired)
+    {
+        if (container.HostConfig.RestartPolicy.Name != "on-failure" || container.HostConfig.RestartPolicy.MaximumRetryCount != 1)
+        {
+            g_logfile << "WSLC Container restart policy authorization: invalid" << std::endl;
+            return E_UNEXPECTED;
+        }
+
+        const auto attempt = ++g_wslcContainerStartCount;
+        g_logfile << "WSLC Container restart policy authorization: on-failure:1, attempt=" << attempt << std::endl;
+
+        std::vector<const char*> args = {"/bin/true", nullptr};
+        WSLCProcessHandle process = nullptr;
+        const auto processHr = g_api->WSLCCreateProcess(Session->SessionId, args[0], args.data(), nullptr, &process, nullptr);
+        g_logfile << "WSLC Container start authorization reentrant WSLCCreateProcess: " << (SUCCEEDED(processHr) ? "ok" : "failed")
+                  << std::endl;
+        if (SUCCEEDED(processHr))
+        {
+            g_api->WSLCReleaseProcess(process);
+        }
+        else
+        {
+            return processHr;
+        }
+
+        if (attempt == 2)
+        {
+            g_logfile << "WSLC Container restart policy authorization: ERROR_ACCESS_DENIED" << std::endl;
+            return HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED);
+        }
     }
 
     return S_OK;
@@ -852,7 +885,10 @@ EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPlugin
         THROW_HR_IF(E_UNEXPECTED, !g_logfile);
 
         g_testType = static_cast<PluginTestType>(ReadDword(key.get(), nullptr, c_testType, static_cast<DWORD>(PluginTestType::Invalid)));
-        THROW_HR_IF(E_INVALIDARG, static_cast<DWORD>(g_testType) <= 0 || static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::MountFolderAccess));
+        THROW_HR_IF(
+            E_INVALIDARG,
+            static_cast<DWORD>(g_testType) <= 0 ||
+                static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::WslcContainerRestartAuthorizationRequired));
 
         g_logfile << "Plugin loaded. TestMode=" << static_cast<DWORD>(g_testType) << std::endl;
         g_api = Api;

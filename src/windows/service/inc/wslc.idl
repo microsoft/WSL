@@ -115,8 +115,8 @@ interface IImageLoadCallback : IUnknown
 ]
 interface IWSLCPluginNotifier : IUnknown
 {
-    // 'InspectJson' follows the wslc_schema::InspectContainer format.
-    // Returning failure prevents the container creation.
+    // Called before each container start. 'InspectJson' follows the wslc_schema::InspectContainer
+    // format and describes the configuration that would be started. Returning failure vetoes the start.
     HRESULT OnContainerStarted([in] LPCSTR InspectJson);
 
     // Called when a container is about to stop. 'ContainerId' is the container identifier. Errors are logged but ignored.
@@ -364,6 +364,9 @@ typedef struct _WSLCContainerOptions
 
     [unique, size_is(MountsCount)] const WSLCMountSpec* Mounts;
     ULONG MountsCount;
+
+    [unique, string] LPCSTR RestartPolicy;
+    LONGLONG RestartMaximumRetryCount;
 } WSLCContainerOptions;
 
 typedef char WSLCContainerId[WSLC_CONTAINER_ID_LENGTH + 1] ;

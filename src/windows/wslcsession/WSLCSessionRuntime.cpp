@@ -16,6 +16,7 @@ Abstract:
 #include "WSLCSessionRuntime.h"
 #include "WSLCSession.h"
 #include "WSLCSessionDefaults.h"
+#include <unordered_map>
 
 using wsl::windows::service::wslc::WSLCSessionRuntime;
 
@@ -26,6 +27,27 @@ constexpr auto c_dockerdReadyLogLine = "API listen on /var/run/docker.sock";
 // How long a VM lease waits for an announced stop to complete before logging that it is still
 // blocked. Purely diagnostic: the wait itself is unbounded (see VmLease).
 constexpr DWORD c_vmStopWaitLogIntervalMs = 30 * 1000;
+
+thread_local std::unordered_map<WSLCSessionRuntime*, size_t> g_runtimeLeaseDepth;
+
+void RegisterRuntimeLease(WSLCSessionRuntime* runtime)
+{
+    ++g_runtimeLeaseDepth[runtime];
+}
+
+void UnregisterRuntimeLease(WSLCSessionRuntime* runtime) noexcept
+{
+    const auto entry = g_runtimeLeaseDepth.find(runtime);
+    if (!WI_VERIFY(entry != g_runtimeLeaseDepth.end() && entry->second != 0))
+    {
+        return;
+    }
+
+    if (--entry->second == 0)
+    {
+        g_runtimeLeaseDepth.erase(entry);
+    }
+}
 
 } // namespace
 
@@ -113,6 +135,11 @@ WSLCVolumes& WSLCSessionRuntime::Volumes()
 bool WSLCSessionRuntime::HasVolumes() const noexcept
 {
     return m_volumes.has_value();
+}
+
+wil::rwlock_release_shared_scope_exit WSLCSessionRuntime::TryLockShared() noexcept
+{
+    return m_lock.try_lock_shared();
 }
 
 wil::rwlock_release_exclusive_scope_exit WSLCSessionRuntime::TryLockExclusive() noexcept
@@ -267,6 +294,20 @@ void WSLCSessionRuntime::EnsureVmRunning()
         generation = m_vmGeneration.load();
     }
 
+    auto finishStart = wil::scope_exit([this, started]() {
+        if (started)
+        {
+            EndVmStartCompletion();
+        }
+    });
+
+    // Recovery completion may invoke external plugins. Run it after releasing the runtime lock;
+    // VmLease holds an activity reference across this call.
+    if (started && m_hooks.CompleteRecovery && !m_terminating->load() && m_vmState.load() == VmState::Running && m_vmGeneration.load() == generation)
+    {
+        m_hooks.CompleteRecovery();
+    }
+
     // Notify plugins that a VM has started, outside the exclusive lock: the handler forwards to the
     // plugin, which may call back into the session (e.g. WSLCCreateProcess acquires a VM lease and
     // the exclusive lock), so firing under the lock would deadlock. EnsureVmRunning's only caller
@@ -276,6 +317,18 @@ void WSLCSessionRuntime::EnsureVmRunning()
     {
         NotifyVmStarted(generation);
     }
+}
+
+__requires_exclusive_lock_held(m_lock) void WSLCSessionRuntime::BeginVmStartCompletionLockHeld()
+{
+    m_vmStartCompleteEvent.ResetEvent();
+    m_vmStartCompletionPending.store(true);
+}
+
+void WSLCSessionRuntime::EndVmStartCompletion() noexcept
+{
+    m_vmStartCompletionPending.store(false);
+    m_vmStartCompleteEvent.SetEvent();
 }
 
 void WSLCSessionRuntime::NotifyVmStarted(uint64_t Generation)
@@ -424,9 +477,9 @@ void WSLCSessionRuntime::StartVmLockHeld()
         m_hooks.RecoverState();
     }
 
+    BeginVmStartCompletionLockHeld();
     m_vmState.store(VmState::Running);
     startCleanup.release();
-
     WSL_LOG("WslcVmStarted", TraceLoggingValue(m_id, "SessionId"));
 }
 
@@ -784,6 +837,16 @@ WSLCSessionRuntime::LockedRuntime WSLCSessionRuntime::Acquire(VmLeasePolicy Poli
 
 WSLCSessionRuntime::VmLease::VmLease(WSLCSessionRuntime& Runtime, VmLeasePolicy Policy) : m_runtime(&Runtime)
 {
+    if (Policy == VmLeasePolicy::ExistingOnly && g_runtimeLeaseDepth.contains(m_runtime))
+    {
+        // Plugin callbacks run synchronously inside the operation they are observing. Borrow that
+        // operation's runtime protection so plugin API reentry does not recursively acquire an SRW
+        // lock, which Windows does not support.
+        m_borrowed = true;
+        RegisterRuntimeLease(m_runtime);
+        return;
+    }
+
     // Record an in-flight operation before bringing the VM up so idle teardown cannot tear it down
     // between EnsureVmRunning() and acquiring the shared lock. AddActivity cancels any pending idle
     // timer.
@@ -806,6 +869,21 @@ WSLCSessionRuntime::VmLease::VmLease(WSLCSessionRuntime& Runtime, VmLeasePolicy 
 
         if (m_runtime->m_vmState.load() == VmState::Running)
         {
+            if (Policy == VmLeasePolicy::Acquire && m_runtime->m_vmStartCompletionPending.load())
+            {
+                m_lock.reset();
+
+                while (!m_runtime->m_vmStartCompleteEvent.wait(c_vmStopWaitLogIntervalMs))
+                {
+                    WSL_LOG(
+                        "WslcVmLeaseWaitingForStartCompletion",
+                        TraceLoggingLevel(WINEVENT_LEVEL_WARNING),
+                        TraceLoggingValue(m_runtime->m_id, "SessionId"));
+                }
+
+                continue;
+            }
+
             // An announced stop always happens, so a VM with one pending is unusable even though it is
             // still Running: wait for the teardown, then retry, which brings up a fresh VM. ExistingOnly
             // callers are exempt and are served by the stopping VM -- see VmLeasePolicy.
@@ -841,11 +919,12 @@ WSLCSessionRuntime::VmLease::VmLease(WSLCSessionRuntime& Runtime, VmLeasePolicy 
         m_lock.reset();
     }
 
+    RegisterRuntimeLease(m_runtime);
     countCleanup.release();
 }
 
 WSLCSessionRuntime::VmLease::VmLease(VmLease&& Other) noexcept :
-    m_runtime(std::exchange(Other.m_runtime, nullptr)), m_lock(std::move(Other.m_lock))
+    m_runtime(std::exchange(Other.m_runtime, nullptr)), m_borrowed(std::exchange(Other.m_borrowed, false)), m_lock(std::move(Other.m_lock))
 {
 }
 
@@ -855,13 +934,18 @@ WSLCSessionRuntime::VmLease& WSLCSessionRuntime::VmLease::operator=(VmLease&& Ot
     {
         if (m_runtime != nullptr)
         {
-            // Release the shared lock before the activity reference so that, if this was the last
-            // activity, idle teardown can immediately take the exclusive lock.
-            m_lock.reset();
-            m_runtime->m_idleState->ReleaseActivity();
+            UnregisterRuntimeLease(m_runtime);
+            if (!m_borrowed)
+            {
+                // Release the shared lock before the activity reference so that, if this was the last
+                // activity, idle teardown can immediately take the exclusive lock.
+                m_lock.reset();
+                m_runtime->m_idleState->ReleaseActivity();
+            }
         }
 
         m_runtime = std::exchange(Other.m_runtime, nullptr);
+        m_borrowed = std::exchange(Other.m_borrowed, false);
         m_lock = std::move(Other.m_lock);
     }
 
@@ -872,11 +956,15 @@ WSLCSessionRuntime::VmLease::~VmLease()
 {
     if (m_runtime != nullptr)
     {
-        // Release the shared lock before the activity reference so that, if this was the last
-        // activity, idle teardown can immediately take the exclusive lock. ReleaseActivity arms the
-        // idle timer on the 1->0 transition.
-        m_lock.reset();
-        m_runtime->m_idleState->ReleaseActivity();
+        UnregisterRuntimeLease(m_runtime);
+        if (!m_borrowed)
+        {
+            // Release the shared lock before the activity reference so that, if this was the last
+            // activity, idle teardown can immediately take the exclusive lock. ReleaseActivity arms the
+            // idle timer on the 1->0 transition.
+            m_lock.reset();
+            m_runtime->m_idleState->ReleaseActivity();
+        }
     }
 }
 

@@ -45,7 +45,8 @@ enum class PluginTestType
     WslcVmRestart,
     WslcVmStopCommitted,
     WslcVmNeverStarted,
-    MountFolderAccess
+    MountFolderAccess,
+    WslcContainerRestartAuthorizationRequired
 };
 
 constexpr auto c_testType = L"TestType";

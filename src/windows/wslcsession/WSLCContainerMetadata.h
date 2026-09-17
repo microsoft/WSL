@@ -52,20 +52,43 @@ struct WSLCVolumeMount
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCVolumeMount, HostPath, ParentVMPath, ContainerPath, ReadOnly, SourceFilename, CreateSourceIfMissing);
 };
 
+struct WSLCContainerRestartPolicy
+{
+    std::string Name{"no"};
+    std::int64_t MaximumRetryCount{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCContainerRestartPolicy, Name, MaximumRetryCount);
+};
+
 struct WSLCContainerMetadataV1
 {
     WSLCContainerFlags Flags{WSLCContainerFlagsNone};
     WSLCProcessFlags InitProcessFlags{WSLCProcessFlagsNone};
     std::vector<WSLCPortMapping> Ports;
     std::vector<WSLCVolumeMount> Volumes;
+    WSLCContainerRestartPolicy RestartPolicy;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCContainerMetadataV1, Flags, InitProcessFlags, Ports, Volumes);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCContainerMetadataV1, Flags, InitProcessFlags, Ports, Volumes, RestartPolicy);
 };
 
 struct WSLCContainerMetadata
 {
     std::optional<WSLCContainerMetadataV1> V1;
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCContainerMetadata, V1);
+};
+
+struct WSLCContainerRestartStateV1
+{
+    std::int64_t RestartCount{};
+    bool HasBeenManuallyStopped{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCContainerRestartStateV1, RestartCount, HasBeenManuallyStopped);
+};
+
+struct WSLCContainerRestartState
+{
+    std::optional<WSLCContainerRestartStateV1> V1;
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCContainerRestartState, V1);
 };
 
 } // namespace wsl::windows::service::wslc

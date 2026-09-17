@@ -62,12 +62,13 @@ struct ContainerInspectState
 {
     std::string Status;
     bool Running{};
+    bool Restarting{};
     int ExitCode{};
     std::string StartedAt;
     std::string FinishedAt;
     std::optional<Health> Health;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInspectState, Status, Running, ExitCode, StartedAt, FinishedAt, Health);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInspectState, Status, Running, Restarting, ExitCode, StartedAt, FinishedAt, Health);
 };
 
 struct Ulimit
@@ -79,14 +80,23 @@ struct Ulimit
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Ulimit, Name, Soft, Hard);
 };
 
+struct RestartPolicyConfig
+{
+    std::string Name{"no"};
+    std::int64_t MaximumRetryCount{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(RestartPolicyConfig, Name, MaximumRetryCount);
+};
+
 struct InspectHostConfig
 {
     std::string NetworkMode;
     std::int64_t Memory{};
     std::int64_t NanoCpus{};
     std::vector<Ulimit> Ulimits;
+    RestartPolicyConfig RestartPolicy;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectHostConfig, NetworkMode, Memory, NanoCpus, Ulimits);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectHostConfig, NetworkMode, Memory, NanoCpus, Ulimits, RestartPolicy);
 };
 
 struct HealthConfig
@@ -150,6 +160,7 @@ struct InspectContainer
     std::string Name;
     std::string Created;
     std::string Image;
+    std::int64_t RestartCount{};
     ContainerInspectState State;
     InspectHostConfig HostConfig;
     ContainerConfig Config;
@@ -161,7 +172,7 @@ struct InspectContainer
     std::optional<std::int64_t> SizeRootFs;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
-        InspectContainer, Id, Name, Created, Image, State, HostConfig, Config, Ports, Mounts, Labels, NetworkSettings, SizeRw, SizeRootFs);
+        InspectContainer, Id, Name, Created, Image, RestartCount, State, HostConfig, Config, Ports, Mounts, Labels, NetworkSettings, SizeRw, SizeRootFs);
 };
 
 // Serializes a container inspect document. SizeRw and SizeRootFs are only populated when the

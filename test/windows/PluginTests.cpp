@@ -835,9 +835,66 @@ class PluginTests
             LR"(Plugin loaded. TestMode=20
             WSLC Session created, name=plugin-wslc-container-rejected, id=*, pid=*, token=set, sid=set
             WSLC Image created, session=*, id=sha256:*, name=debian:latest
-            WSLC Container started, session=*, id=*, name=*, image=debian:latest, state=*
+            WSLC Container starting, session=*, id=*, name=*, image=debian:latest, state=created
             OnWslcContainerStarted: ERROR_ACCESS_DENIED
             WSLC Session stopping, name=plugin-wslc-container-rejected, id=*)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
+    WSL2_TEST_METHOD(WslcContainerRestartAuthorizationRequired)
+    {
+        ConfigurePlugin(PluginTestType::WslcContainerRestartAuthorizationRequired);
+
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-container-restart-authorization");
+
+            LoadTestImage(*session, "debian:latest");
+
+            wsl::windows::common::WSLCContainerLauncher launcher(
+                "debian:latest",
+                "wslc-plugin-restart-authorization",
+                {"/bin/sh",
+                 "-c",
+                 "if [ -e /tmp/wslc-plugin-restarted ]; then exec tail -f /dev/null; "
+                 "else touch /tmp/wslc-plugin-restarted; echo ready; read value; exit 1; fi"},
+                {},
+                "host",
+                WSLCProcessFlagsStdin);
+            launcher.SetRestartPolicy("on-failure", 1);
+
+            auto container = launcher.Launch(*session);
+            auto firstProcess = container.GetInitProcess();
+            WaitForOutput(firstProcess.GetStdHandle(1), "ready");
+
+            auto stdinHandle = firstProcess.GetStdHandle(0);
+            DWORD bytesWritten{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(stdinHandle.Get(), "go\n", 3, &bytesWritten, nullptr));
+            VERIFY_ARE_EQUAL(3UL, bytesWritten);
+            VERIFY_ARE_EQUAL(1, firstProcess.Wait());
+
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() {
+                    const auto inspect = container.Inspect();
+                    THROW_HR_IF(E_FAIL, container.State() != WslcContainerStateExited || inspect.State.Restarting);
+                },
+                std::chrono::milliseconds(100),
+                std::chrono::seconds(30));
+        }
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=26
+            WSLC Session created, name=plugin-wslc-container-restart-authorization, id=*, pid=*, token=set, sid=set
+            WSLC Image created, session=*, id=sha256:*, name=debian:latest
+            WSLC Container starting, session=*, id=*, name=/wslc-plugin-restart-authorization, image=debian:latest, state=created
+            WSLC Container restart policy authorization: on-failure:1, attempt=1
+            WSLC Container start authorization reentrant WSLCCreateProcess: ok
+            WSLC Container stopping, session=*, id=*
+            WSLC Container starting, session=*, id=*, name=/wslc-plugin-restart-authorization, image=debian:latest, state=restarting
+            WSLC Container restart policy authorization: on-failure:1, attempt=2
+            WSLC Container start authorization reentrant WSLCCreateProcess: ok
+            WSLC Container restart policy authorization: ERROR_ACCESS_DENIED
+            WSLC Session stopping, name=plugin-wslc-container-restart-authorization, id=*)";
 
         ValidateLogFile(ExpectedOutput);
     }

@@ -132,8 +132,10 @@ typedef HRESULT (*WSLPluginAPI_OnSessionCreated)(const struct WSLCSessionInforma
 // Called when a WSLC session is about to stop. Errors are ignored.
 typedef HRESULT (*WSLPluginAPI_OnSessionStopping)(const struct WSLCSessionInformation* Session);
 
-// Called when a container starts. Returning an error prevents the container creation.
-// 'InspectContainer' is a JSON document that follows the wslc_schema::InspectContainer format.
+// Called before WSLC starts a container, including every restart-policy retry. Returning an error
+// vetoes that start before the container process is launched.
+// 'InspectContainer' is a JSON document that follows the wslc_schema::InspectContainer format and
+// describes the container configuration that would be started.
 typedef HRESULT (*WSLPluginAPI_ContainerStarted)(const struct WSLCSessionInformation* Session, LPCSTR InspectContainer);
 
 // Called when a container is about to stop. 'ContainerId' is the container identifier. Errors are ignored.
