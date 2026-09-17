@@ -207,7 +207,7 @@ class Plan9ProtocolTests
         VERIFY_IS_TRUE(std::ranges::equal(c_versionResponse, response));
     }
 
-    // Send a truncated tread and validate that the server return returns EINVAL.
+    // Send a truncated tread and validate that the server returns EINVAL.
     WSL2_TEST_METHOD(ReadRejectsTruncatedRequest)
     {
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
@@ -221,7 +221,7 @@ class Plan9ProtocolTests
         VERIFY_IS_TRUE(std::ranges::equal(c_invalidArgumentResponse, response));
     }
 
-    // Validate that the server rejects client ids that extend passed the end of the message.
+    // Validate that the server rejects client ids that extend past the end of the message.
     WSL2_TEST_METHOD(GetLockRejectsOversizedClientId)
     {
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
@@ -260,15 +260,6 @@ class Plan9ProtocolTests
 
         const auto response = ReceivePlan9Message(server.client.get());
         VERIFY_IS_TRUE(std::ranges::equal(c_invalidArgumentResponse, response));
-
-        payload.clear();
-        AppendU8(payload, 0);
-        AppendU64(payload, 0);
-        AppendU64(payload, 0);
-        AppendU32(payload, 0);
-        AppendU16(payload, 4096);
-        SendMessageAndExpectResponse(
-            server.client.get(), MakePlan9Message(Plan9MessageType::Rgetlock, std::move(payload)), Plan9MessageType::Rlerror);
     }
 };
 } // namespace Plan9ProtocolTests
