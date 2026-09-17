@@ -129,6 +129,7 @@ find_nuget_package(Microsoft.Windows.ImplementationLibrary WIL /)
 find_nuget_package(Microsoft.WSL.Kernel KERNEL /build/native)
 find_nuget_package(Microsoft.WSL.bsdtar BSDTARD /build/native/bin)
 find_nuget_package(Microsoft.WSL.LinuxSdk LINUXSDK /)
+find_nuget_package(Microsoft.WSL.OpenVMM WSL_OPENVMM /build/native)
 find_nuget_package(Microsoft.WSL.TestDistro TEST_DISTRO /)
 find_nuget_package(Microsoft.WSL.TestData WSL_TEST_DATA /)
 find_nuget_package(Microsoft.WSLg WSLG /build/native/bin)
@@ -276,6 +277,16 @@ file(CREATE_LINK ${WSLDEPS_SOURCE_DIR}/bin/wsldeps.pdb ${BIN}/wsldeps.pdb)
 if (NOT WSL_DEVICEHOST_BIN)
     file(CREATE_LINK ${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.pdb ${BIN}/wsldevicehost.pdb)
 endif()
+
+foreach(binary openvmm.exe openvmm.pdb wslopenvmm.dll wslopenvmm.pdb)
+    file(CREATE_LINK "${WSL_OPENVMM_SOURCE_DIR}/bin/${TARGET_PLATFORM}/${binary}" "${BIN}/${binary}")
+endforeach()
+
+add_library(wslopenvmm_client SHARED IMPORTED GLOBAL)
+set_target_properties(wslopenvmm_client PROPERTIES
+    IMPORTED_IMPLIB "${WSL_OPENVMM_SOURCE_DIR}/lib/${TARGET_PLATFORM}/wslopenvmm.dll.lib"
+    IMPORTED_LOCATION "${WSL_OPENVMM_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wslopenvmm.dll"
+    INTERFACE_INCLUDE_DIRECTORIES "${WSL_OPENVMM_SOURCE_DIR}/include")
 
 if (${SKIP_PACKAGE_SIGNING})
     set(PACKAGE_SIGN_COMMAND echo Skipped package signing for:)
@@ -570,31 +581,6 @@ set(TAEF_LINK_LIBRARIES
     Wex.Common.lib
     Wex.Logger.lib)
 
-# Only enable OpenVMM when its Rust target is available.
-find_program(CARGO_EXECUTABLE cargo)
-if (CARGO_EXECUTABLE)
-    if ("${TARGET_PLATFORM}" STREQUAL "x64")
-        set(WSLOPENVMM_RUST_TARGET x86_64-pc-windows-msvc)
-    elseif ("${TARGET_PLATFORM}" STREQUAL "arm64")
-        set(WSLOPENVMM_RUST_TARGET aarch64-pc-windows-msvc)
-    else()
-        message(FATAL_ERROR "Unsupported Rust target platform: '${TARGET_PLATFORM}'")
-    endif()
-
-    execute_process(
-        COMMAND rustup target list --installed
-        OUTPUT_VARIABLE RUST_INSTALLED_TARGETS
-        OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-    if (NOT RUST_INSTALLED_TARGETS MATCHES "${WSLOPENVMM_RUST_TARGET}")
-        message(FATAL_ERROR
-            "The Rust target '${WSLOPENVMM_RUST_TARGET}' is not installed. "
-            "Install it with 'rustup target add ${WSLOPENVMM_RUST_TARGET}'.")
-    endif()
-else()
-    message(FATAL_ERROR "Cargo was not found.")
-endif()
-
 # Subprojects
 add_subdirectory(nuget)
 add_subdirectory(msixgluepackage)
@@ -615,9 +601,6 @@ add_subdirectory(src/windows/wslhost)
 add_subdirectory(src/windows/wslrelay)
 add_subdirectory(src/windows/wslinstall)
 add_subdirectory(src/windows/wslc)
-if (CARGO_EXECUTABLE)
-    add_subdirectory(src/windows/wslopenvmm)
-endif()
 add_subdirectory(src/windows/WslcSDK)
 
 if (WSL_BUILD_WSL_SETTINGS)
