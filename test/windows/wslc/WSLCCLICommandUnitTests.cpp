@@ -72,6 +72,50 @@ class WSLCCLICommandUnitTests
         }
     }
 
+    TEST_METHOD(RootCommand_ContainsEventsCommand)
+    {
+        auto root = RootCommand();
+        const auto& subcommands = root.GetCommands();
+        const auto events = std::ranges::find_if(
+            subcommands, [](const auto& subcommand) { return subcommand->Name() == SystemEventsCommand::CommandName; });
+
+        VERIFY_IS_TRUE(events != subcommands.end());
+        VERIFY_ARE_EQUAL(std::wstring(L"root:events"), (*events)->FullName());
+        VERIFY_IS_TRUE(typeid(**events) == typeid(SystemEventsCommand));
+    }
+
+    TEST_METHOD(SystemCommand_ContainsEventsCommand)
+    {
+        const auto system = SystemCommand(L"root");
+        const auto& subcommands = system.GetCommands();
+        const auto events = std::ranges::find_if(
+            subcommands, [](const auto& subcommand) { return subcommand->Name() == SystemEventsCommand::CommandName; });
+
+        VERIFY_IS_TRUE(events != subcommands.end());
+        VERIFY_ARE_EQUAL(std::wstring(L"root:system:events"), (*events)->FullName());
+        VERIFY_IS_TRUE(typeid(**events) == typeid(SystemEventsCommand));
+    }
+
+    TEST_METHOD(SystemEventsCommand_HasExpectedArguments)
+    {
+        const auto arguments = SystemEventsCommand(L"root:system").GetArguments();
+
+        VERIFY_ARE_EQUAL(3u, arguments.size());
+
+        VERIFY_ARE_EQUAL(ArgType::Since, arguments[0].Type());
+        VERIFY_ARE_EQUAL(wsl::shared::Localization::WSLCCLI_EventsSinceArgDescription(), arguments[0].Description());
+        VERIFY_IS_TRUE(arguments[0].IsSingle());
+
+        VERIFY_ARE_EQUAL(ArgType::Until, arguments[1].Type());
+        VERIFY_ARE_EQUAL(wsl::shared::Localization::WSLCCLI_EventsUntilArgDescription(), arguments[1].Description());
+        VERIFY_IS_TRUE(arguments[1].IsSingle());
+
+        VERIFY_ARE_EQUAL(ArgType::EventFilter, arguments[2].Type());
+        VERIFY_ARE_EQUAL(std::wstring(L"filter"), arguments[2].Name());
+        VERIFY_ARE_EQUAL(std::wstring(L"f"), arguments[2].Alias());
+        VERIFY_IS_TRUE(arguments[2].IsUnlimited());
+    }
+
     TEST_METHOD(RootCommand_RetainsSubcommands)
     {
         RootCommand root;
