@@ -32,7 +32,8 @@ public:
     // Filters, advancing SequenceNumber past it. A nullopt SequenceNumber starts a fresh reader at the
     // oldest buffered event (no gap is reported). If the reader has since fallen behind the ring,
     // resyncs SequenceNumber to the oldest buffered event and throws WSLC_E_EVENTS_LOST. Returns
-    // nullopt once the Until window has closed or CancelEvent is signaled.
+    // nullopt once the Until window has closed. Throws E_ABORT on cancellation, session termination,
+    // or caller process exit.
     std::optional<wsl::windows::common::wslc_schema::Event> Get(
         std::optional<uint64_t>& SequenceNumber,
         std::optional<std::chrono::sys_seconds> Since,
@@ -46,9 +47,9 @@ private:
     void Append(wsl::windows::common::wslc_schema::Event Event);
 
     // Blocks until the event at SequenceNumber is buffered, its slot is evicted, or the session
-    // terminates or CancelEvent is signaled. Returns false on cancellation or when Until elapsed
-    // with no event ready. Throws E_ABORT if the session terminated while waiting.
-    bool WaitForEvent(std::unique_lock<std::mutex>& Lock, uint64_t SequenceNumber, std::optional<std::chrono::sys_seconds> Until, HANDLE CancelEvent);
+    // terminates, CancelEvent is signaled, or the caller exits. Returns false when Until elapsed
+    // with no event ready. Throws E_ABORT on cancellation, session termination, or caller exit.
+    bool WaitForEvent(std::unique_lock<std::mutex>& Lock, uint64_t SequenceNumber, std::optional<std::chrono::sys_seconds> Until, HANDLE CancelEvent, HANDLE CallerProcess);
 
     std::optional<wsl::windows::common::wslc_schema::Event> GetLockHeld(uint64_t SequenceNumber);
 

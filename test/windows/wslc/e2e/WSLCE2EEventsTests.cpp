@@ -141,10 +141,18 @@ class WSLCE2EEventsTests
         result = RunWslc(std::format(L"container start {}", containerId));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
+        result = RunWslc(std::format(L"container kill {}", containerId));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VerifyContainerIsListed(containerId, L"exited");
+
+        result = RunWslc(std::format(L"container rm {}", containerId));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VerifyContainerIsNotListed(containerId);
+
         const auto until = EpochSeconds() + 1;
         result = RunWslc(std::format(
-            L"events --since {} --until {} --filter type=container --filter container={} --filter image={} --filter event=create "
-            L"--filter event=start",
+            L"events --since {} --until {} --filter type=container --filter container={} --filter image={} "
+            L"--filter event=create --filter event=start --filter event=stop --filter event=destroy",
             since,
             until,
             containerId,
@@ -152,9 +160,13 @@ class WSLCE2EEventsTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto lines = result.GetStdoutLines();
-        VERIFY_ARE_EQUAL(2u, lines.size());
+        VERIFY_ARE_EQUAL(4u, lines.size());
         VerifyEventLine(lines[0], std::format(L" container create {} (image={}, name={})", containerId, DebianImage.NameAndTag(), c_eventContainerName));
         VerifyEventLine(lines[1], std::format(L" container start {} (image={}, name={})", containerId, DebianImage.NameAndTag(), c_eventContainerName));
+        VerifyEventLine(
+            lines[2],
+            std::format(L" container stop {} (exitCode={}, image={}, name={})", containerId, 128 + WSLCSignalSIGKILL, DebianImage.NameAndTag(), c_eventContainerName));
+        VerifyEventLine(lines[3], std::format(L" container destroy {} (image={}, name={})", containerId, DebianImage.NameAndTag(), c_eventContainerName));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Events_RejectsUnsupportedFilterBeforeResolvingSession)

@@ -7464,7 +7464,7 @@ class WSLCTests
         VERIFY_ARE_EQUAL(E_ABORT, future.get());
     }
 
-    WSLC_TEST_METHOD(EventStreamCancellationFinishesReader)
+    WSLC_TEST_METHOD(EventStreamCancellationAbortsReader)
     {
         WSLCFilter filter{"container", "nonexistent-event-stream-container"};
         const LONGLONG now = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
@@ -7499,7 +7499,7 @@ class WSLCTests
             auto future = getNextResult.get_future();
             FAIL_FAST_IF_MSG(
                 future.wait_for(10s) != std::future_status::ready, "event stream reader did not finish after cancellation");
-            VERIFY_ARE_EQUAL(WSLC_E_EVENT_STREAM_FINISHED, future.get());
+            VERIFY_ARE_EQUAL(E_ABORT, future.get());
             VERIFY_IS_NULL(eventJson.get());
         }
     }
@@ -7511,18 +7511,21 @@ class WSLCTests
         const auto id = container.Id();
 
         WSLCFilter filter{"container", id.c_str()};
-        const LONGLONG until = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() + 120;
+        const LONGLONG until = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() + 1;
         wil::com_ptr<IWSLCEventStream> stream;
         wil::com_ptr<IWSLCEventStream> otherStream;
         VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, until, &filter, 1, &stream));
         VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, until, &filter, 1, &otherStream));
+
+        // Expiring the window must not discard buffered events from before the deadline.
+        std::this_thread::sleep_until(sys_seconds{seconds{until}});
 
         wil::unique_event cancelEvent{wil::EventOptions::ManualReset};
         for (const auto* action : {"create", "start"})
         {
             cancelEvent.SetEvent();
             wil::unique_cotaskmem_ansistring eventJson;
-            VERIFY_ARE_EQUAL(WSLC_E_EVENT_STREAM_FINISHED, stream->GetNext(cancelEvent.get(), &eventJson));
+            VERIFY_ARE_EQUAL(E_ABORT, stream->GetNext(cancelEvent.get(), &eventJson));
             VERIFY_IS_NULL(eventJson.get());
 
             // Cancelling one subscription must neither affect another nor consume its own next event.
@@ -7536,6 +7539,14 @@ class WSLCTests
             VERIFY_ARE_EQUAL(action, event.Action);
             VERIFY_ARE_EQUAL(id, event.Actor.ID);
         }
+
+        wil::unique_cotaskmem_ansistring eventJson;
+        VERIFY_ARE_EQUAL(WSLC_E_EVENT_STREAM_FINISHED, stream->GetNext(cancelEvent.get(), &eventJson));
+        VERIFY_IS_NULL(eventJson.get());
+
+        cancelEvent.SetEvent();
+        VERIFY_ARE_EQUAL(E_ABORT, stream->GetNext(cancelEvent.get(), &eventJson));
+        VERIFY_IS_NULL(eventJson.get());
     }
 
     WSLC_TEST_METHOD(OpenContainer)

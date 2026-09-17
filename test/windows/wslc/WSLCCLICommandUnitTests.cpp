@@ -75,7 +75,7 @@ class WSLCCLICommandUnitTests
     TEST_METHOD(RootCommand_ContainsEventsCommand)
     {
         auto root = RootCommand();
-        auto subcommands = root.GetCommands();
+        const auto& subcommands = root.GetCommands();
         const auto events = std::ranges::find_if(
             subcommands, [](const auto& subcommand) { return subcommand->Name() == SystemEventsCommand::CommandName; });
 
@@ -87,7 +87,7 @@ class WSLCCLICommandUnitTests
     TEST_METHOD(SystemCommand_ContainsEventsCommand)
     {
         const auto system = SystemCommand(L"root");
-        const auto subcommands = system.GetCommands();
+        const auto& subcommands = system.GetCommands();
         const auto events = std::ranges::find_if(
             subcommands, [](const auto& subcommand) { return subcommand->Name() == SystemEventsCommand::CommandName; });
 

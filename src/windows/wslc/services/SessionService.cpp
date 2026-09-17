@@ -36,18 +36,21 @@ namespace {
         using namespace std::chrono;
 
         const sys_seconds time{seconds{timestamp}};
+        const time_zone* zone;
         try
         {
-            auto output = std::format("{:%FT%T.000000000%z}", zoned_time{current_zone(), time});
-            output.insert(output.size() - 2, ":");
-            return output;
+            zone = current_zone();
         }
-        catch (...)
+        catch (const std::runtime_error&)
         {
             // The time zone database is unavailable, so report UTC rather than failing the stream.
             LOG_CAUGHT_EXCEPTION();
             return std::format("{:%FT%T.000000000+00:00}", time);
         }
+
+        auto output = std::format("{:%FT%T.000000000%z}", zoned_time{zone, time});
+        output.insert(output.size() - 2, ":");
+        return output;
     }
 
     std::string FormatEvent(const wslc_schema::Event& event)
@@ -266,6 +269,11 @@ void SessionService::StreamEvents(Terminal& terminal, const Session& session, co
             terminal.Output(L"{}\n", FormatEvent(event));
             terminal.Flush(Terminal::Level::Output);
         }
+    }
+
+    if (result == E_ABORT && cancelEvent != nullptr && wil::event_is_signaled(cancelEvent))
+    {
+        return;
     }
 
     THROW_HR_IF(result, result != WSLC_E_EVENT_STREAM_FINISHED);

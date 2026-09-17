@@ -681,10 +681,10 @@ typedef struct _WSLCListContainersOptions
 ]
 interface IWSLCEventStream : IUnknown
 {
-    // Blocks until the next matching event, cancellation, the until-time, or session termination.
+    // Blocks until the next matching event, cancellation, the until-time, session termination, or caller exit.
     // CancelEvent is an optional manual-reset event that must remain signaled until the call returns.
-    // Returns WSLC_E_EVENT_STREAM_FINISHED for cancellation or the end of the window, with EventJson
-    // set to null. Session termination returns E_ABORT. Successful reads return an event as JSON
+    // Returns WSLC_E_EVENT_STREAM_FINISHED for the end of the window, with EventJson set to null.
+    // Cancellation, session termination, and caller exit return E_ABORT. Successful reads return an event as JSON
     // following the wslc_schema::Event format.
     HRESULT GetNext(
         [in, unique, system_handle(sh_event)] HANDLE CancelEvent,
