@@ -10,11 +10,17 @@ namespace {
     using Plan9MessageType = ::p9fs::MessageType;
 
     constexpr std::array<uint8_t, 21> c_versionRequest = {
-        0x15, 0x00, 0x00, 0x00, static_cast<uint8_t>(Plan9MessageType::Tversion), 0xff, 0xff, 0x00, 0x00, 0x01, 0x00,
-        0x08, 0x00, '9',  'P',  '2',  '0',  '0',  '0',  '.',  'L'};
+        0x15, 0x00, 0x00, 0x00, static_cast<uint8_t>(Plan9MessageType::Tversion),
+        0xff, 0xff, 0x00, 0x00, 0x01,
+        0x00, 0x08, 0x00, '9',  'P',
+        '2',  '0',  '0',  '0',  '.',
+        'L'};
     constexpr std::array<uint8_t, 21> c_versionResponse = {
-        0x15, 0x00, 0x00, 0x00, static_cast<uint8_t>(Plan9MessageType::Rversion), 0xff, 0xff, 0x00, 0x00, 0x01, 0x00,
-        0x08, 0x00, '9',  'P',  '2',  '0',  '0',  '0',  '.',  'L'};
+        0x15, 0x00, 0x00, 0x00, static_cast<uint8_t>(Plan9MessageType::Rversion),
+        0xff, 0xff, 0x00, 0x00, 0x01,
+        0x00, 0x08, 0x00, '9',  'P',
+        '2',  '0',  '0',  '0',  '.',
+        'L'};
     constexpr std::array<uint8_t, 11> c_invalidArgumentResponse = {
         0x0b, 0x00, 0x00, 0x00, static_cast<uint8_t>(Plan9MessageType::Rlerror), 0xff, 0xff, EINVAL, 0x00, 0x00, 0x00};
     constexpr uint16_t c_plan9Port = 1234;
@@ -241,8 +247,7 @@ class Plan9ProtocolTests
         payload.clear();
         AppendU32(payload, 1);
         AppendU32(payload, 0);
-        SendMessageAndExpectResponse(
-            server.client.get(), MakePlan9Message(Plan9MessageType::Tlopen, std::move(payload)), Plan9MessageType::Rlopen);
+        SendMessageAndExpectResponse(server.client.get(), MakePlan9Message(Plan9MessageType::Tlopen, std::move(payload)), Plan9MessageType::Rlopen);
 
         payload.clear();
         AppendU32(payload, 1);
