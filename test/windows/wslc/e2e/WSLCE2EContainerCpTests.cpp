@@ -427,6 +427,58 @@ class WSLCE2EContainerCpTests
         lookupResult.Verify({.Stdout = L"absent\n", .ExitCode = 0});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_LocalToContainer_FollowLinkCopiesDirectoryTree)
+    {
+        auto runResult =
+            RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        runResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto targetDir = std::filesystem::current_path() / L"wslc-cp-followlink-targetdir";
+        auto linkDir = std::filesystem::current_path() / L"wslc-cp-followlink-dirlink";
+        auto cleanup = wil::scope_exit([&] {
+            std::error_code ec;
+            std::filesystem::remove(linkDir, ec);
+            std::filesystem::remove_all(targetDir, ec);
+        });
+
+        std::filesystem::create_directories(targetDir);
+
+        {
+            const auto inner = targetDir / L"inner.txt";
+            wil::unique_hfile file(CreateFileW(inner.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+            THROW_LAST_ERROR_IF(!file);
+            const std::string content = "follow-link-dir\n";
+            DWORD written = 0;
+            THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.get(), content.data(), static_cast<DWORD>(content.size()), &written, nullptr));
+        }
+
+        // A link nested inside the tree, to confirm the staged copy keeps inner links as links.
+        THROW_LAST_ERROR_IF(!CreateSymbolicLinkW((targetDir / L"nested.txt").c_str(), L"inner.txt", 0));
+
+        THROW_LAST_ERROR_IF(!CreateSymbolicLinkW(linkDir.c_str(), targetDir.c_str(), SYMBOLIC_LINK_FLAG_DIRECTORY));
+
+        // --follow-link archives the directory the link points at, carried under the link's own name.
+        const auto cpResult = RunWslc(std::format(L"container cp --follow-link {} {}:/tmp/", linkDir.wstring(), WslcContainerName));
+        cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        const auto catResult = RunWslc(std::format(L"container exec {} cat /tmp/wslc-cp-followlink-dirlink/inner.txt", WslcContainerName));
+        catResult.Verify({.Stdout = L"follow-link-dir\n", .ExitCode = 0});
+
+        // The nested link survives as a link rather than being flattened into a copy of its target.
+        const auto nestedCommand = std::format(
+            L"container exec {} sh -c \"test -L /tmp/wslc-cp-followlink-dirlink/nested.txt && cat "
+            L"/tmp/wslc-cp-followlink-dirlink/nested.txt || echo other\"",
+            WslcContainerName);
+        const auto nestedResult = RunWslc(nestedCommand);
+        nestedResult.Verify({.Stdout = L"follow-link-dir\n", .ExitCode = 0});
+
+        // The target directory's own name is never used as the destination.
+        const auto lookupDirCommand =
+            std::format(L"container exec {} sh -c \"test -e /tmp/wslc-cp-followlink-targetdir && echo present || echo absent\"", WslcContainerName);
+        const auto lookupDirResult = RunWslc(lookupDirCommand);
+        lookupDirResult.Verify({.Stdout = L"absent\n", .ExitCode = 0});
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_QuietFlag)
     {
         // Create and start a container.
@@ -606,6 +658,37 @@ class WSLCE2EContainerCpTests
         VERIFY_ARE_EQUAL(std::wstring(L"follow-link-target\n"), ReadFileContent(copied.wstring()));
 
         // The target's own name is never used as the destination when the link is followed.
+        VERIFY_IS_FALSE(std::filesystem::exists(downloadDir / L"linktarget.txt"));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ContainerToLocal_FollowLinkResolvesRelativeTarget)
+    {
+        auto runResult =
+            RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        runResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // The link target is relative, so it only resolves against the directory holding the link.
+        // Read against the container root it would name a path that does not exist.
+        auto execResult = RunWslc(std::format(
+            L"container exec {} sh -c \"mkdir -p /tmp/linkdir; echo relative-link-target > /tmp/linkdir/linktarget.txt; ln -s "
+            L"linktarget.txt /tmp/linkdir/thelink.txt\"",
+            WslcContainerName));
+        execResult.Verify({.ExitCode = 0});
+
+        auto downloadDir = std::filesystem::current_path() / L"wslc-cp-follow-link-relative-test";
+        std::filesystem::create_directories(downloadDir);
+        auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(downloadDir); });
+
+        const auto cpResult =
+            RunWslc(std::format(L"container cp --follow-link {}:/tmp/linkdir/thelink.txt {}", WslcContainerName, downloadDir.wstring()));
+        cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        const auto copied = downloadDir / L"thelink.txt";
+        VERIFY_IS_TRUE(std::filesystem::exists(copied));
+        VERIFY_IS_TRUE(std::filesystem::is_regular_file(copied));
+        VERIFY_IS_FALSE(std::filesystem::is_symlink(copied));
+        VERIFY_ARE_EQUAL(std::wstring(L"relative-link-target\n"), ReadFileContent(copied.wstring()));
+
         VERIFY_IS_FALSE(std::filesystem::exists(downloadDir / L"linktarget.txt"));
     }
 

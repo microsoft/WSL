@@ -56,42 +56,6 @@ std::string FormatStatsIo(uint64_t Bytes)
     return WideToMultiByte(FormatHumanReadableSize(Bytes, c_statsIoPrecision));
 }
 
-// Container paths are POSIX. Returns the last path component, ignoring trailing separators.
-// Dot components and the root carry no name of their own and yield an empty string.
-std::string PosixBaseName(std::string_view Path)
-{
-    while (Path.size() > 1 && Path.back() == '/')
-    {
-        Path.remove_suffix(1);
-    }
-
-    const auto separator = Path.find_last_of('/');
-    auto name = std::string(separator == std::string_view::npos ? Path : Path.substr(separator + 1));
-
-    if (name == "/" || name == "." || name == "..")
-    {
-        return {};
-    }
-
-    return name.find_first_of("\\/:") == std::string::npos ? name : std::string{};
-}
-
-std::filesystem::path MakeStagingDirectory(const std::filesystem::path& Parent)
-{
-    GUID stagingId{};
-    THROW_IF_FAILED(CoCreateGuid(&stagingId));
-
-    auto staging =
-        Parent /
-        std::format(L".wslc-cp-{}", wsl::shared::string::GuidToString<wchar_t>(stagingId, wsl::shared::string::GuidToStringFlags::None));
-
-    std::error_code error;
-    std::filesystem::create_directories(staging, error);
-    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error.value()), !!error, "Failed to create directory: %ls", staging.c_str());
-
-    return staging;
-}
-
 void MoveOver(const std::filesystem::path& From, const std::filesystem::path& To)
 {
     std::error_code error;
@@ -520,7 +484,7 @@ void ContainerCp(CLIExecutionContext& context)
                 {
                     // The archive has to carry the link's name while holding the target's tree, and tar.exe
                     // cannot rename entries, so the tree is staged under that name with its own links intact.
-                    stagingDir = MakeStagingDirectory(std::filesystem::temp_directory_path());
+                    stagingDir = wsl::windows::common::filesystem::MakeStagingDirectory(std::filesystem::temp_directory_path());
 
                     std::error_code copyError;
                     std::filesystem::copy(
@@ -609,7 +573,7 @@ void ContainerCp(CLIExecutionContext& context)
             auto extractRoot = absTarget;
             if (followLink)
             {
-                stagingDir = MakeStagingDirectory(absTarget);
+                stagingDir = wsl::windows::common::filesystem::MakeStagingDirectory(absTarget);
                 extractRoot = stagingDir;
             }
 
@@ -647,7 +611,26 @@ void ContainerCp(CLIExecutionContext& context)
                 // The archive is named after whatever the link resolved to, while the copy keeps the name that was
                 // asked for. A lone entry is that source and simply takes the name; several entries mean the source
                 // resolved to a path with no name of its own, so they are gathered under one named after it.
-                const auto requestedName = MultiByteToWide(PosixBaseName(srcPath));
+                const auto requestedName = MultiByteToWide(wsl::windows::common::filesystem::PosixBaseName(srcPath));
+
+                // Only '/' and NUL are barred from a POSIX name, so the basename can hold characters that no
+                // Windows file name can. Copying under the resolved target's name instead would silently
+                // produce something other than what was asked for.
+                const auto unrepresentable = [&]() {
+                    constexpr std::wstring_view reserved = L"<>:\"/\\|?*";
+                    for (const auto character : requestedName)
+                    {
+                        if (character < L' ' || reserved.find(character) != std::wstring_view::npos)
+                        {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                }();
+
+                THROW_HR_WITH_USER_ERROR_IF(
+                    E_INVALIDARG, Localization::WSLCCLI_CpSourceNameNotRepresentableError(MultiByteToWide(srcPath)), unrepresentable);
 
                 auto destinationRoot = absTarget;
                 if (!requestedName.empty() && staged.size() > 1)
