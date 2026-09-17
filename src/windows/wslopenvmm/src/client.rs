@@ -17,7 +17,6 @@ use windows::Win32::Foundation::{
     E_FAIL, E_INVALIDARG, ERROR_ALREADY_EXISTS, ERROR_NOT_FOUND, S_OK,
 };
 use windows::core::{GUID, HRESULT};
-use windows_sys::Win32::Networking::WinSock::{AF_INET, AF_INET6};
 
 use crate::{af_unix, rpc, vmservice};
 
@@ -394,12 +393,66 @@ impl VmHandle {
         self.modify_disk(ModifyType::Remove, controller, lun, String::new(), false)
     }
 
-    pub fn bind_port(&self, host_port: u16, guest_port: u16, tcp: bool, family: i32) -> HRESULT {
-        self.modify_port(ModifyType::Update, host_port, guest_port, tcp, family)
+    pub fn add_consomme_nic(&self, nic_id: String, mac_address: String, cidr: String) -> HRESULT {
+        self.with_operation("AddConsommeNic", false, |inner, deadline, cancellation| {
+            let request = ModifyResourceRequest {
+                r#type: ModifyType::Add as i32,
+                resource: Some(vmservice::modify_resource_request::Resource::NicConfig(
+                    NicConfig {
+                        nic_id,
+                        mac_address,
+                        backend: Some(vmservice::nic_config::Backend::Consomme(ConsommeBackend {
+                            cidr,
+                            ports: Vec::new(),
+                        })),
+                        ..Default::default()
+                    },
+                )),
+            };
+            self.rpc(
+                inner,
+                deadline,
+                cancellation,
+                request,
+                |mut client, request| async move { client.modify_resource(request).await },
+            )
+        })
     }
 
-    pub fn unbind_port(&self, host_port: u16, guest_port: u16, tcp: bool, family: i32) -> HRESULT {
-        self.modify_port(ModifyType::Remove, host_port, guest_port, tcp, family)
+    pub fn bind_port(
+        &self,
+        nic_id: String,
+        host_port: u16,
+        guest_port: u16,
+        tcp: bool,
+        host_address: String,
+    ) -> HRESULT {
+        self.modify_port(
+            ModifyType::Update,
+            nic_id,
+            host_port,
+            guest_port,
+            tcp,
+            host_address,
+        )
+    }
+
+    pub fn unbind_port(
+        &self,
+        nic_id: String,
+        host_port: u16,
+        guest_port: u16,
+        tcp: bool,
+        host_address: String,
+    ) -> HRESULT {
+        self.modify_port(
+            ModifyType::Remove,
+            nic_id,
+            host_port,
+            guest_port,
+            tcp,
+            host_address,
+        )
     }
 
     pub fn add_share(&self, tag: String, host_path: String, read_only: bool) -> HRESULT {
@@ -537,10 +590,11 @@ impl VmHandle {
     fn modify_port(
         &self,
         modify_type: ModifyType,
+        nic_id: String,
         host_port: u16,
         guest_port: u16,
         tcp: bool,
-        family: i32,
+        host_address: String,
     ) -> HRESULT {
         let name = if modify_type == ModifyType::Update {
             "BindPort"
@@ -548,11 +602,6 @@ impl VmHandle {
             "UnbindPort"
         };
         self.with_operation(name, false, |inner, deadline, cancellation| {
-            let host_address = match family {
-                family if family == i32::from(AF_INET) => "127.0.0.1",
-                family if family == i32::from(AF_INET6) => "::1",
-                _ => return E_INVALIDARG,
-            };
             let protocol = if tcp {
                 vmservice::IpProtocol::Tcp
             } else {
@@ -562,13 +611,14 @@ impl VmHandle {
                 r#type: modify_type as i32,
                 resource: Some(vmservice::modify_resource_request::Resource::NicConfig(
                     NicConfig {
+                        nic_id,
                         backend: Some(vmservice::nic_config::Backend::Consomme(ConsommeBackend {
                             cidr: String::new(),
                             ports: vec![PortConfig {
                                 host_port: u32::from(host_port),
                                 guest_port: u32::from(guest_port),
                                 protocol: protocol as i32,
-                                host_address: host_address.to_string(),
+                                host_address,
                             }],
                         })),
                         ..Default::default()

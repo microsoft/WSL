@@ -307,16 +307,47 @@ pub unsafe extern "C" fn WslOpenVmmVmDetachScsiDisk(
 }
 
 #[unsafe(no_mangle)]
+pub unsafe extern "C" fn WslOpenVmmVmAddConsommeNic(
+    vm: *mut WslOpenVmmVm,
+    nic_id: *const u16,
+    mac_address: *const u16,
+    cidr: *const u16,
+) -> i32 {
+    let nic_id = match unsafe { string_from_wide(nic_id) } {
+        Ok(value) => value,
+        Err(error) => return error.0,
+    };
+    let mac_address = match unsafe { string_from_wide(mac_address) } {
+        Ok(value) => value,
+        Err(error) => return error.0,
+    };
+    let cidr = match unsafe { string_from_wide(cidr) } {
+        Ok(value) => value,
+        Err(error) => return error.0,
+    };
+    unsafe { with_vm(vm, |vm| vm.add_consomme_nic(nic_id, mac_address, cidr)).0 }
+}
+
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn WslOpenVmmVmBindPort(
     vm: *mut WslOpenVmmVm,
+    nic_id: *const u16,
     host_port: u16,
     guest_port: u16,
     tcp: i32,
-    family: i32,
+    host_address: *const u16,
 ) -> i32 {
+    let nic_id = match unsafe { string_from_wide(nic_id) } {
+        Ok(value) => value,
+        Err(error) => return error.0,
+    };
+    let host_address = match unsafe { string_from_wide(host_address) } {
+        Ok(value) => value,
+        Err(error) => return error.0,
+    };
     unsafe {
         with_vm(vm, |vm| {
-            vm.bind_port(host_port, guest_port, tcp != 0, family)
+            vm.bind_port(nic_id, host_port, guest_port, tcp != 0, host_address)
         })
         .0
     }
@@ -325,14 +356,23 @@ pub unsafe extern "C" fn WslOpenVmmVmBindPort(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn WslOpenVmmVmUnbindPort(
     vm: *mut WslOpenVmmVm,
+    nic_id: *const u16,
     host_port: u16,
     guest_port: u16,
     tcp: i32,
-    family: i32,
+    host_address: *const u16,
 ) -> i32 {
+    let nic_id = match unsafe { string_from_wide(nic_id) } {
+        Ok(value) => value,
+        Err(error) => return error.0,
+    };
+    let host_address = match unsafe { string_from_wide(host_address) } {
+        Ok(value) => value,
+        Err(error) => return error.0,
+    };
     unsafe {
         with_vm(vm, |vm| {
-            vm.unbind_port(host_port, guest_port, tcp != 0, family)
+            vm.unbind_port(nic_id, host_port, guest_port, tcp != 0, host_address)
         })
         .0
     }

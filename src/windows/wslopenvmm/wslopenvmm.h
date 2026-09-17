@@ -45,8 +45,11 @@ __declspec(dllimport) HRESULT WslOpenVmmVmQuit(_Inout_ WslOpenVmmVm* Vm);
 __declspec(dllimport) HRESULT WslOpenVmmVmAttachScsiDisk(
     _Inout_ WslOpenVmmVm* Vm, _In_ UINT32 Controller, _In_ UINT32 Lun, _In_ LPCWSTR HostPath, _In_ BOOL ReadOnly);
 __declspec(dllimport) HRESULT WslOpenVmmVmDetachScsiDisk(_Inout_ WslOpenVmmVm* Vm, _In_ UINT32 Controller, _In_ UINT32 Lun);
-__declspec(dllimport) HRESULT WslOpenVmmVmBindPort(_Inout_ WslOpenVmmVm* Vm, _In_ UINT16 HostPort, _In_ UINT16 GuestPort, _In_ BOOL Tcp, _In_ INT32 Family);
-__declspec(dllimport) HRESULT WslOpenVmmVmUnbindPort(_Inout_ WslOpenVmmVm* Vm, _In_ UINT16 HostPort, _In_ UINT16 GuestPort, _In_ BOOL Tcp, _In_ INT32 Family);
+__declspec(dllimport) HRESULT WslOpenVmmVmAddConsommeNic(_Inout_ WslOpenVmmVm* Vm, _In_ LPCWSTR NicId, _In_ LPCWSTR MacAddress, _In_ LPCWSTR Cidr);
+__declspec(dllimport) HRESULT WslOpenVmmVmBindPort(
+    _Inout_ WslOpenVmmVm* Vm, _In_ LPCWSTR NicId, _In_ UINT16 HostPort, _In_ UINT16 GuestPort, _In_ BOOL Tcp, _In_ LPCWSTR HostAddress);
+__declspec(dllimport) HRESULT WslOpenVmmVmUnbindPort(
+    _Inout_ WslOpenVmmVm* Vm, _In_ LPCWSTR NicId, _In_ UINT16 HostPort, _In_ UINT16 GuestPort, _In_ BOOL Tcp, _In_ LPCWSTR HostAddress);
 __declspec(dllimport) HRESULT WslOpenVmmVmAddShare(_Inout_ WslOpenVmmVm* Vm, _In_ LPCWSTR Tag, _In_ LPCWSTR HostPath, _In_ BOOL ReadOnly);
 __declspec(dllimport) HRESULT WslOpenVmmVmRemoveShare(_Inout_ WslOpenVmmVm* Vm, _In_ LPCWSTR Tag);
 

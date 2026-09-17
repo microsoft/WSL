@@ -672,6 +672,125 @@ mod rpc_path {
     }
 
     #[test]
+    fn dynamic_consomme_operations_preserve_nic_and_port_configuration() {
+        use vmservice::{
+            ConsommeBackend, IpProtocol, ModifyResourceRequest, ModifyType, NicConfig, PortConfig,
+            modify_resource_request::Resource, nic_config::Backend,
+        };
+
+        let service = MockVmService::default();
+        for method in [
+            RpcMethod::CreateVm,
+            RpcMethod::ModifyResource,
+            RpcMethod::ModifyResource,
+            RpcMethod::ModifyResource,
+            RpcMethod::TeardownVm,
+            RpcMethod::Quit,
+        ] {
+            service.expect(method, MockResponse::Success);
+        }
+        let server = MockServerFixture::new(service.clone());
+        let mut config = configured_config();
+        let vm = config
+            .create_vm(&server.socket_path(), 5_000)
+            .expect("create VM over RPC");
+        let nic_id = wide("11111111-1111-1111-1111-111111111111");
+        let mac_address = wide("00-15-5D-01-02-03");
+        let cidr = wide("192.168.1.0/24");
+        let host_address = wide("fe80::1%7");
+
+        // SAFETY: The fixture owns a live VM and all strings are null-terminated
+        // and remain valid throughout the calls.
+        unsafe {
+            assert_eq!(
+                crate::WslOpenVmmVmAddConsommeNic(
+                    vm.as_ptr(),
+                    nic_id.as_ptr(),
+                    mac_address.as_ptr(),
+                    cidr.as_ptr(),
+                ),
+                S_OK.0
+            );
+            assert_eq!(
+                crate::WslOpenVmmVmBindPort(
+                    vm.as_ptr(),
+                    nic_id.as_ptr(),
+                    8080,
+                    80,
+                    1,
+                    host_address.as_ptr(),
+                ),
+                S_OK.0
+            );
+            assert_eq!(
+                crate::WslOpenVmmVmUnbindPort(
+                    vm.as_ptr(),
+                    nic_id.as_ptr(),
+                    8080,
+                    80,
+                    1,
+                    host_address.as_ptr(),
+                ),
+                S_OK.0
+            );
+        }
+        cleanup_vm(&vm);
+
+        let requests = service.requests();
+        let modify_requests: Vec<_> = requests
+            .iter()
+            .filter_map(|request| match &request.message {
+                RpcRequest::ModifyResource(request) => Some(request.as_ref()),
+                _ => None,
+            })
+            .collect();
+        let nic_config = |ports| NicConfig {
+            nic_id: "11111111-1111-1111-1111-111111111111".to_string(),
+            mac_address: String::new(),
+            backend: Some(Backend::Consomme(ConsommeBackend {
+                cidr: String::new(),
+                ports,
+            })),
+            ..Default::default()
+        };
+        assert_eq!(
+            modify_requests,
+            [
+                &ModifyResourceRequest {
+                    r#type: ModifyType::Add as i32,
+                    resource: Some(Resource::NicConfig(NicConfig {
+                        nic_id: "11111111-1111-1111-1111-111111111111".to_string(),
+                        mac_address: "00-15-5D-01-02-03".to_string(),
+                        backend: Some(Backend::Consomme(ConsommeBackend {
+                            cidr: "192.168.1.0/24".to_string(),
+                            ports: Vec::new(),
+                        })),
+                        ..Default::default()
+                    })),
+                },
+                &ModifyResourceRequest {
+                    r#type: ModifyType::Update as i32,
+                    resource: Some(Resource::NicConfig(nic_config(vec![PortConfig {
+                        host_port: 8080,
+                        guest_port: 80,
+                        protocol: IpProtocol::Tcp as i32,
+                        host_address: "fe80::1%7".to_string(),
+                    }]))),
+                },
+                &ModifyResourceRequest {
+                    r#type: ModifyType::Remove as i32,
+                    resource: Some(Resource::NicConfig(nic_config(vec![PortConfig {
+                        host_port: 8080,
+                        guest_port: 80,
+                        protocol: IpProtocol::Tcp as i32,
+                        host_address: "fe80::1%7".to_string(),
+                    }]))),
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn create_vm_timeout_preserves_config_and_rejects_retry() {
         let service = MockVmService::default();
         service.expect(RpcMethod::CreateVm, MockResponse::Pending);
