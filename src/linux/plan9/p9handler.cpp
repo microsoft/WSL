@@ -744,7 +744,7 @@ private:
         const auto length = reader.U64();
         const auto procId = reader.U32();
         const auto clientId = reader.TryString();
-        if (!clientId.Success || clientId.Result.size() > 40)
+        if (!clientId.Success)
         {
             return LX_EINVAL;
         }

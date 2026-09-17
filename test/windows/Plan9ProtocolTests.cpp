@@ -2,15 +2,21 @@
 
 #include "precomp.h"
 #include "Common.h"
+#include "p9defs.h"
 
 namespace Plan9ProtocolTests {
 namespace {
 
-    constexpr std::array<uint8_t, 21> c_versionRequest = {0x15, 0x00, 0x00, 0x00, 0x64, 0xff, 0xff, 0x00, 0x00, 0x01, 0x00,
-                                                          0x08, 0x00, '9',  'P',  '2',  '0',  '0',  '0',  '.',  'L'};
-    constexpr std::array<uint8_t, 21> c_versionResponse = {0x15, 0x00, 0x00, 0x00, 0x65, 0xff, 0xff, 0x00, 0x00, 0x01, 0x00,
-                                                           0x08, 0x00, '9',  'P',  '2',  '0',  '0',  '0',  '.',  'L'};
-    constexpr std::array<uint8_t, 11> c_invalidArgumentResponse = {0x0b, 0x00, 0x00, 0x00, 0x07, 0xff, 0xff, EINVAL, 0x00, 0x00, 0x00};
+    using Plan9MessageType = ::p9fs::MessageType;
+
+    constexpr std::array<uint8_t, 21> c_versionRequest = {
+        0x15, 0x00, 0x00, 0x00, static_cast<uint8_t>(Plan9MessageType::Tversion), 0xff, 0xff, 0x00, 0x00, 0x01, 0x00,
+        0x08, 0x00, '9',  'P',  '2',  '0',  '0',  '0',  '.',  'L'};
+    constexpr std::array<uint8_t, 21> c_versionResponse = {
+        0x15, 0x00, 0x00, 0x00, static_cast<uint8_t>(Plan9MessageType::Rversion), 0xff, 0xff, 0x00, 0x00, 0x01, 0x00,
+        0x08, 0x00, '9',  'P',  '2',  '0',  '0',  '0',  '.',  'L'};
+    constexpr std::array<uint8_t, 11> c_invalidArgumentResponse = {
+        0x0b, 0x00, 0x00, 0x00, static_cast<uint8_t>(Plan9MessageType::Rlerror), 0xff, 0xff, EINVAL, 0x00, 0x00, 0x00};
     constexpr uint16_t c_plan9Port = 1234;
 
     void AppendU8(std::vector<uint8_t>& buffer, uint8_t value)
@@ -46,12 +52,12 @@ namespace {
         buffer.insert(buffer.end(), value.begin(), value.end());
     }
 
-    std::vector<uint8_t> MakePlan9Message(uint8_t type, std::vector<uint8_t> payload)
+    std::vector<uint8_t> MakePlan9Message(Plan9MessageType type, std::vector<uint8_t> payload)
     {
         std::vector<uint8_t> message;
         message.reserve(sizeof(uint32_t) + sizeof(type) + sizeof(uint16_t) + payload.size());
         AppendU32(message, gsl::narrow<uint32_t>(sizeof(uint32_t) + sizeof(type) + sizeof(uint16_t) + payload.size()));
-        AppendU8(message, type);
+        AppendU8(message, static_cast<uint8_t>(type));
         AppendU16(message, UINT16_MAX);
         message.insert(message.end(), payload.begin(), payload.end());
         return message;
@@ -147,12 +153,12 @@ namespace {
         return message;
     }
 
-    void SendMessageAndExpectResponse(SOCKET socket, const std::vector<uint8_t>& request, uint8_t responseType)
+    void SendMessageAndExpectResponse(SOCKET socket, const std::vector<uint8_t>& request, Plan9MessageType responseType)
     {
         SendAll(socket, request);
         const auto response = ReceivePlan9Message(socket);
         VERIFY_IS_GREATER_THAN_OR_EQUAL(response.size(), static_cast<size_t>(5));
-        VERIFY_ARE_EQUAL(responseType, response[4]);
+        VERIFY_ARE_EQUAL(static_cast<uint8_t>(responseType), response[4]);
     }
 
 } // namespace
@@ -181,6 +187,7 @@ class Plan9ProtocolTests
         return true;
     }
 
+    // Smoke test
     WSL2_TEST_METHOD(QueryVersion)
     {
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
@@ -194,6 +201,7 @@ class Plan9ProtocolTests
         VERIFY_IS_TRUE(std::ranges::equal(c_versionResponse, response));
     }
 
+    // Send a truncated tread and validate that the server return returns EINVAL.
     WSL2_TEST_METHOD(ReadRejectsTruncatedRequest)
     {
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
@@ -201,12 +209,13 @@ class Plan9ProtocolTests
 
         auto server = ConnectToServer();
 
-        SendAll(server.client.get(), MakePlan9Message(116, {}));
+        SendAll(server.client.get(), MakePlan9Message(Plan9MessageType::Tread, {}));
 
         const auto response = ReceivePlan9Message(server.client.get());
         VERIFY_IS_TRUE(std::ranges::equal(c_invalidArgumentResponse, response));
     }
 
+    // Validate that the server rejects client ids that extend passed the end of the message.
     WSL2_TEST_METHOD(GetLockRejectsOversizedClientId)
     {
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
@@ -217,7 +226,8 @@ class Plan9ProtocolTests
         std::vector<uint8_t> payload;
         AppendU32(payload, 8192);
         AppendString(payload, "9P2000.L");
-        SendMessageAndExpectResponse(server.client.get(), MakePlan9Message(100, std::move(payload)), 101);
+        SendMessageAndExpectResponse(
+            server.client.get(), MakePlan9Message(Plan9MessageType::Tversion, std::move(payload)), Plan9MessageType::Rversion);
 
         payload.clear();
         AppendU32(payload, 1);
@@ -225,12 +235,14 @@ class Plan9ProtocolTests
         AppendString(payload, "");
         AppendString(payload, "");
         AppendU32(payload, 0);
-        SendMessageAndExpectResponse(server.client.get(), MakePlan9Message(104, std::move(payload)), 105);
+        SendMessageAndExpectResponse(
+            server.client.get(), MakePlan9Message(Plan9MessageType::Tattach, std::move(payload)), Plan9MessageType::Rattach);
 
         payload.clear();
         AppendU32(payload, 1);
         AppendU32(payload, 0);
-        SendMessageAndExpectResponse(server.client.get(), MakePlan9Message(12, std::move(payload)), 13);
+        SendMessageAndExpectResponse(
+            server.client.get(), MakePlan9Message(Plan9MessageType::Tlopen, std::move(payload)), Plan9MessageType::Rlopen);
 
         payload.clear();
         AppendU32(payload, 1);
@@ -239,10 +251,19 @@ class Plan9ProtocolTests
         AppendU64(payload, 0);
         AppendU32(payload, 0);
         AppendString(payload, std::string(4096, 'A'));
-        SendAll(server.client.get(), MakePlan9Message(54, std::move(payload)));
+        SendAll(server.client.get(), MakePlan9Message(Plan9MessageType::Tgetlock, std::move(payload)));
 
         const auto response = ReceivePlan9Message(server.client.get());
         VERIFY_IS_TRUE(std::ranges::equal(c_invalidArgumentResponse, response));
+
+        payload.clear();
+        AppendU8(payload, 0);
+        AppendU64(payload, 0);
+        AppendU64(payload, 0);
+        AppendU32(payload, 0);
+        AppendU16(payload, 4096);
+        SendMessageAndExpectResponse(
+            server.client.get(), MakePlan9Message(Plan9MessageType::Rgetlock, std::move(payload)), Plan9MessageType::Rlerror);
     }
 };
 } // namespace Plan9ProtocolTests
