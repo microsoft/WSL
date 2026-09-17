@@ -169,13 +169,12 @@ if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/UserConfig.cmake")
     find_package(USER REQUIRED PATHS ${CMAKE_CURRENT_LIST_DIR})
 endif()
 
-find_nuget_package(Microsoft.WSL.DeviceHost WSL_DEVICE_HOST /build/native)
-
 if (WSL_DEVICEHOST_BIN)
     set(WSL_VIRTIO_NET_IDL_PATH "${WSL_DEVICEHOST_BIN}/WslDeviceHost.idl")
     set(WSL_DEVICE_HOST_DLL_PATH "${WSL_DEVICEHOST_BIN}/wsldevicehost.dll")
     set(WSL_DEVICE_HOST_VERSION "9.0.0-localbuild")
 else()
+    find_nuget_package(Microsoft.WSL.DeviceHost WSL_DEVICE_HOST /build/native)
     set(WSL_VIRTIO_NET_IDL_PATH "${WSL_DEVICE_HOST_SOURCE_DIR}/idl/WslDeviceHost.idl")
     set(WSL_DEVICE_HOST_DLL_PATH "${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.dll")
 endif()
@@ -300,6 +299,8 @@ else()
     set(PACKAGE_SIGN_COMMAND SignTool.exe sign /a /v /fd SHA256 /f ${PACKAGE_CERTIFICATE})
 endif()
 
+# Generate local test script
+configure_file(${CMAKE_CURRENT_LIST_DIR}/tools/test/test.bat.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/test.bat)
 
 # Common build flags
 set(CMAKE_CXX_STANDARD 20)
@@ -615,9 +616,6 @@ add_subdirectory(src/linux/init)
 add_subdirectory(localization)
 
 add_subdirectory(test/windows)
-
-# Generate local test script after subprojects have registered their test commands.
-configure_file(${CMAKE_CURRENT_LIST_DIR}/tools/test/test.bat.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/test.bat)
 
 if (DEFINED PIPELINE_BUILD_ID)
     add_subdirectory(cloudtest)
