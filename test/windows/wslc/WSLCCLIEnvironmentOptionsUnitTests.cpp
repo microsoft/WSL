@@ -99,6 +99,7 @@ class WSLCCLIEnvironmentOptionsUnitTests
 
         VERIFY_IS_TRUE(target.Contains(ArgType::NoColor));
         VERIFY_IS_TRUE(target.GetValue<ArgType::NoColor>());
+        VERIFY_ARE_EQUAL(Source::Environment, target.GetSource(ArgType::NoColor));
     }
 
     // NO_COLOR spec: "0" / "false" / "no" / "off" are not opt-outs.
@@ -158,12 +159,13 @@ class WSLCCLIEnvironmentOptionsUnitTests
         m_noColor->Set(L"");
 
         ArgMap target;
-        target.Add<ArgType::NoColor>(false);
+        target.Add<ArgType::NoColor>(false, Source::CommandLine);
 
         ApplyEnvironmentOptions(target, NoColorDefs());
 
         VERIFY_ARE_EQUAL(1U, target.Count(ArgType::NoColor));
         VERIFY_IS_FALSE(target.GetValue<ArgType::NoColor>());
+        VERIFY_ARE_EQUAL(Source::CommandLine, target.GetSource(ArgType::NoColor));
     }
 
     // Bindings outside the declared environment arguments are ignored even if the env var is set.
@@ -232,6 +234,10 @@ class WSLCCLIEnvironmentOptionsUnitTests
         VERIFY_ARE_EQUAL(std::wstring{L"environment-global-name"}, target.GetValue<ArgType::Name>());
         VERIFY_ARE_EQUAL(std::wstring{L"command-line-hostname"}, target.GetValue<ArgType::Hostname>());
         VERIFY_ARE_EQUAL(std::wstring{L"environment-command-user"}, target.GetValue<ArgType::User>());
+        VERIFY_ARE_EQUAL(Source::CommandLine, target.GetSource(ArgType::Session));
+        VERIFY_ARE_EQUAL(Source::Environment, target.GetSource(ArgType::Name));
+        VERIFY_ARE_EQUAL(Source::CommandLine, target.GetSource(ArgType::Hostname));
+        VERIFY_ARE_EQUAL(Source::Environment, target.GetSource(ArgType::User));
     }
 
 private:
