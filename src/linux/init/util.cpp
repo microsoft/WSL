@@ -3463,15 +3463,14 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
     auto sendExecResult = wil::scope_exit([&]() { sendResult(execResult); });
 
     const char* Path = wsl::shared::string::FromSpan(Buffer, Message->PathIndex);
-    const char* Arguments = wsl::shared::string::FromSpan(Buffer, Message->CommandLineIndex);
-
-    // Note: this makes the assumption that no empty arguments are in the message
+    const auto arguments = wsl::shared::string::ArrayFromSpan(Buffer, Message->CommandLineIndex);
     std::vector<const char*> ArgumentArray;
-    while (*Arguments != '\0')
+    ArgumentArray.reserve(arguments.size() + 1);
+    for (const auto& argument : arguments)
     {
-        ArgumentArray.emplace_back(Arguments);
-        Arguments += strlen(Arguments) + 1;
+        ArgumentArray.emplace_back(argument.c_str());
     }
+
     ArgumentArray.emplace_back(nullptr);
 
     auto ControlPipe = wil::unique_pipe::create(O_CLOEXEC);

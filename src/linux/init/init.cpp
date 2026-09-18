@@ -64,6 +64,7 @@ typedef struct _CREATE_PROCESS_PARSED_COMMON
 {
     const char* Filename;
     std::string CurrentWorkingDirectory;
+    std::vector<std::string> CommandLineStorage;
     std::vector<const char*> CommandLine;
     EnvironmentBlock Environment;
     uid_t Uid;
@@ -105,7 +106,8 @@ void CreateProcessCommon(PCREATE_PROCESS_PARSED_COMMON Common, int TtyFd, int Se
 
 CREATE_PROCESS_PARSED CreateProcessParse(gsl::span<gsl::byte> Buffer, int MessageFd, const wsl::linux::WslDistributionConfig& Config);
 
-int CreateProcessParseCommon(PCREATE_PROCESS_PARSED_COMMON Parsed, gsl::span<gsl::byte> Buffer, const wsl::linux::WslDistributionConfig& Config);
+template <typename TMessage>
+int CreateProcessParseCommon(PCREATE_PROCESS_PARSED_COMMON Parsed, gsl::span<gsl::byte> Buffer, const TMessage* Message, const wsl::linux::WslDistributionConfig& Config);
 
 int CreateProcessReplyToServer(PCREATE_PROCESS_PARSED Parsed, pid_t CreateProcessPid, int MessageFd);
 
@@ -857,7 +859,7 @@ Return Value:
     //
 
     CREATE_PROCESS_PARSED Parsed{};
-    int Result = CreateProcessParseCommon(&Parsed.Common, Buffer.subspan(offsetof(LX_INIT_CREATE_PROCESS, Common)), Config);
+    int Result = CreateProcessParseCommon(&Parsed.Common, Buffer, Message, Config);
     THROW_ERRNO_IF(EINVAL, Result < 0);
 
     //
@@ -923,7 +925,8 @@ Return Value:
     return Parsed;
 }
 
-int CreateProcessParseCommon(PCREATE_PROCESS_PARSED_COMMON Parsed, gsl::span<gsl::byte> Buffer, const wsl::linux::WslDistributionConfig& Config)
+template <typename TMessage>
+int CreateProcessParseCommon(PCREATE_PROCESS_PARSED_COMMON Parsed, gsl::span<gsl::byte> Buffer, const TMessage* Message, const wsl::linux::WslDistributionConfig& Config)
 
 /*++
 
@@ -935,7 +938,12 @@ Arguments:
 
     Parsed - Supplies a buffer to store the common create process parameters.
 
-    Buffer - Supplies the common create process message data.
+    Buffer - Supplies the complete create process message, including the
+        variable-length data referenced by offsets in Message.
+
+    Message - Supplies the fixed create process message fields and the offsets
+        into Buffer for the filename, current working directory, command line,
+        environment blocks, Windows PATH, and username.
 
     Config - Supplies the distribution configuration.
 
@@ -947,13 +955,6 @@ Return Value:
 
 try
 {
-    auto* Common = gslhelpers::try_get_struct<LX_INIT_CREATE_PROCESS_COMMON>(Buffer);
-    if (!Common)
-    {
-        LOG_ERROR("Invalid message size {}", Buffer.size());
-        return -1;
-    }
-
     //
     // Populate the current working directory. If the path does not begin with a
     // UNIX path separator or `~`, it is translated.
@@ -961,7 +962,7 @@ try
     // N.B. Failure to translate the current working directory is non-fatal.
     //
 
-    auto* Path = wsl::shared::string::FromSpan(Buffer, Common->CurrentWorkingDirectoryOffset);
+    auto* Path = wsl::shared::string::FromSpan(Buffer, Message->CurrentWorkingDirectoryOffset);
     if ((*Path == '/') || (*Path == '~'))
     {
         Parsed->CurrentWorkingDirectory = Path;
@@ -979,12 +980,11 @@ try
     // Initialize the command line will a null-terminator.
     //
 
-    auto CommandLine = Buffer.subspan(Common->CommandLineOffset);
-    for (unsigned short Index = 0; Index < Common->CommandLineCount; Index += 1)
+    Parsed->CommandLineStorage = wsl::shared::string::ArrayFromSpan(Buffer, Message->CommandLineOffset);
+    Parsed->CommandLine.reserve(Parsed->CommandLineStorage.size() + 1);
+    for (const auto& Argument : Parsed->CommandLineStorage)
     {
-        std::string_view Argument{wsl::shared::string::FromSpan(CommandLine)};
-        Parsed->CommandLine.emplace_back(Argument.data());
-        CommandLine = CommandLine.subspan(Argument.size() + 1);
+        Parsed->CommandLine.emplace_back(Argument.c_str());
     }
 
     //
@@ -994,7 +994,7 @@ try
     //
 
     struct passwd* PasswordEntry = nullptr;
-    auto Username = wsl::shared::string::FromSpan(Buffer, Common->UsernameOffset);
+    auto Username = wsl::shared::string::FromSpan(Buffer, Message->UsernameOffset);
     if (strlen(Username) != 0)
     {
         PasswordEntry = getpwnam(Username);
@@ -1014,19 +1014,20 @@ try
 
     if (PasswordEntry == nullptr)
     {
-        PasswordEntry = getpwuid(Common->DefaultUid);
+        PasswordEntry = getpwuid(Message->DefaultUid);
         if (PasswordEntry == nullptr)
         {
-            LOG_ERROR("getpwuid({}) failed {}", Common->DefaultUid, errno);
+            LOG_ERROR("getpwuid({}) failed {}", Message->DefaultUid, errno);
         }
     }
 
     Parsed->CommandLine.emplace_back(nullptr);
-    Parsed->Environment = ConfigCreateEnvironmentBlock(Common, Config);
-    Parsed->Filename = wsl::shared::string::FromSpan(Buffer, Common->FilenameOffset);
-    Parsed->ShellOptions = static_cast<CREATE_PROCESS_SHELL_OPTIONS>(Common->ShellOptions);
+    Parsed->Environment =
+        ConfigCreateEnvironmentBlock(Buffer, Message->EnvironmentOffset, Message->NtEnvironmentOffset, Message->NtPathOffset, Config);
+    Parsed->Filename = wsl::shared::string::FromSpan(Buffer, Message->FilenameOffset);
+    Parsed->ShellOptions = static_cast<CREATE_PROCESS_SHELL_OPTIONS>(Message->ShellOptions);
     Parsed->Uid = PasswordEntry ? PasswordEntry->pw_uid : ROOT_UID; // If the default user was not found, fall back to root.
-    Parsed->AllowOOBE = WI_IsFlagSet(Common->Flags, LxInitCreateProcessFlagAllowOOBE);
+    Parsed->AllowOOBE = WI_IsFlagSet(Message->Flags, LxInitCreateProcessFlagAllowOOBE);
     return 0;
 }
 CATCH_RETURN_ERRNO()
@@ -1404,7 +1405,7 @@ Return Value:
     // Connect an extra socket for OOBE, if requested.
     //
 
-    if (WI_IsFlagSet(CreateProcess.Common.Flags, LxInitCreateProcessFlagAllowOOBE))
+    if (WI_IsFlagSet(CreateProcess.Flags, LxInitCreateProcessFlagAllowOOBE))
     {
         Sockets.push_back(wil::unique_fd{});
     }
@@ -1462,7 +1463,7 @@ Return Value:
     // Move to the correct mount namespace to create the child in.
     //
 
-    if (ConfigSetMountNamespace(WI_IsFlagSet(CreateProcess.Common.Flags, LxInitCreateProcessFlagsElevated)) < 0)
+    if (ConfigSetMountNamespace(WI_IsFlagSet(CreateProcess.Flags, LxInitCreateProcessFlagsElevated)) < 0)
     {
         Result = -1;
         goto CreateProcessUtilityVmEnd;
@@ -1493,7 +1494,7 @@ Return Value:
     // Initialize interop.
     //
 
-    InteropEnabled = WI_IsFlagSet(CreateProcess.Common.Flags, LxInitCreateProcessFlagsInteropEnabled) && Config.InteropEnabled;
+    InteropEnabled = WI_IsFlagSet(CreateProcess.Flags, LxInitCreateProcessFlagsInteropEnabled) && Config.InteropEnabled;
     if (InteropEnabled)
     {
         Result = InteropServer.Create();
@@ -1507,7 +1508,7 @@ Return Value:
     // For any of the standard handles that are not consoles, create pipes.
     //
 
-    if (WI_IsFlagClear(CreateProcess.Common.Flags, LxInitCreateProcessFlagsStdInConsole))
+    if (WI_IsFlagClear(CreateProcess.Flags, LxInitCreateProcessFlagsStdInConsole))
     {
         try
         {
@@ -1521,7 +1522,7 @@ Return Value:
         }
     }
 
-    if (WI_IsFlagClear(CreateProcess.Common.Flags, LxInitCreateProcessFlagsStdOutConsole))
+    if (WI_IsFlagClear(CreateProcess.Flags, LxInitCreateProcessFlagsStdOutConsole))
     {
         try
         {
@@ -1535,7 +1536,7 @@ Return Value:
         }
     }
 
-    if (WI_IsFlagClear(CreateProcess.Common.Flags, LxInitCreateProcessFlagsStdErrConsole))
+    if (WI_IsFlagClear(CreateProcess.Flags, LxInitCreateProcessFlagsStdErrConsole))
     {
         try
         {
@@ -1620,7 +1621,7 @@ Return Value:
         // pipe.
         //
 
-        if (WI_IsFlagClear(CreateProcess.Common.Flags, LxInitCreateProcessFlagsStdInConsole))
+        if (WI_IsFlagClear(CreateProcess.Flags, LxInitCreateProcessFlagsStdInConsole))
         {
             Result = dup2(StdInPipe.read().get(), STDIN_FILENO);
             if (Result < 0)
@@ -1630,7 +1631,7 @@ Return Value:
             }
         }
 
-        if (WI_IsFlagClear(CreateProcess.Common.Flags, LxInitCreateProcessFlagsStdOutConsole))
+        if (WI_IsFlagClear(CreateProcess.Flags, LxInitCreateProcessFlagsStdOutConsole))
         {
             Result = dup2(StdOutPipe.write().get(), STDOUT_FILENO);
             if (Result < 0)
@@ -1640,7 +1641,7 @@ Return Value:
             }
         }
 
-        if (WI_IsFlagClear(CreateProcess.Common.Flags, LxInitCreateProcessFlagsStdErrConsole))
+        if (WI_IsFlagClear(CreateProcess.Flags, LxInitCreateProcessFlagsStdErrConsole))
         {
             Result = dup2(StdErrPipe.write().get(), STDERR_FILENO);
             if (Result < 0)
@@ -1655,7 +1656,7 @@ Return Value:
         // the child.
         //
 
-        Result = CreateProcessParseCommon(&Parsed, Span.subspan(offsetof(LX_INIT_CREATE_PROCESS_UTILITY_VM, Common)), Config);
+        Result = CreateProcessParseCommon(&Parsed, Span, &CreateProcess, Config);
         if (Result < 0)
         {
             goto CreateProcessUtilityVmEnd;
@@ -1720,7 +1721,7 @@ Return Value:
     // Duplicate the stdin file descriptor.
     //
 
-    if (WI_IsFlagSet(CreateProcess.Common.Flags, LxInitCreateProcessFlagsStdInConsole))
+    if (WI_IsFlagSet(CreateProcess.Flags, LxInitCreateProcessFlagsStdInConsole))
     {
         StdIn = dup(Master);
     }
@@ -1836,7 +1837,7 @@ Return Value:
                 // If stdin is a console, close the pseudoterminal master.
                 //
 
-                if ((WI_IsFlagSet(CreateProcess.Common.Flags, LxInitCreateProcessFlagsStdInConsole)) && (Master != -1))
+                if ((WI_IsFlagSet(CreateProcess.Flags, LxInitCreateProcessFlagsStdInConsole)) && (Master != -1))
                 {
                     CLOSE(Master);
                     Master = -1;
@@ -1935,12 +1936,12 @@ Return Value:
             if (BytesRead == 0 || (BytesRead < 0 && errno == EIO))
             {
                 PollDescriptors[3].fd = -1;
-                if (WI_IsFlagSet(CreateProcess.Common.Flags, LxInitCreateProcessFlagsStdOutConsole))
+                if (WI_IsFlagSet(CreateProcess.Flags, LxInitCreateProcessFlagsStdOutConsole))
                 {
                     UtilSocketShutdown(Sockets[1].get(), SHUT_WR);
                 }
 
-                if (WI_IsFlagSet(CreateProcess.Common.Flags, LxInitCreateProcessFlagsStdErrConsole))
+                if (WI_IsFlagSet(CreateProcess.Flags, LxInitCreateProcessFlagsStdErrConsole))
                 {
                     UtilSocketShutdown(Sockets[2].get(), SHUT_WR);
                 }
@@ -1952,11 +1953,11 @@ Return Value:
             }
             else
             {
-                if (WI_IsFlagSet(CreateProcess.Common.Flags, LxInitCreateProcessFlagsStdOutConsole))
+                if (WI_IsFlagSet(CreateProcess.Flags, LxInitCreateProcessFlagsStdOutConsole))
                 {
                     BytesWritten = UtilWriteBuffer(Sockets[1].get(), Buffer.data(), BytesRead);
                 }
-                else if (WI_IsFlagSet(CreateProcess.Common.Flags, LxInitCreateProcessFlagsStdErrConsole))
+                else if (WI_IsFlagSet(CreateProcess.Flags, LxInitCreateProcessFlagsStdErrConsole))
                 {
                     BytesWritten = UtilWriteBuffer(Sockets[2].get(), Buffer.data(), BytesRead);
                 }
@@ -2003,7 +2004,7 @@ Return Value:
                 try
                 {
                     ConfigHandleInteropMessage(
-                        transaction, ControlChannel, WI_IsFlagSet(CreateProcess.Common.Flags, LxInitCreateProcessFlagsElevated), Span, Header, Config);
+                        transaction, ControlChannel, WI_IsFlagSet(CreateProcess.Flags, LxInitCreateProcessFlagsElevated), Span, Header, Config);
                 }
                 CATCH_LOG();
             }
@@ -3369,10 +3370,12 @@ Return Value:
 
 unsigned int StartPlan9(int Argc, char** Argv)
 {
-    constexpr auto* Usage = "Usage: plan9 " LX_INIT_PLAN9_CONTROL_SOCKET_ARG " fd " LX_INIT_PLAN9_SOCKET_PATH_ARG
-                            " path " LX_INIT_PLAN9_SERVER_FD_ARG " fd " LX_INIT_PLAN9_LOG_FILE_ARG
-                            " log-file " LX_INIT_PLAN9_LOG_LEVEL_ARG " level " LX_INIT_PLAN9_PIPE_FD_ARG " fd [--log-truncate]\n";
+    constexpr auto* Usage = "Usage: plan9 (" LX_INIT_PLAN9_BIND_ARG " port | " LX_INIT_PLAN9_SERVER_FD_ARG
+                            " fd [" LX_INIT_PLAN9_SOCKET_PATH_ARG " path]) [" LX_INIT_PLAN9_CONTROL_SOCKET_ARG
+                            " fd] [" LX_INIT_PLAN9_LOG_FILE_ARG " log-file] [" LX_INIT_PLAN9_LOG_LEVEL_ARG
+                            " level] [" LX_INIT_PLAN9_PIPE_FD_ARG " fd] [" LX_INIT_PLAN9_TRUNCATE_LOG_ARG "]\n";
 
+    std::optional<int> BindPort;
     bool LogTruncate = false;
     int LogLevel = TRACE_LEVEL_INFORMATION;
     wil::unique_fd PipeFd;
@@ -3382,6 +3385,7 @@ unsigned int StartPlan9(int Argc, char** Argv)
     wil::unique_fd ServerFd;
 
     ArgumentParser parser(Argc, Argv);
+    parser.AddArgument(Integer{BindPort}, LX_INIT_PLAN9_BIND_ARG);
     parser.AddArgument(UniqueFd{ControlSocket}, LX_INIT_PLAN9_CONTROL_SOCKET_ARG);
     parser.AddArgument(SocketPath, LX_INIT_PLAN9_SOCKET_PATH_ARG);
     parser.AddArgument(UniqueFd{ServerFd}, LX_INIT_PLAN9_SERVER_FD_ARG);
@@ -3400,7 +3404,14 @@ unsigned int StartPlan9(int Argc, char** Argv)
         return 1;
     }
 
-    RunPlan9Server(SocketPath, LogFile, LogLevel, LogTruncate, ControlSocket.get(), ServerFd.get(), PipeFd);
+    if (BindPort.has_value() == static_cast<bool>(ServerFd) ||
+        (BindPort.has_value() && (*BindPort <= 0 || *BindPort > std::numeric_limits<uint16_t>::max())))
+    {
+        std::cerr << Usage;
+        return 1;
+    }
+
+    RunPlan9Server(SocketPath, LogFile, LogLevel, LogTruncate, BindPort.value_or(-1), ControlSocket.get(), std::move(ServerFd), PipeFd);
 
     return 0;
 }
