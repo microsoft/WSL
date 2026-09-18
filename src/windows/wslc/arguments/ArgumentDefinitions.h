@@ -47,6 +47,7 @@ _(CIDFile,          "cidfile",              NO_ALIAS,         Kind::Value,      
 _(Command,          "command",              NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_CommandArgDescription()) \
 _(ContainerId,      "container-id",         NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_ContainerIdArgDescription()) \
 _(Cpus,             "cpus",                 NO_ALIAS,         Kind::Value,      int64_t,      Localization::WSLCCLI_CpusArgDescription()) \
+_(Debug,            "debug",                L"D",             Kind::Flag,       NoConversion, Localization::WSLCCLI_DebugArgDescription()) \
 _(Force,            "force",                L"f",             Kind::Flag,       NoConversion, Localization::WSLCCLI_ForceArgDescription()) \
 _(Detach,           "detach",               L"d",             Kind::Flag,       NoConversion, Localization::WSLCCLI_DetachArgDescription()) \
 _(Details,          "details",              NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_DetailsArgDescription()) \

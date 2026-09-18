@@ -3,13 +3,14 @@
 #pragma once
 
 #include "ExecutionContext.h"
+#include "WSLCDiagnostics.h"
 #include "WSLCSession.h"
 
 namespace wsl::windows::service::wslc {
 
 // Extends COMServiceExecutionContext with a WSLCSession pointer for lazy COM callback
 // registration when warnings are emitted. This enables EMIT_USER_WARNING to stream
-// warnings back to the CLI via IWarningCallback, with proper cancellation support
+// warnings back to the CLI via IDiagnosticCallback, with proper cancellation support
 // during session termination via RegisterUserCOMCallback/CoCancelCall.
 class WSLCExecutionContext : public wsl::windows::common::COMServiceExecutionContext
 {
@@ -17,8 +18,8 @@ public:
     NON_COPYABLE(WSLCExecutionContext);
     NON_MOVABLE(WSLCExecutionContext);
 
-    WSLCExecutionContext(WSLCSession* session, IWarningCallback* warningCallback = nullptr) :
-        m_session(session), m_warningCallback(warningCallback)
+    WSLCExecutionContext(WSLCSession* session, IDiagnosticCallback* diagnosticCallback = nullptr) :
+        m_session(session), m_diagnostics(diagnosticCallback)
     {
     }
 
@@ -27,21 +28,21 @@ public:
 protected:
     bool CollectUserWarning(const std::wstring& warning) override
     {
-        if (m_warningCallback != nullptr)
+        if (m_diagnostics.HasCallback())
         {
+            if (!m_diagnostics.IsEnabled(WSLCDiagnosticLevelWarning))
+            {
+                return true;
+            }
+
             std::unique_ptr<UserCOMCallback> comCallback;
             if (m_session != nullptr)
             {
                 comCallback = std::make_unique<UserCOMCallback>(m_session->RegisterUserCOMCallback());
             }
 
-            auto hr = m_warningCallback->OnWarning(warning.c_str());
-            if (SUCCEEDED(hr) || hr == RPC_E_CALL_CANCELED || hr == HRESULT_FROM_WIN32(ERROR_CANCELLED))
-            {
-                return true;
-            }
-
-            LOG_HR(hr);
+            WSLC_DIAG(m_diagnostics, WSLCDiagnosticLevelWarning, WSLC_DIAG_CODE_USER_WARNING, L"{}", warning);
+            return true;
         }
 
         return COMServiceExecutionContext::CollectUserWarning(warning);
@@ -49,7 +50,7 @@ protected:
 
 private:
     WSLCSession* m_session = nullptr;
-    IWarningCallback* m_warningCallback = nullptr;
+    wsl::windows::wslc::diagnostics::DiagnosticReporter m_diagnostics;
 };
 
 } // namespace wsl::windows::service::wslc

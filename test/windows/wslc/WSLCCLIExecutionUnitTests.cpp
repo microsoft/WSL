@@ -501,6 +501,77 @@ class WSLCCLIExecutionUnitTests
         VERIFY_IS_TRUE(arguments.GetValue<ArgType::NoColor>());
     }
 
+    TEST_METHOD(DebugGlobalOption_EnablesLifecycleMessagesOnStderr)
+    {
+        for (const auto debugOption : {L"-D", L"--debug"})
+        {
+            CapturePipe outPipe;
+            CapturePipe errPipe;
+            CLIExecutionContext context{outPipe.file(), false, errPipe.file(), false};
+            CommandInvocation invocation{std::make_unique<RootCommand>(), std::vector<std::wstring>{debugOption, L"version"}};
+
+            invocation.ParseCommandLine(context);
+            invocation.Execute(context);
+
+            VERIFY_IS_TRUE(context.Args.GetValue<ArgType::Debug>());
+            VERIFY_IS_TRUE(context.Terminal.IsDebugEnabled());
+            const auto diagnostics = errPipe.captured();
+            VERIFY_ARE_NOT_EQUAL(std::wstring::npos, diagnostics.find(L" Selected command: wslc version"));
+            VERIFY_ARE_NOT_EQUAL(std::wstring::npos, diagnostics.find(L" Command-line parsing completed in "));
+            VERIFY_ARE_NOT_EQUAL(std::wstring::npos, diagnostics.find(L" Executing command: wslc version"));
+            VERIFY_ARE_EQUAL(std::wstring::npos, diagnostics.find(L" Command execution finished in "));
+        }
+    }
+
+    TEST_METHOD(DebugGlobalOption_ReportsParsingFailure)
+    {
+        CapturePipe outPipe;
+        CapturePipe errPipe;
+        CLIExecutionContext context{outPipe.file(), false, errPipe.file(), false};
+        CommandInvocation invocation{std::make_unique<RootCommand>(), std::vector<std::wstring>{L"-D", L"--unknown"}};
+
+        VERIFY_THROWS(invocation.ParseCommandLine(context), ArgumentException);
+
+        const auto diagnostics = errPipe.captured();
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, diagnostics.find(L" Command-line parsing failed after "));
+    }
+
+    TEST_METHOD(DebugMacro_EvaluatesArgumentsOnlyWhenEnabled)
+    {
+        {
+            CapturePipe outPipe;
+            CapturePipe errPipe;
+            CLIExecutionContext context{outPipe.file(), false, errPipe.file(), false};
+            int evaluationCount = 0;
+            const auto value = [&]() {
+                ++evaluationCount;
+                return 42;
+            };
+
+            WSLC_DEBUG(context, L"value={}\n", value());
+            VERIFY_ARE_EQUAL(0, evaluationCount);
+            VERIFY_ARE_EQUAL(std::wstring{}, errPipe.captured());
+        }
+
+        {
+            CapturePipe outPipe;
+            CapturePipe errPipe;
+            CLIExecutionContext context{outPipe.file(), false, errPipe.file(), false};
+            int evaluationCount = 0;
+            const auto value = [&]() {
+                ++evaluationCount;
+                return 42;
+            };
+
+            context.Terminal.SetDebugEnabled(true);
+            WSLC_DEBUG(context, L"value={}\n", value());
+            VERIFY_ARE_EQUAL(1, evaluationCount);
+            const auto diagnostics = errPipe.captured();
+            VERIFY_IS_TRUE(diagnostics.starts_with(L"[debug] "));
+            VERIFY_IS_TRUE(diagnostics.ends_with(L" value=42\n"));
+        }
+    }
+
     TEST_METHOD(EnvironmentArguments_LocalAppliedOnlyWhenCommandIsSelected)
     {
         ScopedEnvVariable noColor{L"NO_COLOR", L""};

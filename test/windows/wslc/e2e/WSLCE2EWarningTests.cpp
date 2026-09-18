@@ -10,7 +10,7 @@ Abstract:
 
     End-to-end tests validating how warnings emitted by the WSLC COM service are
     surfaced (or intentionally suppressed) on the wslc.exe CLI's stderr via the
-    IWarningCallback integration.
+    IDiagnosticCallback integration.
 --*/
 
 #include "precomp.h"
@@ -75,7 +75,7 @@ class WSLCE2EWarningTests
     // Injects a container with corrupt WSLC metadata into the default session's storage,
     // then verifies that running the wslc.exe CLI does not surface the COM service's recovery
     // warning on stderr: recovery runs outside the user's current command, so it is logged
-    // (and written to the event log) rather than streamed back via IWarningCallback.
+    // (and written to the event log) rather than streamed back via IDiagnosticCallback.
     WSLC_TEST_METHOD(WSLCE2E_Warning_ContainerRecoveryNotPrintedOnStderr)
     {
         std::string corruptContainerId;

@@ -2637,7 +2637,8 @@ Usage:
             L"SOFTWARE\\Classes\\Interface\\{E3F58C9B-2F4D-4E0A-B7C6-8D9F0A1B2C3D}\\ProxyStubClsid32",
             L"SOFTWARE\\Classes\\Interface\\{F406DACB-3050-4F1B-A8D7-9E0A1B2C3D4E}\\ProxyStubClsid32",
             L"SOFTWARE\\Classes\\Interface\\{05172EBD-4161-4C2C-99E8-AF1B2C3D4E5F}\\ProxyStubClsid32",
-            L"SOFTWARE\\Classes\\Interface\\{16283FCE-5272-4D3D-AAF9-B02C3D4E5F60}\\ProxyStubClsid32"};
+            L"SOFTWARE\\Classes\\Interface\\{16283FCE-5272-4D3D-AAF9-B02C3D4E5F60}\\ProxyStubClsid32",
+            L"SOFTWARE\\Classes\\Interface\\{5AAA8F9F-097E-4A93-AAF1-423D7BAE7CF8}\\ProxyStubClsid32"};
 
         for (const auto* keyName : serviceKeys)
         {

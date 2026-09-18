@@ -19,6 +19,7 @@ Abstract:
 #include "EnvironmentOptions.h"
 
 #include <algorithm>
+#include <chrono>
 #include <functional>
 #include <optional>
 #include <span>
@@ -175,44 +176,98 @@ void CommandInvocation::ApplyRootEnvironmentOptions(argument::ArgMap& arguments)
 
 void CommandInvocation::ParseCommandLine(CLIExecutionContext& context)
 {
-    auto subcommand = ParseGlobalArgumentsAndFindSubcommand(m_cursor, context, Selected());
-    while (subcommand)
-    {
-        Select(subcommand->get());
-        subcommand = ParseGlobalArgumentsAndFindSubcommand(m_cursor, context, Selected());
-    }
+    const auto start = std::chrono::steady_clock::now();
+    const auto reportFailure = [&]() {
+        WSLC_DEBUG(
+            context,
+            L"Command-line parsing failed after {} ms.\n",
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+    };
+    const auto enableDebugOutput = [&]() {
+        if (context.Args.Contains(ArgType::Debug))
+        {
+            context.Terminal.SetDebugEnabled(context.Args.GetValue<ArgType::Debug>());
+        }
+    };
 
+    std::optional<std::reference_wrapper<const Command>> subcommand;
     try
     {
-        ApplyEnvironmentOptions(context.Args, Selected().GetScopedArguments(Scope::Command));
-        Selected().ParseArguments(
-            m_cursor,
-            context.Args,
-            Selected().GetScopedArguments(Scope::Command, Flags::None),
-            /*optionsOnly*/ false,
-            /*stopOnUnknown*/ false,
-            GetInheritedGlobalArguments(Selected()));
+        subcommand = ParseGlobalArgumentsAndFindSubcommand(m_cursor, context, Selected());
     }
-    catch (const ArgumentException& exception)
+    catch (...)
     {
-        if (exception.UnknownOptionToken().has_value())
-        {
-            ThrowIfMisplacedGlobalOption(*exception.UnknownOptionToken(), Selected());
-        }
-
+        enableDebugOutput();
+        reportFailure();
         throw;
     }
 
-    Selected().ValidateArguments(context.Args, Selected().GetScopedArguments(Scope::Command));
-    if (!context.Args.GetValue<ArgType::Help>())
+    enableDebugOutput();
+    try
     {
-        ValidateArgumentRelationships(Selected(), context.Args);
+        while (subcommand)
+        {
+            Select(subcommand->get());
+            subcommand = ParseGlobalArgumentsAndFindSubcommand(m_cursor, context, Selected());
+        }
+
+        ApplyEnvironmentOptions(context.Args, Selected().GetScopedArguments(Scope::Command));
+        try
+        {
+            Selected().ParseArguments(
+                m_cursor,
+                context.Args,
+                Selected().GetScopedArguments(Scope::Command, Flags::None),
+                /*optionsOnly*/ false,
+                /*stopOnUnknown*/ false,
+                GetInheritedGlobalArguments(Selected()));
+        }
+        catch (const ArgumentException& exception)
+        {
+            if (exception.UnknownOptionToken().has_value())
+            {
+                ThrowIfMisplacedGlobalOption(*exception.UnknownOptionToken(), Selected());
+            }
+
+            throw;
+        }
+
+        Selected().ValidateArguments(context.Args, Selected().GetScopedArguments(Scope::Command));
+        if (!context.Args.GetValue<ArgType::Help>())
+        {
+            ValidateArgumentRelationships(Selected(), context.Args);
+        }
     }
+    catch (...)
+    {
+        reportFailure();
+        throw;
+    }
+
+    WSLC_DEBUG(context, L"Selected command: {}\n", Selected().FormatInvocation());
+    WSLC_DEBUG(
+        context,
+        L"Command-line parsing completed in {} ms.\n",
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 }
 
 void CommandInvocation::Execute(CLIExecutionContext& context) const
 {
-    Selected().Execute(context);
+    WSLC_DEBUG(context, L"Executing command: {}\n", Selected().FormatInvocation());
+    const auto start = std::chrono::steady_clock::now();
+
+    try
+    {
+        Selected().Execute(context);
+    }
+    catch (...)
+    {
+        WSLC_DEBUG(
+            context,
+            L"Command execution failed after {} ms.\n",
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+        throw;
+    }
 }
 
 void CommandInvocation::OutputHelp(Terminal& terminal, HelpOutput output, const CommandException* exception, std::span<const Argument> relevantArguments) const

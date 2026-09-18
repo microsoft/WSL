@@ -3268,10 +3268,10 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCContainer::Restart(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, IWarningCallback* WarningCallback)
+HRESULT WSLCContainer::Restart(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, IDiagnosticCallback* DiagnosticCallback)
 try
 {
-    WSLCExecutionContext context(&m_session, WarningCallback);
+    WSLCExecutionContext context(&m_session, DiagnosticCallback);
 
     // Hold a VM lease across both phases: the container is not Running in between, so nothing else
     // keeps the VM alive.
@@ -3280,10 +3280,10 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, IWarningCallback* WarningCallback)
+HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, IDiagnosticCallback* DiagnosticCallback)
 try
 {
-    WSLCExecutionContext context(&m_session, WarningCallback);
+    WSLCExecutionContext context(&m_session, DiagnosticCallback);
 
     THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCContainerStartFlagsValid), "Invalid flags: 0x%x", Flags);
 

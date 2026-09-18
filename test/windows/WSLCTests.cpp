@@ -14098,13 +14098,25 @@ class WSLCTests
 
     // Helper: COM callback that captures all warnings received.
     class CapturingWarningCallback
-        : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWarningCallback, IFastRundown>
+        : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IDiagnosticCallback, IFastRundown>
     {
     public:
-        HRESULT OnWarning(LPCWSTR Message) override
+        HRESULT GetEnabledLevels(WSLCDiagnosticLevel* Levels) override
         {
-            std::lock_guard lock(m_lock);
-            m_warnings.emplace_back(Message);
+            RETURN_HR_IF_NULL(E_POINTER, Levels);
+            *Levels = WSLCDiagnosticLevelWarning;
+            return S_OK;
+        }
+
+        HRESULT OnDiagnostic(const WSLCDiagnosticEvent* Event) override
+        {
+            RETURN_HR_IF_NULL(E_POINTER, Event);
+            if (Event->Level == WSLCDiagnosticLevelWarning && Event->Message != nullptr)
+            {
+                std::lock_guard lock(m_lock);
+                m_warnings.emplace_back(Event->Message);
+            }
+
             return S_OK;
         }
 

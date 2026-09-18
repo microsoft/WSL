@@ -391,6 +391,14 @@
                     </RegistryKey>
                 </RegistryKey>
 
+                <!-- IDiagnosticCallback-->
+                <RegistryKey Root="HKCR" Key="Interface\{5AAA8F9F-097E-4A93-AAF1-423D7BAE7CF8}">
+                    <RegistryValue Value="IDiagnosticCallback" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
                 <!-- IImageLoadCallback-->
                 <RegistryKey Root="HKCR" Key="Interface\{7F3B62FD-E1C1-4F69-A8E2-853CAD9051BD}">
                     <RegistryValue Value="IImageLoadCallback" Type="string" />

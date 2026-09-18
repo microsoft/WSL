@@ -361,7 +361,7 @@ HRESULT WSLCSession::Initialize(
     _In_ const WSLCSessionInitSettings* Settings,
     _In_ IWSLCVirtualMachineFactory* VmFactory,
     _In_ IWSLCPluginNotifier* PluginNotifier,
-    _In_opt_ IWarningCallback* WarningCallback)
+    _In_opt_ IDiagnosticCallback* DiagnosticCallback)
 try
 {
     RETURN_HR_IF(E_POINTER, Settings == nullptr || VmFactory == nullptr);
@@ -377,7 +377,7 @@ try
 
     // Set up a warning context for the duration of initialization so that non-fatal
     // failures are streamed to the CLI.
-    WSLCExecutionContext warningContext(this, WarningCallback);
+    WSLCExecutionContext diagnosticContext(this, DiagnosticCallback);
 
     // The VM (and storage VHD) is created lazily on the first operation. Validate the storage
     // configuration eagerly here so misconfiguration is reported at session creation rather than
@@ -958,10 +958,11 @@ try
 }
 CATCH_LOG()
 
-HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, BOOL AllTags, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback)
+HRESULT WSLCSession::PullImage(
+    LPCSTR Image, LPCSTR RegistryAuthenticationInformation, BOOL AllTags, IProgressCallback* ProgressCallback, IDiagnosticCallback* DiagnosticCallback)
 try
 {
-    WSLCExecutionContext context(this, WarningCallback);
+    WSLCExecutionContext context(this, DiagnosticCallback);
 
     RETURN_HR_IF_NULL(E_POINTER, Image);
 
@@ -1588,10 +1589,11 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::LoadImage(const WSLCHandle ImageHandle, ULONGLONG ContentSize, IWarningCallback* WarningCallback, IImageLoadCallback* LoadCallback)
+HRESULT WSLCSession::LoadImage(
+    const WSLCHandle ImageHandle, ULONGLONG ContentSize, IDiagnosticCallback* DiagnosticCallback, IImageLoadCallback* LoadCallback)
 try
 {
-    WSLCExecutionContext context(this, WarningCallback);
+    WSLCExecutionContext context(this, DiagnosticCallback);
 
     auto lock = AcquireLease();
 
@@ -1605,10 +1607,11 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ImportImage(const WSLCHandle ImageHandle, LPCSTR ImageName, ULONGLONG ContentSize, IWarningCallback* WarningCallback, LPSTR* ImageId)
+HRESULT WSLCSession::ImportImage(
+    const WSLCHandle ImageHandle, LPCSTR ImageName, ULONGLONG ContentSize, IDiagnosticCallback* DiagnosticCallback, LPSTR* ImageId)
 try
 {
-    WSLCExecutionContext context(this, WarningCallback);
+    WSLCExecutionContext context(this, DiagnosticCallback);
 
     RETURN_HR_IF_NULL(E_POINTER, ImageId);
     *ImageId = nullptr;
@@ -2180,10 +2183,11 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, BOOL AllTags, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback)
+HRESULT WSLCSession::PushImage(
+    LPCSTR Image, LPCSTR RegistryAuthenticationInformation, BOOL AllTags, IProgressCallback* ProgressCallback, IDiagnosticCallback* DiagnosticCallback)
 try
 {
-    WSLCExecutionContext context(this, WarningCallback);
+    WSLCExecutionContext context(this, DiagnosticCallback);
 
     RETURN_HR_IF_NULL(E_POINTER, Image);
     RETURN_HR_IF_NULL(E_POINTER, RegistryAuthenticationInformation);
@@ -2345,10 +2349,11 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::CreateContainer(const WSLCContainerOptions* containerOptions, IWarningCallback* WarningCallback, IWSLCContainer** Container)
+HRESULT WSLCSession::CreateContainer(
+    const WSLCContainerOptions* containerOptions, IDiagnosticCallback* DiagnosticCallback, IWSLCContainer** Container)
 try
 {
-    WSLCExecutionContext context(this, WarningCallback);
+    WSLCExecutionContext context(this, DiagnosticCallback);
     THROW_HR_IF_NULL(E_POINTER, containerOptions);
     THROW_HR_IF_NULL(E_POINTER, Container);
     THROW_HR_IF_NULL(E_POINTER, containerOptions->Image);
@@ -3073,10 +3078,15 @@ try
 CATCH_RETURN();
 
 HRESULT WSLCSession::PruneVolumes(
-    const WSLCFilter* Filters, ULONG FiltersCount, IWarningCallback* WarningCallback, WSLCVolumeName** Volumes, ULONG* VolumesCount, ULONGLONG* SpaceReclaimed)
+    const WSLCFilter* Filters,
+    ULONG FiltersCount,
+    IDiagnosticCallback* DiagnosticCallback,
+    WSLCVolumeName** Volumes,
+    ULONG* VolumesCount,
+    ULONGLONG* SpaceReclaimed)
 try
 {
-    WSLCExecutionContext context(this, WarningCallback);
+    WSLCExecutionContext context(this, DiagnosticCallback);
 
     RETURN_HR_IF_NULL(E_POINTER, Volumes);
     RETURN_HR_IF_NULL(E_POINTER, VolumesCount);
@@ -3121,10 +3131,10 @@ CATCH_RETURN();
 
 // Network management.
 
-HRESULT WSLCSession::CreateNetwork(const WSLCNetworkOptions* Options, IWarningCallback* WarningCallback)
+HRESULT WSLCSession::CreateNetwork(const WSLCNetworkOptions* Options, IDiagnosticCallback* DiagnosticCallback)
 try
 {
-    WSLCExecutionContext context(this, WarningCallback);
+    WSLCExecutionContext context(this, DiagnosticCallback);
 
     RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Options->Name);

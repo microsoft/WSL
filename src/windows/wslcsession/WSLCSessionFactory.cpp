@@ -19,6 +19,7 @@ Abstract:
 #include "WSLCSessionFactory.h"
 #include "WSLCSession.h"
 #include "WSLCSessionReference.h"
+#include "WSLCDiagnostics.h"
 #include "wslutil.h"
 
 namespace wslutil = wsl::windows::common::wslutil;
@@ -33,7 +34,7 @@ HRESULT wslc::WSLCSessionFactory::CreateSession(
     _In_ const WSLCSessionInitSettings* Settings,
     _In_ IWSLCVirtualMachineFactory* VmFactory,
     _In_ IWSLCPluginNotifier* PluginNotifier,
-    _In_opt_ IWarningCallback* WarningCallback,
+    _In_opt_ IDiagnosticCallback* DiagnosticCallback,
     _Out_ IWSLCSession** Session,
     _Out_ IWSLCSessionReference** ServiceRef)
 try
@@ -46,9 +47,24 @@ try
 
     // Create the session object.
     auto session = Microsoft::WRL::Make<wslc::WSLCSession>();
+    wsl::windows::wslc::diagnostics::DiagnosticReporter diagnostics{DiagnosticCallback};
 
     // Initialize the session with the VM factory (VMs are created on demand).
-    RETURN_IF_FAILED(session->Initialize(Settings, VmFactory, PluginNotifier, WarningCallback));
+    WSLC_DIAG(
+        diagnostics,
+        WSLCDiagnosticLevelDebug,
+        WSLC_DIAG_CODE_SESSION_INITIALIZATION_STARTED,
+        L"Name: {}; ID: {}",
+        Settings->DisplayName,
+        Settings->SessionId);
+    RETURN_IF_FAILED(session->Initialize(Settings, VmFactory, PluginNotifier, DiagnosticCallback));
+    WSLC_DIAG(
+        diagnostics,
+        WSLCDiagnosticLevelDebug,
+        WSLC_DIAG_CODE_SESSION_INITIALIZATION_COMPLETED,
+        L"Name: {}; ID: {}",
+        Settings->DisplayName,
+        Settings->SessionId);
 
     // Create the service session ref. It extracts metadata and a weak reference from the session.
     auto serviceRef = Microsoft::WRL::Make<wslc::WSLCSessionReference>(session.Get());

@@ -24,6 +24,10 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
     CLIExecutionContext() : wsl::windows::common::ExecutionContext(wsl::windows::common::Context::WslC)
     {
     }
+    CLIExecutionContext(FILE* outFile, bool outVtEnabled, FILE* errFile, bool errVtEnabled) :
+        wsl::windows::common::ExecutionContext(wsl::windows::common::Context::WslC), Terminal(outFile, outVtEnabled, errFile, errVtEnabled)
+    {
+    }
     ~CLIExecutionContext() override = default;
 
     NON_COPYABLE(CLIExecutionContext);
@@ -57,3 +61,13 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 };
 
 } // namespace wsl::windows::wslc::execution
+
+// Debug message arguments are evaluated only when debug output is enabled.
+#define WSLC_DEBUG(Context, ...) \
+    do \
+    { \
+        if ((Context).Terminal.IsDebugEnabled()) \
+        { \
+            (Context).Terminal.Debug(__VA_ARGS__); \
+        } \
+    } while (false)

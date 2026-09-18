@@ -107,7 +107,7 @@ public:
         _In_ const WSLCSessionInitSettings* Settings,
         _In_ IWSLCVirtualMachineFactory* VmFactory,
         _In_ IWSLCPluginNotifier* PluginNotifier,
-        _In_opt_ IWarningCallback* WarningCallback) override;
+        _In_opt_ IDiagnosticCallback* DiagnosticCallback) override;
 
     IFACEMETHOD(GetId)(_Out_ ULONG* Id) override;
     IFACEMETHOD(GetDisplayName)(_Out_ LPWSTR* DisplayName) override;
@@ -130,18 +130,18 @@ public:
         _In_opt_ LPCSTR RegistryAuthenticationInformation,
         _In_ BOOL AllTags,
         _In_opt_ IProgressCallback* ProgressCallback,
-        _In_opt_ IWarningCallback* WarningCallback) override;
+        _In_opt_ IDiagnosticCallback* DiagnosticCallback) override;
     IFACEMETHOD(BuildImage)(_In_ const WSLCBuildImageOptions* Options, _In_opt_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
     IFACEMETHOD(LoadImage)(
         _In_ const WSLCHandle ImageHandle,
         _In_ ULONGLONG ContentLength,
-        _In_opt_ IWarningCallback* WarningCallback,
+        _In_opt_ IDiagnosticCallback* DiagnosticCallback,
         _In_opt_ IImageLoadCallback* LoadCallback) override;
     IFACEMETHOD(ImportImage)(
         _In_ const WSLCHandle ImageHandle,
         _In_opt_ LPCSTR ImageName,
         _In_ ULONGLONG ContentLength,
-        _In_opt_ IWarningCallback* WarningCallback,
+        _In_opt_ IDiagnosticCallback* DiagnosticCallback,
         _Out_ LPSTR* ImageId) override;
     IFACEMETHOD(SaveImage)(_In_ WSLCHandle OutputHandle, _In_ LPCSTR ImageNameOrID, _In_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
     IFACEMETHOD(SaveImages)(_In_ WSLCHandle OutputHandle, _In_ const WSLCStringArray* ImageNames, _In_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
@@ -153,7 +153,7 @@ public:
         _In_ LPCSTR RegistryAuthenticationInformation,
         _In_ BOOL AllTags,
         _In_opt_ IProgressCallback* ProgressCallback,
-        _In_opt_ IWarningCallback* WarningCallback) override;
+        _In_opt_ IDiagnosticCallback* DiagnosticCallback) override;
     IFACEMETHOD(InspectImage)(_In_ LPCSTR ImageNameOrId, _Out_ LPSTR* Output) override;
     IFACEMETHOD(Authenticate)(_In_ LPCSTR ServerAddress, _In_ LPCSTR Username, _In_ LPCSTR Password, _Out_ LPSTR* IdentityToken) override;
     IFACEMETHOD(PruneImages)(
@@ -164,7 +164,8 @@ public:
         _Out_ ULONGLONG* SpaceReclaimed) override;
 
     // Container management.
-    IFACEMETHOD(CreateContainer)(_In_ const WSLCContainerOptions* Options, _In_opt_ IWarningCallback* WarningCallback, _Out_ IWSLCContainer** Container) override;
+    IFACEMETHOD(CreateContainer)(
+        _In_ const WSLCContainerOptions* Options, _In_opt_ IDiagnosticCallback* DiagnosticCallback, _Out_ IWSLCContainer** Container) override;
     IFACEMETHOD(OpenContainer)(_In_ LPCSTR Id, _In_ IWSLCContainer** Container) override;
     IFACEMETHOD(BeginContainerOperation)(_Outptr_ IUnknown** Operation) override;
     IFACEMETHOD(ListContainers)(
@@ -197,13 +198,13 @@ public:
     IFACEMETHOD(PruneVolumes)
     (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters,
      _In_ ULONG FiltersCount,
-     _In_opt_ IWarningCallback* WarningCallback,
+    _In_opt_ IDiagnosticCallback* DiagnosticCallback,
      _Out_ WSLCVolumeName** Volumes,
      _Out_ ULONG* VolumesCount,
      _Out_ ULONGLONG* SpaceReclaimed) override;
 
     // Network management.
-    IFACEMETHOD(CreateNetwork)(_In_ const WSLCNetworkOptions* Options, _In_opt_ IWarningCallback* WarningCallback) override;
+    IFACEMETHOD(CreateNetwork)(_In_ const WSLCNetworkOptions* Options, _In_opt_ IDiagnosticCallback* DiagnosticCallback) override;
     IFACEMETHOD(DeleteNetwork)(_In_ LPCSTR Name) override;
     IFACEMETHOD(ListNetworks)
     (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters, _In_ ULONG FiltersCount, _Out_ LPSTR* Output) override;

@@ -37,6 +37,8 @@ std::wstring_view Terminal::LevelPrefix(Level level) const noexcept
 
     switch (level)
     {
+    case Level::Debug:
+        return Format::Dim.Get();
     case Level::Warning:
         return Format::Fg::BrightYellow.Get();
     case Level::Error:
@@ -44,6 +46,18 @@ std::wstring_view Terminal::LevelPrefix(Level level) const noexcept
     default:
         return {};
     }
+}
+
+std::wstring Terminal::LevelLabel(Level level) const
+{
+    if (level != Level::Debug)
+    {
+        return {};
+    }
+
+    SYSTEMTIME localTime{};
+    GetLocalTime(&localTime);
+    return std::format(L"[debug] {:02}:{:02}:{:02}.{:03} ", localTime.wHour, localTime.wMinute, localTime.wSecond, localTime.wMilliseconds);
 }
 
 bool Terminal::IsVTEnabled(Level level) const noexcept

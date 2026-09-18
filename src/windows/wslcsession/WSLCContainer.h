@@ -310,7 +310,7 @@ public:
 
     IFACEMETHOD(Attach)(_In_opt_ LPCSTR DetachKeys, _Out_ WSLCHandle* Stdin, _Out_ WSLCHandle* Stdout, _Out_ WSLCHandle* Stderr) override;
     IFACEMETHOD(Stop)(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds) override;
-    IFACEMETHOD(Restart)(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, _In_opt_ IWarningCallback* WarningCallback) override;
+    IFACEMETHOD(Restart)(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, _In_opt_ IDiagnosticCallback* DiagnosticCallback) override;
     IFACEMETHOD(Kill)(_In_ WSLCSignal Signal) override;
     IFACEMETHOD(Delete)(WSLCDeleteFlags Flags) override;
     IFACEMETHOD(Export)(_In_ WSLCHandle TarHandle) override;
@@ -319,7 +319,8 @@ public:
     IFACEMETHOD(GetState)(_Out_ WSLCContainerState* State) override;
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLCProcess** process) override;
     IFACEMETHOD(Exec)(_In_ const WSLCProcessOptions* Options, _In_opt_ const WSLCProcessStartOptions* StartOptions, _Out_ IWSLCProcess** Process) override;
-    IFACEMETHOD(Start)(WSLCContainerStartFlags Flags, _In_opt_ const WSLCProcessStartOptions* StartOptions, _In_opt_ IWarningCallback* WarningCallback) override;
+    IFACEMETHOD(Start)(
+        WSLCContainerStartFlags Flags, _In_opt_ const WSLCProcessStartOptions* StartOptions, _In_opt_ IDiagnosticCallback* DiagnosticCallback) override;
     IFACEMETHOD(Inspect)(_In_ BOOL Size, _Out_ LPSTR* Output) override;
     IFACEMETHOD(Logs)(_In_ WSLCLogsFlags Flags, _Out_ WSLCHandle* Stdout, _Out_ WSLCHandle* Stderr, _In_ LONGLONG Since, _In_ LONGLONG Until, _In_ ULONGLONG Tail) override;
     IFACEMETHOD(GetId)(_Out_ WSLCContainerId Id) override;

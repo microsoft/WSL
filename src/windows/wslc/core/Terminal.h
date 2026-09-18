@@ -68,6 +68,7 @@ struct Terminal
     {
         Output,
         Info,
+        Debug,
         Warning,
         Error,
     };
@@ -96,6 +97,14 @@ struct Terminal
     void Info(std::wformat_string<Args...> fmt, Args&&... args)
     {
         EmitFormatted(Level::Info, std::move(fmt), std::forward<Args>(args)...);
+    }
+
+    // Debug output is invariant English support data so logs remain comparable across
+    // machines and correlate directly with source code and diagnostic documentation.
+    template <typename... Args>
+    void Debug(std::wformat_string<Args...> fmt, Args&&... args)
+    {
+        EmitFormatted(Level::Debug, std::move(fmt), std::forward<Args>(args)...);
     }
     template <typename... Args>
     void Warn(std::wformat_string<Args...> fmt, Args&&... args)
@@ -159,6 +168,16 @@ struct Terminal
         m_noColor = noColor;
     }
 
+    bool IsDebugEnabled() const noexcept
+    {
+        return m_debugEnabled;
+    }
+
+    void SetDebugEnabled(bool enabled) noexcept
+    {
+        m_debugEnabled = enabled;
+    }
+
     // Console write width minus one (autowrap guard), or nullopt when redirected.
     std::optional<int> GetConsoleWidth(Level level) const;
 
@@ -171,9 +190,16 @@ private:
     // Per-level SGR prefix (empty when color is off).
     std::wstring_view LevelPrefix(Level level) const noexcept;
 
+    std::wstring LevelLabel(Level level) const;
+
     template <typename... Args>
     void EmitFormatted(Level level, std::wformat_string<Args...> fmt, Args&&... args)
     {
+        if (level == Level::Debug && !m_debugEnabled)
+        {
+            return;
+        }
+
         const OutputChannel& channel = ChannelFor(level);
         const bool vtEnabled = channel.IsVTEnabled();
         const bool colorEnabled = vtEnabled && !m_noColor;
@@ -185,7 +211,8 @@ private:
             [&fmt](auto&... values) { return std::vformat(std::wstring_view{fmt.get()}, std::make_wformat_args(values...)); }, stripped);
 
         const auto prefix = LevelPrefix(level);
-        if (prefix.empty())
+        const auto label = LevelLabel(level);
+        if (prefix.empty() && label.empty())
         {
             channel.WriteString(body);
             return;
@@ -193,10 +220,14 @@ private:
 
         const auto reset = wsl::windows::common::vt::Format::Default.Get();
         std::wstring out;
-        out.reserve(prefix.size() + body.size() + reset.size());
+        out.reserve(prefix.size() + label.size() + body.size() + reset.size());
         out.append(prefix);
+        out.append(label);
         out.append(body);
-        out.append(reset);
+        if (!prefix.empty())
+        {
+            out.append(reset);
+        }
         channel.WriteString(out);
     }
 
@@ -204,6 +235,7 @@ private:
     OutputChannel m_err;
     InputChannel m_in;
     bool m_noColor = false;
+    bool m_debugEnabled = false;
 };
 
 } // namespace wsl::windows::wslc
