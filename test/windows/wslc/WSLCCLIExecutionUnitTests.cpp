@@ -420,7 +420,7 @@ class WSLCCLIExecutionUnitTests
         wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
 
         const auto& options = context.Data.Get<Data::ContainerOptions>();
-        VERIFY_ARE_EQUAL(std::string("on-failure"), options.Restart.Name);
+        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyOnFailure, options.Restart.Policy);
         VERIFY_ARE_EQUAL(5LL, options.Restart.MaximumRetryCount);
     }
 
@@ -436,7 +436,7 @@ class WSLCCLIExecutionUnitTests
         wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
 
         const auto& options = context.Data.Get<Data::ContainerOptions>();
-        VERIFY_ARE_EQUAL(std::string("unless-stopped"), options.Restart.Name);
+        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyUnlessStopped, options.Restart.Policy);
         VERIFY_ARE_EQUAL(0LL, options.Restart.MaximumRetryCount);
     }
 

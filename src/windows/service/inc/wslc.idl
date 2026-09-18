@@ -266,6 +266,15 @@ typedef enum _WSLCMountSpecFlags
 cpp_quote("#define WSLCMountSpecFlagsValid (WSLCMountSpecFlagsTmpfsSize | WSLCMountSpecFlagsTmpfsMode | WSLCMountSpecFlagsCreateSourceIfMissing)")
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCMountSpecFlags);")
 
+typedef enum _WSLCContainerRestartPolicy
+{
+    WSLCContainerRestartPolicyInvalid = -1,
+    WSLCContainerRestartPolicyNone = 0,
+    WSLCContainerRestartPolicyAlways,
+    WSLCContainerRestartPolicyOnFailure,
+    WSLCContainerRestartPolicyUnlessStopped,
+} WSLCContainerRestartPolicy;
+
 typedef struct _WSLCMountSpec
 {
     WSLCMountType Type;
@@ -365,7 +374,7 @@ typedef struct _WSLCContainerOptions
     [unique, size_is(MountsCount)] const WSLCMountSpec* Mounts;
     ULONG MountsCount;
 
-    [unique, string] LPCSTR RestartPolicy;
+    WSLCContainerRestartPolicy RestartPolicy;
     LONGLONG RestartMaximumRetryCount;
 } WSLCContainerOptions;
 

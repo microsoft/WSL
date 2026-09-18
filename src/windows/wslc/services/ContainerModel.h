@@ -47,12 +47,12 @@ enum class PullPolicy
 
 struct RestartPolicy
 {
-    std::string Name{"no"};
+    WSLCContainerRestartPolicy Policy{WSLCContainerRestartPolicyNone};
     int64_t MaximumRetryCount{};
 
     bool IsNone() const noexcept
     {
-        return Name.empty() || Name == "no";
+        return Policy == WSLCContainerRestartPolicyNone;
     }
 };
 

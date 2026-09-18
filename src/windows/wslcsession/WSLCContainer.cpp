@@ -80,6 +80,35 @@ void ValidateStopTimeout(LONG TimeoutSeconds, bool allowDefault)
         TimeoutSeconds < 0 && TimeoutSeconds != WSLC_STOP_TIMEOUT_NONE && (!allowDefault || TimeoutSeconds != WSLC_STOP_TIMEOUT_DEFAULT));
 }
 
+std::string_view RestartPolicyName(WSLCContainerRestartPolicy policy) noexcept
+{
+    switch (policy)
+    {
+    case WSLCContainerRestartPolicyNone:
+        return "no";
+    case WSLCContainerRestartPolicyAlways:
+        return "always";
+    case WSLCContainerRestartPolicyOnFailure:
+        return "on-failure";
+    case WSLCContainerRestartPolicyUnlessStopped:
+        return "unless-stopped";
+    default:
+        return {};
+    }
+}
+
+void ValidateRestartPolicy(WSLCContainerRestartPolicy policy, std::int64_t maximumRetryCount)
+{
+    const bool validPolicy = policy == WSLCContainerRestartPolicyNone || policy == WSLCContainerRestartPolicyAlways ||
+                             policy == WSLCContainerRestartPolicyOnFailure || policy == WSLCContainerRestartPolicyUnlessStopped;
+    THROW_HR_IF_MSG(E_INVALIDARG, !validPolicy, "Invalid container restart policy: %i", static_cast<int>(policy));
+    THROW_HR_IF_MSG(E_INVALIDARG, maximumRetryCount < 0, "Restart maximum retry count cannot be negative");
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        policy != WSLCContainerRestartPolicyOnFailure && maximumRetryCount != 0,
+        "Restart maximum retry count is only valid for on-failure");
+}
+
 std::vector<std::string> StringArrayToVector(const WSLCStringArray& array)
 {
     if (array.Count == 0)
@@ -1966,6 +1995,7 @@ try
         return;
     }
 
+    std::optional<std::string> inspectJson;
     try
     {
         ReplaceInitProcessLockHeld(nullptr);
@@ -1977,9 +2007,12 @@ try
         const auto publicationTime = std::max(stateTime, static_cast<std::int64_t>(std::time(nullptr)));
         CommitState(WslcContainerStateRunning, stateTime, std::nullopt, publicationTime);
 
-        // The initial WSLC-directed start authorized this container configuration and its restart
-        // policy, so Docker retries do not create another plugin authorization boundary.
         ResolvePolicyRestartLockHeld(false);
+        try
+        {
+            inspectJson = wsl::shared::ToJson(BuildInspectContainer(dockerInspect));
+        }
+        CATCH_LOG_MSG("Failed to serialize policy restart notification for container '%hs'", m_id.c_str());
     }
     catch (...)
     {
@@ -1992,6 +2025,20 @@ try
         CATCH_LOG_MSG("Failed to stop unreconciled policy restart of container '%hs'", m_id.c_str());
 
         ResolvePolicyRestartLockHeld(true);
+    }
+
+    lock.reset();
+    lifecycleLock.reset();
+    runtimeLock.reset();
+
+    if (inspectJson)
+    {
+        // Docker has already started the replacement, so this callback reports lifecycle telemetry.
+        try
+        {
+            LOG_IF_FAILED(m_pluginNotifier->OnContainerStarted(inspectJson->c_str()));
+        }
+        CATCH_LOG_MSG("Failed to notify plugin of policy restart for container '%hs'", m_id.c_str());
     }
 }
 catch (...)
@@ -2701,17 +2748,14 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         request.StopTimeout = static_cast<int>(containerOptions.StopTimeout);
     }
 
-    if (containerOptions.RestartPolicy != nullptr)
-    {
-        THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG,
-            Localization::WSLCCLI_ConflictingOptionsError(L"--restart", L"--rm"),
-            WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsRm) && containerOptions.RestartPolicy[0] != '\0' &&
-                std::string_view{containerOptions.RestartPolicy} != "no");
+    ValidateRestartPolicy(containerOptions.RestartPolicy, containerOptions.RestartMaximumRetryCount);
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG,
+        Localization::WSLCCLI_ConflictingOptionsError(L"--restart", L"--rm"),
+        WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsRm) && containerOptions.RestartPolicy != WSLCContainerRestartPolicyNone);
 
-        request.HostConfig.RestartPolicy.Name = containerOptions.RestartPolicy;
-        request.HostConfig.RestartPolicy.MaximumRetryCount = containerOptions.RestartMaximumRetryCount;
-    }
+    request.HostConfig.RestartPolicy.Name = RestartPolicyName(containerOptions.RestartPolicy);
+    request.HostConfig.RestartPolicy.MaximumRetryCount = containerOptions.RestartMaximumRetryCount;
 
     if (containerOptions.InitProcessOptions.CurrentDirectory != nullptr)
     {

@@ -842,18 +842,18 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    WSL2_TEST_METHOD(WslcContainerRestartAuthorizationInherited)
+    WSL2_TEST_METHOD(WslcContainerRestartLifecycleNotifications)
     {
-        ConfigurePlugin(PluginTestType::WslcContainerRestartAuthorizationInherited);
+        ConfigurePlugin(PluginTestType::WslcContainerRestartLifecycleNotifications);
 
         {
-            auto session = CreateWslcSession(L"plugin-wslc-container-restart-authorization");
+            auto session = CreateWslcSession(L"plugin-wslc-container-restart-lifecycle");
 
             LoadTestImage(*session, "debian:latest");
 
             wsl::windows::common::WSLCContainerLauncher launcher(
                 "debian:latest",
-                "wslc-plugin-restart-authorization",
+                "wslc-plugin-restart-lifecycle",
                 {"/bin/sh",
                  "-c",
                  "if [ -e /tmp/wslc-plugin-restarted ]; then exec tail -f /dev/null; "
@@ -861,7 +861,7 @@ class PluginTests
                 {},
                 "host",
                 WSLCProcessFlagsStdin);
-            launcher.SetRestartPolicy("on-failure", 1);
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyOnFailure, 1);
 
             auto container = launcher.Launch(*session);
             auto firstProcess = container.GetInitProcess();
@@ -881,13 +881,16 @@ class PluginTests
 
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=26
-            WSLC Session created, name=plugin-wslc-container-restart-authorization, id=*, pid=*, token=set, sid=set
+            WSLC Session created, name=plugin-wslc-container-restart-lifecycle, id=*, pid=*, token=set, sid=set
             WSLC Image created, session=*, id=sha256:*, name=debian:latest
-            WSLC Container started, session=*, id=*, name=/wslc-plugin-restart-authorization, image=debian:latest, state=running
-            WSLC Container restart policy authorization: on-failure:1
+            WSLC Container started, session=*, id=*, name=/wslc-plugin-restart-lifecycle, image=debian:latest, state=running
+            WSLC Container restart policy notification: on-failure:1
             WSLC Container stopping, session=*, id=*
+            WSLC Container started, session=*, id=*, name=/wslc-plugin-restart-lifecycle, image=debian:latest, state=running
+            WSLC Container restart policy notification: on-failure:1
+            OnWslcContainerStarted automatic restart notification: ERROR_ACCESS_DENIED
             WSLC Container stopping, session=*, id=*
-            WSLC Session stopping, name=plugin-wslc-container-restart-authorization, id=*)";
+            WSLC Session stopping, name=plugin-wslc-container-restart-lifecycle, id=*)";
 
         ValidateLogFile(ExpectedOutput);
     }
