@@ -645,7 +645,8 @@ try
     {
         if (e.hooks.ContainerStarted != nullptr)
         {
-            // Failure rejects the WSLC-directed start. Surface the first error.
+            // The caller determines whether the first plugin failure rejects an operation or is
+            // logged as a best-effort lifecycle notification.
             const auto result = e.hooks.ContainerStarted(Session, InspectJson);
             WSL_LOG(
                 "PluginOnWslcContainerStartedCall",

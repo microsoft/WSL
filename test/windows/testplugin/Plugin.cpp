@@ -31,6 +31,7 @@ std::optional<GUID> g_distroGuid;
 const WSLPluginAPIV1* g_api = nullptr;
 PluginTestType g_testType = PluginTestType::Invalid;
 std::atomic<unsigned int> g_wslcContainerStartedCount{};
+std::atomic<bool> g_wslcContainerIsRunning{};
 
 // Process deliberately left running across OnWslcVmStopping by the WslcVmStopCommitted test, to
 // prove the announced teardown happens anyway. Never released: it dies with the VM.
@@ -643,6 +644,12 @@ try
 
     if (g_testType == PluginTestType::WslcContainerRestartLifecycleNotifications)
     {
+        if (g_wslcContainerIsRunning.exchange(true))
+        {
+            g_logfile << "WSLC Container lifecycle notification order: consecutive starts" << std::endl;
+            return E_UNEXPECTED;
+        }
+
         if (container.HostConfig.RestartPolicy.Name != "on-failure" || container.HostConfig.RestartPolicy.MaximumRetryCount != 1)
         {
             g_logfile << "WSLC Container restart policy notification: invalid" << std::endl;
@@ -664,6 +671,13 @@ CATCH_RETURN();
 HRESULT OnWslcContainerStopping(const WSLCSessionInformation* Session, LPCSTR ContainerId)
 {
     g_logfile << "WSLC Container stopping, session=" << Session->SessionId << ", id=" << ContainerId << std::endl;
+
+    if (g_testType == PluginTestType::WslcContainerRestartLifecycleNotifications && !g_wslcContainerIsRunning.exchange(false))
+    {
+        g_logfile << "WSLC Container lifecycle notification order: stop without start" << std::endl;
+        return E_UNEXPECTED;
+    }
+
     return S_OK;
 }
 
@@ -876,6 +890,7 @@ EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPlugin
 
         g_logfile << "Plugin loaded. TestMode=" << static_cast<DWORD>(g_testType) << std::endl;
         g_wslcContainerStartedCount = 0;
+        g_wslcContainerIsRunning = false;
         g_api = Api;
         Hooks->OnVMStarted = &OnVmStarted;
         Hooks->OnVMStopping = &OnVmStopping;

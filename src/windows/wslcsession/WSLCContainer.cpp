@@ -1376,7 +1376,6 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
 {
     // Either owner may disconnect the COM wrapper, so both must outlive m_lock.
     unique_com_disconnect comWrapper;
-    bool notifyContainerStopping = false;
     bool reconcilePolicyRestart = false;
     std::shared_ptr<StateTransition> transition;
 
@@ -1410,14 +1409,21 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
             }
             else
             {
-                notifyContainerStopping = PrepareForUnexpectedStartLockHeld(eventTime);
+                if (PrepareForUnexpectedStartLockHeld(eventTime))
+                {
+                    NotifyContainerStoppingLockHeld();
+                }
+
                 reconcilePolicyRestart = true;
             }
         }
         else if (event == ContainerEvent::Stop)
         {
             WI_ASSERT(exitCode.has_value());
-            notifyContainerStopping = OnStopped(exitCode.value(), eventTime, eventTimeNanoseconds);
+            if (OnStopped(exitCode.value(), eventTime, eventTimeNanoseconds))
+            {
+                NotifyContainerStoppingLockHeld();
+            }
         }
         else if (event == ContainerEvent::Destroy)
         {
@@ -1447,17 +1453,6 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
             TraceLoggingValue(m_name.c_str(), "Name"),
             TraceLoggingValue(m_id.c_str(), "Id"),
             TraceLoggingValue((int)event, "Event"));
-    }
-
-    if (notifyContainerStopping)
-    {
-        // Plugin callbacks may re-enter WSLC. Invoke this after releasing lifecycle and container
-        // locks, but before policy reconciliation can report the replacement start.
-        try
-        {
-            LOG_IF_FAILED(m_pluginNotifier->OnContainerStopping(m_id.c_str()));
-        }
-        CATCH_LOG();
     }
 
     if (reconcilePolicyRestart)
@@ -1928,6 +1923,14 @@ __requires_exclusive_lock_held(m_lock) bool WSLCContainerImpl::OnStopped(int exi
     return notifyContainerStopping;
 }
 
+__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::NotifyContainerStoppingLockHeld() noexcept
+try
+{
+    // Serializing callbacks with state transitions preserves per-container start/stop ordering.
+    LOG_IF_FAILED(m_pluginNotifier->OnContainerStopping(m_id.c_str()));
+}
+CATCH_LOG()
+
 __requires_lock_held(m_lock) bool WSLCContainerImpl::PolicyRestartPendingLockHeld() const noexcept
 {
     return m_restart && m_restart->Source == RestartSource::Policy;
@@ -1995,7 +1998,6 @@ try
         return;
     }
 
-    std::optional<std::string> inspectJson;
     try
     {
         ReplaceInitProcessLockHeld(nullptr);
@@ -2008,11 +2010,15 @@ try
         CommitState(WslcContainerStateRunning, stateTime, std::nullopt, publicationTime);
 
         ResolvePolicyRestartLockHeld(false);
+
         try
         {
-            inspectJson = wsl::shared::ToJson(BuildInspectContainer(dockerInspect));
+            auto inspectJson = wsl::shared::ToJson(BuildInspectContainer(dockerInspect));
+
+            // Docker has already started the replacement, so failure only affects telemetry.
+            LOG_IF_FAILED(m_pluginNotifier->OnContainerStarted(inspectJson.c_str()));
         }
-        CATCH_LOG_MSG("Failed to serialize policy restart notification for container '%hs'", m_id.c_str());
+        CATCH_LOG_MSG("Failed to notify plugin of policy restart for container '%hs'", m_id.c_str());
     }
     catch (...)
     {
@@ -2025,20 +2031,6 @@ try
         CATCH_LOG_MSG("Failed to stop unreconciled policy restart of container '%hs'", m_id.c_str());
 
         ResolvePolicyRestartLockHeld(true);
-    }
-
-    lock.reset();
-    lifecycleLock.reset();
-    runtimeLock.reset();
-
-    if (inspectJson)
-    {
-        // Docker has already started the replacement, so this callback reports lifecycle telemetry.
-        try
-        {
-            LOG_IF_FAILED(m_pluginNotifier->OnContainerStarted(inspectJson->c_str()));
-        }
-        CATCH_LOG_MSG("Failed to notify plugin of policy restart for container '%hs'", m_id.c_str());
     }
 }
 catch (...)

@@ -251,6 +251,7 @@ private:
 
     __requires_exclusive_lock_held(m_lock)
         [[nodiscard]] bool OnStopped(int exitCode, std::int64_t stopTime, std::optional<std::int64_t> stopTimeNanoseconds);
+    __requires_exclusive_lock_held(m_lock) void NotifyContainerStoppingLockHeld() noexcept;
     __requires_exclusive_lock_held(m_lock) void ArmPolicyRestartLockHeld();
 
     // The event stream, monitor, and startup recovery all enter this state machine. It acquires
