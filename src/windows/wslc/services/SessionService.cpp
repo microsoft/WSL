@@ -23,6 +23,8 @@ Abstract:
 #include <WSLCProcessLauncher.h>
 
 namespace wsl::windows::wslc::services {
+
+using namespace wsl::windows::wslc::cli;
 using namespace wsl::shared;
 using namespace wsl::shared::string;
 using namespace wsl::windows::common;

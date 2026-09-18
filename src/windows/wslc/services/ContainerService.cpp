@@ -30,6 +30,8 @@ Abstract:
 #include <wslc.h>
 
 namespace wsl::windows::wslc::services {
+
+using namespace wsl::windows::wslc::cli;
 namespace mount = wsl::windows::common::mount;
 
 using wsl::windows::common::ClientRunningWSLCProcess;

@@ -30,6 +30,8 @@ using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
 
+using namespace wsl::windows::wslc::cli;
+
 static void WriteSessionTable(Terminal& terminal, const std::vector<SessionInformation>& sessions)
 {
     TableOutput<3> table(

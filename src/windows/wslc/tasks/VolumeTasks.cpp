@@ -32,6 +32,8 @@ using wsl::windows::common::string::FormatHumanReadableSize;
 
 namespace wsl::windows::wslc::task {
 
+using namespace wsl::windows::wslc::cli;
+
 namespace {
 
     // Reported for the fields that only carry a value when volume usage data or swarm cluster
@@ -218,7 +220,7 @@ void ListVolumes(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        auto table = wsl::windows::wslc::TableOutput<2>(context.Terminal, {L"DRIVER", L"VOLUME NAME"});
+        auto table = wsl::windows::wslc::cli::TableOutput<2>(context.Terminal, {L"DRIVER", L"VOLUME NAME"});
         for (const auto& volume : volumes)
         {
             table.WriteRow({

@@ -214,6 +214,8 @@ ContainerOutputInformation ToContainerOutput(const ContainerInformation& contain
 
 namespace wsl::windows::wslc::task {
 
+using namespace wsl::windows::wslc::cli;
+
 // Every container is attempted even if an earlier one fails; the command still exits nonzero.
 template <typename TAction>
 static void ForEachContainer(CLIExecutionContext& context, TAction&& action)
@@ -799,7 +801,7 @@ void ListContainers(CLIExecutionContext& context)
         const bool showSize = context.Args.GetValue<ArgType::Size>();
 
         // Create table with or without column limits based on --no-trunc flag
-        auto table = trunc ? wsl::windows::wslc::TableOutput<8>(
+        auto table = trunc ? wsl::windows::wslc::cli::TableOutput<8>(
                                  context.Terminal,
                                  {{{Localization::WSLCCLI_TableHeaderContainerId(), {.MaxWidth = 12, .Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderImage(), {.MaxWidth = 20, .Overflow = Shrink}},
@@ -810,7 +812,7 @@ void ListContainers(CLIExecutionContext& context)
                                    {Localization::WSLCCLI_TableHeaderNames(), {.MaxWidth = 20, .Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderSize(), {.Overflow = Shrink}}}},
                                  containers.size())
-                           : wsl::windows::wslc::TableOutput<8>(
+                           : wsl::windows::wslc::cli::TableOutput<8>(
                                  context.Terminal,
                                  {Localization::WSLCCLI_TableHeaderContainerId(),
                                   Localization::WSLCCLI_TableHeaderImage(),
@@ -1193,7 +1195,7 @@ void ShowContainerStats(CLIExecutionContext& context)
         bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
         using enum ColumnOverflow;
 
-        auto table = trunc ? wsl::windows::wslc::TableOutput<8>(
+        auto table = trunc ? wsl::windows::wslc::cli::TableOutput<8>(
                                  context.Terminal,
                                  {{{Localization::WSLCCLI_TableHeaderContainerId(), {.MaxWidth = 12, .Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderName(), {.MaxWidth = 20, .Overflow = Shrink}},
@@ -1204,7 +1206,7 @@ void ShowContainerStats(CLIExecutionContext& context)
                                    {Localization::WSLCCLI_TableHeaderBlockIo(), {.Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderPids(), {.Overflow = Shrink}}}},
                                  statsJson.size())
-                           : wsl::windows::wslc::TableOutput<8>(
+                           : wsl::windows::wslc::cli::TableOutput<8>(
                                  context.Terminal,
                                  {Localization::WSLCCLI_TableHeaderContainerId(),
                                   Localization::WSLCCLI_TableHeaderName(),
