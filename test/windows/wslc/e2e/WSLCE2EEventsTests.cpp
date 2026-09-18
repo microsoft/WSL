@@ -169,18 +169,86 @@ class WSLCE2EEventsTests
         VerifyEventLine(lines[3], std::format(L" container destroy {} (image={}, name={})", containerId, DebianImage.NameAndTag(), c_eventContainerName));
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Events_RejectsUnsupportedFilterBeforeResolvingSession)
+    WSLC_TEST_METHOD(WSLCE2E_Events_NetworkLifecycle)
     {
-        GUID sessionGuid{};
-        VERIFY_SUCCEEDED(CoCreateGuid(&sessionGuid));
-        const auto missingSession = L"wslc-events-invalid-filter-" +
-                                    wsl::shared::string::GuidToString<wchar_t>(sessionGuid, wsl::shared::string::GuidToStringFlags::None);
+        GUID runId{};
+        VERIFY_SUCCEEDED(CoCreateGuid(&runId));
+        const auto suffix = wsl::shared::string::GuidToString<wchar_t>(runId, wsl::shared::string::GuidToStringFlags::None);
+        const auto networkName = L"wslc-events-network-" + suffix;
+        const auto containerName = L"wslc-events-container-" + suffix;
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            EnsureContainerDoesNotExist(containerName);
+            EnsureNetworkDoesNotExist(networkName);
+        });
 
+        auto events = RunWslcInteractive(
+            std::format(L"events --since 0 --filter type=network --filter network={}", networkName),
+            ElevationType::Elevated,
+            std::nullopt,
+            ProcessGroup::Create);
+        auto stopReader = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            if (events.IsRunning())
+            {
+                events.SendCtrlBreak();
+            }
+        });
+
+        auto result = RunWslc(std::format(L"network create --driver bridge {}", networkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto networkId = wsl::shared::string::MultiByteToWide(InspectNetwork(networkName).Id);
+
+        const auto expectedEvent = [&](std::wstring_view action, std::wstring_view containerId = {}) {
+            const auto containerAttribute = containerId.empty() ? std::wstring{} : std::format(L"container={}, ", containerId);
+            return std::format(L" network {} {} ({}name={}, type=bridge)", action, networkId, containerAttribute, networkName);
+        };
+
+        const auto createEvent = expectedEvent(L"create");
+        WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(createEvent));
+
+        result = RunWslc(std::format(
+            L"container run -d --name {} --network {} {} sleep infinity", containerName, networkName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto containerId = result.GetStdoutOneLine();
+        const auto connectEvent = expectedEvent(L"connect", containerId);
+        WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(connectEvent));
+
+        result = RunWslc(std::format(L"container rm -f {}", containerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto disconnectEvent = expectedEvent(L"disconnect", containerId);
+        WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(disconnectEvent));
+
+        result = RunWslc(std::format(L"network rm {}", networkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto destroyEvent = expectedEvent(L"destroy");
+        WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(destroyEvent));
+
+        events.SendCtrlBreak();
+        VERIFY_ARE_EQUAL(0, events.Wait());
+        events.VerifyNoErrors();
+        stopReader.release();
+
+        const WSLCExecutionResult output{.Stdout = wsl::shared::string::MultiByteToWide(events.GetStdoutData())};
+        const auto lines = output.GetStdoutLines();
+        const std::vector<std::wstring> expected{createEvent, connectEvent, disconnectEvent, destroyEvent};
+        VERIFY_ARE_EQUAL(expected.size(), lines.size());
+        for (size_t index = 0; index < expected.size(); ++index)
+        {
+            VerifyEventLine(lines[index], expected[index]);
+        }
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Events_RejectsUnsupportedFilter)
+    {
+        auto session = OpenDefaultElevatedSession();
         for (const auto* command : {L"events", L"system events"})
         {
-            const auto result = RunWslc(std::format(L"--session {} {} --filter network=test", missingSession, command));
-            result.Verify({.Stdout = L"", .ExitCode = 1});
-            VERIFY_IS_TRUE(result.StderrContainsSubstring(wsl::shared::Localization::MessageWslcInvalidFilter(L"network")));
+            for (const auto* key : {L"unsupported", L"label", L""})
+            {
+                const auto result = RunWslc(std::format(L"{} --filter {}=test", command, key));
+                result.Verify({.Stdout = L"", .ExitCode = 1});
+                VERIFY_IS_TRUE(result.StderrContainsSubstring(wsl::shared::Localization::MessageWslcInvalidFilter(key)));
+                VERIFY_IS_TRUE(result.StderrContainsSubstring(L"E_INVALIDARG"));
+            }
         }
     }
 

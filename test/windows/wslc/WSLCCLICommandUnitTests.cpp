@@ -110,7 +110,7 @@ class WSLCCLICommandUnitTests
         VERIFY_ARE_EQUAL(wsl::shared::Localization::WSLCCLI_EventsUntilArgDescription(), arguments[1].Description());
         VERIFY_IS_TRUE(arguments[1].IsSingle());
 
-        VERIFY_ARE_EQUAL(ArgType::EventFilter, arguments[2].Type());
+        VERIFY_ARE_EQUAL(ArgType::Filter, arguments[2].Type());
         VERIFY_ARE_EQUAL(std::wstring(L"filter"), arguments[2].Name());
         VERIFY_ARE_EQUAL(std::wstring(L"f"), arguments[2].Alias());
         VERIFY_IS_TRUE(arguments[2].IsUnlimited());
