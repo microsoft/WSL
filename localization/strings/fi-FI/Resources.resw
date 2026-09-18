@@ -1215,7 +1215,7 @@ Katso palautusohjeet: https://aka.ms/wsldiskmountrecovery</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
-    <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. Using cgroup v2 instead. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
+    <value>Cgroup v1 ei ole yhteensopiva jakelukohtaisen cgroup-eristyksen kanssa. Käytetään sen sijaan cgroup v2:ta. Jos haluat käyttää cgroup v1:tä, määritä isolateDistroCgroup=false tiedoston .wslconfig [wsl2]-osaan ja suorita sitten wsl --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
