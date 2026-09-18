@@ -488,7 +488,7 @@ class WSLCCLITerminalUnitTests
         VERIFY_ARE_EQUAL(size_t{1}, callback.EnabledLevelsQueryCount);
 
         wsl::windows::wslc::diagnostics::DiagnosticReporter enabledDiagnostics{&callback};
-        WSLC_DIAG(enabledDiagnostics, WSLCDiagnosticLevelDebug, "enabled-debug", L"value={}", ++evaluationCount);
+        WSLC_DIAG(enabledDiagnostics, WSLCDiagnosticLevelDebug, "enabled-debug", "value={}", ++evaluationCount);
         VERIFY_ARE_EQUAL(size_t{1}, evaluationCount);
         VERIFY_ARE_EQUAL(size_t{1}, callback.DiagnosticCount);
         VERIFY_ARE_EQUAL(size_t{2}, callback.EnabledLevelsQueryCount);

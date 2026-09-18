@@ -8,10 +8,8 @@
 
 namespace wsl::windows::service::wslc {
 
-// Extends COMServiceExecutionContext with a WSLCSession pointer for lazy COM callback
-// registration when warnings are emitted. This enables EMIT_USER_WARNING to stream
-// warnings back to the CLI via IDiagnosticCallback, with proper cancellation support
-// during session termination via RegisterUserCOMCallback/CoCancelCall.
+// Extends COMServiceExecutionContext with a cached diagnostic reporter and a WSLCSession
+// pointer for cancellable reverse COM calls when warnings are emitted.
 class WSLCExecutionContext : public wsl::windows::common::COMServiceExecutionContext
 {
 public:
@@ -24,6 +22,11 @@ public:
     }
 
     ~WSLCExecutionContext() override = default;
+
+    const wsl::windows::wslc::diagnostics::DiagnosticReporter& Diagnostics() const noexcept
+    {
+        return m_diagnostics;
+    }
 
 protected:
     bool CollectUserWarning(const std::wstring& warning) override

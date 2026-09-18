@@ -94,6 +94,7 @@ cpp_quote("#define WSLCDiagnosticLevelValid (WSLCDiagnosticLevelDebug | WSLCDiag
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCDiagnosticLevel);")
 
 cpp_quote("#define WSLC_DIAGNOSTIC_SCHEMA_VERSION 1")
+// Diagnostic codes are stable ASCII identifiers. Human-readable messages use UTF-16.
 cpp_quote("#define WSLC_DIAG_CODE_USER_WARNING \"user-warning\"")
 cpp_quote("#define WSLC_DIAG_CODE_SESSION_RESOLUTION_STARTED \"session-resolution-started\"")
 cpp_quote("#define WSLC_DIAG_CODE_SESSION_OPENED \"session-opened\"")
@@ -102,6 +103,24 @@ cpp_quote("#define WSLC_DIAG_CODE_SESSION_PROCESS_CREATED \"session-process-crea
 cpp_quote("#define WSLC_DIAG_CODE_SESSION_INITIALIZATION_STARTED \"session-initialization-started\"")
 cpp_quote("#define WSLC_DIAG_CODE_SESSION_INITIALIZATION_COMPLETED \"session-initialization-completed\"")
 cpp_quote("#define WSLC_DIAG_CODE_SESSION_CREATION_COMPLETED \"session-creation-completed\"")
+cpp_quote("#define WSLC_DIAG_CODE_IMAGE_PULL_STARTED \"image-pull-started\"")
+cpp_quote("#define WSLC_DIAG_CODE_IMAGE_PULL_COMPLETED \"image-pull-completed\"")
+cpp_quote("#define WSLC_DIAG_CODE_IMAGE_LOAD_STARTED \"image-load-started\"")
+cpp_quote("#define WSLC_DIAG_CODE_IMAGE_LOAD_COMPLETED \"image-load-completed\"")
+cpp_quote("#define WSLC_DIAG_CODE_IMAGE_IMPORT_STARTED \"image-import-started\"")
+cpp_quote("#define WSLC_DIAG_CODE_IMAGE_IMPORT_COMPLETED \"image-import-completed\"")
+cpp_quote("#define WSLC_DIAG_CODE_IMAGE_PUSH_STARTED \"image-push-started\"")
+cpp_quote("#define WSLC_DIAG_CODE_IMAGE_PUSH_COMPLETED \"image-push-completed\"")
+cpp_quote("#define WSLC_DIAG_CODE_CONTAINER_CREATION_STARTED \"container-creation-started\"")
+cpp_quote("#define WSLC_DIAG_CODE_CONTAINER_CREATION_COMPLETED \"container-creation-completed\"")
+cpp_quote("#define WSLC_DIAG_CODE_CONTAINER_STARTING \"container-starting\"")
+cpp_quote("#define WSLC_DIAG_CODE_CONTAINER_STARTED \"container-started\"")
+cpp_quote("#define WSLC_DIAG_CODE_CONTAINER_RESTARTING \"container-restarting\"")
+cpp_quote("#define WSLC_DIAG_CODE_CONTAINER_RESTARTED \"container-restarted\"")
+cpp_quote("#define WSLC_DIAG_CODE_VOLUME_PRUNE_STARTED \"volume-prune-started\"")
+cpp_quote("#define WSLC_DIAG_CODE_VOLUME_PRUNE_COMPLETED \"volume-prune-completed\"")
+cpp_quote("#define WSLC_DIAG_CODE_NETWORK_CREATION_STARTED \"network-creation-started\"")
+cpp_quote("#define WSLC_DIAG_CODE_NETWORK_CREATION_COMPLETED \"network-creation-completed\"")
 
 typedef enum _EnumReferenceFormat
 {

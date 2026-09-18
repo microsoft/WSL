@@ -14096,24 +14096,34 @@ class WSLCTests
         VERIFY_IS_TRUE(process.GetExitEvent().wait(30000));
     }
 
-    // Helper: COM callback that captures all warnings received.
-    class CapturingWarningCallback
+    class CapturingDiagnosticCallback
         : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IDiagnosticCallback, IFastRundown>
     {
     public:
+        explicit CapturingDiagnosticCallback(WSLCDiagnosticLevel enabledLevels = WSLCDiagnosticLevelWarning) :
+            m_enabledLevels(enabledLevels)
+        {
+        }
+
         HRESULT GetEnabledLevels(WSLCDiagnosticLevel* Levels) override
         {
             RETURN_HR_IF_NULL(E_POINTER, Levels);
-            *Levels = WSLCDiagnosticLevelWarning;
+            *Levels = m_enabledLevels;
             return S_OK;
         }
 
         HRESULT OnDiagnostic(const WSLCDiagnosticEvent* Event) override
         {
             RETURN_HR_IF_NULL(E_POINTER, Event);
+
+            std::lock_guard lock(m_lock);
+            if (Event->Code != nullptr)
+            {
+                m_codes.emplace_back(Event->Code);
+            }
+
             if (Event->Level == WSLCDiagnosticLevelWarning && Event->Message != nullptr)
             {
-                std::lock_guard lock(m_lock);
                 m_warnings.emplace_back(Event->Message);
             }
 
@@ -14126,10 +14136,37 @@ class WSLCTests
             return m_warnings;
         }
 
+        std::vector<std::string> GetCodes()
+        {
+            std::lock_guard lock(m_lock);
+            return m_codes;
+        }
+
     private:
+        WSLCDiagnosticLevel m_enabledLevels;
         std::mutex m_lock;
+        std::vector<std::string> m_codes;
         std::vector<std::wstring> m_warnings;
     };
+
+    WSLC_TEST_METHOD(DiagnosticCallbackNetworkLifecycle)
+    {
+        const std::string networkName = "diagnostic-network-lifecycle";
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = "bridge";
+
+        auto callback = Microsoft::WRL::Make<CapturingDiagnosticCallback>(WSLCDiagnosticLevelDebug);
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, callback.Get()));
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        const auto codes = callback->GetCodes();
+        VERIFY_ARE_EQUAL(size_t{2}, codes.size());
+        VERIFY_ARE_EQUAL(std::string{WSLC_DIAG_CODE_NETWORK_CREATION_STARTED}, codes[0]);
+        VERIFY_ARE_EQUAL(std::string{WSLC_DIAG_CODE_NETWORK_CREATION_COMPLETED}, codes[1]);
+    }
 
     WSLC_TEST_METHOD(WarningCallbackContainerRecovery)
     {
@@ -14165,7 +14202,7 @@ class WSLCTests
             VERIFY_SUCCEEDED(session->Terminate());
 
             // Phase 2: Create a new session pointing to the same storage with a warning callback.
-            auto warningCallback = Microsoft::WRL::Make<CapturingWarningCallback>();
+            auto warningCallback = Microsoft::WRL::Make<CapturingDiagnosticCallback>();
 
             auto settings2 = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeConsomme);
             settings2.StoragePath = storagePath.c_str();
@@ -14241,7 +14278,7 @@ class WSLCTests
         VERIFY_IS_TRUE(DeleteFileA(vhdHostPath.c_str()));
 
         {
-            auto warningCallback = Microsoft::WRL::Make<CapturingWarningCallback>();
+            auto warningCallback = Microsoft::WRL::Make<CapturingDiagnosticCallback>();
 
             auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeConsomme);
             settings.StoragePath = storagePath.c_str();
@@ -14314,7 +14351,7 @@ class WSLCTests
 
         // Restart with a warning callback and verify the unsupported volume triggers a recovery warning when the session loads.
         {
-            auto warningCallback = Microsoft::WRL::Make<CapturingWarningCallback>();
+            auto warningCallback = Microsoft::WRL::Make<CapturingDiagnosticCallback>();
 
             auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeConsomme);
             settings.StoragePath = storagePath.c_str();

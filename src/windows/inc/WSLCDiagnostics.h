@@ -3,6 +3,7 @@
 #pragma once
 
 #include <format>
+#include "stringshared.h"
 #include <utility>
 #include <wrl/client.h>
 #include <wslc.h>
@@ -106,6 +107,21 @@ public:
         wsl::windows::wslc::diagnostics::Report(m_callback.Get(), m_enabledLevels, level, code, std::move(format), std::forward<Args>(args)...);
     }
 
+    template <typename... Args>
+    void Report(WSLCDiagnosticLevel level, LPCSTR code, std::format_string<Args...> format, Args&&... args) const noexcept
+    {
+        if (!HasCallback() || !IsEnabled(level))
+        {
+            return;
+        }
+
+        LOG_IF_FAILED(wil::ResultFromException([&]() {
+            const auto message = std::format(std::move(format), std::forward<Args>(args)...);
+            const auto wideMessage = wsl::shared::string::MultiByteToWide(message);
+            wsl::windows::wslc::diagnostics::Report(m_callback.Get(), m_enabledLevels, level, code, wideMessage.c_str());
+        }));
+    }
+
 private:
     Microsoft::WRL::ComPtr<IDiagnosticCallback> m_callback;
     WSLCDiagnosticLevel m_enabledLevels = WSLCDiagnosticLevelNone;
@@ -121,6 +137,6 @@ private:
         const auto _wslcDiagnosticLevel = (Level); \
         if (_wslcDiagnosticContext.IsEnabled(_wslcDiagnosticLevel)) \
         { \
-            _wslcDiagnosticContext.Report(_wslcDiagnosticLevel, __VA_ARGS__); \
+            LOG_IF_FAILED(wil::ResultFromException([&]() { _wslcDiagnosticContext.Report(_wslcDiagnosticLevel, __VA_ARGS__); })); \
         } \
     } while (false)

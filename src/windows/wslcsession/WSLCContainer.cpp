@@ -3272,11 +3272,23 @@ HRESULT WSLCContainer::Restart(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds,
 try
 {
     WSLCExecutionContext context(&m_session, DiagnosticCallback);
+    const auto getContainerName = [this]() {
+        auto [lock, impl] = LockImpl();
+        return impl->Name();
+    };
 
     // Hold a VM lease across both phases: the container is not Running in between, so nothing else
     // keeps the VM alive.
     auto vmLease = m_session.Runtime().AcquireVmLease();
-    return CallImpl(&WSLCContainerImpl::Restart, Signal, TimeoutSeconds);
+    WSLC_DIAG(context.Diagnostics(), WSLCDiagnosticLevelDebug, WSLC_DIAG_CODE_CONTAINER_RESTARTING, "Name: {}", getContainerName());
+
+    const auto result = CallImpl(&WSLCContainerImpl::Restart, Signal, TimeoutSeconds);
+    if (SUCCEEDED(result))
+    {
+        WSLC_DIAG(context.Diagnostics(), WSLCDiagnosticLevelDebug, WSLC_DIAG_CODE_CONTAINER_RESTARTED, "Name: {}", getContainerName());
+    }
+
+    return result;
 }
 CATCH_RETURN();
 
@@ -3284,11 +3296,23 @@ HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags, const WSLCProcessSta
 try
 {
     WSLCExecutionContext context(&m_session, DiagnosticCallback);
+    const auto getContainerName = [this]() {
+        auto [lock, impl] = LockImpl();
+        return impl->Name();
+    };
 
     THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCContainerStartFlagsValid), "Invalid flags: 0x%x", Flags);
 
     auto vmLease = m_session.Runtime().AcquireVmLease();
-    return CallImpl(&WSLCContainerImpl::Start, Flags, StartOptions);
+    WSLC_DIAG(context.Diagnostics(), WSLCDiagnosticLevelDebug, WSLC_DIAG_CODE_CONTAINER_STARTING, "Name: {}", getContainerName());
+
+    const auto result = CallImpl(&WSLCContainerImpl::Start, Flags, StartOptions);
+    if (SUCCEEDED(result))
+    {
+        WSLC_DIAG(context.Diagnostics(), WSLCDiagnosticLevelDebug, WSLC_DIAG_CODE_CONTAINER_STARTED, "Name: {}", getContainerName());
+    }
+
+    return result;
 }
 CATCH_RETURN();
 
