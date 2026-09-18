@@ -45,6 +45,17 @@ enum class PullPolicy
     Never,
 };
 
+struct RestartPolicy
+{
+    WSLCContainerRestartPolicy Policy{WSLCContainerRestartPolicyNone};
+    int64_t MaximumRetryCount{};
+
+    bool IsNone() const noexcept
+    {
+        return Policy == WSLCContainerRestartPolicyNone;
+    }
+};
+
 // Progress output style for `wslc build`. Auto resolves to Tty when progress output is an
 // interactive VT console and Plain otherwise.
 enum class ProgressMode
@@ -63,6 +74,7 @@ struct ContainerOptions
     bool Interactive = false;
     std::string Name;
     bool Remove = false;
+    RestartPolicy Restart;
     bool TTY = false;
     bool PublishAll = false;
     WSLCSignal StopSignal = WSLCSignalNone;

@@ -868,6 +868,59 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
+    WSL2_TEST_METHOD(WslcContainerRestartLifecycleNotifications)
+    {
+        ConfigurePlugin(PluginTestType::WslcContainerRestartLifecycleNotifications);
+
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-container-restart-lifecycle");
+
+            LoadTestImage(*session, "debian:latest");
+
+            wsl::windows::common::WSLCContainerLauncher launcher(
+                "debian:latest",
+                "wslc-plugin-restart-lifecycle",
+                {"/bin/sh",
+                 "-c",
+                 "if [ -e /tmp/wslc-plugin-restarted ]; then exec tail -f /dev/null; "
+                 "else touch /tmp/wslc-plugin-restarted; echo ready; read value; exit 1; fi"},
+                {},
+                "host",
+                WSLCProcessFlagsStdin);
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyOnFailure, 1);
+
+            auto container = launcher.Launch(*session);
+            auto firstProcess = container.GetInitProcess();
+            WaitForOutput(firstProcess.GetStdHandle(1), "ready");
+
+            auto stdinHandle = firstProcess.GetStdHandle(0);
+            DWORD bytesWritten{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(stdinHandle.Get(), "go\n", 3, &bytesWritten, nullptr));
+            VERIFY_ARE_EQUAL(3UL, bytesWritten);
+            VERIFY_ARE_EQUAL(1, firstProcess.Wait());
+
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { THROW_HR_IF(E_FAIL, container.State() != WslcContainerStateRunning); },
+                std::chrono::milliseconds(100),
+                std::chrono::seconds(30));
+        }
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=26
+            WSLC Session created, name=plugin-wslc-container-restart-lifecycle, id=*, pid=*, token=set, sid=set
+            WSLC Image created, session=*, id=sha256:*, name=debian:latest
+            WSLC Container started, session=*, id=*, name=/wslc-plugin-restart-lifecycle, image=debian:latest, state=running
+            WSLC Container restart policy notification: on-failure:1
+            WSLC Container stopping, session=*, id=*
+            WSLC Container started, session=*, id=*, name=/wslc-plugin-restart-lifecycle, image=debian:latest, state=running
+            WSLC Container restart policy notification: on-failure:1
+            OnWslcContainerStarted automatic restart notification: ERROR_ACCESS_DENIED
+            WSLC Container stopping, session=*, id=*
+            WSLC Session stopping, name=plugin-wslc-container-restart-lifecycle, id=*)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
     // Validates the VM-lifecycle hooks: OnWslcVmStarted fires each time the VM is (re)created and
     // OnWslcVmStopping each time it is torn down, decoupled from the once-per-session hooks. Also
     // proves the started hook can call back into the session (WSLCCreateProcess) without deadlocking.
