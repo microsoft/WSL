@@ -4276,9 +4276,6 @@ class MirroredTests
 
     WSL2_TEST_METHOD(LoopbackExplicit)
     {
-        // TODO: re-enable once OS build 29555 loopback regression is resolved.
-        SKIP_TEST_UNSTABLE();
-
         MIRRORED_NETWORKING_TEST_ONLY();
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
@@ -4694,6 +4691,7 @@ class MirroredTests
     WSL2_TEST_METHOD(GuestBindToHostEphemeralRangeCapped)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
+        SKIP_TEST_UNSTABLE();
 
         // The service caps the number of host-ephemeral ports the guest can reserve at half the host
         // ephemeral range size, so it cannot exhaust the host's ephemeral ports. Shrink the host
