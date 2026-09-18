@@ -74,7 +74,7 @@ CATCH_LOG()
 
 namespace {
 
-    // Values sharing a key are OR'd, distinct keys are AND'd. Unrecognized keys are ignored.
+    // Values sharing a key are OR'd, distinct keys are AND'd.
     bool EventMatchesFilters(const wsl::windows::common::wslc_schema::Event& event, const std::map<std::string, std::vector<std::string>>& filters)
     {
         for (const auto& [key, values] : filters)
@@ -143,6 +143,14 @@ Microsoft::WRL::ComPtr<IWSLCEventStream> EventStore::CreateStream(
         E_INVALIDARG,
         Localization::MessageWslcEventsInvalidTimeWindow(SinceTime, UntilTime),
         SinceTime < 0 || UntilTime < 0 || (SinceTime != 0 && UntilTime != 0 && SinceTime > UntilTime));
+
+    for (const auto& [key, values] : Filters)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG,
+            Localization::MessageWslcInvalidFilter(wsl::shared::string::MultiByteToWide(key)),
+            key != "type" && key != "event" && key != "container" && key != "image" && key != "network");
+    }
 
     Microsoft::WRL::ComPtr<EventStream> stream;
     THROW_IF_FAILED(Microsoft::WRL::MakeAndInitialize<EventStream>(&stream, std::move(Session), this, SinceTime, UntilTime, std::move(Filters)));

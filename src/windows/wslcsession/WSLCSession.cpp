@@ -2566,17 +2566,11 @@ try
 }
 CATCH_LOG()
 
-void WSLCSession::OnNetworkEvent(const std::string& NetworkId, NetworkEvent Event, const std::map<std::string, std::string>& Attributes, std::int64_t Time) noexcept
+void WSLCSession::OnNetworkEvent(
+    const std::string& NetworkId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t Time) noexcept
 try
 {
-    static const std::map<NetworkEvent, std::string> actions{
-        {NetworkEvent::Create, "create"},
-        {NetworkEvent::Connect, "connect"},
-        {NetworkEvent::Disconnect, "disconnect"},
-        {NetworkEvent::Destroy, "destroy"},
-        {NetworkEvent::Prune, "prune"}};
-
-    m_eventStore.Record("network", std::string{actions.at(Event)}, NetworkId, Attributes, Time);
+    m_eventStore.Record("network", std::string{Action}, NetworkId, Attributes, Time);
 }
 CATCH_LOG()
 

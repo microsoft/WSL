@@ -354,7 +354,7 @@ private:
 
     // Docker network notifications are forwarded to the event store as they arrive; the session's
     // network state is committed independently by the mutators under m_networksLock.
-    void OnNetworkEvent(const std::string& NetworkId, NetworkEvent Event, const std::map<std::string, std::string>& Attributes, std::int64_t Time) noexcept;
+    void OnNetworkEvent(const std::string& NetworkId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t Time) noexcept;
 
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
 

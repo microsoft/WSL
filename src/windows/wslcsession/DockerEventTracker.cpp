@@ -233,19 +233,6 @@ void DockerEventTracker::OnVolumeEvent(const nlohmann::json& parsed, const std::
 
 void DockerEventTracker::OnNetworkEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime)
 {
-    static std::map<std::string, NetworkEvent> events{
-        {"create", NetworkEvent::Create},
-        {"connect", NetworkEvent::Connect},
-        {"disconnect", NetworkEvent::Disconnect},
-        {"destroy", NetworkEvent::Destroy},
-        {"prune", NetworkEvent::Prune}};
-
-    auto it = events.find(action);
-    if (it == events.end())
-    {
-        return; // Event is not tracked, dropped.
-    }
-
     auto actor = parsed.find("Actor");
     THROW_HR_IF_MSG(E_INVALIDARG, actor == parsed.end(), "Missing Actor in network event");
 
@@ -258,7 +245,7 @@ void DockerEventTracker::OnNetworkEvent(const nlohmann::json& parsed, const std:
     else
     {
         // Docker's aggregate prune event reports no network.
-        THROW_HR_IF_MSG(E_INVALIDARG, it->second != NetworkEvent::Prune, "Missing Actor.ID in network event");
+        THROW_HR_IF_MSG(E_INVALIDARG, action != "prune", "Missing Actor.ID in network event");
     }
 
     std::map<std::string, std::string> attributes;
@@ -274,7 +261,8 @@ void DockerEventTracker::OnNetworkEvent(const nlohmann::json& parsed, const std:
         callbacks = m_networkCallbacks;
     }
 
-    InvokeCallbacks(callbacks, [&](const NetworkCallback& e) { e.Callback(networkId, it->second, attributes, eventTime); });
+    InvokeCallbacks(
+        callbacks, [&](const NetworkCallback& callback) { callback.Callback(networkId, action, attributes, eventTime); });
 }
 
 void DockerEventTracker::OnContainerCreated(const nlohmann::json& parsed, std::int64_t eventTime)

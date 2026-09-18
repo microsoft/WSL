@@ -7383,6 +7383,23 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(EventStreamRejectsUnsupportedFilterKeys)
+    {
+        for (const auto* key : {"unsupported", "label", "Type", ""})
+        {
+            WSLCFilter filters[]{{"type", "network"}, {key, "test"}};
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->GetEvents(0, 0, filters, ARRAYSIZE(filters), &stream));
+            ValidateCOMErrorMessage(wsl::shared::Localization::MessageWslcInvalidFilter(wsl::shared::string::MultiByteToWide(key)));
+            VERIFY_IS_NULL(stream.get());
+        }
+
+        WSLCFilter filter{"event", "future-network-action"};
+        wil::com_ptr<IWSLCEventStream> stream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, 1, &filter, 1, &stream));
+        VERIFY_IS_TRUE(DrainEventStream(stream.get()).empty());
+    }
+
     WSLC_TEST_METHOD(NetworkEventStream)
     {
         const auto networkName = GenerateNetworkEventTestName("wslc-test-network-events");

@@ -40,15 +40,6 @@ enum class VolumeEvent
     Destroy
 };
 
-enum class NetworkEvent
-{
-    Create,
-    Connect,
-    Disconnect,
-    Destroy,
-    Prune
-};
-
 class DockerEventTracker
 {
 public:
@@ -75,7 +66,7 @@ public:
     using ContainerStateChangeCallback = std::function<void(ContainerEvent, std::optional<int>, std::int64_t)>;
     using VolumeEventCallback = std::function<void(const std::string&, VolumeEvent, std::int64_t)>;
     using NetworkEventCallback =
-        std::function<void(const std::string&, NetworkEvent, const std::map<std::string, std::string>&, std::int64_t)>;
+        std::function<void(const std::string&, const std::string&, const std::map<std::string, std::string>&, std::int64_t)>;
     using ContainerCreateCallback = std::function<void(const std::string& ContainerId, std::int64_t Time)>;
 
     explicit DockerEventTracker(WSLCSession& session);
