@@ -154,20 +154,20 @@ jobs:
                   inlineOperation: |
                     [
                           {
-                              "KeyCode": "CP-230012",
+                              "KeyCode": "CP-501332",
                               "OperationCode": "SigntoolSign",
                               "Parameters" : {
                                     "OpusName" : "Microsoft",
                                     "OpusInfo" : "http://www.microsoft.com",
-                                    "FileDigest" : "/fd \"SHA256\"",
+                                    "FileDigest" : "/fd \"SHA384\"",
                                     "PageHash" : "/NPH",
-                                    "TimeStamp" : "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+                                    "TimeStamp" : "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha384"
                                 },
                                 "ToolName" : "sign",
                                 "ToolVersion" : "1.0"
                             },
                             {
-                                "KeyCode" : "CP-230012",
+                                "KeyCode" : "CP-501332",
                                 "OperationCode" : "SigntoolVerify",
                                 "Parameters" : {},
                                 "ToolName" : "sign",
@@ -267,20 +267,20 @@ jobs:
               inlineOperation: |
                 [
                       {
-                          "KeyCode": "CP-230012",
+                          "KeyCode": "CP-501332",
                           "OperationCode": "SigntoolSign",
                           "Parameters" : {
                                 "OpusName" : "Microsoft",
                                 "OpusInfo" : "http://www.microsoft.com",
-                                "FileDigest" : "/fd \"SHA256\"",
+                                "FileDigest" : "/fd \"SHA384\"",
                                 "PageHash" : "/NPH",
-                                "TimeStamp" : "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+                                "TimeStamp" : "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha384"
                             },
                             "ToolName" : "sign",
                             "ToolVersion" : "1.0"
                         },
                         {
-                            "KeyCode" : "CP-230012",
+                            "KeyCode" : "CP-501332",
                             "OperationCode" : "SigntoolVerify",
                             "Parameters" : {},
                             "ToolName" : "sign",
