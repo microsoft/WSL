@@ -14,6 +14,7 @@ public sealed class SessionSettings
     public TimeSpan? Timeout { get; set; }
     public VhdOptions VhdRequirements { get; set; }
     public bool EnableGpu { get; set; }
+    public bool EnableNestedVirtualization { get; set; }
 }
 ```
 
@@ -43,6 +44,7 @@ var sessionSettings = new SessionSettings("demo-session", @"C:\WslcData")
     CpuCount = 4,
     MemorySizeInMB = 4096,
     Timeout = TimeSpan.FromMinutes(5),
-    EnableGpu = true
+    EnableGpu = true,
+    EnableNestedVirtualization = true
 };
 ```
