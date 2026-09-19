@@ -244,43 +244,82 @@ bool HasReadAccessToDrive(wchar_t drive)
 
 void EnsureCaseSensitiveDirectoryRecursive(_In_ HANDLE Directory)
 {
+    // Use iterative depth-first traversal with explicit frames to avoid stack overflow on deeply nested
+    // directory trees. Only O(depth) handles are open at any time — each directory handle is closed once
+    // all its children have been processed and marked case-sensitive.
+
+    struct Frame
+    {
+        wil::unique_hfile OwnedHandle;
+        HANDLE DirectoryHandle;
+        std::vector<std::byte> Buffer;
+        bool Restart;
+    };
+
+    std::vector<Frame> stack;
+    stack.push_back(
+        {.OwnedHandle = {}, .DirectoryHandle = Directory, .Buffer = std::vector<std::byte>(sizeof(FILE_ID_BOTH_DIR_INFORMATION) + MAX_PATH), .Restart = true});
+
     FILE_CASE_SENSITIVE_INFORMATION CaseInfo{};
     IO_STATUS_BLOCK IoStatus{};
-    std::vector<std::byte> buffer{sizeof(FILE_ID_BOTH_DIR_INFORMATION) + MAX_PATH};
-    bool restart = true;
 
-    while (true)
+    while (!stack.empty())
     {
+        auto& frame = stack.back();
+
+        //
+        // Enumerate the next entry in this directory.
+        //
+
         const auto result = NtQueryDirectoryFile(
-            Directory,
+            frame.DirectoryHandle,
             nullptr,
             nullptr,
             nullptr,
             &IoStatus,
-            buffer.data(),
-            static_cast<DWORD>(buffer.size()),
+            frame.Buffer.data(),
+            static_cast<DWORD>(frame.Buffer.size()),
             static_cast<FILE_INFORMATION_CLASS>(FileIdBothDirectoryInformation),
             true,
             nullptr,
-            restart);
+            frame.Restart);
 
         WI_ASSERT(result != STATUS_PENDING);
 
         if (result == STATUS_NO_MORE_FILES || result == STATUS_NO_SUCH_FILE)
         {
-            break;
+            //
+            // Enumeration complete — mark this directory case-sensitive, then pop the frame.
+            //
+            // N.B. This is done with a retry because if the NtfsEnableDirCaseSensitivity
+            //      flag was just changed from 3 to 1, NTFS may not have updated its
+            //      behavior yet in which case it will fail with STATUS_DIRECTORY_NOT_EMPTY.
+            //
+
+            CaseInfo.Flags = FILE_CS_FLAG_CASE_SENSITIVE_DIR;
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() {
+                    THROW_IF_NTSTATUS_FAILED(NtSetInformationFile(
+                        frame.DirectoryHandle, &IoStatus, &CaseInfo, sizeof(CaseInfo), FileCaseSensitiveInformation));
+                },
+                std::chrono::milliseconds{100},
+                std::chrono::seconds{1},
+                []() { return wil::ResultFromCaughtException() == HRESULT_FROM_NT(STATUS_DIRECTORY_NOT_EMPTY); });
+
+            stack.pop_back();
+            continue;
         }
         else if (result == STATUS_BUFFER_OVERFLOW)
         {
-            buffer.resize(buffer.size() * 2);
+            frame.Buffer.resize(frame.Buffer.size() * 2);
             continue;
         }
 
         THROW_IF_NTSTATUS_FAILED(result);
 
-        restart = false;
+        frame.Restart = false;
 
-        const auto* information = reinterpret_cast<const FILE_ID_BOTH_DIR_INFORMATION*>(buffer.data());
+        const auto* information = reinterpret_cast<const FILE_ID_BOTH_DIR_INFORMATION*>(frame.Buffer.data());
 
         //
         // Only process non-reparse point directories.
@@ -303,10 +342,12 @@ void EnsureCaseSensitiveDirectoryRecursive(_In_ HANDLE Directory)
             }
 
             UNICODE_STRING Name{};
-            RtlInitUnicodeString(&Name, information->FileName);
+            Name.Buffer = const_cast<PWCH>(information->FileName);
+            Name.Length = static_cast<USHORT>(information->FileNameLength);
+            Name.MaximumLength = Name.Length;
 
             auto Child = wsl::windows::common::filesystem::OpenRelativeFile(
-                Directory,
+                frame.DirectoryHandle,
                 &Name,
                 (FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES | SYNCHRONIZE),
                 FILE_OPEN,
@@ -315,32 +356,20 @@ void EnsureCaseSensitiveDirectoryRecursive(_In_ HANDLE Directory)
             THROW_IF_NTSTATUS_FAILED(NtQueryInformationFile(Child.get(), &IoStatus, &CaseInfo, sizeof(CaseInfo), FileCaseSensitiveInformation));
 
             //
-            // Skip if the directory already has the flag.
+            // If the child directory is not yet case-sensitive, push a new frame to process it.
             //
 
             if (WI_IsFlagClear(CaseInfo.Flags, FILE_CS_FLAG_CASE_SENSITIVE_DIR))
             {
-                EnsureCaseSensitiveDirectoryRecursive(Child.get());
+                HANDLE childHandle = Child.get();
+                stack.push_back(
+                    {.OwnedHandle = std::move(Child),
+                     .DirectoryHandle = childHandle,
+                     .Buffer = std::vector<std::byte>(sizeof(FILE_ID_BOTH_DIR_INFORMATION) + MAX_PATH),
+                     .Restart = true});
             }
         }
     }
-
-    //
-    // After all children are processed, mark the directory case-sensitive.
-    //
-    // N.B. This is done with a retry because if the NtfsEnableDirCaseSensitivity
-    //      flag was just changed from 3 to 1, NTFS may not have updated its
-    //      behavior yet in which case it will fail with STATUS_DIRECTORY_NOT_EMPTY.
-    //
-
-    CaseInfo.Flags = FILE_CS_FLAG_CASE_SENSITIVE_DIR;
-    wsl::shared::retry::RetryWithTimeout<void>(
-        [&]() {
-            THROW_IF_NTSTATUS_FAILED(NtSetInformationFile(Directory, &IoStatus, &CaseInfo, sizeof(CaseInfo), FileCaseSensitiveInformation));
-        },
-        std::chrono::milliseconds{100},
-        std::chrono::seconds{1},
-        []() { return wil::ResultFromCaughtException() == HRESULT_FROM_NT(STATUS_DIRECTORY_NOT_EMPTY); });
 }
 
 void SetDirectoryCaseSensitive(_In_ PCWSTR Path)
