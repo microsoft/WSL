@@ -1,4 +1,6 @@
-# WSLC CLI Unit Tests
+# WSLC Tests
+#
+# Shared helpers live in helpers/, unit tests in unit/ and end-to-end tests in e2e/.
 
 file(GLOB_RECURSE WSLC_TEST_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
@@ -21,7 +23,11 @@ target_sources(wsltests PRIVATE ${WSLC_TEST_SOURCES} ${WSLC_TEST_HEADERS})
 target_include_directories(wsltests PRIVATE
     ${CMAKE_SOURCE_DIR}/test
     ${CMAKE_SOURCE_DIR}/test/windows
+    ${CMAKE_SOURCE_DIR}/test/windows/common
     ${CMAKE_SOURCE_DIR}/test/windows/wslc
+    ${CMAKE_SOURCE_DIR}/test/windows/wslc/helpers
+    ${CMAKE_SOURCE_DIR}/test/windows/wslc/unit
+    ${CMAKE_SOURCE_DIR}/test/windows/wslc/e2e
     ${CMAKE_SOURCE_DIR}/src/windows/wslc/core
     ${CMAKE_SOURCE_DIR}/src/windows/wslc/commands
     ${CMAKE_SOURCE_DIR}/src/windows/wslc/arguments

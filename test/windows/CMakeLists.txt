@@ -1,34 +1,19 @@
 set(SOURCES
-    SimpleTests.cpp
-    UnitTests.cpp
-    MountTests.cpp
-    NetworkTests.cpp
-    Plan9Tests.cpp
-    DrvFsTests.cpp
-    FilesystemUnitTests.cpp
-    StringUnitTests.cpp
-    Common.cpp
-    PluginTests.cpp
-    PolicyTests.cpp
-    InstallerTests.cpp
-    WSLCTests.cpp
-    WslcSdkTests.cpp
-    WslcSdkWinRtTests.cpp
-    WindowsUpdateTests.cpp)
+    common/Common.cpp)
 
 set(HEADERS
-    Common.h
-    PluginTests.h
-    lxsstest.h)
+    common/Common.h
+    common/lxsstest.h)
 
 add_compile_definitions(INLINE_TEST_METHOD_MARKUP)
 
 add_library(wsltests SHARED ${SOURCES} ${HEADERS})
 
 target_include_directories(wsltests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/common
     ${CMAKE_SOURCE_DIR}/src/windows/WslcSDK
     ${CMAKE_BINARY_DIR}/src/windows/WslcSDK/winrt/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
-set_property(SOURCE NetworkTests.cpp APPEND PROPERTY INCLUDE_DIRECTORIES
+set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/wsl/e2e/NetworkTests.cpp APPEND PROPERTY INCLUDE_DIRECTORIES
     ${CMAKE_SOURCE_DIR}/src/windows/service/exe)
 target_link_directories(wsltests PRIVATE ${BIN})
 target_precompile_headers(wsltests REUSE_FROM common)
@@ -51,6 +36,7 @@ target_link_libraries(wsltests
 
 add_dependencies(wsltests wslserviceidl wslclib wslc wslcsdk wslcsdkwinrtidl)
 add_subdirectory(testplugin)
+add_subdirectory(wsl)
 add_subdirectory(wslc)
 
 # For prettier source tree browsing
