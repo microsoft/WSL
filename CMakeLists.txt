@@ -135,7 +135,6 @@ find_nuget_package(Microsoft.WSL.TestData WSL_TEST_DATA /)
 find_nuget_package(Microsoft.WSLg WSLG /build/native/bin)
 find_nuget_package(vswhere VSWHERE /tools)
 find_nuget_package(Wix WIX /tools/net6.0/any)
-find_nuget_package(Microsoft.WSL.OpenVMM WSL_OPENVMM /build/native)
 
 # Architecture-specific nuget packages from the OS repo.
 if (${TARGET_PLATFORM} STREQUAL "x64")
@@ -278,7 +277,8 @@ if (NOT WSL_DEVICEHOST_BIN)
     file(CREATE_LINK ${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.pdb ${BIN}/wsldevicehost.pdb)
 endif()
 
-foreach(binary openvmm.exe openvmm.pdb wslopenvmm.dll wslopenvmm.pdb)
+# OpenVMM binaries are packaged directly from NuGet; retain PDBs for symbol publishing.
+foreach(binary openvmm.pdb wslopenvmm.pdb)
     file(CREATE_LINK "${WSL_OPENVMM_SOURCE_DIR}/bin/${TARGET_PLATFORM}/${binary}" "${BIN}/${binary}")
 endforeach()
 
