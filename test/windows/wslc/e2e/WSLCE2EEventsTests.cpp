@@ -222,10 +222,9 @@ class WSLCE2EEventsTests
         const auto destroyEvent = expectedEvent(L"destroy");
         WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(destroyEvent));
 
-        events.SendCtrlBreak();
+        stopReader.reset();
         VERIFY_ARE_EQUAL(0, events.Wait());
         events.VerifyNoErrors();
-        stopReader.release();
 
         const WSLCExecutionResult output{.Stdout = wsl::shared::string::MultiByteToWide(events.GetStdoutData())};
         const auto lines = output.GetStdoutLines();
