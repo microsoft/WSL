@@ -45,7 +45,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         // Build session settings via WinRT
         SessionSettings sessionSettings{hstring{sessionName}, hstring{storagePath}};
         sessionSettings.CpuCount(1);
-        sessionSettings.MemoryMB(1024);
+        sessionSettings.MemorySizeInMB(1024);
         sessionSettings.Timeout(winrt::Windows::Foundation::TimeSpan{std::chrono::milliseconds{5000}});
 
         // Attempt to create session
@@ -79,9 +79,11 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
             portMappings.Append(ContainerPortMapping{windowsPort, containerPort, protocol});
         }
 
-        // Fuzz flags
-        auto flags = static_cast<ContainerFlags>(input.Read<uint32_t>());
-        containerSettings.Flags(flags);
+        // Fuzz container options
+        const auto options = input.Read<uint32_t>();
+        containerSettings.EnableAutoRemove((options & 0x1) != 0);
+        containerSettings.EnableGpu((options & 0x2) != 0);
+        containerSettings.Privileged((options & 0x4) != 0);
 
         // Attempt container creation
         auto container = session.CreateContainer(containerSettings);

@@ -49,9 +49,9 @@ static std::vector<Argument> GetFuzzArguments()
         Argument::Create(ArgType::Verbose),
         Argument::Create(ArgType::Version),
         Argument::Create(ArgType::Name),
-        Argument::Create(ArgType::Env, std::nullopt, NO_LIMIT),
-        Argument::Create(ArgType::Volume, std::nullopt, NO_LIMIT),
-        Argument::Create(ArgType::Publish, std::nullopt, NO_LIMIT),
+        Argument::Create(ArgType::Env, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::Volume, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::Publish, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::WorkDir),
         Argument::Create(ArgType::User),
         Argument::Create(ArgType::Hostname),
@@ -86,7 +86,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
             return -1;
         }
 
-        Invocation inv{std::move(args)};
+        InvocationCursor inv{std::move(args)};
         ArgMap execArgs;
         auto arguments = GetFuzzArguments();
 

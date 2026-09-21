@@ -356,7 +356,8 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi")
 
 if (WSL_BUILD_FUZZING)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fsanitize=address")
-    add_compile_definitions(_DISABLE_VECTOR_ANNOTATION _DISABLE_STRING_ANNOTATION)
+    add_compile_definitions(_DISABLE_VECTOR_ANNOTATION _DISABLE_STRING_ANNOTATION _DISABLE_OPTIONAL_ANNOTATION)
+    add_link_options(/INCREMENTAL:NO)
 
     # All instrumented binaries import the dynamic ASAN runtime.
     # We resolve its path so that we can include it in the MSI; we can find it next to the compiler.
