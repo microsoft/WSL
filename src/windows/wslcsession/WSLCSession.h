@@ -30,7 +30,6 @@ Abstract:
 #include <list>
 #include <optional>
 #include <unordered_map>
-#include <unordered_set>
 
 namespace wsl::windows::service::wslc {
 
