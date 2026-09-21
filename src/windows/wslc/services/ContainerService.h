@@ -18,6 +18,7 @@ Abstract:
 #include <docker_schema.h>
 #include <wslc.h>
 #include <wslc_schema.h>
+#include <filesystem>
 
 namespace wsl::windows::wslc::services {
 
@@ -65,6 +66,8 @@ struct ContainerService
     static int Exec(Terminal& terminal, models::Session& session, const std::string& id, models::ContainerOptions options);
     static void Export(models::Session& session, const std::string& id, const std::wstring& outputPath);
     static void Export(models::Session& session, const std::string& id, HANDLE outputHandle);
+
+    static void Copy(models::Session& session, const std::wstring& source, const std::wstring& target, bool followLink);
     static void CopyToContainer(models::Session& session, const std::string& id, const std::string& destPath, HANDLE inputHandle, ULONGLONG contentSize);
     static void CopyFromContainer(models::Session& session, const std::string& id, const std::string& srcPath, bool followLink, HANDLE outputHandle);
     static wsl::windows::common::wslc_schema::InspectContainer Inspect(models::Session& session, const std::string& id, bool size = false);
