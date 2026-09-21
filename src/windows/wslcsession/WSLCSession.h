@@ -30,6 +30,7 @@ Abstract:
 #include <list>
 #include <optional>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace wsl::windows::service::wslc {
 
@@ -229,6 +230,7 @@ public:
     IFACEMETHOD(MapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
     IFACEMETHOD(UnmapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
     IFACEMETHOD(TriggerIdleTermination)(_Out_ BOOL* WasAlreadyIdle) override;
+    IFACEMETHOD(SetNetworkFaultsForTest)(_In_ BOOL FailCreateInspect) override;
 
     // IWSLCCompatSession - converts the WSLCCompat types to the wslc.idl types and forwards to the methods above.
     // Methods that have an identical signature in both interfaces (Terminate, DeleteVolume, Authenticate,
@@ -350,6 +352,10 @@ private:
 
     void OnContainerCreated(const std::string& ContainerId, std::int64_t Time) noexcept;
 
+    // Docker network notifications are forwarded to the event store as they arrive; the session's
+    // network state is committed independently by the mutators under m_networksLock.
+    void OnNetworkEvent(const std::string& NetworkId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t Time) noexcept;
+
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
 
     void Ext4Format(const std::string& Device);
@@ -430,8 +436,14 @@ private:
 
     __guarded_by(m_containersLock) std::shared_ptr<PendingContainerCreate> m_pendingCreate;
 
+    // Test-only fault injection, see SetNetworkFaultsForTest.
+    std::atomic<bool> m_failCreateInspectForTest{false};
+
     // N.B. Declared after everything OnContainerCreated() touches so the callback is unregistered first.
     DockerEventTracker::EventTrackingReference m_containerEventTracking;
+
+    // N.B. Declared after everything OnNetworkEvent() touches so the callback is unregistered first.
+    DockerEventTracker::EventTrackingReference m_networkEventTracking;
 
     // User-provided handles that the session is currently doing IO on.
     std::mutex m_userHandlesLock;
