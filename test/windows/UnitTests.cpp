@@ -23,6 +23,7 @@ Abstract:
 #include "wslservice.h"
 #include "registry.hpp"
 #include "helpers.hpp"
+#include "lxinitshared.h"
 #include "svccomm.hpp"
 #include "relay.hpp"
 #include "ConsoleState.h"
@@ -8254,5 +8255,45 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_ARE_EQUAL(baselineCodePage, GetConsoleOutputCP(), L"Destruction restores the code page saved on the first call");
     }
 
-}; // namespace UnitTests
+    TEST_METHOD(PrettyPrintOutOfBoundsFields)
+    {
+        {
+            alignas(LX_INIT_NETWORK_INFORMATION) std::array<char, offsetof(LX_INIT_NETWORK_INFORMATION, Buffer) + 1> storage{};
+            auto* message = reinterpret_cast<LX_INIT_NETWORK_INFORMATION*>(storage.data());
+            message->Header.MessageSize = offsetof(LX_INIT_NETWORK_INFORMATION, Buffer);
+            message->FileHeaderIndex = message->Header.MessageSize + 1;
+
+            const auto output = message->PrettyPrint();
+            const auto expected = std::format(
+                "Header = {{MessageType = LxMiniInitMessageAny\n"
+                "MessageSize = {}\n"
+                "TransactionId = 0\n"
+                "TransactionStep = 0\n"
+                "}}\n"
+                "FileHeaderIndex = <out-of-bounds>\n"
+                "FileContentsIndex = <empty>\n",
+                message->Header.MessageSize);
+
+            VERIFY_ARE_EQUAL(expected, output);
+        }
+
+        {
+            alignas(LX_INIT_QUERY_ENVIRONMENT_VARIABLE) std::array<char, offsetof(LX_INIT_QUERY_ENVIRONMENT_VARIABLE, Buffer) + 1> storage{};
+            auto* message = reinterpret_cast<LX_INIT_QUERY_ENVIRONMENT_VARIABLE*>(storage.data());
+            message->Header.MessageSize = offsetof(LX_INIT_QUERY_ENVIRONMENT_VARIABLE, Buffer);
+
+            const auto output = message->PrettyPrint();
+            const auto expected = std::format(
+                "Header = {{MessageType = LxMiniInitMessageAny\n"
+                "MessageSize = {}\n"
+                "TransactionId = 0\n"
+                "TransactionStep = 0\n"
+                "}}\n"
+                "Buffer = <out-of-bounds>\n",
+                message->Header.MessageSize);
+
+            VERIFY_ARE_EQUAL(expected, output);
+        }
+    }
+};
 } // namespace UnitTests
