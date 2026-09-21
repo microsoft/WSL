@@ -62,7 +62,7 @@ std::wstring ToJsonW(const T& Value, int indent = -1)
     return wsl::shared::string::MultiByteToWide(ToJson(Value, indent));
 }
 
-template <typename T, typename TJson = nlohmann::json, typename Iterator>
+template <typename T, typename Iterator, typename TJson = nlohmann::json>
 T FromJson(Iterator First, Iterator Last)
 {
     try
@@ -75,16 +75,15 @@ T FromJson(Iterator First, Iterator Last)
     }
     catch (const TJson::exception& e)
     {
-        const std::string_view value{First, Last};
+        const std::string value{First, Last};
 
 #ifdef WIN32
 
         THROW_HR_WITH_USER_ERROR_MSG(
             WSL_E_INVALID_JSON,
             wsl::shared::Localization::MessageInvalidJson(e.what()),
-            "Invalid JSON: %.*hs",
-            static_cast<int>(value.size()),
-            value.data());
+            "Invalid JSON: %hs",
+            value.c_str());
 
 #else
         LOG_ERROR("Failed to deserialize json: '{}'. Error: {}", value, e.what());
@@ -97,14 +96,14 @@ T FromJson(Iterator First, Iterator Last)
 template <typename T, typename TJson = nlohmann::json>
 T FromJson(const char* Value)
 {
-    return FromJson<T, TJson>(Value, Value + strlen(Value));
+    return FromJson<T, const char*, TJson>(Value, Value + strlen(Value));
 }
 
 template <typename T, typename TJson = nlohmann::json>
 T FromJson(const wchar_t* Value)
 {
     const auto value = wsl::shared::string::WideToMultiByte(Value);
-    return FromJson<T, TJson>(value.begin(), value.end());
+    return FromJson<T, decltype(value.begin()), TJson>(value.begin(), value.end());
 }
 
 template <typename T>
