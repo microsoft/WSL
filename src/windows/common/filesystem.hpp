@@ -14,6 +14,8 @@ Abstract:
 
 #pragma once
 
+#include <functional>
+
 #include "wslservice.h"
 
 #define LXSS_FS_TYPE_DRVFS "drvfs"
@@ -174,11 +176,55 @@ std::filesystem::path GetTempFolderPath(_In_ HANDLE userToken);
 std::string GetWindowsHosts(const std::filesystem::path& Path);
 
 /// <summary>
+/// True when Name can be created as a Windows file name. POSIX bars only '/' and NUL, so a name
+/// taken from a container path can hold characters that no Windows file name can.
+/// </summary>
+bool IsRepresentableFileName(std::wstring_view Name);
+
+/// <summary>
 /// Creates a uniquely named staging directory under Parent and returns its path. The name is
 /// derived from a fresh GUID so concurrent callers never collide. Throws if the directory cannot
 /// be created.
 /// </summary>
 std::filesystem::path MakeStagingDirectory(const std::filesystem::path& Parent);
+
+/// <summary>
+/// A staging directory that is removed, with everything under it, once it goes out of scope.
+/// Cleanup is best effort so it cannot throw while an exception is unwinding.
+/// </summary>
+class StagingDirectory
+{
+public:
+    explicit StagingDirectory(const std::filesystem::path& Parent);
+    ~StagingDirectory();
+
+    NON_COPYABLE(StagingDirectory);
+    NON_MOVABLE(StagingDirectory);
+
+    const std::filesystem::path& Path() const noexcept;
+
+private:
+    std::filesystem::path m_path;
+};
+
+/// <summary>
+/// Extracts a tar stream into Destination, creating it when it does not exist. WriteArchive is handed
+/// the handle the archive bytes have to be written to, and runs while tar.exe consumes them.
+///
+/// Every entry is named by the archive and tar.exe cannot rename them as it extracts, so a set
+/// RebaseName is applied afterwards: the archive is unpacked into a staging directory, then a lone
+/// entry is moved out under that name while several entries are gathered under a directory carrying
+/// it. A name that is set but empty still stages, which keeps the merge behavior for an archive whose
+/// source has no name of its own.
+/// </summary>
+void ExtractArchiveInto(const std::filesystem::path& Destination, const std::optional<std::wstring>& RebaseName, const std::function<void(HANDLE)>& WriteArchive);
+
+/// <summary>
+/// Copies the tree at Resolved to LinkName under StagingRoot and returns the copied path. Links inside
+/// the tree are kept as links, so only the one that was named is dereferenced.
+/// </summary>
+std::filesystem::path StageDereferencedTree(
+    const std::filesystem::path& StagingRoot, const std::filesystem::path& LinkName, const std::filesystem::path& Resolved);
 
 /// <summary>
 /// Opens a directory handle with read/execute, optionally also write, & full sharing. The path

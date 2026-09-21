@@ -17,6 +17,7 @@ Abstract:
 #include "Common.h"
 
 using wsl::windows::common::filesystem::GetCanonicalPath;
+using wsl::windows::common::filesystem::IsRepresentableFileName;
 using wsl::windows::common::filesystem::MakeStagingDirectory;
 using wsl::windows::common::filesystem::PosixBaseName;
 
@@ -214,6 +215,57 @@ class FilesystemUnitTests
 
         VERIFY_IS_TRUE(std::filesystem::is_directory(second));
         VERIFY_ARE_NOT_EQUAL(first.wstring(), second.wstring());
+    }
+
+    // A POSIX name bars only '/' and NUL, so a name taken from a container path can hold characters that
+    // no Windows file name can. Those have to be caught before a path is built from them.
+    TEST_METHOD(IsRepresentableFileName_AcceptsNamesWindowsCanCreate)
+    {
+        VERIFY_IS_TRUE(IsRepresentableFileName(L"thelink.txt"));
+        VERIFY_IS_TRUE(IsRepresentableFileName(L"name with spaces"));
+        VERIFY_IS_TRUE(IsRepresentableFileName(L"dots.in.name"));
+
+        // An empty name stands for a path with no name of its own, which the caller handles separately.
+        VERIFY_IS_TRUE(IsRepresentableFileName(L""));
+    }
+
+    TEST_METHOD(IsRepresentableFileName_RejectsReservedCharacters)
+    {
+        const std::wstring reserved[] = {L"a<b", L"a>b", L"a:b", L"a\"b", L"a/b", L"a\\b", L"a|b", L"a?b", L"a*b"};
+        for (const auto& name : reserved)
+        {
+            VERIFY_IS_FALSE(IsRepresentableFileName(name), name.c_str());
+        }
+    }
+
+    TEST_METHOD(IsRepresentableFileName_RejectsControlCharacters)
+    {
+        const std::wstring control = L"a\x01z";
+        VERIFY_IS_FALSE(IsRepresentableFileName(control));
+
+        const std::wstring newline = L"a\nz";
+        VERIFY_IS_FALSE(IsRepresentableFileName(newline));
+    }
+
+    // The directory has to survive for the whole scope and be gone once it closes, since the copy that
+    // uses it leaves entries behind that must not reach the destination.
+    TEST_METHOD(StagingDirectory_RemovesItselfWhenScopeEnds)
+    {
+        std::filesystem::path recorded;
+        {
+            const wsl::windows::common::filesystem::StagingDirectory staging(std::filesystem::current_path());
+            recorded = staging.Path();
+
+            VERIFY_IS_TRUE(std::filesystem::is_directory(recorded));
+
+            // Content under it goes away with it.
+            std::ofstream file(recorded / L"entry.txt");
+            file << "content";
+            file.close();
+            VERIFY_IS_TRUE(std::filesystem::exists(recorded / L"entry.txt"));
+        }
+
+        VERIFY_IS_FALSE(std::filesystem::exists(recorded));
     }
 };
 } // namespace FilesystemUnitTests

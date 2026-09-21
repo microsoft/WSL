@@ -56,36 +56,6 @@ std::string FormatStatsIo(uint64_t Bytes)
     return WideToMultiByte(FormatHumanReadableSize(Bytes, c_statsIoPrecision));
 }
 
-void MoveOver(const std::filesystem::path& From, const std::filesystem::path& To)
-{
-    std::error_code error;
-    std::filesystem::rename(From, To, error);
-    if (!error)
-    {
-        return;
-    }
-
-    // An occupied destination is merged over, but a file and a directory cannot stand in for one another.
-    // std::filesystem::copy would place a file underneath a directory carrying the same name.
-    std::error_code statusError;
-    const auto fromStatus = std::filesystem::status(From, statusError);
-    const auto toStatus = std::filesystem::status(To, statusError);
-    THROW_HR_WITH_USER_ERROR_IF(
-        HRESULT_FROM_WIN32(ERROR_FILE_EXISTS),
-        Localization::WSLCCLI_CpDestinationTypeMismatchError(To.wstring()),
-        std::filesystem::exists(toStatus) && std::filesystem::is_directory(fromStatus) != std::filesystem::is_directory(toStatus));
-
-    // Symlinks are recreated rather than followed, so an entry pointing outside the staging tree
-    // cannot pull unrelated content into the destination.
-    std::error_code copyError;
-    std::filesystem::copy(
-        From,
-        To,
-        std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing | std::filesystem::copy_options::copy_symlinks,
-        copyError);
-    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(copyError.value()), !!copyError, "Failed to copy to: %ls", To.c_str());
-}
-
 // The ps SIZE column: the writable layer on its own, and the total including the read-only image
 // layers in parentheses. The suffix is guarded on 'SizeRootFs > 0', so a zero total renders as the
 // writable size alone; the daemon reports zero both when the size was not requested and when there
@@ -466,14 +436,7 @@ void ContainerCp(CLIExecutionContext& context)
             // --follow-link resolves the source path itself; links found inside a copied directory stay links.
             // tar's -h dereferences every link it walks, so it is limited to a source that is itself a link to
             // a single file, where there is nothing to recurse into.
-            std::filesystem::path stagingDir;
-            auto stagingCleanup = wil::scope_exit([&] {
-                if (!stagingDir.empty())
-                {
-                    std::error_code cleanupError;
-                    std::filesystem::remove_all(stagingDir, cleanupError);
-                }
-            });
+            std::optional<wsl::windows::common::filesystem::StagingDirectory> staging;
 
             bool dereference = false;
             if (followLink && std::filesystem::is_symlink(absPath, fsError))
@@ -486,17 +449,8 @@ void ContainerCp(CLIExecutionContext& context)
                 {
                     // The archive has to carry the link's name while holding the target's tree, and tar.exe
                     // cannot rename entries, so the tree is staged under that name with its own links intact.
-                    stagingDir = wsl::windows::common::filesystem::MakeStagingDirectory(std::filesystem::temp_directory_path());
-
-                    std::error_code copyError;
-                    std::filesystem::copy(
-                        resolved,
-                        stagingDir / absPath.filename(),
-                        std::filesystem::copy_options::recursive | std::filesystem::copy_options::copy_symlinks,
-                        copyError);
-                    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(copyError.value()), !!copyError, "Failed to copy from: %ls", resolved.c_str());
-
-                    absPath = stagingDir / absPath.filename();
+                    staging.emplace(std::filesystem::temp_directory_path());
+                    absPath = wsl::windows::common::filesystem::StageDereferencedTree(staging->Path(), absPath.filename(), resolved);
                 }
                 else
                 {
@@ -555,100 +509,27 @@ void ContainerCp(CLIExecutionContext& context)
 
         if (targetIsDir)
         {
-            // Extract directly into the target directory by piping the download to tar stdin.
-            std::error_code dirError;
-            std::filesystem::create_directories(absTarget, dirError);
-            THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", absTarget.c_str());
-
-            // A followed link produces an archive named after the link's target, but the copy keeps the name that
-            // was asked for. The resolved name is only known once the download completes, so the extraction goes
-            // to a staging directory and the entries are moved up under the requested name afterwards.
-            std::filesystem::path stagingDir;
-            auto stagingCleanup = wil::scope_exit([&] {
-                if (!stagingDir.empty())
-                {
-                    std::error_code cleanupError;
-                    std::filesystem::remove_all(stagingDir, cleanupError);
-                }
-            });
-
-            auto extractRoot = absTarget;
+            // A followed link produces an archive named after the link's target, but the copy keeps the name
+            // that was asked for, so the extraction is rebased onto it.
+            std::optional<std::wstring> rebaseName;
             if (followLink)
             {
-                stagingDir = wsl::windows::common::filesystem::MakeStagingDirectory(absTarget);
-                extractRoot = stagingDir;
-            }
-
-            // Strip trailing separator to avoid the CRT parsing a trailing '\"' as an escaped quote.
-            auto targetDir = extractRoot.wstring();
-            while (targetDir.size() > 1 && (targetDir.back() == L'\\' || targetDir.back() == L'/'))
-            {
-                targetDir.pop_back();
-            }
-
-            auto [pipeRead, pipeWrite] = OpenAnonymousPipe(0, false, false);
-            THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(pipeRead.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
-
-            auto tarCmd = std::format(L"tar.exe -xf - -C \"{}\"", targetDir);
-            SubProcess process(nullptr, tarCmd.c_str());
-            process.SetStdHandles(pipeRead.get(), nullptr, nullptr);
-            auto processHandle = process.Start();
-            pipeRead.reset();
-
-            ContainerService::CopyFromContainer(session, containerId, srcPath, followLink, pipeWrite.get());
-            pipeWrite.reset();
-
-            auto exitCode = SubProcess::GetExitCode(processHandle.get());
-            THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
-
-            if (followLink)
-            {
-                // Moving entries invalidates an open directory iterator, so the listing is taken first.
-                std::vector<std::filesystem::path> staged;
-                for (const auto& entry : std::filesystem::directory_iterator(stagingDir))
-                {
-                    staged.push_back(entry.path());
-                }
-
-                // The archive is named after whatever the link resolved to, while the copy keeps the name that was
-                // asked for. A lone entry is that source and simply takes the name; several entries mean the source
-                // resolved to a path with no name of its own, so they are gathered under one named after it.
-                const auto requestedName = MultiByteToWide(wsl::windows::common::filesystem::PosixBaseName(srcPath));
+                auto requestedName = MultiByteToWide(wsl::windows::common::filesystem::PosixBaseName(srcPath));
 
                 // Only '/' and NUL are barred from a POSIX name, so the basename can hold characters that no
                 // Windows file name can. Copying under the resolved target's name instead would silently
                 // produce something other than what was asked for.
-                const auto unrepresentable = [&]() {
-                    constexpr std::wstring_view reserved = L"<>:\"/\\|?*";
-                    for (const auto character : requestedName)
-                    {
-                        if (character < L' ' || reserved.find(character) != std::wstring_view::npos)
-                        {
-                            return true;
-                        }
-                    }
-
-                    return false;
-                }();
-
                 THROW_HR_WITH_USER_ERROR_IF(
-                    E_INVALIDARG, Localization::WSLCCLI_CpSourceNameNotRepresentableError(MultiByteToWide(srcPath)), unrepresentable);
+                    E_INVALIDARG,
+                    Localization::WSLCCLI_CpSourceNameNotRepresentableError(MultiByteToWide(srcPath)),
+                    !wsl::windows::common::filesystem::IsRepresentableFileName(requestedName));
 
-                auto destinationRoot = absTarget;
-                if (!requestedName.empty() && staged.size() > 1)
-                {
-                    destinationRoot = absTarget / requestedName;
-                    std::filesystem::create_directories(destinationRoot, dirError);
-                    THROW_HR_IF_MSG(
-                        HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", destinationRoot.c_str());
-                }
-
-                const bool rebase = !requestedName.empty() && staged.size() == 1;
-                for (const auto& entry : staged)
-                {
-                    MoveOver(entry, destinationRoot / (rebase ? requestedName : entry.filename().wstring()));
-                }
+                rebaseName = std::move(requestedName);
             }
+
+            wsl::windows::common::filesystem::ExtractArchiveInto(absTarget, rebaseName, [&](HANDLE archive) {
+                ContainerService::CopyFromContainer(session, containerId, srcPath, followLink, archive);
+            });
         }
         else
         {

@@ -988,6 +988,150 @@ std::filesystem::path wsl::windows::common::filesystem::MakeStagingDirectory(con
     return staging;
 }
 
+bool wsl::windows::common::filesystem::IsRepresentableFileName(std::wstring_view Name)
+{
+    constexpr std::wstring_view reserved = L"<>:\"/\\|?*";
+
+    for (const auto character : Name)
+    {
+        if (character < L' ' || reserved.find(character) != std::wstring_view::npos)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+wsl::windows::common::filesystem::StagingDirectory::StagingDirectory(const std::filesystem::path& Parent) :
+    m_path(MakeStagingDirectory(Parent))
+{
+}
+
+wsl::windows::common::filesystem::StagingDirectory::~StagingDirectory()
+{
+    std::error_code error;
+    std::filesystem::remove_all(m_path, error);
+}
+
+const std::filesystem::path& wsl::windows::common::filesystem::StagingDirectory::Path() const noexcept
+{
+    return m_path;
+}
+
+namespace {
+
+void MoveOver(const std::filesystem::path& From, const std::filesystem::path& To)
+{
+    std::error_code error;
+    std::filesystem::rename(From, To, error);
+    if (!error)
+    {
+        return;
+    }
+
+    // An occupied destination is merged over, but a file and a directory cannot stand in for one another.
+    // std::filesystem::copy would place a file underneath a directory carrying the same name.
+    std::error_code statusError;
+    const auto fromStatus = std::filesystem::status(From, statusError);
+    const auto toStatus = std::filesystem::status(To, statusError);
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_FILE_EXISTS),
+        wsl::shared::Localization::WSLCCLI_CpDestinationTypeMismatchError(To.wstring()),
+        std::filesystem::exists(toStatus) && std::filesystem::is_directory(fromStatus) != std::filesystem::is_directory(toStatus));
+
+    // Symlinks are recreated rather than followed, so an entry pointing outside the staging tree
+    // cannot pull unrelated content into the destination.
+    std::error_code copyError;
+    std::filesystem::copy(
+        From,
+        To,
+        std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing | std::filesystem::copy_options::copy_symlinks,
+        copyError);
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(copyError.value()), !!copyError, "Failed to copy to: %ls", To.c_str());
+}
+
+void ExtractTarStream(const std::filesystem::path& Root, const std::function<void(HANDLE)>& WriteArchive)
+{
+    // Strip trailing separator to avoid the CRT parsing a trailing '\"' as an escaped quote.
+    auto targetDir = Root.wstring();
+    while (targetDir.size() > 1 && (targetDir.back() == L'\\' || targetDir.back() == L'/'))
+    {
+        targetDir.pop_back();
+    }
+
+    auto [pipeRead, pipeWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, false, false);
+    THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(pipeRead.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+
+    auto tarCmd = std::format(L"tar.exe -xf - -C \"{}\"", targetDir);
+    wsl::windows::common::SubProcess process(nullptr, tarCmd.c_str());
+    process.SetStdHandles(pipeRead.get(), nullptr, nullptr);
+    auto processHandle = process.Start();
+    pipeRead.reset();
+
+    WriteArchive(pipeWrite.get());
+    pipeWrite.reset();
+
+    const auto exitCode = wsl::windows::common::SubProcess::GetExitCode(processHandle.get());
+    THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
+}
+
+} // namespace
+
+void wsl::windows::common::filesystem::ExtractArchiveInto(
+    const std::filesystem::path& Destination, const std::optional<std::wstring>& RebaseName, const std::function<void(HANDLE)>& WriteArchive)
+{
+    std::error_code dirError;
+    std::filesystem::create_directories(Destination, dirError);
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", Destination.c_str());
+
+    if (!RebaseName.has_value())
+    {
+        ExtractTarStream(Destination, WriteArchive);
+        return;
+    }
+
+    // The staging directory sits inside the destination so the entries below are moved across the same
+    // volume, which keeps the rename a metadata operation rather than a second copy of the content.
+    const StagingDirectory staging(Destination);
+    ExtractTarStream(staging.Path(), WriteArchive);
+
+    // Moving entries invalidates an open directory iterator, so the listing is taken first.
+    std::vector<std::filesystem::path> staged;
+    for (const auto& entry : std::filesystem::directory_iterator(staging.Path()))
+    {
+        staged.push_back(entry.path());
+    }
+
+    // A lone entry is the source itself and simply takes the name; several entries mean the source has no
+    // name of its own, so they are gathered under one directory named after it.
+    auto destinationRoot = Destination;
+    if (!RebaseName->empty() && staged.size() > 1)
+    {
+        destinationRoot = Destination / *RebaseName;
+        std::filesystem::create_directories(destinationRoot, dirError);
+        THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", destinationRoot.c_str());
+    }
+
+    const bool rebase = !RebaseName->empty() && staged.size() == 1;
+    for (const auto& entry : staged)
+    {
+        MoveOver(entry, destinationRoot / (rebase ? *RebaseName : entry.filename().wstring()));
+    }
+}
+
+std::filesystem::path wsl::windows::common::filesystem::StageDereferencedTree(
+    const std::filesystem::path& StagingRoot, const std::filesystem::path& LinkName, const std::filesystem::path& Resolved)
+{
+    auto staged = StagingRoot / LinkName;
+
+    std::error_code copyError;
+    std::filesystem::copy(Resolved, staged, std::filesystem::copy_options::recursive | std::filesystem::copy_options::copy_symlinks, copyError);
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(copyError.value()), !!copyError, "Failed to copy from: %ls", Resolved.c_str());
+
+    return staged;
+}
+
 wil::unique_hfile wsl::windows::common::filesystem::OpenDirectoryHandle(_In_ LPCWSTR pPath, _In_ bool forWrite)
 {
     wil::unique_hfile handle(OpenDirectoryHandleNoThrow(pPath, forWrite));
