@@ -1066,7 +1066,7 @@ HRESULT LxssUserSessionImpl::ExportDistribution(_In_opt_ LPCGUID DistroGuid, _In
     RETURN_HR_IF(E_INVALIDARG, (WI_IsAnyFlagSet(Flags, ~LXSS_EXPORT_DISTRO_FLAGS_ALL)));
 
     LXSS_DISTRO_CONFIGURATION configuration;
-    std::optional<PidTermination> pidTermination;
+    std::vector<PidTermination> pidTerminations;
     wil::unique_hkey distroKey;
     try
     {
@@ -1087,13 +1087,13 @@ HRESULT LxssUserSessionImpl::ExportDistribution(_In_opt_ LPCGUID DistroGuid, _In
         RETURN_HR_IF(WSL_E_WSL1_NOT_SUPPORTED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE) && !g_lxcoreInitialized);
 
         // Add the distribution to the list of converting distributions.
-        pidTermination = _ConversionBegin(configuration.DistroId, LxssDistributionStateExporting);
+        pidTerminations = _ConversionBegin(configuration.DistroId, LxssDistributionStateExporting);
     }
     CATCH_RETURN()
 
     // Set up a scope exit member to remove the distribution from the converting list.
     auto exportComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { _ConversionComplete(configuration.DistroId); });
-    RETURN_IF_FAILED(_WaitForPidTermination(pidTermination));
+    RETURN_IF_FAILED(_WaitForPidTerminations(pidTerminations));
 
     // Log telemetry to track how long exporting the distribution takes.
     WSL_LOG_TELEMETRY(
@@ -1474,7 +1474,7 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
 
         DistributionRegistration registration;
         LXSS_DISTRO_CONFIGURATION configuration;
-        std::optional<PidTermination> pidTermination;
+        std::vector<PidTermination> pidTerminations;
         std::filesystem::path distributionPath;
         auto config = _GetResultantConfig(userToken.get());
 
@@ -1540,12 +1540,12 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
             configuration = s_GetDistributionConfiguration(registration, DistributionName == nullptr);
 
             // Add the distribution to the list of converting distributions.
-            pidTermination = _ConversionBegin(configuration.DistroId, LxssDistributionStateInstalling);
+            pidTerminations = _ConversionBegin(configuration.DistroId, LxssDistributionStateInstalling);
         }
 
         // Set up a scope exit member to remove the distribution from the converting list.
         auto installComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { _ConversionComplete(configuration.DistroId); });
-        THROW_IF_FAILED(_WaitForPidTermination(pidTermination));
+        THROW_IF_FAILED(_WaitForPidTerminations(pidTerminations));
 
         // Declare a scope exit variable to clean up on failure.
         ULONG deleteFlags = 0;
@@ -1876,7 +1876,7 @@ try
     auto runAsUser = wil::CoImpersonateClient();
     std::filesystem::path vhdPath;
     LXSS_DISTRO_CONFIGURATION configuration{};
-    std::optional<PidTermination> pidTermination;
+    std::vector<PidTermination> pidTerminations;
     const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
 
     {
@@ -1892,11 +1892,11 @@ try
             THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), wsl::shared::Localization::MessageCompactVhdNotSupported());
         }
 
-        pidTermination = _ConversionBegin(configuration.DistroId, LxssDistributionStateCompacting);
+        pidTerminations = _ConversionBegin(configuration.DistroId, LxssDistributionStateCompacting);
     }
 
     auto compactionComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { _ConversionComplete(configuration.DistroId); });
-    THROW_IF_FAILED(_WaitForPidTermination(pidTermination));
+    THROW_IF_FAILED(_WaitForPidTerminations(pidTerminations));
 
     {
         std::lock_guard lock(m_instanceLock);
@@ -1933,7 +1933,7 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
 
     DistributionRegistration registration;
     LXSS_DISTRO_CONFIGURATION configuration;
-    std::optional<PidTermination> pidTermination;
+    std::vector<PidTermination> pidTerminations;
     const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
     try
@@ -1963,7 +1963,7 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
         RETURN_HR_IF(WSL_E_WSL1_NOT_SUPPORTED, !g_lxcoreInitialized);
 
         // Add the distribution to the list of converting distributions.
-        pidTermination = _ConversionBegin(configuration.DistroId, LxssDistributionStateConverting);
+        pidTerminations = _ConversionBegin(configuration.DistroId, LxssDistributionStateConverting);
 
         // Remove the distribution ID from m_updatedInitDistros so init is updated on the next launch (in the case of a conversion to WSL1).
         m_updatedInitDistros.erase(
@@ -1973,7 +1973,7 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
 
     // Set up a scope exit member to remove the distribution from the converting list.
     auto conversionComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { _ConversionComplete(configuration.DistroId); });
-    RETURN_IF_FAILED(_WaitForPidTermination(pidTermination));
+    RETURN_IF_FAILED(_WaitForPidTerminations(pidTerminations));
 
     // Log telemetry to track how long enabling VM mode takes.
     WSL_LOG_TELEMETRY(
@@ -2524,29 +2524,22 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid)
 }
 
 _Requires_lock_held_(m_instanceLock)
-std::optional<LxssUserSessionImpl::PidTermination> LxssUserSessionImpl::_ConversionBegin(_In_ GUID DistroGuid, _In_ LxssDistributionState State)
+std::vector<LxssUserSessionImpl::PidTermination> LxssUserSessionImpl::_ConversionBegin(_In_ GUID DistroGuid, _In_ LxssDistributionState State)
 {
     _EnsureNotLocked(&DistroGuid);
+    _TerminateInstanceInternal(&DistroGuid);
 
-    std::optional<PidTermination> pidTermination;
-    const auto instance = m_runningInstances.find(DistroGuid);
-    if (instance != m_runningInstances.end())
+    std::vector<PidTermination> pidTerminations;
+    for (const auto& termination : m_pidTerminations)
     {
-        if (const auto* wslcoreInstance = dynamic_cast<WslCoreInstance*>(instance->second.get()); wslcoreInstance != nullptr)
+        if (IsEqualGUID(termination.second.DistroId, DistroGuid))
         {
-            PidTermination termination;
-            termination.ClientId = wslcoreInstance->GetClientId();
-            termination.Timeout = gsl::narrow_cast<DWORD>(m_utilityVm->GetConfig().DistributionStartTimeout);
-
-            const auto [_, inserted] = m_pidTerminations.emplace(termination.ClientId, termination.Event);
-            THROW_HR_IF(E_UNEXPECTED, !inserted);
-            pidTermination.emplace(std::move(termination));
+            pidTerminations.push_back(termination.second);
         }
     }
 
-    _TerminateInstanceInternal(&DistroGuid);
     m_lockedDistributions.emplace_back(DistroGuid, State);
-    return pidTermination;
+    return pidTerminations;
 }
 
 _Requires_lock_not_held_(m_instanceLock)
@@ -2559,29 +2552,24 @@ void LxssUserSessionImpl::_ConversionComplete(_In_ GUID DistroGuid)
 }
 
 _Requires_lock_not_held_(m_instanceLock)
-HRESULT LxssUserSessionImpl::_WaitForPidTermination(_In_ const std::optional<PidTermination>& PidTermination)
+HRESULT LxssUserSessionImpl::_WaitForPidTerminations(_In_ const std::vector<PidTermination>& PidTerminations)
 try
 {
-    if (!PidTermination.has_value())
-    {
-        return S_OK;
-    }
-
     SlowOperationWatcher slowOperation{"WaitForPidTermination"};
-    const bool terminated = PidTermination->Event.wait(PidTermination->Timeout);
-    slowOperation.Reset();
-
+    const auto startTime = GetTickCount64();
+    for (const auto& termination : PidTerminations)
     {
-        std::lock_guard lock(m_instanceLock);
-        m_pidTerminations.erase(PidTermination->ClientId);
-    }
-
-    if (!terminated)
-    {
-        WSL_LOG(
-            "PidTerminationTimeout",
-            TraceLoggingValue(PidTermination->ClientId, "pid"),
-            TraceLoggingValue(PidTermination->Timeout, "timeout"));
+        const auto elapsed = GetTickCount64() - startTime;
+        const auto timeout = termination.Timeout == INFINITE  ? INFINITE
+                             : elapsed >= termination.Timeout ? 0
+                                                              : termination.Timeout - gsl::narrow_cast<DWORD>(elapsed);
+        if (!termination.Event.wait(timeout))
+        {
+            WSL_LOG(
+                "PidTerminationTimeout",
+                TraceLoggingValue(termination.ClientId, "pid"),
+                TraceLoggingValue(termination.Timeout, "timeout"));
+        }
     }
 
     return S_OK;
@@ -3096,13 +3084,13 @@ void LxssUserSessionImpl::_CreateVm()
             }
 
             auto unlock = wil::scope_exit([&]() { m_instanceLock.unlock(); });
+            TerminateByClientIdLockHeld(Pid);
+
             if (const auto termination = m_pidTerminations.find(Pid); termination != m_pidTerminations.end())
             {
-                termination->second.SetEvent();
+                termination->second.Event.SetEvent();
                 m_pidTerminations.erase(termination);
             }
-
-            TerminateByClientIdLockHeld(Pid);
         };
 
         // N.B. The callbacks must be registered outside of the above try/catch.
@@ -3801,6 +3789,13 @@ bool LxssUserSessionImpl::_TerminateInstanceInternal(_In_ LPCGUID DistroGuid, _I
             {
                 if (const auto* wslcoreInstance = dynamic_cast<WslCoreInstance*>(instance->second.get()); wslcoreInstance != nullptr)
                 {
+                    // Stop releases the system distro, so capture its PID while it is still available.
+                    PidTermination termination;
+                    termination.DistroId = *DistroGuid;
+                    termination.ClientId = wslcoreInstance->GetClientId();
+                    termination.Timeout = gsl::narrow_cast<DWORD>(m_utilityVm->GetConfig().DistributionStartTimeout);
+                    m_pidTerminations.try_emplace(termination.ClientId, std::move(termination));
+
                     m_pluginManager.OnDistributionStopping(&m_session, wslcoreInstance->DistributionInformation());
                 }
 
@@ -4102,6 +4097,13 @@ void LxssUserSessionImpl::_VmTerminate()
 
     m_utilityVm.reset();
     m_vmId.store(GUID_NULL);
+
+    // VM teardown cancels exit callbacks, so complete any remaining waiters after the VM has released its resources.
+    for (const auto& termination : m_pidTerminations)
+    {
+        termination.second.Event.SetEvent();
+    }
+    m_pidTerminations.clear();
 
     // Reset the user's token since its lifetime is tied to the VM.
     m_userToken.reset();
