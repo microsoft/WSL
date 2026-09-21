@@ -55,8 +55,7 @@ New-CliSeed "env-volume" @("--env", "FOO=bar", "--env", "BAZ=qux", "--volume", "
 New-CliSeed "publish" @("--publish", "8080:80", "--publish", "443:443", "--hostname", "devbox")
 
 # --- SDK and WinRT harness seeds (same binary format) ---
-# Format: [widestr sessionName] [widestr storagePath]
-#          [str imageName] [str containerName] [str hostName]
+# Format: [widestr sessionName] [str imageName] [str containerName] [str hostName]
 #          [u8 portCount] [portCount x (u16 windowsPort, u16 containerPort, u8 protocol)]
 #          [u32 flags]
 
@@ -66,7 +65,6 @@ function New-SdkSeed {
     param(
         [string]$Name,
         [string]$SessionName,
-        [string]$StoragePath,
         [string]$ImageName,
         [string]$ContainerName,
         [string]$HostName,
@@ -76,7 +74,6 @@ function New-SdkSeed {
     New-SeedFile $sdkSeedDir "$Name.bin" {
         param($writer)
         Write-WideString $writer $SessionName
-        Write-WideString $writer $StoragePath
         Write-NarrowString $writer $ImageName
         Write-NarrowString $writer $ContainerName
         Write-NarrowString $writer $HostName
@@ -91,17 +88,17 @@ function New-SdkSeed {
 }
 
 New-SdkSeed -Name "basic-session" `
-    -SessionName "test-session" -StoragePath "C:\temp\storage" `
+    -SessionName "test-session" `
     -ImageName "ubuntu:latest" -ContainerName "my-container" -HostName "localhost" `
     -Ports @{WindowsPort=8080; ContainerPort=80; Protocol=0}, @{WindowsPort=443; ContainerPort=443; Protocol=1} `
     -Flags 0
 
 New-SdkSeed -Name "empty-strings" `
-    -SessionName "" -StoragePath "" `
+    -SessionName "" `
     -ImageName "" -ContainerName "" -HostName ""
 
 New-SdkSeed -Name "long-names" `
-    -SessionName ("A" * 63) -StoragePath ("C:\very\long\path\" + ("x" * 40)) `
+    -SessionName ("A" * 63) `
     -ImageName ("registry.example.com/org/" + ("img" * 10) + ":v1.2.3") `
     -ContainerName ("container-" + ("name" * 10)) -HostName ("host-" + ("name" * 10)) `
     -Ports @{WindowsPort=9090; ContainerPort=9090; Protocol=0} `

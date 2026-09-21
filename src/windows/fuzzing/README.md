@@ -89,6 +89,7 @@ fuzzing/
 To build a standalone replay binary (no libFuzzer runtime), add to your `UserConfig.cmake`:
 
 ```cmake
+set(WSL_BUILD_FUZZING true)
 set(WSL_ENABLE_FUZZING_REPLAY true)
 ```
 

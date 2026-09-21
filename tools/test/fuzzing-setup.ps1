@@ -14,8 +14,20 @@ Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All -NoRest
 Write-Host "Enabling WSL..."
 Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux -NoRestart
 
+Write-Host "Enabling Virtual Machine Platform..."
+Enable-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform -NoRestart
+
 $msiPath = Join-Path $PSScriptRoot "wsl.msi"
+if (!(Test-Path $msiPath))
+{
+    throw "WSL MSI not found: $msiPath"
+}
+
 Write-Host "Installing WSL from $msiPath..."
-Start-Process msiexec -ArgumentList "/i `"$msiPath`" /quiet /norestart" -Wait
+$installer = Start-Process msiexec -ArgumentList "/i `"$msiPath`" /quiet /norestart" -Wait -PassThru
+if ($installer.ExitCode -ne 0)
+{
+    throw "WSL MSI installation failed with exit code $($installer.ExitCode)"
+}
 
 Write-Host "Setup complete. Reboot required."

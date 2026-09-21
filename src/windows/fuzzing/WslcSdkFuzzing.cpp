@@ -31,7 +31,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
 
     // Read session parameters from corpus
     std::wstring sessionName = input.ReadWideString();
-    std::wstring storagePath = input.ReadWideString();
+    const auto storagePath = GetFuzzStoragePath(L"WslcSdkFuzzing");
 
     // Initialize session settings
     WslcSessionSettings sessionSettings{};
@@ -101,7 +101,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     hr = WslcCreateContainer(session, &containerSettings, &container, nullptr);
     if (SUCCEEDED(hr) && container)
     {
-        WslcReleaseContainer(container);
+        LOG_IF_FAILED(WslcDeleteContainer(container, WSLC_DELETE_CONTAINER_FLAG_FORCE, nullptr));
+        LOG_IF_FAILED(WslcReleaseContainer(container));
     }
 
     WslcTerminateSession(session);

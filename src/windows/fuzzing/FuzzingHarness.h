@@ -9,8 +9,15 @@
 
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
 #include <string>
+#include <string_view>
 #include <vector>
+
+inline std::wstring GetFuzzStoragePath(std::wstring_view harnessName)
+{
+    return (std::filesystem::temp_directory_path() / harnessName).wstring();
+}
 
 // Cursor over fuzz input bytes. Harnesses construct this from LLVMFuzzerTestOneInput args
 // and call typed Read methods. All reads are bounds-checked and return default values on exhaustion.
@@ -70,10 +77,17 @@ public:
             m_offset += 2;
             if (ch == L'\0')
             {
-                break;
+                return result;
             }
             result.push_back(ch);
         }
+
+        // If we couldn't read anything because there was only one byte left, discard it.
+        if (result.empty() && Remaining() == 1)
+        {
+            ++m_offset;
+        }
+
         return result;
     }
 

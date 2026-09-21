@@ -40,7 +40,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     {
         // Read session parameters from corpus
         std::wstring sessionName = input.ReadWideString();
-        std::wstring storagePath = input.ReadWideString();
+        const auto storagePath = GetFuzzStoragePath(L"WslcWinRtFuzzing");
 
         // Build session settings via WinRT
         SessionSettings sessionSettings{hstring{sessionName}, hstring{storagePath}};
@@ -89,6 +89,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         auto container = session.CreateContainer(containerSettings);
 
         // Cleanup
+        container.Delete(DeleteContainerOption::Force);
         session.Terminate();
     }
     catch (...)
