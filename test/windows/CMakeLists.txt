@@ -25,6 +25,17 @@ add_compile_definitions(INLINE_TEST_METHOD_MARKUP)
 
 add_library(wsltests SHARED ${SOURCES} ${HEADERS})
 
+target_sources(wsltests PRIVATE OpenVmmVirtualMachineBackendTests.cpp)
+target_link_libraries(wsltests virtualmachinebackend)
+add_dependencies(wsltests initramfs)
+
+add_custom_command(
+    TARGET wsltests POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${KERNEL_SOURCE_DIR}/bin/${TARGET_PLATFORM}/kernel"
+        "$<TARGET_FILE_DIR:wsltests>/kernel"
+    VERBATIM)
+
 target_include_directories(wsltests PRIVATE
     ${CMAKE_SOURCE_DIR}/src/windows/WslcSDK
     ${CMAKE_BINARY_DIR}/src/windows/WslcSDK/winrt/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})

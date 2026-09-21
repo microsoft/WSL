@@ -134,6 +134,7 @@ find_nuget_package(Microsoft.WSL.TestData WSL_TEST_DATA /)
 find_nuget_package(Microsoft.WSLg WSLG /build/native/bin)
 find_nuget_package(vswhere VSWHERE /tools)
 find_nuget_package(Wix WIX /tools/net6.0/any)
+find_nuget_package(Microsoft.WSL.OpenVMM WSL_OPENVMM /build/native)
 
 # Architecture-specific nuget packages from the OS repo.
 if (${TARGET_PLATFORM} STREQUAL "x64")
@@ -275,6 +276,16 @@ file(CREATE_LINK ${WSLDEPS_SOURCE_DIR}/bin/wsldeps.pdb ${BIN}/wsldeps.pdb)
 if (NOT WSL_DEVICEHOST_BIN)
     file(CREATE_LINK ${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.pdb ${BIN}/wsldevicehost.pdb)
 endif()
+
+foreach(binary openvmm.exe openvmm.pdb wslopenvmm.dll wslopenvmm.pdb)
+    file(CREATE_LINK "${WSL_OPENVMM_SOURCE_DIR}/bin/${TARGET_PLATFORM}/${binary}" "${BIN}/${binary}")
+endforeach()
+
+add_library(wslopenvmm_client SHARED IMPORTED GLOBAL)
+set_target_properties(wslopenvmm_client PROPERTIES
+    IMPORTED_IMPLIB "${WSL_OPENVMM_SOURCE_DIR}/lib/${TARGET_PLATFORM}/wslopenvmm.dll.lib"
+    IMPORTED_LOCATION "${WSL_OPENVMM_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wslopenvmm.dll"
+    INTERFACE_INCLUDE_DIRECTORIES "${WSL_OPENVMM_SOURCE_DIR}/include")
 
 if (${SKIP_PACKAGE_SIGNING})
     set(PACKAGE_SIGN_COMMAND echo Skipped package signing for:)
