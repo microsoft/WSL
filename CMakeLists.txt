@@ -129,6 +129,7 @@ find_nuget_package(Microsoft.Windows.ImplementationLibrary WIL /)
 find_nuget_package(Microsoft.WSL.Kernel KERNEL /build/native)
 find_nuget_package(Microsoft.WSL.bsdtar BSDTARD /build/native/bin)
 find_nuget_package(Microsoft.WSL.LinuxSdk LINUXSDK /)
+find_nuget_package(Microsoft.WSL.OpenVMM WSL_OPENVMM /build/native)
 find_nuget_package(Microsoft.WSL.TestDistro TEST_DISTRO /)
 find_nuget_package(Microsoft.WSL.TestData WSL_TEST_DATA /)
 find_nuget_package(Microsoft.WSLg WSLG /build/native/bin)
@@ -299,9 +300,8 @@ else()
     set(PACKAGE_SIGN_COMMAND SignTool.exe sign /a /v /fd SHA256 /f ${PACKAGE_CERTIFICATE})
 endif()
 
-
 # Generate local test script
-configure_file(${CMAKE_CURRENT_LIST_DIR}/tools/test/test.bat.in  ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/test.bat)
+configure_file(${CMAKE_CURRENT_LIST_DIR}/tools/test/test.bat.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/test.bat)
 
 # Common build flags
 set(CMAKE_CXX_STANDARD 20)
