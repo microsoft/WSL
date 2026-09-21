@@ -1030,7 +1030,6 @@ void MoveOver(const std::filesystem::path& From, const std::filesystem::path& To
         return;
     }
 
-    // An occupied destination is merged over, but a file and a directory cannot stand in for one another.
     // std::filesystem::copy would place a file underneath a directory carrying the same name.
     std::error_code statusError;
     const auto fromStatus = std::filesystem::status(From, statusError);
@@ -1040,8 +1039,7 @@ void MoveOver(const std::filesystem::path& From, const std::filesystem::path& To
         wsl::shared::Localization::WSLCCLI_CpDestinationTypeMismatchError(To.wstring()),
         std::filesystem::exists(toStatus) && std::filesystem::is_directory(fromStatus) != std::filesystem::is_directory(toStatus));
 
-    // Symlinks are recreated rather than followed, so an entry pointing outside the staging tree
-    // cannot pull unrelated content into the destination.
+    // copy_symlinks keeps an entry pointing outside the staging tree from pulling in unrelated content.
     std::error_code copyError;
     std::filesystem::copy(
         From,
@@ -1091,8 +1089,7 @@ void wsl::windows::common::filesystem::ExtractArchiveInto(
         return;
     }
 
-    // The staging directory sits inside the destination so the entries below are moved across the same
-    // volume, which keeps the rename a metadata operation rather than a second copy of the content.
+    // Staging inside the destination keeps the moves below on one volume, so they stay renames.
     const StagingDirectory staging(Destination);
     ExtractTarStream(staging.Path(), WriteArchive);
 
@@ -1103,8 +1100,7 @@ void wsl::windows::common::filesystem::ExtractArchiveInto(
         staged.push_back(entry.path());
     }
 
-    // A lone entry is the source itself and simply takes the name; several entries mean the source has no
-    // name of its own, so they are gathered under one directory named after it.
+    // A lone entry is the source itself and takes the name; several mean the source has no name of its own.
     auto destinationRoot = Destination;
     if (!RebaseName->empty() && staged.size() > 1)
     {

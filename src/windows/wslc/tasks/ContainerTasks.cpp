@@ -433,9 +433,8 @@ void ContainerCp(CLIExecutionContext& context)
                 absPath = absPath.parent_path();
             }
 
-            // --follow-link resolves the source path itself; links found inside a copied directory stay links.
-            // tar's -h dereferences every link it walks, so it is limited to a source that is itself a link to
-            // a single file, where there is nothing to recurse into.
+            // tar's -h dereferences every link it walks, so it is limited to a source that is itself a link
+            // to a single file, where there is nothing to recurse into.
             std::optional<wsl::windows::common::filesystem::StagingDirectory> staging;
 
             bool dereference = false;
@@ -447,8 +446,7 @@ void ContainerCp(CLIExecutionContext& context)
 
                 if (std::filesystem::is_directory(resolved))
                 {
-                    // The archive has to carry the link's name while holding the target's tree, and tar.exe
-                    // cannot rename entries, so the tree is staged under that name with its own links intact.
+                    // The archive must carry the link's name while holding the target's tree.
                     staging.emplace(std::filesystem::temp_directory_path());
                     absPath = wsl::windows::common::filesystem::StageDereferencedTree(staging->Path(), absPath.filename(), resolved);
                 }
@@ -509,16 +507,15 @@ void ContainerCp(CLIExecutionContext& context)
 
         if (targetIsDir)
         {
-            // A followed link produces an archive named after the link's target, but the copy keeps the name
-            // that was asked for, so the extraction is rebased onto it.
+            // A followed link produces an archive named after the link's target, but the copy keeps the
+            // name that was asked for.
             std::optional<std::wstring> rebaseName;
             if (followLink)
             {
                 auto requestedName = MultiByteToWide(wsl::windows::common::filesystem::PosixBaseName(srcPath));
 
-                // Only '/' and NUL are barred from a POSIX name, so the basename can hold characters that no
-                // Windows file name can. Copying under the resolved target's name instead would silently
-                // produce something other than what was asked for.
+                // Copying under the resolved target's name instead would silently produce something other
+                // than what was asked for.
                 THROW_HR_WITH_USER_ERROR_IF(
                     E_INVALIDARG,
                     Localization::WSLCCLI_CpSourceNameNotRepresentableError(MultiByteToWide(srcPath)),
