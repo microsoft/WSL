@@ -135,7 +135,6 @@ find_nuget_package(Microsoft.WSL.TestData WSL_TEST_DATA /)
 find_nuget_package(Microsoft.WSLg WSLG /build/native/bin)
 find_nuget_package(vswhere VSWHERE /tools)
 find_nuget_package(Wix WIX /tools/net6.0/any)
-find_nuget_package(Microsoft.WSL.OpenVMM WSL_OPENVMM /build/native)
 
 # Architecture-specific nuget packages from the OS repo.
 if (${TARGET_PLATFORM} STREQUAL "x64")
