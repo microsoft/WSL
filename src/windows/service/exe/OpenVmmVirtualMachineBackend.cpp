@@ -264,10 +264,7 @@ OpenVmmVirtualMachineBackend::~OpenVmmVirtualMachineBackend() noexcept
     m_backingFiles.clear();
     if (m_directoryCreated)
     {
-        DeleteOwnedFile(m_rpcSocketPath);
-        DeleteOwnedFile(m_vsockPath);
-        DeleteOwnedFile(m_socketDirectory / L"openvmm.log");
-        LOG_IF_WIN32_BOOL_FALSE(RemoveDirectoryW(m_socketDirectory.c_str()));
+        LOG_IF_FAILED(wil::RemoveDirectoryRecursiveNoThrow(m_socketDirectory.c_str()));
     }
 }
 
