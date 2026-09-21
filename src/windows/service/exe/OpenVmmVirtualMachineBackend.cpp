@@ -239,37 +239,35 @@ void OpenVmmVirtualMachineBackend::DestroyVm(WslOpenVmmVm* Vm) noexcept
     WslOpenVmmDestroyVm(&Vm);
 }
 
-OpenVmmVirtualMachineBackend::OpenVmmVirtualMachineBackend() : m_state(std::make_unique<State>())
-{
-}
+OpenVmmVirtualMachineBackend::OpenVmmVirtualMachineBackend() = default;
 
 OpenVmmVirtualMachineBackend::~OpenVmmVirtualMachineBackend() noexcept
 {
-    if (m_state->m_processWait)
+    if (m_processWait)
     {
-        SetThreadpoolWait(m_state->m_processWait.get(), nullptr, nullptr);
-        WaitForThreadpoolWaitCallbacks(m_state->m_processWait.get(), TRUE);
-        m_state->m_processWait.reset();
+        SetThreadpoolWait(m_processWait.get(), nullptr, nullptr);
+        WaitForThreadpoolWaitCallbacks(m_processWait.get(), TRUE);
+        m_processWait.reset();
     }
-    if (m_state->m_vm && WaitForSingleObject(m_state->m_process.get(), 0) == WAIT_TIMEOUT)
+    if (m_vm && WaitForSingleObject(m_process.get(), 0) == WAIT_TIMEOUT)
     {
-        LOG_IF_FAILED(WslOpenVmmVmTeardown(m_state->m_vm.get()));
-        LOG_IF_FAILED(WslOpenVmmVmQuit(m_state->m_vm.get()));
+        LOG_IF_FAILED(WslOpenVmmVmTeardown(m_vm.get()));
+        LOG_IF_FAILED(WslOpenVmmVmQuit(m_vm.get()));
     }
-    m_state->m_vm.reset();
-    m_state->m_job.reset();
-    if (m_state->m_process)
+    m_vm.reset();
+    m_job.reset();
+    if (m_process)
     {
         // Confirm exit before releasing backing files or deleting socket paths.
-        LOG_LAST_ERROR_IF(WaitForSingleObject(m_state->m_process.get(), INFINITE) == WAIT_FAILED);
+        LOG_LAST_ERROR_IF(WaitForSingleObject(m_process.get(), INFINITE) == WAIT_FAILED);
     }
-    m_state->m_backingFiles.clear();
-    if (m_state->m_directoryCreated)
+    m_backingFiles.clear();
+    if (m_directoryCreated)
     {
-        DeleteOwnedFile(m_state->m_rpcSocketPath);
-        DeleteOwnedFile(m_state->m_vsockPath);
-        DeleteOwnedFile(m_state->m_socketDirectory / L"openvmm.log");
-        LOG_IF_WIN32_BOOL_FALSE(RemoveDirectoryW(m_state->m_socketDirectory.c_str()));
+        DeleteOwnedFile(m_rpcSocketPath);
+        DeleteOwnedFile(m_vsockPath);
+        DeleteOwnedFile(m_socketDirectory / L"openvmm.log");
+        LOG_IF_WIN32_BOOL_FALSE(RemoveDirectoryW(m_socketDirectory.c_str()));
     }
 }
 
@@ -277,7 +275,7 @@ std::unique_ptr<OpenVmmVirtualMachineBackend> OpenVmmVirtualMachineBackend::Crea
 {
     auto description = wsl::windows::common::vm::openvmm::ValidateCreateRequest(Request);
     auto backend = std::unique_ptr<OpenVmmVirtualMachineBackend>{new OpenVmmVirtualMachineBackend{}};
-    backend->m_state->m_description = std::move(description);
+    backend->m_description = std::move(description);
     backend->Initialize(Request);
     return backend;
 }
@@ -295,18 +293,18 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     auto id = wsl::shared::string::GuidToString<wchar_t>(Request.VmId, wsl::shared::string::GuidToStringFlags::None);
     std::erase(id, L'-');
     // An exclusive directory creation prevents shortened path IDs from aliasing another VM.
-    m_state->m_socketDirectory = filesystem::GetTempFolderPath(GetCurrentProcessToken()) / (L"ov-" + id.substr(0, 16));
-    m_state->m_rpcSocketPath = m_state->m_socketDirectory / L"r";
-    m_state->m_vsockPath = m_state->m_socketDirectory / L"v";
+    m_socketDirectory = filesystem::GetTempFolderPath(GetCurrentProcessToken()) / (L"ov-" + id.substr(0, 16));
+    m_rpcSocketPath = m_socketDirectory / L"r";
+    m_vsockPath = m_socketDirectory / L"v";
     const auto longestPath =
-        wsl::shared::string::WideToMultiByte(m_state->m_vsockPath.native() + L"_ffffffff-facb-11e6-bd58-64006a7986d3");
+        wsl::shared::string::WideToMultiByte(m_vsockPath.native() + L"_ffffffff-facb-11e6-bd58-64006a7986d3");
     SOCKADDR_UN address{};
     THROW_HR_IF_MSG(
         E_INVALIDARG,
         longestPath.size() >= sizeof(address.sun_path),
         "OpenVMM guest socket path exceeds the AF_UNIX limit: %hs",
         longestPath.c_str());
-    THROW_HR_IF(E_INVALIDARG, m_state->m_rpcSocketPath.native().find_first_of(L",\"\r\n") != std::wstring::npos);
+    THROW_HR_IF(E_INVALIDARG, m_rpcSocketPath.native().find_first_of(L",\"\r\n") != std::wstring::npos);
 
     const auto tokenUser = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
     const auto sid = wslutil::SidToString(tokenUser->User.Sid);
@@ -315,32 +313,31 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     THROW_IF_WIN32_BOOL_FALSE(ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.c_str(), SDDL_REVISION_1, &security, nullptr));
     SECURITY_ATTRIBUTES attributes{sizeof(attributes), security.get(), FALSE};
     {
-        m_state->m_backingFiles.push_back(OpenBackingFile(Request.Boot.KernelPath, true));
-        m_state->m_backingFiles.push_back(OpenBackingFile(Request.Boot.InitrdPath, true));
-        auto lock = m_state->m_lock.lock_exclusive();
+        m_backingFiles.push_back(OpenBackingFile(Request.Boot.KernelPath, true));
+        m_backingFiles.push_back(OpenBackingFile(Request.Boot.InitrdPath, true));
+        auto lock = m_lock.lock_exclusive();
         for (const auto& disk : Request.BootDisks)
         {
-            const auto& attachment = m_state->m_description.BootDisks.at(disk.Key);
+            const auto& attachment = m_description.BootDisks.at(disk.Key);
             auto backingFile = OpenBackingFile(std::get<VmVirtualDiskSource>(disk.Disk.Source).Path, disk.Disk.ReadOnly);
-            m_state->m_attachedDisks.emplace(
-                attachment.Id.Value, State::AttachedDisk{attachment, std::move(backingFile)});
+            m_attachedDisks.emplace(attachment.Id.Value, AttachedDisk{attachment, std::move(backingFile)});
         }
-        m_state->m_nextDiskId = Request.BootDisks.size() + 1;
-        THROW_IF_WIN32_BOOL_FALSE(CreateDirectoryW(m_state->m_socketDirectory.c_str(), &attributes));
-        m_state->m_directoryCreated = true;
+        m_nextDiskId = Request.BootDisks.size() + 1;
+        THROW_IF_WIN32_BOOL_FALSE(CreateDirectoryW(m_socketDirectory.c_str(), &attributes));
+        m_directoryCreated = true;
     }
 
     UniqueConfig config;
     THROW_IF_FAILED(WslOpenVmmCreateConfig(config.put()));
     THROW_IF_FAILED(WslOpenVmmConfigSetKernelPath(config.get(), Request.Boot.KernelPath.c_str()));
     THROW_IF_FAILED(WslOpenVmmConfigSetInitrdPath(config.get(), Request.Boot.InitrdPath.c_str()));
-    THROW_IF_FAILED(WslOpenVmmConfigSetKernelCmdLine(config.get(), m_state->m_description.Boot.KernelCommandLine.c_str()));
-    THROW_IF_FAILED(WslOpenVmmConfigSetMemoryMb(config.get(), m_state->m_description.Memory.SizeBytes / (1024 * 1024)));
+    THROW_IF_FAILED(WslOpenVmmConfigSetKernelCmdLine(config.get(), m_description.Boot.KernelCommandLine.c_str()));
+    THROW_IF_FAILED(WslOpenVmmConfigSetMemoryMb(config.get(), m_description.Memory.SizeBytes / (1024 * 1024)));
     THROW_IF_FAILED(WslOpenVmmConfigSetProcessorCount(config.get(), Request.Processor.Count));
-    THROW_IF_FAILED(WslOpenVmmConfigSetHvSocketPath(config.get(), m_state->m_vsockPath.c_str()));
+    THROW_IF_FAILED(WslOpenVmmConfigSetHvSocketPath(config.get(), m_vsockPath.c_str()));
     for (const auto& disk : Request.BootDisks)
     {
-        const auto& attachment = m_state->m_description.BootDisks.at(disk.Key);
+        const auto& attachment = m_description.BootDisks.at(disk.Key);
         THROW_IF_FAILED(WslOpenVmmConfigAddBootDisk(
             config.get(),
             attachment.GuestAddress.Controller,
@@ -360,18 +357,18 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
         }
     }
 
-    m_state->m_job = helpers::CreateKillOnCloseJob();
+    m_job = helpers::CreateKillOnCloseJob();
     const auto commandLine =
-        std::format(L"\"{}\" --rpc \"path={},transport=grpc\"", executable.native(), m_state->m_rpcSocketPath.native());
+        std::format(L"\"{}\" --rpc \"path={},transport=grpc\"", executable.native(), m_rpcSocketPath.native());
     SubProcess process{executable.c_str(), commandLine.c_str()};
     process.SetFlags(CREATE_NO_WINDOW);
-    process.SetJobObject(m_state->m_job.get());
+    process.SetJobObject(m_job.get());
     SECURITY_ATTRIBUTES inheritable{sizeof(inheritable), nullptr, TRUE};
     wil::unique_hfile logFile;
     wil::unique_hfile input;
     {
         logFile.reset(CreateFileW(
-            (m_state->m_socketDirectory / L"openvmm.log").c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &inheritable, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr));
+            (m_socketDirectory / L"openvmm.log").c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &inheritable, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr));
         THROW_LAST_ERROR_IF(!logFile);
         input.reset(CreateFileW(
             L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &inheritable, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
@@ -382,14 +379,14 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     THROW_IF_WIN32_BOOL_FALSE(
         DuplicateHandle(GetCurrentProcess(), logFile.get(), GetCurrentProcess(), errorLogFile.put(), 0, TRUE, DUPLICATE_SAME_ACCESS));
     process.SetStdHandles(input.get(), logFile.get(), errorLogFile.get());
-    m_state->m_process = process.Start();
-    m_state->m_processWait.reset(CreateThreadpoolWait(OnProcessExit, this, nullptr));
-    THROW_LAST_ERROR_IF(!m_state->m_processWait);
-    SetThreadpoolWait(m_state->m_processWait.get(), m_state->m_process.get(), nullptr);
+    m_process = process.Start();
+    m_processWait.reset(CreateThreadpoolWait(OnProcessExit, this, nullptr));
+    THROW_LAST_ERROR_IF(!m_processWait);
+    SetThreadpoolWait(m_processWait.get(), m_process.get(), nullptr);
     THROW_IF_FAILED_MSG(
-        WslOpenVmmCreateVm(config.addressof(), m_state->m_rpcSocketPath.c_str(), c_rpcTimeoutMs, m_state->m_vm.put()),
+        WslOpenVmmCreateVm(config.addressof(), m_rpcSocketPath.c_str(), c_rpcTimeoutMs, m_vm.put()),
         "Failed to create OpenVMM VM");
-    const auto result = WaitForSingleObject(m_state->m_process.get(), 0);
+    const auto result = WaitForSingleObject(m_process.get(), 0);
     THROW_LAST_ERROR_IF(result == WAIT_FAILED);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_PROCESS_ABORTED), result == WAIT_OBJECT_0);
 }
@@ -397,7 +394,7 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
 void CALLBACK OpenVmmVirtualMachineBackend::OnProcessExit(PTP_CALLBACK_INSTANCE, void* Context, PTP_WAIT, TP_WAIT_RESULT) noexcept
 {
     auto& backend = *static_cast<OpenVmmVirtualMachineBackend*>(Context);
-    LOG_IF_WIN32_BOOL_FALSE(SetEvent(backend.m_state->m_exitEvent.get()));
+    LOG_IF_WIN32_BOOL_FALSE(SetEvent(backend.m_exitEvent.get()));
 }
 
 VmPlatformCapabilities OpenVmmVirtualMachineBackend::QueryCapabilities()
@@ -456,24 +453,24 @@ wil::unique_handle OpenVmmVirtualMachineBackend::GetTerminationEvent() const
 {
     wil::unique_handle event;
     THROW_IF_WIN32_BOOL_FALSE(DuplicateHandle(
-        GetCurrentProcess(), m_state->m_exitEvent.get(), GetCurrentProcess(), event.put(), 0, FALSE, DUPLICATE_SAME_ACCESS));
+        GetCurrentProcess(), m_exitEvent.get(), GetCurrentProcess(), event.put(), 0, FALSE, DUPLICATE_SAME_ACCESS));
     return event;
 }
 
 void OpenVmmVirtualMachineBackend::Start()
 {
-    auto lock = m_state->m_lock.lock_exclusive();
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_state->m_vm);
-    THROW_IF_FAILED(WslOpenVmmVmResume(m_state->m_vm.get()));
+    auto lock = m_lock.lock_exclusive();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
+    THROW_IF_FAILED(WslOpenVmmVmResume(m_vm.get()));
 }
 
 void OpenVmmVirtualMachineBackend::Terminate()
 {
-    auto lock = m_state->m_lock.lock_exclusive();
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_state->m_vm);
-    THROW_IF_FAILED(WslOpenVmmVmTeardown(m_state->m_vm.get()));
-    const auto quitResult = WslOpenVmmVmQuit(m_state->m_vm.get());
-    const auto waitResult = WaitForSingleObject(m_state->m_process.get(), c_rpcTimeoutMs);
+    auto lock = m_lock.lock_exclusive();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
+    THROW_IF_FAILED(WslOpenVmmVmTeardown(m_vm.get()));
+    const auto quitResult = WslOpenVmmVmQuit(m_vm.get());
+    const auto waitResult = WaitForSingleObject(m_process.get(), c_rpcTimeoutMs);
     THROW_LAST_ERROR_IF(waitResult == WAIT_FAILED);
     if (waitResult != WAIT_OBJECT_0)
     {
@@ -481,8 +478,8 @@ void OpenVmmVirtualMachineBackend::Terminate()
         THROW_HR(HRESULT_FROM_WIN32(WAIT_TIMEOUT));
     }
 
-    m_state->m_vm.reset();
-    m_state->m_attachedDisks.clear();
+    m_vm.reset();
+    m_attachedDisks.clear();
 }
 
 void OpenVmmVirtualMachineBackend::CancelPendingOperations() noexcept
@@ -514,11 +511,11 @@ VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& R
 {
     const auto& source = ValidateDiskRequest(Request);
     auto backingFile = OpenBackingFile(source.Path, Request.ReadOnly);
-    auto lock = m_state->m_lock.lock_exclusive();
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_state->m_vm);
+    auto lock = m_lock.lock_exclusive();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
 
     const auto lunInUse = [&](std::uint32_t Lun) {
-        for (const auto& entry : m_state->m_attachedDisks)
+        for (const auto& entry : m_attachedDisks)
         {
             if (entry.second.Attachment.GuestAddress.Lun == Lun)
             {
@@ -543,30 +540,30 @@ VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& R
         THROW_HR_IF(WSL_E_TOO_MANY_DISKS_ATTACHED, lun == c_maximumDisks);
     }
 
-    THROW_HR_IF(E_BOUNDS, m_state->m_nextDiskId == UINT64_MAX);
+    THROW_HR_IF(E_BOUNDS, m_nextDiskId == UINT64_MAX);
     const VmDiskAttachment attachment{
-        {m_state->m_description.Identity, m_state->m_nextDiskId}, {0, lun}, Request.ReadOnly};
-    const auto [disk, inserted] = m_state->m_attachedDisks.emplace(
-        attachment.Id.Value, State::AttachedDisk{attachment, std::move(backingFile)});
+        {m_description.Identity, m_nextDiskId}, {0, lun}, Request.ReadOnly};
+    const auto [disk, inserted] = m_attachedDisks.emplace(
+        attachment.Id.Value, AttachedDisk{attachment, std::move(backingFile)});
     WI_ASSERT(inserted);
-    auto rollback = wil::scope_exit([&] { m_state->m_attachedDisks.erase(disk); });
+    auto rollback = wil::scope_exit([&] { m_attachedDisks.erase(disk); });
     THROW_IF_FAILED(WslOpenVmmVmAttachScsiDisk(
-        m_state->m_vm.get(), attachment.GuestAddress.Controller, attachment.GuestAddress.Lun, source.Path.c_str(), Request.ReadOnly));
-    ++m_state->m_nextDiskId;
+        m_vm.get(), attachment.GuestAddress.Controller, attachment.GuestAddress.Lun, source.Path.c_str(), Request.ReadOnly));
+    ++m_nextDiskId;
     rollback.release();
     return attachment;
 }
 
 void OpenVmmVirtualMachineBackend::DetachDisk(VmDiskId Disk)
 {
-    THROW_HR_IF(E_INVALIDARG, Disk.Value == 0 || !IsEqualGUID(Disk.Owner.VmId, m_state->m_description.Identity.VmId));
-    auto lock = m_state->m_lock.lock_exclusive();
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_state->m_vm);
-    const auto disk = m_state->m_attachedDisks.find(Disk.Value);
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), disk == m_state->m_attachedDisks.end());
+    THROW_HR_IF(E_INVALIDARG, Disk.Value == 0 || !IsEqualGUID(Disk.Owner.VmId, m_description.Identity.VmId));
+    auto lock = m_lock.lock_exclusive();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
+    const auto disk = m_attachedDisks.find(Disk.Value);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), disk == m_attachedDisks.end());
     THROW_IF_FAILED(WslOpenVmmVmDetachScsiDisk(
-        m_state->m_vm.get(), disk->second.Attachment.GuestAddress.Controller, disk->second.Attachment.GuestAddress.Lun));
-    m_state->m_attachedDisks.erase(disk);
+        m_vm.get(), disk->second.Attachment.GuestAddress.Controller, disk->second.Attachment.GuestAddress.Lun));
+    m_attachedDisks.erase(disk);
 }
 
 VmFileSystemDevice OpenVmmVirtualMachineBackend::CreateFileSystemDevice(const VmFileSystemDeviceRequest&)

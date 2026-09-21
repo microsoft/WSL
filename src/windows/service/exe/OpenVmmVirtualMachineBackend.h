@@ -66,29 +66,24 @@ private:
     static void DestroyVm(WslOpenVmmVm* Vm) noexcept;
     using UniqueVm = wil::unique_any<WslOpenVmmVm*, decltype(&DestroyVm), DestroyVm>;
 
-    struct State
+    struct AttachedDisk
     {
-        struct AttachedDisk
-        {
-            VmDiskAttachment Attachment;
-            wil::unique_hfile BackingFile;
-        };
-
-        wil::srwlock m_lock;
-        VmDescription m_description;
-        _Guarded_by_(m_lock) std::map<std::uint64_t, AttachedDisk> m_attachedDisks;
-        _Guarded_by_(m_lock) std::uint64_t m_nextDiskId = 1;
-        UniqueVm m_vm;
-        wil::unique_handle m_process;
-        wil::unique_handle m_job;
-        std::vector<wil::unique_hfile> m_backingFiles;
-        std::filesystem::path m_socketDirectory;
-        std::filesystem::path m_rpcSocketPath;
-        std::filesystem::path m_vsockPath;
-        bool m_directoryCreated = false;
-        wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
-        wil::unique_threadpool_wait m_processWait;
+        VmDiskAttachment Attachment;
+        wil::unique_hfile BackingFile;
     };
 
-    std::unique_ptr<State> m_state;
+    wil::srwlock m_lock;
+    VmDescription m_description{};
+    _Guarded_by_(m_lock) std::map<std::uint64_t, AttachedDisk> m_attachedDisks;
+    _Guarded_by_(m_lock) std::uint64_t m_nextDiskId = 1;
+    UniqueVm m_vm;
+    wil::unique_handle m_process;
+    wil::unique_handle m_job;
+    std::vector<wil::unique_hfile> m_backingFiles;
+    std::filesystem::path m_socketDirectory;
+    std::filesystem::path m_rpcSocketPath;
+    std::filesystem::path m_vsockPath;
+    bool m_directoryCreated = false;
+    wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
+    wil::unique_threadpool_wait m_processWait;
 };
