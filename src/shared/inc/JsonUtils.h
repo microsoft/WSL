@@ -80,10 +80,7 @@ T FromJson(Iterator First, Iterator Last)
 #ifdef WIN32
 
         THROW_HR_WITH_USER_ERROR_MSG(
-            WSL_E_INVALID_JSON,
-            wsl::shared::Localization::MessageInvalidJson(e.what()),
-            "Invalid JSON: %hs",
-            value.c_str());
+            WSL_E_INVALID_JSON, wsl::shared::Localization::MessageInvalidJson(e.what()), "Invalid JSON: %hs", value.c_str());
 
 #else
         LOG_ERROR("Failed to deserialize json: '{}'. Error: {}", value, e.what());
