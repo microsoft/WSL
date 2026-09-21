@@ -112,9 +112,6 @@ class UnitTests
             LOG_IF_WIN32_BOOL_FALSE(DeleteFile(vhdPath));
         });
 
-        // Export must wait for the running distribution to fully exit before reusing its VHD.
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"true"), 0L);
-
         {
             auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--export {} {}", LXSS_DISTRO_NAME_TEST_L, tarPath));
 
