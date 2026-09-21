@@ -1019,8 +1019,6 @@ const std::filesystem::path& wsl::windows::common::filesystem::StagingDirectory:
     return m_path;
 }
 
-namespace {
-
 void MoveOver(const std::filesystem::path& From, const std::filesystem::path& To)
 {
     std::error_code error;
@@ -1073,8 +1071,6 @@ void ExtractTarStream(const std::filesystem::path& Root, const std::function<voi
     const auto exitCode = wsl::windows::common::SubProcess::GetExitCode(processHandle.get());
     THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
 }
-
-} // namespace
 
 void wsl::windows::common::filesystem::ExtractArchiveInto(
     const std::filesystem::path& Destination, const std::optional<std::wstring>& RebaseName, const std::function<void(HANDLE)>& WriteArchive)
