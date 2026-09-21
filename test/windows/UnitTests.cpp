@@ -3667,6 +3667,8 @@ Usage:
                 {L"C:\\DoesNotExit\\ext4.vhdx", L"C:\\DoesNotExit\\ext4.vhdx"},
                 {L"\\DoesNotExit\\ext4.vhdx", L"\\DoesNotExit\\ext4.vhdx"},
                 {L"", L""},
+                // Verifies that reloading preserves BMP Chinese characters and the rocket's UTF-16 surrogate pair (U+1F680).
+                {L"C:\\中文🚀\\ext4.vhdx", L"C:\\中文🚀\\ext4.vhdx"},
             };
 
             // tuple: WslConfigSetting, expectedValue, actualValue
