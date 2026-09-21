@@ -2728,6 +2728,10 @@ Przykład: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Nie można zastąpić '{0}', ponieważ jest innego typu niż skopiowany wpis.</value>
     <comment>{0} is the destination path. Shown when a file would replace a directory, or a directory would replace a file.</comment>
   </data>
+  <data name="WSLCCLI_CpSourceNameNotRepresentableError" xml:space="preserve">
+    <value>Nie można skopiować '{0}', ponieważ jego nazwy nie można użyć jako nazwy pliku systemu Windows.</value>
+    <comment>{0} is the source path. Shown when the container source name holds a character that is not valid in a Windows file name.</comment>
+  </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Sprawdź kontener.</value>
   </data>

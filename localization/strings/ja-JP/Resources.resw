@@ -2734,6 +2734,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>コピーされたエントリの種類が異なるため、'{0}' を上書きできません。</value>
     <comment>{0} is the destination path. Shown when a file would replace a directory, or a directory would replace a file.</comment>
   </data>
+  <data name="WSLCCLI_CpSourceNameNotRepresentableError" xml:space="preserve">
+    <value>名前を Windows ファイル名として使用できないため、'{0}' をコピーできません。</value>
+    <comment>{0} is the source path. Shown when the container source name holds a character that is not valid in a Windows file name.</comment>
+  </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>コンテナーを検査します。</value>
   </data>

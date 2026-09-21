@@ -2728,6 +2728,10 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
     <value>Kopyalanan girişten farklı türde olduğundan '{0}' üzerine yazılamıyor.</value>
     <comment>{0} is the destination path. Shown when a file would replace a directory, or a directory would replace a file.</comment>
   </data>
+  <data name="WSLCCLI_CpSourceNameNotRepresentableError" xml:space="preserve">
+    <value>Windows dosya adı olarak kullanılamadığı için '{0}' kopyalanamıyor.</value>
+    <comment>{0} is the source path. Shown when the container source name holds a character that is not valid in a Windows file name.</comment>
+  </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Bir kapsayıcıyı incele.</value>
   </data>
