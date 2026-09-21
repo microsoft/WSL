@@ -74,6 +74,13 @@ enum class VmSelectionPolicy
     Preferred
 };
 
+template <typename T>
+struct VmRequestedValue
+{
+    T Value{};
+    VmSelectionPolicy Policy = VmSelectionPolicy::Required;
+};
+
 enum class VmFeature
 {
     LinuxDirectBoot,
@@ -154,6 +161,14 @@ struct VmPlatformCapabilities
     std::bitset<static_cast<size_t>(VmOperation::Count)> Operations;
 };
 
+enum class VmState
+{
+    Created,
+    Running,
+    Stopped,
+    Unknown
+};
+
 struct GuestServicePort
 {
     std::uint32_t Value = 0;
@@ -171,6 +186,12 @@ struct VmProcessorRequest
     VmFeatureRequest NestedVirtualization = VmFeatureRequest::Disabled;
     VmFeatureRequest PerfmonPmu = VmFeatureRequest::Disabled;
     VmFeatureRequest PerfmonLbr = VmFeatureRequest::Disabled;
+};
+
+struct VmMmioRequest
+{
+    std::uint64_t HighWindowSizeBytes = 0;
+    std::optional<std::uint8_t> MaximumGuestAddressBits;
 };
 
 struct VmMemoryRequest
@@ -401,6 +422,12 @@ struct VmPortBinding
     VmTransportProtocol Protocol = VmTransportProtocol::Tcp;
     VmIpEndpoint EffectiveListen;
     std::uint16_t GuestPort = 0;
+};
+
+struct VmDnsRecord
+{
+    std::string Name;
+    VmIpv4Address Address;
 };
 
 enum class VmVirtioFsLayout
