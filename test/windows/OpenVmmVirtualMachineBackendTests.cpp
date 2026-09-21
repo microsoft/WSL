@@ -1,5 +1,3 @@
-// Copyright (C) Microsoft Corporation. All rights reserved.
-
 #include "precomp.h"
 #include "Common.h"
 #include "OpenVmmVirtualMachineBackend.h"
