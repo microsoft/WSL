@@ -544,11 +544,18 @@ public:
     static CreateLxProcessContext s_GetCreateProcessContext(_In_ const GUID& DistroGuid, _In_ bool SystemDistro);
 
 private:
+    struct PidTermination
+    {
+        ULONG ClientId{};
+        DWORD Timeout{};
+        wil::shared_event Event{wil::EventOptions::ManualReset};
+    };
+
     /// <summary>
     /// Adds a distro to the list of converting distros.
     /// </summary>
     _Requires_lock_held_(m_instanceLock)
-    void _ConversionBegin(_In_ GUID DistroGuid, _In_ LxssDistributionState State);
+    std::optional<PidTermination> _ConversionBegin(_In_ GUID DistroGuid, _In_ LxssDistributionState State);
 
     /// <summary>
     /// Removes a distro from the list of converting distros and checks if the
@@ -556,6 +563,9 @@ private:
     /// </summary>
     _Requires_lock_not_held_(m_instanceLock)
     void _ConversionComplete(_In_ GUID DistroGuid);
+
+    _Requires_lock_not_held_(m_instanceLock)
+    HRESULT _WaitForPidTermination(_In_ const std::optional<PidTermination>& PidTermination);
 
     /// <summary>
     /// Creates a distribution registration for legacy installs.
@@ -821,6 +831,11 @@ private:
     /// Contains a list of distribution are toggling VM mode.
     /// </summary>
     _Guarded_by_(m_instanceLock) std::list<std::pair<GUID, LxssDistributionState>> m_lockedDistributions;
+
+    /// <summary>
+    /// Contains waiters for processes that must fully exit before their VHD can be reused.
+    /// </summary>
+    _Guarded_by_(m_instanceLock) std::map<ULONG, wil::shared_event> m_pidTerminations;
 
     /// <summary>
     /// The running utility vm for WSL2 distributions.
