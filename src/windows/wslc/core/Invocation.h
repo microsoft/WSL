@@ -28,11 +28,17 @@ Abstract:
 #include <utility>
 #include <vector>
 
+namespace wsl::windows::wslc::cli {
+struct Terminal;
+}
+
 namespace wsl::windows::wslc {
+
+using namespace wsl::windows::wslc::cli;
+
 struct Argument;
 struct Command;
 struct CommandException;
-struct Terminal;
 
 enum class HelpOutput;
 

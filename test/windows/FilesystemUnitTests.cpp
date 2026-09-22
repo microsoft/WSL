@@ -17,6 +17,8 @@ Abstract:
 #include "Common.h"
 
 using wsl::windows::common::filesystem::GetCanonicalPath;
+using wsl::windows::common::filesystem::MakeStagingDirectory;
+using wsl::windows::common::filesystem::PosixBaseName;
 
 namespace {
 
@@ -142,6 +144,76 @@ class FilesystemUnitTests
         VERIFY_THROWS_SPECIFIC(GetCanonicalPath(UnresolvablePath()), wil::ResultException, [&](const wil::ResultException& e) {
             return e.GetErrorCode() == expectedResult;
         });
+    }
+
+    // The last component of a POSIX container path is what a copy is named after.
+    TEST_METHOD(PosixBaseName_ReturnsLastComponent)
+    {
+        VERIFY_ARE_EQUAL(std::string{"thelink.txt"}, PosixBaseName("/tmp/linkdir/thelink.txt"));
+        VERIFY_ARE_EQUAL(std::string{"file.txt"}, PosixBaseName("file.txt"));
+        VERIFY_ARE_EQUAL(std::string{"tmp"}, PosixBaseName("/tmp"));
+    }
+
+    // A trailing separator names the same entry, so it cannot change the result.
+    TEST_METHOD(PosixBaseName_IgnoresTrailingSeparators)
+    {
+        VERIFY_ARE_EQUAL(std::string{"dir"}, PosixBaseName("/tmp/dir/"));
+        VERIFY_ARE_EQUAL(std::string{"dir"}, PosixBaseName("/tmp/dir///"));
+    }
+
+    // The root and the dot components carry no name of their own. A caller uses the empty result to fall
+    // back to the names the archive already carries.
+    TEST_METHOD(PosixBaseName_PathsWithNoNameYieldEmpty)
+    {
+        const char* const paths[] = {"/", "//", ".", "..", "/tmp/.", "/tmp/..", ""};
+
+        for (const auto* path : paths)
+        {
+            VERIFY_ARE_EQUAL(std::string{}, PosixBaseName(path));
+        }
+    }
+
+    // Only '/' and NUL are barred from a POSIX name, so a basename can hold characters that no Windows
+    // file name can. The name is returned as it stands: judging it against a Windows destination belongs
+    // to the caller, which otherwise could not tell a rejected name from a path that has no name at all.
+    TEST_METHOD(PosixBaseName_KeepsNamesWindowsCannotRepresent)
+    {
+        const std::string colonName = "a:b";
+        const std::string colonPath = "/tmp/a:b";
+        VERIFY_ARE_EQUAL(colonName, PosixBaseName(colonPath));
+
+        const std::string backslashName = "a\\b";
+        const std::string backslashPath = "/tmp/a\\b";
+        VERIFY_ARE_EQUAL(backslashName, PosixBaseName(backslashPath));
+
+        const std::string wildcardName = "a*b";
+        const std::string wildcardPath = "/tmp/a*b";
+        VERIFY_ARE_EQUAL(wildcardName, PosixBaseName(wildcardPath));
+    }
+
+    // Staging goes under the parent it was given so that moving entries out of it afterwards stays on one
+    // volume, and each directory has to be distinct so concurrent copies cannot collide.
+    TEST_METHOD(MakeStagingDirectory_CreatesUniqueDirectoryUnderParent)
+    {
+        const auto parent = std::filesystem::current_path();
+
+        const auto first = MakeStagingDirectory(parent);
+        auto removeFirst = wil::scope_exit([&] {
+            std::error_code error;
+            std::filesystem::remove_all(first, error);
+        });
+
+        VERIFY_IS_TRUE(std::filesystem::is_directory(first));
+        VERIFY_ARE_EQUAL(parent.wstring(), first.parent_path().wstring());
+
+        const auto second = MakeStagingDirectory(parent);
+        auto removeSecond = wil::scope_exit([&] {
+            std::error_code error;
+            std::filesystem::remove_all(second, error);
+        });
+
+        VERIFY_IS_TRUE(std::filesystem::is_directory(second));
+        VERIFY_ARE_NOT_EQUAL(first.wstring(), second.wstring());
     }
 };
 } // namespace FilesystemUnitTests

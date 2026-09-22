@@ -21,6 +21,8 @@ using namespace wsl::windows::wslc::execution;
 
 namespace wsl::windows::wslc::task {
 
+using namespace wsl::windows::wslc::cli;
+
 // Prompts the user to confirm the action described by Data::ConfirmMessage, preceded by the
 // Data::ConfirmWarning explaining what the action affects. The prompt is skipped when --force is
 // passed, and declining terminates the invocation without running the remaining tasks.

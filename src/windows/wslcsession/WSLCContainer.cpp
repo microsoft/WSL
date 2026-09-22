@@ -1839,11 +1839,33 @@ void WSLCContainerImpl::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULO
     }
 }
 
-void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) const
+void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, BOOL FollowLink, WSLCHandle OutHandle) const
 {
     auto lock = m_lock.lock_shared();
 
-    auto [statusCode, socket, isChunked] = m_runtime.Docker().GetArchive(m_id, SrcPath);
+    std::string effectivePath(SrcPath);
+
+    if (FollowLink)
+    {
+        const auto stat = m_runtime.Docker().StatArchivePath(m_id, effectivePath);
+        if (stat.has_value() && stat->IsSymlink() && !stat->linkTarget.empty())
+        {
+            // Container paths are POSIX. A relative link target is resolved against the directory holding the link.
+            std::string resolved = stat->linkTarget;
+            if (resolved.front() != '/')
+            {
+                const auto separator = effectivePath.find_last_of('/');
+                if (separator != std::string::npos)
+                {
+                    resolved = effectivePath.substr(0, separator + 1) + resolved;
+                }
+            }
+
+            effectivePath = std::move(resolved);
+        }
+    }
+
+    auto [statusCode, socket, isChunked] = m_runtime.Docker().GetArchive(m_id, effectivePath);
 
     auto userHandle = m_wslcSession.OpenUserHandle(OutHandle);
 
@@ -3380,7 +3402,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCContainer::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle)
+HRESULT WSLCContainer::DownloadArchive(LPCSTR SrcPath, BOOL FollowLink, WSLCHandle OutHandle)
 try
 {
     WSLCExecutionContext context(&m_session);
@@ -3389,7 +3411,7 @@ try
     RETURN_HR_IF(E_INVALIDARG, SrcPath[0] == '\0');
 
     auto vmLease = m_session.Runtime().AcquireVmLease();
-    return CallImpl(&WSLCContainerImpl::DownloadArchive, SrcPath, OutHandle);
+    return CallImpl(&WSLCContainerImpl::DownloadArchive, SrcPath, FollowLink, OutHandle);
 }
 CATCH_RETURN();
 

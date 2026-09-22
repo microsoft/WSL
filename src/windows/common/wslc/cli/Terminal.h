@@ -29,7 +29,7 @@ Abstract:
 #include <type_traits>
 #include <utility>
 
-namespace wsl::windows::wslc {
+namespace wsl::windows::wslc::cli {
 
 // Fallback width for progress displays when the console width can't be queried. This
 // value already includes the autowrap guard (visible width minus one) so a wrapped line
@@ -212,4 +212,4 @@ private:
     bool m_noColor = false;
 };
 
-} // namespace wsl::windows::wslc
+} // namespace wsl::windows::wslc::cli

@@ -18,6 +18,8 @@ Abstract:
 #include <wslc.h>
 
 namespace wsl::windows::wslc::services {
+
+using namespace wsl::windows::wslc::cli;
 struct SessionInformation
 {
     ULONG SessionId;

@@ -31,7 +31,7 @@ Abstract:
 
 #define FIELD(Name) #Name, Name
 
-#define STRING_FIELD(Name) #Name, (Name <= 0 ? "<empty>" : ((char*)(this)) + Name)
+#define STRING_FIELD(Name) #Name, PrettyPrintSafeStringView(this, Header.MessageSize, Name)
 
 #define STRING_ARRAY_FIELD(Name) #Name, (StringArray((char*)(this), Name, Header.MessageSize))
 
@@ -49,6 +49,21 @@ inline std::string_view PrettyPrintSafeBufferView(const void* structBase, unsign
 
     const size_t maxLen = messageSize - offset;
     return std::string_view(buffer, strnlen(buffer, maxLen));
+}
+
+inline std::string_view PrettyPrintSafeStringView(const void* structBase, unsigned int messageSize, size_t offset)
+{
+    if (offset == 0)
+    {
+        return "<empty>";
+    }
+
+    if (offset >= messageSize)
+    {
+        return "<out-of-bounds>";
+    }
+
+    return PrettyPrintSafeBufferView(structBase, messageSize, reinterpret_cast<const char*>(structBase) + offset);
 }
 
 #define PRETTY_PRINT(...) \

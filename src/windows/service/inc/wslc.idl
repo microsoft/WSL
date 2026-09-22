@@ -583,7 +583,8 @@ interface IWSLCContainer : IUnknown
     HRESULT ConnectToNetwork([in] const WSLCNetworkConnectionOptions* Options);
     HRESULT DisconnectFromNetwork([in] LPCSTR NetworkName);
     HRESULT UploadArchive([in] WSLCHandle TarHandle, [in, string] LPCSTR DestPath, [in] ULONGLONG ContentSize);
-    HRESULT DownloadArchive([in, string] LPCSTR SrcPath, [in] WSLCHandle OutHandle);
+    // When FollowLink is set and SrcPath names a symbolic link, the archive is taken from the link's target.
+    HRESULT DownloadArchive([in, string] LPCSTR SrcPath, [in] BOOL FollowLink, [in] WSLCHandle OutHandle);
     HRESULT Restart([in] WSLCSignal Signal, [in] LONG TimeoutSeconds, [in, unique] IWarningCallback* WarningCallback);
 }
 
@@ -827,6 +828,10 @@ interface IWSLCSession : IUnknown
     // RPC_E_DISCONNECTED. The client holds the returned token for the whole operation; releasing
     // it (or the client exiting) lets the VM idle-terminate again.
     HRESULT BeginContainerOperation([out] IUnknown** Operation);
+
+    // Used only for testing. Fails the next CreateNetwork after dockerd created the network, so the
+    // rollback path can be exercised.
+    HRESULT SetNetworkFaultsForTest([in] BOOL FailCreateInspect);
 }
 
 //
