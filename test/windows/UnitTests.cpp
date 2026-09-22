@@ -8296,6 +8296,31 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
 
             VERIFY_ARE_EQUAL(expected, output);
         }
+
+        {
+            wsl::shared::MessageWriter<WSLC_LISTDIR_RESULT> message;
+
+            const auto verifyEntries = [&](std::string_view entries) {
+                const auto expected = std::format(
+                    "Header = {{MessageType = LxMessageWSLCListDirResult\n"
+                    "MessageSize = {}\n"
+                    "TransactionId = 0\n"
+                    "TransactionStep = 0\n"
+                    "}}\n"
+                    "Result = 0\n"
+                    "EntriesIndex = {}\n",
+                    message->Header.MessageSize,
+                    entries);
+
+                VERIFY_ARE_EQUAL(expected, message->PrettyPrint());
+            };
+
+            message->EntriesIndex = message->Header.MessageSize + 0x1000;
+            verifyEntries("<out-of-bounds>");
+
+            message->EntriesIndex = 0;
+            verifyEntries("<empty>");
+        }
     }
 };
 } // namespace UnitTests
