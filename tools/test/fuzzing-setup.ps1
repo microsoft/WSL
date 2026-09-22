@@ -25,7 +25,7 @@ if (!(Test-Path $msiPath))
 
 Write-Host "Installing WSL from $msiPath..."
 $installer = Start-Process msiexec -ArgumentList "/i `"$msiPath`" /quiet /norestart" -Wait -PassThru
-if ($installer.ExitCode -ne 0)
+if ($installer.ExitCode -notin @(0, 3010))
 {
     throw "WSL MSI installation failed with exit code $($installer.ExitCode)"
 }

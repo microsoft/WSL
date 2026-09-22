@@ -17,6 +17,23 @@
 
 extern "C" int LLVMFuzzerInitialize(int*, char***)
 {
+    static const auto coInitialize = wil::CoInitializeEx(COINIT_MULTITHREADED);
+    (void)coInitialize;
+
+    // Fail before fuzzing if the VM cannot start a session; fuzz inputs are expected to fail, host setup is not.
+    const auto sessionName = L"WslcSdkFuzzing-Probe-" + std::to_wstring(GetCurrentProcessId());
+    const auto storagePath = GetFuzzStoragePath(L"WslcSdkFuzzing");
+    WslcSessionSettings sessionSettings{};
+    THROW_IF_FAILED(WslcInitSessionSettings(sessionName.c_str(), storagePath.c_str(), &sessionSettings));
+    WslcSetSessionSettingsCpuCount(&sessionSettings, 1);
+    WslcSetSessionSettingsMemory(&sessionSettings, 512);
+    WslcSetSessionSettingsTimeout(&sessionSettings, 5000);
+
+    WslcSession session = nullptr;
+    THROW_IF_FAILED(WslcCreateSession(&sessionSettings, &session, nullptr));
+    auto releaseSession = wil::scope_exit([&]() noexcept { LOG_IF_FAILED(WslcReleaseSession(session)); });
+    THROW_IF_FAILED(WslcTerminateSession(session));
+
     return 0;
 }
 

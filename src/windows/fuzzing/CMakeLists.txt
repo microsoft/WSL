@@ -63,6 +63,17 @@ function(add_fuzzing_harness TARGET)
     set(ONEFUZZ_ENTRIES "${ONEFUZZ_ENTRIES}" PARENT_SCOPE)
 endfunction()
 
+function(enable_fuzzing_coverage)
+    foreach(target IN LISTS ARGN)
+        target_compile_options(${target} PRIVATE
+            /fsanitize-coverage=edge
+            /fsanitize-coverage=trace-cmp
+            /fsanitize-coverage=trace-div)
+    endforeach()
+endfunction()
+
+enable_fuzzing_coverage(wslclib wslcsdk wslcsdkwinrt)
+
 # OneFuzz runs a script named 'setup.ps1' from the drop, so the source script is renamed here.
 configure_file(${CMAKE_SOURCE_DIR}/tools/test/fuzzing-setup.ps1 ${FUZZING_OUT_DIR}/setup.ps1 COPYONLY)
 
@@ -84,6 +95,10 @@ add_fuzzing_harness(WslcWinRtFuzzing
     LINK_LIBRARIES wslcsdk
     INCLUDE_DIRECTORIES ${CMAKE_SOURCE_DIR}/src/windows/WslcSDK ${CMAKE_BINARY_DIR}/src/windows/WslcSDK/winrt/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE}
     EXTRA_DEPENDENCIES "wslcsdk.dll" "wslcsdk.pdb")
+# The standalone harness needs the SDK manifest for registration-free WinRT activation.
+target_link_options(WslcWinRtFuzzing PRIVATE
+    /MANIFEST:EMBED
+    /MANIFESTINPUT:${CMAKE_SOURCE_DIR}/nuget/Microsoft.WSL.Containers/manifests/Microsoft.WSL.Containers.manifest)
 
 # Write OneFuzzConfig.json with one entry per harness.
 list(JOIN ONEFUZZ_ENTRIES ",\n" ONEFUZZ_ENTRIES)

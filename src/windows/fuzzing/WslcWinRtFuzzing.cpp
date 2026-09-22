@@ -24,6 +24,18 @@ using namespace winrt::Windows::Foundation;
 extern "C" int LLVMFuzzerInitialize(int*, char***)
 {
     winrt::init_apartment();
+
+    // Fail before fuzzing if activation or host setup cannot start a session.
+    const auto sessionName = L"WslcWinRtFuzzing-Probe-" + std::to_wstring(GetCurrentProcessId());
+    SessionSettings sessionSettings{sessionName, GetFuzzStoragePath(L"WslcWinRtFuzzing")};
+    sessionSettings.CpuCount(1);
+    sessionSettings.MemorySizeInMB(1024);
+    sessionSettings.Timeout(winrt::Windows::Foundation::TimeSpan{std::chrono::milliseconds{5000}});
+
+    Session session{sessionSettings};
+    session.Start();
+    session.Terminate();
+
     return 0;
 }
 

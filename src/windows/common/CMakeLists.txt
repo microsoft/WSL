@@ -181,7 +181,7 @@ function(add_common_library TARGET_NAME)
     # PUBLIC propagates them instead of making each consumer restate them.
     # yaml-cpp backs WSLCUserSettings, advapi32 the credential manager APIs used by
     # WinCredStorage, and Crypt32 the data protection APIs used by FileCredStorage.
-    target_link_libraries(common PUBLIC ${HCS_LINK_LIBRARIES} ${MSI_LINK_LIBRARIES} VirtDisk.lib configfile yaml-cpp advapi32 Crypt32.lib)
+    target_link_libraries(${TARGET_NAME} PUBLIC ${HCS_LINK_LIBRARIES} ${MSI_LINK_LIBRARIES} VirtDisk.lib configfile yaml-cpp advapi32 Crypt32.lib)
 endfunction()
 
 add_common_library(common)
