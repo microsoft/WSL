@@ -69,6 +69,40 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(ArgType::Verbose, withArgument.Arguments().front().Type());
     }
 
+    TEST_METHOD(ArgumentCreate_DefaultsAndOverrides)
+    {
+        const auto defaults = Argument::Create(ArgType::Quiet);
+        VERIFY_ARE_EQUAL(std::wstring{L"quiet"}, defaults.Name());
+        VERIFY_ARE_EQUAL(std::wstring{L"q"}, defaults.Alias());
+
+        const auto noAlias = Argument::Create(ArgType::Quiet, {.Alias = NO_ALIAS});
+        VERIFY_IS_TRUE(noAlias.Alias().empty());
+        VERIFY_ARE_EQUAL(defaults.Description(), noAlias.Description());
+
+        const auto overrides = Argument::Create(
+            ArgType::Filter, {.Name = L"where", .Alias = L"x", .Required = true, .Limit = Limit::Unlimited, .Desc = L"Custom description"});
+        VERIFY_ARE_EQUAL(std::wstring{L"where"}, overrides.Name());
+        VERIFY_ARE_EQUAL(std::wstring{L"x"}, overrides.Alias());
+        VERIFY_IS_TRUE(overrides.Required());
+        VERIFY_ARE_EQUAL(Limit::Unlimited, overrides.Limit());
+        VERIFY_ARE_EQUAL(std::wstring{L"Custom description"}, overrides.Description());
+    }
+
+    TEST_METHOD(ArgumentMatchesOption_RequiresNameOrAliasSpecifier)
+    {
+        const auto argument = Argument::Create(ArgType::Quiet);
+
+        VERIFY_IS_TRUE(argument.MatchesOption(L"--quiet"));
+        VERIFY_IS_TRUE(argument.MatchesOption(L"--quiet=true"));
+        VERIFY_IS_TRUE(argument.MatchesOption(L"-q"));
+        VERIFY_IS_TRUE(argument.MatchesOption(L"-q=true"));
+
+        VERIFY_IS_FALSE(argument.MatchesOption(L"quiet"));
+        VERIFY_IS_FALSE(argument.MatchesOption(L"-"));
+        VERIFY_IS_FALSE(argument.MatchesOption(L"--"));
+        VERIFY_IS_FALSE(argument.MatchesOption(L"---quiet"));
+    }
+
     // Test: Verify Argument::Create() successfully creates arguments for all ArgType enum values
     TEST_METHOD(ArgumentCreate_AllArguments)
     {
@@ -368,6 +402,16 @@ class WSLCCLIArgumentUnitTests
         return values;
     }
 
+    TEST_METHOD(Filter_RejectsMalformedValues)
+    {
+        ArgMap args;
+        args.Add(ArgType::Filter, std::wstring(L"type"));
+        VERIFY_THROWS_SPECIFIC(Argument::Create(ArgType::Filter).Validate(args), ArgumentException, [](const auto& exception) {
+            return exception.Message() == wsl::shared::Localization::WSLCCLI_InvalidFilterError(L"type");
+        });
+        VERIFY_IS_FALSE(args.ContainsValidated(ArgType::Filter));
+    }
+
     // Test: Every ArgType whose validation converts its raw string into a typed value must cache
     // that value on the ArgMap during Argument::Validate, so execution reads it back without
     // re-converting. This drives the real validation + caching path for each converted ArgType.
@@ -393,8 +437,9 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::HealthRetries>(L"3"), 3);
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Last>(L"5"), 5);
 
-        // string -> LONG
+        // string -> LONG (Time and Timeout share the converter)
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Time>(L"5"), 5L);
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Timeout>(L"5"), 5L);
 
         // string -> ULONGLONG (Tail is a raw integer; Since/Until go through the timestamp parser)
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Tail>(L"10"), 10ULL);
@@ -416,16 +461,16 @@ class WSLCCLIArgumentUnitTests
         // mount strings -> mount::Spec
         {
             const auto volume = ValidateAndGetCached<ArgType::Volume>(LR"(C:\hostPath:/containerPath)");
-            VERIFY_ARE_EQUAL(static_cast<int>(mount::Type::Bind), static_cast<int>(volume.MountType));
+            VERIFY_ARE_EQUAL(static_cast<int>(WSLCMountTypeBind), static_cast<int>(volume.MountType));
             VERIFY_ARE_EQUAL(static_cast<int>(mount::BindSourcePolicy::CreateIfMissing), static_cast<int>(volume.BindSource));
 
             const auto tmpfs = ValidateAndGetCached<ArgType::TMPFS>(L"/tmp:size=64k");
-            VERIFY_ARE_EQUAL(static_cast<int>(mount::Type::Tmpfs), static_cast<int>(tmpfs.MountType));
+            VERIFY_ARE_EQUAL(static_cast<int>(WSLCMountTypeTmpfs), static_cast<int>(tmpfs.MountType));
             VERIFY_IS_TRUE(tmpfs.TmpfsOptions.has_value());
             VERIFY_ARE_EQUAL(std::string("size=64k"), tmpfs.TmpfsOptions.value());
 
             const auto structured = ValidateAndGetCached<ArgType::Mount>(L"type=volume,source=data-volume,target=/data");
-            VERIFY_ARE_EQUAL(static_cast<int>(mount::Type::Volume), static_cast<int>(structured.MountType));
+            VERIFY_ARE_EQUAL(static_cast<int>(WSLCMountTypeVolume), static_cast<int>(structured.MountType));
             VERIFY_ARE_EQUAL(std::wstring(L"data-volume"), structured.Source);
         }
 

@@ -108,8 +108,9 @@ class WSLCE2EContainerRunTests
         VERIFY_IS_FALSE(result.Stdout->empty());
 
         result = RunWslc(std::format(L"container run --pull=always --rm --name {} {}", WslcContainerName, registryImage));
-        const auto errorMessage = std::format(
-            L"manifest for {} not found: manifest unknown: manifest unknown\r\nError code: WSLC_E_IMAGE_NOT_FOUND\r\n", registryImage);
+        const auto errorMessage = FormatErrorMessage(
+            std::format(L"manifest for {} not found: manifest unknown: manifest unknown", registryImage),
+            L"WSLC_E_IMAGE_NOT_FOUND");
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
         VerifyContainerIsNotListed(WslcContainerName);
 
@@ -149,7 +150,8 @@ class WSLCE2EContainerRunTests
         auto result = RunWslc(std::format(
             L"container run --cidfile \"{}\" --name {} {}", EscapePath(cidFilePath.wstring()), WslcContainerName, DebianImage.NameAndTag()));
         result.Verify(
-            {.Stderr = std::format(L"CID file '{}' already exists\r\nError code: ERROR_FILE_EXISTS\r\n", EscapePath(cidFilePath.wstring())),
+            {.Stderr = FormatErrorMessage(
+                 std::format(L"CID file '{}' already exists", EscapePath(cidFilePath.wstring())), L"ERROR_FILE_EXISTS"),
              .ExitCode = 1});
 
         VerifyContainerIsNotListed(WslcContainerName);
@@ -172,7 +174,13 @@ class WSLCE2EContainerRunTests
     {
         auto result = RunWslc(std::format(L"container run --rm --entrypoint /bin/does-not-exist {}", DebianImage.NameAndTag()));
         result.Verify(
-            {.Stdout = L"", .Stderr = L"failed to create task for container: failed to create shim task: OCI runtime create failed: runc create failed: unable to start container process: error during container init: exec: \"/bin/does-not-exist\": stat /bin/does-not-exist: no such file or directory: unknown\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            {.Stdout = L"",
+             .Stderr = FormatErrorMessage(
+                 L"failed to create task for container: failed to create shim task: OCI runtime create failed: runc create "
+                 L"failed: unable to start container process: error during container init: exec: \"/bin/does-not-exist\": stat "
+                 L"/bin/does-not-exist: no such file or directory: unknown",
+                 L"E_INVALIDARG"),
+             .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Entrypoint_Detach_Lifecycle)
@@ -414,13 +422,15 @@ class WSLCE2EContainerRunTests
     {
         auto result = RunWslc(std::format(L"container run --rm -u user_does_not_exist {} id -u", DebianImage.NameAndTag()));
         result.Verify(
-            {.Stderr = L"unable to find user user_does_not_exist: no matching entries in passwd file\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+            {.Stderr =
+                 FormatErrorMessage(L"unable to find user user_does_not_exist: no matching entries in passwd file", L"E_FAIL"),
+             .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_UserOption_UnknownGroup_Fails)
     {
         auto result = RunWslc(std::format(L"container run --rm -u root:badgid {} id -u", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"unable to find group badgid: no matching entries in group file\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+        result.Verify({.Stderr = FormatErrorMessage(L"unable to find group badgid: no matching entries in group file", L"E_FAIL"), .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_UserOption_NameGroupRoot)
@@ -479,10 +489,12 @@ class WSLCE2EContainerRunTests
         // Attempt to start — should fail with port conflict
         auto startResult = RunWslc(std::format(L"container start {}", containerId));
         startResult.Verify(
-            {.Stderr = std::format(
-                 L"Failed to map port '127.0.0.1:{}/tcp', Only one usage of each socket address (protocol/network "
-                 L"address/port) is normally permitted. \r\nError code: WSAEADDRINUSE\r\n",
-                 HostTestPort1),
+            {.Stderr = FormatErrorMessage(
+                 std::format(
+                     L"Failed to map port '127.0.0.1:{}/tcp', Only one usage of each socket address (protocol/network "
+                     L"address/port) is normally permitted. ",
+                     HostTestPort1),
+                 L"WSAEADDRINUSE"),
              .ExitCode = 1});
 
         // Clean up the created container
@@ -518,10 +530,12 @@ class WSLCE2EContainerRunTests
         // Attempt to start — should fail with a port conflict, with the IPv6 address bracketed in the message.
         auto ipv6StartResult = RunWslc(std::format(L"container start {}", ipv6ContainerId));
         ipv6StartResult.Verify(
-            {.Stderr = std::format(
-                 L"Failed to map port '[::1]:{}/tcp', Only one usage of each socket address (protocol/network "
-                 L"address/port) is normally permitted. \r\nError code: WSAEADDRINUSE\r\n",
-                 HostTestPort2),
+            {.Stderr = FormatErrorMessage(
+                 std::format(
+                     L"Failed to map port '[::1]:{}/tcp', Only one usage of each socket address (protocol/network "
+                     L"address/port) is normally permitted. ",
+                     HostTestPort2),
+                 L"WSAEADDRINUSE"),
              .ExitCode = 1});
     }
 
@@ -944,7 +958,7 @@ class WSLCE2EContainerRunTests
     {
         auto result = RunWslc(std::format(
             L"container run --rm --network does-not-exist --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Network not found: 'does-not-exist'\r\nError code: WSLC_E_NETWORK_NOT_FOUND\r\n", .ExitCode = 1});
+        result.Verify({.Stderr = FormatErrorMessage(L"Network not found: 'does-not-exist'", L"WSLC_E_NETWORK_NOT_FOUND"), .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_NetworkAlias_Success)
@@ -1004,8 +1018,8 @@ class WSLCE2EContainerRunTests
         auto result =
             RunWslc(std::format(L"container run --rm --network-alias db --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify(
-            {.Stderr =
-                 L"Network aliases require a user-defined network. Use --network to specify one.\r\nError code: E_INVALIDARG\r\n",
+            {.Stderr = FormatErrorMessage(
+                 L"Network aliases require a user-defined network. Use --network to specify one.", L"E_INVALIDARG"),
              .ExitCode = 1});
     }
 
@@ -1014,8 +1028,8 @@ class WSLCE2EContainerRunTests
         auto result = RunWslc(std::format(
             L"container run --rm --network none --network-alias db --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify(
-            {.Stderr =
-                 L"Network aliases require a user-defined network. Use --network to specify one.\r\nError code: E_INVALIDARG\r\n",
+            {.Stderr = FormatErrorMessage(
+                 L"Network aliases require a user-defined network. Use --network to specify one.", L"E_INVALIDARG"),
              .ExitCode = 1});
     }
 
@@ -1075,7 +1089,7 @@ class WSLCE2EContainerRunTests
         auto result =
             RunWslc(std::format(L"container run --rm --ip {} --name {} {} true", ipAddress, WslcContainerName, DebianImage.NameAndTag()));
         result.Verify(
-            {.Stderr = std::format(L"{}\r\nError code: E_INVALIDARG\r\n", wsl::shared::Localization::MessageWslcIpRequiresUserDefinedNetwork()),
+            {.Stderr = FormatErrorMessage(wsl::shared::Localization::MessageWslcIpRequiresUserDefinedNetwork(), L"E_INVALIDARG"),
              .ExitCode = 1});
     }
 
@@ -1086,7 +1100,7 @@ class WSLCE2EContainerRunTests
         auto result = RunWslc(std::format(
             L"container run --rm --network bridge --ip {} --name {} {} true", ipAddress, WslcContainerName, DebianImage.NameAndTag()));
         result.Verify(
-            {.Stderr = std::format(L"{}\r\nError code: E_INVALIDARG\r\n", wsl::shared::Localization::MessageWslcIpRequiresUserDefinedNetwork()),
+            {.Stderr = FormatErrorMessage(wsl::shared::Localization::MessageWslcIpRequiresUserDefinedNetwork(), L"E_INVALIDARG"),
              .ExitCode = 1});
     }
 
@@ -1257,7 +1271,10 @@ with mmap.mmap(fd, 32 * 1024, flags=mmap.MAP_SHARED, prot=mmap.PROT_READ | mmap.
             L"container run --rm --name {} --mount type=tmpfs,target=/data --mount type=tmpfs,target=/data/ {} true",
             WslcContainerName,
             DebianImage.NameAndTag()));
-        result.Verify({.Stdout = L"", .Stderr = FormatWslcError(Localization::WSLCCLI_DuplicateMountDestinationError(L"/data")), .ExitCode = 1});
+        result.Verify(
+            {.Stdout = L"",
+             .Stderr = FormatErrorMessage(Localization::WSLCCLI_DuplicateMountDestinationError(L"/data"), L"E_INVALIDARG"),
+             .ExitCode = 1});
         EnsureContainerDoesNotExist(WslcContainerName);
     }
 
@@ -1358,7 +1375,7 @@ with mmap.mmap(fd, 32 * 1024, flags=mmap.MAP_SHARED, prot=mmap.PROT_READ | mmap.
         {
             auto result =
                 RunWslc(std::format(L"container run --rm --stop-timeout -2 --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid stop timeout value: -2\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stderr = FormatErrorMessage(L"Invalid stop timeout value: -2", L"E_INVALIDARG"), .ExitCode = 1});
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -1366,7 +1383,7 @@ with mmap.mmap(fd, 32 * 1024, flags=mmap.MAP_SHARED, prot=mmap.PROT_READ | mmap.
         {
             auto result = RunWslc(std::format(
                 L"container run --rm --stop-timeout {} --name {} {}", WSLC_STOP_TIMEOUT_DEFAULT, WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid stop timeout value: -2147483648\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stderr = FormatErrorMessage(L"Invalid stop timeout value: -2147483648", L"E_INVALIDARG"), .ExitCode = 1});
             EnsureContainerDoesNotExist(WslcContainerName);
         }
     }

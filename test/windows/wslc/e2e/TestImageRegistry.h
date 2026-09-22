@@ -44,6 +44,9 @@ public:
     // through Delete, such as those exercising image prune, call this to restore the session.
     void Restore(const TestImage& image, const std::wstring& sessionName = L"");
 
+    // Discards cached image state for a session after an operation that can remove multiple images.
+    void InvalidateSession(const std::wstring& sessionName = L"");
+
 private:
     TestImageRegistry() = default;
 

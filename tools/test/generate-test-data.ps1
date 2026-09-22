@@ -168,6 +168,13 @@ function Export-TestImages {
             -Source "docker://docker.io/library/$($entry.Key)"
     }
 
+    Write-Host "[$NugetArchitecture] Downloading docker/dockerfile:1"
+    Export-DockerImage `
+        -Image "docker/dockerfile:1" `
+        -DockerArchitecture $DockerArchitecture `
+        -OutputPath (Join-Path $architectureDirectory "dockerfile-frontend.tar") `
+        -Source "docker://docker.io/docker/dockerfile:1"
+
     Invoke-WslCommand -Command @("docker", "image", "pull", "--platform", "linux/$DockerArchitecture", "hello-world:latest")
 
     $containerId = $null

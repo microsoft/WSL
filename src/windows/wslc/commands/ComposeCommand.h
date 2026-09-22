@@ -25,11 +25,11 @@ struct ComposeCommand final : public Command
     {
     }
 
-    std::vector<std::unique_ptr<Command>> GetCommands() const override;
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 
 protected:
+    std::vector<std::unique_ptr<Command>> CreateCommands() const override;
     void ExecuteInternal(CLIExecutionContext& Context) const override;
 };
 

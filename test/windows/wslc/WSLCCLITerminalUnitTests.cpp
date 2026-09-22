@@ -21,6 +21,7 @@ Abstract:
 #include "Terminal.h"
 
 using namespace wsl::windows::wslc;
+using namespace wsl::windows::wslc::cli;
 using namespace wsl::windows::common::vt;
 using namespace WSLCTestHelpers;
 using namespace WEX::Logging;
@@ -128,6 +129,31 @@ class WSLCCLITerminalUnitTests
         CaptureTerminal cap;
         cap.terminal.Output(L"plain literal\n");
         VERIFY_ARE_EQUAL(std::wstring{L"plain literal\n"}, cap.captured());
+    }
+
+    TEST_METHOD(Terminal_OutputFormatsUtf8String)
+    {
+        SplitCaptureTerminal cap;
+        cap.terminal.Output(L"{}\n", std::string{"caf\xc3\xa9"});
+        VERIFY_ARE_EQUAL(std::wstring{L"caf\u00e9\n"}, cap.outPipe.captured());
+        VERIFY_ARE_EQUAL(std::wstring{}, cap.errPipe.captured());
+    }
+
+    TEST_METHOD(Terminal_FlushMakesBufferedOutputVisibleBeforeClose)
+    {
+        auto [readPipe, writePipe] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+        wil::unique_handle writeHandle{writePipe.release()};
+        std::array<char, 4096> buffer{};
+        auto file = FileFromHandle(writeHandle, "w");
+        VERIFY_ARE_NOT_EQUAL(-1, _setmode(_fileno(file.get()), _O_U8TEXT));
+        VERIFY_ARE_EQUAL(0, setvbuf(file.get(), buffer.data(), _IOFBF, buffer.size()));
+
+        PartialHandleRead reader(readPipe.get());
+        Terminal terminal(file.get(), false, file.get(), false);
+        terminal.Output(L"event\n");
+        terminal.Flush(Terminal::Level::Output);
+
+        reader.Expect("event\r\n");
     }
 
     TEST_METHOD(Terminal_SequenceEmittedWhenVTEnabled)
@@ -550,6 +576,44 @@ class WSLCCLITerminalUnitTests
 
         const auto result = cap.terminal.PromptForLine(Terminal::Level::Output, L"Username: ", false);
         VERIFY_ARE_EQUAL(expected, result);
+    }
+
+    TEST_METHOD(Terminal_Confirm)
+    {
+        // The prompt is written inline on stdout with the standard suffix appended, and nothing
+        // goes to stderr.
+        {
+            InputCaptureTerminal cap{L"y\n"};
+            VERIFY_IS_TRUE(cap.terminal.Confirm(L"Remove everything?"));
+            VERIFY_ARE_EQUAL(std::wstring{L"Remove everything? [y/N] "}, cap.outPipe.captured());
+            VERIFY_ARE_EQUAL(std::wstring{L""}, cap.errPipe.captured());
+        }
+
+        // Only a bare y accepts, in either case and with surrounding whitespace trimmed.
+        for (const auto* answer : {L"y\n", L"Y\n", L"  y  \n"})
+        {
+            InputCaptureTerminal cap{answer};
+            VERIFY_IS_TRUE(cap.terminal.Confirm(L"Remove everything?"));
+        }
+
+        // Anything else declines, including a spelled-out yes, matching the container CLI ecosystem.
+        // A prune with no input attached must abort rather than block, so end of input declines too.
+        for (const auto* answer : {L"yes\n", L"n\n", L"N\n", L"no\n", L"\n", L"maybe\n", L""})
+        {
+            InputCaptureTerminal cap{answer};
+            VERIFY_IS_FALSE(cap.terminal.Confirm(L"Remove everything?"));
+            VERIFY_ARE_EQUAL(std::wstring{L"Remove everything? [y/N] "}, cap.outPipe.captured());
+        }
+
+        // The message is a formatting argument, not a format string, so braces must not be
+        // interpreted.
+        {
+            InputCaptureTerminal cap{L"y\n"};
+            const std::wstring message = L"Remove {} {0} {name} 100%?";
+
+            VERIFY_IS_TRUE(cap.terminal.Confirm(message));
+            VERIFY_ARE_EQUAL(message + L" [y/N] ", cap.outPipe.captured());
+        }
     }
 
     TEST_METHOD(Terminal_ReadLineMaskDefaultsToUnmasked)

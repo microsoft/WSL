@@ -30,7 +30,7 @@ namespace {
     std::vector<Argument> ComposePathArguments(bool IncludeTimeout = false)
     {
         std::vector<Argument> arguments{
-            Argument::Create(ArgType::Path, true, std::nullopt, Localization::WSLCCLI_ComposePathArgDescription()),
+            Argument::Create(ArgType::Path, {.Required = true, .Desc = Localization::WSLCCLI_ComposePathArgDescription()}),
         };
         if (IncludeTimeout)
         {
@@ -53,7 +53,7 @@ namespace {
 
 } // namespace
 
-std::vector<std::unique_ptr<Command>> ComposeCommand::GetCommands() const
+std::vector<std::unique_ptr<Command>> ComposeCommand::CreateCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<ComposeCreateCommand>(FullName()));

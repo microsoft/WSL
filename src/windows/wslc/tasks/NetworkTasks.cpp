@@ -14,6 +14,7 @@ Abstract:
 #include "Argument.h"
 #include "ArgumentConvertedTypes.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "NetworkModel.h"
 #include "NetworkService.h"
 #include "NetworkTasks.h"
@@ -30,6 +31,8 @@ using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
+
+using namespace wsl::windows::wslc::cli;
 
 namespace {
 
@@ -53,7 +56,7 @@ namespace {
                 entry.Labels += ",";
             }
 
-            entry.Labels += value.empty() ? key : std::format("{}={}", key, value);
+            entry.Labels += std::format("{}={}", key, value);
         }
 
         return entry;
@@ -234,7 +237,7 @@ void ListNetworks(CLIExecutionContext& context)
     {
         // Every column has a minimum total width of ten characters, including the padding that follows it.
         constexpr size_t c_minimumColumnWidth = 7;
-        auto table = wsl::windows::wslc::TableOutput<4>(
+        auto table = wsl::windows::wslc::cli::TableOutput<4>(
             context.Terminal,
             {L"NETWORK ID", L"NAME", L"DRIVER", L"SCOPE"},
             {ColumnWidthConfig{.MinWidth = c_minimumColumnWidth},
@@ -262,6 +265,10 @@ void ListNetworks(CLIExecutionContext& context)
 
 void PruneNetworks(CLIExecutionContext& context)
 {
+    context.Data.Add<Data::ConfirmWarning>(Localization::WSLCCLI_NetworkPruneConfirm());
+    context.Data.Add<Data::ConfirmMessage>(Localization::WSLCCLI_PruneConfirmPrompt());
+    ConfirmAction(context);
+
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
 

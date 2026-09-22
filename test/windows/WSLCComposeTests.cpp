@@ -196,7 +196,7 @@ private:
     static wsl::windows::common::wslc_schema::InspectContainer InspectContainer(IWSLCContainer* container)
     {
         wil::unique_cotaskmem_ansistring inspectJson;
-        THROW_IF_FAILED(container->Inspect(&inspectJson));
+        THROW_IF_FAILED(container->Inspect(FALSE, &inspectJson));
         return wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(inspectJson.get());
     }
 };

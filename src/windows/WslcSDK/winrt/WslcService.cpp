@@ -24,7 +24,7 @@ using namespace winrt::Windows::Foundation::Collections;
 namespace winrt::Microsoft::WSL::Containers::implementation {
 
 namespace {
-    WslcComponentFlags GetComponentsForInstall(const InstallOptions& options)
+    WslcComponentFlags GetComponentsForInstall(const winrt::Microsoft::WSL::Containers::InstallOptions& options)
     {
         WslcComponentFlags result = WslcComponentFlags::WSLC_COMPONENT_FLAG_NONE;
         bool shouldCheckMissingComponents = true;
@@ -63,7 +63,7 @@ namespace {
         return result;
     }
 
-    WslcInstallOptions GetOptionsForInstall(const InstallOptions& options)
+    WslcInstallOptions GetOptionsForInstall(const winrt::Microsoft::WSL::Containers::InstallOptions& options)
     {
         WslcInstallOptions result = WslcInstallOptions::WSLC_INSTALL_OPTION_NONE;
 

@@ -18,7 +18,7 @@ Abstract:
 
 using namespace wsl::windows::common::vt;
 
-namespace wsl::windows::wslc {
+namespace wsl::windows::wslc::cli {
 
 FormattedCell::FormattedCell(std::wstring_view text, const Sequence& seq) : sequences({&seq, &Format::Default})
 {
@@ -171,4 +171,4 @@ namespace details {
 
 } // namespace details
 
-} // namespace wsl::windows::wslc
+} // namespace wsl::windows::wslc::cli

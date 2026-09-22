@@ -27,7 +27,7 @@ public:
     DEFAULT_MOVABLE(ServiceRunningProcess);
 
     ServiceRunningProcess(const Microsoft::WRL::ComPtr<WSLCProcess>& process, WSLCProcessFlags Flags);
-    wil::unique_handle GetStdHandle(int Index) override;
+    common::io::HandleWrapper GetStdHandle(int Index) override;
     wil::unique_event GetExitEvent() override;
     WSLCProcess& Get();
 
