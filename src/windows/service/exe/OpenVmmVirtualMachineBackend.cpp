@@ -115,23 +115,22 @@ OpenVmmVirtualMachineBackend::GuestListener::~GuestListener() noexcept
 
 VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmCreateRequest& Request)
 {
-    THROW_HR_IF(E_INVALIDARG, IsEqualGUID(Request.VmId, GUID_NULL));
+    THROW_HR_IF(E_INVALIDARG, IsEqualGUID(Request.Identity.VmId, GUID_NULL));
     THROW_HR_IF(E_INVALIDARG, Request.Processor.Count == 0 || Request.Memory.SizeBytes == 0);
     THROW_HR_IF_MSG(c_notSupported, wsl::shared::Arm64, "OpenVMM direct boot is currently supported only on x64");
     validation::ValidatePath(Request.Boot.KernelPath, L"OpenVMM Kernel Path");
     validation::ValidatePath(Request.Boot.InitrdPath, L"OpenVMM Initrd Path");
     THROW_HR_IF(
         E_INVALIDARG,
-        Request.Boot.GuestCommandLine.find(L'\0') != std::wstring::npos || Request.Boot.UserCommandLine.find(L'\0') != std::wstring::npos);
+        Request.Boot.KernelCommandLine.find(L'\0') != std::wstring::npos);
     THROW_HR_IF(
         E_INVALIDARG,
         Request.Boot.Method != VmBootMethod::Automatic && Request.Boot.Method != VmBootMethod::LinuxDirect &&
             Request.Boot.Method != VmBootMethod::Uefi);
     THROW_HR_IF(c_notSupported, Request.Boot.Method == VmBootMethod::Uefi);
-    THROW_HR_IF(c_notSupported, Request.Boot.RequestedDmaBounceBufferBytes.has_value());
 
     VmDescription description;
-    description.Identity.VmId = Request.VmId;
+    description.Identity = Request.Identity;
     description.Backend = BackendKind::OpenVmm;
     description.Processor.Count = Request.Processor.Count;
     description.Memory.SizeBytes = Request.Memory.SizeBytes;
@@ -155,15 +154,7 @@ VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmC
     }
 
     description.Boot.Method = VmBootMethod::LinuxDirect;
-    description.Boot.KernelCommandLine = Request.Boot.GuestCommandLine;
-    if (!Request.Boot.UserCommandLine.empty())
-    {
-        if (!description.Boot.KernelCommandLine.empty())
-        {
-            description.Boot.KernelCommandLine += L" ";
-        }
-        description.Boot.KernelCommandLine += Request.Boot.UserCommandLine;
-    }
+    description.Boot.KernelCommandLine = Request.Boot.KernelCommandLine;
 
     bool serialConfigured = false;
     bool virtioConfigured = false;
@@ -288,7 +279,7 @@ std::unique_ptr<OpenVmmVirtualMachineBackend> OpenVmmVirtualMachineBackend::Crea
     const auto startTimeMs = GetTickCount64();
     WSL_LOG(
         "OpenVmmCreateVmBegin",
-        TraceLoggingValue(Request.VmId, "vmId"),
+        TraceLoggingValue(Request.Identity.VmId, "vmId"),
         TraceLoggingValue(Request.Processor.Count, "processorCount"),
         TraceLoggingValue(Request.Memory.SizeBytes, "memoryBytes"),
         TraceLoggingValue(Request.BootDisks.size(), "bootDiskCount"),
@@ -303,7 +294,7 @@ std::unique_ptr<OpenVmmVirtualMachineBackend> OpenVmmVirtualMachineBackend::Crea
         backend->Initialize(Request);
         WSL_LOG(
             "OpenVmmCreateVmEnd",
-            TraceLoggingValue(Request.VmId, "vmId"),
+            TraceLoggingValue(Request.Identity.VmId, "vmId"),
             TraceLoggingValue(GetTickCount64() - startTimeMs, "durationMs"));
     }
     catch (...)
@@ -311,7 +302,7 @@ std::unique_ptr<OpenVmmVirtualMachineBackend> OpenVmmVirtualMachineBackend::Crea
         const auto result = wil::ResultFromCaughtException();
         WSL_LOG(
             "OpenVmmCreateVmFailed",
-            TraceLoggingValue(Request.VmId, "vmId"),
+            TraceLoggingValue(Request.Identity.VmId, "vmId"),
             TraceLoggingHResult(result, "result"),
             TraceLoggingValue(GetTickCount64() - startTimeMs, "durationMs"));
         throw;
@@ -330,7 +321,7 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
         "openvmm.exe not found at: %ls",
         executable.c_str());
 
-    auto id = wsl::shared::string::GuidToString<wchar_t>(Request.VmId, wsl::shared::string::GuidToStringFlags::None);
+    auto id = wsl::shared::string::GuidToString<wchar_t>(Request.Identity.VmId, wsl::shared::string::GuidToStringFlags::None);
     std::erase(id, L'-');
     // An exclusive directory creation prevents shortened path IDs from aliasing another VM.
     m_socketDirectory = filesystem::GetTempFolderPath(GetCurrentProcessToken()) / (L"ov-" + id.substr(0, 16));

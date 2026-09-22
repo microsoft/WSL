@@ -40,6 +40,7 @@ enum class BackendKind
 struct VmInstanceId
 {
     GUID VmId{};
+    wil::shared_handle UserToken{};
 };
 
 template <typename Tag>
@@ -221,9 +222,7 @@ struct VmLinuxBootRequest
     std::filesystem::path KernelPath;
     std::filesystem::path InitrdPath;
     VmBootMethod Method = VmBootMethod::Automatic;
-    std::wstring GuestCommandLine;
-    std::wstring UserCommandLine;
-    std::optional<std::uint64_t> RequestedDmaBounceBufferBytes;
+    std::wstring KernelCommandLine;
 };
 
 enum class VmConsoleRole
@@ -334,7 +333,6 @@ struct VmEffectiveBoot
 {
     VmBootMethod Method = VmBootMethod::Automatic;
     std::wstring KernelCommandLine;
-    std::optional<std::uint32_t> PageReportingOrder;
     std::vector<VmConsoleRequest> Consoles;
 };
 
@@ -390,7 +388,7 @@ struct VmNetworkAttachment
 
 struct VmCreateRequest
 {
-    GUID VmId{};
+    VmInstanceId Identity;
     VmProcessorRequest Processor;
     VmMemoryRequest Memory;
     VmLinuxBootRequest Boot;
