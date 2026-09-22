@@ -305,17 +305,6 @@ struct VmCrashCaptureRequest
     VmSelectionPolicy Policy = VmSelectionPolicy::Required;
 };
 
-struct VmCreateRequest
-{
-    GUID VmId{};
-    VmProcessorRequest Processor;
-    VmMemoryRequest Memory;
-    VmLinuxBootRequest Boot;
-    std::vector<VmBootDiskRequest> BootDisks;
-    std::vector<VmConsoleRequest> Consoles;
-    std::optional<VmCrashCaptureRequest> CrashCapture;
-};
-
 struct VmEffectiveProcessor
 {
     std::uint32_t Count = 0;
@@ -340,16 +329,6 @@ struct VmEffectiveBoot
     std::wstring KernelCommandLine;
     std::optional<std::uint32_t> PageReportingOrder;
     std::vector<VmConsoleRequest> Consoles;
-};
-
-struct VmDescription
-{
-    VmInstanceId Identity;
-    BackendKind Backend;
-    VmEffectiveProcessor Processor;
-    VmEffectiveMemory Memory;
-    VmEffectiveBoot Boot;
-    std::map<VmBootResourceKey, VmDiskAttachment> BootDisks;
 };
 
 struct VmIpv4Address
@@ -400,6 +379,29 @@ struct VmNetworkAttachment
     std::wstring Tag;
     std::optional<GUID> GuestInstanceId;
     VmUserModeNatNetwork EffectiveConfiguration;
+};
+
+struct VmCreateRequest
+{
+    GUID VmId{};
+    VmProcessorRequest Processor;
+    VmMemoryRequest Memory;
+    VmLinuxBootRequest Boot;
+    std::vector<VmBootDiskRequest> BootDisks;
+    std::vector<VmConsoleRequest> Consoles;
+    std::optional<VmCrashCaptureRequest> CrashCapture;
+    std::vector<VmNetworkAdapterRequest> NetworkAdapters;
+};
+
+struct VmDescription
+{
+    VmInstanceId Identity;
+    BackendKind Backend;
+    VmEffectiveProcessor Processor;
+    VmEffectiveMemory Memory;
+    VmEffectiveBoot Boot;
+    std::map<VmBootResourceKey, VmDiskAttachment> BootDisks;
+    std::map<std::wstring, VmNetworkAttachment> NetworkAdapters;
 };
 
 enum class VmTransportProtocol
@@ -494,6 +496,8 @@ public:
     virtual ~IVirtualMachineBackend() noexcept = default;
 
     virtual VmPlatformCapabilities GetCapabilities() const = 0;
+    // Returns the effective creation-time configuration, including IDs used for boot resource operations.
+    virtual VmDescription GetDescription() const = 0;
     virtual wil::unique_handle GetTerminationEvent() const = 0;
     virtual void Start() = 0;
     virtual void Terminate() = 0;

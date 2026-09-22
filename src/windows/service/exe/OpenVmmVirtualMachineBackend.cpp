@@ -128,34 +128,18 @@ void ValidateName(std::wstring_view Name, PCWSTR Description)
         E_INVALIDARG, Name.empty() || Name.find(L'\0') != std::wstring_view::npos, "%ls must be nonempty and cannot contain NUL", Description);
 }
 
-std::wstring GetConsommeCidr(const VmUserModeNatNetwork& Configuration)
+void ValidateNetworkConfiguration(const VmUserModeNatNetwork& Configuration)
 {
-    std::uint32_t prefixLength = 0;
-    bool foundZero = false;
-    VmIpv4Address network;
-    for (size_t octet = 0; octet < Configuration.Netmask.Bytes.size(); ++octet)
-    {
-        for (std::uint8_t bit = 0x80; bit != 0; bit >>= 1)
-        {
-            if ((Configuration.Netmask.Bytes[octet] & bit) != 0)
-            {
-                THROW_HR_IF_MSG(E_INVALIDARG, foundZero, "OpenVMM requires a contiguous IPv4 netmask");
-                ++prefixLength;
-            }
-            else
-            {
-                foundZero = true;
-            }
-        }
-
-        network.Bytes[octet] = Configuration.ClientIpv4.Bytes[octet] & Configuration.Netmask.Bytes[octet];
-        THROW_HR_IF_MSG(
-            E_INVALIDARG,
-            network.Bytes[octet] != (Configuration.GatewayIpv4.Bytes[octet] & Configuration.Netmask.Bytes[octet]),
-            "OpenVMM requires the client and gateway IPv4 addresses to be in the same subnet");
-    }
-
-    return std::format(L"{}.{}.{}.{}/{}", network.Bytes[0], network.Bytes[1], network.Bytes[2], network.Bytes[3], prefixLength);
+    // The current C ABI accepts a NIC ID and MAC, but cannot override Consomme's network defaults.
+    THROW_HR_IF_MSG(
+        c_notSupported,
+        Configuration.ClientIpv4.Bytes != (VmIpv4Address{{10, 0, 0, 2}}).Bytes ||
+            Configuration.GatewayIpv4.Bytes != (VmIpv4Address{{10, 0, 0, 1}}).Bytes ||
+            Configuration.Netmask.Bytes != (VmIpv4Address{{255, 255, 255, 0}}).Bytes ||
+            Configuration.GatewayMacIpv4.Bytes != (VmEthernetAddress{{0x52, 0x55, 0x0a, 0x00, 0x00, 0x01}}).Bytes ||
+            Configuration.GatewayMacIpv6.Bytes != (VmEthernetAddress{{0x52, 0x55, 0x0a, 0x00, 0x01, 0x02}}).Bytes ||
+            Configuration.ClientIpv6.has_value() || !Configuration.Nameservers.empty(),
+        "OpenVMM requires the default Consomme network configuration and host-provided DNS");
 }
 
 std::wstring FormatIpAddress(const VmIpAddress& Address)
@@ -316,6 +300,18 @@ VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmC
         description.BootDisks.at(disk.Key) = {{description.Identity, nextId++}, {0, lun}, disk.Disk.ReadOnly};
     }
 
+    // OpenVMM's port RPC channel targets only the first Consomme NIC.
+    THROW_HR_IF_MSG(c_notSupported, Request.NetworkAdapters.size() > 1, "OpenVMM supports one creation-time network adapter");
+    for (const auto& adapter : Request.NetworkAdapters)
+    {
+        ValidateName(adapter.Tag, L"OpenVMM network adapter tag");
+        ValidateNetworkConfiguration(adapter.Configuration);
+        GUID nicId{};
+        THROW_IF_FAILED(CoCreateGuid(&nicId));
+        description.NetworkAdapters.emplace(
+            adapter.Tag, VmNetworkAttachment{{description.Identity, 1}, adapter.Tag, nicId, adapter.Configuration});
+    }
+
     return description;
 }
 
@@ -455,6 +451,18 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     THROW_IF_FAILED(WslOpenVmmConfigSetMemoryMb(config.get(), m_description.Memory.SizeBytes / (1024 * 1024)));
     THROW_IF_FAILED(WslOpenVmmConfigSetProcessorCount(config.get(), Request.Processor.Count));
     THROW_IF_FAILED(WslOpenVmmConfigSetHvSocketPath(config.get(), m_vsockPath.c_str()));
+    {
+        auto lock = m_lock.lock_exclusive();
+        for (const auto& [tag, attachment] : m_description.NetworkAdapters)
+        {
+            const auto nicId = wsl::shared::string::GuidToString<wchar_t>(
+                attachment.GuestInstanceId.value(), wsl::shared::string::GuidToStringFlags::None);
+            const auto macAddress = wsl::shared::string::FormatMacAddress(attachment.EffectiveConfiguration.ClientMac.Bytes, L'-');
+            THROW_IF_FAILED(WslOpenVmmConfigSetConsommeNic(config.get(), nicId.c_str(), macAddress.c_str()));
+            m_networkAdapters.emplace(attachment.Id.Value, NetworkAdapter{attachment, nicId});
+            m_nextDeviceId = attachment.Id.Value + 1;
+        }
+    }
     for (const auto& disk : Request.BootDisks)
     {
         const auto& attachment = m_description.BootDisks.at(disk.Key);
@@ -556,7 +564,6 @@ VmPlatformCapabilities OpenVmmVirtualMachineBackend::QueryCapabilities()
           VmOperation::AddFileSystemShare,
           VmOperation::RemoveFileSystemShare,
           VmOperation::RemoveDevice,
-          VmOperation::AddNetworkAdapter,
           VmOperation::UpdateNetworkAdapter,
           VmOperation::BindPort,
           VmOperation::UnbindPort})
@@ -587,6 +594,11 @@ VmPlatformCapabilities OpenVmmVirtualMachineBackend::QueryCapabilities()
 VmPlatformCapabilities OpenVmmVirtualMachineBackend::GetCapabilities() const
 {
     return QueryCapabilities();
+}
+
+VmDescription OpenVmmVirtualMachineBackend::GetDescription() const
+{
+    return m_description;
 }
 
 wil::unique_handle OpenVmmVirtualMachineBackend::GetTerminationEvent() const
@@ -1010,41 +1022,7 @@ void OpenVmmVirtualMachineBackend::RemoveFileSystemShare(VmShareId Share)
 VmNetworkAttachment OpenVmmVirtualMachineBackend::AddNetworkAdapter(const VmNetworkAdapterRequest& Request)
 {
     ExecutionContext context(Context::ConfigureNetworking);
-    WSL_LOG(
-        "OpenVmmAddNetworkAdapterBegin",
-        TraceLoggingValue(m_description.Identity.VmId, "vmId"),
-        TraceLoggingValue(Request.Tag.c_str(), "tag"));
-    ValidateName(Request.Tag, L"OpenVMM network adapter tag");
-    const auto cidr = GetConsommeCidr(Request.Configuration);
-    const auto macAddress = wsl::shared::string::FormatMacAddress(Request.Configuration.ClientMac.Bytes, L'-');
-    GUID nicId{};
-    THROW_IF_FAILED(CoCreateGuid(&nicId));
-    const auto nicIdString = wsl::shared::string::GuidToString<wchar_t>(nicId, wsl::shared::string::GuidToStringFlags::None);
-
-    auto lock = m_lock.lock_exclusive();
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
-    THROW_HR_IF(E_BOUNDS, m_nextDeviceId == UINT64_MAX);
-    for (const auto& entry : m_networkAdapters)
-    {
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), wsl::shared::string::IsEqual(entry.second.Attachment.Tag, Request.Tag, false));
-    }
-
-    VmNetworkAttachment attachment{{m_description.Identity, m_nextDeviceId}, Request.Tag, nicId, Request.Configuration};
-    const auto [entry, inserted] = m_networkAdapters.emplace(attachment.Id.Value, NetworkAdapter{attachment, nicIdString});
-    WI_ASSERT(inserted);
-    auto rollback = wil::scope_exit([&] { m_networkAdapters.erase(entry); });
-    const auto result = WslOpenVmmVmAddConsommeNic(m_vm.get(), nicIdString.c_str(), macAddress.c_str(), cidr.c_str());
-    WSL_LOG(
-        "OpenVmmAddNetworkAdapterEnd",
-        TraceLoggingValue(m_description.Identity.VmId, "vmId"),
-        TraceLoggingValue(attachment.Id.Value, "deviceId"),
-        TraceLoggingValue(nicId, "nicId"),
-        TraceLoggingValue(Request.Tag.c_str(), "tag"),
-        TraceLoggingHResult(result, "result"));
-    THROW_IF_FAILED(result);
-    ++m_nextDeviceId;
-    rollback.release();
-    return attachment;
+    THROW_HR_MSG(c_notSupported, "OpenVMM network adapter '%ls' must be configured at VM creation time", Request.Tag.c_str());
 }
 
 VmPortBinding OpenVmmVirtualMachineBackend::BindPort(VmDeviceId Device, const VmPortBindingRequest& Request)

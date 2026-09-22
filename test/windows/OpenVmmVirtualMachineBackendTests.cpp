@@ -40,6 +40,19 @@ VmBootDiskRequest CreateDisk(std::wstring Key)
     return disk;
 }
 
+VmNetworkAdapterRequest CreateNetworkRequest()
+{
+    VmNetworkAdapterRequest request;
+    request.Tag = L"eth0";
+    request.Configuration.ClientIpv4.Bytes = {10, 0, 0, 2};
+    request.Configuration.ClientMac.Bytes = {0x00, 0x15, 0x5d, 0x01, 0x02, 0x03};
+    request.Configuration.GatewayIpv4.Bytes = {10, 0, 0, 1};
+    request.Configuration.GatewayMacIpv4.Bytes = {0x52, 0x55, 0x0a, 0x00, 0x00, 0x01};
+    request.Configuration.GatewayMacIpv6.Bytes = {0x52, 0x55, 0x0a, 0x00, 0x01, 0x02};
+    request.Configuration.Netmask.Bytes = {255, 255, 255, 0};
+    return request;
+}
+
 HRESULT DescribeResult(const VmCreateRequest& Request)
 {
     return wil::ResultFromException([&] { ValidateCreateRequest(Request); });
@@ -126,7 +139,71 @@ class OpenVmmVirtualMachineBackendTests
         request.Memory.SizeBytes = 33 * c_mib;
         VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
         request.Memory.SizeBytes = c_mib;
+        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
+        request.Memory.SizeBytes = 2 * c_mib;
+        VERIFY_ARE_EQUAL(request.Memory.SizeBytes, ValidateCreateRequest(request).Memory.SizeBytes);
+    }
+
+    TEST_METHOD(ValidatesCreationTimeNetworking)
+    {
+        SKIP_TEST_ARM64();
+        auto request = CreateRequest();
+        VERIFY_IS_TRUE(ValidateCreateRequest(request).NetworkAdapters.empty());
+        request.NetworkAdapters.push_back(CreateNetworkRequest());
+        const auto description = ValidateCreateRequest(request);
+        VERIFY_ARE_EQUAL(size_t{1}, description.NetworkAdapters.size());
+        const auto& adapter = description.NetworkAdapters.at(L"eth0");
+        VERIFY_IS_TRUE(IsEqualGUID(request.VmId, adapter.Id.Owner.VmId));
+        VERIFY_ARE_EQUAL(UINT64{1}, adapter.Id.Value);
+        VERIFY_IS_TRUE(adapter.GuestInstanceId.has_value());
+        VERIFY_IS_FALSE(IsEqualGUID(GUID_NULL, adapter.GuestInstanceId.value()));
+        VERIFY_IS_TRUE(adapter.EffectiveConfiguration.ClientMac.Bytes == request.NetworkAdapters[0].Configuration.ClientMac.Bytes);
+
+        THROW_IF_FAILED(CoCreateGuid(&request.VmId));
+        const auto other = ValidateCreateRequest(request).NetworkAdapters.at(L"eth0");
+        VERIFY_ARE_EQUAL(adapter.Id.Value, other.Id.Value);
+        VERIFY_IS_FALSE(IsEqualGUID(adapter.Id.Owner.VmId, other.Id.Owner.VmId));
+        VERIFY_IS_FALSE(IsEqualGUID(adapter.GuestInstanceId.value(), other.GuestInstanceId.value()));
+
+        request.NetworkAdapters.push_back(CreateNetworkRequest());
+        request.NetworkAdapters[1].Tag = L"eth1";
         VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+        request.NetworkAdapters.pop_back();
+        request.NetworkAdapters[0].Tag.clear();
+        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
+        request.NetworkAdapters[0].Tag = std::wstring(L"eth\0zero", 8);
+        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
+    }
+
+    TEST_METHOD(RejectsCustomCreationTimeNetworkConfiguration)
+    {
+        SKIP_TEST_ARM64();
+        auto request = CreateRequest();
+        const auto network = CreateNetworkRequest();
+        request.NetworkAdapters.push_back(network);
+        auto& configuration = request.NetworkAdapters[0].Configuration;
+
+        configuration.ClientIpv4.Bytes[3] = 3;
+        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+        configuration = network.Configuration;
+        configuration.GatewayIpv4.Bytes[3] = 254;
+        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+        configuration = network.Configuration;
+        configuration.Netmask.Bytes[2] = 0;
+        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+        configuration = network.Configuration;
+        configuration.GatewayMacIpv4.Bytes[5] = 2;
+        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+        configuration = network.Configuration;
+        configuration.GatewayMacIpv6.Bytes[5] = 3;
+        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+        configuration = network.Configuration;
+        configuration.ClientIpv6 = VmIpv6Address{};
+        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+        configuration = network.Configuration;
+        configuration.Nameservers.push_back(VmIpv4Address{{8, 8, 8, 8}});
+        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { OpenVmmVirtualMachineBackend::Create(request); }));
     }
 
     TEST_METHOD(RejectsInvalidDiskFormats)
@@ -225,6 +302,8 @@ class OpenVmmVirtualMachineBackendTests
     {
         SKIP_TEST_ARM64();
         auto request = CreateRunnableRequest();
+        const auto networkRequest = CreateNetworkRequest();
+        request.NetworkAdapters.push_back(networkRequest);
 
         GUID directoryId{};
         THROW_IF_FAILED(CoCreateGuid(&directoryId));
@@ -265,23 +344,25 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_ARE_NOT_EQUAL(share.Id.Value, replacementShare.Id.Value);
         backend->RemoveFileSystemShare(replacementShare.Id);
 
-        VmNetworkAdapterRequest networkRequest;
-        networkRequest.Tag = L"eth0";
-        networkRequest.Configuration.ClientIpv4.Bytes = {192, 168, 127, 2};
-        networkRequest.Configuration.ClientMac.Bytes = {0x00, 0x15, 0x5d, 0x01, 0x02, 0x03};
-        networkRequest.Configuration.GatewayIpv4.Bytes = {192, 168, 127, 1};
-        networkRequest.Configuration.Netmask.Bytes = {255, 255, 255, 0};
-        const auto network = backend->AddNetworkAdapter(networkRequest);
+        const auto network = backend->GetDescription().NetworkAdapters.at(networkRequest.Tag);
         VERIFY_IS_TRUE(IsEqualGUID(request.VmId, network.Id.Owner.VmId));
         VERIFY_IS_TRUE(network.GuestInstanceId.has_value());
         VERIFY_ARE_EQUAL(networkRequest.Tag, network.Tag);
-        VERIFY_ARE_EQUAL(
-            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] { backend->AddNetworkAdapter(networkRequest); }));
+        VERIFY_ARE_NOT_EQUAL(network.Id.Value, fileSystemDevice.Id.Value);
+        VERIFY_IS_TRUE(network.EffectiveConfiguration.ClientIpv4.Bytes == networkRequest.Configuration.ClientIpv4.Bytes);
+        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AddNetworkAdapter(networkRequest); }));
 
+        // Consomme processes port requests once the guest has initialized its network queues.
+        backend->Start();
         VmPortBindingRequest bindingRequest;
         bindingRequest.Listen.Address = VmIpv4Address{{127, 0, 0, 1}};
         bindingRequest.Listen.Port = ReserveTcpPort();
         bindingRequest.GuestPort = 80;
+        VERIFY_ARE_EQUAL(
+            HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->BindPort(fileSystemDevice.Id, bindingRequest); }));
+        auto invalidNetwork = network.Id;
+        THROW_IF_FAILED(CoCreateGuid(&invalidNetwork.Owner.VmId));
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->BindPort(invalidNetwork, bindingRequest); }));
         const auto binding = backend->BindPort(network.Id, bindingRequest);
         VERIFY_IS_TRUE(IsEqualGUID(request.VmId, binding.Id.Owner.VmId));
         VERIFY_ARE_EQUAL(network.Id.Value, binding.Device.Value);
@@ -349,7 +430,6 @@ class OpenVmmVirtualMachineBackendTests
               VmOperation::AddFileSystemShare,
               VmOperation::RemoveFileSystemShare,
               VmOperation::RemoveDevice,
-              VmOperation::AddNetworkAdapter,
               VmOperation::UpdateNetworkAdapter,
               VmOperation::BindPort,
               VmOperation::UnbindPort})
@@ -381,4 +461,4 @@ class OpenVmmVirtualMachineBackendTests
     }
 };
 
-}
+} // namespace OpenVmmVirtualMachineBackendTests
