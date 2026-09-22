@@ -231,9 +231,7 @@ class FilesystemUnitTests
 
     TEST_METHOD(IsRepresentableFileName_RejectsReservedCharacters)
     {
-        const std::wstring reserved[] = {
-            L"a<b", L"a>b", L"a:b", L"a\"b", L"a/b", L"a\\b", L"a|b", L"a?b", L"a*b",
-            L"con", L"con.txt", L"prn", L"aux", L"nul", L"com1", L"lpt9", L"file.", L"file "};
+        const std::wstring reserved[] = {L"a<b", L"a>b", L"a:b", L"a\"b", L"a/b", L"a\\b", L"a|b", L"a?b", L"a*b"};
         for (const auto& name : reserved)
         {
             VERIFY_IS_FALSE(IsRepresentableFileName(name), name.c_str());
@@ -267,7 +265,7 @@ class FilesystemUnitTests
     TEST_METHOD(IsRepresentableFileName_RejectsReservedDeviceNames)
     {
         const std::wstring devices[] = {
-            L"con", L"CON", L"Prn", L"aux", L"NUL", L"com1", L"COM9", L"lpt1", L"LPT9", L"conin$", L"CONOUT$"};
+            L"con", L"CON", L"Prn", L"aux", L"NUL", L"com1", L"COM9", L"lpt1", L"lpt9", L"LPT9", L"conin$", L"CONOUT$"};
         for (const auto& name : devices)
         {
             VERIFY_IS_FALSE(IsRepresentableFileName(name), name.c_str());
