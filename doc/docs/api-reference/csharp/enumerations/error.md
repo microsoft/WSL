@@ -16,6 +16,7 @@ public enum Error
     SdkUpdateNeeded = -2147219957,
     ContainerDisabled = -2147219956,
     RegistryBlockedByPolicy = -2147219955,
-    VolumeNotAvailable = -2147219954
+    VolumeNotAvailable = -2147219954,
+    ContainerDeleted = -2147219949
 }
 ```

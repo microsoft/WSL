@@ -35,7 +35,16 @@ int main()
     // 0. Check prerequisites
     WslcComponentFlags missing = WSLC_COMPONENT_FLAG_NONE;
     hr = WslcGetMissingComponents(&missing);
-    if (FAILED(hr) || missing != WSLC_COMPONENT_FLAG_NONE) {
+    if (FAILED(hr)) {
+        CoUninitialize();
+        return 1;
+    }
+    if ((missing & WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE) != 0) {
+        printf("Update this application to a version that uses the latest Microsoft.WSL.Containers SDK.\n");
+        CoUninitialize();
+        return 1;
+    }
+    if (missing != WSLC_COMPONENT_FLAG_NONE) {
         printf("WSL components are missing. Run: wsl --install\n");
         CoUninitialize();
         return 1;

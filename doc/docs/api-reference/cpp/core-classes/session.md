@@ -10,6 +10,7 @@
 - `Start()`
 - `Terminate()`
 - `CreateContainer(ContainerSettings containerSettings)`
+- `OpenContainer(hstring nameOrId, ProcessOutputMode initProcessOutputMode)`
 - `PullImage(PullImageOptions options)`
 - `PullImageAsync(PullImageOptions options)`
 - `ImportImage(hstring path, hstring imageName)`
@@ -34,6 +35,8 @@
 - Most methods call `EnsureStarted()` first.
 - `ImportImage` / `ImportImageAsync` and `LoadImage` / `LoadImageAsync` are path-based only.
 - `Authenticate` requires a non-null `Uri` and non-empty username.
+- `OpenContainer` accepts a name, full ID, or unambiguous partial ID prefix. Its output mode controls
+  how init-process I/O is exposed when the opened container starts.
 - `GetImages()` materializes WinRT `ImageInfo` objects from the C array returned by `WslcListSessionImages`.
 
 **Examples**
@@ -56,6 +59,10 @@ auto container = session.CreateContainer(containerSettings);
 ```
 
 ```cpp
+auto opened = session.OpenContainer(L"demo-container", ProcessOutputMode::Event);
+```
+
+```cpp
 auto importOp = session.ImportImageAsync(L"C:\\images\\alpine.tar", L"demo/alpine:latest");
 importOp.Progress([](auto&&, ImageProgress const& p) { /* progress */ });
 co_await importOp;
@@ -71,10 +78,14 @@ session.DeleteImage(L"demo/alpine:latest");
 ```
 
 ```cpp
-auto token = session.Authenticate(
+auto authentication = session.Authenticate(
     winrt::Windows::Foundation::Uri{ L"https://registry.example.com" },
     L"user",
     L"password");
+
+PullImageOptions authenticatedPull{ L"registry.example.com/demo:latest" };
+authenticatedPull.RegistryAuth(authentication.IdentityToken());
+session.PullImage(authenticatedPull);
 ```
 
 ```cpp

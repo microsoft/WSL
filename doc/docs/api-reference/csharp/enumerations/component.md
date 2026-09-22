@@ -8,3 +8,7 @@ public enum Component
     SdkNeedsUpdate = 4
 }
 ```
+
+`SdkNeedsUpdate` indicates that the SDK bundled with the application is incompatible with the
+installed runtime. The application must be updated; this value cannot be passed to
+`WslcService.InstallWithDependencies`.

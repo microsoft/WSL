@@ -7,8 +7,8 @@ public static class WslcService
 {
     public static IReadOnlyList<Component> GetMissingComponents();
     public static ServiceVersion GetVersion();
-    public static void InstallWithDependencies();
-    public static IAsyncActionWithProgress<InstallProgress> InstallWithDependenciesAsync();
+    public static void InstallWithDependencies(InstallOptions options);
+    public static IAsyncActionWithProgress<InstallProgress> InstallWithDependenciesAsync(InstallOptions options);
 }
 ```
 
@@ -33,19 +33,55 @@ ServiceVersion version = WslcService.GetVersion();
 Console.WriteLine($"{version.Major}.{version.Minor}.{version.Revision}");
 ```
 
-## WslcService.InstallWithDependencies()
+## WslcService.InstallWithDependencies(InstallOptions)
 
 ```csharp
-WslcService.InstallWithDependencies();
+IReadOnlyList<Component> missing = WslcService.GetMissingComponents();
+if (missing.Contains(Component.SdkNeedsUpdate))
+{
+    Console.WriteLine("Update the Microsoft.WSL.Containers SDK package.");
+}
+
+Component[] installable = missing
+    .Where(component => component != Component.SdkNeedsUpdate)
+    .ToArray();
+
+var options = new InstallOptions
+{
+    Components = installable
+};
+
+if (installable.Length != 0)
+{
+    WslcService.InstallWithDependencies(options);
+}
 ```
 
-## WslcService.InstallWithDependenciesAsync()
+## WslcService.InstallWithDependenciesAsync(InstallOptions)
 
 ```csharp
-var install = WslcService.InstallWithDependenciesAsync();
-install.Progress = (op, progress) =>
-    Console.WriteLine($"install: {progress.Component} {progress.Progress}/{progress.Total}");
-await install;
+IReadOnlyList<Component> missing = WslcService.GetMissingComponents();
+if (missing.Contains(Component.SdkNeedsUpdate))
+{
+    Console.WriteLine("Update the Microsoft.WSL.Containers SDK package.");
+}
+
+Component[] installable = missing
+    .Where(component => component != Component.SdkNeedsUpdate)
+    .ToArray();
+
+var options = new InstallOptions
+{
+    Components = installable
+};
+
+if (installable.Length != 0)
+{
+    var install = WslcService.InstallWithDependenciesAsync(options);
+    install.Progress = (op, progress) =>
+        Console.WriteLine($"install: {progress.Component} {progress.Progress}/{progress.Total}");
+    await install;
+}
 ```
 
 ---

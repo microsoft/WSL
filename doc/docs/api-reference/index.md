@@ -6,7 +6,6 @@ The WSL container API lets Windows app developers use Linux containers as part o
 
     The WSL container API is currently in **preview** and may have breaking changes in future releases. Please use this preview to evaluate feasibility and then only deploy production grade code once this API goes to general availability in fall 2026.
 
-
 ## API reference
 
 The API is available across the following language projections. Each reference documents the same underlying capabilities, layered as **Session → Container → Process**.

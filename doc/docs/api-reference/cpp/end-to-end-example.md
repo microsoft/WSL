@@ -33,7 +33,15 @@ int main()
 
     // 0. Check prerequisites
     auto missing = WslcService::GetMissingComponents();
-    if (missing != static_cast<Component>(0))
+    for (auto component : missing)
+    {
+        if (component == Component::SdkNeedsUpdate)
+        {
+            printf("Update this application to a version that uses the latest Microsoft.WSL.Containers SDK.\n");
+            return 1;
+        }
+    }
+    if (missing.Size() != 0)
     {
         printf("WSL components are missing. Run: wsl --install\n");
         return 1;
@@ -52,8 +60,7 @@ int main()
 
     // 2. Pull an image
     PullImageOptions pullOpts{ L"docker.io/library/alpine:latest" };
-    auto pullOp = session.PullImageAsync(pullOpts);
-    co_await pullOp;
+    session.PullImage(pullOpts);
 
     // 3. Configure an init process
     ProcessSettings initProcSettings;

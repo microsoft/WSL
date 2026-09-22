@@ -16,3 +16,5 @@ nav:
   - wslcprocessstate.md
   - wslcimageprogressstatus.md
   - wslccomponentflags.md
+  - wslcidentitytokentype.md
+  - wslcinstalloptions.md

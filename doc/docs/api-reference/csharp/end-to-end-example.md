@@ -25,7 +25,16 @@ class Program
     {
         // 0. Check prerequisites
         var missing = WslcService.GetMissingComponents();
-        if (missing.Count > 0)
+        foreach (Component component in missing)
+        {
+            if (component == Component.SdkNeedsUpdate)
+            {
+                Console.WriteLine(
+                    "Update this application to a version that uses the latest Microsoft.WSL.Containers SDK.");
+                return 1;
+            }
+        }
+        if (missing.Count != 0)
         {
             Console.WriteLine("WSL components are missing. Run: wsl --install");
             return 1;

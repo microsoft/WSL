@@ -18,3 +18,5 @@
 - [WslcProcessState](wslcprocessstate.md)
 - [WslcImageProgressStatus](wslcimageprogressstatus.md)
 - [WslcComponentFlags](wslccomponentflags.md)
+- [WslcIdentityTokenType](wslcidentitytokentype.md)
+- [WslcInstallOptions](wslcinstalloptions.md)

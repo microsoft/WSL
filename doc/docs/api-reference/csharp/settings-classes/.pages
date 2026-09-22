@@ -3,6 +3,7 @@ nav:
   - index.md
   - sessionsettings.md
   - vhdoptions.md
+  - installoptions.md
   - pullimageoptions.md
   - pushimageoptions.md
   - tagimageoptions.md
