@@ -2723,7 +2723,7 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
                     registration.Write(Property::OsVersion, distributionInfo->Version);
                 }
 
-                // This needs to be done before plugins are notifed because they might try to run a command inside the distribution.
+                // This needs to be done before plugins are notified because they might try to run a command inside the distribution.
                 m_runningInstances[registration.Id()] = instance;
 
                 if (version == LXSS_WSL_VERSION_2)
@@ -3509,8 +3509,9 @@ void LxssUserSessionImpl::_ProcessImportResultMessage(
         {
             if (Message.TerminalProfileIndex != 0)
             {
-                const auto terminalProfileSpan = Span.subspan(Message.TerminalProfileIndex);
-                const std::string_view terminalProfile(reinterpret_cast<const char*>(terminalProfileSpan.data()), Message.TerminalProfileSize);
+                const auto terminalProfileSpan = Span.subspan(Message.TerminalProfileIndex, Message.TerminalProfileSize);
+                const std::string_view terminalProfile(
+                    reinterpret_cast<const char*>(terminalProfileSpan.data()), terminalProfileSpan.size());
                 _CreateTerminalProfile(terminalProfile, iconPath, Configuration, Registration);
             }
             else

@@ -55,6 +55,25 @@ struct ErrorResponse
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ErrorResponse, message);
 };
 
+// Payload of the X-Docker-Container-Path-Stat response header on /containers/{id}/archive.
+struct ContainerPathStat
+{
+    std::string name;
+    int64_t size{};
+    uint32_t mode{};
+    std::string mtime;
+    std::string linkTarget;
+
+    static constexpr uint32_t c_modeSymlink = 1u << 27;
+
+    bool IsSymlink() const
+    {
+        return (mode & c_modeSymlink) != 0;
+    }
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerPathStat, name, size, mode, mtime, linkTarget);
+};
+
 struct ImageLoadResult
 {
     std::optional<std::string> stream;
@@ -543,8 +562,11 @@ struct InspectContainer
     HostConfig HostConfig;
     std::vector<InspectMount> Mounts;
     NetworkSettings NetworkSettings;
+    std::optional<int64_t> SizeRw;
+    std::optional<int64_t> SizeRootFs;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, Config, HostConfig, Mounts, NetworkSettings);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
+        InspectContainer, Id, Name, Created, Image, State, Config, HostConfig, Mounts, NetworkSettings, SizeRw, SizeRootFs);
 };
 
 struct InspectExec
@@ -775,15 +797,20 @@ struct ContainerInfo
     std::vector<std::string> Names;
     std::string Image;
     std::string ImageID;
+    std::string Command;
+    std::string Status;
     std::map<std::string, std::string> Labels;
     std::vector<Port> Ports;
     std::vector<Mount> Mounts;
     ContainerState State{ContainerState::Unknown};
     int64_t Created{};
+    int64_t SizeRw{};
+    int64_t SizeRootFs{};
     HostConfig HostConfig;
     NetworkSettings NetworkSettings;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, ImageID, Labels, Ports, Mounts, State, Created, HostConfig, NetworkSettings);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
+        ContainerInfo, Id, Names, Image, ImageID, Command, Status, Labels, Ports, Mounts, State, Created, SizeRw, SizeRootFs, HostConfig, NetworkSettings);
 };
 
 struct BuildKitVertex

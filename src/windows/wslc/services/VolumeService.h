@@ -20,6 +20,8 @@ Abstract:
 #include <wslc_schema.h>
 
 namespace wsl::windows::wslc::services {
+
+using namespace wsl::windows::wslc::cli;
 struct VolumeService
 {
     static WSLCVolumeInformation Create(models::Session& session, const models::CreateVolumeOptions& createOptions);

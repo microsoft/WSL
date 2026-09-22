@@ -84,11 +84,16 @@ namespace {
         FieldDefinition{L"destination", Field::Target, Family::General, false, Support::Supported},
         FieldDefinition{L"readonly", Field::ReadOnly, Family::General, true, Support::Supported},
         FieldDefinition{L"ro", Field::ReadOnly, Family::General, true, Support::Supported},
+        // The WSLC mount transport and Docker request model have no end-to-end consistency setting.
         FieldDefinition{L"consistency", Field::Consistency, Family::General, false, Support::Unsupported},
+        // The WSLC mount transport and Docker request model do not carry Docker bind options.
+        // "enabled" requires no non-default bind behavior and is accepted below.
         FieldDefinition{L"bind-propagation", Field::BindPropagation, Family::Bind, false, Support::Unsupported},
         FieldDefinition{L"bind-nonrecursive", Field::BindNonRecursive, Family::Bind, true, Support::Unsupported},
         FieldDefinition{L"bind-recursive", Field::BindRecursive, Family::Bind, false, Support::ValueDependent},
+        // The mount pipeline relies on Docker's default volume copy-up behavior and does not carry VolumeOptions.
         FieldDefinition{L"volume-nocopy", Field::VolumeNoCopy, Family::Volume, true, Support::Unsupported},
+        // Inline mounts reference volumes by name; the volume creation API owns labels, drivers, and driver options.
         FieldDefinition{L"volume-label", Field::VolumeLabel, Family::Volume, false, Support::Unsupported},
         FieldDefinition{L"volume-driver", Field::VolumeDriver, Family::Volume, false, Support::Unsupported},
         FieldDefinition{L"volume-opt", Field::VolumeOption, Family::Volume, false, Support::Unsupported},
@@ -173,21 +178,14 @@ namespace {
 
     std::optional<uint32_t> ParseDockerTmpfsMode(const std::wstring& value)
     {
-        if (value.empty() || value.front() == L'-')
-        {
-            return std::nullopt;
-        }
-
-        size_t position = value.front() == L'+' ? 1 : 0;
-        if (position == value.size())
+        if (value.empty())
         {
             return std::nullopt;
         }
 
         uint64_t result = 0;
-        for (; position < value.size(); ++position)
+        for (const auto digit : value)
         {
-            const auto digit = value[position];
             if (digit < L'0' || digit > L'7')
             {
                 return std::nullopt;
@@ -253,7 +251,10 @@ Spec ParseDockerMountString(const std::wstring& value)
         case Family::General:
             break;
         case Family::Bind:
-            mount.HasBindOptions = true;
+            if (definition->Id != Field::BindRecursive || keyValue.Value != L"enabled")
+            {
+                mount.HasBindOptions = true;
+            }
             break;
         case Family::Volume:
             mount.HasVolumeOptions = true;
@@ -417,15 +418,15 @@ Spec ParseDockerMountString(const std::wstring& value)
     Type type;
     if (mount.Type == L"bind")
     {
-        type = Type::Bind;
+        type = WSLCMountTypeBind;
     }
     else if (mount.Type == L"volume")
     {
-        type = Type::Volume;
+        type = WSLCMountTypeVolume;
     }
     else if (mount.Type == L"tmpfs")
     {
-        type = Type::Tmpfs;
+        type = WSLCMountTypeTmpfs;
     }
     else
     {
@@ -495,15 +496,16 @@ Spec ParseDockerVolumeString(const std::wstring& value)
     if (IsValidNamedVolumeName(rawSource))
     {
         return {
-            .MountType = Type::Volume,
+            .MountType = WSLCMountTypeVolume,
             .Source = rawSource,
             .Target = WideToMultiByte(target),
             .ReadOnly = readOnly,
         };
     }
 
-    std::wstring source;
-    if (FAILED(wil::GetFullPathNameW(rawSource.c_str(), source)))
+    std::error_code error;
+    auto source = wsl::windows::common::filesystem::GetCanonicalPath(rawSource, error);
+    if (error)
     {
         ThrowParse(Localization::WSLCCLI_VolumeHostPathInvalid(value, rawSource));
     }
@@ -514,8 +516,8 @@ Spec ParseDockerVolumeString(const std::wstring& value)
     }
 
     return {
-        .MountType = Type::Bind,
-        .Source = std::move(source),
+        .MountType = WSLCMountTypeBind,
+        .Source = source.wstring(),
         .Target = WideToMultiByte(target),
         .ReadOnly = readOnly,
         .BindSource = BindSourcePolicy::CreateIfMissing,
@@ -529,7 +531,7 @@ Spec ParseDockerTmpfsString(const std::wstring& value)
     const auto options = colon == std::wstring::npos ? std::wstring_view{} : std::wstring_view{value}.substr(colon + 1);
 
     return {
-        .MountType = Type::Tmpfs,
+        .MountType = WSLCMountTypeTmpfs,
         .Target = WideToMultiByte(target),
         .TmpfsOptions = WideToMultiByte(std::wstring{options}),
     };
@@ -547,7 +549,8 @@ void ValidateMountSpec(const Spec& mount)
         ThrowValidation(Localization::WSLCCLI_MountTargetAbsoluteError());
     }
 
-    if (mount.MountType != Type::Tmpfs && (mount.TmpfsSizeBytes.has_value() || mount.TmpfsMode.has_value() || mount.TmpfsOptions.has_value()))
+    if (mount.MountType != WSLCMountTypeTmpfs &&
+        (mount.TmpfsSizeBytes.has_value() || mount.TmpfsMode.has_value() || mount.TmpfsOptions.has_value()))
     {
         ThrowValidation(Localization::WSLCCLI_MountTmpfsOptionsTypeError());
     }
@@ -559,7 +562,7 @@ void ValidateMountSpec(const Spec& mount)
 
     switch (mount.MountType)
     {
-    case Type::Bind:
+    case WSLCMountTypeBind:
         if (mount.Source.empty())
         {
             ThrowValidation(Localization::WSLCCLI_MountSourceRequiredError());
@@ -571,14 +574,14 @@ void ValidateMountSpec(const Spec& mount)
         }
         break;
 
-    case Type::Volume:
+    case WSLCMountTypeVolume:
         if (!mount.Source.empty() && !IsValidNamedVolumeName(mount.Source))
         {
             ThrowValidation(Localization::WSLCCLI_MountVolumeSourceInvalidError());
         }
         break;
 
-    case Type::Tmpfs:
+    case WSLCMountTypeTmpfs:
         if (!mount.Source.empty())
         {
             ThrowValidation(Localization::WSLCCLI_MountTmpfsSourceUnsupportedError());
@@ -610,7 +613,7 @@ void ValidateMountCollection(std::span<const Spec> mounts)
 
 std::string FormatTmpfsOptions(const Spec& mount)
 {
-    WI_ASSERT(mount.MountType == Type::Tmpfs);
+    WI_ASSERT(mount.MountType == WSLCMountTypeTmpfs);
 
     if (mount.TmpfsOptions.has_value())
     {
@@ -636,8 +639,6 @@ std::string FormatTmpfsOptions(const Spec& mount)
 
 std::string NormalizeDestination(std::string destination)
 {
-    std::replace(destination.begin(), destination.end(), '\\', '/');
-
     std::vector<std::string> components;
     size_t start = 0;
     while (start <= destination.size())

@@ -19,6 +19,7 @@ Abstract:
 
 namespace wsl::windows::wslc::services {
 
+using namespace wsl::windows::wslc::cli;
 struct ComposeService
 {
     static void Create(models::Session& Session, const std::wstring& Path);

@@ -64,7 +64,7 @@ try
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(entry.Name, name.get()) != 0);
 
         wil::unique_cotaskmem_ansistring inspect;
-        THROW_IF_FAILED(m_containers[index]->Inspect(&inspect));
+        THROW_IF_FAILED(m_containers[index]->Inspect(FALSE, &inspect));
         const auto json = nlohmann::json::parse(inspect.get());
         const auto image = json.value("Image", std::string{});
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(entry.Image, image.c_str()) != 0);
