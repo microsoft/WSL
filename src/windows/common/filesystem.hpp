@@ -176,8 +176,10 @@ std::filesystem::path GetTempFolderPath(_In_ HANDLE userToken);
 std::string GetWindowsHosts(const std::filesystem::path& Path);
 
 /// <summary>
-/// True when Name can be created as a Windows file name. A POSIX name bars only '/' and NUL, so it can
-/// hold characters that Windows rejects.
+/// True when Name can be created as a Windows file name under that exact name. A POSIX name bars only
+/// '/' and NUL, so it can hold characters Windows rejects, end in a space or dot that Win32 would strip,
+/// or name a reserved device such as CON or COM1. An empty name is accepted; it stands for a path with
+/// no name of its own, which the caller handles separately.
 /// </summary>
 bool IsRepresentableFileName(std::wstring_view Name);
 

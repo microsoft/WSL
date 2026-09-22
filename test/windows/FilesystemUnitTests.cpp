@@ -247,6 +247,44 @@ class FilesystemUnitTests
         VERIFY_IS_FALSE(IsRepresentableFileName(newline));
     }
 
+    // Win32 strips a trailing space or dot, so accepting one would copy the entry under a name other
+    // than the one the caller asked for.
+    TEST_METHOD(IsRepresentableFileName_RejectsTrailingSpaceOrDot)
+    {
+        const std::wstring stripped[] = {L"file.", L"file ", L"file...", L"file   ", L".", L".."};
+        for (const auto& name : stripped)
+        {
+            VERIFY_IS_FALSE(IsRepresentableFileName(name), name.c_str());
+        }
+
+        // A dot or space anywhere else survives untouched.
+        VERIFY_IS_TRUE(IsRepresentableFileName(L".hidden"));
+        VERIFY_IS_TRUE(IsRepresentableFileName(L"..two dots"));
+    }
+
+    TEST_METHOD(IsRepresentableFileName_RejectsReservedDeviceNames)
+    {
+        const std::wstring devices[] = {
+            L"con", L"CON", L"Prn", L"aux", L"NUL", L"com1", L"COM9", L"lpt1", L"LPT9", L"conin$", L"CONOUT$"};
+        for (const auto& name : devices)
+        {
+            VERIFY_IS_FALSE(IsRepresentableFileName(name), name.c_str());
+        }
+
+        // A device name keeps its meaning when it carries an extension.
+        VERIFY_IS_FALSE(IsRepresentableFileName(L"con.txt"));
+        VERIFY_IS_FALSE(IsRepresentableFileName(L"NUL.tar.gz"));
+    }
+
+    TEST_METHOD(IsRepresentableFileName_AcceptsNamesThatOnlyLookReserved)
+    {
+        const std::wstring allowed[] = {L"con2", L"com0", L"lpt0", L"com10", L"console", L"nuls", L"prnt", L"auxiliary"};
+        for (const auto& name : allowed)
+        {
+            VERIFY_IS_TRUE(IsRepresentableFileName(name), name.c_str());
+        }
+    }
+
     // The directory has to survive for the whole scope and be gone once it closes, since the copy that
     // uses it leaves entries behind that must not reach the destination.
     TEST_METHOD(StagingDirectory_RemovesItselfWhenScopeEnds)

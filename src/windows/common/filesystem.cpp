@@ -990,6 +990,12 @@ std::filesystem::path wsl::windows::common::filesystem::MakeStagingDirectory(con
 
 bool wsl::windows::common::filesystem::IsRepresentableFileName(std::wstring_view Name)
 {
+    // An empty name stands for a path with no name of its own, which the caller handles separately.
+    if (Name.empty())
+    {
+        return true;
+    }
+
     constexpr std::wstring_view reserved = L"<>:\"/\\|?*";
 
     for (const auto character : Name)
@@ -998,6 +1004,27 @@ bool wsl::windows::common::filesystem::IsRepresentableFileName(std::wstring_view
         {
             return false;
         }
+    }
+
+    // Win32 drops a trailing space or dot, so the entry would land under a name other than the one that
+    // was asked for. This also covers "." and "..", which name a directory rather than an entry in one.
+    if (Name.back() == L' ' || Name.back() == L'.')
+    {
+        return false;
+    }
+
+    // A device name resolves to the device even when it carries an extension, so match on the stem.
+    const auto stem = wsl::shared::string::AsciiToLower(Name.substr(0, Name.find(L'.')));
+    if (stem == L"con" || stem == L"prn" || stem == L"aux" || stem == L"nul" || stem == L"conin$" || stem == L"conout$")
+    {
+        return false;
+    }
+
+    // COM1-COM9 and LPT1-LPT9, along with the superscript forms Windows resolves to ports 1 through 3.
+    if (stem.size() == 4 && (stem.starts_with(L"com") || stem.starts_with(L"lpt")) &&
+        ((stem[3] >= L'1' && stem[3] <= L'9') || stem[3] == L'\u00b9' || stem[3] == L'\u00b2' || stem[3] == L'\u00b3'))
+    {
+        return false;
     }
 
     return true;
