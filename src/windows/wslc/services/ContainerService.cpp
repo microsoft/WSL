@@ -827,7 +827,8 @@ void ContainerService::Export(Session& session, const std::string& id, HANDLE ou
     THROW_IF_FAILED(container->Export(ToCOMInputHandle(outputHandle)));
 }
 
-void ContainerService::Copy(models::Session& session, const std::wstring& source, const std::wstring& target, bool followLink){
+void ContainerService::Copy(models::Session& session, const std::wstring& source, const std::wstring& target, bool followLink)
+{
     // Determine copy direction by looking for CONTAINER:PATH patterns.
     // A single letter before ':' is a Windows drive path (e.g. C:\path), not a container reference.
     auto isContainerPath = [](const std::wstring& path) -> bool {
@@ -933,8 +934,7 @@ void ContainerService::Copy(models::Session& session, const std::wstring& source
             }
 
             // Create a temp file with DELETE_ON_CLOSE and InheritHandle so tar can write to it via stdout
-            TempFile tarFile(
-                GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, TempFileFlags::DeleteOnClose | TempFileFlags::InheritHandle);
+            TempFile tarFile(GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, TempFileFlags::DeleteOnClose | TempFileFlags::InheritHandle);
 
             // Run tar.exe writing to stdout, redirected to our temp file handle.
             auto tarCmd = std::format(L"tar.exe -c{}f - -C \"{}\" \"{}\"", dereference ? L"h" : L"", parentDir, fileName);
@@ -1101,7 +1101,6 @@ void ContainerService::Copy(models::Session& session, const std::wstring& source
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_CpInvalidDirectionError());
     }
 }
-
 
 void ContainerService::CopyToContainer(Session& session, const std::string& id, const std::string& destPath, HANDLE inputHandle, ULONGLONG contentSize)
 {
