@@ -253,7 +253,7 @@ class FilesystemUnitTests
     {
         std::filesystem::path recorded;
         {
-            const wsl::windows::common::filesystem::StagingDirectory staging(std::filesystem::current_path());
+            const wsl::windows::common::filesystem::StagingDirectory staging(std::filesystem::temp_directory_path());
             recorded = staging.Path();
 
             VERIFY_IS_TRUE(std::filesystem::is_directory(recorded));

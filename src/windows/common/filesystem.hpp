@@ -15,6 +15,7 @@ Abstract:
 #pragma once
 
 #include <functional>
+#include <optional>
 
 #include "wslservice.h"
 

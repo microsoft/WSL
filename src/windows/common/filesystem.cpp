@@ -1019,7 +1019,7 @@ const std::filesystem::path& wsl::windows::common::filesystem::StagingDirectory:
     return m_path;
 }
 
-void MoveOver(const std::filesystem::path& From, const std::filesystem::path& To)
+static void MoveOver(const std::filesystem::path& From, const std::filesystem::path& To)
 {
     std::error_code error;
     std::filesystem::rename(From, To, error);
