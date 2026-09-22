@@ -20,6 +20,8 @@ Abstract:
 #include <wslc_schema.h>
 
 namespace wsl::windows::wslc::services {
+
+using namespace wsl::windows::wslc::cli;
 struct ContainerService
 {
     // Renders a container state with the time it last changed appended. Table output is localized;
@@ -64,7 +66,7 @@ struct ContainerService
     static void Export(models::Session& session, const std::string& id, const std::wstring& outputPath);
     static void Export(models::Session& session, const std::string& id, HANDLE outputHandle);
     static void CopyToContainer(models::Session& session, const std::string& id, const std::string& destPath, HANDLE inputHandle, ULONGLONG contentSize);
-    static void CopyFromContainer(models::Session& session, const std::string& id, const std::string& srcPath, HANDLE outputHandle);
+    static void CopyFromContainer(models::Session& session, const std::string& id, const std::string& srcPath, bool followLink, HANDLE outputHandle);
     static wsl::windows::common::wslc_schema::InspectContainer Inspect(models::Session& session, const std::string& id, bool size = false);
     static void Logs(models::Session& session, const std::string& id, bool follow, bool timestamps, bool details, LONGLONG since, LONGLONG until, ULONGLONG tail = 0);
     static wsl::windows::common::docker_schema::ContainerStats Stats(models::Session& session, const std::string& id);

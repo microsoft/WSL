@@ -26,6 +26,8 @@ using namespace wsl::windows::common;
 using namespace wsl::windows::wslc::execution;
 
 namespace wsl::windows::wslc {
+
+using namespace wsl::windows::wslc::cli;
 int CoreMain(int argc, wchar_t const** argv)
 try
 {

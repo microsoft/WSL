@@ -1,9 +1,11 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 #include "common.h"
+#include <iostream>
 #include <memory>
 #include <string>
 #include <string_view>
 
+#include <netinet/in.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
 
@@ -93,6 +95,23 @@ wil::unique_fd CreateUnixServerSocket(const char* path)
     return server;
 }
 
+wil::unique_fd CreateTcpServerSocket(uint16_t port)
+{
+    wil::unique_fd server{socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, IPPROTO_TCP)};
+    THROW_LAST_ERROR_IF(!server);
+
+    int reuseAddress = 1;
+    THROW_LAST_ERROR_IF(setsockopt(server.get(), SOL_SOCKET, SO_REUSEADDR, &reuseAddress, sizeof(reuseAddress)) < 0);
+
+    sockaddr_in address{};
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    address.sin_port = htons(port);
+    THROW_LAST_ERROR_IF(bind(server.get(), reinterpret_cast<sockaddr*>(&address), sizeof(address)) < 0);
+
+    return server;
+}
+
 // Opens the log file, if one is specified, and sets the log level.
 wil::unique_fd EnableLogging(const char* logFile, int logLevel, bool truncateLog)
 {
@@ -171,7 +190,7 @@ CATCH_LOG();
 
 } // namespace
 
-void RunPlan9Server(const char* socketPath, const char* logFile, int logLevel, bool truncateLog, int controlSocket, int serverFd, wil::unique_fd& pipeFd)
+void RunPlan9Server(const char* socketPath, const char* logFile, int logLevel, bool truncateLog, int bindPort, int controlSocket, wil::unique_fd serverFd, wil::unique_fd& pipeFd)
 {
     // Initialize logging.
     InitializeLogging(false, LogPlan9Exception);
@@ -191,9 +210,14 @@ void RunPlan9Server(const char* socketPath, const char* logFile, int logLevel, b
     wil::unique_fd rootFd{open("/", O_PATH | O_DIRECTORY | O_CLOEXEC)};
     THROW_LAST_ERROR_IF(!rootFd);
 
+    if (bindPort >= 0)
+    {
+        serverFd = CreateTcpServerSocket(gsl::narrow<uint16_t>(bindPort));
+    }
+
     {
         // Create the file system server.
-        auto fileSystem = p9fs::CreateFileSystem(serverFd);
+        auto fileSystem = p9fs::CreateFileSystem(serverFd.release());
 
         // Add the share (the share takes ownership of the fd).
         fileSystem->AddShare("", rootFd.get());
@@ -201,11 +225,53 @@ void RunPlan9Server(const char* socketPath, const char* logFile, int logLevel, b
 
         fileSystem->Resume();
 
+        if (bindPort >= 0)
+        {
+            std::cout << "bound port " << bindPort << std::endl;
+        }
+
         // Close the pipe to signal the parent process that the plan9 server is started.
         pipeFd.reset();
 
-        wsl::shared::SocketChannel channel({controlSocket}, "Plan9Control");
-        RunPlan9ControlFile(*fileSystem, channel);
+        if (controlSocket >= 0)
+        {
+            wsl::shared::SocketChannel channel({controlSocket}, "Plan9Control");
+            RunPlan9ControlFile(*fileSystem, channel);
+        }
+        else
+        {
+            // Keep running until stdin is closed.
+            for (;;)
+            {
+                pollfd stdinFd{STDIN_FILENO, POLLIN | POLLPRI | POLLHUP | POLLERR | POLLNVAL, 0};
+
+                const auto pollResult = poll(&stdinFd, 1, -1);
+                if (pollResult < 0)
+                {
+                    if (errno == EINTR)
+                    {
+                        continue;
+                    }
+
+                    LOG_ERROR("Plan9 server poll() on stdin failed (errno = {})", errno);
+                    _exit(1);
+                }
+
+                if (stdinFd.revents & (POLLHUP | POLLERR | POLLNVAL))
+                {
+                    _exit(0);
+                }
+
+                if (stdinFd.revents & (POLLIN | POLLPRI))
+                {
+                    char ignored{};
+                    if (read(STDIN_FILENO, &ignored, sizeof(ignored)) <= 0)
+                    {
+                        _exit(0);
+                    }
+                }
+            }
+        }
     }
 
     // Unlink the socket path (don't care about failure).

@@ -1221,8 +1221,8 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
-    <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
-    <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+    <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. Using cgroup v2 instead. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
+    <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>오류가 발생했습니다. 나중에 다시 시도하세요.</value>
@@ -2733,6 +2733,10 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_CpDestinationTypeMismatchError" xml:space="preserve">
     <value>복사된 항목과 유형이 다르므로 '{0}' 덮어쓸 수 없습니다.</value>
     <comment>{0} is the destination path. Shown when a file would replace a directory, or a directory would replace a file.</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceNameNotRepresentableError" xml:space="preserve">
+    <value>'{0}' 이름을 Windows 파일 이름으로 사용할 수 없으므로 복사할 수 없습니다.</value>
+    <comment>{0} is the source path. Shown when the container source name holds a character that is not valid in a Windows file name.</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>컨테이너를 검사합니다.</value>

@@ -30,6 +30,8 @@ using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
 
+using namespace wsl::windows::wslc::cli;
+
 static void WriteSessionTable(Terminal& terminal, const std::vector<SessionInformation>& sessions)
 {
     TableOutput<3> table(
@@ -108,7 +110,7 @@ void StreamEvents(CLIExecutionContext& context)
     const EventStreamOptions options{
         .Since = context.Args.GetValue<ArgType::Since>(now),
         .Until = context.Args.GetValue<ArgType::Until>(0),
-        .Filters = context.Args.GetAllValues<ArgType::EventFilter>(),
+        .Filters = context.Args.GetAllValues<ArgType::Filter>(),
     };
     SessionService::StreamEvents(context.Terminal, session, options, context.CreateCancelEvent());
 }

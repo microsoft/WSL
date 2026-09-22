@@ -22,7 +22,7 @@ Abstract:
 #include <string_view>
 #include <Windows.h>
 
-namespace wsl::windows::wslc {
+namespace wsl::windows::wslc::cli {
 
 class OutputChannel
 {
@@ -54,4 +54,4 @@ private:
     std::optional<wsl::windows::common::vt::EnableVirtualTerminal> m_vtMode;
 };
 
-} // namespace wsl::windows::wslc
+} // namespace wsl::windows::wslc::cli
