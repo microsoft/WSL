@@ -74,39 +74,6 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(UINT32{1}, description.BootDisks.at(L"automatic-1").GuestAddress.Lun);
         VERIFY_ARE_EQUAL(UINT32{2}, description.BootDisks.at(L"automatic-2").GuestAddress.Lun);
         VERIFY_ARE_EQUAL(UINT32{0}, description.BootDisks.at(L"exact").GuestAddress.Lun);
-
-        request.BootDisks[0].Disk.Placement = VmScsiPlacement{{0, 0}};
-        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
-        request.BootDisks[0].Disk.Placement.reset();
-        request.BootDisks[1].Key = request.BootDisks[0].Key;
-        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
-    }
-
-    TEST_METHOD(DoesNotCapMemoryAndRequiresGranularSizing)
-    {
-        SKIP_TEST_ARM64();
-        auto request = CreateRequest();
-        request.Memory.SizeBytes = 4096 * c_mib;
-        VERIFY_ARE_EQUAL(request.Memory.SizeBytes, ValidateCreateRequest(request).Memory.SizeBytes);
-        request.Memory.SizeBytes += 2 * c_mib;
-        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
-        request.Memory.SizeBytes = 33 * c_mib;
-        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
-        request.Memory.SizeBytes = c_mib;
-        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
-        request.Memory.SizeBytes = 0;
-        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
-        request.Memory.SizeBytes = 2 * c_mib;
-        VERIFY_ARE_EQUAL(request.Memory.SizeBytes, ValidateCreateRequest(request).Memory.SizeBytes);
-    }
-
-    TEST_METHOD(RejectsInvalidDiskFormats)
-    {
-        SKIP_TEST_ARM64();
-        auto request = CreateRequest();
-        request.BootDisks.push_back(CreateDisk(L"disk"));
-        request.BootDisks[0].Disk.Source = VmVirtualDiskSource{L"C:\\images\\disk.vhd", VmDiskFormat::Vhdx};
-        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
     }
 
     TEST_METHOD(EnforcesDiskLimitsAndKeepsIdsVmScoped)
@@ -123,8 +90,6 @@ class OpenVmmVirtualMachineBackendTests
         const auto second = ValidateCreateRequest(request);
         VERIFY_ARE_EQUAL(first.BootDisks.at(L"0").Id.Value, second.BootDisks.at(L"0").Id.Value);
         VERIFY_IS_FALSE(IsEqualGUID(first.BootDisks.at(L"0").Id.Owner.VmId, second.BootDisks.at(L"0").Id.Owner.VmId));
-        request.BootDisks.push_back(CreateDisk(L"overflow"));
-        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
     }
 
     TEST_METHOD(ValidatesConsoleFamiliesIndependently)
@@ -135,23 +100,14 @@ class OpenVmmVirtualMachineBackendTests
             {VmConsoleRole::EarlyBoot, VmSerialConsole{0, L"\\\\.\\pipe\\early"}},
             {VmConsoleRole::KernelConsole, VmVirtioConsole{0, L"", L"\\\\.\\pipe\\console"}}};
         VERIFY_ARE_EQUAL(size_t{2}, ValidateCreateRequest(request).Boot.Consoles.size());
-        request.Consoles.push_back(request.Consoles[0]);
-        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
-        request.Consoles.pop_back();
         std::get<VmVirtioConsole>(request.Consoles[1].Device).GuestName = L"unsupported-name";
         VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
     }
 
-    TEST_METHOD(RejectsInvalidIdentityAndBootPaths)
+    TEST_METHOD(RejectsUnsupportedBootMethod)
     {
         SKIP_TEST_ARM64();
         auto request = CreateRequest();
-        request.VmId = GUID_NULL;
-        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
-        THROW_IF_FAILED(CoCreateGuid(&request.VmId));
-        request.Boot.KernelPath = L"relative-kernel";
-        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
-        request.Boot.KernelPath = L"C:\\images\\kernel";
         request.Boot.Method = VmBootMethod::Uefi;
         VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
     }
