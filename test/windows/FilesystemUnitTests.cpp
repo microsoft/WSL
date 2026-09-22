@@ -231,7 +231,9 @@ class FilesystemUnitTests
 
     TEST_METHOD(IsRepresentableFileName_RejectsReservedCharacters)
     {
-        const std::wstring reserved[] = {L"a<b", L"a>b", L"a:b", L"a\"b", L"a/b", L"a\\b", L"a|b", L"a?b", L"a*b"};
+        const std::wstring reserved[] = {
+            L"a<b", L"a>b", L"a:b", L"a\"b", L"a/b", L"a\\b", L"a|b", L"a?b", L"a*b",
+            L"con", L"con.txt", L"prn", L"aux", L"nul", L"com1", L"lpt9", L"file.", L"file "};
         for (const auto& name : reserved)
         {
             VERIFY_IS_FALSE(IsRepresentableFileName(name), name.c_str());
@@ -291,7 +293,7 @@ class FilesystemUnitTests
     {
         std::filesystem::path recorded;
         {
-            const wsl::windows::common::filesystem::StagingDirectory staging(std::filesystem::current_path());
+            const wsl::windows::common::filesystem::StagingDirectory staging(std::filesystem::temp_directory_path());
             recorded = staging.Path();
 
             VERIFY_IS_TRUE(std::filesystem::is_directory(recorded));
