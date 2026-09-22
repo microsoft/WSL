@@ -547,6 +547,7 @@ private:
     struct PidTermination
     {
         GUID DistroId{};
+        GUID InstanceId{};
         ULONG ClientId{};
         DWORD Timeout{};
         wil::shared_event Event{wil::EventOptions::ManualReset};
@@ -837,9 +838,9 @@ private:
     _Guarded_by_(m_instanceLock) std::list<std::pair<GUID, LxssDistributionState>> m_lockedDistributions;
 
     /// <summary>
-    /// Contains pending WSL2 exits until their exit notification or VM teardown, even if a conversion wait times out.
+    /// Contains pending WSL2 exits keyed by launch identity, not reusable PID, until exit notification or VM teardown.
     /// </summary>
-    _Guarded_by_(m_instanceLock) std::map<ULONG, PidTermination> m_pidTerminations;
+    _Guarded_by_(m_instanceLock) std::map<GUID, PidTermination, wsl::windows::common::helpers::GuidLess> m_pidTerminations;
 
     /// <summary>
     /// The running utility vm for WSL2 distributions.

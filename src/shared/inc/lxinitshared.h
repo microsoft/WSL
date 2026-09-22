@@ -1271,6 +1271,7 @@ typedef struct _LX_MINI_INIT_MESSAGE
     unsigned int UserProfileOffset;
     unsigned int Flags;
     unsigned int ConnectPort;
+    GUID InstanceId;
     char Buffer[];
 
     PRETTY_PRINT(
@@ -1284,7 +1285,8 @@ typedef struct _LX_MINI_INIT_MESSAGE
         STRING_FIELD(InstallPathOffset),
         STRING_FIELD(UserProfileOffset),
         FIELD(Flags),
-        FIELD(ConnectPort));
+        FIELD(ConnectPort),
+        FIELD(InstanceId));
 
 } LX_MINI_INIT_MESSAGE, *PLX_MINI_INIT_MESSAGE;
 
@@ -1508,8 +1510,9 @@ typedef struct _LX_MINI_INIT_CHILD_EXIT_MESSAGE
 
     MESSAGE_HEADER Header;
     unsigned int ChildPid;
+    GUID InstanceId;
 
-    PRETTY_PRINT(FIELD(Header), FIELD(ChildPid));
+    PRETTY_PRINT(FIELD(Header), FIELD(ChildPid), FIELD(InstanceId));
 } LX_MINI_INIT_CHILD_EXIT_MESSAGE, *PLX_MINI_INIT_CHILD_EXIT_MESSAGE;
 
 typedef struct _LX_MINI_INIT_MOUNT_FOLDER_MESSAGE

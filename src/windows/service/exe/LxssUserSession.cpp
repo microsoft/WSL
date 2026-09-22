@@ -2576,6 +2576,7 @@ try
                 "PidTerminationTimeout",
                 TraceLoggingValue(termination.ClientId, "pid"),
                 TraceLoggingValue(termination.Timeout, "timeout"));
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageDistributionTerminationTimeout(termination.ClientId, termination.Timeout));
         }
     }
 
@@ -2667,6 +2668,8 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
                 break;
             }
 
+            THROW_HR_IF(E_NOT_SET, WI_IsFlagSet(Flags, LXSS_CREATE_INSTANCE_FLAGS_OPEN_EXISTING));
+
             auto pidTerminations = _GetPidTerminations(registration.Id());
             std::erase_if(pidTerminations, [&](const auto& termination) {
                 return std::any_of(waitedTerminations.begin(), waitedTerminations.end(), [&](const auto& waited) {
@@ -2693,8 +2696,6 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
         // not create one.
         if (!instance)
         {
-            THROW_HR_IF(E_NOT_SET, WI_IsFlagSet(Flags, LXSS_CREATE_INSTANCE_FLAGS_OPEN_EXISTING));
-
             // Query information about the distribution.
             auto configuration = s_GetDistributionConfiguration(registration);
             auto defaultUid = registration.Read(Property::DefaultUid);
@@ -3106,7 +3107,7 @@ void LxssUserSessionImpl::_CreateVm()
             throw;
         }
 
-        auto callback = [this](auto Pid) {
+        auto callback = [this](const LX_MINI_INIT_CHILD_EXIT_MESSAGE& ExitMessage) {
             // If the vm is currently being destroyed, the instance lock might be held
             // while WslCoreVm's destructor is waiting on this thread.
             // Cancel the call if the vm destruction is signaled.
@@ -3125,9 +3126,20 @@ void LxssUserSessionImpl::_CreateVm()
             }
 
             auto unlock = wil::scope_exit([&]() { m_instanceLock.unlock(); });
-            TerminateByClientIdLockHeld(Pid);
+            const auto instance = std::find_if(m_runningInstances.begin(), m_runningInstances.end(), [&](const auto& entry) {
+                const auto* wslcoreInstance = dynamic_cast<WslCoreInstance*>(entry.second.get());
+                return wslcoreInstance && ExitMessage.ChildPid == wslcoreInstance->GetClientId() &&
+                       ExitMessage.InstanceId != GUID{} && ExitMessage.InstanceId == wslcoreInstance->GetInstanceId();
+            });
+            if (instance != m_runningInstances.end())
+            {
+                const auto distroId = instance->first;
+                _TerminateInstanceInternal(&distroId, false);
+            }
 
-            if (const auto termination = m_pidTerminations.find(Pid); termination != m_pidTerminations.end())
+            if (const auto termination = m_pidTerminations.find(ExitMessage.InstanceId);
+                termination != m_pidTerminations.end() && ExitMessage.ChildPid == termination->second.ClientId &&
+                ExitMessage.InstanceId != GUID{} && ExitMessage.InstanceId == termination->second.InstanceId)
             {
                 termination->second.Event.SetEvent();
                 m_pidTerminations.erase(termination);
@@ -3833,9 +3845,10 @@ bool LxssUserSessionImpl::_TerminateInstanceInternal(_In_ LPCGUID DistroGuid, _I
                     // Stop releases the system distro, so capture its PID while it is still available.
                     PidTermination termination;
                     termination.DistroId = *DistroGuid;
+                    termination.InstanceId = wslcoreInstance->GetInstanceId();
                     termination.ClientId = wslcoreInstance->GetClientId();
                     termination.Timeout = gsl::narrow_cast<DWORD>(m_utilityVm->GetConfig().DistributionStartTimeout);
-                    m_pidTerminations.try_emplace(termination.ClientId, std::move(termination));
+                    m_pidTerminations.try_emplace(termination.InstanceId, std::move(termination));
 
                     m_pluginManager.OnDistributionStopping(&m_session, wslcoreInstance->DistributionInformation());
                 }
