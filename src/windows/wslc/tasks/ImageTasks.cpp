@@ -38,6 +38,8 @@ using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
 
+using namespace wsl::windows::wslc::cli;
+
 namespace {
 
     class DECLSPEC_UUID("91EF98A7-99A8-41C2-893C-43CDFB7DB69F") WSLCImageLoadCallback
@@ -240,11 +242,11 @@ void ListImages(CLIExecutionContext& context)
 
         auto table =
             trunc
-                ? wsl::windows::wslc::TableOutput<6>(
+                ? wsl::windows::wslc::cli::TableOutput<6>(
                       context.Terminal,
                       {{{L"REPOSITORY", c_shrink}, {L"TAG", c_shrink}, {L"DIGEST", c_shrink}, {L"IMAGE ID", c_imageId}, {L"CREATED", c_shrink}, {L"SIZE", c_shrink}}},
                       images.size())
-                : wsl::windows::wslc::TableOutput<6>(
+                : wsl::windows::wslc::cli::TableOutput<6>(
                       context.Terminal, {L"REPOSITORY", L"TAG", L"DIGEST", L"IMAGE ID", L"CREATED", L"SIZE"});
 
         table.SetDropEmptyColumns(true);

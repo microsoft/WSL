@@ -110,7 +110,7 @@ class WSLCCLICommandUnitTests
         VERIFY_ARE_EQUAL(wsl::shared::Localization::WSLCCLI_EventsUntilArgDescription(), arguments[1].Description());
         VERIFY_IS_TRUE(arguments[1].IsSingle());
 
-        VERIFY_ARE_EQUAL(ArgType::EventFilter, arguments[2].Type());
+        VERIFY_ARE_EQUAL(ArgType::Filter, arguments[2].Type());
         VERIFY_ARE_EQUAL(std::wstring(L"filter"), arguments[2].Name());
         VERIFY_ARE_EQUAL(std::wstring(L"f"), arguments[2].Alias());
         VERIFY_IS_TRUE(arguments[2].IsUnlimited());
@@ -270,6 +270,26 @@ class WSLCCLICommandUnitTests
             VERIFY_IS_TRUE(itr != args.end());
             VERIFY_ARE_EQUAL(std::wstring{L"all"}, itr->Name());
             VERIFY_ARE_EQUAL(std::wstring{L"a"}, itr->Alias());
+            VERIFY_ARE_EQUAL(Kind::Flag, itr->Kind());
+            VERIFY_IS_FALSE(itr->Required());
+        }
+    }
+
+    // Test: Verify container cp exposes --follow-link/-L, matching the docker CLI alias
+    TEST_METHOD(ContainerCpCommand_HasFollowLinkArgumentWithDockerAlias)
+    {
+        const std::wstring parents[] = {L"container", L"wslc"};
+
+        for (const auto& parent : parents)
+        {
+            LogComment(L"Verifying --follow-link for parent: " + parent);
+
+            auto args = ContainerCpCommand(parent).GetArguments();
+            auto itr = std::find_if(args.begin(), args.end(), [](const Argument& arg) { return arg.Type() == ArgType::FollowLink; });
+
+            VERIFY_IS_TRUE(itr != args.end());
+            VERIFY_ARE_EQUAL(std::wstring{L"follow-link"}, itr->Name());
+            VERIFY_ARE_EQUAL(std::wstring{L"L"}, itr->Alias());
             VERIFY_ARE_EQUAL(Kind::Flag, itr->Kind());
             VERIFY_IS_FALSE(itr->Required());
         }

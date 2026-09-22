@@ -228,6 +228,7 @@ Abstract:
 //
 
 #define LX_INIT_PLAN9 "plan9"
+#define LX_INIT_PLAN9_BIND_ARG "--bind"
 #define LX_INIT_PLAN9_CONTROL_SOCKET_ARG "--control-socket"
 #define LX_INIT_PLAN9_SOCKET_PATH_ARG "--socket-path"
 #define LX_INIT_PLAN9_SERVER_FD_ARG "--server-fd"
@@ -673,23 +674,47 @@ typedef struct _LX_PROCESS_CRASH
 
 } LX_PROCESS_CRASH, *PLX_PROCESS_CRASH;
 
-typedef struct _LX_INIT_CREATE_PROCESS_COMMON
+template <LX_MESSAGE_TYPE MessageType>
+struct LX_INIT_CREATE_PROCESS_BASE;
+
+template <>
+struct LX_INIT_CREATE_PROCESS_BASE<LxInitMessageCreateProcess>
 {
+    MESSAGE_HEADER Header;
     unsigned int FilenameOffset;
     unsigned int CurrentWorkingDirectoryOffset;
     unsigned int CommandLineOffset;
-    unsigned short CommandLineCount;
     unsigned int EnvironmentOffset;
-    unsigned short EnvironmentCount;
     unsigned int NtEnvironmentOffset;
-    unsigned short NtEnvironmentCount;
     unsigned int NtPathOffset;
     unsigned int ShellOptions;
     unsigned int UsernameOffset;
     unsigned int DefaultUid;
     int Flags;
-    char Buffer[];
-} LX_INIT_CREATE_PROCESS_COMMON, *PLX_INIT_CREATE_PROCESS_COMMON;
+    int64_t IpcServerId;
+    int64_t StdFdIds[LX_INIT_STD_FD_COUNT];
+    int64_t ForkTokenId;
+    char Buffer[1];
+};
+
+template <>
+struct LX_INIT_CREATE_PROCESS_BASE<LxInitMessageCreateProcessUtilityVm>
+{
+    MESSAGE_HEADER Header;
+    unsigned int FilenameOffset;
+    unsigned int CurrentWorkingDirectoryOffset;
+    unsigned int CommandLineOffset;
+    unsigned int EnvironmentOffset;
+    unsigned int NtEnvironmentOffset;
+    unsigned int NtPathOffset;
+    unsigned int ShellOptions;
+    unsigned int UsernameOffset;
+    unsigned int DefaultUid;
+    int Flags;
+    unsigned short Rows;
+    unsigned short Columns;
+    char Buffer[1];
+};
 
 typedef struct _LX_INIT_CREATE_PROCESS_RESPONSE
 {
@@ -703,23 +728,23 @@ typedef struct _LX_INIT_CREATE_PROCESS_RESPONSE
     PRETTY_PRINT(FIELD(Header), FIELD(Result), FIELD(SignalPipeId), FIELD(Flags));
 } LX_INIT_CREATE_PROCESS_RESPONSE, *PLX_INIT_CREATE_PROCESS_RESPONSE;
 
-typedef struct _LX_INIT_CREATE_PROCESS
+struct LX_INIT_CREATE_PROCESS : LX_INIT_CREATE_PROCESS_BASE<LxInitMessageCreateProcess>
 {
+    using Base = LX_INIT_CREATE_PROCESS_BASE<LxInitMessageCreateProcess>;
     static inline auto Type = LxInitMessageCreateProcess;
     using TResponse = _LX_INIT_CREATE_PROCESS_RESPONSE;
-
-    MESSAGE_HEADER Header;
-    int64_t IpcServerId;
-    int64_t StdFdIds[LX_INIT_STD_FD_COUNT];
-    int64_t ForkTokenId;
-    LX_INIT_CREATE_PROCESS_COMMON Common;
+    using Base::ForkTokenId;
+    using Base::Header;
+    using Base::IpcServerId;
+    using Base::StdFdIds;
 
     PRETTY_PRINT(FIELD(Header), FIELD(IpcServerId), FIELD(StdFdIds), FIELD(ForkTokenId));
-} LX_INIT_CREATE_PROCESS, *PLX_INIT_CREATE_PROCESS;
+};
+
+using PLX_INIT_CREATE_PROCESS = LX_INIT_CREATE_PROCESS*;
 
 typedef struct _LX_INIT_CREATE_NT_PROCESS_COMMON
 {
-    int64_t StdFdIds[LX_INIT_STD_FD_COUNT];
     unsigned int FilenameOffset;
     unsigned int CurrentWorkingDirectoryOffset;
     unsigned int CommandLineOffset;
@@ -729,9 +754,6 @@ typedef struct _LX_INIT_CREATE_NT_PROCESS_COMMON
     unsigned short Columns;
     bool CreatePseudoconsole;
     char Buffer[];
-
-    // Not pretty-printing command line and env since it could contain PII.
-    PRETTY_PRINT(FIELD(StdFdIds), STRING_FIELD(FilenameOffset), STRING_FIELD(CurrentWorkingDirectoryOffset), FIELD(Rows), FIELD(Columns), FIELD(CreatePseudoconsole));
 } LX_INIT_CREATE_NT_PROCESS_COMMON, *PLX_INIT_CREATE_NT_PROCESS_COMMON;
 
 using PCLX_INIT_CREATE_NT_PROCESS_COMMON = const LX_INIT_CREATE_NT_PROCESS_COMMON*;
@@ -744,7 +766,15 @@ typedef struct _LX_INIT_CREATE_NT_PROCESS
     int64_t StdFdIds[LX_INIT_STD_FD_COUNT];
     LX_INIT_CREATE_NT_PROCESS_COMMON Common;
 
-    PRETTY_PRINT(FIELD(Header), FIELD(StdFdIds), FIELD(Common));
+    // Not pretty-printing command line and env since it could contain PII.
+    PRETTY_PRINT(
+        FIELD(Header),
+        FIELD(StdFdIds),
+        STRING_FIELD(Common.FilenameOffset),
+        STRING_FIELD(Common.CurrentWorkingDirectoryOffset),
+        FIELD(Common.Rows),
+        FIELD(Common.Columns),
+        FIELD(Common.CreatePseudoconsole));
 
 } LX_INIT_CREATE_NT_PROCESS, *PLX_INIT_CREATE_NT_PROCESS;
 
@@ -758,7 +788,16 @@ typedef struct _LX_INIT_CREATE_NT_PROCESS_UTILITY_VM
     unsigned int Port;
     LX_INIT_CREATE_NT_PROCESS_COMMON Common;
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Port), FIELD(Common));
+    // Not pretty-printing command line and env since it could contain PII.
+    PRETTY_PRINT(
+        FIELD(Header),
+        FIELD(Port),
+        STRING_FIELD(Common.FilenameOffset),
+        STRING_FIELD(Common.CurrentWorkingDirectoryOffset),
+        FIELD(Common.Rows),
+        FIELD(Common.Columns),
+        FIELD(Common.CreatePseudoconsole));
+
 } LX_INIT_CREATE_NT_PROCESS_UTILITY_VM, *PLX_INIT_CREATE_NT_PROCESS_UTILITY_VM;
 
 using PCLX_INIT_CREATE_NT_PROCESS_UTILITY_VM = const LX_INIT_CREATE_NT_PROCESS_UTILITY_VM*;
@@ -1065,19 +1104,19 @@ typedef enum _LX_INIT_CREATE_PROCESS_FLAGS
 } LX_INIT_CREATE_PROCESS_FLAGS,
     *PLX_INIT_CREATE_PROCESS_FLAGS;
 
-typedef struct _LX_INIT_CREATE_PROCESS_UTILITY_VM
+struct LX_INIT_CREATE_PROCESS_UTILITY_VM : LX_INIT_CREATE_PROCESS_BASE<LxInitMessageCreateProcessUtilityVm>
 {
+    using Base = LX_INIT_CREATE_PROCESS_BASE<LxInitMessageCreateProcessUtilityVm>;
     static inline auto Type = LxInitMessageCreateProcessUtilityVm;
     using TResponse = RESULT_MESSAGE<uint32_t>;
-
-    MESSAGE_HEADER Header;
-    unsigned short Rows;
-    unsigned short Columns;
-    LX_INIT_CREATE_PROCESS_COMMON Common;
+    using Base::Columns;
+    using Base::Header;
+    using Base::Rows;
 
     PRETTY_PRINT(FIELD(Header), FIELD(Rows), FIELD(Columns));
-} LX_INIT_CREATE_PROCESS_UTILITY_VM, *PLX_INIT_CREATE_PROCESS_UTILITY_VM;
+};
 
+using PLX_INIT_CREATE_PROCESS_UTILITY_VM = LX_INIT_CREATE_PROCESS_UTILITY_VM*;
 using PCLX_INIT_CREATE_PROCESS_UTILITY_VM = const LX_INIT_CREATE_PROCESS_UTILITY_VM*;
 
 //
@@ -1550,7 +1589,7 @@ struct CREATE_PROCESS_MESSAGE
     unsigned int CommandLineIndex;
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), STRING_FIELD(PathIndex), STRING_FIELD(CommandLineIndex));
+    PRETTY_PRINT(FIELD(Header), STRING_FIELD(PathIndex), STRING_ARRAY_FIELD(CommandLineIndex));
 };
 
 struct EJECT_VHD_MESSAGE

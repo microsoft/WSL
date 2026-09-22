@@ -1587,7 +1587,12 @@ Return Value:
     return Result;
 }
 
-EnvironmentBlock ConfigCreateEnvironmentBlock(const PLX_INIT_CREATE_PROCESS_COMMON Common, const wsl::linux::WslDistributionConfig& Config)
+EnvironmentBlock ConfigCreateEnvironmentBlock(
+    gsl::span<gsl::byte> Buffer,
+    unsigned int EnvironmentOffset,
+    unsigned int NtEnvironmentOffset,
+    unsigned int NtPathOffset,
+    const wsl::linux::WslDistributionConfig& Config)
 
 /*++
 
@@ -1598,7 +1603,19 @@ Routine Description:
 
 Arguments:
 
-    Common - Supplies a pointer to the common create process message data.
+    Buffer - Supplies the create process message buffer containing the
+        variable-length environment data.
+
+    EnvironmentOffset - Supplies the offset in Buffer to the Linux environment
+        string array.
+
+    NtEnvironmentOffset - Supplies the offset in Buffer to the Windows
+        environment string array.
+
+    NtPathOffset - Supplies the offset in Buffer to the null-terminated Windows
+        PATH string.
+
+    Config - Supplies the distribution configuration.
 
 Return Value:
 
@@ -1611,8 +1628,7 @@ Return Value:
     // Initialize the environment block.
     //
 
-    auto Buffer = (char*)Common + Common->EnvironmentOffset;
-    EnvironmentBlock Environment(Buffer, Common->EnvironmentCount);
+    EnvironmentBlock Environment(wsl::shared::string::ArrayFromSpan(Buffer, EnvironmentOffset));
 
     //
     // Add environment variables to support GUI applications.
@@ -1635,25 +1651,32 @@ Return Value:
     // N.B. Failure to parse WSLENV is non-fatal.
     //
 
-    Buffer = (char*)Common + Common->NtEnvironmentOffset;
-    auto NtEnvironment = UtilParseWslEnv(Buffer);
+    std::vector<char> NtEnvironmentBlock;
+    for (const auto& Variable : wsl::shared::string::ArrayFromSpan(Buffer, NtEnvironmentOffset))
+    {
+        NtEnvironmentBlock.insert(NtEnvironmentBlock.end(), Variable.begin(), Variable.end());
+        NtEnvironmentBlock.push_back('\0');
+    }
+
+    NtEnvironmentBlock.push_back('\0');
+    auto NtEnvironment = UtilParseWslEnv(NtEnvironmentBlock.data());
     if (!NtEnvironment.empty())
     {
         for (size_t Index = 0;;)
         {
-            Buffer = NtEnvironment.data() + Index;
-            auto Length = strnlen(Buffer, NtEnvironment.size() - Index);
+            auto* Variable = NtEnvironment.data() + Index;
+            auto Length = strnlen(Variable, NtEnvironment.size() - Index);
             if (Length == 0)
             {
                 break;
             }
 
-            auto Value = strchr(Buffer, '=');
+            auto Value = strchr(Variable, '=');
             if (Value != NULL)
             {
                 *Value = '\0';
                 Value += 1;
-                Environment.AddVariable(Buffer, Value);
+                Environment.AddVariable(Variable, Value);
             }
 
             Index += Length + 1;
@@ -1681,10 +1704,10 @@ Return Value:
     // N.B. Failure to append the NT path is non-fatal.
     //
 
-    Buffer = reinterpret_cast<char*>(Common) + Common->NtPathOffset;
-    if ((Config.InteropAppendWindowsPath) && (*Buffer != '\0'))
+    std::string NtPath{wsl::shared::string::FromSpan(Buffer, NtPathOffset)};
+    if (Config.InteropAppendWindowsPath && !NtPath.empty())
     {
-        ConfigAppendNtPath(Environment, Buffer);
+        ConfigAppendNtPath(Environment, NtPath.data());
     }
 
     return Environment;
