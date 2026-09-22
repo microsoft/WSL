@@ -60,6 +60,8 @@ set(HEADERS
 add_library(virtualmachinebackend STATIC
     VirtualMachineBackend.cpp
     IVirtualMachineBackend.h
+    HcsVirtualMachineBackend.cpp
+    HcsVirtualMachineBackend.h
     OpenVmmVirtualMachineBackend.cpp
     OpenVmmVirtualMachineBackend.h)
 target_include_directories(virtualmachinebackend PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

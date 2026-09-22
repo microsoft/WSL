@@ -120,9 +120,7 @@ VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmC
     THROW_HR_IF_MSG(c_notSupported, wsl::shared::Arm64, "OpenVMM direct boot is currently supported only on x64");
     validation::ValidatePath(Request.Boot.KernelPath, L"OpenVMM Kernel Path");
     validation::ValidatePath(Request.Boot.InitrdPath, L"OpenVMM Initrd Path");
-    THROW_HR_IF(
-        E_INVALIDARG,
-        Request.Boot.KernelCommandLine.find(L'\0') != std::wstring::npos);
+    THROW_HR_IF(E_INVALIDARG, Request.Boot.KernelCommandLine.find(L'\0') != std::wstring::npos);
     THROW_HR_IF(
         E_INVALIDARG,
         Request.Boot.Method != VmBootMethod::Automatic && Request.Boot.Method != VmBootMethod::LinuxDirect &&
@@ -455,6 +453,7 @@ void CALLBACK OpenVmmVirtualMachineBackend::OnProcessExit(PTP_CALLBACK_INSTANCE,
         TraceLoggingHResult(exitCodeResult, "exitCodeResult"));
     LOG_IF_WIN32_BOOL_FALSE(SetEvent(backend.m_exitEvent.get()));
     LOG_IF_WIN32_BOOL_FALSE(SetEvent(backend.m_operationCancellationEvent.get()));
+    backend.NotifyTerminated(backend.m_description.Identity);
     auto lock = backend.m_lock.lock_exclusive();
     backend.CloseGuestListenersLocked(backend.m_description.Identity);
 }

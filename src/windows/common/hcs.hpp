@@ -17,6 +17,9 @@ Abstract:
 #include "hns_schema.h"
 #include <ComputeNetwork.h>
 #include <ComputeCore.h>
+#include <cstdint>
+#include <filesystem>
+#include <string_view>
 
 namespace wsl::windows::common::hcs {
 
@@ -79,11 +82,18 @@ void StartComputeSystem(_In_ HCS_SYSTEM ComputeSystem, _In_ LPCWSTR Configuratio
 
 void TerminateComputeSystem(_In_ HCS_SYSTEM ComputeSystem);
 
+std::filesystem::path WriteVmCrashLog(
+    const std::filesystem::path& Folder, std::uint32_t MaxFileCount, const GUID& VmId, HANDLE UserToken, std::wstring_view CrashLog);
+
 unique_hcn_service_callback RegisterServiceCallback(_In_ HCS_NOTIFICATION_CALLBACK Callback, _In_ PVOID Context);
 
 unique_hcn_guest_network_service_callback RegisterGuestNetworkServiceCallback(
     _In_ const unique_hcn_guest_network_service& GuestNetworkService, _In_ HCS_NOTIFICATION_CALLBACK Callback, _In_ PVOID Context);
 
 bool IsDisableVgpuSettingsSupported();
+
+bool IsNestedVirtualizationSupported();
+
+std::pair<bool, bool> GetPerfmonCapabilities();
 
 } // namespace wsl::windows::common::hcs

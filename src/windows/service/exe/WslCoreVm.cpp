@@ -1582,16 +1582,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
     {
         try
         {
-            if (wsl::windows::common::helpers::IsWindows11OrAbove())
-            {
-                const auto& processorFeatures = wsl::windows::common::hcs::GetProcessorFeatures();
-                auto feature = std::find(processorFeatures.begin(), processorFeatures.end(), "NestedVirt");
-                m_vmConfig.EnableNestedVirtualization = (feature != processorFeatures.end());
-            }
-            else
-            {
-                m_vmConfig.EnableNestedVirtualization = false;
-            }
+            m_vmConfig.EnableNestedVirtualization = wsl::windows::common::hcs::IsNestedVirtualizationSupported();
 
             vmSettings.ComputeTopology.Processor.ExposeVirtualizationExtensions = m_vmConfig.EnableNestedVirtualization;
             if (!m_vmConfig.EnableNestedVirtualization)
@@ -1602,18 +1593,13 @@ std::wstring WslCoreVm::GenerateConfigJson()
         CATCH_LOG()
     }
 
-#ifdef _AMD64_
-
     // Enable hardware performance counters if they are supported.
     if (m_vmConfig.EnableHardwarePerformanceCounters)
     {
-        HV_X64_HYPERVISOR_HARDWARE_FEATURES hardwareFeatures{};
-        __cpuid(reinterpret_cast<int*>(&hardwareFeatures), HvCpuIdFunctionMsHvHardwareFeatures);
-        vmSettings.ComputeTopology.Processor.EnablePerfmonPmu = hardwareFeatures.ChildPerfmonPmuSupported != 0;
-        vmSettings.ComputeTopology.Processor.EnablePerfmonLbr = hardwareFeatures.ChildPerfmonLbrSupported != 0;
+        const auto [perfmonPmuSupported, perfmonLbrSupported] = wsl::windows::common::hcs::GetPerfmonCapabilities();
+        vmSettings.ComputeTopology.Processor.EnablePerfmonPmu = perfmonPmuSupported;
+        vmSettings.ComputeTopology.Processor.EnablePerfmonLbr = perfmonLbrSupported;
     }
-
-#endif
 
     // Initialize kernel command line.
     std::wstring kernelCmdLine = L"initrd=\\" LXSS_VM_MODE_INITRD_NAME L" " TEXT(WSL_ROOT_INIT_ENV) L"=1 panic=-1";
@@ -2321,33 +2307,12 @@ void WslCoreVm::OnCrash(_In_ LPCWSTR Details)
 
     if (m_vmConfig.MaxCrashDumpCount >= 0)
     {
-        constexpr auto c_extension = L".txt";
-        constexpr auto c_prefix = L"kernel-panic-";
-        const auto filename = std::format(L"{}{}-{}{}", c_prefix, std::time(nullptr), m_runtimeId, c_extension);
-        auto tracePath = m_vmConfig.CrashDumpFolder / filename;
-
-        auto runAsUser = wil::impersonate_token(m_userToken.get());
-
-        std::error_code error;
-        std::filesystem::create_directories(m_vmConfig.CrashDumpFolder, error);
-        if (error.value())
-        {
-            THROW_WIN32_MSG(error.value(), "Failed to create folder: %ls", m_vmConfig.CrashDumpFolder.c_str());
-        }
-
-        auto pred = [&c_extension, &c_prefix](const auto& e) {
-            return WI_IsFlagSet(GetFileAttributes(e.path().c_str()), FILE_ATTRIBUTE_TEMPORARY) && e.path().has_extension() &&
-                   e.path().extension() == c_extension && e.path().has_filename() && e.path().filename().wstring().find(c_prefix) == 0;
-        };
-
-        wsl::windows::common::wslutil::EnforceFileLimit(m_vmConfig.CrashDumpFolder.c_str(), m_vmConfig.MaxCrashDumpCount, pred);
-
-        {
-            std::wofstream outputFile(tracePath.wstring());
-            THROW_HR_IF(E_UNEXPECTED, !outputFile || !(outputFile << crashInformation.CrashLog));
-        }
-
-        m_vmCrashLogFile = std::move(tracePath);
+        m_vmCrashLogFile = wsl::windows::common::hcs::WriteVmCrashLog(
+            m_vmConfig.CrashDumpFolder,
+            gsl::narrow_cast<std::uint32_t>(m_vmConfig.MaxCrashDumpCount),
+            m_runtimeId,
+            m_userToken.get(),
+            crashInformation.CrashLog);
     }
 
     m_vmCrashEvent.SetEvent();

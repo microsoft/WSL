@@ -24,16 +24,17 @@ constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
 
 }
 
-
-void wsl::windows::common::vm::validation::ValidateFeature(VmFeatureRequest Request, PCWSTR Setting)
+bool wsl::windows::common::vm::validation::ValidateFeature(VmFeatureRequest Request, PCWSTR Setting, bool Supported)
 {
     switch (Request)
     {
     case VmFeatureRequest::Disabled:
+        return false;
     case VmFeatureRequest::Preferred:
-        return;
+        return Supported;
     case VmFeatureRequest::Required:
-        THROW_HR_MSG(c_notSupported, "OpenVMM does not support the required %ls setting", Setting);
+        THROW_HR_IF_MSG(c_notSupported, !Supported, "The backend does not support the required %ls setting", Setting);
+        return true;
     }
 
     THROW_HR(E_INVALIDARG);
@@ -79,8 +80,7 @@ const VmVirtualDiskSource& wsl::windows::common::vm::validation::ValidateDiskReq
     return *source;
 }
 
-void wsl::windows::common::vm::validation::ValidateConsolePath(
-    const std::filesystem::path& Path, PCWSTR Backend, HRESULT Error, bool RequireName)
+void wsl::windows::common::vm::validation::ValidateConsolePath(const std::filesystem::path& Path, PCWSTR Backend, HRESULT Error, bool RequireName)
 {
     ValidatePath(Path, Backend);
     THROW_HR_IF_MSG(
@@ -99,6 +99,62 @@ void wsl::windows::common::vm::validation::ValidateName(std::wstring_view Name, 
 void wsl::windows::common::vm::validation::ValidateResourceId(UINT64 Value, const GUID& VmId, const VmInstanceId& Owner)
 {
     THROW_HR_IF(E_INVALIDARG, Value == 0 || !IsEqualGUID(VmId, Owner.VmId));
+}
+
+void IVirtualMachineBackend::RegisterTerminationCallback(TerminationCallback Callback)
+{
+    if (!Callback)
+    {
+        return;
+    }
+
+    WSL_LOG("VirtualMachineBackendRegisterTerminationCallback");
+    GUID vmId{};
+    {
+        auto lock = m_terminationCallbackLock.lock_exclusive();
+        THROW_HR_IF(E_INVALIDARG, m_terminationCallback);
+        if (!m_terminated)
+        {
+            m_terminationCallback = std::move(Callback);
+            return;
+        }
+
+        vmId = m_terminatedVmId;
+    }
+
+    std::thread([callback = std::move(Callback), vmId]() {
+        try
+        {
+            wsl::windows::common::wslutil::SetThreadDescription(L"VmTerminationCallback");
+            callback(vmId);
+        }
+        CATCH_LOG();
+    }).detach();
+}
+
+void IVirtualMachineBackend::NotifyTerminated(const VmInstanceId& Identity) noexcept
+{
+    TerminationCallback callback;
+    {
+        auto lock = m_terminationCallbackLock.lock_exclusive();
+        if (m_terminated)
+        {
+            return;
+        }
+
+        m_terminated = true;
+        m_terminatedVmId = Identity.VmId;
+        callback = std::move(m_terminationCallback);
+    }
+
+    if (callback)
+    {
+        try
+        {
+            callback(Identity.VmId);
+        }
+        CATCH_LOG();
+    }
 }
 
 VmGuestListener IVirtualMachineBackend::RegisterGuestListenerLocked(const VmInstanceId& Identity, GuestServicePort Port)
@@ -149,9 +205,7 @@ wil::unique_socket IVirtualMachineBackend::AcceptGuestListenerConnection(VmListe
 std::shared_ptr<VmGuestListenerState> IVirtualMachineBackend::RemoveGuestListenerLocked(VmListenerId Listener, const VmInstanceId& Identity)
 {
     WSL_LOG(
-        "OpenVmmCloseGuestListener",
-        TraceLoggingValue(Identity.VmId, "vmId"),
-        TraceLoggingValue(Listener.Value, "listenerId"));
+        "OpenVmmCloseGuestListener", TraceLoggingValue(Identity.VmId, "vmId"), TraceLoggingValue(Listener.Value, "listenerId"));
     THROW_HR_IF(E_INVALIDARG, Listener.Value == 0 || !IsEqualGUID(Listener.Owner.VmId, Identity.VmId));
     const auto entry = m_guestListeners.find(Listener.Value);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), entry == m_guestListeners.end());
