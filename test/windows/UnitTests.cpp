@@ -32,6 +32,7 @@ Abstract:
 #include <nlohmann/json.hpp>
 #include "Distribution.h"
 #include "WslCoreConfigInterface.h"
+#include "WslCoreFilesystem.h"
 #include "CommandLine.h"
 #include "retryshared.h"
 
@@ -1992,22 +1993,8 @@ Usage:
         // Create a 100MB swap vhdx.
         auto swapVhd = wil::GetCurrentDirectoryW<std::wstring>() + L"\\TestSwap.vhdx";
 
-        VIRTUAL_STORAGE_TYPE storageType{};
-        storageType.DeviceId = VIRTUAL_STORAGE_TYPE_DEVICE_VHDX;
-        storageType.VendorId = VIRTUAL_STORAGE_TYPE_VENDOR_MICROSOFT;
-
-        CREATE_VIRTUAL_DISK_PARAMETERS createVhdParameters{};
-        createVhdParameters.Version = CREATE_VIRTUAL_DISK_VERSION_2;
-        createVhdParameters.Version2.BlockSizeInBytes = 1024 * 1024;
-        createVhdParameters.Version2.MaximumSize = 100 * 1024 * 1024;
-
-        wil::unique_hfile vhd{};
-        VERIFY_ARE_EQUAL(
-            ::CreateVirtualDisk(
-                &storageType, swapVhd.c_str(), VIRTUAL_DISK_ACCESS_NONE, nullptr, CREATE_VIRTUAL_DISK_FLAG_SUPPORT_COMPRESSED_VOLUMES, 0, &createVhdParameters, nullptr, &vhd),
-            0l);
-
-        vhd.reset();
+        const auto tokenUser = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
+        wsl::core::filesystem::CreateVhd(swapVhd.c_str(), 100 * _1MB, tokenUser->User.Sid, false, false);
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
             WslShutdown();
@@ -2034,6 +2021,24 @@ Usage:
         // Validate that the vhdx is resized correctly if the swap size changes
         configChange.Update(LxssGenerateTestConfig() + L"\nswap=200MB\nswapFile=" + swapVhd);
         validateSwapSize(L"200M");
+
+        WslShutdown();
+        PACL dacl{};
+        wil::unique_hlocal descriptor;
+        THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
+            swapVhd.c_str(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, &dacl, nullptr, &descriptor));
+        VERIFY_IS_NOT_NULL(dacl);
+        for (DWORD index = 0; index < dacl->AceCount; ++index)
+        {
+            void* ace{};
+            THROW_IF_WIN32_BOOL_FALSE(GetAce(dacl, index, &ace));
+            auto* allowed = static_cast<ACCESS_ALLOWED_ACE*>(ace);
+            VERIFY_ARE_EQUAL(ACCESS_ALLOWED_ACE_TYPE, allowed->Header.AceType);
+
+            wil::unique_hlocal_string sid;
+            THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSidW(&allowed->SidStart, &sid));
+            VERIFY_IS_FALSE(std::wstring_view(sid.get()).starts_with(L"S-1-5-83-1-"));
+        }
     }
 
     TEST_METHOD(InitDoesntBlockSignals)
@@ -3208,6 +3213,41 @@ Usage:
             // Validate that the distribution still starts and that the vhd hasn't moved.
             validateDistro();
             VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\ext4.vhdx", absolutePath)));
+        }
+    }
+
+    TEST_METHOD(CreateVhdPermissions)
+    {
+        const auto path = std::filesystem::path(L"wsl-test-vhd-permissions-{}.vhdx");
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove(path); });
+
+        const auto tokenUser = wil::get_token_information<TOKEN_USER>();
+        for (const auto fixed : {false, true})
+        {
+            wsl::core::filesystem::CreateVhd(path.c_str(), 16 * _1MB, tokenUser->User.Sid, false, fixed);
+
+            PSID owner{};
+            PACL dacl{};
+            wil::unique_hlocal descriptor;
+            THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
+                path.c_str(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION, &owner, nullptr, &dacl, nullptr, &descriptor));
+
+            VERIFY_IS_TRUE(EqualSid(owner, tokenUser->User.Sid));
+            VERIFY_IS_NOT_NULL(dacl);
+            VERIFY_ARE_EQUAL(1, dacl->AceCount);
+
+            SECURITY_DESCRIPTOR_CONTROL control{};
+            DWORD revision{};
+            THROW_IF_WIN32_BOOL_FALSE(GetSecurityDescriptorControl(descriptor.get(), &control, &revision));
+            VERIFY_IS_TRUE(WI_IsFlagSet(control, SE_DACL_PROTECTED));
+
+            void* ace{};
+            THROW_IF_WIN32_BOOL_FALSE(GetAce(dacl, 0, &ace));
+            auto* allowed = static_cast<ACCESS_ALLOWED_ACE*>(ace);
+            VERIFY_ARE_EQUAL(ACCESS_ALLOWED_ACE_TYPE, allowed->Header.AceType);
+            VERIFY_ARE_EQUAL(0, allowed->Header.AceFlags);
+            VERIFY_ARE_EQUAL(FILE_GENERIC_READ | FILE_GENERIC_WRITE | DELETE, allowed->Mask);
+            VERIFY_IS_TRUE(EqualSid(&allowed->SidStart, tokenUser->User.Sid));
         }
     }
 

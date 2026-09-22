@@ -74,8 +74,15 @@ RequiredExtraMmioSpaceForPmemFileInMb(_In_ PCWSTR FilePath)
     return std::max(fileSizeBytes.QuadPart / static_cast<INT64>(_1MB), 1i64);
 }
 
-wil::unique_hfile OpenVhdBackingFile(_In_ PCWSTR Path)
+wil::unique_hfile OpenVhdBackingFile(_In_ PCWSTR Path, _In_opt_ HANDLE UserToken)
 {
+    // User-owned VHDs may not grant the service identity access.
+    wil::unique_token_reverter runAsUser;
+    if (UserToken != nullptr)
+    {
+        runAsUser = wil::impersonate_token(UserToken);
+    }
+
     wil::unique_hfile file{CreateFileW(
         Path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
     THROW_LAST_ERROR_IF(!file);
@@ -836,7 +843,8 @@ WslCoreVm::~WslCoreVm() noexcept
         {
             try
             {
-                wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), Entry.first.Path.c_str());
+                wsl::windows::common::hcs::RevokeVmAccess(
+                    m_machineId.c_str(), Entry.first.Path.c_str(), Entry.first.Type == DiskType::VHD ? m_userToken.get() : nullptr);
             }
             CATCH_LOG()
         }
@@ -1020,7 +1028,7 @@ ULONG WslCoreVm::AttachDiskLockHeld(
         FreeLun(Lun.value());
         if (WI_IsFlagSet(diskFlags, DiskStateFlags::AccessGranted))
         {
-            wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), Disk);
+            wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), Disk, Type == DiskType::VHD ? UserToken : nullptr);
         }
 
         if (WI_IsFlagSet(diskFlags, DiskStateFlags::Online))
@@ -1083,14 +1091,14 @@ ULONG WslCoreVm::AttachDiskLockHeld(
                 wsl::windows::common::hcs::RemoveScsiDisk(m_system.get(), staleLun);
                 if (WI_IsFlagSet(found->second.Flags, DiskStateFlags::AccessGranted))
                 {
-                    wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), found->first.Path.c_str());
+                    wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), found->first.Path.c_str(), UserToken);
                 }
 
                 m_attachedDisks.erase(found);
                 FreeLun(staleLun);
             }
 
-            backingFile = OpenVhdBackingFile(Disk);
+            backingFile = OpenVhdBackingFile(Disk, UserToken);
 
             auto grantDiskAccess = [&]() {
                 auto runAsUser = wil::impersonate_token(UserToken);
@@ -1382,7 +1390,8 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::DetachDisk(_In_opt_ PCWSTR Disk)
             wsl::windows::common::hcs::RemoveScsiDisk(m_system.get(), it->second.Lun);
             if (WI_VERIFY(WI_IsFlagSet(it->second.Flags, DiskStateFlags::AccessGranted)))
             {
-                wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), it->first.Path.c_str());
+                wsl::windows::common::hcs::RevokeVmAccess(
+                    m_machineId.c_str(), it->first.Path.c_str(), it->first.Type == DiskType::VHD ? m_userToken.get() : nullptr);
             }
 
             FreeLun(it->second.Lun);
@@ -1432,7 +1441,7 @@ void WslCoreVm::EjectVhdLockHeld(_In_ PCWSTR VhdPath)
             wsl::windows::common::hcs::RemoveScsiDisk(m_system.get(), search->second.Lun);
             if (WI_IsFlagSet(search->second.Flags, DiskStateFlags::AccessGranted))
             {
-                wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), VhdPath);
+                wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), VhdPath, m_userToken.get());
             }
         }
 
@@ -1786,7 +1795,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
     // inherited ACLs; otherwise StartComputeSystem will surface E_ACCESSDENIED.
     auto attachDisk = [&](PCWSTR path, bool grantVmAccess) {
         auto lun = ReserveLun();
-        auto backingFile = OpenVhdBackingFile(path);
+        auto backingFile = OpenVhdBackingFile(path, grantVmAccess ? m_userToken.get() : nullptr);
         hcs::Attachment disk{};
         disk.Type = hcs::AttachmentType::VirtualDisk;
         disk.Path = path;

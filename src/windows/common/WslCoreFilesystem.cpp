@@ -67,6 +67,19 @@ void wsl::core::filesystem::CreateVhd(_In_ LPCWSTR target, _In_ ULONGLONG maximu
     //      to the VHD because the operation is done while impersonating the user.
     auto sd = windows::common::security::CreateSecurityDescriptor(userSid);
 
+    EXPLICIT_ACCESS access{};
+    access.grfAccessMode = SET_ACCESS;
+    access.grfAccessPermissions = FILE_GENERIC_READ | FILE_GENERIC_WRITE | DELETE;
+    access.grfInheritance = NO_INHERITANCE;
+    BuildTrusteeWithSid(&access.Trustee, userSid);
+
+    windows::common::security::unique_acl acl;
+    THROW_IF_WIN32_ERROR(SetEntriesInAcl(1, &access, nullptr, &acl));
+    THROW_IF_WIN32_BOOL_FALSE(SetSecurityDescriptorDacl(&sd, true, acl.get(), false));
+
+    // Do not inherit permissions that could grant other users access to the VHD.
+    THROW_IF_WIN32_BOOL_FALSE(SetSecurityDescriptorControl(&sd, SE_DACL_PROTECTED, SE_DACL_PROTECTED));
+
     wil::unique_hfile vhd{};
     auto result = HRESULT_FROM_WIN32(
         ::CreateVirtualDisk(&storageType, target, VIRTUAL_DISK_ACCESS_NONE, &sd, flags, 0, &createVhdParameters, nullptr, &vhd));
