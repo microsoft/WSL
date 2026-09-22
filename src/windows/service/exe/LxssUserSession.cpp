@@ -2529,6 +2529,14 @@ std::vector<LxssUserSessionImpl::PidTermination> LxssUserSessionImpl::_Conversio
     _EnsureNotLocked(&DistroGuid);
     _TerminateInstanceInternal(&DistroGuid);
 
+    auto pidTerminations = _GetPidTerminations(DistroGuid);
+    m_lockedDistributions.emplace_back(DistroGuid, State);
+    return pidTerminations;
+}
+
+_Requires_lock_held_(m_instanceLock)
+std::vector<LxssUserSessionImpl::PidTermination> LxssUserSessionImpl::_GetPidTerminations(_In_ const GUID& DistroGuid) const
+{
     std::vector<PidTermination> pidTerminations;
     for (const auto& termination : m_pidTerminations)
     {
@@ -2538,7 +2546,6 @@ std::vector<LxssUserSessionImpl::PidTermination> LxssUserSessionImpl::_Conversio
         }
     }
 
-    m_lockedDistributions.emplace_back(DistroGuid, State);
     return pidTerminations;
 }
 
@@ -2642,7 +2649,7 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
 
     std::shared_ptr<LxssRunningInstance> instance;
     {
-        std::lock_guard lock(m_instanceLock);
+        std::unique_lock lock(m_instanceLock);
 
         // m_disableNewInstanceCreation is set when the session is being deleted.
         // In that code path, don't create a new session.
@@ -2650,9 +2657,40 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
 
         registration = DistributionRegistration::OpenOrDefault(lxssKey.get(), DistroGuid);
 
+        // Retain event ownership so neither PID nor event-handle reuse can match a previous wait.
+        std::vector<PidTermination> waitedTerminations;
+        while (true)
+        {
+            instance = _RunningInstance(&registration.Id());
+            if (instance)
+            {
+                break;
+            }
+
+            auto pidTerminations = _GetPidTerminations(registration.Id());
+            std::erase_if(pidTerminations, [&](const auto& termination) {
+                return std::any_of(waitedTerminations.begin(), waitedTerminations.end(), [&](const auto& waited) {
+                    return waited.Event.get() == termination.Event.get();
+                });
+            });
+
+            if (pidTerminations.empty())
+            {
+                break;
+            }
+
+            waitedTerminations.insert(waitedTerminations.end(), pidTerminations.begin(), pidTerminations.end());
+
+            lock.unlock();
+            THROW_IF_FAILED(_WaitForPidTerminations(pidTerminations));
+            lock.lock();
+
+            THROW_HR_IF(RPC_E_DISCONNECTED, m_disableNewInstanceCreation);
+            registration = DistributionRegistration::OpenOrDefault(lxssKey.get(), DistroGuid);
+        }
+
         // Check if an instance is already running for this distribution, if
         // not create one.
-        instance = _RunningInstance(&registration.Id());
         if (!instance)
         {
             THROW_HR_IF(E_NOT_SET, WI_IsFlagSet(Flags, LXSS_CREATE_INSTANCE_FLAGS_OPEN_EXISTING));
@@ -2997,6 +3035,9 @@ _Requires_exclusive_lock_held_(m_instanceLock)
 void LxssUserSessionImpl::_CreateVm()
 {
     ExecutionContext context(Context::CreateVm);
+
+    // An operation may resume after session shutdown while waiting for a distribution to exit.
+    THROW_HR_IF(RPC_E_DISCONNECTED, m_disableNewInstanceCreation);
 
     if (!m_utilityVm)
     {

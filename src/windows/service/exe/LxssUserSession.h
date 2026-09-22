@@ -558,6 +558,9 @@ private:
     _Requires_lock_held_(m_instanceLock)
     std::vector<PidTermination> _ConversionBegin(_In_ GUID DistroGuid, _In_ LxssDistributionState State);
 
+    _Requires_lock_held_(m_instanceLock)
+    std::vector<PidTermination> _GetPidTerminations(_In_ const GUID& DistroGuid) const;
+
     /// <summary>
     /// Removes a distro from the list of converting distros and checks if the
     /// Linux utility VM is idle.
