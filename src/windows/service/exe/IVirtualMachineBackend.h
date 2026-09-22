@@ -180,6 +180,13 @@ struct VmGuestListener
     GuestServicePort Port;
 };
 
+struct VmGuestListenerState
+{
+    VmGuestListener Listener;
+    wil::unique_socket Socket;
+    wil::unique_event CancellationEvent{wil::EventOptions::ManualReset};
+};
+
 struct VmProcessorRequest
 {
     std::uint32_t Count = 0;
@@ -518,8 +525,45 @@ public:
     virtual VmNetworkAttachment AddNetworkAdapter(const VmNetworkAdapterRequest& Request) = 0;
     virtual VmPortBinding BindPort(VmDeviceId Device, const VmPortBindingRequest& Request) = 0;
     virtual void UnbindPort(VmPortBindingId Binding) = 0;
+
+
+protected:
+    // Protects all mutable backend state, including the base listener registry. Callers must
+    // release it before performing blocking I/O or waiting for a callback.
+    mutable wil::srwlock m_lock;
+
+    // These helpers require m_lock to be held exclusively. ConfigureGuestListener runs while
+    // m_lock is held and must not re-enter another listener helper.
+    VmGuestListener RegisterGuestListenerLocked(const VmInstanceId& Identity, GuestServicePort Port);
+    wil::unique_socket AcceptGuestListenerConnection(VmListenerId Listener, const VmInstanceId& Identity) const;
+    std::shared_ptr<VmGuestListenerState> RemoveGuestListenerLocked(VmListenerId Listener, const VmInstanceId& Identity);
+    void CloseGuestListenersLocked(const VmInstanceId& Identity) noexcept;
+
+private:
+    virtual std::shared_ptr<VmGuestListenerState> ConfigureGuestListener(const VmGuestListener& Listener);
+
+    _Guarded_by_(m_lock) std::map<std::uint64_t, std::shared_ptr<VmGuestListenerState>> m_guestListeners;
+    _Guarded_by_(m_lock) std::uint64_t m_nextListenerId = 1;
 };
 
 VmPlatformCapabilities QueryVirtualMachineBackendCapabilities(BackendKind Kind);
 
 std::unique_ptr<IVirtualMachineBackend> CreateVirtualMachineBackend(BackendKind Kind, const VmCreateRequest& Request);
+
+namespace wsl::windows::common::vm::validation {
+
+void ValidateFeature(VmFeatureRequest Request, PCWSTR Setting);
+void ValidateUnsupportedSelection(VmSelectionPolicy Policy);
+void ValidatePath(const std::filesystem::path& Path, PCWSTR Backend);
+const VmVirtualDiskSource& ValidateDiskRequest(const VmDiskRequest& Request, UINT32 MaximumDisks);
+void ValidateConsolePath(const std::filesystem::path& Path, PCWSTR Backend, HRESULT Error, bool RequireName);
+void ValidateName(std::wstring_view Name, PCWSTR Description);
+void ValidateResourceId(UINT64 Value, const GUID& VmId, const VmInstanceId& Owner);
+
+template <typename Tag>
+void ValidateResourceId(const VmResourceId<Tag>& Id, const VmInstanceId& Owner)
+{
+    ValidateResourceId(Id.Value, Id.Owner.VmId, Owner);
+}
+
+}
