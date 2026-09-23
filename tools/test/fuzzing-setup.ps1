@@ -1,5 +1,5 @@
 # OneFuzz VM setup for WSLC fuzzing.
-# Installs Hyper-V and WSL so the service is available for SDK harnesses.
+# Installs WSL and Virtual Machine Platform so the service is available for SDK harnesses.
 # RebootAfterSetup must be true in OneFuzzConfig.json for features to take effect.
 #
 # N.B. OneFuzz runs the setup script from a flat drop directory, so wsl.msi is staged
@@ -7,9 +7,6 @@
 
 Set-Location -Path $PSScriptRoot
 $ErrorActionPreference = "Stop"
-
-Write-Host "Enabling Hyper-V..."
-Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All -NoRestart
 
 Write-Host "Enabling WSL..."
 Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux -NoRestart
