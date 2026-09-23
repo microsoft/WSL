@@ -1742,6 +1742,20 @@ try
         THROW_HR(hr);
     }
 
+    if (SUCCEEDED(hr))
+    {
+        CLSID proxyStubClsid{};
+        hr = CoGetPSClsid(__uuidof(IWSLCCompatSession2), &proxyStubClsid);
+        if (hr == REGDB_E_IIDNOTREG)
+        {
+            WI_SetFlag(componentCheck, WSLC_COMPONENT_FLAG_WSL_PACKAGE);
+        }
+        else if (FAILED(hr))
+        {
+            THROW_HR(hr);
+        }
+    }
+
     *missingComponents = componentCheck;
 
     return S_OK;
