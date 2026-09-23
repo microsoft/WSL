@@ -69,7 +69,6 @@ struct ContainerService
 
     static bool IsCopyingToContainer(const std::wstring& source, const std::wstring& target);
     static std::pair<std::string, std::string> ParseContainerPath(const std::wstring& path);
-    static std::filesystem::path ResolveSymlinks(std::filesystem::path& path);
 
     static void CopyStdinToContainer(models::Session& session, const std::string& containerId, const std::string& destPath);
     static void CopyContainerPathToStdout(models::Session& session, const std::string& containerId, const std::string& srcPath, bool followLink);

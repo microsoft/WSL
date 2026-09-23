@@ -868,7 +868,9 @@ std::pair<std::string, std::string> ContainerService::ParseContainerPath(const s
 {
     auto colonPos = path.find(L':');
 
-    THROW_HR_IF(E_UNEXPECTED, colonPos == std::wstring::npos || (colonPos == 1 && std::isalpha(static_cast<unsigned char>(path[0]))));
+    THROW_HR_IF(
+        E_UNEXPECTED,
+        colonPos == std::wstring::npos || colonPos == 0 || (colonPos == 1 && std::isalpha(static_cast<unsigned char>(path[0]))));
 
     auto container = WideToMultiByte(path.substr(0, colonPos));
     auto containerPath = WideToMultiByte(path.substr(colonPos + 1));

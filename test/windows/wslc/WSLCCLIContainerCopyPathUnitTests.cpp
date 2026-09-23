@@ -141,6 +141,7 @@ class WSLCCLIContainerCopyPathUnitTests
         VerifyPathIsNotAContainerPath(L"c:/local/file.txt");
         VerifyPathIsNotAContainerPath(L"file.txt");
         VerifyPathIsNotAContainerPath(L"\\\\server\\share\\file.txt");
+        VerifyPathIsNotAContainerPath(L":/tmp/file.txt");
         VerifyPathIsNotAContainerPath(L"");
     }
 };
