@@ -22,6 +22,7 @@ Abstract:
 
 namespace {
 
+constexpr UINT64 c_mib = 1024 * 1024;
 constexpr UINT32 c_maximumDisks = 254;
 constexpr UINT32 c_rpcTimeoutMs = 30000;
 constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
@@ -79,7 +80,7 @@ VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmC
     description.Identity.VmId = Request.VmId;
     description.Backend = BackendKind::OpenVmm;
     description.Processor.Count = Request.Processor.Count;
-    description.Memory.SizeBytes = Request.Memory.SizeBytes;
+    description.Memory.SizeBytes = (Request.Memory.SizeBytes / c_mib) * c_mib;
     ValidateFeature(Request.Processor.NestedVirtualization, L"nested virtualization");
     ValidateFeature(Request.Processor.PerfmonPmu, L"PMU");
     ValidateFeature(Request.Processor.PerfmonLbr, L"LBR");
