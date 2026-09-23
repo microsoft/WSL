@@ -176,7 +176,7 @@ VolumeMount VolumeMount::Parse(const std::wstring& value)
     volume.m_host = std::move(mountSpec.Source);
     volume.m_containerPath = std::move(mountSpec.Target);
     volume.m_isReadOnlyMode = mountSpec.ReadOnly;
-    volume.m_isNamedVolume = mountSpec.MountType == mount::Type::Volume;
+    volume.m_isNamedVolume = mountSpec.MountType == WSLCMountTypeVolume;
     return volume;
 }
 
@@ -256,23 +256,6 @@ std::vector<std::wstring> EnvironmentVariable::ParseFile(const std::wstring& fil
     }
 
     return envVars;
-}
-
-void ValidateUniqueMountDestinations(const ContainerOptions& options)
-{
-    try
-    {
-        mount::ValidateMountCollection(options.Mounts);
-    }
-    catch (const mount::MountException& ex)
-    {
-        if (ex.Error() == mount::ValidationError::DuplicateDestination)
-        {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_DuplicateMountDestinationError(MultiByteToWide(ex.Destination())));
-        }
-
-        throw;
-    }
 }
 
 CidFile::CidFile(const std::optional<std::wstring>& path)

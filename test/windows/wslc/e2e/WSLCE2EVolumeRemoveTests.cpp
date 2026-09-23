@@ -127,7 +127,7 @@ class WSLCE2EVolumeRemoveTests
         result = RunWslc(std::format(L"volume remove {}", TestVolumeName));
         result.Verify(
             {.Stdout = L"",
-             .Stderr = std::format(L"Volume '{}' is in use.\r\nError code: ERROR_SHARING_VIOLATION\r\n", TestVolumeName),
+             .Stderr = FormatErrorMessage(std::format(L"Volume '{}' is in use.", TestVolumeName), L"ERROR_SHARING_VIOLATION"),
              .ExitCode = 1});
 
         VerifyVolumeIsListed(TestVolumeName);
@@ -182,7 +182,7 @@ class WSLCE2EVolumeRemoveTests
         result = RunWslc(std::format(L"volume remove --force {}", TestVolumeName));
         result.Verify(
             {.Stdout = L"",
-             .Stderr = std::format(L"Volume '{}' is in use.\r\nError code: ERROR_SHARING_VIOLATION\r\n", TestVolumeName),
+             .Stderr = FormatErrorMessage(std::format(L"Volume '{}' is in use.", TestVolumeName), L"ERROR_SHARING_VIOLATION"),
              .ExitCode = 1});
 
         VerifyVolumeIsListed(TestVolumeName);

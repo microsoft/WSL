@@ -70,6 +70,22 @@ class WSLCE2EInspectTests
         result.Verify({.Stdout = L"[]\r\n", .Stderr = std::format(L"Object not found: {}\r\n", InvalidImage.NameAndTag()), .ExitCode = 1});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Inspect_SizeIgnoredForNonContainerTypes)
+    {
+        // --size on an object with no file sizes warns and inspects the object anyway.
+        auto result = RunWslc(std::format(L"inspect --size {}", DebianImage.NameAndTag()));
+        result.Verify({.ExitCode = 0});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"WARNING: --size ignored for image"));
+
+        auto document = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(result.Stdout.value()));
+        VERIFY_ARE_EQUAL(1u, document.size());
+        VERIFY_IS_FALSE(document[0].contains("SizeRw"));
+
+        // A plain inspect of the same image emits no warning.
+        auto plain = RunWslc(std::format(L"inspect {}", DebianImage.NameAndTag()));
+        plain.Verify({.Stderr = L"", .ExitCode = 0});
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Inspect_Image_Success)
     {
         auto result = RunWslc(std::format(L"inspect {}", DebianImage.NameAndTag()));
@@ -154,7 +170,7 @@ class WSLCE2EInspectTests
         auto inspectData =
             wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
         VERIFY_ARE_EQUAL(1u, inspectData.size());
-        VERIFY_ARE_EQUAL(WslcContainerName, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
+        VERIFY_ARE_EQUAL(std::format(L"/{}", WslcContainerName), wsl::shared::string::MultiByteToWide(inspectData[0].Name));
 
         // Config.Labels must be present in the emitted JSON even when empty.
         auto json = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(result.Stdout.value()));
@@ -237,7 +253,7 @@ class WSLCE2EInspectTests
             auto inspectData =
                 wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
             VERIFY_ARE_EQUAL(1u, inspectData.size());
-            VERIFY_ARE_EQUAL(DebianImage.Name, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
+            VERIFY_ARE_EQUAL(std::format(L"/{}", DebianImage.Name), wsl::shared::string::MultiByteToWide(inspectData[0].Name));
         }
 
         // With --type container
@@ -247,7 +263,7 @@ class WSLCE2EInspectTests
             auto inspectData =
                 wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
             VERIFY_ARE_EQUAL(1u, inspectData.size());
-            VERIFY_ARE_EQUAL(DebianImage.Name, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
+            VERIFY_ARE_EQUAL(std::format(L"/{}", DebianImage.Name), wsl::shared::string::MultiByteToWide(inspectData[0].Name));
         }
 
         // With --type image

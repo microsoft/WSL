@@ -29,12 +29,13 @@ std::vector<Argument> ContainerListCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::All),
-        Argument::Create(ArgType::Filter, false, Limit::Unlimited),
+        Argument::Create(ArgType::Filter, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::Format),
         Argument::Create(ArgType::Last),
         Argument::Create(ArgType::Latest),
         Argument::Create(ArgType::NoTrunc),
         Argument::Create(ArgType::Quiet),
+        Argument::Create(ArgType::Size),
     };
 }
 

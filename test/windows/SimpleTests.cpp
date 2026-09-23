@@ -119,9 +119,11 @@ class SimpleTests
         // Setting a distro VHD to sparse requires the allow unsafe flag.
         ValidateOutput(
             std::format(L"{} {} {} {}", WSL_MANAGE_ARG, tempDistro, WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG, L"true").c_str(),
-            L"Sparse VHD support is currently disabled due to potential data corruption.\r\n"
-            L"To force a distribution to use a sparse VHD, please run:\r\n"
-            L"wsl.exe --manage <DistributionName> --set-sparse true --allow-unsafe\r\nError code: Wsl/Service/E_INVALIDARG\r\n",
+            FormatErrorMessage(
+                L"Sparse VHD support is currently disabled due to potential data corruption.\r\n"
+                L"To force a distribution to use a sparse VHD, please run:\r\n"
+                L"wsl.exe --manage <DistributionName> --set-sparse true --allow-unsafe",
+                L"Wsl/Service/E_INVALIDARG"),
             L"",
             -1);
 

@@ -61,7 +61,7 @@ class WSLCE2EImageSaveTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Save_ImageNotFound)
     {
         const auto result = RunWslc(std::format(L"image save --output \"{}\" {}", SavedArchivePath.wstring(), InvalidImage.NameAndTag()));
-        result.Verify({.Stdout = L"", .Stderr = L"reference does not exist\r\nError code: WSLC_E_IMAGE_NOT_FOUND\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .Stderr = FormatErrorMessage(L"reference does not exist", L"WSLC_E_IMAGE_NOT_FOUND"), .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Save_Success)
@@ -91,6 +91,30 @@ class WSLCE2EImageSaveTests
         // Run a container from the loaded image to verify it works
         auto runResult = RunWslc(std::format(L"container run --rm {} echo Hello from saved image!", DebianImage.NameAndTag()));
         runResult.Verify({.Stdout = L"Hello from saved image!\n", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Load_QuietFlag)
+    {
+        // Save source image.
+        auto saveResult = RunWslc(std::format(L"image save --output \"{}\" {}", SavedArchivePath.wstring(), DebianImage.NameAndTag()));
+        saveResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        TestImageRegistry::Instance().Delete(DebianImage);
+
+        // wslc surfaces no layer progress, so --quiet only suppresses a progress display; the
+        // "Loaded image:" line must still appear.
+        auto quietResult = RunWslc(std::format(L"image load --quiet --input \"{}\"", SavedArchivePath.wstring()));
+        quietResult.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(quietResult.StdoutContainsLine(std::format(L"Loaded image: {}", DebianImage.NameAndTag())));
+
+        // The loaded image is usable.
+        auto runResult = RunWslc(std::format(L"container run --rm {} echo Hello from quiet load!", DebianImage.NameAndTag()));
+        runResult.Verify({.Stdout = L"Hello from quiet load!\n", .Stderr = L"", .ExitCode = 0});
+
+        // The alias form produces the same output.
+        auto aliasResult = RunWslc(std::format(L"image load -q --input \"{}\"", SavedArchivePath.wstring()));
+        aliasResult.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_ARE_EQUAL(quietResult.Stdout.value(), aliasResult.Stdout.value());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Save_ToStdout_Success)

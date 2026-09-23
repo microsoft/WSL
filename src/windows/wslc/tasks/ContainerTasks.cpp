@@ -15,6 +15,7 @@ Abstract:
 #include "ArgumentConvertedTypes.h"
 #include "AsyncExecution.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "ContainerModel.h"
 #include "ContainerService.h"
 #include "ContainerTasks.h"
@@ -36,11 +37,75 @@ using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
-using wsl::windows::common::string::FormatBytes;
-using wsl::windows::common::string::FormatStorageSize;
+using wsl::windows::common::string::FormatHumanReadableSize;
 using wsl::windows::common::string::StorageSizeUnit;
 
 namespace {
+
+// Docker reports memory in binary units and network and block IO in decimal units.
+constexpr uint32_t c_statsMemoryPrecision = 4;
+constexpr uint32_t c_statsIoPrecision = 3;
+
+std::string FormatStatsMemory(uint64_t Bytes)
+{
+    return WideToMultiByte(FormatHumanReadableSize(Bytes, c_statsMemoryPrecision, StorageSizeUnit::Binary));
+}
+
+std::string FormatStatsIo(uint64_t Bytes)
+{
+    return WideToMultiByte(FormatHumanReadableSize(Bytes, c_statsIoPrecision));
+}
+
+void MoveOver(const std::filesystem::path& From, const std::filesystem::path& To)
+{
+    std::error_code error;
+    std::filesystem::rename(From, To, error);
+    if (!error)
+    {
+        return;
+    }
+
+    // An occupied destination is merged over, but a file and a directory cannot stand in for one another.
+    // std::filesystem::copy would place a file underneath a directory carrying the same name.
+    std::error_code statusError;
+    const auto fromStatus = std::filesystem::status(From, statusError);
+    const auto toStatus = std::filesystem::status(To, statusError);
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_FILE_EXISTS),
+        Localization::WSLCCLI_CpDestinationTypeMismatchError(To.wstring()),
+        std::filesystem::exists(toStatus) && std::filesystem::is_directory(fromStatus) != std::filesystem::is_directory(toStatus));
+
+    // Symlinks are recreated rather than followed, so an entry pointing outside the staging tree
+    // cannot pull unrelated content into the destination.
+    std::error_code copyError;
+    std::filesystem::copy(
+        From,
+        To,
+        std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing | std::filesystem::copy_options::copy_symlinks,
+        copyError);
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(copyError.value()), !!copyError, "Failed to copy to: %ls", To.c_str());
+}
+
+// The ps SIZE column: the writable layer on its own, and the total including the read-only image
+// layers in parentheses. The suffix is guarded on 'SizeRootFs > 0', so a zero total renders as the
+// writable size alone; the daemon reports zero both when the size was not requested and when there
+// is no parent layer to measure. The table is localized while json keeps the invariant form.
+std::wstring FormatContainerSize(LONGLONG SizeRw, LONGLONG SizeRootFs, FormatType format)
+{
+    const auto writable = FormatHumanReadableSize(static_cast<uint64_t>(std::max<LONGLONG>(SizeRw, 0)), c_statsIoPrecision);
+    if (SizeRootFs <= 0)
+    {
+        return writable;
+    }
+
+    const auto total = FormatHumanReadableSize(static_cast<uint64_t>(SizeRootFs), c_statsIoPrecision);
+    if (format == FormatType::Json)
+    {
+        return std::format(L"{} (virtual {})", writable, total);
+    }
+
+    return Localization::WSLCCLI_ContainerSizeWithVirtual(writable, total);
+}
 
 nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_schema::ContainerStats& stats)
 {
@@ -99,31 +164,87 @@ nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_sche
     }
 
     const auto& containerName = stats.name.empty() ? stats.id : stats.name;
-    const auto formatBinaryBytes = [](uint64_t bytes) {
-        return WideToMultiByte(FormatStorageSize(bytes, StorageSizeUnit::Binary, 2, true));
-    };
 
     return {
         {"ID", stats.id},
         {"Name", containerName},
         {"CPUPerc", std::format("{:.2f}%", cpuPercent)},
-        {"MemUsage", std::format("{} / {}", formatBinaryBytes(stats.memory_stats.usage), formatBinaryBytes(stats.memory_stats.limit))},
+        {"MemUsage", std::format("{} / {}", FormatStatsMemory(stats.memory_stats.usage), FormatStatsMemory(stats.memory_stats.limit))},
         {"MemPerc", std::format("{:.2f}%", memPercent)},
-        {"NetIO", std::format("{} / {}", formatBinaryBytes(netRxBytes), formatBinaryBytes(netTxBytes))},
-        {"BlockIO", std::format("{} / {}", formatBinaryBytes(blkReadBytes), formatBinaryBytes(blkWriteBytes))},
+        {"NetIO", std::format("{} / {}", FormatStatsIo(netRxBytes), FormatStatsIo(netTxBytes))},
+        {"BlockIO", std::format("{} / {}", FormatStatsIo(blkReadBytes), FormatStatsIo(blkWriteBytes))},
         {"PIDs", stats.pids_stats.current},
     };
+}
+
+// Builds the representation of a container, shared by the table and json output so the two cannot
+// drift. Every value is emitted as a string apart from the platform object, and the id is truncated
+// unless --no-trunc is passed. RunningFor, Size and Status are the only fields that vary with the
+// format: docker renders them in invariant English, so json keeps that while the table is localized.
+ContainerOutputInformation ToContainerOutput(const ContainerInformation& container, bool truncate, FormatType format)
+{
+    ContainerOutputInformation entry;
+    entry.Command = WideToMultiByte(ContainerService::FormatCommand(container.Command, truncate));
+    entry.CreatedAt = EpochToLocalDisplayTime(container.CreatedAt);
+    // The runtime reports health as a suffix on the status description, which is the only place it is
+    // exposed by the listing API.
+    entry.HealthStatus = ContainerService::FormatHealthStatus(container.Status);
+    entry.ID = truncate ? TruncateId(container.Id) : container.Id;
+    entry.Image = container.Image;
+    entry.Labels = container.Labels;
+    entry.LocalVolumes = std::to_string(container.LocalVolumes);
+    entry.Mounts = WideToMultiByte(ContainerService::FormatMounts(container.Mounts, truncate));
+    entry.Names = container.Name;
+    entry.Networks = container.Networks;
+    entry.Platform.architecture = wsl::shared::Arm64 ? "arm64" : "amd64";
+    entry.Platform.os = "linux";
+    entry.Ports = WideToMultiByte(ContainerService::FormatPorts(container.State, container.Ports));
+    entry.RunningFor = WideToMultiByte(
+        format == FormatType::Json ? FormatInvariantRelativeTime(container.CreatedAt) : FormatRelativeTime(container.CreatedAt));
+    // The daemon only computes container sizes when the listing request asks for them, so this is a
+    // formatted zero unless --size was passed.
+    entry.Size = WideToMultiByte(FormatContainerSize(container.SizeRw, container.SizeRootFs, format));
+    entry.State = WideToMultiByte(ContainerService::ContainerStateName(container.State));
+    entry.Status = WideToMultiByte(ContainerService::FormatStatus(container.Status, container.State, container.StateChangedAt, format));
+
+    return entry;
 }
 
 } // namespace
 
 namespace wsl::windows::wslc::task {
 
-static bool TryInspectContainer(Terminal& terminal, Session& session, const std::string& containerId, std::optional<wslc_schema::InspectContainer>& inspectData)
+using namespace wsl::windows::wslc::cli;
+
+// Every container is attempted even if an earlier one fails; the command still exits nonzero.
+template <typename TAction>
+static void ForEachContainer(CLIExecutionContext& context, TAction&& action)
+{
+    for (const auto& id : context.Args.GetAllValues<ArgType::ContainerId>())
+    {
+        try
+        {
+            action(WideToMultiByte(id));
+            context.Terminal.Output(L"{}\n", id);
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            context.ReportError(wil::ResultFromCaughtException());
+
+            // CollectErrorImpl keeps the first message when the next container fails with the same HRESULT.
+            context.ClearError();
+            context.ExitCode = 1;
+        }
+    }
+}
+
+static bool TryInspectContainer(
+    Terminal& terminal, Session& session, const std::string& containerId, std::optional<wslc_schema::InspectContainer>& inspectData, bool size = false)
 {
     try
     {
-        inspectData = ContainerService::Inspect(session, containerId);
+        inspectData = ContainerService::Inspect(session, containerId, size);
         return true;
     }
     catch (const wil::ResultException& ex)
@@ -188,7 +309,10 @@ void GetContainers(CLIExecutionContext& context)
     // Filter values are parsed and cached during argument validation.
     auto filters = context.Args.GetAllValues<ArgType::Filter>();
 
-    context.Data.Add<Data::Containers>(ContainerService::List(session, context.Args.GetValue<ArgType::All>(), limit, filters));
+    // `container stats` reuses this task and does not register --size.
+    const bool size = context.Args.Contains(ArgType::Size) && context.Args.GetValue<ArgType::Size>();
+
+    context.Data.Add<Data::Containers>(ContainerService::List(session, context.Args.GetValue<ArgType::All>(), limit, filters, size));
 }
 
 void InspectContainers(CLIExecutionContext& context)
@@ -197,10 +321,11 @@ void InspectContainers(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto containerIds = context.Args.GetAllValues<ArgType::ContainerId>();
     std::vector<wsl::windows::common::wslc_schema::InspectContainer> result;
+    const bool size = context.Args.GetValue<ArgType::Size>();
     for (const auto& id : containerIds)
     {
         std::optional<wslc_schema::InspectContainer> inspectData;
-        if (TryInspectContainer(context.Terminal, session, WideToMultiByte(id), inspectData))
+        if (TryInspectContainer(context.Terminal, session, WideToMultiByte(id), inspectData, size))
         {
             result.push_back(*inspectData);
         }
@@ -210,7 +335,13 @@ void InspectContainers(CLIExecutionContext& context)
         }
     }
 
-    auto json = ToJson(result, context.Args.GetValue<ArgType::InspectFormat>(c_jsonPrettyPrintIndent));
+    nlohmann::json array = nlohmann::json::array();
+    for (const auto& entry : result)
+    {
+        array.push_back(wslc_schema::ToInspectJson(entry));
+    }
+
+    auto json = array.dump(context.Args.GetValue<ArgType::InspectFormat>(c_jsonPrettyPrintIndent));
     context.Terminal.Output(L"{}\n", MultiByteToWide(json));
 }
 
@@ -218,14 +349,9 @@ void KillContainers(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    auto containerIds = context.Args.GetAllValues<ArgType::ContainerId>();
     const auto signal = context.Args.GetValue<ArgType::Signal>(WSLCSignalSIGKILL);
 
-    for (const auto& id : containerIds)
-    {
-        ContainerService::Kill(session, WideToMultiByte(id), signal);
-        context.Terminal.Output(L"{}\n", id);
-    }
+    ForEachContainer(context, [&](const std::string& id) { ContainerService::Kill(session, id, signal); });
 }
 
 void ExportContainer(CLIExecutionContext& context)
@@ -261,6 +387,7 @@ void ContainerCp(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     const auto& source = context.Args.GetValue<ArgType::Source>();
     const auto& target = context.Args.GetValue<ArgType::Target>();
+    const bool followLink = context.Args.GetValue<ArgType::FollowLink>();
 
     // Determine copy direction by looking for CONTAINER:PATH patterns.
     // A single letter before ':' is a Windows drive path (e.g. C:\path), not a container reference.
@@ -329,6 +456,54 @@ void ContainerCp(CLIExecutionContext& context)
             THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpSourceNotFoundError(source), fsError || !pathExists);
 
             auto absPath = std::filesystem::absolute(source);
+
+            // A trailing separator leaves filename() empty, which would name an empty tar entry.
+            if (!absPath.has_filename())
+            {
+                absPath = absPath.parent_path();
+            }
+
+            // --follow-link resolves the source path itself; links found inside a copied directory stay links.
+            // tar's -h dereferences every link it walks, so it is limited to a source that is itself a link to
+            // a single file, where there is nothing to recurse into.
+            std::filesystem::path stagingDir;
+            auto stagingCleanup = wil::scope_exit([&] {
+                if (!stagingDir.empty())
+                {
+                    std::error_code cleanupError;
+                    std::filesystem::remove_all(stagingDir, cleanupError);
+                }
+            });
+
+            bool dereference = false;
+            if (followLink && std::filesystem::is_symlink(absPath, fsError))
+            {
+                std::error_code resolveError;
+                const auto resolved = std::filesystem::canonical(absPath, resolveError);
+                THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpSourceNotFoundError(source), !!resolveError);
+
+                if (std::filesystem::is_directory(resolved))
+                {
+                    // The archive has to carry the link's name while holding the target's tree, and tar.exe
+                    // cannot rename entries, so the tree is staged under that name with its own links intact.
+                    stagingDir = wsl::windows::common::filesystem::MakeStagingDirectory(std::filesystem::temp_directory_path());
+
+                    std::error_code copyError;
+                    std::filesystem::copy(
+                        resolved,
+                        stagingDir / absPath.filename(),
+                        std::filesystem::copy_options::recursive | std::filesystem::copy_options::copy_symlinks,
+                        copyError);
+                    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(copyError.value()), !!copyError, "Failed to copy from: %ls", resolved.c_str());
+
+                    absPath = stagingDir / absPath.filename();
+                }
+                else
+                {
+                    dereference = true;
+                }
+            }
+
             auto parentDir = absPath.parent_path().wstring();
             auto fileName = absPath.filename().wstring();
 
@@ -342,8 +517,8 @@ void ContainerCp(CLIExecutionContext& context)
             filesystem::TempFile tarFile(
                 GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, filesystem::TempFileFlags::DeleteOnClose | filesystem::TempFileFlags::InheritHandle);
 
-            // Run tar.exe writing to stdout, redirected to our temp file handle
-            auto tarCmd = std::format(L"tar.exe -cf - -C \"{}\" \"{}\"", parentDir, fileName);
+            // Run tar.exe writing to stdout, redirected to our temp file handle.
+            auto tarCmd = std::format(L"tar.exe -c{}f - -C \"{}\" \"{}\"", dereference ? L"h" : L"", parentDir, fileName);
             SubProcess process(nullptr, tarCmd.c_str());
             process.SetStdHandles(nullptr, tarFile.Handle.get(), nullptr);
             auto exitCode = process.Run();
@@ -385,8 +560,27 @@ void ContainerCp(CLIExecutionContext& context)
             std::filesystem::create_directories(absTarget, dirError);
             THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", absTarget.c_str());
 
+            // A followed link produces an archive named after the link's target, but the copy keeps the name that
+            // was asked for. The resolved name is only known once the download completes, so the extraction goes
+            // to a staging directory and the entries are moved up under the requested name afterwards.
+            std::filesystem::path stagingDir;
+            auto stagingCleanup = wil::scope_exit([&] {
+                if (!stagingDir.empty())
+                {
+                    std::error_code cleanupError;
+                    std::filesystem::remove_all(stagingDir, cleanupError);
+                }
+            });
+
+            auto extractRoot = absTarget;
+            if (followLink)
+            {
+                stagingDir = wsl::windows::common::filesystem::MakeStagingDirectory(absTarget);
+                extractRoot = stagingDir;
+            }
+
             // Strip trailing separator to avoid the CRT parsing a trailing '\"' as an escaped quote.
-            auto targetDir = absTarget.wstring();
+            auto targetDir = extractRoot.wstring();
             while (targetDir.size() > 1 && (targetDir.back() == L'\\' || targetDir.back() == L'/'))
             {
                 targetDir.pop_back();
@@ -401,11 +595,60 @@ void ContainerCp(CLIExecutionContext& context)
             auto processHandle = process.Start();
             pipeRead.reset();
 
-            ContainerService::CopyFromContainer(session, containerId, srcPath, pipeWrite.get());
+            ContainerService::CopyFromContainer(session, containerId, srcPath, followLink, pipeWrite.get());
             pipeWrite.reset();
 
             auto exitCode = SubProcess::GetExitCode(processHandle.get());
             THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
+
+            if (followLink)
+            {
+                // Moving entries invalidates an open directory iterator, so the listing is taken first.
+                std::vector<std::filesystem::path> staged;
+                for (const auto& entry : std::filesystem::directory_iterator(stagingDir))
+                {
+                    staged.push_back(entry.path());
+                }
+
+                // The archive is named after whatever the link resolved to, while the copy keeps the name that was
+                // asked for. A lone entry is that source and simply takes the name; several entries mean the source
+                // resolved to a path with no name of its own, so they are gathered under one named after it.
+                const auto requestedName = MultiByteToWide(wsl::windows::common::filesystem::PosixBaseName(srcPath));
+
+                // Only '/' and NUL are barred from a POSIX name, so the basename can hold characters that no
+                // Windows file name can. Copying under the resolved target's name instead would silently
+                // produce something other than what was asked for.
+                const auto unrepresentable = [&]() {
+                    constexpr std::wstring_view reserved = L"<>:\"/\\|?*";
+                    for (const auto character : requestedName)
+                    {
+                        if (character < L' ' || reserved.find(character) != std::wstring_view::npos)
+                        {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                }();
+
+                THROW_HR_WITH_USER_ERROR_IF(
+                    E_INVALIDARG, Localization::WSLCCLI_CpSourceNameNotRepresentableError(MultiByteToWide(srcPath)), unrepresentable);
+
+                auto destinationRoot = absTarget;
+                if (!requestedName.empty() && staged.size() > 1)
+                {
+                    destinationRoot = absTarget / requestedName;
+                    std::filesystem::create_directories(destinationRoot, dirError);
+                    THROW_HR_IF_MSG(
+                        HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", destinationRoot.c_str());
+                }
+
+                const bool rebase = !requestedName.empty() && staged.size() == 1;
+                for (const auto& entry : staged)
+                {
+                    MoveOver(entry, destinationRoot / (rebase ? requestedName : entry.filename().wstring()));
+                }
+            }
         }
         else
         {
@@ -416,7 +659,7 @@ void ContainerCp(CLIExecutionContext& context)
             // the exclusive write handle, preventing other processes from tampering.
             filesystem::TempFile tarFile(GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS);
 
-            ContainerService::CopyFromContainer(session, containerId, srcPath, tarFile.Handle.get());
+            ContainerService::CopyFromContainer(session, containerId, srcPath, followLink, tarFile.Handle.get());
 
             // Step 1: Pipe tar -t output and read just enough lines to classify the archive.
             auto [listStdoutRead, listStdoutWrite] = OpenAnonymousPipe(0, true, false);
@@ -525,15 +768,17 @@ void ListContainers(CLIExecutionContext& context)
     if (context.Args.GetValue<ArgType::Quiet>())
     {
         // Print only the container ids
+        bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
         for (const auto& container : containers)
         {
-            context.Terminal.Output(L"{}\n", MultiByteToWide(container.Id));
+            context.Terminal.Output(L"{}\n", MultiByteToWide(trunc ? TruncateId(container.Id) : container.Id));
         }
 
         return;
     }
 
     const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
+    bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
 
     switch (format)
     {
@@ -541,49 +786,62 @@ void ListContainers(CLIExecutionContext& context)
     {
         for (const auto& container : containers)
         {
-            context.Terminal.Output(L"{}\n", ToJsonW(container, c_jsonCompactIndent));
+            context.Terminal.Output(L"{}\n", ToJsonW(ToContainerOutput(container, trunc, FormatType::Json), c_jsonCompactIndent));
         }
 
         break;
     }
     case FormatType::Table:
     {
-        bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
         using enum ColumnOverflow;
 
+        // SIZE trails the other columns. It is always declared, and is left empty and hidden unless
+        // --size was passed.
+        constexpr size_t c_sizeColumn = 7;
+        const bool showSize = context.Args.GetValue<ArgType::Size>();
+
         // Create table with or without column limits based on --no-trunc flag
-        auto table = trunc ? wsl::windows::wslc::TableOutput<6>(
+        auto table = trunc ? wsl::windows::wslc::cli::TableOutput<8>(
                                  context.Terminal,
                                  {{{Localization::WSLCCLI_TableHeaderContainerId(), {.MaxWidth = 12, .Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderName(), {.MaxWidth = 20, .Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderImage(), {.MaxWidth = 20, .Overflow = Shrink}},
+                                   {Localization::WSLCCLI_TableHeaderCommand(), {.Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderCreated(), {.Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderStatus(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderPorts(), {.Overflow = Shrink}}}},
+                                   {Localization::WSLCCLI_TableHeaderPorts(), {.Overflow = Shrink}},
+                                   {Localization::WSLCCLI_TableHeaderNames(), {.MaxWidth = 20, .Overflow = Shrink}},
+                                   {Localization::WSLCCLI_TableHeaderSize(), {.Overflow = Shrink}}}},
                                  containers.size())
-                           : wsl::windows::wslc::TableOutput<6>(
+                           : wsl::windows::wslc::cli::TableOutput<8>(
                                  context.Terminal,
                                  {Localization::WSLCCLI_TableHeaderContainerId(),
-                                  Localization::WSLCCLI_TableHeaderName(),
                                   Localization::WSLCCLI_TableHeaderImage(),
+                                  Localization::WSLCCLI_TableHeaderCommand(),
                                   Localization::WSLCCLI_TableHeaderCreated(),
                                   Localization::WSLCCLI_TableHeaderStatus(),
-                                  Localization::WSLCCLI_TableHeaderPorts()});
+                                  Localization::WSLCCLI_TableHeaderPorts(),
+                                  Localization::WSLCCLI_TableHeaderNames(),
+                                  Localization::WSLCCLI_TableHeaderSize()});
 
-        // Add each container as a row
+        table.SetColumnHidden(c_sizeColumn, !showSize);
+
         for (const auto& container : containers)
         {
+            const auto entry = ToContainerOutput(container, trunc, FormatType::Table);
             table.WriteRow({
-                MultiByteToWide(trunc ? TruncateId(container.Id) : container.Id),
-                MultiByteToWide(container.Name),
-                MultiByteToWide(container.Image),
-                FormatRelativeTime(container.CreatedAt),
-                ContainerService::ContainerStateToString(container.State, container.StateChangedAt),
-                ContainerService::FormatPorts(container.State, container.Ports),
+                MultiByteToWide(entry.ID),
+                MultiByteToWide(entry.Image),
+                MultiByteToWide(entry.Command),
+                MultiByteToWide(entry.RunningFor),
+                MultiByteToWide(entry.Status),
+                MultiByteToWide(entry.Ports),
+                MultiByteToWide(entry.Names),
+                showSize ? MultiByteToWide(entry.Size) : std::wstring{},
             });
         }
 
         table.Complete();
+
         break;
     }
     default:
@@ -595,14 +853,10 @@ void RemoveContainers(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    auto containerIds = context.Args.GetAllValues<ArgType::ContainerId>();
-    bool force = context.Args.GetValue<ArgType::Force>();
-    bool deleteVolumes = context.Args.GetValue<ArgType::Volumes>();
-    for (const auto& id : containerIds)
-    {
-        ContainerService::Delete(session, WideToMultiByte(id), force, deleteVolumes);
-        context.Terminal.Output(L"{}\n", id);
-    }
+    const bool force = context.Args.GetValue<ArgType::Force>();
+    const bool deleteVolumes = context.Args.GetValue<ArgType::Volumes>();
+
+    ForEachContainer(context, [&](const std::string& id) { ContainerService::Delete(session, id, force, deleteVolumes); });
 }
 
 void RunContainer(CLIExecutionContext& context)
@@ -839,8 +1093,6 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Mounts.insert(options.Mounts.end(), std::make_move_iterator(tmpfs.begin()), std::make_move_iterator(tmpfs.end()));
     }
 
-    ValidateUniqueMountDestinations(options);
-
     for (const auto& label : context.Args.GetAllValues<ArgType::Label>())
     {
         options.Labels.push_back(label);
@@ -943,7 +1195,7 @@ void ShowContainerStats(CLIExecutionContext& context)
         bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
         using enum ColumnOverflow;
 
-        auto table = trunc ? wsl::windows::wslc::TableOutput<8>(
+        auto table = trunc ? wsl::windows::wslc::cli::TableOutput<8>(
                                  context.Terminal,
                                  {{{Localization::WSLCCLI_TableHeaderContainerId(), {.MaxWidth = 12, .Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderName(), {.MaxWidth = 20, .Overflow = Shrink}},
@@ -954,7 +1206,7 @@ void ShowContainerStats(CLIExecutionContext& context)
                                    {Localization::WSLCCLI_TableHeaderBlockIo(), {.Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderPids(), {.Overflow = Shrink}}}},
                                  statsJson.size())
-                           : wsl::windows::wslc::TableOutput<8>(
+                           : wsl::windows::wslc::cli::TableOutput<8>(
                                  context.Terminal,
                                  {Localization::WSLCCLI_TableHeaderContainerId(),
                                   Localization::WSLCCLI_TableHeaderName(),
@@ -1006,7 +1258,6 @@ void StopContainers(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    auto containersToStop = context.Args.GetAllValues<ArgType::ContainerId>();
     StopContainerOptions options;
 
     // WSLCSignalNone lets Docker use the container's configured STOPSIGNAL, or its default when none is configured.
@@ -1017,11 +1268,24 @@ void StopContainers(CLIExecutionContext& context)
         options.Timeout = context.Args.GetValue<ArgType::Time>();
     }
 
-    for (const auto& id : containersToStop)
+    ForEachContainer(context, [&](const std::string& id) { ContainerService::Stop(session, id, options); });
+}
+
+void RestartContainers(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+    StopContainerOptions options;
+
+    // WSLCSignalNone lets Docker use the container's configured STOPSIGNAL, or its default when none is configured.
+    options.Signal = context.Args.GetValue<ArgType::Signal>(WSLCSignalNone);
+
+    if (context.Args.Contains(ArgType::Timeout))
     {
-        ContainerService::Stop(context.Data.Get<Data::Session>(), WideToMultiByte(id), options);
-        context.Terminal.Output(L"{}\n", id);
+        options.Timeout = context.Args.GetValue<ArgType::Timeout>();
     }
+
+    ForEachContainer(context, [&](const std::string& id) { ContainerService::Restart(context.Terminal, session, id, options); });
 }
 
 void ViewContainerLogs(CLIExecutionContext& context)
@@ -1031,6 +1295,7 @@ void ViewContainerLogs(CLIExecutionContext& context)
     auto containerId = context.Args.GetValue<ArgType::ContainerId>();
     bool follow = context.Args.GetValue<ArgType::Follow>();
     bool timestamps = context.Args.GetValue<ArgType::Timestamps>();
+    bool details = context.Args.GetValue<ArgType::Details>();
 
     ULONGLONG tail = 0;
     if (context.Args.Contains(ArgType::Tail))
@@ -1053,22 +1318,35 @@ void ViewContainerLogs(CLIExecutionContext& context)
         until = context.Args.GetValue<ArgType::Until>();
     }
 
-    ContainerService::Logs(session, WideToMultiByte(containerId), follow, timestamps, since, until, tail);
+    ContainerService::Logs(session, WideToMultiByte(containerId), follow, timestamps, details, since, until, tail);
 }
 
 void PruneContainers(CLIExecutionContext& context)
 {
+    context.Data.Add<Data::ConfirmWarning>(Localization::WSLCCLI_ContainerPruneConfirm());
+    context.Data.Add<Data::ConfirmMessage>(Localization::WSLCCLI_PruneConfirmPrompt());
+    ConfirmAction(context);
+
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
 
-    auto result = ContainerService::Prune(session);
+    // Filter values are parsed and cached during argument validation.
+    auto filters = context.Args.GetAllValues<ArgType::Filter>();
 
-    for (const auto& containerId : result.PrunedContainers)
+    auto result = ContainerService::Prune(session, filters);
+
+    if (!result.PrunedContainers.empty())
     {
-        context.Terminal.Output(L"{}\n", MultiByteToWide(containerId));
+        context.Terminal.Output(L"{}\n", Localization::WSLCCLI_ContainerPruneDeletedHeader());
+        for (const auto& containerId : result.PrunedContainers)
+        {
+            context.Terminal.Output(L"{}\n", MultiByteToWide(containerId));
+        }
+
+        context.Terminal.Output(L"\n");
     }
 
-    context.Terminal.Output(L"\n");
-    context.Terminal.Output(L"{}\n", Localization::WSLCCLI_ContainerPruneSpaceReclaimedBytes(FormatBytes(result.SpaceReclaimed)));
+    context.Terminal.Output(
+        L"{}\n", Localization::WSLCCLI_ContainerPruneSpaceReclaimedBytes(FormatHumanReadableSize(result.SpaceReclaimed, c_reclaimedSpacePrecision)));
 }
 } // namespace wsl::windows::wslc::task

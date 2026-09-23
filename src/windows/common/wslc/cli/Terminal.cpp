@@ -14,7 +14,7 @@ Abstract:
 #include "precomp.h"
 #include "Terminal.h"
 
-namespace wsl::windows::wslc {
+namespace wsl::windows::wslc::cli {
 
 using namespace wsl::windows::common::vt;
 
@@ -80,4 +80,11 @@ std::wstring Terminal::PromptForLine(Level level, std::wstring_view label, bool 
     return line.value_or(std::wstring{});
 }
 
-} // namespace wsl::windows::wslc
+bool Terminal::Confirm(std::wstring_view message)
+{
+    const auto answer = PromptForLine(std::format(L"{} [y/N] ", message));
+
+    return wsl::shared::string::IsEqual(wsl::shared::string::TrimAscii(std::wstring_view{answer}), L"y", true);
+}
+
+} // namespace wsl::windows::wslc::cli

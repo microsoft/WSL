@@ -13,27 +13,28 @@ Abstract:
 --*/
 
 #pragma once
+#include "HandleIO.h"
 #include "wslc.h"
 
 namespace wsl::windows::service::wslc {
 
 struct TypedHandle
 {
-    wil::unique_handle Handle;
+    common::io::HandleWrapper Handle;
     WSLCHandleType Type = WSLCHandleTypeUnknown;
 
     TypedHandle() = default;
-    TypedHandle(wil::unique_handle&& handle, WSLCHandleType type) : Handle(std::move(handle)), Type(type)
+    TypedHandle(common::io::HandleWrapper&& handle, WSLCHandleType type) : Handle(std::move(handle)), Type(type)
     {
     }
 
     bool is_valid() const noexcept
     {
-        return Handle.is_valid();
+        return Handle.IsValid();
     }
     HANDLE get() const noexcept
     {
-        return Handle.get();
+        return Handle.Get();
     }
 };
 
