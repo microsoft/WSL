@@ -2023,27 +2023,7 @@ Usage:
         validateSwapSize(L"200M");
 
         WslShutdown();
-
-        PACL dacl{};
-        wil::unique_hlocal descriptor;
-        THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
-            swapVhd.c_str(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, &dacl, nullptr, &descriptor));
-
-        VERIFY_IS_NOT_NULL(dacl);
-
-        // Verify that no ACE matches the VM identity, since those should not be leaked after the VM terminates.
-        constexpr auto c_virtualMachineSidPrefix = L"S-1-5-83-1-";
-        for (DWORD index = 0; index < dacl->AceCount; ++index)
-        {
-            void* ace{};
-            THROW_IF_WIN32_BOOL_FALSE(GetAce(dacl, index, &ace));
-            auto* allowed = static_cast<ACCESS_ALLOWED_ACE*>(ace);
-            VERIFY_ARE_EQUAL(ACCESS_ALLOWED_ACE_TYPE, allowed->Header.AceType);
-
-            wil::unique_hlocal_string sid;
-            THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSidW(&allowed->SidStart, &sid));
-            VERIFY_IS_FALSE(std::wstring_view(sid.get()).starts_with(c_virtualMachineSidPrefix));
-        }
+        VerifyNoVmAccessToVhd(swapVhd.c_str());
     }
 
     TEST_METHOD(InitDoesntBlockSignals)
@@ -3576,9 +3556,14 @@ Usage:
         std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
         VERIFY_ARE_EQUAL(err, L"");
 
+        VerifyNoVmAccessToVhd(vhdPath.c_str());
+
         std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} echo ok", name));
         VERIFY_ARE_EQUAL(out, L"ok\n");
         VERIFY_ARE_EQUAL(err, L"");
+
+        WslShutdown();
+        VerifyNoVmAccessToVhd(vhdPath.c_str());
     }
 
     WSL2_TEST_METHOD(FileOffsets)

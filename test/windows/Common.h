@@ -614,6 +614,8 @@ bool WslShutdown();
 
 void TerminateDistribution(LPCWSTR DistributionName = LXSS_DISTRO_NAME_TEST_L);
 
+void VerifyNoVmAccessToVhd(LPCWSTR VhdPath);
+
 void Trim(std::wstring& string);
 
 inline auto EnableSystemd(const std::string& extraConfig = "", LPCWSTR distroName = LXSS_DISTRO_NAME_TEST_L)

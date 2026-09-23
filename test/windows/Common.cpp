@@ -2520,6 +2520,29 @@ void TerminateDistribution(LPCWSTR DistributionName)
     VERIFY_ARE_EQUAL(0u, LxsstuLaunchWsl(std::format(L"{} {}", WSL_TERMINATE_ARG, DistributionName)));
 }
 
+void VerifyNoVmAccessToVhd(LPCWSTR VhdPath)
+{
+    PACL dacl{};
+    wil::unique_hlocal descriptor;
+    THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(VhdPath, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, &dacl, nullptr, &descriptor));
+
+    VERIFY_IS_NOT_NULL(dacl);
+
+    // VM-specific ACEs must be removed when the VHD is detached.
+    constexpr auto c_virtualMachineSidPrefix = L"S-1-5-83-1-";
+    for (DWORD index = 0; index < dacl->AceCount; ++index)
+    {
+        void* ace{};
+        THROW_IF_WIN32_BOOL_FALSE(GetAce(dacl, index, &ace));
+        auto* allowed = static_cast<ACCESS_ALLOWED_ACE*>(ace);
+        VERIFY_ARE_EQUAL(ACCESS_ALLOWED_ACE_TYPE, allowed->Header.AceType);
+
+        wil::unique_hlocal_string sid;
+        THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSidW(&allowed->SidStart, &sid));
+        VERIFY_IS_FALSE(std::wstring_view(sid.get()).starts_with(c_virtualMachineSidPrefix));
+    }
+}
+
 void ValidateOutput(LPCWSTR CommandLine, const std::wstring& ExpectedOutput, const std::wstring& ExpectedWarnings, int ExitCode)
 {
     auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(CommandLine, ExitCode);
