@@ -30,8 +30,6 @@ class OpenVmmVirtualMachineBackend : public IVirtualMachineBackend
 public:
     ~OpenVmmVirtualMachineBackend() noexcept override;
 
-    // Networking supports one creation-time Consomme NIC: 10.0.0.2/24, gateway 10.0.0.1,
-    // default gateway MACs, automatic guest IPv6 and host DNS. Custom settings and hot-add are unsupported.
     static std::unique_ptr<OpenVmmVirtualMachineBackend> Create(const VmCreateRequest& Request);
 
     static VmPlatformCapabilities QueryCapabilities();
@@ -106,6 +104,14 @@ private:
         std::wstring HostAddress;
     };
 
+    struct SessionFileSystemResources
+    {
+        std::filesystem::path SocketDirectory;
+        std::filesystem::path RpcSocketPath;
+        std::filesystem::path VsockPath;
+        bool DirectoryCreated = false;
+    };
+
     wil::srwlock m_lock;
     _Requires_lock_held_(m_lock)
     void CloseGuestListeners() noexcept;
@@ -126,10 +132,7 @@ private:
     wil::unique_handle m_process;
     wil::unique_handle m_job;
     std::thread m_processLogThread;
-    std::filesystem::path m_socketDirectory;
-    std::filesystem::path m_rpcSocketPath;
-    std::filesystem::path m_vsockPath;
-    bool m_directoryCreated = false;
+    SessionFileSystemResources m_fileSystemResources;
     wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
     wil::unique_event m_operationCancellationEvent{wil::EventOptions::ManualReset};
 };

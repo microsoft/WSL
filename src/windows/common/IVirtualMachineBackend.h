@@ -188,12 +188,6 @@ struct VmProcessorRequest
     VmFeatureRequest PerfmonLbr = VmFeatureRequest::Disabled;
 };
 
-struct VmMmioRequest
-{
-    std::uint64_t HighWindowSizeBytes = 0;
-    std::optional<std::uint8_t> MaximumGuestAddressBits;
-};
-
 struct VmMemoryRequest
 {
     std::uint64_t SizeBytes = 0;

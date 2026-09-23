@@ -75,6 +75,17 @@ std::filesystem::path GetVsockListenerPath(const std::filesystem::path& VsockPat
     return std::format(L"{}_{:08x}-facb-11e6-bd58-64006a7986d3", VsockPath.native(), Port.Value);
 }
 
+SOCKADDR_UN GetUnixSocketAddress(const std::filesystem::path& Path)
+{
+    SOCKADDR_UN address{};
+    address.sun_family = AF_UNIX;
+    const auto narrowPath = wsl::shared::string::WideToMultiByte(Path.native());
+    THROW_HR_IF_MSG(E_INVALIDARG, narrowPath.size() >= sizeof(address.sun_path), "vsock bridge path too long: %hs", narrowPath.c_str());
+    std::copy(narrowPath.cbegin(), narrowPath.cend(), address.sun_path);
+    address.sun_path[narrowPath.size()] = '\0';
+    return address;
+}
+
 std::wstring FormatIpAddress(const VmIpAddress& Address)
 {
     if (const auto* ipv4 = std::get_if<VmIpv4Address>(&Address))
@@ -252,9 +263,9 @@ OpenVmmVirtualMachineBackend::~OpenVmmVirtualMachineBackend() noexcept
     {
         m_processLogThread.join();
     }
-    if (m_directoryCreated)
+    if (m_fileSystemResources.DirectoryCreated)
     {
-        LOG_IF_FAILED(wil::RemoveDirectoryRecursiveNoThrow(m_socketDirectory.c_str()));
+        LOG_IF_FAILED(wil::RemoveDirectoryRecursiveNoThrow(m_fileSystemResources.SocketDirectory.c_str()));
     }
     WSL_LOG(
         "OpenVmmDestroyVmEnd",
@@ -308,12 +319,12 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     auto id = wsl::shared::string::GuidToString<wchar_t>(Request.VmId, wsl::shared::string::GuidToStringFlags::None);
     std::erase(id, L'-');
     // An exclusive directory creation prevents shortened path IDs from aliasing another VM.
-    m_socketDirectory = filesystem::GetTempFolderPath(GetCurrentProcessToken()) / (L"ov-" + id.substr(0, 16));
-    m_rpcSocketPath = m_socketDirectory / L"r";
-    m_vsockPath = m_socketDirectory / L"v";
+    m_fileSystemResources.SocketDirectory = filesystem::GetTempFolderPath(GetCurrentProcessToken()) / (L"ov-" + id.substr(0, 16));
+    m_fileSystemResources.RpcSocketPath = m_fileSystemResources.SocketDirectory / L"r";
+    m_fileSystemResources.VsockPath = m_fileSystemResources.SocketDirectory / L"v";
     constexpr size_t c_guidStringLength = 38;
     constexpr size_t c_guestSocketSuffixLength = 1 + c_guidStringLength;
-    const auto vsockPath = wsl::shared::string::WideToMultiByte(m_vsockPath.native());
+    const auto vsockPath = wsl::shared::string::WideToMultiByte(m_fileSystemResources.VsockPath.native());
     SOCKADDR_UN address{};
     THROW_HR_IF_MSG(
         E_INVALIDARG,
@@ -333,8 +344,8 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
         m_attachedDisks.emplace(attachment.Id.Value, attachment);
     }
     m_nextDiskId = Request.BootDisks.size() + 1;
-    THROW_IF_WIN32_BOOL_FALSE(CreateDirectoryW(m_socketDirectory.c_str(), &attributes));
-    m_directoryCreated = true;
+    THROW_IF_WIN32_BOOL_FALSE(CreateDirectoryW(m_fileSystemResources.SocketDirectory.c_str(), &attributes));
+    m_fileSystemResources.DirectoryCreated = true;
 
     UniqueConfig config;
     THROW_IF_FAILED(WslOpenVmmCreateConfig(config.put()));
@@ -343,18 +354,15 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     THROW_IF_FAILED(WslOpenVmmConfigSetKernelCmdLine(config.get(), m_description.Boot.KernelCommandLine.c_str()));
     THROW_IF_FAILED(WslOpenVmmConfigSetMemoryMb(config.get(), m_description.Memory.SizeBytes / (1024 * 1024)));
     THROW_IF_FAILED(WslOpenVmmConfigSetProcessorCount(config.get(), Request.Processor.Count));
-    THROW_IF_FAILED(WslOpenVmmConfigSetHvSocketPath(config.get(), m_vsockPath.c_str()));
+    THROW_IF_FAILED(WslOpenVmmConfigSetHvSocketPath(config.get(), m_fileSystemResources.VsockPath.c_str()));
+    for (const auto& [tag, attachment] : m_description.NetworkAdapters)
     {
-        auto lock = m_lock.lock_exclusive();
-        for (const auto& [tag, attachment] : m_description.NetworkAdapters)
-        {
-            const auto nicId = wsl::shared::string::GuidToString<wchar_t>(
-                attachment.GuestInstanceId.value(), wsl::shared::string::GuidToStringFlags::None);
-            const auto macAddress = wsl::shared::string::FormatMacAddress(attachment.EffectiveConfiguration.ClientMac.Bytes, L'-');
-            THROW_IF_FAILED(WslOpenVmmConfigSetConsommeNic(config.get(), nicId.c_str(), macAddress.c_str()));
-            m_networkAdapters.emplace(attachment.Id.Value, NetworkAdapter{attachment, nicId});
-            m_nextDeviceId = attachment.Id.Value + 1;
-        }
+        const auto nicId =
+            wsl::shared::string::GuidToString<wchar_t>(attachment.GuestInstanceId.value(), wsl::shared::string::GuidToStringFlags::None);
+        const auto macAddress = wsl::shared::string::FormatMacAddress(attachment.EffectiveConfiguration.ClientMac.Bytes, L'-');
+        THROW_IF_FAILED(WslOpenVmmConfigSetConsommeNic(config.get(), nicId.c_str(), macAddress.c_str()));
+        m_networkAdapters.emplace(attachment.Id.Value, NetworkAdapter{attachment, nicId});
+        m_nextDeviceId = attachment.Id.Value + 1;
     }
     for (const auto& disk : Request.BootDisks)
     {
@@ -379,7 +387,8 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     }
 
     m_job = helpers::CreateKillOnCloseJob();
-    const auto commandLine = std::format(L"\"{}\" --rpc \"path={},transport=grpc\"", executable.native(), m_rpcSocketPath.native());
+    const auto commandLine =
+        std::format(L"\"{}\" --rpc \"path={},transport=grpc\"", executable.native(), m_fileSystemResources.RpcSocketPath.native());
     SubProcess process{executable.c_str(), commandLine.c_str()};
     process.SetFlags(CREATE_NO_WINDOW);
     process.SetJobObject(m_job.get());
@@ -398,9 +407,10 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
         "OpenVmmProcessStarted",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
         TraceLoggingValue(GetProcessId(m_process.get()), "processId"),
-        TraceLoggingValue(m_socketDirectory.c_str(), "socketDirectory"));
+        TraceLoggingValue(m_fileSystemResources.SocketDirectory.c_str(), "socketDirectory"));
     const auto startTimeMs = GetTickCount64();
-    const auto createResult = WslOpenVmmCreateVm(config.addressof(), m_rpcSocketPath.c_str(), c_rpcTimeoutMs, m_vm.put());
+    const auto createResult =
+        WslOpenVmmCreateVm(config.addressof(), m_fileSystemResources.RpcSocketPath.c_str(), c_rpcTimeoutMs, m_vm.put());
     WSL_LOG(
         "OpenVmmCreateVmRpc",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
@@ -501,10 +511,7 @@ VmDescription OpenVmmVirtualMachineBackend::GetDescription() const
 
 wil::unique_handle OpenVmmVirtualMachineBackend::GetTerminationEvent() const
 {
-    wil::unique_handle event;
-    THROW_IF_WIN32_BOOL_FALSE(
-        DuplicateHandle(GetCurrentProcess(), m_exitEvent.get(), GetCurrentProcess(), event.put(), 0, FALSE, DUPLICATE_SAME_ACCESS));
-    return event;
+    return wil::unique_handle{wsl::windows::common::wslutil::DuplicateHandle(m_exitEvent.get())};
 }
 
 void OpenVmmVirtualMachineBackend::Start()
@@ -597,18 +604,13 @@ VmGuestListener OpenVmmVirtualMachineBackend::CreateGuestListener(GuestServicePo
 
     auto listener = std::make_shared<GuestListener>();
     listener->Listener = {{m_description.Identity, m_nextListenerId}, Port};
-    listener->Path = GetVsockListenerPath(m_vsockPath, Port);
+    listener->Path = GetVsockListenerPath(m_fileSystemResources.VsockPath, Port);
     DeleteOwnedFile(listener->Path);
 
     listener->Socket.reset(::socket(AF_UNIX, SOCK_STREAM, 0));
     THROW_WIN32_IF(static_cast<DWORD>(WSAGetLastError()), !listener->Socket);
 
-    SOCKADDR_UN address{};
-    address.sun_family = AF_UNIX;
-    const auto narrowPath = wsl::shared::string::WideToMultiByte(listener->Path.native());
-    THROW_HR_IF_MSG(E_INVALIDARG, narrowPath.size() >= sizeof(address.sun_path), "vsock bridge path too long: %hs", narrowPath.c_str());
-    std::copy(narrowPath.cbegin(), narrowPath.cend(), address.sun_path);
-    address.sun_path[narrowPath.size()] = '\0';
+    const auto address = GetUnixSocketAddress(listener->Path);
 
     THROW_WIN32_IF(
         static_cast<DWORD>(WSAGetLastError()),
@@ -633,7 +635,7 @@ wil::unique_socket OpenVmmVirtualMachineBackend::AcceptGuestConnection(VmListene
         "OpenVmmAcceptGuestConnectionBegin",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
         TraceLoggingValue(Listener.Value, "listenerId"));
-    THROW_HR_IF(E_INVALIDARG, Listener.Value == 0 || !IsEqualGUID(Listener.Owner.VmId, m_description.Identity.VmId));
+    ValidateResourceId(Listener, m_description.Identity);
 
     std::shared_ptr<GuestListener> listener;
     {
@@ -667,12 +669,7 @@ wil::unique_socket OpenVmmVirtualMachineBackend::ConnectGuest(GuestServicePort P
     wil::unique_socket socket{::socket(AF_UNIX, SOCK_STREAM, 0)};
     THROW_WIN32_IF(static_cast<DWORD>(WSAGetLastError()), !socket);
 
-    SOCKADDR_UN address{};
-    address.sun_family = AF_UNIX;
-    const auto narrowPath = wsl::shared::string::WideToMultiByte(m_vsockPath.native());
-    THROW_HR_IF_MSG(E_INVALIDARG, narrowPath.size() >= sizeof(address.sun_path), "vsock bridge path too long: %hs", narrowPath.c_str());
-    std::copy(narrowPath.cbegin(), narrowPath.cend(), address.sun_path);
-    address.sun_path[narrowPath.size()] = '\0';
+    const auto address = GetUnixSocketAddress(m_fileSystemResources.VsockPath);
 
     THROW_WIN32_IF(
         static_cast<DWORD>(WSAGetLastError()), connect(socket.get(), reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR);
@@ -716,7 +713,7 @@ void OpenVmmVirtualMachineBackend::CloseGuestListener(VmListenerId Listener)
         "OpenVmmCloseGuestListener",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
         TraceLoggingValue(Listener.Value, "listenerId"));
-    THROW_HR_IF(E_INVALIDARG, Listener.Value == 0 || !IsEqualGUID(Listener.Owner.VmId, m_description.Identity.VmId));
+    ValidateResourceId(Listener, m_description.Identity);
     auto lock = m_lock.lock_exclusive();
     const auto entry = m_guestListeners.find(Listener.Value);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), entry == m_guestListeners.end());
@@ -730,7 +727,7 @@ VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& R
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
 
-    const auto lunInUse = [&](std::uint32_t Lun) {
+    const auto lunInUse = [this](std::uint32_t Lun) {
         for (const auto& entry : m_attachedDisks)
         {
             if (entry.second.GuestAddress.Lun == Lun)
@@ -763,7 +760,7 @@ VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& R
     const VmDiskAttachment attachment{{m_description.Identity, m_nextDiskId}, {0, lun}, Request.ReadOnly};
     const auto [disk, inserted] = m_attachedDisks.emplace(attachment.Id.Value, attachment);
     WI_ASSERT(inserted);
-    auto rollback = wil::scope_exit([&] { m_attachedDisks.erase(disk); });
+    auto rollback = wil::scope_exit([this, &disk] { m_attachedDisks.erase(disk); });
     const auto result = WslOpenVmmVmAttachScsiDisk(
         m_vm.get(), attachment.GuestAddress.Controller, attachment.GuestAddress.Lun, source.Path.c_str(), Request.ReadOnly);
     WSL_LOG(
@@ -785,7 +782,7 @@ void OpenVmmVirtualMachineBackend::DetachDisk(VmDiskId Disk)
     ExecutionContext context(Context::DetachDisk);
     WSL_LOG(
         "OpenVmmDetachDiskBegin", TraceLoggingValue(m_description.Identity.VmId, "vmId"), TraceLoggingValue(Disk.Value, "diskId"));
-    THROW_HR_IF(E_INVALIDARG, Disk.Value == 0 || !IsEqualGUID(Disk.Owner.VmId, m_description.Identity.VmId));
+    ValidateResourceId(Disk, m_description.Identity);
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
     const auto disk = m_attachedDisks.find(Disk.Value);
@@ -862,7 +859,7 @@ VmFileSystemShare OpenVmmVirtualMachineBackend::AddFileSystemShare(VmDeviceId De
     WI_ASSERT(inserted);
     device->second.Share = share.Id.Value;
     device->second.Device.State = VmFileSystemDeviceState::Serving;
-    auto rollback = wil::scope_exit([&] {
+    auto rollback = wil::scope_exit([this, &device, &entry] {
         device->second.Share.reset();
         device->second.Device.State = VmFileSystemDeviceState::Prepared;
         m_fileSystemShares.erase(entry);
@@ -958,7 +955,7 @@ VmPortBinding OpenVmmVirtualMachineBackend::BindPort(VmDeviceId Device, const Vm
     VmPortBinding binding{{m_description.Identity, m_nextPortBindingId}, Device, Request.Protocol, Request.Listen, Request.GuestPort};
     const auto [entry, inserted] = m_portBindings.emplace(binding.Id.Value, PortBinding{binding, adapter->second.NicId, hostAddress});
     WI_ASSERT(inserted);
-    auto rollback = wil::scope_exit([&] { m_portBindings.erase(entry); });
+    auto rollback = wil::scope_exit([this, &entry] { m_portBindings.erase(entry); });
     const auto result =
         WslOpenVmmVmBindPort(m_vm.get(), adapter->second.NicId.c_str(), Request.Listen.Port, Request.GuestPort, tcp, hostAddress.c_str());
     WSL_LOG(
