@@ -7097,13 +7097,15 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         if (LxsstuVmMode())
         {
             constexpr auto testVhd = L"EmptyVhd.vhdx";
+            constexpr auto c_testVhdSize = 20 * _1MB;
 
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { DeleteFile(testVhd); });
 
-            LxsstuLaunchPowershellAndCaptureOutput(std::format(L"New-Vhd {}  -SizeBytes 20MB", testVhd));
+            LxsstuLaunchPowershellAndCaptureOutput(std::format(L"New-Vhd {} -SizeBytes {}", testVhd, c_testVhdSize));
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--mount {} --vhd --bare", testVhd)), 0L);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkfs.ext4 /dev/sde"), 0L);
+            const auto disk = GetBlockDeviceInWsl(c_testVhdSize);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mkfs.ext4 {}", disk)), 0L);
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount"), 0L);
 
             auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--import-in-place broken-test-distro {}", testVhd), -1);
