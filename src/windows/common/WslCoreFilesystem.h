@@ -31,7 +31,7 @@ wil::unique_hfile CreateFile(
     _In_ LPCWSTR fileName, _In_ DWORD desiredAccess, _In_ DWORD shareMode, _In_ DWORD creationDisposition, _In_ DWORD flagsAndAttributes, _In_ PSID userSid);
 
 /// <summary>
-/// Create a VHD of the specified size, granting only the specified user read, write, and delete access.
+/// Create a VHD of the specified size, granting only the specified user access to the VHD.
 /// </summary>
 void CreateVhd(_In_ LPCWSTR target, _In_ ULONGLONG maximumSize, _In_ PSID userSid, _In_ BOOL sparse, _In_ BOOL fixed);
 

@@ -69,7 +69,7 @@ void wsl::core::filesystem::CreateVhd(_In_ LPCWSTR target, _In_ ULONGLONG maximu
 
     EXPLICIT_ACCESS access{};
     access.grfAccessMode = SET_ACCESS;
-    access.grfAccessPermissions = FILE_GENERIC_READ | FILE_GENERIC_WRITE | DELETE;
+    access.grfAccessPermissions = FILE_ALL_ACCESS;
     access.grfInheritance = NO_INHERITANCE;
     BuildTrusteeWithSid(&access.Trustee, userSid);
 

@@ -2023,11 +2023,16 @@ Usage:
         validateSwapSize(L"200M");
 
         WslShutdown();
+
         PACL dacl{};
         wil::unique_hlocal descriptor;
         THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
             swapVhd.c_str(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, &dacl, nullptr, &descriptor));
+
         VERIFY_IS_NOT_NULL(dacl);
+
+        // Verify that no ACE matches the VM identity, since those should not be leaked after the VM terminates.
+        constexpr auto c_virtualMachineSidPrefix = L"S-1-5-83-1-";
         for (DWORD index = 0; index < dacl->AceCount; ++index)
         {
             void* ace{};
@@ -2037,7 +2042,7 @@ Usage:
 
             wil::unique_hlocal_string sid;
             THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSidW(&allowed->SidStart, &sid));
-            VERIFY_IS_FALSE(std::wstring_view(sid.get()).starts_with(L"S-1-5-83-1-"));
+            VERIFY_IS_FALSE(std::wstring_view(sid.get()).starts_with(c_virtualMachineSidPrefix));
         }
     }
 
@@ -3246,8 +3251,9 @@ Usage:
             auto* allowed = static_cast<ACCESS_ALLOWED_ACE*>(ace);
             VERIFY_ARE_EQUAL(ACCESS_ALLOWED_ACE_TYPE, allowed->Header.AceType);
             VERIFY_ARE_EQUAL(0, allowed->Header.AceFlags);
-            VERIFY_ARE_EQUAL(FILE_GENERIC_READ | FILE_GENERIC_WRITE | DELETE, allowed->Mask);
+            VERIFY_ARE_EQUAL(FILE_ALL_ACCESS, allowed->Mask);
             VERIFY_IS_TRUE(EqualSid(&allowed->SidStart, tokenUser->User.Sid));
+            VERIFY_IS_TRUE(std::filesystem::remove(path));
         }
     }
 
