@@ -1,8 +1,8 @@
 # WslcSetContainerInitProcessIOCallbacks
 
 Sets callbacks that receive the standard output, standard error, and exit code from the init process
-of an existing container. See [`WslcProcessCallbacks`](../structures/wslcprocesscallbacks.md) for the
-individual callbacks.
+of a container that has not been started. See
+[`WslcProcessCallbacks`](../structures/wslcprocesscallbacks.md) for the individual callbacks.
 
 ```c
 STDAPI WslcSetContainerInitProcessIOCallbacks(
@@ -23,9 +23,9 @@ Call this function before [`WslcStartContainer`](wslcstartcontainer.md), and sta
 `WSLC_CONTAINER_START_FLAG_ATTACH`. It has no effect after the container is already running.
 
 Registering any callback through this function consumes both process I/O handles, so neither can
-subsequently be acquired with `WslcGetProcessIOHandle`. When using either I/O callback, also
-register `onExit`; it runs after buffered I/O has been delivered. The caller owns `context` and must
-keep it valid until `onExit` returns.
+subsequently be acquired with `WslcGetProcessIOHandle`. If registered, `onExit` runs after buffered
+I/O has been delivered and the I/O callbacks have returned. The caller owns `context` and must keep
+it valid until all registered callbacks have returned.
 
 ```c
 WslcProcessCallbacks callbacks = {0};

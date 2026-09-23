@@ -40,7 +40,7 @@ int main()
         return 1;
     }
     if ((missing & WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE) != 0) {
-        printf("Update this application to a version that uses the latest Microsoft.WSL.Containers SDK.\n");
+        printf("Update this application to a version that uses a compatible Microsoft.WSL.Containers SDK.\n");
         CoUninitialize();
         return 1;
     }

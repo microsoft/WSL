@@ -30,7 +30,7 @@ class Program
             if (component == Component.SdkNeedsUpdate)
             {
                 Console.WriteLine(
-                    "Update this application to a version that uses the latest Microsoft.WSL.Containers SDK.");
+                    "Update this application to a version that uses a compatible Microsoft.WSL.Containers SDK.");
                 return 1;
             }
         }

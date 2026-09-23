@@ -12,7 +12,7 @@ STDAPI WslcListSessionImages(_In_ WslcSession session, _Outptr_result_buffer_(*c
 
 Return value: `HRESULT`.
 
-Header note: `images` is allocated using `CoTaskMemAlloc`; free it with `CoTaskMemFree`.
+`images` is allocated using `CoTaskMemAlloc`; free it with `CoTaskMemFree`.
 
 Example:
 

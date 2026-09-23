@@ -4,30 +4,27 @@ Progress item reported by `WslcService::InstallWithDependenciesAsync(InstallOpti
 
 **Properties**
 
-- `Component()`
-- `Progress()`
-- `Total()`
+| Property | Type |
+|---|---|
+| `Component()` | `Component` |
+| `Progress()` | `uint32_t` |
+| `Total()` | `uint32_t` |
 
 ```cpp
 auto missing = WslcService::GetMissingComponents();
-std::vector<Component> installable;
 for (auto component : missing)
 {
     if (component == Component::SdkNeedsUpdate)
     {
-        printf("Update the Microsoft.WSL.Containers SDK package.\n");
-    }
-    else
-    {
-        installable.push_back(component);
+        printf("Update this application to a version that uses a compatible Microsoft.WSL.Containers SDK.\n");
+        co_return;
     }
 }
 
-if (!installable.empty())
+if (missing.Size() != 0)
 {
-    auto components = winrt::single_threaded_vector<Component>(std::move(installable));
     InstallOptions options;
-    options.Components(components.GetView());
+    options.Components(missing);
     auto install = WslcService::InstallWithDependenciesAsync(options);
     install.Progress([](auto&&, InstallProgress const& p)
     {

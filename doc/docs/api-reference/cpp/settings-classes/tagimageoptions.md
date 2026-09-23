@@ -6,9 +6,11 @@
 
 **Properties**
 
-- `Image()` / setter
-- `Repository()` / setter
-- `Tag()` / setter
+| Property | Type |
+|---|---|
+| `Image()` / setter | `hstring` |
+| `Repository()` / setter | `hstring` |
+| `Tag()` / setter | `hstring` |
 
 ```cpp
 TagImageOptions options{L"alpine:latest", L"registry.example.com/alpine", L"v1"};

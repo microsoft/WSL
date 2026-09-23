@@ -4,9 +4,11 @@ Version returned by `WslcService::GetVersion()`.
 
 **Properties**
 
-- `Major()`
-- `Minor()`
-- `Revision()`
+| Property | Type |
+|---|---|
+| `Major()` | `uint32_t` |
+| `Minor()` | `uint32_t` |
+| `Revision()` | `uint32_t` |
 
 ```cpp
 auto version = WslcService::GetVersion();

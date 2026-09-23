@@ -39,19 +39,17 @@ Console.WriteLine($"{version.Major}.{version.Minor}.{version.Revision}");
 IReadOnlyList<Component> missing = WslcService.GetMissingComponents();
 if (missing.Contains(Component.SdkNeedsUpdate))
 {
-    Console.WriteLine("Update the Microsoft.WSL.Containers SDK package.");
+    Console.WriteLine(
+        "Update this application to a version that uses a compatible Microsoft.WSL.Containers SDK.");
+    return;
 }
-
-Component[] installable = missing
-    .Where(component => component != Component.SdkNeedsUpdate)
-    .ToArray();
 
 var options = new InstallOptions
 {
-    Components = installable
+    Components = missing
 };
 
-if (installable.Length != 0)
+if (missing.Count != 0)
 {
     WslcService.InstallWithDependencies(options);
 }
@@ -63,19 +61,17 @@ if (installable.Length != 0)
 IReadOnlyList<Component> missing = WslcService.GetMissingComponents();
 if (missing.Contains(Component.SdkNeedsUpdate))
 {
-    Console.WriteLine("Update the Microsoft.WSL.Containers SDK package.");
+    Console.WriteLine(
+        "Update this application to a version that uses a compatible Microsoft.WSL.Containers SDK.");
+    return;
 }
-
-Component[] installable = missing
-    .Where(component => component != Component.SdkNeedsUpdate)
-    .ToArray();
 
 var options = new InstallOptions
 {
-    Components = installable
+    Components = missing
 };
 
-if (installable.Length != 0)
+if (missing.Count != 0)
 {
     var install = WslcService.InstallWithDependenciesAsync(options);
     install.Progress = (op, progress) =>

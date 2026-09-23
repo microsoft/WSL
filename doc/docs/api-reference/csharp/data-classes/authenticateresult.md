@@ -10,8 +10,9 @@ public sealed class AuthenticateResult
 }
 ```
 
-`IdentityToken` is a base64-encoded JSON value that can be assigned directly to
-`PullImageOptions.RegistryAuth` or `PushImageOptions.RegistryAuth`.
+`IdentityToken` contains opaque registry authentication data that can be assigned directly to
+`PullImageOptions.RegistryAuth` or `PushImageOptions.RegistryAuth`. `TokenType` identifies whether
+it represents an identity token or the supplied credentials.
 
 ```csharp
 AuthenticateResult authentication = session.Authenticate(registryUri, username, password);

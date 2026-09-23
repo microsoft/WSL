@@ -23,13 +23,11 @@ STDAPI WslcSessionAuthenticate(
 
 Return value: `HRESULT`.
 
-`identityToken` is a base64-encoded JSON value suitable for the `registryAuth` field of
-`WslcPullImageOptions` or `WslcPushImageOptions`. It contains either an `identitytoken` returned by
-the registry or the supplied username and password.
+`identityToken` contains opaque registry authentication data suitable for the `registryAuth` field
+of `WslcPullImageOptions` or `WslcPushImageOptions`.
 
-`tokenType` reports which representation is encoded. After the input arguments and session are
-validated, it is initialized to `WSLC_IDENTITY_TOKEN_TYPE_UNKNOWN` and retains that value if
-authentication fails. If input validation fails, its value is unchanged.
+On success, `tokenType` reports whether the authentication data contains an identity token or the
+supplied credentials.
 
 `identityToken` is allocated using `CoTaskMemAlloc`; free it with `CoTaskMemFree`.
 

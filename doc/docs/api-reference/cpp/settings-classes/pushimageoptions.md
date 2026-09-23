@@ -6,8 +6,10 @@
 
 **Properties**
 
-- `Image()` / setter
-- `RegistryAuth()` / setter
+| Property | Type |
+|---|---|
+| `Image()` / setter | `hstring` |
+| `RegistryAuth()` / setter | `hstring` |
 
 ```cpp
 PushImageOptions options{L"registry.example.com/demo:latest", authentication.IdentityToken()};

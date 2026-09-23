@@ -13,6 +13,6 @@ public sealed class InstallOptions
 ```
 
 If `Components` is `null`, the service determines which components require installation. Set
-`Repair` to `true` to allow selected components to be reinstalled. If the component list contains
-`Component.SdkNeedsUpdate`, installation fails because the running SDK cannot update itself. Update
-the client package and exclude that value before installing other components.
+`Repair` to `true` to allow the WSL package to be reinstalled; it has no effect when installing
+Virtual Machine Platform. If the component list contains `Component.SdkNeedsUpdate`, installation
+fails. Stop and tell the user to update the application.

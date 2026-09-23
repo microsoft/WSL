@@ -13,4 +13,4 @@ typedef enum WslcInstallOptions
 | Enumerator | Meaning |
 |---|---|
 | `WSLC_INSTALL_OPTION_NONE` | Use the normal installation or update behavior for the selected components. |
-| `WSLC_INSTALL_OPTION_REPAIR` | Request repair behavior for the selected components, including resetting WSL package registration before updating it. |
+| `WSLC_INSTALL_OPTION_REPAIR` | Allow the WSL package to be reinstalled. This option has no effect when installing Virtual Machine Platform. |

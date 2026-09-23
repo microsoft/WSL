@@ -6,8 +6,10 @@
 
 **Properties**
 
-- `Uri()` / setter
-- `RegistryAuth()` / setter
+| Property | Type |
+|---|---|
+| `Uri()` / setter | `hstring` |
+| `RegistryAuth()` / setter | `hstring` |
 
 ```cpp
 PullImageOptions options{L"docker.io/library/alpine:latest"};
