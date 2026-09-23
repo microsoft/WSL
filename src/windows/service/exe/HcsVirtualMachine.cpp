@@ -354,9 +354,9 @@ HcsVirtualMachine::~HcsVirtualMachine()
     // on in-flight HCS exit/crash callbacks, which may themselves need m_lock. OnExit() is lock-free,
     // and closing the compute system drains all callbacks, so the rest of teardown needs no lock.
 
-    // Wait up to 5 seconds for the VM to terminate gracefully.
+    // Wait up to 30 seconds for the VM to terminate gracefully.
     bool forceTerminate = false;
-    if (!m_vmExitEvent.wait(5000))
+    if (!m_vmExitEvent.wait(30000))
     {
         forceTerminate = true;
         try
