@@ -2369,16 +2369,22 @@ try
 
     // Apply the policy to a local copy without modifying the caller's options.
     auto options = *containerOptions;
-    if (options.CapAdd.Count > 0 &&
-        !wsl::windows::policies::IsFeatureAllowed(wsl::windows::policies::OpenPoliciesKey().get(), wsl::windows::policies::c_allowWSLContainerPrivileged))
+    const bool capAddIgnored = options.CapAdd.Count > 0 && !wsl::windows::policies::IsFeatureAllowed(
+                                                               wsl::windows::policies::OpenPoliciesKey().get(),
+                                                               wsl::windows::policies::c_allowWSLContainerPrivileged);
+    if (capAddIgnored)
     {
         options.CapAdd = {};
-        EMIT_USER_WARNING(Localization::MessageWslcCapabilityAdditionsDisabled());
     }
 
     auto lock = AcquireLease();
 
     auto result = wil::ResultFromException([&]() { CreateContainerImpl(&options, Container); });
+
+    if (capAddIgnored && SUCCEEDED(result))
+    {
+        EMIT_USER_WARNING(Localization::MessageWslcCapabilityAdditionsDisabled());
+    }
 
     // This telemetry event is used to keep track of the container creation failure rate and surface unexpected errors.
     WSL_LOG(
