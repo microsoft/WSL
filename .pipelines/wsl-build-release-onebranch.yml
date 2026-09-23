@@ -36,7 +36,7 @@ resources:
     - repository: releaseScripts
       type: git
       name: Microsoft.WSL/wsl-release-scripts
-      ref: refs/tags/v1
+      ref: refs/tags/v2
 
 extends:
   template: v2/Microsoft.Official.yml@templates
