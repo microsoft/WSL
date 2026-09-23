@@ -3282,13 +3282,7 @@ Usage:
         wsl::windows::common::security::unique_acl acl;
         THROW_IF_WIN32_ERROR(SetEntriesInAcl(1, &access, nullptr, &acl));
         THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
-            vhdPath.data(),
-            SE_FILE_OBJECT,
-            DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
-            nullptr,
-            nullptr,
-            acl.get(),
-            nullptr));
+            vhdPath.data(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION, nullptr, nullptr, acl.get(), nullptr));
 
         const auto nonElevatedToken = GetNonElevatedToken();
         for (const auto elevated : {true, false})
