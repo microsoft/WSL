@@ -277,7 +277,8 @@ if (NOT WSL_DEVICEHOST_BIN)
     file(CREATE_LINK ${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.pdb ${BIN}/wsldevicehost.pdb)
 endif()
 
-foreach(binary openvmm.exe openvmm.pdb wslopenvmm.dll wslopenvmm.pdb)
+# OpenVMM binaries are packaged directly from NuGet; retain PDBs for symbol publishing.
+foreach(binary openvmm.pdb wslopenvmm.pdb)
     file(CREATE_LINK "${WSL_OPENVMM_SOURCE_DIR}/bin/${TARGET_PLATFORM}/${binary}" "${BIN}/${binary}")
 endforeach()
 

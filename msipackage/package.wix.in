@@ -294,9 +294,9 @@
                 <ServiceControl Id="StopService" Stop="both" Remove="uninstall" Name="WSLService" Wait="yes" />
 
                 <File Id="wsldevicehost.dll" Source="${WSL_DEVICE_HOST_DLL_PATH}" />
-                <File Id="openvmm.exe" Source="${PACKAGE_INPUT_DIR}/openvmm.exe" />
-                <File Id="wslopenvmm.dll" Source="${PACKAGE_INPUT_DIR}/wslopenvmm.dll" />
-
+                <File Id="openvmm.exe" Source="${WSL_OPENVMM_SOURCE_DIR}/bin/${TARGET_PLATFORM}/openvmm.exe" />
+                <File Id="wslopenvmm.dll" Source="${WSL_OPENVMM_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wslopenvmm.dll" />
+                
                 <!-- WSLC COM app - activated through WSLService -->
                 <RegistryKey Root="HKCR" Key="AppID\{E9B79997-57E3-4201-AECC-6A464E530DD2}">
                     <!-- O:BAG:BAD:(A;;CCDCSW;;;AU)(A;;CCDCSW;;;PS)(A;;CCDCSW;;;SY) -->
