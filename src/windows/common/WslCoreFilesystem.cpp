@@ -67,10 +67,9 @@ void wsl::core::filesystem::CreateVhd(_In_ LPCWSTR target, _In_ ULONGLONG maximu
     //      to the VHD because the operation is done while impersonating the user.
     auto sd = windows::common::security::CreateSecurityDescriptor(userSid);
 
-    // Explicitely give access to the user, and the administrator group to the VHD.
-    // The administrator group is added because if only the user has access to the VHD, then previous version of WSL
-    // will fail to open the VHD because the it was sometimes opened with SYSTEM access.
-    // Adding the administrator group solves the issue because SYSTEM is part of the administrator group.
+    // Explicitly grant access to the user and BUILTIN\Administrators.
+    // Administrator access preserves compatibility with older WSL versions that open VHDs as SYSTEM,
+    // whose token includes the Administrators group.
     auto [administratorsSid, administratorsSidBuffer] =
         windows::common::security::CreateSid(SECURITY_NT_AUTHORITY, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS);
 

@@ -31,7 +31,8 @@ wil::unique_hfile CreateFile(
     _In_ LPCWSTR fileName, _In_ DWORD desiredAccess, _In_ DWORD shareMode, _In_ DWORD creationDisposition, _In_ DWORD flagsAndAttributes, _In_ PSID userSid);
 
 /// <summary>
-/// Create a VHD of the specified size, granting only the specified user access to the VHD.
+/// Create a VHD of the specified size, granting full access only to the specified user and BUILTIN\Administrators.
+/// Administrator access preserves compatibility with older WSL versions; inherited access is disabled.
 /// </summary>
 void CreateVhd(_In_ LPCWSTR target, _In_ ULONGLONG maximumSize, _In_ PSID userSid, _In_ BOOL sparse, _In_ BOOL fixed);
 
