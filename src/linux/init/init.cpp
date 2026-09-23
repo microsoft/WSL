@@ -3676,7 +3676,4 @@ void MountDistroCgroupNamespace(int CgroupNamespaceFd)
     THROW_LAST_ERROR_IF(umount2(CGROUP_MOUNTPOINT, MNT_DETACH) < 0);
     THROW_LAST_ERROR_IF(
         UtilMount(CGROUP2_DEVICE, CGROUP_MOUNTPOINT, CGROUP2_DEVICE, MS_NOSUID | MS_NODEV | MS_NOEXEC | MS_RELATIME, nullptr) < 0);
-
-    THROW_LAST_ERROR_IF(setns(OriginalCgroupNamespace.get(), CLONE_NEWCGROUP) < 0);
-    RestoreCgroupNamespace.release();
 }

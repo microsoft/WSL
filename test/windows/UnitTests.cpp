@@ -8141,43 +8141,42 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         debugInput.reset();
         debugOutput.reset();
 
-        constexpr auto c_checkRemainingCgroupsCommand =
-            "set -- /sys/fs/cgroup/wsl-user/distro-*; "
-            "test \"$#\" -eq 1 && test -d \"$1\" && printf '\\nWSL_CGROUP_%s\\n' CLEAN\n";
-        std::string cgroupCheckOutput;
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() {
-                DWORD bytesWritten{};
-                THROW_IF_WIN32_BOOL_FALSE(WriteFile(
-                    debugWrite.get(), c_checkRemainingCgroupsCommand, static_cast<DWORD>(strlen(c_checkRemainingCgroupsCommand)), &bytesWritten, nullptr));
-                THROW_HR_IF(E_UNEXPECTED, bytesWritten != strlen(c_checkRemainingCgroupsCommand));
+        // The debug shell echoes the script. Build "PASS" from "PA" and "SS" at runtime so the echoed command
+        // cannot satisfy the success check below.
+        constexpr auto c_checkRemainingCgroupsCommand = R"(
+{
+    if timeout 30 sh -c '
+        while true; do
+            set -- /sys/fs/cgroup/wsl-user/distro-*
+            if [ "$#" -eq 1 ] && [ -d "$1" ]; then
+                exit 0
+            fi
+            sleep 1
+        done
+    '; then
+        printf '\n%s%s\n' PA SS
+    else
+        printf '\n%s\n' FAIL
+    fi
+    busybox poweroff -f
+}
+)";
 
-                DWORD bytesAvailable{};
-                THROW_IF_WIN32_BOOL_FALSE(PeekNamedPipe(debugRead.get(), nullptr, 0, nullptr, &bytesAvailable, nullptr));
-                if (bytesAvailable != 0)
-                {
-                    std::string buffer(bytesAvailable, '\0');
-                    DWORD bytesRead{};
-                    THROW_IF_WIN32_BOOL_FALSE(ReadFile(debugRead.get(), buffer.data(), bytesAvailable, &bytesRead, nullptr));
-                    cgroupCheckOutput.append(buffer.data(), bytesRead);
-                }
+        DWORD bytesWritten{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(
+            debugWrite.get(), c_checkRemainingCgroupsCommand, static_cast<DWORD>(strlen(c_checkRemainingCgroupsCommand)), &bytesWritten, nullptr));
+        VERIFY_ARE_EQUAL(bytesWritten, strlen(c_checkRemainingCgroupsCommand));
+        debugWrite.reset();
 
-                THROW_HR_IF_MSG(
-                    E_UNEXPECTED,
-                    WaitForSingleObject(debugProcess.get(), 0) != WAIT_TIMEOUT,
-                    "Debug shell exited. Output: %hs",
-                    cgroupCheckOutput.c_str());
-                THROW_HR_IF_MSG(
-                    E_PENDING,
-                    cgroupCheckOutput.find("WSL_CGROUP_CLEAN") == std::string::npos,
-                    "Waiting for cgroup cleanup. Debug shell output: %hs",
-                    cgroupCheckOutput.c_str());
-            },
-            std::chrono::seconds(1),
-            std::chrono::seconds(30),
-            []() { return wil::ResultFromCaughtException() == E_PENDING; }));
+        VERIFY_ARE_EQUAL(WaitForSingleObject(debugProcess.get(), 60 * 1000), WAIT_OBJECT_0);
 
+        // Ensure a clean WSL state after shutting down the VM from the debug shell.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown --force"), 0L);
         keepAlive2.Reset();
+
+        const auto cgroupCheckOutput = ReadToString(debugRead.get());
+        VERIFY_IS_TRUE(cgroupCheckOutput.find("PASS") != std::string::npos);
+
         TerminateDistribution(secondDistroName);
     }
 
@@ -8321,6 +8320,39 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             message->EntriesIndex = 0;
             verifyEntries("<empty>");
         }
+    }
+
+    WSL2_TEST_METHOD(SystemdBootTimeout)
+    {
+        auto cleanupVm = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
+        auto cleanupSystemd = EnableSystemd("initTimeout=1000");
+
+        DistroFileChange bootService(L"/etc/systemd/system/wsl-test-boot-timeout.service", false);
+        bootService.SetContent(
+            L"[Unit]\n"
+            L"DefaultDependencies=no\n"
+            L"Before=multi-user.target\n"
+            L"[Service]\n"
+            L"Type=oneshot\n"
+            L"ExecStart=/bin/sleep infinity\n"
+            L"TimeoutStartSec=infinity\n"
+            L"[Install]\n"
+            L"WantedBy=multi-user.target\n");
+
+        DistroFileChange enabledService(L"/etc/systemd/system/multi-user.target.wants/wsl-test-boot-timeout.service", false);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"-u root systemctl enable wsl-test-boot-timeout.service"), 0L);
+        WslShutdown();
+
+        wsl::windows::common::SubProcess process(nullptr, LxssGenerateWslCommandLine(L"-u root echo booted").c_str());
+        const auto result = process.RunAndCaptureOutput(30 * 1000);
+        VERIFY_ARE_EQUAL(result.ExitCode, 0L);
+        VERIFY_ARE_EQUAL(result.Stdout, L"booted\n");
+
+        const auto dmesg = LxsstuLaunchWslAndCaptureOutput(L"-u root dmesg").first;
+        VERIFY_ARE_NOT_EQUAL(dmesg.find(L"failed to start within 1000ms"), std::wstring::npos);
+
+        const auto cgroup = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/self/cgroup").first;
+        VERIFY_ARE_EQUAL(cgroup, L"0::/non-systemd\n");
     }
 };
 } // namespace UnitTests
