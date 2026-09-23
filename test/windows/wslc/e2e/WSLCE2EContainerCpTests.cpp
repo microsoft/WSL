@@ -772,12 +772,106 @@ class WSLCE2EContainerCpTests
         VERIFY_ARE_NOT_EQUAL(0u, result.Stderr.value().size());
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_StdoutIsTerminal)
+    {
+        // A pseudo console gives wslc a console stdout, which a copy to '-' must reject: a tar stream
+        // written to a terminal would be rendered as text rather than captured.
+        auto session = RunWslcInteractive(L"container cp fakecontainer:/path -", ElevationType::Elevated, PseudoConsole{200, 50});
+
+        WaitForPseudoConsoleOutput(session, string::WideToMultiByte(Localization::WSLCCLI_CpStdoutIsTerminalError()));
+        VERIFY_ARE_EQUAL(1, session.Wait());
+    }
+
+    // The container to local file destination path against one container. The rejection rules themselves
+    // are covered by the ExtractSingleFileAs unit tests, so what is proven here is that a cp reaches
+    // them, and that the stdout destination produces a real archive.
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ContainerToLocal_FileDestinationBehavior)
+    {
+        auto runResult =
+            RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        runResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto execResult = RunWslc(std::format(
+            L"container exec {} sh -c \"echo stdout-dest-test > /tmp/stdoutfile.txt; mkdir -p /tmp/srcdir; echo inner > "
+            L"/tmp/srcdir/inner.txt\"",
+            WslcContainerName));
+        execResult.Verify({.ExitCode = 0});
+
+        auto workDir = std::filesystem::current_path() / L"wslc-cp-file-dest-behavior";
+        std::filesystem::create_directories(workDir);
+        auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(workDir); });
+
+        // '-' as the target writes the archive itself to standard output, rather than the file contents,
+        // so the stream can be piped into another tar.
+        const auto cpResult = RunWslcAndRedirectToFile(std::format(L"container cp {}:/tmp/stdoutfile.txt -", WslcContainerName), TarPath);
+        cpResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        VERIFY_IS_TRUE(std::filesystem::exists(TarPath));
+
+        // The first header block names the entry and carries the ustar magic, which distinguishes an
+        // archive from the file's own contents.
+        const auto header = ReadFileBytes(TarPath, 512);
+        VERIFY_IS_TRUE(header.size() >= 512);
+        VERIFY_ARE_EQUAL(std::string{"stdoutfile.txt"}, std::string{header.data()});
+        VERIFY_ARE_EQUAL(std::string{"ustar"}, std::string{header.data() + 257});
+
+        // Extracting the archive must give back the file that was copied.
+        const auto extractDir = workDir / L"extracted";
+        std::filesystem::create_directories(extractDir);
+        RunTar(std::format(L"tar.exe -xf \"{}\" -C \"{}\"", TarPath.wstring(), extractDir.wstring()));
+        VERIFY_ARE_EQUAL(std::wstring(L"stdout-dest-test\n"), ReadFileContent((extractDir / L"stdoutfile.txt").wstring()));
+
+        // A directory cannot be given a file path. The copy has to fail without creating the destination,
+        // and without leaving staging behind in the directory that would have held it.
+        const auto rejectedDir = workDir / L"rejected";
+        std::filesystem::create_directories(rejectedDir);
+        const auto targetFile = rejectedDir / L"target.txt";
+
+        const auto rejectedResult = RunWslc(std::format(L"container cp {}:/tmp/srcdir {}", WslcContainerName, targetFile.wstring()));
+        VERIFY_IS_TRUE(rejectedResult.ExitCode.has_value());
+        VERIFY_ARE_NOT_EQUAL(0u, rejectedResult.ExitCode.value());
+
+        VERIFY_IS_FALSE(std::filesystem::exists(targetFile));
+        VERIFY_ARE_EQUAL(
+            static_cast<size_t>(0),
+            static_cast<size_t>(std::distance(std::filesystem::directory_iterator(rejectedDir), std::filesystem::directory_iterator{})));
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container-cp";
     const std::wstring InvalidContainerName = L"wslc-nonexistent-container-for-cp";
     const TestImage& DebianImage = DebianTestImage();
 
     std::filesystem::path TarPath{};
+
+    // Reads up to Count bytes, so a binary artifact can be inspected without going through the text
+    // helpers that the rest of these tests use.
+    static std::string ReadFileBytes(const std::filesystem::path& Path, size_t Count)
+    {
+        std::ifstream file(Path, std::ios::binary);
+        VERIFY_IS_TRUE(file.is_open());
+
+        std::string bytes(Count, '\0');
+        file.read(bytes.data(), static_cast<std::streamsize>(Count));
+        bytes.resize(static_cast<size_t>(file.gcount()));
+
+        return bytes;
+    }
+
+    static void RunTar(const std::wstring& CommandLine)
+    {
+        auto command = CommandLine;
+        STARTUPINFOW si{sizeof(si)};
+        PROCESS_INFORMATION pi{};
+        THROW_LAST_ERROR_IF(!CreateProcessW(nullptr, command.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi));
+        wil::unique_handle tarProcess(pi.hProcess);
+        wil::unique_handle tarThread(pi.hThread);
+        WaitForSingleObject(tarProcess.get(), INFINITE);
+
+        DWORD exitCode = 0;
+        GetExitCodeProcess(tarProcess.get(), &exitCode);
+        THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
+    }
 
     // Creates a tar file containing a single text file using tar.exe.
     void CreateTestTarFile()
@@ -797,17 +891,7 @@ private:
         }
 
         // Use tar.exe to create the archive.
-        auto tarCmd = std::format(L"tar.exe -cf \"{}\" -C \"{}\" testfile.txt", TarPath.wstring(), tarSrcDir.wstring());
-        STARTUPINFOW si{sizeof(si)};
-        PROCESS_INFORMATION pi{};
-        THROW_LAST_ERROR_IF(!CreateProcessW(nullptr, tarCmd.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi));
-        wil::unique_handle tarProcess(pi.hProcess);
-        wil::unique_handle tarThread(pi.hThread);
-        WaitForSingleObject(tarProcess.get(), INFINITE);
-
-        DWORD exitCode = 0;
-        GetExitCodeProcess(tarProcess.get(), &exitCode);
-        THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
+        RunTar(std::format(L"tar.exe -cf \"{}\" -C \"{}\" testfile.txt", TarPath.wstring(), tarSrcDir.wstring()));
     }
 };
 } // namespace WSLCE2ETests

@@ -218,6 +218,15 @@ private:
 void ExtractArchiveInto(const std::filesystem::path& Destination, const std::optional<std::wstring>& RebaseName, const std::function<void(HANDLE)>& WriteArchive);
 
 /// <summary>
+/// Extracts a tar stream holding a single file and places it at DestinationFile, creating the parent
+/// directory if it is missing. tar.exe cannot rename entries, so the entry is staged beside the
+/// destination and moved into place under the requested name. A file path names one entry, so an
+/// archive that is empty, holds several entries, or holds a directory is rejected before anything
+/// is moved.
+/// </summary>
+void ExtractSingleFileAs(const std::filesystem::path& DestinationFile, const std::function<void(HANDLE)>& WriteArchive);
+
+/// <summary>
 /// Copies the tree at Resolved to LinkName under StagingRoot and returns the copied path. Links inside the
 /// tree are kept as links, so only the one that was named is dereferenced.
 /// </summary>

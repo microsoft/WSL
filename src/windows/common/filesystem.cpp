@@ -1139,6 +1139,38 @@ void wsl::windows::common::filesystem::ExtractArchiveInto(
     }
 }
 
+void wsl::windows::common::filesystem::ExtractSingleFileAs(const std::filesystem::path& DestinationFile, const std::function<void(HANDLE)>& WriteArchive)
+{
+    const auto destinationDirectory = DestinationFile.parent_path();
+
+    std::error_code dirError;
+    std::filesystem::create_directories(destinationDirectory, dirError);
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", destinationDirectory.c_str());
+
+    // Staging inside the destination directory keeps the move below on one volume, so it stays a rename.
+    const StagingDirectory staging(destinationDirectory);
+    ExtractTarStream(staging.Path(), WriteArchive);
+
+    std::vector<std::filesystem::path> staged;
+    for (const auto& entry : std::filesystem::directory_iterator(staging.Path()))
+    {
+        staged.push_back(entry.path());
+    }
+
+    THROW_HR_WITH_USER_ERROR_IF(E_FAIL, wsl::shared::Localization::WSLCCLI_CpNoFileExtractedError(), staged.empty());
+
+    // symlink_status keeps a link to a directory classed as the single entry it is, rather than as the
+    // tree it points at. A name that cannot be queried is left to the move below, which reports why.
+    std::error_code statusError;
+    const auto stagedStatus = std::filesystem::symlink_status(staged.front(), statusError);
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_FAIL,
+        wsl::shared::Localization::WSLCCLI_CpSourceIsDirectoryError(),
+        staged.size() > 1 || (!statusError && std::filesystem::is_directory(stagedStatus)));
+
+    MoveOver(staged.front(), DestinationFile);
+}
+
 std::filesystem::path wsl::windows::common::filesystem::StageDereferencedTree(
     const std::filesystem::path& StagingRoot, const std::filesystem::path& LinkName, const std::filesystem::path& Resolved)
 {
