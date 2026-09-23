@@ -1,6 +1,7 @@
 # WSL Tests
 #
-# Unit tests live in unit/ and end-to-end tests live in e2e/.
+# End-to-end tests live in e2e/. Unit tests for src/windows/common live in
+# ../common/unit/.
 
 file(GLOB_RECURSE WSL_TEST_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
@@ -24,6 +25,5 @@ target_include_directories(wsltests PRIVATE
     ${CMAKE_SOURCE_DIR}/test
     ${CMAKE_SOURCE_DIR}/test/windows
     ${CMAKE_SOURCE_DIR}/test/windows/common
-    ${CMAKE_SOURCE_DIR}/test/windows/wsl/unit
     ${CMAKE_SOURCE_DIR}/test/windows/wsl/e2e
 )

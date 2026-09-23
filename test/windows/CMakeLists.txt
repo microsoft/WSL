@@ -5,9 +5,15 @@ set(HEADERS
     common/Common.h
     common/lxsstest.h)
 
+# Unit tests for src/windows/common live in common/unit/. Tests for the
+# src/windows/common/wslc/ subtree stay under wslc/unit/ with the rest of WSLC.
+file(GLOB_RECURSE COMMON_TEST_SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/common/unit/*.cpp
+)
+
 add_compile_definitions(INLINE_TEST_METHOD_MARKUP)
 
-add_library(wsltests SHARED ${SOURCES} ${HEADERS})
+add_library(wsltests SHARED ${SOURCES} ${HEADERS} ${COMMON_TEST_SOURCES})
 
 target_include_directories(wsltests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/common

@@ -43,5 +43,7 @@ void WSLCTestFixtureCleanup()
         }
     }
 
+    WSACleanup();
+
     fixture.Initialized = false;
 }
