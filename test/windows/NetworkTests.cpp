@@ -2818,7 +2818,7 @@ class NetworkTests
                               L"while [ ! -e {0} ]; do sleep 0.1; done\n"
                               L"printf 'response-while-forward-blocked'\n"
                               L"while [ ! -e {1} ]; do sleep 0.1; done\n"
-                              L"cat >/dev/null\n",
+                              L"printf 'drained:%s\\n' \"$(wc -c)\"\n",
                               sendSignalPath,
                               drainSignalPath)
                               .c_str());
@@ -2849,6 +2849,7 @@ class NetworkTests
         VERIFY_ARE_EQUAL(ioctlsocket(hostSocket.get(), FIONBIO, &nonBlocking), 0);
 
         const std::string payload(64 * 1024, 'x');
+        size_t totalBytesSent = 0;
         bool sendBlocked = false;
         const auto sendDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
         while (std::chrono::steady_clock::now() < sendDeadline)
@@ -2856,6 +2857,7 @@ class NetworkTests
             const auto bytesSent = send(hostSocket.get(), payload.data(), static_cast<int>(payload.size()), 0);
             if (bytesSent > 0)
             {
+                totalBytesSent += static_cast<size_t>(bytesSent);
                 continue;
             }
 
@@ -2865,34 +2867,38 @@ class NetworkTests
             break;
         }
         VERIFY_IS_TRUE(sendBlocked);
+        VERIFY_IS_GREATER_THAN(totalBytesSent, size_t{0});
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"touch {}", sendSignalPath)), 0L);
 
-        constexpr std::string_view response = "response-while-forward-blocked";
-        std::string received;
-        wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() {
-                std::array<char, 64> receiveBuffer{};
-                const auto bytesReceived = recv(hostSocket.get(), receiveBuffer.data(), static_cast<int>(receiveBuffer.size()), 0);
-                if (bytesReceived == SOCKET_ERROR)
-                {
-                    const auto error = WSAGetLastError();
-                    THROW_HR_IF(HRESULT_FROM_WIN32(error), error != WSAEWOULDBLOCK);
-                }
-                else
-                {
-                    THROW_HR_IF(E_UNEXPECTED, bytesReceived == 0);
-                    received.append(receiveBuffer.data(), static_cast<size_t>(bytesReceived));
-                }
+        auto verifyResponse = [&](std::string_view response) {
+            std::string received;
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() {
+                    std::array<char, 64> receiveBuffer{};
+                    const auto bytesReceived = recv(hostSocket.get(), receiveBuffer.data(), static_cast<int>(receiveBuffer.size()), 0);
+                    if (bytesReceived == SOCKET_ERROR)
+                    {
+                        const auto error = WSAGetLastError();
+                        THROW_HR_IF(HRESULT_FROM_WIN32(error), error != WSAEWOULDBLOCK);
+                    }
+                    else
+                    {
+                        THROW_HR_IF(E_UNEXPECTED, bytesReceived == 0);
+                        received.append(receiveBuffer.data(), static_cast<size_t>(bytesReceived));
+                    }
 
-                THROW_HR_IF(E_PENDING, received.size() < response.size());
-            },
-            std::chrono::milliseconds(100),
-            std::chrono::seconds(10));
-        VERIFY_ARE_EQUAL(received, response);
+                    THROW_HR_IF(E_PENDING, received.size() < response.size());
+                },
+                std::chrono::milliseconds(100),
+                std::chrono::seconds(10));
+            VERIFY_ARE_EQUAL(received, response);
+        };
+        verifyResponse("response-while-forward-blocked");
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"touch {}", drainSignalPath)), 0L);
         VERIFY_ARE_EQUAL(shutdown(hostSocket.get(), SD_SEND), 0);
+        verifyResponse(std::format("drained:{}\n", totalBytesSent));
     }
 
     static void TestNonRootNamespaceEphemeralBind()
