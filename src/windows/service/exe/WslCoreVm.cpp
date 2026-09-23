@@ -1795,7 +1795,24 @@ std::wstring WslCoreVm::GenerateConfigJson()
     // inherited ACLs; otherwise StartComputeSystem will surface E_ACCESSDENIED.
     auto attachDisk = [&](PCWSTR path, bool grantVmAccess) {
         auto lun = ReserveLun();
-        auto backingFile = OpenVhdBackingFile(path, grantVmAccess ? m_userToken.get() : nullptr);
+        wil::unique_hfile backingFile;
+        try
+        {
+            backingFile = OpenVhdBackingFile(path, grantVmAccess ? m_userToken.get() : nullptr);
+        }
+        catch (...)
+        {
+            if (!grantVmAccess || wil::ResultFromCaughtException() != E_ACCESSDENIED)
+            {
+                throw;
+            }
+
+            LOG_CAUGHT_EXCEPTION();
+
+            // Custom VHDs may be accessible only to the service and VMWP.
+            backingFile = OpenVhdBackingFile(path, nullptr);
+        }
+
         hcs::Attachment disk{};
         disk.Type = hcs::AttachmentType::VirtualDisk;
         disk.Path = path;

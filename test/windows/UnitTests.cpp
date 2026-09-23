@@ -1991,7 +1991,7 @@ Usage:
     WSL2_TEST_METHOD(TestExistingSwapVhd)
     {
         // Create a 100MB swap vhdx.
-        auto swapVhd = wil::GetCurrentDirectoryW<std::wstring>() + L"\\TestSwap.vhdx";
+        const auto swapVhd = wil::GetCurrentDirectoryW<std::wstring>() + L"\\TestSwap.vhdx";
 
         const auto tokenUser = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
         wsl::core::filesystem::CreateVhd(swapVhd.c_str(), 100 * _1MB, tokenUser->User.Sid, false, false);
@@ -2001,14 +2001,14 @@ Usage:
             DeleteFile(swapVhd.c_str());
         });
 
-        // Update .wslconfig. Update the swapVhd path to replace single backslash
+        // Update .wslconfig. Escape the swapVhd path to replace single backslash
         // with double backslashes so as to be compatible with .wslconfig parsing.
         // The following regex replacement only works as intended if the path contains
         // single backslashes. Negative lookahead can be used to handle paths with double
         // backslashes but then the negative lookbehind case should also be used but the
         // latter is not supported in std::regex.
-        swapVhd = std::regex_replace(swapVhd, std::wregex(L"\\\\"), L"\\\\");
-        WslConfigChange configChange(LxssGenerateTestConfig() + L"\nswap=256MB\nswapFile=" + swapVhd);
+        const auto escapedSwapVhd = std::regex_replace(swapVhd, std::wregex(L"\\\\"), L"\\\\");
+        WslConfigChange configChange(LxssGenerateTestConfig() + L"\nswap=256MB\nswapFile=" + escapedSwapVhd);
 
         auto validateSwapSize = [](LPCWSTR Expected) {
             auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"swapon | awk 'END {print $3}'");
@@ -2019,7 +2019,7 @@ Usage:
         validateSwapSize(L"256M");
 
         // Validate that the vhdx is resized correctly if the swap size changes
-        configChange.Update(LxssGenerateTestConfig() + L"\nswap=200MB\nswapFile=" + swapVhd);
+        configChange.Update(LxssGenerateTestConfig() + L"\nswap=200MB\nswapFile=" + escapedSwapVhd);
         validateSwapSize(L"200M");
 
         WslShutdown();
