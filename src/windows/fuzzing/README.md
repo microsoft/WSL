@@ -57,7 +57,7 @@ The nightly pipeline (`.pipelines/fuzzing-stage.yml`) builds the harnesses + MSI
 
 ### VM Setup
 
-`setup.ps1` runs on the OneFuzz VM before fuzzing. It enables Hyper-V, enables WSL, and installs `wsl.msi` from the build drop. `RebootAfterSetup` is enabled so features activate before the harness runs.
+`setup.ps1` runs on the OneFuzz VM before fuzzing. It enables WSL and the Virtual Machine Platform optional feature, then installs `wsl.msi` from the build drop. `RebootAfterSetup` is enabled so features activate before the harness runs.
 
 The script lives at `tools\test\fuzzing-setup.ps1` and is staged into the drop as `setup.ps1` (the name OneFuzz executes).
 
