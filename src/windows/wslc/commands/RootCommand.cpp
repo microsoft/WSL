@@ -28,6 +28,8 @@ using namespace wsl::windows::wslc::execution;
 using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
+
+using namespace wsl::windows::wslc::cli;
 std::vector<std::unique_ptr<Command>> RootCommand::CreateCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
@@ -42,6 +44,7 @@ std::vector<std::unique_ptr<Command>> RootCommand::CreateCommands() const
     commands.push_back(std::make_unique<ImageBuildCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerCreateCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerExecCommand>(FullName()));
+    commands.push_back(std::make_unique<SystemEventsCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerExportCommand>(FullName()));
     commands.push_back(std::make_unique<ImageListCommand>(FullName(), true));
     commands.push_back(std::make_unique<ImageImportCommand>(FullName()));

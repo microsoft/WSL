@@ -111,6 +111,8 @@ InputSource OpenImageInput(const std::wstring& input)
 
 namespace wsl::windows::wslc::services {
 
+using namespace wsl::windows::wslc::cli;
+
 using namespace wsl::windows::wslc::models;
 using wsl::windows::common::wslc_schema::InspectImage;
 
@@ -290,7 +292,7 @@ void ImageService::Build(
 }
 
 std::vector<ImageInformation> ImageService::List(
-    wsl::windows::wslc::models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters, bool containerCounts, bool all)
+    wsl::windows::wslc::models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters, bool containerCounts, bool all, bool digests)
 {
     std::vector<WSLCFilter> filterEntries;
     filterEntries.reserve(filters.size());
@@ -303,6 +305,7 @@ std::vector<ImageInformation> ImageService::List(
     options.Flags = WSLCListImagesFlagsNone;
     WI_SetFlagIf(options.Flags, WSLCListImagesFlagsContainerCounts, containerCounts);
     WI_SetFlagIf(options.Flags, WSLCListImagesFlagsAll, all);
+    WI_SetFlagIf(options.Flags, WSLCListImagesFlagsDigests, digests);
     options.Filters = filterEntries.empty() ? nullptr : filterEntries.data();
     options.FiltersCount = static_cast<ULONG>(filterEntries.size());
 
@@ -326,6 +329,12 @@ std::vector<ImageInformation> ImageService::List(
         }
 
         info.Id = image.Hash;
+
+        if (digests)
+        {
+            info.Digest = DigestFromRepoDigest(image.Digest);
+        }
+
         info.Created = image.Created;
         info.Size = image.Size;
         info.Containers = image.Containers;

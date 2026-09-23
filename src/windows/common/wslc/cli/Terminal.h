@@ -29,7 +29,7 @@ Abstract:
 #include <type_traits>
 #include <utility>
 
-namespace wsl::windows::wslc {
+namespace wsl::windows::wslc::cli {
 
 // Fallback width for progress displays when the console width can't be queried. This
 // value already includes the autowrap guard (visible width minus one) so a wrapped line
@@ -106,6 +106,12 @@ struct Terminal
     void Error(std::wformat_string<Args...> fmt, Args&&... args)
     {
         EmitFormatted(Level::Error, std::move(fmt), std::forward<Args>(args)...);
+    }
+
+    // Makes redirected output visible before a blocking operation.
+    void Flush(Level level) const
+    {
+        ChannelFor(level).Flush();
     }
 
     // True when user input is attached to an interactive console (a prompt can be
@@ -206,4 +212,4 @@ private:
     bool m_noColor = false;
 };
 
-} // namespace wsl::windows::wslc
+} // namespace wsl::windows::wslc::cli

@@ -18,11 +18,20 @@ Abstract:
 #include <wslc.h>
 
 namespace wsl::windows::wslc::services {
+
+using namespace wsl::windows::wslc::cli;
 struct SessionInformation
 {
     ULONG SessionId;
     DWORD CreatorPid;
     std::wstring DisplayName;
+};
+
+struct EventStreamOptions
+{
+    LONGLONG Since{};
+    LONGLONG Until{};
+    std::vector<std::pair<std::string, std::string>> Filters;
 };
 
 struct SessionService
@@ -39,6 +48,7 @@ struct SessionService
     static wsl::windows::wslc::models::Session OpenOrCreateDefaultSession(Terminal& terminal);
     // Runs the given command and arguments in a session without a TTY, resolving the executable from PATH.
     static int Run(Terminal& terminal, const wsl::windows::wslc::models::Session& session, const std::vector<std::string>& arguments);
+    static void StreamEvents(Terminal& terminal, const wsl::windows::wslc::models::Session& session, const EventStreamOptions& options, HANDLE cancelEvent);
     static int TerminateSession(Terminal& terminal, const wsl::windows::wslc::models::Session& session);
 
 private:

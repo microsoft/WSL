@@ -1222,8 +1222,8 @@ Consulte as instruções de recuperação em: https://aka.ms/wsldiskmountrecover
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
-    <value>O Cgroup v1 é incompatível com o isolamento de cgroup por distribuição. Para usar o cgroup v1, defina isolateDistroCgroup=false em [wsl2] em .wslconfig e execute wsl --shutdown.</value>
-    <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+    <value>O Cgroup v1 é incompatível com o isolamento de cgroup por distribuição. Usando o cgroup v2 em vez disso. Para usar o cgroup v1, defina isolateDistroCgroup=false em [wsl2] em .wslconfig e execute wsl --shutdown.</value>
+    <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Algo não deu certo. Tente novamente mais tarde.</value>
@@ -1731,24 +1731,24 @@ Reserve um momento para visualizar alguns dos recursos favoritos da comunidade o
     <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
   </data>
   <data name="Settings_OOBEWSLContainer.Description" xml:space="preserve">
-    <value>Easily run Linux containers on Windows as a first-class experience.
+    <value>Execute facilmente contêineres do Linux no Windows como uma experiência de primeira classe.
     
-You can use wslc.exe to build, run, push, pull, and manage Linux containers directly on Windows.
+Você pode usar wslc.exe para compilar, executar, efetuar push, efetuar pull e gerenciar contêineres do Linux diretamente no Windows.
 
-You can also use the WSLC API to build Windows applications whose runtime logic is powered by Linux containers, making it easier to embed Linux containers directly into your app for cloud-to-local workflows, AI applications, and isolation.</value>
+Você também pode usar a API do WSLC para criar aplicativos do Windows cuja lógica de runtime é alimentada por contêineres do Linux, facilitando a inserção de contêineres do Linux diretamente em seu aplicativo para fluxos de trabalho de nuvem para local, aplicativos de IA e isolamento.</value>
   </data>
   <data name="Settings_OOBEWSLContainer.Title" xml:space="preserve">
-    <value>WSL container</value>
+    <value>Contêiner WSL</value>
   </data>
   <data name="Settings_OOBEWSLContainer_LearnMoreLink.Content" xml:space="preserve">
-    <value>Learn more about WSL container</value>
+    <value>Saiba mais sobre o contêiner WSL</value>
   </data>
   <data name="Settings_OOBEWSLContainer_LearnMoreLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslc</value>
     <comment>{Locked}Uri to the WSL container documentation</comment>
   </data>
   <data name="Settings_OOBEWSLContainer_APIReferenceLink.Content" xml:space="preserve">
-    <value>WSL container API reference</value>
+    <value>Referência da API de contêiner WSL</value>
   </data>
   <data name="Settings_OOBEWSLContainer_APIReferenceLink.NavigateUri" xml:space="preserve">
     <value>https://wsl.dev/api-reference/</value>
@@ -2734,6 +2734,10 @@ Exemplo: tar -cf - arquivos | wslc container cp - CONTAINER:/path</value>
   <data name="WSLCCLI_CpDestinationTypeMismatchError" xml:space="preserve">
     <value>Não é possível substituir '{0}' porque é um tipo diferente da entrada copiada.</value>
     <comment>{0} is the destination path. Shown when a file would replace a directory, or a directory would replace a file.</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceNameNotRepresentableError" xml:space="preserve">
+    <value>Não é possível copiar '{0}' porque seu nome não pode ser usado como um nome de arquivo do Windows.</value>
+    <comment>{0} is the source path. Shown when the container source name holds a character that is not valid in a Windows file name.</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Inspecionar um contêiner.</value>
