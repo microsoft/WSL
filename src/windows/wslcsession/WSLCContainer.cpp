@@ -1386,6 +1386,14 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     }
 
     {
+        // VM teardown waits for event delivery while holding the runtime lock exclusively. Do not
+        // block behind it; recovery will reconstruct any transition dropped during teardown.
+        auto runtimeLock = m_runtime.TryLockShared();
+        if (!runtimeLock || !m_runtime.HasDocker() || m_runtime.VmExited())
+        {
+            return;
+        }
+
         auto lifecycleLock = m_lifecycleLock.lock_exclusive();
         auto lock = m_lock.lock_exclusive();
         transition = m_transition;
@@ -1993,8 +2001,7 @@ try
 
     if (!dockerInspect.State.Running)
     {
-        ResolvePolicyRestartLockHeld(false);
-        [[maybe_unused]] const auto transition = OnFailedRestartExclusiveLockHeld();
+        ResolvePolicyRestartLockHeld(true);
         return;
     }
 
