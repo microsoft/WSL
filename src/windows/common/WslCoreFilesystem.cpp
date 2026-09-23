@@ -67,14 +67,26 @@ void wsl::core::filesystem::CreateVhd(_In_ LPCWSTR target, _In_ ULONGLONG maximu
     //      to the VHD because the operation is done while impersonating the user.
     auto sd = windows::common::security::CreateSecurityDescriptor(userSid);
 
-    EXPLICIT_ACCESS access{};
-    access.grfAccessMode = SET_ACCESS;
-    access.grfAccessPermissions = FILE_ALL_ACCESS;
-    access.grfInheritance = NO_INHERITANCE;
-    BuildTrusteeWithSid(&access.Trustee, userSid);
+    // Explicitely give access to the user, and the administrator group to the VHD.
+    // The administrator group is added because if only the user has access to the VHD, then previous version of WSL
+    // will fail to open the VHD because the it was sometimes opened with SYSTEM access.
+    // Adding the administrator group solves the issue because SYSTEM is part of the administrator group.
+    auto [administratorsSid, administratorsSidBuffer] =
+        windows::common::security::CreateSid(SECURITY_NT_AUTHORITY, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS);
+
+    EXPLICIT_ACCESS access[2]{};
+    access[0].grfAccessMode = SET_ACCESS;
+    access[0].grfAccessPermissions = FILE_ALL_ACCESS;
+    access[0].grfInheritance = NO_INHERITANCE;
+    BuildTrusteeWithSid(&access[0].Trustee, userSid);
+
+    access[1].grfAccessMode = SET_ACCESS;
+    access[1].grfAccessPermissions = FILE_ALL_ACCESS;
+    access[1].grfInheritance = NO_INHERITANCE;
+    BuildTrusteeWithSid(&access[1].Trustee, administratorsSid);
 
     windows::common::security::unique_acl acl;
-    THROW_IF_WIN32_ERROR(SetEntriesInAcl(1, &access, nullptr, &acl));
+    THROW_IF_WIN32_ERROR(SetEntriesInAcl(ARRAYSIZE(access), access, nullptr, &acl));
     THROW_IF_WIN32_BOOL_FALSE(SetSecurityDescriptorDacl(&sd, true, acl.get(), false));
 
     // Do not inherit permissions that could grant other users access to the VHD.

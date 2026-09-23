@@ -3206,6 +3206,9 @@ Usage:
         const auto path = std::filesystem::path(L"wsl-test-vhd-permissions.vhdx");
 
         const auto tokenUser = wil::get_token_information<TOKEN_USER>();
+        auto [administratorsSid, administratorsSidBuffer] =
+            wsl::windows::common::security::CreateSid(SECURITY_NT_AUTHORITY, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS);
+
         for (const auto fixed : {false, true})
         {
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove(path); });
@@ -3219,21 +3222,92 @@ Usage:
 
             VERIFY_IS_TRUE(EqualSid(owner, tokenUser->User.Sid));
             VERIFY_IS_NOT_NULL(dacl);
-            VERIFY_ARE_EQUAL(1, dacl->AceCount);
+            VERIFY_ARE_EQUAL(2, dacl->AceCount);
 
             SECURITY_DESCRIPTOR_CONTROL control{};
             DWORD revision{};
             THROW_IF_WIN32_BOOL_FALSE(GetSecurityDescriptorControl(descriptor.get(), &control, &revision));
             VERIFY_IS_TRUE(WI_IsFlagSet(control, SE_DACL_PROTECTED));
 
-            void* ace{};
-            THROW_IF_WIN32_BOOL_FALSE(GetAce(dacl, 0, &ace));
-            auto* allowed = static_cast<ACCESS_ALLOWED_ACE*>(ace);
-            VERIFY_ARE_EQUAL(ACCESS_ALLOWED_ACE_TYPE, allowed->Header.AceType);
-            VERIFY_ARE_EQUAL(0, allowed->Header.AceFlags);
-            VERIFY_ARE_EQUAL(FILE_ALL_ACCESS, allowed->Mask);
-            VERIFY_IS_TRUE(EqualSid(&allowed->SidStart, tokenUser->User.Sid));
+            bool foundUser = false;
+            bool foundAdministrators = false;
+            for (DWORD index = 0; index < dacl->AceCount; ++index)
+            {
+                void* ace{};
+                THROW_IF_WIN32_BOOL_FALSE(GetAce(dacl, index, &ace));
+                auto* allowed = static_cast<ACCESS_ALLOWED_ACE*>(ace);
+                VERIFY_ARE_EQUAL(ACCESS_ALLOWED_ACE_TYPE, allowed->Header.AceType);
+                VERIFY_ARE_EQUAL(0, allowed->Header.AceFlags);
+                VERIFY_ARE_EQUAL(FILE_ALL_ACCESS, allowed->Mask);
+                if (EqualSid(&allowed->SidStart, tokenUser->User.Sid))
+                {
+                    foundUser = true;
+                }
+                else
+                {
+                    VERIFY_IS_TRUE(EqualSid(&allowed->SidStart, administratorsSid));
+                    foundAdministrators = true;
+                }
+            }
+
+            VERIFY_IS_TRUE(foundUser);
+            VERIFY_IS_TRUE(foundAdministrators);
             VERIFY_IS_TRUE(std::filesystem::remove(path));
+        }
+    }
+
+    WSL2_TEST_METHOD(SetSparseWithProtectedVhd)
+    {
+        constexpr auto name = L"sparse-protected-test-distro";
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
+        auto cleanup =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
+        WslShutdown();
+
+        const auto distroKey = OpenDistributionKey(name);
+        VERIFY_IS_NOT_NULL(distroKey.get());
+        const auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath", L"");
+        const auto vhdFileName =
+            wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"VhdFileName", L"ext4.vhdx");
+        auto vhdPath = (std::filesystem::path(basePath) / vhdFileName).wstring();
+
+        // Remove SYSTEM and Administrators access so success requires impersonating the user.
+        const auto tokenUser = wil::get_token_information<TOKEN_USER>();
+        EXPLICIT_ACCESS access{};
+        access.grfAccessMode = SET_ACCESS;
+        access.grfAccessPermissions = FILE_ALL_ACCESS;
+        access.grfInheritance = NO_INHERITANCE;
+        BuildTrusteeWithSid(&access.Trustee, tokenUser->User.Sid);
+
+        wsl::windows::common::security::unique_acl acl;
+        THROW_IF_WIN32_ERROR(SetEntriesInAcl(1, &access, nullptr, &acl));
+        THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
+            vhdPath.data(),
+            SE_FILE_OBJECT,
+            DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
+            nullptr,
+            nullptr,
+            acl.get(),
+            nullptr));
+
+        const auto nonElevatedToken = GetNonElevatedToken();
+        for (const auto elevated : {true, false})
+        {
+            for (const auto sparse : {true, false})
+            {
+                VERIFY_ARE_EQUAL(
+                    LxsstuLaunchWsl(
+                        std::format(L"--manage {} --set-sparse {} --allow-unsafe", name, sparse ? L"true" : L"false"),
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        elevated ? nullptr : nonElevatedToken.get()),
+                    0L);
+
+                const auto attributes = GetFileAttributesW(vhdPath.c_str());
+                VERIFY_ARE_NOT_EQUAL(INVALID_FILE_ATTRIBUTES, attributes);
+                VERIFY_ARE_EQUAL(sparse, WI_IsFlagSet(attributes, FILE_ATTRIBUTE_SPARSE_FILE));
+            }
         }
     }
 
