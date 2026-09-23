@@ -119,6 +119,12 @@ const TestImage& DebianTestImage()
     return image;
 }
 
+const TestImage& DockerfileFrontendTestImage()
+{
+    static const TestImage image{L"docker/dockerfile", L"1", std::filesystem::path{g_testDataPath} / L"dockerfile-frontend.tar"};
+    return image;
+}
+
 const TestImage& HelloWorldTestImage()
 {
     static const TestImage image{L"hello-world", L"latest", std::filesystem::path{g_testDataPath} / L"HelloWorldSaved.tar"};

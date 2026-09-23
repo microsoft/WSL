@@ -180,6 +180,9 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(WSLC_E_NETWORK_NOT_FOUND),
     X(WSLC_E_SESSION_NOT_FOUND),
     X(WSLC_E_VM_NOT_RUNNING),
+    X(WSLC_E_CONTAINER_DELETED),
+    X(WSLC_E_EVENTS_LOST),
+    X(WSLC_E_EVENT_STREAM_FINISHED),
     X(WSLC_E_WU_SEARCH_FAILED),
     X_WIN32(RPC_S_SERVER_UNAVAILABLE),
     X_WIN32(ERROR_ELEVATION_REQUIRED),
@@ -1432,11 +1435,22 @@ std::tuple<uint32_t, uint32_t, uint32_t> wsl::windows::common::wslutil::ParseWsl
 
 wsl::windows::common::wslutil::ImageReference wsl::windows::common::wslutil::ImageReference::Parse(const std::string& input)
 {
+    auto reference = TryParse(input);
+    if (!reference.has_value())
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageWslcInvalidImage(input.c_str()));
+    }
+
+    return std::move(reference.value());
+}
+
+std::optional<wsl::windows::common::wslutil::ImageReference> wsl::windows::common::wslutil::ImageReference::TryParse(const std::string& input)
+{
     static const auto regex = BuildImageReferenceRegex();
     std::smatch match;
     if (!std::regex_match(input, match, regex))
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageWslcInvalidImage(input.c_str()));
+        return std::nullopt;
     }
 
     const auto& repo = match[1];

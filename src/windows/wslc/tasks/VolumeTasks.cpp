@@ -14,6 +14,7 @@ Abstract:
 #include "Argument.h"
 #include "ArgumentConvertedTypes.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "VolumeModel.h"
 #include "VolumeService.h"
 #include "VolumeTasks.h"
@@ -30,6 +31,8 @@ using namespace wsl::windows::wslc::services;
 using wsl::windows::common::string::FormatHumanReadableSize;
 
 namespace wsl::windows::wslc::task {
+
+using namespace wsl::windows::wslc::cli;
 
 namespace {
 
@@ -217,7 +220,7 @@ void ListVolumes(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        auto table = wsl::windows::wslc::TableOutput<2>(context.Terminal, {L"DRIVER", L"VOLUME NAME"});
+        auto table = wsl::windows::wslc::cli::TableOutput<2>(context.Terminal, {L"DRIVER", L"VOLUME NAME"});
         for (const auto& volume : volumes)
         {
             table.WriteRow({
@@ -236,6 +239,11 @@ void ListVolumes(CLIExecutionContext& context)
 
 void PruneVolumes(CLIExecutionContext& context)
 {
+    context.Data.Add<Data::ConfirmWarning>(
+        context.Args.GetValue<ArgType::All>() ? Localization::WSLCCLI_VolumePruneAllConfirm() : Localization::WSLCCLI_VolumePruneConfirm());
+    context.Data.Add<Data::ConfirmMessage>(Localization::WSLCCLI_PruneConfirmPrompt());
+    ConfirmAction(context);
+
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
 
