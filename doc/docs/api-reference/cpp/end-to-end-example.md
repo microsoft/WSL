@@ -37,7 +37,7 @@ int main()
     {
         if (component == Component::SdkNeedsUpdate)
         {
-            printf("Update this application to a version that uses a compatible Microsoft.WSL.Containers SDK.\n");
+            printf("This application is incompatible with the installed WSL runtime.\n");
             return 1;
         }
     }

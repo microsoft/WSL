@@ -21,9 +21,9 @@ Callbacks are only made for components actively installed by this call. The list
 components can be acquired beforehand with
 [`WslcGetMissingComponents`](wslcgetmissingcomponents.md).
 
-`WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE` reports that the client SDK must be updated. If `components`
-contains this flag, the function immediately returns `WSLC_E_SDK_UPDATE_NEEDED` without installing
-any components. The application should stop and tell the user to update the application.
+`WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE` reports that the client SDK is incompatible with the
+installed WSL runtime. If `components` contains this flag, the function immediately returns
+`WSLC_E_SDK_UPDATE_NEEDED` without installing any components.
 
 Example:
 
@@ -44,7 +44,7 @@ if (SUCCEEDED(hr))
 {
     if ((missing & WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE) != 0)
     {
-        printf("Update this application to a version that uses a compatible Microsoft.WSL.Containers SDK.\n");
+        hr = WSLC_E_SDK_UPDATE_NEEDED;
     }
     else if (missing != WSLC_COMPONENT_FLAG_NONE)
     {

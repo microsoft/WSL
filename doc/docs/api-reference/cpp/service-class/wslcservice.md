@@ -15,8 +15,8 @@ Static entry points over the service-level C API.
 - `GetVersion()` returns a `ServiceVersion` constructed from `major`, `minor`, and `revision`.
 - `InstallWithDependencies()` installs the selected components synchronously.
 - `InstallWithDependenciesAsync()` runs on a background thread and reports `InstallProgress`.
-- If `GetMissingComponents()` returns `Component::SdkNeedsUpdate`, stop and tell the user to update
-  the application.
+- If `GetMissingComponents()` returns `Component::SdkNeedsUpdate`, installation cannot resolve the
+  SDK compatibility error.
 
 ```cpp
 auto missing = WslcService::GetMissingComponents();
@@ -24,7 +24,7 @@ for (auto component : missing)
 {
     if (component == Component::SdkNeedsUpdate)
     {
-        printf("Update this application to a version that uses a compatible Microsoft.WSL.Containers SDK.\n");
+        // Installing components cannot resolve this compatibility error.
         co_return;
     }
 }

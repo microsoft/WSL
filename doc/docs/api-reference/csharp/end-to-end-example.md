@@ -29,8 +29,7 @@ class Program
         {
             if (component == Component.SdkNeedsUpdate)
             {
-                Console.WriteLine(
-                    "Update this application to a version that uses a compatible Microsoft.WSL.Containers SDK.");
+                Console.WriteLine("This application is incompatible with the installed WSL runtime.");
                 return 1;
             }
         }

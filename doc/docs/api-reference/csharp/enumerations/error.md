@@ -12,7 +12,7 @@
 | `InvalidSessionName` | `-2147219960` | `0x80040608` | The session name is invalid. |
 | `NetworkNotFound` | `-2147219959` | `0x80040609` | The requested network was not found. |
 | `WindowsUpdateSearchFailed` | `-2147219958` | `0x8004060A` | Windows Update could not search for the WSL package. |
-| `SdkUpdateNeeded` | `-2147219957` | `0x8004060B` | The application uses an incompatible SDK version and must be updated. |
+| `SdkUpdateNeeded` | `-2147219957` | `0x8004060B` | The client SDK version is incompatible with the installed WSL runtime. |
 | `ContainerDisabled` | `-2147219956` | `0x8004060C` | The WSL container feature is disabled by computer policy. |
 | `RegistryBlockedByPolicy` | `-2147219955` | `0x8004060D` | Registry access is blocked by policy. |
 | `VolumeNotAvailable` | `-2147219954` | `0x8004060E` | The requested volume is not available. |

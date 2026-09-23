@@ -16,7 +16,7 @@ for (auto component : missing)
 {
     if (component == Component::SdkNeedsUpdate)
     {
-        printf("Update this application to a version that uses a compatible Microsoft.WSL.Containers SDK.\n");
+        // Installing components cannot resolve this compatibility error.
         co_return;
     }
 }

@@ -39,8 +39,7 @@ Console.WriteLine($"{version.Major}.{version.Minor}.{version.Revision}");
 IReadOnlyList<Component> missing = WslcService.GetMissingComponents();
 if (missing.Contains(Component.SdkNeedsUpdate))
 {
-    Console.WriteLine(
-        "Update this application to a version that uses a compatible Microsoft.WSL.Containers SDK.");
+    // Installing components cannot resolve this compatibility error.
     return;
 }
 
@@ -61,8 +60,7 @@ if (missing.Count != 0)
 IReadOnlyList<Component> missing = WslcService.GetMissingComponents();
 if (missing.Contains(Component.SdkNeedsUpdate))
 {
-    Console.WriteLine(
-        "Update this application to a version that uses a compatible Microsoft.WSL.Containers SDK.");
+    // Installing components cannot resolve this compatibility error.
     return;
 }
 
