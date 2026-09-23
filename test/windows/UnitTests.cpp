@@ -3203,12 +3203,12 @@ Usage:
 
     TEST_METHOD(CreateVhdPermissions)
     {
-        const auto path = std::filesystem::path(L"wsl-test-vhd-permissions-{}.vhdx");
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove(path); });
+        const auto path = std::filesystem::path(L"wsl-test-vhd-permissions.vhdx");
 
         const auto tokenUser = wil::get_token_information<TOKEN_USER>();
         for (const auto fixed : {false, true})
         {
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove(path); });
             wsl::core::filesystem::CreateVhd(path.c_str(), 16 * _1MB, tokenUser->User.Sid, false, fixed);
 
             PSID owner{};
