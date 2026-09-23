@@ -2452,6 +2452,12 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid)
         // when the function exits.
         auto removedDistroString = wsl::shared::string::GuidToString<wchar_t>(*DistroGuid);
         bool removeDistro = false;
+        auto unregisterComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+            if (removeDistro)
+            {
+                _ConversionComplete(*DistroGuid);
+            }
+        });
         auto deleteDistroKey = wil::scope_exit([&] {
             if (removeDistro)
             {
@@ -2459,6 +2465,7 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid)
             }
         });
 
+        std::vector<PidTermination> pidTerminations;
         {
             std::lock_guard lock(m_instanceLock);
 
@@ -2470,14 +2477,13 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid)
             WSL_LOG_TELEMETRY(
                 "UnregisterDistributionBegin", PDT_ProductAndServiceUsage, TraceLoggingValue(configuration.Name.c_str(), "name"));
 
-            // Ensure that a filesystem export is not in progress.
-            _EnsureNotLocked(DistroGuid);
+            // Terminate the distribution and prevent concurrent operations while waiting for init to exit.
+            pidTerminations = _ConversionBegin(*DistroGuid, LxssDistributionStateUninstalling);
 
             // After this point the distribution registry key should be deleted.
             removeDistro = true;
 
-            // Terminate the distribution and mark it as uninstalling.
-            _TerminateInstanceInternal(DistroGuid);
+            // Mark the distribution as uninstalling.
             registration.Write(Property::State, LxssDistributionStateUninstalling);
 
             // If the default distribution has been unregistered, search for another
@@ -2497,7 +2503,12 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid)
                     DistributionRegistration::SetDefault(lxssKey.get(), distributions[0]);
                 }
             }
+        }
 
+        THROW_IF_FAILED(_WaitForPidTerminations(pidTerminations));
+
+        {
+            std::lock_guard lock(m_instanceLock);
             {
                 auto runAsUser = wil::CoImpersonateClient();
                 _DeleteDistributionLockHeld(configuration);
