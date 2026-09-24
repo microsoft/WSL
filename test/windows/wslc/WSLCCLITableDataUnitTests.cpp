@@ -151,6 +151,51 @@ class WSLCCLITableDataUnitTests
         VERIFY_IS_TRUE(posOk >= static_cast<size_t>(14 + c_defaultColumnPadding));
     }
 
+    TEST_METHOD(TableData_MinCellWidth_DefaultIsAppliedToNonFinalColumns)
+    {
+        const TableData defaults{L"A", L"B"};
+        VERIFY_ARE_EQUAL(c_defaultMinCellWidth, defaults.MinCellWidth);
+
+        TableCapture cap({L"A", L"B", L"C"});
+        cap.table.MinCellWidth = c_defaultMinCellWidth;
+
+        cap.table.AddRow({L"x", L"y", L"z"});
+        cap.Render();
+
+        // Columns narrower than the minimum are widened so each cell, padding included, occupies
+        // the minimum width.
+        const auto dataLine = cap.lines()[1];
+        VERIFY_ARE_EQUAL(static_cast<size_t>(0), dataLine.find(L'x'));
+        VERIFY_ARE_EQUAL(c_defaultMinCellWidth, dataLine.find(L'y'));
+        VERIFY_ARE_EQUAL(c_defaultMinCellWidth * 2, dataLine.find(L'z'));
+    }
+
+    TEST_METHOD(TableData_MinCellWidth_FinalColumnIsExempt)
+    {
+        TableCapture cap({L"A", L"B"});
+        cap.table.MinCellWidth = c_defaultMinCellWidth;
+
+        cap.table.AddRow({L"x", L"y"});
+        cap.Render();
+
+        // The final column renders at its natural width, so no line carries trailing whitespace.
+        for (const auto& line : cap.lines())
+        {
+            VERIFY_ARE_EQUAL(c_defaultMinCellWidth + 1, line.size());
+        }
+    }
+
+    TEST_METHOD(TableData_MinCellWidth_WiderColumnKeepsItsWidth)
+    {
+        TableCapture cap({L"CONTAINER_NAME", L"STATUS"});
+        cap.table.MinCellWidth = c_defaultMinCellWidth;
+
+        cap.table.AddRow({L"abc", L"ok"});
+        cap.Render();
+
+        VERIFY_ARE_EQUAL(wcslen(L"CONTAINER_NAME") + c_defaultColumnPadding, cap.lines()[1].find(L"ok"));
+    }
+
     TEST_METHOD(TableData_MaxWidth_LongValueIsTruncatedWithEllipsis)
     {
         ColumnWidthConfig configs[2]{};
