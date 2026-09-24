@@ -16,6 +16,12 @@ this file work is a derivative of https://github.com/microsoft/MixedReality-Grap
     Scan only files modified in current git checkout.
 .PARAMETER Staged
     Check only files staged for commit
+.PARAMETER Branch
+    Scan only files modified by the current branch, i.e. changed relative to the commit the branch
+    diverged from. Uncommitted changes are included; deleted files are skipped.
+.PARAMETER BaseBranch
+    Base branch to compute the divergence point from when -Branch is used. Defaults to the local
+    master branch.
 .PARAMETER ChangesFile
     Scan only files listed in provided txt file (one path per line). Paths need to be relative to repo root.
 .PARAMETER Verify
@@ -30,6 +36,8 @@ param (
     [string]$ClangFormat = $null,
     [boolean]$ModifiedOnly = $True,
     [boolean]$Staged = $false,
+    [switch]$Branch,
+    [string]$BaseBranch = "master",
     [string]$ChangesFile = $null,
     [boolean]$Verify = $false,
     [boolean]$NoFail = $false
@@ -78,6 +86,25 @@ function GetChangedFiles {
     }
 }
 
+<#
+.SYNOPSIS
+    Returns the commit the current branch diverged from, or $null when it cannot be determined.
+#>
+function GetBranchBaseCommit {
+    [CmdletBinding()]
+    param(
+        [string]$BaseBranch
+    )
+    process {
+        $Commit = (& git merge-base HEAD $BaseBranch 2>$null)
+        if (($LASTEXITCODE -ne 0) -or [string]::IsNullOrEmpty($Commit)) {
+            return $null
+        }
+
+        return $Commit.Trim()
+    }
+}
+
 if ([string]::IsNullOrEmpty($Path)) {
     $Path = $RepoRoot
 }
@@ -97,31 +124,41 @@ if ($ChangesFile) {
         }
     }
 }
-elseif ($ModifiedOnly -or $Staged) {
+elseif ($Branch -or $ModifiedOnly -or $Staged) {
     $ModifiedFiles = @()
     Push-Location -Path $RepoRoot
     $Success = $False
     try {
-        if ($Staged) {
-            $Status = (& git diff-index --cached --name-only HEAD)
-            $Success = ($LASTEXITCODE -eq 0)
-            $Status | ForEach-Object {
-                $FullPath = Resolve-Path $_ -ErrorAction SilentlyContinue
-                $FileName = Split-Path -Leaf -Path $FullPath
-                if ($FileName -match $FilePatterns) {
-                    $ModifiedFiles += $FullPath
-                }
+        if ($Branch) {
+            $BaseCommit = GetBranchBaseCommit -BaseBranch $BaseBranch
+            if ([string]::IsNullOrEmpty($BaseCommit)) {
+                Pop-Location
+                Write-Host -ForegroundColor Red "Could not determine the commit the current branch diverged from. Specify the base branch with -BaseBranch."
+                exit 1
             }
+
+            # Files touched by the branch, including uncommitted changes. Deleted files are skipped
+            # since there is nothing left to format.
+            Write-Host "[clang-format] Using branch changes since $BaseCommit"
+            $Changes = (& git diff --name-only --diff-filter=d $BaseCommit)
+            $Success = ($LASTEXITCODE -eq 0)
+        }
+        elseif ($Staged) {
+            $Changes = (& git diff-index --cached --name-only HEAD)
+            $Success = ($LASTEXITCODE -eq 0)
         }
         else {
             $Status = (& git status --porcelain)
             $Success = ($LASTEXITCODE -eq 0)
-            $Status | ForEach-Object {
-                $FullPath = (Resolve-Path ($_.Trim() -split " ", 2)[-1] -ErrorAction SilentlyContinue)
-                $FileName = Split-Path -Leaf -Path $FullPath
-                if ($FileName -match $FilePatterns) {
-                    $ModifiedFiles += $FullPath
-                }
+            # Strip the porcelain status prefix to get the path.
+            $Changes = $Status | ForEach-Object { ($_.Trim() -split " ", 2)[-1] }
+        }
+
+        $Changes | ForEach-Object {
+            $FullPath = Resolve-Path $_ -ErrorAction SilentlyContinue
+            $FileName = Split-Path -Leaf -Path $FullPath
+            if ($FileName -match $FilePatterns) {
+                $ModifiedFiles += $FullPath
             }
         }
     }
@@ -302,7 +339,12 @@ if ($Success) {
 else {
     Write-Host -ForegroundColor Red "Errors found (see output). Please make sure to resolve all issues before opening a Pull Request."
     Write-Host -ForegroundColor Red "Formatting can be applied by running:"
-    Write-Host -ForegroundColor Red "   powershell $PSCommandPath -ModifiedOnly ```$false [-Path <path to file or directory>]"
+    if ($Branch) {
+        Write-Host -ForegroundColor Red "   powershell $PSCommandPath -Branch"
+    }
+    else {
+        Write-Host -ForegroundColor Red "   powershell $PSCommandPath -ModifiedOnly ```$false [-Path <path to file or directory>]"
+    }
     if ($NoFail) {
         exit 0  # do not prevent commit when used in pre-commit hook
     }
