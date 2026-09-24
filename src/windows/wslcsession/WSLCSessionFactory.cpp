@@ -25,6 +25,23 @@ Abstract:
 namespace wslutil = wsl::windows::common::wslutil;
 namespace wslc = wsl::windows::service::wslc;
 
+namespace {
+
+std::wstring SanitizeDisplayName(std::wstring_view displayName)
+{
+    wchar_t userName[256 + 1] = {};
+    DWORD userNameLength = ARRAYSIZE(userName);
+    if (!GetUserNameW(userName, &userNameLength))
+    {
+        LOG_LAST_ERROR();
+        return L"<session>";
+    }
+
+    return wsl::windows::wslc::diagnostics::SanitizeUserName(displayName, userName);
+}
+
+} // namespace
+
 void wslc::WSLCSessionFactory::SetDestructionCallback(std::function<void()>&& callback)
 {
     m_destructionCallback = std::move(callback);
@@ -50,20 +67,20 @@ try
     wsl::windows::wslc::diagnostics::DiagnosticReporter diagnostics{DiagnosticCallback};
 
     // Initialize the session with the VM factory (VMs are created on demand).
-    WSLC_DIAG(
+    WSLC_EVENT(
         diagnostics,
-        WSLCDiagnosticLevelDebug,
+        "SessionInitializationStarted",
         WSLC_DIAG_CODE_SESSION_INITIALIZATION_STARTED,
         L"Name: {}; ID: {}",
-        Settings->DisplayName,
+        SanitizeDisplayName(Settings->DisplayName),
         Settings->SessionId);
     RETURN_IF_FAILED(session->Initialize(Settings, VmFactory, PluginNotifier, DiagnosticCallback));
-    WSLC_DIAG(
+    WSLC_EVENT(
         diagnostics,
-        WSLCDiagnosticLevelDebug,
+        "SessionInitializationCompleted",
         WSLC_DIAG_CODE_SESSION_INITIALIZATION_COMPLETED,
         L"Name: {}; ID: {}",
-        Settings->DisplayName,
+        SanitizeDisplayName(Settings->DisplayName),
         Settings->SessionId);
 
     // Create the service session ref. It extracts metadata and a weak reference from the session.

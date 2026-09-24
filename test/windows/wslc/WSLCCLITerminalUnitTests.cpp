@@ -471,6 +471,20 @@ class WSLCCLITerminalUnitTests
         VERIFY_ARE_EQUAL(WSLCDiagnosticLevelNone, wsl::windows::wslc::diagnostics::GetEnabledLevels(&callback));
     }
 
+    TEST_METHOD(DiagnosticHelpers_SanitizeString)
+    {
+        using wsl::windows::wslc::diagnostics::SanitizeString;
+        using wsl::windows::wslc::diagnostics::SanitizeUserName;
+
+        VERIFY_ARE_EQUAL(
+            std::wstring{L"<user> used <token>; <user>"},
+            SanitizeString(L"Alice used token-123; ALICE", {{L"alice", L"<user>"}, {L"token-123", L"<token>"}}));
+        VERIFY_ARE_EQUAL(std::wstring{L"wslc-cli-<user>"}, SanitizeUserName(L"wslc-cli-alice", L"alice"));
+        VERIFY_ARE_EQUAL(std::wstring{L"<user>-work-<user>"}, SanitizeUserName(L"Alice-work-ALICE", L"alice"));
+        VERIFY_ARE_EQUAL(std::wstring{L"custom-session"}, SanitizeUserName(L"custom-session", L"alice"));
+        VERIFY_ARE_EQUAL(std::wstring{L"wslc-cli-alice"}, SanitizeUserName(L"wslc-cli-alice", L""));
+    }
+
     TEST_METHOD(DiagnosticMacro_EvaluatesMessageOnlyWhenEnabled)
     {
         TestDiagnosticCallback callback;
@@ -494,6 +508,70 @@ class WSLCCLITerminalUnitTests
         VERIFY_ARE_EQUAL(size_t{2}, callback.EnabledLevelsQueryCount);
         VERIFY_ARE_EQUAL(std::string{"enabled-debug"}, callback.LastCode);
         VERIFY_ARE_EQUAL(std::wstring{L"value=1"}, callback.LastMessage);
+    }
+
+    TEST_METHOD(DiagnosticEvent_EvaluatesMessageOnceForEnabledSinks)
+    {
+        TestDiagnosticCallback callback;
+        size_t evaluationCount = 0;
+        size_t traceCount = 0;
+
+        wsl::windows::wslc::diagnostics::DiagnosticReporter disabledDiagnostics{&callback};
+        wsl::windows::wslc::events::Dispatch(
+            false,
+            false,
+            [&]() {
+                ++evaluationCount;
+                return std::wstring{L"disabled"};
+            },
+            [&](const std::wstring&) { ++traceCount; },
+            [&](const std::wstring& message) {
+                disabledDiagnostics.Report(WSLCDiagnosticLevelDebug, "disabled-event", message.c_str());
+            });
+        VERIFY_ARE_EQUAL(size_t{0}, evaluationCount);
+        VERIFY_ARE_EQUAL(size_t{0}, traceCount);
+        VERIFY_ARE_EQUAL(size_t{0}, callback.DiagnosticCount);
+
+        wsl::windows::wslc::events::Dispatch(
+            true,
+            false,
+            [&]() {
+                ++evaluationCount;
+                return std::wstring{L"trace-only"};
+            },
+            [&](const std::wstring& message) {
+                ++traceCount;
+                VERIFY_ARE_EQUAL(std::wstring{L"trace-only"}, message);
+            },
+            [&](const std::wstring& message) {
+                disabledDiagnostics.Report(WSLCDiagnosticLevelDebug, "trace-only-event", message.c_str());
+            });
+        VERIFY_ARE_EQUAL(size_t{1}, evaluationCount);
+        VERIFY_ARE_EQUAL(size_t{1}, traceCount);
+        VERIFY_ARE_EQUAL(size_t{0}, callback.DiagnosticCount);
+
+        callback.EnabledLevels = WSLCDiagnosticLevelDebug;
+        wsl::windows::wslc::diagnostics::DiagnosticReporter enabledDiagnostics{&callback};
+        wsl::windows::wslc::events::Dispatch(
+            true,
+            true,
+            [&]() {
+                ++evaluationCount;
+                return std::wstring{L"enabled"};
+            },
+            [&](const std::wstring& message) {
+                ++traceCount;
+                VERIFY_ARE_EQUAL(std::wstring{L"enabled"}, message);
+            },
+            [&](const std::wstring& message) {
+                enabledDiagnostics.Report(WSLCDiagnosticLevelDebug, "enabled-event", message.c_str());
+            });
+
+        VERIFY_ARE_EQUAL(size_t{2}, evaluationCount);
+        VERIFY_ARE_EQUAL(size_t{2}, traceCount);
+        VERIFY_ARE_EQUAL(size_t{1}, callback.DiagnosticCount);
+        VERIFY_ARE_EQUAL(std::string{"enabled-event"}, callback.LastCode);
+        VERIFY_ARE_EQUAL(std::wstring{L"enabled"}, callback.LastMessage);
     }
 
     TEST_METHOD(Terminal_SetNoColorTogglesIsNoColor)

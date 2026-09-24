@@ -98,9 +98,8 @@ public:
     static WSLCSessionManagerImpl* Instance() noexcept;
 
 private:
-    // Resolves the default session name for a caller: appends the username
-    // from the token SID so different users don't collide.
-    static std::wstring ResolveDefaultSessionName(const CallingProcessTokenInfo& TokenInfo);
+    static std::wstring ResolveUserName(const CallingProcessTokenInfo& TokenInfo);
+    static std::wstring ResolveDefaultSessionName(bool Elevated, std::wstring_view UserName);
 
     // Returns true if the name matches a reserved default session prefix.
     static bool IsReservedSessionName(LPCWSTR Name);

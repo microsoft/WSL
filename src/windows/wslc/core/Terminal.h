@@ -106,6 +106,10 @@ struct Terminal
     {
         EmitFormatted(Level::Debug, std::move(fmt), std::forward<Args>(args)...);
     }
+    void Debug(std::wstring_view message)
+    {
+        EmitFormatted(Level::Debug, L"{}", message);
+    }
     template <typename... Args>
     void Warn(std::wformat_string<Args...> fmt, Args&&... args)
     {

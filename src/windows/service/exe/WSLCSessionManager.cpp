@@ -190,18 +190,19 @@ void WSLCSessionManagerImpl::CreateSession(
     THROW_HR_IF_NULL(E_POINTER, WslcSession);
 
     wsl::windows::wslc::diagnostics::DiagnosticReporter diagnostics{DiagnosticCallback};
-    const auto reportDebug = [&](LPCSTR code) { WSLC_DIAG(diagnostics, WSLCDiagnosticLevelDebug, code); };
-    reportDebug(WSLC_DIAG_CODE_SESSION_RESOLUTION_STARTED);
+    WSLC_EVENT(diagnostics, "SessionResolutionStarted", WSLC_DIAG_CODE_SESSION_RESOLUTION_STARTED, "{}", "");
 
     auto tokenInfo = GetCallingProcessTokenInfo();
     const auto callerToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
 
     // Resolve display name upfront (for both default and custom sessions).
     std::wstring resolvedDisplayName;
+    std::optional<std::wstring> callerUserName;
     if (Settings == nullptr)
     {
         // Default session: name determined from token, qualified with username.
-        resolvedDisplayName = ResolveDefaultSessionName(tokenInfo);
+        callerUserName = ResolveUserName(tokenInfo);
+        resolvedDisplayName = ResolveDefaultSessionName(tokenInfo.Elevated, *callerUserName);
         Flags = WSLCSessionFlagsOpenExisting | WSLCSessionFlagsPersistent;
     }
     else
@@ -222,7 +223,13 @@ void WSLCSessionManagerImpl::CreateSession(
         THROW_HR_IF(WSLC_E_SESSION_RESERVED, IsReservedSessionName(Settings->DisplayName));
 
         resolvedDisplayName = Settings->DisplayName;
+        LOG_IF_FAILED(wil::ResultFromException([&]() { callerUserName = ResolveUserName(tokenInfo); }));
     }
+
+    const auto sanitizeDisplayName = [&]() {
+        return callerUserName.has_value() ? wsl::windows::wslc::diagnostics::SanitizeUserName(resolvedDisplayName, *callerUserName)
+                                          : std::wstring{L"<session>"};
+    };
 
     std::lock_guard lock(m_wslcSessionsLock);
 
@@ -245,11 +252,11 @@ void WSLCSessionManagerImpl::CreateSession(
     if (result.has_value())
     {
         THROW_IF_FAILED(result.value());
-        WSLC_DIAG(diagnostics, WSLCDiagnosticLevelDebug, WSLC_DIAG_CODE_SESSION_OPENED, L"Name: {}", resolvedDisplayName);
+        WSLC_EVENT(diagnostics, "SessionOpened", WSLC_DIAG_CODE_SESSION_OPENED, L"Name: {}", sanitizeDisplayName());
         return; // Existing session was opened.
     }
 
-    WSLC_DIAG(diagnostics, WSLCDiagnosticLevelDebug, WSLC_DIAG_CODE_SESSION_CREATION_STARTED, L"Name: {}", resolvedDisplayName);
+    WSLC_EVENT(diagnostics, "SessionCreationStarted", WSLC_DIAG_CODE_SESSION_CREATION_STARTED, L"Name: {}", sanitizeDisplayName());
     wslutil::StopWatch stopWatch;
 
     // Initialize settings for the default session.
@@ -300,7 +307,7 @@ void WSLCSessionManagerImpl::CreateSession(
 
         // Launch per-user COM server factory and add it to a fresh per-session job object for crash cleanup.
         auto factory = wslutil::CreateComServerAsUser<IWSLCSessionFactory>(__uuidof(WSLCSessionFactory), userToken.get());
-        WSLC_DIAG(diagnostics, WSLCDiagnosticLevelDebug, WSLC_DIAG_CODE_SESSION_PROCESS_CREATED, L"Name: {}; ID: {}", resolvedDisplayName, sessionId);
+        WSLC_EVENT(diagnostics, "SessionProcessCreated", WSLC_DIAG_CODE_SESSION_PROCESS_CREATED, L"Name: {}; ID: {}", sanitizeDisplayName(), sessionId);
         wil::unique_handle sessionJob = CreateSessionProcessJob(factory.get());
 
         const auto sessionSettings = CreateSessionSettings(sessionId, callerFileName.c_str(), Settings, resolvedDisplayName.c_str());
@@ -357,7 +364,7 @@ void WSLCSessionManagerImpl::CreateSession(
         }
 
         *WslcSession = session.detach();
-        WSLC_DIAG(diagnostics, WSLCDiagnosticLevelDebug, WSLC_DIAG_CODE_SESSION_CREATION_COMPLETED, L"Name: {}; ID: {}", resolvedDisplayName, sessionId);
+        WSLC_EVENT(diagnostics, "SessionCreationCompleted", WSLC_DIAG_CODE_SESSION_CREATION_COMPLETED, L"Name: {}; ID: {}", sanitizeDisplayName(), sessionId);
     });
 
     // This telemetry event is used to keep track of session creation performance (via CreationTimeMs) and failure reasons (via Result).
@@ -414,7 +421,7 @@ void WSLCSessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLCSession
     std::wstring resolvedName;
     if (DisplayName == nullptr)
     {
-        resolvedName = ResolveDefaultSessionName(tokenInfo);
+        resolvedName = ResolveDefaultSessionName(tokenInfo.Elevated, ResolveUserName(tokenInfo));
         DisplayName = resolvedName.c_str();
     }
 
@@ -518,10 +525,8 @@ CallingProcessTokenInfo WSLCSessionManagerImpl::GetCallingProcessTokenInfo()
     return {std::move(tokenInfo), elevated};
 }
 
-std::wstring WSLCSessionManagerImpl::ResolveDefaultSessionName(const CallingProcessTokenInfo& TokenInfo)
+std::wstring WSLCSessionManagerImpl::ResolveUserName(const CallingProcessTokenInfo& TokenInfo)
 {
-    // Look up the username from the caller's SID so each user gets their own
-    // default session (e.g. "wslc-cli-alice", "wslc-cli-admin-bob").
     wchar_t username[256 + 1] = {};
     DWORD usernameLen = ARRAYSIZE(username);
     wchar_t domain[MAX_PATH] = {};
@@ -529,8 +534,13 @@ std::wstring WSLCSessionManagerImpl::ResolveDefaultSessionName(const CallingProc
     SID_NAME_USE sidType;
     THROW_IF_WIN32_BOOL_FALSE(LookupAccountSidW(nullptr, TokenInfo.TokenInfo->User.Sid, username, &usernameLen, domain, &domainLen, &sidType));
 
-    auto baseName = TokenInfo.Elevated ? wsl::windows::wslc::DefaultAdminSessionName : wsl::windows::wslc::DefaultSessionName;
-    return std::format(L"{}-{}", baseName, username);
+    return username;
+}
+
+std::wstring WSLCSessionManagerImpl::ResolveDefaultSessionName(bool Elevated, std::wstring_view UserName)
+{
+    const auto baseName = Elevated ? wsl::windows::wslc::DefaultAdminSessionName : wsl::windows::wslc::DefaultSessionName;
+    return std::format(L"{}-{}", baseName, UserName);
 }
 
 bool WSLCSessionManagerImpl::IsReservedSessionName(LPCWSTR Name)

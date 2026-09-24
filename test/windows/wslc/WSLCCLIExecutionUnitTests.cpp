@@ -536,20 +536,42 @@ class WSLCCLIExecutionUnitTests
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, diagnostics.find(L" Command-line parsing failed after "));
     }
 
-    TEST_METHOD(DebugMacro_EvaluatesArgumentsOnlyWhenEnabled)
+    TEST_METHOD(DebugEvent_EvaluatesArgumentsOnlyForEnabledSinks)
     {
         {
             CapturePipe outPipe;
             CapturePipe errPipe;
             CLIExecutionContext context{outPipe.file(), false, errPipe.file(), false};
             int evaluationCount = 0;
-            const auto value = [&]() {
-                ++evaluationCount;
-                return 42;
-            };
+            int traceCount = 0;
 
-            WSLC_DEBUG(context, L"value={}\n", value());
+            wsl::windows::wslc::events::Dispatch(
+                false,
+                false,
+                [&]() {
+                    ++evaluationCount;
+                    return std::wstring{L"disabled"};
+                },
+                [&](const std::wstring&) { ++traceCount; },
+                [&](const std::wstring& message) { context.Terminal.Debug(message); });
             VERIFY_ARE_EQUAL(0, evaluationCount);
+            VERIFY_ARE_EQUAL(0, traceCount);
+            VERIFY_ARE_EQUAL(std::wstring{}, errPipe.captured());
+
+            wsl::windows::wslc::events::Dispatch(
+                true,
+                false,
+                [&]() {
+                    ++evaluationCount;
+                    return std::wstring{L"trace-only"};
+                },
+                [&](const std::wstring& message) {
+                    ++traceCount;
+                    VERIFY_ARE_EQUAL(std::wstring{L"trace-only"}, message);
+                },
+                [&](const std::wstring& message) { context.Terminal.Debug(message); });
+            VERIFY_ARE_EQUAL(1, evaluationCount);
+            VERIFY_ARE_EQUAL(1, traceCount);
             VERIFY_ARE_EQUAL(std::wstring{}, errPipe.captured());
         }
 
@@ -564,7 +586,7 @@ class WSLCCLIExecutionUnitTests
             };
 
             context.Terminal.SetDebugEnabled(true);
-            WSLC_DEBUG(context, L"value={}\n", value());
+            WSLC_CLI_EVENT(context, "TestDebugEvent", L"value={}\n", value());
             VERIFY_ARE_EQUAL(1, evaluationCount);
             const auto diagnostics = errPipe.captured();
             VERIFY_IS_TRUE(diagnostics.starts_with(L"[debug] "));

@@ -15,6 +15,8 @@ Abstract:
 #include "ArgMap.h"
 #include "ExecutionContextData.h"
 #include "Terminal.h"
+#include "WSLCEvent.h"
+#include "WslTelemetry.h"
 #include <optional>
 
 namespace wsl::windows::wslc::execution {
@@ -62,12 +64,22 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 
 } // namespace wsl::windows::wslc::execution
 
-// Debug message arguments are evaluated only when debug output is enabled.
-#define WSLC_DEBUG(Context, ...) \
+// CLI events are always available through TraceLogging and are mirrored to stderr
+// when debug output is enabled. Message arguments are evaluated once when either sink is enabled.
+#define WSLC_CLI_EVENT(Context, Name, Format, ...) \
     do \
     { \
-        if ((Context).Terminal.IsDebugEnabled()) \
-        { \
-            (Context).Terminal.Debug(__VA_ARGS__); \
-        } \
+        auto&& _wslcDebugContext = (Context); \
+        const bool _wslcDebugTraceEnabled = \
+            g_hTraceLoggingProvider != nullptr && TraceLoggingProviderEnabled(g_hTraceLoggingProvider, WINEVENT_LEVEL_VERBOSE, 0); \
+        const bool _wslcDebugOutputEnabled = _wslcDebugContext.Terminal.IsDebugEnabled(); \
+        ::wsl::windows::wslc::events::Dispatch( \
+            _wslcDebugTraceEnabled, \
+            _wslcDebugOutputEnabled, \
+            [&]() { return ::wsl::windows::wslc::events::FormatMessage((Format), __VA_ARGS__); }, \
+            [&](const std::wstring& _wslcDebugMessage) { \
+                WSL_LOG( \
+                    Name, TraceLoggingLevel(WINEVENT_LEVEL_VERBOSE), TraceLoggingWideString(_wslcDebugMessage.c_str(), "Message")); \
+            }, \
+            [&](const std::wstring& _wslcDebugMessage) { _wslcDebugContext.Terminal.Debug(_wslcDebugMessage); }); \
     } while (false)

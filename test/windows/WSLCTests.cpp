@@ -14122,6 +14122,11 @@ class WSLCTests
                 m_codes.emplace_back(Event->Code);
             }
 
+            if (Event->Message != nullptr)
+            {
+                m_messages.emplace_back(Event->Message);
+            }
+
             if (Event->Level == WSLCDiagnosticLevelWarning && Event->Message != nullptr)
             {
                 m_warnings.emplace_back(Event->Message);
@@ -14142,10 +14147,17 @@ class WSLCTests
             return m_codes;
         }
 
+        std::vector<std::wstring> GetMessages()
+        {
+            std::lock_guard lock(m_lock);
+            return m_messages;
+        }
+
     private:
         WSLCDiagnosticLevel m_enabledLevels;
         std::mutex m_lock;
         std::vector<std::string> m_codes;
+        std::vector<std::wstring> m_messages;
         std::vector<std::wstring> m_warnings;
     };
 
@@ -14166,6 +14178,28 @@ class WSLCTests
         VERIFY_ARE_EQUAL(size_t{2}, codes.size());
         VERIFY_ARE_EQUAL(std::string{WSLC_DIAG_CODE_NETWORK_CREATION_STARTED}, codes[0]);
         VERIFY_ARE_EQUAL(std::string{WSLC_DIAG_CODE_NETWORK_CREATION_COMPLETED}, codes[1]);
+    }
+
+    WSLC_TEST_METHOD(DiagnosticCallbackContainerEvents)
+    {
+        WSLCContainerLauncher launcher("debian:latest", "diagnostic-container-events", {"sleep", "99999"});
+        auto container = launcher.Launch(*m_defaultSession);
+
+        auto callback = Microsoft::WRL::Make<CapturingDiagnosticCallback>(WSLCDiagnosticLevelDebug);
+        VERIFY_SUCCEEDED(container.Get().Restart(WSLCSignalSIGKILL, 0, callback.Get()));
+
+        const auto codes = callback->GetCodes();
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(static_cast<size_t>(std::count(codes.begin(), codes.end(), WSLC_DIAG_CODE_CONTAINER_EVENT)), size_t{2});
+        VERIFY_ARE_EQUAL(size_t{2}, static_cast<size_t>(std::count(codes.begin(), codes.end(), WSLC_DIAG_CODE_CONTAINER_STATE_CHANGE)));
+        VERIFY_ARE_EQUAL(size_t{1}, static_cast<size_t>(std::count(codes.begin(), codes.end(), WSLC_DIAG_CODE_CONTAINER_PROCESS_STOP)));
+
+        const auto messages = callback->GetMessages();
+        VERIFY_IS_TRUE(std::any_of(messages.begin(), messages.end(), [](const auto& message) {
+            return message.find(L"Event: stop; Exit code: 137") != std::wstring::npos;
+        }));
+        VERIFY_IS_TRUE(std::any_of(messages.begin(), messages.end(), [](const auto& message) {
+            return message.find(L"State: running -> exited; Exit code: 137") != std::wstring::npos;
+        }));
     }
 
     WSLC_TEST_METHOD(WarningCallbackContainerRecovery)

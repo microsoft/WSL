@@ -25,6 +25,7 @@ Abstract:
 #include "wslc_schema.h"
 #include "WSLCCompat.h"
 #include "WSLCContainerMetadata.h"
+#include "WSLCDiagnostics.h"
 #include "WSLCNetworkMetadata.h"
 #include "WSLCVhdVolume.h"
 #include <unordered_map>
@@ -96,11 +97,11 @@ public:
 
     void Initialize();
 
-    void Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions);
+    void Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, wsl::windows::wslc::diagnostics::DiagnosticReporter Diagnostics);
     void Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr) const;
-    void Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, bool Kill);
-    void Restart(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds);
-    void Delete(WSLCDeleteFlags Flags);
+    void Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, bool Kill, wsl::windows::wslc::diagnostics::DiagnosticReporter Diagnostics);
+    void Restart(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, wsl::windows::wslc::diagnostics::DiagnosticReporter Diagnostics);
+    void Delete(WSLCDeleteFlags Flags, const wsl::windows::wslc::diagnostics::DiagnosticReporter& Diagnostics);
     void Export(WSLCHandle TarHandle) const;
     void UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize) const;
     void DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) const;
@@ -125,8 +126,6 @@ public:
 
     // Re-registers a stopped container's VM-scoped port allocations against the restarted VM.
     void RecoverPorts(const common::docker_schema::ContainerInfo& dockerContainer);
-
-    __requires_lock_held(m_lock) void CommitState(WSLCContainerState State, std::int64_t Time, std::optional<int> ExitCode = std::nullopt) noexcept;
 
     const std::string& ID() const noexcept;
 
@@ -167,13 +166,57 @@ private:
         Delete
     };
 
+    struct PendingDiagnosticEvent
+    {
+        WSLCDiagnosticLevel Level;
+        std::string Code;
+        std::wstring Message;
+    };
+
+    // Docker lifecycle events arrive on the relay thread. Queue callback delivery so
+    // the diagnostic callback is invoked from the originating COM operation thread.
+    struct OperationDiagnostics
+    {
+        explicit OperationDiagnostics(const wsl::windows::wslc::diagnostics::DiagnosticReporter& reporter) : Reporter(reporter)
+        {
+        }
+
+        bool IsEnabled(WSLCDiagnosticLevel level) const noexcept
+        {
+            return Reporter.IsEnabled(level);
+        }
+
+        void Report(WSLCDiagnosticLevel level, LPCSTR code, LPCWSTR message)
+        {
+            Pending.push_back({level, code, message != nullptr ? message : L""});
+        }
+
+        void Flush() noexcept
+        {
+            for (const auto& event : Pending)
+            {
+                Reporter.Report(event.Level, event.Code.c_str(), event.Message.c_str());
+            }
+
+            Pending.clear();
+        }
+
+        wsl::windows::wslc::diagnostics::DiagnosticReporter Reporter;
+        std::vector<PendingDiagnosticEvent> Pending;
+    };
+
+    __requires_lock_held(m_lock) void CommitState(
+        WSLCContainerState State, std::int64_t Time, OperationDiagnostics& Diagnostics, std::optional<int> ExitCode = std::nullopt) noexcept;
+
     struct StateTransition
     {
-        StateTransition(TransitionKind kind, ContainerEvent expectedEvent) : Kind(kind), ExpectedEvent(expectedEvent)
+        StateTransition(TransitionKind kind, ContainerEvent expectedEvent, const wsl::windows::wslc::diagnostics::DiagnosticReporter& diagnostics) :
+            Kind(kind), Diagnostics(diagnostics), ExpectedEvent(expectedEvent)
         {
         }
 
         const TransitionKind Kind;
+        OperationDiagnostics Diagnostics;
         wil::unique_event Completed{wil::EventOptions::ManualReset};
         std::exception_ptr Exception;
 
@@ -186,6 +229,12 @@ private:
     // that Start() and Stop() cannot land in between.
     struct RestartTransaction
     {
+        explicit RestartTransaction(const wsl::windows::wslc::diagnostics::DiagnosticReporter& diagnostics) :
+            Diagnostics(diagnostics)
+        {
+        }
+
+        OperationDiagnostics Diagnostics;
         wil::unique_event Completed{wil::EventOptions::ManualReset};
     };
 
@@ -194,7 +243,8 @@ private:
     void AllocateBridgedModePorts();
     void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::int64_t eventTime) noexcept;
 
-    __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> StartTransition(TransitionKind kind, ContainerEvent expectedEvent);
+    __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> StartTransition(
+        TransitionKind kind, ContainerEvent expectedEvent, const wsl::windows::wslc::diagnostics::DiagnosticReporter& Diagnostics);
 
     // Returns with both locks held when no transition is active (or it matches kind) and, if waitForRestart,
     // no restart is in flight either. Both conditions are re-checked every time the locks come back.
@@ -206,12 +256,17 @@ private:
 
     // Phases of Restart(). Identical to Start() and Stop() except that they do not stand down for the
     // restart they are part of.
-    void StartPhase(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, bool RestartPhase);
-    void StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill, bool RestartPhase);
+    void StartPhase(
+        WSLCContainerStartFlags Flags,
+        const WSLCProcessStartOptions* StartOptions,
+        bool RestartPhase,
+        const wsl::windows::wslc::diagnostics::DiagnosticReporter& Diagnostics);
+    void StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill, bool RestartPhase, const wsl::windows::wslc::diagnostics::DiagnosticReporter& Diagnostics);
 
     // Undoes what the phases left half-done: releases the resources the stop phase held back and
     // requests the auto-delete OnStopped() deferred, returning that delete's transition.
-    __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> OnFailedRestartExclusiveLockHeld();
+    __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> OnFailedRestartExclusiveLockHeld(
+        const wsl::windows::wslc::diagnostics::DiagnosticReporter& Diagnostics);
 
     void WaitForCompletionEvent(HANDLE Event) const;
     void WaitForTransitionCompletion(const std::shared_ptr<StateTransition>& transition) const;
@@ -225,10 +280,10 @@ private:
     __requires_exclusive_lock_held(m_lock) void ReleaseProcesses();
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect PrepareDisconnectComWrapper();
 
-    __requires_exclusive_lock_held(m_lock) void OnStopped(int exitCode, std::int64_t stopTime);
+    __requires_exclusive_lock_held(m_lock) void OnStopped(int exitCode, std::int64_t stopTime, OperationDiagnostics& Diagnostics);
 
     void SetExitCode(int ExitCode) noexcept;
-    void SignalInitProcessExit() noexcept;
+    __requires_exclusive_lock_held(m_lock) void SignalInitProcessExit(OperationDiagnostics& Diagnostics) noexcept;
 
     std::unique_ptr<RelayedProcessIO> CreateRelayedProcessIO(wil::shared_socket stream, WSLCProcessFlags flags);
 
@@ -319,8 +374,7 @@ public:
     IFACEMETHOD(GetState)(_Out_ WSLCContainerState* State) override;
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLCProcess** process) override;
     IFACEMETHOD(Exec)(_In_ const WSLCProcessOptions* Options, _In_opt_ const WSLCProcessStartOptions* StartOptions, _Out_ IWSLCProcess** Process) override;
-    IFACEMETHOD(Start)(
-        WSLCContainerStartFlags Flags, _In_opt_ const WSLCProcessStartOptions* StartOptions, _In_opt_ IDiagnosticCallback* DiagnosticCallback) override;
+    IFACEMETHOD(Start)(WSLCContainerStartFlags Flags, _In_opt_ const WSLCProcessStartOptions* StartOptions, _In_opt_ IDiagnosticCallback* DiagnosticCallback) override;
     IFACEMETHOD(Inspect)(_In_ BOOL Size, _Out_ LPSTR* Output) override;
     IFACEMETHOD(Logs)(_In_ WSLCLogsFlags Flags, _Out_ WSLCHandle* Stdout, _Out_ WSLCHandle* Stderr, _In_ LONGLONG Since, _In_ LONGLONG Until, _In_ ULONGLONG Tail) override;
     IFACEMETHOD(GetId)(_Out_ WSLCContainerId Id) override;

@@ -178,8 +178,9 @@ void CommandInvocation::ParseCommandLine(CLIExecutionContext& context)
 {
     const auto start = std::chrono::steady_clock::now();
     const auto reportFailure = [&]() {
-        WSLC_DEBUG(
+        WSLC_CLI_EVENT(
             context,
+            "CommandLineParsingFailed",
             L"Command-line parsing failed after {} ms.\n",
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
     };
@@ -244,16 +245,17 @@ void CommandInvocation::ParseCommandLine(CLIExecutionContext& context)
         throw;
     }
 
-    WSLC_DEBUG(context, L"Selected command: {}\n", Selected().FormatInvocation());
-    WSLC_DEBUG(
+    WSLC_CLI_EVENT(context, "CommandSelected", L"Selected command: {}\n", Selected().FormatInvocation());
+    WSLC_CLI_EVENT(
         context,
+        "CommandLineParsingCompleted",
         L"Command-line parsing completed in {} ms.\n",
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 }
 
 void CommandInvocation::Execute(CLIExecutionContext& context) const
 {
-    WSLC_DEBUG(context, L"Executing command: {}\n", Selected().FormatInvocation());
+    WSLC_CLI_EVENT(context, "CommandExecutionStarted", L"Executing command: {}\n", Selected().FormatInvocation());
     const auto start = std::chrono::steady_clock::now();
 
     try
@@ -262,8 +264,9 @@ void CommandInvocation::Execute(CLIExecutionContext& context) const
     }
     catch (...)
     {
-        WSLC_DEBUG(
+        WSLC_CLI_EVENT(
             context,
+            "CommandExecutionFailed",
             L"Command execution failed after {} ms.\n",
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
         throw;

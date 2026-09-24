@@ -65,8 +65,9 @@ try
     CLIExecutionContext context;
     const auto invocationStart = std::chrono::steady_clock::now();
     const auto completeInvocation = [&](int exitCode) {
-        WSLC_DEBUG(
+        WSLC_CLI_EVENT(
             context,
+            "CommandCompleted",
             L"Command completed with exit code {} in {} ms.\n",
             exitCode,
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - invocationStart).count());
