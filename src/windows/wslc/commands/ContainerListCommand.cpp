@@ -14,6 +14,7 @@ Abstract:
 
 #include "ContainerCommand.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "ContainerTasks.h"
 #include "SessionTasks.h"
 #include "Task.h"
@@ -55,7 +56,8 @@ void ContainerListCommand::ExecuteInternal(CLIExecutionContext& context) const
     context
         << ResolveSession
         << GetContainers
-        << ListContainers;
+        << ListContainers //
+        << PrintTable;
 }
 // clang-format on
 

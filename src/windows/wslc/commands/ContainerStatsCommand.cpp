@@ -14,6 +14,7 @@ Abstract:
 
 #include "ContainerCommand.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "ContainerTasks.h"
 #include "SessionTasks.h"
 #include "Task.h"
@@ -45,8 +46,9 @@ std::wstring ContainerStatsCommand::LongDescription() const
 
 void ContainerStatsCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context               //
-        << ResolveSession //
-        << ShowContainerStats;
+    context                   //
+        << ResolveSession     //
+        << ShowContainerStats //
+        << PrintTable;
 }
 } // namespace wsl::windows::wslc

@@ -18,7 +18,7 @@ Abstract:
 #include "NetworkModel.h"
 #include "NetworkService.h"
 #include "NetworkTasks.h"
-#include "TableOutput.h"
+#include "TableRenderer.h"
 #include <wslc_schema.h>
 
 using namespace wsl::shared;
@@ -235,19 +235,11 @@ void ListNetworks(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        // Every column has a minimum total width of ten characters, including the padding that follows it.
-        constexpr size_t c_minimumColumnWidth = 7;
-        auto table = wsl::windows::wslc::cli::TableOutput<4>(
-            context.Terminal,
-            {L"NETWORK ID", L"NAME", L"DRIVER", L"SCOPE"},
-            {ColumnWidthConfig{.MinWidth = c_minimumColumnWidth},
-             ColumnWidthConfig{.MinWidth = c_minimumColumnWidth},
-             ColumnWidthConfig{.MinWidth = c_minimumColumnWidth},
-             ColumnWidthConfig{.MinWidth = c_minimumColumnWidth}});
+        wsl::windows::wslc::cli::TableData table{L"NETWORK ID", L"NAME", L"DRIVER", L"SCOPE"};
         for (const auto& network : networks)
         {
             const auto entry = ToNetworkOutput(network, trunc);
-            table.WriteRow({
+            table.AddRow({
                 MultiByteToWide(entry.ID),
                 MultiByteToWide(entry.Name),
                 MultiByteToWide(entry.Driver),
@@ -255,7 +247,7 @@ void ListNetworks(CLIExecutionContext& context)
             });
         }
 
-        table.Complete();
+        context.Data.Add<Data::Table>(std::move(table));
         break;
     }
     default:

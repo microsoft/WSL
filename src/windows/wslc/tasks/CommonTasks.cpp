@@ -15,6 +15,7 @@ Abstract:
 #include "CLIExecutionContext.h"
 #include "CommonTasks.h"
 #include "Exceptions.h"
+#include "TableRenderer.h"
 
 using namespace wsl::shared;
 using namespace wsl::windows::wslc::execution;
@@ -44,6 +45,16 @@ void ConfirmAction(CLIExecutionContext& context)
     {
         throw TerminateException{};
     }
+}
+
+void PrintTable(CLIExecutionContext& context)
+{
+    if (!context.Data.Contains(Data::Table))
+    {
+        return;
+    }
+
+    RenderTable(context.Terminal, context.Data.Get<Data::Table>());
 }
 
 } // namespace wsl::windows::wslc::task
