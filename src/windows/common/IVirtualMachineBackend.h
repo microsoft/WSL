@@ -40,6 +40,7 @@ enum class BackendKind
 struct VmInstanceId
 {
     GUID VmId{};
+    wil::shared_handle UserToken{};
 };
 
 template <typename Tag>
@@ -180,12 +181,25 @@ struct VmGuestListener
     GuestServicePort Port;
 };
 
+struct VmGuestListenerState
+{
+    VmGuestListener Listener;
+    wil::unique_socket Socket;
+    wil::unique_event CancellationEvent{wil::EventOptions::ManualReset};
+};
+
 struct VmProcessorRequest
 {
     std::uint32_t Count = 0;
     VmFeatureRequest NestedVirtualization = VmFeatureRequest::Disabled;
     VmFeatureRequest PerfmonPmu = VmFeatureRequest::Disabled;
     VmFeatureRequest PerfmonLbr = VmFeatureRequest::Disabled;
+};
+
+struct VmMmioRequest
+{
+    std::uint64_t HighWindowSizeBytes = 0;
+    std::optional<std::uint8_t> MaximumGuestAddressBits;
 };
 
 struct VmMemoryRequest
@@ -208,9 +222,7 @@ struct VmLinuxBootRequest
     std::filesystem::path KernelPath;
     std::filesystem::path InitrdPath;
     VmBootMethod Method = VmBootMethod::Automatic;
-    std::wstring GuestCommandLine;
-    std::wstring UserCommandLine;
-    std::optional<std::uint64_t> RequestedDmaBounceBufferBytes;
+    std::wstring KernelCommandLine;
 };
 
 enum class VmConsoleRole
@@ -295,7 +307,8 @@ struct VmDiskAttachment
 
 struct VmCrashCaptureRequest
 {
-    std::filesystem::path SavedStatePath;
+    std::filesystem::path Path;
+    std::uint32_t MaxCrashLogCount = 10;
     VmSelectionPolicy Policy = VmSelectionPolicy::Required;
 };
 
@@ -321,7 +334,6 @@ struct VmEffectiveBoot
 {
     VmBootMethod Method = VmBootMethod::Automatic;
     std::wstring KernelCommandLine;
-    std::optional<std::uint32_t> PageReportingOrder;
     std::vector<VmConsoleRequest> Consoles;
 };
 
@@ -377,7 +389,8 @@ struct VmNetworkAttachment
 
 struct VmCreateRequest
 {
-    GUID VmId{};
+    VmInstanceId Identity;
+    std::wstring Owner;
     VmProcessorRequest Processor;
     VmMemoryRequest Memory;
     VmLinuxBootRequest Boot;
@@ -487,14 +500,17 @@ struct VmFileSystemShare
 class IVirtualMachineBackend
 {
 public:
+    using TerminationCallback = std::function<void(GUID)>;
+
     virtual ~IVirtualMachineBackend() noexcept = default;
 
     virtual VmPlatformCapabilities GetCapabilities() const = 0;
-    // Returns the effective creation-time configuration, including IDs used for boot resource operations.
     virtual VmDescription GetDescription() const = 0;
     virtual wil::unique_handle GetTerminationEvent() const = 0;
     virtual void Start() = 0;
     virtual void Terminate() = 0;
+    virtual void CancelPendingOperations() noexcept = 0;
+    void RegisterTerminationCallback(TerminationCallback Callback);
 
     virtual VmGuestListener CreateGuestListener(GuestServicePort Port) = 0;
     virtual wil::unique_socket AcceptGuestConnection(VmListenerId Listener) = 0;
@@ -511,8 +527,49 @@ public:
     virtual VmNetworkAttachment AddNetworkAdapter(const VmNetworkAdapterRequest& Request) = 0;
     virtual VmPortBinding BindPort(VmDeviceId Device, const VmPortBindingRequest& Request) = 0;
     virtual void UnbindPort(VmPortBindingId Binding) = 0;
+
+protected:
+    // Protects all mutable backend state, including the base listener registry. Callers must
+    // release it before performing blocking I/O or waiting for a callback.
+    mutable wil::srwlock m_lock;
+
+    // These helpers require m_lock to be held exclusively. ConfigureGuestListener runs while
+    // m_lock is held and must not re-enter another listener helper.
+    VmGuestListener RegisterGuestListenerLocked(const VmInstanceId& Identity, GuestServicePort Port);
+    wil::unique_socket AcceptGuestListenerConnection(VmListenerId Listener, const VmInstanceId& Identity) const;
+    std::shared_ptr<VmGuestListenerState> RemoveGuestListenerLocked(VmListenerId Listener, const VmInstanceId& Identity);
+    void CloseGuestListenersLocked(const VmInstanceId& Identity) noexcept;
+    void NotifyTerminated(const VmInstanceId& Identity) noexcept;
+
+private:
+    virtual std::shared_ptr<VmGuestListenerState> ConfigureGuestListener(const VmGuestListener& Listener);
+
+    _Guarded_by_(m_lock) std::map<std::uint64_t, std::shared_ptr<VmGuestListenerState>> m_guestListeners;
+    _Guarded_by_(m_lock) std::uint64_t m_nextListenerId = 1;
+    wil::srwlock m_terminationCallbackLock;
+    _Guarded_by_(m_terminationCallbackLock) bool m_terminated = false;
+    _Guarded_by_(m_terminationCallbackLock) GUID m_terminatedVmId {};
+    _Guarded_by_(m_terminationCallbackLock) TerminationCallback m_terminationCallback;
 };
 
 VmPlatformCapabilities QueryVirtualMachineBackendCapabilities(BackendKind Kind);
 
 std::unique_ptr<IVirtualMachineBackend> CreateVirtualMachineBackend(BackendKind Kind, const VmCreateRequest& Request);
+
+namespace wsl::windows::common::vm::validation {
+
+bool ValidateFeature(VmFeatureRequest Request, PCWSTR Setting, bool Supported = false);
+void ValidateUnsupportedSelection(VmSelectionPolicy Policy);
+void ValidatePath(const std::filesystem::path& Path, PCWSTR Backend);
+const VmVirtualDiskSource& ValidateDiskRequest(const VmDiskRequest& Request, UINT32 MaximumDisks);
+void ValidateConsolePath(const std::filesystem::path& Path, PCWSTR Backend, HRESULT Error, bool RequireName);
+void ValidateName(std::wstring_view Name, PCWSTR Description);
+void ValidateResourceId(UINT64 Value, const GUID& VmId, const VmInstanceId& Owner);
+
+template <typename Tag>
+void ValidateResourceId(const VmResourceId<Tag>& Id, const VmInstanceId& Owner)
+{
+    ValidateResourceId(Id.Value, Id.Owner.VmId, Owner);
+}
+
+} // namespace wsl::windows::common::vm::validation

@@ -53,6 +53,7 @@ set(SOURCES
     WslInstall.cpp
     WslSecurity.cpp
     VirtualMachineBackend.cpp
+    HcsVirtualMachineBackend.cpp
     OpenVmmVirtualMachineBackend.cpp
     SlowOperationWatcher.cpp
     WslTelemetry.cpp
@@ -146,6 +147,7 @@ set(HEADERS
     WslInstall.h
     WslSecurity.h
     IVirtualMachineBackend.h
+    HcsVirtualMachineBackend.h
     OpenVmmVirtualMachineBackend.h
     SlowOperationWatcher.h
     WslTelemetry.h
