@@ -1229,7 +1229,7 @@ try
         //      should be sent to unblock the wsl service.
         //
 
-        wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, 1)};
+        wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, 1, true, LX_INIT_HVSOCKET_LISTEN_BUFFER_SIZE)};
         if (!ListenSocket)
         {
             SocketAddress.svm_port = -1;
@@ -1418,7 +1418,7 @@ Return Value:
     //      should be sent to unblock the wsl service.
     //
 
-    ListenSocket = UtilListenVsockAnyPort(&SocketAddress, Sockets.size());
+    ListenSocket = UtilListenVsockAnyPort(&SocketAddress, Sockets.size(), true, LX_INIT_HVSOCKET_LISTEN_BUFFER_SIZE);
     if (ListenSocket < 0)
     {
         SocketAddress.svm_port = -1;

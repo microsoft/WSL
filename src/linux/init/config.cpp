@@ -903,7 +903,7 @@ try
     sockaddr_vm SocketAddress{};
     if (UtilIsUtilityVm() && Config.InteropEnabled)
     {
-        ListenSocket = UtilListenVsockAnyPort(&SocketAddress, 1);
+        ListenSocket = UtilListenVsockAnyPort(&SocketAddress, 1, true, LX_INIT_HVSOCKET_LISTEN_BUFFER_SIZE);
     }
 
     //

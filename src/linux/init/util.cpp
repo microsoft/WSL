@@ -1593,7 +1593,7 @@ Return Value:
     return g_IsVmMode;
 }
 
-int UtilListenVsockAnyPort(struct sockaddr_vm* Address, int Backlog, bool CloseOnExec)
+int UtilListenVsockAnyPort(struct sockaddr_vm* Address, int Backlog, bool CloseOnExec, std::optional<int> SocketBuffer)
 
 /*++
 
@@ -1606,6 +1606,10 @@ Arguments:
     Address - Supplies a buffer to receive the socket address of the socket.
 
     Backlog - Supplies the length of the backlog.
+
+    CloseOnExec - Supplies a boolean specifying if the socket file descriptor should be closed on exec.
+
+    SocketBuffer - Optionally supplies the size to use for the socket send and receive buffers.
 
 Return Value:
 
@@ -1625,6 +1629,24 @@ Return Value:
     {
         Result = -1;
         goto ListenVsockAnyPortExit;
+    }
+
+    if (SocketBuffer)
+    {
+        int BufferSize = *SocketBuffer;
+        Result = setsockopt(SocketFd, SOL_SOCKET, SO_SNDBUF, &BufferSize, sizeof(BufferSize));
+        if (Result < 0)
+        {
+            LOG_ERROR("setsockopt(SO_SNDBUF, {}) failed {}", BufferSize, errno);
+            goto ListenVsockAnyPortExit;
+        }
+
+        Result = setsockopt(SocketFd, SOL_SOCKET, SO_RCVBUF, &BufferSize, sizeof(BufferSize));
+        if (Result < 0)
+        {
+            LOG_ERROR("setsockopt(SO_RCVBUF, {}) failed {}", BufferSize, errno);
+            goto ListenVsockAnyPortExit;
+        }
     }
 
     Result = listen(SocketFd, Backlog);
@@ -3453,7 +3475,7 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
     auto sendResult = [&](unsigned long Result) { Transaction.SendResultMessage<int32_t>(Result); };
 
     sockaddr_vm SocketAddress{};
-    wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, 1, false)};
+    wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, 1, false, LX_INIT_HVSOCKET_LISTEN_BUFFER_SIZE)};
     THROW_LAST_ERROR_IF(!ListenSocket);
 
     sendResult(SocketAddress.svm_port);
