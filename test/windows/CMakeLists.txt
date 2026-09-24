@@ -26,6 +26,7 @@ add_compile_definitions(INLINE_TEST_METHOD_MARKUP)
 add_library(wsltests SHARED ${SOURCES} ${HEADERS})
 
 target_sources(wsltests PRIVATE OpenVmmVirtualMachineBackendTests.cpp)
+target_link_libraries(wsltests virtualmachinebackend)
 add_dependencies(wsltests initramfs)
 
 add_custom_command(

@@ -16,6 +16,7 @@ Abstract:
 #include "precomp.h"
 #include "hcs.hpp"
 #include <ComputeCore.h>
+#include "wslutil.h"
 
 #pragma hdrstop
 
@@ -25,6 +26,41 @@ using wsl::windows::common::ExecutionContext;
 constexpr auto c_processorCapabilities = "ProcessorCapabilities";
 constexpr LPCWSTR c_processorCapabilitiesQuery = L"{ \"PropertyQueries\": {\"ProcessorCapabilities\" : {}}}";
 constexpr LPCWSTR c_scsiResourcePath = L"VirtualMachine/Devices/Scsi/0/Attachments/";
+
+std::filesystem::path wsl::windows::common::hcs::WriteVmCrashLog(
+    const std::filesystem::path& Folder, std::uint32_t MaxFileCount, const GUID& VmId, HANDLE UserToken, std::wstring_view CrashLog)
+{
+    auto runAsUser = wil::impersonate_token(UserToken);
+
+    std::error_code error;
+    std::filesystem::create_directories(Folder, error);
+    if (error.value())
+    {
+        THROW_WIN32_MSG(error.value(), "Failed to create folder: %ls", Folder.c_str());
+    }
+
+    constexpr auto c_extension = L".txt";
+    constexpr auto c_prefix = L"kernel-panic-";
+    const auto vmId = wsl::shared::string::GuidToString<wchar_t>(VmId, wsl::shared::string::GuidToStringFlags::None);
+    const auto fileName = std::format(L"{}{}-{}{}", c_prefix, std::time(nullptr), vmId, c_extension);
+    const auto filePath = Folder / fileName;
+
+    auto pred = [&c_extension, &c_prefix](const auto& entry) {
+        return WI_IsFlagSet(GetFileAttributes(entry.path().c_str()), FILE_ATTRIBUTE_TEMPORARY) && entry.path().has_extension() &&
+               entry.path().extension() == c_extension && entry.path().has_filename() &&
+               entry.path().filename().wstring().find(c_prefix) == 0;
+    };
+
+    wslutil::EnforceFileLimit(Folder.c_str(), MaxFileCount, pred);
+
+    {
+        std::wofstream outputFile(filePath.wstring());
+        THROW_HR_IF(E_UNEXPECTED, !outputFile.is_open() || !(outputFile << CrashLog));
+    }
+
+    THROW_IF_WIN32_BOOL_FALSE(SetFileAttributesW(filePath.c_str(), FILE_ATTRIBUTE_TEMPORARY));
+    return filePath;
+}
 
 void wsl::windows::common::hcs::AddPlan9Share(
     _In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Name, _In_ PCWSTR AccessName, _In_ PCWSTR Path, _In_ UINT32 Port, _In_ Plan9ShareFlags Flags, _In_opt_ HANDLE UserToken)
@@ -132,6 +168,37 @@ const std::vector<std::string>& wsl::windows::common::hcs::GetProcessorFeatures(
     });
 
     return g_processorFeatures;
+}
+
+bool wsl::windows::common::hcs::IsNestedVirtualizationSupported()
+{
+    if constexpr (wsl::shared::Arm64)
+    {
+        return false;
+    }
+
+    if (!helpers::IsWindows11OrAbove())
+    {
+        return false;
+    }
+
+    const auto& processorFeatures = GetProcessorFeatures();
+    return std::find(processorFeatures.begin(), processorFeatures.end(), "NestedVirt") != processorFeatures.end();
+}
+
+std::pair<bool, bool> wsl::windows::common::hcs::GetPerfmonCapabilities()
+{
+#ifdef _AMD64_
+
+    HV_X64_HYPERVISOR_HARDWARE_FEATURES hardwareFeatures{};
+    __cpuid(reinterpret_cast<int*>(&hardwareFeatures), HvCpuIdFunctionMsHvHardwareFeatures);
+    return {hardwareFeatures.ChildPerfmonPmuSupported != 0, hardwareFeatures.ChildPerfmonLbrSupported != 0};
+
+#else
+
+    return {};
+
+#endif
 }
 
 wsl::shared::hns::HNSEndpoint wsl::windows::common::hcs::GetEndpointProperties(HCN_ENDPOINT Endpoint)

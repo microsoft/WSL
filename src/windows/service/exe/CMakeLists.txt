@@ -57,6 +57,18 @@ set(HEADERS
     WSLCSessionManagerFactory.h
     WSLCPluginNotifier.h)
 
+add_library(virtualmachinebackend STATIC
+    VirtualMachineBackend.cpp
+    IVirtualMachineBackend.h
+    HcsVirtualMachineBackend.cpp
+    HcsVirtualMachineBackend.h
+    OpenVmmVirtualMachineBackend.cpp
+    OpenVmmVirtualMachineBackend.h)
+target_include_directories(virtualmachinebackend PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_precompile_headers(virtualmachinebackend REUSE_FROM common)
+target_link_libraries(virtualmachinebackend PUBLIC common ${COMMON_LINK_LIBRARIES} wslopenvmm_client)
+set_target_properties(virtualmachinebackend PROPERTIES FOLDER windows)
+
 add_executable(wslservice ${SOURCES} ${HEADERS})
 add_dependencies(wslservice wslserviceidl wslservicemc)
 add_compile_definitions(__WRL_CLASSIC_COM__)
@@ -72,6 +84,7 @@ target_link_libraries(wslservice
                       configfile
                       legacy_stdio_definitions
                       VirtDisk.lib
+                      virtualmachinebackend
                       Winhttp.lib
                       Synchronization.lib
                       yaml-cpp)
