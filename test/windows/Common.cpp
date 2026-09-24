@@ -2543,6 +2543,49 @@ void VerifyNoVmAccessToVhd(LPCWSTR VhdPath)
     }
 }
 
+std::wstring GetBlockDeviceInWsl(ULONGLONG SizeBytes)
+{
+    // Wait for the disk to be attached.
+    const auto timeout = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+    const auto expectedSize = std::to_wstring(SizeBytes);
+
+    bool done = false;
+    while (true)
+    {
+        for (wchar_t name = 'a'; name < 'z'; name++)
+        {
+            std::wstring cmd = L"-u root blockdev --getsize64 /dev/sd";
+            cmd += name;
+
+            std::wstring out;
+            try
+            {
+                out = LxsstuLaunchWslAndCaptureOutput(cmd.data()).first;
+            }
+            CATCH_LOG()
+
+            Trim(out);
+
+            if (out == expectedSize)
+            {
+                return std::wstring(L"/dev/sd") + name;
+            }
+        }
+
+        if (done)
+        {
+            break;
+        }
+
+        done = std::chrono::steady_clock::now() > timeout;
+    }
+
+    VERIFY_FAIL(L"Failed to find the block device in WSL");
+
+    // Unreachable.
+    return {};
+}
+
 void ValidateOutput(LPCWSTR CommandLine, const std::wstring& ExpectedOutput, const std::wstring& ExpectedWarnings, int ExitCode)
 {
     auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(CommandLine, ExitCode);
