@@ -852,7 +852,11 @@ void LxssInstance::_InitializeConfiguration(_In_ const std::filesystem::path& Pl
 
     const auto timezone = wsl::windows::common::helpers::GetLinuxTimezone(m_userToken.get());
     ULONG featureFlags{};
-    WI_SetFlagIf(featureFlags, LxInitFeatureRootfsCompressed, WI_IsFlagSet(GetFileAttributesW(m_configuration.BasePath.c_str()), FILE_ATTRIBUTE_COMPRESSED));
+    {
+        auto runAsUser = wil::impersonate_token(m_userToken.get());
+        WI_SetFlagIf(featureFlags, LxInitFeatureRootfsCompressed, WI_IsFlagSet(GetFileAttributesW(m_configuration.BasePath.c_str()), FILE_ATTRIBUTE_COMPRESSED));
+    }
+
     auto message = wsl::windows::common::helpers::GenerateConfigurationMessage(
         m_configuration.Name, fixedDrives, m_defaultUid, timezone, Plan9SocketPath.wstring(), featureFlags);
 

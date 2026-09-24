@@ -90,6 +90,7 @@ WslCoreInstance::WslCoreInstance(
     // N.B. The system distro has an empty base path.
     if (!m_configuration.BasePath.empty())
     {
+        auto runAsUser = wil::impersonate_token(UserToken);
         WI_SetFlagIf(m_featureFlags, LxInitFeatureRootfsCompressed, WI_IsFlagSet(GetFileAttributesW(m_configuration.BasePath.c_str()), FILE_ATTRIBUTE_COMPRESSED));
     }
 
