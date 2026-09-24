@@ -89,7 +89,7 @@ namespace {
 
         entry.CreatedAt = EpochToLocalDisplayTime(image.Created);
         entry.CreatedSince =
-            WideToMultiByte(format == FormatType::Json ? FormatInvariantRelativeTime(image.Created) : FormatRelativeTime(image.Created));
+            WideToMultiByte(IsJsonFormat(format) ? FormatInvariantRelativeTime(image.Created) : FormatRelativeTime(image.Created));
         entry.Digest = image.Digest.empty() ? std::string{c_none} : image.Digest;
         entry.ID = truncate ? TruncateId(image.Id, true) : image.Id;
         entry.Repository = image.Repository.value_or(std::string{c_none});
@@ -188,7 +188,7 @@ void GetImages(CLIExecutionContext& context)
     // The container count is only reported by json output, and gathering it costs an extra query in
     // the service, so it is only requested when it will be shown.
     const bool containerCounts =
-        context.Args.GetValue<ArgType::Format>(FormatType::Table) == FormatType::Json && !context.Args.GetValue<ArgType::Quiet>();
+        IsJsonFormat(context.Args.GetValue<ArgType::Format>(FormatType::Table)) && !context.Args.GetValue<ArgType::Quiet>();
 
     auto images = ImageService::List(
         session, filters, containerCounts, context.Args.GetValue<ArgType::All>(), context.Args.GetValue<ArgType::Digests>());
@@ -223,6 +223,17 @@ void ListImages(CLIExecutionContext& context)
             context.Terminal.Output(L"{}\n", ToJsonW(ToImageOutput(image, trunc, format), c_jsonCompactIndent));
         }
 
+        break;
+    }
+    case FormatType::JsonArray:
+    {
+        nlohmann::json output = nlohmann::json::array();
+        for (const auto& image : images)
+        {
+            output.push_back(ToImageOutput(image, trunc, format));
+        }
+
+        context.Terminal.Output(L"{}\n", ToJsonW(output, c_jsonCompactIndent));
         break;
     }
     case FormatType::Table:

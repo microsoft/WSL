@@ -302,8 +302,10 @@ class WSLCE2EContainerListTests
     {
         const auto result = RunWslc(L"container list --format invalid");
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(
-            L"Invalid format value: invalid is not a recognized format type. Supported format types are: json, table."));
+        VERIFY_IS_TRUE(
+            result.StderrContainsSubstring(L"Invalid format value: invalid is not a recognized format type. Supported format "
+                                           L"types are: json, json-array, table."),
+            result.Stderr.value().c_str());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_JsonFormat)
@@ -345,6 +347,13 @@ class WSLCE2EContainerListTests
 
         VERIFY_IS_TRUE(findContainer(containers, containerId));
         VERIFY_IS_TRUE(findContainer(containers, containerId2));
+
+        result = RunWslc(L"container list --all --format json-array --no-trunc");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto containerArray = ParseJsonArrayOutputAs<ContainerOutputInformation>(result);
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(containerArray.size(), 2U);
+        VERIFY_IS_TRUE(findContainer(containerArray, containerId));
+        VERIFY_IS_TRUE(findContainer(containerArray, containerId2));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_JsonFormat_MatchesDockerShape)

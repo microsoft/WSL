@@ -632,6 +632,7 @@ models::FormatType GetFormatTypeFromString(const std::wstring& input, const std:
     // message's supported-values list, so adding a type here updates both automatically.
     static constexpr std::pair<std::wstring_view, models::FormatType> c_formatTypes[] = {
         {L"json", models::FormatType::Json},
+        {L"json-array", models::FormatType::JsonArray},
         {L"table", models::FormatType::Table},
     };
 

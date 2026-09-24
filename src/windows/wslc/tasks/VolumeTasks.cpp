@@ -218,6 +218,17 @@ void ListVolumes(CLIExecutionContext& context)
 
         break;
     }
+    case FormatType::JsonArray:
+    {
+        nlohmann::json output = nlohmann::json::array();
+        for (const auto& volume : volumes)
+        {
+            output.push_back(ToVolumeOutput(volume));
+        }
+
+        context.Terminal.Output(L"{}\n", ToJsonW(output, c_jsonCompactIndent));
+        break;
+    }
     case FormatType::Table:
     {
         auto table = wsl::windows::wslc::cli::TableOutput<2>(context.Terminal, {L"DRIVER", L"VOLUME NAME"});

@@ -25,12 +25,18 @@ namespace wsl::windows::wslc::models {
 
 namespace mount = wsl::windows::common::mount;
 
-// Valid formats for container list output.
+// Valid formats for command output.
 enum class FormatType
 {
     Table,
     Json,
+    JsonArray,
 };
+
+constexpr bool IsJsonFormat(FormatType format) noexcept
+{
+    return format == FormatType::Json || format == FormatType::JsonArray;
+}
 
 struct ContainerNetwork
 {

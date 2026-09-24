@@ -194,6 +194,12 @@ class WSLCE2EGlobalTests
         // The version payload is emitted as one compact object.
         const auto root = VerifyCompactJsonOutput(result);
         VERIFY_ARE_EQUAL(std::string{WSL_PACKAGE_VERSION}, root["Client"]["Version"].get<std::string>());
+
+        result = RunWslc(L"version --format json-array");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto array = ParseJsonArrayOutput(result);
+        VERIFY_ARE_EQUAL(1u, array.size());
+        VERIFY_ARE_EQUAL(std::string{WSL_PACKAGE_VERSION}, array[0]["Client"]["Version"].get<std::string>());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_VersionCommand_FormatTable)
@@ -222,8 +228,10 @@ class WSLCE2EGlobalTests
     {
         const auto result = RunWslc(L"system info --format invalid");
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(
-            L"Invalid format value: invalid is not a recognized format type. Supported format types are: json, table."));
+        VERIFY_IS_TRUE(
+            result.StderrContainsSubstring(L"Invalid format value: invalid is not a recognized format type. Supported format "
+                                           L"types are: json, json-array, table."),
+            result.Stderr.value().c_str());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_SystemInfoCommand_FormatJson)
@@ -259,6 +267,12 @@ class WSLCE2EGlobalTests
             VERIFY_IS_TRUE(session.contains("CreatorPid"));
             VERIFY_IS_TRUE(session.contains("Name"));
         }
+
+        result = RunWslc(L"system info --format json-array");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto array = ParseJsonArrayOutput(result);
+        VERIFY_ARE_EQUAL(1u, array.size());
+        VERIFY_ARE_EQUAL(std::string{WSL_PACKAGE_VERSION}, array[0]["Client"]["Version"].get<std::string>());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_SystemInfoCommand_RootAlias)

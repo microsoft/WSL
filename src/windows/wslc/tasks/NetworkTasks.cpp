@@ -233,6 +233,17 @@ void ListNetworks(CLIExecutionContext& context)
 
         break;
     }
+    case FormatType::JsonArray:
+    {
+        nlohmann::json output = nlohmann::json::array();
+        for (const auto& network : networks)
+        {
+            output.push_back(ToNetworkOutput(network, trunc));
+        }
+
+        context.Terminal.Output(L"{}\n", ToJsonW(output, c_jsonCompactIndent));
+        break;
+    }
     case FormatType::Table:
     {
         // Every column has a minimum total width of ten characters, including the padding that follows it.

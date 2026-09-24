@@ -220,6 +220,10 @@ class WSLCCLIContainerCommandUnitTests
             std::wstring{L"exited 2 hours ago"},
             ContainerService::FormatStatus("", WslcContainerStateExited, twoHoursAgo, models::FormatType::Json));
         VERIFY_ARE_EQUAL(std::wstring{L"created"}, ContainerService::FormatStatus("", WslcContainerStateCreated, 0, models::FormatType::Json));
+        VERIFY_ARE_EQUAL(
+            std::wstring{L"exited 2 hours ago"},
+            ContainerService::FormatStatus("", WslcContainerStateExited, twoHoursAgo, models::FormatType::JsonArray));
+        VERIFY_ARE_EQUAL(std::wstring{L"created"}, ContainerService::FormatStatus("", WslcContainerStateCreated, 0, models::FormatType::JsonArray));
     }
 
     // A status supplied by the runtime is already invariant, so it is passed through unchanged for

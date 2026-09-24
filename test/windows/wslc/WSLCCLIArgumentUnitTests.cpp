@@ -195,10 +195,12 @@ class WSLCCLIArgumentUnitTests
         // Verify format type
         auto format = validation::GetFormatTypeFromString(L"json");
         VERIFY_ARE_EQUAL(format, FormatType::Json);
+        format = validation::GetFormatTypeFromString(L"json-array");
+        VERIFY_ARE_EQUAL(format, FormatType::JsonArray);
         format = validation::GetFormatTypeFromString(L"table");
         VERIFY_ARE_EQUAL(format, FormatType::Table);
         VERIFY_THROWS(validation::GetFormatTypeFromString(L"xml"), ArgumentException);
-        VERIFY_NO_THROW(validation::ValidateFormatTypeFromString({L"json", L"table"}, L"formatArg"));
+        VERIFY_NO_THROW(validation::ValidateFormatTypeFromString({L"json", L"json-array", L"table"}, L"formatArg"));
         VERIFY_THROWS(validation::ValidateFormatTypeFromString({L"JSON", L"TABLE", L"csv"}, L"formatArg"), ArgumentException);
 
         // Verify image pull policy
@@ -419,6 +421,7 @@ class WSLCCLIArgumentUnitTests
     {
         // string -> FormatType
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Format>(L"json"), FormatType::Json);
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Format>(L"json-array"), FormatType::JsonArray);
 
         // string -> json::dump() indentation
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::InspectFormat>(L"json"), wsl::shared::c_jsonCompactIndent);

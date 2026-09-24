@@ -228,6 +228,13 @@ class WSLCE2EContainerStatsTests
         VERIFY_IS_TRUE(entry["NetIO"].is_string());
         VERIFY_IS_TRUE(entry["BlockIO"].is_string());
         VERIFY_IS_TRUE(entry["PIDs"].is_number_unsigned());
+
+        result = RunWslc(std::format(L"container stats --no-trunc --format json-array {}", containerId));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto array = ParseJsonArrayOutput(result);
+        VERIFY_ARE_EQUAL(1u, array.size());
+        VERIFY_ARE_EQUAL(WideToMultiByte(containerId), array[0]["ID"].get<std::string>());
     }
 
 private:

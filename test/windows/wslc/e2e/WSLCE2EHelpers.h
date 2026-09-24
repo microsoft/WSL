@@ -259,15 +259,22 @@ std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalReg
 // Tags an image for a registry and returns the full registry image reference (e.g. "127.0.0.1:PORT/debian:latest").
 std::wstring TagImageForRegistry(const std::wstring& imageName, const std::wstring& registryAddress);
 
-// Verifies "--format json" output was emitted as a single compact line and returns the parsed document.
+// Verifies JSON output was emitted as a single compact line and returns the parsed document.
 inline nlohmann::json VerifyCompactJsonOutput(const WSLCExecutionResult& result)
 {
     VERIFY_IS_TRUE(result.Stdout.has_value());
 
     const auto lines = result.GetStdoutLines();
-    VERIFY_ARE_EQUAL(1u, lines.size(), L"'--format json' output must be a single line");
+    VERIFY_ARE_EQUAL(1u, lines.size(), L"JSON output must be a single line");
 
     return nlohmann::json::parse(wsl::shared::string::WideToMultiByte(lines[0]));
+}
+
+inline nlohmann::json ParseJsonArrayOutput(const WSLCExecutionResult& result)
+{
+    auto document = VerifyCompactJsonOutput(result);
+    VERIFY_IS_TRUE(document.is_array(), L"'--format json-array' output must be a JSON array");
+    return document;
 }
 
 // Parses list output emitted as one compact JSON object per line.
@@ -293,6 +300,12 @@ inline std::vector<nlohmann::json> ParseNdjsonOutput(const WSLCExecutionResult& 
     }
 
     return entries;
+}
+
+template <typename T>
+std::vector<T> ParseJsonArrayOutputAs(const WSLCExecutionResult& result)
+{
+    return ParseJsonArrayOutput(result).get<std::vector<T>>();
 }
 
 // Typed form of ParseNdjsonOutput() that deserializes each line into T.

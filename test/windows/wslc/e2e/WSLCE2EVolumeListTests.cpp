@@ -59,8 +59,10 @@ class WSLCE2EVolumeListTests
     {
         auto result = RunWslc(L"volume list --format invalid");
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(
-            L"Invalid format value: invalid is not a recognized format type. Supported format types are: json, table."));
+        VERIFY_IS_TRUE(
+            result.StderrContainsSubstring(L"Invalid format value: invalid is not a recognized format type. Supported format "
+                                           L"types are: json, json-array, table."),
+            result.Stderr.value().c_str());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_List_QuietOption_OutputsNamesOnly)
@@ -100,6 +102,11 @@ class WSLCE2EVolumeListTests
 
         VERIFY_ARE_NOT_EQUAL(names.end(), std::find(names.begin(), names.end(), WideToMultiByte(TestVolumeName)));
         VERIFY_ARE_NOT_EQUAL(names.end(), std::find(names.begin(), names.end(), WideToMultiByte(TestVolumeName2)));
+
+        result = RunWslc(L"volume list --format json-array");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto volumeArray = ParseJsonArrayOutputAs<VolumeListOutput>(result);
+        VERIFY_ARE_EQUAL(2U, volumeArray.size());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_List_ReportsFullFieldSet)
@@ -234,6 +241,10 @@ class WSLCE2EVolumeListTests
         // NDJSON with zero rows must be exactly empty stdout — not "[]", not "\n".
         result = RunWslc(L"volume list --format json --filter name=wslc-flt-vlist-no-such-volume-zzz");
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(L"volume list --format json-array --filter name=wslc-flt-vlist-no-such-volume-zzz");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_ARE_EQUAL(0u, ParseJsonArrayOutput(result).size());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_List_Filter_Name)

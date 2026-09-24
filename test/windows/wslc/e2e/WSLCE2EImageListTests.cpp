@@ -119,8 +119,10 @@ class WSLCE2EImageListTests
     {
         const auto result = RunWslc(L"image list --format invalid");
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(
-            L"Invalid format value: invalid is not a recognized format type. Supported format types are: json, table."));
+        VERIFY_IS_TRUE(
+            result.StderrContainsSubstring(L"Invalid format value: invalid is not a recognized format type. Supported format "
+                                           L"types are: json, json-array, table."),
+            result.Stderr.value().c_str());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_List_JsonFormat)
@@ -142,6 +144,18 @@ class WSLCE2EImageListTests
 
         VERIFY_ARE_NOT_EQUAL(imageNames.end(), std::find(imageNames.begin(), imageNames.end(), DebianImage.NameAndTag()));
         VERIFY_ARE_NOT_EQUAL(imageNames.end(), std::find(imageNames.begin(), imageNames.end(), AlpineImage.NameAndTag()));
+
+        const auto arrayResult = RunWslc(L"image list --format json-array");
+        arrayResult.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto imageArray = ParseJsonArrayOutputAs<ImageOutputInformation>(arrayResult);
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(imageArray.size(), 2u);
+        for (const auto& image : imageArray)
+        {
+            VERIFY_IS_TRUE(
+                std::ranges::all_of(
+                    image.Containers, [](char value) { return std::isdigit(static_cast<unsigned char>(value)) != 0; }),
+                L"'Containers' must be a container count");
+        }
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_List_JsonFormat_MatchesDockerShape)

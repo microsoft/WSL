@@ -99,7 +99,7 @@ std::wstring FormatContainerSize(LONGLONG SizeRw, LONGLONG SizeRootFs, FormatTyp
     }
 
     const auto total = FormatHumanReadableSize(static_cast<uint64_t>(SizeRootFs), c_statsIoPrecision);
-    if (format == FormatType::Json)
+    if (IsJsonFormat(format))
     {
         return std::format(L"{} (virtual {})", writable, total);
     }
@@ -199,8 +199,8 @@ ContainerOutputInformation ToContainerOutput(const ContainerInformation& contain
     entry.Platform.architecture = wsl::shared::Arm64 ? "arm64" : "amd64";
     entry.Platform.os = "linux";
     entry.Ports = WideToMultiByte(ContainerService::FormatPorts(container.State, container.Ports));
-    entry.RunningFor = WideToMultiByte(
-        format == FormatType::Json ? FormatInvariantRelativeTime(container.CreatedAt) : FormatRelativeTime(container.CreatedAt));
+    entry.RunningFor =
+        WideToMultiByte(IsJsonFormat(format) ? FormatInvariantRelativeTime(container.CreatedAt) : FormatRelativeTime(container.CreatedAt));
     // The daemon only computes container sizes when the listing request asks for them, so this is a
     // formatted zero unless --size was passed.
     entry.Size = WideToMultiByte(FormatContainerSize(container.SizeRw, container.SizeRootFs, format));
@@ -791,6 +791,17 @@ void ListContainers(CLIExecutionContext& context)
 
         break;
     }
+    case FormatType::JsonArray:
+    {
+        nlohmann::json output = nlohmann::json::array();
+        for (const auto& container : containers)
+        {
+            output.push_back(ToContainerOutput(container, trunc, format));
+        }
+
+        context.Terminal.Output(L"{}\n", ToJsonW(output, c_jsonCompactIndent));
+        break;
+    }
     case FormatType::Table:
     {
         using enum ColumnOverflow;
@@ -1190,6 +1201,9 @@ void ShowContainerStats(CLIExecutionContext& context)
 
         break;
     }
+    case FormatType::JsonArray:
+        context.Terminal.Output(L"{}\n", ToJsonW(statsJson, c_jsonCompactIndent));
+        break;
     case FormatType::Table:
     {
         bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();

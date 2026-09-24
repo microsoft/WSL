@@ -57,8 +57,10 @@ class WSLCE2ENetworkListTests
     {
         auto result = RunWslc(L"network list --format invalid");
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(
-            L"Invalid format value: invalid is not a recognized format type. Supported format types are: json, table."));
+        VERIFY_IS_TRUE(
+            result.StderrContainsSubstring(L"Invalid format value: invalid is not a recognized format type. Supported format "
+                                           L"types are: json, json-array, table."),
+            result.Stderr.value().c_str());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_List_QuietOption_OutputsIdsOnly)
@@ -145,6 +147,11 @@ class WSLCE2ENetworkListTests
 
         VERIFY_ARE_EQUAL(1u, static_cast<size_t>(std::count(names.begin(), names.end(), WideToMultiByte(TestNetworkName))));
         VERIFY_ARE_EQUAL(1u, static_cast<size_t>(std::count(names.begin(), names.end(), WideToMultiByte(TestNetworkName2))));
+
+        auto arrayResult = RunWslc(L"network list --format json-array");
+        arrayResult.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto networkArray = ParseJsonArrayOutput(arrayResult);
+        VERIFY_ARE_EQUAL(nlohmann::json(networks).dump(), networkArray.dump());
 
         auto quietResult = RunWslc(L"network list --format json --quiet");
         quietResult.Verify({.Stderr = L"", .ExitCode = 0});

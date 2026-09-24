@@ -54,10 +54,12 @@ void VersionCommand::ExecuteInternal(CLIExecutionContext& context) const
     switch (format)
     {
     case FormatType::Json:
+    case FormatType::JsonArray:
     {
         nlohmann::json root;
         root["Client"]["Version"] = std::string{WSL_PACKAGE_VERSION};
-        context.Terminal.Output(L"{}\n", MultiByteToWide(root.dump(c_jsonCompactIndent)));
+        const auto output = format == FormatType::JsonArray ? nlohmann::json::array({root}) : root;
+        context.Terminal.Output(L"{}\n", MultiByteToWide(output.dump(c_jsonCompactIndent)));
         break;
     }
     case FormatType::Table:

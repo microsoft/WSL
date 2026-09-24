@@ -384,7 +384,7 @@ std::wstring ContainerService::LocalizedContainerStateName(WSLCContainerState st
 
 std::wstring ContainerService::ContainerStateToString(WSLCContainerState state, LONGLONG stateChangedAt, FormatType format)
 {
-    const auto invariant = format == FormatType::Json;
+    const auto invariant = IsJsonFormat(format);
     auto stateString = invariant ? ContainerStateName(state) : LocalizedContainerStateName(state);
     if (stateChangedAt == 0 || state == WSLCContainerState::WslcContainerStateInvalid)
     {
