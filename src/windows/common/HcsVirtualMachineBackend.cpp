@@ -291,12 +291,6 @@ void HcsVirtualMachineBackend::Terminate()
     m_terminatingEvent.SetEvent();
 }
 
-void HcsVirtualMachineBackend::CancelPendingOperations() noexcept
-{
-    auto lock = m_lock.lock_exclusive();
-    CloseGuestListenersLocked(m_configuration.Description.Identity);
-}
-
 VmGuestListener HcsVirtualMachineBackend::CreateGuestListener(GuestServicePort Port)
 {
     auto lock = m_lock.lock_exclusive();

@@ -14,6 +14,7 @@ Abstract:
 
 #pragma once
 
+#include <thread>
 #include "IVirtualMachineBackend.h"
 
 struct WslOpenVmmVm;
@@ -40,7 +41,6 @@ public:
     wil::unique_handle GetTerminationEvent() const override;
     void Start() override;
     void Terminate() override;
-    void CancelPendingOperations() noexcept override;
 
     VmGuestListener CreateGuestListener(GuestServicePort Port) override;
     wil::unique_socket AcceptGuestConnection(VmListenerId Listener) override;
@@ -63,19 +63,14 @@ private:
     NON_COPYABLE(OpenVmmVirtualMachineBackend);
     NON_MOVABLE(OpenVmmVirtualMachineBackend);
 
-    static void CALLBACK OnProcessExit(PTP_CALLBACK_INSTANCE, void* Context, PTP_WAIT, TP_WAIT_RESULT) noexcept;
+    void OnProcessExit(DWORD ExitCode) noexcept;
+    void ReadProcessLog(wil::unique_hfile Pipe) noexcept;
     void Initialize(const VmCreateRequest& Request);
 
     static void DestroyVm(WslOpenVmmVm* Vm) noexcept;
     using UniqueVm = wil::unique_any<WslOpenVmmVm*, decltype(&DestroyVm), DestroyVm>;
 
     std::shared_ptr<VmGuestListenerState> ConfigureGuestListener(const VmGuestListener& Listener) override;
-
-    struct AttachedDisk
-    {
-        VmDiskAttachment Attachment;
-        wil::unique_hfile BackingFile;
-    };
 
     struct GuestListener : VmGuestListenerState
     {
@@ -109,8 +104,16 @@ private:
         std::wstring HostAddress;
     };
 
+    struct SessionFileSystemResources
+    {
+        std::filesystem::path SocketDirectory;
+        std::filesystem::path RpcSocketPath;
+        std::filesystem::path VsockPath;
+        bool DirectoryCreated = false;
+    };
+
     VmDescription m_description{};
-    _Guarded_by_(m_lock) std::map<std::uint64_t, AttachedDisk> m_attachedDisks;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, VmDiskAttachment> m_attachedDisks;
     _Guarded_by_(m_lock) std::uint64_t m_nextDiskId = 1;
     _Guarded_by_(m_lock) std::map<std::uint64_t, FileSystemDevice> m_fileSystemDevices;
     _Guarded_by_(m_lock) std::map<std::uint64_t, FileSystemShare> m_fileSystemShares;
@@ -119,15 +122,10 @@ private:
     _Guarded_by_(m_lock) std::uint64_t m_nextDeviceId = 1;
     _Guarded_by_(m_lock) std::uint64_t m_nextShareId = 1;
     _Guarded_by_(m_lock) std::uint64_t m_nextPortBindingId = 1;
-    _Guarded_by_(m_lock) UniqueVm m_vm;
+    UniqueVm m_vm;
     wil::unique_handle m_process;
     wil::unique_handle m_job;
-    std::vector<wil::unique_hfile> m_backingFiles;
-    std::filesystem::path m_socketDirectory;
-    std::filesystem::path m_rpcSocketPath;
-    std::filesystem::path m_vsockPath;
-    bool m_directoryCreated = false;
+    std::thread m_processLogThread;
+    SessionFileSystemResources m_fileSystemResources;
     wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
-    wil::unique_event m_operationCancellationEvent{wil::EventOptions::ManualReset};
-    wil::unique_threadpool_wait m_processWait;
 };

@@ -399,6 +399,7 @@ void OpenVmmVirtualMachineBackend::OnProcessExit(DWORD ExitCode) noexcept
     WSL_LOG(
         "OpenVmmProcessExited", TraceLoggingValue(m_description.Identity.VmId, "vmId"), TraceLoggingValue(ExitCode, "exitCode"));
     LOG_IF_WIN32_BOOL_FALSE(SetEvent(m_exitEvent.get()));
+    NotifyTerminated(m_description.Identity);
     auto lock = m_lock.lock_exclusive();
     CloseGuestListenersLocked(m_description.Identity);
 }
@@ -530,7 +531,7 @@ std::shared_ptr<VmGuestListenerState> OpenVmmVirtualMachineBackend::ConfigureGue
 
     auto listener = std::make_shared<GuestListener>();
     listener->Listener = Listener;
-    listener->Path = GetVsockListenerPath(m_vsockPath, Listener.Port);
+    listener->Path = GetVsockListenerPath(m_fileSystemResources.VsockPath, Listener.Port);
     DeleteOwnedFile(listener->Path);
 
     listener->Socket.reset(::socket(AF_UNIX, SOCK_STREAM, 0));

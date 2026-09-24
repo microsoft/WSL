@@ -29,7 +29,6 @@ public:
     wil::unique_handle GetTerminationEvent() const override;
     void Start() override;
     void Terminate() override;
-    void CancelPendingOperations() noexcept override;
 
     VmGuestListener CreateGuestListener(GuestServicePort Port) override;
     wil::unique_socket AcceptGuestConnection(VmListenerId Listener) override;

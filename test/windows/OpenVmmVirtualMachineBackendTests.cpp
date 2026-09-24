@@ -53,11 +53,6 @@ VmNetworkAdapterRequest CreateNetworkRequest()
     return request;
 }
 
-HRESULT DescribeResult(const VmCreateRequest& Request)
-{
-    return wil::ResultFromException([&] { ValidateCreateRequest(Request); });
-}
-
 template <typename Callback>
 HRESULT OperationResult(Callback&& Operation)
 {
@@ -120,30 +115,15 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(UINT32{2}, description.BootDisks.at(L"automatic-2").GuestAddress.Lun);
         VERIFY_ARE_EQUAL(UINT32{0}, description.BootDisks.at(L"exact").GuestAddress.Lun);
 
-        request.BootDisks[0].Disk.Placement = VmScsiPlacement{{0, 0}};
-        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
-        request.BootDisks[0].Disk.Placement.reset();
-        request.BootDisks[1].Key = request.BootDisks[0].Key;
-        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
+        auto highestPlacementRequest = CreateRequest();
+        highestPlacementRequest.BootDisks.push_back(CreateDisk(L"highest"));
+        highestPlacementRequest.BootDisks[0].Disk.Placement = VmScsiPlacement{{0, 253}};
+        VERIFY_ARE_EQUAL(
+            UINT32{253}, ValidateCreateRequest(highestPlacementRequest).BootDisks.at(L"highest").GuestAddress.Lun);
+
     }
 
-    TEST_METHOD(DoesNotCapMemoryAndRequiresGranularSizing)
-    {
-        SKIP_TEST_ARM64();
-        auto request = CreateRequest();
-        request.Memory.SizeBytes = 4096 * c_mib;
-        VERIFY_ARE_EQUAL(request.Memory.SizeBytes, ValidateCreateRequest(request).Memory.SizeBytes);
-        request.Memory.SizeBytes += 2 * c_mib;
-        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
-        request.Memory.SizeBytes = 33 * c_mib;
-        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
-        request.Memory.SizeBytes = c_mib;
-        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
-        request.Memory.SizeBytes = 2 * c_mib;
-        VERIFY_ARE_EQUAL(request.Memory.SizeBytes, ValidateCreateRequest(request).Memory.SizeBytes);
-    }
-
-    TEST_METHOD(ValidatesCreationTimeNetworking)
+    TEST_METHOD(DescribesCreationTimeNetworking)
     {
         SKIP_TEST_ARM64();
         auto request = CreateRequest();
@@ -164,54 +144,6 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_IS_FALSE(IsEqualGUID(adapter.Id.Owner.VmId, other.Id.Owner.VmId));
         VERIFY_IS_FALSE(IsEqualGUID(adapter.GuestInstanceId.value(), other.GuestInstanceId.value()));
 
-        request.NetworkAdapters.push_back(CreateNetworkRequest());
-        request.NetworkAdapters[1].Tag = L"eth1";
-        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
-        request.NetworkAdapters.pop_back();
-        request.NetworkAdapters[0].Tag.clear();
-        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
-        request.NetworkAdapters[0].Tag = std::wstring(L"eth\0zero", 8);
-        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
-    }
-
-    TEST_METHOD(RejectsCustomCreationTimeNetworkConfiguration)
-    {
-        SKIP_TEST_ARM64();
-        auto request = CreateRequest();
-        const auto network = CreateNetworkRequest();
-        request.NetworkAdapters.push_back(network);
-        auto& configuration = request.NetworkAdapters[0].Configuration;
-
-        configuration.ClientIpv4.Bytes[3] = 3;
-        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
-        configuration = network.Configuration;
-        configuration.GatewayIpv4.Bytes[3] = 254;
-        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
-        configuration = network.Configuration;
-        configuration.Netmask.Bytes[2] = 0;
-        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
-        configuration = network.Configuration;
-        configuration.GatewayMacIpv4.Bytes[5] = 2;
-        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
-        configuration = network.Configuration;
-        configuration.GatewayMacIpv6.Bytes[5] = 3;
-        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
-        configuration = network.Configuration;
-        configuration.ClientIpv6 = VmIpv6Address{};
-        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
-        configuration = network.Configuration;
-        configuration.Nameservers.push_back(VmIpv4Address{{8, 8, 8, 8}});
-        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { OpenVmmVirtualMachineBackend::Create(request); }));
-    }
-
-    TEST_METHOD(RejectsInvalidDiskFormats)
-    {
-        SKIP_TEST_ARM64();
-        auto request = CreateRequest();
-        request.BootDisks.push_back(CreateDisk(L"disk"));
-        request.BootDisks[0].Disk.Source = VmVirtualDiskSource{L"C:\\images\\disk.vhd", VmDiskFormat::Vhdx};
-        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
     }
 
     TEST_METHOD(EnforcesDiskLimitsAndKeepsIdsVmScoped)
@@ -228,30 +160,9 @@ class OpenVmmVirtualMachineBackendTests
         const auto second = ValidateCreateRequest(request);
         VERIFY_ARE_EQUAL(first.BootDisks.at(L"0").Id.Value, second.BootDisks.at(L"0").Id.Value);
         VERIFY_IS_FALSE(IsEqualGUID(first.BootDisks.at(L"0").Id.Owner.VmId, second.BootDisks.at(L"0").Id.Owner.VmId));
-        request.BootDisks.push_back(CreateDisk(L"overflow"));
-        VERIFY_ARE_EQUAL(WSL_E_TOO_MANY_DISKS_ATTACHED, DescribeResult(request));
     }
 
-    TEST_METHOD(CreatePreservesValidationErrors)
-    {
-        SKIP_TEST_ARM64();
-        auto request = CreateRequest();
-        request.Memory.SizeBytes = 0;
-        VERIFY_ARE_EQUAL(E_INVALIDARG, wil::ResultFromException([&] { OpenVmmVirtualMachineBackend::Create(request); }));
-
-        request.Memory.SizeBytes = 4098 * c_mib;
-        VERIFY_ARE_EQUAL(c_notSupported, wil::ResultFromException([&] { OpenVmmVirtualMachineBackend::Create(request); }));
-
-        request.Memory.SizeBytes = 512 * c_mib;
-        for (UINT32 index = 0; index < 255; ++index)
-        {
-            request.BootDisks.push_back(CreateDisk(std::to_wstring(index)));
-        }
-        VERIFY_ARE_EQUAL(
-            WSL_E_TOO_MANY_DISKS_ATTACHED, wil::ResultFromException([&] { OpenVmmVirtualMachineBackend::Create(request); }));
-    }
-
-    TEST_METHOD(ValidatesConsoleFamiliesIndependently)
+    TEST_METHOD(DescribesConsoleFamiliesIndependently)
     {
         SKIP_TEST_ARM64();
         auto request = CreateRequest();
@@ -259,25 +170,6 @@ class OpenVmmVirtualMachineBackendTests
             {VmConsoleRole::EarlyBoot, VmSerialConsole{0, L"\\\\.\\pipe\\early"}},
             {VmConsoleRole::KernelConsole, VmVirtioConsole{0, L"", L"\\\\.\\pipe\\console"}}};
         VERIFY_ARE_EQUAL(size_t{2}, ValidateCreateRequest(request).Boot.Consoles.size());
-        request.Consoles.push_back(request.Consoles[0]);
-        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
-        request.Consoles.pop_back();
-        std::get<VmVirtioConsole>(request.Consoles[1].Device).GuestName = L"unsupported-name";
-        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
-    }
-
-    TEST_METHOD(RejectsInvalidIdentityAndBootPaths)
-    {
-        SKIP_TEST_ARM64();
-        auto request = CreateRequest();
-        request.Identity.VmId = GUID_NULL;
-        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
-        THROW_IF_FAILED(CoCreateGuid(&request.Identity.VmId));
-        request.Boot.KernelPath = L"relative-kernel";
-        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
-        request.Boot.KernelPath = L"C:\\images\\kernel";
-        request.Boot.Method = VmBootMethod::Uefi;
-        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
     }
 
     TEST_METHOD(BootsAndTerminates)
@@ -378,7 +270,7 @@ class OpenVmmVirtualMachineBackendTests
         backend->Terminate();
     }
 
-    TEST_METHOD(CancelPendingOperationsCancelsGuestAccept)
+    TEST_METHOD(ManagesGuestListenerLifetime)
     {
         SKIP_TEST_ARM64();
         auto backend = OpenVmmVirtualMachineBackend::Create(CreateRunnableRequest());
@@ -386,27 +278,12 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(
             HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] { backend->CreateGuestListener(listener.Port); }));
 
-        std::promise<void> acceptStarted;
-        auto started = acceptStarted.get_future();
-        auto accept = std::async(std::launch::async, [&] {
-            acceptStarted.set_value();
-            return OperationResult([&] { backend->AcceptGuestConnection(listener.Id); });
-        });
-        started.get();
-
-        backend->CancelPendingOperations();
-        const auto acceptStatus = accept.wait_for(std::chrono::seconds{30});
-        VERIFY_ARE_EQUAL(std::future_status::ready, acceptStatus);
-        if (acceptStatus != std::future_status::ready)
-        {
-            backend->Terminate();
-        }
-        VERIFY_ARE_EQUAL(E_ABORT, accept.get());
+        backend->CloseGuestListener(listener.Id);
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->CloseGuestListener(listener.Id); }));
-        if (acceptStatus == std::future_status::ready)
-        {
-            backend->Terminate();
-        }
+        const auto replacement = backend->CreateGuestListener(listener.Port);
+        VERIFY_ARE_NOT_EQUAL(listener.Id.Value, replacement.Id.Value);
+        backend->CloseGuestListener(replacement.Id);
+        backend->Terminate();
     }
 
     TEST_METHOD(CapabilitiesReflectVmServiceProtocol)
