@@ -997,6 +997,76 @@ class WslcSdkWinRtTests
         container.Delete(WSLCSDK::DeleteContainerOption::Force);
     }
 
+    WSLC_TEST_METHOD(ProcessEnableStandardInput)
+    {
+        // Unit: the property defaults to false and round-trips.
+        {
+            auto procSettings = WSLCSDK::ProcessSettings();
+            VERIFY_IS_FALSE(procSettings.EnableStandardInput());
+
+            procSettings.EnableStandardInput(true);
+            VERIFY_IS_TRUE(procSettings.EnableStandardInput());
+        }
+
+        // Negative: changing the value after the settings have been applied must throw.
+        {
+            auto procSettings = WSLCSDK::ProcessSettings();
+            procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"1"}));
+
+            auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+            containerSettings.InitProcess(procSettings);
+
+            auto container = m_defaultSession.CreateContainer(containerSettings);
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+            VERIFY_THROWS_HR(procSettings.EnableStandardInput(true), E_ILLEGAL_STATE_CHANGE);
+        }
+
+        // Functional: without the property, stdin is closed immediately so cat produces no output.
+        {
+            auto output = RunContainerAndWaitForExit(L"debian:latest", {.commandLine = {L"/bin/cat"}});
+            VERIFY_ARE_EQUAL(output.ExitCode, 0);
+            VERIFY_ARE_EQUAL(output.StandardOutput, L"");
+        }
+
+        // Functional: with the property, input written to stdin is echoed back by cat.
+        {
+            auto procSettings = WSLCSDK::ProcessSettings();
+            procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/cat"}));
+            procSettings.OutputMode(WSLCSDK::ProcessOutputMode::Stream);
+            procSettings.EnableStandardInput(true);
+
+            auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+            containerSettings.InitProcess(procSettings);
+
+            auto container = m_defaultSession.CreateContainer(containerSettings);
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+            auto initProcess = container.InitProcess();
+
+            std::promise<void> promise;
+            auto autoRevoker = initProcess.Exited(winrt::auto_revoke, [&](int32_t) { promise.set_value(); });
+
+            container.Start();
+
+            auto stdoutStream = initProcess.GetOutputStream(WSLCSDK::ProcessOutputHandle::StandardOutput);
+
+            // Write to stdin and close it so that cat sees EOF and exits.
+            {
+                auto stdinStream = initProcess.GetInputStream();
+                DataWriter writer{stdinStream};
+                writer.WriteString(L"hello-from-stdin\n");
+                writer.StoreAsync().get();
+                writer.FlushAsync().get();
+                writer.DetachStream();
+                stdinStream.Close();
+            }
+
+            VERIFY_ARE_EQUAL(promise.get_future().wait_for(2min), std::future_status::ready);
+            VERIFY_ARE_EQUAL(ReadStream(stdoutStream), L"hello-from-stdin\n");
+        }
+    }
+
     WSLC_TEST_METHOD(ProcessSignal)
     {
         // Negative: Signal() before Start() must throw.
