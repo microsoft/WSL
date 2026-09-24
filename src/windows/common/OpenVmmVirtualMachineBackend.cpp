@@ -394,6 +394,7 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     process.SetJobObject(m_job.get());
     SECURITY_ATTRIBUTES inheritable{sizeof(inheritable), nullptr, TRUE};
     auto input = wsl::windows::common::filesystem::OpenNulDevice(GENERIC_READ);
+    helpers::SetHandleInheritable(input.get());
     wil::unique_hfile output{CreateFileW(
         L"NUL", GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &inheritable, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
     THROW_LAST_ERROR_IF(!output);
