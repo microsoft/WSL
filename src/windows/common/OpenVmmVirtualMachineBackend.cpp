@@ -189,13 +189,10 @@ VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmC
         if (disk.Disk.Placement)
         {
             const auto& placement = *disk.Disk.Placement;
-            if (placement.Address.Lun < c_maximumDisks)
-            {
-                THROW_HR_IF(c_notSupported, placement.Address.Controller != 0);
-                THROW_HR_IF(E_BOUNDS, placement.Address.Lun >= c_maximumDisks);
-                THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), allocated.test(placement.Address.Lun));
-                allocated.set(placement.Address.Lun);
-            }
+            THROW_HR_IF(c_notSupported, placement.Address.Controller != 0);
+            THROW_HR_IF(E_BOUNDS, placement.Address.Lun >= c_maximumDisks);
+            THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), allocated.test(placement.Address.Lun));
+            allocated.set(placement.Address.Lun);
         }
     }
 
@@ -449,7 +446,6 @@ void OpenVmmVirtualMachineBackend::OnProcessExit(DWORD ExitCode) noexcept
     WSL_LOG(
         "OpenVmmProcessExited", TraceLoggingValue(m_description.Identity.VmId, "vmId"), TraceLoggingValue(ExitCode, "exitCode"));
     LOG_IF_WIN32_BOOL_FALSE(SetEvent(m_exitEvent.get()));
-    LOG_IF_WIN32_BOOL_FALSE(SetEvent(m_operationCancellationEvent.get()));
     auto lock = m_lock.lock_exclusive();
     CloseGuestListeners();
 }
@@ -572,23 +568,6 @@ void OpenVmmVirtualMachineBackend::Terminate()
         TraceLoggingValue(GetTickCount64() - startTimeMs, "durationMs"));
 }
 
-void OpenVmmVirtualMachineBackend::CancelPendingOperations() noexcept
-{
-    WSL_LOG("OpenVmmCancelPendingOperations", TraceLoggingValue(m_description.Identity.VmId, "vmId"));
-    if (m_vm)
-    {
-        const auto result = WslOpenVmmVmCancelRequests(m_vm.get());
-        WSL_LOG(
-            "OpenVmmCancelRequests",
-            TraceLoggingValue(m_description.Identity.VmId, "vmId"),
-            TraceLoggingHResult(result, "result"));
-        LOG_IF_FAILED(result);
-    }
-    LOG_IF_WIN32_BOOL_FALSE(SetEvent(m_operationCancellationEvent.get()));
-    auto lock = m_lock.lock_exclusive();
-    CloseGuestListeners();
-}
-
 VmGuestListener OpenVmmVirtualMachineBackend::CreateGuestListener(GuestServicePort Port)
 {
     WSL_LOG(
@@ -665,6 +644,7 @@ wil::unique_socket OpenVmmVirtualMachineBackend::ConnectGuest(GuestServicePort P
     {
         auto lock = m_lock.lock_shared();
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
+        THROW_HR_IF(E_ABORT, m_exitEvent.is_signaled());
     }
 
     wil::unique_socket socket{::socket(AF_UNIX, SOCK_STREAM, 0)};
@@ -677,16 +657,14 @@ wil::unique_socket OpenVmmVirtualMachineBackend::ConnectGuest(GuestServicePort P
 
     const auto request = std::format("CONNECT {}\n", Port.Value);
     wsl::windows::common::socket::Send(
-        socket.get(),
-        gsl::make_span(reinterpret_cast<const gsl::byte*>(request.data()), request.size()),
-        m_operationCancellationEvent.get());
+        socket.get(), gsl::make_span(reinterpret_cast<const gsl::byte*>(request.data()), request.size()), m_exitEvent.get());
 
     std::array<char, 64> response{};
     size_t responseLength = 0;
     for (; responseLength < response.size() - 1; ++responseLength)
     {
         const auto bytesRead = wsl::windows::common::socket::Receive(
-            socket.get(), gsl::make_span(reinterpret_cast<gsl::byte*>(&response[responseLength]), 1), m_operationCancellationEvent.get(), MSG_WAITALL, c_rpcTimeoutMs);
+            socket.get(), gsl::make_span(reinterpret_cast<gsl::byte*>(&response[responseLength]), 1), m_exitEvent.get(), MSG_WAITALL, c_rpcTimeoutMs);
         THROW_HR_IF_MSG(
             HRESULT_FROM_WIN32(ERROR_CONNECTION_ABORTED), bytesRead == 0, "vsock bridge closed during CONNECT handshake");
         if (response[responseLength] == '\n')

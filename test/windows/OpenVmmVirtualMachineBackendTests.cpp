@@ -136,6 +136,36 @@ class OpenVmmVirtualMachineBackendTests
         const auto second = ValidateCreateRequest(request);
         VERIFY_ARE_EQUAL(first.BootDisks.at(L"0").Id.Value, second.BootDisks.at(L"0").Id.Value);
         VERIFY_IS_FALSE(IsEqualGUID(first.BootDisks.at(L"0").Id.Owner.VmId, second.BootDisks.at(L"0").Id.Owner.VmId));
+        request.BootDisks.push_back(CreateDisk(L"overflow"));
+        VERIFY_ARE_EQUAL(WSL_E_TOO_MANY_DISKS_ATTACHED, DescribeResult(request));
+    }
+
+    TEST_METHOD(ValidatesExplicitBootDiskPlacements)
+    {
+        SKIP_TEST_ARM64();
+        auto request = CreateRequest();
+        request.BootDisks.push_back(CreateDisk(L"exact"));
+        auto& disk = request.BootDisks[0].Disk;
+        disk.Placement = VmScsiPlacement{{0, 253}};
+        VERIFY_ARE_EQUAL(UINT32{253}, ValidateCreateRequest(request).BootDisks.at(L"exact").GuestAddress.Lun);
+
+        for (const UINT32 lun : {UINT32{254}, UINT32_MAX})
+        {
+            disk.Placement = VmScsiPlacement{{0, lun}};
+            VERIFY_ARE_EQUAL(E_BOUNDS, DescribeResult(request));
+        }
+
+        for (const UINT32 lun : {UINT32{0}, UINT32{254}, UINT32_MAX})
+        {
+            disk.Placement = VmScsiPlacement{{1, lun}};
+            VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+        }
+
+        disk.Placement = VmScsiPlacement{{0, 253}};
+        auto duplicate = CreateDisk(L"duplicate");
+        duplicate.Disk.Placement = disk.Placement;
+        request.BootDisks.push_back(std::move(duplicate));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), DescribeResult(request));
     }
 
     TEST_METHOD(ValidatesConsoleFamiliesIndependently)
@@ -256,7 +286,7 @@ class OpenVmmVirtualMachineBackendTests
         backend->Terminate();
     }
 
-    TEST_METHOD(CancelPendingOperationsCancelsGuestAccept)
+    TEST_METHOD(ManagesGuestListenerLifetime)
     {
         SKIP_TEST_ARM64();
         auto backend = OpenVmmVirtualMachineBackend::Create(CreateRunnableRequest());
@@ -264,27 +294,12 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(
             HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] { backend->CreateGuestListener(listener.Port); }));
 
-        std::promise<void> acceptStarted;
-        auto started = acceptStarted.get_future();
-        auto accept = std::async(std::launch::async, [&] {
-            acceptStarted.set_value();
-            return OperationResult([&] { backend->AcceptGuestConnection(listener.Id); });
-        });
-        started.get();
-
-        backend->CancelPendingOperations();
-        const auto acceptStatus = accept.wait_for(std::chrono::seconds{30});
-        VERIFY_ARE_EQUAL(std::future_status::ready, acceptStatus);
-        if (acceptStatus != std::future_status::ready)
-        {
-            backend->Terminate();
-        }
-        VERIFY_ARE_EQUAL(E_ABORT, accept.get());
+        backend->CloseGuestListener(listener.Id);
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->CloseGuestListener(listener.Id); }));
-        if (acceptStatus == std::future_status::ready)
-        {
-            backend->Terminate();
-        }
+        const auto replacement = backend->CreateGuestListener(listener.Port);
+        VERIFY_ARE_NOT_EQUAL(listener.Id.Value, replacement.Id.Value);
+        backend->CloseGuestListener(replacement.Id);
+        backend->Terminate();
     }
 
     TEST_METHOD(CapabilitiesReflectVmServiceProtocol)
