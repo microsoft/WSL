@@ -32,6 +32,8 @@ using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
 
+using namespace wsl::windows::wslc::cli;
+
 namespace {
 
     // Shared by the table and json output so the two cannot drift. The id is truncated unless --no-trunc is passed.
@@ -235,7 +237,7 @@ void ListNetworks(CLIExecutionContext& context)
     {
         // Every column has a minimum total width of ten characters, including the padding that follows it.
         constexpr size_t c_minimumColumnWidth = 7;
-        auto table = wsl::windows::wslc::TableOutput<4>(
+        auto table = wsl::windows::wslc::cli::TableOutput<4>(
             context.Terminal,
             {L"NETWORK ID", L"NAME", L"DRIVER", L"SCOPE"},
             {ColumnWidthConfig{.MinWidth = c_minimumColumnWidth},

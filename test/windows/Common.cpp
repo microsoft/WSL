@@ -1158,7 +1158,7 @@ Return Value:
 
 // WslKeepAlive class definitions
 
-WslKeepAlive::WslKeepAlive(HANDLE Token) : m_token(Token)
+WslKeepAlive::WslKeepAlive(HANDLE Token, const std::wstring& DistroName) : m_token(Token), m_distroName(DistroName)
 {
     Set();
 }
@@ -1191,7 +1191,8 @@ void WslKeepAlive::Run()
 
         // Start a process that outputs 'running', then waits
         const std::wstring expectedOutput = L"running";
-        std::wstring cmd = L"wsl.exe echo -n " + expectedOutput + L" && read -n 1 ";
+        const auto distroArgument = m_distroName.empty() ? L"" : std::format(L"-d {} ", m_distroName);
+        std::wstring cmd = L"wsl.exe " + distroArgument + L"echo -n " + expectedOutput + L" && read -n 1 ";
         const auto process = LxsstuStartProcess(cmd.data(), m_read.get(), write.get(), nullptr, m_token);
         write.reset();
 
@@ -1237,7 +1238,7 @@ std::pair<DWORD, DWORD> GetServiceState(SC_HANDLE service)
     return std::make_pair(status.dwCurrentState, status.dwProcessId);
 }
 
-void WaitForServiceState(SC_HANDLE service, DWORD state, DWORD previousPid)
+bool WaitForServiceState(SC_HANDLE service, DWORD state, DWORD previousPid)
 {
     DWORD currentState{};
     DWORD pid{};
@@ -1261,6 +1262,8 @@ void WaitForServiceState(SC_HANDLE service, DWORD state, DWORD previousPid)
     {
         LogError("Timed waiting for service to reach state: %lu. Current state: %lu, error: 0x%x", state, currentState, wil::ResultFromCaughtException());
     }
+
+    return currentState == state;
 }
 
 void StopService(SC_HANDLE service)
@@ -1317,6 +1320,8 @@ Return Value:
     {
         VERIFY_ARE_EQUAL(GetLastError(), ERROR_SERVICE_ALREADY_RUNNING);
     }
+
+    VERIFY_IS_TRUE(WaitForServiceState(service.get(), SERVICE_RUNNING, 0));
 }
 
 void StopWslService()
@@ -1538,6 +1543,7 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         L"\n"
         L"mountDeviceTimeout=120000\n"
         L"kernelBootTimeout=120000\n"
+        L"distributionStartTimeout=120000\n"
         L"debugConsoleLogFile=" +
         EscapePath(Default.debugConsoleLogFile.value_or(kernelLogs)) +
         L"\n"
@@ -2512,6 +2518,49 @@ bool WslShutdown()
 void TerminateDistribution(LPCWSTR DistributionName)
 {
     VERIFY_ARE_EQUAL(0u, LxsstuLaunchWsl(std::format(L"{} {}", WSL_TERMINATE_ARG, DistributionName)));
+}
+
+std::wstring GetBlockDeviceInWsl(ULONGLONG SizeBytes)
+{
+    // Wait for the disk to be attached.
+    const auto timeout = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+    const auto expectedSize = std::to_wstring(SizeBytes);
+
+    bool done = false;
+    while (true)
+    {
+        for (wchar_t name = 'a'; name < 'z'; name++)
+        {
+            std::wstring cmd = L"-u root blockdev --getsize64 /dev/sd";
+            cmd += name;
+
+            std::wstring out;
+            try
+            {
+                out = LxsstuLaunchWslAndCaptureOutput(cmd.data()).first;
+            }
+            CATCH_LOG()
+
+            Trim(out);
+
+            if (out == expectedSize)
+            {
+                return std::wstring(L"/dev/sd") + name;
+            }
+        }
+
+        if (done)
+        {
+            break;
+        }
+
+        done = std::chrono::steady_clock::now() > timeout;
+    }
+
+    VERIFY_FAIL(L"Failed to find the block device in WSL");
+
+    // Unreachable.
+    return {};
 }
 
 void ValidateOutput(LPCWSTR CommandLine, const std::wstring& ExpectedOutput, const std::wstring& ExpectedWarnings, int ExitCode)

@@ -18,8 +18,10 @@ using namespace wsl::windows::wslc::execution;
 using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
+
+using namespace wsl::windows::wslc::cli;
 // Container Root Command
-std::vector<std::unique_ptr<Command>> ContainerCommand::GetCommands() const
+std::vector<std::unique_ptr<Command>> ContainerCommand::CreateCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<ContainerAttachCommand>(FullName()));

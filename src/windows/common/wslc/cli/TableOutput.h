@@ -29,7 +29,7 @@ Abstract:
 #include "Terminal.h"
 #include "VTSupport.h"
 
-namespace wsl::windows::wslc {
+namespace wsl::windows::wslc::cli {
 
 using wsl::windows::common::vt::Sequence;
 
@@ -213,7 +213,9 @@ struct TableOutput
     // Omits columns whose data cells are all empty, dropping their headers along with them,
     // instead of rendering them at header width. Emptiness is measured across the buffered data
     // rows only, so header text never keeps a column alive. Lets a table be declared with its full
-    // set of potential columns and shed the ones the caller left unpopulated.
+    // set of potential columns and shed the ones the caller left unpopulated. A table with no data
+    // rows has no emptiness to infer, so it renders every column; use SetColumnHidden() to omit one
+    // there.
     void SetDropEmptyColumns(bool dropEmptyColumns)
     {
         m_dropEmptyColumns = dropEmptyColumns;
@@ -407,7 +409,7 @@ private:
         // For plain cells, wrap the text directly.
         if (cell.sequences.empty())
         {
-            auto chunks = wsl::windows::wslc::details::WrapText(cell.fmt, col.MaxLength);
+            auto chunks = wsl::windows::wslc::cli::details::WrapText(cell.fmt, col.MaxLength);
             std::vector<FormattedCell> result;
             result.reserve(chunks.size());
             for (auto& chunk : chunks)
@@ -438,7 +440,7 @@ private:
             }
         }
 
-        auto chunks = wsl::windows::wslc::details::WrapText(visibleText, col.MaxLength);
+        auto chunks = wsl::windows::wslc::cli::details::WrapText(visibleText, col.MaxLength);
         std::vector<FormattedCell> result;
         result.reserve(chunks.size());
         for (auto& chunk : chunks)
@@ -719,4 +721,4 @@ private:
     }
 };
 
-} // namespace wsl::windows::wslc
+} // namespace wsl::windows::wslc::cli

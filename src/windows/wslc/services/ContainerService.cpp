@@ -30,6 +30,8 @@ Abstract:
 #include <wslc.h>
 
 namespace wsl::windows::wslc::services {
+
+using namespace wsl::windows::wslc::cli;
 namespace mount = wsl::windows::common::mount;
 
 using wsl::windows::common::ClientRunningWSLCProcess;
@@ -833,14 +835,14 @@ void ContainerService::CopyToContainer(Session& session, const std::string& id, 
     THROW_IF_FAILED(container->UploadArchive(ToCOMInputHandle(inputHandle), destPath.c_str(), contentSize));
 }
 
-void ContainerService::CopyFromContainer(Session& session, const std::string& id, const std::string& srcPath, HANDLE outputHandle)
+void ContainerService::CopyFromContainer(Session& session, const std::string& id, const std::string& srcPath, bool followLink, HANDLE outputHandle)
 {
     [[maybe_unused]] auto operation = session.BeginContainerOperation();
 
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
 
-    THROW_IF_FAILED(container->DownloadArchive(srcPath.c_str(), ToCOMInputHandle(outputHandle)));
+    THROW_IF_FAILED(container->DownloadArchive(srcPath.c_str(), followLink, ToCOMInputHandle(outputHandle)));
 }
 
 void ContainerService::Logs(Session& session, const std::string& id, bool follow, bool timestamps, bool details, LONGLONG since, LONGLONG until, ULONGLONG tail)

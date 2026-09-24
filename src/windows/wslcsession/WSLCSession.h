@@ -128,6 +128,7 @@ public:
     IFACEMETHOD(PullImage)(
         _In_ LPCSTR Image,
         _In_opt_ LPCSTR RegistryAuthenticationInformation,
+        _In_ BOOL AllTags,
         _In_opt_ IProgressCallback* ProgressCallback,
         _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(BuildImage)(_In_ const WSLCBuildImageOptions* Options, _In_opt_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
@@ -228,6 +229,7 @@ public:
     IFACEMETHOD(MapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
     IFACEMETHOD(UnmapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
     IFACEMETHOD(TriggerIdleTermination)(_Out_ BOOL* WasAlreadyIdle) override;
+    IFACEMETHOD(SetNetworkFaultsForTest)(_In_ BOOL FailCreateInspect) override;
 
     // IWSLCCompatSession - converts the WSLCCompat types to the wslc.idl types and forwards to the methods above.
     // Methods that have an identical signature in both interfaces (Terminate, DeleteVolume, Authenticate,
@@ -349,6 +351,10 @@ private:
 
     void OnContainerCreated(const std::string& ContainerId, std::int64_t Time) noexcept;
 
+    // Docker network notifications are forwarded to the event store as they arrive; the session's
+    // network state is committed independently by the mutators under m_networksLock.
+    void OnNetworkEvent(const std::string& NetworkId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t Time) noexcept;
+
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
 
     void Ext4Format(const std::string& Device);
@@ -358,6 +364,10 @@ private:
     void OnCrashDumpWritten(const std::wstring& DumpPath, const std::string& ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp);
 
     void OnImageCreated(const std::string& ImageNameOrId) noexcept;
+
+    // Notifies plugins for each image created by an --all-tags pull, identified by the manifest digests
+    // the pull reported. Requires the VM lease.
+    void OnRepositoryImagesCreated(const wsl::windows::common::wslutil::RepositoryReference& Repository, const std::vector<std::string>& Digests) noexcept;
 
     void OnImageDeleted(const std::string& ImageId) noexcept;
 
@@ -376,7 +386,9 @@ private:
     void RecoverExistingNetworks();
 
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent);
-    void StreamImageOperation(DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback);
+    // Returns the manifest digest each pulled tag resolved to, in the order the daemon reported them.
+    std::vector<std::string> StreamImageOperation(
+        DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback);
 
     // The VM factory is a cross-process proxy supplied by the SYSTEM service at Initialize() time
     // but first used later (on demand) from a different thread/apartment. A directly stored proxy
@@ -425,8 +437,14 @@ private:
 
     __guarded_by(m_containersLock) std::shared_ptr<PendingContainerCreate> m_pendingCreate;
 
+    // Test-only fault injection, see SetNetworkFaultsForTest.
+    std::atomic<bool> m_failCreateInspectForTest{false};
+
     // N.B. Declared after everything OnContainerCreated() touches so the callback is unregistered first.
     DockerEventTracker::EventTrackingReference m_containerEventTracking;
+
+    // N.B. Declared after everything OnNetworkEvent() touches so the callback is unregistered first.
+    DockerEventTracker::EventTrackingReference m_networkEventTracking;
 
     // User-provided handles that the session is currently doing IO on.
     std::mutex m_userHandlesLock;

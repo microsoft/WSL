@@ -3,7 +3,6 @@ site_description: Windows Subsystem for Linux developer and architecture documen
 
 nav:
     - 'Home': 'index.md'
-    - 'Security model': 'security.md'
     - 'Getting started':
        - 'Building and testing WSL': 'dev-loop.md'
        - 'Debugging WSL': 'debugging.md'
@@ -23,6 +22,7 @@ nav:
        - 'localhost': technical-documentation/localhost.md
        - 'plan9': technical-documentation/plan9.md
     - 'Technical documentation':
+       - 'Security model': technical-documentation/security.md
        - 'Boot process': technical-documentation/boot-process.md
        - 'Interop': technical-documentation/interop.md
        - 'Drvfs & Plan9': technical-documentation/drvfs.md

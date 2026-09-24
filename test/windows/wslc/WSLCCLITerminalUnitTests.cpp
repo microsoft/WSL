@@ -21,6 +21,7 @@ Abstract:
 #include "Terminal.h"
 
 using namespace wsl::windows::wslc;
+using namespace wsl::windows::wslc::cli;
 using namespace wsl::windows::common::vt;
 using namespace WSLCTestHelpers;
 using namespace WEX::Logging;
@@ -128,6 +129,31 @@ class WSLCCLITerminalUnitTests
         CaptureTerminal cap;
         cap.terminal.Output(L"plain literal\n");
         VERIFY_ARE_EQUAL(std::wstring{L"plain literal\n"}, cap.captured());
+    }
+
+    TEST_METHOD(Terminal_OutputFormatsUtf8String)
+    {
+        SplitCaptureTerminal cap;
+        cap.terminal.Output(L"{}\n", std::string{"caf\xc3\xa9"});
+        VERIFY_ARE_EQUAL(std::wstring{L"caf\u00e9\n"}, cap.outPipe.captured());
+        VERIFY_ARE_EQUAL(std::wstring{}, cap.errPipe.captured());
+    }
+
+    TEST_METHOD(Terminal_FlushMakesBufferedOutputVisibleBeforeClose)
+    {
+        auto [readPipe, writePipe] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+        wil::unique_handle writeHandle{writePipe.release()};
+        std::array<char, 4096> buffer{};
+        auto file = FileFromHandle(writeHandle, "w");
+        VERIFY_ARE_NOT_EQUAL(-1, _setmode(_fileno(file.get()), _O_U8TEXT));
+        VERIFY_ARE_EQUAL(0, setvbuf(file.get(), buffer.data(), _IOFBF, buffer.size()));
+
+        PartialHandleRead reader(readPipe.get());
+        Terminal terminal(file.get(), false, file.get(), false);
+        terminal.Output(L"event\n");
+        terminal.Flush(Terminal::Level::Output);
+
+        reader.Expect("event\r\n");
     }
 
     TEST_METHOD(Terminal_SequenceEmittedWhenVTEnabled)

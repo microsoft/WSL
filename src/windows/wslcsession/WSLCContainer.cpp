@@ -555,7 +555,9 @@ bool ContainerStartedAfterEvent(const TimePointNs& containerStartTime, std::int6
         return containerStartTime > TimePointNs{std::chrono::nanoseconds{eventTimeNanoseconds.value()}};
     }
 
-    return std::chrono::floor<std::chrono::seconds>(containerStartTime).time_since_epoch().count() > eventTime;
+    // The second-resolution fallback includes equality because the caller separately verifies that
+    // Docker is reporting a different run.
+    return std::chrono::floor<std::chrono::seconds>(containerStartTime).time_since_epoch().count() >= eventTime;
 }
 
 std::string WSLCStateToEventAction(WSLCContainerState state)
@@ -1377,6 +1379,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     // Either owner may disconnect the COM wrapper, so both must outlive m_lock.
     unique_com_disconnect comWrapper;
     bool reconcilePolicyRestart = false;
+    bool notifyContainerStopping = false;
     std::shared_ptr<StateTransition> transition;
 
     if (event == ContainerEvent::Kill)
@@ -1417,21 +1420,14 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
             }
             else
             {
-                if (PrepareForUnexpectedStartLockHeld(eventTime))
-                {
-                    NotifyContainerStoppingLockHeld();
-                }
-
+                notifyContainerStopping = PrepareForUnexpectedStartLockHeld(eventTime);
                 reconcilePolicyRestart = true;
             }
         }
         else if (event == ContainerEvent::Stop)
         {
             WI_ASSERT(exitCode.has_value());
-            if (OnStopped(exitCode.value(), eventTime, eventTimeNanoseconds))
-            {
-                NotifyContainerStoppingLockHeld();
-            }
+            notifyContainerStopping = OnStopped(exitCode.value(), eventTime, eventTimeNanoseconds);
         }
         else if (event == ContainerEvent::Destroy)
         {
@@ -1461,6 +1457,13 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
             TraceLoggingValue(m_name.c_str(), "Name"),
             TraceLoggingValue(m_id.c_str(), "Id"),
             TraceLoggingValue((int)event, "Event"));
+
+        if (notifyContainerStopping)
+        {
+            ActivityRef callbackActivity{m_runtime.IdleStateShared()};
+            runtimeLock.reset();
+            NotifyContainerStoppingLockHeld();
+        }
     }
 
     if (reconcilePolicyRestart)
@@ -1611,14 +1614,15 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
             {
                 lock = m_lock.lock_exclusive();
 
-                if (manualStopRequest && m_manualStopRequests > 0)
-                {
-                    --m_manualStopRequests;
-                }
-
-                // HTTP 304 is returned when the container is already stopped.
+                // HTTP 304 is returned when the container is already stopped. The stop event consumes
+                // the published manual-stop intent.
                 if (Kill || e.StatusCode() != 304)
                 {
+                    if (manualStopRequest && m_manualStopRequests > 0)
+                    {
+                        --m_manualStopRequests;
+                    }
+
                     // A force delete can win the locks released above, so the container may be gone rather than stuck.
                     THROW_HR_WITH_USER_ERROR_IF(
                         WSLC_E_CONTAINER_DELETED,
@@ -1808,7 +1812,8 @@ __requires_exclusive_lock_held(m_lock) bool WSLCContainerImpl::OnStopped(int exi
         {
             dockerInspect = m_runtime.Docker().InspectContainer(m_id);
             const auto dockerStartTime = GetContainerStartTime(dockerInspect.value());
-            if ((dockerInspect->State.Running || dockerInspect->State.Restarting) && dockerStartTime &&
+            const bool replacementRun = dockerInspect->State.StartedAt != m_initProcessStartedAt;
+            if ((dockerInspect->State.Running || dockerInspect->State.Restarting) && replacementRun && dockerStartTime &&
                 ContainerStartedAfterEvent(dockerStartTime.value(), stopTime, stopTimeNanoseconds))
             {
                 if (stopTimeNanoseconds)
@@ -1828,11 +1833,6 @@ __requires_exclusive_lock_held(m_lock) bool WSLCContainerImpl::OnStopped(int exi
                         TraceLoggingValue(
                             std::chrono::floor<std::chrono::seconds>(dockerStartTime.value()).time_since_epoch().count(),
                             "DockerStartTime"));
-                }
-
-                if (m_initProcessStartedAt == dockerInspect->State.StartedAt)
-                {
-                    return false;
                 }
 
                 replacementNeedsReconciliation = true;
@@ -1974,6 +1974,11 @@ try
         return;
     }
 
+    if (m_restart && m_restart->Source == RestartSource::Explicit)
+    {
+        return;
+    }
+
     const auto dockerInspect = m_runtime.Docker().InspectContainer(m_id);
     if (!PolicyRestartPendingLockHeld())
     {
@@ -2021,6 +2026,8 @@ try
         try
         {
             auto inspectJson = wsl::shared::ToJson(BuildInspectContainer(dockerInspect));
+            ActivityRef callbackActivity{m_runtime.IdleStateShared()};
+            runtimeLock.reset();
 
             // Docker has already started the replacement, so failure only affects telemetry.
             LOG_IF_FAILED(m_pluginNotifier->OnContainerStarted(inspectJson.c_str()));
@@ -2299,11 +2306,33 @@ void WSLCContainerImpl::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULO
     }
 }
 
-void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) const
+void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, BOOL FollowLink, WSLCHandle OutHandle) const
 {
     auto lock = m_lock.lock_shared();
 
-    auto [statusCode, socket, isChunked] = m_runtime.Docker().GetArchive(m_id, SrcPath);
+    std::string effectivePath(SrcPath);
+
+    if (FollowLink)
+    {
+        const auto stat = m_runtime.Docker().StatArchivePath(m_id, effectivePath);
+        if (stat.has_value() && stat->IsSymlink() && !stat->linkTarget.empty())
+        {
+            // Container paths are POSIX. A relative link target is resolved against the directory holding the link.
+            std::string resolved = stat->linkTarget;
+            if (resolved.front() != '/')
+            {
+                const auto separator = effectivePath.find_last_of('/');
+                if (separator != std::string::npos)
+                {
+                    resolved = effectivePath.substr(0, separator + 1) + resolved;
+                }
+            }
+
+            effectivePath = std::move(resolved);
+        }
+    }
+
+    auto [statusCode, socket, isChunked] = m_runtime.Docker().GetArchive(m_id, effectivePath);
 
     auto userHandle = m_wslcSession.OpenUserHandle(OutHandle);
 
@@ -3915,7 +3944,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCContainer::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle)
+HRESULT WSLCContainer::DownloadArchive(LPCSTR SrcPath, BOOL FollowLink, WSLCHandle OutHandle)
 try
 {
     WSLCExecutionContext context(&m_session);
@@ -3924,7 +3953,7 @@ try
     RETURN_HR_IF(E_INVALIDARG, SrcPath[0] == '\0');
 
     auto vmLease = m_session.Runtime().AcquireVmLease();
-    return CallImpl(&WSLCContainerImpl::DownloadArchive, SrcPath, OutHandle);
+    return CallImpl(&WSLCContainerImpl::DownloadArchive, SrcPath, FollowLink, OutHandle);
 }
 CATCH_RETURN();
 

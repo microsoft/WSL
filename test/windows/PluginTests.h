@@ -15,6 +15,7 @@ Abstract:
 #pragma once
 
 #include "registry.hpp"
+#include <cstdint>
 #include <wil/resource.h>
 constexpr auto c_configKey = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Lxss\\Test";
 
@@ -49,6 +50,7 @@ enum class PluginTestType
     WslcContainerRestartLifecycleNotifications
 };
 
+constexpr std::int64_t c_restartLifecycleMaximumRetryCount = 3;
 constexpr auto c_testType = L"TestType";
 constexpr auto c_logFile = L"LogFile";
 constexpr auto c_mountFolder = L"MountFolder";

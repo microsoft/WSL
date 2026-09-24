@@ -24,8 +24,10 @@ using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 
+using namespace wsl::windows::wslc::cli;
+
 // Registry Root Command
-std::vector<std::unique_ptr<Command>> RegistryCommand::GetCommands() const
+std::vector<std::unique_ptr<Command>> RegistryCommand::CreateCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<RegistryLoginCommand>(FullName()));

@@ -5,6 +5,7 @@
 #include <optional>
 #include <mutex>
 #include <condition_variable>
+#include <utility>
 
 /**
  * @brief Class that contains a value T that can contain a single value and
@@ -21,14 +22,14 @@ public:
      *
      * @param[in] value Value to be stored.
      */
-    void post(T& value)
+    void post(T value)
     {
         std::unique_lock lck(m_mtx);
         while (m_value.has_value())
         {
             m_cv.wait(lck);
         }
-        m_value = value;
+        m_value.emplace(std::move(value));
         m_cv.notify_all();
     }
 
@@ -44,7 +45,7 @@ public:
         {
             m_cv.wait(lck);
         }
-        auto return_value = m_value.value();
+        auto return_value = std::move(m_value.value());
         m_value.reset();
         m_cv.notify_all();
         return return_value;
@@ -67,10 +68,10 @@ public:
                 return std::nullopt;
             }
         }
-        auto return_value = m_value.value();
+        auto return_value = std::move(m_value.value());
         m_value.reset();
         m_cv.notify_all();
-        return {return_value};
+        return {std::move(return_value)};
     }
 
 private:

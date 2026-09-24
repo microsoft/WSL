@@ -88,6 +88,21 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(std::wstring{L"Custom description"}, overrides.Description());
     }
 
+    TEST_METHOD(ArgumentMatchesOption_RequiresNameOrAliasSpecifier)
+    {
+        const auto argument = Argument::Create(ArgType::Quiet);
+
+        VERIFY_IS_TRUE(argument.MatchesOption(L"--quiet"));
+        VERIFY_IS_TRUE(argument.MatchesOption(L"--quiet=true"));
+        VERIFY_IS_TRUE(argument.MatchesOption(L"-q"));
+        VERIFY_IS_TRUE(argument.MatchesOption(L"-q=true"));
+
+        VERIFY_IS_FALSE(argument.MatchesOption(L"quiet"));
+        VERIFY_IS_FALSE(argument.MatchesOption(L"-"));
+        VERIFY_IS_FALSE(argument.MatchesOption(L"--"));
+        VERIFY_IS_FALSE(argument.MatchesOption(L"---quiet"));
+    }
+
     // Test: Verify Argument::Create() successfully creates arguments for all ArgType enum values
     TEST_METHOD(ArgumentCreate_AllArguments)
     {
@@ -414,6 +429,16 @@ class WSLCCLIArgumentUnitTests
         auto values = onDemand.GetAllValues<E>();       // triggers on-demand validation
         VERIFY_ARE_EQUAL(onDemand.CountValidated(E), eager.CountValidated(E));
         return values;
+    }
+
+    TEST_METHOD(Filter_RejectsMalformedValues)
+    {
+        ArgMap args;
+        args.Add(ArgType::Filter, std::wstring(L"type"));
+        VERIFY_THROWS_SPECIFIC(Argument::Create(ArgType::Filter).Validate(args), ArgumentException, [](const auto& exception) {
+            return exception.Message() == wsl::shared::Localization::WSLCCLI_InvalidFilterError(L"type");
+        });
+        VERIFY_IS_FALSE(args.ContainsValidated(ArgType::Filter));
     }
 
     // Test: Every ArgType whose validation converts its raw string into a typed value must cache

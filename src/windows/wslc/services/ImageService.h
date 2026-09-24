@@ -23,6 +23,8 @@ Abstract:
 
 namespace wsl::windows::wslc::services {
 
+using namespace wsl::windows::wslc::cli;
+
 struct BuildSecret
 {
     std::wstring Id; // value for docker's --secret id= field
@@ -68,13 +70,14 @@ public:
         wsl::windows::wslc::models::Session& session,
         const std::vector<std::pair<std::string, std::string>>& filters = {},
         bool containerCounts = false,
-        bool all = false);
+        bool all = false,
+        bool digests = false);
     static void Load(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::wstring& input, IImageLoadCallback* callback = nullptr);
     static std::string Import(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName);
     static std::vector<wsl::windows::wslc::models::DeletedImageEntry> Delete(
         wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune);
     static wsl::windows::common::wslc_schema::InspectImage Inspect(wsl::windows::wslc::models::Session& session, const std::string& image);
-    static void Pull(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
+    static void Pull(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback, bool allTags = false);
     static void Push(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback, bool allTags = false);
     static void Save(wsl::windows::wslc::models::Session& session, const std::vector<std::string>& images, const std::wstring& output, HANDLE cancelEvent = nullptr);
     static void Save(wsl::windows::wslc::models::Session& session, const std::vector<std::string>& images, HANDLE outputHandle, HANDLE cancelEvent = nullptr);

@@ -32,6 +32,7 @@ const WSLPluginAPIV1* g_api = nullptr;
 PluginTestType g_testType = PluginTestType::Invalid;
 std::atomic<unsigned int> g_wslcContainerStartedCount{};
 std::atomic<bool> g_wslcContainerIsRunning{};
+std::string g_wslcContainerStartedAt;
 
 // Process deliberately left running across OnWslcVmStopping by the WslcVmStopCommitted test, to
 // prove the announced teardown happens anyway. Never released: it dies with the VM.
@@ -51,6 +52,20 @@ HRESULT g_stopWindowCallerResult = E_PENDING;
 std::atomic<bool> g_leakedProcessDied = false;
 
 std::optional<uint32_t> g_previousInitPid;
+
+HRESULT VerifyWslcContainerLifecycleReentry(const WSLCSessionInformation* Session, const char* Callback)
+{
+    std::vector<const char*> args = {"/bin/true", nullptr};
+    WSLCProcessHandle process = nullptr;
+    const auto hr = g_api->WSLCCreateProcess(Session->SessionId, args[0], args.data(), nullptr, &process, nullptr);
+    g_logfile << "WSLC Container " << Callback << " reentrant WSLCCreateProcess: " << (SUCCEEDED(hr) ? "ok" : "failed") << std::endl;
+    if (SUCCEEDED(hr))
+    {
+        g_api->WSLCReleaseProcess(process);
+    }
+
+    return hr;
+}
 
 std::vector<char> ReadFromSocket(SOCKET socket)
 {
@@ -431,34 +446,49 @@ void RunWslcSuccessChecks(const WSLCSessionInformation* Session)
                 Session->SessionId, arguments[0], arguments.data(), env.empty() ? nullptr : env.data(), &process, nullptr));
             auto releaseProcess = wil::scope_exit([&]() { g_api->WSLCReleaseProcess(process); });
 
-            wil::unique_handle stdinHandle;
-            wil::unique_handle stdoutHandle;
-            wil::unique_handle stderrHandle;
+            wil::unique_socket stdinSocket;
+            wil::unique_socket stdoutSocket;
+            wil::unique_socket stderrSocket;
             wil::unique_handle exitEvent;
-            THROW_IF_FAILED(g_api->WSLCProcessGetFd(process, WSLCProcessFdStdin, &stdinHandle));
-            THROW_IF_FAILED(g_api->WSLCProcessGetFd(process, WSLCProcessFdStdout, &stdoutHandle));
-            THROW_IF_FAILED(g_api->WSLCProcessGetFd(process, WSLCProcessFdStderr, &stderrHandle));
+            THROW_IF_FAILED(g_api->WSLCProcessGetFd(process, WSLCProcessFdStdin, &stdinSocket));
+            THROW_IF_FAILED(g_api->WSLCProcessGetFd(process, WSLCProcessFdStdout, &stdoutSocket));
+            THROW_IF_FAILED(g_api->WSLCProcessGetFd(process, WSLCProcessFdStderr, &stderrSocket));
             THROW_IF_FAILED(g_api->WSLCProcessGetExitEvent(process, &exitEvent));
+
+            const auto validateSocket = [](SOCKET socket) {
+                int socketType = 0;
+                int socketTypeSize = sizeof(socketType);
+                if (getsockopt(socket, SOL_SOCKET, SO_TYPE, reinterpret_cast<char*>(&socketType), &socketTypeSize) == SOCKET_ERROR)
+                {
+                    THROW_HR(HRESULT_FROM_WIN32(WSAGetLastError()));
+                }
+
+                THROW_HR_IF(E_UNEXPECTED, socketType != SOCK_STREAM);
+            };
+
+            validateSocket(stdinSocket.get());
+            validateSocket(stdoutSocket.get());
+            validateSocket(stderrSocket.get());
 
             std::string out;
             std::string err;
 
             MultiHandleWait io;
             io.AddHandle(std::make_unique<ReadHandle>(
-                std::move(stdoutHandle), [&out](const auto& span) { out.append(span.begin(), span.end()); }));
+                std::move(stdoutSocket), [&out](const auto& span) { out.append(span.begin(), span.end()); }));
 
             io.AddHandle(std::make_unique<ReadHandle>(
-                std::move(stderrHandle), [&err](const auto& span) { err.append(span.begin(), span.end()); }));
+                std::move(stderrSocket), [&err](const auto& span) { err.append(span.begin(), span.end()); }));
 
             io.AddHandle(std::make_unique<EventHandle>(std::move(exitEvent)));
 
             if (input.has_value())
             {
-                io.AddHandle(std::make_unique<WriteHandle>(std::move(stdinHandle), std::vector<char>(input->begin(), input->end())));
+                io.AddHandle(std::make_unique<WriteHandle>(std::move(stdinSocket), std::vector<char>(input->begin(), input->end())));
             }
             else
             {
-                stdinHandle.reset();
+                stdinSocket.reset();
             }
 
             io.Run(60000ms);
@@ -496,7 +526,7 @@ void RunWslcSuccessChecks(const WSLCSessionInformation* Session)
             auto releaseProcess = wil::scope_exit([&]() { g_api->WSLCReleaseProcess(process); });
 
             // Validate that getting an fd that doesn't exist fails with the expected error code.
-            HANDLE dummy = nullptr;
+            SOCKET dummy = INVALID_SOCKET;
             g_logfile << "WSLCProcessGetFd(999): " << g_api->WSLCProcessGetFd(process, static_cast<WSLCProcessFd>(999), &dummy) << std::endl;
             int exitCode = -1;
 
@@ -650,14 +680,29 @@ try
             return E_UNEXPECTED;
         }
 
-        if (container.HostConfig.RestartPolicy.Name != "on-failure" || container.HostConfig.RestartPolicy.MaximumRetryCount != 1)
+        if (container.State.StartedAt.empty() || container.State.StartedAt == g_wslcContainerStartedAt)
+        {
+            g_logfile << "WSLC Container lifecycle notification order: duplicate start" << std::endl;
+            return E_UNEXPECTED;
+        }
+
+        g_wslcContainerStartedAt = container.State.StartedAt;
+
+        if (container.HostConfig.RestartPolicy.Name != "on-failure" ||
+            container.HostConfig.RestartPolicy.MaximumRetryCount != c_restartLifecycleMaximumRetryCount)
         {
             g_logfile << "WSLC Container restart policy notification: invalid" << std::endl;
             return E_UNEXPECTED;
         }
 
-        g_logfile << "WSLC Container restart policy notification: on-failure:1" << std::endl;
-        if (++g_wslcContainerStartedCount == 2)
+        g_logfile << "WSLC Container restart policy notification: on-failure:" << c_restartLifecycleMaximumRetryCount << std::endl;
+        const auto startCount = ++g_wslcContainerStartedCount;
+        if (startCount > 1)
+        {
+            RETURN_IF_FAILED(VerifyWslcContainerLifecycleReentry(Session, "started"));
+        }
+
+        if (startCount == 2)
         {
             g_logfile << "OnWslcContainerStarted automatic restart notification: ERROR_ACCESS_DENIED" << std::endl;
             return HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED);
@@ -676,6 +721,11 @@ HRESULT OnWslcContainerStopping(const WSLCSessionInformation* Session, LPCSTR Co
     {
         g_logfile << "WSLC Container lifecycle notification order: stop without start" << std::endl;
         return E_UNEXPECTED;
+    }
+
+    if (g_testType == PluginTestType::WslcContainerRestartLifecycleNotifications)
+    {
+        RETURN_IF_FAILED(VerifyWslcContainerLifecycleReentry(Session, "stopping"));
     }
 
     return S_OK;
@@ -891,6 +941,7 @@ EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPlugin
         g_logfile << "Plugin loaded. TestMode=" << static_cast<DWORD>(g_testType) << std::endl;
         g_wslcContainerStartedCount = 0;
         g_wslcContainerIsRunning = false;
+        g_wslcContainerStartedAt.clear();
         g_api = Api;
         Hooks->OnVMStarted = &OnVmStarted;
         Hooks->OnVMStopping = &OnVmStopping;
