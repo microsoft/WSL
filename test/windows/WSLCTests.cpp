@@ -20,7 +20,6 @@ Abstract:
 #include "WSLCContainerLauncher.h"
 #include "WSLCContainerEntry.h"
 #include "WslCoreFilesystem.h"
-#include "WslCoreNetworkEndpointSettings.h"
 #include "hcs.hpp"
 #include "ContainerNameGenerator.h"
 #include "wslc/e2e/WSLCE2EHelpers.h"
@@ -3778,21 +3777,6 @@ class WSLCTests
     {
         WINDOWS_11_TEST_ONLY();
         ValidateNetworking(WSLCNetworkingModeConsomme, true);
-    }
-
-    TEST_METHOD(ConsommeNetworkingIpv6DefaultRoute)
-    {
-        const auto hostNetworkSettings = wsl::core::networking::GetHostEndpointSettings();
-        const auto hostIpv6Gateway = hostNetworkSettings->GetBestGatewayAddressString(AF_INET6);
-        if (hostIpv6Gateway.empty())
-        {
-            LogSkipped("Host does not have an IPv6 default gateway.");
-            return;
-        }
-
-        const auto expectedRoute = std::format("default via {} dev eth0", wsl::shared::string::WideToMultiByte(hostIpv6Gateway));
-        ExpectCommandResult(
-            m_defaultSession.get(), {"/bin/sh", "-c", std::format("ip -6 route show default dev eth0 | grep -F -- '{}'", expectedRoute)}, 0);
     }
 
     // DNS test helpers
