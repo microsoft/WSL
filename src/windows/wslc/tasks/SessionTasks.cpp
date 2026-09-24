@@ -39,6 +39,8 @@ static void WriteSessionTable(Terminal& terminal, const std::vector<SessionInfor
         {Localization::MessageWslcHeaderCreatorPid(), {}},
         {Localization::MessageWslcHeaderDisplayName(), {}}}};
 
+    table.Reserve(sessions.size());
+
     for (const auto& session : sessions)
     {
         table.AddRow({

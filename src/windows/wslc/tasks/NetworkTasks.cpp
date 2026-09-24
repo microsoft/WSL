@@ -236,6 +236,8 @@ void ListNetworks(CLIExecutionContext& context)
     case FormatType::Table:
     {
         wsl::windows::wslc::cli::TableData table{L"NETWORK ID", L"NAME", L"DRIVER", L"SCOPE"};
+        table.Reserve(networks.size());
+
         for (const auto& network : networks)
         {
             const auto entry = ToNetworkOutput(network, trunc);

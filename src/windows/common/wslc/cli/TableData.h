@@ -14,6 +14,11 @@ Abstract:
     VT sequences, which are zero display width, so a cell's visible width is
     simply its text length.
 
+    A table holds every row it emits: column widths are measured across the complete
+    set so that each row aligns against widths that fit it. Callers therefore build a
+    table from a result set they already hold in full, and should call Reserve() with
+    the expected row count so row storage is allocated once.
+
     This header is rendering-agnostic and does not depend on Terminal; see
     TableRenderer.h for layout and emission.
 
@@ -156,6 +161,12 @@ struct TableData
 
     // Convenience for the common case of headers without per-column width configuration.
     TableData(std::initializer_list<std::wstring_view> headers);
+
+    // Allocates row storage for the expected number of rows.
+    void Reserve(size_t rowCount)
+    {
+        Rows.reserve(rowCount);
+    }
 
     // Appends a data row. The cell count must match the column count.
     void AddRow(std::vector<Cell> cells);

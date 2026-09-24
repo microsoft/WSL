@@ -816,6 +816,7 @@ void ListContainers(CLIExecutionContext& context)
         }
 
         wsl::windows::wslc::cli::TableData table{std::move(columns)};
+        table.Reserve(containers.size());
 
         for (const auto& container : containers)
         {
@@ -1204,6 +1205,8 @@ void ShowContainerStats(CLIExecutionContext& context)
             {Localization::WSLCCLI_TableHeaderNetIo(), limit({.Overflow = Shrink})},
             {Localization::WSLCCLI_TableHeaderBlockIo(), limit({.Overflow = Shrink})},
             {Localization::WSLCCLI_TableHeaderPids(), limit({.Overflow = Shrink})}}};
+
+        table.Reserve(statsJson.size());
 
         for (const auto& entry : statsJson)
         {

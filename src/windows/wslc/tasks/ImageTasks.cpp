@@ -251,6 +251,7 @@ void ListImages(CLIExecutionContext& context)
         columns.emplace_back(ColumnDefinition{L"SIZE", columnConfig});
 
         wsl::windows::wslc::cli::TableData table{std::move(columns)};
+        table.Reserve(images.size());
 
         for (const auto& image : images)
         {
