@@ -6,12 +6,14 @@
 - `CommandLine()` / setter
 - `EnvironmentVariables()` / setter
 - `OutputMode()` / setter
+- `EnableStandardInput()` / setter
 
 **Important notes**
 
 - `CommandLine(nullptr)` and `EnvironmentVariables(nullptr)` are rejected.
 - `Process::Start()` later requires a **non-empty** `CommandLine()`.
 - `ProcessOutputMode::Event` installs C callbacks; `ProcessOutputMode::Stream` expects stream access; `Discard` is the default.
+- `EnableStandardInput()` defaults to `false`. It must be set to `true` before the settings are applied for `Process::GetInputStream()` to be usable.
 
 ```cpp
 using namespace winrt::Windows::Foundation::Collections;

@@ -106,6 +106,21 @@ void ProcessSettings::OutputMode(winrt::Microsoft::WSL::Containers::ProcessOutpu
     m_outputMode = value;
 }
 
+bool ProcessSettings::EnableStandardInput()
+{
+    return m_enableStandardInput;
+}
+
+void ProcessSettings::EnableStandardInput(bool value)
+{
+    if (m_processSettings)
+    {
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
+    }
+
+    m_enableStandardInput = value;
+}
+
 WslcProcessSettings* ProcessSettings::ToStructPointer()
 {
     if (m_processSettings)
@@ -143,6 +158,11 @@ WslcProcessSettings* ProcessSettings::ToStructPointer()
         }
 
         winrt::check_hresult(WslcSetProcessSettingsEnvVariables(m_processSettings.get(), m_envStrings.GetRawPointer(), size));
+    }
+
+    if (m_enableStandardInput)
+    {
+        winrt::check_hresult(WslcSetProcessSettingsFlags(m_processSettings.get(), WSLC_PROCESS_FLAG_STDIN));
     }
 
     return m_processSettings.get();

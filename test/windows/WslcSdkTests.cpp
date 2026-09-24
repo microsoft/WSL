@@ -1313,6 +1313,71 @@ class WslcSdkTests
         }
     }
 
+    WSLC_TEST_METHOD(ProcessFlags)
+    {
+        // Negative: unknown flag bits must be rejected (TTY is not exposed by the SDK).
+        {
+            WslcProcessSettings procSettings;
+            VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+            VERIFY_ARE_EQUAL(WslcSetProcessSettingsFlags(&procSettings, static_cast<WslcProcessFlags>(0x00000002)), E_INVALIDARG);
+        }
+
+        // Negative: null settings pointer must fail.
+        {
+            VERIFY_ARE_EQUAL(WslcSetProcessSettingsFlags(nullptr, WSLC_PROCESS_FLAG_STDIN), E_POINTER);
+        }
+
+        // Functional: without WSLC_PROCESS_FLAG_STDIN, stdin is closed immediately so cat produces no output.
+        {
+            WslcProcessSettings procSettings;
+            VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+            const char* argv[] = {"/bin/cat"};
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsFlags(&procSettings, WSLC_PROCESS_FLAG_NONE));
+
+            WslcContainerSettings containerSettings;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+            auto output = RunContainerAndCapture(m_defaultSession, containerSettings);
+            VERIFY_ARE_EQUAL(output.stdoutOutput, "");
+        }
+
+        // Functional: with WSLC_PROCESS_FLAG_STDIN, input written to stdin is echoed back by cat.
+        {
+            WslcProcessSettings procSettings;
+            VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+            const char* argv[] = {"/bin/cat"};
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsFlags(&procSettings, WSLC_PROCESS_FLAG_STDIN));
+
+            WslcContainerSettings containerSettings;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+            UniqueContainer container;
+            VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+            VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
+
+            UniqueProcess process;
+            VERIFY_SUCCEEDED(WslcGetContainerInitProcess(container.get(), &process));
+
+            // Write to stdin and close it so that cat sees EOF and exits.
+            {
+                wil::unique_handle stdinHandle;
+                VERIFY_SUCCEEDED(WslcGetProcessIOHandle(process.get(), WSLC_PROCESS_IO_HANDLE_STDIN, &stdinHandle));
+
+                constexpr std::string_view c_input = "hello-from-stdin\n";
+                DWORD written = 0;
+                VERIFY_IS_TRUE(WriteFile(stdinHandle.get(), c_input.data(), static_cast<DWORD>(c_input.size()), &written, nullptr));
+                VERIFY_ARE_EQUAL(written, static_cast<DWORD>(c_input.size()));
+            }
+
+            auto output = WaitForProcessOutput(process.get());
+            VERIFY_ARE_EQUAL(output.stdoutOutput, "hello-from-stdin\n");
+        }
+    }
+
     WSLC_TEST_METHOD(ProcessSignal)
     {
         WslcProcessSettings procSettings;

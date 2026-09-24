@@ -219,6 +219,7 @@ namespace Microsoft.WSL.Containers
         IVector<String> CommandLine;
         IMap<String, String> EnvironmentVariables;
         ProcessOutputMode OutputMode;
+        Boolean EnableStandardInput;
     };
 
     enum ProcessState
