@@ -73,6 +73,15 @@ struct FlagsTraits<WslcDeleteContainerFlags>
     WSLC_FLAG_VALUE_ASSERT(WSLC_DELETE_CONTAINER_FLAG_FORCE, WSLCDeleteFlagsForce);
 };
 
+template <>
+struct FlagsTraits<WslcProcessFlags>
+{
+    using WslcType = WSLCProcessFlags;
+    // WSLCProcessFlagsTty is intentionally not exposed by the SDK yet.
+    constexpr static WslcProcessFlags Mask = WSLC_PROCESS_FLAG_STDIN;
+    WSLC_FLAG_VALUE_ASSERT(WSLC_PROCESS_FLAG_STDIN, WSLCProcessFlagsStdin);
+};
+
 template <typename Flags>
 typename FlagsTraits<Flags>::WslcType ConvertFlags(Flags flags)
 {
@@ -218,9 +227,9 @@ bool CopyProcessSettingsToRuntime(WSLCCompatProcessOptions& runtimeOptions, cons
         runtimeOptions.CommandLine.Count = initProcessOptions->commandLineCount;
         runtimeOptions.Environment.Values = initProcessOptions->environment;
         runtimeOptions.Environment.Count = initProcessOptions->environmentCount;
+        runtimeOptions.Flags = ConvertFlags(initProcessOptions->flags);
 
         // TODO: No user access
-        // containerOptions.InitProcessOptions.Flags;
         // containerOptions.InitProcessOptions.TtyRows;
         // containerOptions.InitProcessOptions.TtyColumns;
         // containerOptions.InitProcessOptions.User;
@@ -1291,6 +1300,20 @@ try
 
     internalType->environment = key_value;
     internalType->environmentCount = static_cast<uint32_t>(argc);
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+STDAPI WslcSetProcessSettingsFlags(_In_ WslcProcessSettings* processSettings, _In_ WslcProcessFlags flags)
+try
+{
+    auto internalType = CheckAndGetInternalType(processSettings);
+
+    // Reject unknown flag bits so future additions can't be silently ignored.
+    RETURN_HR_IF(E_INVALIDARG, (flags & ~FlagsTraits<WslcProcessFlags>::Mask) != WSLC_PROCESS_FLAG_NONE);
+
+    internalType->flags = flags;
 
     return S_OK;
 }

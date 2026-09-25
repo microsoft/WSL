@@ -345,6 +345,26 @@ STDAPI WslcSetProcessSettingsCmdLine(_In_ WslcProcessSettings* processSettings, 
 
 STDAPI WslcSetProcessSettingsEnvVariables(_In_ WslcProcessSettings* processSettings, _In_reads_(argc) PCSTR const* key_value, size_t argc);
 
+// Flags that control optional behavior of a process.
+typedef enum WslcProcessFlags
+{
+    WSLC_PROCESS_FLAG_NONE = 0x00000000,
+    // Enables standard input for the process. Standard input is disabled by
+    // default: without this flag the process observes an immediately closed
+    // stdin and WSLC_PROCESS_IO_HANDLE_STDIN cannot be used.
+    WSLC_PROCESS_FLAG_STDIN = 0x00000001,
+} WslcProcessFlags;
+
+DEFINE_ENUM_FLAG_OPERATORS(WslcProcessFlags);
+
+// Sets the flags for the process, replacing any previously set flags.
+//
+// Unknown flag bits are rejected with E_INVALIDARG.
+//
+// Must be called before the settings are used to start a process
+// (WslcCreateContainerProcess) or a container init process (WslcStartContainer).
+STDAPI WslcSetProcessSettingsFlags(_In_ WslcProcessSettings* processSettings, _In_ WslcProcessFlags flags);
+
 typedef enum WslcProcessIOHandle
 {
     WSLC_PROCESS_IO_HANDLE_STDIN = 0,
