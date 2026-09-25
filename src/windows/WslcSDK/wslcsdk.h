@@ -361,8 +361,8 @@ DEFINE_ENUM_FLAG_OPERATORS(WslcProcessFlags);
 //
 // Unknown flag bits are rejected with E_INVALIDARG.
 //
-// Must be called before the settings are used to start a process
-// (WslcCreateContainerProcess) or a container init process (WslcStartContainer).
+// Must be called before the settings are used to create a process
+// (WslcCreateContainerProcess) or container (WslcCreateContainer).
 STDAPI WslcSetProcessSettingsFlags(_In_ WslcProcessSettings* processSettings, _In_ WslcProcessFlags flags);
 
 typedef enum WslcProcessIOHandle

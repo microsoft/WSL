@@ -160,10 +160,9 @@ WslcProcessSettings* ProcessSettings::ToStructPointer()
         winrt::check_hresult(WslcSetProcessSettingsEnvVariables(m_processSettings.get(), m_envStrings.GetRawPointer(), size));
     }
 
-    if (m_enableStandardInput)
-    {
-        winrt::check_hresult(WslcSetProcessSettingsFlags(m_processSettings.get(), WSLC_PROCESS_FLAG_STDIN));
-    }
+    WslcProcessFlags processSettingsFlags = WSLC_PROCESS_FLAG_NONE;
+    WI_SetFlagIf(processSettingsFlags, WSLC_PROCESS_FLAG_STDIN, m_enableStandardInput);
+    winrt::check_hresult(WslcSetProcessSettingsFlags(m_processSettings.get(), processSettingsFlags));
 
     return m_processSettings.get();
 }

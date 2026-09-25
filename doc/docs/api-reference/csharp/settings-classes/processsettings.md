@@ -19,7 +19,7 @@ Notes:
 - The init process is started by `Container.Start()`, not by `Process.Start()`.
 - `OutputMode.Event` enables `OutputReceived` / `ErrorReceived`.
 - `OutputMode.Stream` enables `GetOutputStream(...)`.
-- `EnableStandardInput` defaults to `false`. Set it to `true` before the settings are applied to use `Process.GetInputStream()`.
+- `EnableStandardInput` defaults to `false`. Must be set before `Process.Start()` or `Session.CreateContainer()` to have effect.
 
 Example:
 
