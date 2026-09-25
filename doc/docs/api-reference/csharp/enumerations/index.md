@@ -15,4 +15,5 @@
 - [ProcessState](processstate.md)
 - [VhdType](vhdtype.md)
 - [ImageProgressStatus](imageprogressstatus.md)
+- [IdentityTokenType](identitytokentype.md)
 - [SessionTerminationReason](sessionterminationreason.md)

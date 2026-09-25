@@ -1,17 +1,9 @@
 # Component
 
-`WslcService::GetMissingComponents()` returns a `Component` bitmask.
+`WslcService::GetMissingComponents()` returns a view of missing components.
 
-Underlying values:
-
-- `VirtualMachinePlatform = 1`
-- `WslPackage = 2`
-- `SdkNeedsUpdate = 4`
-
-```cpp
-auto missing = WslcService::GetMissingComponents();
-if (missing != static_cast<Component>(0))
-{
-    co_await WslcService::InstallWithDependenciesAsync();
-}
-```
+| Enumerator | Meaning |
+|---|---|
+| `VirtualMachinePlatform` | The Virtual Machine Platform optional component is not enabled. |
+| `WslPackage` | The WSL package is not installed or must be updated to a version that supports WSLC. |
+| `SdkNeedsUpdate` | The SDK used by the application is incompatible with the installed WSL runtime; installing components cannot resolve this condition. |

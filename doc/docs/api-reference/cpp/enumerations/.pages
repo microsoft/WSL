@@ -13,4 +13,5 @@ nav:
   - processstate.md
   - vhdtype.md
   - imageprogressstatus.md
+  - identitytokentype.md
   - sessionterminationreason.md
