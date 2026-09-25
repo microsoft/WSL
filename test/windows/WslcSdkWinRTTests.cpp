@@ -75,6 +75,40 @@ std::wstring ReadStream(IInputStream const& stream)
     return output;
 }
 
+// Builds process settings for the given command line. The output mode defaults to Stream so that
+// stdout / stderr can be read back by the caller.
+WSLCSDK::ProcessSettings MakeProcessSettings(
+    std::span<const std::wstring_view> commandLine,
+    bool enableStandardInput = false,
+    WSLCSDK::ProcessOutputMode outputMode = WSLCSDK::ProcessOutputMode::Stream)
+{
+    std::vector<winrt::hstring> arguments;
+    arguments.reserve(commandLine.size());
+    for (const auto& argument : commandLine)
+    {
+        arguments.emplace_back(argument);
+    }
+
+    auto procSettings = WSLCSDK::ProcessSettings();
+    procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>(std::move(arguments)));
+    procSettings.OutputMode(outputMode);
+    procSettings.EnableStandardInput(enableStandardInput);
+    return procSettings;
+}
+
+// Writes the given input to a process's stdin and closes the stream so that the process sees EOF.
+// Requires ProcessSettings::EnableStandardInput(true).
+void WriteToProcessStdin(WSLCSDK::Process const& process, winrt::hstring const& input)
+{
+    auto stdinStream = process.GetInputStream();
+    DataWriter writer{stdinStream};
+    writer.WriteString(input);
+    writer.StoreAsync().get();
+    writer.FlushAsync().get();
+    writer.DetachStream();
+    stdinStream.Close();
+}
+
 class WslcSdkWinRtTests
 {
     WSLC_TEST_CLASS(WslcSdkWinRtTests)
@@ -103,6 +137,24 @@ class WslcSdkWinRtTests
         auto autoRevoker = initProcess.Exited(winrt::auto_revoke, [&](int32_t) { promise.set_value(); });
         container.Start();
         VERIFY_ARE_EQUAL(promise.get_future().wait_for(timeout), std::future_status::ready);
+    }
+
+    // Starts a process whose stdin is enabled (using the provided starter, since the init process is
+    // started by the container), writes the given input to stdin, and returns its stdout.
+    template <typename TStart>
+    std::wstring RunProcessWithStdin(WSLCSDK::Process const& process, TStart&& start, winrt::hstring const& input, std::chrono::milliseconds timeout = 2min)
+    {
+        std::promise<void> promise;
+        auto autoRevoker = process.Exited(winrt::auto_revoke, [&](int32_t) { promise.set_value(); });
+
+        start();
+
+        // Acquire the output stream before writing so that it is not missed once the process exits.
+        auto stdoutStream = process.GetOutputStream(WSLCSDK::ProcessOutputHandle::StandardOutput);
+        WriteToProcessStdin(process, input);
+
+        VERIFY_ARE_EQUAL(promise.get_future().wait_for(timeout), std::future_status::ready);
+        return ReadStream(stdoutStream);
     }
 
     CapturedProcessOutput GetProcessOutput(WSLCSDK::Process const& process)
@@ -999,6 +1051,9 @@ class WslcSdkWinRtTests
 
     WSLC_TEST_METHOD(ProcessEnableStandardInput)
     {
+        constexpr std::wstring_view c_catCommandLine[] = {L"/bin/cat"};
+        constexpr std::wstring_view c_sleepCommandLine[] = {L"/bin/sleep", L"99"};
+
         // Unit: the property defaults to false and round-trips.
         {
             auto procSettings = WSLCSDK::ProcessSettings();
@@ -1031,39 +1086,44 @@ class WslcSdkWinRtTests
 
         // Functional: with the property, input written to stdin is echoed back by cat.
         {
-            auto procSettings = WSLCSDK::ProcessSettings();
-            procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/cat"}));
-            procSettings.OutputMode(WSLCSDK::ProcessOutputMode::Stream);
-            procSettings.EnableStandardInput(true);
-
             auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
-            containerSettings.InitProcess(procSettings);
+            containerSettings.InitProcess(MakeProcessSettings(c_catCommandLine, true));
 
             auto container = m_defaultSession.CreateContainer(containerSettings);
             auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
             auto initProcess = container.InitProcess();
+            auto output = RunProcessWithStdin(initProcess, [&]() { container.Start(); }, L"hello-from-stdin\n");
+            VERIFY_ARE_EQUAL(output, L"hello-from-stdin\n");
+        }
 
-            std::promise<void> promise;
-            auto autoRevoker = initProcess.Exited(winrt::auto_revoke, [&](int32_t) { promise.set_value(); });
+        // Functional: the property is also honored for processes created in an already running container.
+        {
+            auto initProcSettings = MakeProcessSettings(c_sleepCommandLine);
 
+            auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+            containerSettings.InitProcess(initProcSettings);
+
+            auto container = m_defaultSession.CreateContainer(containerSettings);
             container.Start();
 
-            auto stdoutStream = initProcess.GetOutputStream(WSLCSDK::ProcessOutputHandle::StandardOutput);
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
-            // Write to stdin and close it so that cat sees EOF and exits.
+            // Without the property, stdin is closed immediately so cat produces no output.
             {
-                auto stdinStream = initProcess.GetInputStream();
-                DataWriter writer{stdinStream};
-                writer.WriteString(L"hello-from-stdin\n");
-                writer.StoreAsync().get();
-                writer.FlushAsync().get();
-                writer.DetachStream();
-                stdinStream.Close();
+                auto execProcess = container.CreateProcess(MakeProcessSettings(c_catCommandLine));
+                StartProcessAndWaitForExit(execProcess);
+
+                VERIFY_ARE_EQUAL(execProcess.ExitCode(), 0);
+                VERIFY_ARE_EQUAL(ReadStream(execProcess.GetOutputStream(WSLCSDK::ProcessOutputHandle::StandardOutput)), L"");
             }
 
-            VERIFY_ARE_EQUAL(promise.get_future().wait_for(2min), std::future_status::ready);
-            VERIFY_ARE_EQUAL(ReadStream(stdoutStream), L"hello-from-stdin\n");
+            // With the property, input written to stdin is echoed back by cat.
+            {
+                auto execProcess = container.CreateProcess(MakeProcessSettings(c_catCommandLine, true));
+                auto output = RunProcessWithStdin(execProcess, [&]() { execProcess.Start(); }, L"hello-from-exec-stdin\n");
+                VERIFY_ARE_EQUAL(output, L"hello-from-exec-stdin\n");
+            }
         }
     }
 

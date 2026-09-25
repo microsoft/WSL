@@ -1311,7 +1311,7 @@ try
     auto internalType = CheckAndGetInternalType(processSettings);
 
     // Reject unknown flag bits so future additions can't be silently ignored.
-    RETURN_HR_IF(E_INVALIDARG, (flags & ~FlagsTraits<WslcProcessFlags>::Mask) != WSLC_PROCESS_FLAG_NONE);
+    RETURN_HR_IF(E_INVALIDARG, WI_IsAnyFlagSet(flags, ~FlagsTraits<WslcProcessFlags>::Mask));
 
     internalType->flags = flags;
 
