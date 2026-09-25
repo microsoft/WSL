@@ -140,8 +140,15 @@ elseif ($Branch -or $ModifiedOnly -or $Staged) {
             # Files touched by the branch, including uncommitted changes. Deleted files are skipped
             # since there is nothing left to format.
             Write-Host "[clang-format] Using branch changes since $BaseCommit"
-            $Changes = (& git diff --name-only --diff-filter=d $BaseCommit)
+            $Changes = @(& git diff --name-only --diff-filter=d $BaseCommit)
             $Success = ($LASTEXITCODE -eq 0)
+
+            # git diff only reports tracked files, so new files that haven't been added yet need to
+            # be collected separately.
+            if ($Success) {
+                $Changes += @(& git ls-files --others --exclude-standard)
+                $Success = ($LASTEXITCODE -eq 0)
+            }
         }
         elseif ($Staged) {
             $Changes = (& git diff-index --cached --name-only HEAD)
