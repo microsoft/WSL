@@ -1330,20 +1330,12 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::DetachDisk(_In_opt_ PCWSTR Disk)
                 return result;
             }
 
-            // Detach the disk from the VM.
-            wsl::windows::common::hcs::RemoveScsiDisk(m_system.get(), it->second.Lun);
-            if (WI_VERIFY(WI_IsFlagSet(it->second.Flags, DiskStateFlags::AccessGranted)))
-            {
-                wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), it->first.Path.c_str());
-            }
+            // Detach the disk from the VM and undo the host state changes that were performed to attach it.
+            WI_ASSERT(WI_IsFlagSet(it->second.Flags, DiskStateFlags::AccessGranted));
+            wsl::windows::common::hcs::RemoveDiskWithAccess(
+                m_system.get(), m_machineId.c_str(), it->first.Path.c_str(), it->second.Lun, it->second.Flags, m_vmConfig.MountDeviceTimeout);
 
             FreeLun(it->second.Lun);
-
-            // If the disk was online before being attached, revert to that state.
-            if (WI_IsFlagSet(it->second.Flags, DiskStateFlags::Online))
-            {
-                RestorePassthroughDiskState(it->first.Path.c_str());
-            }
 
             deleted = true;
             it = m_attachedDisks.erase(it);
@@ -1381,11 +1373,8 @@ void WslCoreVm::EjectVhdLockHeld(_In_ PCWSTR VhdPath)
         // Impersonate the session manager and remove the vhd.
         {
             auto runAsSelf = wil::run_as_self();
-            wsl::windows::common::hcs::RemoveScsiDisk(m_system.get(), search->second.Lun);
-            if (WI_IsFlagSet(search->second.Flags, DiskStateFlags::AccessGranted))
-            {
-                wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), VhdPath);
-            }
+            wsl::windows::common::hcs::RemoveDiskWithAccess(
+                m_system.get(), m_machineId.c_str(), VhdPath, search->second.Lun, search->second.Flags, m_vmConfig.MountDeviceTimeout);
         }
 
         m_attachedDisks.erase(search);

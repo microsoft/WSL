@@ -563,6 +563,15 @@ std::unique_ptr<IVirtualMachineBackend> CreateVirtualMachineBackend(BackendKind 
 
 namespace wsl::windows::common::vm::validation {
 
+/// <summary>
+/// Validates that a resource id was issued by the backend that owns the VM it is used with.
+/// </summary>
+template <typename Tag>
+void ValidateResourceId(const VmResourceId<Tag>& Id, const VmInstanceId& Owner)
+{
+    THROW_HR_IF(E_INVALIDARG, Id.Value == 0 || !IsEqualGUID(Id.Owner.VmId, Owner.VmId));
+}
+
 bool ValidateFeature(VmFeatureRequest Request, PCWSTR Setting, bool Supported = false);
 
 void ValidatePath(const std::filesystem::path& Path);

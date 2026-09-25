@@ -99,6 +99,18 @@ unique_hcs_system OpenComputeSystem(_In_ PCWSTR Id, _In_ DWORD RequestedAccess);
 
 void RegisterCallback(_In_ HCS_SYSTEM ComputeSystem, _In_ HCS_EVENT_CALLBACK Callback, _In_ void* Context);
 
+/// <summary>
+/// Removes a disk from a compute system, undoing the host state changes that were performed to attach it.
+/// Access is revoked if it was granted, and the disk is brought back online if it was taken offline.
+/// </summary>
+void RemoveDiskWithAccess(
+    _In_ HCS_SYSTEM ComputeSystem,
+    _In_ PCWSTR VmId,
+    _In_ PCWSTR Disk,
+    _In_ ULONG Lun,
+    _In_ wsl::windows::common::disk::DiskStateFlags Flags,
+    _In_ size_t TimeoutMs = wsl::windows::common::disk::c_defaultDiskTimeoutMs);
+
 void RemoveScsiDisk(_In_ HCS_SYSTEM ComputeSystem, _In_ ULONG Lun);
 
 void RevokeVmAccess(_In_ PCWSTR VmId, _In_ PCWSTR FilePath);

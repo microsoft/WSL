@@ -32,11 +32,7 @@ constexpr UINT32 c_maximumDisks = 254;
 constexpr UINT32 c_rpcTimeoutMs = 30000;
 constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
 
-template <typename Tag>
-void ValidateResourceId(const VmResourceId<Tag>& Id, const VmInstanceId& Owner)
-{
-    THROW_HR_IF(E_INVALIDARG, Id.Value == 0 || !IsEqualGUID(Id.Owner.VmId, Owner.VmId));
-}
+using validation::ValidateResourceId;
 
 void DestroyConfig(WslOpenVmmConfig* Config) noexcept
 {

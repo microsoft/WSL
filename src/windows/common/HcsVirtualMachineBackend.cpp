@@ -404,11 +404,13 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
             return;
         }
 
-        schema::RemoveScsiDisk(m_system.get(), found->second.Attachment.GuestAddress.Lun);
-        if (WI_IsFlagSet(found->second.Flags, wsl::windows::common::disk::DiskStateFlags::AccessGranted))
-        {
-            schema::RevokeVmAccess(m_vmIdString.c_str(), found->second.Path.c_str());
-        }
+        schema::RemoveDiskWithAccess(
+            m_system.get(),
+            m_vmIdString.c_str(),
+            found->second.Path.c_str(),
+            found->second.Attachment.GuestAddress.Lun,
+            found->second.Flags,
+            static_cast<size_t>(found->second.DeviceTimeout.count()));
 
         m_attachedDisks.erase(found);
     });
@@ -456,7 +458,8 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
     });
 
     const VmDiskAttachment attachment{{m_configuration.Description.Identity, m_nextDiskId}, {0, lun}, Request.ReadOnly, Request.UserDisk};
-    m_attachedDisks.emplace(attachment.Id.Value, AttachedDisk{attachment, passThrough, path, diskFlags, std::move(backingFile)});
+    m_attachedDisks.emplace(
+        attachment.Id.Value, AttachedDisk{attachment, passThrough, path, diskFlags, Request.DeviceTimeout, std::move(backingFile)});
     ++m_nextDiskId;
     cleanup.release();
 
@@ -472,9 +475,45 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
     return attachment;
 }
 
-void HcsVirtualMachineBackend::DetachDisk(VmDiskId)
+void HcsVirtualMachineBackend::DetachDisk(VmDiskId Disk)
 {
-    THROW_HR(c_notSupported);
+    ExecutionContext context(Context::DetachDisk);
+
+    WSL_LOG(
+        "HcsDetachDiskBegin",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(Disk.Value, "diskId"));
+
+    validation::ValidateResourceId(Disk, m_configuration.Description.Identity);
+
+    auto lock = m_lock.lock_exclusive();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
+
+    // N.B. Unknown disks are reported with the same error as WslCoreVm::DetachDisk.
+    const auto disk = m_attachedDisks.find(Disk.Value);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), disk == m_attachedDisks.end());
+
+    // Detach the disk from the VM and undo the host state changes that were performed to attach it.
+    //
+    // N.B. Volumes that the guest mounted from this disk must be unmounted by the caller before the
+    //      disk is detached, since the guest protocol is not part of the backend.
+    schema::RemoveDiskWithAccess(
+        m_system.get(),
+        m_vmIdString.c_str(),
+        disk->second.Path.c_str(),
+        disk->second.Attachment.GuestAddress.Lun,
+        disk->second.Flags,
+        static_cast<size_t>(disk->second.DeviceTimeout.count()));
+
+    WSL_LOG(
+        "HcsDetachDiskEnd",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(Disk.Value, "diskId"),
+        TraceLoggingValue(disk->second.Attachment.GuestAddress.Controller, "controller"),
+        TraceLoggingValue(disk->second.Attachment.GuestAddress.Lun, "lun"),
+        TraceLoggingValue(disk->second.PassThrough, "passThrough"));
+
+    m_attachedDisks.erase(disk);
 }
 
 VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFileSystemDeviceRequest&)

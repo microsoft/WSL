@@ -372,6 +372,28 @@ void wsl::windows::common::hcs::RegisterCallback(_In_ HCS_SYSTEM ComputeSystem, 
     THROW_IF_FAILED(::HcsSetComputeSystemCallback(ComputeSystem, HcsEventOptionNone, Context, Callback));
 }
 
+void wsl::windows::common::hcs::RemoveDiskWithAccess(
+    _In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR VmId, _In_ PCWSTR Disk, _In_ ULONG Lun, _In_ wsl::windows::common::disk::DiskStateFlags Flags, _In_ size_t TimeoutMs)
+{
+    RemoveScsiDisk(ComputeSystem, Lun);
+    if (WI_IsFlagSet(Flags, wsl::windows::common::disk::DiskStateFlags::AccessGranted))
+    {
+        RevokeVmAccess(VmId, Disk);
+    }
+
+    // If the disk was online before being attached, revert to that state.
+    //
+    // N.B. Failures are logged and ignored because the disk is no longer attached to the VM.
+    if (WI_IsFlagSet(Flags, wsl::windows::common::disk::DiskStateFlags::Online))
+    {
+        try
+        {
+            wsl::windows::common::disk::BringOnline(Disk, TimeoutMs);
+        }
+        CATCH_LOG()
+    }
+}
+
 void wsl::windows::common::hcs::RemoveScsiDisk(_In_ HCS_SYSTEM ComputeSystem, _In_ ULONG Lun)
 {
     ModifySettingRequest<void> request{};
