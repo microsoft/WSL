@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #include "ContainerCommand.h"
+#include "ArgumentConvertedTypes.h"
 #include "CLIExecutionContext.h"
 #include "ContainerTasks.h"
 #include "SessionTasks.h"
@@ -64,6 +65,7 @@ std::vector<Argument> ContainerCreateCommand::GetArguments() const
         Argument::Create(ArgType::PublishAll),
         Argument::Create(ArgType::Pull),
         Argument::Create(ArgType::Remove),
+        Argument::Create(ArgType::Restart),
         // Argument::Create(ArgType::Scheme),
         Argument::Create(ArgType::ShmSize),
         Argument::Create(ArgType::StopSignal),
@@ -87,6 +89,15 @@ std::wstring ContainerCreateCommand::ShortDescription() const
 std::wstring ContainerCreateCommand::LongDescription() const
 {
     return Localization::WSLCCLI_ContainerCreateLongDesc();
+}
+
+void ContainerCreateCommand::ValidateArgumentsInternal(ArgMap& execArgs) const
+{
+    if (execArgs.GetValue<ArgType::Remove>() && !execArgs.GetValue<ArgType::Restart>().IsNone())
+    {
+        throw ArgumentException(
+            Localization::WSLCCLI_ConflictingOptionsError(L"--restart", L"--rm"), GetArgumentsForHelp({ArgType::Restart, ArgType::Remove}));
+    }
 }
 
 // clang-format off

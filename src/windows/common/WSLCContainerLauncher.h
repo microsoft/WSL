@@ -80,6 +80,7 @@ public:
     void SetEntrypoint(std::vector<std::string>&& entrypoint);
     void SetDefaultStopSignal(WSLCSignal Signal);
     void SetStopTimeout(LONG Timeout);
+    void SetRestartPolicy(WSLCContainerRestartPolicy Policy, std::int64_t MaximumRetryCount);
     void SetShmSize(int64_t ShmSize);
     void SetHealthCmd(std::string&& HealthCmd);
     void SetHealthInterval(int64_t Nanoseconds);
@@ -120,6 +121,8 @@ private:
     std::vector<std::string> m_entrypoint;
     WSLCSignal m_stopSignal = WSLCSignalNone;
     std::optional<LONG> m_stopTimeout;
+    WSLCContainerRestartPolicy m_restartPolicy{WSLCContainerRestartPolicyNone};
+    std::int64_t m_restartMaximumRetryCount{};
     int64_t m_shmSize = 0;
     std::optional<std::string> m_healthCmd;
     std::optional<int64_t> m_healthInterval;

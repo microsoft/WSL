@@ -1152,6 +1152,38 @@ class WSLCCLIExecutionUnitTests
             command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto&) { return true; });
     }
 
+    TEST_METHOD(RunCommand_ParseRestartPolicy_SetsRestartOptions)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --restart on-failure:5 ubuntu sh");
+
+        ContainerRunCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyOnFailure, options.Restart.Policy);
+        VERIFY_ARE_EQUAL(5LL, options.Restart.MaximumRetryCount);
+    }
+
+    TEST_METHOD(CreateCommand_ParseRestartPolicy_SetsRestartOptions)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --restart unless-stopped ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyUnlessStopped, options.Restart.Policy);
+        VERIFY_ARE_EQUAL(0LL, options.Restart.MaximumRetryCount);
+    }
+
     TEST_METHOD(SetContainerOptionsFromArgs_WithoutNetwork_NetworksIsEmpty)
     {
         CLIExecutionContext context;
