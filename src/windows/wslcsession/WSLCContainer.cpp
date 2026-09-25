@@ -1812,8 +1812,7 @@ __requires_exclusive_lock_held(m_lock) bool WSLCContainerImpl::OnStopped(int exi
         {
             dockerInspect = m_runtime.Docker().InspectContainer(m_id);
             const auto dockerStartTime = GetContainerStartTime(dockerInspect.value());
-            const bool replacementRun = dockerInspect->State.StartedAt != m_initProcessStartedAt;
-            if ((dockerInspect->State.Running || dockerInspect->State.Restarting) && replacementRun && dockerStartTime &&
+            if ((dockerInspect->State.Running || dockerInspect->State.Restarting) && dockerStartTime &&
                 ContainerStartedAfterEvent(dockerStartTime.value(), stopTime, stopTimeNanoseconds))
             {
                 if (stopTimeNanoseconds)
@@ -1833,6 +1832,11 @@ __requires_exclusive_lock_held(m_lock) bool WSLCContainerImpl::OnStopped(int exi
                         TraceLoggingValue(
                             std::chrono::floor<std::chrono::seconds>(dockerStartTime.value()).time_since_epoch().count(),
                             "DockerStartTime"));
+                }
+
+                if (dockerInspect->State.StartedAt == m_initProcessStartedAt)
+                {
+                    return false;
                 }
 
                 replacementNeedsReconciliation = true;
