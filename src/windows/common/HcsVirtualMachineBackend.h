@@ -53,6 +53,16 @@ private:
         wsl::windows::common::hcs::ComputeSystem Settings;
     };
 
+    struct AttachedDisk
+    {
+        VmDiskAttachment Attachment;
+        // Set for pass-through disks, cleared for virtual disks.
+        bool PassThrough = false;
+        std::wstring Path;
+        wsl::windows::common::disk::DiskStateFlags Flags{};
+        wil::unique_hfile BackingFile;
+    };
+
     HcsVirtualMachineBackend();
     void Initialize(const VmCreateRequest& Request);
     VmConfiguration BuildConfiguration(const VmCreateRequest& Request);
@@ -60,11 +70,19 @@ private:
     void OnCrash(PCWSTR Details);
     void OnExit(PCWSTR ExitDetails);
     std::shared_ptr<VmGuestListenerState> ConfigureGuestListener(const VmGuestListener& Listener) override;
+
+    _Requires_lock_held_(m_lock)
+    std::uint32_t ReserveLunLocked(const std::optional<VmScsiPlacement>& Placement) const;
+
+    _Requires_lock_held_(m_lock)
+    std::map<std::uint64_t, AttachedDisk>::iterator FindAttachedDiskLocked(bool PassThrough, const std::wstring& Path);
+
     NON_COPYABLE(HcsVirtualMachineBackend);
     NON_MOVABLE(HcsVirtualMachineBackend);
 
     wil::srwlock m_lock;
     VmConfiguration m_configuration;
+    std::wstring m_vmIdString;
     wil::unique_event m_terminatingEvent{wil::EventOptions::ManualReset};
     wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
     wil::unique_event m_vmCrashEvent{wil::EventOptions::ManualReset};
@@ -74,5 +92,7 @@ private:
     _Guarded_by_(m_exitDetailsLock) std::wstring m_exitDetails;
     // Closing the system drains callbacks before their event and context are destroyed.
     _Guarded_by_(m_lock) wsl::windows::common::hcs::unique_hcs_system m_system;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, AttachedDisk> m_attachedDisks;
+    _Guarded_by_(m_lock) std::uint64_t m_nextDiskId = 1;
     wil::unique_handle m_restrictedToken;
 };

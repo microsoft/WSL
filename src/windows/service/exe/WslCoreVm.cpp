@@ -73,21 +73,6 @@ RequiredExtraMmioSpaceForPmemFileInMb(_In_ PCWSTR FilePath)
     // Convert from bytes to megabytes. Ensure that we don't truncate a 512kb file to 0mb.
     return std::max(fileSizeBytes.QuadPart / static_cast<INT64>(_1MB), 1i64);
 }
-
-wil::unique_hfile OpenVhdBackingFile(_In_ PCWSTR Path)
-{
-    wil::unique_hfile file{CreateFileW(
-        Path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
-    THROW_LAST_ERROR_IF(!file);
-
-    return file;
-}
-
-bool IsBackingVolumeMounted(_In_ HANDLE File)
-{
-    DWORD bytesReturned{};
-    return DeviceIoControl(File, FSCTL_IS_VOLUME_MOUNTED, nullptr, 0, nullptr, 0, &bytesReturned, nullptr);
-}
 } // namespace
 
 WslCoreVm::WslCoreVm(_In_ wsl::core::Config&& VmConfig, _In_ InitializeDrvFsCallback InitializeDrvFs) :
@@ -1025,8 +1010,7 @@ ULONG WslCoreVm::AttachDiskLockHeld(
 
         if (WI_IsFlagSet(diskFlags, DiskStateFlags::Online))
         {
-            const auto diskHandle = wsl::windows::common::disk::OpenDevice(Disk, GENERIC_READ | GENERIC_WRITE, m_vmConfig.MountDeviceTimeout);
-            wsl::windows::common::disk::SetOnline(diskHandle.get(), true, m_vmConfig.MountDeviceTimeout);
+            wsl::windows::common::disk::BringOnline(Disk, m_vmConfig.MountDeviceTimeout);
         }
     });
 
@@ -1043,28 +1027,19 @@ ULONG WslCoreVm::AttachDiskLockHeld(
             }
 
             // Grant the VM access to the disk.
-            GrantVmWorkerProcessAccessToDisk(Disk, UserToken);
+            wsl::windows::common::hcs::GrantVmWorkerProcessAccessToDisk(m_machineId.c_str(), Disk, UserToken);
             WI_SetFlag(diskFlags, DiskStateFlags::AccessGranted);
 
-            // Set the disk online if needed.
+            // Set the disk offline if needed.
             //
             // N.B. The disk handle must be closed prior to adding the disk to the VM.
+            if (wsl::windows::common::disk::TakeOffline(Disk, m_vmConfig.MountDeviceTimeout))
             {
-                const auto diskHandle =
-                    wsl::windows::common::disk::OpenDevice(Disk, GENERIC_READ | GENERIC_WRITE, m_vmConfig.MountDeviceTimeout);
-                if (wsl::windows::common::disk::IsDiskOnline(diskHandle.get()))
-                {
-                    wsl::windows::common::disk::SetOnline(diskHandle.get(), false, m_vmConfig.MountDeviceTimeout);
-                    WI_SetFlag(diskFlags, DiskStateFlags::Online);
-                }
+                WI_SetFlag(diskFlags, DiskStateFlags::Online);
             }
 
             // Add the disk to the VM.
-            wsl::shared::retry::RetryWithTimeout<void>(
-                std::bind(wsl::windows::common::hcs::AddPassThroughDisk, m_system.get(), Disk, Lun.value()),
-                wsl::windows::common::disk::c_diskOperationRetry,
-                std::chrono::milliseconds(m_vmConfig.MountDeviceTimeout),
-                []() { return wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION); });
+            wsl::windows::common::hcs::AddPassThroughDiskWithRetry(m_system.get(), Disk, Lun.value(), m_vmConfig.MountDeviceTimeout);
         }
         else
         {
@@ -1074,7 +1049,7 @@ ULONG WslCoreVm::AttachDiskLockHeld(
                 THROW_HR_IF(WSL_E_USER_VHD_ALREADY_ATTACHED, found->first.User);
 
                 // Check if the lun is still valid. It could be stale if the backing volume is reattached.
-                if (IsBackingVolumeMounted(found->second.BackingFile.get()))
+                if (wsl::windows::common::disk::IsBackingVolumeMounted(found->second.BackingFile.get()))
                 {
                     return found->second.Lun;
                 }
@@ -1090,33 +1065,10 @@ ULONG WslCoreVm::AttachDiskLockHeld(
                 FreeLun(staleLun);
             }
 
-            backingFile = OpenVhdBackingFile(Disk);
+            backingFile = wsl::windows::common::disk::OpenVhdBackingFile(Disk);
 
-            auto grantDiskAccess = [&]() {
-                auto runAsUser = wil::impersonate_token(UserToken);
-                wsl::windows::common::hcs::GrantVmAccess(m_machineId.c_str(), Disk);
-                WI_SetFlag(diskFlags, DiskStateFlags::AccessGranted);
-            };
-
-            // Grant the VM access to the disk.
-            if (WI_IsFlagClear(Flags, MountFlags::ReadOnly))
-            {
-                grantDiskAccess();
-            }
-
-            auto result = wil::ResultFromException([&]() {
-                wsl::windows::common::hcs::AddVhd(m_system.get(), Disk, Lun.value(), WI_IsFlagSet(Flags, MountFlags::ReadOnly));
-            });
-
-            if (result == HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED) && WI_IsFlagClear(diskFlags, DiskStateFlags::AccessGranted))
-            {
-                grantDiskAccess();
-                wsl::windows::common::hcs::AddVhd(m_system.get(), Disk, Lun.value(), WI_IsFlagSet(Flags, MountFlags::ReadOnly));
-            }
-            else
-            {
-                THROW_IF_FAILED(result);
-            }
+            wsl::windows::common::hcs::AddVhdWithAccess(
+                m_system.get(), m_machineId.c_str(), Disk, Lun.value(), WI_IsFlagSet(Flags, MountFlags::ReadOnly), UserToken, diskFlags);
         }
     }
     catch (...)
@@ -1772,7 +1724,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
     // inherited ACLs; otherwise StartComputeSystem will surface E_ACCESSDENIED.
     auto attachDisk = [&](PCWSTR path, bool grantVmAccess) {
         auto lun = ReserveLun();
-        auto backingFile = OpenVhdBackingFile(path);
+        auto backingFile = wsl::windows::common::disk::OpenVhdBackingFile(path);
         hcs::Attachment disk{};
         disk.Type = hcs::AttachmentType::VirtualDisk;
         disk.Path = path;
@@ -1848,18 +1800,6 @@ GUID WslCoreVm::GetRuntimeId() const
 int WslCoreVm::GetVmIdleTimeout() const
 {
     return m_vmConfig.VmIdleTimeout;
-}
-
-void WslCoreVm::GrantVmWorkerProcessAccessToDisk(_In_ PCWSTR Disk, _In_opt_ HANDLE UserToken) const
-{
-    if (ARGUMENT_PRESENT(UserToken))
-    {
-        // Impersonating the user doesn't let us access a block device,
-        // check for an elevated token instead.
-        THROW_HR_IF(WSL_E_ELEVATION_NEEDED_TO_MOUNT_DISK, ((!wsl::windows::common::security::IsTokenElevated(UserToken))));
-    }
-
-    wsl::windows::common::hcs::GrantVmAccess(m_machineId.c_str(), Disk);
 }
 
 void WslCoreVm::InitializeGuest()
@@ -2413,8 +2353,7 @@ ULONG WslCoreVm::ReserveLun(_In_ std::optional<ULONG> Lun)
 void WslCoreVm::RestorePassthroughDiskState(_In_ LPCWSTR Disk) const
 try
 {
-    const auto diskHandle = wsl::windows::common::disk::OpenDevice(Disk, GENERIC_READ | GENERIC_WRITE, m_vmConfig.MountDeviceTimeout);
-    wsl::windows::common::disk::SetOnline(diskHandle.get(), true, m_vmConfig.MountDeviceTimeout);
+    wsl::windows::common::disk::BringOnline(Disk, m_vmConfig.MountDeviceTimeout);
     return;
 }
 CATCH_LOG()

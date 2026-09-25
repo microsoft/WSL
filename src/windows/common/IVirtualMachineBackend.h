@@ -290,6 +290,11 @@ struct VmDiskRequest
     std::variant<VmVirtualDiskSource, VmPhysicalDiskSource> Source;
     bool ReadOnly = true;
     std::optional<VmScsiPlacement> Placement;
+    // Set for disks that the user explicitly attached (for instance via 'wsl --mount'), as opposed
+    // to disks that WSL attaches on the user's behalf.
+    bool UserDisk = false;
+    // Timeout applied to host disk state changes and to retries when attaching a physical disk.
+    std::chrono::milliseconds DeviceTimeout{5000};
 };
 
 struct VmBootDiskRequest
@@ -303,6 +308,7 @@ struct VmDiskAttachment
     VmDiskId Id;
     VmGuestDiskAddress GuestAddress;
     bool ReadOnly = true;
+    bool UserDisk = false;
 };
 
 struct VmCrashCaptureRequest
@@ -558,5 +564,13 @@ std::unique_ptr<IVirtualMachineBackend> CreateVirtualMachineBackend(BackendKind 
 namespace wsl::windows::common::vm::validation {
 
 bool ValidateFeature(VmFeatureRequest Request, PCWSTR Setting, bool Supported = false);
+
+void ValidatePath(const std::filesystem::path& Path);
+
+void ValidateDiskPlacement(const VmDiskRequest& Request);
+
+const VmVirtualDiskSource& ValidateDiskRequest(const VmDiskRequest& Request);
+
+const std::wstring& ValidateDiskSource(const VmDiskRequest& Request);
 
 } // namespace wsl::windows::common::vm::validation

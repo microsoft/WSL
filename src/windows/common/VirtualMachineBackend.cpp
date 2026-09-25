@@ -21,8 +21,9 @@ Abstract:
 namespace {
 
 constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+constexpr UINT32 c_maximumDisks = 254;
 
-}
+} // namespace
 
 bool wsl::windows::common::vm::validation::ValidateFeature(VmFeatureRequest Request, PCWSTR Setting, bool Supported)
 {
@@ -191,4 +192,60 @@ VmPlatformCapabilities QueryVirtualMachineBackendCapabilities(BackendKind Kind)
     }
 
     THROW_HR(E_INVALIDARG);
+}
+
+void wsl::windows::common::vm::validation::ValidatePath(const std::filesystem::path& Path)
+{
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        Path.empty() || !Path.is_absolute() || Path.native().find(L'\0') != std::wstring::npos,
+        "An absolute, nonempty host path is required");
+}
+
+void wsl::windows::common::vm::validation::ValidateDiskPlacement(const VmDiskRequest& Request)
+{
+    if (Request.Placement)
+    {
+        THROW_HR_IF(c_notSupported, Request.Placement->Address.Controller != 0 || Request.Placement->Address.Lun >= c_maximumDisks);
+    }
+}
+
+const VmVirtualDiskSource& wsl::windows::common::vm::validation::ValidateDiskRequest(const VmDiskRequest& Request)
+{
+    const auto* source = std::get_if<VmVirtualDiskSource>(&Request.Source);
+    THROW_HR_IF(c_notSupported, source == nullptr);
+    ValidatePath(source->Path);
+    switch (source->Format)
+    {
+    case VmDiskFormat::Vhd:
+        THROW_HR_IF(E_INVALIDARG, _wcsicmp(source->Path.extension().c_str(), L".vhd") != 0);
+        break;
+    case VmDiskFormat::Vhdx:
+        THROW_HR_IF(E_INVALIDARG, _wcsicmp(source->Path.extension().c_str(), L".vhdx") != 0);
+        break;
+    default:
+        THROW_HR(E_INVALIDARG);
+    }
+
+    ValidateDiskPlacement(Request);
+
+    return *source;
+}
+
+const std::wstring& wsl::windows::common::vm::validation::ValidateDiskSource(const VmDiskRequest& Request)
+{
+    const auto* physicalSource = std::get_if<VmPhysicalDiskSource>(&Request.Source);
+    if (physicalSource == nullptr)
+    {
+        return ValidateDiskRequest(Request).Path.native();
+    }
+
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        physicalSource->DevicePath.empty() || physicalSource->DevicePath.find(L'\0') != std::wstring::npos,
+        "A nonempty device path is required");
+
+    ValidateDiskPlacement(Request);
+
+    return physicalSource->DevicePath;
 }

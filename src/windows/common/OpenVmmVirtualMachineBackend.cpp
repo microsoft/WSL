@@ -32,39 +32,6 @@ constexpr UINT32 c_maximumDisks = 254;
 constexpr UINT32 c_rpcTimeoutMs = 30000;
 constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
 
-void ValidatePath(const std::filesystem::path& Path)
-{
-    THROW_HR_IF_MSG(
-        E_INVALIDARG,
-        Path.empty() || !Path.is_absolute() || Path.native().find(L'\0') != std::wstring::npos,
-        "OpenVMM requires an absolute, nonempty host path");
-}
-
-const VmVirtualDiskSource& ValidateDiskRequest(const VmDiskRequest& Request)
-{
-    const auto* source = std::get_if<VmVirtualDiskSource>(&Request.Source);
-    THROW_HR_IF(c_notSupported, source == nullptr);
-    ValidatePath(source->Path);
-    switch (source->Format)
-    {
-    case VmDiskFormat::Vhd:
-        THROW_HR_IF(E_INVALIDARG, _wcsicmp(source->Path.extension().c_str(), L".vhd") != 0);
-        break;
-    case VmDiskFormat::Vhdx:
-        THROW_HR_IF(E_INVALIDARG, _wcsicmp(source->Path.extension().c_str(), L".vhdx") != 0);
-        break;
-    default:
-        THROW_HR(E_INVALIDARG);
-    }
-
-    if (Request.Placement)
-    {
-        THROW_HR_IF(c_notSupported, Request.Placement->Address.Controller != 0 || Request.Placement->Address.Lun >= c_maximumDisks);
-    }
-
-    return *source;
-}
-
 template <typename Tag>
 void ValidateResourceId(const VmResourceId<Tag>& Id, const VmInstanceId& Owner)
 {
@@ -177,7 +144,7 @@ VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmC
     {
         THROW_HR_IF(E_INVALIDARG, disk.Key.empty() || description.BootDisks.contains(disk.Key));
         description.BootDisks.emplace(disk.Key, VmDiskAttachment{});
-        ValidateDiskRequest(disk.Disk);
+        validation::ValidateDiskRequest(disk.Disk);
         if (disk.Disk.Placement)
         {
             const auto& placement = *disk.Disk.Placement;
@@ -662,7 +629,7 @@ void OpenVmmVirtualMachineBackend::CloseGuestListener(VmListenerId Listener)
 
 VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& Request)
 {
-    const auto& source = ValidateDiskRequest(Request);
+    const auto& source = validation::ValidateDiskRequest(Request);
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
 

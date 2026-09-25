@@ -115,6 +115,49 @@ void wsl::windows::common::hcs::AddPassThroughDisk(_In_ HCS_SYSTEM ComputeSystem
     ModifyComputeSystem(ComputeSystem, wsl::shared::ToJsonW(request).c_str());
 }
 
+void wsl::windows::common::hcs::AddPassThroughDiskWithRetry(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun, _In_ size_t TimeoutMs)
+{
+    wsl::shared::retry::RetryWithTimeout<void>(
+        std::bind(AddPassThroughDisk, ComputeSystem, Disk, Lun),
+        wsl::windows::common::disk::c_diskOperationRetry,
+        std::chrono::milliseconds(TimeoutMs),
+        []() { return wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION); });
+}
+
+void wsl::windows::common::hcs::AddVhdWithAccess(
+    _In_ HCS_SYSTEM ComputeSystem,
+    _In_ PCWSTR VmId,
+    _In_ PCWSTR VhdPath,
+    _In_ ULONG Lun,
+    _In_ bool ReadOnly,
+    _In_opt_ HANDLE UserToken,
+    _Inout_ wsl::windows::common::disk::DiskStateFlags& Flags)
+{
+    auto grantDiskAccess = [&]() {
+        auto runAsUser = wil::impersonate_token(UserToken);
+        GrantVmAccess(VmId, VhdPath);
+        WI_SetFlag(Flags, wsl::windows::common::disk::DiskStateFlags::AccessGranted);
+    };
+
+    // Grant the VM access to the disk.
+    if (!ReadOnly)
+    {
+        grantDiskAccess();
+    }
+
+    const auto result = wil::ResultFromException([&]() { AddVhd(ComputeSystem, VhdPath, Lun, ReadOnly); });
+
+    if (result == HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED) && WI_IsFlagClear(Flags, wsl::windows::common::disk::DiskStateFlags::AccessGranted))
+    {
+        grantDiskAccess();
+        AddVhd(ComputeSystem, VhdPath, Lun, ReadOnly);
+    }
+    else
+    {
+        THROW_IF_FAILED(result);
+    }
+}
+
 wsl::windows::common::hcs::unique_hcs_operation wsl::windows::common::hcs::CreateOperation()
 {
     unique_hcs_operation operation(::HcsCreateOperation(nullptr, nullptr));
@@ -274,6 +317,18 @@ void wsl::windows::common::hcs::GrantVmAccess(_In_ PCWSTR VmId, _In_ PCWSTR File
     ExecutionContext context(Context::HCS);
 
     THROW_IF_FAILED_MSG(::HcsGrantVmAccess(VmId, FilePath), "HcsGrantVmAccess(%ls, %ls)", VmId, FilePath);
+}
+
+void wsl::windows::common::hcs::GrantVmWorkerProcessAccessToDisk(_In_ PCWSTR VmId, _In_ PCWSTR Disk, _In_opt_ HANDLE UserToken)
+{
+    if (ARGUMENT_PRESENT(UserToken))
+    {
+        // Impersonating the user doesn't let us access a block device,
+        // check for an elevated token instead.
+        THROW_HR_IF(WSL_E_ELEVATION_NEEDED_TO_MOUNT_DISK, ((!wsl::windows::common::security::IsTokenElevated(UserToken))));
+    }
+
+    GrantVmAccess(VmId, Disk);
 }
 
 void wsl::windows::common::hcs::ModifyComputeSystem(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Configuration, _In_opt_ HANDLE Identity)

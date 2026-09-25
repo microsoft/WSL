@@ -27,6 +27,7 @@ namespace {
 namespace schema = wsl::windows::common::hcs;
 
 constexpr UINT64 c_mib = 1024 * 1024;
+constexpr UINT32 c_maximumDisks = 254;
 constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
 
 VmEffectiveProcessor ConfigureProcessor(const VmProcessorRequest& Request, schema::Processor& Settings)
@@ -216,6 +217,7 @@ void HcsVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     const auto id = wsl::shared::string::GuidToString<wchar_t>(Request.Identity.VmId, wsl::shared::string::GuidToStringFlags::None);
     const auto settings = wsl::shared::ToJsonW(configuration.Settings);
     m_configuration = std::move(configuration);
+    m_vmIdString = id;
     auto lock = m_lock.lock_exclusive();
     m_system = schema::CreateComputeSystem(id.c_str(), settings.c_str());
     schema::RegisterCallback(m_system.get(), OnSystemEvent, this);
@@ -292,9 +294,182 @@ void HcsVirtualMachineBackend::CloseGuestListener(VmListenerId Listener)
     RemoveGuestListenerLocked(Listener, m_configuration.Description.Identity);
 }
 
-VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest&)
+std::uint32_t HcsVirtualMachineBackend::ReserveLunLocked(const std::optional<VmScsiPlacement>& Placement) const
 {
-    THROW_HR(c_notSupported);
+    const auto lunInUse = [this](std::uint32_t Lun) {
+        for (const auto& entry : m_attachedDisks)
+        {
+            if (entry.second.Attachment.GuestAddress.Lun == Lun)
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    std::uint32_t lun = 0;
+    if (Placement)
+    {
+        const auto& address = Placement->Address;
+        THROW_HR_IF(c_notSupported, address.Controller != 0);
+        THROW_HR_IF(E_BOUNDS, address.Lun >= c_maximumDisks);
+        lun = address.Lun;
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), lunInUse(lun));
+    }
+    else
+    {
+        while (lun < c_maximumDisks && lunInUse(lun))
+        {
+            ++lun;
+        }
+        THROW_HR_IF(WSL_E_TOO_MANY_DISKS_ATTACHED, lun == c_maximumDisks);
+    }
+
+    return lun;
+}
+
+std::map<std::uint64_t, HcsVirtualMachineBackend::AttachedDisk>::iterator HcsVirtualMachineBackend::FindAttachedDiskLocked(
+    bool PassThrough, const std::wstring& Path)
+{
+    return std::find_if(m_attachedDisks.begin(), m_attachedDisks.end(), [&](const auto& entry) {
+        return entry.second.PassThrough == PassThrough && entry.second.Path == Path;
+    });
+}
+
+VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Request)
+{
+    ExecutionContext context(Context::MountDisk);
+
+    const auto& path = validation::ValidateDiskSource(Request);
+    const bool passThrough = std::holds_alternative<VmPhysicalDiskSource>(Request.Source);
+    const auto timeoutMs = static_cast<size_t>(Request.DeviceTimeout.count());
+
+    auto lock = m_lock.lock_exclusive();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
+    THROW_HR_IF(E_BOUNDS, m_nextDiskId == UINT64_MAX);
+
+    // Set scope exit variables to perform cleanup if attaching the disk fails.
+    wsl::windows::common::disk::DiskStateFlags diskFlags{};
+    wil::unique_hfile backingFile;
+    std::optional<VmDiskAttachment> existingAttachment;
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+        if (WI_IsFlagSet(diskFlags, wsl::windows::common::disk::DiskStateFlags::AccessGranted))
+        {
+            schema::RevokeVmAccess(m_vmIdString.c_str(), path.c_str());
+        }
+
+        if (WI_IsFlagSet(diskFlags, wsl::windows::common::disk::DiskStateFlags::Online))
+        {
+            wsl::windows::common::disk::BringOnline(path.c_str(), timeoutMs);
+        }
+    });
+
+    // Failures are reported with the same user-facing message as WslCoreVm::AttachDiskLockHeld.
+    const auto wrapAttachFailure = [&](auto&& Routine) {
+        try
+        {
+            Routine();
+        }
+        catch (...)
+        {
+            const auto result = wil::ResultFromCaughtException();
+            THROW_HR_WITH_USER_ERROR(
+                result, wsl::shared::Localization::MessageFailedToAttachDisk(path.c_str(), wsl::windows::common::wslutil::GetSystemErrorString(result)));
+        }
+    };
+
+    // Check if the disk is already attached.
+    //
+    // N.B. This runs before reserving a LUN so that a request targeting the LUN of the disk being
+    //      reattached is reported as a duplicate, and so that a stale attachment frees its LUN.
+    wrapAttachFailure([&] {
+        const auto found = FindAttachedDiskLocked(passThrough, path);
+        if (found == m_attachedDisks.end())
+        {
+            return;
+        }
+
+        if (passThrough)
+        {
+            THROW_HR_WITH_USER_ERROR(WSL_E_DISK_ALREADY_ATTACHED, wsl::shared::Localization::MessageDiskAlreadyAttached(path.c_str()));
+        }
+
+        // Prevent user from launching a distro vhd after manually mounting it; otherwise, return the attachment of the mounted disk.
+        THROW_HR_IF(WSL_E_USER_VHD_ALREADY_ATTACHED, found->second.Attachment.UserDisk);
+
+        // Check if the attachment is still valid. It could be stale if the backing volume is reattached.
+        if (wsl::windows::common::disk::IsBackingVolumeMounted(found->second.BackingFile.get()))
+        {
+            existingAttachment = found->second.Attachment;
+            return;
+        }
+
+        schema::RemoveScsiDisk(m_system.get(), found->second.Attachment.GuestAddress.Lun);
+        if (WI_IsFlagSet(found->second.Flags, wsl::windows::common::disk::DiskStateFlags::AccessGranted))
+        {
+            schema::RevokeVmAccess(m_vmIdString.c_str(), found->second.Path.c_str());
+        }
+
+        m_attachedDisks.erase(found);
+    });
+
+    if (existingAttachment.has_value())
+    {
+        cleanup.release();
+        return existingAttachment.value();
+    }
+
+    const auto lun = ReserveLunLocked(Request.Placement);
+
+    wrapAttachFailure([&] {
+        if (passThrough)
+        {
+            // Grant the VM access to the disk.
+            schema::GrantVmWorkerProcessAccessToDisk(
+                m_vmIdString.c_str(), path.c_str(), m_configuration.Description.Identity.UserToken.get());
+            WI_SetFlag(diskFlags, wsl::windows::common::disk::DiskStateFlags::AccessGranted);
+
+            // Set the disk offline if needed.
+            //
+            // N.B. The disk handle must be closed prior to adding the disk to the VM.
+            if (wsl::windows::common::disk::TakeOffline(path.c_str(), timeoutMs))
+            {
+                WI_SetFlag(diskFlags, wsl::windows::common::disk::DiskStateFlags::Online);
+            }
+
+            // Add the disk to the VM.
+            schema::AddPassThroughDiskWithRetry(m_system.get(), path.c_str(), lun, timeoutMs);
+        }
+        else
+        {
+            backingFile = wsl::windows::common::disk::OpenVhdBackingFile(path.c_str());
+
+            schema::AddVhdWithAccess(
+                m_system.get(),
+                m_vmIdString.c_str(),
+                path.c_str(),
+                lun,
+                Request.ReadOnly,
+                m_configuration.Description.Identity.UserToken.get(),
+                diskFlags);
+        }
+    });
+
+    const VmDiskAttachment attachment{{m_configuration.Description.Identity, m_nextDiskId}, {0, lun}, Request.ReadOnly, Request.UserDisk};
+    m_attachedDisks.emplace(attachment.Id.Value, AttachedDisk{attachment, passThrough, path, diskFlags, std::move(backingFile)});
+    ++m_nextDiskId;
+    cleanup.release();
+
+    WSL_LOG(
+        "HcsAttachDiskEnd",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(attachment.Id.Value, "diskId"),
+        TraceLoggingValue(attachment.GuestAddress.Controller, "controller"),
+        TraceLoggingValue(attachment.GuestAddress.Lun, "lun"),
+        TraceLoggingValue(passThrough, "passThrough"),
+        TraceLoggingValue(Request.ReadOnly, "readOnly"));
+
+    return attachment;
 }
 
 void HcsVirtualMachineBackend::DetachDisk(VmDiskId)
