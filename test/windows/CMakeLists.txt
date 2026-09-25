@@ -19,13 +19,14 @@ set(SOURCES
 set(HEADERS
     Common.h
     PluginTests.h
+    VirtualMachineBackendTestHelpers.h
     lxsstest.h)
 
 add_compile_definitions(INLINE_TEST_METHOD_MARKUP)
 
 add_library(wsltests SHARED ${SOURCES} ${HEADERS})
 
-target_sources(wsltests PRIVATE OpenVmmVirtualMachineBackendTests.cpp)
+target_sources(wsltests PRIVATE HcsVirtualMachineBackendTests.cpp OpenVmmVirtualMachineBackendTests.cpp)
 add_dependencies(wsltests initramfs)
 
 add_custom_command(

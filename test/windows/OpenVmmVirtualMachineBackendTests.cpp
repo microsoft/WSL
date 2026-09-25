@@ -3,34 +3,14 @@
 #include "precomp.h"
 #include "Common.h"
 #include "OpenVmmVirtualMachineBackend.h"
+#include "VirtualMachineBackendTestHelpers.h"
 
 using wsl::windows::common::vm::openvmm::ValidateCreateRequest;
+using namespace VirtualMachineBackendTestHelpers;
 
 namespace {
 
-constexpr UINT64 c_mib = 1024 * 1024;
 constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
-
-VmCreateRequest CreateRequest()
-{
-    VmCreateRequest request;
-    THROW_IF_FAILED(CoCreateGuid(&request.Identity.VmId));
-    request.Processor.Count = 2;
-    request.Memory.SizeBytes = 512 * c_mib;
-    request.Boot.KernelPath = L"C:\\images\\kernel";
-    request.Boot.InitrdPath = L"C:\\images\\initrd";
-    return request;
-}
-
-VmCreateRequest CreateRunnableRequest()
-{
-    auto request = CreateRequest();
-    const auto basePath = wsl::windows::common::wslutil::GetBasePath();
-    request.Boot.KernelPath = basePath / L"kernel";
-    request.Boot.InitrdPath = basePath / LXSS_VM_MODE_INITRD_NAME;
-    request.Boot.KernelCommandLine = L"panic=-1";
-    return request;
-}
 
 VmBootDiskRequest CreateDisk(std::wstring Key)
 {
@@ -51,12 +31,6 @@ VmNetworkAdapterRequest CreateNetworkRequest()
     request.Configuration.GatewayMacIpv6.Bytes = {0x52, 0x55, 0x0a, 0x00, 0x01, 0x02};
     request.Configuration.Netmask.Bytes = {255, 255, 255, 0};
     return request;
-}
-
-template <typename Callback>
-HRESULT OperationResult(Callback&& Operation)
-{
-    return wil::ResultFromException(std::forward<Callback>(Operation));
 }
 
 std::uint16_t ReserveTcpPort()
@@ -175,18 +149,7 @@ class OpenVmmVirtualMachineBackendTests
     TEST_METHOD(BootsAndTerminates)
     {
         SKIP_TEST_ARM64();
-        auto backend = OpenVmmVirtualMachineBackend::Create(CreateRunnableRequest());
-        auto terminationEvent = backend->GetTerminationEvent();
-        backend->Start();
-
-        const auto runningResult = WaitForSingleObject(terminationEvent.get(), 100);
-        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), runningResult);
-        if (runningResult == WAIT_TIMEOUT)
-        {
-            backend->Terminate();
-        }
-
-        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(terminationEvent.get(), 30 * 1000));
+        VerifyBootsAndTerminates(OpenVmmVirtualMachineBackend::Create(CreateRunnableRequest()));
     }
 
     TEST_METHOD(ManagesFileSystemNetworkAndPortResources)

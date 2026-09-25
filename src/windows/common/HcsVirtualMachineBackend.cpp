@@ -127,12 +127,15 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
     VmConfiguration configuration{};
     configuration.Settings.Owner = Request.Owner;
     configuration.Settings.ShouldTerminateOnLastHandleClosed = true;
+    configuration.Settings.SchemaVersion.Major = 2;
+    configuration.Settings.SchemaVersion.Minor = wsl::windows::common::helpers::IsWindows11OrAbove() ? 7 : 3;
     auto& description = configuration.Description;
     description.Identity = Request.Identity;
     description.Backend = BackendKind::Hcs;
     description.Processor = ConfigureProcessor(Request.Processor, configuration.Settings.VirtualMachine.ComputeTopology.Processor);
     description.Memory = ConfigureMemory(Request.Memory, configuration.Settings.VirtualMachine.ComputeTopology.Memory);
     description.Boot = ConfigureBoot(Request.Boot, configuration.Settings.VirtualMachine.Chipset);
+    configuration.Settings.VirtualMachine.Devices.Scsi["0"] = {};
     signalEarlyTermination.release();
     return configuration;
 }
