@@ -2707,6 +2707,9 @@ Usage: wslc container cp [OPTIONS] SOURCE DEST
     <value>tar.exe not found. Windows tar is required for local file copy.</value>
     <comment>{Locked="tar.exe"}</comment>
   </data>
+  <data name="WSLCCLI_CpStdoutIsTerminalError" xml:space="preserve">
+    <value>Cannot write copy output to the console.</value>
+  </data>
   <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
     <value>Invalid copy direction. Use CONTAINER:PATH as either source or destination.</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>

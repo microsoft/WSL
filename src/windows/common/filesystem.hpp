@@ -14,6 +14,9 @@ Abstract:
 
 #pragma once
 
+#include <functional>
+#include <optional>
+
 #include "wslservice.h"
 
 #define LXSS_FS_TYPE_DRVFS "drvfs"
@@ -174,11 +177,61 @@ std::filesystem::path GetTempFolderPath(_In_ HANDLE userToken);
 std::string GetWindowsHosts(const std::filesystem::path& Path);
 
 /// <summary>
+/// True when Name can be created as a Windows file name under that exact name. A POSIX name bars only
+/// '/' and NUL, so it can hold characters Windows rejects, end in a space or dot that Win32 would strip,
+/// or name a reserved device such as CON or COM1. An empty name is accepted; it stands for a path with
+/// no name of its own, which the caller handles separately.
+/// </summary>
+bool IsRepresentableFileName(std::wstring_view Name);
+
+/// <summary>
 /// Creates a uniquely named staging directory under Parent and returns its path. The name is
 /// derived from a fresh GUID so concurrent callers never collide. Throws if the directory cannot
 /// be created.
 /// </summary>
 std::filesystem::path MakeStagingDirectory(const std::filesystem::path& Parent);
+
+/// <summary>
+/// A staging directory that is removed, with everything under it, once it goes out of scope.
+/// </summary>
+class StagingDirectory
+{
+public:
+    explicit StagingDirectory(const std::filesystem::path& Parent);
+    ~StagingDirectory();
+
+    NON_COPYABLE(StagingDirectory);
+    NON_MOVABLE(StagingDirectory);
+
+    const std::filesystem::path& Path() const noexcept;
+
+private:
+    std::filesystem::path m_path;
+};
+
+/// <summary>
+/// Extracts a tar stream into Destination, calling WriteArchive with the handle to write the archive to.
+/// tar.exe cannot rename entries, so a set RebaseName is applied after extraction: a lone entry takes that
+/// name, several entries are gathered under a directory carrying it. A set but empty name still stages,
+/// which merges the entries under their own names.
+/// </summary>
+void ExtractArchiveInto(const std::filesystem::path& Destination, const std::optional<std::wstring>& RebaseName, const std::function<void(HANDLE)>& WriteArchive);
+
+/// <summary>
+/// Extracts a tar stream holding a single file and places it at DestinationFile, creating the parent
+/// directory if it is missing. tar.exe cannot rename entries, so the entry is staged beside the
+/// destination and moved into place under the requested name. A file path names one entry, so an
+/// archive that is empty, holds several entries, or holds a directory is rejected before anything
+/// is moved.
+/// </summary>
+void ExtractSingleFileAs(const std::filesystem::path& DestinationFile, const std::function<void(HANDLE)>& WriteArchive);
+
+/// <summary>
+/// Copies the tree at Resolved to LinkName under StagingRoot and returns the copied path. Links inside the
+/// tree are kept as links, so only the one that was named is dereferenced.
+/// </summary>
+std::filesystem::path StageDereferencedTree(
+    const std::filesystem::path& StagingRoot, const std::filesystem::path& LinkName, const std::filesystem::path& Resolved);
 
 /// <summary>
 /// Opens a directory handle with read/execute, optionally also write, & full sharing. The path
