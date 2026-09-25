@@ -500,7 +500,7 @@ wsl::windows::common::SvcComm::LaunchProcess(
 
         wsl::shared::SocketChannel InteropChannel{
             wil::unique_socket{reinterpret_cast<SOCKET>(InteropSocket.release())}, "Interop"};
-        ExitCode = interop::VmModeWorkerThread(InteropChannel, InstanceId);
+        ExitCode = interop::VmModeWorkerThread(InteropChannel, InstanceId, WI_IsFlagSet(LaunchFlags, LXSS_LAUNCH_FLAG_ENABLE_INTEROP), false);
     }
 
     return ExitCode;
