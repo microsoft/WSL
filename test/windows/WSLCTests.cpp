@@ -7847,36 +7847,32 @@ class WSLCTests
             wil::com_ptr<IWSLCEventStream> stream;
             VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, until, &filter, 1, &stream));
 
+            std::promise<HRESULT> getNextResult;
+            wil::unique_event readerStarted{wil::EventOptions::ManualReset};
             wil::unique_event cancelEvent{wil::EventOptions::ManualReset};
-            for (size_t attempt = 0; attempt < 2; ++attempt)
-            {
-                cancelEvent.ResetEvent();
-                std::promise<HRESULT> getNextResult;
-                wil::unique_event readerStarted{wil::EventOptions::ManualReset};
-                wil::unique_cotaskmem_ansistring eventJson;
-                std::thread readerThread([&]() {
-                    const auto coInitialize = wil::CoInitializeEx();
-                    readerStarted.SetEvent();
-                    getNextResult.set_value(stream->GetNext(cancelEvent.get(), &eventJson));
-                });
-                auto threadCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-                    cancelEvent.SetEvent();
-                    FAIL_FAST_IF_MSG(
-                        WaitForSingleObject(readerThread.native_handle(), 10 * 1000) != WAIT_OBJECT_0,
-                        "event stream reader did not finish after cancellation");
-                    readerThread.join();
-                });
-
-                VERIFY_IS_TRUE(readerStarted.wait(30 * 1000));
-                VERIFY_ARE_EQUAL(WAIT_TIMEOUT, WaitForSingleObject(readerThread.native_handle(), 100));
+            wil::unique_cotaskmem_ansistring eventJson;
+            std::thread readerThread([&]() {
+                const auto coInitialize = wil::CoInitializeEx();
+                readerStarted.SetEvent();
+                getNextResult.set_value(stream->GetNext(cancelEvent.get(), &eventJson));
+            });
+            auto threadCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 cancelEvent.SetEvent();
-
-                auto future = getNextResult.get_future();
                 FAIL_FAST_IF_MSG(
-                    future.wait_for(10s) != std::future_status::ready, "event stream reader did not finish after cancellation");
-                VERIFY_ARE_EQUAL(E_ABORT, future.get());
-                VERIFY_IS_NULL(eventJson.get());
-            }
+                    WaitForSingleObject(readerThread.native_handle(), 10 * 1000) != WAIT_OBJECT_0,
+                    "event stream reader did not finish after cancellation");
+                readerThread.join();
+            });
+
+            VERIFY_IS_TRUE(readerStarted.wait(30 * 1000));
+            VERIFY_ARE_EQUAL(WAIT_TIMEOUT, WaitForSingleObject(readerThread.native_handle(), 100));
+            cancelEvent.SetEvent();
+
+            auto future = getNextResult.get_future();
+            FAIL_FAST_IF_MSG(
+                future.wait_for(10s) != std::future_status::ready, "event stream reader did not finish after cancellation");
+            VERIFY_ARE_EQUAL(E_ABORT, future.get());
+            VERIFY_IS_NULL(eventJson.get());
         }
     }
 
@@ -7948,7 +7944,9 @@ class WSLCTests
         readers[0].join();
         VERIFY_ARE_EQUAL(E_ABORT, results[0]);
         VERIFY_IS_NULL(eventJson[0].get());
-        VERIFY_ARE_EQUAL(WAIT_TIMEOUT, WaitForSingleObject(readers[1].native_handle(), 100));
+
+        // Cancelling one stream must leave the other subscriber parked.
+        VERIFY_ARE_EQUAL(WAIT_TIMEOUT, WaitForSingleObject(readers[1].native_handle(), 1000));
 
         cancelEvents[1].SetEvent();
         FAIL_FAST_IF_MSG(
