@@ -366,6 +366,16 @@ wil::com_ptr<IWSLCCompatSessionManager> CreateSessionManager()
     return result;
 }
 
+void ValidateStringArray(PCSTR const* strings, uint32_t count)
+{
+    THROW_HR_IF(E_INVALIDARG, (strings == nullptr && count != 0) || (strings != nullptr && count == 0));
+
+    for (uint32_t index = 0; index < count; ++index)
+    {
+        THROW_HR_IF_NULL(E_INVALIDARG, strings[index]);
+    }
+}
+
 } // namespace
 
 // SESSION DEFINITIONS
@@ -449,9 +459,10 @@ try
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsDnsTunneling);
 
-    if (SUCCEEDED(errorInfoWrapper.CaptureResult(
-            sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, nullptr, &result->session))))
+    wil::com_ptr<IWSLCCompatSession> compatSession;
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, nullptr, &compatSession))))
     {
+        result->session = compatSession.query<IWSLCCompatSession2>();
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->session.get());
         *session = reinterpret_cast<WslcSession>(result.release());
     }
@@ -781,7 +792,7 @@ try
 
     auto result = std::make_unique<WslcContainerImpl>();
 
-    WSLCCompatContainerOptions containerOptions{};
+    WSLCCompatContainerOptions2 containerOptions{};
     std::unique_ptr<WSLCCompatPortMapping[]> convertedPorts; // this must stay in same scope as containerOptions since containerOptions.Ports is getting a raw pointer to the array owned by convertedPorts.
 
     containerOptions.Image = internalContainerSettings->image;
@@ -895,13 +906,17 @@ try
     // SDK only exposes the network mode (no additional endpoints today).
     containerOptions.ContainerNetwork.NetworkMode = internalContainerSettings->networkMode;
 
+    containerOptions.CapAdd = {
+        internalContainerSettings->capabilityAdditions, static_cast<ULONG>(internalContainerSettings->capabilityAdditionsCount)};
+    containerOptions.CapDrop = {internalContainerSettings->capabilityDrops, static_cast<ULONG>(internalContainerSettings->capabilityDropsCount)};
+
     // TODO: No user access
     // containerOptions.Labels;
     // containerOptions.LabelsCount;
     // containerOptions.StopSignal;
     // containerOptions.ShmSize;
 
-    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalSession->session->CreateContainer(&containerOptions, nullptr, &result->container))))
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalSession->session->CreateContainer2(&containerOptions, nullptr, &result->container))))
     {
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->container.get());
 
@@ -1110,6 +1125,34 @@ try
 
     internalType->namedVolumes = namedVolumes;
     internalType->namedVolumesCount = namedVolumeCount;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+STDAPI WslcSetContainerSettingsCapabilityAdditions(
+    _In_ WslcContainerSettings* containerSettings, _In_reads_opt_(capabilityCount) PCSTR const* capabilities, _In_ uint32_t capabilityCount)
+try
+{
+    auto internalType = CheckAndGetInternalType(containerSettings);
+    ValidateStringArray(capabilities, capabilityCount);
+
+    internalType->capabilityAdditions = capabilities;
+    internalType->capabilityAdditionsCount = capabilityCount;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+STDAPI WslcSetContainerSettingsCapabilityDrops(
+    _In_ WslcContainerSettings* containerSettings, _In_reads_opt_(capabilityCount) PCSTR const* capabilities, _In_ uint32_t capabilityCount)
+try
+{
+    auto internalType = CheckAndGetInternalType(containerSettings);
+    ValidateStringArray(capabilities, capabilityCount);
+
+    internalType->capabilityDrops = capabilities;
+    internalType->capabilityDropsCount = capabilityCount;
 
     return S_OK;
 }
@@ -1720,6 +1763,20 @@ try
     else if (FAILED(hr))
     {
         THROW_HR(hr);
+    }
+
+    if (SUCCEEDED(hr))
+    {
+        CLSID proxyStubClsid{};
+        hr = CoGetPSClsid(__uuidof(IWSLCCompatSession2), &proxyStubClsid);
+        if (hr == REGDB_E_IIDNOTREG)
+        {
+            WI_SetFlag(componentCheck, WSLC_COMPONENT_FLAG_WSL_PACKAGE);
+        }
+        else if (FAILED(hr))
+        {
+            THROW_HR(hr);
+        }
     }
 
     *missingComponents = componentCheck;

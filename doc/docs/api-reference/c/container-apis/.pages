@@ -13,6 +13,8 @@ nav:
   - wslcsetcontainersettingsportmappings.md
   - wslcsetcontainersettingsvolumes.md
   - wslcsetcontainersettingsnamedvolumes.md
+  - wslcsetcontainersettingscapabilityadditions.md
+  - wslcsetcontainersettingscapabilitydrops.md
   - wslccreatecontainerprocess.md
   - wslcgetcontainerid.md
   - wslcgetcontainerinitprocess.md

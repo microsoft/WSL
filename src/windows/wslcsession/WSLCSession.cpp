@@ -2354,6 +2354,7 @@ try
     WSLCExecutionContext context(this, WarningCallback);
     THROW_HR_IF_NULL(E_POINTER, containerOptions);
     THROW_HR_IF_NULL(E_POINTER, Container);
+    *Container = nullptr;
     THROW_HR_IF_NULL(E_POINTER, containerOptions->Image);
     THROW_HR_IF_MSG(
         E_INVALIDARG,
@@ -2366,9 +2367,24 @@ try
         "Invalid process flags: 0x%x",
         containerOptions->InitProcessOptions.Flags);
 
+    // Apply the policy to a local copy without modifying the caller's options.
+    auto options = *containerOptions;
+    const bool capAddIgnored = options.CapAdd.Count > 0 && !wsl::windows::policies::IsFeatureAllowed(
+                                                               wsl::windows::policies::OpenPoliciesKey().get(),
+                                                               wsl::windows::policies::c_allowWSLContainerPrivileged);
+    if (capAddIgnored)
+    {
+        options.CapAdd = {};
+    }
+
     auto lock = AcquireLease();
 
-    auto result = wil::ResultFromException([&]() { CreateContainerImpl(containerOptions, Container); });
+    auto result = wil::ResultFromException([&]() { CreateContainerImpl(&options, Container); });
+
+    if (capAddIgnored && SUCCEEDED(result))
+    {
+        EMIT_USER_WARNING(Localization::MessageWslcCapabilityAdditionsDisabled());
+    }
 
     // This telemetry event is used to keep track of the container creation failure rate and surface unexpected errors.
     WSL_LOG(
@@ -3777,7 +3793,7 @@ CATCH_RETURN();
 
 HRESULT WSLCSession::InterfaceSupportsErrorInfo(REFIID riid)
 {
-    return riid == __uuidof(IWSLCSession) || riid == __uuidof(IWSLCCompatSession) ? S_OK : S_FALSE;
+    return riid == __uuidof(IWSLCSession) || riid == __uuidof(IWSLCCompatSession) || riid == __uuidof(IWSLCCompatSession2) ? S_OK : S_FALSE;
 }
 
 HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IWSLCCompatProgressCallback* ProgressCallback, IWSLCCompatWarningCallback* WarningCallback)
@@ -3900,8 +3916,18 @@ HRESULT WSLCSession::CreateContainer(const WSLCCompatContainerOptions* Options, 
 try
 {
     RETURN_HR_IF_NULL(E_POINTER, Options);
+    const auto options = apicompat::Convert(*Options);
+
+    return CreateContainer2(&options, WarningCallback, Container);
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::CreateContainer2(const WSLCCompatContainerOptions2* Options, IWSLCCompatWarningCallback* WarningCallback, IWSLCCompatContainer** Container)
+try
+{
     RETURN_HR_IF_NULL(E_POINTER, Container);
     *Container = nullptr;
+    RETURN_HR_IF_NULL(E_POINTER, Options);
 
     const auto warning = apicompat::Convert(WarningCallback);
     const auto options = apicompat::Convert(*Options);

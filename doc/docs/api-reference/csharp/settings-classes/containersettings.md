@@ -19,12 +19,14 @@ public sealed class ContainerSettings
     public IList<ContainerPortMapping> PortMappings { get; set; }
     public IList<ContainerVolume> Volumes { get; set; }
     public IList<ContainerNamedVolume> NamedVolumes { get; set; }
+    public IList<string> CapabilityAdditions { get; set; }
+    public IList<string> CapabilityDrops { get; set; }
 }
 ```
 
 Notes:
 
-- `PortMappings`, `Volumes`, and `NamedVolumes` are mutable collections.
+- `PortMappings`, `Volumes`, `NamedVolumes`, `CapabilityAdditions`, and `CapabilityDrops` are mutable collections.
 - `InitProcess` is optional.
 - `NetworkingMode` is nullable; `null` means “leave default behavior”.
 

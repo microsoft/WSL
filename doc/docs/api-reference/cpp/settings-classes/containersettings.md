@@ -19,6 +19,8 @@
 - `PortMappings()` / setter
 - `Volumes()` / setter
 - `NamedVolumes()` / setter
+- `CapabilityAdditions()` / setter
+- `CapabilityDrops()` / setter
 
 **Important notes**
 
