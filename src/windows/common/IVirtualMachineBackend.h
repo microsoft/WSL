@@ -541,7 +541,7 @@ protected:
     void NotifyTerminated(const VmInstanceId& Identity) noexcept;
 
 private:
-    virtual std::shared_ptr<VmGuestListenerState> ConfigureGuestListener(const VmGuestListener& Listener);
+    virtual std::shared_ptr<VmGuestListenerState> ConfigureGuestListener(const VmGuestListener& Listener) = 0;
 
     _Guarded_by_(m_lock) std::map<std::uint64_t, std::shared_ptr<VmGuestListenerState>> m_guestListeners;
     _Guarded_by_(m_lock) std::uint64_t m_nextListenerId = 1;
@@ -558,17 +558,5 @@ std::unique_ptr<IVirtualMachineBackend> CreateVirtualMachineBackend(BackendKind 
 namespace wsl::windows::common::vm::validation {
 
 bool ValidateFeature(VmFeatureRequest Request, PCWSTR Setting, bool Supported = false);
-void ValidateUnsupportedSelection(VmSelectionPolicy Policy);
-void ValidatePath(const std::filesystem::path& Path, PCWSTR Backend);
-const VmVirtualDiskSource& ValidateDiskRequest(const VmDiskRequest& Request, UINT32 MaximumDisks);
-void ValidateConsolePath(const std::filesystem::path& Path, PCWSTR Backend, HRESULT Error, bool RequireName);
-void ValidateName(std::wstring_view Name, PCWSTR Description);
-void ValidateResourceId(UINT64 Value, const GUID& VmId, const VmInstanceId& Owner);
-
-template <typename Tag>
-void ValidateResourceId(const VmResourceId<Tag>& Id, const VmInstanceId& Owner)
-{
-    ValidateResourceId(Id.Value, Id.Owner.VmId, Owner);
-}
 
 } // namespace wsl::windows::common::vm::validation

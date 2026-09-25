@@ -59,6 +59,7 @@ private:
     static void CALLBACK OnSystemEvent(HCS_EVENT* Event, void* Context) noexcept;
     void OnCrash(PCWSTR Details);
     void OnExit(PCWSTR ExitDetails);
+    std::shared_ptr<VmGuestListenerState> ConfigureGuestListener(const VmGuestListener& Listener) override;
     NON_COPYABLE(HcsVirtualMachineBackend);
     NON_MOVABLE(HcsVirtualMachineBackend);
 

@@ -27,7 +27,6 @@ namespace {
 namespace schema = wsl::windows::common::hcs;
 
 constexpr UINT64 c_mib = 1024 * 1024;
-constexpr UINT64 c_memoryGranularity = 2 * c_mib;
 constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
 
 VmEffectiveProcessor ConfigureProcessor(const VmProcessorRequest& Request, schema::Processor& Settings)
@@ -71,13 +70,6 @@ VmEffectiveMemory ConfigureMemory(const VmMemoryRequest& Request, schema::Memory
 
 VmEffectiveBoot ConfigureBoot(const VmLinuxBootRequest& Request, schema::Chipset& Settings)
 {
-    validation::ValidatePath(Request.KernelPath, L"HCS kernel");
-    if (!Request.InitrdPath.empty())
-    {
-        validation::ValidatePath(Request.InitrdPath, L"HCS initrd");
-    }
-    THROW_HR_IF(E_INVALIDARG, Request.KernelCommandLine.find(L'\0') != std::wstring::npos);
-
     VmEffectiveBoot boot{};
     boot.Method = Request.Method;
     switch (boot.Method)
@@ -96,62 +88,37 @@ VmEffectiveBoot ConfigureBoot(const VmLinuxBootRequest& Request, schema::Chipset
     case VmBootMethod::Uefi:
         break;
     default:
-        THROW_HR(E_INVALIDARG);
+        break;
     }
 
     boot.KernelCommandLine = Request.KernelCommandLine;
     Settings.UseUtc = true;
-    if (boot.Method == VmBootMethod::LinuxDirect)
+    switch (boot.Method)
     {
+    case VmBootMethod::LinuxDirect:
         THROW_HR_IF_MSG(c_notSupported, wsl::shared::Arm64, "HCS Linux direct boot is currently supported only on x64");
         Settings.LinuxKernelDirect =
             schema::LinuxKernelDirect{Request.KernelPath.native(), Request.InitrdPath.native(), boot.KernelCommandLine};
-    }
-    else
+        break;
+    case VmBootMethod::Uefi:
     {
         THROW_HR_IF_MSG(c_notSupported, !Request.InitrdPath.empty(), "HCS UEFI boot does not support an initrd");
         const auto kernelName = Request.KernelPath.filename().native();
-        THROW_HR_IF(E_INVALIDARG, kernelName.empty());
         Settings.Uefi = schema::Uefi{
             {schema::UefiBootDevice::VmbFs, Request.KernelPath.parent_path().native(), L"\\" + kernelName, boot.KernelCommandLine}};
+        break;
+    }
+    default:
+        break;
     }
 
     return boot;
-}
-
-std::wstring GetVmbFsPath(const std::filesystem::path& Path, const std::filesystem::path& Root)
-{
-    const auto path = Path.lexically_normal();
-    const auto root = Root.lexically_normal();
-    auto position = path.begin();
-    for (const auto& component : root)
-    {
-        if (component.empty())
-        {
-            continue;
-        }
-
-        THROW_HR_IF(E_INVALIDARG, position == path.end() || _wcsicmp(component.c_str(), position->c_str()) != 0);
-        ++position;
-    }
-
-    std::filesystem::path relative;
-    for (; position != path.end(); ++position)
-    {
-        relative /= *position;
-    }
-    THROW_HR_IF(E_INVALIDARG, relative.empty() || relative.filename().empty());
-    return L"\\" + relative.native();
 }
 
 } // namespace
 
 HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfiguration(const VmCreateRequest& Request)
 {
-    THROW_HR_IF(E_INVALIDARG, IsEqualGUID(Request.Identity.VmId, GUID_NULL) || !Request.Identity.UserToken);
-    THROW_HR_IF(E_INVALIDARG, Request.Owner.empty() || Request.Owner.find(L'\0') != std::wstring::npos);
-    THROW_HR_IF(E_INVALIDARG, Request.Processor.Count == 0 || Request.Memory.SizeBytes == 0);
-    THROW_HR_IF(E_INVALIDARG, Request.Memory.SizeBytes % c_memoryGranularity != 0);
     auto signalEarlyTermination = wil::scope_exit([&] { m_terminatingEvent.SetEvent(); });
 
     m_restrictedToken = wsl::windows::common::security::CreateRestrictedToken(Request.Identity.UserToken.get());
@@ -289,6 +256,14 @@ void HcsVirtualMachineBackend::Terminate()
     CloseGuestListenersLocked(m_configuration.Description.Identity);
     // A system terminated before Start may not send an exit notification.
     m_terminatingEvent.SetEvent();
+}
+
+std::shared_ptr<VmGuestListenerState> HcsVirtualMachineBackend::ConfigureGuestListener(const VmGuestListener& Listener)
+{
+    auto state = std::make_shared<VmGuestListenerState>();
+    state->Listener = Listener;
+    state->Socket = wsl::windows::common::hvsocket::Listen(Listener.Id.Owner.VmId, Listener.Port.Value);
+    return state;
 }
 
 VmGuestListener HcsVirtualMachineBackend::CreateGuestListener(GuestServicePort Port)
