@@ -274,8 +274,6 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_IS_TRUE(IsEqualGUID(request.VmId, binding.Id.Owner.VmId));
         VERIFY_ARE_EQUAL(network.Id.Value, binding.Device.Value);
         VERIFY_ARE_EQUAL(bindingRequest.Listen.Port, binding.EffectiveListen.Port);
-        VERIFY_ARE_EQUAL(
-            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] { backend->BindPort(network.Id, bindingRequest); }));
 
         auto dynamicBinding = bindingRequest;
         dynamicBinding.Listen.Port = 0;

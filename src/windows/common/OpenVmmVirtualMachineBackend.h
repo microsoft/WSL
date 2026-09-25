@@ -71,10 +71,11 @@ private:
     struct GuestListener
     {
         ~GuestListener() noexcept;
+        std::optional<wil::unique_socket> Accept();
 
         VmGuestListener Listener;
         wil::unique_socket Socket;
-        std::filesystem::path Path;
+        wil::unique_hfile SocketFile;
         wil::unique_event CancellationEvent{wil::EventOptions::ManualReset};
     };
 

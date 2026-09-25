@@ -128,6 +128,12 @@ std::wstring wsl::windows::common::string::SockAddrInetToWstring(const SOCKADDR_
         break;
     case AF_INET6:
         RtlIpv6AddressToStringW(&sockAddrInet.Ipv6.sin6_addr, ipAddress.data());
+        if (sockAddrInet.Ipv6.sin6_scope_id != 0)
+        {
+            ipAddress.resize(std::wcslen(ipAddress.data()));
+            ipAddress += std::format(L"%{}", sockAddrInet.Ipv6.sin6_scope_id);
+            return ipAddress;
+        }
         break;
     default:
         ipAddress = std::format(L"[[ADDRESS_FAMILY {}]]", sockAddrInet.si_family);
