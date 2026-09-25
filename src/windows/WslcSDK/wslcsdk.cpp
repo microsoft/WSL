@@ -1822,8 +1822,7 @@ try
 
         if (wuContext.GetUpdateCount() == 0)
         {
-            // During the preview period, the package may not be published yet, so fall back to getting it from GH.
-            // When moving to GA, change this to an error like WSL_E_NO_UPDATE_AVAILABLE or similar.
+            // If Windows Update has no matching package, fall back to getting it from GitHub.
             if (callback)
             {
                 callback(0);
