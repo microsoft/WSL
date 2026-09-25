@@ -11,10 +11,10 @@ STDAPI WslcSetProcessSettingsFlags(_In_ WslcProcessSettings* processSettings, _I
 
 Return value: `HRESULT`. Unknown flag bits are rejected with `E_INVALIDARG`.
 
-Replaces any previously set flags. Must be called before the settings are used to start a
-process ([WslcCreateContainerProcess](../container-apis/wslccreatecontainerprocess.md)) or a
-container init process
-([WslcSetContainerSettingsInitProcess](../container-apis/wslcsetcontainersettingsinitprocess.md)).
+Replaces any previously set flags. Must be called before
+[WslcCreateContainerProcess](../container-apis/wslccreatecontainerprocess.md)
+or before [WslcCreateContainer](../container-apis/wslccreatecontainer.md) for a
+container init process.
 
 Standard input is **disabled by default**. Without `WSLC_PROCESS_FLAG_STDIN` the process
 observes an immediately closed stdin and `WslcGetProcessIOHandle` cannot be used with
