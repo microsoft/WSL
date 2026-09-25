@@ -18,7 +18,7 @@ Abstract:
 #include "VolumeModel.h"
 #include "VolumeService.h"
 #include "VolumeTasks.h"
-#include "TableOutput.h"
+#include "TableRenderer.h"
 #include <wslc_schema.h>
 
 using namespace wsl::shared;
@@ -220,16 +220,18 @@ void ListVolumes(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        auto table = wsl::windows::wslc::cli::TableOutput<2>(context.Terminal, {L"DRIVER", L"VOLUME NAME"});
+        wsl::windows::wslc::cli::TableData table{L"DRIVER", L"VOLUME NAME"};
+        table.Reserve(volumes.size());
+
         for (const auto& volume : volumes)
         {
-            table.WriteRow({
+            table.AddRow({
                 MultiByteToWide(volume.Driver),
                 MultiByteToWide(volume.Name),
             });
         }
 
-        table.Complete();
+        context.Data.Add<Data::Table>(std::move(table));
         break;
     }
     default:

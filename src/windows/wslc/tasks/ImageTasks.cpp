@@ -21,7 +21,7 @@ Abstract:
 #include "ImageService.h"
 #include "ImageTasks.h"
 #include "ImageProgressCallback.h"
-#include "TableOutput.h"
+#include "TableRenderer.h"
 #include "Task.h"
 #include <format>
 #include <unordered_map>
@@ -235,37 +235,42 @@ void ListImages(CLIExecutionContext& context)
         // When --no-trunc is passed, IMAGE ID also shows full length via TruncateId().
         constexpr ColumnWidthConfig c_imageId{.MinWidth = 12, .MaxWidth = 12, .Overflow = Shrink};
 
-        // The DIGEST column sits between TAG and IMAGE ID. The column is always declared, and is
-        // left empty and hidden unless --digests was passed.
-        constexpr size_t c_digestColumn = 2;
         const bool digests = context.Args.GetValue<ArgType::Digests>();
+        const ColumnWidthConfig columnConfig = trunc ? c_shrink : ColumnWidthConfig{};
+        const ColumnWidthConfig imageIdConfig = trunc ? c_imageId : ColumnWidthConfig{};
 
-        auto table =
-            trunc
-                ? wsl::windows::wslc::cli::TableOutput<6>(
-                      context.Terminal,
-                      {{{L"REPOSITORY", c_shrink}, {L"TAG", c_shrink}, {L"DIGEST", c_shrink}, {L"IMAGE ID", c_imageId}, {L"CREATED", c_shrink}, {L"SIZE", c_shrink}}},
-                      images.size())
-                : wsl::windows::wslc::cli::TableOutput<6>(
-                      context.Terminal, {L"REPOSITORY", L"TAG", L"DIGEST", L"IMAGE ID", L"CREATED", L"SIZE"});
+        // The DIGEST column sits between TAG and IMAGE ID, and is only present with --digests.
+        std::vector<ColumnDefinition> columns{{L"REPOSITORY", columnConfig}, {L"TAG", columnConfig}};
+        if (digests)
+        {
+            columns.emplace_back(ColumnDefinition{L"DIGEST", columnConfig});
+        }
 
-        table.SetDropEmptyColumns(true);
-        table.SetColumnHidden(c_digestColumn, !digests);
+        columns.emplace_back(ColumnDefinition{L"IMAGE ID", imageIdConfig});
+        columns.emplace_back(ColumnDefinition{L"CREATED", columnConfig});
+        columns.emplace_back(ColumnDefinition{L"SIZE", columnConfig});
+
+        wsl::windows::wslc::cli::TableData table{std::move(columns)};
+        table.Reserve(images.size());
 
         for (const auto& image : images)
         {
             const auto entry = ToImageOutput(image, trunc, format);
-            table.WriteRow({
-                MultiByteToWide(entry.Repository),
-                MultiByteToWide(entry.Tag),
-                digests ? MultiByteToWide(entry.Digest) : std::wstring{},
-                MultiByteToWide(entry.ID),
-                MultiByteToWide(entry.CreatedSince),
-                MultiByteToWide(entry.Size),
-            });
+
+            std::vector<Cell> cells{MultiByteToWide(entry.Repository), MultiByteToWide(entry.Tag)};
+            if (digests)
+            {
+                cells.emplace_back(MultiByteToWide(entry.Digest));
+            }
+
+            cells.emplace_back(MultiByteToWide(entry.ID));
+            cells.emplace_back(MultiByteToWide(entry.CreatedSince));
+            cells.emplace_back(MultiByteToWide(entry.Size));
+
+            table.AddRow(std::move(cells));
         }
 
-        table.Complete();
+        context.Data.Add<Data::Table>(std::move(table));
         break;
     }
     default:

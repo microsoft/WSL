@@ -914,6 +914,11 @@ class WSLCCLIExecutionUnitTests
                 dataMap.Add<Data::ConfirmMessage>(std::wstring{L"message"});
                 handled = true;
             }
+            else if (dataType == Data::Table)
+            {
+                dataMap.Add<Data::Table>(wsl::windows::wslc::cli::TableData{L"HEADER"});
+                handled = true;
+            }
 
             if (!handled)
             {

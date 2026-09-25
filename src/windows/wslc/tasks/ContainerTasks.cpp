@@ -23,7 +23,7 @@ Abstract:
 #include "MountSpecParsing.h"
 #include "SessionModel.h"
 #include "SessionService.h"
-#include "TableOutput.h"
+#include "TableRenderer.h"
 #include <wil/result_macros.h>
 #include <filesystem.hpp>
 #include <wslc_schema.h>
@@ -795,52 +795,51 @@ void ListContainers(CLIExecutionContext& context)
     {
         using enum ColumnOverflow;
 
-        // SIZE trails the other columns. It is always declared, and is left empty and hidden unless
-        // --size was passed.
-        constexpr size_t c_sizeColumn = 7;
         const bool showSize = context.Args.GetValue<ArgType::Size>();
 
-        // Create table with or without column limits based on --no-trunc flag
-        auto table = trunc ? wsl::windows::wslc::cli::TableOutput<8>(
-                                 context.Terminal,
-                                 {{{Localization::WSLCCLI_TableHeaderContainerId(), {.MaxWidth = 12, .Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderImage(), {.MaxWidth = 20, .Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderCommand(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderCreated(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderStatus(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderPorts(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderNames(), {.MaxWidth = 20, .Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderSize(), {.Overflow = Shrink}}}},
-                                 containers.size())
-                           : wsl::windows::wslc::cli::TableOutput<8>(
-                                 context.Terminal,
-                                 {Localization::WSLCCLI_TableHeaderContainerId(),
-                                  Localization::WSLCCLI_TableHeaderImage(),
-                                  Localization::WSLCCLI_TableHeaderCommand(),
-                                  Localization::WSLCCLI_TableHeaderCreated(),
-                                  Localization::WSLCCLI_TableHeaderStatus(),
-                                  Localization::WSLCCLI_TableHeaderPorts(),
-                                  Localization::WSLCCLI_TableHeaderNames(),
-                                  Localization::WSLCCLI_TableHeaderSize()});
+        // Column limits only apply when values are truncated.
+        const auto limit = [trunc](ColumnWidthConfig config) { return trunc ? config : ColumnWidthConfig{}; };
 
-        table.SetColumnHidden(c_sizeColumn, !showSize);
+        std::vector<ColumnDefinition> columns{
+            {Localization::WSLCCLI_TableHeaderContainerId(), limit({.MaxWidth = 12, .Overflow = Shrink})},
+            {Localization::WSLCCLI_TableHeaderImage(), limit({.MaxWidth = 20, .Overflow = Shrink})},
+            {Localization::WSLCCLI_TableHeaderCommand(), limit({.Overflow = Shrink})},
+            {Localization::WSLCCLI_TableHeaderCreated(), limit({.Overflow = Shrink})},
+            {Localization::WSLCCLI_TableHeaderStatus(), limit({.Overflow = Shrink})},
+            {Localization::WSLCCLI_TableHeaderPorts(), limit({.Overflow = Shrink})},
+            {Localization::WSLCCLI_TableHeaderNames(), limit({.MaxWidth = 20, .Overflow = Shrink})}};
+
+        // SIZE trails the other columns and is only present with --size.
+        if (showSize)
+        {
+            columns.emplace_back(ColumnDefinition{Localization::WSLCCLI_TableHeaderSize(), limit({.Overflow = Shrink})});
+        }
+
+        wsl::windows::wslc::cli::TableData table{std::move(columns)};
+        table.Reserve(containers.size());
 
         for (const auto& container : containers)
         {
             const auto entry = ToContainerOutput(container, trunc, FormatType::Table);
-            table.WriteRow({
+
+            std::vector<Cell> cells{
                 MultiByteToWide(entry.ID),
                 MultiByteToWide(entry.Image),
                 MultiByteToWide(entry.Command),
                 MultiByteToWide(entry.RunningFor),
                 MultiByteToWide(entry.Status),
                 MultiByteToWide(entry.Ports),
-                MultiByteToWide(entry.Names),
-                showSize ? MultiByteToWide(entry.Size) : std::wstring{},
-            });
+                MultiByteToWide(entry.Names)};
+
+            if (showSize)
+            {
+                cells.emplace_back(MultiByteToWide(entry.Size));
+            }
+
+            table.AddRow(std::move(cells));
         }
 
-        table.Complete();
+        context.Data.Add<Data::Table>(std::move(table));
 
         break;
     }
@@ -1195,32 +1194,24 @@ void ShowContainerStats(CLIExecutionContext& context)
         bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
         using enum ColumnOverflow;
 
-        auto table = trunc ? wsl::windows::wslc::cli::TableOutput<8>(
-                                 context.Terminal,
-                                 {{{Localization::WSLCCLI_TableHeaderContainerId(), {.MaxWidth = 12, .Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderName(), {.MaxWidth = 20, .Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderCpuPercent(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderMemUsageLimit(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderMemPercent(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderNetIo(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderBlockIo(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderPids(), {.Overflow = Shrink}}}},
-                                 statsJson.size())
-                           : wsl::windows::wslc::cli::TableOutput<8>(
-                                 context.Terminal,
-                                 {Localization::WSLCCLI_TableHeaderContainerId(),
-                                  Localization::WSLCCLI_TableHeaderName(),
-                                  Localization::WSLCCLI_TableHeaderCpuPercent(),
-                                  Localization::WSLCCLI_TableHeaderMemUsageLimit(),
-                                  Localization::WSLCCLI_TableHeaderMemPercent(),
-                                  Localization::WSLCCLI_TableHeaderNetIo(),
-                                  Localization::WSLCCLI_TableHeaderBlockIo(),
-                                  Localization::WSLCCLI_TableHeaderPids()});
+        const auto limit = [trunc](ColumnWidthConfig config) { return trunc ? config : ColumnWidthConfig{}; };
+
+        wsl::windows::wslc::cli::TableData table{std::vector<ColumnDefinition>{
+            {Localization::WSLCCLI_TableHeaderContainerId(), limit({.MaxWidth = 12, .Overflow = Shrink})},
+            {Localization::WSLCCLI_TableHeaderName(), limit({.MaxWidth = 20, .Overflow = Shrink})},
+            {Localization::WSLCCLI_TableHeaderCpuPercent(), limit({.Overflow = Shrink})},
+            {Localization::WSLCCLI_TableHeaderMemUsageLimit(), limit({.Overflow = Shrink})},
+            {Localization::WSLCCLI_TableHeaderMemPercent(), limit({.Overflow = Shrink})},
+            {Localization::WSLCCLI_TableHeaderNetIo(), limit({.Overflow = Shrink})},
+            {Localization::WSLCCLI_TableHeaderBlockIo(), limit({.Overflow = Shrink})},
+            {Localization::WSLCCLI_TableHeaderPids(), limit({.Overflow = Shrink})}}};
+
+        table.Reserve(statsJson.size());
 
         for (const auto& entry : statsJson)
         {
             const auto id = entry["ID"].get<std::string>();
-            table.WriteRow({
+            table.AddRow({
                 MultiByteToWide(trunc ? TruncateId(id) : id),
                 MultiByteToWide(entry["Name"].get<std::string>()),
                 MultiByteToWide(entry["CPUPerc"].get<std::string>()),
@@ -1232,7 +1223,7 @@ void ShowContainerStats(CLIExecutionContext& context)
             });
         }
 
-        table.Complete();
+        context.Data.Add<Data::Table>(std::move(table));
         break;
     }
     default:

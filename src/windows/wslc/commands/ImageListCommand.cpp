@@ -14,6 +14,7 @@ Abstract:
 
 #include "ImageCommand.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "ImageTasks.h"
 #include "SessionTasks.h"
 #include "Task.h"
@@ -52,6 +53,7 @@ void ImageListCommand::ExecuteInternal(CLIExecutionContext& context) const
     context               //
         << ResolveSession //
         << GetImages      //
-        << ListImages;
+        << ListImages     //
+        << PrintTable;
 }
 } // namespace wsl::windows::wslc
