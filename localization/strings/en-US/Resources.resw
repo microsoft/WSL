@@ -1005,6 +1005,9 @@ Falling back to NAT networking.</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>WSL container is disabled by the computer policy.</value>
   </data>
+  <data name="MessageWSLContainerNestedVirtualizationDisabled" xml:space="preserve">
+    <value>Nested virtualization for WSL containers is disabled by the computer policy.</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>The container image registry '{}' is blocked by the computer policy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
