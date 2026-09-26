@@ -108,6 +108,7 @@ Abstract:
 #define WSL_UNINSTALL_ARG L"--uninstall"
 #define WSL_UNMOUNT_ARG L"--unmount"
 #define WSL_UNREGISTER_ARG L"--unregister"
+#define WSL_UNREGISTER_OPTION_FORCE L"--force"
 #define WSL_UPDATE_ARG L"--update"
 #define WSL_UPDATE_ARG_CONFIRM_OPTION_LONG L"--confirm"
 #define WSL_UPDATE_ARG_PRE_RELEASE_OPTION_LONG L"--pre-release"
