@@ -2,7 +2,13 @@ parameters:
   - name: branch
     type: string
 
-  - name: version
+  - name: test
+    type: string
+
+  - name: testDisplayName
+    type: string
+
+  - name: testMap
     type: string
 
   - name: image
@@ -16,8 +22,8 @@ parameters:
     default: ''
 
 jobs:
-  - job: test_${{ parameters.branch }}_${{ parameters.version }}
-    displayName: "${{ parameters.version }} tests - ${{ parameters.branch }}"
+  - job: test_${{ parameters.branch }}_${{ parameters.test }}
+    displayName: "${{ parameters.testDisplayName }} - ${{ parameters.branch }}"
     dependsOn: []
     condition: and(succeeded(), eq('${{ parameters.run }}', true))
     variables:
@@ -34,10 +40,10 @@ jobs:
     steps:
       - task: CloudTestServerBuildTask@2
         inputs:
-          DisplayName: "${{ parameters.version }} tests - ${{ parameters.branch }}"
+          DisplayName: "${{ parameters.testDisplayName }} - ${{ parameters.branch }}"
           connectedServiceName: "CloudTest-PROD"
           cloudTestTenant: "wsl"
-          testMapLocation: 'testbin\x64\cloudtest\wsl-test-image-${{ parameters.image }}-${{ parameters.version}}\TestMap.xml'
+          testMapLocation: 'testbin\x64\cloudtest\wsl-test-image-${{ parameters.image }}-${{ parameters.testMap}}\TestMap.xml'
           pipelineArtifactName: "drop_wsl_build"
           pipelineArtifactBuildUrl: '$(System.TaskDefinitionsUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)'
           buildDropArtifactName: ""
