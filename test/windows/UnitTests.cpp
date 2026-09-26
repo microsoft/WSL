@@ -5699,6 +5699,34 @@ VERSION_ID="Invalid|Format"
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister debian-12"), 0L);
 
+            {
+                const auto invalidLocation = std::filesystem::path(g_testDistroPath) / L"invalid-location";
+                auto invalidLocationManifest = R"({
+    "ModernDistributions": {
+        "invalid-location": [
+            {
+                "Name": "invalid-location",
+                "FriendlyName": "InvalidLocation",
+                "Amd64Url": {
+                    "Url": "http://127.0.0.1:12/dummyUrl",
+                    "Sha256": ""
+                },
+                "Arm64Url": {
+                    "Url": "http://127.0.0.1:12/dummyUrl",
+                    "Sha256": ""
+                }
+            }
+        ]
+    }
+})";
+
+                auto invalidLocationRestore = SetManifest(invalidLocationManifest);
+                auto [output, error] = LxsstuLaunchWslAndCaptureOutput(
+                    std::format(L"--install invalid-location --no-launch --location \"{}\"", invalidLocation.native()), -1);
+                VERIFY_IS_TRUE(output.find(L"Downloading:") == std::wstring::npos);
+                VERIFY_IS_FALSE(error.empty());
+            }
+
             // Verify that name matching is not case-sensitive on the version.
             ValidateInstall(L"Debian-12 --no-launch --name debian-12");
             ValidateDistributionStarts(L"debian-12");
