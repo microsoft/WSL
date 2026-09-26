@@ -92,6 +92,8 @@ public:
 
     GUID GetDistributionId() const override;
 
+    GUID GetInstanceId() const;
+
     std::shared_ptr<LxssPort> GetInitPort() override;
 
     std::shared_ptr<LxssRunningInstance> GetSystemDistro();

@@ -7174,6 +7174,39 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             "#Comment 127.0.0.1 microsoft.com windows.microsoft.com\n#AnotherComment\n127.0.0.1 wsl.dev", "127.0.0.1\twsl.dev\n");
     }
 
+    WSL2_TEST_METHOD(UnregisterTerminatingDistribution)
+    {
+        constexpr auto distroName = L"test-unregister-terminating";
+        WslKeepAlive keepAlive;
+
+        for (const bool terminateFirst : {false, true})
+        {
+            auto cleanup = wil::scope_exit_log(
+                WI_DIAGNOSTICS_INFO, [distroName]() { LxsstuLaunchWsl(std::format(L"--unregister {}", distroName)); });
+
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(std::format(L"--install --from-file \"{}\" --no-launch --name {} --version 2", g_testDistroPath, distroName)), 0L);
+            ValidateDistributionStarts(distroName);
+
+            const auto distroKey = OpenDistributionKey(distroName);
+            const auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath");
+            const auto vhdPath = std::filesystem::path(basePath) / LXSS_VM_MODE_VHD_NAME;
+            VERIFY_IS_TRUE(std::filesystem::exists(vhdPath));
+
+            if (terminateFirst)
+            {
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--terminate {}", distroName)), 0L);
+            }
+
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--unregister {}", distroName));
+            VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
+            VERIFY_ARE_EQUAL(err, L"");
+            VERIFY_IS_FALSE(std::filesystem::exists(vhdPath));
+            VERIFY_IS_FALSE(GetDistributionId(distroName).has_value());
+            cleanup.release();
+        }
+    }
+
     // Validate that a distribution can be unregistered even if its BasePath doesn't exist.
     // See https://github.com/microsoft/WSL/issues/13004
     TEST_METHOD(BrokenDistroUnregister)
