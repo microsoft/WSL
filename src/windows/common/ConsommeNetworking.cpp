@@ -335,12 +335,13 @@ void ConsommeNetworking::RefreshGuestConnection()
     // Query current networking information before acquiring the lock.
     auto networkSettings = GetHostEndpointSettings();
 
-    std::wstring default_route = networkSettings->GetBestGatewayAddressString();
+    const auto defaultRouteIpv4 = networkSettings->GetBestGatewayAddressString(AF_INET);
+    const auto defaultRouteIpv6 = networkSettings->GetBestGatewayAddressString(AF_INET6);
 
     networking::DnsInfo currentDns{};
     if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::DnsTunneling))
     {
-        currentDns = networking::HostDnsInfo::GetDnsTunnelingSettings(default_route);
+        currentDns = networking::HostDnsInfo::GetDnsTunnelingSettings(defaultRouteIpv4);
     }
     else
     {
@@ -363,8 +364,9 @@ void ConsommeNetworking::RefreshGuestConnection()
             "RefreshVirtioNetConnection",
             TraceLoggingValue(networkSettings->PreferredIpAddress.AddressString.c_str(), "ClientIp"),
             TraceLoggingValue(networkSettings->PreferredIpAddress.PrefixLength, "PrefixLength"),
-            TraceLoggingValue(default_route.c_str(), "GatewayIp"),
-            TraceLoggingValue(networkSettings->PreferredIpv6Address.AddressString.c_str(), "ClientIpv6"));
+            TraceLoggingValue(defaultRouteIpv4.c_str(), "GatewayIp"),
+            TraceLoggingValue(networkSettings->PreferredIpv6Address.AddressString.c_str(), "ClientIpv6"),
+            TraceLoggingValue(defaultRouteIpv6.c_str(), "GatewayIpv6"));
         m_adapterId = m_guestDeviceManager->AddVirtioNetDevice(c_eth0DeviceName, virtioNetConfig, nameservers, m_userToken.get());
     }
     else if (!m_virtioNetConfig.has_value() || !AreEqual(m_virtioNetConfig.value(), virtioNetConfig) || !AreEqual(m_virtioNetNameservers, nameservers))
@@ -382,9 +384,10 @@ void ConsommeNetworking::RefreshGuestConnection()
     if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::Ipv6))
     {
         UpdateIpv6Address(networkSettings->PreferredIpv6Address);
+        UpdateDefaultRoute(AF_INET6, defaultRouteIpv6, m_trackedDefaultRouteIpv6);
     }
 
-    UpdateDefaultRoute(default_route);
+    UpdateDefaultRoute(AF_INET, defaultRouteIpv4, m_trackedDefaultRouteIpv4);
 
     UpdateDnsSettings(currentDns);
     UpdateMtu(minMtu);
@@ -452,8 +455,10 @@ void ConsommeNetworking::SetupLoopbackDevice()
     m_gnsChannel.SendNetworkDeviceMessage(loopbackType, ToJsonW(createLoopbackDevice).c_str());
 }
 
-void ConsommeNetworking::SendDefaultRoute(const std::wstring& gateway, hns::ModifyRequestType requestType)
+void ConsommeNetworking::SendDefaultRoute(ADDRESS_FAMILY family, const std::wstring& gateway, hns::ModifyRequestType requestType)
 {
+    WI_ASSERT(family == AF_INET || family == AF_INET6);
+
     if (gateway.empty() || !m_adapterId.has_value())
     {
         return;
@@ -461,8 +466,8 @@ void ConsommeNetworking::SendDefaultRoute(const std::wstring& gateway, hns::Modi
 
     wsl::shared::hns::Route route;
     route.NextHop = gateway;
-    route.DestinationPrefix = LX_INIT_DEFAULT_ROUTE_PREFIX;
-    route.Family = AF_INET;
+    route.DestinationPrefix = (family == AF_INET) ? LX_INIT_DEFAULT_ROUTE_PREFIX : LX_INIT_DEFAULT_ROUTE_V6_PREFIX;
+    route.Family = family;
 
     hns::ModifyGuestEndpointSettingRequest<hns::Route> request;
     request.RequestType = requestType;
@@ -471,16 +476,18 @@ void ConsommeNetworking::SendDefaultRoute(const std::wstring& gateway, hns::Modi
     m_gnsChannel.SendHnsNotification(ToJsonW(request).c_str(), m_adapterId.value());
 }
 
-void ConsommeNetworking::UpdateDefaultRoute(const std::wstring& gateway)
+void ConsommeNetworking::UpdateDefaultRoute(ADDRESS_FAMILY family, const std::wstring& gateway, std::wstring& trackedGateway)
 {
-    if (gateway == m_trackedDefaultRoute || !m_adapterId.has_value())
+    WI_ASSERT(family == AF_INET || family == AF_INET6);
+
+    if (gateway == trackedGateway || !m_adapterId.has_value())
     {
         return;
     }
 
-    SendDefaultRoute(m_trackedDefaultRoute, hns::ModifyRequestType::Remove);
-    m_trackedDefaultRoute = gateway;
-    SendDefaultRoute(gateway, hns::ModifyRequestType::Add);
+    SendDefaultRoute(family, trackedGateway, hns::ModifyRequestType::Remove);
+    trackedGateway = gateway;
+    SendDefaultRoute(family, gateway, hns::ModifyRequestType::Add);
 }
 
 void ConsommeNetworking::UpdateDnsSettings(const networking::DnsInfo& dns)
