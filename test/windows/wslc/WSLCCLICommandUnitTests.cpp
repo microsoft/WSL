@@ -369,14 +369,19 @@ class WSLCCLICommandUnitTests
         VERIFY_IS_TRUE(found, L"RootCommand should contain SystemInfoCommand");
     }
 
-    TEST_METHOD(RootCommand_GlobalCommandLineArguments_OnlySession)
+    TEST_METHOD(RootCommand_GlobalCommandLineArguments_IncludeDebugAndSession)
     {
         auto root = RootCommand();
         auto globals = root.GetScopedArguments(Scope::Global, Flags::None);
 
-        VERIFY_ARE_EQUAL(1u, globals.size());
-        VERIFY_ARE_EQUAL(ArgType::Session, globals[0].Type());
-        VERIFY_ARE_EQUAL(Kind::Value, globals[0].Kind());
+        VERIFY_ARE_EQUAL(2u, globals.size());
+        const auto debug = std::ranges::find(globals, ArgType::Debug, &Argument::Type);
+        const auto session = std::ranges::find(globals, ArgType::Session, &Argument::Type);
+        VERIFY_IS_TRUE(debug != globals.end());
+        VERIFY_ARE_EQUAL(Kind::Flag, debug->Kind());
+        VERIFY_ARE_EQUAL(std::wstring{L"D"}, debug->Alias());
+        VERIFY_IS_TRUE(session != globals.end());
+        VERIFY_ARE_EQUAL(Kind::Value, session->Kind());
     }
 
     TEST_METHOD(RootCommand_GlobalArguments_HaveExpectedRestrictions)
@@ -385,13 +390,19 @@ class WSLCCLICommandUnitTests
         const auto arguments = root.GetGlobalArguments();
         const auto allGlobalArguments = root.GetScopedArguments(Scope::Global);
         const auto environmentArguments = root.GetScopedArguments(Scope::Global, Flags::EnvironmentOnly);
+        const auto debug = std::ranges::find(arguments, ArgType::Debug, &Argument::Type);
         const auto session = std::ranges::find(arguments, ArgType::Session, &Argument::Type);
         const auto noColor = std::ranges::find(arguments, ArgType::NoColor, &Argument::Type);
 
-        VERIFY_ARE_EQUAL(2u, arguments.size());
-        VERIFY_ARE_EQUAL(2u, allGlobalArguments.size());
+        VERIFY_ARE_EQUAL(3u, arguments.size());
+        VERIFY_ARE_EQUAL(3u, allGlobalArguments.size());
         VERIFY_ARE_EQUAL(1u, environmentArguments.size());
         VERIFY_ARE_EQUAL(ArgType::NoColor, environmentArguments[0].Type());
+        VERIFY_IS_TRUE(debug != arguments.end());
+        VERIFY_ARE_EQUAL(Flags::None, debug->Flags());
+        VERIFY_ARE_EQUAL(Scope::Global, debug->Scope());
+        VERIFY_IS_TRUE(debug->GlobalOwner().has_value());
+        VERIFY_ARE_EQUAL(&root, &debug->GlobalOwner()->get());
         VERIFY_IS_TRUE(session != arguments.end());
         VERIFY_ARE_EQUAL(Flags::None, session->Flags());
         VERIFY_IS_TRUE(session->HasAllFlags(Flags::None));

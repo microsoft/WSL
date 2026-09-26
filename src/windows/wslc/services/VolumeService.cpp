@@ -12,7 +12,7 @@ Abstract:
 
 --*/
 #include "VolumeService.h"
-#include "WarningCallback.h"
+#include "DiagnosticCallback.h"
 #include <wslutil.h>
 #include <wslc.h>
 
@@ -87,7 +87,7 @@ wsl::windows::common::wslc_schema::InspectVolume VolumeService::Inspect(models::
 models::PruneVolumesResult VolumeService::Prune(
     Terminal& terminal, models::Session& session, bool all, const std::vector<std::pair<std::string, std::string>>& filters)
 {
-    WarningCallback warningCallback(terminal);
+    DiagnosticCallback diagnosticCallback(terminal);
     const bool hasExplicitAll = std::any_of(filters.begin(), filters.end(), [](const auto& f) { return f.first == "all"; });
 
     std::vector<WSLCFilter> filterEntries;
@@ -107,7 +107,7 @@ models::PruneVolumesResult VolumeService::Prune(
     THROW_IF_FAILED(session.Get()->PruneVolumes(
         filterEntries.empty() ? nullptr : filterEntries.data(),
         static_cast<ULONG>(filterEntries.size()),
-        &warningCallback,
+        &diagnosticCallback,
         &volumes,
         volumes.size_address<ULONG>(),
         &spaceReclaimed));

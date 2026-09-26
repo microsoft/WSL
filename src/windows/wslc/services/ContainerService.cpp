@@ -17,7 +17,7 @@ Abstract:
 #include "ConsoleService.h"
 #include "ImageService.h"
 #include "ImageProgressCallback.h"
-#include "WarningCallback.h"
+#include "DiagnosticCallback.h"
 #include <wslutil.h>
 #include <HandleConsoleProgressBar.h>
 #include <WSLCProcessLauncher.h>
@@ -59,7 +59,7 @@ static void PullImage(Terminal& terminal, Session& session, const std::string& i
 
 static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& terminal, Session& session, const std::string& image, const ContainerOptions& options)
 {
-    WarningCallback warningCallback(terminal);
+    DiagnosticCallback diagnosticCallback(terminal);
 
     if (options.Pull == PullPolicy::Always)
     {
@@ -277,12 +277,12 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& termi
         containerLauncher.AddLabel(key, value);
     }
 
-    auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get(), &warningCallback);
+    auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get(), &diagnosticCallback);
     if (result == WSLC_E_IMAGE_NOT_FOUND && options.Pull == PullPolicy::Missing)
     {
         terminal.Info(L"{}\n", Localization::WSLCCLI_ImageNotFoundPulling(wsl::shared::string::MultiByteToWide(image)));
         PullImage(terminal, session, image);
-        return containerLauncher.Create(*session.Get(), &warningCallback);
+        return containerLauncher.Create(*session.Get(), &diagnosticCallback);
     }
 
     THROW_IF_FAILED(result);
@@ -603,8 +603,8 @@ int ContainerService::Run(Terminal& terminal, Session& session, const std::strin
         startOptions.TtyColumns = size.X;
     }
 
-    WarningCallback warningCallback(terminal);
-    THROW_IF_FAILED(container.Start(startFlags, &startOptions, &warningCallback)); // TODO: detach keys
+    DiagnosticCallback diagnosticCallback(terminal);
+    THROW_IF_FAILED(container.Start(startFlags, &startOptions, &diagnosticCallback)); // TODO: detach keys
 
     // Disable auto-delete only after successful start
     runningContainer.SetDeleteOnClose(false);
@@ -645,8 +645,8 @@ int ContainerService::Start(Terminal& terminal, Session& session, const std::str
     startOptions.TtyRows = size.Y;
     startOptions.TtyColumns = size.X;
 
-    WarningCallback warningCallback(terminal);
-    THROW_IF_FAILED_EXCEPT(container->Start(flags, &startOptions, &warningCallback), WSLC_E_CONTAINER_IS_RUNNING);
+    DiagnosticCallback diagnosticCallback(terminal);
+    THROW_IF_FAILED_EXCEPT(container->Start(flags, &startOptions, &diagnosticCallback), WSLC_E_CONTAINER_IS_RUNNING);
 
     if (!attach)
     {
@@ -677,8 +677,8 @@ void ContainerService::Restart(Terminal& terminal, Session& session, const std::
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
 
-    WarningCallback warningCallback(terminal);
-    THROW_IF_FAILED(container->Restart(options.Signal, options.Timeout, &warningCallback));
+    DiagnosticCallback diagnosticCallback(terminal);
+    THROW_IF_FAILED(container->Restart(options.Signal, options.Timeout, &diagnosticCallback));
 }
 
 void ContainerService::Kill(Session& session, const std::string& id, WSLCSignal signal)

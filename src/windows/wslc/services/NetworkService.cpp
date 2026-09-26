@@ -12,7 +12,7 @@ Abstract:
 
 --*/
 #include "NetworkService.h"
-#include "WarningCallback.h"
+#include "DiagnosticCallback.h"
 #include <wslutil.h>
 #include <wslc.h>
 
@@ -24,7 +24,7 @@ namespace wsl::windows::wslc::services {
 
 void NetworkService::Create(Terminal& terminal, models::Session& session, const models::CreateNetworkOptions& createOptions)
 {
-    WarningCallback warningCallback(terminal);
+    DiagnosticCallback diagnosticCallback(terminal);
     WSLCNetworkOptions options{};
     options.Name = createOptions.Name.c_str();
     if (createOptions.Driver.has_value())
@@ -67,7 +67,7 @@ void NetworkService::Create(Terminal& terminal, models::Session& session, const 
         options.IpRange = createOptions.IpRange->c_str();
     }
 
-    THROW_IF_FAILED(session.Get()->CreateNetwork(&options, &warningCallback));
+    THROW_IF_FAILED(session.Get()->CreateNetwork(&options, &diagnosticCallback));
 }
 
 void NetworkService::Delete(models::Session& session, const std::string& name)

@@ -66,17 +66,28 @@ namespace {
         Microsoft::WRL::ComPtr<IWSLCCompatProgressCallback> m_inner;
     };
 
-    class WarningCallbackAdapter
-        : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWarningCallback>
+    class DiagnosticCallbackAdapter
+        : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IDiagnosticCallback>
     {
     public:
-        WarningCallbackAdapter(IWSLCCompatWarningCallback* Inner) : m_inner(Inner)
+        DiagnosticCallbackAdapter(IWSLCCompatWarningCallback* Inner) : m_inner(Inner)
         {
         }
 
-        IFACEMETHOD(OnWarning)(LPCWSTR Message) override
+        IFACEMETHOD(GetEnabledLevels)(WSLCDiagnosticLevel* Levels) override
         {
-            return m_inner->OnWarning(Message);
+            RETURN_HR_IF_NULL(E_POINTER, Levels);
+            *Levels = WSLCDiagnosticLevelWarning;
+            return S_OK;
+        }
+
+        IFACEMETHOD(OnDiagnostic)(const WSLCDiagnosticEvent* Event) override
+        {
+            RETURN_HR_IF_NULL(E_POINTER, Event);
+            RETURN_HR_IF(E_INVALIDARG, Event->SchemaVersion != WSLC_DIAGNOSTIC_SCHEMA_VERSION);
+            RETURN_HR_IF(E_INVALIDARG, Event->Level != WSLCDiagnosticLevelWarning);
+            RETURN_HR_IF_NULL(E_INVALIDARG, Event->Message);
+            return m_inner->OnWarning(Event->Message);
         }
 
     private:
@@ -409,12 +420,12 @@ Microsoft::WRL::ComPtr<IProgressCallback> Convert(IWSLCCompatProgressCallback* C
     return result;
 }
 
-Microsoft::WRL::ComPtr<IWarningCallback> Convert(IWSLCCompatWarningCallback* Callback)
+Microsoft::WRL::ComPtr<IDiagnosticCallback> Convert(IWSLCCompatWarningCallback* Callback)
 {
-    Microsoft::WRL::ComPtr<IWarningCallback> result;
+    Microsoft::WRL::ComPtr<IDiagnosticCallback> result;
     if (Callback != nullptr)
     {
-        result = Microsoft::WRL::Make<WarningCallbackAdapter>(Callback);
+        result = Microsoft::WRL::Make<DiagnosticCallbackAdapter>(Callback);
     }
 
     return result;

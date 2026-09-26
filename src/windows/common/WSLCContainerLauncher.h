@@ -69,12 +69,12 @@ public:
     void AddPrimaryNetworkAlias(const std::string& Alias);
     void SetPrimaryNetworkIpAddress(std::string&& Address);
 
-    std::pair<HRESULT, std::optional<RunningWSLCContainer>> CreateNoThrow(IWSLCSession& Session, IWarningCallback* WarningCallback = nullptr);
-    RunningWSLCContainer Create(IWSLCSession& Session, IWarningCallback* WarningCallback = nullptr);
+    std::pair<HRESULT, std::optional<RunningWSLCContainer>> CreateNoThrow(IWSLCSession& Session, IDiagnosticCallback* DiagnosticCallback = nullptr);
+    RunningWSLCContainer Create(IWSLCSession& Session, IDiagnosticCallback* DiagnosticCallback = nullptr);
 
-    RunningWSLCContainer Launch(IWSLCSession& Session, WSLCContainerStartFlags Flags = WSLCContainerStartFlagsAttach, IWarningCallback* WarningCallback = nullptr);
+    RunningWSLCContainer Launch(IWSLCSession& Session, WSLCContainerStartFlags Flags = WSLCContainerStartFlagsAttach, IDiagnosticCallback* DiagnosticCallback = nullptr);
     std::pair<HRESULT, std::optional<RunningWSLCContainer>> LaunchNoThrow(
-        IWSLCSession& Session, WSLCContainerStartFlags Flags = WSLCContainerStartFlagsAttach, IWarningCallback* WarningCallback = nullptr);
+        IWSLCSession& Session, WSLCContainerStartFlags Flags = WSLCContainerStartFlagsAttach, IDiagnosticCallback* DiagnosticCallback = nullptr);
 
     void SetName(std::string&& Name);
     void SetEntrypoint(std::vector<std::string>&& entrypoint);

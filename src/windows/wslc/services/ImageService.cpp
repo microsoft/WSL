@@ -15,7 +15,7 @@ Abstract:
 #include "RegistryService.h"
 #include "SessionService.h"
 #include "SpecParsing.h"
-#include "WarningCallback.h"
+#include "DiagnosticCallback.h"
 #include <filesystem.hpp>
 #include <wslutil.h>
 #include <HandleConsoleProgressBar.h>
@@ -344,18 +344,18 @@ std::vector<ImageInformation> ImageService::List(
 
 void ImageService::Load(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::wstring& input, IImageLoadCallback* callback)
 {
-    WarningCallback warningCallback(terminal);
+    DiagnosticCallback diagnosticCallback(terminal);
     auto source = OpenImageInput(input);
-    THROW_IF_FAILED(session.Get()->LoadImage(ToCOMInputHandle(source.Handle.Get()), source.ContentLength, &warningCallback, callback));
+    THROW_IF_FAILED(session.Get()->LoadImage(ToCOMInputHandle(source.Handle.Get()), source.ContentLength, &diagnosticCallback, callback));
 }
 
 std::string ImageService::Import(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName)
 {
-    WarningCallback warningCallback(terminal);
+    DiagnosticCallback diagnosticCallback(terminal);
     auto source = OpenImageInput(input);
     wil::unique_cotaskmem_ansistring imageId;
     THROW_IF_FAILED(session.Get()->ImportImage(
-        ToCOMInputHandle(source.Handle.Get()), imageName.empty() ? nullptr : imageName.c_str(), source.ContentLength, &warningCallback, &imageId));
+        ToCOMInputHandle(source.Handle.Get()), imageName.empty() ? nullptr : imageName.c_str(), source.ContentLength, &diagnosticCallback, &imageId));
     return imageId.get() ? std::string(imageId.get()) : std::string();
 }
 
@@ -390,10 +390,10 @@ std::vector<wsl::windows::wslc::models::DeletedImageEntry> ImageService::Delete(
 
 void ImageService::Pull(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback, bool allTags)
 {
-    WarningCallback warningCallback(terminal);
+    DiagnosticCallback diagnosticCallback(terminal);
     auto server = GetServerFromImage(image);
     auto auth = RegistryService::Get(server);
-    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), auth.c_str(), allTags ? TRUE : FALSE, callback, &warningCallback));
+    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), auth.c_str(), allTags ? TRUE : FALSE, callback, &diagnosticCallback));
 }
 
 void ImageService::Tag(wsl::windows::wslc::models::Session& session, const std::string& sourceImage, const std::string& targetImage)
@@ -421,10 +421,10 @@ InspectImage ImageService::Inspect(wsl::windows::wslc::models::Session& session,
 
 void ImageService::Push(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback, bool allTags)
 {
-    WarningCallback warningCallback(terminal);
+    DiagnosticCallback diagnosticCallback(terminal);
     auto server = GetServerFromImage(image);
     auto auth = RegistryService::Get(server);
-    THROW_IF_FAILED(session.Get()->PushImage(image.c_str(), auth.c_str(), allTags ? TRUE : FALSE, callback, &warningCallback));
+    THROW_IF_FAILED(session.Get()->PushImage(image.c_str(), auth.c_str(), allTags ? TRUE : FALSE, callback, &diagnosticCallback));
 }
 
 void ImageService::Save(wsl::windows::wslc::models::Session& session, const std::vector<std::string>& images, const std::wstring& output, HANDLE cancelEvent)

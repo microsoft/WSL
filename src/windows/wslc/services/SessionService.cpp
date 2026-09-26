@@ -15,7 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "SessionService.h"
 #include "ConsoleService.h"
-#include "WarningCallback.h"
+#include "DiagnosticCallback.h"
 #include <wslc.h>
 #include <WSLCProcessLauncher.h>
 
@@ -54,13 +54,13 @@ Session SessionService::OpenDefaultSession()
 
 Session SessionService::OpenOrCreateDefaultSession(Terminal& terminal)
 {
-    WarningCallback warningCallback(terminal);
+    DiagnosticCallback diagnosticCallback(terminal);
     auto manager = CreateSessionManager();
 
-    // Null Settings = default session with server-determined name and settings. The warning callback
-    // is consumed during CreateSession (session initialization); it is not retained afterwards.
+    // Null Settings = default session with server-determined name and settings. The diagnostic
+    // callback is consumed during CreateSession and is not retained afterwards.
     wil::com_ptr<IWSLCSession> session;
-    THROW_IF_FAILED(manager->CreateSession(nullptr, WSLCSessionFlagsNone, &warningCallback, &session));
+    THROW_IF_FAILED(manager->CreateSession(nullptr, WSLCSessionFlagsNone, &diagnosticCallback, &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
     return Session(std::move(session));
@@ -125,11 +125,11 @@ int SessionService::Enter(Terminal& terminal, const std::wstring& storagePath, c
     THROW_HR_IF(E_INVALIDARG, storagePath.empty());
     THROW_HR_IF(E_INVALIDARG, displayName.empty());
 
-    WarningCallback warningCallback(terminal);
+    DiagnosticCallback diagnosticCallback(terminal);
     auto sessionManager = CreateSessionManager();
 
     wil::com_ptr<IWSLCSession> session;
-    THROW_IF_FAILED(sessionManager->EnterSession(displayName.c_str(), storagePath.c_str(), &warningCallback, &session));
+    THROW_IF_FAILED(sessionManager->EnterSession(displayName.c_str(), storagePath.c_str(), &diagnosticCallback, &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
     terminal.Info(L"{}\n", Localization::MessageWslcCreatedSession(displayName));
 
