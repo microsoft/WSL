@@ -128,7 +128,7 @@ New-ItemProperty -Path $UserLxssRegistryPath -Name "OOBEComplete" -Value "1" -Pr
 if ($DistroPath)
 {
     Write-Host "Importing distro $DistroName($Version) from $DistroPath"
-    & wsl.exe --unregister "$DistroName" # Ignore non-zero return for this call
+    & wsl.exe --unregister "$DistroName" --force # Ignore non-zero return for this call
     Run { wsl.exe --import "$DistroName" "$env:LocalAppData\lxss" "$DistroPath" --version "$Version" }
     Run { wsl.exe --set-default "$DistroName" }
 }

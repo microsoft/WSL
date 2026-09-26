@@ -496,8 +496,8 @@ class UnitTests
         // Import a second distro from the same tarball as the test distro.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", peerDistroName, g_testDistroPath)), 0L);
 
-        auto cleanupPeer =
-            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"--unregister {}", peerDistroName)); });
+        auto cleanupPeer = wil::scope_exit_log(
+            WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"--unregister {} --force", peerDistroName)); });
 
         // Enable systemd in the peer distro (no helper exists for non-test distros).
         VERIFY_ARE_EQUAL(
@@ -550,10 +550,10 @@ class UnitTests
             auto cleanupVm = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
             auto cleanupSystemd = EnableSystemd(extraConfig);
 
-            LxsstuLaunchWsl(std::format(L"--unregister {}", peerDistroName));
+            LxsstuLaunchWsl(std::format(L"--unregister {} --force", peerDistroName));
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", peerDistroName, g_testDistroPath)), 0L);
             auto cleanupPeer = wil::scope_exit_log(
-                WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"--unregister {}", peerDistroName)); });
+                WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"--unregister {} --force", peerDistroName)); });
 
             auto cleanupPeerSystemd = EnableSystemd(extraConfig, peerDistroName);
 
@@ -1266,7 +1266,7 @@ class UnitTests
 
         auto deleteNewDistro = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
             VERIFY_IS_TRUE(DeleteFileW(newDistroTar));
-            LxsstuLaunchWsl(std::format(L"--unregister {}", newDistroName));
+            LxsstuLaunchWsl(std::format(L"--unregister {} --force", newDistroName));
         });
 
         validateOutput(
@@ -1276,7 +1276,8 @@ class UnitTests
         validateOutput(std::format(L"-d {} -- ln -f -s /bin/bash /bin/sh", newDistroName).c_str(), L"", 0);
         validateOutput(
             std::format(L"--export {} {}", newDistroName, newDistroTar).c_str(), L"The operation completed successfully. \r\n", 0);
-        validateOutput(std::format(L"--unregister {}", newDistroName).c_str(), L"The operation completed successfully. \r\n", 0);
+        validateOutput(
+            std::format(L"--unregister {} --force", newDistroName).c_str(), L"The operation completed successfully. \r\n", 0);
         validateOutput(
             std::format(L"--import {} . {} --version {}", newDistroName, newDistroTar, version).c_str(),
             L"The operation completed successfully. \r\n",
@@ -1929,8 +1930,12 @@ Arguments for managing distributions in Windows Subsystem for Linux:
     --terminate, -t <Distro>
         Terminates the specified distribution.
 
-    --unregister <Distro>
-        Unregisters the distribution and deletes the root filesystem.
+    --unregister <Distro> [Options]
+        Unregisters the distribution and permanently deletes the root filesystem after confirmation.
+
+        Options:
+            --force
+                Skip confirmation. Required when input is redirected.
 )""";
 
         const std::wstring WslConfigHelpMessage =
@@ -3145,7 +3150,7 @@ Usage:
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
 
         auto cleanupName = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() {
-            LxsstuLaunchWsl(std::format(L"--unregister {}", name));
+            LxsstuLaunchWsl(std::format(L"--unregister {} --force", name));
             std::filesystem::remove_all(testFolder);
         });
 
@@ -3221,7 +3226,7 @@ Usage:
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() {
-            LxsstuLaunchWsl(std::format(L"--unregister {}", name));
+            LxsstuLaunchWsl(std::format(L"--unregister {} --force", name));
             std::filesystem::remove_all(moveElevatedFolder);
             std::filesystem::remove_all(moveNonElevatedFolder);
         });
@@ -3297,7 +3302,7 @@ Usage:
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() {
-            LxsstuLaunchWsl(std::format(L"--unregister {}", name));
+            LxsstuLaunchWsl(std::format(L"--unregister {} --force", name));
             std::filesystem::remove_all(firstFolder);
             std::filesystem::remove_all(secondFolder);
         });
@@ -3363,7 +3368,7 @@ Usage:
         WslShutdown();
 
         auto cleanupName =
-            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {} --force", name)); });
 
         auto validateDistro = [name](LPCWSTR size, LPCWSTR expectedSize, const std::wstring& expectedError = {}) {
             auto [out, _] =
@@ -3403,7 +3408,7 @@ Usage:
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
         auto cleanupName =
-            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {} --force", name)); });
         WslShutdown();
 
         // Start an export to a pipe we deliberately don't drain. Use a tiny buffer so the export blocks
@@ -3465,7 +3470,7 @@ Usage:
         WslShutdown();
 
         auto cleanupName =
-            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {} --force", name)); });
 
         const auto distroKey = OpenDistributionKey(name);
         VERIFY_IS_NOT_NULL(distroKey.get());
@@ -4513,7 +4518,7 @@ localhostForwarding=true
             WslShutdown();
             VERIFY_ARE_EQUAL(
                 LxsstuLaunchWsl(std::format(L"--export {} \"{}\" --vhd", testDistro.DistroName, testDistroVhdPathExported.c_str())), 0u);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {}", testDistro.DistroName)), 0u);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {} --force", testDistro.DistroName)), 0u);
             VERIFY_IS_FALSE(std::filesystem::exists(testDistroVhdPath));
             VERIFY_IS_TRUE(service.EnumerateDistributions().empty());
 
@@ -4532,7 +4537,7 @@ localhostForwarding=true
 
             WslShutdown();
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--export {} \"{}\"", testDistro.DistroName, testDistroExported.c_str())), 0u);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {}", testDistro.DistroName)), 0u);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {} --force", testDistro.DistroName)), 0u);
             VERIFY_IS_FALSE(std::filesystem::exists(testDistroRootfsPath));
             VERIFY_IS_TRUE(service.EnumerateDistributions().empty());
             VERIFY_ARE_EQUAL(
@@ -4592,7 +4597,7 @@ localhostForwarding=true
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [tmpDistroName]() {
             DeleteFile(testTar);
-            LxsstuLaunchWsl(std::format(L"--unregister {}", tmpDistroName));
+            LxsstuLaunchWsl(std::format(L"--unregister {} --force", tmpDistroName));
         });
 
         DistroFileChange osRelease(L"/etc/os-release");
@@ -4664,7 +4669,7 @@ VERSION_ID="Invalid|Format"
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} echo -e 'VERSION_ID=v' > /etc/os-release", tmpDistroName).c_str()), 0L);
             validateFlavorVersion(tmpDistroName, L"", L"v");
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {}", tmpDistroName).c_str()), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {} --force", tmpDistroName).c_str()), 0L);
         }
 
         // Validate that importing and then converting also behaves correctly when there's no os-release
@@ -4679,7 +4684,7 @@ VERSION_ID="Invalid|Format"
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} echo -e 'VERSION_ID=v2' > /etc/os-release", tmpDistroName).c_str()), 0L);
             validateFlavorVersion(tmpDistroName, L"", L"v2");
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {}", tmpDistroName).c_str()), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {} --force", tmpDistroName).c_str()), 0L);
         }
 
         // Verify that importing a distribution with an os-release as then converting works as well
@@ -4832,7 +4837,7 @@ VERSION_ID="Invalid|Format"
 
             std::filesystem::create_directory(testDir);
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, testDistroName]() {
-                LxsstuLaunchWsl(std::format(L"--unregister {}", testDistroName));
+                LxsstuLaunchWsl(std::format(L"--unregister {} --force", testDistroName));
                 std::error_code error;
                 std::filesystem::remove_all(testDir, error);
             });
@@ -4868,7 +4873,7 @@ VERSION_ID="Invalid|Format"
             std::wstring{L"{1DB260CB-912D-432A-B898-518DFD0F374E}"});
 
         // Validate that installing a new distribution succeeds.
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(L"--unregister test_new_default"); });
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(L"--unregister test_new_default --force"); });
 
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(std::format(L"--install --from-file \"{}\" --no-launch --name test_new_default", g_testDistroPath)), 0L);
@@ -4939,7 +4944,7 @@ VERSION_ID="Invalid|Format"
         // Distribution with default name and icon
         {
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
-                LxsstuLaunchWsl(L"--unregister test-default-name");
+                LxsstuLaunchWsl(L"--unregister test-default-name --force");
                 DeleteFile(L"distro-default-name-icon.tar");
             });
 
@@ -4957,7 +4962,7 @@ VERSION_ID="Invalid|Format"
                 for (const auto& location : {currentDirectory, std::wstring(L".")})
                 {
                     auto cleanup = wil::scope_exit_log(
-                        WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"--unregister {}", distroName)); });
+                        WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"--unregister {} --force", distroName)); });
 
                     VERIFY_ARE_EQUAL(
                         LxsstuLaunchWsl(
@@ -5000,7 +5005,7 @@ VERSION_ID="Invalid|Format"
         // Distribution with default name and no icon
         {
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
-                LxsstuLaunchWsl(L"--unregister test-default-name");
+                LxsstuLaunchWsl(L"--unregister test-default-name --force");
                 DeleteFile(L"distro-default-name-no-icon.tar");
             });
 
@@ -5029,7 +5034,7 @@ VERSION_ID="Invalid|Format"
         // Distribution with no default name
         {
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
-                LxsstuLaunchWsl(L"--unregister test-distro-no-default-name");
+                LxsstuLaunchWsl(L"--unregister test-distro-no-default-name --force");
                 DeleteFile(L"distro-no-default-name.tar");
             });
 
@@ -5070,7 +5075,7 @@ VERSION_ID="Invalid|Format"
             constexpr auto distroName = L"distro-vhd-size";
             constexpr auto tarFileName = L"distro-vhd-size.tar";
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-                LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
+                LxsstuLaunchWsl(std::format(L"--unregister {} --force", distroName));
                 DeleteFile(tarFileName);
             });
 
@@ -5164,7 +5169,7 @@ VERSION_ID="Invalid|Format"
             const auto distroName = L"distro-import-in-place";
             const auto vhdName = L"distro-import-in-place.vhdx";
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-                LxsstuLaunchWsl(std::format(L"--unregister {}", distroName).c_str());
+                LxsstuLaunchWsl(std::format(L"--unregister {} --force", distroName).c_str());
                 DeleteFileW(vhdName);
             });
 
@@ -5198,7 +5203,7 @@ VERSION_ID="Invalid|Format"
         // Distribution with overridden default location
         {
             auto cleanup = wil::scope_exit_log(
-                WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(L"--unregister test-overridden-default-location"); });
+                WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(L"--unregister test-overridden-default-location --force"); });
 
             auto currentPath = std::filesystem::current_path();
             WslConfigChange wslconfig(std::format(L"[general]\ndistributionInstallPath = {}", EscapePath(currentPath.wstring())));
@@ -5230,7 +5235,8 @@ VERSION_ID="Invalid|Format"
         // Distribution installed in a custom location
 
         {
-            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(L"--unregister test-custom-location"); });
+            auto cleanup =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(L"--unregister test-custom-location --force"); });
 
             InstallFromTar(g_testDistroPath.c_str(), L"--name test-custom-location --location test-distro-folder");
             ValidateDistributionStarts(L"test-custom-location");
@@ -5258,7 +5264,8 @@ VERSION_ID="Invalid|Format"
         // Distribution installed from stdin
         {
 
-            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(L"--unregister test-install-stdin"); });
+            auto cleanup =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(L"--unregister test-install-stdin --force"); });
 
             wil::unique_handle importTar{
                 CreateFile(g_testDistroPath.c_str(), GENERIC_READ, 0, nullptr, OPEN_EXISTING, HANDLE_FLAG_INHERIT, nullptr)};
@@ -5322,7 +5329,7 @@ VERSION_ID="Invalid|Format"
         {
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
                 DeleteFile(L"big-icon.tar");
-                LxsstuLaunchWsl(L"--unregister big-icon");
+                LxsstuLaunchWsl(L"--unregister big-icon --force");
             });
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"fallocate /icon.ico -l 20MB"), 0L);
@@ -5361,7 +5368,7 @@ VERSION_ID="Invalid|Format"
         {
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
                 DeleteFile(L"icon-not-found.tar");
-                LxsstuLaunchWsl(L"--unregister icon-not-found");
+                LxsstuLaunchWsl(L"--unregister icon-not-found --force");
             });
 
             CreateTarFromManifest(L"[shortcut]\nicon = /does-not-exist.ico", L"icon-not-found.tar");
@@ -5395,7 +5402,7 @@ VERSION_ID="Invalid|Format"
 
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [distroName]() {
                 DeleteFile(tarName);
-                LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
+                LxsstuLaunchWsl(std::format(L"--unregister {} --force", distroName));
             });
 
             DistroFileChange profileTemplate(L"/terminal.json", false);
@@ -5437,7 +5444,7 @@ VERSION_ID="Invalid|Format"
 
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [distroName]() {
                 DeleteFile(tarName);
-                LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
+                LxsstuLaunchWsl(std::format(L"--unregister {} --force", distroName));
             });
 
             DistroFileChange profileTemplate(L"/terminal.json", false);
@@ -5465,7 +5472,7 @@ VERSION_ID="Invalid|Format"
 
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [distroName]() {
                 DeleteFile(tarName);
-                LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
+                LxsstuLaunchWsl(std::format(L"--unregister {} --force", distroName));
             });
 
             auto profileGuid = wsl::shared::string::GuidToString<wchar_t>(
@@ -5509,7 +5516,7 @@ VERSION_ID="Invalid|Format"
 
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [distroName]() {
                 DeleteFile(tarName);
-                LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
+                LxsstuLaunchWsl(std::format(L"--unregister {} --force", distroName));
             });
 
             CreateTarFromManifest(L"[windowsterminal]\nenabled = false", tarName);
@@ -5531,7 +5538,7 @@ VERSION_ID="Invalid|Format"
 
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [distroName]() {
                 DeleteFile(tarName);
-                LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
+                LxsstuLaunchWsl(std::format(L"--unregister {} --force", distroName));
             });
 
             CreateTarFromManifest(L"[shortcut]\nenabled = false", tarName);
@@ -5581,7 +5588,7 @@ VERSION_ID="Invalid|Format"
 
     static void UnregisterDistribution(LPCWSTR Name)
     {
-        LxsstuLaunchWsl(std::format(L"--unregister {}", Name));
+        LxsstuLaunchWsl(std::format(L"--unregister {} --force", Name));
     }
 
     TEST_METHOD(FileUrl)
@@ -5697,25 +5704,25 @@ VERSION_ID="Invalid|Format"
                     L"--list --online'.",
                     L"Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND"));
 
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister debian-12"), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister debian-12 --force"), 0L);
 
             // Verify that name matching is not case-sensitive on the version.
             ValidateInstall(L"Debian-12 --no-launch --name debian-12");
             ValidateDistributionStarts(L"debian-12");
 
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister debian-12"), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister debian-12 --force"), 0L);
 
             // Verify that name matching is not case-sensitive on the flavor.
             ValidateInstall(L"Debian --no-launch --name debian-12");
             ValidateDistributionStarts(L"debian-12");
 
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister debian-12"), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister debian-12 --force"), 0L);
 
             // Validate an install with a vhd size.
             ValidateInstall(L"Debian --no-launch --name debian-12 --vhd-size 1GB");
             ValidateDistributionStarts(L"debian-12");
 
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister debian-12"), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister debian-12 --force"), 0L);
 
             // Validate an install with a vhd size and fixed vhd.
             ValidateInstall(L"Debian --no-launch --name debian-12 --vhd-size 1GB --fixed-vhd");
@@ -6366,7 +6373,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
             DeleteFile(tarName);
 
-            LxsstuLaunchWsl(L"--unregister end2end");
+            LxsstuLaunchWsl(L"--unregister end2end --force");
         });
 
         wil::unique_handle tarHandle{CreateFile(tarName, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr)};
@@ -6465,7 +6472,8 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         };
 
         auto importAndTest = [&version](LPCWSTR FileName) {
-            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [FileName]() { LxsstuLaunchWsl(L"--unregister test-format"); });
+            auto cleanup =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [FileName]() { LxsstuLaunchWsl(L"--unregister test-format --force"); });
             LxsstuLaunchWsl(std::format(L"--install --no-launch --from-file {} --name test-format --version {}", FileName, version));
 
             auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"-d test-format echo OK");
@@ -7122,7 +7130,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         // Validate that tars containing /etc, but not /bin/sh are accepted.
         if (LxsstuVmMode())
         {
-            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(L"--unregister empty-distro"); });
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(L"--unregister empty-distro --force"); });
 
             DistroFileChange conf(L"/etc/wsl.conf", false);
             conf.SetContent(L"");
@@ -7137,7 +7145,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
     {
         constexpr auto test_distro = L"import-test-distro";
         auto cleanup = wil::scope_exit_log(
-            WI_DIAGNOSTICS_INFO, [test_distro]() { LxsstuLaunchWsl(std::format(L"--unregister {}", test_distro)); });
+            WI_DIAGNOSTICS_INFO, [test_distro]() { LxsstuLaunchWsl(std::format(L"--unregister {} --force", test_distro)); });
 
         // The below logline makes it easier to find the bsdtar output when debugging this test case.
         fprintf(stderr, "Starting ImportExportStdout test case\n");
@@ -7192,10 +7200,112 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, L"State", LxssDistributionStateInstalled);
         wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, L"Flags", LXSS_DISTRO_FLAGS_VM_MODE);
 
-        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"--unregister DummyBrokenDistro");
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"--unregister DummyBrokenDistro --force");
 
         VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
         VERIFY_ARE_EQUAL(err, L"");
+    }
+
+    TEST_METHOD(UnregisterConfirmation)
+    {
+        namespace registry = wsl::windows::common::registry;
+        using wsl::windows::common::SubProcess;
+
+        GUID id{};
+        VERIFY_SUCCEEDED(CoCreateGuid(&id));
+        const auto keyName = wsl::shared::string::GuidToString<wchar_t>(id);
+        const auto distroName = std::format(L"unregister-test-{}", keyName);
+        const auto basePath = std::filesystem::temp_directory_path() / distroName;
+        VERIFY_IS_FALSE(std::filesystem::exists(basePath));
+        const auto userKey = registry::OpenLxssUserKey();
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { registry::DeleteKey(userKey.get(), keyName.c_str()); });
+
+        // A registration with a missing BasePath exercises the command without risking a real distribution's files.
+        auto registerDistro = [&] {
+            const auto distroKey = registry::CreateKey(userKey.get(), keyName.c_str());
+            registry::WriteString(distroKey.get(), nullptr, L"BasePath", basePath.c_str());
+            registry::WriteString(distroKey.get(), nullptr, L"DistributionName", distroName.c_str());
+            registry::WriteDword(distroKey.get(), nullptr, L"DefaultUid", 0);
+            registry::WriteDword(distroKey.get(), nullptr, L"Version", LXSS_DISTRO_VERSION_2);
+            registry::WriteDword(distroKey.get(), nullptr, L"State", LxssDistributionStateInstalled);
+            registry::WriteDword(distroKey.get(), nullptr, L"Flags", LXSS_DISTRO_FLAGS_VM_MODE);
+        };
+
+        registerDistro();
+        const auto command = std::format(L"--unregister \"{}\"", distroName);
+
+        for (const auto arguments : {L"--unregister", L"--unregister --force", L"--unregister \"\" --force"})
+        {
+            LxsstuLaunchWslAndCaptureOutput(arguments, -1);
+            VERIFY_IS_TRUE(GetDistributionId(distroName.c_str()).has_value());
+        }
+
+        // Redirected input must not confirm deletion, even if it contains an affirmative answer.
+        for (const auto answer : {"", "y\n", "yes\n"})
+        {
+            auto [read, write] = CreateSubprocessPipe(true, false);
+            DWORD written{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(write.get(), answer, static_cast<DWORD>(strlen(answer)), &written, nullptr));
+            write.reset();
+            SubProcess process(nullptr, LxssGenerateWslCommandLine(command.c_str()).c_str());
+            process.SetStdHandles(read.get(), nullptr, nullptr);
+            const auto output = process.RunAndCaptureOutput(30000);
+            VERIFY_ARE_EQUAL(output.ExitCode, static_cast<DWORD>(ERROR_CANCELLED));
+            VERIFY_IS_TRUE(output.Stderr.find(L"permanently delete") != std::wstring::npos);
+            VERIFY_IS_TRUE(output.Stderr.find(L"--force") != std::wstring::npos);
+            VERIFY_IS_TRUE(GetDistributionId(distroName.c_str()).has_value());
+        }
+
+        for (const auto suffix : {L" --froce", L" --force unexpected"})
+        {
+            LxsstuLaunchWslAndCaptureOutput(command + suffix, -1);
+            VERIFY_IS_TRUE(GetDistributionId(distroName.c_str()).has_value());
+        }
+
+        auto runInteractive = [&](std::string_view answer) {
+            auto [inputRead, inputWrite] = CreateSubprocessPipe(false, false);
+            auto [outputRead, outputWrite] = CreateSubprocessPipe(false, false);
+            wsl::windows::common::helpers::unique_pseudo_console console;
+            VERIFY_SUCCEEDED(CreatePseudoConsole(COORD{120, 30}, inputRead.get(), outputWrite.get(), 0, console.put()));
+            inputRead.reset();
+            outputWrite.reset();
+
+            auto output = std::async(std::launch::async, [&] { return ReadToString(outputRead.get()); });
+            auto closeConsole = wil::scope_exit([&] { console.reset(); });
+            SubProcess process(nullptr, LxssGenerateWslCommandLine(command.c_str()).c_str());
+            process.SetPseudoConsole(console.get());
+            const auto handle = process.Start();
+            auto stopProcess = wil::scope_exit([&] {
+                if (WaitForSingleObject(handle.get(), 0) == WAIT_TIMEOUT)
+                {
+                    LOG_IF_WIN32_BOOL_FALSE(TerminateProcess(handle.get(), 1));
+                }
+            });
+
+            DWORD written{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(inputWrite.get(), answer.data(), static_cast<DWORD>(answer.size()), &written, nullptr));
+            VERIFY_ARE_EQUAL(written, answer.size());
+            const auto exitCode = SubProcess::GetExitCode(handle.get(), 30000);
+            console.reset();
+            VERIFY_IS_TRUE(output.get().find("permanently delete") != std::string::npos);
+            return exitCode;
+        };
+
+        for (const auto answer : {"\r", "n\r", "no\r", "yesterday\r"})
+        {
+            VERIFY_ARE_EQUAL(runInteractive(answer), static_cast<DWORD>(ERROR_CANCELLED));
+            VERIFY_IS_TRUE(GetDistributionId(distroName.c_str()).has_value());
+        }
+
+        for (const auto answer : {"y\r", "YES\r"})
+        {
+            VERIFY_ARE_EQUAL(runInteractive(answer), 0u);
+            VERIFY_IS_FALSE(GetDistributionId(distroName.c_str()).has_value());
+            registerDistro();
+        }
+
+        LxsstuLaunchWslAndCaptureOutput(command + L" --force");
+        VERIFY_IS_FALSE(GetDistributionId(distroName.c_str()).has_value());
     }
 
     // Validate that calling the binfmt interpreter with tty fd's but not controlling terminal doesn't display a warning.
@@ -7273,7 +7383,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             LOG_IF_WIN32_BOOL_FALSE(DeleteFile(vhdPath));
             LOG_IF_WIN32_BOOL_FALSE(DeleteFile(vhdxPath));
             LOG_IF_WIN32_BOOL_FALSE(DeleteFile(exportedVhdPath));
-            LxsstuLaunchWsl(std::format(L"--unregister {}", newDistroName));
+            LxsstuLaunchWsl(std::format(L"--unregister {} --force", newDistroName));
         });
 
         // Attempt to export the distribution to a .vhd (should fail).
@@ -8016,11 +8126,11 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
 
         // Ensure no stale state from a previous run.
         LxsstuLaunchWsl(std::format(L"--terminate {}", secondDistroName));
-        LxsstuLaunchWsl(std::format(L"--unregister {}", secondDistroName));
+        LxsstuLaunchWsl(std::format(L"--unregister {} --force", secondDistroName));
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
             LxsstuLaunchWsl(std::format(L"--terminate {}", secondDistroName));
-            LxsstuLaunchWsl(std::format(L"--unregister {}", secondDistroName));
+            LxsstuLaunchWsl(std::format(L"--unregister {} --force", secondDistroName));
         });
 
         // Import the second distro.

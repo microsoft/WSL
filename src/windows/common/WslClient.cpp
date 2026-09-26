@@ -18,6 +18,7 @@ Abstract:
 #include "HandleConsoleProgressBar.h"
 #include "Distribution.h"
 #include "CommandLine.h"
+#include "InputChannel.h"
 #include <conio.h>
 #include "WslCoreFilesystem.h"
 
@@ -1251,15 +1252,59 @@ int Unmount(_In_ const std::wstring& arg)
     return 0;
 }
 
-int UnregisterDistribution(_In_ LPCWSTR distributionName)
+int UnregisterDistribution(_In_ LPCWSTR distributionName, bool force)
 {
-    auto progress = wsl::windows::common::ConsoleProgressIndicator(wsl::shared::Localization::MessageStatusUnregistering(), true);
     wsl::windows::common::SvcComm service;
     const GUID distroGuid = service.GetDistributionId(distributionName, LXSS_GET_DISTRO_ID_LIST_ALL);
+
+    if (!force)
+    {
+        wsl::windows::common::wslutil::PrintMessage(Localization::MessageUnregisterWarning(distributionName), stderr);
+        wsl::windows::wslc::cli::InputChannel input{GetStdHandle(STD_INPUT_HANDLE), stdin};
+        if (!input.IsInteractive())
+        {
+            wsl::windows::common::wslutil::PrintMessage(Localization::MessageUnregisterRequiresForce(WSL_UNREGISTER_OPTION_FORCE), stderr);
+            return ERROR_CANCELLED;
+        }
+
+        wsl::windows::common::wslutil::PrintMessage(Localization::MessageUnregisterConfirmation(), stderr);
+        fflush(stderr);
+        const auto answer = input.ReadLine(false);
+        if (!answer || ferror(stdin))
+        {
+            return ERROR_CANCELLED;
+        }
+
+        const auto trimmed = wsl::shared::string::TrimAscii(std::wstring_view{*answer});
+        if (!wsl::shared::string::IsEqual(trimmed, L"y", true) && !wsl::shared::string::IsEqual(trimmed, L"yes", true))
+        {
+            return ERROR_CANCELLED;
+        }
+    }
+
+    auto progress = wsl::windows::common::ConsoleProgressIndicator(wsl::shared::Localization::MessageStatusUnregistering(), true);
     service.UnregisterDistribution(&distroGuid);
     progress.End();
     wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
     return 0;
+}
+
+int Unregister(_In_ std::wstring_view commandLine)
+{
+    std::wstring distributionName;
+    bool force = false;
+    ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
+    parser.AddPositionalArgument(distributionName, 0);
+    parser.AddArgument(force, WSL_UNREGISTER_OPTION_FORCE);
+    parser.Parse();
+
+    if (distributionName.empty())
+    {
+        wsl::windows::common::wslutil::PrintMessage(Localization::MessageRequiredParameterMissing(WSL_UNREGISTER_ARG), stdout);
+        return -1;
+    }
+
+    return UnregisterDistribution(distributionName.c_str(), force);
 }
 
 int UpdatePackage(std::wstring_view commandLine)
@@ -1369,7 +1414,7 @@ int WslconfigMain(_In_ int argc, _In_reads_(argc) LPWSTR* argv)
     }
     else if ((argc >= 3) && ((IsEqual(argv[1], WSLCONFIG_COMMAND_UNREGISTER_DISTRIBUTION, true)) || (IsEqual(argv[1], WSLCONFIG_COMMAND_UNREGISTER_DISTRIBUTION_SHORT, true))))
     {
-        exitCode = UnregisterDistribution(argv[2]);
+        exitCode = UnregisterDistribution(argv[2], true);
     }
     else
     {
@@ -1718,15 +1763,7 @@ int WslMain(_In_ std::wstring_view commandLine)
         }
         else if (argument == WSL_UNREGISTER_ARG)
         {
-            commandLine = wsl::windows::common::helpers::ConsumeArgument(commandLine, argument);
-            argument = wsl::windows::common::helpers::ParseArgument(commandLine);
-            if (argument.empty())
-            {
-                wsl::windows::common::wslutil::PrintMessage(Localization::MessageRequiredParameterMissing(WSL_UNREGISTER_ARG), stdout);
-                return exitCode;
-            }
-
-            return UnregisterDistribution(std::wstring(argument).c_str());
+            return Unregister(commandLine);
         }
         else if (argument == WSL_SET_DEFAULT_VERSION_ARG)
         {
