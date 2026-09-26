@@ -85,6 +85,9 @@ private:
     std::shared_ptr<VmGuestListenerState> ConfigureGuestListener(const VmGuestListener& Listener) override;
 
     _Requires_lock_held_(m_lock)
+    void CloseFileSystemDevicesLocked() noexcept;
+
+    _Requires_lock_held_(m_lock)
     std::uint32_t ReserveLunLocked(const std::optional<VmScsiPlacement>& Placement) const;
 
     _Requires_lock_held_(m_lock)

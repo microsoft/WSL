@@ -68,6 +68,19 @@ class HcsVirtualMachineBackendTests
 {
     WSL_TEST_CLASS(HcsVirtualMachineBackendTests)
 
+    TEST_METHOD(FileSystemRequestsDefaultToVirtioFs)
+    {
+        const VmFileSystemDeviceRequest device;
+        VERIFY_IS_TRUE(std::holds_alternative<VmVirtioFsDevice>(device.Transport));
+        VERIFY_ARE_EQUAL(VmVirtioFsLayout::Aggregate, std::get<VmVirtioFsDevice>(device.Transport).Layout);
+        const VmFileSystemShareRequest share;
+        VERIFY_IS_TRUE(std::holds_alternative<VmVirtioFsShareOptions>(share.Options));
+        VERIFY_IS_TRUE(std::get<VmVirtioFsShareOptions>(share.Options).MountOptions.empty());
+        VERIFY_IS_TRUE(share.ReadOnly);
+        const VmFileSystemShare result;
+        VERIFY_IS_TRUE(std::holds_alternative<VmVirtioFsShareAddress>(result.GuestAddress));
+    }
+
     TEST_METHOD(PreservesCallerIdentityAndBootInputs)
     {
         SKIP_TEST_ARM64();

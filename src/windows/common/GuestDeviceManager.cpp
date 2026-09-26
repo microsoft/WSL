@@ -98,6 +98,11 @@ void GuestDeviceManager::AddRemoteFileSystem(_In_ REFCLSID clsid, _In_ PCWSTR ta
     m_deviceHostSupport->AddRemoteFileSystem(clsid, tag, server);
 }
 
+void GuestDeviceManager::RemoveRemoteFileSystem(_In_ REFCLSID clsid, _In_ std::wstring_view tag) noexcept
+{
+    m_deviceHostSupport->RemoveRemoteFileSystem(clsid, tag);
+}
+
 void GuestDeviceManager::AddSharedMemoryDevice(_In_ PCWSTR Tag, _In_ PCWSTR Path, _In_ UINT32 SizeMb, _In_ HANDLE UserToken)
 {
     auto guestDeviceLock = m_lock.lock_exclusive();

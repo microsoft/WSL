@@ -143,30 +143,11 @@ HcsVirtualMachineBackend::HcsVirtualMachineBackend() = default;
 
 HcsVirtualMachineBackend::~HcsVirtualMachineBackend() noexcept
 {
-    std::vector<wil::com_ptr<IPlan9FileSystem>> plan9Servers;
-    {
-        auto lock = m_lock.lock_exclusive();
-        for (const auto& entry : m_fileSystemDevices)
-        {
-            if (std::holds_alternative<VmPlan9SocketDevice>(entry.second.Transport) && entry.second.Plan9Server)
-            {
-                plan9Servers.emplace_back(entry.second.Plan9Server);
-            }
-        }
-
-        // Device hosts must be shut down before the compute system is closed.
-        m_guestDeviceManager.reset();
-    }
-
-    for (const auto& server : plan9Servers)
-    {
-        LOG_IF_FAILED(server->Teardown());
-    }
-
     schema::unique_hcs_system system;
     std::map<std::uint64_t, AttachedDisk> attachedDisks;
     {
         auto lock = m_lock.lock_exclusive();
+        CloseFileSystemDevicesLocked();
         system = std::move(m_system);
         attachedDisks = std::move(m_attachedDisks);
         CloseGuestListenersLocked(m_configuration.Description.Identity);
@@ -305,6 +286,7 @@ void HcsVirtualMachineBackend::Terminate()
     {
         auto lock = m_lock.lock_exclusive();
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
+        CloseFileSystemDevicesLocked();
         system = std::move(m_system);
         attachedDisks = std::move(m_attachedDisks);
         CloseGuestListenersLocked(m_configuration.Description.Identity);
@@ -596,6 +578,22 @@ void HcsVirtualMachineBackend::DetachDisk(VmDiskId Disk)
     m_attachedDisks.erase(disk);
 }
 
+_Requires_lock_held_(m_lock)
+void HcsVirtualMachineBackend::CloseFileSystemDevicesLocked() noexcept
+{
+    for (const auto& entry : m_fileSystemDevices)
+    {
+        if (entry.second.Plan9Server)
+        {
+            LOG_IF_FAILED(entry.second.Plan9Server->Teardown());
+        }
+    }
+
+    // Device hosts must be shut down while the compute system and callback context still exist.
+    m_guestDeviceManager.reset();
+    m_fileSystemDevices.clear();
+}
+
 VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request)
 {
     const auto tag = std::visit(
@@ -647,13 +645,17 @@ VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFile
     std::wstring mountOptions;
     wil::com_ptr<IPlan9FileSystem> plan9Server;
     std::optional<GUID> guestInstanceId;
-    const auto plan9Socket = std::holds_alternative<VmPlan9SocketDevice>(Request.Transport);
+    std::optional<GUID> registeredFileSystemClassId;
     auto removeOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
         if (guestInstanceId.has_value())
         {
             m_guestDeviceManager->RemoveGuestDevice(guestInstanceId.value());
         }
-        if (plan9Socket && plan9Server)
+        if (registeredFileSystemClassId.has_value())
+        {
+            m_guestDeviceManager->RemoveRemoteFileSystem(registeredFileSystemClassId.value(), tag);
+        }
+        if (plan9Server)
         {
             LOG_IF_FAILED(plan9Server->Teardown());
         }
@@ -683,6 +685,7 @@ VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFile
                 THROW_HR_IF(E_UNEXPECTED, !plan9Server);
 
                 m_guestDeviceManager->AddRemoteFileSystem(transport.FileSystemClassId, transport.Tag.c_str(), plan9Server);
+                registeredFileSystemClassId = transport.FileSystemClassId;
                 guestInstanceId = m_guestDeviceManager->AddNewDevice(transport.DeviceType, plan9Server, transport.Tag.c_str());
                 device.State = VmFileSystemDeviceState::Serving;
             }

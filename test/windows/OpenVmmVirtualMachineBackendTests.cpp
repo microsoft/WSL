@@ -200,11 +200,14 @@ class OpenVmmVirtualMachineBackendTests
         auto removeShareDirectory = wil::scope_exit([&] { LOG_IF_WIN32_BOOL_FALSE(RemoveDirectoryW(sharePath.c_str())); });
 
         auto backend = OpenVmmVirtualMachineBackend::Create(request);
-        VmFileSystemDeviceRequest fileSystemRequest{{L"test-share", VmVirtioFsLayout::Aggregate}};
+        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->CreateFileSystemDevice({VmPlan9SocketDevice{{50000}}}); }));
+        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->CreateFileSystemDevice({VmPlan9VirtioDevice{L"plan9"}}); }));
+        VmFileSystemDeviceRequest fileSystemRequest{VmVirtioFsDevice{L"test-share", VmVirtioFsLayout::Aggregate}};
         VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->CreateFileSystemDevice(fileSystemRequest); }));
         auto& fileSystemTransport = std::get<VmVirtioFsDevice>(fileSystemRequest.Transport);
         fileSystemTransport.Layout = VmVirtioFsLayout::SingleShare;
         const auto fileSystemDevice = backend->CreateFileSystemDevice(fileSystemRequest);
+        VERIFY_ARE_EQUAL(UINT64{1}, fileSystemDevice.Id.Value);
         VERIFY_IS_TRUE(IsEqualGUID(request.Identity.VmId, fileSystemDevice.Id.Owner.VmId));
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Prepared, fileSystemDevice.State);
         VERIFY_ARE_EQUAL(
