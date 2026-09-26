@@ -473,14 +473,15 @@ class WSLCCLIExecutionUnitTests
             context.ApplyTerminalOptions();
             VERIFY_IS_FALSE(context.Terminal.IsNoColor());
 
-            VERIFY_THROWS_SPECIFIC(context.Args.Add<ArgType::NoColor>(true), wil::ResultException, [](const wil::ResultException& e) {
-                return e.GetErrorCode() == E_ILLEGAL_METHOD_CALL;
-            });
+            VERIFY_THROWS_SPECIFIC(
+                context.Args.Add<ArgType::NoColor>(true, Source::CommandLine), wil::ResultException, [](const wil::ResultException& e) {
+                    return e.GetErrorCode() == E_ILLEGAL_METHOD_CALL;
+                });
         }
 
         {
             CLIExecutionContext present;
-            present.Args.Add<ArgType::NoColor>(true);
+            present.Args.Add<ArgType::NoColor>(true, Source::CommandLine);
             present.ApplyTerminalOptions();
             VERIFY_IS_TRUE(present.Terminal.IsNoColor());
 
@@ -942,7 +943,7 @@ class WSLCCLIExecutionUnitTests
     TEST_METHOD(SetContainerOptionsFromArgs_WithWorkDir_SetsWorkingDirectory)
     {
         CLIExecutionContext context;
-        context.Args.Add<ArgType::WorkDir>(std::wstring{L"/app"});
+        context.Args.Add<ArgType::WorkDir>(std::wstring{L"/app"}, Source::CommandLine);
 
         wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
 
