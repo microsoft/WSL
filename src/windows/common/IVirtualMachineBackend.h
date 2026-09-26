@@ -16,6 +16,7 @@ Abstract:
 
 #include <winsock2.h>
 #include <windows.h>
+#include <windowsdefs.h>
 #include <wil/resource.h>
 #include <array>
 #include <bitset>
@@ -405,15 +406,49 @@ enum class VmVirtioFsLayout
     Aggregate
 };
 
+// The guest identifies a virtio-fs device by its tag, which cannot exceed the length of a GUID
+// without braces.
+constexpr std::size_t c_maxVirtioFsTagLength = 36;
+
+struct VmVirtioFsShareOptions
+{
+    std::map<std::wstring, std::wstring> MountOptions;
+};
+
 struct VmVirtioFsDevice
 {
     std::wstring Tag;
     VmVirtioFsLayout Layout = VmVirtioFsLayout::Aggregate;
+    // Mount options applied to the device itself. Shares of an aggregate device carry their own
+    // options; a single-share device inherits the options of the share that it serves.
+    VmVirtioFsShareOptions Options;
 };
+
+enum class VmPlan9Transport
+{
+    Socket,
+    Virtio
+};
+
+using VmPlan9ServerFactory = std::function<wil::com_ptr<IPlan9FileSystem>(HANDLE UserToken)>;
+
+struct VmPlan9Device
+{
+    std::wstring Tag;
+    VmPlan9Transport Transport = VmPlan9Transport::Socket;
+    std::uint32_t Port = 0;
+    // Used to register a virtio server with the guest device host.
+    GUID FileSystemClassId{};
+    // Used to create the initial virtio device for the server.
+    GUID DeviceType{};
+    VmPlan9ServerFactory ServerFactory;
+};
+
+using VmFileSystemDeviceTransport = std::variant<VmVirtioFsDevice, VmPlan9Device>;
 
 struct VmFileSystemDeviceRequest
 {
-    VmVirtioFsDevice Transport;
+    VmFileSystemDeviceTransport Transport;
 };
 
 enum class VmFileSystemDeviceState
@@ -427,11 +462,9 @@ struct VmFileSystemDevice
 {
     VmDeviceId Id;
     VmFileSystemDeviceState State = VmFileSystemDeviceState::Prepared;
-};
-
-struct VmVirtioFsShareOptions
-{
-    std::map<std::wstring, std::wstring> MountOptions;
+    // Set once the device exists in the VM. Backends that create the device when its first share is
+    // added report a prepared device without a guest instance id.
+    std::optional<GUID> GuestInstanceId;
 };
 
 struct VmFileSystemShareRequest

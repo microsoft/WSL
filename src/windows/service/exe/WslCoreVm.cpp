@@ -2809,23 +2809,7 @@ WslCoreVm::VirtioFsShare::VirtioFsShare(PCWSTR Path, PCWSTR Options, bool Admin)
 
 std::wstring WslCoreVm::VirtioFsShare::OptionsString() const
 {
-    std::wstring optionsString;
-    for (const auto& option : Options)
-    {
-        if (!optionsString.empty())
-        {
-            optionsString += L';';
-        }
-
-        optionsString += option.first;
-        if (!option.second.empty())
-        {
-            optionsString += L'=';
-            optionsString += option.second;
-        }
-    }
-
-    return optionsString;
+    return FormatVirtioFsMountOptions(Options);
 }
 
 bool WslCoreVm::VirtioFsShare::operator<(const VirtioFsShare& other) const

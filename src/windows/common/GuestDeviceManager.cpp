@@ -3,6 +3,28 @@
 #include "precomp.h"
 #include "GuestDeviceManager.h"
 #include "DeviceHostProxy.h"
+#include "IVirtualMachineBackend.h"
+
+std::wstring FormatVirtioFsMountOptions(_In_ const std::map<std::wstring, std::wstring>& Options)
+{
+    std::wstring optionsString;
+    for (const auto& option : Options)
+    {
+        if (!optionsString.empty())
+        {
+            optionsString += L';';
+        }
+
+        optionsString += option.first;
+        if (!option.second.empty())
+        {
+            optionsString += L'=';
+            optionsString += option.second;
+        }
+    }
+
+    return optionsString;
+}
 
 GuestDeviceManager::GuestDeviceManager(_In_ const std::wstring& machineId, _In_ const GUID& runtimeId, bool EnableTelemetry) :
     m_machineId(machineId), m_deviceHostSupport(wil::MakeOrThrow<DeviceHostProxy>(machineId, runtimeId, EnableTelemetry))

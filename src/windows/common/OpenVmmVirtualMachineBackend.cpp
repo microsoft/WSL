@@ -685,14 +685,15 @@ void OpenVmmVirtualMachineBackend::DetachDisk(VmDiskId Disk)
 
 VmFileSystemDevice OpenVmmVirtualMachineBackend::CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request)
 {
+    const auto* transport = std::get_if<VmVirtioFsDevice>(&Request.Transport);
     WSL_LOG(
         "OpenVmmCreateFileSystemDeviceBegin",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
-        TraceLoggingValue(Request.Transport.Tag.c_str(), "tag"),
-        TraceLoggingValue(static_cast<UINT32>(Request.Transport.Layout), "layout"));
+        TraceLoggingValue(transport ? transport->Tag.c_str() : L"", "tag"));
+    THROW_HR_IF(c_notSupported, !transport);
     THROW_HR_IF_MSG(
         c_notSupported,
-        Request.Transport.Layout != VmVirtioFsLayout::SingleShare,
+        transport->Layout != VmVirtioFsLayout::SingleShare,
         "OpenVMM currently supports only single-share virtio-fs devices");
 
     auto lock = m_lock.lock_exclusive();
@@ -700,19 +701,18 @@ VmFileSystemDevice OpenVmmVirtualMachineBackend::CreateFileSystemDevice(const Vm
     THROW_HR_IF(E_BOUNDS, m_nextDeviceId == UINT64_MAX);
     for (const auto& entry : m_fileSystemDevices)
     {
-        THROW_HR_IF(
-            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), wsl::shared::string::IsEqual(entry.second.Transport.Tag, Request.Transport.Tag, false));
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), wsl::shared::string::IsEqual(entry.second.Transport.Tag, transport->Tag, false));
     }
 
     VmFileSystemDevice device{{m_description.Identity, m_nextDeviceId}, VmFileSystemDeviceState::Prepared};
-    const auto inserted = m_fileSystemDevices.emplace(device.Id.Value, FileSystemDevice{device, Request.Transport, {}}).second;
+    const auto inserted = m_fileSystemDevices.emplace(device.Id.Value, FileSystemDevice{device, *transport, {}}).second;
     WI_ASSERT(inserted);
     ++m_nextDeviceId;
     WSL_LOG(
         "OpenVmmCreateFileSystemDeviceEnd",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
         TraceLoggingValue(device.Id.Value, "deviceId"),
-        TraceLoggingValue(Request.Transport.Tag.c_str(), "tag"));
+        TraceLoggingValue(transport->Tag.c_str(), "tag"));
     return device;
 }
 

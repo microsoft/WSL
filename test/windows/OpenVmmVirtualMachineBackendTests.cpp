@@ -97,9 +97,7 @@ class OpenVmmVirtualMachineBackendTests
         auto highestPlacementRequest = CreateRequest();
         highestPlacementRequest.BootDisks.push_back(CreateDisk(L"highest"));
         highestPlacementRequest.BootDisks[0].Disk.Placement = VmScsiPlacement{{0, 253}};
-        VERIFY_ARE_EQUAL(
-            UINT32{253}, ValidateCreateRequest(highestPlacementRequest).BootDisks.at(L"highest").GuestAddress.Lun);
-
+        VERIFY_ARE_EQUAL(UINT32{253}, ValidateCreateRequest(highestPlacementRequest).BootDisks.at(L"highest").GuestAddress.Lun);
     }
 
     TEST_METHOD(DescribesCreationTimeNetworking)
@@ -122,7 +120,6 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(adapter.Id.Value, other.Id.Value);
         VERIFY_IS_FALSE(IsEqualGUID(adapter.Id.Owner.VmId, other.Id.Owner.VmId));
         VERIFY_IS_FALSE(IsEqualGUID(adapter.GuestInstanceId.value(), other.GuestInstanceId.value()));
-
     }
 
     TEST_METHOD(EnforcesDiskLimitsAndKeepsIdsVmScoped)
@@ -205,7 +202,8 @@ class OpenVmmVirtualMachineBackendTests
         auto backend = OpenVmmVirtualMachineBackend::Create(request);
         VmFileSystemDeviceRequest fileSystemRequest{{L"test-share", VmVirtioFsLayout::Aggregate}};
         VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->CreateFileSystemDevice(fileSystemRequest); }));
-        fileSystemRequest.Transport.Layout = VmVirtioFsLayout::SingleShare;
+        auto& fileSystemTransport = std::get<VmVirtioFsDevice>(fileSystemRequest.Transport);
+        fileSystemTransport.Layout = VmVirtioFsLayout::SingleShare;
         const auto fileSystemDevice = backend->CreateFileSystemDevice(fileSystemRequest);
         VERIFY_IS_TRUE(IsEqualGUID(request.Identity.VmId, fileSystemDevice.Id.Owner.VmId));
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Prepared, fileSystemDevice.State);
@@ -220,7 +218,7 @@ class OpenVmmVirtualMachineBackendTests
         const auto share = backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest);
         VERIFY_IS_TRUE(IsEqualGUID(request.Identity.VmId, share.Id.Owner.VmId));
         VERIFY_ARE_EQUAL(fileSystemDevice.Id.Value, share.Device.Value);
-        VERIFY_ARE_EQUAL(fileSystemRequest.Transport.Tag, share.GuestAddress.Tag);
+        VERIFY_ARE_EQUAL(fileSystemTransport.Tag, share.GuestAddress.Tag);
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] {
                              backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest);
                          }));
