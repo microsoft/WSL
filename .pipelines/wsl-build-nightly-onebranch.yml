@@ -47,6 +47,8 @@ extends:
         vsoOrg: microsoft
         vsoProject: Microsoft.WSL
 
+    - template: fuzzing-stage.yml@self
+
     - template: test-stage.yml@self
       parameters:
         rs_prerelease_only: false
