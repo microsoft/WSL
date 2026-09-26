@@ -1696,7 +1696,7 @@ std::optional<std::string> WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRe
             return;
         }
 
-        auto parsed = shared::FromJson<docker_schema::ImageLoadResult>(std::string(buffer.begin(), buffer.end()).c_str());
+        auto parsed = shared::FromJson<docker_schema::ImageLoadResult>(buffer.begin(), buffer.end());
 
         if (parsed.errorDetail.has_value())
         {
