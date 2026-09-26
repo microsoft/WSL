@@ -425,12 +425,14 @@ class MountTests
     WSL2_TEST_METHOD(RelativePathUnmount)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
+        WslKeepAlive keepAlive;
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " TEST_MOUNT_VHD L" --vhd --bare"), (DWORD)0);
 
         const auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount " TEST_MOUNT_VHD), (DWORD)0);
+        VerifyNoVmAccessToVhd(TEST_MOUNT_VHD);
     }
 
     // Test relative mount/unmounting of a --vhd that does not exist

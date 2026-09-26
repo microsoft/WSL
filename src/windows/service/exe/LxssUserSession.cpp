@@ -1871,7 +1871,6 @@ CATCH_RETURN()
 HRESULT LxssUserSessionImpl::CompactDistribution(_In_ LPCGUID DistroGuid)
 try
 {
-    auto runAsUser = wil::CoImpersonateClient();
     std::filesystem::path vhdPath;
     LXSS_DISTRO_CONFIGURATION configuration{};
 
@@ -1912,6 +1911,7 @@ try
 
     auto compactionComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { _ConversionComplete(configuration.DistroId); });
 
+    auto runAsUser = wil::CoImpersonateClient();
     THROW_IF_FAILED_MSG(
         wil::ResultFromException([&] { wsl::core::filesystem::CompactVhd(vhdPath.c_str()); }),
         "Failed to compact VHD: %ls",

@@ -67,6 +67,30 @@ void wsl::core::filesystem::CreateVhd(_In_ LPCWSTR target, _In_ ULONGLONG maximu
     //      to the VHD because the operation is done while impersonating the user.
     auto sd = windows::common::security::CreateSecurityDescriptor(userSid);
 
+    // Explicitly grant access to the user and BUILTIN\Administrators.
+    // Administrator access preserves compatibility with older WSL versions that open VHDs as SYSTEM,
+    // whose token includes the Administrators group.
+    auto [administratorsSid, administratorsSidBuffer] =
+        windows::common::security::CreateSid(SECURITY_NT_AUTHORITY, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS);
+
+    EXPLICIT_ACCESS access[2]{};
+    access[0].grfAccessMode = SET_ACCESS;
+    access[0].grfAccessPermissions = FILE_ALL_ACCESS;
+    access[0].grfInheritance = NO_INHERITANCE;
+    BuildTrusteeWithSid(&access[0].Trustee, userSid);
+
+    access[1].grfAccessMode = SET_ACCESS;
+    access[1].grfAccessPermissions = FILE_ALL_ACCESS;
+    access[1].grfInheritance = NO_INHERITANCE;
+    BuildTrusteeWithSid(&access[1].Trustee, administratorsSid);
+
+    windows::common::security::unique_acl acl;
+    THROW_IF_WIN32_ERROR(SetEntriesInAcl(ARRAYSIZE(access), access, nullptr, &acl));
+    THROW_IF_WIN32_BOOL_FALSE(SetSecurityDescriptorDacl(&sd, true, acl.get(), false));
+
+    // Do not inherit permissions that could grant other users access to the VHD.
+    THROW_IF_WIN32_BOOL_FALSE(SetSecurityDescriptorControl(&sd, SE_DACL_PROTECTED, SE_DACL_PROTECTED));
+
     wil::unique_hfile vhd{};
     auto result = HRESULT_FROM_WIN32(
         ::CreateVirtualDisk(&storageType, target, VIRTUAL_DISK_ACCESS_NONE, &sd, flags, 0, &createVhdParameters, nullptr, &vhd));

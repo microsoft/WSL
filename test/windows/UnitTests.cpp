@@ -32,6 +32,7 @@ Abstract:
 #include <nlohmann/json.hpp>
 #include "Distribution.h"
 #include "WslCoreConfigInterface.h"
+#include "WslCoreFilesystem.h"
 #include "CommandLine.h"
 #include "retryshared.h"
 
@@ -1990,38 +1991,24 @@ Usage:
     WSL2_TEST_METHOD(TestExistingSwapVhd)
     {
         // Create a 100MB swap vhdx.
-        auto swapVhd = wil::GetCurrentDirectoryW<std::wstring>() + L"\\TestSwap.vhdx";
+        const auto swapVhd = wil::GetCurrentDirectoryW<std::wstring>() + L"\\TestSwap.vhdx";
 
-        VIRTUAL_STORAGE_TYPE storageType{};
-        storageType.DeviceId = VIRTUAL_STORAGE_TYPE_DEVICE_VHDX;
-        storageType.VendorId = VIRTUAL_STORAGE_TYPE_VENDOR_MICROSOFT;
-
-        CREATE_VIRTUAL_DISK_PARAMETERS createVhdParameters{};
-        createVhdParameters.Version = CREATE_VIRTUAL_DISK_VERSION_2;
-        createVhdParameters.Version2.BlockSizeInBytes = 1024 * 1024;
-        createVhdParameters.Version2.MaximumSize = 100 * 1024 * 1024;
-
-        wil::unique_hfile vhd{};
-        VERIFY_ARE_EQUAL(
-            ::CreateVirtualDisk(
-                &storageType, swapVhd.c_str(), VIRTUAL_DISK_ACCESS_NONE, nullptr, CREATE_VIRTUAL_DISK_FLAG_SUPPORT_COMPRESSED_VOLUMES, 0, &createVhdParameters, nullptr, &vhd),
-            0l);
-
-        vhd.reset();
+        const auto tokenUser = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
+        wsl::core::filesystem::CreateVhd(swapVhd.c_str(), 100 * _1MB, tokenUser->User.Sid, false, false);
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
             WslShutdown();
             DeleteFile(swapVhd.c_str());
         });
 
-        // Update .wslconfig. Update the swapVhd path to replace single backslash
+        // Update .wslconfig. Escape the swapVhd path to replace single backslash
         // with double backslashes so as to be compatible with .wslconfig parsing.
         // The following regex replacement only works as intended if the path contains
         // single backslashes. Negative lookahead can be used to handle paths with double
         // backslashes but then the negative lookbehind case should also be used but the
         // latter is not supported in std::regex.
-        swapVhd = std::regex_replace(swapVhd, std::wregex(L"\\\\"), L"\\\\");
-        WslConfigChange configChange(LxssGenerateTestConfig() + L"\nswap=256MB\nswapFile=" + swapVhd);
+        const auto escapedSwapVhd = std::regex_replace(swapVhd, std::wregex(L"\\\\"), L"\\\\");
+        WslConfigChange configChange(LxssGenerateTestConfig() + L"\nswap=256MB\nswapFile=" + escapedSwapVhd);
 
         auto validateSwapSize = [](LPCWSTR Expected) {
             auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"swapon | awk 'END {print $3}'");
@@ -2032,8 +2019,11 @@ Usage:
         validateSwapSize(L"256M");
 
         // Validate that the vhdx is resized correctly if the swap size changes
-        configChange.Update(LxssGenerateTestConfig() + L"\nswap=200MB\nswapFile=" + swapVhd);
+        configChange.Update(LxssGenerateTestConfig() + L"\nswap=200MB\nswapFile=" + escapedSwapVhd);
         validateSwapSize(L"200M");
+
+        WslShutdown();
+        VerifyNoVmAccessToVhd(swapVhd.c_str());
     }
 
     TEST_METHOD(InitDoesntBlockSignals)
@@ -3211,6 +3201,110 @@ Usage:
         }
     }
 
+    TEST_METHOD(CreateVhdPermissions)
+    {
+        const auto path = std::filesystem::path(L"wsl-test-vhd-permissions.vhdx");
+
+        const auto tokenUser = wil::get_token_information<TOKEN_USER>();
+        auto [administratorsSid, administratorsSidBuffer] =
+            wsl::windows::common::security::CreateSid(SECURITY_NT_AUTHORITY, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS);
+
+        for (const auto fixed : {false, true})
+        {
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove(path); });
+            wsl::core::filesystem::CreateVhd(path.c_str(), 16 * _1MB, tokenUser->User.Sid, false, fixed);
+
+            PSID owner{};
+            PACL dacl{};
+            wil::unique_hlocal descriptor;
+            THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
+                path.c_str(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION, &owner, nullptr, &dacl, nullptr, &descriptor));
+
+            VERIFY_IS_TRUE(EqualSid(owner, tokenUser->User.Sid));
+            VERIFY_IS_NOT_NULL(dacl);
+            VERIFY_ARE_EQUAL(2, dacl->AceCount);
+
+            SECURITY_DESCRIPTOR_CONTROL control{};
+            DWORD revision{};
+            THROW_IF_WIN32_BOOL_FALSE(GetSecurityDescriptorControl(descriptor.get(), &control, &revision));
+            VERIFY_IS_TRUE(WI_IsFlagSet(control, SE_DACL_PROTECTED));
+
+            bool foundUser = false;
+            bool foundAdministrators = false;
+            for (DWORD index = 0; index < dacl->AceCount; ++index)
+            {
+                void* ace{};
+                THROW_IF_WIN32_BOOL_FALSE(GetAce(dacl, index, &ace));
+                auto* allowed = static_cast<ACCESS_ALLOWED_ACE*>(ace);
+                VERIFY_ARE_EQUAL(ACCESS_ALLOWED_ACE_TYPE, allowed->Header.AceType);
+                VERIFY_ARE_EQUAL(0, allowed->Header.AceFlags);
+                VERIFY_ARE_EQUAL(FILE_ALL_ACCESS, allowed->Mask);
+                if (EqualSid(&allowed->SidStart, tokenUser->User.Sid))
+                {
+                    foundUser = true;
+                }
+                else
+                {
+                    VERIFY_IS_TRUE(EqualSid(&allowed->SidStart, administratorsSid));
+                    foundAdministrators = true;
+                }
+            }
+
+            VERIFY_IS_TRUE(foundUser);
+            VERIFY_IS_TRUE(foundAdministrators);
+            VERIFY_IS_TRUE(std::filesystem::remove(path));
+        }
+    }
+
+    WSL2_TEST_METHOD(SetSparseWithProtectedVhd)
+    {
+        constexpr auto name = L"sparse-protected-test-distro";
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
+        auto cleanup =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
+        WslShutdown();
+
+        const auto distroKey = OpenDistributionKey(name);
+        VERIFY_IS_NOT_NULL(distroKey.get());
+        const auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath", L"");
+        const auto vhdFileName =
+            wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"VhdFileName", L"ext4.vhdx");
+        auto vhdPath = (std::filesystem::path(basePath) / vhdFileName).wstring();
+
+        // Remove SYSTEM and Administrators access so success requires impersonating the user.
+        const auto tokenUser = wil::get_token_information<TOKEN_USER>();
+        EXPLICIT_ACCESS access{};
+        access.grfAccessMode = SET_ACCESS;
+        access.grfAccessPermissions = FILE_ALL_ACCESS;
+        access.grfInheritance = NO_INHERITANCE;
+        BuildTrusteeWithSid(&access.Trustee, tokenUser->User.Sid);
+
+        wsl::windows::common::security::unique_acl acl;
+        THROW_IF_WIN32_ERROR(SetEntriesInAcl(1, &access, nullptr, &acl));
+        THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
+            vhdPath.data(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION, nullptr, nullptr, acl.get(), nullptr));
+
+        const auto nonElevatedToken = GetNonElevatedToken();
+        for (const auto elevated : {true, false})
+        {
+            for (const auto sparse : {true, false})
+            {
+                VERIFY_ARE_EQUAL(
+                    LxsstuLaunchWsl(
+                        std::format(L"--manage {} --set-sparse {} --allow-unsafe", name, sparse ? L"true" : L"false"),
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        elevated ? nullptr : nonElevatedToken.get()),
+                    0L);
+
+                const auto attributes = GetFileAttributesW(vhdPath.c_str());
+                VERIFY_ARE_NOT_EQUAL(INVALID_FILE_ATTRIBUTES, attributes);
+                VERIFY_ARE_EQUAL(sparse, WI_IsFlagSet(attributes, FILE_ATTRIBUTE_SPARSE_FILE));
+            }
+        }
+    }
+
     WSL2_TEST_METHOD(MoveVhdOwnership)
     {
         constexpr auto name = L"move-owner-test-distro";
@@ -3530,9 +3624,14 @@ Usage:
         std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
         VERIFY_ARE_EQUAL(err, L"");
 
+        VerifyNoVmAccessToVhd(vhdPath.c_str());
+
         std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} echo ok", name));
         VERIFY_ARE_EQUAL(out, L"ok\n");
         VERIFY_ARE_EQUAL(err, L"");
+
+        WslShutdown();
+        VerifyNoVmAccessToVhd(vhdPath.c_str());
     }
 
     WSL2_TEST_METHOD(FileOffsets)
