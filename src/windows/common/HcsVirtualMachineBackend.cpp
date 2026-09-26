@@ -148,7 +148,7 @@ HcsVirtualMachineBackend::~HcsVirtualMachineBackend() noexcept
         auto lock = m_lock.lock_exclusive();
         for (const auto& entry : m_fileSystemDevices)
         {
-            if (entry.second.Plan9Socket && entry.second.Plan9Server)
+            if (std::holds_alternative<VmPlan9SocketDevice>(entry.second.Transport) && entry.second.Plan9Server)
             {
                 plan9Servers.emplace_back(entry.second.Plan9Server);
             }
@@ -598,7 +598,19 @@ void HcsVirtualMachineBackend::DetachDisk(VmDiskId Disk)
 
 VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request)
 {
-    const auto tag = std::visit([](const auto& transport) -> const std::wstring& { return transport.Tag; }, Request.Transport);
+    const auto tag = std::visit(
+        [](const auto& transport) {
+            using Transport = std::decay_t<decltype(transport)>;
+            if constexpr (std::is_same_v<Transport, VmPlan9SocketDevice>)
+            {
+                return std::wstring{};
+            }
+            else
+            {
+                return transport.Tag;
+            }
+        },
+        Request.Transport);
     WSL_LOG(
         "HcsCreateFileSystemDeviceBegin",
         TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
@@ -609,17 +621,33 @@ VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFile
     THROW_HR_IF(E_BOUNDS, m_nextDeviceId == UINT64_MAX);
     for (const auto& entry : m_fileSystemDevices)
     {
-        THROW_HR_IF(
-            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
-            std::visit(
-                [&tag](const auto& transport) { return wsl::shared::string::IsEqual(transport.Tag, tag, false); }, entry.second.Transport));
+        const auto duplicate = std::visit(
+            [](const auto& requested, const auto& existing) {
+                using Requested = std::decay_t<decltype(requested)>;
+                using Existing = std::decay_t<decltype(existing)>;
+                if constexpr (std::is_same_v<Requested, VmPlan9SocketDevice> && std::is_same_v<Existing, VmPlan9SocketDevice>)
+                {
+                    return requested.Port.Value == existing.Port.Value;
+                }
+                else if constexpr (!std::is_same_v<Requested, VmPlan9SocketDevice> && !std::is_same_v<Existing, VmPlan9SocketDevice>)
+                {
+                    return wsl::shared::string::IsEqual(requested.Tag, existing.Tag, false);
+                }
+                else
+                {
+                    return false;
+                }
+            },
+            Request.Transport,
+            entry.second.Transport);
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), duplicate);
     }
 
     VmFileSystemDevice device{{m_configuration.Description.Identity, m_nextDeviceId}, VmFileSystemDeviceState::Prepared};
     std::wstring mountOptions;
     wil::com_ptr<IPlan9FileSystem> plan9Server;
     std::optional<GUID> guestInstanceId;
-    bool plan9Socket = false;
+    const auto plan9Socket = std::holds_alternative<VmPlan9SocketDevice>(Request.Transport);
     auto removeOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
         if (guestInstanceId.has_value())
         {
@@ -648,25 +676,25 @@ VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFile
                     device.State = VmFileSystemDeviceState::Serving;
                 }
             }
+            else if constexpr (std::is_same_v<Transport, VmPlan9VirtioDevice>)
+            {
+                THROW_HR_IF(E_INVALIDARG, !transport.ServerFactory);
+                plan9Server = transport.ServerFactory(m_configuration.Description.Identity.UserToken.get());
+                THROW_HR_IF(E_UNEXPECTED, !plan9Server);
+
+                m_guestDeviceManager->AddRemoteFileSystem(transport.FileSystemClassId, transport.Tag.c_str(), plan9Server);
+                guestInstanceId = m_guestDeviceManager->AddNewDevice(transport.DeviceType, plan9Server, transport.Tag.c_str());
+                device.State = VmFileSystemDeviceState::Serving;
+            }
             else
             {
                 THROW_HR_IF(E_INVALIDARG, !transport.ServerFactory);
                 plan9Server = transport.ServerFactory(m_configuration.Description.Identity.UserToken.get());
                 THROW_HR_IF(E_UNEXPECTED, !plan9Server);
 
-                if (transport.Transport == VmPlan9Transport::Virtio)
-                {
-                    m_guestDeviceManager->AddRemoteFileSystem(transport.FileSystemClassId, transport.Tag.c_str(), plan9Server);
-                    guestInstanceId = m_guestDeviceManager->AddNewDevice(transport.DeviceType, plan9Server, transport.Tag.c_str());
-                }
-                else
-                {
-                    plan9Socket = true;
-                    auto runAsUser = wil::impersonate_token(m_configuration.Description.Identity.UserToken.get());
-                    THROW_IF_FAILED(plan9Server->Init(&m_runtimeId, transport.Port));
-                    THROW_IF_FAILED(plan9Server->Resume());
-                }
-
+                auto runAsUser = wil::impersonate_token(m_configuration.Description.Identity.UserToken.get());
+                THROW_IF_FAILED(plan9Server->Init(&m_runtimeId, transport.Port.Value));
+                THROW_IF_FAILED(plan9Server->Resume());
                 device.State = VmFileSystemDeviceState::Serving;
             }
         },
@@ -675,7 +703,7 @@ VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFile
     device.GuestInstanceId = guestInstanceId;
     const auto inserted =
         m_fileSystemDevices
-            .emplace(device.Id.Value, FileSystemDevice{device, Request.Transport, std::move(mountOptions), std::move(plan9Server), plan9Socket})
+            .emplace(device.Id.Value, FileSystemDevice{device, Request.Transport, std::move(mountOptions), std::move(plan9Server)})
             .second;
     WI_ASSERT(inserted);
     ++m_nextDeviceId;

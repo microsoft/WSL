@@ -212,13 +212,17 @@ class OpenVmmVirtualMachineBackendTests
 
         VmFileSystemShareRequest shareRequest;
         shareRequest.HostPath = sharePath;
-        shareRequest.Options.MountOptions.emplace(L"unsupported", L"");
+        shareRequest.Options = VmPlan9ShareOptions{};
         VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest); }));
-        shareRequest.Options.MountOptions.clear();
+        shareRequest.Options = VmVirtioFsShareOptions{};
+        auto& shareOptions = std::get<VmVirtioFsShareOptions>(shareRequest.Options);
+        shareOptions.MountOptions.emplace(L"unsupported", L"");
+        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest); }));
+        shareOptions.MountOptions.clear();
         const auto share = backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest);
         VERIFY_IS_TRUE(IsEqualGUID(request.Identity.VmId, share.Id.Owner.VmId));
         VERIFY_ARE_EQUAL(fileSystemDevice.Id.Value, share.Device.Value);
-        VERIFY_ARE_EQUAL(fileSystemTransport.Tag, share.GuestAddress.Tag);
+        VERIFY_ARE_EQUAL(fileSystemTransport.Tag, std::get<VmVirtioFsShareAddress>(share.GuestAddress).Tag);
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] {
                              backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest);
                          }));
