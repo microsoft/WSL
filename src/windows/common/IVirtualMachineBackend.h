@@ -470,19 +470,17 @@ struct VmVirtioFsDevice
     VmVirtioFsShareOptions Options;
 };
 
-enum class VmPlan9Transport
-{
-    Socket,
-    Virtio
-};
-
 using VmPlan9ServerFactory = std::function<wil::com_ptr<IPlan9FileSystem>(HANDLE UserToken)>;
 
-struct VmPlan9Device
+struct VmPlan9SocketDevice
+{
+    GuestServicePort Port;
+    VmPlan9ServerFactory ServerFactory;
+};
+
+struct VmPlan9VirtioDevice
 {
     std::wstring Tag;
-    VmPlan9Transport Transport = VmPlan9Transport::Socket;
-    std::uint32_t Port = 0;
     // Used to register a virtio server with the guest device host.
     GUID FileSystemClassId{};
     // Used to create the initial virtio device for the server.
@@ -490,7 +488,7 @@ struct VmPlan9Device
     VmPlan9ServerFactory ServerFactory;
 };
 
-using VmFileSystemDeviceTransport = std::variant<VmVirtioFsDevice, VmPlan9Device>;
+using VmFileSystemDeviceTransport = std::variant<VmVirtioFsDevice, VmPlan9SocketDevice, VmPlan9VirtioDevice>;
 
 struct VmFileSystemDeviceRequest
 {
@@ -513,12 +511,24 @@ struct VmFileSystemDevice
     std::optional<GUID> GuestInstanceId;
 };
 
+struct VmPlan9ShareOptions
+{
+    bool LinuxMetadata = false;
+    bool CaseSensitive = false;
+    bool UseShareRootIdentity = false;
+    bool AllowOptions = false;
+    bool AllowSubPaths = false;
+};
+
+using VmFileSystemShareOptions = std::variant<VmVirtioFsShareOptions, VmPlan9ShareOptions>;
+
 struct VmFileSystemShareRequest
 {
     std::filesystem::path HostPath;
+    // Child name for aggregate virtio-fs devices or access name for Plan9 shares.
     std::wstring Name;
     bool ReadOnly = true;
-    VmVirtioFsShareOptions Options;
+    VmFileSystemShareOptions Options;
 };
 
 struct VmVirtioFsShareAddress
@@ -527,11 +537,25 @@ struct VmVirtioFsShareAddress
     std::optional<std::wstring> ChildName;
 };
 
+struct VmPlan9SocketShareAddress
+{
+    GuestServicePort Port;
+    std::wstring AccessName;
+};
+
+struct VmPlan9VirtioShareAddress
+{
+    std::wstring Tag;
+    std::wstring AccessName;
+};
+
+using VmFileSystemShareAddress = std::variant<VmVirtioFsShareAddress, VmPlan9SocketShareAddress, VmPlan9VirtioShareAddress>;
+
 struct VmFileSystemShare
 {
     VmShareId Id;
     VmDeviceId Device;
-    VmVirtioFsShareAddress GuestAddress;
+    VmFileSystemShareAddress GuestAddress;
     std::filesystem::path EffectiveHostPath;
     bool ReadOnly = true;
 };

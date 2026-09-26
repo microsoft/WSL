@@ -238,7 +238,7 @@ class HcsVirtualMachineBackendTests
         const VmShareId share{identity, 1};
         const VmPortBindingId binding{identity, 1};
 
-        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->CreateFileSystemDevice({VmPlan9Device{}}); }));
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->CreateFileSystemDevice({VmPlan9SocketDevice{}}); }));
         VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AddFileSystemShare(device, {}); }));
         VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->RemoveFileSystemShare(share); }));
         VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AddNetworkAdapter({}); }));

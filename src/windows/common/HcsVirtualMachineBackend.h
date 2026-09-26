@@ -74,7 +74,6 @@ private:
         // Mount options applied when the virtio-fs device is created.
         std::wstring MountOptions;
         wil::com_ptr<IPlan9FileSystem> Plan9Server;
-        bool Plan9Socket = false;
     };
 
     HcsVirtualMachineBackend();
