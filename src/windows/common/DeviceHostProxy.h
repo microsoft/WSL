@@ -31,6 +31,8 @@ public:
 
     void AddRemoteFileSystem(const GUID& ImplementationClsid, const std::wstring& Tag, const wil::com_ptr<IPlan9FileSystem>& Plan9Fs);
 
+    void RemoveRemoteFileSystem(const GUID& ImplementationClsid, std::wstring_view Tag) noexcept;
+
     wil::com_ptr<IPlan9FileSystem> GetRemoteFileSystem(const GUID& ImplementationClsid, std::wstring_view Tag);
 
     wil::com_ptr<IWslVirtioNetDevice> GetVirtioNetDevice(const GUID& InstanceId);
