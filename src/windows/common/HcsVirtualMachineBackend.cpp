@@ -145,6 +145,26 @@ HcsVirtualMachineBackend::HcsVirtualMachineBackend() = default;
 
 HcsVirtualMachineBackend::~HcsVirtualMachineBackend() noexcept
 {
+    std::vector<wil::com_ptr<IPlan9FileSystem>> plan9Servers;
+    {
+        auto lock = m_lock.lock_exclusive();
+        for (const auto& entry : m_fileSystemDevices)
+        {
+            if (entry.second.Plan9Socket && entry.second.Plan9Server)
+            {
+                plan9Servers.emplace_back(entry.second.Plan9Server);
+            }
+        }
+
+        // Device hosts must be shut down before the compute system is closed.
+        m_guestDeviceManager.reset();
+    }
+
+    for (const auto& server : plan9Servers)
+    {
+        LOG_IF_FAILED(server->Teardown());
+    }
+
     schema::unique_hcs_system system;
     std::map<std::uint64_t, AttachedDisk> attachedDisks;
     {
@@ -231,6 +251,8 @@ void HcsVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     m_vmIdString = id;
     auto lock = m_lock.lock_exclusive();
     m_system = schema::CreateComputeSystem(id.c_str(), settings.c_str());
+    m_runtimeId = wsl::windows::common::hcs::GetRuntimeId(m_system.get());
+    m_guestDeviceManager = std::make_shared<GuestDeviceManager>(id, m_runtimeId, true);
     schema::RegisterCallback(m_system.get(), OnSystemEvent, this);
 }
 
@@ -603,9 +625,99 @@ void HcsVirtualMachineBackend::DetachDisk(VmDiskId Disk)
     m_attachedDisks.erase(disk);
 }
 
-VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFileSystemDeviceRequest&)
+VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request)
 {
-    THROW_HR(c_notSupported);
+    const auto tag = std::visit([](const auto& transport) -> const std::wstring& { return transport.Tag; }, Request.Transport);
+    WSL_LOG(
+        "HcsCreateFileSystemDeviceBegin",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(tag.c_str(), "tag"));
+
+    auto lock = m_lock.lock_exclusive();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system || !m_guestDeviceManager);
+    THROW_HR_IF(E_BOUNDS, m_nextDeviceId == UINT64_MAX);
+    for (const auto& entry : m_fileSystemDevices)
+    {
+        THROW_HR_IF(
+            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
+            std::visit(
+                [&tag](const auto& transport) { return wsl::shared::string::IsEqual(transport.Tag, tag, false); }, entry.second.Transport));
+    }
+
+    VmFileSystemDevice device{{m_configuration.Description.Identity, m_nextDeviceId}, VmFileSystemDeviceState::Prepared};
+    std::wstring mountOptions;
+    wil::com_ptr<IPlan9FileSystem> plan9Server;
+    std::optional<GUID> guestInstanceId;
+    bool plan9Socket = false;
+    auto removeOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+        if (guestInstanceId.has_value())
+        {
+            m_guestDeviceManager->RemoveGuestDevice(guestInstanceId.value());
+        }
+        if (plan9Socket && plan9Server)
+        {
+            LOG_IF_FAILED(plan9Server->Teardown());
+        }
+    });
+
+    std::visit(
+        [&](const auto& transport) {
+            using Transport = std::decay_t<decltype(transport)>;
+            if constexpr (std::is_same_v<Transport, VmVirtioFsDevice>)
+            {
+                mountOptions = FormatVirtioFsMountOptions(transport.Options.MountOptions);
+
+                // An aggregate device serves each of its shares as a child, so it can be created
+                // before any share exists. A single-share device is created once its share is added.
+                if (transport.Layout == VmVirtioFsLayout::Aggregate)
+                {
+                    const VirtioFsShareOptions options{.Kind = VirtiofsShareKind_Aggregate};
+                    guestInstanceId = m_guestDeviceManager->AddVirtiofsDevice(
+                        transport.Tag.c_str(), mountOptions.c_str(), L"", m_configuration.Description.Identity.UserToken.get(), options);
+                    device.State = VmFileSystemDeviceState::Serving;
+                }
+            }
+            else
+            {
+                THROW_HR_IF(E_INVALIDARG, !transport.ServerFactory);
+                plan9Server = transport.ServerFactory(m_configuration.Description.Identity.UserToken.get());
+                THROW_HR_IF(E_UNEXPECTED, !plan9Server);
+
+                if (transport.Transport == VmPlan9Transport::Virtio)
+                {
+                    m_guestDeviceManager->AddRemoteFileSystem(transport.FileSystemClassId, transport.Tag.c_str(), plan9Server);
+                    guestInstanceId = m_guestDeviceManager->AddNewDevice(transport.DeviceType, plan9Server, transport.Tag.c_str());
+                }
+                else
+                {
+                    plan9Socket = true;
+                    auto runAsUser = wil::impersonate_token(m_configuration.Description.Identity.UserToken.get());
+                    THROW_IF_FAILED(plan9Server->Init(&m_runtimeId, transport.Port));
+                    THROW_IF_FAILED(plan9Server->Resume());
+                }
+
+                device.State = VmFileSystemDeviceState::Serving;
+            }
+        },
+        Request.Transport);
+
+    device.GuestInstanceId = guestInstanceId;
+    const auto inserted =
+        m_fileSystemDevices
+            .emplace(device.Id.Value, FileSystemDevice{device, Request.Transport, std::move(mountOptions), std::move(plan9Server), plan9Socket})
+            .second;
+    WI_ASSERT(inserted);
+    ++m_nextDeviceId;
+    removeOnFailure.release();
+
+    WSL_LOG(
+        "HcsCreateFileSystemDeviceEnd",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(device.Id.Value, "deviceId"),
+        TraceLoggingValue(tag.c_str(), "tag"),
+        TraceLoggingValue(device.GuestInstanceId.has_value(), "created"));
+
+    return device;
 }
 
 VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId, const VmFileSystemShareRequest&)

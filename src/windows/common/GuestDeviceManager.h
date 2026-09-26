@@ -13,6 +13,11 @@ struct VirtioFsShareOptions
 };
 
 //
+// Formats virtio-fs mount options as the semicolon separated 'name[=value]' list that the device host expects.
+//
+std::wstring FormatVirtioFsMountOptions(_In_ const std::map<std::wstring, std::wstring>& Options);
+
+//
 // Provides synchronized access to guest device operations.
 //
 class GuestDeviceManager

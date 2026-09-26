@@ -15,6 +15,7 @@ Abstract:
 #pragma once
 
 #include "IVirtualMachineBackend.h"
+#include "GuestDeviceManager.h"
 #include "hcs.hpp"
 
 class HcsVirtualMachineBackend : public IVirtualMachineBackend
@@ -66,6 +67,16 @@ private:
         wil::unique_hfile BackingFile;
     };
 
+    struct FileSystemDevice
+    {
+        VmFileSystemDevice Device;
+        VmFileSystemDeviceTransport Transport;
+        // Mount options applied when the virtio-fs device is created.
+        std::wstring MountOptions;
+        wil::com_ptr<IPlan9FileSystem> Plan9Server;
+        bool Plan9Socket = false;
+    };
+
     HcsVirtualMachineBackend();
     void Initialize(const VmCreateRequest& Request);
     VmConfiguration BuildConfiguration(const VmCreateRequest& Request);
@@ -97,5 +108,10 @@ private:
     _Guarded_by_(m_lock) wsl::windows::common::hcs::unique_hcs_system m_system;
     _Guarded_by_(m_lock) std::map<std::uint64_t, AttachedDisk> m_attachedDisks;
     _Guarded_by_(m_lock) std::uint64_t m_nextDiskId = 1;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, FileSystemDevice> m_fileSystemDevices;
+    _Guarded_by_(m_lock) std::uint64_t m_nextDeviceId = 1;
     wil::unique_handle m_restrictedToken;
+
+    _Guarded_by_(m_lock) std::shared_ptr<GuestDeviceManager> m_guestDeviceManager;
+    _Guarded_by_(m_lock) GUID m_runtimeId {};
 };
