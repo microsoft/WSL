@@ -7876,6 +7876,87 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(EventStreamExpiredWindowWithOptionalCancellation)
+    {
+        WSLCFilter filter{"container", "nonexistent-event-stream-container"};
+        wil::com_ptr<IWSLCEventStream> stream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, 1, &filter, 1, &stream));
+
+        wil::unique_event cancelEvent{wil::EventOptions::ManualReset};
+        wil::unique_cotaskmem_ansistring eventJson;
+        for (const auto handle : {static_cast<HANDLE>(nullptr), cancelEvent.get()})
+        {
+            VERIFY_ARE_EQUAL(WSLC_E_EVENT_STREAM_FINISHED, stream->GetNext(handle, &eventJson));
+            VERIFY_IS_NULL(eventJson.get());
+        }
+
+        cancelEvent.SetEvent();
+        VERIFY_ARE_EQUAL(E_ABORT, stream->GetNext(cancelEvent.get(), &eventJson));
+        VERIFY_IS_NULL(eventJson.get());
+
+        cancelEvent.ResetEvent();
+        VERIFY_ARE_EQUAL(WSLC_E_EVENT_STREAM_FINISHED, stream->GetNext(cancelEvent.get(), &eventJson));
+        VERIFY_IS_NULL(eventJson.get());
+    }
+
+    WSLC_TEST_METHOD(EventStreamCancellationIsolatesPendingReaders)
+    {
+        WSLCFilter filter{"container", "nonexistent-event-stream-container"};
+        const LONGLONG until = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() + 120;
+        std::array<wil::com_ptr<IWSLCEventStream>, 2> streams;
+        std::array<wil::unique_event, 2> cancelEvents;
+        std::array<wil::unique_event, 2> readerStarted;
+        std::array<wil::unique_cotaskmem_ansistring, 2> eventJson;
+        std::array<HRESULT, 2> results{};
+        std::array<std::thread, 2> readers;
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            for (size_t index = 0; index < readers.size(); ++index)
+            {
+                if (readers[index].joinable())
+                {
+                    cancelEvents[index].SetEvent();
+                    FAIL_FAST_IF_MSG(
+                        WaitForSingleObject(readers[index].native_handle(), 10 * 1000) != WAIT_OBJECT_0,
+                        "event stream reader did not finish after cancellation");
+                    readers[index].join();
+                }
+            }
+        });
+
+        for (size_t index = 0; index < readers.size(); ++index)
+        {
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, until, &filter, 1, &streams[index]));
+            cancelEvents[index].create(wil::EventOptions::ManualReset);
+            readerStarted[index].create(wil::EventOptions::ManualReset);
+            readers[index] = std::thread([&, index]() {
+                const auto coInitialize = wil::CoInitializeEx();
+                readerStarted[index].SetEvent();
+                results[index] = streams[index]->GetNext(cancelEvents[index].get(), &eventJson[index]);
+            });
+            VERIFY_IS_TRUE(readerStarted[index].wait(30 * 1000));
+            VERIFY_ARE_EQUAL(WAIT_TIMEOUT, WaitForSingleObject(readers[index].native_handle(), 100));
+        }
+
+        cancelEvents[0].SetEvent();
+        FAIL_FAST_IF_MSG(
+            WaitForSingleObject(readers[0].native_handle(), 10 * 1000) != WAIT_OBJECT_0,
+            "event stream reader did not finish after cancellation");
+        readers[0].join();
+        VERIFY_ARE_EQUAL(E_ABORT, results[0]);
+        VERIFY_IS_NULL(eventJson[0].get());
+
+        // Cancelling one stream must leave the other subscriber parked.
+        VERIFY_ARE_EQUAL(WAIT_TIMEOUT, WaitForSingleObject(readers[1].native_handle(), 1000));
+
+        cancelEvents[1].SetEvent();
+        FAIL_FAST_IF_MSG(
+            WaitForSingleObject(readers[1].native_handle(), 10 * 1000) != WAIT_OBJECT_0,
+            "event stream reader did not finish after cancellation");
+        readers[1].join();
+        VERIFY_ARE_EQUAL(E_ABORT, results[1]);
+        VERIFY_IS_NULL(eventJson[1].get());
+    }
+
     WSLC_TEST_METHOD(EventStreamCancellationPreservesBufferedEvents)
     {
         WSLCContainerLauncher launcher("debian:latest", "wslc-test-event-cancellation", {"sleep", "99999"});
