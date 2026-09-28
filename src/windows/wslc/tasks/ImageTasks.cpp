@@ -241,15 +241,16 @@ void ListImages(CLIExecutionContext& context)
         const ColumnWidthConfig imageIdConfig = trunc ? c_imageId : ColumnWidthConfig{};
 
         // The DIGEST column sits between TAG and IMAGE ID, and is only present with --digests.
-        std::vector<ColumnDefinition> columns{{L"REPOSITORY", columnConfig}, {L"TAG", columnConfig}};
+        std::vector<ColumnDefinition> columns{
+            {Localization::WSLCCLI_TableHeaderRepository(), columnConfig}, {Localization::WSLCCLI_TableHeaderTag(), columnConfig}};
         if (digests)
         {
-            columns.emplace_back(ColumnDefinition{L"DIGEST", columnConfig});
+            columns.emplace_back(ColumnDefinition{Localization::WSLCCLI_TableHeaderDigest(), columnConfig});
         }
 
-        columns.emplace_back(ColumnDefinition{L"IMAGE ID", imageIdConfig});
-        columns.emplace_back(ColumnDefinition{L"CREATED", columnConfig});
-        columns.emplace_back(ColumnDefinition{L"SIZE", columnConfig});
+        columns.emplace_back(ColumnDefinition{Localization::WSLCCLI_TableHeaderImageId(), imageIdConfig});
+        columns.emplace_back(ColumnDefinition{Localization::WSLCCLI_TableHeaderCreated(), columnConfig});
+        columns.emplace_back(ColumnDefinition{Localization::WSLCCLI_TableHeaderSize(), columnConfig});
 
         wsl::windows::cli::table::TableData table{std::move(columns)};
         table.Reserve(images.size());

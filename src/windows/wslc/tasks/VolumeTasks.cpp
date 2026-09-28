@@ -221,7 +221,7 @@ void ListVolumes(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        wsl::windows::cli::table::TableData table{L"DRIVER", L"VOLUME NAME"};
+        wsl::windows::cli::table::TableData table{Localization::WSLCCLI_TableHeaderDriver(), Localization::WSLCCLI_TableHeaderVolumeName()};
         table.Reserve(volumes.size());
 
         for (const auto& volume : volumes)

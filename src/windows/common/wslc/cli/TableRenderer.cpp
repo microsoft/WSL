@@ -49,21 +49,6 @@ namespace {
         return chunks;
     }
 
-    std::optional<size_t> GetEffectiveConsoleWidth(const Terminal& terminal, const TableData& table, Terminal::Level level)
-    {
-        if (table.ConsoleWidthOverride > 0)
-        {
-            return table.ConsoleWidthOverride;
-        }
-
-        if (const auto width = terminal.GetConsoleWidth(level); width.has_value())
-        {
-            return static_cast<size_t>(*width);
-        }
-
-        return std::nullopt;
-    }
-
     // Establishes each column's floor and cap, then grows it to fit the widest value it holds.
     std::vector<RenderColumn> MeasureColumns(const TableData& table)
     {
@@ -219,24 +204,45 @@ namespace {
 
 } // namespace
 
-void RenderTable(Terminal& terminal, const TableData& table, Terminal::Level level)
+void TableRenderer::Render(const TableData& table)
 {
+    Emit(Layout(table, GetLayoutOptions()));
+}
+
+LayoutOptions TableRenderer::GetLayoutOptions() const
+{
+    LayoutOptions options;
+    options.VtEnabled = m_terminal.IsVTEnabled(m_level);
+    options.ColorEnabled = m_terminal.IsColorEnabled(m_level);
+
+    if (const auto width = m_terminal.GetConsoleWidth(m_level); width.has_value())
+    {
+        options.ConsoleWidth = static_cast<size_t>(*width);
+    }
+
+    return options;
+}
+
+TableLayout TableRenderer::Layout(const TableData& table, const LayoutOptions& options)
+{
+    TableLayout layout;
+
     if (table.Columns.empty())
     {
-        return;
+        return layout;
     }
 
     if (table.Rows.empty() && !table.ShowHeader)
     {
-        return;
+        return layout;
     }
 
-    const bool vtEnabled = terminal.IsVTEnabled(level);
-    const bool colorEnabled = terminal.IsColorEnabled(level);
+    const bool vtEnabled = options.VtEnabled;
+    const bool colorEnabled = options.ColorEnabled;
 
     auto columns = MeasureColumns(table);
 
-    const auto consoleWidth = GetEffectiveConsoleWidth(terminal, table, level);
+    const auto consoleWidth = (table.ConsoleWidthOverride > 0) ? std::optional<size_t>{table.ConsoleWidthOverride} : options.ConsoleWidth;
     const size_t totalWidth = consoleWidth.value_or(c_redirectedConsoleWidth);
     const size_t availableWidth = (totalWidth > table.RowIndent) ? totalWidth - table.RowIndent : 0;
 
@@ -300,7 +306,7 @@ void RenderTable(Terminal& terminal, const TableData& table, Terminal::Level lev
                 }
             }
 
-            terminal.Write(level, L"{}\n", line);
+            layout.Lines.emplace_back(std::move(line));
         }
     };
 
@@ -322,13 +328,34 @@ void RenderTable(Terminal& terminal, const TableData& table, Terminal::Level lev
         {
             static const Cell emptyCell{};
             const Cell& cell = row.Cells.empty() ? emptyCell : row.Cells.front();
-            terminal.Write(level, L"{}\n", cell.Render(vtEnabled, colorEnabled));
+            layout.Lines.emplace_back(cell.Render(vtEnabled, colorEnabled));
         }
         else
         {
             emitRow(row.Cells);
         }
     }
+
+    layout.ColumnWidths.reserve(columns.size());
+    for (const auto& column : columns)
+    {
+        layout.ColumnWidths.push_back(column.Width);
+    }
+
+    return layout;
+}
+
+void StaticTableRenderer::Emit(const TableLayout& layout)
+{
+    for (const auto& line : layout.Lines)
+    {
+        m_terminal.Write(m_level, L"{}\n", line);
+    }
+}
+
+void RenderTable(Terminal& terminal, const TableData& table, Terminal::Level level)
+{
+    StaticTableRenderer{terminal, level}.Render(table);
 }
 
 } // namespace wsl::windows::cli::table

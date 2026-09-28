@@ -63,6 +63,48 @@ class WSLCCLITableDataUnitTests
         VERIFY_ARE_EQUAL(static_cast<size_t>(0), cap.lines().size());
     }
 
+    TEST_METHOD(TableRenderer_Layout_ProducesLinesWithoutTerminal)
+    {
+        TableData table({L"NAME", L"STATUS"});
+        table.MinCellWidth = 0;
+        table.AddRow({L"my-container", L"running"});
+
+        const auto layout = TableRenderer::Layout(table, LayoutOptions{.ConsoleWidth = 120});
+
+        VERIFY_ARE_EQUAL(static_cast<size_t>(2), layout.Lines.size());
+        VERIFY_ARE_EQUAL(std::wstring{L"NAME           STATUS"}, layout.Lines[0]);
+        VERIFY_ARE_EQUAL(std::wstring{L"my-container   running"}, layout.Lines[1]);
+
+        VERIFY_ARE_EQUAL(static_cast<size_t>(2), layout.ColumnWidths.size());
+        VERIFY_ARE_EQUAL(static_cast<size_t>(12), layout.ColumnWidths[0]);
+        VERIFY_ARE_EQUAL(static_cast<size_t>(7), layout.ColumnWidths[1]);
+    }
+
+    TEST_METHOD(TableRenderer_Layout_ConsoleWidthOverrideTakesPrecedence)
+    {
+        TableData table({L"NAME", L"STATUS"});
+        table.MinCellWidth = 0;
+        table.Columns[0].Config = {.Overflow = ColumnOverflow::Shrink};
+        table.AddRow({L"a-very-long-container-name", L"running"});
+        table.ConsoleWidthOverride = 20;
+
+        const auto layout = TableRenderer::Layout(table, LayoutOptions{.ConsoleWidth = 120});
+
+        VERIFY_ARE_EQUAL(static_cast<size_t>(10), layout.ColumnWidths[0]);
+        VERIFY_IS_TRUE(layout.Lines[1].size() <= 20);
+    }
+
+    TEST_METHOD(TableRenderer_Layout_EmptyWithoutHeaderProducesNoLines)
+    {
+        TableData table({L"NAME", L"STATUS"});
+        table.ShowHeader = false;
+
+        const auto layout = TableRenderer::Layout(table, LayoutOptions{});
+
+        VERIFY_IS_TRUE(layout.Lines.empty());
+        VERIFY_IS_TRUE(layout.ColumnWidths.empty());
+    }
+
     TEST_METHOD(TableData_SingleRow_EmitsHeaderPlusOneDataLine)
     {
         TableCapture cap({L"NAME", L"STATUS"});

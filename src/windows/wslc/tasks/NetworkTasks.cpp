@@ -236,7 +236,11 @@ void ListNetworks(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        wsl::windows::cli::table::TableData table{L"NETWORK ID", L"NAME", L"DRIVER", L"SCOPE"};
+        wsl::windows::cli::table::TableData table{
+            Localization::WSLCCLI_TableHeaderNetworkId(),
+            Localization::WSLCCLI_TableHeaderName(),
+            Localization::WSLCCLI_TableHeaderDriver(),
+            Localization::WSLCCLI_TableHeaderScope()};
         table.Reserve(networks.size());
 
         for (const auto& network : networks)
