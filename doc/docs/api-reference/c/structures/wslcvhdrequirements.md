@@ -26,3 +26,4 @@ typedef struct WslcVhdRequirements
 - `name` is ignored by `WslcSetSessionSettingsVhd`.
 - The remaining fields after `type` are only honored by `WslcCreateSessionVhdVolume`.
 - `WslcSetSessionSettingsVhd` rejects non-`NONE` flags with `E_INVALIDARG`.
+- `WSLC_VHD_TYPE_SPARSE` is supported for session storage and named volumes. This feature is currently experimental.
