@@ -28,6 +28,7 @@ Do not put credentials or other sensitive information in the session's name.
   - converted to **milliseconds** and must fit in `uint32_t`
 - `VhdRequirements()` / setter
   - setter rejects `nullptr`
+  - use `VhdType::Sparse` to create sparse session storage; this feature is currently experimental
 - `EnableGpu()` / setter
 
 ```cpp

@@ -496,7 +496,7 @@ class WSLCTests
         // Reject invalid storage flags.
         {
             auto settings = GetDefaultSessionSettings(L"invalid-storage-flags");
-            settings.StorageFlags = static_cast<WSLCSessionStorageFlags>(0x4);
+            settings.StorageFlags = static_cast<WSLCSessionStorageFlags>(0x8);
             wil::com_ptr<IWSLCSession> session;
             VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session), E_INVALIDARG);
         }

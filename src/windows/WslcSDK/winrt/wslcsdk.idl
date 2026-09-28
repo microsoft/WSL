@@ -291,6 +291,7 @@ namespace Microsoft.WSL.Containers
     {
         Dynamic = 0,
         Fixed = 1,
+        Sparse = 2,
     };
 
     struct VhdOwner

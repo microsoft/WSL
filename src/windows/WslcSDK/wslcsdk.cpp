@@ -448,6 +448,7 @@ try
     runtimeSettings.FeatureFlags = ConvertFlags(internalType->featureFlags);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsDnsTunneling);
+    WI_SetFlagIf(runtimeSettings.StorageFlags, WSLCSessionStorageFlagsSparse, internalType->vhdRequirements.type == WSLC_VHD_TYPE_SPARSE);
 
     if (SUCCEEDED(errorInfoWrapper.CaptureResult(
             sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, nullptr, &result->session))))
@@ -513,13 +514,21 @@ try
     std::vector<WSLCCompatDriverOption> driverOpts;
     driverOpts.push_back({"SizeBytes", sizeStr.c_str()});
 
-    if (options->type == WSLC_VHD_TYPE_FIXED)
+    switch (options->type)
     {
+    case WSLC_VHD_TYPE_DYNAMIC:
+        break;
+
+    case WSLC_VHD_TYPE_FIXED:
         driverOpts.push_back({"Fixed", "true"});
-    }
-    else
-    {
-        RETURN_HR_IF(E_INVALIDARG, options->type != WSLC_VHD_TYPE_DYNAMIC);
+        break;
+
+    case WSLC_VHD_TYPE_SPARSE:
+        driverOpts.push_back({"Sparse", "true"});
+        break;
+
+    default:
+        RETURN_HR(E_INVALIDARG);
     }
 
     if (WI_IsFlagSet(options->flags, WSLC_VHD_REQ_FLAG_OWNER))
@@ -562,10 +571,7 @@ try
     if (vhdRequirements)
     {
         RETURN_HR_IF(E_INVALIDARG, vhdRequirements->sizeBytes == 0);
-        RETURN_HR_IF(E_NOTIMPL, vhdRequirements->type != WSLC_VHD_TYPE_DYNAMIC);
-
-        // Owner is only honored on named volumes; reject here so callers can't
-        // mistakenly believe it applied to the session rootfs VHD.
+        RETURN_HR_IF(E_NOTIMPL, vhdRequirements->type != WSLC_VHD_TYPE_DYNAMIC && vhdRequirements->type != WSLC_VHD_TYPE_SPARSE);
         RETURN_HR_IF(E_INVALIDARG, vhdRequirements->flags != WSLC_VHD_REQ_FLAG_NONE);
 
         internalType->vhdRequirements = *vhdRequirements;

@@ -11,8 +11,11 @@ STDAPI WslcSetSessionSettingsVhd(_In_ WslcSessionSettings* sessionSettings, _In_
 
 Return value: `HRESULT`.
 
-- `WslcSetSessionSettingsVhd` rejects non-`NONE` flags with `E_INVALIDARG`.
-- `WSLC_VHD_TYPE_FIXED` is only honored by `WslcCreateSessionVhdVolume`.
+Header notes:
+
+- `flags` must be `WSLC_VHD_REQ_FLAG_NONE`; other flags are rejected with `E_INVALIDARG`.
+- Session storage supports `WSLC_VHD_TYPE_DYNAMIC` and `WSLC_VHD_TYPE_SPARSE`.
+- `WSLC_VHD_TYPE_SPARSE` is currently experimental.
 
 Example:
 

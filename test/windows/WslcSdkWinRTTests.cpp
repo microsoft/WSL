@@ -1640,7 +1640,7 @@ class WslcSdkWinRtTests
         // Create a dedicated session so that volume creation does not affect the shared default session.
         auto settings = WSLCSDK::SessionSettings(L"wslc-winrt-vhd-test", vhdSessionStorage.wstring());
         settings.Timeout(std::chrono::duration_cast<TimeSpan>(30s));
-        settings.VhdRequirements(WSLCSDK::VhdOptions(L"", 4096ull * 1024 * 1024, WSLCSDK::VhdType::Dynamic));
+        settings.VhdRequirements(WSLCSDK::VhdOptions(L"", 4096ull * 1024 * 1024, WSLCSDK::VhdType::Sparse));
 
         auto session = WSLCSDK::Session(settings);
         session.Start();
@@ -1649,12 +1649,17 @@ class WslcSdkWinRtTests
         const auto debianTar = GetTestImagePath("debian:latest");
         session.LoadImageAsync(debianTar.wstring()).get();
 
+        const auto storageAttributes = GetFileAttributesW((vhdSessionStorage / L"storage.vhdx").c_str());
+        VERIFY_IS_FALSE(storageAttributes == INVALID_FILE_ATTRIBUTES);
+        VERIFY_IS_TRUE(WI_IsFlagSet(storageAttributes, FILE_ATTRIBUTE_SPARSE_FILE));
+
         // Positive: create a named VHD volume.
-        session.CreateVhdVolume(WSLCSDK::VhdOptions(c_volumeName, c_vhdSizeBytes, WSLCSDK::VhdType::Dynamic));
+        session.CreateVhdVolume(WSLCSDK::VhdOptions(c_volumeName, c_vhdSizeBytes, WSLCSDK::VhdType::Sparse));
 
         // The backing VHD file must exist on disk.
         const auto expectedVhdPath = vhdSessionStorage / "volumes" / (std::wstring(c_volumeName) + L".vhdx");
         VERIFY_IS_TRUE(std::filesystem::exists(expectedVhdPath));
+        VERIFY_IS_TRUE(WI_IsFlagSet(GetFileAttributesW(expectedVhdPath.c_str()), FILE_ATTRIBUTE_SPARSE_FILE));
 
         // Positive: write a marker via a container that mounts the named volume.
         {
