@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+  <metadata>
+    <id>Microsoft.WSL.TestDistro</id>
+    <version>$version$</version>
+    <authors>Microsoft</authors>
+    <projectUrl>https://github.com/microsoft/WSL</projectUrl>
+    <description>WSL Test distribution</description>
+  </metadata>
+  <files>
+    <file src="x64\test_distro.tar.xz" target="x64"/>
+    <file src="arm64\test_distro.tar.xz" target="arm64"/>
+  </files>
+</package>

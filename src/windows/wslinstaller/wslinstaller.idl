@@ -1,0 +1,20 @@
+/*++
+
+Copyright (c) Microsoft Corporation.  All rights reserved.
+
+Module Name:
+
+    wslinstaller.idl
+
+
+--*/
+
+[
+    uuid(D72BF71C-95DA-400D-9E4A-6ABA6064FE60),
+    pointer_default(unique),
+    object
+]
+interface IWslInstaller : IUnknown
+{
+    HRESULT Install([out] DWORD* ExitCode);
+};

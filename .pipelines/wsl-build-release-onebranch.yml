@@ -1,0 +1,98 @@
+parameters:
+- name: bypassTests
+  displayName: 'Publish release even if tests fail'
+  type: boolean
+  default: false
+
+- name: pushToStore
+  displayName: 'Push the release to the Microsoft Store'
+  type: boolean
+  default: true
+
+- name: testVersion
+  displayName: 'Test the release pipeline'
+  type: string
+  default: ''
+  
+- name: nugetSuffix
+  displayName: 'Nuget version suffix (must include "-")'
+  type: string
+  default: ''
+
+trigger:
+  tags:
+    include: ['*.*.*']
+
+variables:
+  WindowsContainerImage: "onebranch.azurecr.io/windows/ltsc2022/vse2022:latest"
+  WindowsHostVersion: '1ESWindows2022'
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: OneBranch.Pipelines/GovernedTemplates
+      ref: refs/heads/main
+    - repository: releaseScripts
+      type: git
+      name: Microsoft.WSL/wsl-release-scripts
+      ref: refs/tags/v2
+
+extends:
+  template: v2/Microsoft.Official.yml@templates
+  parameters:
+    platform:
+      name: "windows_undocked"
+    featureFlags:
+      EnableCDPxPAT: false
+      WindowsHostVersion: 1ESWindows2022
+    globalSdl:
+      credscan:
+        enabled: true
+      codesign:
+        enabled: true
+        break: true
+        targetGlob: '**\*.dll;**\*.exe;**\*.sys;**\*.msi;**\*.msix;**\*.msixbundle;**\*.appx;**\*.nupkg'
+      perStage:
+        credscan:
+          enabled: true
+      tsa:
+        # The 1ES Official governed template force-runs TSA onboarding regardless of this flag.
+        # Without a config file it auto-derives the codebase name "microsoft_Microsoft.WSL_microsoft/WSL",
+        # which contains the illegal characters '.' and '/', so onboarding fails with PreconditionFailed
+        # and breaks every release build. Point TSA at an explicit, sanitized codebase config instead.
+        enabled: true
+        configFile: $(Build.SourcesDirectory)\.config\tsaoptions.json
+      evidence:
+        enabled: false
+    git:
+      fetchDepth: -1
+      fetchTags: true
+
+    stages:
+    - template: build-stage.yml@self
+      parameters:
+        isRelease: true
+        packageVersion: ${{ iif(eq(parameters.testVersion, ''), variables['Build.SourceBranchName'], parameters.testVersion) }}
+        nugetSuffix: ${{ parameters.nugetSuffix }}
+        traceLoggingConfig: $(ReleaseTraceLoggingConfig)
+        vsoOrg: microsoft
+        vsoProject: Microsoft.WSL
+
+    - template: dcat-stage.yml@self
+
+    - template: test-stage.yml@self
+      parameters:
+        rs_prerelease_only: false
+
+    - template: flight-stage.yml@self
+      parameters:
+        publishPackage: ${{ iif(eq(parameters.testVersion, ''), true, false) }}
+        packageVersion: ${{ iif(eq(parameters.testVersion, ''), variables['Build.SourceBranchName'], parameters.testVersion) }}
+        bypassTests: ${{ parameters.bypassTests }}
+        pushToStore: ${{ parameters.pushToStore }}
+
+    - ${{ if or(eq(parameters.testVersion, ''), not(eq(parameters.nugetSuffix, ''))) }}:
+        - template: nuget-stage.yml@self
+          parameters:
+            isNightly: false

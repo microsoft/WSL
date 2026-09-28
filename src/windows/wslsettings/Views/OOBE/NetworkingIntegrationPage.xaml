@@ -1,0 +1,21 @@
+﻿<Page
+    x:Class="WslSettings.Views.OOBE.NetworkingIntegrationPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:behaviors="using:WslSettings.Behaviors"
+    xmlns:controls="using:WslSettings.Controls"
+    behaviors:NavigationViewHeaderBehavior.HeaderMode="Never">
+
+    <controls:OOBEContent x:Uid="Settings_OOBENetworkingIntegration" HeroImage="ms-appx:///Assets/SettingsOOBENetworkingIntegration.png">
+        <controls:OOBEContent.PageContent>
+            <StackPanel Orientation="Vertical" Spacing="12">
+                <TextBlock x:Uid="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsTitle" Style="{StaticResource OobeSubtitleStyle}" Margin="0,0,0,-6"/>
+                <controls:HyperlinkTextBlock x:Uid="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample"/>
+                <TextBlock x:Uid="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingTitle" Style="{StaticResource OobeSubtitleStyle}" Margin="0,12,0,-6"/>
+                <TextBlock x:Uid="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingSample" TextWrapping="Wrap"/>
+                <HyperlinkButton x:Uid="Settings_OOBENetworkingIntegrationLinuxNetworkingAppsLink" Style="{StaticResource TextButtonStyle}" Margin="0,6,0,-12"/>
+                <HyperlinkButton x:Uid="Settings_OOBENetworkingIntegrationMirroredModeLink" Style="{StaticResource TextButtonStyle}"/>
+            </StackPanel>
+        </controls:OOBEContent.PageContent>
+    </controls:OOBEContent>
+</Page>

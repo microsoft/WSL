@@ -1,0 +1,101 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ContainerCreateCommand.cpp
+
+Abstract:
+
+    Implementation of command execution logic.
+
+--*/
+
+#include "ContainerCommand.h"
+#include "CLIExecutionContext.h"
+#include "ContainerTasks.h"
+#include "SessionTasks.h"
+#include "Task.h"
+
+using namespace wsl::windows::wslc::execution;
+using namespace wsl::windows::wslc::task;
+using namespace wsl::shared;
+
+namespace wsl::windows::wslc {
+// Container Create Command
+std::vector<Argument> ContainerCreateCommand::GetArguments() const
+{
+    // clang-format off
+    return {
+        Argument::Create(ArgType::ImageId, {.Required = true}),
+        Argument::Create(ArgType::Command),
+        Argument::Create(ArgType::ForwardArgs),
+        Argument::Create(ArgType::CIDFile),
+        Argument::Create(ArgType::Cpus),
+        Argument::Create(ArgType::DNS, {.Limit = Limit::Unlimited}),
+        // Argument::Create(ArgType::DNSDomain),
+        Argument::Create(ArgType::DNSOption, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::DNSSearch, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::Domainname),
+        Argument::Create(ArgType::Entrypoint),
+        Argument::Create(ArgType::Env, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::EnvFile, {.Limit = Limit::Unlimited}),
+        // Argument::Create(ArgType::GroupId),
+        Argument::Create(ArgType::Gpus),
+        Argument::Create(ArgType::HealthCmd),
+        Argument::Create(ArgType::HealthInterval),
+        Argument::Create(ArgType::HealthRetries),
+        Argument::Create(ArgType::HealthStartPeriod),
+        Argument::Create(ArgType::HealthTimeout),
+        Argument::Create(ArgType::Hostname),
+        Argument::Create(ArgType::Interactive),
+        Argument::Create(ArgType::IpAddress),
+        Argument::Create(ArgType::Label, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::Memory),
+        Argument::Create(ArgType::Mount, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::Name),
+        Argument::Create(ArgType::Network, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::NetworkAlias, {.Limit = Limit::Unlimited}),
+        // Argument::Create(ArgType::NoDNS),
+        // Argument::Create(ArgType::Progress),
+        Argument::Create(ArgType::NoHealthcheck),
+        Argument::Create(ArgType::Publish, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::PublishAll),
+        Argument::Create(ArgType::Pull),
+        Argument::Create(ArgType::Remove),
+        // Argument::Create(ArgType::Scheme),
+        Argument::Create(ArgType::ShmSize),
+        Argument::Create(ArgType::StopSignal),
+        Argument::Create(ArgType::StopTimeout),
+        Argument::Create(ArgType::TMPFS, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::TTY),
+        Argument::Create(ArgType::Ulimit, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::User),
+        Argument::Create(ArgType::Volume, {.Limit = Limit::Unlimited}),
+        // Argument::Create(ArgType::Virtual),
+        Argument::Create(ArgType::WorkDir),
+    };
+    // clang-format on
+}
+
+std::wstring ContainerCreateCommand::ShortDescription() const
+{
+    return Localization::WSLCCLI_ContainerCreateDesc();
+}
+
+std::wstring ContainerCreateCommand::LongDescription() const
+{
+    return Localization::WSLCCLI_ContainerCreateLongDesc();
+}
+
+// clang-format off
+void ContainerCreateCommand::ExecuteInternal(CLIExecutionContext& context) const
+{
+    context
+        << ResolveSession
+        << SetContainerOptionsFromArgs
+        << CreateContainer;
+}
+// clang-format on
+} // namespace wsl::windows::wslc

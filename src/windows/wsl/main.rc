@@ -1,0 +1,27 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    main.rc
+
+Abstract:
+
+    This file contains resources for wsl.
+
+--*/
+
+#include <windows.h>
+#include "resource.h"
+#include "wslversioninfo.h"
+
+#define VER_INTERNALNAME_STR "wsl.exe"
+#define VER_ORIGINALFILENAME_STR "wsl.exe"
+
+#define VER_FILETYPE VFT_APP
+#define VER_FILESUBTYPE VFT2_UNKNOWN
+#define VER_FILEDESCRIPTION_STR "Windows Subsystem for Linux"
+ID_ICON ICON PRELOAD DISCARDABLE "..\..\..\Images\wsl.ico"
+
+#include <common.ver>

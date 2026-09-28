@@ -1,0 +1,305 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    SessionService.cpp
+
+Abstract:
+
+    This file contains the SessionService implementation
+
+--*/
+
+#include "precomp.h"
+#include "SessionService.h"
+#include "ConsoleService.h"
+#include "JsonUtils.h"
+#include "WarningCallback.h"
+#include "wslc_schema.h"
+
+#include <wslc.h>
+#include <WSLCProcessLauncher.h>
+
+namespace wsl::windows::wslc::services {
+
+using namespace wsl::windows::wslc::cli;
+using namespace wsl::shared;
+using namespace wsl::shared::string;
+using namespace wsl::windows::common;
+using namespace wsl::windows::wslc::models;
+namespace wslutil = wsl::windows::common::wslutil;
+
+namespace {
+
+    std::string FormatEventTimestamp(std::int64_t timestamp)
+    {
+        using namespace std::chrono;
+
+        const sys_seconds time{seconds{timestamp}};
+        const time_zone* zone;
+        try
+        {
+            zone = current_zone();
+        }
+        catch (const std::runtime_error&)
+        {
+            // The time zone database is unavailable, so report UTC rather than failing the stream.
+            LOG_CAUGHT_EXCEPTION();
+            return std::format("{:%FT%T.000000000+00:00}", time);
+        }
+
+        auto output = std::format("{:%FT%T.000000000%z}", zoned_time{zone, time});
+        output.insert(output.size() - 2, ":");
+        return output;
+    }
+
+    std::string FormatEvent(const wslc_schema::Event& event)
+    {
+        auto output = std::format("{} {} {} {}", FormatEventTimestamp(event.time), event.Type, event.Action, event.Actor.ID);
+        if (!event.Actor.Attributes.empty())
+        {
+            output.append(" (");
+            bool first = true;
+            for (const auto& [key, value] : event.Actor.Attributes)
+            {
+                if (!first)
+                {
+                    output.append(", ");
+                }
+
+                output.append(std::format("{}={}", key, value));
+                first = false;
+            }
+
+            output.push_back(')');
+        }
+
+        return output;
+    }
+
+} // namespace
+
+static wil::com_ptr<IWSLCSessionManager> CreateSessionManager()
+{
+    wil::com_ptr<IWSLCSessionManager> manager;
+    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&manager)));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(manager.get());
+    return manager;
+}
+
+Session SessionService::OpenSessionByName(const wil::com_ptr<IWSLCSessionManager>& manager, LPCWSTR displayName)
+{
+    wil::com_ptr<IWSLCSession> session;
+    THROW_IF_FAILED(manager->OpenSessionByName(displayName, &session));
+
+    wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+    return Session(std::move(session));
+}
+
+Session SessionService::OpenSession(const std::wstring& sessionName)
+{
+    return OpenSessionByName(CreateSessionManager(), sessionName.c_str());
+}
+
+Session SessionService::OpenDefaultSession()
+{
+    // Null DisplayName = default session, resolved from caller's token by the server.
+    return OpenSessionByName(CreateSessionManager(), nullptr);
+}
+
+Session SessionService::OpenOrCreateDefaultSession(Terminal& terminal)
+{
+    WarningCallback warningCallback(terminal);
+    auto manager = CreateSessionManager();
+
+    // Null Settings = default session with server-determined name and settings. The warning callback
+    // is consumed during CreateSession (session initialization); it is not retained afterwards.
+    wil::com_ptr<IWSLCSession> session;
+    THROW_IF_FAILED(manager->CreateSession(nullptr, WSLCSessionFlagsNone, &warningCallback, &session));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
+    return Session(std::move(session));
+}
+
+int SessionService::Attach(Terminal& terminal, const Session& session)
+{
+    // Configure console for interactive usage.
+    wsl::windows::common::ConsoleState console{};
+    console.SetInteractiveMode();
+    const auto windowSize = console.GetWindowSize();
+
+    const std::string shell = "/bin/sh";
+
+    // Launch with terminal fds (PTY).
+    wsl::windows::common::WSLCProcessLauncher launcher{shell, {shell, "--login"}, {"TERM=xterm-256color"}, WSLCProcessFlagsTty | WSLCProcessFlagsStdin};
+    launcher.SetTtySize(windowSize.Y, windowSize.X);
+    auto process = launcher.Launch(*session.Get());
+    auto tty = process.GetStdHandle(WSLCFDTty);
+    auto updateTerminalSize = [&]() {
+        const auto windowSize = console.GetWindowSize();
+        LOG_IF_FAILED(process.Get().ResizeTty(windowSize.Y, windowSize.X));
+    };
+
+    // Start input relay thread to forward console input to TTY
+    // Runs in parallel with output relay (main thread)
+    auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
+    std::thread inputThread([&] {
+        try
+        {
+            wsl::windows::common::relay::StandardInputRelay(
+                GetStdHandle(STD_INPUT_HANDLE), tty.Get(), updateTerminalSize, exitEvent.get());
+        }
+        catch (...)
+        {
+            exitEvent.SetEvent();
+        }
+    });
+
+    auto joinInput = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+        exitEvent.SetEvent();
+        if (inputThread.joinable())
+        {
+            inputThread.join();
+        }
+    });
+
+    // Relay tty output -> console (blocks until output ends).
+    wsl::windows::common::relay::InterruptableRelay(tty.Get(), GetStdHandle(STD_OUTPUT_HANDLE), exitEvent.get());
+
+    process.GetExitEvent().wait();
+
+    auto exitCode = process.GetExitCode();
+
+    terminal.Output(L"{}\n", wsl::shared::Localization::MessageWslcShellExited(string::MultiByteToWide(shell), static_cast<int>(exitCode)));
+
+    return static_cast<int>(exitCode);
+}
+
+int SessionService::Enter(Terminal& terminal, const std::wstring& storagePath, const std::wstring& displayName)
+{
+    THROW_HR_IF(E_INVALIDARG, storagePath.empty());
+    THROW_HR_IF(E_INVALIDARG, displayName.empty());
+
+    WarningCallback warningCallback(terminal);
+    auto sessionManager = CreateSessionManager();
+
+    wil::com_ptr<IWSLCSession> session;
+    THROW_IF_FAILED(sessionManager->EnterSession(displayName.c_str(), storagePath.c_str(), &warningCallback, &session));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+    terminal.Info(L"{}\n", Localization::MessageWslcCreatedSession(displayName));
+
+    const std::string shell = "/bin/sh";
+    wsl::windows::common::WSLCProcessLauncher launcher{shell, {shell, "--login"}, {"TERM=xterm-256color"}, WSLCProcessFlagsTty | WSLCProcessFlagsStdin};
+
+    wsl::windows::common::ConsoleState console;
+    const auto windowSize = console.GetWindowSize();
+    launcher.SetTtySize(windowSize.Y, windowSize.X);
+
+    return ConsoleService::AttachToCurrentConsole(terminal, console, launcher.Launch(*session.get()));
+}
+
+WSLCVersion SessionService::ManagerVersion()
+{
+    WSLCVersion version{};
+    THROW_IF_FAILED(CreateSessionManager()->GetVersion(&version));
+
+    return version;
+}
+
+std::vector<SessionInformation> SessionService::List()
+{
+    std::vector<SessionInformation> result;
+    auto sessionManager = CreateSessionManager();
+
+    wil::unique_cotaskmem_array_ptr<WSLCSessionListEntry> sessions;
+    THROW_IF_FAILED(sessionManager->ListSessions(&sessions, sessions.size_address<ULONG>()));
+    for (size_t i = 0; i < sessions.size(); ++i)
+    {
+        const auto& current = sessions[i];
+        SessionInformation info{};
+        info.CreatorPid = current.CreatorPid;
+        info.SessionId = current.SessionId;
+        info.DisplayName = current.DisplayName;
+        result.emplace_back(info);
+    }
+
+    return result;
+}
+
+int SessionService::Run(Terminal& terminal, const Session& session, const std::vector<std::string>& arguments)
+{
+    WI_ASSERT(!arguments.empty());
+
+    // Pass a default $PATH environment for convenience.
+    const std::vector<std::string> environment{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"};
+    wsl::windows::common::WSLCProcessLauncher launcher{arguments.front(), arguments, environment, WSLCProcessFlagsStdin};
+
+    auto [result, process, error] = launcher.LaunchNoThrow(*session.Get());
+    THROW_HR_WITH_USER_ERROR_IF(result, Localization::MessageWslcFailedToLaunchCommand(arguments.front(), error), FAILED(result) && error != 0);
+
+    THROW_IF_FAILED(result);
+
+    wsl::windows::common::ConsoleState console{};
+    return ConsoleService::AttachToCurrentConsole(terminal, console, std::move(process.value()));
+}
+
+void SessionService::StreamEvents(Terminal& terminal, const Session& session, const EventStreamOptions& options, HANDLE cancelEvent)
+{
+    std::vector<WSLCFilter> filterEntries;
+    filterEntries.reserve(options.Filters.size());
+    for (const auto& [key, value] : options.Filters)
+    {
+        filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
+    }
+
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
+
+    wil::com_ptr<IWSLCEventStream> stream;
+    THROW_IF_FAILED(session.Get()->GetEvents(
+        options.Since, options.Until, filterEntries.empty() ? nullptr : filterEntries.data(), static_cast<ULONG>(filterEntries.size()), &stream));
+
+    HRESULT result = S_OK;
+    while (SUCCEEDED(result))
+    {
+        wil::unique_cotaskmem_ansistring eventJson;
+        result = stream->GetNext(cancelEvent, &eventJson);
+        if (SUCCEEDED(result))
+        {
+            const auto event = wsl::shared::FromJson<wslc_schema::Event>(eventJson.get());
+            terminal.Output(L"{}\n", FormatEvent(event));
+            terminal.Flush(Terminal::Level::Output);
+        }
+    }
+
+    if (result == E_ABORT && cancelEvent != nullptr && wil::event_is_signaled(cancelEvent))
+    {
+        return;
+    }
+
+    THROW_HR_IF(result, result != WSLC_E_EVENT_STREAM_FINISHED);
+}
+
+int SessionService::TerminateSession(Terminal& terminal, const Session& session)
+{
+    HRESULT hr = session.Get()->Terminate();
+    if (FAILED(hr))
+    {
+        auto errorString = wsl::windows::common::wslutil::ErrorCodeToString(hr);
+
+        wil::unique_cotaskmem_string displayName;
+        if (SUCCEEDED(session.Get()->GetDisplayName(&displayName)) && displayName)
+        {
+            terminal.Error(L"{}\n", Localization::MessageErrorCode(Localization::MessageWslcTerminateSessionFailed(displayName.get()), errorString));
+        }
+        else
+        {
+            terminal.Error(L"{}\n", Localization::MessageErrorCode(Localization::MessageWslcTerminateDefaultSessionFailed(), errorString));
+        }
+        return 1;
+    }
+
+    return 0;
+}
+} // namespace wsl::windows::wslc::services

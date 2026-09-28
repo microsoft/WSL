@@ -1,0 +1,20 @@
+# WslcComponentFlags
+
+```c
+typedef enum WslcComponentFlags
+{
+    WSLC_COMPONENT_FLAG_NONE = 0,
+    WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM = 1,
+    WSLC_COMPONENT_FLAG_WSL_PACKAGE = 2,
+    WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE = 4,
+} WslcComponentFlags;
+```
+
+| Enumerator | Value |
+|---|---|
+| `WSLC_COMPONENT_FLAG_NONE` | `0` |
+| `WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM` | `1` |
+| `WSLC_COMPONENT_FLAG_WSL_PACKAGE` | `2` |
+| `WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE` | `4` |
+
+---

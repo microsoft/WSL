@@ -1,0 +1,150 @@
+﻿---
+# this file work is a derivative of onecoreuap/net/.clang-format
+# https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md
+#
+Language:        Cpp
+# BasedOnStyle:  LLVM
+AccessModifierOffset: -4
+AlignAfterOpenBracket: AlwaysBreak
+AlignConsecutiveAssignments: false
+AlignEscapedNewlines: DontAlign
+AlignOperands:   true
+AlignTrailingComments: true
+AllowAllParametersOfDeclarationOnNextLine: true
+AllowShortBlocksOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AlwaysBreakAfterDefinitionReturnType: None
+AlwaysBreakAfterReturnType: None
+AlwaysBreakBeforeMultilineStrings: true
+AlwaysBreakTemplateDeclarations: true
+BinPackArguments: false
+BinPackParameters: false
+BreakBeforeBinaryOperators: None
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterCaseLabel: true
+  AfterClass: true
+  AfterControlStatement: true
+  AfterEnum: true
+  AfterFunction: true
+  AfterNamespace: false
+  AfterStruct: true
+  AfterUnion: true
+  AfterExternBlock: false
+  BeforeCatch: true
+  BeforeElse: true
+  SplitEmptyFunction: true
+  SplitEmptyRecord: true
+  SplitEmptyNamespace: true
+BreakBeforeTernaryOperators: true
+BreakConstructorInitializers: AfterColon
+ColumnLimit: 130
+CommentPragmas:  '^ IWYU pragma:'
+CompactNamespaces: true
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+ConstructorInitializerIndentWidth: 4
+ContinuationIndentWidth: 4
+Cpp11BracedListStyle: true
+DerivePointerAlignment: false
+DisableFormat:   false
+ExperimentalAutoDetectBinPacking: false
+FixNamespaceComments: true
+ForEachMacros:   [ foreach, Q_FOREACH, BOOST_FOREACH ]
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^"(stdafx.h|pch.h|precomp.h)"$'
+    Priority: -1
+IndentCaseLabels: false
+InsertBraces: true
+IndentWidth:     4
+IndentWrappedFunctionNames: false
+KeepEmptyLinesAtTheStartOfBlocks: true
+MacroBlockBegin: '^BEGIN_COM_MAP$|^BEGIN_CONNECTION_POINT_MAP$|^BEGIN_HELPER_NODEMAP$|^BEGIN_MODULE$|^BEGIN_MSG_MAP$|^BEGIN_OBJECT_MAP$|^BEGIN_TEST_CLASS$|^BEGIN_TEST_METHOD$|^BEGIN_TEST_METHOD_PROPERTIES$'
+MacroBlockEnd: '^END_COM_MAP$|^END_CONNECTION_POINT_MAP$|^END_HELPER_NODEMAP$|^END_MODULE$|^END_MSG_MAP$|^END_OBJECT_MAP$|^END_TEST_CLASS$|^END_TEST_METHOD$|^END_TEST_METHOD_PROPERTIES$'
+MaxEmptyLinesToKeep: 1
+NamespaceIndentation: Inner
+ObjCBlockIndentWidth: 2
+ObjCSpaceAfterProperty: false
+ObjCSpaceBeforeProtocolList: true
+PenaltyBreakBeforeFirstCallParameter: 19
+PenaltyBreakComment: 300
+PenaltyBreakFirstLessLess: 120
+PenaltyBreakString: 1000
+PenaltyExcessCharacter: 1
+PenaltyReturnTypeOnItsOwnLine: 1000
+PointerAlignment: Left
+SortIncludes: false
+SpaceAfterCStyleCast: false
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeParens: ControlStatements
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: 1
+SpacesInAngles:  false
+SpacesInContainerLiterals: true
+SpacesInCStyleCastParentheses: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+Standard:        Cpp11
+StatementMacros: [
+  _Acquires_exclusive_lock_,
+  _Acquires_lock_,
+  _Acquires_nonreentrant_lock_,
+  _Acquires_shared_lock_,
+  _Analysis_assume_smart_lock_acquired_,
+  _Analysis_assume_smart_lock_released_,
+  _Create_lock_level_,
+  _Detaches_lock_,
+  _Function_class_,
+  _Global_cancel_spin_lock_,
+  _Global_critical_region_,
+  _Global_interlock_,
+  _Global_priority_region_,
+  _Has_lock_kind_,
+  _Has_lock_level_,
+  _IRQL_always_function_max_,
+  _IRQL_always_function_min_,
+  _IRQL_raises_,
+  _IRQL_requires_,
+  _IRQL_requires_max_,
+  _IRQL_requires_min_,
+  _IRQL_requires_same_,
+  _IRQL_restores_,
+  _IRQL_restores_global_,
+  _IRQL_saves_,
+  _IRQL_saves_global_,
+  _Lock_level_order_,
+  _Moves_lock_,
+  _Must_inspect_result_,
+  _No_competing_thread_,
+  _Post_same_lock_,
+  _Post_writable_byte_size_,
+  _Pre_satisfies_,
+  _Releases_exclusive_lock_,
+  _Releases_lock_,
+  _Releases_nonreentrant_lock_,
+  _Releases_shared_lock_,
+  _Replaces_lock_,
+  _Requires_exclusive_lock_held_,
+  _Requires_lock_held_,
+  _Requires_lock_not_held_,
+  _Requires_no_locks_held_,
+  _Requires_shared_lock_held_,
+  _Ret_maybenull_,
+  _Ret_range_,
+  _Success_,
+  _Swaps_locks_,
+  _Use_decl_annotations_,
+  _When_,
+  RpcEndExcept,
+]
+TabWidth:        4
+TypenameMacros: [
+  IFACEMETHOD,
+  STDMETHOD,
+]
+UseTab:          Never
+...
+

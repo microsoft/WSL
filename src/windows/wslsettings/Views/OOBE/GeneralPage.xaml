@@ -1,0 +1,18 @@
+﻿<Page
+    x:Class="WslSettings.Views.OOBE.GeneralPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:behaviors="using:WslSettings.Behaviors"
+    xmlns:controls="using:WslSettings.Controls"
+    behaviors:NavigationViewHeaderBehavior.HeaderMode="Never">
+
+    <controls:OOBEContent x:Uid="Settings_OOBEGeneral" HeroImage="ms-appx:///Assets/SettingsOOBEGeneral.png">
+        <controls:OOBEContent.PageContent>
+            <StackPanel Orientation="Vertical">
+                <HyperlinkButton x:Uid="Settings_OOBEGeneral_WSLDocumentationLink" Style="{StaticResource TextButtonStyle}"/>
+                <HyperlinkButton x:Uid="Settings_OOBEGeneral_BestPracticesSetupLink" Style="{StaticResource TextButtonStyle}"/>
+                <HyperlinkButton x:Uid="Settings_OOBEGeneral_GettingStartedLinuxLink" Style="{StaticResource TextButtonStyle}"/>
+            </StackPanel>
+        </controls:OOBEContent.PageContent>
+    </controls:OOBEContent>
+</Page>

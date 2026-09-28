@@ -1,0 +1,183 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WSLCE2EContainerInspectTests.cpp
+
+Abstract:
+
+    This file contains end-to-end tests for WSLC.
+--*/
+
+#include "precomp.h"
+#include "windows/Common.h"
+#include "WSLCExecutor.h"
+#include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
+#include <wslc_schema.h>
+
+namespace WSLCE2ETests {
+using namespace wsl::shared;
+using namespace wsl::shared::string;
+
+class WSLCE2EContainerInspectTests
+{
+    WSLC_TEST_CLASS(WSLCE2EContainerInspectTests)
+
+    TEST_CLASS_SETUP(ClassSetup)
+    {
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
+        return true;
+    }
+
+    TEST_CLASS_CLEANUP(ClassCleanup)
+    {
+        EnsureContainerDoesNotExist(TestContainerName1);
+        EnsureContainerDoesNotExist(TestContainerName2);
+        return true;
+    }
+
+    TEST_METHOD_SETUP(MethodSetup)
+    {
+        EnsureContainerDoesNotExist(TestContainerName1);
+        EnsureContainerDoesNotExist(TestContainerName2);
+        return true;
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Inspect_HelpCommand)
+    {
+        auto result = RunWslc(L"container inspect --help");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Inspect_MissingContainerId)
+    {
+        auto result = RunWslc(L"container inspect");
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'container-id'"));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Inspect_ContainerNotFound)
+    {
+        auto result = RunWslc(std::format(L"container inspect {}", TestContainerName1));
+        result.Verify({.Stdout = L"[]\r\n", .Stderr = std::format(L"Container '{}' not found.\r\n", TestContainerName1), .ExitCode = 1});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Inspect_Success)
+    {
+        auto createResult = RunWslc(std::format(L"container create --name {} {}", TestContainerName1, DebianImage.NameAndTag()));
+        createResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto result = RunWslc(std::format(L"container inspect {}", TestContainerName1));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto inspectData =
+            wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
+        VERIFY_ARE_EQUAL(1u, inspectData.size());
+        VERIFY_ARE_EQUAL("/" + WideToMultiByte(TestContainerName1), inspectData[0].Name);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Inspect_SizeOption)
+    {
+        auto createResult = RunWslc(std::format(L"container create --name {} {}", TestContainerName1, DebianImage.NameAndTag()));
+        createResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Without --size the document must not carry the size fields.
+        auto plain = RunWslc(std::format(L"container inspect {}", TestContainerName1));
+        plain.Verify({.Stderr = L"", .ExitCode = 0});
+        auto plainDocument = nlohmann::json::parse(WideToMultiByte(plain.Stdout.value()));
+        VERIFY_ARE_EQUAL(1u, plainDocument.size());
+        VERIFY_IS_FALSE(plainDocument[0].contains("SizeRw"));
+        VERIFY_IS_FALSE(plainDocument[0].contains("SizeRootFs"));
+
+        const auto verifySized = [&](const std::wstring& command) {
+            auto result = RunWslc(command);
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+
+            auto document = nlohmann::json::parse(WideToMultiByte(result.Stdout.value()));
+            VERIFY_ARE_EQUAL(1u, document.size());
+            VERIFY_IS_TRUE(document[0].contains("SizeRw"));
+            VERIFY_IS_TRUE(document[0].contains("SizeRootFs"));
+            VERIFY_IS_TRUE(document[0]["SizeRw"].is_number());
+            VERIFY_IS_TRUE(document[0]["SizeRootFs"].is_number());
+
+            // The image layers always account for more than nothing.
+            VERIFY_IS_GREATER_THAN(document[0]["SizeRootFs"].get<int64_t>(), static_cast<int64_t>(0));
+        };
+
+        verifySized(std::format(L"container inspect --size {}", TestContainerName1));
+        verifySized(std::format(L"inspect --size {}", TestContainerName1));
+        verifySized(std::format(L"inspect --size --type container {}", TestContainerName1));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Inspect_SizeOption_ListedInHelp)
+    {
+        auto result = RunWslc(L"container inspect --help");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"--size"));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Display total file sizes"));
+        VERIFY_IS_FALSE(result.StdoutContainsSubstring(L"if the type is container"));
+
+        result = RunWslc(L"inspect --help");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"--size"));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Display total file sizes if the type is container"));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Inspect_FormatJson_IsSingleLine)
+    {
+        auto createResult = RunWslc(std::format(L"container create --name {} {}", TestContainerName1, DebianImage.NameAndTag()));
+        createResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto result = RunWslc(std::format(L"container inspect --format json {}", TestContainerName1));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto document = VerifyCompactJsonOutput(result);
+        VERIFY_IS_TRUE(document.is_array());
+        VERIFY_ARE_EQUAL(1u, document.size());
+        VERIFY_ARE_EQUAL("/" + WideToMultiByte(TestContainerName1), document[0]["Name"].get<std::string>());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_InspectMultiple_Success)
+    {
+        // Create two containers to inspect at the same time
+        auto result = RunWslc(std::format(L"container create --name {} {}", TestContainerName1, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        result = RunWslc(std::format(L"container create --name {} {}", TestContainerName2, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Inspect both containers in the same command
+        result = RunWslc(std::format(L"container inspect {} {}", TestContainerName1, TestContainerName2));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto inspectData =
+            wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
+        VERIFY_ARE_EQUAL(2u, inspectData.size());
+        VERIFY_ARE_EQUAL("/" + WideToMultiByte(TestContainerName1), inspectData[0].Name);
+        VERIFY_ARE_EQUAL("/" + WideToMultiByte(TestContainerName2), inspectData[1].Name);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Inspect_MixedFoundNotFound)
+    {
+        // Create one container but not the other
+        auto result = RunWslc(std::format(L"container create --name {} {}", TestContainerName1, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Inspect both containers in the same command, expecting one to be found and the other to not be found
+        result = RunWslc(std::format(L"container inspect {} {}", TestContainerName1, TestContainerName2));
+        result.Verify({.Stderr = std::format(L"Container '{}' not found.\r\n", TestContainerName2), .ExitCode = 1});
+
+        // Verify found container
+        auto inspectData =
+            wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
+        VERIFY_ARE_EQUAL(1u, inspectData.size());
+        VERIFY_ARE_EQUAL("/" + WideToMultiByte(TestContainerName1), inspectData[0].Name);
+    }
+
+private:
+    const std::wstring TestContainerName1 = L"wslc-e2e-container-inspect-1";
+    const std::wstring TestContainerName2 = L"wslc-e2e-container-inspect-2";
+    const TestImage& DebianImage = DebianTestImage();
+};
+} // namespace WSLCE2ETests

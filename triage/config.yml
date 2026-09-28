@@ -1,0 +1,412 @@
+wpa_profile: no-filter.wpaProfile
+
+logs_rules:
+    missing_logs_message: |
+        # Logs are required for review from WSL team
+        
+        If this a feature request, please reply with '/feature'. If this is a question, reply with '/question'.
+        **Otherwise, please attach logs by following the instructions below**, your issue will not be reviewed unless they are added. These logs will help us understand what is going on in your machine.
+        
+        <details>
+        
+        <summary>How to collect WSL logs</summary>
+        
+        Download and execute [collect-wsl-logs.ps1](https://github.com/Microsoft/WSL/blob/master/diagnostics/collect-wsl-logs.ps1) in an **administrative powershell prompt**:
+        
+        ```
+        Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/collect-wsl-logs.ps1" -OutFile collect-wsl-logs.ps1
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        .\collect-wsl-logs.ps1
+        ```
+        
+        The script will output the path of the log file once done.
+
+        If this is a networking issue, please use `.\collect-wsl-logs.ps1 -LogProfile networking` instead, following the instructions in [Collect WSL logs for networking issues](https://github.com/microsoft/WSL/blob/master/CONTRIBUTING.md#collect-wsl-logs-for-networking-issues)
+        
+        Once completed please upload the output files to this GitHub issue.
+         
+        See [Collect WSL logs (recommended method)](https://github.com/microsoft/WSL/blob/master/CONTRIBUTING.md#8-collect-wsl-logs-recommended-method).
+        
+        If you choose to email these logs instead of attaching them to the bug, please send them to wsl-gh-logs@microsoft.com with the GitHub issue number in the subject, and include a link to your GitHub issue comment in the message body, and reply with '/emailed-logs'.
+        </details>
+        
+    
+    missing_logs_add_tags: ['needs-author-feedback']
+    missing_logs_etl_message: 'No logs.etl found in the archive. Make sure that you ran `collect-wsl-logs.ps1` as administrator and that the `logs.etl` file is in the archive.'
+    skip_tags: ['emailed-logs']
+
+optional_component_rules:
+    - name: VirtualMachinePlatform
+      set: vmp-oc-enabled
+
+    - name: Microsoft-Windows-Subsystem-Linux
+      set: wsl-oc-enabled
+
+tags_rules:
+    ignore: ['/featurename']
+    tags:
+        - contains: '/question'
+          tag: 'question'
+        
+        - contains: '/feature'
+          tag: 'feature'
+          
+        - contains: '/emailed-logs'
+          tag: 'emailed-logs'
+
+rules:
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
+        task: GuestLog
+        field1:
+            contains: 'brd: module loaded'
+      set: booting
+        
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
+        task: GuestLog
+        field1:
+            contains: 'oom-kill'
+      set: 
+        name: oom
+        capture:
+            field1: oom-error
+        
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
+        task: GuestLog
+        field1:
+            contains: 'Kernel panic'
+      set: 
+        name: kernel-panic
+        capture:
+            field1: kmsg
+    
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
+        task: GuestLog
+        field1:
+            regex: 'WSL (.*) ERROR'
+      set: init-error
+
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
+        task: GuestLog
+        field1:
+            regex: 'init(.*) segfault'
+      set:
+        name: init-crash
+        capture:
+            field1: error
+
+    - logline:
+        provider: Microsoft.Windows.Subsystem.Lxss
+        task: UserVisibleError
+      set: 
+        name: user-visible-error
+        capture:
+            field3: error
+            
+    - logline:
+        provider: Microsoft.Windows.Subsystem.Lxss
+        task: UserVisibleError
+        field3: Wsl/CallMsi/REGDB_E_CLASSNOTREG
+      set: msix-bad-install-state
+
+    - logline:
+        provider: Microsoft.Windows.Subsystem.Lxss
+        task: LxssException
+        field1: 'onecore\vm\wsl\lxss\wslutil\liftedsupport.cpp'
+        field5: '0x80070002'
+      set: msix-bad-app-exec-alias-state
+
+    - logline:
+        provider: Microsoft-Windows-Hyper-V-Chipset
+        field1:
+            regex: '.*biosdevice.*80070057.*' # 80070057 = E_INVALIDARG
+      set: corrupted-initramfs
+        
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
+        task: FailedToStartVm
+      set: 
+        name: vm-failed-to-start
+        capture:
+          field4: error
+
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
+        task: Error
+        field8: '0x8004032D' # 0x8004032D = WSL_E_VIRTUAL_MACHINE_PLATFORM_REQUIRED
+      set: 
+        name: vmp-required
+        capture:
+          field8: error
+
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
+        task: Error
+        field9: {contains: HcnCreateNetwork}
+      set:
+        name: hns-create-network-error
+        capture:
+          field9: error
+          field8: hresult
+
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
+      set: service-running
+      oneshot: true
+      
+    - logline:
+        provider: Microsoft.Windows.Subsystem.Lxss
+        task: LxssException
+        field7: 
+            regex: '.*0x80070422.*'
+      set: service-disabled-error
+      
+    - logline:
+        provider: Microsoft.Windows.Subsystem.Lxss
+        task: UserVisible Error
+        field3: {regex: '.*/ConfigureNetworking/HNS/.*'}
+      set: 
+        name: hns-fatal-error
+        capture:
+          field3: error
+
+    - logline:
+        provider: Microsoft.Windows.Hyper.V.NetMgmt
+        task: NetMgmt::CreateVirtualSwitch
+        field4: '0x80041002'
+      set: 
+        name: vmswitch-known-issue
+        capture:
+            field4: error
+      
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
+        task: GuestLog
+        field1:
+            contains: 'EXT4-fs error'
+      set: 
+        name: ext4-error
+        capture:
+            field1: error
+
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
+        task: GuestLog
+        field1: {regex: "EXT4-fs.*Can't find ext4 filesystem"}
+      set: 
+        name: ext4-mount-error
+        capture:
+            field1: error
+
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
+        task: GuestLog
+        field1: {regex: ".*No space left on device"}
+      set: 
+        name: disk-out-of-space
+        capture:
+            field1: error
+
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
+        task: LinuxCrash
+      set:
+        name: linux-crash
+        capture:
+          field3: linux-crash-path
+          field6: linux-crash-process
+
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
+      set: wsl-service-logs
+      oneshot: true
+
+    - logline:
+        provider: Microsoft.Windows.Subsystem.Lxss
+      set: wsl-client-logs
+      oneshot: true
+
+    - logline:
+        provider: Microsoft.Windows.Subsystem.Lxss
+        field8: {regex: ".*InstallMsix\\(.*"}
+      set:
+        name: msix-install-error
+        capture:
+            field7: error
+      oneshot: true
+
+    - logline:
+        provider: Microsoft-Windows-VHDMP
+        task: VHD_VIRTUAL_DISK_HANDLE_CREATE_TASK
+        event: 'Microsoft-Windows-VHDMP/VHD_VIRTUAL_DISK_HANDLE_CREATE_TASK/win:Stop'
+        field1: {not: '0x00000000'}
+      set:
+          name: disk-attach-error
+          capture:
+            field1: error
+            field2: vhdpath
+
+    - logline:
+        provider: Microsoft.Windows.HyperV.Worker
+        task: FallbackError
+        field2: {regex: ".*vmchipset\\.dll.*80090006.*"} #0x80090006 = NTE_BAD_SIGNATURE 
+      set:
+        name: hyper-v-firmware-expired
+        capture:
+          field2: signature-error
+
+actions:
+    - foreach:
+        var: user-visible-error
+        debug_message: 'Detected user visible error: $error'
+        skip_similar_issues: false
+
+    - foreach:
+        var: linux-crash
+        debug_message: 'Found evidence of linux crash: $linux-crash-process (dump: $linux-crash-path)'
+        skip_similar_issues: false
+
+    - foreach:
+        var: disk-attach-error
+        debug_message: 'Found evidence of disk failing to attach. Error: $error, Path: $vhdpath'
+
+    - when:
+        condition: 'init-crash'
+        debug_message: 'Found evidence of init crash: $error'
+        tag: init-crash
+
+    - when:
+        condition: 'kernel-panic'
+        debug_message: 'Found evidence of kernel panic: $kmsg'
+        skip_similar_issues: false
+
+    - when: 
+        condition: 
+         and: ['oom', 'booting']
+        user_message: 'The logs show that WSL2 ran out of memory. Try increasing wsl2.memory in .wslconfig and see if that solves the issue.'
+        debug_message: 'Found evidence of OOM kill: $oom-error'
+        tag: needs-author-feedback
+        skip_similar_issues: true
+        
+    - when: 
+        condition: 
+         and: ['vm-failed-to-start', 'hyperv-firmware-expired']
+        user_message: 'The logs show that your Hyper-V firmware is expired. Please update your Windows build and see if that solves the issue'
+        tag: needs-author-feedback
+        skip_similar_issues: true
+        
+    - when: 
+        condition:  'hns-create-network-error'
+        debug_message: 'Found evidence of HcnCreateNetwork failure: $error. HResult: $hresult'
+
+    - when:
+        condition:
+         and: ['vm-failed-to-start', 'hns-create-network-error']
+        user_message: "The logs show that the VM failed to start because the HNS network couldn't be created. Adding network tag"
+        tag: network
+        skip_similar_issues: true
+
+    - when:
+        condition:
+          and: ['vm-failed-to-start', 'corrupted-initramfs']
+        user_message: 'Your WSL installation seems corrupted. Please try to download and install the [latest WSL release](https://github.com/microsoft/WSL/releases/latest)'
+        tag: needs-author-feedback
+        skip_similar_issues: true
+       
+    - when:
+        condition:
+          and: [{not: 'service-running'}, 'service-disabled-error']
+        user_message: 'The logs show that wslservice is disabled. Try to run (elevated command prompt): `sc.exe config wslservice start= demand` and see if that solves the issue'
+        tag: needs-author-feedback
+        skip_similar_issues: true
+
+    - when:
+        condition:
+          and: ['vm-failed-to-start', 'hns-fatal-error']
+        user_message: 'An HNS error seems to be causing WSL2 to fail to start. Adding network tag'
+        debug_message: 'Found HNS error: $error'
+        tag: 'network'
+
+    - when:
+        condition:
+          and: ['vm-failed-to-start', 'vmswitch-known-issue']
+        user_message: 'Known vmswitch issue found (error: $error). Adding network tag'
+        debug_message: 'Found evidence of vmswitch error: $error'
+        tag: 'network'
+        skip_similar_issues: true
+
+        
+    - when: 
+        condition: {or:  ['ext4-error', 'ext4-mount-error']}
+        user_message: 'The logs shows that a disk mount error occurred. Try to [follow these repair instructions](https://learn.microsoft.com/en-us/windows/wsl/disk-space#how-to-repair-a-vhd-mounting-error) and see if that solves the issue.'
+        debug_message: 'Found evidence of ext4 error: $error'
+        tag: 'needs-author-feedback'
+        skip_similar_issues: true
+
+
+    - when:
+        condition:
+          not:
+            or: ['wsl-client-logs', 'wsl-service-logs']
+        user_message: "The log file doesn't contain any WSL traces. Please make sure **that you reproduced the issue while the log collection was running.**"
+        debug_message: 'Found no WSL traces in the logs'
+        tag: 'needs-author-feedback'
+        skip_similar_issues: false
+
+    - when:
+        condition:
+          and:
+            - vmp-required
+            - not: vmp-oc-enabled
+        debug_message: 'Found evidence of virtual machine platform component missing: $error'
+        user_message: 'It appears that the VirtualMachinePlatform optional component is not enabled. Please try running: `dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart`, then reboot and see if that solves the issue.'
+        skip_similar_issues: false
+        tag: 'needs-author-feedback'
+
+    - when:
+        condition: msix-install-error
+        debug_message: 'Found evidence of MSIX install error: $error, adding msix tag'
+        tag: 'msix'
+
+    - when: 
+        condition: msix-bad-app-exec-alias-state
+        debug_message: 'Found evidence of failed app execution alias execution in LiftedSupport'
+
+    - when:
+        condition: {or: [msix-bad-install-state, msix-bad-app-exec-alias-state]}
+        user_message: | 
+            Your WSL installation appears to be in a bad state. Can you try running the following command to reinstall WSL (elevated powershell) and see if that solves the issue?
+            
+            ```
+            Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/triage/install-latest-wsl.ps1" -OutFile install-latest-wsl.ps1
+            Set-ExecutionPolicy Bypass -Scope Process -Force
+            .\install-latest-wsl.ps1
+             ```
+            
+            
+        tag: 'msix'
+
+    - when:
+       condition: disk-out-of-space
+       debug_message: 'Found evidence of disk being full: $error'
+       user_message: |
+        It looks like WSL is out of space. If you're importing a new distribution, try to add: 
+        
+        ```
+        [wsl2]
+        defaultVhdSize = <size> # (example: 1500GB)
+        ```
+        
+        Otherwise, if you need to increase the size of an existing distribution, you can follow [these instructions](https://learn.microsoft.com/en-us/windows/wsl/disk-space#how-to-expand-the-size-of-your-wsl-2-virtual-hard-disk).
+
+    - when:
+        condition:
+          and: ['hyper-v-firmware-expired', 'vm-failed-to-start']
+        tag: 'needs-author-feedback'
+        debug_message: 'Found evidence of hyper-v firmware expiration: $signature-error'
+        user_message: |
+          It looks like the Hyper-V firmware on your Windows build has expired. Please try to update Windows to a more recent build and see if that solves the issue.

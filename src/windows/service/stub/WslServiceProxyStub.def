@@ -1,0 +1,5 @@
+LIBRARY WslServiceProxyStub.dll
+
+EXPORTS
+    DllGetClassObject      PRIVATE
+    DllCanUnloadNow        PRIVATE

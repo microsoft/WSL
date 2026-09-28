@@ -1,0 +1,359 @@
+<#
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE in the project root for license information.
+
+this file work is a derivative of https://github.com/microsoft/MixedReality-GraphicsTools-Unreal/blob/main/Tools/scripts/Common.psm1
+#>
+
+<#
+.SYNOPSIS
+    Run clang-format on all source files.
+.PARAMETER Path
+    Path to the directory (or file) to be processed recursively. By default scans the entire repo.
+.PARAMETER ClangFormat
+    Path to clang-format executable, e.g. "C:\Tools\clang-format.exe"
+.PARAMETER ModifiedOnly
+    Scan only files modified in current git checkout.
+.PARAMETER Staged
+    Check only files staged for commit
+.PARAMETER Branch
+    Scan only files modified by the current branch, i.e. changed relative to the commit the branch
+    diverged from. Uncommitted changes are included; deleted files are skipped.
+.PARAMETER BaseBranch
+    Base branch to compute the divergence point from when -Branch is used. Defaults to the local
+    master branch.
+.PARAMETER ChangesFile
+    Scan only files listed in provided txt file (one path per line). Paths need to be relative to repo root.
+.PARAMETER Verify
+    Whether to fail if files are not formatted (instead of applying changes).
+.PARAMETER NoFail
+    Do not set RC=1 when errors found, i.e. only report errors in output.
+#>
+[CmdletBinding()]
+param (
+    [string]$Path = $null,
+    [boolean]$DefaultPackagesConfig = $false,
+    [string]$ClangFormat = $null,
+    [boolean]$ModifiedOnly = $True,
+    [boolean]$Staged = $false,
+    [switch]$Branch,
+    [string]$BaseBranch = "master",
+    [string]$ChangesFile = $null,
+    [boolean]$Verify = $false,
+    [boolean]$NoFail = $false
+)
+
+# Only check source files
+$FilePatterns = "\.(h|cpp|hpp|c|hxx)$"
+
+$IgnoreFolders = "(out|.git|.vs|.vscode|bin|CMakeFiles|generated|debug|x64|packages|_deps)$"
+
+# Handle both execution methods: direct PowerShell and powershell.exe script invocation
+if ([string]::IsNullOrEmpty($PSScriptRoot)) {
+    $RepoRoot = (Get-Location).Path
+} else {
+    $RepoRoot = (Resolve-Path "$PSScriptRoot")
+}
+
+<#
+.SYNOPSIS
+    Given the path to the list of raw git changes, returns an array of
+    those changes rooted in the git root directory.
+.DESCRIPTION
+    For example, the raw git changes will contain lines like:
+
+    Assets/File.cs
+
+    This function will return a list of paths that look like (assuming
+    that RepoRoot is C:\repo):
+
+    C:\repo\Assets\File.cs
+#>
+function GetChangedFiles {
+    [CmdletBinding()]
+    param(
+        [string]$Filename,
+        [string]$RepoRoot
+    )
+    process {
+        $rawContent = Get-Content -Path $Filename
+        $processedContent = @()
+        foreach ($line in $rawContent) {
+            $joinedPath = Join-Path -Path $RepoRoot -ChildPath $line
+            $processedContent += $joinedPath
+        }
+        $processedContent
+    }
+}
+
+<#
+.SYNOPSIS
+    Returns the commit the current branch diverged from, or $null when it cannot be determined.
+#>
+function GetBranchBaseCommit {
+    [CmdletBinding()]
+    param(
+        [string]$BaseBranch
+    )
+    process {
+        $Commit = (& git merge-base HEAD $BaseBranch 2>$null)
+        if (($LASTEXITCODE -ne 0) -or [string]::IsNullOrEmpty($Commit)) {
+            return $null
+        }
+
+        return $Commit.Trim()
+    }
+}
+
+if ([string]::IsNullOrEmpty($Path)) {
+    $Path = $RepoRoot
+}
+
+$ModifiedFiles = $null
+
+if ($ChangesFile) {
+    if (-not (Test-Path -Path $ChangesFile -PathType Leaf)) {
+        Write-Host -ForegroundColor Red "ChangesFile not found: $ChangesFile"
+        Write-Host "Checking all source files"
+    }
+    else {
+        $ModifiedFiles = GetChangedFiles -Filename $ChangesFile -RepoRoot $RepoRoot
+        if (($null -eq $ModifiedFiles) -or ($ModifiedFiles.Count -eq 0)) {
+            Write-Host -ForegroundColor Green "No modified files to format."
+            exit 0
+        }
+    }
+}
+elseif ($Branch -or $ModifiedOnly -or $Staged) {
+    $ModifiedFiles = @()
+    Push-Location -Path $RepoRoot
+    $Success = $False
+    try {
+        if ($Branch) {
+            $BaseCommit = GetBranchBaseCommit -BaseBranch $BaseBranch
+            if ([string]::IsNullOrEmpty($BaseCommit)) {
+                Pop-Location
+                Write-Host -ForegroundColor Red "Could not determine the commit the current branch diverged from. Specify the base branch with -BaseBranch."
+                exit 1
+            }
+
+            # Files touched by the branch, including uncommitted changes. Deleted files are skipped
+            # since there is nothing left to format.
+            Write-Host "[clang-format] Using branch changes since $BaseCommit"
+            $Changes = @(& git diff --name-only --diff-filter=d $BaseCommit)
+            $Success = ($LASTEXITCODE -eq 0)
+
+            # git diff only reports tracked files, so new files that haven't been added yet need to
+            # be collected separately.
+            if ($Success) {
+                $Changes += @(& git ls-files --others --exclude-standard)
+                $Success = ($LASTEXITCODE -eq 0)
+            }
+        }
+        elseif ($Staged) {
+            $Changes = (& git diff-index --cached --name-only HEAD)
+            $Success = ($LASTEXITCODE -eq 0)
+        }
+        else {
+            $Status = (& git status --porcelain)
+            $Success = ($LASTEXITCODE -eq 0)
+            # Strip the porcelain status prefix to get the path.
+            $Changes = $Status | ForEach-Object { ($_.Trim() -split " ", 2)[-1] }
+        }
+
+        $Changes | ForEach-Object {
+            $FullPath = Resolve-Path $_ -ErrorAction SilentlyContinue
+            $FileName = Split-Path -Leaf -Path $FullPath
+            if ($FileName -match $FilePatterns) {
+                $ModifiedFiles += $FullPath
+            }
+        }
+    }
+    catch {
+        # empty
+    }
+    if (-not $Success) {
+        Write-Host -ForegroundColor Red "Could not get the list of modified files. Check if git is configured correctly."
+        exit 1
+    }
+    Pop-Location
+    if (($null -eq $ModifiedFiles) -or ($ModifiedFiles.Count -eq 0)) {
+        Write-Host -ForegroundColor Green "No modified files to format."
+        exit 0
+    }
+}
+
+$ClangFormat = "${LLVM_INSTALL_DIR}/clang-format.exe"
+if (-not (Test-Path -Type Leaf -Path $ClangFormat)) {
+    # The artifact directory is only known by cmake. Let cmake drop a link/copy where we can find it.
+    $ClangFormat = "$PSScriptRoot\clang-format.exe"
+}
+
+if (-not (Test-Path -Type Leaf -Path $ClangFormat)) {
+    Write-Host -ForegroundColor Red "clang-format.exe not found, use cmake to grab llvm package or specify directly with -ClangFormat"
+    exit 1
+}
+
+function Collect-FilesToFormat {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $True)]
+        [string]$Path,
+        [string[]]$ModifiedFiles = $null
+    )
+    process {
+        $Path = Resolve-Path $Path
+        $files = [System.Collections.Generic.List[string]]::new()
+        if ((Get-Item -Path $Path) -is [System.IO.DirectoryInfo]) {
+            Get-ChildItem -Path $Path -File `
+            | Where-Object { $_.Name -match $FilePatterns } `
+            | ForEach-Object {
+                $FilePath = "$Path\$($_.Name)"
+                if (($null -eq $ModifiedFiles) -or ($ModifiedFiles -contains $FilePath)) {
+                    if (!($FilePath -match "Intermediate")) {
+                        [void]$files.Add($FilePath)
+                    }
+                }
+            }
+            Get-ChildItem -Path $Path -Directory `
+            | Where-Object { $_.Name -notmatch $IgnoreFolders } `
+            | ForEach-Object {
+                $subFiles = @(Collect-FilesToFormat -Path "$Path\$($_.Name)" `
+                        -ModifiedFiles $ModifiedFiles)
+                foreach ($f in $subFiles) {
+                    [void]$files.Add($f)
+                }
+            }
+        }
+        else {
+            [void]$files.Add("$Path")
+        }
+        return @($files)
+    }
+}
+
+$allFiles = @(Collect-FilesToFormat -Path $Path -ModifiedFiles $ModifiedFiles)
+
+if ($allFiles.Count -eq 0) {
+    Write-Host -ForegroundColor Green "No files to format."
+    exit 0
+}
+
+$threadCount = [Environment]::ProcessorCount
+$totalFiles = $allFiles.Count
+Write-Host "[clang-format] Checking $totalFiles files using $threadCount threads..."
+
+# Create runspace pool for parallel execution (one thread per CPU core)
+$pool = [RunspaceFactory]::CreateRunspacePool(1, $threadCount)
+$pool.Open()
+
+$formatScript = {
+    param($clangFormatExe, $filePath, $verifyMode)
+    $pinfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $pinfo.FileName = $clangFormatExe
+    if ($verifyMode) {
+        $pinfo.Arguments = "--style=file -Werror --dry-run `"$filePath`""
+    }
+    else {
+        $pinfo.Arguments = "--style=file -Werror -i `"$filePath`""
+    }
+    $pinfo.RedirectStandardError = $true # Not redirecting stdout to avoid a pipe deadlock.
+    $pinfo.UseShellExecute = $false
+
+    $proc = [System.Diagnostics.Process]::new()
+    $proc.StartInfo = $pinfo
+    [void]$proc.Start()
+    $stderr = $proc.StandardError.ReadToEnd()
+    $proc.WaitForExit()
+
+    [PSCustomObject]@{
+        File     = $filePath
+        ExitCode = $proc.ExitCode
+        Output   = $stderr.TrimEnd()
+    }
+}
+
+# Submit all jobs to the runspace pool
+$jobs = [System.Collections.ArrayList]::new()
+foreach ($file in $allFiles) {
+    $ps = [PowerShell]::Create()
+    $ps.RunspacePool = $pool
+    [void]$ps.AddScript($formatScript).AddArgument($ClangFormat).AddArgument($file).AddArgument($Verify)
+    $handle = $ps.BeginInvoke()
+    [void]$jobs.Add([PSCustomObject]@{
+        PowerShell = $ps
+        Handle     = $handle
+    })
+}
+
+# Determine console width for progress display
+try { $lineWidth = [Math]::Max(([Console]::BufferWidth - 1), 40) } catch { $lineWidth = 120 }
+
+$Success = $true
+
+try {
+    while ($jobs.Count -gt 0) {
+        $finishedJobs = @($jobs | Where-Object { $_.Handle.IsCompleted })
+        foreach ($job in $finishedJobs) {
+            try {
+                $result = $job.PowerShell.EndInvoke($job.Handle)[0]
+            }
+            catch {
+                $result = [PSCustomObject]@{ File = "unknown"; ExitCode = 1; Output = $_.Exception.Message }
+            }
+            $job.PowerShell.Dispose()
+            [void]$jobs.Remove($job)
+
+            if ($result.ExitCode -ne 0) {
+                $Success = $false
+                # Clear progress line and print error permanently
+                [Console]::Write("`r" + (" " * $lineWidth) + "`r")
+                Write-Host -ForegroundColor Red "[clang-format] $($result.File)"
+                if ($result.Output) {
+                    Write-Host $result.Output
+                }
+            }
+
+            # Update progress line in-place with latest file
+            $completed = $totalFiles - $jobs.Count
+            $status = "[clang-format] ($completed/$totalFiles) $($result.File)"
+            if ($status.Length -gt $lineWidth) {
+                $status = $status.Substring(0, $lineWidth)
+            }
+            [Console]::Write("`r" + $status.PadRight($lineWidth))
+        }
+        Start-Sleep -Milliseconds 50
+    }
+}
+finally {
+    # Clean up any remaining jobs and the pool
+    foreach ($job in $jobs) {
+        $job.PowerShell.Stop()
+        $job.PowerShell.Dispose()
+    }
+
+    # Clear final progress line
+    [Console]::Write("`r" + (" " * $lineWidth) + "`r")
+
+    $pool.Close()
+    $pool.Dispose()
+}
+
+if ($Success) {
+    Write-Host "Done."
+    exit 0
+}
+else {
+    Write-Host -ForegroundColor Red "Errors found (see output). Please make sure to resolve all issues before opening a Pull Request."
+    Write-Host -ForegroundColor Red "Formatting can be applied by running:"
+    if ($Branch) {
+        Write-Host -ForegroundColor Red "   powershell $PSCommandPath -Branch"
+    }
+    else {
+        Write-Host -ForegroundColor Red "   powershell $PSCommandPath -ModifiedOnly ```$false [-Path <path to file or directory>]"
+    }
+    if ($NoFail) {
+        exit 0  # do not prevent commit when used in pre-commit hook
+    }
+    exit 1
+}

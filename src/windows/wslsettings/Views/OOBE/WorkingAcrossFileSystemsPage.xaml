@@ -1,0 +1,22 @@
+﻿<Page
+    x:Class="WslSettings.Views.OOBE.WorkingAcrossFileSystemsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:behaviors="using:WslSettings.Behaviors"
+    xmlns:controls="using:WslSettings.Controls"
+    behaviors:NavigationViewHeaderBehavior.HeaderMode="Never">
+
+    <controls:OOBEContent x:Uid="Settings_OOBECrossOSFileAccess" HeroImage="ms-appx:///Assets/SettingsOOBECrossOSFileAccess.gif">
+        <controls:OOBEContent.PageContent>
+            <StackPanel Orientation="Vertical" Spacing="12">
+                <TextBlock x:Uid="Settings_OOBECrossOSFileAccess_WindowsFromLinuxTitle" Style="{StaticResource OobeSubtitleStyle}" Margin="0,0,0,-6"/>
+                <TextBlock x:Uid="Settings_OOBECrossOSFileAccess_WindowsFromLinuxSample" TextWrapping="Wrap"/>
+                <TextBlock x:Uid="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerTitle" Style="{StaticResource OobeSubtitleStyle}" Margin="0,12,0,-6"/>
+                <TextBlock x:Uid="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerSample" TextWrapping="Wrap"/>
+                <TextBlock x:Uid="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLTitle" Style="{StaticResource OobeSubtitleStyle}" Margin="0,12,0,-6"/>
+                <TextBlock x:Uid="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLSample" TextWrapping="Wrap"/>
+                <HyperlinkButton x:Uid="Settings_OOBECrossOSFileAccessLink" Margin="0,6,0,0" Style="{StaticResource TextButtonStyle}"/>
+            </StackPanel>
+        </controls:OOBEContent.PageContent>
+    </controls:OOBEContent>
+</Page>

@@ -1,0 +1,19 @@
+title: Enumerations
+nav:
+  - index.md
+  - wslccontainernetworkingmode.md
+  - wslcvhdtype.md
+  - wslcvhdrequirementsflags.md
+  - wslcsessionfeatureflags.md
+  - wslcsessionterminationreason.md
+  - wslcportprotocol.md
+  - wslccontainerflags.md
+  - wslccontainerstartflags.md
+  - wslccontainerstate.md
+  - wslcsignal.md
+  - wslcdeletecontainerflags.md
+  - wslcprocessiohandle.md
+  - wslcprocessflags.md
+  - wslcprocessstate.md
+  - wslcimageprogressstatus.md
+  - wslccomponentflags.md

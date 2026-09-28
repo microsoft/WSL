@@ -1,0 +1,374 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WpaProfileContainer xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" Version="2" xmlns="http://tempuri.org/SerializableElement.xsd">
+  <Content xsi:type="WpaProfile2">
+    <Sessions>
+      <Session Index="0">
+        <FileReferences />
+      </Session>
+    </Sessions>
+    <Views>
+      <View Guid="fa2db56d-11da-45d9-b766-1168edd04483" IsVisible="true" Title="Analysis">
+        <Graphs>
+          <Graph Guid="04f69f98-176e-4d1c-b44e-97f734996ab8" LayoutStyle="All" GraphHeight="125" IsMinimized="false" IsShown="true" IsExpanded="false" HelpText="{}{\rtf1\ansi\ansicpg1252\uc1\htmautsp\deff2{\fonttbl{\f0\fcharset0 Times New Roman;}{\f2\fcharset0 Segoe UI;}}{\colortbl\red0\green0\blue0;\red255\green255\blue255;}\loch\hich\dbch\pard\plain\ltrpar\itap0{\lang1033\fs18\f2\cf0 \cf0\ql{\f2 {\ltrch Shows every event in the trace, including the associated payload fields.}\li0\ri0\sa0\sb0\fi0\ql\par{\f2 \li0\ri0\sa0\sb0\fi0\ql\par{\f2 {\ltrch New capability - graph payload fields!}\li0\ri0\sa0\sb0\fi0\ql\par{\f2 \li0\ri0\sa0\sb0\fi0\ql\par{\f2 {\ltrch 1. Filter down to the event with the payload field you want to graph.}\li0\ri0\sa0\sb0\fi0\ql\par{\f2 {\ltrch 2. Drag the column corresponding to the payload field you want to graph to the right of the blue bar.}\li0\ri0\sa0\sb0\fi0\ql\par{\f2 {\ltrch 3. If the automatic graphing isn't representing your data correctly, go to View Editor and:}\li0\ri0\sa0\sb0\fi0\ql\par{\f2 {\ltrch a. Adjust the aggregation mode for your column, or}\li0\ri0\sa0\sb0\fi0\ql\par{\f2 {\ltrch b. Go to Advanced &gt; Graph Configuration and change your graphing aggregation mode.}\li0\ri0\sa0\sb0\fi0\ql\par}">
+            <Preset Name="Activity by Provider, Task, Opcode" BarGraphIntervalCount="50" IsThreadActivityTable="false" GraphColumnCount="35" KeyColumnCount="8" LeftFrozenColumnCount="9" RightFrozenColumnCount="33" InitialFilterShouldKeep="true" GraphFilterTopValue="0" GraphFilterThresholdValue="0" HelpText="{}{\rtf1\ansi\ansicpg1252\uc1\htmautsp\deff2{\fonttbl{\f0\fcharset0 Times New Roman;}{\f2\fcharset0 Segoe UI;}}{\colortbl\red0\green0\blue0;\red255\green255\blue255;}\loch\hich\dbch\pard\plain\ltrpar\itap0{\lang1033\fs18\f2\cf0 \cf0\ql{\f2 {\ltrch Groups all the events by provider, task, and opcode.}\li0\ri0\sa0\sb0\fi0\ql\par}&#xD;&#xA;}&#xD;&#xA;}">
+              <MetadataEntries>
+                <MetadataEntry Guid="bbfc990a-b6c9-4dcd-858b-f040ab4a1efe" Name="Time" ColumnMetadata="StartTime" />
+                <MetadataEntry Guid="bbfc990a-b6c9-4dcd-858b-f040ab4a1efe" Name="Time" ColumnMetadata="EndTime" />
+                <MetadataEntry Guid="edf01e5d-3644-4dbc-ab9d-f8954e6db6ea" Name="ThreadId" ColumnMetadata="EndThreadId" />
+              </MetadataEntries>
+              <HighlightEntries />
+              <Columns>
+                <Column Guid="8b4c40f8-0d99-437d-86ab-56ec200137dc" Name="Provider Name" SortPriority="1" Width="200" IsVisible="true">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="2a23f9b1-65d6-46d2-87b2-72f3606b7f75" Name="Provider Id" SortPriority="5" Width="100" IsVisible="false">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="511777f7-30ef-4e86-bd0b-0facaf23a0d3" Name="Task Name" SortPriority="2" Width="80" IsVisible="true">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="5b51716b-b88f-443a-a396-c6316296d5f8" Name="Opcode Name" SortPriority="3" Width="80" IsVisible="true">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="c72e1c5a-f6db-4c84-8c0b-85989e514075" Name="Id" SortPriority="3" Width="80" IsVisible="true">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="d446a182-5203-4a29-aca1-4ab9bea0d1b5" Name="Version" SortPriority="0" Width="80" IsVisible="false">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="7ee6a5ff-1faf-428a-a7c2-7d2cb2b5cf26" Name="Process" SortPriority="9" Width="150" IsVisible="true">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="b51bcda1-7ea3-4409-b4af-51a704893bd9" Name="Process Id" SortPriority="0" Width="50" IsVisible="false">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="cb796d44-2927-5ac1-d231-4b71904c18f5" Name="Thread Name" SortPriority="0" Width="80" IsVisible="false">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="82ddfdff-ee93-5f35-08ac-4705069618dc" Name="Thread Activity Tag" SortPriority="0" Width="80" IsVisible="false">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="2818954f-2d30-5569-4510-dade0a5a605c" Name="Annotation" SortPriority="0" Width="80" IsVisible="false">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="90fe0b49-e3bb-440f-b829-5813c42108a1" Name="Event Name" SortPriority="4" Width="100" IsVisible="true">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="72892fbe-0f55-426a-9aa1-26b6baf09ffb" Name="Event Type" SortPriority="6" Width="100" IsVisible="false">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="0734f1a4-fbd9-4ff6-aec0-cf43875c8253" Name="Message" SortPriority="6" Width="100" IsVisible="false">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="3be8610c-babb-4154-9970-1b2210928024" Name="Cpu" SortPriority="7" Width="30" IsVisible="true">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="edf01e5d-3644-4dbc-ab9d-f8954e6db6ea" Name="ThreadId" SortPriority="8" Width="50" IsVisible="true">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="0c5cf8cd-9b9e-5798-1a5d-09d429f7fa3c" Name="Field 1" SortPriority="-1" Width="80" IsVisible="true" HelpText="Field 1">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="71badd11-26e5-56bc-44ec-12f4cc6a8f3e" Name="Field 2" SortPriority="-1" Width="80" IsVisible="true" HelpText="Field 2">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="411dba2d-5d6e-5272-8287-636d0841768c" Name="Field 3" SortPriority="-1" Width="80" IsVisible="true" HelpText="Field 3">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="048f5050-1f17-59b3-fa22-4b0781ee630b" Name="Field 4" SortPriority="-1" Width="80" IsVisible="true" HelpText="Field 4">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="94e48f22-d499-5227-bb04-be011b4159b0" Name="Field 5" SortPriority="-1" Width="80" IsVisible="true" HelpText="Field 5">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="c1054028-424a-59ba-e760-6d30abbd69c5" Name="Field 6" SortPriority="-1" Width="80" IsVisible="true" HelpText="Field 6">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="5cbc4b58-2de1-5449-55b2-4651d4edf90a" Name="Field 7" SortPriority="-1" Width="80" IsVisible="true" HelpText="Field 7">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="fc01e6c9-a43b-51a1-fd2e-112ba48aff65" Name="Field 8" SortPriority="-1" Width="80" IsVisible="true" HelpText="Field 8">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="e3dcf300-46e2-5c43-ef4b-2c3db489ec25" Name="Field 9" SortPriority="-1" Width="80" IsVisible="true" HelpText="Field 9">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="87c21ddb-4b29-58e3-5ddc-f114c5ca209a" Name="Field 10" SortPriority="-1" Width="80" IsVisible="true" HelpText="Field 10">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="65f8fe42-ad02-5016-3521-f93329c76227" Name="Field 11" SortPriority="-1" Width="80" IsVisible="true" HelpText="Field 11">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="03d48fd3-0fe4-57f5-a477-49beb0d70a1f" Name="Field 12" SortPriority="-1" Width="80" IsVisible="true" HelpText="Field 12">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="998f8e2d-0f5a-5a54-0133-226e2de62c0b" Name="Field 13" SortPriority="-1" Width="80" IsVisible="true" HelpText="Field 13">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="bb772c34-9600-5bf7-3f54-e6080f8a0611" Name="Field 14" SortPriority="-1" Width="80" IsVisible="true" HelpText="Field 14">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="1479add7-3dcb-580b-f1e9-87d5186ced61" Name="Field 15" SortPriority="-1" Width="80" IsVisible="true" HelpText="Field 15">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="342f7677-17b2-4c7e-b9ec-e89612c49792" Name="Count" AggregationMode="Sum" SortOrder="Descending" SortPriority="0" Width="80" IsVisible="true">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="bbfc990a-b6c9-4dcd-858b-f040ab4a1efe" Name="Time" SortPriority="11" Width="80" IsVisible="true">
+                  <ColorQueryEntries />
+                </Column>
+              </Columns>
+            </Preset>
+          </Graph>
+        </Graphs>
+        <SessionIndices>
+          <SessionIndex>0</SessionIndex>
+        </SessionIndices>
+      </View>
+      <View Guid="67563633-8128-4b0b-bf07-e76dc861e5c6" IsVisible="true" Title="Analysis">
+        <Graphs>
+          <Graph Guid="04f69f98-176e-4d1c-b44e-97f734996ab8" LayoutStyle="All" GraphHeight="125" IsMinimized="false" IsShown="true" IsExpanded="false" HelpText="{}{\rtf1\ansi\ansicpg1252\uc1\htmautsp\deff2{\fonttbl{\f0\fcharset0 Times New Roman;}{\f2\fcharset0 Segoe UI;}}{\colortbl\red0\green0\blue0;\red255\green255\blue255;}\loch\hich\dbch\pard\plain\ltrpar\itap0{\lang1033\fs18\f2\cf0 \cf0\ql{\f2 {\ltrch Shows every event in the trace, including the associated payload fields.}\li0\ri0\sa0\sb0\fi0\ql\par{\f2 \li0\ri0\sa0\sb0\fi0\ql\par{\f2 {\ltrch New capability - graph payload fields!}\li0\ri0\sa0\sb0\fi0\ql\par{\f2 \li0\ri0\sa0\sb0\fi0\ql\par{\f2 {\ltrch 1. Filter down to the event with the payload field you want to graph.}\li0\ri0\sa0\sb0\fi0\ql\par{\f2 {\ltrch 2. Drag the column corresponding to the payload field you want to graph to the right of the blue bar.}\li0\ri0\sa0\sb0\fi0\ql\par{\f2 {\ltrch 3. If the automatic graphing isn't representing your data correctly, go to View Editor and:}\li0\ri0\sa0\sb0\fi0\ql\par{\f2 {\ltrch a. Adjust the aggregation mode for your column, or}\li0\ri0\sa0\sb0\fi0\ql\par{\f2 {\ltrch b. Go to Advanced &gt; Graph Configuration and change your graphing aggregation mode.}\li0\ri0\sa0\sb0\fi0\ql\par}">
+            <Preset Name="Activity by Provider, Task, Opcode" BarGraphIntervalCount="50" IsThreadActivityTable="false" GraphColumnCount="36" KeyColumnCount="7" LeftFrozenColumnCount="8" RightFrozenColumnCount="34" InitialFilterShouldKeep="true" GraphFilterTopValue="0" GraphFilterThresholdValue="0" HelpText="{}{\rtf1\ansi\ansicpg1252\uc1\htmautsp\deff2{\fonttbl{\f0\fcharset0 Times New Roman;}{\f2\fcharset0 Segoe UI;}}{\colortbl\red0\green0\blue0;\red255\green255\blue255;}\loch\hich\dbch\pard\plain\ltrpar\itap0{\lang1033\fs18\f2\cf0 \cf0\ql{\f2 {\ltrch Groups all the events by provider, task, and opcode.}\li0\ri0\sa0\sb0\fi0\ql\par}&#xD;&#xA;}&#xD;&#xA;}">
+              <MetadataEntries>
+                <MetadataEntry Guid="edf01e5d-3644-4dbc-ab9d-f8954e6db6ea" Name="ThreadId" ColumnMetadata="EndThreadId" />
+                <MetadataEntry Guid="bbfc990a-b6c9-4dcd-858b-f040ab4a1efe" Name="Time" ColumnMetadata="StartTime" />
+                <MetadataEntry Guid="bbfc990a-b6c9-4dcd-858b-f040ab4a1efe" Name="Time" ColumnMetadata="EndTime" />
+              </MetadataEntries>
+              <HighlightEntries />
+              <Columns>
+                <Column Guid="bbfc990a-b6c9-4dcd-858b-f040ab4a1efe" Name="Time" SortPriority="38" Width="80" IsVisible="true">
+                  <DateTimeTimestampOptionsParameter DateTimeEnabled="true" />
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="2a23f9b1-65d6-46d2-87b2-72f3606b7f75" Name="Provider Id" SortPriority="32" Width="100" IsVisible="false">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="5b51716b-b88f-443a-a396-c6316296d5f8" Name="Opcode Name" SortPriority="29" Width="80" IsVisible="false">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="c72e1c5a-f6db-4c84-8c0b-85989e514075" Name="Id" SortPriority="30" Width="80" IsVisible="false">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="d446a182-5203-4a29-aca1-4ab9bea0d1b5" Name="Version" SortPriority="1" Width="80" IsVisible="false">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="7ee6a5ff-1faf-428a-a7c2-7d2cb2b5cf26" Name="Process" SortPriority="37" Width="150" IsVisible="false">
+                  <ProcessOptionsParameter />
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="b51bcda1-7ea3-4409-b4af-51a704893bd9" Name="Process Id" SortPriority="2" Width="50" IsVisible="false">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="cb796d44-2927-5ac1-d231-4b71904c18f5" Name="Thread Name" SortPriority="3" Width="80" IsVisible="false">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="82ddfdff-ee93-5f35-08ac-4705069618dc" Name="Thread Activity Tag" SortPriority="4" Width="80" IsVisible="false">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="2818954f-2d30-5569-4510-dade0a5a605c" Name="Annotation" SortPriority="5" Width="80" IsVisible="false">
+                  <AnnotationsOptionsParameter>
+                    <AnnotationQueryEntries />
+                  </AnnotationsOptionsParameter>
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="8b4c40f8-0d99-437d-86ab-56ec200137dc" Name="Provider Name" SortPriority="27" Width="305" IsVisible="true">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="511777f7-30ef-4e86-bd0b-0facaf23a0d3" Name="Task Name" SortPriority="28" Width="223" IsVisible="true">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="90fe0b49-e3bb-440f-b829-5813c42108a1" Name="Event Name" SortPriority="31" Width="222" IsVisible="true">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="72892fbe-0f55-426a-9aa1-26b6baf09ffb" Name="Event Type" SortPriority="33" Width="100" IsVisible="false">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="0734f1a4-fbd9-4ff6-aec0-cf43875c8253" Name="Message" SortPriority="34" Width="100" IsVisible="false">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="3be8610c-babb-4154-9970-1b2210928024" Name="Cpu" SortPriority="35" Width="30" IsVisible="false">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="edf01e5d-3644-4dbc-ab9d-f8954e6db6ea" Name="ThreadId" SortPriority="36" Width="50" IsVisible="false">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="0c5cf8cd-9b9e-5798-1a5d-09d429f7fa3c" Name="Field 1" SortPriority="6" Width="352" IsVisible="true" HelpText="Field 1">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="71badd11-26e5-56bc-44ec-12f4cc6a8f3e" Name="Field 2" SortPriority="7" Width="282" IsVisible="true" HelpText="Field 2">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="411dba2d-5d6e-5272-8287-636d0841768c" Name="Field 3" SortPriority="8" Width="125" IsVisible="true" HelpText="Field 3">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="048f5050-1f17-59b3-fa22-4b0781ee630b" Name="Field 4" SortPriority="9" Width="1061" IsVisible="true" HelpText="Field 4">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="94e48f22-d499-5227-bb04-be011b4159b0" Name="Field 5" SortPriority="10" Width="80" IsVisible="true" HelpText="Field 5">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="c1054028-424a-59ba-e760-6d30abbd69c5" Name="Field 6" SortPriority="11" Width="80" IsVisible="true" HelpText="Field 6">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="5cbc4b58-2de1-5449-55b2-4651d4edf90a" Name="Field 7" SortPriority="12" Width="80" IsVisible="true" HelpText="Field 7">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="fc01e6c9-a43b-51a1-fd2e-112ba48aff65" Name="Field 8" SortPriority="13" Width="80" IsVisible="true" HelpText="Field 8">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="e3dcf300-46e2-5c43-ef4b-2c3db489ec25" Name="Field 9" SortPriority="14" Width="80" IsVisible="true" HelpText="Field 9">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="87c21ddb-4b29-58e3-5ddc-f114c5ca209a" Name="Field 10" SortPriority="15" Width="80" IsVisible="true" HelpText="Field 10">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="65f8fe42-ad02-5016-3521-f93329c76227" Name="Field 11" SortPriority="16" Width="80" IsVisible="true" HelpText="Field 11">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="03d48fd3-0fe4-57f5-a477-49beb0d70a1f" Name="Field 12" SortPriority="17" Width="80" IsVisible="true" HelpText="Field 12">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="998f8e2d-0f5a-5a54-0133-226e2de62c0b" Name="Field 13" SortPriority="18" Width="80" IsVisible="true" HelpText="Field 13">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="bb772c34-9600-5bf7-3f54-e6080f8a0611" Name="Field 14" SortPriority="19" Width="80" IsVisible="true" HelpText="Field 14">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="1479add7-3dcb-580b-f1e9-87d5186ced61" Name="Field 15" SortPriority="20" Width="80" IsVisible="true" HelpText="Field 15">
+                  <ColorQueryEntries />
+                </Column>
+                <Column Guid="342f7677-17b2-4c7e-b9ec-e89612c49792" Name="Count" AggregationMode="Sum" SortOrder="Descending" SortPriority="0" Width="80" IsVisible="true">
+                  <ColorQueryEntries />
+                </Column>
+              </Columns>
+            </Preset>
+          </Graph>
+        </Graphs>
+        <SessionIndices>
+          <SessionIndex>0</SessionIndex>
+        </SessionIndices>
+      </View>
+    </Views>
+    <ModifiedGraphs>
+      <GraphSchema Guid="04f69f98-176e-4d1c-b44e-97f734996ab8" HelpText="{}{\rtf1\ansi\ansicpg1252\uc1\htmautsp\deff2{\fonttbl{\f0\fcharset0 Times New Roman;}{\f2\fcharset0 Segoe UI;}}{\colortbl\red0\green0\blue0;\red255\green255\blue255;}\loch\hich\dbch\pard\plain\ltrpar\itap0{\lang1033\fs18\f2\cf0 \cf0\ql{\f2 {\ltrch Shows every event in the trace, including the associated payload fields.}\li0\ri0\sa0\sb0\fi0\ql\par{\f2 \li0\ri0\sa0\sb0\fi0\ql\par{\f2 {\ltrch New capability - graph payload fields!}\li0\ri0\sa0\sb0\fi0\ql\par{\f2 \li0\ri0\sa0\sb0\fi0\ql\par{\f2 {\ltrch 1. Filter down to the event with the payload field you want to graph.}\li0\ri0\sa0\sb0\fi0\ql\par{\f2 {\ltrch 2. Drag the column corresponding to the payload field you want to graph to the right of the blue bar.}\li0\ri0\sa0\sb0\fi0\ql\par{\f2 {\ltrch 3. If the automatic graphing isn't representing your data correctly, go to View Editor and:}\li0\ri0\sa0\sb0\fi0\ql\par{\f2 {\ltrch a. Adjust the aggregation mode for your column, or}\li0\ri0\sa0\sb0\fi0\ql\par{\f2 {\ltrch b. Go to Advanced &gt; Graph Configuration and change your graphing aggregation mode.}\li0\ri0\sa0\sb0\fi0\ql\par}">
+        <ModifiedPresets />
+        <PersistedPresets>
+          <Preset Name="Activity by Provider, Task, Opcode" BarGraphIntervalCount="50" IsThreadActivityTable="false" GraphColumnCount="36" KeyColumnCount="7" LeftFrozenColumnCount="8" RightFrozenColumnCount="34" InitialFilterShouldKeep="true" GraphFilterTopValue="0" GraphFilterThresholdValue="0" HelpText="{}{\rtf1\ansi\ansicpg1252\uc1\htmautsp\deff2{\fonttbl{\f0\fcharset0 Times New Roman;}{\f2\fcharset0 Segoe UI;}}{\colortbl\red0\green0\blue0;\red255\green255\blue255;}\loch\hich\dbch\pard\plain\ltrpar\itap0{\lang1033\fs18\f2\cf0 \cf0\ql{\f2 {\ltrch Groups all the events by provider, task, and opcode.}\li0\ri0\sa0\sb0\fi0\ql\par}&#xD;&#xA;}&#xD;&#xA;}">
+            <MetadataEntries>
+              <MetadataEntry Guid="edf01e5d-3644-4dbc-ab9d-f8954e6db6ea" Name="ThreadId" ColumnMetadata="EndThreadId" />
+              <MetadataEntry Guid="bbfc990a-b6c9-4dcd-858b-f040ab4a1efe" Name="Time" ColumnMetadata="StartTime" />
+              <MetadataEntry Guid="bbfc990a-b6c9-4dcd-858b-f040ab4a1efe" Name="Time" ColumnMetadata="EndTime" />
+            </MetadataEntries>
+            <HighlightEntries />
+            <Columns>
+              <Column Guid="bbfc990a-b6c9-4dcd-858b-f040ab4a1efe" Name="Time" SortPriority="38" Width="80" IsVisible="true">
+                <DateTimeTimestampOptionsParameter DateTimeEnabled="true" />
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="2a23f9b1-65d6-46d2-87b2-72f3606b7f75" Name="Provider Id" SortPriority="32" Width="100" IsVisible="false">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="5b51716b-b88f-443a-a396-c6316296d5f8" Name="Opcode Name" SortPriority="29" Width="80" IsVisible="false">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="c72e1c5a-f6db-4c84-8c0b-85989e514075" Name="Id" SortPriority="30" Width="80" IsVisible="false">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="d446a182-5203-4a29-aca1-4ab9bea0d1b5" Name="Version" SortPriority="1" Width="80" IsVisible="false">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="7ee6a5ff-1faf-428a-a7c2-7d2cb2b5cf26" Name="Process" SortPriority="37" Width="150" IsVisible="false">
+                <ProcessOptionsParameter />
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="b51bcda1-7ea3-4409-b4af-51a704893bd9" Name="Process Id" SortPriority="2" Width="50" IsVisible="false">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="cb796d44-2927-5ac1-d231-4b71904c18f5" Name="Thread Name" SortPriority="3" Width="80" IsVisible="false">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="82ddfdff-ee93-5f35-08ac-4705069618dc" Name="Thread Activity Tag" SortPriority="4" Width="80" IsVisible="false">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="2818954f-2d30-5569-4510-dade0a5a605c" Name="Annotation" SortPriority="5" Width="80" IsVisible="false">
+                <AnnotationsOptionsParameter>
+                  <AnnotationQueryEntries />
+                </AnnotationsOptionsParameter>
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="8b4c40f8-0d99-437d-86ab-56ec200137dc" Name="Provider Name" SortPriority="27" Width="305" IsVisible="true">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="511777f7-30ef-4e86-bd0b-0facaf23a0d3" Name="Task Name" SortPriority="28" Width="223" IsVisible="true">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="90fe0b49-e3bb-440f-b829-5813c42108a1" Name="Event Name" SortPriority="31" Width="222" IsVisible="true">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="72892fbe-0f55-426a-9aa1-26b6baf09ffb" Name="Event Type" SortPriority="33" Width="100" IsVisible="false">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="0734f1a4-fbd9-4ff6-aec0-cf43875c8253" Name="Message" SortPriority="34" Width="100" IsVisible="false">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="3be8610c-babb-4154-9970-1b2210928024" Name="Cpu" SortPriority="35" Width="30" IsVisible="false">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="edf01e5d-3644-4dbc-ab9d-f8954e6db6ea" Name="ThreadId" SortPriority="36" Width="50" IsVisible="false">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="0c5cf8cd-9b9e-5798-1a5d-09d429f7fa3c" Name="Field 1" SortPriority="6" Width="352" IsVisible="true" HelpText="Field 1">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="71badd11-26e5-56bc-44ec-12f4cc6a8f3e" Name="Field 2" SortPriority="7" Width="282" IsVisible="true" HelpText="Field 2">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="411dba2d-5d6e-5272-8287-636d0841768c" Name="Field 3" SortPriority="8" Width="125" IsVisible="true" HelpText="Field 3">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="048f5050-1f17-59b3-fa22-4b0781ee630b" Name="Field 4" SortPriority="9" Width="1061" IsVisible="true" HelpText="Field 4">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="94e48f22-d499-5227-bb04-be011b4159b0" Name="Field 5" SortPriority="10" Width="80" IsVisible="true" HelpText="Field 5">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="c1054028-424a-59ba-e760-6d30abbd69c5" Name="Field 6" SortPriority="11" Width="80" IsVisible="true" HelpText="Field 6">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="5cbc4b58-2de1-5449-55b2-4651d4edf90a" Name="Field 7" SortPriority="12" Width="80" IsVisible="true" HelpText="Field 7">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="fc01e6c9-a43b-51a1-fd2e-112ba48aff65" Name="Field 8" SortPriority="13" Width="80" IsVisible="true" HelpText="Field 8">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="e3dcf300-46e2-5c43-ef4b-2c3db489ec25" Name="Field 9" SortPriority="14" Width="80" IsVisible="true" HelpText="Field 9">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="87c21ddb-4b29-58e3-5ddc-f114c5ca209a" Name="Field 10" SortPriority="15" Width="80" IsVisible="true" HelpText="Field 10">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="65f8fe42-ad02-5016-3521-f93329c76227" Name="Field 11" SortPriority="16" Width="80" IsVisible="true" HelpText="Field 11">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="03d48fd3-0fe4-57f5-a477-49beb0d70a1f" Name="Field 12" SortPriority="17" Width="80" IsVisible="true" HelpText="Field 12">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="998f8e2d-0f5a-5a54-0133-226e2de62c0b" Name="Field 13" SortPriority="18" Width="80" IsVisible="true" HelpText="Field 13">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="bb772c34-9600-5bf7-3f54-e6080f8a0611" Name="Field 14" SortPriority="19" Width="80" IsVisible="true" HelpText="Field 14">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="1479add7-3dcb-580b-f1e9-87d5186ced61" Name="Field 15" SortPriority="20" Width="80" IsVisible="true" HelpText="Field 15">
+                <ColorQueryEntries />
+              </Column>
+              <Column Guid="342f7677-17b2-4c7e-b9ec-e89612c49792" Name="Count" AggregationMode="Sum" SortOrder="Descending" SortPriority="0" Width="80" IsVisible="true">
+                <ColorQueryEntries />
+              </Column>
+            </Columns>
+          </Preset>
+        </PersistedPresets>
+      </GraphSchema>
+    </ModifiedGraphs>
+  </Content>
+</WpaProfileContainer>

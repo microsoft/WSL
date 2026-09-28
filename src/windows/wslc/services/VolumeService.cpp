@@ -1,0 +1,127 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    VolumeService.cpp
+
+Abstract:
+
+    This file contains the VolumeService implementation
+
+--*/
+#include "VolumeService.h"
+#include "WarningCallback.h"
+#include <wslutil.h>
+#include <wslc.h>
+
+using namespace wsl::shared;
+using namespace wsl::shared::string;
+using namespace wsl::windows::common::wslutil;
+
+namespace wsl::windows::wslc::services {
+
+using namespace wsl::windows::wslc::cli;
+
+WSLCVolumeInformation VolumeService::Create(models::Session& session, const models::CreateVolumeOptions& createOptions)
+{
+    WSLCVolumeOptions options{};
+    options.Name = createOptions.Name.c_str();
+    if (createOptions.Driver.has_value())
+    {
+        options.Driver = createOptions.Driver->c_str();
+    }
+
+    // Set driver options
+    std::vector<KeyValuePair> driverOpts;
+    for (const auto& option : createOptions.DriverOpts)
+    {
+        driverOpts.push_back({.Key = option.first.c_str(), .Value = option.second.c_str()});
+    }
+
+    // Set labels
+    std::vector<KeyValuePair> labels;
+    for (const auto& label : createOptions.Labels)
+    {
+        labels.push_back({.Key = label.first.c_str(), .Value = label.second.c_str()});
+    }
+
+    options.DriverOpts = driverOpts.data();
+    options.DriverOptsCount = static_cast<ULONG>(driverOpts.size());
+    options.Labels = labels.data();
+    options.LabelsCount = static_cast<ULONG>(labels.size());
+
+    WSLCVolumeInformation info{};
+    THROW_IF_FAILED(session.Get()->CreateVolume(&options, &info));
+    return info;
+}
+
+void VolumeService::Delete(models::Session& session, const std::string& name)
+{
+    THROW_IF_FAILED(session.Get()->DeleteVolume(name.c_str()));
+}
+
+std::vector<wsl::windows::common::wslc_schema::VolumeListEntry> VolumeService::List(
+    models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters)
+{
+    std::vector<WSLCFilter> filterEntries;
+    filterEntries.reserve(filters.size());
+    for (const auto& [key, value] : filters)
+    {
+        filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
+    }
+
+    wil::unique_cotaskmem_ansistring output;
+    THROW_IF_FAILED(session.Get()->ListVolumes(
+        filterEntries.empty() ? nullptr : filterEntries.data(), static_cast<ULONG>(filterEntries.size()), &output));
+
+    return FromJson<std::vector<wsl::windows::common::wslc_schema::VolumeListEntry>>(output.get());
+}
+
+wsl::windows::common::wslc_schema::InspectVolume VolumeService::Inspect(models::Session& session, const std::string& name)
+{
+    wil::unique_cotaskmem_ansistring output;
+    THROW_IF_FAILED(session.Get()->InspectVolume(name.c_str(), &output));
+    return FromJson<wsl::windows::common::wslc_schema::InspectVolume>(output.get());
+}
+
+models::PruneVolumesResult VolumeService::Prune(
+    Terminal& terminal, models::Session& session, bool all, const std::vector<std::pair<std::string, std::string>>& filters)
+{
+    WarningCallback warningCallback(terminal);
+    const bool hasExplicitAll = std::any_of(filters.begin(), filters.end(), [](const auto& f) { return f.first == "all"; });
+
+    std::vector<WSLCFilter> filterEntries;
+    filterEntries.reserve(filters.size() + ((all && !hasExplicitAll) ? 1 : 0));
+    if (all && !hasExplicitAll)
+    {
+        filterEntries.push_back({.Key = "all", .Value = "true"});
+    }
+
+    for (const auto& [key, value] : filters)
+    {
+        filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
+    }
+
+    wil::unique_cotaskmem_array_ptr<WSLCVolumeName> volumes;
+    ULONGLONG spaceReclaimed = 0;
+    THROW_IF_FAILED(session.Get()->PruneVolumes(
+        filterEntries.empty() ? nullptr : filterEntries.data(),
+        static_cast<ULONG>(filterEntries.size()),
+        &warningCallback,
+        &volumes,
+        volumes.size_address<ULONG>(),
+        &spaceReclaimed));
+
+    models::PruneVolumesResult result;
+    result.SpaceReclaimed = spaceReclaimed;
+    result.PrunedVolumes.reserve(volumes.size());
+    for (auto ptr = volumes.get(), end = volumes.get() + volumes.size(); ptr != end; ++ptr)
+    {
+        result.PrunedVolumes.emplace_back(*ptr);
+    }
+
+    return result;
+}
+} // namespace wsl::windows::wslc::services

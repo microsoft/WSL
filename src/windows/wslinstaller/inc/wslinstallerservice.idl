@@ -1,0 +1,32 @@
+/*++
+
+Copyright (c) Microsoft Corporation.  All rights reserved.
+
+Module Name:
+
+    wslinstalleridl.idl
+
+Abstract:
+
+    This file contains the COM object definitions used to talk with the WSL
+    service "WslInstaller"
+
+--*/
+
+import "unknwn.idl";
+import "wtypes.idl";
+
+cpp_quote("#ifdef __cplusplus")
+cpp_quote("const GUID CLSID_WslInstaller = { 0xb5aeb4c3, 0x9541, 0x492f, { 0xad, 0x4d, 0x50, 0x59, 0x51, 0xf6, 0xad, 0xa4 }};")
+cpp_quote("class DECLSPEC_UUID(\"B5AEB4C3-9541-492F-AD4D-505951F6ADA4\") WslInstaller;")
+cpp_quote("#endif")
+
+[
+    uuid(1E912664-C599-474A-A552-DAEAF73B3164),
+    pointer_default(unique),
+    object
+]
+interface IWslInstaller : IUnknown
+{
+    HRESULT Install([out] UINT* ExitCode, [out] LPWSTR* ErrorMessage);
+};

@@ -1,0 +1,71 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ContainerListCommand.cpp
+
+Abstract:
+
+    Implementation of command execution logic.
+
+--*/
+
+#include "ContainerCommand.h"
+#include "CLIExecutionContext.h"
+#include "ContainerTasks.h"
+#include "SessionTasks.h"
+#include "Task.h"
+
+using namespace wsl::windows::wslc::execution;
+using namespace wsl::windows::wslc::task;
+using namespace wsl::shared;
+using namespace wsl::shared::string;
+
+namespace wsl::windows::wslc {
+// Container List Command
+std::vector<Argument> ContainerListCommand::GetArguments() const
+{
+    return {
+        Argument::Create(ArgType::All),
+        Argument::Create(ArgType::Filter, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::Format),
+        Argument::Create(ArgType::Last),
+        Argument::Create(ArgType::Latest),
+        Argument::Create(ArgType::NoTrunc),
+        Argument::Create(ArgType::Quiet),
+        Argument::Create(ArgType::Size),
+    };
+}
+
+std::wstring ContainerListCommand::ShortDescription() const
+{
+    return Localization::WSLCCLI_ContainerListDesc();
+}
+
+std::wstring ContainerListCommand::LongDescription() const
+{
+    return Localization::WSLCCLI_ContainerListLongDesc();
+}
+
+// clang-format off
+void ContainerListCommand::ExecuteInternal(CLIExecutionContext& context) const
+{
+    context
+        << ResolveSession
+        << GetContainers
+        << ListContainers;
+}
+// clang-format on
+
+void ContainerListCommand::ValidateArgumentsInternal(ArgMap& execArgs) const
+{
+    if (execArgs.Contains(ArgType::Last) && execArgs.GetValue<ArgType::Latest>())
+    {
+        throw ArgumentException(
+            Localization::WSLCCLI_MultipleExclusiveArgumentsProvided(L"--last, --latest"),
+            GetArgumentsForHelp({ArgType::Last, ArgType::Latest}));
+    }
+}
+} // namespace wsl::windows::wslc

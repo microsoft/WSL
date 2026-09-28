@@ -1,0 +1,180 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WSLCE2EContainerKillTests.cpp
+
+Abstract:
+
+    This file contains end-to-end tests for WSLC.
+--*/
+
+#include "precomp.h"
+#include "windows/Common.h"
+#include "WSLCExecutor.h"
+#include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
+
+namespace WSLCE2ETests {
+using namespace wsl::shared;
+
+class WSLCE2EContainerKillTests
+{
+    WSLC_TEST_CLASS(WSLCE2EContainerKillTests)
+
+    TEST_CLASS_SETUP(ClassSetup)
+    {
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
+        return true;
+    }
+
+    TEST_CLASS_CLEANUP(ClassCleanup)
+    {
+        EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureContainerDoesNotExist(WslcContainerName2);
+        return true;
+    }
+
+    TEST_METHOD_SETUP(TestMethodSetup)
+    {
+        EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureContainerDoesNotExist(WslcContainerName2);
+        return true;
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Kill_HelpCommand)
+    {
+        auto result = RunWslc(L"container kill --help");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Kill_KillsRunningContainer)
+    {
+        // Run a container in the background
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId.empty());
+
+        // Verify container is running
+        VerifyContainerIsListed(containerId, L"running");
+
+        // Kill the container
+        result = RunWslc(std::format(L"container kill {}", containerId));
+        result.Verify({.Stdout = std::format(L"{}\r\n", containerId), .Stderr = L"", .ExitCode = 0});
+
+        // Verify the container is no longer running
+        VerifyContainerIsListed(containerId, L"exited");
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Kill_ByName)
+    {
+        // Run a container in the background
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId.empty());
+
+        // Verify container is running
+        VerifyContainerIsListed(containerId, L"running");
+
+        // Kill by container name
+        result = RunWslc(std::format(L"container kill {}", WslcContainerName));
+        result.Verify({.Stdout = std::format(L"{}\r\n", WslcContainerName), .Stderr = L"", .ExitCode = 0});
+
+        // Verify container is no longer running
+        VerifyContainerIsListed(containerId, L"exited");
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Kill_NotFound)
+    {
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto result = RunWslc(std::format(L"container kill {}", WslcContainerName));
+        result.Verify(
+            {.Stderr =
+                 FormatErrorMessage(std::format(L"Container '{}' not found.", WslcContainerName), L"WSLC_E_CONTAINER_NOT_FOUND"),
+             .ExitCode = 1});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Kill_InvalidSignal)
+    {
+        auto result = RunWslc(std::format(L"container run --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        {
+            result = RunWslc(std::format(L"container kill {} -s 0", WslcContainerName));
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Invalid signal value: 0 is out of valid range (1-31)."));
+        }
+
+        {
+            result = RunWslc(std::format(L"container kill {} -s 32", WslcContainerName));
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Invalid signal value: 32 is out of valid range (1-31)."));
+        }
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Kill_TargetedContainerOnly)
+    {
+        // Run first container in background
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto firstContainerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(firstContainerId.empty());
+
+        // Run second container in background
+        result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName2, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto secondContainerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(secondContainerId.empty());
+
+        // Verify both are running
+        VerifyContainerIsListed(firstContainerId, L"running");
+        VerifyContainerIsListed(secondContainerId, L"running");
+
+        // Kill only the first container
+        result = RunWslc(std::format(L"container kill {}", firstContainerId));
+        result.Verify({.Stdout = std::format(L"{}\r\n", firstContainerId), .Stderr = L"", .ExitCode = 0});
+
+        // Verify first exited, second still running
+        VerifyContainerIsListed(firstContainerId, L"exited");
+        VerifyContainerIsListed(secondContainerId, L"running");
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Kill_ContinuesAfterFailure)
+    {
+        // Run first container in background
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto firstContainerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(firstContainerId.empty());
+
+        // Run second container in background
+        result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName2, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto secondContainerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(secondContainerId.empty());
+
+        // A container that cannot be killed is reported without skipping the ones after it
+        result = RunWslc(std::format(L"container kill {} {} {}", firstContainerId, InvalidContainerName, secondContainerId));
+        result.Verify(
+            {.Stdout = std::format(L"{}\r\n{}\r\n", firstContainerId, secondContainerId),
+             .Stderr = FormatErrorMessage(
+                 std::format(L"Container '{}' not found.", InvalidContainerName), L"WSLC_E_CONTAINER_NOT_FOUND"),
+             .ExitCode = 1});
+
+        VerifyContainerIsListed(firstContainerId, L"exited");
+        VerifyContainerIsListed(secondContainerId, L"exited");
+    }
+
+private:
+    const std::wstring WslcContainerName = L"wslc-test-container";
+    const std::wstring WslcContainerName2 = L"wslc-test-container-2";
+    const std::wstring InvalidContainerName = L"wslc-nonexistent-container-for-kill";
+    const TestImage& DebianImage = DebianTestImage();
+};
+} // namespace WSLCE2ETests

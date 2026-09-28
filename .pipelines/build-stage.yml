@@ -1,0 +1,156 @@
+parameters:
+  - name: isRelease
+    type: boolean
+    default: true
+
+  - name: packageVersion
+    type: string
+    default: ""
+
+  - name: nugetSuffix
+    type: string
+    default: ""
+
+  - name: isNightly
+    type: boolean
+    default: false
+
+  - name: traceLoggingConfig
+    type: string
+    default: ''
+
+  - name: nugetPackages
+    type: object
+    default:
+      - Microsoft.WSL.PluginApi.nuspec
+      - Microsoft.WSL.Containers.nuspec
+
+  - name: includePackageStage
+    type: boolean
+    default: true
+
+  - name: targets
+    type: object
+    default:
+      - target: "wsl;libwsl;wslg;wslservice;wslhost;wslrelay;wslinstaller;wslinstall;initramfs;wslserviceproxystub;wsldevicehostproxystub;wslsettings;wslinstallerproxystub;testplugin;wslcsession;wslc;wsltests;wslcsdk"
+        pattern: "wsl.exe,libwsl.dll,wslg.exe,wslservice.exe,wslhost.exe,wslrelay.exe,wslinstaller.exe,wslinstall.dll,wslserviceproxystub.dll,wsldevicehostproxystub.dll,wslsettings/wslsettings.dll,wslsettings/wslsettings.exe,wslinstallerproxystub.dll,WSLDVCPlugin.dll,testplugin.dll,wsldeps.dll,wslcsession.exe,wslc.exe,wslcsdk.dll"
+      - target: "msixgluepackage"
+        pattern: "gluepackage.msix"
+      - target: "msipackage;wslcsdkcs"
+        pattern: "wsl.msi,wslcsdkcs.dll,Microsoft.WSL.Containers.winmd"
+
+  - name: pool
+    type: string
+    default: ''
+
+  - name: vsoOrg
+    type: string
+
+  - name: vsoProject
+    type: string
+
+  - name: esrp
+    type: object
+    default:
+      ConnectedServiceName: "AzureConnection-AME"
+      signConfigType: "inlineSignParams"
+      SessionTimeout: 60
+      MaxConcurrency: 50
+      MaxRetryAttempts: 5
+      ServiceEndpointUrl: $(EsrpServiceEndpointUrl)
+      AuthAKVName: $(EsrpAuthAKVName)
+      AuthSignCertName: $(EsrpAuthSignCertName)
+      AppRegistrationClientId: $(EsrpAppRegistrationClientId)
+      AppRegistrationTenantId: $(EsrpAppRegistrationTenantId)
+      EsrpClientId: $(EsrpClientId)
+
+stages:
+  # ── x64 build stage ──────────────────────────────────────────────────
+  # Runs in parallel with build_arm64. Tests depend on this stage.
+  - stage: build_x64
+    dependsOn: []
+    jobs:
+      - template: build-job.yml
+        parameters:
+          platform: x64
+          artifactSuffix: '_build'
+          isRelease: ${{ parameters.isRelease }}
+          isNightly: ${{ parameters.isNightly }}
+          packageVersion: ${{ parameters.packageVersion }}
+          traceLoggingConfig: ${{ parameters.traceLoggingConfig }}
+          targets: ${{ parameters.targets }}
+          pool: ${{ parameters.pool }}
+          vsoOrg: ${{ parameters.vsoOrg }}
+          vsoProject: ${{ parameters.vsoProject }}
+          esrp: ${{ parameters.esrp }}
+          includeTestArtifacts: true
+
+  # ── arm64 build stage (runs in parallel with build_x64) ──────────────
+  # Includes formatting/localization checks as a first job, then arm64 build.
+  - stage: build_arm64
+    dependsOn: []
+    jobs:
+      - job: checks
+        displayName: "Formatting & localization checks"
+        timeoutInMinutes: 30
+
+        variables:
+          ob_outputDirectory: '$(Build.SourcesDirectory)\out'
+
+        ${{ if eq(parameters.pool, '') }}:
+          pool: {'type': 'windows'}
+
+        ${{ else }}:
+          pool: ${{ parameters.pool }}
+
+        steps:
+          - script: python tools/devops/validate-localization.py
+            displayName: Validate localization resources
+
+          - script: python tools\devops\validate-copyright-headers.py src
+            displayName: Validate copyright headers (src/)
+
+          - script: python tools\devops\validate-copyright-headers.py test
+            displayName: Validate copyright headers (test/)
+
+          - script: python tools\devops\validate-line-endings.py .
+            displayName: Validate line endings
+
+          - task: CMake@1
+            displayName: "CMake ."
+            inputs:
+              workingDirectory: "."
+              cmakeArgs: .
+
+          - task: PowerShell@2
+            inputs:
+              targetType: "filePath"
+              filePath: FormatSource.ps1
+              arguments: "-ModifiedOnly $false -Verify $true"
+            displayName: "Clang-format check"
+
+      - template: build-job.yml
+        parameters:
+          platform: arm64
+          artifactSuffix: '_build_arm64'
+          dependsOn: checks
+          isRelease: ${{ parameters.isRelease }}
+          isNightly: ${{ parameters.isNightly }}
+          packageVersion: ${{ parameters.packageVersion }}
+          traceLoggingConfig: ${{ parameters.traceLoggingConfig }}
+          targets: ${{ parameters.targets }}
+          pool: ${{ parameters.pool }}
+          vsoOrg: ${{ parameters.vsoOrg }}
+          vsoProject: ${{ parameters.vsoProject }}
+          esrp: ${{ parameters.esrp }}
+          includeCodeQL: true
+
+  # ── package stage (release and nightly only) ─────────────────────────
+  # Creates msixbundle, appxupload, and NuGet packages from both platform artifacts.
+  - ${{ if parameters.includePackageStage }}:
+    - template: package-stage.yml
+      parameters:
+        isRelease: ${{ parameters.isRelease }}
+        pool: ${{ parameters.pool }}
+        esrp: ${{ parameters.esrp }}
+        nugetPackages: ${{ parameters.nugetPackages }}

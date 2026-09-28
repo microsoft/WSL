@@ -1,0 +1,207 @@
+/*++
+
+Copyright (c) Microsoft Corporation.  All rights reserved.
+
+Module Name:
+
+    windowsdefs.idl
+
+Abstract:
+
+    This file contains the COM object used by WSL.
+
+--*/
+
+import "unknwn.idl";
+import "wtypes.idl";
+
+[
+    object,
+    uuid(3e57bd3c-5a5d-4bdc-a0a6-5b4193d4b719),
+    pointer_default( unique )
+]
+interface IVmVirtualDeviceAccess : IUnknown
+{
+    [local]
+    HRESULT _Reserved();
+
+    // N.B. The original declaration has another method before GetDevice(), but that method is declared as call_as, which doesn't generate an entry in the vtable. 
+    [local]
+    HRESULT
+    GetDevice(
+        [in]          REFGUID    CategoryID,
+        [in]          REFGUID    DeviceID,
+        [out, retval] IUnknown** Device
+        );
+};
+
+typedef[v1_enum] enum {
+    FIOV_BAR0 = 0, ///< Bar 0 of the virtual device
+    FIOV_BAR1,     ///< Bar 1 of the virtual device
+    FIOV_BAR2,     ///< Bar 2 of the virtual device
+    FIOV_BAR3,     ///< Bar 3 of the virtual device
+    FIOV_BAR4,     ///< Bar 4 of the virtual device
+    FIOV_BAR5,     ///< Bar 5 of the virtual device
+    FIOV_ROMBAR    ///< ROM BAR of the virtual device
+} FIOV_BAR_SELECTOR;
+
+typedef[v1_enum] enum {
+    FiovMmioMappingFlagNone = 0x00000000,
+    FiovMmioMappingFlagWriteable = 0x00000001,
+    FiovMmioMappingFlagExecutable = 0x00000002
+
+} FiovMmioMappingFlags;
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(FiovMmioMappingFlags);")
+
+[
+    object,
+    uuid(f5dfbec1-b9f3-4b26-bf6f-c251448bcf7a),
+    helpstring("IVmFiovGuestMemoryFastNotification Interface"),
+    pointer_default(unique),
+]
+interface IVmFiovGuestMemoryFastNotification : IUnknown
+{
+    HRESULT
+    RegisterDoorbell(
+        [in] FIOV_BAR_SELECTOR BarIndex,
+        [in] UINT64 BarOffset,
+        [in] UINT64 TriggerValue,
+        [in] UINT64 Flags,
+        [in, system_handle(sh_event)] HANDLE NotificationEvent
+        );
+
+    HRESULT
+    UnregisterDoorbell(
+        [in]                          FIOV_BAR_SELECTOR    BarIndex,
+        [in]                          UINT64               BarOffset,
+        [in]                          UINT64               TriggerValue,
+        [in]                          UINT64               Flags
+        );
+};
+
+[
+    local,
+    object,
+    uuid(68c6a1b9-de39-42c3-8d28-bf40a5126541)
+]
+interface ICallingProcessInfo : IUnknown
+{
+    HRESULT OpenCallerProcessHandle(DWORD desiredAccess, [out, annotation("_Out_")] HANDLE *callerProcessHandle);
+};
+
+[
+    object,
+    uuid(9d416457-abbc-46cf-8b93-901c68bec627),
+    helpstring("IVmFiovGuestMmioMappings Interface"),
+    pointer_default(unique),
+]
+interface IVmFiovGuestMmioMappings : IUnknown
+{
+    HRESULT
+    CreateSectionBackedMmioRange(
+        [in]                             FIOV_BAR_SELECTOR     BarIndex,
+        [in]                             ULONG64               BarOffsetInPages,
+        [in]                             UINT64                PageCount,
+        [in]                             FiovMmioMappingFlags  MappingFlags,
+        [in, system_handle(sh_section)]  HANDLE                SectionHandle,
+        [in]                             UINT64                SectionOffsetInPages
+        );
+
+    HRESULT
+    DestroySectionBackedMmioRange(
+        [in]                             FIOV_BAR_SELECTOR     BarIndex,
+        [in]                             ULONG64               BarOffsetInPages
+        );
+};
+
+[
+    object,
+    uuid(78523d62-d919-47ca-9cd7-08139172d685),
+    helpstring("IVmDeviceHost Interface"),
+    pointer_default(unique)
+]
+interface IVmDeviceHost : IUnknown
+{
+    HRESULT
+    GetDeviceInstance(
+        [in] REFGUID DeviceClassId,
+        [in] REFGUID DeviceInstanceId,
+        [out, retval] IUnknown** DeviceInstance
+        );
+};
+
+[
+    object,
+    uuid(e31aa49b-0914-465e-b145-1b9ba13efb10),
+    helpstring("IVmDeviceHostSupport Interface"),
+    pointer_default(unique)
+]
+interface IVmDeviceHostSupport : IUnknown
+{
+    HRESULT
+    RegisterDeviceHost(
+        [in] IVmDeviceHost* DeviceHost,
+        [in] DWORD ProcessId,
+        [out] UINT64* IpcSectionHandle
+        );
+};
+
+[
+    uuid(7649D52D-D275-4289-901E-EB626C967ECE),
+    pointer_default(unique),
+    object
+]
+interface IPlan9FileSystem : IUnknown
+{
+    HRESULT AddShare([in, unique] LPCWSTR name, [in, system_handle(sh_file)] HANDLE handle, [in] UINT32 flags);
+    HRESULT RemoveShare([in, unique] LPCWSTR name);
+    HRESULT Pause();
+    HRESULT Resume();
+    HRESULT Teardown();
+    HRESULT SetAllowedFiles([in, unique] LPCWSTR shareName, [in, size_is(count)] const LPCWSTR *files, [in] int count);
+    HRESULT Init([in, unique] LPCGUID vmId, [in] ULONG port);
+    HRESULT AddSharePath([in, unique] LPCWSTR name, [in, unique] LPCWSTR path, [in] UINT32 flags);
+    HRESULT CreateVirtioDevice([in, unique] LPCWSTR vmId,
+                               [in, unique] IUnknown *deviceHostSupport,
+                               [in, unique] LPCWSTR tag,
+                               [in, unique, defaultvalue(NULL)] GUID *instanceId);
+    HRESULT IsRunning();
+};
+
+[
+    uuid(8434F839-CA86-495D-8A75-7EB36D073FFE),
+    pointer_default(unique),
+    object
+]
+interface IPlan9FileSystemHost : IUnknown
+{
+    HRESULT NotifyAllDevicesInUse([in, unique] LPCWSTR tag);
+    HRESULT RegisterDoorbell([in] REFGUID InstanceId,
+                             [in] UINT8 BarIndex,
+                             [in] UINT64 Offset,
+                             [in] UINT64 TriggerValue,
+                             [in] UINT64 Flags,
+                             [in, system_handle(sh_event)] HANDLE Event);
+    HRESULT UnregisterDoorbell([in] REFGUID InstanceId,
+                               [in] UINT8 BarIndex,
+                               [in] UINT64 Offset,
+                               [in] UINT64 TriggerValue,
+                               [in] UINT64 Flags);
+    HRESULT CreateSectionBackedMmioRange([in] REFGUID InstanceId,
+                                         [in] UINT8 BarIndex,
+                                         [in] UINT64 BarOffsetInPages,
+                                         [in] UINT64 PageCount,
+                                         [in] UINT64 MappingFlags,
+                                         [in, system_handle(sh_section)] HANDLE SectionHandle,
+                                         [in] UINT64 SectionOffsetInPages);
+    HRESULT DestroySectionBackedMmioRange([in] REFGUID InstanceId,
+                                          [in] UINT8 BarIndex,
+                                          [in] UINT64 BarOffsetInPages);
+};
+
+cpp_quote("#ifdef __cplusplus")
+cpp_quote("namespace p9fs")
+cpp_quote("{")
+cpp_quote("class DECLSPEC_UUID(\"AFC7B6DE-D642-41B7-AB0C-A01019510741\") Plan9FileSystem;")
+cpp_quote("}")
+cpp_quote("#endif")

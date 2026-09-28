@@ -1,0 +1,28 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    main.rc
+
+Abstract:
+
+    This file contains resources for wslinstaller.
+
+--*/
+
+#include <windows.h>
+#include "wslversioninfo.h"
+
+#define ID_ICON 1
+#define VER_INTERNALNAME_STR "wslinstaller.exe"
+#define VER_ORIGINALFILENAME_STR "wslinstaller.exe"
+
+#define VER_FILETYPE VFT_APP
+#define VER_FILESUBTYPE VFT2_UNKNOWN
+#define VER_FILEDESCRIPTION_STR "Windows Subsystem for Linux Installer Service"
+ID_ICON ICON PRELOAD DISCARDABLE "..\..\..\images\wsl.ico"
+
+
+#include <common.ver>

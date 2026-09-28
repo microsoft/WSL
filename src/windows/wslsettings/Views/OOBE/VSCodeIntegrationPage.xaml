@@ -1,0 +1,20 @@
+﻿<Page
+    x:Class="WslSettings.Views.OOBE.VSCodeIntegrationPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:behaviors="using:WslSettings.Behaviors"
+    xmlns:controls="using:WslSettings.Controls"
+    behaviors:NavigationViewHeaderBehavior.HeaderMode="Never">
+
+    <controls:OOBEContent x:Uid="Settings_OOBEVSCodeIntegration" HeroImage="ms-appx:///Assets/SettingsOOBEVSCodeIntegration.png">
+        <controls:OOBEContent.PageContent>
+            <StackPanel Orientation="Vertical" Spacing="12">
+                <TextBlock x:Uid="Settings_OOBEVSCodeIntegration_VSCodeInstallTitle" Style="{StaticResource OobeSubtitleStyle}" Margin="0,0,0,-6"/>
+                <TextBlock x:Uid="Settings_OOBEVSCodeIntegration_VSCodeInstallSample" TextWrapping="Wrap"/>
+                <TextBlock x:Uid="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle" Style="{StaticResource OobeSubtitleStyle}" Margin="0,12,0,-6"/>
+                <TextBlock x:Uid="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectSample" TextWrapping="Wrap"/>
+                <HyperlinkButton x:Uid="Settings_OOBEVSCodeIntegrationLink" Margin="0,6,0,0" Style="{StaticResource TextButtonStyle}"/>
+            </StackPanel>
+        </controls:OOBEContent.PageContent>
+    </controls:OOBEContent>
+</Page>

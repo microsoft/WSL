@@ -1,0 +1,14 @@
+title: C# API reference
+nav:
+  - index.md
+  - overview.md
+  - projected-namespace.md
+  - common-cswinrt-type-mappings.md
+  - data-classes
+  - settings-classes
+  - core-classes
+  - service-class
+  - delegates-and-events.md
+  - enumerations
+  - known-gaps.md
+  - end-to-end-example.md

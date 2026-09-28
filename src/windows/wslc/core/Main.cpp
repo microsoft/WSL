@@ -1,0 +1,173 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    Main.cpp
+
+Abstract:
+
+    Main program entry point.
+
+--*/
+#define WIN32_LEAN_AND_MEAN
+#pragma once
+#include <Windows.h>
+#include "precomp.h"
+#include "wslutil.h"
+#include "Errors.h"
+#include "CLIExecutionContext.h"
+#include "Invocation.h"
+#include "RootCommand.h"
+
+using namespace wsl::shared;
+using namespace wsl::windows::common;
+using namespace wsl::windows::wslc::execution;
+
+namespace wsl::windows::wslc {
+
+using namespace wsl::windows::wslc::cli;
+int CoreMain(int argc, wchar_t const** argv)
+try
+{
+    EnableContextualizedErrors(false, true);
+    HRESULT result = S_OK;
+
+    wslutil::ConfigureCrt();
+    wslutil::InitializeWil();
+
+    // Extract the executable name from argv[0] for use in help/usage output.
+    if (argc > 0 && argv[0])
+    {
+        std::wstring_view exe{argv[0]};
+        auto lastSlash = exe.find_last_of(L"\\/");
+        if (lastSlash != std::wstring_view::npos)
+        {
+            exe = exe.substr(lastSlash + 1);
+        }
+        auto dot = exe.rfind(L'.');
+        if (dot != std::wstring_view::npos)
+        {
+            exe = exe.substr(0, dot);
+        }
+        s_ExecutableName = exe;
+    }
+
+    WslTraceLoggingInitialize(WslcTelemetryProvider, !wsl::shared::OfficialBuild);
+    auto cleanupTelemetry = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslTraceLoggingUninitialize(); });
+
+    wslutil::SetCrtEncoding(_O_U8TEXT);
+    auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
+    wslutil::CoInitializeSecurity();
+
+    // Must be declared after COM init; it holds COM references.
+    CLIExecutionContext context;
+
+    // SetConsoleCtrlHandler only accepts plain function pointers, so route Ctrl-C
+    // through a static reference into the context.
+    static auto& s_cancelEvent = context.CancelEvent;
+    auto ctrlHandler = [](DWORD ctrlType) -> BOOL {
+        if (ctrlType == CTRL_C_EVENT || ctrlType == CTRL_BREAK_EVENT)
+        {
+            if (s_cancelEvent && !s_cancelEvent.is_signaled())
+            {
+                s_cancelEvent.SetEvent();
+                return TRUE;
+            }
+        }
+        return FALSE;
+    };
+    SetConsoleCtrlHandler(ctrlHandler, TRUE);
+    auto unregisterHandler = wil::scope_exit([&]() { SetConsoleCtrlHandler(ctrlHandler, FALSE); });
+
+    WSADATA data{};
+    THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &data));
+    auto wsaCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WSACleanup(); });
+
+    std::vector<std::wstring> args;
+    for (int i = 1; i < argc; ++i)
+    {
+        args.emplace_back(argv[i]);
+    }
+
+    CommandInvocation invocation{std::make_unique<RootCommand>(), std::move(args)};
+
+    // Apply root environment options before any user-visible output. Keep this outside the try so
+    // a failure cannot reroute through the colored-help error path.
+    invocation.ApplyRootEnvironmentOptions(context.Args);
+    context.ApplyTerminalOptions();
+
+    // Past this point, environment variable options are in effect.
+
+    try
+    {
+        invocation.ParseCommandLine(context);
+        invocation.Execute(context);
+    }
+    catch (const ArgumentException& ae)
+    {
+        invocation.OutputHelp(context.Terminal, HelpOutput::Argument, &ae, ae.Arguments());
+        return 1;
+    }
+    catch (const CommandException& ce)
+    {
+        invocation.OutputHelp(context.Terminal, HelpOutput::Command, &ce);
+        return 1;
+    }
+    catch (const ExecutionException& ee)
+    {
+        context.Terminal.Error(L"{}\n", ee.Message());
+        return 1;
+    }
+    catch (const TerminateException&)
+    {
+        // The user declined a confirmation prompt, so the requested action is not performed.
+        return 0;
+    }
+    catch (...)
+    {
+        LOG_CAUGHT_EXCEPTION();
+
+        // If the user pressed Ctrl-C, acknowledge the cancellation and exit.
+        if (context.CancelEvent && context.CancelEvent.is_signaled())
+        {
+            // Cancel events are often considered warnings rather than errors, as the user
+            // intentionally triggered it.
+            const auto strings = wslutil::ErrorToString({.Code = HRESULT_FROM_WIN32(ERROR_CANCELLED)});
+            context.Terminal.Warn(L"\n{}\n", strings.Message);
+
+            // Exit with code 1 is consistent with Docker build and pull, but the POSIX-convention
+            // for cancellation is exit code 130, which is used by Docker compose and most shells.
+            // TODO: Consider switching to 130 or differentiate the cancellation types when we have
+            // more than image cancellation supported.
+            return 1;
+        }
+
+        // Using WSL shared utility to get the HRESULT from the caught exception.
+        // CLIExecutionContext is a derived class of wsl::windows::common::ExecutionContext.
+        result = wil::ResultFromCaughtException();
+
+        if (FAILED(result))
+        {
+            context.ReportError(result);
+        }
+    }
+
+    if (context.ExitCode.has_value())
+    {
+        return context.ExitCode.value();
+    }
+
+    return FAILED(result) ? 1 : 0;
+}
+catch (...)
+{
+    return 1;
+}
+} // namespace wsl::windows::wslc
+
+int wmain(int argc, wchar_t const** argv)
+{
+    return wsl::windows::wslc::CoreMain(argc, argv);
+}

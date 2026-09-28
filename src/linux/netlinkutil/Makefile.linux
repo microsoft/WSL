@@ -1,0 +1,20 @@
+# This makefile is used to work from a linux environment and is not part of the OS build process.
+
+CXXFLAGS += -std=c++20 -Wall -Wextra -g3 -fPIC -I../inc
+LDFLAGS +=
+
+SRC = SyscallError main Interface NetlinkResponse NetlinkParseException RuntimeErrorWithSourceLocation Utils Address NetlinkTransaction NetlinkTransactionError
+OBJ = $(addsuffix .o, $(SRC))
+BIN = test
+CXX=clang++
+
+$(BIN): $(OBJ)
+	$(CXX) $(CXXFLAGS) $(OBJ) $(LDFLAGS) -o $(BIN)
+
+clean:
+	$(RM) $(OBJ) $(LIB) $(BIN)
+
+check: test
+	./test
+
+all: check

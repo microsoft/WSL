@@ -1,0 +1,43 @@
+# EditorConfig — https://editorconfig.org
+# Complements .clang-format for non-C++ files
+
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = crlf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.{cpp,h,hpp,c,idl}]
+# C/C++ formatting is handled by .clang-format
+indent_size = 4
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[*.{json,jsonc}]
+indent_size = 2
+
+[*.{md,markdown}]
+trim_trailing_whitespace = false
+
+[*.py]
+indent_size = 4
+
+[*.{ps1,psm1,psd1}]
+indent_size = 4
+
+[*.{xml,resw,resx,props,targets,nuspec}]
+indent_size = 2
+
+[*.cmake]
+indent_size = 4
+
+[CMakeLists.txt]
+indent_size = 4
+
+[Makefile]
+indent_style = tab

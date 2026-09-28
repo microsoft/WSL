@@ -1,0 +1,8 @@
+LIBRARY libwsl
+
+EXPORTS
+    GetWslConfigFilePath
+    CreateWslConfig
+    FreeWslConfig
+    GetWslConfigSetting
+    SetWslConfigSetting

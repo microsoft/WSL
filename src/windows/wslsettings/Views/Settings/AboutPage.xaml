@@ -1,0 +1,40 @@
+﻿<Page
+    x:Class="WslSettings.Views.Settings.AboutPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ctControls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:behaviors="using:WslSettings.Behaviors"
+    xmlns:controls="using:WslSettings.Controls"
+    behaviors:NavigationViewHeaderBehavior.HeaderMode="Never">
+
+    <Page.Resources>
+        <DataTemplate x:Key="UnderlinedHyperlinkTemplate">
+            <TextBlock Text="{Binding}" TextDecorations="Underline" />
+        </DataTemplate>
+    </Page.Resources>
+
+    <Grid Margin="{ThemeResource ContentPageMargin}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <TextBlock x:Uid="Settings_AboutPageTitle" Style="{ThemeResource PageHeaderTextBlockStyle}" Margin="{StaticResource MediumSmallBottomMargin}" HorizontalAlignment="Left"/>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="{StaticResource SettingsCardSpacing}">
+                <ctControls:SettingsExpander x:Uid="Settings_About" IsExpanded="True">
+                    <TextBlock IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.VersionDescription, Mode=OneWay}" />
+                    <ctControls:SettingsExpander.Items>
+                        <ctControls:SettingsCard HorizontalContentAlignment="Left" ContentAlignment="Left" Margin="-42,0,0,0">
+                            <StackPanel Orientation="Vertical">
+                                <HyperlinkButton x:Uid="Settings_IssuesLink" Margin="{StaticResource HyperlinkButtonNegativeMargin}" ContentTemplate="{StaticResource UnderlinedHyperlinkTemplate}" />
+                                <HyperlinkButton x:Uid="Settings_DocumentationLink" Margin="{StaticResource HyperlinkButtonNegativeMargin}" ContentTemplate="{StaticResource UnderlinedHyperlinkTemplate}" />
+                                <HyperlinkButton x:Uid="Settings_ReleaseNotesLink" Margin="{StaticResource HyperlinkButtonNegativeMargin}" ContentTemplate="{StaticResource UnderlinedHyperlinkTemplate}" />
+                                <HyperlinkButton x:Uid="Settings_PrivacyPolicyLink" Margin="{StaticResource HyperlinkButtonNegativeMargin}" ContentTemplate="{StaticResource UnderlinedHyperlinkTemplate}" />
+                            </StackPanel>
+                        </ctControls:SettingsCard>
+                    </ctControls:SettingsExpander.Items>
+                </ctControls:SettingsExpander>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>

@@ -1,0 +1,23 @@
+name: Process new comment on issue
+
+on: 
+  workflow_dispatch :
+  issue_comment:
+    types: [created]
+
+jobs:
+  wti:
+    name: Run wti
+    runs-on: windows-2022
+    permissions:
+      issues: write
+    if: ${{ !github.event.issue.pull_request && github.event.issue.user.id == github.event.comment.user.id }}
+    steps: 
+        - name: Checkout repo
+          uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        
+        - uses: ./.github/actions/triage
+          with: 
+              issue: '${{ github.event.issue.number }}'
+              comment: '${{ github.event.comment.id }}'
+              token: ${{ secrets.GITHUB_TOKEN }}
