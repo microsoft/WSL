@@ -19,6 +19,8 @@ Abstract:
 #include "Terminal.h"
 
 namespace wsl::windows::wslc::services {
+
+using namespace wsl::windows::wslc::cli;
 class ConsoleService
 {
 public:
@@ -26,6 +28,9 @@ public:
         Terminal& terminal, wsl::windows::common::ConsoleState& console, wsl::windows::common::ClientRunningWSLCProcess&& process, bool triggerRefresh = false);
     static bool RelayInteractiveTty(
         wsl::windows::common::ConsoleState& console, wsl::windows::common::ClientRunningWSLCProcess& process, HANDLE tty, bool triggerRefresh = false);
-    static void RelayNonTtyProcess(wil::unique_handle&& Stdin, wil::unique_handle&& Stdout, wil::unique_handle&& Stderr);
+    static void RelayNonTtyProcess(
+        wsl::windows::common::io::HandleWrapper&& Stdin,
+        wsl::windows::common::io::HandleWrapper&& Stdout,
+        wsl::windows::common::io::HandleWrapper&& Stderr);
 };
 } // namespace wsl::windows::wslc::services

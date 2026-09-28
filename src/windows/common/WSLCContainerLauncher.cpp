@@ -230,7 +230,7 @@ void WSLCContainerLauncher::AddUlimit(const std::string& Name, std::int64_t Soft
 void wsl::windows::common::WSLCContainerLauncher::AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly)
 {
     AddMount({
-        .MountType = mount::Type::Bind,
+        .MountType = WSLCMountTypeBind,
         .Source = HostPath,
         .Target = ContainerPath,
         .ReadOnly = ReadOnly,
@@ -241,7 +241,7 @@ void wsl::windows::common::WSLCContainerLauncher::AddVolume(const std::wstring& 
 void wsl::windows::common::WSLCContainerLauncher::AddNamedVolume(const std::string& Name, const std::string& ContainerPath, bool ReadOnly)
 {
     AddMount({
-        .MountType = mount::Type::Volume,
+        .MountType = WSLCMountTypeVolume,
         .Source = wsl::shared::string::MultiByteToWide(Name),
         .Target = ContainerPath,
         .ReadOnly = ReadOnly,
@@ -251,20 +251,7 @@ void wsl::windows::common::WSLCContainerLauncher::AddNamedVolume(const std::stri
 void wsl::windows::common::WSLCContainerLauncher::AddMount(const mount::Spec& Mount)
 {
     WSLCMountSpec mount{};
-    switch (Mount.MountType)
-    {
-    case mount::Type::Bind:
-        mount.Type = WSLCMountTypeBind;
-        break;
-
-    case mount::Type::Volume:
-        mount.Type = WSLCMountTypeVolume;
-        break;
-
-    case mount::Type::Tmpfs:
-        mount.Type = WSLCMountTypeTmpfs;
-        break;
-    }
+    mount.Type = Mount.MountType;
 
     if (!Mount.Source.empty())
     {
@@ -273,7 +260,7 @@ void wsl::windows::common::WSLCContainerLauncher::AddMount(const mount::Spec& Mo
 
     mount.Target = m_mountTargets.emplace_back(Mount.Target).c_str();
     mount.ReadOnly = Mount.ReadOnly ? TRUE : FALSE;
-    if (Mount.MountType == mount::Type::Bind && Mount.BindSource == mount::BindSourcePolicy::CreateIfMissing)
+    if (Mount.MountType == WSLCMountTypeBind && Mount.BindSource == mount::BindSourcePolicy::CreateIfMissing)
     {
         WI_SetFlag(mount.Flags, WSLCMountSpecFlagsCreateSourceIfMissing);
     }
@@ -292,7 +279,6 @@ void wsl::windows::common::WSLCContainerLauncher::AddMount(const mount::Spec& Mo
 
     if (Mount.TmpfsOptions.has_value())
     {
-        WI_SetFlag(mount.Flags, WSLCMountSpecFlagsTmpfsOptions);
         mount.TmpfsOptions = m_mountTmpfsOptions.emplace_back(Mount.TmpfsOptions.value()).c_str();
     }
 
@@ -315,7 +301,7 @@ void wsl::windows::common::WSLCContainerLauncher::AddLabel(const std::string& Ke
 void wsl::windows::common::WSLCContainerLauncher::AddTmpfs(const std::string& ContainerPath, const std::string& Options)
 {
     AddMount({
-        .MountType = mount::Type::Tmpfs,
+        .MountType = WSLCMountTypeTmpfs,
         .Target = ContainerPath,
         .TmpfsOptions = Options,
     });
@@ -334,6 +320,11 @@ void wsl::windows::common::WSLCContainerLauncher::AddAdditionalNetwork(const std
 void wsl::windows::common::WSLCContainerLauncher::AddPrimaryNetworkAlias(const std::string& Alias)
 {
     m_primaryNetworkAliases.push_back(Alias);
+}
+
+void wsl::windows::common::WSLCContainerLauncher::SetPrimaryNetworkIpAddress(std::string&& Address)
+{
+    m_primaryNetworkIpAddress = std::move(Address);
 }
 
 std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::LaunchNoThrow(
@@ -485,12 +476,17 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     options.ContainerNetwork.Networks = connections.empty() ? nullptr : connections.data();
     options.ContainerNetwork.NetworksCount = static_cast<ULONG>(connections.size());
 
-    // Aliases for the primary endpoint.
+    // Settings for the primary endpoint.
     std::vector<KeyValuePair> primarySettings;
-    primarySettings.reserve(m_primaryNetworkAliases.size());
+    primarySettings.reserve(m_primaryNetworkAliases.size() + (m_primaryNetworkIpAddress.has_value() ? 1 : 0));
     for (const auto& alias : m_primaryNetworkAliases)
     {
         primarySettings.push_back({.Key = "Aliases", .Value = alias.c_str()});
+    }
+
+    if (m_primaryNetworkIpAddress.has_value())
+    {
+        primarySettings.push_back({.Key = "IPAddress", .Value = m_primaryNetworkIpAddress->c_str()});
     }
 
     options.ContainerNetwork.Settings = primarySettings.empty() ? nullptr : primarySettings.data();
@@ -531,7 +527,7 @@ RunningWSLCContainer WSLCContainerLauncher::Launch(IWSLCSession& Session, WSLCCo
 wsl::windows::common::wslc_schema::InspectContainer RunningWSLCContainer::Inspect()
 {
     wil::unique_cotaskmem_ansistring output;
-    THROW_IF_FAILED(m_container->Inspect(&output));
+    THROW_IF_FAILED(m_container->Inspect(FALSE, &output));
 
     return wsl::shared::FromJson<wslc_schema::InspectContainer>(output.get());
 }

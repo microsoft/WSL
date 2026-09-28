@@ -27,18 +27,18 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ImageBuildCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::Path, true),
-        Argument::Create(ArgType::BuildArg, false, Limit::Unlimited),
+        Argument::Create(ArgType::Path, {.Required = true}),
+        Argument::Create(ArgType::BuildArg, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::BuildPull),
         Argument::Create(ArgType::BuildTarget),
         Argument::Create(ArgType::File),
         Argument::Create(ArgType::IidFile),
-        Argument::Create(ArgType::BuildLabel, false, Limit::Unlimited),
+        Argument::Create(ArgType::BuildLabel, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::NoCache),
-        Argument::Create(ArgType::BuildOutput, false, std::nullopt, Localization::WSLCCLI_BuildOutputArgDescription()),
+        Argument::Create(ArgType::BuildOutput, {.Desc = Localization::WSLCCLI_BuildOutputArgDescription()}),
         Argument::Create(ArgType::Progress),
-        Argument::Create(ArgType::Secret, false, Limit::Unlimited),
-        Argument::Create(ArgType::Tag, false, Limit::Unlimited),
+        Argument::Create(ArgType::Secret, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::Tag, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::Verbose),
     };
 }

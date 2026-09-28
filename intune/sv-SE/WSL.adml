@@ -55,6 +55,9 @@
         <string id="AllowWSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->Tillåt WSL-container</string>
         <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Den här principen styr om WSL-containern kan användas på den här datorn. När den är aktiverad eller inte konfigurerad kan användare och Windows-program köra Linux-containrar via WSL. När den är inaktiverad blockeras WSL-containern för alla användare och Windows-appar kan inte köra Linux-containrar. Varning! Om du ställer in den här inställningen på "Disabled" kan Windows-appar som är beroende av Linux-containrar sluta fungera.</string>
 
+        <string id="AllowWSLContainerPrivileged"><!-- _locComment_text='{Locked="WSL"}' -->Tillåt privilegierade WSL-containrar</string>
+        <string id="AllowWSLContainerPrivilegedExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Den här principen styr om WSL containrar kan köras i privilegierat läge på den här datorn. När det är aktiverat eller inte konfigurerat kan användare och Windows-program starta privilegierade containrar. När det är inställt på 'Disabled' nekas begäranden om att starta en privilegierad container för alla användare och Windows-appar. Privilegierade containrar körs med utökade Linux-funktioner och minskad isolering från containervärden.</string>
+
         <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->Tillåt lista för WSL-containerregister</string>
         <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment_text='{Locked="WSL"}' -->När WSL-containern är aktiverad tillåts den bara att hämta avbildningar från de register som anges här. Detta påverkar både WSL-containerns CLI och alla program som använder WSL-container-API:et.</string>
     </stringTable>

@@ -15,6 +15,7 @@
 - [WslcSignal](wslcsignal.md)
 - [WslcDeleteContainerFlags](wslcdeletecontainerflags.md)
 - [WslcProcessIOHandle](wslcprocessiohandle.md)
+- [WslcProcessFlags](wslcprocessflags.md)
 - [WslcProcessState](wslcprocessstate.md)
 - [WslcImageProgressStatus](wslcimageprogressstatus.md)
 - [WslcComponentFlags](wslccomponentflags.md)

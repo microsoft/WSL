@@ -18,6 +18,7 @@ Abstract:
 #include "precomp.h"
 #include "windows/Common.h"
 #include "VTSupport.h"
+#include <set>
 
 namespace WSLCE2ETests {
 
@@ -27,6 +28,12 @@ enum class ElevationType
 {
     Elevated,
     NonElevated
+};
+
+enum class ProcessGroup
+{
+    Inherit,
+    Create
 };
 
 inline std::wstring GetWslcPath()
@@ -72,7 +79,8 @@ struct WSLCInteractiveSession
         wil::unique_hfile stderrRead,
         wil::unique_handle processHandle,
         wil::unique_handle nonElevatedToken = wil::unique_handle{},
-        wsl::windows::common::helpers::unique_pseudo_console pseudoConsole = {});
+        wsl::windows::common::helpers::unique_pseudo_console pseudoConsole = {},
+        ProcessGroup processGroup = ProcessGroup::Inherit);
     ~WSLCInteractiveSession();
 
     // Non-copyable, non-movable
@@ -107,6 +115,7 @@ struct WSLCInteractiveSession
 
     bool IsRunning() const;
     void CloseStdin();
+    void SendCtrlBreak();
     std::optional<int> GetExitCode() const;
     void WaitForExit(DWORD timeoutMs = DefaultWaitTimeoutMs);
     int Wait(DWORD timeoutMs = DefaultWaitTimeoutMs);
@@ -122,6 +131,7 @@ private:
     wsl::windows::common::helpers::unique_pseudo_console m_pseudoConsole;
     wil::unique_handle m_processHandle;
     wil::unique_handle m_nonElevatedToken; // Keep token alive for the lifetime of the session
+    ProcessGroup m_processGroup;
     std::unique_ptr<PartialHandleRead> m_stdoutReader;
     std::unique_ptr<PartialHandleRead> m_stderrReader;
     std::optional<std::string> m_ignoreSequence;
@@ -136,7 +146,14 @@ WSLCExecutionResult RunWslcWithStdinFile(
     const std::wstring& commandLine, const std::filesystem::path& stdinFilePath, ElevationType elevationType = ElevationType::Elevated);
 void RunWslcAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expected, ElevationType elevationType = ElevationType::Elevated);
 
+// Runs a command expected to succeed without stderr output and returns its non-empty stdout lines as
+// a set, so two listings can be compared without depending on ordering or duplicates.
+std::set<std::wstring> RunWslcAndGetStdoutLineSet(const std::wstring& cmd, ElevationType elevationType = ElevationType::Elevated);
+
 WSLCInteractiveSession RunWslcInteractive(
-    const std::wstring& commandLine, ElevationType elevationType = ElevationType::Elevated, std::optional<PseudoConsole> pseudoConsole = std::nullopt);
+    const std::wstring& commandLine,
+    ElevationType elevationType = ElevationType::Elevated,
+    std::optional<PseudoConsole> pseudoConsole = std::nullopt,
+    ProcessGroup processGroup = ProcessGroup::Inherit);
 
 } // namespace WSLCE2ETests

@@ -1498,10 +1498,12 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
 
             _ValidateDistributionNameAndPathNotInUse(lxssKey.get(), distributionPath.c_str(), DistributionName);
 
-            if (!std::filesystem::exists(distributionPath))
             {
                 auto impersonate = wil::CoImpersonateClient();
-                wil::CreateDirectoryDeep(distributionPath.c_str());
+                if (!std::filesystem::exists(distributionPath))
+                {
+                    wil::CreateDirectoryDeep(distributionPath.c_str());
+                }
             }
 
             // If importing a vhd, determine if it is a .vhd or .vhdx.
@@ -2723,7 +2725,7 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
                     registration.Write(Property::OsVersion, distributionInfo->Version);
                 }
 
-                // This needs to be done before plugins are notifed because they might try to run a command inside the distribution.
+                // This needs to be done before plugins are notified because they might try to run a command inside the distribution.
                 m_runningInstances[registration.Id()] = instance;
 
                 if (version == LXSS_WSL_VERSION_2)
@@ -2978,8 +2980,13 @@ void LxssUserSessionImpl::_CreateVm()
 
         m_vmId.store(vmId);
 
+        const auto weakSession = weak_from_this();
+        auto initializeDrvFs = [weakSession, vmId](HANDLE userToken) noexcept {
+            return s_InitializeDrvFs(weakSession, vmId, userToken);
+        };
+
         // Create the utility VM and register for callbacks.
-        m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId);
+        m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId, std::move(initializeDrvFs));
 
         if (m_httpProxyStateTracker)
         {
@@ -3504,8 +3511,9 @@ void LxssUserSessionImpl::_ProcessImportResultMessage(
         {
             if (Message.TerminalProfileIndex != 0)
             {
-                const auto terminalProfileSpan = Span.subspan(Message.TerminalProfileIndex);
-                const std::string_view terminalProfile(reinterpret_cast<const char*>(terminalProfileSpan.data()), Message.TerminalProfileSize);
+                const auto terminalProfileSpan = Span.subspan(Message.TerminalProfileIndex, Message.TerminalProfileSize);
+                const std::string_view terminalProfile(
+                    reinterpret_cast<const char*>(terminalProfileSpan.data()), terminalProfileSpan.size());
                 _CreateTerminalProfile(terminalProfile, iconPath, Configuration, Registration);
             }
             else
@@ -3909,6 +3917,7 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
 
     if (Path != nullptr)
     {
+        auto impersonate = wil::CoImpersonateClient();
         canonicalPath = wsl::windows::common::filesystem::GetCanonicalPath(Path, error);
         if (error)
         {
@@ -3953,6 +3962,7 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
 
         if (Path != nullptr)
         {
+            auto impersonate = wil::CoImpersonateClient();
             auto canonicalDistroPath = wsl::windows::common::filesystem::GetCanonicalPath(configuration.BasePath, error);
             if (error)
             {
@@ -4233,6 +4243,31 @@ wil::unique_hkey LxssUserSessionImpl::s_OpenLxssUserKey(_In_ HANDLE UserToken)
 {
     auto runAsUser = wil::impersonate_token(UserToken);
     return wsl::windows::common::registry::OpenLxssUserKey();
+}
+
+LX_INIT_DRVFS_MOUNT LxssUserSessionImpl::s_InitializeDrvFs(_In_ const std::weak_ptr<LxssUserSessionImpl>& Session, _In_ const GUID& VmId, _In_ HANDLE UserToken) noexcept
+{
+    try
+    {
+        const auto session = Session.lock();
+        if (!session)
+        {
+            return LxInitDrvfsMountNone;
+        }
+
+        std::lock_guard lock(session->m_instanceLock);
+        if (!session->m_utilityVm || !IsEqualGUID(session->m_utilityVm->GetRuntimeId(), VmId))
+        {
+            return LxInitDrvfsMountNone;
+        }
+
+        return session->m_utilityVm->InitializeDrvFs(UserToken) ? LxInitDrvfsMountElevated : LxInitDrvfsMountNonElevated;
+    }
+    catch (...)
+    {
+        LOG_CAUGHT_EXCEPTION();
+        return LxInitDrvfsMountNone;
+    }
 }
 
 bool LxssUserSessionImpl::s_TerminateInstance(_Inout_ LxssUserSessionImpl* UserSession, _In_ GUID DistroGuid, _In_ bool CheckForClients)

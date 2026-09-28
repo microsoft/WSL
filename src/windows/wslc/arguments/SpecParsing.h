@@ -87,7 +87,7 @@ ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value, const std::w
 WSLCSignal GetWSLCSignalFromString(const std::wstring& input, const std::wstring& argName = {});
 
 // Parses a timestamp given as Unix epoch seconds or an RFC3339 string into epoch seconds.
-ULONGLONG GetTimestampFromString(const std::wstring& value, const std::wstring& argName = {});
+LONGLONG GetTimestampFromString(const std::wstring& value, const std::wstring& argName = {});
 
 // Parses an output format ("json"/"table") into a FormatType.
 models::FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring& argName = {});

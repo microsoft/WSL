@@ -188,6 +188,12 @@ void Argument::Validate(ArgMap& execArgs) const
         });
         break;
 
+    case ArgType::Timeout:
+        CacheConverted<ArgType::Timeout>(execArgs, m_name, [](const std::wstring& value, const std::wstring& name) {
+            return validation::GetIntegerFromString<LONG>(value, name);
+        });
+        break;
+
     case ArgType::Secret:
         CacheConverted<ArgType::Secret>(
             execArgs, m_name, [](const std::wstring& value, const std::wstring&) { return validation::ParseSecretSpec(value); });
@@ -349,16 +355,6 @@ void ValidateWSLCSignalFromString(const std::vector<std::wstring>& values, const
     for (const auto& value : values)
     {
         std::ignore = GetWSLCSignalFromString(value, argName);
-    }
-}
-
-// Validates that each --filter argument is in the form "key=value". Rejects entries without an '=';
-// the runtime validates the key and value for specific objects.
-void ValidateFilter(const std::vector<std::wstring>& values)
-{
-    for (const auto& value : values)
-    {
-        std::ignore = ParseFilter(value);
     }
 }
 

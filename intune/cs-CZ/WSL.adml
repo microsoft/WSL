@@ -55,6 +55,9 @@
         <string id="AllowWSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->Povolit kontejner WSL</string>
         <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Tato zásada určuje, jestli se na tomto počítači dá používat kontejner WSL. Když je tato zásada povolená nebo není nakonfigurovaná, uživatelé a aplikace pro Windows můžou spouštět kontejnery Linuxu přes WSL. Když je tato zásada zakázaná, kontejner WSL se zablokuje pro všechny uživatele a aplikace pro Windows nemůžou spouštět kontejnery Linuxu. Upozornění: Nastavení na 'Disabled' může narušit aplikace pro Windows, které závisejí na kontejnerech Linuxu.</string>
 
+        <string id="AllowWSLContainerPrivileged"><!-- _locComment_text='{Locked="WSL"}' -->Povolit privilegované kontejnery WSL</string>
+        <string id="AllowWSLContainerPrivilegedExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Tato zásada určuje, jestli můžou kontejnery WSL na tomto počítači běžet v privilegovaném režimu. Pokud je zásada povolená nebo nenakonfigurovaná, uživatelé a aplikace Windows můžou spouštět privilegované kontejnery. Pokud je nastavená na Disabled, žádosti o spuštění privilegovaného kontejneru se odmítnou všem uživatelům a aplikacím Windows. Privilegované kontejnery běží s rozšířenými oprávněními Linuxu a menší izolací od hostitele kontejneru.</string>
+
         <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->Seznam povolených registrů pro kontejnery WSL</string>
         <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment_text='{Locked="WSL"}' -->Když je tato zásada povolená, kontejner WSL bude moct stahovat image jen z registrů uvedených tady. Ovlivní to rozhraní CLI kontejneru WSL i všechny aplikace používající rozhraní API kontejneru WSL.</string>
     </stringTable>

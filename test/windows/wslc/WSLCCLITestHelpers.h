@@ -33,7 +33,7 @@ Abstract:
 
 namespace WSLCTestHelpers {
 
-inline wsl::windows::wslc::Invocation CreateInvocationFromCommandLine(const std::wstring& commandLine)
+inline wsl::windows::wslc::InvocationCursor CreateInvocationFromCommandLine(const std::wstring& commandLine)
 {
     // Simulate creation of Arvc/Argc from command line as Windows does.
     int argc = 0;
@@ -42,15 +42,14 @@ inline wsl::windows::wslc::Invocation CreateInvocationFromCommandLine(const std:
     VERIFY_IS_NOT_NULL(argv.get());
     VERIFY_IS_GREATER_THAN(argc, 0);
 
-    // Convert to vector for Invocation, skipping argv[0] (executable path)
-    // This is what we do in wmain() to populate Invocation input vector.
+    // Convert to a cursor over argv, skipping argv[0] (executable path).
     std::vector<std::wstring> args;
     for (int i = 1; i < argc; ++i) // Skip argv[0]
     {
         args.push_back(argv[i]);
     }
 
-    return wsl::windows::wslc::Invocation(std::move(args));
+    return wsl::windows::wslc::InvocationCursor(std::move(args));
 }
 
 // Helper function to convert wstring to UTF-8 string for TAEF logging
@@ -201,7 +200,7 @@ private:
 struct CaptureTerminal
 {
     CapturePipe pipe;
-    wsl::windows::wslc::Terminal terminal;
+    wsl::windows::wslc::cli::Terminal terminal;
 
     explicit CaptureTerminal(bool vtEnabled = false) : terminal(pipe.file(), vtEnabled, pipe.file(), vtEnabled)
     {
@@ -218,13 +217,13 @@ template <size_t N>
 struct TableOutputCapture
 {
     CaptureTerminal capture;
-    wsl::windows::wslc::TableOutput<N> table;
+    wsl::windows::wslc::cli::TableOutput<N> table;
 
     // Header + optional config + optional VT flag.
     explicit TableOutputCapture(
-        typename wsl::windows::wslc::TableOutput<N>::header_t&& header,
+        typename wsl::windows::wslc::cli::TableOutput<N>::header_t&& header,
         size_t sizingBuffer = 50,
-        size_t columnPadding = wsl::windows::wslc::TableOutput<N>::DefaultColumnPadding,
+        size_t columnPadding = wsl::windows::wslc::cli::TableOutput<N>::DefaultColumnPadding,
         bool vtEnabled = false) :
         capture(vtEnabled), table(capture.terminal, std::move(header), sizingBuffer, columnPadding)
     {
@@ -233,17 +232,17 @@ struct TableOutputCapture
 
     // Header + column configs + optional VT flag.
     explicit TableOutputCapture(
-        typename wsl::windows::wslc::TableOutput<N>::header_t&& header,
-        typename wsl::windows::wslc::TableOutput<N>::column_config_t&& configs,
+        typename wsl::windows::wslc::cli::TableOutput<N>::header_t&& header,
+        typename wsl::windows::wslc::cli::TableOutput<N>::column_config_t&& configs,
         bool vtEnabled = false) :
         capture(vtEnabled),
-        table(capture.terminal, std::move(header), std::move(configs), 50, wsl::windows::wslc::TableOutput<N>::DefaultColumnPadding)
+        table(capture.terminal, std::move(header), std::move(configs), 50, wsl::windows::wslc::cli::TableOutput<N>::DefaultColumnPadding)
     {
         table.SetConsoleWidthOverride(120);
     }
 
     // Column definitions.
-    explicit TableOutputCapture(typename wsl::windows::wslc::TableOutput<N>::column_def_t&& defs, bool vtEnabled = false) :
+    explicit TableOutputCapture(typename wsl::windows::wslc::cli::TableOutput<N>::column_def_t&& defs, bool vtEnabled = false) :
         capture(vtEnabled), table(capture.terminal, std::move(defs))
     {
         table.SetConsoleWidthOverride(120);

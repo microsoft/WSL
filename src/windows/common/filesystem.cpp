@@ -972,6 +972,22 @@ std::string wsl::windows::common::filesystem::GetWindowsHosts(const std::filesys
     return WindowsHosts;
 }
 
+std::filesystem::path wsl::windows::common::filesystem::MakeStagingDirectory(const std::filesystem::path& Parent)
+{
+    GUID stagingId{};
+    THROW_IF_FAILED(CoCreateGuid(&stagingId));
+
+    auto staging =
+        Parent /
+        std::format(L".wslc-cp-{}", wsl::shared::string::GuidToString<wchar_t>(stagingId, wsl::shared::string::GuidToStringFlags::None));
+
+    std::error_code error;
+    std::filesystem::create_directories(staging, error);
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error.value()), !!error, "Failed to create directory: %ls", staging.c_str());
+
+    return staging;
+}
+
 wil::unique_hfile wsl::windows::common::filesystem::OpenDirectoryHandle(_In_ LPCWSTR pPath, _In_ bool forWrite)
 {
     wil::unique_hfile handle(OpenDirectoryHandleNoThrow(pPath, forWrite));
@@ -1038,6 +1054,24 @@ std::pair<NTSTATUS, wil::unique_hfile> wsl::windows::common::filesystem::OpenRel
         &File, DesiredAccess, &Attributes, &IoStatus, nullptr, 0, (FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE), Disposition, CreateOptions, EaBuffer, EaSize);
 
     return std::make_pair(Status, std::move(File));
+}
+
+std::string wsl::windows::common::filesystem::PosixBaseName(std::string_view Path)
+{
+    while (Path.size() > 1 && Path.back() == '/')
+    {
+        Path.remove_suffix(1);
+    }
+
+    const auto separator = Path.find_last_of('/');
+    auto name = std::string(separator == std::string_view::npos ? Path : Path.substr(separator + 1));
+
+    if (name == "." || name == "..")
+    {
+        return {};
+    }
+
+    return name;
 }
 
 wil::unique_hfile wsl::windows::common::filesystem::ReopenFile(_In_ HANDLE Handle, _In_ ACCESS_MASK DesiredAccess, _In_ ULONG CreateOptions)

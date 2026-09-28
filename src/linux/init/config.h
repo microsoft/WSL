@@ -304,6 +304,10 @@ class EnvironmentBlock
 public:
     EnvironmentBlock() = default;
 
+    explicit EnvironmentBlock(std::vector<std::string> Variables) : m_variables(std::move(Variables))
+    {
+    }
+
     EnvironmentBlock(const char* Buffer, unsigned short Count)
     {
         m_variables.reserve(Count);
@@ -391,7 +395,12 @@ void ConfigCreateResolvConfSymlink(const wsl::linux::WslDistributionConfig& Conf
 
 int ConfigCreateResolvConfSymlinkTarget(void);
 
-EnvironmentBlock ConfigCreateEnvironmentBlock(PLX_INIT_CREATE_PROCESS_COMMON Common, const wsl::linux::WslDistributionConfig& Config);
+EnvironmentBlock ConfigCreateEnvironmentBlock(
+    gsl::span<gsl::byte> Buffer,
+    unsigned int EnvironmentOffset,
+    unsigned int NtEnvironmentOffset,
+    unsigned int NtPathOffset,
+    const wsl::linux::WslDistributionConfig& Config);
 
 std::optional<unsigned int> ConfigGetDriveLetter(std::string_view MountSource);
 

@@ -127,11 +127,18 @@ class WSLCE2ENetworkListTests
         names.reserve(networks.size());
         for (const auto& network : networks)
         {
-            VERIFY_ARE_EQUAL(3u, network.size());
+            VERIFY_ARE_EQUAL(9u, network.size());
             VERIFY_IS_TRUE(network.contains("ID"));
             VERIFY_IS_FALSE(network.contains("Id"));
             VERIFY_IS_TRUE(network.contains("Name"));
             VERIFY_IS_TRUE(network.contains("Driver"));
+            VERIFY_IS_TRUE(network.contains("Scope"));
+            VERIFY_IS_TRUE(network.contains("CreatedAt"));
+            VERIFY_IS_TRUE(network.contains("IPv4"));
+            VERIFY_IS_TRUE(network.contains("IPv6"));
+            VERIFY_IS_TRUE(network.contains("Internal"));
+            VERIFY_IS_TRUE(network.contains("Labels"));
+            VERIFY_IS_TRUE(network.at("CreatedAt").get<std::string>().ends_with(" +0000 UTC"));
             VerifyIdOutput(MultiByteToWide(network.at("ID").get<std::string>()), true);
             names.push_back(network.at("Name").get<std::string>());
         }
@@ -161,6 +168,28 @@ class WSLCE2ENetworkListTests
             const auto id = MultiByteToWide(network.at("ID").get<std::string>());
             VERIFY_IS_TRUE(fullTableResult.StdoutContainsSubstring(id));
         }
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Network_List_IncludesPredefinedNetworks)
+    {
+        // The predefined networks are not created by wslc but are still reported by list.
+        auto result = RunWslc(L"network list --format json");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        std::set<std::string> names;
+        for (const auto& network : ParseNdjsonOutputAs<NetworkListOutput>(result))
+        {
+            names.insert(network.Name);
+        }
+
+        VERIFY_IS_TRUE(names.contains("bridge"));
+        VERIFY_IS_TRUE(names.contains("host"));
+        VERIFY_IS_TRUE(names.contains("none"));
+
+        result = RunWslc(L"network list");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"NETWORK ID"));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"SCOPE"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_List_Filter_MalformedValue)
@@ -197,7 +226,7 @@ class WSLCE2ENetworkListTests
         auto listNames = [&](const std::wstring& filterArgs) {
             auto r = RunWslc(std::format(L"network list --format json {}", filterArgs));
             r.Verify({.Stderr = L"", .ExitCode = 0});
-            const auto networks = ParseNdjsonOutputAs<WSLCNetworkInformation>(r);
+            const auto networks = ParseNdjsonOutputAs<NetworkListOutput>(r);
             std::set<std::string> names;
             for (const auto& n : networks)
             {
@@ -243,7 +272,7 @@ class WSLCE2ENetworkListTests
         auto listNames = [&](const std::wstring& filterArgs) {
             auto r = RunWslc(std::format(L"network list --format json {}", filterArgs));
             r.Verify({.Stderr = L"", .ExitCode = 0});
-            const auto networks = ParseNdjsonOutputAs<WSLCNetworkInformation>(r);
+            const auto networks = ParseNdjsonOutputAs<NetworkListOutput>(r);
             std::set<std::string> names;
             for (const auto& n : networks)
             {
@@ -304,7 +333,7 @@ class WSLCE2ENetworkListTests
         auto listNames = [&](const std::wstring& filterArgs) {
             auto r = RunWslc(std::format(L"network list --format json {}", filterArgs));
             r.Verify({.Stderr = L"", .ExitCode = 0});
-            const auto networks = ParseNdjsonOutputAs<WSLCNetworkInformation>(r);
+            const auto networks = ParseNdjsonOutputAs<NetworkListOutput>(r);
             std::set<std::string> names;
             for (const auto& n : networks)
             {

@@ -22,7 +22,7 @@ Abstract:
 #include <string>
 #include <Windows.h>
 
-namespace wsl::windows::wslc {
+namespace wsl::windows::wslc::cli {
 
 class InputChannel
 {
@@ -53,4 +53,4 @@ private:
     bool m_interactiveOverride = false;
 };
 
-} // namespace wsl::windows::wslc
+} // namespace wsl::windows::wslc::cli

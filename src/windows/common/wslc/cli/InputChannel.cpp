@@ -16,7 +16,7 @@ Abstract:
 
 #include <wil/resource.h>
 
-namespace wsl::windows::wslc {
+namespace wsl::windows::wslc::cli {
 
 InputChannel::InputChannel(HANDLE consoleHandle, FILE* readFile) : m_file(readFile)
 {
@@ -103,4 +103,4 @@ std::optional<std::wstring> InputChannel::ReadLine(bool mask) const
     return line;
 }
 
-} // namespace wsl::windows::wslc
+} // namespace wsl::windows::wslc::cli

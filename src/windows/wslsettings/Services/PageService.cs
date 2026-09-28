@@ -24,6 +24,7 @@ public class PageService : IPageService
         Configure<AboutViewModel, AboutPage>();
 
         Configure<GeneralViewModel, GeneralPage>();
+        Configure<WSLContainerViewModel, WSLContainerPage>();
         Configure<WorkingAcrossFileSystemsViewModel, WorkingAcrossFileSystemsPage>();
         Configure<VSCodeIntegrationViewModel, VSCodeIntegrationPage>();
         Configure<VSIntegrationViewModel, VSIntegrationPage>();

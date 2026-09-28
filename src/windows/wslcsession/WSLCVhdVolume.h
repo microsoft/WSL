@@ -43,6 +43,7 @@ public:
         ULONG Lun,
         std::string&& VirtualMachinePath,
         std::string&& CreatedAt,
+        std::string&& Mountpoint,
         std::map<std::string, std::string>&& DriverOpts,
         std::map<std::string, std::string>&& Labels,
         WSLCVirtualMachine& VirtualMachine,
@@ -76,6 +77,10 @@ public:
     {
         return m_labels;
     }
+    const std::string& Mountpoint() const noexcept override
+    {
+        return m_mountpoint;
+    }
 
     std::pair<HRESULT, std::string> Status() const override
     {
@@ -99,6 +104,7 @@ private:
     std::filesystem::path m_hostPath;
     std::string m_virtualMachinePath;
     std::string m_createdAt;
+    std::string m_mountpoint;
     std::map<std::string, std::string> m_driverOpts;
     std::map<std::string, std::string> m_labels;
     ULONGLONG m_sizeBytes{};

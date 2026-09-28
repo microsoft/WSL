@@ -29,7 +29,7 @@ Abstract:
 #include <type_traits>
 #include <utility>
 
-namespace wsl::windows::wslc {
+namespace wsl::windows::wslc::cli {
 
 // Fallback width for progress displays when the console width can't be queried. This
 // value already includes the autowrap guard (visible width minus one) so a wrapped line
@@ -108,6 +108,12 @@ struct Terminal
         EmitFormatted(Level::Error, std::move(fmt), std::forward<Args>(args)...);
     }
 
+    // Makes redirected output visible before a blocking operation.
+    void Flush(Level level) const
+    {
+        ChannelFor(level).Flush();
+    }
+
     // True when user input is attached to an interactive console (a prompt can be
     // shown and echo can be masked); false when input is redirected from a file or pipe.
     bool IsInputInteractive() const noexcept
@@ -138,6 +144,12 @@ struct Terminal
     {
         return PromptForLine(Level::Output, label, mask);
     }
+
+    // Prompts for confirmation by writing message followed by " [y/N] ", then reading one line.
+    // Returns true only when the answer is "y" (case-insensitive, surrounding ASCII whitespace
+    // ignored); every other answer, including end of input, declines. Declining at end of input is
+    // what lets a non-interactive prune abort instead of blocking.
+    bool Confirm(std::wstring_view message);
 
     bool IsVTEnabled(Level level) const noexcept;
 
@@ -200,4 +212,4 @@ private:
     bool m_noColor = false;
 };
 
-} // namespace wsl::windows::wslc
+} // namespace wsl::windows::wslc::cli

@@ -88,7 +88,7 @@ class WSLCE2EVolumeListTests
         result = RunWslc(L"volume list --format json");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        auto volumes = ParseNdjsonOutputAs<WSLCVolumeInformation>(result);
+        auto volumes = ParseNdjsonOutputAs<VolumeListOutput>(result);
         VERIFY_ARE_EQUAL(2U, volumes.size());
 
         std::vector<std::string> names;
@@ -100,6 +100,31 @@ class WSLCE2EVolumeListTests
 
         VERIFY_ARE_NOT_EQUAL(names.end(), std::find(names.begin(), names.end(), WideToMultiByte(TestVolumeName)));
         VERIFY_ARE_NOT_EQUAL(names.end(), std::find(names.begin(), names.end(), WideToMultiByte(TestVolumeName2)));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Volume_List_ReportsFullFieldSet)
+    {
+        auto result = RunWslc(std::format(L"volume create --label env=prod {}", TestVolumeName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(L"volume list --format json");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto entries = ParseNdjsonOutput(result);
+        VERIFY_ARE_EQUAL(1u, entries.size());
+        const auto& volume = entries[0];
+
+        VERIFY_ARE_EQUAL(10u, volume.size());
+        VERIFY_ARE_EQUAL("N/A", volume["Availability"].get<std::string>());
+        VERIFY_ARE_EQUAL("guest", volume["Driver"].get<std::string>());
+        VERIFY_ARE_EQUAL("N/A", volume["Group"].get<std::string>());
+        VERIFY_ARE_EQUAL("env=prod", volume["Labels"].get<std::string>());
+        VERIFY_ARE_EQUAL("N/A", volume["Links"].get<std::string>());
+        VERIFY_IS_FALSE(volume["Mountpoint"].get<std::string>().empty());
+        VERIFY_ARE_EQUAL(WideToMultiByte(TestVolumeName), volume["Name"].get<std::string>());
+        VERIFY_ARE_EQUAL("local", volume["Scope"].get<std::string>());
+        VERIFY_ARE_EQUAL("N/A", volume["Size"].get<std::string>());
+        VERIFY_ARE_EQUAL("N/A", volume["Status"].get<std::string>());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_List_Filter_MalformedValue)
@@ -243,7 +268,7 @@ private:
     {
         auto result = RunWslc(std::format(L"volume list --format json {}", filterArgs));
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        const auto volumes = ParseNdjsonOutputAs<WSLCVolumeInformation>(result);
+        const auto volumes = ParseNdjsonOutputAs<VolumeListOutput>(result);
         std::set<std::string> names;
         for (const auto& v : volumes)
         {

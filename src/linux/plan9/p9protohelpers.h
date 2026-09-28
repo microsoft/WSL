@@ -33,14 +33,9 @@ public:
 
     gsl::span<const gsl::byte> Read(unsigned int count)
     {
-        if (m_Message.size() - m_Offset < count)
-        {
-            FAIL_FAST();
-        }
-
-        auto result = m_Message.subspan(m_Offset, count);
-        m_Offset += count;
-        return result;
+        auto result = TryRead(count);
+        THROW_INVALID_IF(!result.Success);
+        return result.Result;
     }
 
     ReadResult<gsl::span<const gsl::byte>> TryRead(unsigned int count)

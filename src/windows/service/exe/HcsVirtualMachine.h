@@ -100,6 +100,7 @@ private:
 
     // Shares: key is ShareId, value is nullopt for Plan9 or the aggregate DeviceInstanceId for VirtioFS.
     std::map<GUID, std::optional<GUID>, wsl::windows::common::helpers::GuidLess> m_shares;
+    wil::com_ptr<IPlan9FileSystem> m_plan9Server;
     std::optional<GUID> m_virtioFsDevice;
 
     std::filesystem::path m_vmSavedStateFile;
