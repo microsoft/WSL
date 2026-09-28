@@ -26,6 +26,55 @@ std::wstring FormatVirtioFsMountOptions(_In_ const std::map<std::wstring, std::w
     return optionsString;
 }
 
+std::map<std::wstring, std::wstring> ParseVirtioFsMountOptions(_In_ std::wstring_view Options)
+{
+    std::map<std::wstring, std::wstring> parsed;
+    for (const auto& option : wsl::shared::string::Split(std::wstring{Options}, L';'))
+    {
+        std::wstring key;
+        std::wstring value;
+        const auto pos = option.find_first_of(L'=');
+        if (pos == option.npos)
+        {
+            key = option;
+        }
+        else
+        {
+            key = option.substr(0, pos);
+            value = option.substr(pos + 1);
+        }
+
+        if (!key.empty())
+        {
+            parsed.insert({std::move(key), std::move(value)});
+        }
+    }
+
+    return parsed;
+}
+
+std::wstring NormalizeSharePath(_In_ const std::filesystem::path& Path)
+{
+    std::wstring sharePath = Path.wstring();
+    if (!sharePath.ends_with(L'\\') && !sharePath.ends_with(L'/'))
+    {
+        sharePath.push_back(L'\\');
+    }
+
+    return wsl::windows::common::filesystem::GetCanonicalPath(sharePath).wstring();
+}
+
+void AddPlan9SharePath(_In_ const wil::com_ptr<IPlan9FileSystem>& Server, _In_ PCWSTR AccessName, _In_ PCWSTR Path, _In_ UINT32 Flags)
+{
+    HRESULT result = Server->AddSharePath(AccessName, Path, Flags);
+    if (result == HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS))
+    {
+        result = S_OK;
+    }
+
+    THROW_IF_FAILED(result);
+}
+
 GuestDeviceManager::GuestDeviceManager(_In_ const std::wstring& machineId, _In_ const GUID& runtimeId, bool EnableTelemetry) :
     m_machineId(machineId), m_deviceHostSupport(wil::MakeOrThrow<DeviceHostProxy>(machineId, runtimeId, EnableTelemetry))
 {

@@ -75,6 +75,16 @@ private:
         wil::com_ptr<IPlan9FileSystem> Plan9Server;
     };
 
+    using FileSystemDeviceMap = std::map<std::uint64_t, FileSystemDevice>;
+
+    struct FileSystemShare
+    {
+        VmFileSystemShare Share;
+        // Options the share was created with. Together with the host path these identify a virtio-fs
+        // share, so a repeated request reuses the existing share instead of creating a second one.
+        std::wstring MountOptions;
+    };
+
     HcsVirtualMachineBackend();
     void Initialize(const VmCreateRequest& Request);
     VmConfiguration BuildConfiguration(const VmCreateRequest& Request);
@@ -93,6 +103,27 @@ private:
     _Requires_lock_held_(m_lock)
     std::map<std::uint64_t, AttachedDisk>::iterator FindAttachedDiskLocked(bool PassThrough, const std::wstring& Path);
 
+    _Requires_lock_held_(m_lock)
+    FileSystemDeviceMap::iterator FindFileSystemDeviceLocked(VmDeviceId Device);
+
+    /// <summary>
+    /// Returns the share of Device that already serves HostPath with MountOptions, if there is one.
+    /// </summary>
+    _Requires_lock_held_(m_lock)
+    const FileSystemShare* FindFileSystemShareLocked(VmDeviceId Device, const std::wstring& HostPath, const std::wstring& MountOptions) const;
+
+    /// <summary>
+    /// Resolves the token used to reach the host path of a share, preferring the one on the request.
+    /// </summary>
+    HANDLE ResolveShareUserToken(const VmFileSystemShareRequest& Request) const;
+
+    /// <summary>
+    /// Adds a share to a Plan 9 device and returns the name the guest uses to reach it.
+    /// </summary>
+    _Requires_lock_held_(m_lock)
+    std::wstring AddPlan9ShareLocked(
+        const FileSystemDevice& Device, const VmFileSystemShareRequest& Request, HANDLE UserToken, const std::wstring& HostPath) const;
+
     NON_COPYABLE(HcsVirtualMachineBackend);
     NON_MOVABLE(HcsVirtualMachineBackend);
 
@@ -109,8 +140,10 @@ private:
     _Guarded_by_(m_lock) wsl::windows::common::hcs::unique_hcs_system m_system;
     _Guarded_by_(m_lock) std::map<std::uint64_t, AttachedDisk> m_attachedDisks;
     _Guarded_by_(m_lock) std::uint64_t m_nextDiskId = 1;
-    _Guarded_by_(m_lock) std::map<std::uint64_t, FileSystemDevice> m_fileSystemDevices;
+    _Guarded_by_(m_lock) FileSystemDeviceMap m_fileSystemDevices;
     _Guarded_by_(m_lock) std::uint64_t m_nextDeviceId = 1;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, FileSystemShare> m_fileSystemShares;
+    _Guarded_by_(m_lock) std::uint64_t m_nextShareId = 1;
     wil::unique_handle m_restrictedToken;
 
     _Guarded_by_(m_lock) std::shared_ptr<GuestDeviceManager> m_guestDeviceManager;

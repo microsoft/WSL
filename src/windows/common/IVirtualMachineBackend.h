@@ -479,10 +479,14 @@ using VmFileSystemShareOptions = std::variant<VmVirtioFsShareOptions, VmPlan9Sha
 struct VmFileSystemShareRequest
 {
     std::filesystem::path HostPath;
-    // Child name for aggregate virtio-fs devices or access name for Plan9 shares.
+    // Child name for aggregate virtio-fs devices or access name for Plan9 shares. Generated when empty.
     std::wstring Name;
     bool ReadOnly = true;
     VmFileSystemShareOptions Options;
+    // Token whose identity is used to reach the host path. Elevated and unelevated callers share the
+    // same VM, so a share carries its own token instead of reusing the one that created the VM. The
+    // VM identity token is used when this is unset.
+    wil::shared_handle UserToken{};
 };
 
 struct VmVirtioFsShareAddress
