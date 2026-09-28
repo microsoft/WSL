@@ -1274,7 +1274,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::CompleteTransitio
     transition->Completed.SetEvent();
 }
 
-void WSLCContainerImpl::RecordEvent(std::string&& Action, std::int64_t Time, std::optional<int> ExitCode) noexcept
+void WSLCContainerImpl::RecordEvent(std::string&& Action, common::wslc_schema::EventTimestamp Timestamp, std::optional<int> ExitCode) noexcept
 try
 {
     auto attributes = StripInternalLabels(m_labels);
@@ -1286,11 +1286,11 @@ try
         attributes["exitCode"] = std::to_string(ExitCode.value());
     }
 
-    m_eventStore.Record("container", std::move(Action), m_id, std::move(attributes), Time);
+    m_eventStore.Record("container", std::move(Action), m_id, std::move(attributes), Timestamp);
 }
 CATCH_LOG()
 
-void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode, std::int64_t eventTime) noexcept
+void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode, common::wslc_schema::EventTimestamp eventTime) noexcept
 {
     // Either owner may disconnect the COM wrapper, so both must outlive m_lock.
     unique_com_disconnect comWrapper;
@@ -1575,7 +1575,7 @@ __requires_exclusive_lock_held(m_lock) std::shared_ptr<WSLCContainerImpl::StateT
     return StartTransition(TransitionKind::Delete, ContainerEvent::Destroy);
 }
 
-__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exitCode, std::int64_t stopTime)
+__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exitCode, common::wslc_schema::EventTimestamp stopTime)
 {
     auto transition = m_transition;
 
@@ -3129,7 +3129,8 @@ __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::
     return unique_com_disconnect{std::exchange(m_comWrapper, nullptr)};
 }
 
-__requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(WSLCContainerState State, std::int64_t Time, std::optional<int> ExitCode) noexcept
+__requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(
+    WSLCContainerState State, common::wslc_schema::EventTimestamp Timestamp, std::optional<int> ExitCode) noexcept
 {
     // N.B. A deleted container cannot transition back to any other state.
     WI_ASSERT(m_state != WslcContainerStateDeleted);
@@ -3142,9 +3143,9 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(WSLCContainerSt
 
     m_state = State;
     m_stateGeneration++;
-    m_stateChangedAt = Time;
+    m_stateChangedAt = Timestamp.Time;
 
-    RecordEvent(WSLCStateToEventAction(State), Time, ExitCode);
+    RecordEvent(WSLCStateToEventAction(State), Timestamp, ExitCode);
 
     if (State == WslcContainerStateRunning)
     {

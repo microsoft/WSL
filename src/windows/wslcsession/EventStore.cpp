@@ -58,7 +58,12 @@ void EventStore::Append(wsl::windows::common::wslc_schema::Event Event)
     m_updated.notify_all();
 }
 
-void EventStore::Record(std::string&& Type, std::string&& Action, const std::string& ActorId, std::map<std::string, std::string> ActorAttributes, std::int64_t Time) noexcept
+void EventStore::Record(
+    std::string&& Type,
+    std::string&& Action,
+    const std::string& ActorId,
+    std::map<std::string, std::string> ActorAttributes,
+    wsl::windows::common::wslc_schema::EventTimestamp Timestamp) noexcept
 try
 {
     wsl::windows::common::wslc_schema::Event event;
@@ -66,7 +71,8 @@ try
     event.Action = std::move(Action);
     event.Actor.ID = ActorId;
     event.Actor.Attributes = std::move(ActorAttributes);
-    event.time = Time;
+    event.time = Timestamp.Time;
+    event.timeNano = Timestamp.TimeNano;
 
     Append(std::move(event));
 }

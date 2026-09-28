@@ -172,7 +172,7 @@ void DockerExecProcessControl::SetExitCode(int ExitCode)
     }
 }
 
-void DockerExecProcessControl::OnEvent(ContainerEvent Event, std::optional<int> ExitCode, std::int64_t)
+void DockerExecProcessControl::OnEvent(ContainerEvent Event, std::optional<int> ExitCode, common::wslc_schema::EventTimestamp)
 {
     if (Event == ContainerEvent::ExecDied && !m_exitEvent.is_signaled())
     {

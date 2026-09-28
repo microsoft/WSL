@@ -7311,6 +7311,32 @@ class WSLCTests
             // The whole lifecycle falls inside the requested window.
             VERIFY_IS_TRUE(lifecycleEvents[0].time >= since);
             VERIFY_IS_TRUE(lifecycleEvents[4].time < until);
+
+            // Each event keeps the exact time Docker reported for it.
+            // WSLC records Docker's 'die' as 'stop'; Docker also emits unrecorded events such as 'attach'.
+            auto dockerEvents = ExpectCommandResult(
+                m_defaultSession.get(),
+                {"/usr/bin/docker",
+                 "events",
+                 "--since",
+                 std::to_string(lifecycleEvents.front().time),
+                 "--until",
+                 std::to_string(lifecycleEvents.back().time + 1),
+                 "--filter",
+                 "type=container",
+                 "--filter",
+                 "container=" + id,
+                 "--format",
+                 "{{.Action}} {{.TimeNano}}"},
+                0);
+
+            const auto dockerLines = wsl::shared::string::Split(dockerEvents.Output[1], '\n');
+            for (const auto& event : lifecycleEvents)
+            {
+                const auto dockerAction = event.Action == "stop" ? std::string{"die"} : event.Action;
+                const auto expected = std::format("{} {}", dockerAction, event.timeNano);
+                VERIFY_IS_TRUE(std::ranges::find(dockerLines, expected) != dockerLines.end());
+            }
         }
 
         // Each lifecycle action is independently selectable: an 'event=<action>' filter, AND'd with
@@ -7480,6 +7506,8 @@ class WSLCTests
                 VERIFY_ARE_EQUAL(networkId, event.Actor.ID);
                 VERIFY_ARE_EQUAL(networkName, event.Actor.Attributes.at("name"));
                 VERIFY_ARE_EQUAL(networkDriver, event.Actor.Attributes.at("type"));
+                VERIFY_IS_TRUE(event.timeNano > 0);
+                VERIFY_ARE_EQUAL(event.time, event.timeNano / 1'000'000'000);
             }
 
             // Only the endpoint events name the container that attached to the network.

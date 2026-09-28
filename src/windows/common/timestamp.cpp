@@ -22,16 +22,19 @@ Abstract:
 #include <optional>
 #include <sstream>
 
+static std::string FormatUtcOffset(std::chrono::minutes offset)
+{
+    const auto magnitude = std::abs(offset.count());
+    return std::format("{}{:02}:{:02}", offset.count() < 0 ? '-' : '+', magnitude / 60, magnitude % 60);
+}
+
 static std::string LocalUtcOffset()
 {
     try
     {
         const auto* zone = std::chrono::current_zone();
         const auto offset = zone->get_info(std::chrono::system_clock::now()).offset;
-        const auto minutes = std::chrono::duration_cast<std::chrono::minutes>(offset).count();
-        const auto magnitude = std::abs(minutes);
-
-        return std::format("{}{:02}:{:02}", minutes < 0 ? '-' : '+', magnitude / 60, magnitude % 60);
+        return FormatUtcOffset(std::chrono::duration_cast<std::chrono::minutes>(offset));
     }
     catch (...)
     {
@@ -39,6 +42,34 @@ static std::string LocalUtcOffset()
         LOG_CAUGHT_EXCEPTION();
         return "+00:00";
     }
+}
+
+// Splits into whole seconds and a non-negative fraction, so pre-epoch times round down rather than toward zero.
+static std::pair<std::chrono::sys_seconds, std::chrono::nanoseconds> SplitEpoch(std::int64_t epochSeconds, std::int64_t epochNanoseconds)
+{
+    if (epochNanoseconds == 0)
+    {
+        return {std::chrono::sys_seconds{std::chrono::seconds{epochSeconds}}, std::chrono::nanoseconds::zero()};
+    }
+
+    const std::chrono::sys_time<std::chrono::nanoseconds> time{std::chrono::nanoseconds{epochNanoseconds}};
+    const auto wholeSeconds = std::chrono::floor<std::chrono::seconds>(time);
+    return {wholeSeconds, time - wholeSeconds};
+}
+
+static std::string FormatRfc3339Nano(std::chrono::sys_seconds time, std::chrono::nanoseconds fraction, std::chrono::seconds offset)
+{
+    auto output = std::format("{:%FT%T}.{:09}", time + offset, fraction.count());
+    if (offset == std::chrono::seconds::zero())
+    {
+        output.push_back('Z');
+    }
+    else
+    {
+        output.append(FormatUtcOffset(std::chrono::duration_cast<std::chrono::minutes>(offset)));
+    }
+
+    return output;
 }
 
 std::string wsl::windows::common::timestamp::ExpandToRfc3339(const std::string& timestamp)
@@ -309,6 +340,32 @@ std::string wsl::windows::common::timestamp::Rfc3339ToUtcDisplayTime(std::string
 
     // Network timestamps are reported in UTC rather than the local time zone.
     return std::format("{:%F %T}{} +0000 UTC", parsed, fraction);
+}
+
+std::string wsl::windows::common::timestamp::EpochToRfc3339Nano(std::int64_t epochSeconds, std::int64_t epochNanoseconds, std::chrono::seconds offset)
+{
+    const auto [time, fraction] = SplitEpoch(epochSeconds, epochNanoseconds);
+    return FormatRfc3339Nano(time, fraction, offset);
+}
+
+std::string wsl::windows::common::timestamp::EpochToLocalRfc3339Nano(std::int64_t epochSeconds, std::int64_t epochNanoseconds)
+{
+    const auto [time, fraction] = SplitEpoch(epochSeconds, epochNanoseconds);
+
+    const std::chrono::time_zone* zone;
+    try
+    {
+        zone = std::chrono::current_zone();
+    }
+    catch (const std::runtime_error&)
+    {
+        // The time zone database is unavailable, so report UTC rather than failing the caller.
+        LOG_CAUGHT_EXCEPTION();
+        return FormatRfc3339Nano(time, fraction, std::chrono::seconds::zero());
+    }
+
+    // Resolved at the event's own time, so replayed history keeps the offset it had across a DST change.
+    return FormatRfc3339Nano(time, fraction, zone->get_info(time).offset);
 }
 
 namespace {
