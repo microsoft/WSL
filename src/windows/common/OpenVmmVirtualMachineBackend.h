@@ -35,10 +35,10 @@ public:
     static VmPlatformCapabilities QueryCapabilities();
 
     VmPlatformCapabilities GetCapabilities() const override;
+    VmDescription GetDescription() const override;
     wil::unique_handle GetTerminationEvent() const override;
     void Start() override;
     void Terminate() override;
-    void CancelPendingOperations() noexcept override;
 
     VmGuestListener CreateGuestListener(GuestServicePort Port) override;
     wil::unique_socket AcceptGuestConnection(VmListenerId Listener) override;
@@ -61,25 +61,77 @@ private:
     NON_COPYABLE(OpenVmmVirtualMachineBackend);
     NON_MOVABLE(OpenVmmVirtualMachineBackend);
 
-    static void CALLBACK OnProcessExit(PTP_CALLBACK_INSTANCE, void* Context, PTP_WAIT, TP_WAIT_RESULT) noexcept;
+    void OnProcessExit(DWORD ExitCode) noexcept;
     void ReadProcessLog(wil::unique_hfile Pipe) noexcept;
     void Initialize(const VmCreateRequest& Request);
 
     static void DestroyVm(WslOpenVmmVm* Vm) noexcept;
     using UniqueVm = wil::unique_any<WslOpenVmmVm*, decltype(&DestroyVm), DestroyVm>;
 
+    struct GuestListener
+    {
+        ~GuestListener() noexcept;
+        std::optional<wil::unique_socket> Accept();
+
+        VmGuestListener Listener;
+        wil::unique_socket Socket;
+        wil::unique_hfile SocketFile;
+        wil::unique_event CancellationEvent{wil::EventOptions::ManualReset};
+    };
+
+    struct FileSystemDevice
+    {
+        VmFileSystemDevice Device;
+        VmVirtioFsDevice Transport;
+        std::optional<std::uint64_t> Share;
+    };
+
+    struct FileSystemShare
+    {
+        VmFileSystemShare Share;
+    };
+
+    struct NetworkAdapter
+    {
+        VmNetworkAttachment Attachment;
+        std::wstring NicId;
+    };
+
+    struct PortBinding
+    {
+        VmPortBinding Binding;
+        std::wstring NicId;
+        std::wstring HostAddress;
+    };
+
+    struct SessionFileSystemResources
+    {
+        std::filesystem::path SocketDirectory;
+        std::filesystem::path RpcSocketPath;
+        std::filesystem::path VsockPath;
+        bool DirectoryCreated = false;
+    };
+
     wil::srwlock m_lock;
+    _Requires_lock_held_(m_lock)
+    void CloseGuestListeners() noexcept;
+
     VmDescription m_description{};
     _Guarded_by_(m_lock) std::map<std::uint64_t, VmDiskAttachment> m_attachedDisks;
     _Guarded_by_(m_lock) std::uint64_t m_nextDiskId = 1;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, std::shared_ptr<GuestListener>> m_guestListeners;
+    _Guarded_by_(m_lock) std::uint64_t m_nextListenerId = 1;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, FileSystemDevice> m_fileSystemDevices;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, FileSystemShare> m_fileSystemShares;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, NetworkAdapter> m_networkAdapters;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, PortBinding> m_portBindings;
+    _Guarded_by_(m_lock) std::uint64_t m_nextDeviceId = 1;
+    _Guarded_by_(m_lock) std::uint64_t m_nextShareId = 1;
+    _Guarded_by_(m_lock) std::uint64_t m_nextPortBindingId = 1;
     UniqueVm m_vm;
     wil::unique_handle m_process;
     wil::unique_handle m_job;
     std::thread m_processLogThread;
-    std::filesystem::path m_socketDirectory;
-    std::filesystem::path m_rpcSocketPath;
-    std::filesystem::path m_vsockPath;
-    bool m_directoryCreated = false;
+    SessionFileSystemResources m_fileSystemResources;
     wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
-    wil::unique_threadpool_wait m_processWait;
 };
