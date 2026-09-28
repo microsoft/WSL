@@ -36,17 +36,7 @@ Abstract:
 #define LXSS_ROOTFS_MOUNT "/rootfs"
 #define LXSS_TOOLS_MOUNT "/tools"
 
-namespace {
 constexpr auto c_shortIconName = L"shortcut.ico";
-
-void WarnIfSparseVhdCreationRequested(bool sparse)
-{
-    if (sparse)
-    {
-        EMIT_USER_WARNING(wsl::shared::Localization::MessageSparseVhdDisabled());
-    }
-}
-} // namespace
 
 // 16 MB buffer used for relaying tar contents via hvsocket.
 #define LXSS_RELAY_BUFFER_SIZE (0x1000000)
@@ -1594,10 +1584,8 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
                         VhdSize = config.VhdSizeBytes;
                     }
 
-                    WarnIfSparseVhdCreationRequested(config.EnableSparseVhd);
-
                     wsl::core::filesystem::CreateVhd(
-                        configuration.VhdFilePath.c_str(), VhdSize, GetUserSid(), false, WI_IsFlagSet(Flags, LXSS_IMPORT_DISTRO_FLAGS_FIXED_VHD));
+                        configuration.VhdFilePath.c_str(), VhdSize, GetUserSid(), config.EnableSparseVhd, WI_IsFlagSet(Flags, LXSS_IMPORT_DISTRO_FLAGS_FIXED_VHD));
 
                     deleteFlags = LXSS_DELETE_DISTRO_FLAGS_VHD;
                 }
@@ -1787,10 +1775,9 @@ try
         THROW_HR_WITH_USER_ERROR(WSL_E_VM_MODE_INVALID_STATE, wsl::shared::Localization::MessageSparseVhdWsl2Only());
     }
 
-    // Allow disabling sparse mode but not enabling until the data corruption issue has been resolved.
     if (Sparse && !AllowUnsafe)
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageSparseVhdDisabled());
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageSparseVhdRequiresAllowUnsafe());
     }
 
     // Don't attempt if running
@@ -1815,6 +1802,11 @@ try
         .SetSparse = Sparse,
     };
     THROW_IF_WIN32_BOOL_FALSE(::DeviceIoControl(vhd.get(), FSCTL_SET_SPARSE, &buffer, sizeof(buffer), nullptr, 0, nullptr, nullptr));
+
+    if (Sparse)
+    {
+        EMIT_USER_WARNING(wsl::shared::Localization::MessageSparseVhdUnsafe());
+    }
 
     return S_OK;
 }
@@ -2125,10 +2117,12 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
             // Create a vhd to store the root filesystem.
             {
                 auto runAsUser = wil::impersonate_token(userToken.get());
-                WarnIfSparseVhdCreationRequested(m_utilityVm->GetConfig().EnableSparseVhd);
-
                 wsl::core::filesystem::CreateVhd(
-                    configuration.VhdFilePath.c_str(), m_utilityVm->GetConfig().VhdSizeBytes, GetUserSid(), false, false);
+                    configuration.VhdFilePath.c_str(),
+                    m_utilityVm->GetConfig().VhdSizeBytes,
+                    GetUserSid(),
+                    m_utilityVm->GetConfig().EnableSparseVhd,
+                    false);
 
                 deleteFlags = LXSS_DELETE_DISTRO_FLAGS_VHD;
             }
