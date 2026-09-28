@@ -36,7 +36,17 @@ Abstract:
 #define LXSS_ROOTFS_MOUNT "/rootfs"
 #define LXSS_TOOLS_MOUNT "/tools"
 
+namespace {
 constexpr auto c_shortIconName = L"shortcut.ico";
+
+void WarnIfSparseVhdCreationRequested(bool sparse)
+{
+    if (sparse)
+    {
+        EMIT_USER_WARNING(wsl::shared::Localization::MessageSparseVhdDisabled());
+    }
+}
+} // namespace
 
 // 16 MB buffer used for relaying tar contents via hvsocket.
 #define LXSS_RELAY_BUFFER_SIZE (0x1000000)
@@ -1584,8 +1594,10 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
                         VhdSize = config.VhdSizeBytes;
                     }
 
+                    WarnIfSparseVhdCreationRequested(config.EnableSparseVhd);
+
                     wsl::core::filesystem::CreateVhd(
-                        configuration.VhdFilePath.c_str(), VhdSize, GetUserSid(), config.EnableSparseVhd, WI_IsFlagSet(Flags, LXSS_IMPORT_DISTRO_FLAGS_FIXED_VHD));
+                        configuration.VhdFilePath.c_str(), VhdSize, GetUserSid(), false, WI_IsFlagSet(Flags, LXSS_IMPORT_DISTRO_FLAGS_FIXED_VHD));
 
                     deleteFlags = LXSS_DELETE_DISTRO_FLAGS_VHD;
                 }
@@ -2113,12 +2125,10 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
             // Create a vhd to store the root filesystem.
             {
                 auto runAsUser = wil::impersonate_token(userToken.get());
+                WarnIfSparseVhdCreationRequested(m_utilityVm->GetConfig().EnableSparseVhd);
+
                 wsl::core::filesystem::CreateVhd(
-                    configuration.VhdFilePath.c_str(),
-                    m_utilityVm->GetConfig().VhdSizeBytes,
-                    GetUserSid(),
-                    m_utilityVm->GetConfig().EnableSparseVhd,
-                    false);
+                    configuration.VhdFilePath.c_str(), m_utilityVm->GetConfig().VhdSizeBytes, GetUserSid(), false, false);
 
                 deleteFlags = LXSS_DELETE_DISTRO_FLAGS_VHD;
             }

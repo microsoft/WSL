@@ -1197,6 +1197,10 @@ To force a distribution to use a sparse VHD, please run:
 wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
+  <data name="MessageSparseVhdUnsafe" xml:space="preserve">
+    <value>Sparse VHDs are currently experimental. If you encounter unexpected behavior, please file an issue at https://github.com/microsoft/WSL.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale. {Locked="https://github.com/microsoft/WSL"}The URL should not be translated.</comment>
+  </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>Failed to mount {}, see dmesg for more details.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
