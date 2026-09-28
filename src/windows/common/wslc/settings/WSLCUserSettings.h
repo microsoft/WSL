@@ -48,6 +48,7 @@ enum class Setting : size_t
     SessionDefaultBindingAddress,
     SessionStoragePath,
     SessionIdleTimeout,
+    SessionSparseVhd,
 
     Max
 };
@@ -106,6 +107,7 @@ namespace details {
     DEFINE_SETTING_MAPPING(SessionDefaultBindingAddress, std::string, std::string,     std::string{},                 "session.defaultBindingAddress")
     DEFINE_SETTING_MAPPING(SessionStoragePath,       std::string, std::string,         std::string{},                 "session.storagePath")
     DEFINE_SETTING_MAPPING(SessionIdleTimeout,       uint32_t,    uint32_t,            30,                            "session.idleTimeout")
+    DEFINE_SETTING_MAPPING(SessionSparseVhd,         bool,        bool,                false,                         "session.sparseVhd")
 
 #undef DEFINE_SETTING_MAPPING
     // clang-format on

@@ -141,6 +141,7 @@ class WSLCCLISettingsUnitTests
             "  cpuCount: 8\n"
             "  memorySize: 4GB\n"
             "  maxStorageSize: 20000MB\n"
+            "  sparseVhd: true\n"
             "credentialStore: file\n");
 
         UserSettingsTest s{dir};
@@ -150,6 +151,7 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(8u, s.Get<Setting::SessionCpuCount>());
         VERIFY_ARE_EQUAL(4096u, s.Get<Setting::SessionMemoryMb>());
         VERIFY_ARE_EQUAL(20000u, s.Get<Setting::SessionStorageSizeMb>());
+        VERIFY_IS_TRUE(s.Get<Setting::SessionSparseVhd>());
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::File), static_cast<int>(s.Get<Setting::CredentialStore>()));
     }
 

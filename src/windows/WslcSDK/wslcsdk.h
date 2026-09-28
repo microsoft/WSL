@@ -84,7 +84,8 @@ typedef enum WslcContainerNetworkingMode
 typedef enum WslcVhdType
 {
     WSLC_VHD_TYPE_DYNAMIC = 0, // Expanding VHDX (default)
-    WSLC_VHD_TYPE_FIXED = 1    // Fixed-allocation VHDX (only honored by WslcCreateSessionVhdVolume)
+    WSLC_VHD_TYPE_FIXED = 1,   // Fixed-allocation VHDX (only honored by WslcCreateSessionVhdVolume)
+    WSLC_VHD_TYPE_SPARSE = 2   // Expanding sparse VHDX (experimental)
 } WslcVhdType;
 
 typedef enum WslcVhdRequirementsFlags

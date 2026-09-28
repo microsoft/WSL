@@ -29,6 +29,7 @@ namespace wsl::windows::service::wslc {
 namespace {
     constexpr auto c_sizeBytesOpt = "SizeBytes";
     constexpr auto c_fixedOpt = "Fixed";
+    constexpr auto c_sparseOpt = "Sparse";
     constexpr auto c_uidOpt = "Uid";
     constexpr auto c_gidOpt = "Gid";
 
@@ -36,6 +37,7 @@ namespace {
     {
         ULONGLONG SizeBytes{};
         bool Fixed{false};
+        bool Sparse{false};
         std::optional<uint32_t> Uid;
         std::optional<uint32_t> Gid;
 
@@ -49,6 +51,9 @@ namespace {
                 E_INVALIDARG, Localization::MessageWslcInvalidVolumeOption(c_sizeBytesOpt, DriverOpts.at(c_sizeBytesOpt)), opts.SizeBytes == 0);
 
             opts.Fixed = parser.OptionalBool(c_fixedOpt).value_or(false);
+            opts.Sparse = parser.OptionalBool(c_sparseOpt).value_or(false);
+            THROW_HR_WITH_USER_ERROR_IF(
+                E_INVALIDARG, Localization::MessageWslcInvalidVolumeOption(c_sparseOpt, "true"), opts.Fixed && opts.Sparse);
 
             // Uid and Gid must be supplied together — leaving one as the
             // mkfs default (root) is a confusing footgun.
@@ -164,7 +169,7 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Create(
     std::filesystem::create_directories(hostPath.parent_path());
 
     const auto tokenInfo = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
-    wsl::core::filesystem::CreateVhd(hostPath.c_str(), opts.SizeBytes, tokenInfo->User.Sid, false, opts.Fixed);
+    wsl::core::filesystem::CreateVhd(hostPath.c_str(), opts.SizeBytes, tokenInfo->User.Sid, opts.Sparse, opts.Fixed);
 
     auto [lun, device] = VirtualMachine.AttachDisk(hostPath.c_str(), false);
     auto attachCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VirtualMachine.DetachDisk(lun); });

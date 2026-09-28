@@ -15,6 +15,7 @@ Return value: `HRESULT`.
 
 
 - `WSLC_VHD_TYPE_FIXED` is only honored by `WslcCreateSessionVhdVolume`.
+- `WSLC_VHD_TYPE_SPARSE` creates a dynamically expanding sparse VHD. This feature is currently experimental.
 - `uid` and `gid` are honored iff `flags & WSLC_VHD_REQ_FLAG_OWNER`.
 
 Example:
