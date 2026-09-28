@@ -75,8 +75,9 @@ private:
     struct GuestListener : VmGuestListenerState
     {
         ~GuestListener() noexcept;
+        std::optional<wil::unique_socket> Accept();
 
-        std::filesystem::path Path;
+        wil::unique_hfile SocketFile;
     };
 
     struct FileSystemDevice

@@ -31,6 +31,8 @@ constexpr UINT64 c_mib = 1024 * 1024;
 constexpr UINT32 c_maximumDisks = 254;
 constexpr UINT32 c_rpcTimeoutMs = 30000;
 constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+// Hybrid vsock embeds the AF_VSOCK port in the first field of this AF_HYPERV service ID.
+constexpr std::wstring_view c_vsockServiceIdSuffix = L"-facb-11e6-bd58-64006a7986d3";
 
 using validation::ValidateResourceId;
 
@@ -55,14 +57,14 @@ void DeleteOwnedFile(const std::filesystem::path& Path) noexcept
 
 std::filesystem::path GetVsockListenerPath(const std::filesystem::path& VsockPath, GuestServicePort Port)
 {
-    return std::format(L"{}_{:08x}-facb-11e6-bd58-64006a7986d3", VsockPath.native(), Port.Value);
+    return std::format(L"{}_{:08x}{}", VsockPath.native(), Port.Value, c_vsockServiceIdSuffix);
 }
 
 SOCKADDR_UN GetUnixSocketAddress(const std::filesystem::path& Path)
 {
     SOCKADDR_UN address{};
     address.sun_family = AF_UNIX;
-    const auto narrowPath = wsl::shared::string::WideToMultiByte(Path.native());
+    const auto narrowPath = Path.string();
     THROW_HR_IF_MSG(E_INVALIDARG, narrowPath.size() >= sizeof(address.sun_path), "vsock bridge path too long: %hs", narrowPath.c_str());
     std::copy(narrowPath.cbegin(), narrowPath.cend(), address.sun_path);
     address.sun_path[narrowPath.size()] = '\0';
@@ -73,21 +75,15 @@ std::wstring FormatIpAddress(const VmIpAddress& Address)
 {
     if (const auto* ipv4 = std::get_if<VmIpv4Address>(&Address))
     {
-        return std::format(L"{}.{}.{}.{}", ipv4->Bytes[0], ipv4->Bytes[1], ipv4->Bytes[2], ipv4->Bytes[3]);
+        return wsl::windows::common::string::IntegerIpv4ToWstring(std::bit_cast<std::uint32_t>(ipv4->Bytes));
     }
 
     const auto& ipv6 = std::get<VmIpv6Address>(Address);
-    IN6_ADDR address{};
-    std::copy(ipv6.Bytes.begin(), ipv6.Bytes.end(), address.u.Byte);
-    std::wstring result(INET6_ADDRSTRLEN, L'\0');
-    THROW_WIN32_IF(static_cast<DWORD>(WSAGetLastError()), InetNtopW(AF_INET6, &address, result.data(), result.size()) == nullptr);
-    result.resize(std::wcslen(result.c_str()));
-    if (ipv6.ScopeId != 0)
-    {
-        result += std::format(L"%{}", ipv6.ScopeId);
-    }
-
-    return result;
+    SOCKADDR_INET address{};
+    address.Ipv6.sin6_family = AF_INET6;
+    address.Ipv6.sin6_scope_id = ipv6.ScopeId;
+    std::copy(ipv6.Bytes.begin(), ipv6.Bytes.end(), address.Ipv6.sin6_addr.u.Byte);
+    return wsl::windows::common::string::SockAddrInetToWstring(address);
 }
 
 } // namespace
@@ -95,7 +91,12 @@ std::wstring FormatIpAddress(const VmIpAddress& Address)
 OpenVmmVirtualMachineBackend::GuestListener::~GuestListener() noexcept
 {
     Socket.reset();
-    DeleteOwnedFile(Path);
+    SocketFile.reset();
+}
+
+std::optional<wil::unique_socket> OpenVmmVirtualMachineBackend::GuestListener::Accept()
+{
+    return wsl::windows::common::socket::CancellableAccept(Socket.get(), INFINITE, CancellationEvent.get());
 }
 
 VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmCreateRequest& Request)
@@ -533,17 +534,31 @@ std::shared_ptr<VmGuestListenerState> OpenVmmVirtualMachineBackend::ConfigureGue
 
     auto listener = std::make_shared<GuestListener>();
     listener->Listener = Listener;
-    listener->Path = GetVsockListenerPath(m_fileSystemResources.VsockPath, Listener.Port);
-    DeleteOwnedFile(listener->Path);
+    const auto path = GetVsockListenerPath(m_fileSystemResources.VsockPath, Listener.Port);
+    DeleteOwnedFile(path);
 
     listener->Socket.reset(::socket(AF_UNIX, SOCK_STREAM, 0));
     THROW_WIN32_IF(static_cast<DWORD>(WSAGetLastError()), !listener->Socket);
 
-    const auto address = GetUnixSocketAddress(listener->Path);
+    const auto address = GetUnixSocketAddress(path);
 
     THROW_WIN32_IF(
         static_cast<DWORD>(WSAGetLastError()),
         bind(listener->Socket.get(), reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR);
+    auto bindCleanup = wil::scope_exit([&] {
+        listener->Socket.reset();
+        DeleteOwnedFile(path);
+    });
+    listener->SocketFile.reset(CreateFileW(
+        path.c_str(),
+        DELETE | GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        nullptr,
+        OPEN_EXISTING,
+        FILE_FLAG_DELETE_ON_CLOSE | FILE_FLAG_OPEN_REPARSE_POINT,
+        nullptr));
+    THROW_LAST_ERROR_IF(!listener->SocketFile);
+    bindCleanup.release();
     THROW_WIN32_IF(static_cast<DWORD>(WSAGetLastError()), listen(listener->Socket.get(), SOMAXCONN) == SOCKET_ERROR);
 
     WSL_LOG(
@@ -846,13 +861,6 @@ VmPortBinding OpenVmmVirtualMachineBackend::BindPort(VmDeviceId Device, const Vm
     const auto adapter = m_networkAdapters.find(Device.Value);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), adapter == m_networkAdapters.end());
     THROW_HR_IF(E_BOUNDS, m_nextPortBindingId == UINT64_MAX);
-    for (const auto& entry : m_portBindings)
-    {
-        THROW_HR_IF(
-            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
-            entry.second.Binding.Protocol == Request.Protocol && entry.second.Binding.EffectiveListen.Port == Request.Listen.Port &&
-                wsl::shared::string::IsEqual(entry.second.HostAddress, hostAddress, false));
-    }
 
     VmPortBinding binding{{m_description.Identity, m_nextPortBindingId}, Device, Request.Protocol, Request.Listen, Request.GuestPort};
     const auto [entry, inserted] = m_portBindings.emplace(binding.Id.Value, PortBinding{binding, adapter->second.NicId, hostAddress});
