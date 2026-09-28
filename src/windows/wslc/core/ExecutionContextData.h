@@ -65,7 +65,7 @@ namespace details {
     DEFINE_DATA_MAPPING(NetworkEndpointOptions, wsl::windows::wslc::models::NetworkEndpointOptions);
     DEFINE_DATA_MAPPING(ConfirmWarning, std::wstring);
     DEFINE_DATA_MAPPING(ConfirmMessage, std::wstring);
-    DEFINE_DATA_MAPPING(Table, wsl::windows::wslc::cli::TableData);
+    DEFINE_DATA_MAPPING(Table, wsl::windows::cli::table::TableData);
 } // namespace details
 
 struct DataMap : wsl::windows::wslc::EnumBasedVariantMap<Data, wsl::windows::wslc::execution::details::DataMapping>

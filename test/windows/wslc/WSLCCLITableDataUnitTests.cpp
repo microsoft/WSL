@@ -21,6 +21,7 @@ Abstract:
 
 using namespace wsl::windows::wslc;
 using namespace wsl::windows::wslc::cli;
+using namespace wsl::windows::cli::table;
 using namespace wsl::windows::common::vt;
 using namespace WSLCTestHelpers;
 using namespace WEX::Logging;
@@ -777,7 +778,8 @@ class WSLCCLITableDataUnitTests
     {
         Cell cell(L"bold", Format::Bright);
         VERIFY_ARE_EQUAL(static_cast<size_t>(4), cell.VisibleWidth());
-        VERIFY_ARE_EQUAL(static_cast<size_t>(2), static_cast<size_t>(cell.Prefix != nullptr) + static_cast<size_t>(cell.Suffix != nullptr));
+        VERIFY_IS_FALSE(cell.Prefix.Empty());
+        VERIFY_IS_FALSE(cell.Suffix.Empty());
 
         // Color enabled: sequences emitted
         const auto rendered = cell.Render(true, true);
@@ -786,6 +788,20 @@ class WSLCCLITableDataUnitTests
 
         // Color disabled: plain text only
         VERIFY_ARE_EQUAL(std::wstring{L"bold"}, cell.Render(false, false));
+    }
+
+    TEST_METHOD(Cell_SequenceCtor_CopiesTemporarySequence)
+    {
+        const auto expected = std::wstring{Sgr({1, 31}).Get()};
+
+        Cell cell(L"styled", Sgr({1, 31}));
+
+        VERIFY_ARE_EQUAL(expected, cell.Prefix.Text);
+        VERIFY_IS_TRUE(cell.Prefix.IsColor);
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, cell.Render(true, true).find(expected));
+
+        // The prefix and the trailing reset are both color sequences.
+        VERIFY_ARE_EQUAL(std::wstring{L"styled"}, cell.Render(true, false));
     }
 
     TEST_METHOD(Cell_VisibleWidth_StyledMultipleCharacters)

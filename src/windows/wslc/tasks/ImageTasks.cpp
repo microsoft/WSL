@@ -39,6 +39,7 @@ using namespace wsl::windows::wslc::services;
 namespace wsl::windows::wslc::task {
 
 using namespace wsl::windows::wslc::cli;
+using namespace wsl::windows::cli::table;
 
 namespace {
 
@@ -250,7 +251,7 @@ void ListImages(CLIExecutionContext& context)
         columns.emplace_back(ColumnDefinition{L"CREATED", columnConfig});
         columns.emplace_back(ColumnDefinition{L"SIZE", columnConfig});
 
-        wsl::windows::wslc::cli::TableData table{std::move(columns)};
+        wsl::windows::cli::table::TableData table{std::move(columns)};
         table.Reserve(images.size());
 
         for (const auto& image : images)

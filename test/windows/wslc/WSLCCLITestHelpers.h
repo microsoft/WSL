@@ -220,7 +220,7 @@ struct CaptureTerminal
 struct TableCapture
 {
     CaptureTerminal capture;
-    wsl::windows::wslc::cli::TableData table;
+    wsl::windows::cli::table::TableData table;
 
     explicit TableCapture(std::initializer_list<std::wstring_view> headers, bool vtEnabled = false) :
         capture(vtEnabled), table(headers)
@@ -229,7 +229,7 @@ struct TableCapture
         table.MinCellWidth = 0;
     }
 
-    explicit TableCapture(std::vector<wsl::windows::wslc::cli::ColumnDefinition> columns, bool vtEnabled = false) :
+    explicit TableCapture(std::vector<wsl::windows::cli::table::ColumnDefinition> columns, bool vtEnabled = false) :
         capture(vtEnabled), table(std::move(columns))
     {
         table.ConsoleWidthOverride = 120;
@@ -239,7 +239,7 @@ struct TableCapture
     // Lays out and emits the table. Call after all rows have been added.
     void Render()
     {
-        wsl::windows::wslc::cli::RenderTable(capture.terminal, table);
+        wsl::windows::cli::table::RenderTable(capture.terminal, table);
     }
 
     // Returns captured output split into lines.

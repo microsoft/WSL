@@ -16,7 +16,7 @@ Abstract:
 
 using namespace wsl::windows::common::vt;
 
-namespace wsl::windows::wslc::cli {
+namespace wsl::windows::cli::table {
 
 namespace {
 
@@ -331,4 +331,4 @@ void RenderTable(Terminal& terminal, const TableData& table, Terminal::Level lev
     }
 }
 
-} // namespace wsl::windows::wslc::cli
+} // namespace wsl::windows::cli::table

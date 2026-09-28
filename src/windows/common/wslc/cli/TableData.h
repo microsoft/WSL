@@ -10,8 +10,8 @@ Abstract:
 
     Data model for tabular CLI output. A table is a list of column definitions
     plus a list of rows; a row holds one cell per column, or a single spanning
-    cell that occupies the whole line. Cells carry their own text and optional
-    VT sequences, which are zero display width, so a cell's visible width is
+    cell that occupies the whole line. Cells own their text and optional VT
+    sequences, which are zero display width, so a cell's visible width is
     simply its text length.
 
     A table holds every row it emits: column widths are measured across the complete
@@ -28,11 +28,27 @@ Abstract:
 #include <string>
 #include <string_view>
 #include <vector>
-#include "VTSupport.h"
 
-namespace wsl::windows::wslc::cli {
+namespace wsl::windows::common::vt {
+struct Sequence;
+}
+
+namespace wsl::windows::cli::table {
 
 using wsl::windows::common::vt::Sequence;
+
+// A VT sequence owned by the cell that carries it. IsColor marks the sequences that --no-color
+// suppresses; see vt::Sequence::IsColor().
+struct CellSequence
+{
+    std::wstring Text;
+    bool IsColor = false;
+
+    bool Empty() const
+    {
+        return Text.empty();
+    }
+};
 
 // A single table cell. Prefix and Suffix are emitted around Text when the destination supports
 // VT; they contribute no display width. The pair covers both styling (color + reset) and
@@ -40,8 +56,8 @@ using wsl::windows::common::vt::Sequence;
 struct Cell
 {
     std::wstring Text;
-    const Sequence* Prefix = nullptr;
-    const Sequence* Suffix = nullptr;
+    CellSequence Prefix;
+    CellSequence Suffix;
 
     Cell() = default;
 
@@ -62,12 +78,6 @@ struct Cell
 
     // Paired cell: wraps the text with an explicit open and close sequence.
     Cell(std::wstring_view text, const Sequence& prefix, const Sequence& suffix);
-
-    // Block temporaries: the cell only stores pointers, so binding a Sequence rvalue (including
-    // derived types such as the ConstructedSequence returned by Sgr()) would dangle once the full
-    // expression ends. Only long-lived Sequence instances may be used here.
-    Cell(std::wstring_view text, const Sequence&& style) = delete;
-    Cell(std::wstring_view text, const Sequence&& prefix, const Sequence&& suffix) = delete;
 
     size_t VisibleWidth() const
     {
@@ -192,4 +202,4 @@ namespace details {
 
 } // namespace details
 
-} // namespace wsl::windows::wslc::cli
+} // namespace wsl::windows::cli::table

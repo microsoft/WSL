@@ -29,6 +29,7 @@ using namespace wsl::windows::wslc::execution;
 namespace wsl::windows::wslc {
 
 using namespace wsl::windows::wslc::cli;
+using namespace wsl::windows::cli::table;
 
 std::wstring s_ExecutableName = L"wslc";
 

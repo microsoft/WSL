@@ -215,6 +215,7 @@ ContainerOutputInformation ToContainerOutput(const ContainerInformation& contain
 namespace wsl::windows::wslc::task {
 
 using namespace wsl::windows::wslc::cli;
+using namespace wsl::windows::cli::table;
 
 // Every container is attempted even if an earlier one fails; the command still exits nonzero.
 template <typename TAction>
@@ -815,7 +816,7 @@ void ListContainers(CLIExecutionContext& context)
             columns.emplace_back(ColumnDefinition{Localization::WSLCCLI_TableHeaderSize(), limit({.Overflow = Shrink})});
         }
 
-        wsl::windows::wslc::cli::TableData table{std::move(columns)};
+        wsl::windows::cli::table::TableData table{std::move(columns)};
         table.Reserve(containers.size());
 
         for (const auto& container : containers)
@@ -1196,7 +1197,7 @@ void ShowContainerStats(CLIExecutionContext& context)
 
         const auto limit = [trunc](ColumnWidthConfig config) { return trunc ? config : ColumnWidthConfig{}; };
 
-        wsl::windows::wslc::cli::TableData table{std::vector<ColumnDefinition>{
+        wsl::windows::cli::table::TableData table{std::vector<ColumnDefinition>{
             {Localization::WSLCCLI_TableHeaderContainerId(), limit({.MaxWidth = 12, .Overflow = Shrink})},
             {Localization::WSLCCLI_TableHeaderName(), limit({.MaxWidth = 20, .Overflow = Shrink})},
             {Localization::WSLCCLI_TableHeaderCpuPercent(), limit({.Overflow = Shrink})},

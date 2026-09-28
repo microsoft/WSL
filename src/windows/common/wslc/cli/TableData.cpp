@@ -14,16 +14,27 @@ Abstract:
 --*/
 #include "precomp.h"
 #include "TableData.h"
+#include "VTSupport.h"
 
 using namespace wsl::windows::common::vt;
 
-namespace wsl::windows::wslc::cli {
+namespace wsl::windows::cli::table {
 
-Cell::Cell(std::wstring_view text, const Sequence& style) : Text(text), Prefix(&style), Suffix(&Format::Default)
+namespace {
+
+    CellSequence Capture(const Sequence& sequence)
+    {
+        return CellSequence{std::wstring{sequence.Get()}, sequence.IsColor()};
+    }
+
+} // namespace
+
+Cell::Cell(std::wstring_view text, const Sequence& style) : Text(text), Prefix(Capture(style)), Suffix(Capture(Format::Default))
 {
 }
 
-Cell::Cell(std::wstring_view text, const Sequence& prefix, const Sequence& suffix) : Text(text), Prefix(&prefix), Suffix(&suffix)
+Cell::Cell(std::wstring_view text, const Sequence& prefix, const Sequence& suffix) :
+    Text(text), Prefix(Capture(prefix)), Suffix(Capture(suffix))
 {
 }
 
@@ -34,7 +45,9 @@ std::wstring Cell::Render(bool vtEnabled, bool colorEnabled) const
 
 std::wstring Cell::RenderTruncated(size_t maxWidth, bool vtEnabled, bool colorEnabled) const
 {
-    const auto emit = [&](const Sequence* sequence) { return vtEnabled && sequence && (colorEnabled || !sequence->IsColor()); };
+    const auto emit = [&](const CellSequence& sequence) {
+        return vtEnabled && !sequence.Empty() && (colorEnabled || !sequence.IsColor);
+    };
 
     const bool withPrefix = emit(Prefix);
     const bool withSuffix = emit(Suffix);
@@ -60,7 +73,7 @@ std::wstring Cell::RenderTruncated(size_t maxWidth, bool vtEnabled, bool colorEn
 
     if (withPrefix)
     {
-        result.append(Prefix->Get());
+        result.append(Prefix.Text);
     }
 
     result.append(text);
@@ -68,7 +81,7 @@ std::wstring Cell::RenderTruncated(size_t maxWidth, bool vtEnabled, bool colorEn
 
     if (withSuffix)
     {
-        result.append(Suffix->Get());
+        result.append(Suffix.Text);
     }
 
     return result;
@@ -134,4 +147,4 @@ namespace details {
 
 } // namespace details
 
-} // namespace wsl::windows::wslc::cli
+} // namespace wsl::windows::cli::table

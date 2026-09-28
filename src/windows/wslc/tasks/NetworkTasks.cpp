@@ -33,6 +33,7 @@ using namespace wsl::windows::wslc::services;
 namespace wsl::windows::wslc::task {
 
 using namespace wsl::windows::wslc::cli;
+using namespace wsl::windows::cli::table;
 
 namespace {
 
@@ -235,7 +236,7 @@ void ListNetworks(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        wsl::windows::wslc::cli::TableData table{L"NETWORK ID", L"NAME", L"DRIVER", L"SCOPE"};
+        wsl::windows::cli::table::TableData table{L"NETWORK ID", L"NAME", L"DRIVER", L"SCOPE"};
         table.Reserve(networks.size());
 
         for (const auto& network : networks)
