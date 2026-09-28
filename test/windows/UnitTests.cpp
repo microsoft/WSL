@@ -1931,11 +1931,12 @@ Arguments for managing distributions in Windows Subsystem for Linux:
         Terminates the specified distribution.
 
     --unregister <Distro> [Options]
-        Unregisters the distribution and permanently deletes the root filesystem after confirmation.
+        Unregisters the distribution and permanently deletes the root filesystem after a 10-second warning.
+        Press Ctrl+C during the warning period to cancel.
 
         Options:
             --force
-                Skip confirmation. Required when input is redirected.
+                Skip the warning and delay.
 )""";
 
         const std::wstring WslConfigHelpMessage =
@@ -7206,7 +7207,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_ARE_EQUAL(err, L"");
     }
 
-    TEST_METHOD(UnregisterConfirmation)
+    TEST_METHOD(UnregisterWarningDelay)
     {
         namespace registry = wsl::windows::common::registry;
         using wsl::windows::common::SubProcess;
@@ -7240,29 +7241,42 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             VERIFY_IS_TRUE(GetDistributionId(distroName.c_str()).has_value());
         }
 
-        // Redirected input must not confirm deletion, even if it contains an affirmative answer.
-        for (const auto answer : {"", "y\n", "yes\n"})
-        {
-            auto [read, write] = CreateSubprocessPipe(true, false);
-            DWORD written{};
-            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(write.get(), answer, static_cast<DWORD>(strlen(answer)), &written, nullptr));
-            write.reset();
-            SubProcess process(nullptr, LxssGenerateWslCommandLine(command.c_str()).c_str());
-            process.SetStdHandles(read.get(), nullptr, nullptr);
-            const auto output = process.RunAndCaptureOutput(30000);
-            VERIFY_ARE_EQUAL(output.ExitCode, static_cast<DWORD>(ERROR_CANCELLED));
-            VERIFY_IS_TRUE(output.Stderr.find(L"permanently delete") != std::wstring::npos);
-            VERIFY_IS_TRUE(output.Stderr.find(L"--force") != std::wstring::npos);
-            VERIFY_IS_TRUE(GetDistributionId(distroName.c_str()).has_value());
-        }
-
         for (const auto suffix : {L" --froce", L" --force unexpected"})
         {
             LxsstuLaunchWslAndCaptureOutput(command + suffix, -1);
             VERIFY_IS_TRUE(GetDistributionId(distroName.c_str()).has_value());
         }
 
-        auto runInteractive = [&](std::string_view answer) {
+        // Existing automation must finish after the warning, both at EOF and with an open stdin pipe.
+        for (const bool closeInput : {true, false})
+        {
+            auto [read, write] = CreateSubprocessPipe(true, false);
+            if (closeInput)
+            {
+                write.reset();
+            }
+            else
+            {
+                constexpr char input[] = "yes";
+                DWORD written{};
+                VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(write.get(), input, sizeof(input) - 1, &written, nullptr));
+            }
+
+            SubProcess process(nullptr, LxssGenerateWslCommandLine(command.c_str()).c_str());
+            process.SetStdHandles(read.get(), nullptr, nullptr);
+            const auto start = std::chrono::steady_clock::now();
+            const auto output = process.RunAndCaptureOutput(30000);
+            VERIFY_IS_TRUE(std::chrono::steady_clock::now() - start >= std::chrono::seconds(10));
+            VERIFY_ARE_EQUAL(output.ExitCode, 0u);
+            VERIFY_IS_TRUE(output.Stderr.find(distroName) != std::wstring::npos);
+            VERIFY_IS_TRUE(output.Stderr.find(L"permanently delete") != std::wstring::npos);
+            VERIFY_IS_TRUE(output.Stderr.find(L"automatically in 10 seconds") != std::wstring::npos);
+            VERIFY_IS_TRUE(output.Stderr.find(L"Ctrl+C") != std::wstring::npos);
+            VERIFY_IS_FALSE(GetDistributionId(distroName.c_str()).has_value());
+            registerDistro();
+        }
+
+        auto runInteractive = [&](std::string_view input) {
             auto [inputRead, inputWrite] = CreateSubprocessPipe(false, false);
             auto [outputRead, outputWrite] = CreateSubprocessPipe(false, false);
             wsl::windows::common::helpers::unique_pseudo_console console;
@@ -7270,10 +7284,25 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             inputRead.reset();
             outputWrite.reset();
 
-            auto output = std::async(std::launch::async, [&] { return ReadToString(outputRead.get()); });
+            wil::unique_event warningDisplayed{wil::EventOptions::ManualReset};
+            auto output = std::async(std::launch::async, [&] {
+                std::string text;
+                char buffer[4096];
+                DWORD read{};
+                while (ReadFile(outputRead.get(), buffer, sizeof(buffer), &read, nullptr) && read != 0)
+                {
+                    text.append(buffer, read);
+                    if (text.find("Use --force to skip this delay.") != std::string::npos)
+                    {
+                        warningDisplayed.SetEvent();
+                    }
+                }
+                return text;
+            });
             auto closeConsole = wil::scope_exit([&] { console.reset(); });
             SubProcess process(nullptr, LxssGenerateWslCommandLine(command.c_str()).c_str());
             process.SetPseudoConsole(console.get());
+            const auto start = std::chrono::steady_clock::now();
             const auto handle = process.Start();
             auto stopProcess = wil::scope_exit([&] {
                 if (WaitForSingleObject(handle.get(), 0) == WAIT_TIMEOUT)
@@ -7282,29 +7311,43 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                 }
             });
 
-            DWORD written{};
-            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(inputWrite.get(), answer.data(), static_cast<DWORD>(answer.size()), &written, nullptr));
-            VERIFY_ARE_EQUAL(written, answer.size());
+            VERIFY_ARE_EQUAL(WaitForSingleObject(warningDisplayed.get(), 10000), WAIT_OBJECT_0);
+            VERIFY_IS_TRUE(GetDistributionId(distroName.c_str()).has_value());
+            if (!input.empty())
+            {
+                DWORD written{};
+                VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(inputWrite.get(), input.data(), static_cast<DWORD>(input.size()), &written, nullptr));
+                VERIFY_ARE_EQUAL(written, input.size());
+            }
+
             const auto exitCode = SubProcess::GetExitCode(handle.get(), 30000);
+            const auto elapsed = std::chrono::steady_clock::now() - start;
             console.reset();
             VERIFY_IS_TRUE(output.get().find("permanently delete") != std::string::npos);
-            return exitCode;
+            return std::pair{exitCode, elapsed};
         };
 
-        for (const auto answer : {"\r", "n\r", "no\r", "yesterday\r"})
-        {
-            VERIFY_ARE_EQUAL(runInteractive(answer), static_cast<DWORD>(ERROR_CANCELLED));
-            VERIFY_IS_TRUE(GetDistributionId(distroName.c_str()).has_value());
-        }
+        // Ctrl+C after the warning is displayed must stop deletion.
+        const auto [cancelCode, cancelElapsed] = runInteractive("\x03");
+        VERIFY_ARE_NOT_EQUAL(cancelCode, 0u);
+        VERIFY_IS_TRUE(cancelElapsed < std::chrono::seconds(10));
+        VERIFY_IS_TRUE(GetDistributionId(distroName.c_str()).has_value());
 
-        for (const auto answer : {"y\r", "YES\r"})
+        // Neither an idle console nor a partial line may cause an unbounded wait.
+        for (const auto input : {"", "yes"})
         {
-            VERIFY_ARE_EQUAL(runInteractive(answer), 0u);
+            const auto [exitCode, elapsed] = runInteractive(input);
+            VERIFY_ARE_EQUAL(exitCode, 0u);
+            VERIFY_IS_TRUE(elapsed >= std::chrono::seconds(10));
             VERIFY_IS_FALSE(GetDistributionId(distroName.c_str()).has_value());
             registerDistro();
         }
 
-        LxsstuLaunchWslAndCaptureOutput(command + L" --force");
+        // --force must bypass the warning period without waiting for input.
+        SubProcess forced(nullptr, LxssGenerateWslCommandLine((command + L" --force").c_str()).c_str());
+        const auto forcedOutput = forced.RunAndCaptureOutput(5000);
+        VERIFY_ARE_EQUAL(forcedOutput.ExitCode, 0u);
+        VERIFY_ARE_EQUAL(forcedOutput.Stderr, L"");
         VERIFY_IS_FALSE(GetDistributionId(distroName.c_str()).has_value());
     }
 

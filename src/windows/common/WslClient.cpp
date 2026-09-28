@@ -18,7 +18,6 @@ Abstract:
 #include "HandleConsoleProgressBar.h"
 #include "Distribution.h"
 #include "CommandLine.h"
-#include "InputChannel.h"
 #include <conio.h>
 #include "WslCoreFilesystem.h"
 
@@ -1259,27 +1258,15 @@ int UnregisterDistribution(_In_ LPCWSTR distributionName, bool force)
 
     if (!force)
     {
+        constexpr DWORD c_unregisterDelaySeconds = 10;
         wsl::windows::common::wslutil::PrintMessage(Localization::MessageUnregisterWarning(distributionName), stderr);
-        wsl::windows::wslc::cli::InputChannel input{GetStdHandle(STD_INPUT_HANDLE), stdin};
-        if (!input.IsInteractive())
-        {
-            wsl::windows::common::wslutil::PrintMessage(Localization::MessageUnregisterRequiresForce(WSL_UNREGISTER_OPTION_FORCE), stderr);
-            return ERROR_CANCELLED;
-        }
-
-        wsl::windows::common::wslutil::PrintMessage(Localization::MessageUnregisterConfirmation(), stderr);
+        wsl::windows::common::wslutil::PrintMessage(
+            Localization::MessageUnregisterDelay(c_unregisterDelaySeconds, WSL_UNREGISTER_OPTION_FORCE), stderr);
         fflush(stderr);
-        const auto answer = input.ReadLine(false);
-        if (!answer || ferror(stdin))
-        {
-            return ERROR_CANCELLED;
-        }
 
-        const auto trimmed = wsl::shared::string::TrimAscii(std::wstring_view{*answer});
-        if (!wsl::shared::string::IsEqual(trimmed, L"y", true) && !wsl::shared::string::IsEqual(trimmed, L"yes", true))
-        {
-            return ERROR_CANCELLED;
-        }
+        // Keep existing callers working without reading stdin or waiting indefinitely for an answer.
+        // The default console control handler allows Ctrl+C to exit before deletion starts.
+        std::this_thread::sleep_for(std::chrono::seconds(c_unregisterDelaySeconds));
     }
 
     auto progress = wsl::windows::common::ConsoleProgressIndicator(wsl::shared::Localization::MessageStatusUnregistering(), true);

@@ -297,13 +297,9 @@ and 'wsl.exe --install &lt;Distro&gt;' to install.</value>
     <value>Unregistering '{}' will permanently delete all of its files, settings, and installed software.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageUnregisterConfirmation" xml:space="preserve">
-    <value>Continue? Type y or yes to confirm (default: no).</value>
-    <comment>{Locked="y"}{Locked="yes"}The accepted confirmation responses must not be translated.</comment>
-  </data>
-  <data name="MessageUnregisterRequiresForce" xml:space="preserve">
-    <value>No distribution was deleted. Use {} to confirm deletion when input is redirected.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageUnregisterDelay" xml:space="preserve">
+    <value>Deletion will proceed automatically in {0} seconds. Press Ctrl+C to cancel. Use {1} to skip this delay.</value>
+    <comment>{FixedPlaceholder="{0}"}{FixedPlaceholder="{1}"}{Locked="Ctrl+C"}The first insert is the delay in seconds. The second is the command-line option to skip the delay.</comment>
   </data>
   <data name="MessageUserNotFound" xml:space="preserve">
     <value>User not found.</value>
@@ -620,11 +616,12 @@ Arguments for managing distributions in Windows Subsystem for Linux:
         Terminates the specified distribution.
 
     --unregister &lt;Distro&gt; [Options]
-        Unregisters the distribution and permanently deletes the root filesystem after confirmation.
+        Unregisters the distribution and permanently deletes the root filesystem after a 10-second warning.
+        Press Ctrl+C during the warning period to cancel.
 
         Options:
             --force
-                Skip confirmation. Required when input is redirected.</value>
+                Skip the warning and delay.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
@@ -646,7 +643,7 @@ Arguments for managing distributions in Windows Subsystem for Linux:
 "}{Locked="--import-in-place "}{Locked="--list,"}{Locked="--all
 "}{Locked="--running
 "}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}{Locked="--force
-"}Command line arguments, file names and string inserts should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
+"}Command line arguments, file names and string inserts should not be translated. {Locked="Ctrl+C"} {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessagePackageVersions" xml:space="preserve">
     <value>WSL version: {}
