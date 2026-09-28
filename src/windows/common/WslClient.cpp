@@ -18,6 +18,7 @@ Abstract:
 #include "HandleConsoleProgressBar.h"
 #include "Distribution.h"
 #include "CommandLine.h"
+#include "InputChannel.h"
 #include <conio.h>
 #include "WslCoreFilesystem.h"
 
@@ -1251,22 +1252,33 @@ int Unmount(_In_ const std::wstring& arg)
     return 0;
 }
 
-int UnregisterDistribution(_In_ LPCWSTR distributionName, bool force)
+int UnregisterDistribution(_In_ LPCWSTR distributionName, bool interactive)
 {
     wsl::windows::common::SvcComm service;
     const GUID distroGuid = service.GetDistributionId(distributionName, LXSS_GET_DISTRO_ID_LIST_ALL);
 
-    if (!force)
+    if (interactive)
     {
-        constexpr DWORD c_unregisterDelaySeconds = 10;
+        wsl::windows::wslc::cli::InputChannel input{GetStdHandle(STD_INPUT_HANDLE), stdin};
+        DWORD outputMode{};
+        if (!input.IsInteractive() || !GetConsoleMode(GetStdHandle(STD_ERROR_HANDLE), &outputMode))
+        {
+            wsl::windows::common::wslutil::PrintMessage(Localization::MessageUnregisterRequiresConsole(WSL_UNREGISTER_OPTION_FORCE), stderr);
+            return ERROR_CANCELLED;
+        }
+
+        // A caller may have inherited a policy that ignores Ctrl+C. An explicitly requested prompt must be cancellable.
+        THROW_IF_WIN32_BOOL_FALSE(SetConsoleCtrlHandler(nullptr, FALSE));
         wsl::windows::common::wslutil::PrintMessage(Localization::MessageUnregisterWarning(distributionName), stderr);
-        wsl::windows::common::wslutil::PrintMessage(
-            Localization::MessageUnregisterDelay(c_unregisterDelaySeconds, WSL_UNREGISTER_OPTION_FORCE), stderr);
+        wsl::windows::common::wslutil::PrintMessage(Localization::MessageUnregisterConfirmation(), stderr);
         fflush(stderr);
 
-        // Keep existing callers working without reading stdin or waiting indefinitely for an answer.
-        // The default console control handler allows Ctrl+C to exit before deletion starts.
-        std::this_thread::sleep_for(std::chrono::seconds(c_unregisterDelaySeconds));
+        const auto answer = input.ReadLine(false);
+        if (!answer || ferror(stdin) || feof(stdin) ||
+            !wsl::shared::string::IsEqual(wsl::shared::string::TrimAscii(std::wstring_view{*answer}), L"yes", true))
+        {
+            return ERROR_CANCELLED;
+        }
     }
 
     auto progress = wsl::windows::common::ConsoleProgressIndicator(wsl::shared::Localization::MessageStatusUnregistering(), true);
@@ -1278,20 +1290,26 @@ int UnregisterDistribution(_In_ LPCWSTR distributionName, bool force)
 
 int Unregister(_In_ std::wstring_view commandLine)
 {
-    std::wstring distributionName;
-    bool force = false;
-    ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
-    parser.AddPositionalArgument(distributionName, 0);
-    parser.AddArgument(force, WSL_UNREGISTER_OPTION_FORCE);
-    parser.Parse();
-
-    if (distributionName.empty())
+    int argc{};
+    wil::unique_hlocal_ptr<LPWSTR[]> argv{CommandLineToArgvW(std::wstring{commandLine}.c_str(), &argc)};
+    THROW_LAST_ERROR_IF(!argv);
+    if (argc < 2 || argv[1][0] == L'\0')
     {
         wsl::windows::common::wslutil::PrintMessage(Localization::MessageRequiredParameterMissing(WSL_UNREGISTER_ARG), stdout);
         return -1;
     }
 
-    return UnregisterDistribution(distributionName.c_str(), force);
+    // Preserve the legacy positional name (including leading hyphens) and ignored trailing arguments.
+    // Only explicitly requested confirmation changes the behavior of an existing unregister command.
+    bool interactive = false;
+    bool force = false;
+    for (int index = 2; index < argc; index++)
+    {
+        interactive |= wsl::shared::string::IsEqual(argv[index], WSL_UNREGISTER_OPTION_INTERACTIVE);
+        force |= wsl::shared::string::IsEqual(argv[index], WSL_UNREGISTER_OPTION_FORCE);
+    }
+
+    return UnregisterDistribution(argv[1], interactive && !force);
 }
 
 int UpdatePackage(std::wstring_view commandLine)
@@ -1401,7 +1419,7 @@ int WslconfigMain(_In_ int argc, _In_reads_(argc) LPWSTR* argv)
     }
     else if ((argc >= 3) && ((IsEqual(argv[1], WSLCONFIG_COMMAND_UNREGISTER_DISTRIBUTION, true)) || (IsEqual(argv[1], WSLCONFIG_COMMAND_UNREGISTER_DISTRIBUTION_SHORT, true))))
     {
-        exitCode = UnregisterDistribution(argv[2], true);
+        exitCode = UnregisterDistribution(argv[2], false);
     }
     else
     {
