@@ -8356,5 +8356,37 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         const auto cgroup = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/self/cgroup").first;
         VERIFY_ARE_EQUAL(cgroup, L"0::/non-systemd\n");
     }
+
+    TEST_METHOD(WriteInstallLog)
+    {
+        const auto directory = std::filesystem::current_path() / L"install-log-test";
+        VERIFY_IS_TRUE(std::filesystem::create_directory(directory));
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(directory); });
+
+        const auto verifyRejected = [](const std::filesystem::path& path) {
+            VERIFY_THROWS_SPECIFIC(
+                wsl::windows::common::install::WriteInstallLogImpl(path.wstring(), "must not be written"),
+                wil::ResultException,
+                [](const wil::ResultException& e) { return e.GetErrorCode() == E_ACCESSDENIED; });
+        };
+
+        verifyRejected(directory);
+        VERIFY_IS_TRUE(std::filesystem::is_empty(directory));
+
+        const auto target = directory / L"target.txt";
+        const auto link = directory / L"log.txt";
+        wsl::windows::common::install::WriteInstallLogImpl(target.wstring(), "original content");
+        const auto original = ReadFileContent(target.wstring());
+        VERIFY_IS_TRUE(original.ends_with(L": original content\n"));
+
+        VERIFY_IS_TRUE(CreateSymbolicLinkW(link.c_str(), target.c_str(), SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE));
+        verifyRejected(link);
+        VERIFY_ARE_EQUAL(original, ReadFileContent(target.wstring()));
+        VERIFY_IS_TRUE(std::filesystem::remove(link));
+
+        VERIFY_WIN32_BOOL_SUCCEEDED(CreateHardLinkW(link.c_str(), target.c_str(), nullptr));
+        verifyRejected(link);
+        VERIFY_ARE_EQUAL(original, ReadFileContent(target.wstring()));
+    }
 };
 } // namespace UnitTests
