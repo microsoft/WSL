@@ -42,7 +42,7 @@ plugins:
 theme:
     name: material
     logo: assets/wsl-logo.png
-    favicon: assets/favicon.png
+    favicon: assets/wsl-logo.png
     features:
         - navigation.tracking
         - navigation.sections
