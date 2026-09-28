@@ -30,6 +30,47 @@ constexpr UINT64 c_mib = 1024 * 1024;
 constexpr UINT32 c_maximumDisks = 254;
 constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
 
+template <typename... Visitors>
+struct Overloaded : Visitors...
+{
+    using Visitors::operator()...;
+};
+
+template <typename... Visitors>
+Overloaded(Visitors...) -> Overloaded<Visitors...>;
+
+// Virtio-fs and Plan9 virtio devices are addressed by tag; Plan9 socket devices have none.
+std::wstring GetFileSystemDeviceTag(const VmFileSystemDeviceTransport& Transport)
+{
+    return std::visit(
+        Overloaded{
+            [](const VmVirtioFsDevice& transport) { return transport.Tag; },
+            [](const VmPlan9VirtioDevice& transport) { return transport.Tag; },
+            [](const VmPlan9SocketDevice&) { return std::wstring{}; }},
+        Transport);
+}
+
+// Plan9 socket devices are addressed by the port their server listens on.
+std::optional<std::uint32_t> GetPlan9SocketPort(const VmFileSystemDeviceTransport& Transport)
+{
+    return std::visit(
+        Overloaded{
+            [](const VmPlan9SocketDevice& transport) { return std::optional<std::uint32_t>{transport.Port.Value}; },
+            [](const VmVirtioFsDevice&) { return std::optional<std::uint32_t>{}; },
+            [](const VmPlan9VirtioDevice&) { return std::optional<std::uint32_t>{}; }},
+        Transport);
+}
+
+// A share whose name the caller left unspecified is named after a new GUID, which is short enough to
+// also be usable as a virtio-fs tag.
+std::wstring GenerateShareName()
+{
+    GUID name{};
+    THROW_IF_FAILED(CoCreateGuid(&name));
+
+    return wsl::shared::string::GuidToString<wchar_t>(name, wsl::shared::string::GuidToStringFlags::None);
+}
+
 VmEffectiveProcessor ConfigureProcessor(const VmProcessorRequest& Request, schema::Processor& Settings)
 {
     VmEffectiveProcessor processor{};
@@ -137,6 +178,17 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
     description.Memory = ConfigureMemory(Request.Memory, configuration.Settings.VirtualMachine.ComputeTopology.Memory);
     description.Boot = ConfigureBoot(Request.Boot, configuration.Settings.VirtualMachine.Chipset);
     configuration.Settings.VirtualMachine.Devices.Scsi["0"] = {};
+
+    // Permit the VM identity and SYSTEM to bind and connect Hyper-V sockets. Plan 9 socket
+    // transports initialize their listener while impersonating the VM identity.
+    const auto tokenUser = wil::get_token_information<TOKEN_USER>(Request.Identity.UserToken.get());
+    wil::unique_hlocal_string userSid;
+    THROW_LAST_ERROR_IF(!ConvertSidToStringSidW(tokenUser->User.Sid, &userSid));
+    const auto securityDescriptor = std::format(L"D:P(A;;FA;;;SY)(A;;FA;;;{})", userSid.get());
+    auto& hvSocket = configuration.Settings.VirtualMachine.Devices.HvSocket.HvSocketConfig;
+    hvSocket.DefaultBindSecurityDescriptor = securityDescriptor;
+    hvSocket.DefaultConnectSecurityDescriptor = securityDescriptor;
+
     signalEarlyTermination.release();
     return configuration;
 }
@@ -620,24 +672,13 @@ void HcsVirtualMachineBackend::CloseFileSystemDevicesLocked() noexcept
 
     // Device hosts must be shut down while the compute system and callback context still exist.
     m_guestDeviceManager.reset();
+    m_fileSystemShares.clear();
     m_fileSystemDevices.clear();
 }
 
 VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request)
 {
-    const auto tag = std::visit(
-        [](const auto& transport) {
-            using Transport = std::decay_t<decltype(transport)>;
-            if constexpr (std::is_same_v<Transport, VmPlan9SocketDevice>)
-            {
-                return std::wstring{};
-            }
-            else
-            {
-                return transport.Tag;
-            }
-        },
-        Request.Transport);
+    const auto tag = GetFileSystemDeviceTag(Request.Transport);
     WSL_LOG(
         "HcsCreateFileSystemDeviceBegin",
         TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
@@ -646,27 +687,18 @@ VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFile
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system || !m_guestDeviceManager);
     THROW_HR_IF(E_BOUNDS, m_nextDeviceId == UINT64_MAX);
+    // Two devices conflict when the guest would reach them the same way: the same Plan9 socket port,
+    // or the same tag. A socket device never conflicts with a tagged one.
+    //
+    // N.B. This compares the two transports through their addresses rather than visiting both
+    //      variants at once, which would require a lambda for every pair of alternatives.
+    const auto requestedPort = GetPlan9SocketPort(Request.Transport);
     for (const auto& entry : m_fileSystemDevices)
     {
-        const auto duplicate = std::visit(
-            [](const auto& requested, const auto& existing) {
-                using Requested = std::decay_t<decltype(requested)>;
-                using Existing = std::decay_t<decltype(existing)>;
-                if constexpr (std::is_same_v<Requested, VmPlan9SocketDevice> && std::is_same_v<Existing, VmPlan9SocketDevice>)
-                {
-                    return requested.Port.Value == existing.Port.Value;
-                }
-                else if constexpr (!std::is_same_v<Requested, VmPlan9SocketDevice> && !std::is_same_v<Existing, VmPlan9SocketDevice>)
-                {
-                    return wsl::shared::string::IsEqual(requested.Tag, existing.Tag, false);
-                }
-                else
-                {
-                    return false;
-                }
-            },
-            Request.Transport,
-            entry.second.Transport);
+        const auto existingPort = GetPlan9SocketPort(entry.second.Transport);
+        const bool duplicate = requestedPort.has_value() || existingPort.has_value()
+                                   ? requestedPort == existingPort
+                                   : wsl::shared::string::IsEqual(tag, GetFileSystemDeviceTag(entry.second.Transport), false);
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), duplicate);
     }
 
@@ -691,10 +723,8 @@ VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFile
     });
 
     std::visit(
-        [&](const auto& transport) {
-            using Transport = std::decay_t<decltype(transport)>;
-            if constexpr (std::is_same_v<Transport, VmVirtioFsDevice>)
-            {
+        Overloaded{
+            [&](const VmVirtioFsDevice& transport) {
                 mountOptions = FormatVirtioFsMountOptions(transport.Options.MountOptions);
 
                 // An aggregate device serves each of its shares as a child, so it can be created
@@ -706,9 +736,8 @@ VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFile
                         transport.Tag.c_str(), mountOptions.c_str(), L"", m_configuration.Description.Identity.UserToken.get(), options);
                     device.State = VmFileSystemDeviceState::Serving;
                 }
-            }
-            else if constexpr (std::is_same_v<Transport, VmPlan9VirtioDevice>)
-            {
+            },
+            [&](const VmPlan9VirtioDevice& transport) {
                 THROW_HR_IF(E_INVALIDARG, !transport.ServerFactory);
                 plan9Server = transport.ServerFactory(m_configuration.Description.Identity.UserToken.get());
                 THROW_HR_IF(E_UNEXPECTED, !plan9Server);
@@ -717,9 +746,8 @@ VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFile
                 registeredFileSystemClassId = transport.FileSystemClassId;
                 guestInstanceId = m_guestDeviceManager->AddNewDevice(transport.DeviceType, plan9Server, transport.Tag.c_str());
                 device.State = VmFileSystemDeviceState::Serving;
-            }
-            else
-            {
+            },
+            [&](const VmPlan9SocketDevice& transport) {
                 THROW_HR_IF(E_INVALIDARG, !transport.ServerFactory);
                 plan9Server = transport.ServerFactory(m_configuration.Description.Identity.UserToken.get());
                 THROW_HR_IF(E_UNEXPECTED, !plan9Server);
@@ -728,8 +756,7 @@ VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFile
                 THROW_IF_FAILED(plan9Server->Init(&m_runtimeId, transport.Port.Value));
                 THROW_IF_FAILED(plan9Server->Resume());
                 device.State = VmFileSystemDeviceState::Serving;
-            }
-        },
+            }},
         Request.Transport);
 
     device.GuestInstanceId = guestInstanceId;
@@ -751,9 +778,178 @@ VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFile
     return device;
 }
 
-VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId, const VmFileSystemShareRequest&)
+HcsVirtualMachineBackend::FileSystemDeviceMap::iterator HcsVirtualMachineBackend::FindFileSystemDeviceLocked(VmDeviceId Device)
 {
-    THROW_HR(c_notSupported);
+    const auto device = m_fileSystemDevices.find(Device.Value);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), device == m_fileSystemDevices.end());
+
+    return device;
+}
+
+const HcsVirtualMachineBackend::FileSystemShare* HcsVirtualMachineBackend::FindFileSystemShareLocked(
+    VmDeviceId Device, const std::wstring& HostPath, const std::wstring& MountOptions) const
+{
+    for (const auto& entry : m_fileSystemShares)
+    {
+        const auto& share = entry.second;
+        if ((share.Share.Device.Value == Device.Value) && (share.Share.EffectiveHostPath.native() == HostPath) &&
+            (share.MountOptions == MountOptions))
+        {
+            return &share;
+        }
+    }
+
+    return nullptr;
+}
+
+HANDLE HcsVirtualMachineBackend::ResolveShareUserToken(const VmFileSystemShareRequest& Request) const
+{
+    HANDLE userToken = Request.UserToken ? Request.UserToken.get() : m_configuration.Description.Identity.UserToken.get();
+    THROW_HR_IF_MSG(E_UNEXPECTED, !userToken, "UserToken not set for the file system share request");
+
+    return userToken;
+}
+
+std::wstring HcsVirtualMachineBackend::AddPlan9ShareLocked(
+    const FileSystemDevice& Device, const VmFileSystemShareRequest& Request, HANDLE UserToken, const std::wstring& HostPath) const
+{
+    const auto* options = std::get_if<VmPlan9ShareOptions>(&Request.Options);
+    THROW_HR_IF_MSG(E_INVALIDARG, !options, "A Plan 9 device requires Plan 9 share options");
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !Device.Plan9Server);
+
+    auto flags = schema::Plan9ShareFlags::None;
+    WI_SetFlagIf(flags, schema::Plan9ShareFlags::ReadOnly, Request.ReadOnly);
+    WI_SetFlagIf(flags, schema::Plan9ShareFlags::LinuxMetadata, options->LinuxMetadata);
+    WI_SetFlagIf(flags, schema::Plan9ShareFlags::CaseSensitive, options->CaseSensitive);
+    WI_SetFlagIf(flags, schema::Plan9ShareFlags::UseShareRootIdentity, options->UseShareRootIdentity);
+    WI_SetFlagIf(flags, schema::Plan9ShareFlags::AllowOptions, options->AllowOptions);
+    WI_SetFlagIf(flags, schema::Plan9ShareFlags::AllowSubPaths, options->AllowSubPaths);
+
+    // Allow the Plan 9 server to create NT symlinks.
+    //
+    // N.B. This may fail for unelevated users, however symlink creation will
+    //      succeed even without this privilege if developer mode is enabled.
+    wsl::windows::common::security::EnableTokenPrivilege(UserToken, SE_CREATE_SYMBOLIC_LINK_NAME);
+
+    auto accessName = Request.Name.empty() ? GenerateShareName() : Request.Name;
+    auto runAsUser = wil::impersonate_token(UserToken);
+    AddPlan9SharePath(Device.Plan9Server, accessName.c_str(), HostPath.c_str(), static_cast<UINT32>(flags));
+
+    return accessName;
+}
+
+VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device, const VmFileSystemShareRequest& Request)
+{
+    validation::ValidateResourceId(Device, m_configuration.Description.Identity);
+    THROW_HR_IF_MSG(E_INVALIDARG, Request.HostPath.empty(), "A host path is required");
+    const auto userToken = ResolveShareUserToken(Request);
+
+    WSL_LOG(
+        "HcsAddFileSystemShareBegin",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(Device.Value, "deviceId"),
+        TraceLoggingValue(Request.HostPath.c_str(), "path"),
+        TraceLoggingValue(Request.ReadOnly, "readOnly"));
+
+    auto lock = m_lock.lock_exclusive();
+    // N.B. A torn-down VM is reported as HCS_E_TERMINATED to match WslCoreVm::AddDrvFsShare.
+    THROW_HR_IF(HCS_E_TERMINATED, !m_system || !m_guestDeviceManager);
+    THROW_HR_IF(E_BOUNDS, m_nextShareId == std::numeric_limits<std::uint64_t>::max());
+    const auto device = FindFileSystemDeviceLocked(Device);
+
+    // A virtio-fs share resolves to a canonical directory, while a Plan 9 share may be rooted at a
+    // prefix such as '\\?' so that the guest can mount arbitrary subpaths below it.
+    std::wstring hostPath;
+    std::wstring mountOptions;
+    std::optional<VmFileSystemShare> reused;
+    VmFileSystemShareAddress guestAddress;
+    std::visit(
+        Overloaded{
+            [&](const VmVirtioFsDevice& transport) {
+                const auto* options = std::get_if<VmVirtioFsShareOptions>(&Request.Options);
+                THROW_HR_IF_MSG(E_INVALIDARG, !options, "A virtio-fs device requires virtio-fs share options");
+
+                validation::ValidatePath(Request.HostPath);
+                hostPath = NormalizeSharePath(Request.HostPath);
+
+                auto shareOptions = options->MountOptions;
+                if (Request.ReadOnly)
+                {
+                    shareOptions[L"ro"] = {};
+                }
+
+                mountOptions = FormatVirtioFsMountOptions(shareOptions);
+
+                // Repeating a request for the same path and options reuses the existing share so that
+                // multiple guest mounts of one host directory are backed by a single virtio-fs share.
+                if (const auto* existing = FindFileSystemShareLocked(Device, hostPath, mountOptions))
+                {
+                    reused = existing->Share;
+                    return;
+                }
+
+                std::optional<std::wstring> childName;
+                if (transport.Layout == VmVirtioFsLayout::Aggregate)
+                {
+                    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !device->second.Device.GuestInstanceId.has_value());
+                    childName = Request.Name.empty() ? GenerateShareName() : Request.Name;
+                    m_guestDeviceManager->AddVirtiofsChild(
+                        device->second.Device.GuestInstanceId.value(), childName->c_str(), mountOptions.c_str(), hostPath.c_str());
+                }
+                else
+                {
+                    // A single-share device is the share, so it is created on first use and cannot be shared further.
+                    THROW_HR_IF_MSG(
+                        E_INVALIDARG, !Request.Name.empty(), "A single-share virtio-fs device does not accept a share name");
+                    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), device->second.Device.GuestInstanceId.has_value());
+                    device->second.Device.GuestInstanceId =
+                        m_guestDeviceManager->AddVirtiofsDevice(transport.Tag.c_str(), mountOptions.c_str(), hostPath.c_str(), userToken);
+                }
+
+                device->second.Device.State = VmFileSystemDeviceState::Serving;
+                guestAddress = VmVirtioFsShareAddress{transport.Tag, std::move(childName)};
+            },
+            [&](const VmPlan9SocketDevice& transport) {
+                hostPath = Request.HostPath.native();
+                guestAddress = VmPlan9SocketShareAddress{transport.Port, AddPlan9ShareLocked(device->second, Request, userToken, hostPath)};
+            },
+            [&](const VmPlan9VirtioDevice& transport) {
+                hostPath = Request.HostPath.native();
+                guestAddress = VmPlan9VirtioShareAddress{transport.Tag, AddPlan9ShareLocked(device->second, Request, userToken, hostPath)};
+            }},
+        device->second.Transport);
+
+    if (reused.has_value())
+    {
+        WSL_LOG(
+            "HcsAddFileSystemShareEnd",
+            TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+            TraceLoggingValue(Device.Value, "deviceId"),
+            TraceLoggingValue(reused->Id.Value, "shareId"),
+            TraceLoggingValue(false, "created"));
+
+        return reused.value();
+    }
+
+    VmFileSystemShare share{};
+    share.Id = VmShareId{m_configuration.Description.Identity, m_nextShareId};
+    share.Device = Device;
+    share.GuestAddress = std::move(guestAddress);
+    share.EffectiveHostPath = hostPath;
+    share.ReadOnly = Request.ReadOnly;
+
+    const auto inserted = m_fileSystemShares.emplace(share.Id.Value, FileSystemShare{share, std::move(mountOptions)}).second;
+    WI_ASSERT(inserted);
+    ++m_nextShareId;
+
+    WSL_LOG(
+        "HcsAddFileSystemShareEnd",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(Device.Value, "deviceId"),
+        TraceLoggingValue(share.Id.Value, "shareId"),
+        TraceLoggingValue(true, "created"));
+
+    return share;
 }
 
 void HcsVirtualMachineBackend::RemoveFileSystemShare(VmShareId)

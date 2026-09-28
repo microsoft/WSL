@@ -969,13 +969,7 @@ void WslCoreVm::AddPlan9Share(
             }
         }
 
-        HRESULT result = server->AddSharePath(AccessName, Path, static_cast<UINT32>(Flags));
-        if (result == HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS))
-        {
-            result = S_OK;
-        }
-
-        THROW_IF_FAILED(result);
+        AddPlan9SharePath(server, AccessName, Path, static_cast<UINT32>(Flags));
     }
 
     if (addNewDevice)
@@ -2156,13 +2150,7 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
     WI_ASSERT(Admin == wsl::windows::common::security::IsTokenElevated(UserToken));
 
     // Ensure that the path has a trailing path separator.
-    std::wstring sharePath(Path);
-    if (!sharePath.ends_with(L'\\') && !sharePath.ends_with(L'/'))
-    {
-        sharePath.push_back(L'\\');
-    }
-
-    sharePath = wsl::windows::common::filesystem::GetCanonicalPath(sharePath).wstring();
+    std::wstring sharePath = NormalizeSharePath(Path);
 
     std::wstring effectiveOptions(Options);
 
@@ -2771,35 +2759,12 @@ bool WslCoreVm::AttachedDisk::operator==(const AttachedDisk& other) const
     return Type == other.Type && wsl::windows::common::string::IsPathComponentEqual(Path, other.Path);
 }
 
-WslCoreVm::VirtioFsShare::VirtioFsShare(PCWSTR Path, PCWSTR Options, bool Admin) : Path(Path), Admin(Admin)
+WslCoreVm::VirtioFsShare::VirtioFsShare(PCWSTR Path, PCWSTR Options, bool Admin) :
+    Path(Path), Options(ParseVirtioFsMountOptions(Options)), Admin(Admin)
 {
-    // Parse the options string into a map representing mount options to ensure that shares with functionally
-    // identical options can share a single device.
-    // For example: "uid=1000;gid=1000" and "gid=1000;uid=1000"
-    auto optionsVector = wsl::shared::string::Split(std::wstring{Options}, L';');
-    for (const auto& option : optionsVector)
-    {
-        std::wstring key;
-        std::wstring value;
-        const auto pos = option.find_first_of(L'=');
-        if (pos == option.npos)
-        {
-            key = option;
-        }
-        else
-        {
-            key = option.substr(0, pos);
-            value = option.substr(pos + 1);
-        }
-
-        if (!key.empty())
-        {
-            this->Options.insert({std::move(key), std::move(value)});
-        }
-    }
-
     if constexpr (wsl::shared::Debug)
     {
+        auto optionsVector = wsl::shared::string::Split(std::wstring{Options}, L';');
         const auto originalSet = std::set<std::wstring>(optionsVector.begin(), optionsVector.end());
         auto newVector = wsl::shared::string::Split(OptionsString(), L';');
         const auto newSet = std::set<std::wstring>(newVector.begin(), newVector.end());

@@ -39,6 +39,15 @@ void CreateVhd(const std::filesystem::path& Path)
         &storageType, Path.c_str(), VIRTUAL_DISK_ACCESS_NONE, nullptr, CREATE_VIRTUAL_DISK_FLAG_SUPPORT_COMPRESSED_VOLUMES, 0, &parameters, nullptr, &vhd));
 }
 
+// Tests require elevation, so the test process token is the elevated counterpart of
+// GetNonElevatedToken() and stands in for an administrator's DrvFs share.
+wil::unique_handle GetElevatedTestToken()
+{
+    wil::unique_handle token;
+    THROW_IF_WIN32_BOOL_FALSE(OpenProcessToken(GetCurrentProcess(), TOKEN_ALL_ACCESS, &token));
+    return token;
+}
+
 VmDiskRequest CreateDiskRequest(const std::filesystem::path& Path, std::optional<UINT32> Lun = std::nullopt)
 {
     VmDiskRequest request;
@@ -172,20 +181,24 @@ class HcsVirtualMachineBackendTests
         CreateVhd(secondPath);
 
         auto firstBackend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
-        auto secondBackend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
         firstBackend->Start();
-        secondBackend->Start();
         const auto first = firstBackend->AttachDisk(CreateDiskRequest(firstPath, 253));
-        const auto second = secondBackend->AttachDisk(CreateDiskRequest(secondPath));
 
         VERIFY_ARE_EQUAL(UINT32{253}, first.GuestAddress.Lun);
-        VERIFY_ARE_EQUAL(first.Id.Value, second.Id.Value);
-        VERIFY_IS_FALSE(IsEqualGUID(first.Id.Owner.VmId, second.Id.Owner.VmId));
         VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { firstBackend->AttachDisk(CreateDiskRequest(secondPath, 254)); }));
 
         firstBackend->DetachDisk(first.Id);
-        secondBackend->DetachDisk(second.Id);
         firstBackend->Terminate();
+
+        // Disk IDs are local to a VM and can be reused after another VM has terminated.
+        auto secondBackend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        secondBackend->Start();
+        const auto second = secondBackend->AttachDisk(CreateDiskRequest(secondPath));
+
+        VERIFY_ARE_EQUAL(first.Id.Value, second.Id.Value);
+        VERIFY_IS_FALSE(IsEqualGUID(first.Id.Owner.VmId, second.Id.Owner.VmId));
+
+        secondBackend->DetachDisk(second.Id);
         secondBackend->Terminate();
     }
 
@@ -252,12 +265,128 @@ class HcsVirtualMachineBackendTests
         const VmPortBindingId binding{identity, 1};
 
         VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->CreateFileSystemDevice({VmPlan9SocketDevice{}}); }));
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AddFileSystemShare(device, {}); }));
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddFileSystemShare(device, {}); }));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] {
+                             VmFileSystemShareRequest request{};
+                             request.HostPath = L"C:\\";
+                             backend->AddFileSystemShare(device, request);
+                         }));
         VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->RemoveFileSystemShare(share); }));
         VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AddNetworkAdapter({}); }));
         VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->BindPort(device, {}); }));
         VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->UnbindPort(binding); }));
         backend->Terminate();
+    }
+
+    TEST_METHOD(SharesHostDirectoriesPerElevationLevel)
+    {
+        SKIP_TEST_ARM64();
+        const auto directory = CreateTestDirectory();
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { std::filesystem::remove_all(directory); });
+
+        auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        backend->Start();
+
+        // Elevated and unelevated callers share one VM, so each elevation level gets its own device
+        // just as WslCoreVm::AddDrvFsShare uses a separate Plan 9 port and virtio-fs tag for each.
+        const auto userDevice = backend->CreateFileSystemDevice({VmVirtioFsDevice{L"drvfs-user", VmVirtioFsLayout::Aggregate}});
+        const auto adminDevice = backend->CreateFileSystemDevice({VmVirtioFsDevice{L"drvfs-admin", VmVirtioFsLayout::Aggregate}});
+        VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Serving, userDevice.State);
+        VERIFY_IS_TRUE(userDevice.GuestInstanceId.has_value());
+        VERIFY_ARE_NOT_EQUAL(userDevice.Id.Value, adminDevice.Id.Value);
+
+        // Leaving the token unset serves the share through the identity that created the VM.
+        VmFileSystemShareRequest request;
+        request.HostPath = directory;
+        request.Options = VmVirtioFsShareOptions{};
+        request.ReadOnly = false;
+
+        const auto share = backend->AddFileSystemShare(userDevice.Id, request);
+        VERIFY_ARE_EQUAL(userDevice.Id.Value, share.Device.Value);
+        VERIFY_IS_TRUE(IsEqualGUID(backend->GetDescription().Identity.VmId, share.Id.Owner.VmId));
+        VERIFY_IS_FALSE(share.ReadOnly);
+
+        const auto& address = std::get<VmVirtioFsShareAddress>(share.GuestAddress);
+        VERIFY_ARE_EQUAL(std::wstring{L"drvfs-user"}, address.Tag);
+        VERIFY_IS_TRUE(address.ChildName.has_value());
+
+        // The host path is canonicalized so that requests naming the same directory resolve to a
+        // single share. GetCanonicalPath removes the separator NormalizeSharePath appends before
+        // canonicalization.
+        VERIFY_ARE_EQUAL(std::filesystem::canonical(directory).native(), share.EffectiveHostPath.native());
+
+        // Repeating a request reuses the share instead of adding a second child for one directory.
+        const auto reused = backend->AddFileSystemShare(userDevice.Id, request);
+        VERIFY_ARE_EQUAL(share.Id.Value, reused.Id.Value);
+
+        // Mount options are part of a share's identity, so a read-only mount is a separate share.
+        auto readOnlyRequest = request;
+        readOnlyRequest.ReadOnly = true;
+        const auto readOnlyShare = backend->AddFileSystemShare(userDevice.Id, readOnlyRequest);
+        VERIFY_ARE_NOT_EQUAL(share.Id.Value, readOnlyShare.Id.Value);
+        VERIFY_IS_TRUE(readOnlyShare.ReadOnly);
+
+        // A share carries its own token, so the elevated device reaches the same directory without
+        // reusing the share that the unelevated device serves.
+        auto adminRequest = request;
+        adminRequest.UserToken = wil::shared_handle{GetElevatedTestToken().release()};
+        const auto adminShare = backend->AddFileSystemShare(adminDevice.Id, adminRequest);
+        VERIFY_ARE_EQUAL(adminDevice.Id.Value, adminShare.Device.Value);
+        VERIFY_ARE_NOT_EQUAL(share.Id.Value, adminShare.Id.Value);
+        VERIFY_ARE_EQUAL(std::wstring{L"drvfs-admin"}, std::get<VmVirtioFsShareAddress>(adminShare.GuestAddress).Tag);
+        VERIFY_ARE_EQUAL(share.EffectiveHostPath.native(), adminShare.EffectiveHostPath.native());
+
+        // Exercise the remaining file-system transports as well: Plan 9 socket and Plan 9 virtio.
+        const auto createPlan9Server = [](HANDLE userToken) {
+            return wsl::windows::common::wslutil::CreateComServerAsUser<p9fs::Plan9FileSystem, IPlan9FileSystem>(userToken);
+        };
+
+        VmPlan9SocketDevice socketDevice{GuestServicePort{LX_INIT_UTILITY_VM_PLAN9_PORT}, createPlan9Server};
+        const auto socketDeviceResult = backend->CreateFileSystemDevice({socketDevice});
+        VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Serving, socketDeviceResult.State);
+        VmFileSystemShareRequest socketRequest;
+        socketRequest.HostPath = directory;
+        socketRequest.Options = VmPlan9ShareOptions{};
+        socketRequest.ReadOnly = false;
+        const auto socketShare = backend->AddFileSystemShare(socketDeviceResult.Id, socketRequest);
+        VERIFY_ARE_EQUAL(socketDevice.Port.Value, std::get<VmPlan9SocketShareAddress>(socketShare.GuestAddress).Port.Value);
+        VERIFY_IS_FALSE(socketShare.ReadOnly);
+
+        VmPlan9VirtioDevice virtioDevice{L"plan9-virtio"};
+        virtioDevice.FileSystemClassId = __uuidof(p9fs::Plan9FileSystem);
+        virtioDevice.DeviceType = VIRTIO_PLAN9_DEVICE_ID;
+        virtioDevice.ServerFactory = createPlan9Server;
+        const auto virtioDeviceResult = backend->CreateFileSystemDevice({virtioDevice});
+        VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Serving, virtioDeviceResult.State);
+        VmFileSystemShareRequest virtioRequest;
+        virtioRequest.HostPath = directory;
+        virtioRequest.Options = VmPlan9ShareOptions{};
+        virtioRequest.ReadOnly = false;
+        const auto virtioShare = backend->AddFileSystemShare(virtioDeviceResult.Id, virtioRequest);
+        VERIFY_ARE_EQUAL(std::wstring{L"plan9-virtio"}, std::get<VmPlan9VirtioShareAddress>(virtioShare.GuestAddress).Tag);
+        VERIFY_IS_FALSE(virtioShare.ReadOnly);
+
+        // A host path is required, and the options must match the device that serves them.
+        VmFileSystemShareRequest pathless;
+        pathless.Options = VmVirtioFsShareOptions{};
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddFileSystemShare(userDevice.Id, pathless); }));
+
+        auto plan9Options = request;
+        plan9Options.Options = VmPlan9ShareOptions{};
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddFileSystemShare(userDevice.Id, plan9Options); }));
+
+        auto unknownDevice = userDevice.Id;
+        unknownDevice.Value = UINT64_MAX;
+        VERIFY_ARE_EQUAL(
+            HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->AddFileSystemShare(unknownDevice, request); }));
+
+        auto foreignDevice = userDevice.Id;
+        THROW_IF_FAILED(CoCreateGuid(&foreignDevice.Owner.VmId));
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddFileSystemShare(foreignDevice, request); }));
+
+        // A torn-down VM reports the same error as WslCoreVm::AddDrvFsShare.
+        backend->Terminate();
+        VERIFY_ARE_EQUAL(HCS_E_TERMINATED, OperationResult([&] { backend->AddFileSystemShare(userDevice.Id, request); }));
     }
 };
 
