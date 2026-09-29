@@ -23,6 +23,8 @@ parameters:
     default:
       - name: rs_prerelease
         image: rs_prerelease-2025-01-30
+      - name: ge_current
+        image: ge_current-2026-09-28
       - name: ni_release
         image: win11-23h2-ent-2024-11-18
       - name: fe_release
@@ -30,8 +32,6 @@ parameters:
         server: true
       - name: vb_release
         image: win10-22h2-ent-g2-2024-09-10
-
-      # TODO: ge_release
 
 stages:
 - stage: test
