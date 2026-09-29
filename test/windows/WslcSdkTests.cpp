@@ -19,6 +19,7 @@ Abstract:
 #include "WSLCContainerLauncher.h"
 #include "WSLCProcessLauncher.h"
 #include "wslc_schema.h"
+#include "wslpolicies.h"
 #include "wslc/e2e/WSLCE2EHelpers.h"
 #include <optional>
 
@@ -1297,6 +1298,24 @@ class WslcSdkTests
 
         const char* capabilitiesWithNull[] = {nullptr};
         VERIFY_ARE_EQUAL(WslcSetContainerSettingsCapabilityAdditions(&containerSettings, capabilitiesWithNull, 1), E_INVALIDARG);
+    }
+
+    WSLC_TEST_METHOD(ContainerCapabilityAdditionsBlockedByPolicy)
+    {
+        namespace policies = wsl::windows::policies;
+        RegistryKeyChange<DWORD> policy(HKEY_LOCAL_MACHINE, policies::c_registryKey, policies::c_allowWSLContainerPrivileged, 0);
+
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+        const char* capabilities[] = {"NET_ADMIN"};
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsCapabilityAdditions(&containerSettings, capabilities, ARRAYSIZE(capabilities)));
+
+        UniqueContainer container;
+        wil::unique_cotaskmem_string errorMessage;
+        VERIFY_ARE_EQUAL(WSLC_E_CAPABILITY_ADDITIONS_DISABLED, WslcCreateContainer(m_defaultSession, &containerSettings, &container, &errorMessage));
+        VERIFY_IS_NULL(container.get());
+        VERIFY_IS_NOT_NULL(errorMessage.get());
+        VERIFY_ARE_EQUAL(wsl::shared::Localization::MessageWslcCapabilityAdditionsDisabled(), std::wstring(errorMessage.get()));
     }
 
     WSLC_TEST_METHOD(ProcessEnvVariables)

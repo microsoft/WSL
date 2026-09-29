@@ -16,3 +16,4 @@ Underlying HRESULT values:
 - `ContainerDisabled = -2147219956`
 - `RegistryBlockedByPolicy = -2147219955`
 - `VolumeNotAvailable = -2147219954`
+- `CapabilityAdditionsDisabled = -2147219948`

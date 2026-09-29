@@ -2367,24 +2367,16 @@ try
         "Invalid process flags: 0x%x",
         containerOptions->InitProcessOptions.Flags);
 
-    // Apply the policy to a local copy without modifying the caller's options.
-    auto options = *containerOptions;
-    const bool capAddIgnored = options.CapAdd.Count > 0 && !wsl::windows::policies::IsFeatureAllowed(
-                                                               wsl::windows::policies::OpenPoliciesKey().get(),
-                                                               wsl::windows::policies::c_allowWSLContainerPrivileged);
-    if (capAddIgnored)
-    {
-        options.CapAdd = {};
-    }
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_CAPABILITY_ADDITIONS_DISABLED,
+        Localization::MessageWslcCapabilityAdditionsDisabled(),
+        containerOptions->CapAdd.Count > 0 &&
+            !wsl::windows::policies::IsFeatureAllowed(
+                wsl::windows::policies::OpenPoliciesKey().get(), wsl::windows::policies::c_allowWSLContainerPrivileged));
 
     auto lock = AcquireLease();
 
-    auto result = wil::ResultFromException([&]() { CreateContainerImpl(&options, Container); });
-
-    if (capAddIgnored && SUCCEEDED(result))
-    {
-        EMIT_USER_WARNING(Localization::MessageWslcCapabilityAdditionsDisabled());
-    }
+    auto result = wil::ResultFromException([&]() { CreateContainerImpl(containerOptions, Container); });
 
     // This telemetry event is used to keep track of the container creation failure rate and surface unexpected errors.
     WSL_LOG(

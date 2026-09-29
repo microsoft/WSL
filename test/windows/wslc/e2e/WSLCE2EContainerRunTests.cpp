@@ -16,6 +16,7 @@ Abstract:
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
 #include "TestImageRegistry.h"
+#include "wslpolicies.h"
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
@@ -1645,6 +1646,19 @@ with mmap.mmap(fd, 32 * 1024, flags=mmap.MAP_SHARED, prot=mmap.PROT_READ | mmap.
         constexpr auto c_droppedCapabilities = (1ull << 13) | (1ull << 0); // NET_RAW, CHOWN
         VERIFY_ARE_EQUAL(c_addedCapabilities, effective & c_addedCapabilities);
         VERIFY_ARE_EQUAL(0ull, effective & c_droppedCapabilities);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_CapabilitiesBlockedByPolicy)
+    {
+        namespace policies = wsl::windows::policies;
+        RegistryKeyChange<DWORD> policy(HKEY_LOCAL_MACHINE, policies::c_registryKey, policies::c_allowWSLContainerPrivileged, 0);
+        const auto expectedError =
+            FormatErrorMessage(Localization::MessageWslcCapabilityAdditionsDisabled(), L"WSLC_E_CAPABILITY_ADDITIONS_DISABLED");
+
+        auto result =
+            RunWslc(std::format(L"container run --name {} --cap-add NET_ADMIN {} true", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"", .Stderr = expectedError, .ExitCode = 1});
+        VerifyContainerIsNotListed(WslcContainerName);
     }
 
 private:

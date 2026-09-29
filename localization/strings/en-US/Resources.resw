@@ -1006,7 +1006,7 @@ Falling back to NAT networking.</value>
     <value>WSL container is disabled by the computer policy.</value>
   </data>
   <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
-    <value>The requested Linux capability additions were ignored because they are disabled by the computer policy.</value>
+    <value>Linux capability additions are disabled by the computer policy.</value>
   </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>The container image registry '{}' is blocked by the computer policy.</value>
