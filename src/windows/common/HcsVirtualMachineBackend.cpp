@@ -869,7 +869,6 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
                 const auto* options = std::get_if<VmVirtioFsShareOptions>(&Request.Options);
                 THROW_HR_IF_MSG(E_INVALIDARG, !options, "A virtio-fs device requires virtio-fs share options");
 
-                validation::ValidatePath(Request.HostPath);
                 hostPath = NormalizeSharePath(Request.HostPath);
 
                 auto shareOptions = options->MountOptions;
