@@ -2441,6 +2441,22 @@ Usage:
         auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"nproc --all");
         VERIFY_ARE_EQUAL(L"1\n", output);
         VERIFY_ARE_EQUAL(L"", warnings);
+
+        const int logicalProcessorCount = wsl::windows::common::wslutil::GetLogicalProcessorCount();
+        if (logicalProcessorCount > 256)
+        {
+            configChange.Update(LxssGenerateTestConfig());
+            std::tie(output, warnings) = LxsstuLaunchWslAndCaptureOutput(L"nproc --all");
+            VERIFY_ARE_EQUAL(L"256\n", output);
+            VERIFY_ARE_EQUAL(L"", warnings);
+
+            configChange.Update(LxssGenerateTestConfig() + std::format(L"\nprocessors={}", logicalProcessorCount));
+            std::tie(output, warnings) = LxsstuLaunchWslAndCaptureOutput(L"nproc --all");
+            VERIFY_ARE_EQUAL(L"256\n", output);
+            VERIFY_ARE_EQUAL(
+                std::format(L"wsl: wsl2.processors cannot exceed the maximum supported processor count ({} > 256)\r\n", logicalProcessorCount),
+                warnings);
+        }
     }
 
     WSL2_TEST_METHOD(DmesgCollection)

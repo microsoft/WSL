@@ -294,14 +294,23 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
 {
     // Determine the maximum number of processors that can be added to the VM.
     // If the user did not supply a processor count, use the maximum.
-    MaximumProcessorCount = wsl::windows::common::wslutil::GetLogicalProcessorCount();
+    const int logicalProcessorCount = wsl::windows::common::wslutil::GetLogicalProcessorCount();
+    MaximumProcessorCount = std::min(logicalProcessorCount, 256);
     if (ProcessorCount <= 0)
     {
         ProcessorCount = MaximumProcessorCount;
     }
     else if (ProcessorCount > MaximumProcessorCount)
     {
-        EMIT_USER_WARNING(wsl::shared::Localization::MessageTooManyProcessors(ProcessorCount, MaximumProcessorCount));
+        if (ProcessorCount > logicalProcessorCount)
+        {
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageTooManyProcessors(ProcessorCount, logicalProcessorCount));
+        }
+        else
+        {
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageUnsupportedProcessorCount(ProcessorCount, MaximumProcessorCount));
+        }
+
         ProcessorCount = MaximumProcessorCount;
     }
 
