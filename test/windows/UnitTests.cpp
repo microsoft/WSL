@@ -5133,7 +5133,10 @@ VERSION_ID="Invalid|Format"
         };
 
         InstallWithVhdSize(false);
-        InstallWithVhdSize(true);
+        {
+            WslConfigChange config(LxssGenerateTestConfig({.sparse = true}));
+            InstallWithVhdSize(true);
+        }
 
         // Distribution imported in place
         if (LxsstuVmMode())
