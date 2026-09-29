@@ -116,7 +116,8 @@ public:
     /// <summary>
     /// Enumerates all registered distributions.
     /// </summary>
-    IFACEMETHOD(EnumerateDistributions)(_Out_ PULONG DistributionCount, _Out_ LXSS_ENUMERATE_INFO** Distributions, _Out_ LXSS_ERROR_INFO* Error) override;
+    IFACEMETHOD(EnumerateDistributions)(
+        _In_ BOOL Deleted, _Out_ PULONG DistributionCount, _Out_ LXSS_ENUMERATE_INFO** Distributions, _Out_ LXSS_ERROR_INFO* Error) override;
 
     /// <summary>
     /// Exports a distribution from to tar file.
@@ -264,7 +265,9 @@ public:
     /// <summary>
     /// Unregisters a distribution.
     /// </summary>
-    IFACEMETHOD(UnregisterDistribution)(_In_ LPCGUID DistroGuid, _Out_ LXSS_ERROR_INFO* Error) override;
+    IFACEMETHOD(RestoreDistribution)(_In_ LPCWSTR DistributionName, _In_opt_ LPCWSTR NewName, _Out_ LXSS_ERROR_INFO* Error) override;
+
+    IFACEMETHOD(UnregisterDistribution)(_In_ LPCGUID DistroGuid, _In_ BOOL Permanent, _Out_ LXSS_ERROR_INFO* Error) override;
 
     // IWslSupport methods.
 
@@ -536,7 +539,11 @@ public:
     /// Unregisters a distribution.
     /// </summary>
     HRESULT
-    UnregisterDistribution(_In_ LPCGUID DistroGuid);
+    UnregisterDistribution(_In_ LPCGUID DistroGuid, bool Permanent);
+
+    HRESULT RestoreDistribution(_In_ LPCWSTR DistributionName, _In_opt_ LPCWSTR NewName);
+
+    HRESULT EnumerateDeletedDistributions(_Out_ PULONG DistributionCount, _Out_ LXSS_ENUMERATE_INFO** Distributions);
 
     /// <summary>
     /// Queries a distribution's default UID, default environment, and flags.
@@ -853,6 +860,11 @@ private:
     /// Timer to control terminating the Linux utility VM.
     /// </summary>
     wil::unique_threadpool_timer m_vmTerminationTimer;
+
+    // The cleanup timer runs under the user token, never the service identity.
+    wil::unique_handle m_recoveryToken;
+    wil::unique_threadpool_timer m_recoveryTimer;
+    static VOID CALLBACK s_CleanupDeletedDistributions(PTP_CALLBACK_INSTANCE, PVOID Context, PTP_TIMER);
 
     /// <summary>
     /// Signaled when the utility vm is terminating.

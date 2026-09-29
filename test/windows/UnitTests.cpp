@@ -31,6 +31,7 @@ Abstract:
 #include <userenv.h>
 #include <nlohmann/json.hpp>
 #include "Distribution.h"
+#include "DeletedDistributionStore.h"
 #include "WslCoreConfigInterface.h"
 #include "CommandLine.h"
 #include "retryshared.h"
@@ -1908,6 +1909,9 @@ Arguments for managing distributions in Windows Subsystem for Linux:
                 List all distributions, including distributions that are
                 currently being installed or uninstalled.
 
+            --deleted
+                List retained distributions with their recovery IDs.
+
             --running
                 List only distributions that are currently running.
 
@@ -1930,15 +1934,18 @@ Arguments for managing distributions in Windows Subsystem for Linux:
         Terminates the specified distribution.
 
     --unregister <Distro> [Options]
-        Unregisters the distribution and permanently deletes the root filesystem.
+        Unregisters the distribution without prompting.
+        WSL 2 disks can be restored for 24 hours; WSL 1 files are deleted immediately.
+        Retained disks continue to use disk space until cleanup runs.
 
         Options:
-            --interactive
-                Warn and ask for confirmation before deleting the distribution.
-                Requires console input and output.
-
             --force
-                Skip interactive confirmation.
+                Permanently delete the distribution without retaining its disk.
+
+    --restore-distribution <Distro|ID> [--name <NewName>]
+        Restores a retained WSL 2 distribution at its recovery location.
+        Use 'wsl.exe --list --deleted' to find recovery IDs.
+        Use --name if another distribution already has the original name.
 )""";
 
         const std::wstring WslConfigHelpMessage =
@@ -7206,7 +7213,251 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_ARE_EQUAL(err, L"");
     }
 
-    TEST_METHOD(UnregisterConfirmation)
+    TEST_METHOD(UnregisterRecoveryStore)
+    {
+        using Store = wsl::windows::common::DeletedDistributionStore;
+        namespace registry = wsl::windows::common::registry;
+        GUID testId{};
+        VERIFY_SUCCEEDED(CoCreateGuid(&testId));
+        const auto testName = wsl::shared::string::GuidToString<wchar_t>(testId);
+        const auto registryPath = L"Software\\Microsoft\\WSL\\Tests\\Recovery-" + testName;
+        const auto user = registry::OpenCurrentUser();
+        const auto key = registry::CreateKey(user.get(), registryPath.c_str());
+        const auto directory = std::filesystem::temp_directory_path() / (L"wsl-recovery-test-" + testName);
+        std::filesystem::create_directory(directory);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+            registry::DeleteKey(user.get(), registryPath.c_str());
+            std::filesystem::remove_all(directory);
+        });
+        auto keyName = [](const GUID& id) { return wsl::shared::string::GuidToString<wchar_t>(id); };
+        auto create = [&] {
+            GUID id{};
+            VERIFY_SUCCEEDED(CoCreateGuid(&id));
+            const auto name = keyName(id);
+            const auto base = directory / name;
+            std::filesystem::create_directory(base);
+            std::ofstream(base / L"ext4.vhdx", std::ios::binary) << "original disk contents";
+            const auto registration = registry::CreateKey(key.get(), name.c_str());
+            registry::WriteString(registration.get(), nullptr, L"DistributionName", L"recovery-test");
+            registry::WriteString(registration.get(), nullptr, L"BasePath", base.c_str());
+            registry::WriteDword(registration.get(), nullptr, L"State", LxssDistributionStateInstalled);
+            registry::WriteDword(registration.get(), nullptr, L"DefaultUid", 1234);
+            return std::make_pair(id, base / L"ext4.vhdx");
+        };
+        auto entryFor = [&](const GUID& id) {
+            const auto entries = Store::Enumerate(key.get());
+            const auto found = std::find_if(entries.begin(), entries.end(), [&](const auto& e) { return IsEqualGUID(e.Id, id); });
+            VERIFY_IS_TRUE(found != entries.end());
+            return *found;
+        };
+        auto isActive = [&](const GUID& id) {
+            return SUCCEEDED(registry::OpenKeyNoThrow(key.get(), keyName(id).c_str(), KEY_READ).second);
+        };
+        auto contents = [](const auto& path) {
+            std::ifstream file(path, std::ios::binary);
+            return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+        };
+
+        // The old path is free immediately; restoration keeps settings and does not overwrite its replacement.
+        {
+            const auto [id, path] = create();
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            auto entry = entryFor(id);
+            VERIFY_IS_FALSE(isActive(id));
+            VERIFY_IS_FALSE(std::filesystem::exists(path));
+            VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
+            std::ofstream(path) << "replacement";
+            Store::Restore(key.get(), entry, L"restored-test");
+            VERIFY_IS_TRUE(isActive(id));
+            VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
+            const auto registration = registry::OpenKey(key.get(), keyName(id).c_str(), KEY_READ);
+            VERIFY_ARE_EQUAL(registry::ReadString(registration.get(), nullptr, L"DistributionName"), L"restored-test");
+            VERIFY_ARE_EQUAL(registry::ReadDword(registration.get(), nullptr, L"DefaultUid", 0), 1234u);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
+            VERIFY_ARE_EQUAL(contents(path), "replacement");
+        }
+        // Exact expiry boundary, a backwards clock, and missing timestamps.
+        {
+            const auto [id, path] = create();
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            Store::Cleanup(key.get(), entry.DeletedAt - 1);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention - 1);
+            VERIFY_IS_TRUE(std::filesystem::exists(entry.Path));
+            const auto deleted = registry::OpenKey(key.get(), (L"Deleted-" + keyName(id)).c_str(), KEY_READ | KEY_WRITE);
+            registry::DeleteValue(deleted.get(), L"DeletedAt");
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_IS_TRUE(std::filesystem::exists(entry.Path));
+            registry::WriteQword(deleted.get(), nullptr, L"DeletedAt", entry.DeletedAt);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
+            VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
+        }
+        // A busy disk is not silently deleted, and a broken registration stays removable.
+        {
+            const auto [id, path] = create();
+            const wil::unique_hfile held{CreateFileW(path.c_str(), GENERIC_READ, 0, nullptr, OPEN_EXISTING, 0, nullptr)};
+            VERIFY_IS_TRUE(!!held);
+            VERIFY_FAILED(wil::ResultFromException([&] { Store::Retain(key.get(), id, path); }));
+            VERIFY_IS_TRUE(isActive(id));
+            VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
+        }
+        {
+            const auto [id, path] = create();
+            std::filesystem::remove(path);
+            VERIFY_IS_FALSE(Store::Retain(key.get(), id, path));
+            VERIFY_IS_TRUE(isActive(id));
+        }
+        // Replacing a retained file cannot trick cleanup into deleting the replacement.
+        {
+            const auto [id, path] = create();
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            const auto saved = entry.Path.parent_path() / L"saved.vhdx";
+            std::filesystem::rename(entry.Path, saved);
+            std::ofstream(entry.Path) << "unrelated replacement";
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_ARE_EQUAL(contents(entry.Path), "unrelated replacement");
+            VERIFY_FAILED(wil::ResultFromException([&] { Store::Restore(key.get(), entry, L"wrong-file"); }));
+            std::filesystem::remove(entry.Path);
+            // Reparse points are refused, even when they target the original file.
+            VERIFY_WIN32_BOOL_SUCCEEDED(CreateSymbolicLinkW(entry.Path.c_str(), saved.c_str(), SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE));
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_ARE_EQUAL(contents(saved), "original disk contents");
+            std::filesystem::remove(entry.Path);
+            std::filesystem::rename(saved, entry.Path);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
+        }
+        // Startup finishes the journal after a move, before the registration rename committed.
+        {
+            const auto [id, path] = create();
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            VERIFY_ARE_EQUAL(RegRenameKey(key.get(), (L"Deleted-" + keyName(id)).c_str(), keyName(id).c_str()), ERROR_SUCCESS);
+            Store::RecoverPending(key.get());
+            VERIFY_IS_FALSE(isActive(id));
+            VERIFY_ARE_EQUAL(contents(entryFor(id).Path), "original disk contents");
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+        }
+        // Startup leaves the original registration intact when a move never happened.
+        {
+            const auto [id, path] = create();
+            const auto registration = registry::OpenKey(key.get(), keyName(id).c_str(), KEY_READ | KEY_WRITE);
+            registry::WriteString(registration.get(), nullptr, L"RecoveryPath", (directory / L"missing.vhdx").c_str());
+            registry::WriteDword(registration.get(), nullptr, L"State", LxssDistributionStateDeleted);
+            registry::WriteDword(registration.get(), nullptr, L"RecoveryPreviousState", LxssDistributionStateInstalled);
+            Store::RecoverPending(key.get());
+            VERIFY_IS_TRUE(isActive(id));
+            VERIFY_ARE_EQUAL(registry::ReadDword(registration.get(), nullptr, L"State", 0), static_cast<DWORD>(LxssDistributionStateInstalled));
+            VERIFY_IS_FALSE(registry::ReadOptionalString(registration.get(), nullptr, L"RecoveryPath").has_value());
+            VERIFY_ARE_EQUAL(contents(path), "original disk contents");
+        }
+        // A disk manually imported in place is no longer eligible for deletion.
+        {
+            const auto [id, path] = create();
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            const auto [activeId, unusedPath] = create();
+            const auto active = registry::OpenKey(key.get(), keyName(activeId).c_str(), KEY_READ | KEY_WRITE);
+            registry::WriteString(active.get(), nullptr, L"BasePath", entry.Path.parent_path().c_str());
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_IS_TRUE(std::filesystem::exists(entry.Path));
+            registry::DeleteKey(key.get(), keyName(activeId).c_str());
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
+        }
+    }
+
+    TEST_METHOD(UnregisterRecoveryLifecycle)
+    {
+        namespace registry = wsl::windows::common::registry;
+        using Store = wsl::windows::common::DeletedDistributionStore;
+        GUID testId{};
+        VERIFY_SUCCEEDED(CoCreateGuid(&testId));
+        const auto suffix = wsl::shared::string::GuidToString<wchar_t>(testId);
+        const auto name = L"recovery-test-" + suffix.substr(1, suffix.size() - 2);
+        const auto restoredName = name + L"-restored";
+        const auto folder = std::filesystem::temp_directory_path() / name;
+        const auto install = folder / L"install";
+        const auto archive = folder / L"distro.tar";
+        const auto userKey = registry::OpenLxssUserKey();
+        std::filesystem::create_directory(folder);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+            for (const auto& distro : {name, restoredName})
+            {
+                if (GetDistributionId(distro.c_str()).has_value())
+                {
+                    LxsstuLaunchWsl(std::format(L"--unregister {} --force", distro));
+                }
+            }
+            // Only remove tombstones created by this test.
+            for (const auto& entry : Store::Enumerate(userKey.get()))
+            {
+                if (entry.Name == name || entry.Name == restoredName)
+                {
+                    registry::DeleteKey(userKey.get(), (L"Deleted-" + wsl::shared::string::GuidToString<wchar_t>(entry.Id)).c_str());
+                }
+            }
+            std::filesystem::remove_all(folder);
+        });
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--export {} \"{}\"", LXSS_DISTRO_NAME_TEST_L, archive.wstring())), 0u);
+        const auto import =
+            std::format(L"--import {} \"{}\" \"{}\" --version {}", name, install.wstring(), archive.wstring(), LxsstuVmMode() ? 2 : 1);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(import), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} -u root -- sh -c 'echo retained-data > /root/recovery-marker'", name)), 0u);
+        const auto originalId = GetDistributionId(name.c_str());
+        VERIFY_IS_TRUE(originalId.has_value());
+        const auto originalKey = wsl::shared::string::GuidToString<wchar_t>(*originalId);
+        const auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--unregister {}", name));
+        VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
+        VERIFY_ARE_EQUAL(err, L"");
+        VERIFY_IS_FALSE(GetDistributionId(name.c_str()).has_value());
+        if (!LxsstuVmMode())
+        {
+            VERIFY_IS_FALSE(std::filesystem::exists(install / L"rootfs"));
+            const auto entries = Store::Enumerate(userKey.get());
+            VERIFY_IS_TRUE(std::none_of(entries.begin(), entries.end(), [&](const auto& entry) { return entry.Name == name; }));
+            return;
+        }
+        VERIFY_IS_FALSE(std::filesystem::exists(install / L"ext4.vhdx"));
+        // Reuse both name and location immediately, then recover the old disk under a different name.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(import), 0u);
+        auto [list, listErr] = LxsstuLaunchWslAndCaptureOutput(L"--list --deleted");
+        VERIFY_IS_TRUE(list.find(originalKey) != std::wstring::npos);
+        VERIFY_ARE_EQUAL(listErr, L"");
+        VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(std::format(L"--restore-distribution {}", name)), 0u);
+        RestartWslService();
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--restore-distribution {} --name {}", originalKey, restoredName)), 0u);
+        auto [data, dataErr] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -u root -- cat /root/recovery-marker", restoredName));
+        VERIFY_ARE_EQUAL(data, L"retained-data\n");
+        VERIFY_ARE_EQUAL(dataErr, L"");
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} -u root -- test ! -e /root/recovery-marker", name)), 0u);
+        const auto restoredKey = OpenDistributionKey(restoredName.c_str());
+        const auto restoredPath =
+            std::filesystem::path(registry::ReadString(restoredKey.get(), nullptr, L"BasePath")) / L"ext4.vhdx";
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {} --force", restoredName)), 0u);
+        VERIFY_IS_FALSE(std::filesystem::exists(restoredPath));
+
+        // Startup cleanup honors persisted expiry and never touches the newly installed replacement path.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {}", name)), 0u);
+        const auto entries = Store::Enumerate(userKey.get());
+        const auto expired = std::find_if(entries.begin(), entries.end(), [&](const auto& entry) { return entry.Name == name; });
+        VERIFY_IS_TRUE(expired != entries.end());
+        const auto expiredKey = registry::OpenKey(
+            userKey.get(), (L"Deleted-" + wsl::shared::string::GuidToString<wchar_t>(expired->Id)).c_str(), KEY_READ | KEY_WRITE);
+        registry::WriteQword(expiredKey.get(), nullptr, L"DeletedAt", Store::Now() - Store::Retention - 1);
+        std::filesystem::create_directories(install);
+        std::ofstream(install / L"keep.txt") << "must survive";
+        RestartWslService();
+        LxsstuLaunchWslAndCaptureOutput(L"--list --deleted");
+        VERIFY_IS_FALSE(std::filesystem::exists(expired->Path));
+        VERIFY_IS_TRUE(std::filesystem::exists(install / L"keep.txt"));
+        VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(std::format(L"--restore-distribution {}", name)), 0u);
+    }
+
+    TEST_METHOD(UnregisterCompatibility)
     {
         namespace registry = wsl::windows::common::registry;
         using wsl::windows::common::SubProcess;
@@ -7281,88 +7532,6 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             }
         }
 
-        registerDistro(distroName);
-        const auto interactiveCommand = command + L" --interactive";
-        {
-            auto [read, write] = CreateSubprocessPipe(true, false);
-            constexpr char input[] = "yes\n";
-            DWORD written{};
-            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(write.get(), input, sizeof(input) - 1, &written, nullptr));
-            SubProcess process(nullptr, LxssGenerateWslCommandLine(interactiveCommand.c_str()).c_str());
-            process.SetStdHandles(read.get(), nullptr, nullptr);
-            const auto output = process.RunAndCaptureOutput(5000);
-            VERIFY_ARE_EQUAL(output.ExitCode, static_cast<DWORD>(ERROR_CANCELLED));
-            VERIFY_IS_TRUE(output.Stderr.find(L"requires console input and output") != std::wstring::npos);
-            VERIFY_IS_TRUE(GetDistributionId(distroName.c_str()).has_value());
-            DWORD available{};
-            VERIFY_WIN32_BOOL_SUCCEEDED(PeekNamedPipe(read.get(), nullptr, 0, nullptr, &available, nullptr));
-            VERIFY_ARE_EQUAL(available, sizeof(input) - 1);
-        }
-
-        auto runInteractive = [&](std::string_view input) {
-            auto [inputRead, inputWrite] = CreateSubprocessPipe(false, false);
-            auto [outputRead, outputWrite] = CreateSubprocessPipe(false, false);
-            wsl::windows::common::helpers::unique_pseudo_console console;
-            VERIFY_SUCCEEDED(CreatePseudoConsole(COORD{120, 30}, inputRead.get(), outputWrite.get(), 0, console.put()));
-            inputRead.reset();
-            outputWrite.reset();
-
-            wil::unique_event warningDisplayed{wil::EventOptions::ManualReset};
-            auto output = std::async(std::launch::async, [&] {
-                std::string text;
-                char buffer[4096];
-                DWORD read{};
-                while (ReadFile(outputRead.get(), buffer, sizeof(buffer), &read, nullptr) && read != 0)
-                {
-                    text.append(buffer, read);
-                    if (text.find("(default: no):") != std::string::npos)
-                    {
-                        warningDisplayed.SetEvent();
-                    }
-                }
-                return text;
-            });
-            auto closeConsole = wil::scope_exit([&] { console.reset(); });
-            SubProcess process(nullptr, LxssGenerateWslCommandLine(interactiveCommand.c_str()).c_str());
-            process.SetPseudoConsole(console.get());
-            // New process groups initially ignore Ctrl+C. Explicit confirmation must restore cancellation.
-            process.SetFlags(CREATE_NEW_PROCESS_GROUP);
-            const auto handle = process.Start();
-            auto stopProcess = wil::scope_exit([&] {
-                if (WaitForSingleObject(handle.get(), 0) == WAIT_TIMEOUT)
-                {
-                    LOG_IF_WIN32_BOOL_FALSE(TerminateProcess(handle.get(), 1));
-                }
-            });
-
-            VERIFY_ARE_EQUAL(WaitForSingleObject(warningDisplayed.get(), 10000), WAIT_OBJECT_0);
-            VERIFY_IS_TRUE(GetDistributionId(distroName.c_str()).has_value());
-            VERIFY_ARE_EQUAL(WaitForSingleObject(handle.get(), 100), WAIT_TIMEOUT);
-            DWORD written{};
-            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(inputWrite.get(), input.data(), static_cast<DWORD>(input.size()), &written, nullptr));
-            VERIFY_ARE_EQUAL(written, input.size());
-            const auto exitCode = SubProcess::GetExitCode(handle.get(), 10000);
-            console.reset();
-            VERIFY_IS_TRUE(output.get().find("permanently delete") != std::string::npos);
-            return exitCode;
-        };
-
-        for (const auto input : {"\r", "no\r", "y\r", "yes please\r", "\x1a\r"})
-        {
-            VERIFY_ARE_EQUAL(runInteractive(input), static_cast<DWORD>(ERROR_CANCELLED));
-            VERIFY_IS_TRUE(GetDistributionId(distroName.c_str()).has_value());
-        }
-        for (const auto input : {"\x03", "yes\x03"})
-        {
-            VERIFY_ARE_NOT_EQUAL(runInteractive(input), 0u);
-            VERIFY_IS_TRUE(GetDistributionId(distroName.c_str()).has_value());
-        }
-        for (const auto input : {"yes\r", " YES \r"})
-        {
-            VERIFY_ARE_EQUAL(runInteractive(input), 0u);
-            VERIFY_IS_FALSE(GetDistributionId(distroName.c_str()).has_value());
-            registerDistro(distroName);
-        }
     }
 
     // Validate that calling the binfmt interpreter with tty fd's but not controlling terminal doesn't display a warning.

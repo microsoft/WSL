@@ -42,7 +42,8 @@ typedef enum _LxssDistributionState
     LxssDistributionStateUninstalling,
     LxssDistributionStateConverting,
     LxssDistributionStateExporting,
-    LxssDistributionStateCompacting
+    LxssDistributionStateCompacting,
+    LxssDistributionStateDeleted
 } LxssDistributionState;
 
 typedef
@@ -222,6 +223,7 @@ interface ILxssUserSession : IUnknown
 
     HRESULT UnregisterDistribution(
         [in] LPCGUID DistroGuid,
+        [in] BOOL Permanent,
         [in, out] LXSS_ERROR_INFO* Error);
 
     HRESULT ConfigureDistribution(
@@ -261,6 +263,7 @@ interface ILxssUserSession : IUnknown
         [in, out] LXSS_ERROR_INFO* Error);
 
     HRESULT EnumerateDistributions(
+        [in] BOOL Deleted,
         [out] ULONG *DistributionCount,
         [out, size_is(, *DistributionCount)] LXSS_ENUMERATE_INFO **Distributions,
         [in, out] LXSS_ERROR_INFO* Error);
@@ -347,6 +350,11 @@ interface ILxssUserSession : IUnknown
         [in] LPCGUID DistroGuid,
         [in] LPCWSTR DistributionName, 
         [ in, out ] LXSS_ERROR_INFO * Error);
+
+    HRESULT RestoreDistribution(
+        [in] LPCWSTR DistributionName,
+        [in, unique] LPCWSTR NewName,
+        [in, out] LXSS_ERROR_INFO* Error);
 
     HRESULT CompactDistribution(
         [in] LPCGUID DistroGuid,

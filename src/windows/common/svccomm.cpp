@@ -208,13 +208,13 @@ wsl::windows::common::SvcComm::CreateInstanceNoThrow(_In_opt_ LPCGUID DistroGuid
     return m_userSession->CreateInstance(DistroGuid, Flags, Error);
 }
 
-std::vector<LXSS_ENUMERATE_INFO> wsl::windows::common::SvcComm::EnumerateDistributions() const
+std::vector<LXSS_ENUMERATE_INFO> wsl::windows::common::SvcComm::EnumerateDistributions(bool Deleted) const
 {
     ExecutionContext enumerateDistroContext(Context::EnumerateDistros);
     ClientExecutionContext context;
 
     wil::unique_cotaskmem_array_ptr<LXSS_ENUMERATE_INFO> Distributions;
-    THROW_IF_FAILED(m_userSession->EnumerateDistributions(Distributions.size_address<ULONG>(), &Distributions, context.OutError()));
+    THROW_IF_FAILED(m_userSession->EnumerateDistributions(Deleted, Distributions.size_address<ULONG>(), &Distributions, context.OutError()));
 
     std::vector<LXSS_ENUMERATE_INFO> DistributionList;
     for (size_t Index = 0; Index < Distributions.size(); Index += 1)
@@ -723,8 +723,14 @@ void wsl::windows::common::SvcComm::TerminateInstance(_In_opt_ LPCGUID DistroGui
     THROW_IF_FAILED(m_userSession->TerminateDistribution(DistroGuid, context.OutError()));
 }
 
-void wsl::windows::common::SvcComm::UnregisterDistribution(_In_ LPCGUID DistroGuid) const
+void wsl::windows::common::SvcComm::UnregisterDistribution(_In_ LPCGUID DistroGuid, bool Permanent) const
 {
     ClientExecutionContext context;
-    THROW_IF_FAILED(m_userSession->UnregisterDistribution(DistroGuid, context.OutError()));
+    THROW_IF_FAILED(m_userSession->UnregisterDistribution(DistroGuid, Permanent, context.OutError()));
+}
+
+void wsl::windows::common::SvcComm::RestoreDistribution(_In_ LPCWSTR DistributionName, _In_opt_ LPCWSTR NewName) const
+{
+    ClientExecutionContext context;
+    THROW_IF_FAILED(m_userSession->RestoreDistribution(DistributionName, NewName, context.OutError()));
 }

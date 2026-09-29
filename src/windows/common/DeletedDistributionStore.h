@@ -1,0 +1,27 @@
+// Copyright (c) Microsoft. All rights reserved.
+#pragma once
+
+namespace wsl::windows::common {
+
+// Callers serialize operations and impersonate the distribution's owner.
+class DeletedDistributionStore
+{
+public:
+    struct Entry
+    {
+        GUID Id;
+        std::wstring Name;
+        std::filesystem::path Path;
+        ULONG64 DeletedAt;
+    };
+
+    static constexpr ULONG64 Retention = 24ULL * 60 * 60 * 10000000;
+    static ULONG64 Now();
+    static bool Retain(HKEY LxssKey, const GUID& Id, const std::filesystem::path& VhdPath);
+    static std::vector<Entry> Enumerate(HKEY LxssKey);
+    static void Restore(HKEY LxssKey, const Entry& Distribution, LPCWSTR Name);
+    static void RecoverPending(HKEY LxssKey) noexcept;
+    static void Cleanup(HKEY LxssKey, ULONG64 CurrentTime = Now()) noexcept;
+};
+
+} // namespace wsl::windows::common

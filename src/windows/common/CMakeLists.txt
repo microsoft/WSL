@@ -7,6 +7,7 @@ set(SOURCES
     DeviceHostProxy.cpp
     disk.cpp
     Distribution.cpp
+    DeletedDistributionStore.cpp
     Dmesg.cpp
     DnsResolver.cpp
     DnsTunnelingChannel.cpp
@@ -68,6 +69,7 @@ set(SOURCES
     notifications.cpp)
 
 set(HEADERS
+    DeletedDistributionStore.h
     ../../../generated/Localization.h
     APICompat.h
     ../inc/docker_schema.h

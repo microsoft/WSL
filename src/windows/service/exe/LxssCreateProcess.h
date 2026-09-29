@@ -135,6 +135,7 @@ typedef struct _LXSS_DISTRO_CONFIGURATION
     std::wstring Flavor;
     std::wstring OsVersion;
     std::optional<std::wstring> ShortcutPath;
+    std::optional<std::wstring> TerminalProfilePath;
     bool RunOOBE;
 } LXSS_DISTRO_CONFIGURATION, *PLXSS_DISTRO_CONFIGURATION;
 

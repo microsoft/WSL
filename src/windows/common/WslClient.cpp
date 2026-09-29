@@ -18,7 +18,6 @@ Abstract:
 #include "HandleConsoleProgressBar.h"
 #include "Distribution.h"
 #include "CommandLine.h"
-#include "InputChannel.h"
 #include <conio.h>
 #include "WslCoreFilesystem.h"
 
@@ -60,6 +59,7 @@ struct ListOptions
     bool running;
     bool all;
     bool online;
+    bool deleted;
 };
 
 struct ShellExecOptions
@@ -699,6 +699,7 @@ int ListDistributions(_In_ std::wstring_view commandLine)
     ListOptions options{};
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
     parser.AddArgument(options.all, WSL_LIST_ARG_ALL_OPTION);
+    parser.AddArgument(options.deleted, WSL_LIST_ARG_DELETED_OPTION);
     parser.AddArgument(options.running, WSL_LIST_ARG_RUNNING_OPTION);
     parser.AddArgument(options.quiet, WSL_LIST_ARG_QUIET_OPTION_LONG, WSL_LIST_ARG_QUIET_OPTION);
     parser.AddArgument(options.verbose, WSL_LIST_ARG_VERBOSE_OPTION_LONG, WSL_LIST_ARG_VERBOSE_OPTION);
@@ -715,6 +716,24 @@ int ListDistributionsHelper(_In_ ListOptions options)
     THROW_HR_IF(
         WSL_E_INVALID_USAGE,
         ((options.quiet && options.verbose) || (options.all && options.running)) || ((options.verbose || options.all) && options.online));
+
+    if (options.deleted)
+    {
+        THROW_HR_IF(WSL_E_INVALID_USAGE, options.all || options.running || options.online || options.verbose);
+        wsl::windows::common::SvcComm service;
+        for (const auto& distro : service.EnumerateDistributions(true))
+        {
+            if (options.quiet)
+            {
+                wprintf(L"%s\n", distro.DistroName);
+            }
+            else
+            {
+                wprintf(L"%s  %s\n", wsl::shared::string::GuidToString<wchar_t>(distro.DistroGuid).c_str(), distro.DistroName);
+            }
+        }
+        return 0;
+    }
 
     // Query all registered distributions and sort the list so the default
     // (if present) is first.
@@ -1252,37 +1271,13 @@ int Unmount(_In_ const std::wstring& arg)
     return 0;
 }
 
-int UnregisterDistribution(_In_ LPCWSTR distributionName, bool interactive)
+int UnregisterDistribution(_In_ LPCWSTR distributionName, bool permanent)
 {
     wsl::windows::common::SvcComm service;
     const GUID distroGuid = service.GetDistributionId(distributionName, LXSS_GET_DISTRO_ID_LIST_ALL);
 
-    if (interactive)
-    {
-        wsl::windows::wslc::cli::InputChannel input{GetStdHandle(STD_INPUT_HANDLE), stdin};
-        DWORD outputMode{};
-        if (!input.IsInteractive() || !GetConsoleMode(GetStdHandle(STD_ERROR_HANDLE), &outputMode))
-        {
-            wsl::windows::common::wslutil::PrintMessage(Localization::MessageUnregisterRequiresConsole(WSL_UNREGISTER_OPTION_FORCE), stderr);
-            return ERROR_CANCELLED;
-        }
-
-        // A caller may have inherited a policy that ignores Ctrl+C. An explicitly requested prompt must be cancellable.
-        THROW_IF_WIN32_BOOL_FALSE(SetConsoleCtrlHandler(nullptr, FALSE));
-        wsl::windows::common::wslutil::PrintMessage(Localization::MessageUnregisterWarning(distributionName), stderr);
-        wsl::windows::common::wslutil::PrintMessage(Localization::MessageUnregisterConfirmation(), stderr);
-        fflush(stderr);
-
-        const auto answer = input.ReadLine(false);
-        if (!answer || ferror(stdin) || feof(stdin) ||
-            !wsl::shared::string::IsEqual(wsl::shared::string::TrimAscii(std::wstring_view{*answer}), L"yes", true))
-        {
-            return ERROR_CANCELLED;
-        }
-    }
-
     auto progress = wsl::windows::common::ConsoleProgressIndicator(wsl::shared::Localization::MessageStatusUnregistering(), true);
-    service.UnregisterDistribution(&distroGuid);
+    service.UnregisterDistribution(&distroGuid, permanent);
     progress.End();
     wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
     return 0;
@@ -1300,16 +1295,28 @@ int Unregister(_In_ std::wstring_view commandLine)
     }
 
     // Preserve the legacy positional name (including leading hyphens) and ignored trailing arguments.
-    // Only explicitly requested confirmation changes the behavior of an existing unregister command.
-    bool interactive = false;
     bool force = false;
     for (int index = 2; index < argc; index++)
     {
-        interactive |= wsl::shared::string::IsEqual(argv[index], WSL_UNREGISTER_OPTION_INTERACTIVE);
         force |= wsl::shared::string::IsEqual(argv[index], WSL_UNREGISTER_OPTION_FORCE);
     }
 
-    return UnregisterDistribution(argv[1], interactive && !force);
+    return UnregisterDistribution(argv[1], force);
+}
+
+int RestoreDistribution(_In_ std::wstring_view commandLine)
+{
+    std::wstring name;
+    std::optional<std::wstring> newName;
+    ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
+    parser.AddPositionalArgument(name, 0);
+    parser.AddArgument(newName, L"--name");
+    parser.Parse();
+    THROW_HR_IF(WSL_E_INVALID_USAGE, name.empty());
+    wsl::windows::common::SvcComm service;
+    service.RestoreDistribution(name.c_str(), newName ? newName->c_str() : nullptr);
+    wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
+    return 0;
 }
 
 int UpdatePackage(std::wstring_view commandLine)
@@ -1765,6 +1772,10 @@ int WslMain(_In_ std::wstring_view commandLine)
             }
 
             return TerminateDistribution(std::wstring(argument).c_str());
+        }
+        else if (argument == WSL_RESTORE_DISTRIBUTION_ARG)
+        {
+            return RestoreDistribution(commandLine);
         }
         else if (argument == WSL_UNREGISTER_ARG)
         {
