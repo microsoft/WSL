@@ -44,34 +44,6 @@ static std::string LocalUtcOffset()
     }
 }
 
-// Splits into whole seconds and a non-negative fraction, so pre-epoch times round down rather than toward zero.
-static std::pair<std::chrono::sys_seconds, std::chrono::nanoseconds> SplitEpoch(std::int64_t epochSeconds, std::int64_t epochNanoseconds)
-{
-    if (epochNanoseconds == 0)
-    {
-        return {std::chrono::sys_seconds{std::chrono::seconds{epochSeconds}}, std::chrono::nanoseconds::zero()};
-    }
-
-    const std::chrono::sys_time<std::chrono::nanoseconds> time{std::chrono::nanoseconds{epochNanoseconds}};
-    const auto wholeSeconds = std::chrono::floor<std::chrono::seconds>(time);
-    return {wholeSeconds, time - wholeSeconds};
-}
-
-static std::string FormatRfc3339Nano(std::chrono::sys_seconds time, std::chrono::nanoseconds fraction, std::chrono::seconds offset)
-{
-    auto output = std::format("{:%FT%T}.{:09}", time + offset, fraction.count());
-    if (offset == std::chrono::seconds::zero())
-    {
-        output.push_back('Z');
-    }
-    else
-    {
-        output.append(FormatUtcOffset(std::chrono::duration_cast<std::chrono::minutes>(offset)));
-    }
-
-    return output;
-}
-
 std::string wsl::windows::common::timestamp::ExpandToRfc3339(const std::string& timestamp)
 {
     std::string_view value{timestamp};
@@ -342,16 +314,26 @@ std::string wsl::windows::common::timestamp::Rfc3339ToUtcDisplayTime(std::string
     return std::format("{:%F %T}{} +0000 UTC", parsed, fraction);
 }
 
-std::string wsl::windows::common::timestamp::EpochToRfc3339Nano(std::int64_t epochSeconds, std::int64_t epochNanoseconds, std::chrono::seconds offset)
+std::string wsl::windows::common::timestamp::EpochToRfc3339Nano(std::int64_t epochNanoseconds, std::chrono::seconds offset)
 {
-    const auto [time, fraction] = SplitEpoch(epochSeconds, epochNanoseconds);
-    return FormatRfc3339Nano(time, fraction, offset);
+    const std::chrono::sys_time<std::chrono::nanoseconds> time{std::chrono::nanoseconds{epochNanoseconds}};
+
+    // %T prints all nine fractional digits because the time point has nanosecond precision.
+    auto output = std::format("{:%FT%T}", time + offset);
+    if (offset == std::chrono::seconds::zero())
+    {
+        output.push_back('Z');
+    }
+    else
+    {
+        output.append(FormatUtcOffset(std::chrono::duration_cast<std::chrono::minutes>(offset)));
+    }
+
+    return output;
 }
 
-std::string wsl::windows::common::timestamp::EpochToLocalRfc3339Nano(std::int64_t epochSeconds, std::int64_t epochNanoseconds)
+std::string wsl::windows::common::timestamp::EpochToLocalRfc3339Nano(std::int64_t epochNanoseconds)
 {
-    const auto [time, fraction] = SplitEpoch(epochSeconds, epochNanoseconds);
-
     const std::chrono::time_zone* zone;
     try
     {
@@ -361,11 +343,12 @@ std::string wsl::windows::common::timestamp::EpochToLocalRfc3339Nano(std::int64_
     {
         // The time zone database is unavailable, so report UTC rather than failing the caller.
         LOG_CAUGHT_EXCEPTION();
-        return FormatRfc3339Nano(time, fraction, std::chrono::seconds::zero());
+        return EpochToRfc3339Nano(epochNanoseconds, std::chrono::seconds::zero());
     }
 
     // Resolved at the event's own time, so replayed history keeps the offset it had across a DST change.
-    return FormatRfc3339Nano(time, fraction, zone->get_info(time).offset);
+    const std::chrono::sys_time<std::chrono::nanoseconds> time{std::chrono::nanoseconds{epochNanoseconds}};
+    return EpochToRfc3339Nano(epochNanoseconds, zone->get_info(time).offset);
 }
 
 namespace {

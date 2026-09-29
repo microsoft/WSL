@@ -42,10 +42,10 @@ void EventStore::Append(wsl::windows::common::wslc_schema::Event Event)
 {
     std::lock_guard lock(m_lock);
 
-    // Events are recorded in Docker's delivery order, which is also timestamp order. Subscribers rely on
+    // Events are recorded in Docker's delivery order, which is also timestamp order to the second. Subscribers rely on
     // this: they resume from a sequence number, so an out-of-order event could never be inserted where it
     // belongs without hiding it from readers that already moved past that point.
-    WI_ASSERT(m_events.empty() || m_events.back().time <= Event.time);
+    WI_ASSERT(m_events.empty() || m_events.back().timeNano / 1'000'000'000 <= Event.timeNano / 1'000'000'000);
 
     m_events.push_back(std::move(Event));
 
@@ -58,12 +58,7 @@ void EventStore::Append(wsl::windows::common::wslc_schema::Event Event)
     m_updated.notify_all();
 }
 
-void EventStore::Record(
-    std::string&& Type,
-    std::string&& Action,
-    const std::string& ActorId,
-    std::map<std::string, std::string> ActorAttributes,
-    wsl::windows::common::wslc_schema::EventTimestamp Timestamp) noexcept
+void EventStore::Record(std::string&& Type, std::string&& Action, const std::string& ActorId, std::map<std::string, std::string> ActorAttributes, std::int64_t TimeNano) noexcept
 try
 {
     wsl::windows::common::wslc_schema::Event event;
@@ -71,8 +66,7 @@ try
     event.Action = std::move(Action);
     event.Actor.ID = ActorId;
     event.Actor.Attributes = std::move(ActorAttributes);
-    event.time = Timestamp.Time;
-    event.timeNano = Timestamp.TimeNano;
+    event.timeNano = TimeNano;
 
     Append(std::move(event));
 }
@@ -253,7 +247,7 @@ std::optional<wsl::windows::common::wslc_schema::Event> EventStore::Get(
         // so that every parked reader is guaranteed to observe an event before the next write can evict
         // it.
         const auto event = GetLockHeld(SequenceNumber.value()).value();
-        const std::chrono::sys_seconds eventTime{std::chrono::seconds{event.time}};
+        const std::chrono::sys_time<std::chrono::nanoseconds> eventTime{std::chrono::nanoseconds{event.timeNano}};
 
         // Advance in delivery order before applying the time window.
         SequenceNumber.value()++;

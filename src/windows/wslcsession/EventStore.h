@@ -23,12 +23,7 @@ class EventStore
 public:
     static constexpr size_t c_eventRingCapacity = 256;
 
-    void Record(
-        std::string&& Type,
-        std::string&& Action,
-        const std::string& ActorId,
-        std::map<std::string, std::string> ActorAttributes,
-        wsl::windows::common::wslc_schema::EventTimestamp Timestamp) noexcept;
+    void Record(std::string&& Type, std::string&& Action, const std::string& ActorId, std::map<std::string, std::string> ActorAttributes, std::int64_t TimeNano) noexcept;
 
     Microsoft::WRL::ComPtr<IWSLCEventStream> CreateStream(
         Microsoft::WRL::ComPtr<WSLCSession> Session, int64_t SinceTime, int64_t UntilTime, std::map<std::string, std::vector<std::string>> Filters);

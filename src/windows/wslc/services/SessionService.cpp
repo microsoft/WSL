@@ -35,8 +35,8 @@ namespace {
 
     std::string FormatEvent(const wslc_schema::Event& event)
     {
-        auto output = std::format(
-            "{} {} {} {}", timestamp::EpochToLocalRfc3339Nano(event.time, event.timeNano), event.Type, event.Action, event.Actor.ID);
+        auto output =
+            std::format("{} {} {} {}", timestamp::EpochToLocalRfc3339Nano(event.timeNano), event.Type, event.Action, event.Actor.ID);
         if (!event.Actor.Attributes.empty())
         {
             output.append(" (");

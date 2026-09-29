@@ -349,15 +349,11 @@ private:
     // because the container ID isn't known until Docker assigns it.
     void WaitForConflictingCreateToComplete(std::unique_lock<std::mutex>& ContainersLock);
 
-    void OnContainerCreated(const std::string& ContainerId, common::wslc_schema::EventTimestamp Timestamp) noexcept;
+    void OnContainerCreated(const std::string& ContainerId, std::int64_t TimeNano) noexcept;
 
     // Docker network notifications are forwarded to the event store as they arrive; the session's
     // network state is committed independently by the mutators under m_networksLock.
-    void OnNetworkEvent(
-        const std::string& NetworkId,
-        const std::string& Action,
-        const std::map<std::string, std::string>& Attributes,
-        common::wslc_schema::EventTimestamp Timestamp) noexcept;
+    void OnNetworkEvent(const std::string& NetworkId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t TimeNano) noexcept;
 
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
 

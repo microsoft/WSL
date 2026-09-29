@@ -378,21 +378,14 @@ struct EventActor
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(EventActor, ID, Attributes);
 };
 
-struct EventTimestamp
-{
-    std::int64_t Time{};
-    std::int64_t TimeNano{};
-};
-
 struct Event
 {
     std::string Type;
     std::string Action;
     EventActor Actor;
-    std::int64_t time{};
-    std::int64_t timeNano{};
+    std::int64_t timeNano{}; // Nanoseconds since the Unix epoch.
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Event, Type, Action, Actor, time, timeNano);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Event, Type, Action, Actor, timeNano);
 };
 
 } // namespace wsl::windows::common::wslc_schema

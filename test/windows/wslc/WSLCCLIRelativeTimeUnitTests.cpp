@@ -136,14 +136,12 @@ class WSLCCLIRelativeTimeUnitTests
         constexpr std::int64_t c_seconds = 1700000000;
         const auto utc = std::chrono::seconds::zero();
 
-        VERIFY_ARE_EQUAL(std::string{"2023-11-14T22:13:20.123456789Z"}, EpochToRfc3339Nano(c_seconds, c_seconds * 1'000'000'000 + 123456789, utc));
+        VERIFY_ARE_EQUAL(std::string{"2023-11-14T22:13:20.123456789Z"}, EpochToRfc3339Nano(c_seconds * 1'000'000'000 + 123456789, utc));
         VERIFY_ARE_EQUAL(
             std::string{"2023-11-14T15:13:20.123456789-07:00"},
-            EpochToRfc3339Nano(c_seconds, c_seconds * 1'000'000'000 + 123456789, -std::chrono::hours{7}));
-        VERIFY_ARE_EQUAL(std::string{"2023-11-14T22:13:20.100758600Z"}, EpochToRfc3339Nano(c_seconds, c_seconds * 1'000'000'000 + 100758600, utc));
-
-        // When timeNano is absent, the full nine-digit layout is still produced.
-        VERIFY_ARE_EQUAL(std::string{"2023-11-14T22:13:20.000000000Z"}, EpochToRfc3339Nano(c_seconds, 0, utc));
+            EpochToRfc3339Nano(c_seconds * 1'000'000'000 + 123456789, -std::chrono::hours{7}));
+        VERIFY_ARE_EQUAL(std::string{"2023-11-14T22:13:20.100758600Z"}, EpochToRfc3339Nano(c_seconds * 1'000'000'000 + 100758600, utc));
+        VERIFY_ARE_EQUAL(std::string{"2023-11-14T22:13:20.000000000Z"}, EpochToRfc3339Nano(c_seconds * 1'000'000'000, utc));
     }
 };
 

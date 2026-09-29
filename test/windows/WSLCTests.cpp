@@ -7309,8 +7309,8 @@ class WSLCTests
             verifyEvents(lifecycleEvents, id, {"create", "start", "kill", "stop", "destroy"});
 
             // The whole lifecycle falls inside the requested window.
-            VERIFY_IS_TRUE(lifecycleEvents[0].time >= since);
-            VERIFY_IS_TRUE(lifecycleEvents[4].time < until);
+            VERIFY_IS_TRUE(lifecycleEvents[0].timeNano / 1'000'000'000 >= since);
+            VERIFY_IS_TRUE(lifecycleEvents[4].timeNano / 1'000'000'000 < until);
 
             // Each event keeps the exact time Docker reported for it.
             // WSLC records Docker's 'die' as 'stop'; Docker also emits unrecorded events such as 'attach'.
@@ -7319,9 +7319,9 @@ class WSLCTests
                 {"/usr/bin/docker",
                  "events",
                  "--since",
-                 std::to_string(lifecycleEvents.front().time),
+                 std::to_string(lifecycleEvents.front().timeNano / 1'000'000'000),
                  "--until",
-                 std::to_string(lifecycleEvents.back().time + 1),
+                 std::to_string(lifecycleEvents.back().timeNano / 1'000'000'000 + 1),
                  "--filter",
                  "type=container",
                  "--filter",
@@ -7477,7 +7477,7 @@ class WSLCTests
         // bounded queries below read a settled store.
         const auto remainingEvents = ReadEvents(stream.get(), lifecycleActions.size() - lifecycleEvents.size());
         lifecycleEvents.insert(lifecycleEvents.end(), remainingEvents.begin(), remainingEvents.end());
-        const LONGLONG until = lifecycleEvents.back().time + 1;
+        const LONGLONG until = lifecycleEvents.back().timeNano / 1'000'000'000 + 1;
 
         auto eventsMatching = [&](const std::vector<WSLCFilter>& Filters) {
             wil::com_ptr<IWSLCEventStream> replayStream;
@@ -7506,8 +7506,7 @@ class WSLCTests
                 VERIFY_ARE_EQUAL(networkId, event.Actor.ID);
                 VERIFY_ARE_EQUAL(networkName, event.Actor.Attributes.at("name"));
                 VERIFY_ARE_EQUAL(networkDriver, event.Actor.Attributes.at("type"));
-                VERIFY_IS_TRUE(event.timeNano > 0);
-                VERIFY_ARE_EQUAL(event.time, event.timeNano / 1'000'000'000);
+                VERIFY_IS_GREATER_THAN(event.timeNano, 0LL);
             }
 
             // Only the endpoint events name the container that attached to the network.
@@ -7709,7 +7708,7 @@ class WSLCTests
         // The session event store retains create across restart and records destroy after reconnect.
         WSLCFilter filter{"network", networkName.c_str()};
         wil::com_ptr<IWSLCEventStream> replayStream;
-        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, destroyEvents[0].time + 1, &filter, 1, &replayStream));
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, destroyEvents[0].timeNano / 1'000'000'000 + 1, &filter, 1, &replayStream));
         const auto events = DrainEventStream(replayStream.get());
 
         VERIFY_ARE_EQUAL(static_cast<size_t>(2), events.size());
