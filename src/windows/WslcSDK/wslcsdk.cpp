@@ -280,7 +280,7 @@ bool NeedsVirtualMachineServicesInstalled()
     return !wsl::windows::common::wslutil::IsVirtualMachinePlatformInstalled();
 }
 
-#define WSLC_API_MIN_VERSION_SUPPORTED 2, 8, 0
+#define WSLC_API_MIN_VERSION_SUPPORTED 3, 0, 2
 
 bool DoesWslRuntimeVersionSupportWslc(const std::optional<std::tuple<uint32_t, uint32_t, uint32_t>>& version)
 {
@@ -343,7 +343,7 @@ wil::com_ptr<IWSLCCompatSessionManager> CreateSessionManager()
         THROW_WIN32_IF_MSG(
             ERROR_NOT_SUPPORTED,
             currentState == WslRuntimeState::InstalledWithoutWslcSupport,
-            "The currently installed WSL version does not support WSLC.");
+            "The installed WSL version does not support this SDK version.");
         THROW_HR_IF_MSG(
             hr,
             currentState == WslRuntimeState::InstalledWithWslcSupport,
@@ -1741,19 +1741,9 @@ try
     {
         THROW_HR(hr);
     }
-
-    if (SUCCEEDED(hr))
+    else if (CheckWslRuntimeState() != WslRuntimeState::InstalledWithWslcSupport)
     {
-        CLSID proxyStubClsid{};
-        hr = CoGetPSClsid(__uuidof(IWSLCCompatSession2), &proxyStubClsid);
-        if (hr == REGDB_E_IIDNOTREG)
-        {
-            WI_SetFlag(componentCheck, WSLC_COMPONENT_FLAG_WSL_PACKAGE);
-        }
-        else if (FAILED(hr))
-        {
-            THROW_HR(hr);
-        }
+        WI_SetFlag(componentCheck, WSLC_COMPONENT_FLAG_WSL_PACKAGE);
     }
 
     *missingComponents = componentCheck;
