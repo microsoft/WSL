@@ -188,7 +188,7 @@ VmPlatformCapabilities QueryVirtualMachineBackendCapabilities(BackendKind Kind)
         return OpenVmmVirtualMachineBackend::QueryCapabilities();
 
     case BackendKind::Hcs:
-        return {.Backend = BackendKind::Hcs};
+        return HcsVirtualMachineBackend::QueryCapabilities();
     }
 
     THROW_HR(E_INVALIDARG);

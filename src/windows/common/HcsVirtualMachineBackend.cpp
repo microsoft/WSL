@@ -57,7 +57,7 @@ VmEffectiveProcessor ConfigureProcessor(const VmProcessorRequest& Request, schem
 VmEffectiveMemory ConfigureMemory(const VmMemoryRequest& Request, schema::Memory& Settings)
 {
     VmEffectiveMemory memory{};
-    memory.SizeBytes = Request.SizeBytes;
+    memory.SizeBytes = (Request.SizeBytes / c_mib) * c_mib;
     memory.AllowOvercommit = validation::ValidateFeature(Request.AllowOvercommit, L"memory overcommit", true);
     memory.DeferredCommit = validation::ValidateFeature(Request.DeferredCommit, L"deferred memory commit", true);
     memory.ColdDiscard = validation::ValidateFeature(Request.ColdDiscard, L"cold discard", true);
@@ -144,10 +144,17 @@ HcsVirtualMachineBackend::HcsVirtualMachineBackend() = default;
 
 HcsVirtualMachineBackend::~HcsVirtualMachineBackend() noexcept
 {
+    schema::unique_hcs_system system;
+    std::map<std::uint64_t, AttachedDisk> attachedDisks;
     {
         auto lock = m_lock.lock_exclusive();
-        m_system.reset();
+        system = std::move(m_system);
+        attachedDisks = std::move(m_attachedDisks);
+        CloseGuestListenersLocked(m_configuration.Description.Identity);
     }
+
+    system.reset();
+    CleanupAttachedDisks(std::move(attachedDisks));
 
     auto exitDetailsLock = m_exitDetailsLock.lock_shared();
     WSL_LOG(
@@ -228,7 +235,47 @@ void HcsVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
 
 VmPlatformCapabilities HcsVirtualMachineBackend::GetCapabilities() const
 {
-    return {.Backend = BackendKind::Hcs};
+    return QueryCapabilities();
+}
+
+VmPlatformCapabilities HcsVirtualMachineBackend::QueryCapabilities()
+{
+    VmPlatformCapabilities capabilities{};
+    capabilities.Backend = BackendKind::Hcs;
+    for (const auto operation :
+         {VmOperation::Create,
+          VmOperation::Start,
+          VmOperation::Terminate,
+          VmOperation::CreateGuestListener,
+          VmOperation::AcceptGuestConnection,
+          VmOperation::ConnectGuest,
+          VmOperation::CloseGuestListener,
+          VmOperation::AttachDisk,
+          VmOperation::DetachDisk})
+    {
+        capabilities.Operations.set(static_cast<size_t>(operation));
+    }
+
+    for (const auto feature :
+         {VmFeature::LinuxFirmwareBoot, VmFeature::MemoryOvercommit, VmFeature::DeferredMemoryCommit, VmFeature::ColdDiscard, VmFeature::Vhd, VmFeature::Vhdx, VmFeature::PhysicalDisk})
+    {
+        capabilities.Features.set(static_cast<size_t>(feature));
+    }
+
+    if constexpr (!wsl::shared::Arm64)
+    {
+        capabilities.Features.set(static_cast<size_t>(VmFeature::LinuxDirectBoot));
+    }
+
+    if (schema::IsNestedVirtualizationSupported())
+    {
+        capabilities.Features.set(static_cast<size_t>(VmFeature::NestedVirtualization));
+    }
+
+    const auto [perfmonPmuSupported, perfmonLbrSupported] = schema::GetPerfmonCapabilities();
+    capabilities.Features.set(static_cast<size_t>(VmFeature::PerfmonPmu), perfmonPmuSupported);
+    capabilities.Features.set(static_cast<size_t>(VmFeature::PerfmonLbr), perfmonLbrSupported);
+    return capabilities;
 }
 
 VmDescription HcsVirtualMachineBackend::GetDescription() const
@@ -254,13 +301,24 @@ void HcsVirtualMachineBackend::Start()
 
 void HcsVirtualMachineBackend::Terminate()
 {
-    auto lock = m_lock.lock_exclusive();
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
-    schema::TerminateComputeSystem(m_system.get());
-    m_system.reset();
-    CloseGuestListenersLocked(m_configuration.Description.Identity);
-    // A system terminated before Start may not send an exit notification.
-    m_terminatingEvent.SetEvent();
+    schema::unique_hcs_system system;
+    std::map<std::uint64_t, AttachedDisk> attachedDisks;
+    {
+        auto lock = m_lock.lock_exclusive();
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
+        system = std::move(m_system);
+        attachedDisks = std::move(m_attachedDisks);
+        CloseGuestListenersLocked(m_configuration.Description.Identity);
+    }
+
+    auto cleanup = wil::scope_exit([&] {
+        system.reset();
+        CleanupAttachedDisks(std::move(attachedDisks));
+        m_terminatingEvent.SetEvent();
+        NotifyTerminated(m_configuration.Description.Identity);
+    });
+
+    schema::TerminateComputeSystem(system.get());
 }
 
 std::shared_ptr<VmGuestListenerState> HcsVirtualMachineBackend::ConfigureGuestListener(const VmGuestListener& Listener)
@@ -335,8 +393,33 @@ std::map<std::uint64_t, HcsVirtualMachineBackend::AttachedDisk>::iterator HcsVir
     bool PassThrough, const std::wstring& Path)
 {
     return std::find_if(m_attachedDisks.begin(), m_attachedDisks.end(), [&](const auto& entry) {
-        return entry.second.PassThrough == PassThrough && entry.second.Path == Path;
+        return entry.second.PassThrough == PassThrough && wsl::windows::common::string::IsPathComponentEqual(entry.second.Path, Path);
     });
+}
+
+void HcsVirtualMachineBackend::CleanupAttachedDisks(std::map<std::uint64_t, AttachedDisk>&& Disks) noexcept
+{
+    for (const auto& entry : Disks)
+    {
+        const auto& disk = entry.second;
+        if (WI_IsFlagSet(disk.Flags, wsl::windows::common::disk::DiskStateFlags::AccessGranted))
+        {
+            try
+            {
+                schema::RevokeVmAccess(m_vmIdString.c_str(), disk.Path.c_str());
+            }
+            CATCH_LOG()
+        }
+
+        if (WI_IsFlagSet(disk.Flags, wsl::windows::common::disk::DiskStateFlags::Online))
+        {
+            try
+            {
+                wsl::windows::common::disk::BringOnline(disk.Path.c_str(), static_cast<size_t>(disk.DeviceTimeout.count()));
+            }
+            CATCH_LOG()
+        }
+    }
 }
 
 VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Request)

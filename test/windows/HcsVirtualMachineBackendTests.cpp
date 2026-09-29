@@ -10,6 +10,7 @@ using namespace VirtualMachineBackendTestHelpers;
 namespace {
 
 constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+constexpr HRESULT c_invalidState = HRESULT_FROM_WIN32(ERROR_INVALID_STATE);
 
 std::filesystem::path CreateTestDirectory()
 {
@@ -50,6 +51,15 @@ VmDiskRequest CreateDiskRequest(const std::filesystem::path& Path, std::optional
     return request;
 }
 
+std::filesystem::path ChangePathCase(const std::filesystem::path& Path)
+{
+    auto value = Path.native();
+    std::transform(value.begin(), value.end(), value.begin(), [](wchar_t Character) {
+        return static_cast<wchar_t>(std::towupper(Character));
+    });
+    return value;
+}
+
 } // namespace
 
 namespace HcsVirtualMachineBackendTests {
@@ -63,13 +73,14 @@ class HcsVirtualMachineBackendTests
         SKIP_TEST_ARM64();
         auto request = CreateRunnableRequest();
         request.Boot.KernelCommandLine = L"panic=-1 console=hvc0 custom=value";
+        request.Memory.SizeBytes += 123;
         auto backend = HcsVirtualMachineBackend::Create(request);
         const auto description = backend->GetDescription();
 
         VERIFY_IS_TRUE(IsEqualGUID(request.Identity.VmId, description.Identity.VmId));
         VERIFY_ARE_EQUAL(BackendKind::Hcs, description.Backend);
         VERIFY_ARE_EQUAL(request.Processor.Count, description.Processor.Count);
-        VERIFY_ARE_EQUAL(request.Memory.SizeBytes, description.Memory.SizeBytes);
+        VERIFY_ARE_EQUAL((request.Memory.SizeBytes / c_mib) * c_mib, description.Memory.SizeBytes);
         VERIFY_ARE_EQUAL(VmBootMethod::LinuxDirect, description.Boot.Method);
         VERIFY_ARE_EQUAL(request.Boot.KernelCommandLine, description.Boot.KernelCommandLine);
         VERIFY_ARE_EQUAL(BackendKind::Hcs, backend->GetCapabilities().Backend);
@@ -110,6 +121,9 @@ class HcsVirtualMachineBackendTests
         const auto duplicate = backend->AttachDisk(CreateDiskRequest(automaticPath, 3));
         VERIFY_ARE_EQUAL(automatic.Id.Value, duplicate.Id.Value);
         VERIFY_ARE_EQUAL(automatic.GuestAddress.Lun, duplicate.GuestAddress.Lun);
+        const auto differentlyCased = backend->AttachDisk(CreateDiskRequest(ChangePathCase(automaticPath)));
+        VERIFY_ARE_EQUAL(automatic.Id.Value, differentlyCased.Id.Value);
+        VERIFY_ARE_EQUAL(automatic.GuestAddress.Lun, differentlyCased.GuestAddress.Lun);
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] {
                              backend->AttachDisk(CreateDiskRequest(invalidPath, exact.GuestAddress.Lun));
                          }));
@@ -160,6 +174,52 @@ class HcsVirtualMachineBackendTests
         secondBackend->DetachDisk(second.Id);
         firstBackend->Terminate();
         secondBackend->Terminate();
+    }
+
+    TEST_METHOD(RejectsUnsupportedCreationResources)
+    {
+        auto request = CreateRunnableRequest();
+        request.BootDisks.push_back({});
+        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { HcsVirtualMachineBackend::Create(request); }));
+
+        request.BootDisks.clear();
+        request.Consoles.push_back({});
+        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { HcsVirtualMachineBackend::Create(request); }));
+
+        request.Consoles.clear();
+        request.NetworkAdapters.push_back({});
+        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { HcsVirtualMachineBackend::Create(request); }));
+    }
+
+    TEST_METHOD(NotifiesTerminationCallbacksWithoutHoldingBackendLock)
+    {
+        SKIP_TEST_ARM64();
+        auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        wil::unique_event callbackEvent{wil::EventOptions::ManualReset};
+        GUID callbackVmId{};
+        HRESULT callbackResult = S_OK;
+        backend->RegisterTerminationCallback([&](GUID VmId) {
+            callbackVmId = VmId;
+            callbackResult = OperationResult([&] { backend->ConnectGuest({}); });
+            callbackEvent.SetEvent();
+        });
+
+        backend->Terminate();
+        VERIFY_IS_TRUE(callbackEvent.wait(30 * 1000));
+        VERIFY_IS_TRUE(IsEqualGUID(backend->GetDescription().Identity.VmId, callbackVmId));
+        VERIFY_ARE_EQUAL(c_invalidState, callbackResult);
+
+        auto lateBackend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        lateBackend->Terminate();
+        wil::unique_event lateCallbackEvent{wil::EventOptions::ManualReset};
+        GUID lateCallbackVmId{};
+        lateBackend->RegisterTerminationCallback([&](GUID VmId) {
+            lateCallbackVmId = VmId;
+            lateCallbackEvent.SetEvent();
+        });
+
+        VERIFY_IS_TRUE(lateCallbackEvent.wait(30 * 1000));
+        VERIFY_IS_TRUE(IsEqualGUID(lateBackend->GetDescription().Identity.VmId, lateCallbackVmId));
     }
 
     TEST_METHOD(RejectsUnsupportedResourceOperations)

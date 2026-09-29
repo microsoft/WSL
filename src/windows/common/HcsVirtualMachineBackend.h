@@ -23,6 +23,7 @@ public:
     ~HcsVirtualMachineBackend() noexcept override;
 
     static std::unique_ptr<HcsVirtualMachineBackend> Create(const VmCreateRequest& Request);
+    static VmPlatformCapabilities QueryCapabilities();
 
     VmPlatformCapabilities GetCapabilities() const override;
     VmDescription GetDescription() const override;
@@ -71,6 +72,7 @@ private:
     static void CALLBACK OnSystemEvent(HCS_EVENT* Event, void* Context) noexcept;
     void OnCrash(PCWSTR Details);
     void OnExit(PCWSTR ExitDetails);
+    void CleanupAttachedDisks(std::map<std::uint64_t, AttachedDisk>&& Disks) noexcept;
     std::shared_ptr<VmGuestListenerState> ConfigureGuestListener(const VmGuestListener& Listener) override;
 
     _Requires_lock_held_(m_lock)
@@ -82,7 +84,6 @@ private:
     NON_COPYABLE(HcsVirtualMachineBackend);
     NON_MOVABLE(HcsVirtualMachineBackend);
 
-    wil::srwlock m_lock;
     VmConfiguration m_configuration;
     std::wstring m_vmIdString;
     wil::unique_event m_terminatingEvent{wil::EventOptions::ManualReset};
