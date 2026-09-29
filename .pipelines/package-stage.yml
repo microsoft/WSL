@@ -9,7 +9,7 @@ parameters:
       - Microsoft.WSL.PluginApi.nuspec
 
   - name: pool
-    type: string
+    type: object
     default: ''
 
   - name: esrp
