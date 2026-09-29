@@ -589,7 +589,8 @@ try
     const auto key = s_OpenLxssUserKey(token.get());
     std::lock_guard lock(m_instanceLock);
     const auto entries = [&] {
-        auto impersonate = wil::impersonate_token(token.get());
+        THROW_HR_IF_NULL(E_UNEXPECTED, m_recoveryToken.get());
+        auto impersonate = wil::impersonate_token(m_recoveryToken.get());
         DeletedDistributionStore::RecoverPending(key.get());
         DeletedDistributionStore::Cleanup(key.get());
         return DeletedDistributionStore::Enumerate(key.get());
@@ -628,7 +629,8 @@ try
     const auto key = s_OpenLxssUserKey(token.get());
     std::lock_guard lock(m_instanceLock);
     const auto entries = [&] {
-        auto impersonate = wil::impersonate_token(token.get());
+        THROW_HR_IF_NULL(E_UNEXPECTED, m_recoveryToken.get());
+        auto impersonate = wil::impersonate_token(m_recoveryToken.get());
         DeletedDistributionStore::RecoverPending(key.get());
         DeletedDistributionStore::Cleanup(key.get());
         return DeletedDistributionStore::Enumerate(key.get());
@@ -693,8 +695,22 @@ LxssUserSessionImpl::LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId
             wsl::windows::common::registry::DeleteKeyValue(lxssKey.get(), LXSS_LEGACY_INSTALL_VALUE);
         }
 
+        // Never retain an elevated caller's authority for later unattended deletion.
+        HANDLE cleanupToken = userToken.get();
+        TOKEN_ELEVATION_TYPE elevationType{};
+        DWORD tokenSize{};
+        THROW_IF_WIN32_BOOL_FALSE(GetTokenInformation(cleanupToken, TokenElevationType, &elevationType, sizeof(elevationType), &tokenSize));
+        wil::unique_token_linked_token linkedToken;
+        if (elevationType == TokenElevationTypeFull)
+        {
+            THROW_IF_FAILED(wil::get_token_information_nothrow(linkedToken, cleanupToken));
+            cleanupToken = linkedToken.LinkedToken;
+        }
+        wil::unique_handle impersonationToken;
         THROW_IF_WIN32_BOOL_FALSE(
-            DuplicateTokenEx(userToken.get(), MAXIMUM_ALLOWED, nullptr, SecurityImpersonation, TokenImpersonation, &m_recoveryToken));
+            DuplicateTokenEx(cleanupToken, MAXIMUM_ALLOWED, nullptr, SecurityImpersonation, TokenImpersonation, &impersonationToken));
+        THROW_IF_WIN32_BOOL_FALSE(
+            ::CreateRestrictedToken(impersonationToken.get(), DISABLE_MAX_PRIVILEGE, 0, nullptr, 0, nullptr, 0, nullptr, &m_recoveryToken));
         {
             auto impersonate = wil::impersonate_token(m_recoveryToken.get());
             wsl::windows::common::DeletedDistributionStore::RecoverPending(lxssKey.get());

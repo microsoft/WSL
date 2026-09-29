@@ -263,10 +263,13 @@ public:
     IFACEMETHOD(TerminateDistribution)(_In_opt_ LPCGUID DistroGuid, _Out_ LXSS_ERROR_INFO* Error) override;
 
     /// <summary>
-    /// Unregisters a distribution.
+    /// Restores a retained WSL 2 distribution.
     /// </summary>
     IFACEMETHOD(RestoreDistribution)(_In_ LPCWSTR DistributionName, _In_opt_ LPCWSTR NewName, _Out_ LXSS_ERROR_INFO* Error) override;
 
+    /// <summary>
+    /// Unregisters a distribution, retaining its disk unless Permanent is specified.
+    /// </summary>
     IFACEMETHOD(UnregisterDistribution)(_In_ LPCGUID DistroGuid, _In_ BOOL Permanent, _Out_ LXSS_ERROR_INFO* Error) override;
 
     // IWslSupport methods.
