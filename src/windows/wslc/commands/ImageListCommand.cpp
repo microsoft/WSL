@@ -50,10 +50,10 @@ std::wstring ImageListCommand::LongDescription() const
 
 void ImageListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context               //
-        << ResolveSession //
-        << GetImages      //
-        << ListImages     //
-        << PrintTable;
+    context                  //
+        << ResolveSession    //
+        << GetImages         //
+        << FormatImageOutput //
+        << PrintFormattedOutput;
 }
 } // namespace wsl::windows::wslc

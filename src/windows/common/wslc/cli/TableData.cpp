@@ -89,23 +89,36 @@ std::wstring Cell::RenderTruncated(size_t maxWidth, bool vtEnabled, bool colorEn
 
 TableData::TableData(std::initializer_list<std::wstring_view> headers)
 {
-    Columns.reserve(headers.size());
+    m_columns.reserve(headers.size());
     for (const auto& header : headers)
     {
-        Columns.emplace_back(ColumnDefinition{std::wstring{header}, {}});
+        m_columns.emplace_back(ColumnDefinition{std::wstring{header}, {}});
     }
+}
+
+TableData& TableData::AddColumn(std::wstring name, ColumnWidthConfig config)
+{
+    THROW_HR_IF(E_ILLEGAL_METHOD_CALL, !m_rows.empty());
+
+    m_columns.emplace_back(ColumnDefinition{std::move(name), m_truncate ? config : ColumnWidthConfig{}});
+    return *this;
 }
 
 void TableData::AddRow(std::vector<Cell> cells)
 {
-    THROW_HR_IF(E_INVALIDARG, cells.size() != Columns.size());
-
-    Rows.emplace_back(Row{std::move(cells), false});
+    AddRow(Row{std::move(cells), false});
 }
 
-void TableData::AddLine(Cell cell)
+void TableData::AddRow(Row row)
 {
-    Rows.emplace_back(Row{std::vector<Cell>{std::move(cell)}, true});
+    THROW_HR_IF(E_INVALIDARG, row.Spanning || row.Cells.size() != m_columns.size());
+
+    m_rows.emplace_back(std::move(row));
+}
+
+void TableData::AddSpanningRow(Cell cell)
+{
+    m_rows.emplace_back(Row{std::vector<Cell>{std::move(cell)}, true});
 }
 
 namespace details {

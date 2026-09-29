@@ -18,7 +18,7 @@ Abstract:
 #include "VolumeModel.h"
 #include "VolumeService.h"
 #include "VolumeTasks.h"
-#include "TableRenderer.h"
+#include "TableData.h"
 #include <wslc_schema.h>
 
 using namespace wsl::shared;
@@ -191,37 +191,40 @@ void InspectVolumes(CLIExecutionContext& context)
     context.Terminal.Output(L"{}\n", MultiByteToWide(json));
 }
 
-void ListVolumes(CLIExecutionContext& context)
+void FormatVolumeOutput(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Volumes));
     auto& volumes = context.Data.Get<Data::Volumes>();
+    const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
 
     if (context.Args.GetValue<ArgType::Quiet>())
     {
+        TableData table{Localization::WSLCCLI_TableHeaderVolumeName()};
+        table.ShowHeader = false;
+        table.Reserve(volumes.size());
+
         for (const auto& volume : volumes)
         {
-            context.Terminal.Output(L"{}\n", MultiByteToWide(volume.Name));
+            table.AddRow({MultiByteToWide(volume.Name)});
         }
 
-        return;
+        context.Data.Add<Data::Table>(std::move(table));
     }
-
-    const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
-
-    switch (format)
+    else if (format == FormatType::Json)
     {
-    case FormatType::Json:
-    {
+        std::vector<std::wstring> json;
+        json.reserve(volumes.size());
+
         for (const auto& volume : volumes)
         {
-            context.Terminal.Output(L"{}\n", ToJsonW(ToVolumeOutput(volume), c_jsonCompactIndent));
+            json.push_back(ToJsonW(ToVolumeOutput(volume), c_jsonCompactIndent));
         }
 
-        break;
+        context.Data.Add<Data::Json>(std::move(json));
     }
-    case FormatType::Table:
+    else if (format == FormatType::Table)
     {
-        wsl::windows::cli::table::TableData table{Localization::WSLCCLI_TableHeaderDriver(), Localization::WSLCCLI_TableHeaderVolumeName()};
+        TableData table{Localization::WSLCCLI_TableHeaderDriver(), Localization::WSLCCLI_TableHeaderVolumeName()};
         table.Reserve(volumes.size());
 
         for (const auto& volume : volumes)
@@ -233,9 +236,9 @@ void ListVolumes(CLIExecutionContext& context)
         }
 
         context.Data.Add<Data::Table>(std::move(table));
-        break;
     }
-    default:
+    else
+    {
         THROW_HR(E_UNEXPECTED);
     }
 }

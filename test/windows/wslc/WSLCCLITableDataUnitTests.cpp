@@ -80,15 +80,14 @@ class WSLCCLITableDataUnitTests
         VERIFY_ARE_EQUAL(static_cast<size_t>(7), layout.ColumnWidths[1]);
     }
 
-    TEST_METHOD(TableRenderer_Layout_ConsoleWidthOverrideTakesPrecedence)
+    TEST_METHOD(TableRenderer_Layout_ConsoleWidthConstrainsColumns)
     {
         TableData table({L"NAME", L"STATUS"});
         table.MinCellWidth = 0;
-        table.Columns[0].Config = {.Overflow = ColumnOverflow::Shrink};
+        table.ColumnConfig(0) = {.Overflow = ColumnOverflow::Shrink};
         table.AddRow({L"a-very-long-container-name", L"running"});
-        table.ConsoleWidthOverride = 20;
 
-        const auto layout = TableRenderer::Layout(table, LayoutOptions{.ConsoleWidth = 120});
+        const auto layout = TableRenderer::Layout(table, LayoutOptions{.ConsoleWidth = 20});
 
         VERIFY_ARE_EQUAL(static_cast<size_t>(10), layout.ColumnWidths[0]);
         VERIFY_IS_TRUE(layout.Lines[1].size() <= 20);
@@ -284,7 +283,7 @@ class WSLCCLITableDataUnitTests
         configs[1].PreferredShrink = true;
 
         TableCapture cap(std::vector<ColumnDefinition>{{L"ID", configs[0]}, {L"DESCRIPTION", configs[1]}});
-        cap.table.ConsoleWidthOverride = 20;
+        cap.consoleWidth = 20;
 
         cap.table.AddRow({L"abc123", L"this-is-a-long-description-value"});
         cap.Render();
@@ -705,7 +704,7 @@ class WSLCCLITableDataUnitTests
     {
         TableCapture cap({L"", L""});
         cap.table.ShowHeader = false;
-        cap.table.Columns[1].Config = ColumnWidthConfig{
+        cap.table.ColumnConfig(1) = ColumnWidthConfig{
             .MaxWidth = 8,
             .Overflow = ColumnOverflow::Wrap,
         };
@@ -716,6 +715,52 @@ class WSLCCLITableDataUnitTests
         VERIFY_ARE_EQUAL(static_cast<size_t>(2), cap.lines().size());
         VERIFY_ARE_EQUAL(std::wstring{L"opt   hello"}, cap.lines()[0]);
         VERIFY_ARE_EQUAL(std::wstring{L"      world"}, cap.lines()[1]);
+    }
+
+    TEST_METHOD(TableData_AddRow_RejectsCellCountMismatch)
+    {
+        TableData table({L"NAME", L"STATUS"});
+
+        std::vector<Cell> tooFew{L"my-container"};
+        VERIFY_THROWS_SPECIFIC(table.AddRow(tooFew), wil::ResultException, [](const wil::ResultException& e) {
+            return e.GetErrorCode() == E_INVALIDARG;
+        });
+
+        std::vector<Cell> tooMany{L"my-container", L"running", L"extra"};
+        VERIFY_THROWS_SPECIFIC(table.AddRow(tooMany), wil::ResultException, [](const wil::ResultException& e) {
+            return e.GetErrorCode() == E_INVALIDARG;
+        });
+
+        VERIFY_IS_TRUE(table.IsEmpty());
+    }
+
+    TEST_METHOD(TableData_AddRow_RejectsPartiallyBuiltRow)
+    {
+        TableData table({L"NAME", L"STATUS"});
+
+        Row row;
+        row.AddCell(L"my-container").AddCellIf(false, L"running");
+
+        VERIFY_THROWS_SPECIFIC(table.AddRow(std::move(row)), wil::ResultException, [](const wil::ResultException& e) {
+            return e.GetErrorCode() == E_INVALIDARG;
+        });
+
+        VERIFY_IS_TRUE(table.IsEmpty());
+    }
+
+    TEST_METHOD(TableData_AddColumn_RejectsColumnAfterFirstRow)
+    {
+        TableData table;
+        table.AddColumn(L"NAME").AddColumn(L"STATUS");
+
+        std::vector<Cell> cells{L"my-container", L"running"};
+        table.AddRow(cells);
+
+        VERIFY_THROWS_SPECIFIC(table.AddColumn(L"SIZE"), wil::ResultException, [](const wil::ResultException& e) {
+            return e.GetErrorCode() == E_ILLEGAL_METHOD_CALL;
+        });
+
+        VERIFY_ARE_EQUAL(static_cast<size_t>(2), table.ColumnCount());
     }
 
     TEST_METHOD(Cell_VisibleWidth_PlainText)
@@ -1011,13 +1056,13 @@ class WSLCCLITableDataUnitTests
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, line.find(L'\u2026'));
     }
 
-    TEST_METHOD(TableData_AddLine_BlankLineEmittedBetweenRows)
+    TEST_METHOD(TableData_AddSpanningRow_BlankLineEmittedBetweenRows)
     {
         TableCapture cap({L"", L""});
         cap.table.ShowHeader = false;
 
         cap.table.AddRow({L"row-a", L"val-a"});
-        cap.table.AddLine();
+        cap.table.AddSpanningRow();
         cap.table.AddRow({L"row-b", L"val-b"});
         cap.Render();
 
@@ -1029,13 +1074,13 @@ class WSLCCLITableDataUnitTests
         VERIFY_IS_TRUE(lines[2].find(L"row-b") != std::wstring::npos);
     }
 
-    TEST_METHOD(TableData_AddLine_SectionHeaderEmittedBetweenRows)
+    TEST_METHOD(TableData_AddSpanningRow_SectionHeaderEmittedBetweenRows)
     {
         TableCapture cap({L"", L""});
         cap.table.ShowHeader = false;
 
         cap.table.AddRow({L"opt-a", L"desc-a"});
-        cap.table.AddLine(Cell{L"Global Options:"});
+        cap.table.AddSpanningRow(Cell{L"Global Options:"});
         cap.table.AddRow({L"opt-b", L"desc-b"});
         cap.Render();
 
@@ -1046,7 +1091,7 @@ class WSLCCLITableDataUnitTests
         VERIFY_IS_TRUE(lines[2].find(L"opt-b") != std::wstring::npos);
     }
 
-    TEST_METHOD(TableData_AddLine_DoesNotAffectColumnWidths)
+    TEST_METHOD(TableData_AddSpanningRow_DoesNotAffectColumnWidths)
     {
         // The break text is longer than any data cell; column widths should
         // be driven only by data rows, not breaks.
@@ -1054,7 +1099,7 @@ class WSLCCLITableDataUnitTests
         cap.table.ShowHeader = false;
 
         cap.table.AddRow({L"ab", L"cd"});
-        cap.table.AddLine(Cell{L"This is a very long section header that should not widen columns"});
+        cap.table.AddSpanningRow(Cell{L"This is a very long section header that should not widen columns"});
         cap.table.AddRow({L"ef", L"gh"});
         cap.Render();
 
@@ -1064,16 +1109,16 @@ class WSLCCLITableDataUnitTests
         VERIFY_ARE_EQUAL(lines[0].size(), lines[2].size());
     }
 
-    TEST_METHOD(TableData_AddLine_SharedColumnWidthsAcrossSections)
+    TEST_METHOD(TableData_AddSpanningRow_SharedColumnWidthsAcrossSections)
     {
         // Data rows in different sections share column widths because they
         // are sized together within a single table instance.
         TableCapture cap({L"", L""});
         cap.table.ShowHeader = false;
 
-        cap.table.AddLine(Cell{L"Section A:"});
+        cap.table.AddSpanningRow(Cell{L"Section A:"});
         cap.table.AddRow({L"short", L"x"});
-        cap.table.AddLine(Cell{L"Section B:"});
+        cap.table.AddSpanningRow(Cell{L"Section B:"});
         cap.table.AddRow({L"much-longer-name", L"y"});
         cap.Render();
 
@@ -1086,13 +1131,13 @@ class WSLCCLITableDataUnitTests
         VERIFY_ARE_EQUAL(lines[1].size(), lines[3].size());
     }
 
-    TEST_METHOD(TableData_AddLine_CellRendersSequences)
+    TEST_METHOD(TableData_AddSpanningRow_CellRendersSequences)
     {
         using namespace wsl::windows::common::vt;
         TableCapture cap(std::vector<ColumnDefinition>{{L"", {}}, {L"", {}}}, true);
         cap.table.ShowHeader = false;
 
-        cap.table.AddLine(Cell{L"Options:", Format::Bright});
+        cap.table.AddSpanningRow(Cell{L"Options:", Format::Bright});
         cap.table.AddRow({L"name", L"desc"});
         cap.Render();
 
@@ -1103,13 +1148,13 @@ class WSLCCLITableDataUnitTests
         VERIFY_IS_TRUE(lines[0].find(L"Options:") != std::wstring::npos);
     }
 
-    TEST_METHOD(TableData_AddLine_CellStrippedWhenVTDisabled)
+    TEST_METHOD(TableData_AddSpanningRow_CellStrippedWhenVTDisabled)
     {
         using namespace wsl::windows::common::vt;
         TableCapture cap({L"", L""});
         cap.table.ShowHeader = false;
 
-        cap.table.AddLine(Cell{L"Options:", Format::Bright});
+        cap.table.AddSpanningRow(Cell{L"Options:", Format::Bright});
         cap.table.AddRow({L"name", L"desc"});
         cap.Render();
 

@@ -46,9 +46,9 @@ std::wstring VolumeListCommand::LongDescription() const
 
 void VolumeListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << ResolveSession //
-            << GetVolumes     //
-            << ListVolumes    //
-            << PrintTable;
+    context << ResolveSession     //
+            << GetVolumes         //
+            << FormatVolumeOutput //
+            << PrintFormattedOutput;
 }
 } // namespace wsl::windows::wslc

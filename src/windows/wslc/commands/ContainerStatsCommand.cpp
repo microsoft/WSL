@@ -46,9 +46,9 @@ std::wstring ContainerStatsCommand::LongDescription() const
 
 void ContainerStatsCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context                   //
-        << ResolveSession     //
-        << ShowContainerStats //
-        << PrintTable;
+    context                           //
+        << ResolveSession             //
+        << FormatContainerStatsOutput //
+        << PrintFormattedOutput;
 }
 } // namespace wsl::windows::wslc

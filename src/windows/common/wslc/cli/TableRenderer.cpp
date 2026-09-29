@@ -52,18 +52,19 @@ namespace {
     // Establishes each column's floor and cap, then grows it to fit the widest value it holds.
     std::vector<RenderColumn> MeasureColumns(const TableData& table)
     {
-        const size_t columnCount = table.Columns.size();
+        const auto& tableColumns = table.GetColumns();
+        const size_t columnCount = tableColumns.size();
         std::vector<RenderColumn> columns(columnCount);
 
         for (size_t i = 0; i < columnCount; ++i)
         {
-            const auto& config = table.Columns[i].Config;
+            const auto& config = tableColumns[i].Config;
             auto& column = columns[i];
 
             column.Overflow = config.Overflow;
             column.PreferredShrink = config.PreferredShrink;
             column.ConfiguredMax = (config.MaxWidth != ColumnWidthConfig::NoLimit) ? config.MaxWidth : 0;
-            column.MinWidth = table.Columns[i].Name.size();
+            column.MinWidth = tableColumns[i].Name.size();
 
             if (config.MinWidth != ColumnWidthConfig::NoLimit)
             {
@@ -78,7 +79,7 @@ namespace {
             }
         }
 
-        for (const auto& row : table.Rows)
+        for (const auto& row : table.GetRows())
         {
             if (row.Spanning)
             {
@@ -215,7 +216,11 @@ LayoutOptions TableRenderer::GetLayoutOptions() const
     options.VtEnabled = m_terminal.IsVTEnabled(m_level);
     options.ColorEnabled = m_terminal.IsColorEnabled(m_level);
 
-    if (const auto width = m_terminal.GetConsoleWidth(m_level); width.has_value())
+    if (m_consoleWidth.has_value())
+    {
+        options.ConsoleWidth = m_consoleWidth;
+    }
+    else if (const auto width = m_terminal.GetConsoleWidth(m_level); width.has_value())
     {
         options.ConsoleWidth = static_cast<size_t>(*width);
     }
@@ -227,12 +232,12 @@ TableLayout TableRenderer::Layout(const TableData& table, const LayoutOptions& o
 {
     TableLayout layout;
 
-    if (table.Columns.empty())
+    if (table.GetColumns().empty())
     {
         return layout;
     }
 
-    if (table.Rows.empty() && !table.ShowHeader)
+    if (table.GetRows().empty() && !table.ShowHeader)
     {
         return layout;
     }
@@ -242,14 +247,13 @@ TableLayout TableRenderer::Layout(const TableData& table, const LayoutOptions& o
 
     auto columns = MeasureColumns(table);
 
-    const auto consoleWidth = (table.ConsoleWidthOverride > 0) ? std::optional<size_t>{table.ConsoleWidthOverride} : options.ConsoleWidth;
-    const size_t totalWidth = consoleWidth.value_or(c_redirectedConsoleWidth);
+    const size_t totalWidth = options.ConsoleWidth.value_or(c_redirectedConsoleWidth);
     const size_t availableWidth = (totalWidth > table.RowIndent) ? totalWidth - table.RowIndent : 0;
 
     ShrinkColumns(columns, availableWidth, table.ColumnPadding);
 
     // Skipped when the destination is redirected so the receiver controls its own width.
-    if (consoleWidth.has_value())
+    if (options.ConsoleWidth.has_value())
     {
         FitWrapColumns(columns, availableWidth, table.ColumnPadding);
     }
@@ -313,8 +317,8 @@ TableLayout TableRenderer::Layout(const TableData& table, const LayoutOptions& o
     if (table.ShowHeader)
     {
         std::vector<Cell> headerCells;
-        headerCells.reserve(table.Columns.size());
-        for (const auto& column : table.Columns)
+        headerCells.reserve(table.GetColumns().size());
+        for (const auto& column : table.GetColumns())
         {
             headerCells.emplace_back(column.Name);
         }
@@ -322,7 +326,7 @@ TableLayout TableRenderer::Layout(const TableData& table, const LayoutOptions& o
         emitRow(headerCells);
     }
 
-    for (const auto& row : table.Rows)
+    for (const auto& row : table.GetRows())
     {
         if (row.Spanning)
         {
@@ -353,9 +357,9 @@ void StaticTableRenderer::Emit(const TableLayout& layout)
     }
 }
 
-void RenderTable(Terminal& terminal, const TableData& table, Terminal::Level level)
+void RenderTable(Terminal& terminal, const TableData& table, Terminal::Level level, std::optional<size_t> consoleWidth)
 {
-    StaticTableRenderer{terminal, level}.Render(table);
+    StaticTableRenderer{terminal, level, consoleWidth}.Render(table);
 }
 
 } // namespace wsl::windows::cli::table

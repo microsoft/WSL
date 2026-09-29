@@ -221,25 +221,24 @@ struct TableCapture
 {
     CaptureTerminal capture;
     wsl::windows::cli::table::TableData table;
+    size_t consoleWidth = 120;
 
     explicit TableCapture(std::initializer_list<std::wstring_view> headers, bool vtEnabled = false) :
         capture(vtEnabled), table(headers)
     {
-        table.ConsoleWidthOverride = 120;
         table.MinCellWidth = 0;
     }
 
     explicit TableCapture(std::vector<wsl::windows::cli::table::ColumnDefinition> columns, bool vtEnabled = false) :
         capture(vtEnabled), table(std::move(columns))
     {
-        table.ConsoleWidthOverride = 120;
         table.MinCellWidth = 0;
     }
 
     // Lays out and emits the table. Call after all rows have been added.
     void Render()
     {
-        wsl::windows::cli::table::RenderTable(capture.terminal, table);
+        wsl::windows::cli::table::RenderTable(capture.terminal, table, wsl::windows::wslc::cli::Terminal::Level::Output, consoleWidth);
     }
 
     // Returns captured output split into lines.

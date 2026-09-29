@@ -21,7 +21,7 @@ Abstract:
 #include "ImageService.h"
 #include "ImageTasks.h"
 #include "ImageProgressCallback.h"
-#include "TableRenderer.h"
+#include "TableData.h"
 #include "Task.h"
 #include <format>
 #include <unordered_map>
@@ -196,37 +196,40 @@ void GetImages(CLIExecutionContext& context)
     context.Data.Add<Data::Images>(std::move(images));
 }
 
-void ListImages(CLIExecutionContext& context)
+void FormatImageOutput(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Images));
     auto& images = context.Data.Get<Data::Images>();
 
+    const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
+    const bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
+
     if (context.Args.GetValue<ArgType::Quiet>())
     {
-        bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
+        wsl::windows::cli::table::TableData table{Localization::WSLCCLI_TableHeaderImageId()};
+        table.ShowHeader = false;
+        table.Reserve(images.size());
+
         for (const auto& image : images)
         {
-            context.Terminal.Output(L"{}\n", trunc ? TruncateId(image.Id, true) : image.Id);
+            table.AddRow({MultiByteToWide(trunc ? TruncateId(image.Id, true) : image.Id)});
         }
 
-        return;
+        context.Data.Add<Data::Table>(std::move(table));
     }
-
-    const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
-    bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
-
-    switch (format)
+    else if (format == FormatType::Json)
     {
-    case FormatType::Json:
-    {
+        std::vector<std::wstring> json;
+        json.reserve(images.size());
+
         for (const auto& image : images)
         {
-            context.Terminal.Output(L"{}\n", ToJsonW(ToImageOutput(image, trunc, format), c_jsonCompactIndent));
+            json.push_back(ToJsonW(ToImageOutput(image, trunc, format), c_jsonCompactIndent));
         }
 
-        break;
+        context.Data.Add<Data::Json>(std::move(json));
     }
-    case FormatType::Table:
+    else if (format == FormatType::Table)
     {
         using enum ColumnOverflow;
 
@@ -237,45 +240,37 @@ void ListImages(CLIExecutionContext& context)
         constexpr ColumnWidthConfig c_imageId{.MinWidth = 12, .MaxWidth = 12, .Overflow = Shrink};
 
         const bool digests = context.Args.GetValue<ArgType::Digests>();
-        const ColumnWidthConfig columnConfig = trunc ? c_shrink : ColumnWidthConfig{};
-        const ColumnWidthConfig imageIdConfig = trunc ? c_imageId : ColumnWidthConfig{};
 
-        // The DIGEST column sits between TAG and IMAGE ID, and is only present with --digests.
-        std::vector<ColumnDefinition> columns{
-            {Localization::WSLCCLI_TableHeaderRepository(), columnConfig}, {Localization::WSLCCLI_TableHeaderTag(), columnConfig}};
-        if (digests)
-        {
-            columns.emplace_back(ColumnDefinition{Localization::WSLCCLI_TableHeaderDigest(), columnConfig});
-        }
+        wsl::windows::cli::table::TableData table;
+        table.Truncate(trunc)
+            .AddColumn(Localization::WSLCCLI_TableHeaderRepository(), c_shrink)
+            .AddColumn(Localization::WSLCCLI_TableHeaderTag(), c_shrink)
+            .AddColumnIf(digests, Localization::WSLCCLI_TableHeaderDigest(), c_shrink)
+            .AddColumn(Localization::WSLCCLI_TableHeaderImageId(), c_imageId)
+            .AddColumn(Localization::WSLCCLI_TableHeaderCreated(), c_shrink)
+            .AddColumn(Localization::WSLCCLI_TableHeaderSize(), c_shrink);
 
-        columns.emplace_back(ColumnDefinition{Localization::WSLCCLI_TableHeaderImageId(), imageIdConfig});
-        columns.emplace_back(ColumnDefinition{Localization::WSLCCLI_TableHeaderCreated(), columnConfig});
-        columns.emplace_back(ColumnDefinition{Localization::WSLCCLI_TableHeaderSize(), columnConfig});
-
-        wsl::windows::cli::table::TableData table{std::move(columns)};
         table.Reserve(images.size());
 
         for (const auto& image : images)
         {
             const auto entry = ToImageOutput(image, trunc, format);
 
-            std::vector<Cell> cells{MultiByteToWide(entry.Repository), MultiByteToWide(entry.Tag)};
-            if (digests)
-            {
-                cells.emplace_back(MultiByteToWide(entry.Digest));
-            }
+            Row row;
+            row.AddCell(MultiByteToWide(entry.Repository))
+                .AddCell(MultiByteToWide(entry.Tag))
+                .AddCellIf(digests, MultiByteToWide(entry.Digest))
+                .AddCell(MultiByteToWide(entry.ID))
+                .AddCell(MultiByteToWide(entry.CreatedSince))
+                .AddCell(MultiByteToWide(entry.Size));
 
-            cells.emplace_back(MultiByteToWide(entry.ID));
-            cells.emplace_back(MultiByteToWide(entry.CreatedSince));
-            cells.emplace_back(MultiByteToWide(entry.Size));
-
-            table.AddRow(std::move(cells));
+            table.AddRow(std::move(row));
         }
 
         context.Data.Add<Data::Table>(std::move(table));
-        break;
     }
-    default:
+    else
+    {
         THROW_HR(E_UNEXPECTED);
     }
 }

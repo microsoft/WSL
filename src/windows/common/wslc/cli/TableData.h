@@ -10,17 +10,12 @@ Abstract:
 
     Data model for tabular CLI output. A table is a list of column definitions
     plus a list of rows; a row holds one cell per column, or a single spanning
-    cell that occupies the whole line. Cells own their text and optional VT
-    sequences, which are zero display width, so a cell's visible width is
-    simply its text length.
+    cell that occupies the whole line.
 
-    A table holds every row it emits: column widths are measured across the complete
-    set so that each row aligns against widths that fit it. Callers therefore build a
-    table from a result set they already hold in full, and should call Reserve() with
-    the expected row count so row storage is allocated once.
+    Column widths are measured across every row, so a table must hold the
+    complete result set before it is rendered.
 
-    This header is rendering-agnostic and does not depend on Terminal; see
-    TableRenderer.h for layout and emission.
+    See TableRenderer.h for layout and emission.
 
 --*/
 #pragma once
@@ -38,7 +33,7 @@ namespace wsl::windows::cli::table {
 using wsl::windows::common::vt::Sequence;
 
 // A VT sequence owned by the cell that carries it. IsColor marks the sequences that --no-color
-// suppresses; see vt::Sequence::IsColor().
+// suppresses.
 struct CellSequence
 {
     std::wstring Text;
@@ -51,8 +46,7 @@ struct CellSequence
 };
 
 // A single table cell. Prefix and Suffix are emitted around Text when the destination supports
-// VT; they contribute no display width. The pair covers both styling (color + reset) and
-// paired constructs such as hyperlink open/close.
+// VT; they contribute no display width.
 struct Cell
 {
     std::wstring Text;
@@ -73,10 +67,9 @@ struct Cell
     {
     }
 
-    // Styled cell: wraps the text with the sequence and a trailing reset.
+    // Wraps the text with the sequence and a trailing reset.
     Cell(std::wstring_view text, const Sequence& style);
 
-    // Paired cell: wraps the text with an explicit open and close sequence.
     Cell(std::wstring_view text, const Sequence& prefix, const Sequence& suffix);
 
     size_t VisibleWidth() const
@@ -84,37 +77,47 @@ struct Cell
         return Text.size();
     }
 
-    // Renders the cell with or without its sequences.
-    // When vtEnabled is false, no sequences are emitted.
-    // When vtEnabled is true but colorEnabled is false, only non-color sequences are emitted.
+    // When vtEnabled is false no sequences are emitted; when only colorEnabled is false, the
+    // color sequences are dropped.
     std::wstring Render(bool vtEnabled, bool colorEnabled) const;
 
-    // Renders with text truncated to maxWidth characters, appending an ellipsis.
-    // Sequences are still emitted so styling is closed correctly.
+    // Truncates the text to maxWidth characters with an ellipsis, still emitting the sequences
+    // so styling is closed correctly.
     std::wstring RenderTruncated(size_t maxWidth, bool vtEnabled, bool colorEnabled) const;
 };
 
-// A table row. A normal row holds one cell per column. A spanning row holds a single cell that is
-// emitted as a standalone line: it takes no part in column sizing and receives no indent, which
-// suits section headings and blank separators.
+// A normal row holds one cell per column. A spanning row holds a single cell emitted as a
+// standalone line, taking no part in column sizing and receiving no indent.
 struct Row
 {
     std::vector<Cell> Cells;
     bool Spanning = false;
+
+    // Cells accumulate here for rows whose shape varies with the column set. The row is not part of
+    // the table until it is handed to TableData::AddRow, which validates the cell count.
+    Row& AddCell(Cell cell)
+    {
+        Cells.emplace_back(std::move(cell));
+        return *this;
+    }
+
+    Row& AddCellIf(bool condition, Cell cell)
+    {
+        return condition ? AddCell(std::move(cell)) : *this;
+    }
 };
 
 // Controls how a column handles content that exceeds its available width.
 enum class ColumnOverflow
 {
-    // Truncates content with an ellipsis at MaxWidth; column width is fixed and does not
-    // participate in the shrink loop.
+    // Fixed width; truncates with an ellipsis at MaxWidth.
     Truncate,
 
-    // Participates in the shrink loop: reduced largest-first down to MinWidth, then truncated.
-    // PreferredShrink=true marks this as a higher-priority shrink target.
+    // Shrinks largest-first down to MinWidth, then truncates. PreferredShrink marks this as a
+    // higher-priority shrink target.
     Shrink,
 
-    // Wraps long values across multiple physical rows; width is remaining space after other columns.
+    // Takes the space remaining after the other columns and wraps across physical rows.
     Wrap,
 };
 
@@ -122,10 +125,10 @@ struct ColumnWidthConfig
 {
     static constexpr size_t NoLimit = 0;
 
-    size_t MinWidth = NoLimit; // Minimum visible width (NoLimit = header width).
-    size_t MaxWidth = NoLimit; // Maximum visible width cap (NoLimit = unlimited).
+    size_t MinWidth = NoLimit;
+    size_t MaxWidth = NoLimit;
     ColumnOverflow Overflow = ColumnOverflow::Truncate;
-    bool PreferredShrink = true; // Prioritizes this column in the shrink loop.
+    bool PreferredShrink = true;
 };
 
 struct ColumnDefinition
@@ -137,20 +140,16 @@ struct ColumnDefinition
 // Spacing inserted between columns.
 inline constexpr size_t c_defaultColumnPadding = 3;
 
-// Minimum total width of a column including its padding. Combined with the default padding this
-// gives list output the same column rhythm as other container CLIs. The final column is exempt:
-// it emits no trailing padding, so a minimum there would only add trailing whitespace.
+// Minimum total width of a column including its padding. The final column is exempt: it emits no
+// trailing padding, so a minimum there would only add trailing whitespace.
 inline constexpr size_t c_defaultMinCellWidth = 10;
 
-// Table contents and presentation options. Build one of these with columns, add rows, then hand it
-// to RenderTable().
-struct TableData
+// The column set is open until the first row is added, after which it is fixed so every row keeps a
+// matching cell count. Only each column's width configuration stays mutable.
+class TableData
 {
-    std::vector<ColumnDefinition> Columns;
-    std::vector<Row> Rows;
-
-    // Emits the column names as a leading row. When false the header is omitted even if the table
-    // has no rows.
+public:
+    // Emits the column names as a leading row.
     bool ShowHeader = true;
 
     // Spaces prepended to every non-spanning row. Does not affect column width calculations.
@@ -159,40 +158,71 @@ struct TableData
     size_t ColumnPadding = c_defaultColumnPadding;
     size_t MinCellWidth = c_defaultMinCellWidth;
 
-    // Overrides console width for column fitting; 0 uses the Terminal-derived width. When set, the
-    // wrap pass runs as if a real console were attached.
-    size_t ConsoleWidthOverride = 0;
-
     TableData() = default;
 
-    explicit TableData(std::vector<ColumnDefinition> columns) : Columns(std::move(columns))
+    explicit TableData(std::vector<ColumnDefinition> columns) : m_columns(std::move(columns))
     {
     }
 
-    // Convenience for the common case of headers without per-column width configuration.
     TableData(std::initializer_list<std::wstring_view> headers);
 
-    // Allocates row storage for the expected number of rows.
     void Reserve(size_t rowCount)
     {
-        Rows.reserve(rowCount);
+        m_rows.reserve(rowCount);
+    }
+
+    // Clears the width configuration of every subsequently added column, for callers that disable
+    // truncation wholesale.
+    TableData& Truncate(bool enabled)
+    {
+        m_truncate = enabled;
+        return *this;
+    }
+
+    // Appends a column. Only valid before the first row is added.
+    TableData& AddColumn(std::wstring name, ColumnWidthConfig config = {});
+
+    TableData& AddColumnIf(bool condition, std::wstring name, ColumnWidthConfig config = {})
+    {
+        return condition ? AddColumn(std::move(name), config) : *this;
     }
 
     // Appends a data row. The cell count must match the column count.
     void AddRow(std::vector<Cell> cells);
 
-    // Appends a standalone line that does not participate in column sizing.
-    void AddLine(Cell cell = {});
+    void AddRow(Row row);
+
+    void AddSpanningRow(Cell cell = {});
+
+    const std::vector<ColumnDefinition>& GetColumns() const
+    {
+        return m_columns;
+    }
+
+    const std::vector<Row>& GetRows() const
+    {
+        return m_rows;
+    }
+
+    ColumnWidthConfig& ColumnConfig(size_t index)
+    {
+        return m_columns.at(index).Config;
+    }
 
     size_t ColumnCount() const
     {
-        return Columns.size();
+        return m_columns.size();
     }
 
     bool IsEmpty() const
     {
-        return Rows.empty();
+        return m_rows.empty();
     }
+
+private:
+    std::vector<ColumnDefinition> m_columns;
+    std::vector<Row> m_rows;
+    bool m_truncate = true;
 };
 
 namespace details {

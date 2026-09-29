@@ -56,8 +56,8 @@ void ContainerListCommand::ExecuteInternal(CLIExecutionContext& context) const
     context
         << ResolveSession
         << GetContainers
-        << ListContainers //
-        << PrintTable;
+        << FormatContainerOutput //
+        << PrintFormattedOutput;
 }
 // clang-format on
 

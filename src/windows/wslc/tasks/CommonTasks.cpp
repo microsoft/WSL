@@ -48,14 +48,19 @@ void ConfirmAction(CLIExecutionContext& context)
     }
 }
 
-void PrintTable(CLIExecutionContext& context)
+void PrintFormattedOutput(CLIExecutionContext& context)
 {
-    if (!context.Data.Contains(Data::Table))
+    if (context.Data.Contains(Data::Json))
     {
-        return;
+        for (const auto& line : context.Data.Get<Data::Json>())
+        {
+            context.Terminal.Output(L"{}\n", line);
+        }
     }
-
-    RenderTable(context.Terminal, context.Data.Get<Data::Table>());
+    else if (context.Data.Contains(Data::Table))
+    {
+        RenderTable(context.Terminal, context.Data.Get<Data::Table>());
+    }
 }
 
 } // namespace wsl::windows::wslc::task

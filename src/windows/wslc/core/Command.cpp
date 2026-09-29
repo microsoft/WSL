@@ -483,7 +483,7 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
         table.RowIndent = c_helpRowIndent;
         table.ColumnPadding = c_helpColumnPadding;
         table.MinCellWidth = 0;
-        table.Columns[1].Config.Overflow = ColumnOverflow::Wrap;
+        table.ColumnConfig(1).Overflow = ColumnOverflow::Wrap;
         return table;
     };
 
@@ -496,7 +496,7 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
         table.RowIndent = c_helpRowIndent;
         table.ColumnPadding = c_helpColumnPadding;
         table.MinCellWidth = 0;
-        table.Columns[2].Config.Overflow = ColumnOverflow::Wrap;
+        table.ColumnConfig(2).Overflow = ColumnOverflow::Wrap;
         return table;
     };
 
@@ -609,7 +609,7 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
 
         if (hasHelpOptions)
         {
-            table.AddLine(Cell(Localization::WSLCCLI_HeadingOptions(), HelpHeadingEmphasis));
+            table.AddSpanningRow(Cell(Localization::WSLCCLI_HeadingOptions(), HelpHeadingEmphasis));
             AddArgumentRows(table, std::span<const Argument>{helpStandardArgs});
         }
 
@@ -635,13 +635,13 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
 
             if (hasPreviousOptionSection)
             {
-                table.AddLine();
+                table.AddSpanningRow();
             }
 
             const auto globalOwnerInvocation = globalOwner->get().FormatInvocation();
             const auto globalScopeName =
                 globalOwnerInvocation == s_ExecutableName ? globalOwnerInvocation : std::wstring{globalOwner->get().Name()};
-            table.AddLine(Cell(Localization::WSLCCLI_HeadingScopedGlobalOptions(globalScopeName), HelpHeadingEmphasis));
+            table.AddSpanningRow(Cell(Localization::WSLCCLI_HeadingScopedGlobalOptions(globalScopeName), HelpHeadingEmphasis));
             AddArgumentRows(table, std::span<const Argument>{globalArguments}.subspan(scopeStart, scopeEnd - scopeStart));
             hasPreviousOptionSection = true;
             scopeStart = scopeEnd;

@@ -47,9 +47,9 @@ std::wstring NetworkListCommand::LongDescription() const
 
 void NetworkListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << ResolveSession //
-            << GetNetworks    //
-            << ListNetworks   //
-            << PrintTable;
+    context << ResolveSession      //
+            << GetNetworks         //
+            << FormatNetworkOutput //
+            << PrintFormattedOutput;
 }
 } // namespace wsl::windows::wslc

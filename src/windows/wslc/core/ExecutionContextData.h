@@ -46,6 +46,7 @@ enum class Data : size_t
     ConfirmWarning,
     ConfirmMessage,
     Table,
+    Json,
 
     Max
 };
@@ -66,6 +67,7 @@ namespace details {
     DEFINE_DATA_MAPPING(ConfirmWarning, std::wstring);
     DEFINE_DATA_MAPPING(ConfirmMessage, std::wstring);
     DEFINE_DATA_MAPPING(Table, wsl::windows::cli::table::TableData);
+    DEFINE_DATA_MAPPING(Json, std::vector<std::wstring>);
 } // namespace details
 
 struct DataMap : wsl::windows::wslc::EnumBasedVariantMap<Data, wsl::windows::wslc::execution::details::DataMapping>

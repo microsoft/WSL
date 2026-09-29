@@ -18,7 +18,7 @@ Abstract:
 #include "NetworkModel.h"
 #include "NetworkService.h"
 #include "NetworkTasks.h"
-#include "TableRenderer.h"
+#include "TableData.h"
 #include <wslc_schema.h>
 
 using namespace wsl::shared;
@@ -202,7 +202,7 @@ void InspectNetworks(CLIExecutionContext& context)
     context.Terminal.Output(L"{}\n", MultiByteToWide(json));
 }
 
-void ListNetworks(CLIExecutionContext& context)
+void FormatNetworkOutput(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Networks));
     auto& networks = context.Data.Get<Data::Networks>();
@@ -213,28 +213,33 @@ void ListNetworks(CLIExecutionContext& context)
     const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
     const bool quiet = context.Args.GetValue<ArgType::Quiet>();
     const bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
+
     if (format == FormatType::Table && quiet)
     {
+        wsl::windows::cli::table::TableData table{Localization::WSLCCLI_TableHeaderNetworkId()};
+        table.ShowHeader = false;
+        table.Reserve(networks.size());
+
         for (const auto& network : networks)
         {
-            context.Terminal.Output(L"{}\n", MultiByteToWide(TruncateId(network.Id, trunc)));
+            table.AddRow({MultiByteToWide(TruncateId(network.Id, trunc))});
         }
 
-        return;
+        context.Data.Add<Data::Table>(std::move(table));
     }
+    else if (format == FormatType::Json)
+    {
+        std::vector<std::wstring> json;
+        json.reserve(networks.size());
 
-    switch (format)
-    {
-    case FormatType::Json:
-    {
         for (const auto& network : networks)
         {
-            context.Terminal.Output(L"{}\n", ToJsonW(ToNetworkOutput(network, trunc), c_jsonCompactIndent));
+            json.push_back(ToJsonW(ToNetworkOutput(network, trunc), c_jsonCompactIndent));
         }
 
-        break;
+        context.Data.Add<Data::Json>(std::move(json));
     }
-    case FormatType::Table:
+    else if (format == FormatType::Table)
     {
         wsl::windows::cli::table::TableData table{
             Localization::WSLCCLI_TableHeaderNetworkId(),
@@ -255,9 +260,9 @@ void ListNetworks(CLIExecutionContext& context)
         }
 
         context.Data.Add<Data::Table>(std::move(table));
-        break;
     }
-    default:
+    else
+    {
         THROW_HR(E_UNEXPECTED);
     }
 }
