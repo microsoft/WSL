@@ -24,12 +24,17 @@ VmNetworkAdapterRequest CreateNetworkRequest()
 {
     VmNetworkAdapterRequest request;
     request.Tag = L"eth0";
-    request.Configuration.ClientIpv4.Bytes = {10, 0, 0, 2};
-    request.Configuration.ClientMac.Bytes = {0x00, 0x15, 0x5d, 0x01, 0x02, 0x03};
-    request.Configuration.GatewayIpv4.Bytes = {10, 0, 0, 1};
-    request.Configuration.GatewayMacIpv4.Bytes = {0x52, 0x55, 0x0a, 0x00, 0x00, 0x01};
-    request.Configuration.GatewayMacIpv6.Bytes = {0x52, 0x55, 0x0a, 0x00, 0x01, 0x02};
-    request.Configuration.Netmask.Bytes = {255, 255, 255, 0};
+    VmUserModeNatNetwork configuration;
+    configuration.Configuration.clientIp.value = htonl(0x0a000002);
+    constexpr std::array<BYTE, 6> clientMac{0x00, 0x15, 0x5d, 0x01, 0x02, 0x03};
+    std::copy(clientMac.begin(), clientMac.end(), std::begin(configuration.Configuration.clientMac.bytes));
+    configuration.Configuration.gatewayIp.value = htonl(0x0a000001);
+    constexpr std::array<BYTE, 6> gatewayMac{0x52, 0x55, 0x0a, 0x00, 0x00, 0x01};
+    std::copy(gatewayMac.begin(), gatewayMac.end(), std::begin(configuration.Configuration.gatewayMac.bytes));
+    constexpr std::array<BYTE, 6> gatewayMacIpv6{0x52, 0x55, 0x0a, 0x00, 0x01, 0x02};
+    std::copy(gatewayMacIpv6.begin(), gatewayMacIpv6.end(), std::begin(configuration.Configuration.gatewayMacIpv6.bytes));
+    configuration.Configuration.netmask.value = htonl(0xffffff00);
+    request.Configuration = configuration;
     return request;
 }
 
@@ -113,7 +118,13 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(UINT64{1}, adapter.Id.Value);
         VERIFY_IS_TRUE(adapter.GuestInstanceId.has_value());
         VERIFY_IS_FALSE(IsEqualGUID(GUID_NULL, adapter.GuestInstanceId.value()));
-        VERIFY_IS_TRUE(adapter.EffectiveConfiguration.ClientMac.Bytes == request.NetworkAdapters[0].Configuration.ClientMac.Bytes);
+        const auto& effectiveConfiguration = std::get<VmUserModeNatNetwork>(adapter.EffectiveConfiguration).Configuration;
+        const auto& requestedConfiguration = std::get<VmUserModeNatNetwork>(request.NetworkAdapters[0].Configuration).Configuration;
+        VERIFY_IS_TRUE(
+            std::equal(
+                std::begin(effectiveConfiguration.clientMac.bytes),
+                std::end(effectiveConfiguration.clientMac.bytes),
+                std::begin(requestedConfiguration.clientMac.bytes)));
 
         THROW_IF_FAILED(CoCreateGuid(&request.Identity.VmId));
         const auto other = ValidateCreateRequest(request).NetworkAdapters.at(L"eth0");
@@ -207,7 +218,7 @@ class OpenVmmVirtualMachineBackendTests
         auto& fileSystemTransport = std::get<VmVirtioFsDevice>(fileSystemRequest.Transport);
         fileSystemTransport.Layout = VmVirtioFsLayout::SingleShare;
         const auto fileSystemDevice = backend->CreateFileSystemDevice(fileSystemRequest);
-        VERIFY_ARE_EQUAL(UINT64{1}, fileSystemDevice.Id.Value);
+        VERIFY_ARE_EQUAL(UINT64{2}, fileSystemDevice.Id.Value);
         VERIFY_IS_TRUE(IsEqualGUID(request.Identity.VmId, fileSystemDevice.Id.Owner.VmId));
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Prepared, fileSystemDevice.State);
         VERIFY_ARE_EQUAL(
@@ -243,14 +254,18 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_IS_TRUE(network.GuestInstanceId.has_value());
         VERIFY_ARE_EQUAL(networkRequest.Tag, network.Tag);
         VERIFY_ARE_NOT_EQUAL(network.Id.Value, fileSystemDevice.Id.Value);
-        VERIFY_IS_TRUE(network.EffectiveConfiguration.ClientIpv4.Bytes == networkRequest.Configuration.ClientIpv4.Bytes);
+        VERIFY_ARE_EQUAL(
+            std::get<VmUserModeNatNetwork>(networkRequest.Configuration).Configuration.clientIp.value,
+            std::get<VmUserModeNatNetwork>(network.EffectiveConfiguration).Configuration.clientIp.value);
         VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AddNetworkAdapter(networkRequest); }));
 
         // Consomme processes port requests once the guest has initialized its network queues.
         backend->Start();
         VmPortBindingRequest bindingRequest;
-        bindingRequest.Listen.Address = VmIpv4Address{{127, 0, 0, 1}};
-        bindingRequest.Listen.Port = ReserveTcpPort();
+        bindingRequest.ListenAddress.family = IpAddressFamily_V4;
+        const auto loopbackAddress = htonl(INADDR_LOOPBACK);
+        std::memcpy(bindingRequest.ListenAddress.bytes, &loopbackAddress, sizeof(loopbackAddress));
+        bindingRequest.HostPort = ReserveTcpPort();
         bindingRequest.GuestPort = 80;
         VERIFY_ARE_EQUAL(
             HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->BindPort(fileSystemDevice.Id, bindingRequest); }));
@@ -260,10 +275,10 @@ class OpenVmmVirtualMachineBackendTests
         const auto binding = backend->BindPort(network.Id, bindingRequest);
         VERIFY_IS_TRUE(IsEqualGUID(request.Identity.VmId, binding.Id.Owner.VmId));
         VERIFY_ARE_EQUAL(network.Id.Value, binding.Device.Value);
-        VERIFY_ARE_EQUAL(bindingRequest.Listen.Port, binding.EffectiveListen.Port);
+        VERIFY_ARE_EQUAL(bindingRequest.HostPort, binding.EffectiveHostPort);
 
         auto dynamicBinding = bindingRequest;
-        dynamicBinding.Listen.Port = 0;
+        dynamicBinding.HostPort = 0;
         VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->BindPort(network.Id, dynamicBinding); }));
         backend->UnbindPort(binding.Id);
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->UnbindPort(binding.Id); }));
@@ -310,7 +325,6 @@ class OpenVmmVirtualMachineBackendTests
               VmOperation::AddFileSystemShare,
               VmOperation::RemoveFileSystemShare,
               VmOperation::RemoveDevice,
-              VmOperation::UpdateNetworkAdapter,
               VmOperation::BindPort,
               VmOperation::UnbindPort})
         {

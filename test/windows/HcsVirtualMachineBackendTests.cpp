@@ -110,6 +110,18 @@ class HcsVirtualMachineBackendTests
         VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::CreateFileSystemDevice)));
         VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::AddFileSystemShare)));
         VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::RemoveFileSystemShare)));
+        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::AddNetworkAdapter)));
+        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::UpdateNetworkAdapter)));
+        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::RemoveNetworkAdapter)));
+        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::BindPort)));
+        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::UnbindPort)));
+        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::CreateVirtualAddress)));
+        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::CreateDnsRecord)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::HostEndpointNetwork)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::UserModeNatNetwork)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::DynamicHostPort)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::VirtualHostAddress)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::StaticDnsARecord)));
         backend->Terminate();
     }
 
@@ -213,19 +225,15 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { HcsVirtualMachineBackend::Create(request); }));
     }
 
-    TEST_METHOD(RejectsUnsupportedCreationResources)
+    TEST_METHOD(DefersNetworkAdapterCreationUntilVmStarts)
     {
+        SKIP_TEST_ARM64();
         auto request = CreateRunnableRequest();
-        request.BootDisks.push_back({});
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { HcsVirtualMachineBackend::Create(request); }));
-
-        request.BootDisks.clear();
-        request.Consoles.push_back({});
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { HcsVirtualMachineBackend::Create(request); }));
-
-        request.Consoles.clear();
         request.NetworkAdapters.push_back({});
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { HcsVirtualMachineBackend::Create(request); }));
+        auto backend = HcsVirtualMachineBackend::Create(request);
+
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->Start(); }));
+        backend->Terminate();
     }
 
     TEST_METHOD(NotifiesTerminationCallbacksWithoutHoldingBackendLock)
@@ -276,9 +284,14 @@ class HcsVirtualMachineBackendTests
                              backend->AddFileSystemShare(device, request);
                          }));
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->RemoveFileSystemShare(share); }));
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AddNetworkAdapter({}); }));
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->BindPort(device, {}); }));
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->UnbindPort(binding); }));
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddNetworkAdapter({}); }));
+        VmPortBindingRequest bindingRequest{};
+        bindingRequest.ListenAddress.family = IpAddressFamily_V4;
+        const auto loopbackAddress = htonl(INADDR_LOOPBACK);
+        std::memcpy(bindingRequest.ListenAddress.bytes, &loopbackAddress, sizeof(loopbackAddress));
+        bindingRequest.GuestPort = 80;
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->BindPort(device, bindingRequest); }));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->UnbindPort(binding); }));
         backend->Terminate();
     }
 

@@ -16,7 +16,9 @@ Abstract:
 
 #include <winsock2.h>
 #include <windows.h>
+#include <ws2ipdef.h>
 #include <windowsdefs.h>
+#include <WslDeviceHost.h>
 #include <wil/resource.h>
 #include <array>
 #include <bitset>
@@ -31,6 +33,7 @@ Abstract:
 #include <variant>
 #include <vector>
 #include "defs.h"
+#include "stringshared.h"
 
 enum class BackendKind
 {
@@ -147,6 +150,7 @@ enum class VmOperation
     RemoveDevice,
     AddNetworkAdapter,
     UpdateNetworkAdapter,
+    RemoveNetworkAdapter,
     BindPort,
     UnbindPort,
     CreateVirtualAddress,
@@ -154,7 +158,7 @@ enum class VmOperation
     Count
 };
 
-static_assert(static_cast<size_t>(VmOperation::Count) == 24);
+static_assert(static_cast<size_t>(VmOperation::Count) == 25);
 
 struct VmPlatformCapabilities
 {
@@ -344,46 +348,36 @@ struct VmEffectiveBoot
     std::vector<VmConsoleRequest> Consoles;
 };
 
-struct VmIpv4Address
-{
-    std::array<std::uint8_t, 4> Bytes{};
-};
-
-struct VmIpv6Address
-{
-    std::array<std::uint8_t, 16> Bytes{};
-    std::uint32_t ScopeId = 0;
-};
-
-using VmIpAddress = std::variant<VmIpv4Address, VmIpv6Address>;
-
-struct VmEthernetAddress
-{
-    std::array<std::uint8_t, 6> Bytes{};
-};
-
-struct VmIpEndpoint
-{
-    VmIpAddress Address;
-    std::uint16_t Port = 0;
-};
-
+// Network served by a user-mode NAT that runs on the host and reaches the guest through a virtio-net
+// device. The device configuration is described with the guest device host ABI types so that the
+// NAT's view of the guest is not restated by every backend.
 struct VmUserModeNatNetwork
 {
-    VmIpv4Address ClientIpv4;
-    std::optional<VmIpv6Address> ClientIpv6;
-    VmEthernetAddress ClientMac;
-    VmIpv4Address GatewayIpv4;
-    VmEthernetAddress GatewayMacIpv4;
-    VmEthernetAddress GatewayMacIpv6;
-    VmIpv4Address Netmask;
-    std::vector<VmIpAddress> Nameservers;
+    WslVirtioNetConfig Configuration{};
+    std::vector<IpAddress> Nameservers;
+
+    wsl::shared::string::MacAddress ClientMacAddress() const;
 };
+
+// Network served by an endpoint that the caller created on the host network stack. The mirrored and
+// NAT networking modes use this: the host owns the network, address assignment and name resolution,
+// so the backend only has to attach the endpoint to the VM as an adapter.
+struct VmHostEndpointNetwork
+{
+    GUID EndpointId{};
+    // Identifies the adapter inside the VM. Mirrored networking sets this to the interface id of the
+    // host interface being mirrored so that an interface keeps the same adapter as its endpoint is
+    // added and removed; NAT has no host interface to match and reuses the endpoint id.
+    GUID InstanceId{};
+    wsl::shared::string::MacAddress MacAddress{};
+};
+
+using VmNetworkConfiguration = std::variant<VmHostEndpointNetwork, VmUserModeNatNetwork>;
 
 struct VmNetworkAdapterRequest
 {
     std::wstring Tag;
-    VmUserModeNatNetwork Configuration;
+    VmNetworkConfiguration Configuration;
 };
 
 struct VmNetworkAttachment
@@ -391,7 +385,7 @@ struct VmNetworkAttachment
     VmDeviceId Id;
     std::wstring Tag;
     std::optional<GUID> GuestInstanceId;
-    VmUserModeNatNetwork EffectiveConfiguration;
+    VmNetworkConfiguration EffectiveConfiguration;
 };
 
 struct VmCreateRequest
@@ -418,16 +412,13 @@ struct VmDescription
     std::map<std::wstring, VmNetworkAttachment> NetworkAdapters;
 };
 
-enum class VmTransportProtocol
-{
-    Tcp,
-    Udp
-};
-
 struct VmPortBindingRequest
 {
-    VmTransportProtocol Protocol = VmTransportProtocol::Tcp;
-    VmIpEndpoint Listen;
+    TransportProtocol Protocol = TransportProtocol_Tcp;
+    // Host endpoint to listen on. A zero HostPort asks the backend to allocate one.
+    IpAddress ListenAddress;
+    std::uint32_t ListenScopeId = 0;
+    std::uint16_t HostPort = 0;
     std::uint16_t GuestPort = 0;
 };
 
@@ -435,15 +426,19 @@ struct VmPortBinding
 {
     VmPortBindingId Id;
     VmDeviceId Device;
-    VmTransportProtocol Protocol = VmTransportProtocol::Tcp;
-    VmIpEndpoint EffectiveListen;
+    TransportProtocol Protocol = TransportProtocol_Tcp;
+    IpAddress EffectiveListenAddress;
+    std::uint32_t EffectiveListenScopeId = 0;
+    std::uint16_t EffectiveHostPort = 0;
     std::uint16_t GuestPort = 0;
 };
 
 struct VmDnsRecord
 {
+    DnsRecordType Type = DnsRecordType_A;
+    // Name the guest resolves and the address returned for it.
     std::string Name;
-    VmIpv4Address Address;
+    IpAddress Address;
 };
 
 enum class VmVirtioFsLayout
@@ -592,8 +587,12 @@ public:
     virtual void RemoveFileSystemShare(VmShareId Share) = 0;
 
     virtual VmNetworkAttachment AddNetworkAdapter(const VmNetworkAdapterRequest& Request) = 0;
+    virtual void UpdateNetworkAdapter(VmDeviceId Device, const VmNetworkConfiguration& Configuration) = 0;
+    virtual void RemoveNetworkAdapter(VmDeviceId Device) = 0;
     virtual VmPortBinding BindPort(VmDeviceId Device, const VmPortBindingRequest& Request) = 0;
     virtual void UnbindPort(VmPortBindingId Binding) = 0;
+    virtual IpAddress CreateVirtualAddress(VmDeviceId Device, const IpAddress& Destination) = 0;
+    virtual void CreateDnsRecord(VmDeviceId Device, const VmDnsRecord& Record) = 0;
 
 protected:
     // Protects all mutable backend state, including the base listener registry. Callers must

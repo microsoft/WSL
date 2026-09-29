@@ -71,21 +71,6 @@ SOCKADDR_UN GetUnixSocketAddress(const std::filesystem::path& Path)
     return address;
 }
 
-std::wstring FormatIpAddress(const VmIpAddress& Address)
-{
-    if (const auto* ipv4 = std::get_if<VmIpv4Address>(&Address))
-    {
-        return wsl::windows::common::string::IntegerIpv4ToWstring(std::bit_cast<std::uint32_t>(ipv4->Bytes));
-    }
-
-    const auto& ipv6 = std::get<VmIpv6Address>(Address);
-    SOCKADDR_INET address{};
-    address.Ipv6.sin6_family = AF_INET6;
-    address.Ipv6.sin6_scope_id = ipv6.ScopeId;
-    std::copy(ipv6.Bytes.begin(), ipv6.Bytes.end(), address.Ipv6.sin6_addr.u.Byte);
-    return wsl::windows::common::string::SockAddrInetToWstring(address);
-}
-
 } // namespace
 
 OpenVmmVirtualMachineBackend::GuestListener::~GuestListener() noexcept
@@ -176,6 +161,13 @@ VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmC
     THROW_HR_IF_MSG(c_notSupported, Request.NetworkAdapters.size() > 1, "OpenVMM supports one creation-time network adapter");
     for (const auto& adapter : Request.NetworkAdapters)
     {
+        // OpenVMM serves its NIC with a built-in user-mode NAT and has no host network stack to
+        // attach an endpoint created on the host to.
+        THROW_HR_IF_MSG(
+            c_notSupported,
+            !std::holds_alternative<VmUserModeNatNetwork>(adapter.Configuration),
+            "OpenVMM only supports user-mode NAT networks");
+
         GUID nicId{};
         THROW_IF_FAILED(CoCreateGuid(&nicId));
         description.NetworkAdapters.emplace(
@@ -312,7 +304,8 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     {
         const auto nicId =
             wsl::shared::string::GuidToString<wchar_t>(attachment.GuestInstanceId.value(), wsl::shared::string::GuidToStringFlags::None);
-        const auto macAddress = wsl::shared::string::FormatMacAddress(attachment.EffectiveConfiguration.ClientMac.Bytes, L'-');
+        const auto& configuration = std::get<VmUserModeNatNetwork>(attachment.EffectiveConfiguration);
+        const auto macAddress = wsl::shared::string::FormatMacAddress(configuration.ClientMacAddress(), L'-');
         THROW_IF_FAILED(WslOpenVmmConfigSetConsommeNic(config.get(), nicId.c_str(), macAddress.c_str()));
         m_networkAdapters.emplace(attachment.Id.Value, NetworkAdapter{attachment, nicId});
         m_nextDeviceId = attachment.Id.Value + 1;
@@ -426,7 +419,6 @@ VmPlatformCapabilities OpenVmmVirtualMachineBackend::QueryCapabilities()
           VmOperation::AddFileSystemShare,
           VmOperation::RemoveFileSystemShare,
           VmOperation::RemoveDevice,
-          VmOperation::UpdateNetworkAdapter,
           VmOperation::BindPort,
           VmOperation::UnbindPort})
     {
@@ -838,6 +830,20 @@ VmNetworkAttachment OpenVmmVirtualMachineBackend::AddNetworkAdapter(const VmNetw
     THROW_HR_MSG(c_notSupported, "OpenVMM network adapter '%ls' must be configured at VM creation time", Request.Tag.c_str());
 }
 
+void OpenVmmVirtualMachineBackend::UpdateNetworkAdapter(VmDeviceId Device, const VmNetworkConfiguration&)
+{
+    ExecutionContext context(Context::ConfigureNetworking);
+    validation::ValidateResourceId(Device, m_description.Identity);
+    THROW_HR_MSG(c_notSupported, "OpenVMM network adapters cannot be updated after VM creation");
+}
+
+void OpenVmmVirtualMachineBackend::RemoveNetworkAdapter(VmDeviceId Device)
+{
+    ExecutionContext context(Context::ConfigureNetworking);
+    validation::ValidateResourceId(Device, m_description.Identity);
+    THROW_HR_MSG(c_notSupported, "OpenVMM network adapters cannot be removed after VM creation");
+}
+
 VmPortBinding OpenVmmVirtualMachineBackend::BindPort(VmDeviceId Device, const VmPortBindingRequest& Request)
 {
     ExecutionContext context(Context::ConfigureNetworking);
@@ -846,20 +852,22 @@ VmPortBinding OpenVmmVirtualMachineBackend::BindPort(VmDeviceId Device, const Vm
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
         TraceLoggingValue(Device.Value, "deviceId"),
         TraceLoggingValue(static_cast<UINT32>(Request.Protocol), "protocol"),
-        TraceLoggingValue(Request.Listen.Port, "hostPort"),
+        TraceLoggingValue(Request.HostPort, "hostPort"),
         TraceLoggingValue(Request.GuestPort, "guestPort"));
     ValidateResourceId(Device, m_description.Identity);
+    THROW_HR_IF(
+        E_INVALIDARG, Request.ListenAddress.family != IpAddressFamily_V4 && Request.ListenAddress.family != IpAddressFamily_V6);
     THROW_HR_IF_MSG(
-        c_notSupported, Request.Listen.Port == 0, "OpenVMM cannot report the allocated port for a dynamic host port binding");
+        c_notSupported, Request.HostPort == 0, "OpenVMM cannot report the allocated port for a dynamic host port binding");
     THROW_HR_IF(E_INVALIDARG, Request.GuestPort == 0);
-    const auto hostAddress = FormatIpAddress(Request.Listen.Address);
+    const auto hostAddress = wsl::windows::common::string::IpAddressToWstring(Request.ListenAddress, Request.ListenScopeId);
     bool tcp = false;
     switch (Request.Protocol)
     {
-    case VmTransportProtocol::Tcp:
+    case TransportProtocol_Tcp:
         tcp = true;
         break;
-    case VmTransportProtocol::Udp:
+    case TransportProtocol_Udp:
         break;
     default:
         THROW_HR(E_INVALIDARG);
@@ -871,12 +879,19 @@ VmPortBinding OpenVmmVirtualMachineBackend::BindPort(VmDeviceId Device, const Vm
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), adapter == m_networkAdapters.end());
     THROW_HR_IF(E_BOUNDS, m_nextPortBindingId == UINT64_MAX);
 
-    VmPortBinding binding{{m_description.Identity, m_nextPortBindingId}, Device, Request.Protocol, Request.Listen, Request.GuestPort};
+    VmPortBinding binding{
+        {m_description.Identity, m_nextPortBindingId},
+        Device,
+        Request.Protocol,
+        Request.ListenAddress,
+        Request.ListenScopeId,
+        Request.HostPort,
+        Request.GuestPort};
     const auto [entry, inserted] = m_portBindings.emplace(binding.Id.Value, PortBinding{binding, adapter->second.NicId, hostAddress});
     WI_ASSERT(inserted);
     auto rollback = wil::scope_exit([this, &entry] { m_portBindings.erase(entry); });
     const auto result =
-        WslOpenVmmVmBindPort(m_vm.get(), adapter->second.NicId.c_str(), Request.Listen.Port, Request.GuestPort, tcp, hostAddress.c_str());
+        WslOpenVmmVmBindPort(m_vm.get(), adapter->second.NicId.c_str(), Request.HostPort, Request.GuestPort, tcp, hostAddress.c_str());
     WSL_LOG(
         "OpenVmmBindPortEnd",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
@@ -905,9 +920,9 @@ void OpenVmmVirtualMachineBackend::UnbindPort(VmPortBindingId Binding)
     const auto result = WslOpenVmmVmUnbindPort(
         m_vm.get(),
         binding->second.NicId.c_str(),
-        binding->second.Binding.EffectiveListen.Port,
+        binding->second.Binding.EffectiveHostPort,
         binding->second.Binding.GuestPort,
-        binding->second.Binding.Protocol == VmTransportProtocol::Tcp,
+        binding->second.Binding.Protocol == TransportProtocol_Tcp,
         binding->second.HostAddress.c_str());
     WSL_LOG(
         "OpenVmmUnbindPortEnd",
@@ -917,4 +932,18 @@ void OpenVmmVirtualMachineBackend::UnbindPort(VmPortBindingId Binding)
         TraceLoggingHResult(result, "result"));
     THROW_IF_FAILED(result);
     m_portBindings.erase(binding);
+}
+
+IpAddress OpenVmmVirtualMachineBackend::CreateVirtualAddress(VmDeviceId Device, const IpAddress&)
+{
+    ExecutionContext context(Context::ConfigureNetworking);
+    validation::ValidateResourceId(Device, m_description.Identity);
+    THROW_HR_MSG(c_notSupported, "OpenVMM does not support virtual host addresses");
+}
+
+void OpenVmmVirtualMachineBackend::CreateDnsRecord(VmDeviceId Device, const VmDnsRecord&)
+{
+    ExecutionContext context(Context::ConfigureNetworking);
+    validation::ValidateResourceId(Device, m_description.Identity);
+    THROW_HR_MSG(c_notSupported, "OpenVMM does not support static DNS records");
 }
