@@ -18,7 +18,6 @@ Notes:
 
 - Use `SessionSettings.VhdRequirements` for session-level storage requirements.
 - Use `Session.CreateVhdVolume(...)` for named session volumes.
-- Set `Type` to `VhdType.Sparse` to create a sparse VHD. This feature is currently experimental.
 - `Owner` is intended for named-volume creation and is rejected on `SessionSettings.VhdRequirements`.
 
 Example:
