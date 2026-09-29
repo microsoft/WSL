@@ -194,14 +194,6 @@ VmPlatformCapabilities QueryVirtualMachineBackendCapabilities(BackendKind Kind)
     THROW_HR(E_INVALIDARG);
 }
 
-void wsl::windows::common::vm::validation::ValidatePath(const std::filesystem::path& Path)
-{
-    THROW_HR_IF_MSG(
-        E_INVALIDARG,
-        Path.empty() || !Path.is_absolute() || Path.native().find(L'\0') != std::wstring::npos,
-        "An absolute, nonempty host path is required");
-}
-
 void wsl::windows::common::vm::validation::ValidateDiskPlacement(const VmDiskRequest& Request)
 {
     if (Request.Placement)
@@ -214,7 +206,6 @@ const VmVirtualDiskSource& wsl::windows::common::vm::validation::ValidateDiskReq
 {
     const auto* source = std::get_if<VmVirtualDiskSource>(&Request.Source);
     THROW_HR_IF(c_notSupported, source == nullptr);
-    ValidatePath(source->Path);
     switch (source->Format)
     {
     case VmDiskFormat::Vhd:

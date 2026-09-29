@@ -575,8 +575,6 @@ void ValidateResourceId(const VmResourceId<Tag>& Id, const VmInstanceId& Owner)
 
 bool ValidateFeature(VmFeatureRequest Request, PCWSTR Setting, bool Supported = false);
 
-void ValidatePath(const std::filesystem::path& Path);
-
 void ValidateDiskPlacement(const VmDiskRequest& Request);
 
 const VmVirtualDiskSource& ValidateDiskRequest(const VmDiskRequest& Request);
