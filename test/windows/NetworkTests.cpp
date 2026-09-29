@@ -5750,6 +5750,31 @@ class ConsommeTests
         }
     }
 
+    WSL2_TEST_METHOD(ConfigurationNoIpv6)
+    {
+        CONSOMME_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .kernelCommandLine = L"ipv6.disable=1"}));
+
+        auto [networkingMode, warnings] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --networking-mode", 0);
+        VERIFY_IS_TRUE(warnings.empty());
+        VERIFY_ARE_EQUAL(wsl::shared::string::Trim(networkingMode), L"consomme");
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /proc/sys/net/ipv6"), 1L);
+
+        const auto state = NetworkTests::GetInterfaceState(L"eth0");
+        VERIFY_IS_TRUE(state.Up);
+        VERIFY_IS_FALSE(state.V4Addresses.empty());
+        VERIFY_IS_TRUE(state.V6Addresses.empty());
+        VERIFY_IS_TRUE(state.Gateway.has_value());
+
+        const auto loopbackState = NetworkTests::GetInterfaceState(L"loopback0");
+        VERIFY_IS_TRUE(loopbackState.Up);
+        VERIFY_ARE_EQUAL(loopbackState.V4Addresses.size(), 1u);
+        VERIFY_ARE_EQUAL(loopbackState.V4Addresses[0].Address, L"169.254.73.250");
+        VERIFY_ARE_EQUAL(loopbackState.V4Addresses[0].PrefixLength, 28u);
+        VERIFY_IS_TRUE(loopbackState.V6Addresses.empty());
+    }
+
     WSL2_TEST_METHOD(ValidateMacAddress)
     {
         CONSOMME_TEST_ONLY();
