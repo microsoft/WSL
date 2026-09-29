@@ -4740,6 +4740,16 @@ VERSION_ID="Invalid|Format"
         DistroFileChange distributionconf(L"/etc/wsl-distribution.conf", false);
         distributionconf.SetContent(L"[oobe]\ncommand = /bin/bash -c 'echo OOBE'\n");
 
+        GUID runId;
+        THROW_IF_FAILED(CoCreateGuid(&runId));
+        const auto drvFsTestPath = std::filesystem::temp_directory_path() /
+                                   std::format(L"wsl-oobe-drvfs-test-{}", wsl::shared::string::GuidToString<wchar_t>(runId));
+        std::filesystem::create_directory(drvFsTestPath);
+        auto cleanupDrvFsTestPath = wil::scope_exit([&]() {
+            std::error_code ignored;
+            std::filesystem::remove_all(drvFsTestPath, ignored);
+        });
+
         RegistryKeyChange<DWORD> runOOBE(lxssKey.get(), testDistroIdString.c_str(), L"RunOOBE", 1);
         const RegistryKeyChange<DWORD> defaultUid(lxssKey.get(), testDistroIdString.c_str(), L"DefaultUid", 0);
 
@@ -4795,7 +4805,38 @@ VERSION_ID="Invalid|Format"
             distributionconf.SetContent(
                 L"[oobe]\ncommand = /bin/bash -c 'echo OOBE && useradd -u 1010 -m -s /bin/bash user'\n defaultUid = 1010\n");
 
+            constexpr auto userMountPoint = L"/run/wsl-oobe-user-mount";
+            const auto userMountIdCommand = std::format(L"findmnt -n -o ID -M {}", userMountPoint);
+            const auto userMountOwnerCommand = std::format(L"stat -c %u:%g {}", userMountPoint);
+            std::wstring originalUserMountId;
+            std::optional<DistroFileChange> fstab;
+            auto cleanupUserMount = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                if (fstab.has_value())
+                {
+                    fstab.reset();
+                    TerminateDistribution();
+                }
+            });
+
+            if (LxsstuVmMode())
+            {
+                fstab.emplace(L"/etc/fstab");
+                fstab->SetContent(
+                    std::format(L"{} {} drvfs uid=2000,gid=2001,x-mount.mkdir 0 0\n", drvFsTestPath.root_path().generic_wstring(), userMountPoint)
+                        .c_str());
+            }
+
             TerminateDistribution();
+
+            if (LxsstuVmMode())
+            {
+                auto [mountId, warnings] = LxsstuLaunchWslAndCaptureOutput(userMountIdCommand);
+                VERIFY_IS_FALSE(mountId.empty());
+                VERIFY_ARE_EQUAL(L"", warnings);
+                originalUserMountId = std::move(mountId);
+                validateOutput(userMountOwnerCommand.c_str(), L"2000:2001\n");
+                VERIFY_ARE_EQUAL(1, runOOBE.Get());
+            }
 
             validateOutput(nullptr, L"OOBE\n");
             VERIFY_ARE_EQUAL(runOOBE.Get(), 0);
@@ -4803,6 +4844,22 @@ VERSION_ID="Invalid|Format"
             // Validate that DefaultUid was set
             validateOutput(L"id -u", L"1010\n");
             VERIFY_ARE_EQUAL(defaultUid.Get(), 1010);
+
+            if (LxsstuVmMode())
+            {
+                // DrvFs mounts created before OOBE should be refreshed to use the new default user.
+                validateOutput(
+                    std::format(
+                        L"bash -c 'path=$(wslpath -u \"{}\") && mountpoint=$(findmnt -n -o TARGET -T \"$path\") && "
+                        L"test \"$(stat -c %u:%g \"$mountpoint\")\" = \"$(id -u):$(id -g)\" && touch \"$path/probe\" && "
+                        L"chmod 0644 \"$path/probe\"'",
+                        drvFsTestPath.wstring())
+                        .c_str(),
+                    L"");
+
+                validateOutput(userMountOwnerCommand.c_str(), L"2000:2001\n");
+                validateOutput(userMountIdCommand.c_str(), originalUserMountId.c_str());
+            }
 
             // New file should be created with the correct uid.
             const std::wstring testFilePathLinux = L"/tmp/oobe_file_test";
@@ -4812,6 +4869,22 @@ VERSION_ID="Invalid|Format"
                 testFilePathWindows.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
             VERIFY_IS_TRUE(file.is_valid());
             validateOutput(std::format(L"stat -c %u {}", testFilePathLinux).c_str(), L"1010\n");
+        }
+
+        if (LxsstuVmMode())
+        {
+            runOOBE.Set(1);
+            const auto mountIdCommand =
+                std::format(L"path=$(wslpath -u \"{}\") && findmnt -n -o ID -T \"$path\"", drvFsTestPath.generic_wstring());
+            distributionconf.SetContent(
+                std::format(L"[oobe]\ncommand = /bin/bash -c '{} > \"$path/mount-id\"'\ndefaultUid = 1010\n", mountIdCommand).c_str());
+
+            TerminateDistribution();
+
+            validateOutput(nullptr, L"");
+            VERIFY_ARE_EQUAL(runOOBE.Get(), 0);
+            VERIFY_ARE_EQUAL(defaultUid.Get(), 1010);
+            validateOutput(std::format(L"bash -c '{} | cmp -s - \"$path/mount-id\"'", mountIdCommand).c_str(), L"");
         }
 
         // Verify that the default UID isn't changed if it's not present in wsl-distribution.conf.
