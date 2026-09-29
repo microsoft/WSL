@@ -370,18 +370,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     {
         ExecutionContext context(Context::ConfigureGpu);
 
-        hcs::ModifySettingRequest<hcs::GpuConfiguration> gpuRequest{};
-        gpuRequest.ResourcePath = L"VirtualMachine/ComputeTopology/Gpu";
-        gpuRequest.RequestType = hcs::ModifyRequestType::Update;
-        gpuRequest.Settings.AssignmentMode = hcs::GpuAssignmentMode::Mirror;
-        gpuRequest.Settings.AllowVendorExtension = true;
-        if (wsl::windows::common::hcs::IsDisableVgpuSettingsSupported())
-        {
-            gpuRequest.Settings.DisableGdiAcceleration = true;
-            gpuRequest.Settings.DisablePresentation = true;
-        }
-
-        wsl::windows::common::hcs::ModifyComputeSystem(m_system.get(), wsl::shared::ToJsonW(gpuRequest).c_str());
+        wsl::windows::common::hcs::AddMirroredGpu(m_system.get());
 
         // Also add 9p shares for the library directories.
         // N.B. These are not hosted by the out-of-proc drvfs 9p server because the GPU shares

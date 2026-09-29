@@ -117,6 +117,11 @@ class HcsVirtualMachineBackendTests
         VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::UnbindPort)));
         VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::CreateVirtualAddress)));
         VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::CreateDnsRecord)));
+        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::AddPersistentMemory)));
+        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::AddGpu)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::PersistentMemory)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::MirroredGpu)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::GpuVendorExtension)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::HostEndpointNetwork)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::UserModeNatNetwork)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::DynamicHostPort)));
@@ -292,6 +297,7 @@ class HcsVirtualMachineBackendTests
         bindingRequest.GuestPort = 80;
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->BindPort(device, bindingRequest); }));
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->UnbindPort(binding); }));
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddPersistentMemory({}); }));
         backend->Terminate();
     }
 

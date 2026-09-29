@@ -94,6 +94,16 @@ void GrantVmAccess(_In_ PCWSTR VmId, _In_ PCWSTR FilePath);
 /// </summary>
 void GrantVmWorkerProcessAccessToDisk(_In_ PCWSTR VmId, _In_ PCWSTR Disk, _In_opt_ HANDLE UserToken);
 
+/// <summary>
+/// Assigns the host GPUs to a running compute system using mirrored assignment. The GDI acceleration
+/// and presentation settings are only sent to hosts that support them.
+/// </summary>
+void AddMirroredGpu(
+    _In_ HCS_SYSTEM ComputeSystem,
+    _In_ bool AllowVendorExtension = true,
+    _In_ bool DisableGdiAcceleration = true,
+    _In_ bool DisablePresentation = true);
+
 void ModifyComputeSystem(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Configuration, _In_opt_ HANDLE Identity = nullptr);
 
 unique_hcs_system OpenComputeSystem(_In_ PCWSTR Id, _In_ DWORD RequestedAccess);
