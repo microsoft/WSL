@@ -2641,9 +2641,12 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid, boo
 
             {
                 auto runAsUser = wil::CoImpersonateClient();
-                // The retained disk has moved; never delete it or a file that appeared at its old path.
+                // Preserve legacy rootfs/temp cleanup so the install path can be reused by either WSL version.
+                // The retained VHD has moved; never unmount or delete a replacement at its old path.
                 _DeleteDistributionLockHeld(
-                    configuration, retained ? (LXSS_DELETE_DISTRO_FLAGS_SHORTCUTS | LXSS_DELETE_DISTRO_FLAGS_WSLG_SHORTCUTS) : LXSS_DELETE_DISTRO_FLAGS_ALL);
+                    configuration,
+                    retained ? (LXSS_DELETE_DISTRO_FLAGS_ALL & ~(LXSS_DELETE_DISTRO_FLAGS_VHD | LXSS_DELETE_DISTRO_FLAGS_UNMOUNT))
+                             : LXSS_DELETE_DISTRO_FLAGS_ALL);
             }
 
             WslOfflineDistributionInformation distributionInfo;

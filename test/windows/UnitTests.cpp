@@ -7455,6 +7455,13 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--set-default {}", name)), 0u);
         auto restoreDefault = wil::scope_exit_log(
             WI_DIAGNOSTICS_INFO, [&] { LxsstuLaunchWsl(std::format(L"--set-default {}", LXSS_DISTRO_NAME_TEST_L)); });
+        if (LxsstuVmMode())
+        {
+            // Legacy rootfs/temp artifacts must not prevent importing WSL 1 into this path later.
+            std::filesystem::create_directories(install / LXSS_ROOTFS_DIRECTORY / L"log");
+            std::filesystem::create_directories(install / LXSS_TEMP_DIRECTORY);
+            std::ofstream(install / LXSS_PLAN9_UNIX_SOCKET) << "stale socket";
+        }
         const auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--unregister {}", name));
         VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
         VERIFY_ARE_EQUAL(err, L"");
@@ -7468,6 +7475,12 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             return;
         }
         VERIFY_IS_FALSE(std::filesystem::exists(install / L"ext4.vhdx"));
+        VERIFY_IS_FALSE(std::filesystem::exists(install / LXSS_ROOTFS_DIRECTORY));
+        VERIFY_IS_FALSE(std::filesystem::exists(install / LXSS_TEMP_DIRECTORY));
+        VERIFY_IS_FALSE(std::filesystem::exists(install / LXSS_PLAN9_UNIX_SOCKET));
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(std::format(L"--import {} \"{}\" \"{}\" --version 1", name, install.wstring(), archive.wstring())), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {} --force", name)), 0u);
         // Reuse both name and location immediately, then recover the old disk under a different name.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(import), 0u);
         auto [list, listErr] = LxsstuLaunchWslAndCaptureOutput(L"--list --deleted");
