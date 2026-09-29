@@ -295,6 +295,7 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
     // Determine the maximum number of processors that can be added to the VM.
     // If the user did not supply a processor count, use the maximum.
     const int logicalProcessorCount = wsl::windows::common::wslutil::GetLogicalProcessorCount();
+    // Without a NUMA topology, the WSL VM cannot start with more than 256 processors.
     MaximumProcessorCount = std::min(logicalProcessorCount, 256);
     if (ProcessorCount <= 0)
     {
