@@ -7,7 +7,7 @@ Underlying values:
 - `Sparse = 2`
 
 ```cpp
-vhdOptions.Type(VhdType::Sparse);
+vhdOptions.Type(VhdType::Dynamic);
 ```
 
 `Sparse` creates a dynamically expanding VHD backed by a sparse host file. This feature is currently experimental.
