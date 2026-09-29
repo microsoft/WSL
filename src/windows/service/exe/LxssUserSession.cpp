@@ -1761,6 +1761,8 @@ CATCH_RETURN()
 HRESULT LxssUserSessionImpl::SetSparse(_In_ LPCGUID DistroGuid, _In_ BOOLEAN Sparse, _In_ BOOLEAN AllowUnsafe)
 try
 {
+    UNREFERENCED_PARAMETER(AllowUnsafe);
+
     const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     const wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
     auto runAsUser = wil::impersonate_token(userToken.get());
@@ -1773,11 +1775,6 @@ try
     if (WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE))
     {
         THROW_HR_WITH_USER_ERROR(WSL_E_VM_MODE_INVALID_STATE, wsl::shared::Localization::MessageSparseVhdWsl2Only());
-    }
-
-    if (Sparse && !AllowUnsafe)
-    {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageSparseVhdRequiresAllowUnsafe());
     }
 
     // Don't attempt if running
