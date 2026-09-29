@@ -204,7 +204,7 @@ HcsVirtualMachineBackend::~HcsVirtualMachineBackend() noexcept
     {
         auto lock = m_lock.lock_exclusive();
         CloseNetworkAdaptersLocked();
-        CloseFileSystemDevicesLocked();
+        CloseGuestDevicesLocked();
         system = std::move(m_system);
         attachedDisks = std::move(m_attachedDisks);
         CloseGuestListenersLocked(m_configuration.Description.Identity);
@@ -362,7 +362,7 @@ void HcsVirtualMachineBackend::Terminate()
         auto lock = m_lock.lock_exclusive();
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
         CloseNetworkAdaptersLocked();
-        CloseFileSystemDevicesLocked();
+        CloseGuestDevicesLocked();
         system = std::move(m_system);
         attachedDisks = std::move(m_attachedDisks);
         CloseGuestListenersLocked(m_configuration.Description.Identity);
@@ -655,7 +655,7 @@ void HcsVirtualMachineBackend::DetachDisk(VmDiskId Disk)
 }
 
 _Requires_lock_held_(m_lock)
-void HcsVirtualMachineBackend::CloseFileSystemDevicesLocked() noexcept
+void HcsVirtualMachineBackend::CloseGuestDevicesLocked() noexcept
 {
     for (const auto& entry : m_fileSystemDevices)
     {
@@ -669,6 +669,110 @@ void HcsVirtualMachineBackend::CloseFileSystemDevicesLocked() noexcept
     m_guestDeviceManager.reset();
     m_fileSystemShares.clear();
     m_fileSystemDevices.clear();
+    m_persistentMemoryDevices.clear();
+}
+
+VmPersistentMemoryDevice HcsVirtualMachineBackend::AddPersistentMemory(const VmPersistentMemoryRequest& Request)
+{
+    THROW_HR_IF(E_INVALIDARG, Request.Path.empty());
+
+    // Serialize additions so that the guest enumerates persistent memory devices in the order they
+    // were added. The guest names a device after that order (/dev/pmem<index>) and callers rely on
+    // the name, so the caller's wait for the device runs before the next addition begins.
+    auto persistentMemoryLock = m_persistentMemoryLock.lock_exclusive();
+
+    std::shared_ptr<GuestDeviceManager> guestDeviceManager;
+    HANDLE userToken{};
+    VmPersistentMemoryDevice device{};
+    {
+        auto lock = m_lock.lock_exclusive();
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system || !m_guestDeviceManager);
+        THROW_HR_IF(E_BOUNDS, m_nextDeviceId == UINT64_MAX);
+        guestDeviceManager = m_guestDeviceManager;
+        userToken = Request.UserToken ? Request.UserToken.get() : m_configuration.Description.Identity.UserToken.get();
+        THROW_HR_IF_MSG(E_UNEXPECTED, !userToken, "UserToken not set for the persistent memory request");
+
+        device.Id = {m_configuration.Description.Identity, m_nextDeviceId++};
+        device.Index = m_nextPersistentMemoryIndex;
+        device.EffectiveHostPath = Request.Path;
+        device.ReadOnly = Request.ReadOnly;
+    }
+
+    WSL_LOG(
+        "HcsAddPersistentMemoryBegin",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(device.Id.Value, "deviceId"),
+        TraceLoggingValue(device.Index, "index"),
+        TraceLoggingValue(Request.Path.c_str(), "path"),
+        TraceLoggingValue(Request.ReadOnly, "readOnly"));
+
+    // N.B. If this succeeds, the device would need to be removed if a later step fails. HCS does not
+    //      support removing persistent memory devices, so a failure leaves the device in place; all
+    //      persistent memory devices are added during VM creation, so any failure terminates the VM.
+    device.GuestInstanceId = guestDeviceManager->AddVirtioPmemDevice(Request.Path.c_str(), Request.ReadOnly, userToken);
+
+    // The device is now attached, so record it and consume its index before anything that can fail.
+    // Otherwise a failure below would leave an attached but untracked device and let the next
+    // addition reuse this device's guest name.
+    {
+        auto lock = m_lock.lock_exclusive();
+        const auto inserted = m_persistentMemoryDevices.emplace(device.Id.Value, device).second;
+        WI_ASSERT(inserted);
+    }
+
+    ++m_nextPersistentMemoryIndex;
+
+    // Give the caller a chance to observe the device in the guest while additions are still
+    // serialized. This runs without m_lock because it blocks on the guest.
+    if (Request.WaitForGuestDevice)
+    {
+        Request.WaitForGuestDevice(device.Index);
+    }
+
+    WSL_LOG(
+        "HcsAddPersistentMemoryEnd",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(device.Id.Value, "deviceId"),
+        TraceLoggingValue(device.Index, "index"),
+        TraceLoggingValue(device.GuestInstanceId, "instanceId"));
+
+    return device;
+}
+
+VmGpuAttachment HcsVirtualMachineBackend::AddGpu(const VmGpuRequest& Request)
+{
+    ExecutionContext context(Context::ConfigureGpu);
+    THROW_HR_IF(c_notSupported, Request.AssignmentMode != VmGpuAssignmentMode::Mirror);
+
+    const auto disableVgpuSettingsSupported = schema::IsDisableVgpuSettingsSupported();
+    VmGpuAttachment attachment{};
+    attachment.AssignmentMode = Request.AssignmentMode;
+    attachment.VendorExtension = validation::ValidateFeature(Request.VendorExtension, L"GPU vendor extension", true);
+    attachment.GdiAccelerationDisabled =
+        validation::ValidateFeature(Request.DisableGdiAcceleration, L"GPU GDI acceleration", disableVgpuSettingsSupported);
+    attachment.PresentationDisabled =
+        validation::ValidateFeature(Request.DisablePresentation, L"GPU presentation", disableVgpuSettingsSupported);
+
+    auto lock = m_lock.lock_exclusive();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_gpu.has_value());
+    THROW_HR_IF(E_BOUNDS, m_nextDeviceId == UINT64_MAX);
+
+    schema::AddMirroredGpu(
+        m_system.get(), attachment.VendorExtension, attachment.GdiAccelerationDisabled, attachment.PresentationDisabled);
+
+    attachment.Id = {m_configuration.Description.Identity, m_nextDeviceId++};
+    m_gpu = attachment;
+
+    WSL_LOG(
+        "HcsAddGpu",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(attachment.Id.Value, "deviceId"),
+        TraceLoggingValue(attachment.VendorExtension, "vendorExtension"),
+        TraceLoggingValue(attachment.GdiAccelerationDisabled, "gdiAccelerationDisabled"),
+        TraceLoggingValue(attachment.PresentationDisabled, "presentationDisabled"));
+
+    return attachment;
 }
 
 VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request)

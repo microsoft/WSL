@@ -39,6 +39,9 @@ public:
     VmDiskAttachment AttachDisk(const VmDiskRequest& Request) override;
     void DetachDisk(VmDiskId Disk) override;
 
+    VmPersistentMemoryDevice AddPersistentMemory(const VmPersistentMemoryRequest& Request) override;
+    VmGpuAttachment AddGpu(const VmGpuRequest& Request) override;
+
     VmFileSystemDevice CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request) override;
     VmFileSystemShare AddFileSystemShare(VmDeviceId Device, const VmFileSystemShareRequest& Request) override;
     void RemoveFileSystemShare(VmShareId Share) override;
@@ -117,7 +120,7 @@ private:
     std::shared_ptr<VmGuestListenerState> ConfigureGuestListener(const VmGuestListener& Listener) override;
 
     _Requires_lock_held_(m_lock)
-    void CloseFileSystemDevicesLocked() noexcept;
+    void CloseGuestDevicesLocked() noexcept;
 
     _Requires_lock_held_(m_lock)
     std::uint32_t ReserveLunLocked(const std::optional<VmScsiPlacement>& Placement) const;
@@ -198,6 +201,12 @@ private:
     _Guarded_by_(m_lock) std::uint64_t m_nextDiskId = 1;
     _Guarded_by_(m_lock) FileSystemDeviceMap m_fileSystemDevices;
     _Guarded_by_(m_lock) std::uint64_t m_nextDeviceId = 1;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, VmPersistentMemoryDevice> m_persistentMemoryDevices;
+    _Guarded_by_(m_lock) std::optional<VmGpuAttachment> m_gpu;
+    // Serializes persistent memory additions, including the caller's wait for the device to appear
+    // in the guest. Acquired before m_lock, which is released while the wait runs.
+    wil::srwlock m_persistentMemoryLock;
+    _Guarded_by_(m_persistentMemoryLock) std::uint32_t m_nextPersistentMemoryIndex = 0;
     _Guarded_by_(m_lock) std::map<std::uint64_t, FileSystemShare> m_fileSystemShares;
     _Guarded_by_(m_lock) std::uint64_t m_nextShareId = 1;
     _Guarded_by_(m_lock) std::vector<VmNetworkAdapterRequest> m_pendingNetworkAdapters;

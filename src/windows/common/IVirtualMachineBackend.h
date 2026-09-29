@@ -512,6 +512,59 @@ struct VmFileSystemShare
     bool ReadOnly = true;
 };
 
+// Invoked with the index of a newly added persistent memory device while the backend still
+// serializes persistent memory additions. Callers that name devices after the order in which the
+// guest enumerated them (/dev/pmem<index>) use this to wait for the device to appear before the
+// next one is added. The device is already added and tracked when this runs, so throwing fails
+// AddPersistentMemory without reusing the device's index.
+using VmPersistentMemoryReadyCallback = std::function<void(std::uint32_t DeviceIndex)>;
+
+struct VmPersistentMemoryRequest
+{
+    std::filesystem::path Path;
+    bool ReadOnly = true;
+    // Token whose identity is used to reach the backing file. The VM identity token is used when
+    // this is unset.
+    wil::shared_handle UserToken{};
+    VmPersistentMemoryReadyCallback WaitForGuestDevice;
+};
+
+struct VmPersistentMemoryDevice
+{
+    VmDeviceId Id;
+    GUID GuestInstanceId{};
+    // Position of the device among the persistent memory devices added to this VM. The guest names
+    // the device after the order in which it enumerated it, so this matches /dev/pmem<Index> as
+    // long as every device is added through the backend.
+    std::uint32_t Index = 0;
+    std::filesystem::path EffectiveHostPath;
+    bool ReadOnly = true;
+};
+
+enum class VmGpuAssignmentMode
+{
+    Mirror
+};
+
+struct VmGpuRequest
+{
+    VmGpuAssignmentMode AssignmentMode = VmGpuAssignmentMode::Mirror;
+    VmFeatureRequest VendorExtension = VmFeatureRequest::Preferred;
+    // Presentation and GDI acceleration are only controllable on hosts that support the setting; a
+    // preferred request leaves them at the host default elsewhere.
+    VmFeatureRequest DisableGdiAcceleration = VmFeatureRequest::Preferred;
+    VmFeatureRequest DisablePresentation = VmFeatureRequest::Preferred;
+};
+
+struct VmGpuAttachment
+{
+    VmDeviceId Id;
+    VmGpuAssignmentMode AssignmentMode = VmGpuAssignmentMode::Mirror;
+    bool VendorExtension = false;
+    bool GdiAccelerationDisabled = false;
+    bool PresentationDisabled = false;
+};
+
 class IVirtualMachineBackend
 {
 public:
@@ -533,6 +586,17 @@ public:
 
     virtual VmDiskAttachment AttachDisk(const VmDiskRequest& Request) = 0;
     virtual void DetachDisk(VmDiskId Disk) = 0;
+
+    /// <summary>
+    /// Exposes a host file to the guest as a persistent memory device. Additions are serialized so
+    /// that devices are enumerated by the guest in the order they were added.
+    /// </summary>
+    virtual VmPersistentMemoryDevice AddPersistentMemory(const VmPersistentMemoryRequest& Request) = 0;
+
+    /// <summary>
+    /// Assigns the host GPUs to the VM and reports the settings that were applied.
+    /// </summary>
+    virtual VmGpuAttachment AddGpu(const VmGpuRequest& Request) = 0;
 
     virtual VmFileSystemDevice CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request) = 0;
     virtual VmFileSystemShare AddFileSystemShare(VmDeviceId Device, const VmFileSystemShareRequest& Request) = 0;

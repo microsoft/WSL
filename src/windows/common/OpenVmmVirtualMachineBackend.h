@@ -49,6 +49,9 @@ public:
     VmDiskAttachment AttachDisk(const VmDiskRequest& Request) override;
     void DetachDisk(VmDiskId Disk) override;
 
+    VmPersistentMemoryDevice AddPersistentMemory(const VmPersistentMemoryRequest& Request) override;
+    VmGpuAttachment AddGpu(const VmGpuRequest& Request) override;
+
     VmFileSystemDevice CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request) override;
     VmFileSystemShare AddFileSystemShare(VmDeviceId Device, const VmFileSystemShareRequest& Request) override;
     void RemoveFileSystemShare(VmShareId Share) override;

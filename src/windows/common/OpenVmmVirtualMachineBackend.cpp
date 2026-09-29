@@ -676,6 +676,16 @@ void OpenVmmVirtualMachineBackend::DetachDisk(VmDiskId Disk)
     m_attachedDisks.erase(disk);
 }
 
+VmPersistentMemoryDevice OpenVmmVirtualMachineBackend::AddPersistentMemory(const VmPersistentMemoryRequest&)
+{
+    THROW_HR_MSG(c_notSupported, "OpenVMM does not support persistent memory devices");
+}
+
+VmGpuAttachment OpenVmmVirtualMachineBackend::AddGpu(const VmGpuRequest&)
+{
+    THROW_HR_MSG(c_notSupported, "OpenVMM does not support GPU assignment");
+}
+
 VmFileSystemDevice OpenVmmVirtualMachineBackend::CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request)
 {
     const auto* transport = std::get_if<VmVirtioFsDevice>(&Request.Transport);

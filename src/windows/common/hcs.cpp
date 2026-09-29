@@ -26,6 +26,7 @@ using wsl::windows::common::ExecutionContext;
 constexpr auto c_processorCapabilities = "ProcessorCapabilities";
 constexpr LPCWSTR c_processorCapabilitiesQuery = L"{ \"PropertyQueries\": {\"ProcessorCapabilities\" : {}}}";
 constexpr LPCWSTR c_scsiResourcePath = L"VirtualMachine/Devices/Scsi/0/Attachments/";
+constexpr LPCWSTR c_gpuResourcePath = L"VirtualMachine/ComputeTopology/Gpu";
 
 std::filesystem::path wsl::windows::common::hcs::WriteVmCrashLog(
     const std::filesystem::path& Folder, std::uint32_t MaxFileCount, const GUID& VmId, HANDLE UserToken, std::wstring_view CrashLog)
@@ -395,6 +396,28 @@ void wsl::windows::common::hcs::RemoveDiskWithAccess(
         }
         CATCH_LOG()
     }
+}
+
+void wsl::windows::common::hcs::AddMirroredGpu(
+    _In_ HCS_SYSTEM ComputeSystem,
+    _In_ bool AllowVendorExtension,
+    _In_ bool DisableGdiAcceleration,
+    _In_ bool DisablePresentation)
+{
+    ModifySettingRequest<GpuConfiguration> request{};
+    request.ResourcePath = c_gpuResourcePath;
+    request.RequestType = ModifyRequestType::Update;
+    request.Settings.AssignmentMode = GpuAssignmentMode::Mirror;
+    request.Settings.AllowVendorExtension = AllowVendorExtension;
+
+    // N.B. Hosts that predate these settings reject a request that carries them.
+    if (IsDisableVgpuSettingsSupported())
+    {
+        request.Settings.DisableGdiAcceleration = DisableGdiAcceleration;
+        request.Settings.DisablePresentation = DisablePresentation;
+    }
+
+    ModifyComputeSystem(ComputeSystem, wsl::shared::ToJsonW(request).c_str());
 }
 
 void wsl::windows::common::hcs::RemoveScsiDisk(_In_ HCS_SYSTEM ComputeSystem, _In_ ULONG Lun)

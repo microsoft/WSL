@@ -333,18 +333,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     // Add GPU to the VM if requested
     if (FeatureEnabled(WslcFeatureFlagsGPU))
     {
-        hcs::ModifySettingRequest<hcs::GpuConfiguration> gpuRequest{};
-        gpuRequest.ResourcePath = L"VirtualMachine/ComputeTopology/Gpu";
-        gpuRequest.RequestType = hcs::ModifyRequestType::Update;
-        gpuRequest.Settings.AssignmentMode = hcs::GpuAssignmentMode::Mirror;
-        gpuRequest.Settings.AllowVendorExtension = true;
-        if (wsl::windows::common::hcs::IsDisableVgpuSettingsSupported())
-        {
-            gpuRequest.Settings.DisableGdiAcceleration = true;
-            gpuRequest.Settings.DisablePresentation = true;
-        }
-
-        hcs::ModifyComputeSystem(m_computeSystem.get(), wsl::shared::ToJsonW(gpuRequest).c_str());
+        hcs::AddMirroredGpu(m_computeSystem.get());
     }
 }
 
