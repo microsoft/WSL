@@ -2943,7 +2943,8 @@ try
             auto DevicePath = GetLunDevicePath(Message->ScsiLun);
 
             auto CommandLine = std::format("/usr/sbin/e2fsck -f -y '{}'", DevicePath);
-            THROW_LAST_ERROR_IF(UtilExecCommandLine(CommandLine.c_str()) < 0);
+            // e2fsck returns 1 when filesystem errors were corrected.
+            THROW_LAST_ERROR_IF(UtilExecCommandLine(CommandLine.c_str(), nullptr, {0, 1}) < 0);
 
             if (Message->NewSize == 0)
             {

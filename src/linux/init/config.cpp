@@ -2943,7 +2943,7 @@ try
             return wsl::shared::retry::RetryWithTimeout<bool>(
                 [&]() {
                     std::string Output;
-                    auto exitCode = UtilExecCommandLine(cmd.c_str(), &Output, 0, false);
+                    auto exitCode = UtilExecCommandLine(cmd.c_str(), &Output, {0}, false);
                     if (exitCode == 0) // is-active returns 0 if the unit is active.
                     {
                         return true;
