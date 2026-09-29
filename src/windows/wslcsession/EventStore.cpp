@@ -247,7 +247,9 @@ std::optional<wsl::windows::common::wslc_schema::Event> EventStore::Get(
         // so that every parked reader is guaranteed to observe an event before the next write can evict
         // it.
         const auto event = GetLockHeld(SequenceNumber.value()).value();
-        const std::chrono::sys_time<std::chrono::nanoseconds> eventTime{std::chrono::nanoseconds{event.timeNano}};
+
+        // Compared in seconds, since converting a far-future Since or Until bound to nanoseconds would overflow.
+        const std::chrono::sys_seconds eventTime{std::chrono::floor<std::chrono::seconds>(std::chrono::nanoseconds{event.timeNano})};
 
         // Advance in delivery order before applying the time window.
         SequenceNumber.value()++;

@@ -7401,6 +7401,15 @@ class WSLCTests
             VERIFY_IS_TRUE(DrainEventStream(stream.get()).empty());
         }
 
+        // An until-time in year 3000, beyond the range of nanosecond time points, still returns the recorded events.
+        {
+            WSLCFilter filter{"container", id.c_str()};
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, 32'503'680'000, &filter, 1, &stream));
+
+            verifyEvents(ReadEvents(stream.get(), 5), id, {"create", "start", "kill", "stop", "destroy"});
+        }
+
         // A since-time later than a non-zero until-time describes a backwards window and is rejected.
         {
             wil::com_ptr<IWSLCEventStream> stream;
