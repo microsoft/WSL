@@ -122,6 +122,7 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
 {
     auto signalEarlyTermination = wil::scope_exit([&] { m_terminatingEvent.SetEvent(); });
 
+    THROW_HR_IF(E_INVALIDARG, IsEqualGUID(Request.Identity.VmId, GUID_NULL));
     m_restrictedToken = wsl::windows::common::security::CreateRestrictedToken(Request.Identity.UserToken.get());
 
     VmConfiguration configuration{};
@@ -526,7 +527,7 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
             }
 
             // Add the disk to the VM.
-            schema::AddPassThroughDiskWithRetry(m_system.get(), path.c_str(), lun, timeoutMs);
+            schema::AddPassThroughDiskWithRetry(m_system.get(), path.c_str(), lun, Request.ReadOnly, timeoutMs);
         }
         else
         {

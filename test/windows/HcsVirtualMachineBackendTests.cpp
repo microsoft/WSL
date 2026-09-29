@@ -176,6 +176,13 @@ class HcsVirtualMachineBackendTests
         secondBackend->Terminate();
     }
 
+    TEST_METHOD(RejectsInvalidIdentity)
+    {
+        auto request = CreateRunnableRequest();
+        request.Identity.VmId = GUID_NULL;
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { HcsVirtualMachineBackend::Create(request); }));
+    }
+
     TEST_METHOD(RejectsUnsupportedCreationResources)
     {
         auto request = CreateRunnableRequest();

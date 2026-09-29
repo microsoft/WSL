@@ -1039,7 +1039,8 @@ ULONG WslCoreVm::AttachDiskLockHeld(
             }
 
             // Add the disk to the VM.
-            wsl::windows::common::hcs::AddPassThroughDiskWithRetry(m_system.get(), Disk, Lun.value(), m_vmConfig.MountDeviceTimeout);
+            wsl::windows::common::hcs::AddPassThroughDiskWithRetry(
+                m_system.get(), Disk, Lun.value(), false, m_vmConfig.MountDeviceTimeout);
         }
         else
         {

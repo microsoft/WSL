@@ -104,21 +104,24 @@ void wsl::windows::common::hcs::AddVhd(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWST
     ModifyComputeSystem(ComputeSystem, wsl::shared::ToJsonW(request).c_str());
 }
 
-void wsl::windows::common::hcs::AddPassThroughDisk(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun)
+void wsl::windows::common::hcs::AddPassThroughDisk(
+    _In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun, _In_ bool ReadOnly)
 {
     ModifySettingRequest<Attachment> request{};
     request.RequestType = ModifyRequestType::Add;
     request.Settings.Path = Disk;
+    request.Settings.ReadOnly = ReadOnly;
     request.ResourcePath = c_scsiResourcePath + std::to_wstring(Lun);
     request.Settings.Type = AttachmentType::PassThru;
 
     ModifyComputeSystem(ComputeSystem, wsl::shared::ToJsonW(request).c_str());
 }
 
-void wsl::windows::common::hcs::AddPassThroughDiskWithRetry(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun, _In_ size_t TimeoutMs)
+void wsl::windows::common::hcs::AddPassThroughDiskWithRetry(
+    _In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun, _In_ bool ReadOnly, _In_ size_t TimeoutMs)
 {
     wsl::shared::retry::RetryWithTimeout<void>(
-        std::bind(AddPassThroughDisk, ComputeSystem, Disk, Lun),
+        std::bind(AddPassThroughDisk, ComputeSystem, Disk, Lun, ReadOnly),
         wsl::windows::common::disk::c_diskOperationRetry,
         std::chrono::milliseconds(TimeoutMs),
         []() { return wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION); });

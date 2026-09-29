@@ -53,12 +53,13 @@ void RemovePlan9Share(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR AccessName, _In
 
 void AddVhd(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR VhdPath, _In_ ULONG Lun, _In_ bool ReadOnly = false);
 
-void AddPassThroughDisk(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun);
+void AddPassThroughDisk(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun, _In_ bool ReadOnly);
 
 /// <summary>
 /// Adds a pass-through disk to a compute system, retrying while the disk is still in use by the host.
 /// </summary>
-void AddPassThroughDiskWithRetry(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun, _In_ size_t TimeoutMs);
+void AddPassThroughDiskWithRetry(
+    _In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun, _In_ bool ReadOnly, _In_ size_t TimeoutMs);
 
 /// <summary>
 /// Adds a VHD to a compute system, granting the VM access to the file if needed.
