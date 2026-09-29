@@ -105,7 +105,11 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL((request.Memory.SizeBytes / c_mib) * c_mib, description.Memory.SizeBytes);
         VERIFY_ARE_EQUAL(VmBootMethod::LinuxDirect, description.Boot.Method);
         VERIFY_ARE_EQUAL(request.Boot.KernelCommandLine, description.Boot.KernelCommandLine);
-        VERIFY_ARE_EQUAL(BackendKind::Hcs, backend->GetCapabilities().Backend);
+        const auto capabilities = backend->GetCapabilities();
+        VERIFY_ARE_EQUAL(BackendKind::Hcs, capabilities.Backend);
+        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::CreateFileSystemDevice)));
+        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::AddFileSystemShare)));
+        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::RemoveFileSystemShare)));
         backend->Terminate();
     }
 
@@ -271,7 +275,7 @@ class HcsVirtualMachineBackendTests
                              request.HostPath = L"C:\\";
                              backend->AddFileSystemShare(device, request);
                          }));
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->RemoveFileSystemShare(share); }));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->RemoveFileSystemShare(share); }));
         VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AddNetworkAdapter({}); }));
         VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->BindPort(device, {}); }));
         VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->UnbindPort(binding); }));
@@ -326,6 +330,25 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_NOT_EQUAL(share.Id.Value, readOnlyShare.Id.Value);
         VERIFY_IS_TRUE(readOnlyShare.ReadOnly);
 
+        auto invalidShare = share.Id;
+        THROW_IF_FAILED(CoCreateGuid(&invalidShare.Owner.VmId));
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->RemoveFileSystemShare(invalidShare); }));
+
+        backend->RemoveFileSystemShare(share.Id);
+        const auto replacementShare = backend->AddFileSystemShare(userDevice.Id, request);
+        VERIFY_ARE_NOT_EQUAL(share.Id.Value, replacementShare.Id.Value);
+        backend->RemoveFileSystemShare(replacementShare.Id);
+        VERIFY_ARE_EQUAL(
+            HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->RemoveFileSystemShare(replacementShare.Id); }));
+
+        const auto singleShareDevice = backend->CreateFileSystemDevice({VmVirtioFsDevice{L"drvfs-single", VmVirtioFsLayout::SingleShare}});
+        const auto singleShare = backend->AddFileSystemShare(singleShareDevice.Id, request);
+        VERIFY_IS_FALSE(std::get<VmVirtioFsShareAddress>(singleShare.GuestAddress).ChildName.has_value());
+        backend->RemoveFileSystemShare(singleShare.Id);
+        const auto replacementSingleShare = backend->AddFileSystemShare(singleShareDevice.Id, request);
+        VERIFY_ARE_NOT_EQUAL(singleShare.Id.Value, replacementSingleShare.Id.Value);
+        backend->RemoveFileSystemShare(replacementSingleShare.Id);
+
         // A share carries its own token, so the elevated device reaches the same directory without
         // reusing the share that the unelevated device serves.
         auto adminRequest = request;
@@ -352,6 +375,14 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(socketDevice.Port.Value, std::get<VmPlan9SocketShareAddress>(socketShare.GuestAddress).Port.Value);
         VERIFY_IS_FALSE(socketShare.ReadOnly);
 
+        // A Plan 9 device keeps serving after one of its shares is removed, so the share can be added again.
+        backend->RemoveFileSystemShare(socketShare.Id);
+        VERIFY_ARE_EQUAL(
+            HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->RemoveFileSystemShare(socketShare.Id); }));
+        const auto replacementSocketShare = backend->AddFileSystemShare(socketDeviceResult.Id, socketRequest);
+        VERIFY_ARE_NOT_EQUAL(socketShare.Id.Value, replacementSocketShare.Id.Value);
+        backend->RemoveFileSystemShare(replacementSocketShare.Id);
+
         VmPlan9VirtioDevice virtioDevice{L"plan9-virtio"};
         virtioDevice.FileSystemClassId = __uuidof(p9fs::Plan9FileSystem);
         virtioDevice.DeviceType = VIRTIO_PLAN9_DEVICE_ID;
@@ -365,6 +396,10 @@ class HcsVirtualMachineBackendTests
         const auto virtioShare = backend->AddFileSystemShare(virtioDeviceResult.Id, virtioRequest);
         VERIFY_ARE_EQUAL(std::wstring{L"plan9-virtio"}, std::get<VmPlan9VirtioShareAddress>(virtioShare.GuestAddress).Tag);
         VERIFY_IS_FALSE(virtioShare.ReadOnly);
+        backend->RemoveFileSystemShare(virtioShare.Id);
+        const auto replacementVirtioShare = backend->AddFileSystemShare(virtioDeviceResult.Id, virtioRequest);
+        VERIFY_ARE_NOT_EQUAL(virtioShare.Id.Value, replacementVirtioShare.Id.Value);
+        backend->RemoveFileSystemShare(replacementVirtioShare.Id);
 
         // A host path is required, and the options must match the device that serves them.
         VmFileSystemShareRequest pathless;

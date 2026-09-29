@@ -84,6 +84,9 @@ private:
         // Options the share was created with. Together with the host path these identify a virtio-fs
         // share, so a repeated request reuses the existing share instead of creating a second one.
         std::wstring MountOptions;
+        // Token the share was created with, if any. A Plan 9 share is removed under the same identity
+        // that added it. Unset shares fall back to the VM identity token.
+        wil::shared_handle UserToken;
     };
 
     HcsVirtualMachineBackend();
@@ -124,6 +127,12 @@ private:
     _Requires_lock_held_(m_lock)
     std::wstring AddPlan9ShareLocked(
         const FileSystemDevice& Device, const VmFileSystemShareRequest& Request, HANDLE UserToken, const std::wstring& HostPath) const;
+
+    /// <summary>
+    /// Removes a share from a Plan 9 device by the name the guest uses to reach it.
+    /// </summary>
+    _Requires_lock_held_(m_lock)
+    void RemovePlan9ShareLocked(const FileSystemDevice& Device, const std::wstring& AccessName, HANDLE UserToken) const;
 
     NON_COPYABLE(HcsVirtualMachineBackend);
     NON_MOVABLE(HcsVirtualMachineBackend);

@@ -307,7 +307,10 @@ VmPlatformCapabilities HcsVirtualMachineBackend::QueryCapabilities()
           VmOperation::ConnectGuest,
           VmOperation::CloseGuestListener,
           VmOperation::AttachDisk,
-          VmOperation::DetachDisk})
+          VmOperation::DetachDisk,
+          VmOperation::CreateFileSystemDevice,
+          VmOperation::AddFileSystemShare,
+          VmOperation::RemoveFileSystemShare})
     {
         capabilities.Operations.set(static_cast<size_t>(operation));
     }
@@ -838,6 +841,15 @@ std::wstring HcsVirtualMachineBackend::AddPlan9ShareLocked(
     return accessName;
 }
 
+_Requires_lock_held_(m_lock)
+void HcsVirtualMachineBackend::RemovePlan9ShareLocked(const FileSystemDevice& Device, const std::wstring& AccessName, HANDLE UserToken) const
+{
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !Device.Plan9Server);
+
+    auto runAsUser = wil::impersonate_token(UserToken);
+    THROW_IF_FAILED(Device.Plan9Server->RemoveShare(AccessName.c_str()));
+}
+
 VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device, const VmFileSystemShareRequest& Request)
 {
     validation::ValidateResourceId(Device, m_configuration.Description.Identity);
@@ -937,7 +949,8 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
     share.EffectiveHostPath = hostPath;
     share.ReadOnly = Request.ReadOnly;
 
-    const auto inserted = m_fileSystemShares.emplace(share.Id.Value, FileSystemShare{share, std::move(mountOptions)}).second;
+    const auto inserted =
+        m_fileSystemShares.emplace(share.Id.Value, FileSystemShare{share, std::move(mountOptions), Request.UserToken}).second;
     WI_ASSERT(inserted);
     ++m_nextShareId;
 
@@ -951,9 +964,66 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
     return share;
 }
 
-void HcsVirtualMachineBackend::RemoveFileSystemShare(VmShareId)
+void HcsVirtualMachineBackend::RemoveFileSystemShare(VmShareId Share)
 {
-    THROW_HR(c_notSupported);
+    WSL_LOG(
+        "HcsRemoveFileSystemShareBegin",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(Share.Value, "shareId"));
+
+    validation::ValidateResourceId(Share, m_configuration.Description.Identity);
+
+    auto lock = m_lock.lock_exclusive();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system || !m_guestDeviceManager);
+    const auto share = m_fileSystemShares.find(Share.Value);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), share == m_fileSystemShares.end());
+    const auto device = m_fileSystemDevices.find(share->second.Share.Device.Value);
+    THROW_HR_IF(E_UNEXPECTED, device == m_fileSystemDevices.end());
+
+    // A Plan 9 share is removed under the identity that added it, matching AddPlan9ShareLocked.
+    HANDLE userToken = share->second.UserToken ? share->second.UserToken.get() : m_configuration.Description.Identity.UserToken.get();
+    THROW_HR_IF_MSG(E_UNEXPECTED, !userToken, "UserToken not set for the file system share");
+
+    // A Plan 9 device serves each of its shares by name, so removing one leaves the device serving
+    // the others. A virtio-fs share is either a child of an aggregate device or the device itself.
+    std::visit(
+        Overloaded{
+            [&](const VmVirtioFsDevice& transport) {
+                THROW_HR_IF(E_UNEXPECTED, !device->second.Device.GuestInstanceId.has_value());
+
+                const auto& guestAddress = std::get<VmVirtioFsShareAddress>(share->second.Share.GuestAddress);
+                if (transport.Layout == VmVirtioFsLayout::Aggregate)
+                {
+                    THROW_HR_IF(E_UNEXPECTED, !guestAddress.ChildName.has_value());
+                    m_guestDeviceManager->RemoveVirtiofsChild(
+                        device->second.Device.GuestInstanceId.value(), guestAddress.ChildName->c_str());
+                }
+                else
+                {
+                    THROW_HR_IF(E_UNEXPECTED, guestAddress.ChildName.has_value());
+                    m_guestDeviceManager->RemoveGuestDevice(device->second.Device.GuestInstanceId.value());
+                    device->second.Device.GuestInstanceId.reset();
+                    device->second.Device.State = VmFileSystemDeviceState::Prepared;
+                }
+            },
+            [&](const VmPlan9SocketDevice&) {
+                const auto& guestAddress = std::get<VmPlan9SocketShareAddress>(share->second.Share.GuestAddress);
+                RemovePlan9ShareLocked(device->second, guestAddress.AccessName, userToken);
+            },
+            [&](const VmPlan9VirtioDevice&) {
+                const auto& guestAddress = std::get<VmPlan9VirtioShareAddress>(share->second.Share.GuestAddress);
+                RemovePlan9ShareLocked(device->second, guestAddress.AccessName, userToken);
+            }},
+        device->second.Transport);
+
+    WSL_LOG(
+        "HcsRemoveFileSystemShareEnd",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(Share.Value, "shareId"),
+        TraceLoggingValue(device->second.Device.Id.Value, "deviceId"),
+        TraceLoggingValue(GetFileSystemDeviceTag(device->second.Transport).c_str(), "tag"));
+
+    m_fileSystemShares.erase(share);
 }
 
 VmNetworkAttachment HcsVirtualMachineBackend::AddNetworkAdapter(const VmNetworkAdapterRequest&)
