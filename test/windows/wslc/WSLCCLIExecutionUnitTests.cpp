@@ -920,6 +920,11 @@ class WSLCCLIExecutionUnitTests
                 dataMap.Add<Data::Table>(wsl::windows::cli::table::TableData{L"HEADER"});
                 handled = true;
             }
+            else if (dataType == Data::Json)
+            {
+                dataMap.Add<Data::Json>(std::vector<std::wstring>{});
+                handled = true;
+            }
 
             if (!handled)
             {
