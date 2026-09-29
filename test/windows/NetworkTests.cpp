@@ -2080,7 +2080,14 @@ class NetworkTests
         VerifyLoopbackGuestToGuest(address, IPPROTO_TCP);
     }
 
-    static wil::unique_socket BindHostPort(uint16_t Port, int Type, int Protocol, bool ExpectSuccess, bool Ipv6 = false, bool Localhost = false)
+    static wil::unique_socket BindHostPort(
+        uint16_t Port,
+        int Type,
+        int Protocol,
+        bool ExpectSuccess,
+        bool Ipv6 = false,
+        bool Localhost = false,
+        std::chrono::seconds BindTimeout = std::chrono::seconds::zero())
     {
         int AddressFamily{};
         const SOCKADDR* Address{};
@@ -2115,7 +2122,28 @@ class NetworkTests
         wil::unique_socket listenSocket(socket(AddressFamily, Type, Protocol));
         VERIFY_IS_TRUE(!!listenSocket);
 
-        VERIFY_ARE_EQUAL(bind(listenSocket.get(), Address, AddressSize) != SOCKET_ERROR, ExpectSuccess);
+        bool bound = false;
+        int error = 0;
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                bound = bind(listenSocket.get(), Address, AddressSize) != SOCKET_ERROR;
+                error = bound ? 0 : WSAGetLastError();
+                THROW_HR_IF_MSG(
+                    HRESULT_FROM_WIN32(error),
+                    ExpectSuccess && !bound,
+                    "Host bind failed: port=%u protocol=%d family=%d WSAGetLastError=%d",
+                    Port,
+                    Protocol,
+                    AddressFamily,
+                    error);
+            },
+            std::chrono::milliseconds(100),
+            BindTimeout,
+            [&]() {
+                return ExpectSuccess && BindTimeout > std::chrono::seconds::zero() && (error == WSAEADDRINUSE || error == WSAEACCES);
+            }));
+
+        VERIFY_ARE_EQUAL(bound, ExpectSuccess);
 
         return listenSocket;
     }
@@ -2694,13 +2722,9 @@ class NetworkTests
         VerifyNotBoundLoopback(port, false);
     }
 
-    static void ValidateLocalhostRelayTraffic(ADDRESS_FAMILY addressFamily)
+    static void ValidateLocalhostRelayTraffic(ADDRESS_FAMILY addressFamily, HANDLE read)
     {
         THROW_HR_IF(E_INVALIDARG, addressFamily != AF_INET && addressFamily != AF_INET6);
-
-        // Bind a port in the guest.
-        auto [guestProcess, read] =
-            BindGuestPort(addressFamily == AF_INET6 ? L"TCP6-LISTEN:1234,bind=::1" : L"TCP4-LISTEN:1234,bind=127.0.0.1", true);
 
         // Connect to the port via the localhost relay
         wil::unique_socket hostSocket;
@@ -2737,7 +2761,7 @@ class NetworkTests
             while (totalRead < content.size())
             {
                 DWORD bytesRead{};
-                VERIFY_IS_TRUE(ReadFile(read.get(), content.data() + totalRead, static_cast<DWORD>(content.size()) - totalRead, &bytesRead, nullptr));
+                VERIFY_IS_TRUE(ReadFile(read, content.data() + totalRead, static_cast<DWORD>(content.size()) - totalRead, &bytesRead, nullptr));
                 LogInfo("Read %lu bytes", bytesRead);
 
                 totalRead += bytesRead;
@@ -2746,12 +2770,58 @@ class NetworkTests
         }
     }
 
+    static void ValidateLocalhostRelayTraffic(ADDRESS_FAMILY addressFamily)
+    {
+        auto [guestProcess, read] =
+            BindGuestPort(addressFamily == AF_INET6 ? L"TCP6-LISTEN:1234,bind=::1" : L"TCP4-LISTEN:1234,bind=127.0.0.1", true);
+
+        ValidateLocalhostRelayTraffic(addressFamily, read.get());
+    }
+
     WSL2_TEST_METHOD(NatLocalhostRelay)
     {
         WslKeepAlive keepAlive;
 
         ValidateLocalhostRelayTraffic(AF_INET);
         ValidateLocalhostRelayTraffic(AF_INET6);
+    }
+
+    WSL2_TEST_METHOD(NatLocalhostRelayDualStack)
+    {
+        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Nat}));
+        WslKeepAlive keepAlive;
+
+        for (int iteration = 0; iteration < 2; ++iteration)
+        {
+            {
+                auto [guestProcess, read] = BindGuestPort(L"TCP6-LISTEN:1234,bind=::,ipv6only=0,fork", true);
+
+                ValidateLocalhostRelayTraffic(AF_INET6, read.get());
+                ValidateLocalhostRelayTraffic(AF_INET, read.get());
+            }
+
+            VerifyNotBoundLoopback(1234, false);
+            VerifyNotBoundLoopback(1234, true);
+        }
+    }
+
+    WSL2_TEST_METHOD(NatLocalhostRelayIpv6Only)
+    {
+        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Nat}));
+        WslKeepAlive keepAlive;
+
+        for (const auto* bindSpec : {L"TCP6-LISTEN:1234,bind=::,ipv6only=1,fork", L"TCP6-LISTEN:1234,bind=::1,ipv6only=0,fork"})
+        {
+            {
+                auto [guestProcess, read] = BindGuestPort(bindSpec, true);
+
+                ValidateLocalhostRelayTraffic(AF_INET6, read.get());
+                VerifyNotBoundLoopback(1234, false);
+                ValidateLocalhostRelayTraffic(AF_INET6, read.get());
+            }
+
+            VerifyNotBoundLoopback(1234, true);
+        }
     }
 
     WSL2_TEST_METHOD(NatLocalhostRelayNoIpv6)
@@ -4511,13 +4581,16 @@ class MirroredTests
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
+        WslKeepAlive keepAlive;
+
+        // Short-lived guest binds can retain their host reservation until the port tracker's 60-second timeout.
         {
-            auto hostPort = NetworkTests::BindHostPort(1234, SOCK_STREAM, IPPROTO_TCP, true);
+            auto hostPort = NetworkTests::BindHostPort(1234, SOCK_STREAM, IPPROTO_TCP, true, false, false, std::chrono::minutes(2));
             NetworkTests::BindGuestPort(L"TCP4-LISTEN:1234", false);
         }
 
         {
-            auto hostPort = NetworkTests::BindHostPort(1234, SOCK_DGRAM, IPPROTO_UDP, true);
+            auto hostPort = NetworkTests::BindHostPort(1234, SOCK_DGRAM, IPPROTO_UDP, true, false, false, std::chrono::minutes(2));
             NetworkTests::BindGuestPort(L"UDP4-LISTEN:1234", false);
         }
     }
