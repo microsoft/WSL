@@ -4741,6 +4741,16 @@ VERSION_ID="Invalid|Format"
         DistroFileChange distributionconf(L"/etc/wsl-distribution.conf", false);
         distributionconf.SetContent(L"[oobe]\ncommand = /bin/bash -c 'echo OOBE'\n");
 
+        GUID runId;
+        THROW_IF_FAILED(CoCreateGuid(&runId));
+        const auto drvFsTestPath = std::filesystem::temp_directory_path() /
+                                   std::format(L"wsl-oobe-drvfs-test-{}", wsl::shared::string::GuidToString<wchar_t>(runId));
+        std::filesystem::create_directory(drvFsTestPath);
+        auto cleanupDrvFsTestPath = wil::scope_exit([&]() {
+            std::error_code ignored;
+            std::filesystem::remove_all(drvFsTestPath, ignored);
+        });
+
         RegistryKeyChange<DWORD> runOOBE(lxssKey.get(), testDistroIdString.c_str(), L"RunOOBE", 1);
         const RegistryKeyChange<DWORD> defaultUid(lxssKey.get(), testDistroIdString.c_str(), L"DefaultUid", 0);
 
@@ -4796,7 +4806,38 @@ VERSION_ID="Invalid|Format"
             distributionconf.SetContent(
                 L"[oobe]\ncommand = /bin/bash -c 'echo OOBE && useradd -u 1010 -m -s /bin/bash user'\n defaultUid = 1010\n");
 
+            constexpr auto userMountPoint = L"/run/wsl-oobe-user-mount";
+            const auto userMountIdCommand = std::format(L"findmnt -n -o ID -M {}", userMountPoint);
+            const auto userMountOwnerCommand = std::format(L"stat -c %u:%g {}", userMountPoint);
+            std::wstring originalUserMountId;
+            std::optional<DistroFileChange> fstab;
+            auto cleanupUserMount = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                if (fstab.has_value())
+                {
+                    fstab.reset();
+                    TerminateDistribution();
+                }
+            });
+
+            if (LxsstuVmMode())
+            {
+                fstab.emplace(L"/etc/fstab");
+                fstab->SetContent(
+                    std::format(L"{} {} drvfs uid=2000,gid=2001,x-mount.mkdir 0 0\n", drvFsTestPath.root_path().generic_wstring(), userMountPoint)
+                        .c_str());
+            }
+
             TerminateDistribution();
+
+            if (LxsstuVmMode())
+            {
+                auto [mountId, warnings] = LxsstuLaunchWslAndCaptureOutput(userMountIdCommand);
+                VERIFY_IS_FALSE(mountId.empty());
+                VERIFY_ARE_EQUAL(L"", warnings);
+                originalUserMountId = std::move(mountId);
+                validateOutput(userMountOwnerCommand.c_str(), L"2000:2001\n");
+                VERIFY_ARE_EQUAL(1, runOOBE.Get());
+            }
 
             validateOutput(nullptr, L"OOBE\n");
             VERIFY_ARE_EQUAL(runOOBE.Get(), 0);
@@ -4804,6 +4845,22 @@ VERSION_ID="Invalid|Format"
             // Validate that DefaultUid was set
             validateOutput(L"id -u", L"1010\n");
             VERIFY_ARE_EQUAL(defaultUid.Get(), 1010);
+
+            if (LxsstuVmMode())
+            {
+                // DrvFs mounts created before OOBE should be refreshed to use the new default user.
+                validateOutput(
+                    std::format(
+                        L"bash -c 'path=$(wslpath -u \"{}\") && mountpoint=$(findmnt -n -o TARGET -T \"$path\") && "
+                        L"test \"$(stat -c %u:%g \"$mountpoint\")\" = \"$(id -u):$(id -g)\" && touch \"$path/probe\" && "
+                        L"chmod 0644 \"$path/probe\"'",
+                        drvFsTestPath.wstring())
+                        .c_str(),
+                    L"");
+
+                validateOutput(userMountOwnerCommand.c_str(), L"2000:2001\n");
+                validateOutput(userMountIdCommand.c_str(), originalUserMountId.c_str());
+            }
 
             // New file should be created with the correct uid.
             const std::wstring testFilePathLinux = L"/tmp/oobe_file_test";
@@ -4813,6 +4870,22 @@ VERSION_ID="Invalid|Format"
                 testFilePathWindows.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
             VERIFY_IS_TRUE(file.is_valid());
             validateOutput(std::format(L"stat -c %u {}", testFilePathLinux).c_str(), L"1010\n");
+        }
+
+        if (LxsstuVmMode())
+        {
+            runOOBE.Set(1);
+            const auto mountIdCommand =
+                std::format(L"path=$(wslpath -u \"{}\") && findmnt -n -o ID -T \"$path\"", drvFsTestPath.generic_wstring());
+            distributionconf.SetContent(
+                std::format(L"[oobe]\ncommand = /bin/bash -c '{} > \"$path/mount-id\"'\ndefaultUid = 1010\n", mountIdCommand).c_str());
+
+            TerminateDistribution();
+
+            validateOutput(nullptr, L"");
+            VERIFY_ARE_EQUAL(runOOBE.Get(), 0);
+            VERIFY_ARE_EQUAL(defaultUid.Get(), 1010);
+            validateOutput(std::format(L"bash -c '{} | cmp -s - \"$path/mount-id\"'", mountIdCommand).c_str(), L"");
         }
 
         // Verify that the default UID isn't changed if it's not present in wsl-distribution.conf.
@@ -7098,13 +7171,15 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         if (LxsstuVmMode())
         {
             constexpr auto testVhd = L"EmptyVhd.vhdx";
+            constexpr auto c_testVhdSize = 20 * _1MB;
 
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { DeleteFile(testVhd); });
 
-            LxsstuLaunchPowershellAndCaptureOutput(std::format(L"New-Vhd {}  -SizeBytes 20MB", testVhd));
+            LxsstuLaunchPowershellAndCaptureOutput(std::format(L"New-Vhd {} -SizeBytes {}", testVhd, c_testVhdSize));
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--mount {} --vhd --bare", testVhd)), 0L);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkfs.ext4 /dev/sde"), 0L);
+            const auto disk = GetBlockDeviceInWsl(c_testVhdSize);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mkfs.ext4 {}", disk)), 0L);
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount"), 0L);
 
             auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--import-in-place broken-test-distro {}", testVhd), -1);
@@ -8354,6 +8429,38 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
 
         const auto cgroup = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/self/cgroup").first;
         VERIFY_ARE_EQUAL(cgroup, L"0::/non-systemd\n");
+    }
+
+    TEST_METHOD(WriteInstallLog)
+    {
+        const auto directory = std::filesystem::current_path() / L"install-log-test";
+        VERIFY_IS_TRUE(std::filesystem::create_directory(directory));
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(directory); });
+
+        const auto verifyRejected = [](const std::filesystem::path& path) {
+            VERIFY_THROWS_SPECIFIC(
+                wsl::windows::common::install::WriteInstallLogImpl(path.wstring(), "must not be written"),
+                wil::ResultException,
+                [](const wil::ResultException& e) { return e.GetErrorCode() == E_ACCESSDENIED; });
+        };
+
+        verifyRejected(directory);
+        VERIFY_IS_TRUE(std::filesystem::is_empty(directory));
+
+        const auto target = directory / L"target.txt";
+        const auto link = directory / L"log.txt";
+        wsl::windows::common::install::WriteInstallLogImpl(target.wstring(), "original content");
+        const auto original = ReadFileContent(target.wstring());
+        VERIFY_IS_TRUE(original.ends_with(L": original content\n"));
+
+        VERIFY_IS_TRUE(CreateSymbolicLinkW(link.c_str(), target.c_str(), SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE));
+        verifyRejected(link);
+        VERIFY_ARE_EQUAL(original, ReadFileContent(target.wstring()));
+        VERIFY_IS_TRUE(std::filesystem::remove(link));
+
+        VERIFY_WIN32_BOOL_SUCCEEDED(CreateHardLinkW(link.c_str(), target.c_str(), nullptr));
+        verifyRejected(link);
+        VERIFY_ARE_EQUAL(original, ReadFileContent(target.wstring()));
     }
 
     TEST_METHOD(BidirectionalRelayContinuesAfterHalfClose)

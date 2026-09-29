@@ -12,18 +12,6 @@ namespace wsl::windows::service::wslc {
 
 namespace {
 
-    bool IsSignaled(HANDLE Handle)
-    {
-        if (Handle == nullptr)
-        {
-            return false;
-        }
-
-        const auto result = WaitForSingleObject(Handle, 0);
-        THROW_LAST_ERROR_IF(result == WAIT_FAILED);
-        return result == WAIT_OBJECT_0;
-    }
-
     std::optional<std::chrono::sys_seconds> ToTimeBound(int64_t TimeSeconds)
     {
         if (TimeSeconds == 0)
@@ -173,11 +161,25 @@ std::optional<wsl::windows::common::wslc_schema::Event> EventStore::GetLockHeld(
 }
 
 bool EventStore::WaitForEvent(
-    std::unique_lock<std::mutex>& Lock, uint64_t SequenceNumber, std::optional<std::chrono::sys_seconds> Until, HANDLE CancelEvent, HANDLE CallerProcess)
+    std::unique_lock<std::mutex>& Lock, uint64_t SequenceNumber, std::optional<std::chrono::sys_seconds> Until, gsl::span<const HANDLE> WaitHandles)
 {
     // Eviction also makes this true, so the caller can report the gap after waking.
     const auto eventAvailable = [&] { return SequenceNumber < m_firstSequenceNumber + m_events.size(); };
-    const auto aborted = [&] { return m_terminating || IsSignaled(CancelEvent) || IsSignaled(CallerProcess); };
+    const auto aborted = [&] {
+        if (m_terminating)
+        {
+            return true;
+        }
+
+        if (WaitHandles.empty())
+        {
+            return false;
+        }
+
+        const auto result = WaitForMultipleObjects(gsl::narrow_cast<DWORD>(WaitHandles.size()), WaitHandles.data(), FALSE, 0);
+        THROW_LAST_ERROR_IF(result == WAIT_FAILED);
+        return result < WAIT_OBJECT_0 + WaitHandles.size();
+    };
     const auto ready = [&] { return aborted() || eventAvailable(); };
 
     if (Until.has_value())
@@ -204,16 +206,18 @@ std::optional<wsl::windows::common::wslc_schema::Event> EventStore::Get(
     HANDLE CancelEvent)
 {
     const auto callerProcess = wsl::windows::common::wslutil::OpenCallingProcess(SYNCHRONIZE);
-    const std::array handles{CancelEvent, callerProcess.get()};
+    std::array<HANDLE, 2> handles{};
+    size_t handleCount = 0;
 
     // Destroy the waits after releasing m_lock and before closing the process handle. Taking
     // m_lock in the callback prevents a notification being lost between the predicate and wait.
     std::array<wil::unique_threadpool_wait, 2> waits;
-    for (size_t i = 0; i < handles.size(); ++i)
+    for (const auto handle : {CancelEvent, callerProcess.get()})
     {
-        if (handles[i] != nullptr)
+        if (handle != nullptr)
         {
-            waits[i].reset(CreateThreadpoolWait(
+            handles[handleCount] = handle;
+            waits[handleCount].reset(CreateThreadpoolWait(
                 [](PTP_CALLBACK_INSTANCE, PVOID context, PTP_WAIT, TP_WAIT_RESULT) {
                     auto* store = static_cast<EventStore*>(context);
                     std::lock_guard lock(store->m_lock);
@@ -221,18 +225,20 @@ std::optional<wsl::windows::common::wslc_schema::Event> EventStore::Get(
                 },
                 this,
                 nullptr));
-            THROW_LAST_ERROR_IF(!waits[i]);
-            SetThreadpoolWait(waits[i].get(), handles[i], nullptr);
+            THROW_LAST_ERROR_IF(!waits[handleCount]);
+            SetThreadpoolWait(waits[handleCount].get(), handle, nullptr);
+            ++handleCount;
         }
     }
 
+    const gsl::span<const HANDLE> waitHandles{handles.data(), handleCount};
     std::unique_lock lock(m_lock);
 
     // Position the reader. A first read (no sequence number yet) starts at the oldest buffered
     // event
     SequenceNumber = SequenceNumber.value_or(m_firstSequenceNumber);
 
-    while (WaitForEvent(lock, SequenceNumber.value(), Until, CancelEvent, callerProcess.get()))
+    while (WaitForEvent(lock, SequenceNumber.value(), Until, waitHandles))
     {
         // A reader that has fallen behind the ring missed events to eviction: reset it so the
         // next call starts fresh at the oldest buffered event, and report the gap.
