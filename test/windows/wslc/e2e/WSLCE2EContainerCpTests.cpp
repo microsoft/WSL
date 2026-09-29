@@ -860,16 +860,8 @@ private:
 
     static void RunTar(const std::wstring& CommandLine)
     {
-        auto command = CommandLine;
-        STARTUPINFOW si{sizeof(si)};
-        PROCESS_INFORMATION pi{};
-        THROW_LAST_ERROR_IF(!CreateProcessW(nullptr, command.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi));
-        wil::unique_handle tarProcess(pi.hProcess);
-        wil::unique_handle tarThread(pi.hThread);
-        WaitForSingleObject(tarProcess.get(), INFINITE);
-
-        DWORD exitCode = 0;
-        GetExitCodeProcess(tarProcess.get(), &exitCode);
+        wsl::windows::common::SubProcess process(nullptr, CommandLine.c_str());
+        const auto exitCode = process.Run();
         THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
     }
 

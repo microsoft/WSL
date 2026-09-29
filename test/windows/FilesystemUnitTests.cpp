@@ -60,8 +60,9 @@ std::filesystem::path ExistingFile()
 }
 
 // Builds a ustar archive in memory. tar.exe is the extractor under test, so archives are assembled here
-// rather than produced by tar, which keeps entry names, types and ordering under the test's control and
-// allows archives that tar would not willingly create.
+// rather than produced by tar, which keeps entry names, types and ordering under the test's control. It
+// also reaches archives tar.exe cannot be asked for on Windows: one holding no entries, which tar refuses
+// to write, and entries named "a*b", "trail." or "nul", which cannot exist as files for tar to read.
 class TarBuilder
 {
 public:
@@ -89,11 +90,9 @@ public:
     std::function<void(HANDLE)> Writer() const
     {
         return [bytes = Build()](HANDLE Handle) {
-            // tar.exe can reject an entry and exit before the whole archive is written, which breaks the
-            // pipe. That is already reported through its exit code, so a short write is left to surface
-            // there rather than as a write failure here.
             DWORD written = 0;
-            WriteFile(Handle, bytes.data(), static_cast<DWORD>(bytes.size()), &written, nullptr);
+            VERIFY_IS_TRUE(!!WriteFile(Handle, bytes.data(), static_cast<DWORD>(bytes.size()), &written, nullptr));
+            VERIFY_ARE_EQUAL(bytes.size(), static_cast<size_t>(written));
         };
     }
 

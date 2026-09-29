@@ -943,14 +943,8 @@ void ContainerService::CopyLocalPathToContainer(
         }
     }
 
-    std::wstring parentDir = absPath.parent_path().wstring();
+    std::wstring parentDir = wsl::windows::common::filesystem::StripTrailingSeparators(absPath.parent_path());
     std::wstring fileName = absPath.filename().wstring();
-
-    // Strip trailing separator to avoid the CRT parsing '\"' as an escaped quote
-    while (parentDir.size() > 1 && (parentDir.back() == L'\\' || parentDir.back() == L'/'))
-    {
-        parentDir.pop_back();
-    }
 
     // Create a temp file with DELETE_ON_CLOSE and InheritHandle so tar can write to it via stdout
     TempFile tarFile(GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, TempFileFlags::DeleteOnClose | TempFileFlags::InheritHandle);

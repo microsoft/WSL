@@ -1039,6 +1039,7 @@ wsl::windows::common::filesystem::StagingDirectory::~StagingDirectory()
 {
     std::error_code error;
     std::filesystem::remove_all(m_path, error);
+    LOG_HR_IF_MSG(HRESULT_FROM_WIN32(error.value()), !!error, "Failed to remove directory: %ls", m_path.c_str());
 }
 
 const std::filesystem::path& wsl::windows::common::filesystem::StagingDirectory::Path() const noexcept
@@ -1074,14 +1075,20 @@ static void MoveOver(const std::filesystem::path& From, const std::filesystem::p
     THROW_HR_IF_MSG(HRESULT_FROM_WIN32(copyError.value()), !!copyError, "Failed to copy to: %ls", To.c_str());
 }
 
+std::wstring wsl::windows::common::filesystem::StripTrailingSeparators(const std::filesystem::path& Path)
+{
+    auto text = Path.wstring();
+    while (text.size() > 1 && (text.back() == L'\\' || text.back() == L'/'))
+    {
+        text.pop_back();
+    }
+
+    return text;
+}
+
 void ExtractTarStream(const std::filesystem::path& Root, const std::function<void(HANDLE)>& WriteArchive)
 {
-    // Strip trailing separator to avoid the CRT parsing a trailing '\"' as an escaped quote.
-    auto targetDir = Root.wstring();
-    while (targetDir.size() > 1 && (targetDir.back() == L'\\' || targetDir.back() == L'/'))
-    {
-        targetDir.pop_back();
-    }
+    const auto targetDir = wsl::windows::common::filesystem::StripTrailingSeparators(Root);
 
     auto [pipeRead, pipeWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, false, false);
     THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(pipeRead.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
