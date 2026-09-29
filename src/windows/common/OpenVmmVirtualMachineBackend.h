@@ -38,6 +38,9 @@ public:
 
     VmPlatformCapabilities GetCapabilities() const override;
     VmDescription GetDescription() const override;
+    VmState GetState() const override;
+    std::wstring GetExitDetails() const override;
+    VmCrashInformation GetCrashInformation() const override;
     wil::unique_handle GetTerminationEvent() const override;
     void Start() override;
     void Terminate() override;
@@ -53,8 +56,12 @@ public:
     VmGpuAttachment AddGpu(const VmGpuRequest& Request) override;
 
     VmFileSystemDevice CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request) override;
+    VmFileSystemDevice GetFileSystemDeviceStatus(VmDeviceId Device) override;
     VmFileSystemShare AddFileSystemShare(VmDeviceId Device, const VmFileSystemShareRequest& Request) override;
     void RemoveFileSystemShare(VmShareId Share) override;
+    VmSharedMemoryDevice AddSharedMemory(const VmSharedMemoryRequest& Request) override;
+    void ConfigureGuestDma(const VmGuestDmaRequest& Request) override;
+    void RemoveDevice(VmDeviceId Device) override;
 
     VmNetworkAttachment AddNetworkAdapter(const VmNetworkAdapterRequest& Request) override;
     void UpdateNetworkAdapter(VmDeviceId Device, const VmNetworkConfiguration& Configuration) override;
@@ -135,4 +142,6 @@ private:
     std::thread m_processLogThread;
     SessionFileSystemResources m_fileSystemResources;
     wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
+    _Guarded_by_(m_lock) VmState m_state = VmState::Unknown;
+    _Guarded_by_(m_lock) std::wstring m_exitDetails;
 };

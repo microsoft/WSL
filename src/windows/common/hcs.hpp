@@ -133,12 +133,19 @@ void TerminateComputeSystem(_In_ HCS_SYSTEM ComputeSystem);
 std::filesystem::path WriteVmCrashLog(
     const std::filesystem::path& Folder, std::uint32_t MaxFileCount, const GUID& VmId, HANDLE UserToken, std::wstring_view CrashLog);
 
+std::filesystem::path CreateVmSavedStateFile(const std::filesystem::path& Folder, const GUID& VmId, HANDLE UserToken);
+
+void EnforceVmSavedStateFileLimit(const std::filesystem::path& Folder, size_t MaxFileCount, HANDLE UserToken);
+
 unique_hcn_service_callback RegisterServiceCallback(_In_ HCS_NOTIFICATION_CALLBACK Callback, _In_ PVOID Context);
 
 unique_hcn_guest_network_service_callback RegisterGuestNetworkServiceCallback(
     _In_ const unique_hcn_guest_network_service& GuestNetworkService, _In_ HCS_NOTIFICATION_CALLBACK Callback, _In_ PVOID Context);
 
 bool IsDisableVgpuSettingsSupported();
+
+// Small backing pages are disabled on builds affected by a VID partition-teardown deadlock.
+bool IsSmallPageMemorySupported();
 
 bool IsNestedVirtualizationSupported();
 

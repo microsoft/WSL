@@ -41,7 +41,9 @@ HRESULT OperationResult(Callback&& Operation)
 inline void VerifyBootsAndTerminates(std::unique_ptr<IVirtualMachineBackend> Backend)
 {
     auto terminationEvent = Backend->GetTerminationEvent();
+    VERIFY_ARE_EQUAL(VmState::Created, Backend->GetState());
     Backend->Start();
+    VERIFY_ARE_EQUAL(VmState::Running, Backend->GetState());
 
     const auto runningResult = WaitForSingleObject(terminationEvent.get(), 100);
     VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), runningResult);
@@ -51,6 +53,7 @@ inline void VerifyBootsAndTerminates(std::unique_ptr<IVirtualMachineBackend> Bac
     }
 
     VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(terminationEvent.get(), 30 * 1000));
+    VERIFY_ARE_EQUAL(VmState::Stopped, Backend->GetState());
 }
 
 } // namespace VirtualMachineBackendTestHelpers

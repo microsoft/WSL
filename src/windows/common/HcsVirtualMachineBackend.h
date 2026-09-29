@@ -28,6 +28,9 @@ public:
 
     VmPlatformCapabilities GetCapabilities() const override;
     VmDescription GetDescription() const override;
+    VmState GetState() const override;
+    std::wstring GetExitDetails() const override;
+    VmCrashInformation GetCrashInformation() const override;
     wil::unique_handle GetTerminationEvent() const override;
     void Start() override;
     void Terminate() override;
@@ -43,8 +46,12 @@ public:
     VmGpuAttachment AddGpu(const VmGpuRequest& Request) override;
 
     VmFileSystemDevice CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request) override;
+    VmFileSystemDevice GetFileSystemDeviceStatus(VmDeviceId Device) override;
     VmFileSystemShare AddFileSystemShare(VmDeviceId Device, const VmFileSystemShareRequest& Request) override;
     void RemoveFileSystemShare(VmShareId Share) override;
+    VmSharedMemoryDevice AddSharedMemory(const VmSharedMemoryRequest& Request) override;
+    void ConfigureGuestDma(const VmGuestDmaRequest& Request) override;
+    void RemoveDevice(VmDeviceId Device) override;
 
     VmNetworkAttachment AddNetworkAdapter(const VmNetworkAdapterRequest& Request) override;
     void UpdateNetworkAdapter(VmDeviceId Device, const VmNetworkConfiguration& Configuration) override;
@@ -192,8 +199,10 @@ private:
     wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
     wil::unique_event m_vmCrashEvent{wil::EventOptions::ManualReset};
     std::optional<VmCrashCaptureRequest> m_crashCapture;
-    std::optional<std::filesystem::path> m_vmCrashLogFile;
-    wil::srwlock m_exitDetailsLock;
+    mutable wil::srwlock m_crashInformationLock;
+    _Guarded_by_(m_crashInformationLock) std::optional<std::filesystem::path> m_vmCrashLogFile;
+    _Guarded_by_(m_crashInformationLock) std::optional<std::filesystem::path> m_vmSavedStateFile;
+    mutable wil::srwlock m_exitDetailsLock;
     _Guarded_by_(m_exitDetailsLock) std::wstring m_exitDetails;
     // Closing the system drains callbacks before their event and context are destroyed.
     _Guarded_by_(m_lock) wsl::windows::common::hcs::unique_hcs_system m_system;
@@ -202,7 +211,9 @@ private:
     _Guarded_by_(m_lock) FileSystemDeviceMap m_fileSystemDevices;
     _Guarded_by_(m_lock) std::uint64_t m_nextDeviceId = 1;
     _Guarded_by_(m_lock) std::map<std::uint64_t, VmPersistentMemoryDevice> m_persistentMemoryDevices;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, VmSharedMemoryDevice> m_sharedMemoryDevices;
     _Guarded_by_(m_lock) std::optional<VmGpuAttachment> m_gpu;
+    _Guarded_by_(m_lock) VmState m_state = VmState::Unknown;
     // Serializes persistent memory additions, including the caller's wait for the device to appear
     // in the guest. Acquired before m_lock, which is released while the wait runs.
     wil::srwlock m_persistentMemoryLock;

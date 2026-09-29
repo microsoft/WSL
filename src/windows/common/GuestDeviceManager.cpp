@@ -152,14 +152,17 @@ void GuestDeviceManager::RemoveRemoteFileSystem(_In_ REFCLSID clsid, _In_ std::w
     m_deviceHostSupport->RemoveRemoteFileSystem(clsid, tag);
 }
 
-void GuestDeviceManager::AddSharedMemoryDevice(_In_ PCWSTR Tag, _In_ PCWSTR Path, _In_ UINT32 SizeMb, _In_ HANDLE UserToken)
+GUID GuestDeviceManager::AddSharedMemoryDevice(_In_ PCWSTR Tag, _In_ PCWSTR Path, _In_ UINT32 SizeMb, _In_ HANDLE UserToken)
 {
     auto guestDeviceLock = m_lock.lock_exclusive();
     auto objectLifetime = CreateSectionObjectRoot(Path, UserToken);
 
-    (void)m_deviceHostSupport->AddVirtiofsDevice(
+    const auto instanceId = m_deviceHostSupport->AddVirtiofsDevice(
         UserToken, Tag, objectLifetime.Path, VirtiofsShareKind_SectionBacked, SizeMb, L"");
-    m_objectDirectories.emplace_back(std::move(objectLifetime));
+    auto removeOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { m_deviceHostSupport->RemoveDevice(instanceId); });
+    m_objectDirectories.emplace(instanceId, std::move(objectLifetime));
+    removeOnFailure.release();
+    return instanceId;
 }
 
 GuestDeviceManager::DirectoryObjectLifetime GuestDeviceManager::CreateSectionObjectRoot(_In_ std::wstring_view RelativeRootPath, _In_ HANDLE UserToken) const
@@ -242,4 +245,5 @@ void GuestDeviceManager::RemoveGuestDevice(_In_ const GUID& InstanceId)
     }
 
     m_deviceHostSupport->RemoveDevice(InstanceId);
+    m_objectDirectories.erase(InstanceId);
 }

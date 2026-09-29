@@ -63,6 +63,35 @@ std::filesystem::path wsl::windows::common::hcs::WriteVmCrashLog(
     return filePath;
 }
 
+std::filesystem::path wsl::windows::common::hcs::CreateVmSavedStateFile(
+    const std::filesystem::path& Folder, const GUID& VmId, HANDLE UserToken)
+{
+    auto runAsUser = wil::impersonate_token(UserToken);
+    wsl::windows::common::filesystem::EnsureDirectory(Folder.c_str());
+
+    const auto vmId = wsl::shared::string::GuidToString<wchar_t>(VmId, wsl::shared::string::GuidToStringFlags::None);
+    const auto filePath = Folder / std::format(L"saved-state-{}-{}.vmrs", std::time(nullptr), vmId);
+    wil::unique_handle file{
+        CreateFileW(filePath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY, nullptr)};
+    THROW_LAST_ERROR_IF(!file);
+    auto removeOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { std::filesystem::remove(filePath); });
+    GrantVmAccess(vmId.c_str(), filePath.c_str());
+    removeOnFailure.release();
+    return filePath;
+}
+
+void wsl::windows::common::hcs::EnforceVmSavedStateFileLimit(
+    const std::filesystem::path& Folder, size_t MaxFileCount, HANDLE UserToken)
+{
+    auto runAsUser = wil::impersonate_token(UserToken);
+    const auto predicate = [](const auto& entry) {
+        return WI_IsFlagSet(GetFileAttributes(entry.path().c_str()), FILE_ATTRIBUTE_TEMPORARY) && entry.path().has_extension() &&
+               entry.path().extension() == L".vmrs" && entry.path().has_filename() &&
+               entry.path().filename().wstring().starts_with(L"saved-state-") && entry.file_size() > 0;
+    };
+    wsl::windows::common::wslutil::EnforceFileLimit(Folder.c_str(), MaxFileCount, predicate);
+}
+
 void wsl::windows::common::hcs::AddPlan9Share(
     _In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Name, _In_ PCWSTR AccessName, _In_ PCWSTR Path, _In_ UINT32 Port, _In_ Plan9ShareFlags Flags, _In_opt_ HANDLE UserToken)
 {
@@ -502,4 +531,14 @@ bool wsl::windows::common::hcs::IsDisableVgpuSettingsSupported()
 
     // See if the Windows version has the required platform change.
     return ((GetSchemaVersion() >= c_schemaVersionNickel) && (wsl::windows::common::helpers::GetWindowsVersion().BuildNumber >= 22545));
+}
+
+bool wsl::windows::common::hcs::IsSmallPageMemorySupported()
+{
+    const auto version = wsl::windows::common::helpers::GetWindowsVersion();
+    using wsl::windows::common::helpers::WindowsBuildNumbers;
+    return (version.BuildNumber >= WindowsBuildNumbers::Germanium) ||
+           (version.BuildNumber >= WindowsBuildNumbers::Cobalt && version.UpdateBuildRevision >= 2360) ||
+           (version.BuildNumber >= WindowsBuildNumbers::Iron && version.UpdateBuildRevision >= 1970) ||
+           (version.BuildNumber >= WindowsBuildNumbers::Vibranium_22H2 && version.UpdateBuildRevision >= 3393);
 }

@@ -165,6 +165,11 @@ struct VmMemoryRequest
     VmFeatureRequest AllowOvercommit = VmFeatureRequest::Disabled;
     VmFeatureRequest DeferredCommit = VmFeatureRequest::Disabled;
     VmFeatureRequest ColdDiscard = VmFeatureRequest::Disabled;
+    VmFeatureRequest SmallPageBacking = VmFeatureRequest::Disabled;
+    std::optional<std::uint32_t> FaultClusterSizeShift;
+    std::optional<std::uint32_t> DirectMapFaultClusterSizeShift;
+    std::optional<std::uint32_t> PageReportingOrder;
+    std::optional<std::wstring> HostingProcessNameSuffix;
 };
 
 enum class VmBootMethod
@@ -273,6 +278,8 @@ struct VmCrashCaptureRequest
 {
     std::filesystem::path Path;
     std::uint32_t MaxCrashLogCount = 10;
+    std::optional<std::filesystem::path> SavedStateFolder;
+    std::uint32_t MaxSavedStateCount = 10;
     VmSelectionPolicy Policy = VmSelectionPolicy::Required;
 };
 
@@ -290,6 +297,11 @@ struct VmEffectiveMemory
     bool AllowOvercommit = false;
     bool DeferredCommit = false;
     bool ColdDiscard = false;
+    bool SmallPageBacking = false;
+    std::optional<std::uint32_t> FaultClusterSizeShift;
+    std::optional<std::uint32_t> DirectMapFaultClusterSizeShift;
+    std::optional<std::uint32_t> PageReportingOrder;
+    std::optional<std::wstring> HostingProcessNameSuffix;
     std::optional<std::uint64_t> HighMmioBaseBytes;
     std::optional<std::uint64_t> HighMmioSizeBytes;
 };
@@ -347,6 +359,7 @@ struct VmCreateRequest
     std::wstring Owner;
     VmProcessorRequest Processor;
     VmMemoryRequest Memory;
+    VmMmioRequest Mmio;
     VmLinuxBootRequest Boot;
     std::vector<VmBootDiskRequest> BootDisks;
     std::vector<VmConsoleRequest> Consoles;
@@ -426,6 +439,13 @@ struct VmPlan9SocketDevice
     VmPlan9ServerFactory ServerFactory;
 };
 
+// Plan 9 server hosted directly by HCS rather than by an out-of-process IPlan9FileSystem server.
+// This is used for shares that must remain available independently of DrvFs.
+struct VmPlan9HostedDevice
+{
+    GuestServicePort Port;
+};
+
 struct VmPlan9VirtioDevice
 {
     std::wstring Tag;
@@ -436,7 +456,8 @@ struct VmPlan9VirtioDevice
     VmPlan9ServerFactory ServerFactory;
 };
 
-using VmFileSystemDeviceTransport = std::variant<VmVirtioFsDevice, VmPlan9SocketDevice, VmPlan9VirtioDevice>;
+using VmFileSystemDeviceTransport =
+    std::variant<VmVirtioFsDevice, VmPlan9SocketDevice, VmPlan9HostedDevice, VmPlan9VirtioDevice>;
 
 struct VmFileSystemDeviceRequest
 {
@@ -565,6 +586,36 @@ struct VmGpuAttachment
     bool PresentationDisabled = false;
 };
 
+struct VmSharedMemoryRequest
+{
+    std::wstring Tag;
+    std::wstring Path;
+    std::uint64_t SizeBytes = 0;
+    wil::shared_handle UserToken{};
+};
+
+struct VmSharedMemoryDevice
+{
+    VmDeviceId Id;
+    GUID GuestInstanceId{};
+    std::wstring Tag;
+    std::wstring ObjectPath;
+    std::uint64_t SizeBytes = 0;
+};
+
+struct VmGuestDmaRequest
+{
+    std::uint64_t BaseAddress = 0;
+    std::uint64_t SizeBytes = 0;
+};
+
+struct VmCrashInformation
+{
+    bool Crashed = false;
+    std::optional<std::filesystem::path> CrashLogFile;
+    std::optional<std::filesystem::path> SavedStateFile;
+};
+
 class IVirtualMachineBackend
 {
 public:
@@ -575,6 +626,9 @@ public:
     virtual VmPlatformCapabilities GetCapabilities() const = 0;
     // Returns the effective creation-time configuration, including IDs used for boot resource operations.
     virtual VmDescription GetDescription() const = 0;
+    virtual VmState GetState() const = 0;
+    virtual std::wstring GetExitDetails() const = 0;
+    virtual VmCrashInformation GetCrashInformation() const = 0;
     virtual wil::unique_handle GetTerminationEvent() const = 0;
     virtual void Start() = 0;
     virtual void Terminate() = 0;
@@ -599,8 +653,12 @@ public:
     virtual VmGpuAttachment AddGpu(const VmGpuRequest& Request) = 0;
 
     virtual VmFileSystemDevice CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request) = 0;
+    virtual VmFileSystemDevice GetFileSystemDeviceStatus(VmDeviceId Device) = 0;
     virtual VmFileSystemShare AddFileSystemShare(VmDeviceId Device, const VmFileSystemShareRequest& Request) = 0;
     virtual void RemoveFileSystemShare(VmShareId Share) = 0;
+    virtual VmSharedMemoryDevice AddSharedMemory(const VmSharedMemoryRequest& Request) = 0;
+    virtual void ConfigureGuestDma(const VmGuestDmaRequest& Request) = 0;
+    virtual void RemoveDevice(VmDeviceId Device) = 0;
 
     virtual VmNetworkAttachment AddNetworkAdapter(const VmNetworkAdapterRequest& Request) = 0;
     virtual void UpdateNetworkAdapter(VmDeviceId Device, const VmNetworkConfiguration& Configuration) = 0;

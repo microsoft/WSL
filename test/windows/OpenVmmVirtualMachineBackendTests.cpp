@@ -86,6 +86,12 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(UINT64{1}, disk.Id.Value);
         VERIFY_ARE_EQUAL(UINT32{0}, disk.GuestAddress.Lun);
         VERIFY_IS_FALSE(disk.ReadOnly);
+
+        request.Mmio.HighWindowSizeBytes = c_mib;
+        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+        request.Mmio = {};
+        request.Memory.SmallPageBacking = VmFeatureRequest::Required;
+        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
     }
 
     TEST_METHOD(ReservesExactPlacementsBeforeAutomaticDisks)
@@ -315,7 +321,6 @@ class OpenVmmVirtualMachineBackendTests
                {VmFeature::SerialConsole,
               VmFeature::VirtioConsole,
               VmFeature::VirtioFsFileBacked,
-              VmFeature::SavedStateOnCrash,
               VmFeature::UserModeNatNetwork,
               VmFeature::TcpPortBinding,
               VmFeature::UdpPortBinding,
