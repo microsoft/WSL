@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft. All rights reserved.
 #include "precomp.h"
 #include "DeletedDistributionStore.h"
+#include "retryshared.h"
 
 using namespace wsl::windows::common;
 using namespace wsl::windows::common::registry;
@@ -129,7 +130,10 @@ ULONG64 DeletedDistributionStore::Now()
 
 bool DeletedDistributionStore::Retain(HKEY lxssKey, const GUID& id, const std::filesystem::path& vhdPath)
 {
-    auto file = OpenDisk(vhdPath);
+    // HCS may briefly keep a handle after ejecting the disk. Match the existing
+    // unregister retry window for sharing violations rather than failing a normal teardown.
+    auto file = wsl::shared::retry::RetryWithTimeout<wil::unique_hfile>(
+        [&] { return OpenDisk(vhdPath); }, std::chrono::milliseconds(100), std::chrono::seconds(10), {HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION)});
     if (!file)
     {
         // Broken registrations with no filesystem must still be removable.
@@ -263,9 +267,17 @@ try
             }
             else
             {
-                // The service stopped before the move or during rollback.
-                WriteDword(key.get(), nullptr, L"State", ReadDword(key.get(), nullptr, PreviousState, LxssDistributionStateInstalled));
-                ClearRecoveryValues(key.get());
+                // A missing recovery path can also mean its volume is offline. Only
+                // roll back the journal when the original disk is positively identified.
+                const auto originalPath = std::filesystem::path(ReadString(key.get(), nullptr, L"BasePath")) /
+                                          ReadString(key.get(), nullptr, L"VhdFileName", LXSS_VM_MODE_VHD_NAME);
+                auto original = OpenDisk(originalPath);
+                if (original)
+                {
+                    VerifyIdentity(key.get(), original.get());
+                    WriteDword(key.get(), nullptr, L"State", ReadDword(key.get(), nullptr, PreviousState, LxssDistributionStateInstalled));
+                    ClearRecoveryValues(key.get());
+                }
             }
         }
         CATCH_LOG()
@@ -314,6 +326,28 @@ try
                 FILE_DISPOSITION_INFO disposition{TRUE};
                 THROW_IF_WIN32_BOOL_FALSE(SetFileInformationByHandle(file.get(), FileDispositionInfo, &disposition, sizeof(disposition)));
                 file.reset();
+            }
+            else
+            {
+                const wil::unique_hfile directory{CreateFileW(
+                    entry.Path.parent_path().c_str(),
+                    FILE_READ_ATTRIBUTES,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                    nullptr,
+                    OPEN_EXISTING,
+                    FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
+                    nullptr)};
+                if (!directory)
+                {
+                    continue;
+                }
+                FILE_ID_INFO expected{};
+                DWORD size = sizeof(expected);
+                THROW_IF_WIN32_ERROR(RegGetValueW(key.get(), nullptr, RecoveryFileId, RRF_RT_REG_BINARY, nullptr, &expected, &size));
+                if (size != sizeof(expected) || Identity(directory.get()).VolumeSerialNumber != expected.VolumeSerialNumber)
+                {
+                    continue;
+                }
             }
             // Never recursively delete a directory or revisit the original distribution path.
             RemoveDirectoryW(entry.Path.parent_path().c_str());

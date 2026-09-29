@@ -2581,8 +2581,14 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid, boo
         {
             std::lock_guard lock(m_instanceLock);
 
+            {
+                auto runAsUser = wil::CoImpersonateClient();
+                wsl::windows::common::DeletedDistributionStore::RecoverPending(lxssKey.get());
+            }
             // Get the configuration information about the distribution.
             registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
+            // Do not discard an interrupted recovery journal while its disk is unavailable.
+            THROW_HR_IF(E_ILLEGAL_STATE_CHANGE, registration.Read(Property::RecoveryPath).has_value());
             configuration = s_GetDistributionConfiguration(registration);
 
             // Log telemetry about the distribution being removed.
@@ -3995,8 +4001,13 @@ bool LxssUserSessionImpl::_ValidateDistro(_In_ HKEY LxssKey, _In_ LPCGUID Distro
     std::wstring packageFamilyName;
     try
     {
-        // Ensure a subkey exists for the distribution.
-        auto configuration = s_GetDistributionConfiguration(DistributionRegistration::Open(LxssKey, *DistroGuid));
+        // Pending recovery must survive an offline volume or removal of a Store app.
+        const auto registration = DistributionRegistration::Open(LxssKey, *DistroGuid);
+        if (registration.Read(Property::RecoveryPath).has_value())
+        {
+            return true;
+        }
+        auto configuration = s_GetDistributionConfiguration(registration);
         packageFamilyName = configuration.PackageFamilyName;
 
         // If there is no package family name associated with the distribution,

@@ -7309,6 +7309,21 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             VERIFY_IS_FALSE(Store::Retain(key.get(), id, path));
             VERIFY_IS_TRUE(isActive(id));
         }
+        // A short-lived handle left by disk teardown is retried, matching existing unregister behavior.
+        {
+            const auto [id, path] = create();
+            wil::unique_hfile held{CreateFileW(path.c_str(), GENERIC_READ, 0, nullptr, OPEN_EXISTING, 0, nullptr)};
+            VERIFY_IS_TRUE(!!held);
+            auto release = std::async(std::launch::async, [handle = std::move(held)]() mutable {
+                std::this_thread::sleep_for(std::chrono::milliseconds(300));
+                handle.reset();
+            });
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            release.get();
+            const auto entry = entryFor(id);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
+        }
         // Replacing a retained file cannot trick cleanup into deleting the replacement.
         {
             const auto [id, path] = create();
@@ -7345,6 +7360,14 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         {
             const auto [id, path] = create();
             const auto registration = registry::OpenKey(key.get(), keyName(id).c_str(), KEY_READ | KEY_WRITE);
+            const wil::unique_hfile file{CreateFileW(
+                path.c_str(), FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0, nullptr)};
+            VERIFY_IS_TRUE(!!file);
+            FILE_ID_INFO identity{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(GetFileInformationByHandleEx(file.get(), FileIdInfo, &identity, sizeof(identity)));
+            VERIFY_ARE_EQUAL(
+                RegSetValueExW(registration.get(), L"RecoveryFileId", 0, REG_BINARY, reinterpret_cast<const BYTE*>(&identity), sizeof(identity)),
+                ERROR_SUCCESS);
             registry::WriteString(registration.get(), nullptr, L"RecoveryPath", (directory / L"missing.vhdx").c_str());
             registry::WriteDword(registration.get(), nullptr, L"State", LxssDistributionStateDeleted);
             registry::WriteDword(registration.get(), nullptr, L"RecoveryPreviousState", LxssDistributionStateInstalled);
@@ -7353,6 +7376,25 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             VERIFY_ARE_EQUAL(registry::ReadDword(registration.get(), nullptr, L"State", 0), static_cast<DWORD>(LxssDistributionStateInstalled));
             VERIFY_IS_FALSE(registry::ReadOptionalString(registration.get(), nullptr, L"RecoveryPath").has_value());
             VERIFY_ARE_EQUAL(contents(path), "original disk contents");
+        }
+        // An unavailable recovery directory must not discard the durable cleanup record.
+        {
+            const auto [id, path] = create();
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            const auto offline = directory / L"offline";
+            std::filesystem::rename(entry.Path.parent_path(), offline);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 1u);
+            VERIFY_ARE_EQUAL(RegRenameKey(key.get(), (L"Deleted-" + keyName(id)).c_str(), keyName(id).c_str()), ERROR_SUCCESS);
+            Store::RecoverPending(key.get());
+            const auto pending = registry::OpenKey(key.get(), keyName(id).c_str(), KEY_READ);
+            VERIFY_IS_TRUE(registry::ReadOptionalString(pending.get(), nullptr, L"RecoveryPath").has_value());
+            std::filesystem::rename(offline, entry.Path.parent_path());
+            Store::RecoverPending(key.get());
+            VERIFY_IS_FALSE(isActive(id));
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
         }
         // A disk manually imported in place is no longer eligible for deletion.
         {
