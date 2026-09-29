@@ -96,6 +96,16 @@ class HcsVirtualMachineBackendTests
         auto request = CreateRunnableRequest();
         request.Boot.KernelCommandLine = L"panic=-1 console=hvc0 custom=value";
         request.Memory.SizeBytes += 123;
+        request.Memory.AllowOvercommit = VmFeatureRequest::Required;
+        request.Memory.DeferredCommit = VmFeatureRequest::Required;
+        request.Memory.ColdDiscard = VmFeatureRequest::Required;
+        request.Memory.SmallPageBacking = VmFeatureRequest::Preferred;
+        request.Memory.FaultClusterSizeShift = 4;
+        request.Memory.DirectMapFaultClusterSizeShift = 4;
+        request.Memory.PageReportingOrder = 5;
+        request.Memory.HostingProcessNameSuffix = L"WSL";
+        request.Mmio.HighWindowSizeBytes = 24 * c_mib;
+        request.Mmio.MaximumGuestAddressBits = 36;
         auto backend = HcsVirtualMachineBackend::Create(request);
         const auto description = backend->GetDescription();
 
@@ -103,6 +113,13 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(BackendKind::Hcs, description.Backend);
         VERIFY_ARE_EQUAL(request.Processor.Count, description.Processor.Count);
         VERIFY_ARE_EQUAL((request.Memory.SizeBytes / c_mib) * c_mib, description.Memory.SizeBytes);
+        VERIFY_ARE_EQUAL(wsl::windows::common::hcs::IsSmallPageMemorySupported(), description.Memory.SmallPageBacking);
+        VERIFY_ARE_EQUAL(UINT32{4}, description.Memory.FaultClusterSizeShift.value());
+        VERIFY_ARE_EQUAL(UINT32{4}, description.Memory.DirectMapFaultClusterSizeShift.value());
+        VERIFY_ARE_EQUAL(UINT32{5}, description.Memory.PageReportingOrder.value());
+        VERIFY_ARE_EQUAL(std::wstring{L"WSL"}, description.Memory.HostingProcessNameSuffix.value());
+        VERIFY_ARE_EQUAL(UINT64{24 * c_mib}, description.Memory.HighMmioSizeBytes.value());
+        VERIFY_ARE_EQUAL((UINT64{1} << 36) - (24 * c_mib), description.Memory.HighMmioBaseBytes.value());
         VERIFY_ARE_EQUAL(VmBootMethod::LinuxDirect, description.Boot.Method);
         VERIFY_ARE_EQUAL(request.Boot.KernelCommandLine, description.Boot.KernelCommandLine);
         const auto capabilities = backend->GetCapabilities();
@@ -119,7 +136,22 @@ class HcsVirtualMachineBackendTests
         VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::CreateDnsRecord)));
         VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::AddPersistentMemory)));
         VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::AddGpu)));
+        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::GetFileSystemDeviceStatus)));
+        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::AddSharedMemory)));
+        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::ConfigureGuestDma)));
+        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::RemoveDevice)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::PersistentMemory)));
+        VERIFY_ARE_EQUAL(
+            wsl::windows::common::hcs::IsSmallPageMemorySupported(),
+            capabilities.Features.test(static_cast<size_t>(VmFeature::SmallPageMemory)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::SerialConsole)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::VirtioConsole)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::Plan9Socket)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::Plan9Virtio)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::VirtioFsFileBacked)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::VirtioFsAggregate)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::SectionBackedSharedMemory)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::GuestDmaWindow)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::MirroredGpu)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::GpuVendorExtension)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::HostEndpointNetwork)));
@@ -298,6 +330,10 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->BindPort(device, bindingRequest); }));
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->UnbindPort(binding); }));
         VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddPersistentMemory({}); }));
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddSharedMemory({}); }));
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->ConfigureGuestDma({}); }));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->GetFileSystemDeviceStatus(device); }));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->RemoveDevice(device); }));
         backend->Terminate();
     }
 
@@ -317,6 +353,7 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Serving, userDevice.State);
         VERIFY_IS_TRUE(userDevice.GuestInstanceId.has_value());
         VERIFY_ARE_NOT_EQUAL(userDevice.Id.Value, adminDevice.Id.Value);
+        VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Serving, backend->GetFileSystemDeviceStatus(userDevice.Id).State);
 
         // Leaving the token unset serves the share through the identity that created the VM.
         VmFileSystemShareRequest request;
@@ -363,10 +400,14 @@ class HcsVirtualMachineBackendTests
         const auto singleShareDevice = backend->CreateFileSystemDevice({VmVirtioFsDevice{L"drvfs-single", VmVirtioFsLayout::SingleShare}});
         const auto singleShare = backend->AddFileSystemShare(singleShareDevice.Id, request);
         VERIFY_IS_FALSE(std::get<VmVirtioFsShareAddress>(singleShare.GuestAddress).ChildName.has_value());
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_BUSY), OperationResult([&] { backend->RemoveDevice(singleShareDevice.Id); }));
         backend->RemoveFileSystemShare(singleShare.Id);
         const auto replacementSingleShare = backend->AddFileSystemShare(singleShareDevice.Id, request);
         VERIFY_ARE_NOT_EQUAL(singleShare.Id.Value, replacementSingleShare.Id.Value);
         backend->RemoveFileSystemShare(replacementSingleShare.Id);
+        backend->RemoveDevice(singleShareDevice.Id);
+        VERIFY_ARE_EQUAL(
+            HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->GetFileSystemDeviceStatus(singleShareDevice.Id); }));
 
         // A share carries its own token, so the elevated device reaches the same directory without
         // reusing the share that the unelevated device serves.
@@ -401,6 +442,20 @@ class HcsVirtualMachineBackendTests
         const auto replacementSocketShare = backend->AddFileSystemShare(socketDeviceResult.Id, socketRequest);
         VERIFY_ARE_NOT_EQUAL(socketShare.Id.Value, replacementSocketShare.Id.Value);
         backend->RemoveFileSystemShare(replacementSocketShare.Id);
+        backend->RemoveDevice(socketDeviceResult.Id);
+
+        VmPlan9HostedDevice hostedDevice{GuestServicePort{LX_INIT_UTILITY_VM_PLAN9_PORT}};
+        const auto hostedDeviceResult = backend->CreateFileSystemDevice({hostedDevice});
+        const auto hostedShare = backend->AddFileSystemShare(hostedDeviceResult.Id, socketRequest);
+        VERIFY_ARE_EQUAL(hostedDevice.Port.Value, std::get<VmPlan9SocketShareAddress>(hostedShare.GuestAddress).Port.Value);
+        backend->RemoveFileSystemShare(hostedShare.Id);
+        backend->RemoveDevice(hostedDeviceResult.Id);
+
+        const auto sharedMemory = backend->AddSharedMemory({L"test-memory", L"test-memory", 8 * c_mib});
+        VERIFY_ARE_EQUAL(UINT64{8 * c_mib}, sharedMemory.SizeBytes);
+        VERIFY_ARE_EQUAL(std::wstring{L"test-memory"}, sharedMemory.Tag);
+        VERIFY_IS_FALSE(IsEqualGUID(GUID_NULL, sharedMemory.GuestInstanceId));
+        backend->RemoveDevice(sharedMemory.Id);
 
         VmPlan9VirtioDevice virtioDevice{L"plan9-virtio"};
         virtioDevice.FileSystemClassId = __uuidof(p9fs::Plan9FileSystem);

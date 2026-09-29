@@ -68,7 +68,7 @@ public:
 
     void RemoveRemoteFileSystem(_In_ REFCLSID clsid, _In_ std::wstring_view tag) noexcept;
 
-    void AddSharedMemoryDevice(_In_ PCWSTR Tag, _In_ PCWSTR Path, _In_ UINT32 SizeMb, _In_ HANDLE UserToken);
+    GUID AddSharedMemoryDevice(_In_ PCWSTR Tag, _In_ PCWSTR Path, _In_ UINT32 SizeMb, _In_ HANDLE UserToken);
 
     wil::com_ptr<IPlan9FileSystem> GetRemoteFileSystem(_In_ REFCLSID clsid, _In_ std::wstring_view tag);
 
@@ -91,6 +91,6 @@ private:
     wil::srwlock m_lock;
     std::wstring m_machineId;
     wil::com_ptr<DeviceHostProxy> m_deviceHostSupport;
-    _Guarded_by_(m_lock) std::vector<DirectoryObjectLifetime> m_objectDirectories;
+    _Guarded_by_(m_lock) std::map<GUID, DirectoryObjectLifetime, wsl::windows::common::helpers::GuidLess> m_objectDirectories;
     _Guarded_by_(m_lock) std::map<std::wstring, GUID> m_virtioNetDevices;
 };

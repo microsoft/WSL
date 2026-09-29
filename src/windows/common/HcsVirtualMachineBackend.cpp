@@ -47,7 +47,8 @@ std::wstring GetFileSystemDeviceTag(const VmFileSystemDeviceTransport& Transport
         Overloaded{
             [](const VmVirtioFsDevice& transport) { return transport.Tag; },
             [](const VmPlan9VirtioDevice& transport) { return transport.Tag; },
-            [](const VmPlan9SocketDevice&) { return std::wstring{}; }},
+            [](const VmPlan9SocketDevice&) { return std::wstring{}; },
+            [](const VmPlan9HostedDevice&) { return std::wstring{}; }},
         Transport);
 }
 
@@ -57,6 +58,7 @@ std::optional<std::uint32_t> GetPlan9SocketPort(const VmFileSystemDeviceTranspor
     return std::visit(
         Overloaded{
             [](const VmPlan9SocketDevice& transport) { return std::optional<std::uint32_t>{transport.Port.Value}; },
+            [](const VmPlan9HostedDevice& transport) { return std::optional<std::uint32_t>{transport.Port.Value}; },
             [](const VmVirtioFsDevice&) { return std::optional<std::uint32_t>{}; },
             [](const VmPlan9VirtioDevice&) { return std::optional<std::uint32_t>{}; }},
         Transport);
@@ -96,18 +98,58 @@ VmEffectiveProcessor ConfigureProcessor(const VmProcessorRequest& Request, schem
     return processor;
 }
 
-VmEffectiveMemory ConfigureMemory(const VmMemoryRequest& Request, schema::Memory& Settings)
+VmEffectiveMemory ConfigureMemory(const VmMemoryRequest& Request, const VmMmioRequest& Mmio, schema::Memory& Settings)
 {
     VmEffectiveMemory memory{};
     memory.SizeBytes = (Request.SizeBytes / c_mib) * c_mib;
     memory.AllowOvercommit = validation::ValidateFeature(Request.AllowOvercommit, L"memory overcommit", true);
     memory.DeferredCommit = validation::ValidateFeature(Request.DeferredCommit, L"deferred memory commit", true);
     memory.ColdDiscard = validation::ValidateFeature(Request.ColdDiscard, L"cold discard", true);
+    memory.SmallPageBacking =
+        validation::ValidateFeature(Request.SmallPageBacking, L"small-page memory", schema::IsSmallPageMemorySupported());
+    THROW_HR_IF(
+        E_INVALIDARG,
+        (memory.SmallPageBacking || Request.FaultClusterSizeShift.has_value() ||
+         Request.DirectMapFaultClusterSizeShift.has_value()) &&
+            !memory.AllowOvercommit);
+    memory.FaultClusterSizeShift = Request.FaultClusterSizeShift;
+    memory.DirectMapFaultClusterSizeShift = Request.DirectMapFaultClusterSizeShift;
+    memory.PageReportingOrder = Request.PageReportingOrder;
+    memory.HostingProcessNameSuffix = Request.HostingProcessNameSuffix;
 
     Settings.SizeInMB = memory.SizeBytes / c_mib;
     Settings.AllowOvercommit = memory.AllowOvercommit;
     Settings.EnableDeferredCommit = memory.DeferredCommit;
     Settings.EnableColdDiscardHint = memory.ColdDiscard;
+    if (memory.SmallPageBacking)
+    {
+        Settings.BackingPageSize = schema::MemoryBackingPageSize::Small;
+    }
+    Settings.FaultClusterSizeShift = memory.FaultClusterSizeShift;
+    Settings.DirectMapFaultClusterSizeShift = memory.DirectMapFaultClusterSizeShift;
+    Settings.HostingProcessNameSuffix = memory.HostingProcessNameSuffix;
+
+    if (Mmio.HighWindowSizeBytes != 0)
+    {
+        THROW_HR_IF(E_INVALIDARG, (Mmio.HighWindowSizeBytes % c_mib) != 0);
+        Settings.HighMmioGapInMB = Mmio.HighWindowSizeBytes / c_mib;
+        memory.HighMmioSizeBytes = Mmio.HighWindowSizeBytes;
+        if (Mmio.MaximumGuestAddressBits)
+        {
+            THROW_HR_IF(
+                E_INVALIDARG,
+                Mmio.MaximumGuestAddressBits.value() >= 64 ||
+                    Mmio.HighWindowSizeBytes > (UINT64{1} << Mmio.MaximumGuestAddressBits.value()));
+            memory.HighMmioBaseBytes = (UINT64{1} << Mmio.MaximumGuestAddressBits.value()) - Mmio.HighWindowSizeBytes;
+            THROW_HR_IF(E_INVALIDARG, (memory.HighMmioBaseBytes.value() % c_mib) != 0);
+            Settings.HighMmioBaseInMB = memory.HighMmioBaseBytes.value() / c_mib;
+        }
+    }
+    else
+    {
+        THROW_HR_IF(E_INVALIDARG, Mmio.MaximumGuestAddressBits.has_value());
+    }
+
     return memory;
 }
 
@@ -177,9 +219,18 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
     description.Identity = Request.Identity;
     description.Backend = BackendKind::Hcs;
     description.Processor = ConfigureProcessor(Request.Processor, configuration.Settings.VirtualMachine.ComputeTopology.Processor);
-    description.Memory = ConfigureMemory(Request.Memory, configuration.Settings.VirtualMachine.ComputeTopology.Memory);
+    description.Memory = ConfigureMemory(Request.Memory, Request.Mmio, configuration.Settings.VirtualMachine.ComputeTopology.Memory);
     description.Boot = ConfigureBoot(Request.Boot, configuration.Settings.VirtualMachine.Chipset);
     configuration.Settings.VirtualMachine.Devices.Scsi["0"] = {};
+
+    if (Request.CrashCapture && Request.CrashCapture->SavedStateFolder)
+    {
+        THROW_HR_IF(E_INVALIDARG, Request.CrashCapture->SavedStateFolder->empty());
+        const auto savedStatePath = schema::CreateVmSavedStateFile(
+            Request.CrashCapture->SavedStateFolder.value(), Request.Identity.VmId, Request.Identity.UserToken.get());
+        configuration.Settings.VirtualMachine.DebugOptions.BugcheckSavedStateFileName = savedStatePath.native();
+        m_vmSavedStateFile = savedStatePath;
+    }
 
     // Permit the VM identity and SYSTEM to bind and connect Hyper-V sockets. Plan 9 socket
     // transports initialize their listener while impersonating the VM identity.
@@ -213,6 +264,18 @@ HcsVirtualMachineBackend::~HcsVirtualMachineBackend() noexcept
     system.reset();
     CleanupAttachedDisks(std::move(attachedDisks));
 
+    try
+    {
+        auto crashLock = m_crashInformationLock.lock_shared();
+        if (m_vmSavedStateFile && std::filesystem::exists(m_vmSavedStateFile.value()) &&
+            std::filesystem::is_empty(m_vmSavedStateFile.value()))
+        {
+            auto runAsUser = wil::impersonate_token(m_configuration.Description.Identity.UserToken.get());
+            std::filesystem::remove(m_vmSavedStateFile.value());
+        }
+    }
+    CATCH_LOG()
+
     auto exitDetailsLock = m_exitDetailsLock.lock_shared();
     WSL_LOG(
         "HcsVirtualMachineBackendDestroyed",
@@ -229,7 +292,7 @@ std::unique_ptr<HcsVirtualMachineBackend> HcsVirtualMachineBackend::Create(const
     {
         newInstance->m_configuration.Description.Identity = Request.Identity;
         newInstance->m_configuration.Description.Backend = BackendKind::Hcs;
-        if (Request.CrashCapture && !Request.CrashCapture->Path.empty())
+        if (Request.CrashCapture)
         {
             newInstance->m_crashCapture = Request.CrashCapture;
         }
@@ -254,12 +317,13 @@ std::unique_ptr<HcsVirtualMachineBackend> HcsVirtualMachineBackend::Create(const
             // A kernel panic can cause an hvsocket error. Wait for an HCS notification to provide a better error for the user.
             if (newInstance->m_vmCrashEvent.wait(1000))
             {
-                if (newInstance->m_vmCrashLogFile.has_value())
+                const auto crashInformation = newInstance->GetCrashInformation();
+                if (crashInformation.CrashLogFile.has_value())
                 {
                     THROW_HR_WITH_USER_ERROR(
                         WSL_E_VM_CRASHED,
                         wsl::shared::Localization::MessageWSL2Crashed() + L"\r\n" +
-                            wsl::shared::Localization::MessageWSL2CrashedStackTrace(newInstance->m_vmCrashLogFile.value()));
+                            wsl::shared::Localization::MessageWSL2CrashedStackTrace(crashInformation.CrashLogFile.value()));
                 }
                 else
                 {
@@ -287,6 +351,7 @@ void HcsVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     m_vmIdString = id;
     auto lock = m_lock.lock_exclusive();
     m_system = schema::CreateComputeSystem(id.c_str(), settings.c_str());
+    m_state = VmState::Created;
     m_runtimeId = wsl::windows::common::hcs::GetRuntimeId(m_system.get());
     m_guestDeviceManager = std::make_shared<GuestDeviceManager>(id, m_runtimeId, true);
     m_pendingNetworkAdapters = Request.NetworkAdapters;
@@ -315,8 +380,12 @@ VmPlatformCapabilities HcsVirtualMachineBackend::QueryCapabilities()
           VmOperation::AddPersistentMemory,
           VmOperation::AddGpu,
           VmOperation::CreateFileSystemDevice,
+          VmOperation::GetFileSystemDeviceStatus,
           VmOperation::AddFileSystemShare,
           VmOperation::RemoveFileSystemShare,
+          VmOperation::AddSharedMemory,
+          VmOperation::ConfigureGuestDma,
+          VmOperation::RemoveDevice,
           VmOperation::AddNetworkAdapter,
           VmOperation::UpdateNetworkAdapter,
           VmOperation::RemoveNetworkAdapter,
@@ -333,12 +402,21 @@ VmPlatformCapabilities HcsVirtualMachineBackend::QueryCapabilities()
           VmFeature::MemoryOvercommit,
           VmFeature::DeferredMemoryCommit,
           VmFeature::ColdDiscard,
+          VmFeature::SerialConsole,
+          VmFeature::VirtioConsole,
           VmFeature::Vhd,
           VmFeature::Vhdx,
           VmFeature::PhysicalDisk,
           VmFeature::PersistentMemory,
+          VmFeature::Plan9Socket,
+          VmFeature::Plan9Virtio,
+          VmFeature::VirtioFsFileBacked,
+          VmFeature::VirtioFsAggregate,
+          VmFeature::SectionBackedSharedMemory,
           VmFeature::MirroredGpu,
           VmFeature::GpuVendorExtension,
+          VmFeature::SavedStateOnCrash,
+          VmFeature::GuestDmaWindow,
           VmFeature::HostEndpointNetwork,
           VmFeature::UserModeNatNetwork,
           VmFeature::TcpPortBinding,
@@ -355,6 +433,8 @@ VmPlatformCapabilities HcsVirtualMachineBackend::QueryCapabilities()
     {
         capabilities.Features.set(static_cast<size_t>(VmFeature::LinuxDirectBoot));
     }
+
+    capabilities.Features.set(static_cast<size_t>(VmFeature::SmallPageMemory), schema::IsSmallPageMemorySupported());
 
     if (schema::IsNestedVirtualizationSupported())
     {
@@ -379,6 +459,31 @@ VmDescription HcsVirtualMachineBackend::GetDescription() const
     return m_configuration.Description;
 }
 
+VmState HcsVirtualMachineBackend::GetState() const
+{
+    auto lock = m_lock.lock_shared();
+    return m_state;
+}
+
+std::wstring HcsVirtualMachineBackend::GetExitDetails() const
+{
+    auto lock = m_exitDetailsLock.lock_shared();
+    return m_exitDetails;
+}
+
+VmCrashInformation HcsVirtualMachineBackend::GetCrashInformation() const
+{
+    VmCrashInformation information{};
+    information.Crashed = m_vmCrashEvent.is_signaled();
+    auto lock = m_crashInformationLock.lock_shared();
+    information.CrashLogFile = m_vmCrashLogFile;
+    if (information.Crashed)
+    {
+        information.SavedStateFile = m_vmSavedStateFile;
+    }
+    return information;
+}
+
 wil::unique_handle HcsVirtualMachineBackend::GetTerminationEvent() const
 {
     wil::unique_handle event;
@@ -395,6 +500,7 @@ void HcsVirtualMachineBackend::Start()
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
         const auto settings = wsl::shared::ToJsonW(m_configuration.Settings);
         schema::StartComputeSystem(m_system.get(), settings.c_str());
+        m_state = VmState::Running;
         networkAdapters = std::move(m_pendingNetworkAdapters);
     }
 
@@ -414,6 +520,7 @@ void HcsVirtualMachineBackend::Terminate()
         CloseNetworkAdaptersLocked();
         CloseGuestDevicesLocked();
         system = std::move(m_system);
+        m_state = VmState::Stopped;
         attachedDisks = std::move(m_attachedDisks);
         CloseGuestListenersLocked(m_configuration.Description.Identity);
     }
@@ -725,6 +832,7 @@ void HcsVirtualMachineBackend::CloseGuestDevicesLocked() noexcept
     m_fileSystemShares.clear();
     m_fileSystemDevices.clear();
     m_persistentMemoryDevices.clear();
+    m_sharedMemoryDevices.clear();
 }
 
 VmPersistentMemoryDevice HcsVirtualMachineBackend::AddPersistentMemory(const VmPersistentMemoryRequest& Request)
@@ -910,6 +1018,10 @@ VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFile
                 THROW_IF_FAILED(plan9Server->Init(&m_runtimeId, transport.Port.Value));
                 THROW_IF_FAILED(plan9Server->Resume());
                 device.State = VmFileSystemDeviceState::Serving;
+            },
+            [&](const VmPlan9HostedDevice& transport) {
+                THROW_HR_IF(E_INVALIDARG, transport.Port.Value == 0);
+                device.State = VmFileSystemDeviceState::Serving;
             }},
         Request.Transport);
 
@@ -930,6 +1042,23 @@ VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFile
         TraceLoggingValue(device.GuestInstanceId.has_value(), "created"));
 
     return device;
+}
+
+VmFileSystemDevice HcsVirtualMachineBackend::GetFileSystemDeviceStatus(VmDeviceId Device)
+{
+    validation::ValidateResourceId(Device, m_configuration.Description.Identity);
+    auto lock = m_lock.lock_exclusive();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
+    const auto device = FindFileSystemDeviceLocked(Device);
+    if (device->second.Plan9Server && device->second.Plan9Server->IsRunning() != S_OK)
+    {
+        device->second.Device.State = VmFileSystemDeviceState::Unavailable;
+    }
+    else if (device->second.Plan9Server)
+    {
+        device->second.Device.State = VmFileSystemDeviceState::Serving;
+    }
+    return device->second.Device;
 }
 
 HcsVirtualMachineBackend::FileSystemDeviceMap::iterator HcsVirtualMachineBackend::FindFileSystemDeviceLocked(VmDeviceId Device)
@@ -1075,6 +1204,22 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
                 hostPath = Request.HostPath.native();
                 guestAddress = VmPlan9SocketShareAddress{transport.Port, AddPlan9ShareLocked(device->second, Request, userToken, hostPath)};
             },
+            [&](const VmPlan9HostedDevice& transport) {
+                const auto* options = std::get_if<VmPlan9ShareOptions>(&Request.Options);
+                THROW_HR_IF_MSG(E_INVALIDARG, !options, "An HCS-hosted Plan 9 device requires Plan 9 share options");
+                hostPath = Request.HostPath.native();
+                auto flags = schema::Plan9ShareFlags::None;
+                WI_SetFlagIf(flags, schema::Plan9ShareFlags::ReadOnly, Request.ReadOnly);
+                WI_SetFlagIf(flags, schema::Plan9ShareFlags::LinuxMetadata, options->LinuxMetadata);
+                WI_SetFlagIf(flags, schema::Plan9ShareFlags::CaseSensitive, options->CaseSensitive);
+                WI_SetFlagIf(flags, schema::Plan9ShareFlags::UseShareRootIdentity, options->UseShareRootIdentity);
+                WI_SetFlagIf(flags, schema::Plan9ShareFlags::AllowOptions, options->AllowOptions);
+                WI_SetFlagIf(flags, schema::Plan9ShareFlags::AllowSubPaths, options->AllowSubPaths);
+                const auto accessName = Request.Name.empty() ? GenerateShareName() : Request.Name;
+                schema::AddPlan9Share(
+                    m_system.get(), accessName.c_str(), accessName.c_str(), hostPath.c_str(), transport.Port.Value, flags, userToken);
+                guestAddress = VmPlan9SocketShareAddress{transport.Port, accessName};
+            },
             [&](const VmPlan9VirtioDevice& transport) {
                 hostPath = Request.HostPath.native();
                 guestAddress = VmPlan9VirtioShareAddress{transport.Tag, AddPlan9ShareLocked(device->second, Request, userToken, hostPath)};
@@ -1161,6 +1306,10 @@ void HcsVirtualMachineBackend::RemoveFileSystemShare(VmShareId Share)
                 const auto& guestAddress = std::get<VmPlan9SocketShareAddress>(share->second.Share.GuestAddress);
                 RemovePlan9ShareLocked(device->second, guestAddress.AccessName, userToken);
             },
+            [&](const VmPlan9HostedDevice& transport) {
+                const auto& guestAddress = std::get<VmPlan9SocketShareAddress>(share->second.Share.GuestAddress);
+                schema::RemovePlan9Share(m_system.get(), guestAddress.AccessName.c_str(), transport.Port.Value);
+            },
             [&](const VmPlan9VirtioDevice&) {
                 const auto& guestAddress = std::get<VmPlan9VirtioShareAddress>(share->second.Share.GuestAddress);
                 RemovePlan9ShareLocked(device->second, guestAddress.AccessName, userToken);
@@ -1175,6 +1324,99 @@ void HcsVirtualMachineBackend::RemoveFileSystemShare(VmShareId Share)
         TraceLoggingValue(GetFileSystemDeviceTag(device->second.Transport).c_str(), "tag"));
 
     m_fileSystemShares.erase(share);
+}
+
+VmSharedMemoryDevice HcsVirtualMachineBackend::AddSharedMemory(const VmSharedMemoryRequest& Request)
+{
+    THROW_HR_IF(
+        E_INVALIDARG,
+        Request.Tag.empty() || Request.Path.empty() || Request.SizeBytes == 0 || (Request.SizeBytes % c_mib) != 0 ||
+            (Request.SizeBytes / c_mib) > UINT32_MAX);
+
+    auto lock = m_lock.lock_exclusive();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system || !m_guestDeviceManager);
+    THROW_HR_IF(E_BOUNDS, m_nextDeviceId == UINT64_MAX);
+    HANDLE userToken = Request.UserToken ? Request.UserToken.get() : m_configuration.Description.Identity.UserToken.get();
+    THROW_HR_IF_MSG(E_UNEXPECTED, !userToken, "UserToken not set for the shared memory request");
+
+    for (const auto& entry : m_sharedMemoryDevices)
+    {
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), wsl::shared::string::IsEqual(entry.second.Tag, Request.Tag, false));
+    }
+
+    VmSharedMemoryDevice device{};
+    device.Id = {m_configuration.Description.Identity, m_nextDeviceId};
+    device.Tag = Request.Tag;
+    device.ObjectPath = std::format(L"WSL\\{}\\{}", m_vmIdString, Request.Path);
+    device.SizeBytes = Request.SizeBytes;
+    device.GuestInstanceId = m_guestDeviceManager->AddSharedMemoryDevice(
+        Request.Tag.c_str(), Request.Path.c_str(), static_cast<UINT32>(Request.SizeBytes / c_mib), userToken);
+    auto removeOnFailure =
+        wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { m_guestDeviceManager->RemoveGuestDevice(device.GuestInstanceId); });
+    const auto inserted = m_sharedMemoryDevices.emplace(device.Id.Value, device).second;
+    WI_ASSERT(inserted);
+    ++m_nextDeviceId;
+    removeOnFailure.release();
+    return device;
+}
+
+void HcsVirtualMachineBackend::ConfigureGuestDma(const VmGuestDmaRequest& Request)
+{
+    THROW_HR_IF(E_INVALIDARG, Request.BaseAddress == 0 || Request.SizeBytes == 0);
+    auto lock = m_lock.lock_exclusive();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system || !m_guestDeviceManager);
+    m_guestDeviceManager->SetSwiotlb(Request.BaseAddress, Request.SizeBytes);
+}
+
+void HcsVirtualMachineBackend::RemoveDevice(VmDeviceId Device)
+{
+    validation::ValidateResourceId(Device, m_configuration.Description.Identity);
+    auto lock = m_lock.lock_exclusive();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system || !m_guestDeviceManager);
+
+    if (const auto sharedMemory = m_sharedMemoryDevices.find(Device.Value); sharedMemory != m_sharedMemoryDevices.end())
+    {
+        m_guestDeviceManager->RemoveGuestDevice(sharedMemory->second.GuestInstanceId);
+        m_sharedMemoryDevices.erase(sharedMemory);
+        return;
+    }
+
+    if ((m_gpu && m_gpu->Id.Value == Device.Value) || m_persistentMemoryDevices.contains(Device.Value) ||
+        m_networkAdapters.contains(Device.Value))
+    {
+        THROW_HR(c_notSupported);
+    }
+
+    const auto device = m_fileSystemDevices.find(Device.Value);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), device == m_fileSystemDevices.end());
+    const auto hasShares = std::ranges::any_of(
+        m_fileSystemShares, [&](const auto& entry) { return entry.second.Share.Device.Value == Device.Value; });
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_BUSY), hasShares);
+
+    std::visit(
+        Overloaded{
+            [&](const VmVirtioFsDevice&) {
+                if (device->second.Device.GuestInstanceId)
+                {
+                    m_guestDeviceManager->RemoveGuestDevice(device->second.Device.GuestInstanceId.value());
+                }
+            },
+            [&](const VmPlan9VirtioDevice& transport) {
+                if (device->second.Device.GuestInstanceId)
+                {
+                    m_guestDeviceManager->RemoveGuestDevice(device->second.Device.GuestInstanceId.value());
+                }
+                m_guestDeviceManager->RemoveRemoteFileSystem(transport.FileSystemClassId, transport.Tag);
+            },
+            [&](const VmPlan9SocketDevice&) {
+                if (device->second.Plan9Server)
+                {
+                    THROW_IF_FAILED(device->second.Plan9Server->Teardown());
+                }
+            },
+            [&](const VmPlan9HostedDevice&) {}},
+        device->second.Transport);
+    m_fileSystemDevices.erase(device);
 }
 
 std::map<std::uint64_t, HcsVirtualMachineBackend::NetworkAdapter>::iterator HcsVirtualMachineBackend::FindNetworkAdapterLocked(VmDeviceId Device)
@@ -1585,11 +1827,13 @@ void HcsVirtualMachineBackend::OnCrash(PCWSTR Details)
         return;
     }
 
+    auto signalCrash = wil::scope_exit([&] { m_vmCrashEvent.SetEvent(); });
     WSL_LOG("GuestCrash", TraceLoggingValue(Details, "Data"));
     const auto crashInformation = wsl::shared::FromJson<wsl::windows::common::hcs::CrashReport>(Details);
 
-    if (m_crashCapture)
+    if (m_crashCapture && !m_crashCapture->Path.empty())
     {
+        auto lock = m_crashInformationLock.lock_exclusive();
         m_vmCrashLogFile = wsl::windows::common::hcs::WriteVmCrashLog(
             m_crashCapture->Path,
             m_crashCapture->MaxCrashLogCount,
@@ -1598,13 +1842,30 @@ void HcsVirtualMachineBackend::OnCrash(PCWSTR Details)
             crashInformation.CrashLog);
     }
 
-    m_vmCrashEvent.SetEvent();
+    std::optional<std::filesystem::path> savedStateFile;
+    {
+        auto lock = m_crashInformationLock.lock_shared();
+        savedStateFile = m_vmSavedStateFile;
+    }
+    if (m_crashCapture && m_crashCapture->SavedStateFolder && savedStateFile)
+    {
+        schema::EnforceVmSavedStateFileLimit(
+            m_crashCapture->SavedStateFolder.value(),
+            static_cast<size_t>(m_crashCapture->MaxSavedStateCount) + 1,
+            m_configuration.Description.Identity.UserToken.get());
+    }
+
 }
 
 void HcsVirtualMachineBackend::OnExit(PCWSTR ExitDetails)
 {
     // Closing the system drains callbacks before their event and context are destroyed.
     // An exit without a prior termination request must cancel pending operations.
+    {
+        auto lock = m_lock.lock_exclusive();
+        m_state = VmState::Stopped;
+    }
+
     {
         auto exitDetailsLock = m_exitDetailsLock.lock_exclusive();
         if (ExitDetails != nullptr)

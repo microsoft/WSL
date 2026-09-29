@@ -102,6 +102,12 @@ VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmC
     validation::ValidateFeature(Request.Memory.AllowOvercommit, L"memory overcommit");
     validation::ValidateFeature(Request.Memory.DeferredCommit, L"deferred memory commit");
     validation::ValidateFeature(Request.Memory.ColdDiscard, L"cold discard");
+    validation::ValidateFeature(Request.Memory.SmallPageBacking, L"small-page memory");
+    THROW_HR_IF(
+        c_notSupported,
+        Request.Memory.FaultClusterSizeShift.has_value() || Request.Memory.DirectMapFaultClusterSizeShift.has_value() ||
+            Request.Memory.PageReportingOrder.has_value() || Request.Memory.HostingProcessNameSuffix.has_value());
+    THROW_HR_IF(c_notSupported, Request.Mmio.HighWindowSizeBytes != 0 || Request.Mmio.MaximumGuestAddressBits.has_value());
 
     if (Request.CrashCapture)
     {
@@ -367,6 +373,7 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     THROW_LAST_ERROR_IF(result == WAIT_FAILED);
     THROW_HR_WITH_USER_ERROR_IF(WSL_E_VM_CRASHED, wsl::shared::Localization::MessageWSL2Crashed(), result == WAIT_OBJECT_0);
     THROW_IF_FAILED_MSG(createResult, "Failed to create OpenVMM VM");
+    m_state = VmState::Created;
 }
 
 void OpenVmmVirtualMachineBackend::ReadProcessLog(wil::unique_hfile Pipe) noexcept
@@ -395,9 +402,13 @@ void OpenVmmVirtualMachineBackend::OnProcessExit(DWORD ExitCode) noexcept
     WSL_LOG(
         "OpenVmmProcessExited", TraceLoggingValue(m_description.Identity.VmId, "vmId"), TraceLoggingValue(ExitCode, "exitCode"));
     LOG_IF_WIN32_BOOL_FALSE(SetEvent(m_exitEvent.get()));
+    {
+        auto lock = m_lock.lock_exclusive();
+        m_state = VmState::Stopped;
+        m_exitDetails = std::format(L"OpenVMM process exited with code {}", ExitCode);
+        CloseGuestListenersLocked(m_description.Identity);
+    }
     NotifyTerminated(m_description.Identity);
-    auto lock = m_lock.lock_exclusive();
-    CloseGuestListenersLocked(m_description.Identity);
 }
 
 VmPlatformCapabilities OpenVmmVirtualMachineBackend::QueryCapabilities()
@@ -416,6 +427,7 @@ VmPlatformCapabilities OpenVmmVirtualMachineBackend::QueryCapabilities()
           VmOperation::AttachDisk,
           VmOperation::DetachDisk,
           VmOperation::CreateFileSystemDevice,
+          VmOperation::GetFileSystemDeviceStatus,
           VmOperation::AddFileSystemShare,
           VmOperation::RemoveFileSystemShare,
           VmOperation::RemoveDevice,
@@ -426,14 +438,11 @@ VmPlatformCapabilities OpenVmmVirtualMachineBackend::QueryCapabilities()
     }
     for (const auto feature :
          {VmFeature::LinuxDirectBoot,
-          VmFeature::LinuxFirmwareBoot,
-          VmFeature::MemoryOvercommit,
           VmFeature::SerialConsole,
           VmFeature::VirtioConsole,
           VmFeature::Vhd,
           VmFeature::Vhdx,
           VmFeature::VirtioFsFileBacked,
-          VmFeature::SavedStateOnCrash,
           VmFeature::UserModeNatNetwork,
           VmFeature::TcpPortBinding,
           VmFeature::UdpPortBinding,
@@ -455,6 +464,23 @@ VmDescription OpenVmmVirtualMachineBackend::GetDescription() const
     return m_description;
 }
 
+VmState OpenVmmVirtualMachineBackend::GetState() const
+{
+    auto lock = m_lock.lock_shared();
+    return m_state;
+}
+
+std::wstring OpenVmmVirtualMachineBackend::GetExitDetails() const
+{
+    auto lock = m_lock.lock_shared();
+    return m_exitDetails;
+}
+
+VmCrashInformation OpenVmmVirtualMachineBackend::GetCrashInformation() const
+{
+    return {};
+}
+
 wil::unique_handle OpenVmmVirtualMachineBackend::GetTerminationEvent() const
 {
     return wil::unique_handle{wsl::windows::common::wslutil::DuplicateHandle(m_exitEvent.get())};
@@ -473,6 +499,7 @@ void OpenVmmVirtualMachineBackend::Start()
         TraceLoggingHResult(result, "result"),
         TraceLoggingValue(GetTickCount64() - startTimeMs, "durationMs"));
     THROW_IF_FAILED(result);
+    m_state = VmState::Running;
 }
 
 void OpenVmmVirtualMachineBackend::Terminate()
@@ -505,6 +532,7 @@ void OpenVmmVirtualMachineBackend::Terminate()
     }
 
     m_vm.reset();
+    m_state = VmState::Stopped;
     m_attachedDisks.clear();
     m_fileSystemShares.clear();
     m_fileSystemDevices.clear();
@@ -749,6 +777,16 @@ VmFileSystemDevice OpenVmmVirtualMachineBackend::CreateFileSystemDevice(const Vm
     return device;
 }
 
+VmFileSystemDevice OpenVmmVirtualMachineBackend::GetFileSystemDeviceStatus(VmDeviceId Device)
+{
+    validation::ValidateResourceId(Device, m_description.Identity);
+    auto lock = m_lock.lock_shared();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
+    const auto device = m_fileSystemDevices.find(Device.Value);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), device == m_fileSystemDevices.end());
+    return device->second.Device;
+}
+
 VmFileSystemShare OpenVmmVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device, const VmFileSystemShareRequest& Request)
 {
     WSL_LOG(
@@ -832,6 +870,27 @@ void OpenVmmVirtualMachineBackend::RemoveFileSystemShare(VmShareId Share)
     device->second.Share.reset();
     device->second.Device.State = VmFileSystemDeviceState::Prepared;
     m_fileSystemShares.erase(share);
+}
+
+VmSharedMemoryDevice OpenVmmVirtualMachineBackend::AddSharedMemory(const VmSharedMemoryRequest&)
+{
+    THROW_HR_MSG(c_notSupported, "OpenVMM does not support section-backed shared memory devices");
+}
+
+void OpenVmmVirtualMachineBackend::ConfigureGuestDma(const VmGuestDmaRequest&)
+{
+    THROW_HR_MSG(c_notSupported, "OpenVMM does not support configuring a guest DMA window");
+}
+
+void OpenVmmVirtualMachineBackend::RemoveDevice(VmDeviceId Device)
+{
+    validation::ValidateResourceId(Device, m_description.Identity);
+    auto lock = m_lock.lock_exclusive();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
+    const auto device = m_fileSystemDevices.find(Device.Value);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), device == m_fileSystemDevices.end());
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_BUSY), device->second.Share.has_value());
+    m_fileSystemDevices.erase(device);
 }
 
 VmNetworkAttachment OpenVmmVirtualMachineBackend::AddNetworkAdapter(const VmNetworkAdapterRequest& Request)
