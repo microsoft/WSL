@@ -22,7 +22,7 @@ parameters:
     type: object
 
   - name: pool
-    type: string
+    type: object
     default: ''
 
   - name: vsoOrg

@@ -183,7 +183,9 @@ elseif ($Branch -or $ModifiedOnly -or $Staged) {
     }
 }
 
-$ClangFormat = "${LLVM_INSTALL_DIR}/clang-format.exe"
+if ([string]::IsNullOrEmpty($ClangFormat)) {
+    $ClangFormat = "${LLVM_INSTALL_DIR}/clang-format.exe"
+}
 if (-not (Test-Path -Type Leaf -Path $ClangFormat)) {
     # The artifact directory is only known by cmake. Let cmake drop a link/copy where we can find it.
     $ClangFormat = "$PSScriptRoot\clang-format.exe"
