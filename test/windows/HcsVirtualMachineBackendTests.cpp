@@ -107,6 +107,10 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(request.Boot.KernelCommandLine, description.Boot.KernelCommandLine);
         const auto capabilities = backend->GetCapabilities();
         VERIFY_ARE_EQUAL(BackendKind::Hcs, capabilities.Backend);
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::UserModeNatNetwork)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::TcpPortBinding)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::UdpPortBinding)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::Ipv6PortBinding)));
         backend->Terminate();
     }
 
@@ -210,19 +214,15 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { HcsVirtualMachineBackend::Create(request); }));
     }
 
-    TEST_METHOD(RejectsUnsupportedCreationResources)
+    TEST_METHOD(DefersNetworkAdapterCreationUntilVmStarts)
     {
+        SKIP_TEST_ARM64();
         auto request = CreateRunnableRequest();
-        request.BootDisks.push_back({});
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { HcsVirtualMachineBackend::Create(request); }));
-
-        request.BootDisks.clear();
-        request.Consoles.push_back({});
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { HcsVirtualMachineBackend::Create(request); }));
-
-        request.Consoles.clear();
         request.NetworkAdapters.push_back({});
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { HcsVirtualMachineBackend::Create(request); }));
+        auto backend = HcsVirtualMachineBackend::Create(request);
+
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->Start(); }));
+        backend->Terminate();
     }
 
     TEST_METHOD(NotifiesTerminationCallbacksWithoutHoldingBackendLock)
@@ -273,9 +273,14 @@ class HcsVirtualMachineBackendTests
                              backend->AddFileSystemShare(device, request);
                          }));
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->RemoveFileSystemShare(share); }));
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AddNetworkAdapter({}); }));
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->BindPort(device, {}); }));
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->UnbindPort(binding); }));
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddNetworkAdapter({}); }));
+        VmPortBindingRequest bindingRequest{};
+        bindingRequest.ListenAddress.family = IpAddressFamily_V4;
+        const auto loopbackAddress = htonl(INADDR_LOOPBACK);
+        std::memcpy(bindingRequest.ListenAddress.bytes, &loopbackAddress, sizeof(loopbackAddress));
+        bindingRequest.GuestPort = 80;
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->BindPort(device, bindingRequest); }));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->UnbindPort(binding); }));
         backend->Terminate();
     }
 

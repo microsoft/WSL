@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "ExecutionContext.h"
 #include "HcsVirtualMachineBackend.h"
+#include "WslCoreNetworkEndpointSettings.h"
 #include "hvsocket.hpp"
 
 using wsl::windows::common::Context;
@@ -164,6 +165,9 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
     auto signalEarlyTermination = wil::scope_exit([&] { m_terminatingEvent.SetEvent(); });
 
     THROW_HR_IF(E_INVALIDARG, IsEqualGUID(Request.Identity.VmId, GUID_NULL));
+
+    m_restrictedToken = wsl::windows::common::security::CreateRestrictedToken(Request.Identity.UserToken.get());
+
     VmConfiguration configuration{};
     configuration.Settings.Owner = Request.Owner;
     configuration.Settings.ShouldTerminateOnLastHandleClosed = true;
@@ -199,6 +203,7 @@ HcsVirtualMachineBackend::~HcsVirtualMachineBackend() noexcept
     std::map<std::uint64_t, AttachedDisk> attachedDisks;
     {
         auto lock = m_lock.lock_exclusive();
+        CloseNetworkAdaptersLocked();
         CloseFileSystemDevicesLocked();
         system = std::move(m_system);
         attachedDisks = std::move(m_attachedDisks);
@@ -284,6 +289,7 @@ void HcsVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     m_system = schema::CreateComputeSystem(id.c_str(), settings.c_str());
     m_runtimeId = wsl::windows::common::hcs::GetRuntimeId(m_system.get());
     m_guestDeviceManager = std::make_shared<GuestDeviceManager>(id, m_runtimeId, true);
+    m_pendingNetworkAdapters = Request.NetworkAdapters;
     schema::RegisterCallback(m_system.get(), OnSystemEvent, this);
 }
 
@@ -297,7 +303,14 @@ VmPlatformCapabilities HcsVirtualMachineBackend::QueryCapabilities()
     VmPlatformCapabilities capabilities{};
     capabilities.Backend = BackendKind::Hcs;
     for (const auto feature :
-         {VmFeature::NestedVirtualization, VmFeature::DeferredMemoryCommit, VmFeature::ColdDiscard, VmFeature::PhysicalDisk})
+         {VmFeature::NestedVirtualization,
+          VmFeature::DeferredMemoryCommit,
+          VmFeature::ColdDiscard,
+          VmFeature::PhysicalDisk,
+          VmFeature::UserModeNatNetwork,
+          VmFeature::TcpPortBinding,
+          VmFeature::UdpPortBinding,
+          VmFeature::Ipv6PortBinding})
     {
         capabilities.Features.set(static_cast<size_t>(feature));
     }
@@ -312,6 +325,7 @@ VmPlatformCapabilities HcsVirtualMachineBackend::QueryCapabilities()
 
 VmDescription HcsVirtualMachineBackend::GetDescription() const
 {
+    auto lock = m_lock.lock_shared();
     return m_configuration.Description;
 }
 
@@ -325,10 +339,19 @@ wil::unique_handle HcsVirtualMachineBackend::GetTerminationEvent() const
 
 void HcsVirtualMachineBackend::Start()
 {
-    auto lock = m_lock.lock_exclusive();
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
-    const auto settings = wsl::shared::ToJsonW(m_configuration.Settings);
-    schema::StartComputeSystem(m_system.get(), settings.c_str());
+    std::vector<VmNetworkAdapterRequest> networkAdapters;
+    {
+        auto lock = m_lock.lock_exclusive();
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
+        const auto settings = wsl::shared::ToJsonW(m_configuration.Settings);
+        schema::StartComputeSystem(m_system.get(), settings.c_str());
+        networkAdapters = std::move(m_pendingNetworkAdapters);
+    }
+
+    for (const auto& adapter : networkAdapters)
+    {
+        AddNetworkAdapter(adapter);
+    }
 }
 
 void HcsVirtualMachineBackend::Terminate()
@@ -338,6 +361,7 @@ void HcsVirtualMachineBackend::Terminate()
     {
         auto lock = m_lock.lock_exclusive();
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
+        CloseNetworkAdaptersLocked();
         CloseFileSystemDevicesLocked();
         system = std::move(m_system);
         attachedDisks = std::move(m_attachedDisks);
@@ -994,19 +1018,390 @@ void HcsVirtualMachineBackend::RemoveFileSystemShare(VmShareId Share)
     m_fileSystemShares.erase(share);
 }
 
-VmNetworkAttachment HcsVirtualMachineBackend::AddNetworkAdapter(const VmNetworkAdapterRequest&)
+std::map<std::uint64_t, HcsVirtualMachineBackend::NetworkAdapter>::iterator HcsVirtualMachineBackend::FindNetworkAdapterLocked(VmDeviceId Device)
 {
-    THROW_HR(c_notSupported);
+    validation::ValidateResourceId(Device, m_configuration.Description.Identity);
+    const auto adapter = m_networkAdapters.find(Device.Value);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), adapter == m_networkAdapters.end());
+    return adapter;
 }
 
-VmPortBinding HcsVirtualMachineBackend::BindPort(VmDeviceId, const VmPortBindingRequest&)
+wil::com_ptr<IWslVirtioNetDevice> HcsVirtualMachineBackend::GetUserModeNatDeviceLocked(VmDeviceId Device) const
 {
-    THROW_HR(c_notSupported);
+    validation::ValidateResourceId(Device, m_configuration.Description.Identity);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system || !m_guestDeviceManager);
+    const auto adapter = m_networkAdapters.find(Device.Value);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), adapter == m_networkAdapters.end());
+
+    // A host endpoint network is served by the host network stack, which owns port forwarding, virtual
+    // addresses and name resolution for the adapter. Only a user-mode NAT exposes them to the backend.
+    THROW_HR_IF_MSG(
+        c_notSupported,
+        !std::holds_alternative<VmUserModeNatNetwork>(adapter->second.Attachment.EffectiveConfiguration),
+        "The adapter is not served by a user-mode NAT");
+
+    auto device = m_guestDeviceManager->GetVirtioNetDevice(adapter->second.Attachment.Tag.c_str());
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), !device);
+    return device;
 }
 
-void HcsVirtualMachineBackend::UnbindPort(VmPortBindingId)
+void HcsVirtualMachineBackend::ModifyHostEndpointLocked(
+    const VmHostEndpointNetwork& Configuration, const std::wstring& ResourcePath, schema::ModifyRequestType RequestType) const
 {
-    THROW_HR(c_notSupported);
+    schema::ModifySettingRequest<schema::NetworkAdapter> request{};
+    request.ResourcePath = ResourcePath;
+    request.RequestType = RequestType;
+    request.Settings.EndpointId = Configuration.EndpointId;
+    request.Settings.InstanceId = Configuration.InstanceId;
+    request.Settings.MacAddress = Configuration.MacAddress;
+    const auto settings = wsl::shared::ToJsonW(request);
+
+    auto retryCount = 0ul;
+    const auto hr = wsl::shared::retry::RetryWithTimeout<HRESULT>(
+        [&] {
+            const auto attemptResult =
+                wil::ResultFromException([&] { schema::ModifyComputeSystem(m_system.get(), settings.c_str()); });
+
+            WSL_LOG(
+                "HcsModifyNetworkAdapter",
+                TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+                TraceLoggingValue(Configuration.EndpointId, "endpointId"),
+                TraceLoggingValue(static_cast<std::uint32_t>(RequestType), "requestType"),
+                TraceLoggingValue(retryCount, "retryCount"),
+                TraceLoggingHResult(attemptResult, "result"));
+
+            ++retryCount;
+            return THROW_IF_FAILED(attemptResult);
+        },
+        wsl::core::networking::AddEndpointRetryPeriod,
+        wsl::core::networking::AddEndpointRetryTimeout,
+        wsl::core::networking::AddEndpointRetryPredicate);
+
+    // The endpoint is already attached to the compute system, which is the state the add asked for.
+    if (RequestType == schema::ModifyRequestType::Add && hr == HCN_E_ENDPOINT_ALREADY_ATTACHED)
+    {
+        return;
+    }
+
+    THROW_IF_FAILED(hr);
+}
+
+VmNetworkAttachment HcsVirtualMachineBackend::AddNetworkAdapter(const VmNetworkAdapterRequest& Request)
+{
+    ExecutionContext context(Context::ConfigureNetworking);
+
+    WSL_LOG(
+        "HcsAddNetworkAdapterBegin",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(Request.Tag.c_str(), "tag"));
+
+    THROW_HR_IF_MSG(E_INVALIDARG, Request.Tag.empty(), "A network adapter requires a tag");
+
+    auto lock = m_lock.lock_exclusive();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system || !m_guestDeviceManager);
+    THROW_HR_IF(E_BOUNDS, m_nextDeviceId == std::numeric_limits<std::uint64_t>::max());
+    THROW_HR_IF(
+        HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_configuration.Description.NetworkAdapters.contains(Request.Tag));
+
+    VmNetworkAttachment attachment{};
+    attachment.Id = VmDeviceId{m_configuration.Description.Identity, m_nextDeviceId};
+    attachment.Tag = Request.Tag;
+    attachment.EffectiveConfiguration = Request.Configuration;
+
+    // A host endpoint is attached to the running compute system as a network adapter, while a
+    // user-mode NAT reaches the guest through a virtio-net device served by the device host.
+    std::wstring resourcePath;
+    auto rollback = wil::scope_exit([&] {
+        try
+        {
+            if (!resourcePath.empty())
+            {
+                ModifyHostEndpointLocked(
+                    std::get<VmHostEndpointNetwork>(attachment.EffectiveConfiguration), resourcePath, schema::ModifyRequestType::Remove);
+            }
+            else if (attachment.GuestInstanceId.has_value())
+            {
+                m_guestDeviceManager->RemoveGuestDevice(attachment.GuestInstanceId.value());
+            }
+        }
+        CATCH_LOG();
+    });
+
+    std::visit(
+        Overloaded{
+            [&](const VmHostEndpointNetwork& configuration) {
+                THROW_HR_IF(
+                    E_INVALIDARG, IsEqualGUID(configuration.EndpointId, GUID_NULL) || IsEqualGUID(configuration.InstanceId, GUID_NULL));
+                resourcePath = wsl::core::networking::c_networkAdapterPrefix +
+                               wsl::shared::string::GuidToString<wchar_t>(configuration.InstanceId);
+                ModifyHostEndpointLocked(configuration, resourcePath, schema::ModifyRequestType::Add);
+                attachment.GuestInstanceId = configuration.InstanceId;
+            },
+            [&](const VmUserModeNatNetwork& configuration) {
+                attachment.GuestInstanceId = m_guestDeviceManager->AddVirtioNetDevice(
+                    Request.Tag.c_str(),
+                    configuration.Configuration,
+                    configuration.Nameservers,
+                    m_configuration.Description.Identity.UserToken.get());
+            }},
+        Request.Configuration);
+
+    const auto inserted = m_networkAdapters.emplace(attachment.Id.Value, NetworkAdapter{attachment, resourcePath}).second;
+    WI_ASSERT(inserted);
+    ++m_nextDeviceId;
+    m_configuration.Description.NetworkAdapters[Request.Tag] = attachment;
+    rollback.release();
+
+    WSL_LOG(
+        "HcsAddNetworkAdapterEnd",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(Request.Tag.c_str(), "tag"),
+        TraceLoggingValue(attachment.Id.Value, "deviceId"));
+
+    return attachment;
+}
+
+void HcsVirtualMachineBackend::UpdateNetworkAdapter(VmDeviceId Device, const VmNetworkConfiguration& Configuration)
+{
+    ExecutionContext context(Context::ConfigureNetworking);
+
+    WSL_LOG(
+        "HcsUpdateNetworkAdapterBegin",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(Device.Value, "deviceId"));
+
+    // A user-mode NAT can be reconfigured in place; a host endpoint is reconfigured on the host and
+    // has to be removed and added again to change the endpoint the adapter is bound to.
+    const auto* configuration = std::get_if<VmUserModeNatNetwork>(&Configuration);
+    THROW_HR_IF_MSG(c_notSupported, !configuration, "A host endpoint adapter cannot be updated in place");
+
+    auto lock = m_lock.lock_exclusive();
+    auto adapter = FindNetworkAdapterLocked(Device);
+    auto device = GetUserModeNatDeviceLocked(Device);
+    IpAddress emptyNameserver{};
+    auto* nameservers =
+        configuration->Nameservers.empty() ? &emptyNameserver : const_cast<IpAddress*>(configuration->Nameservers.data());
+    THROW_IF_FAILED(device->Update(
+        const_cast<WslVirtioNetConfig*>(&configuration->Configuration),
+        gsl::narrow_cast<UINT32>(configuration->Nameservers.size()),
+        nameservers));
+
+    adapter->second.Attachment.EffectiveConfiguration = Configuration;
+    m_configuration.Description.NetworkAdapters[adapter->second.Attachment.Tag] = adapter->second.Attachment;
+
+    WSL_LOG(
+        "HcsUpdateNetworkAdapterEnd",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(Device.Value, "deviceId"));
+}
+
+void HcsVirtualMachineBackend::RemoveNetworkAdapterLocked(std::map<std::uint64_t, NetworkAdapter>::iterator Adapter)
+{
+    const auto& attachment = Adapter->second.Attachment;
+    std::visit(
+        Overloaded{
+            [&](const VmHostEndpointNetwork& configuration) {
+                ModifyHostEndpointLocked(configuration, Adapter->second.ResourcePath, schema::ModifyRequestType::Remove);
+            },
+            [&](const VmUserModeNatNetwork&) {
+                // Tearing down the relay is best effort: the device is removed either way, and a
+                // device host that already exited has released the ports with it.
+                if (auto device = m_guestDeviceManager->GetVirtioNetDevice(attachment.Tag.c_str()))
+                {
+                    LOG_IF_FAILED(device->Teardown());
+                }
+
+                if (attachment.GuestInstanceId.has_value())
+                {
+                    m_guestDeviceManager->RemoveGuestDevice(attachment.GuestInstanceId.value());
+                }
+            }},
+        attachment.EffectiveConfiguration);
+
+    // The bindings were served by the adapter that is going away, so they no longer exist.
+    std::erase_if(m_portBindings, [&](const auto& entry) { return entry.second.Binding.Device.Value == attachment.Id.Value; });
+    m_configuration.Description.NetworkAdapters.erase(attachment.Tag);
+    m_networkAdapters.erase(Adapter);
+}
+
+void HcsVirtualMachineBackend::RemoveNetworkAdapter(VmDeviceId Device)
+{
+    ExecutionContext context(Context::ConfigureNetworking);
+
+    WSL_LOG(
+        "HcsRemoveNetworkAdapterBegin",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(Device.Value, "deviceId"));
+
+    auto lock = m_lock.lock_exclusive();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system || !m_guestDeviceManager);
+    RemoveNetworkAdapterLocked(FindNetworkAdapterLocked(Device));
+
+    WSL_LOG(
+        "HcsRemoveNetworkAdapterEnd",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(Device.Value, "deviceId"));
+}
+
+void HcsVirtualMachineBackend::CloseNetworkAdaptersLocked() noexcept
+{
+    WSL_LOG(
+        "HcsCloseNetworkAdapters",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(m_networkAdapters.size(), "adapterCount"));
+
+    // The compute system is going away with its adapters, so only the device host relays, which
+    // outlive it, have to be torn down.
+    for (const auto& entry : m_networkAdapters)
+    {
+        if (std::holds_alternative<VmUserModeNatNetwork>(entry.second.Attachment.EffectiveConfiguration) && m_guestDeviceManager)
+        {
+            try
+            {
+                if (auto device = m_guestDeviceManager->GetVirtioNetDevice(entry.second.Attachment.Tag.c_str()))
+                {
+                    LOG_IF_FAILED(device->Teardown());
+                }
+            }
+            CATCH_LOG();
+        }
+    }
+
+    m_portBindings.clear();
+    m_networkAdapters.clear();
+}
+
+VmPortBinding HcsVirtualMachineBackend::BindPort(VmDeviceId Device, const VmPortBindingRequest& Request)
+{
+    ExecutionContext context(Context::ConfigureNetworking);
+
+    THROW_HR_IF(E_INVALIDARG, Request.GuestPort == 0);
+    THROW_HR_IF(E_INVALIDARG, Request.Protocol != TransportProtocol_Tcp && Request.Protocol != TransportProtocol_Udp);
+    const auto& listenAddress = Request.ListenAddress;
+
+    WSL_LOG(
+        "HcsBindPortBegin",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(Device.Value, "deviceId"),
+        TraceLoggingValue(
+            wsl::windows::common::string::IpAddressToWstring(Request.ListenAddress, Request.ListenScopeId).c_str(), "listenAddress"),
+        TraceLoggingValue(Request.GuestPort, "guestPort"));
+
+    auto lock = m_lock.lock_exclusive();
+    THROW_HR_IF(E_BOUNDS, m_nextPortBindingId == std::numeric_limits<std::uint64_t>::max());
+    auto adapter = FindNetworkAdapterLocked(Device);
+    auto device = GetUserModeNatDeviceLocked(Device);
+
+    auto listen = listenAddress;
+    UINT16 hostPort = 0;
+    THROW_IF_FAILED(device->BindPort(Request.Protocol, &listen, Request.HostPort, Request.GuestPort, &hostPort));
+
+    VmPortBinding binding{};
+    binding.Id = VmPortBindingId{m_configuration.Description.Identity, m_nextPortBindingId};
+    binding.Device = Device;
+    binding.Protocol = Request.Protocol;
+    binding.EffectiveListenAddress = Request.ListenAddress;
+    binding.EffectiveListenScopeId = Request.ListenScopeId;
+    binding.EffectiveHostPort = hostPort;
+    binding.GuestPort = Request.GuestPort;
+    // A zero listen port asks the relay to allocate one, so report the port it actually listens on.
+
+    const auto inserted = m_portBindings.emplace(binding.Id.Value, PortBinding{binding, adapter->second.Attachment.Tag}).second;
+    WI_ASSERT(inserted);
+    ++m_nextPortBindingId;
+
+    WSL_LOG(
+        "HcsBindPortEnd",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(Device.Value, "deviceId"),
+        TraceLoggingValue(binding.Id.Value, "bindingId"),
+        TraceLoggingValue(
+            wsl::windows::common::string::IpAddressToWstring(binding.EffectiveListenAddress, binding.EffectiveListenScopeId).c_str(),
+            "listenAddress"),
+        TraceLoggingValue(hostPort, "hostPort"));
+
+    return binding;
+}
+
+void HcsVirtualMachineBackend::UnbindPort(VmPortBindingId Binding)
+{
+    ExecutionContext context(Context::ConfigureNetworking);
+
+    WSL_LOG(
+        "HcsUnbindPortBegin",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(Binding.Value, "bindingId"));
+
+    validation::ValidateResourceId(Binding, m_configuration.Description.Identity);
+
+    auto lock = m_lock.lock_exclusive();
+    const auto binding = m_portBindings.find(Binding.Value);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), binding == m_portBindings.end());
+    auto device = GetUserModeNatDeviceLocked(binding->second.Binding.Device);
+
+    // The relay tracks a binding by the guest port it forwards to, per protocol and address family.
+    THROW_IF_FAILED(device->UnbindPort(
+        binding->second.Binding.Protocol, binding->second.Binding.EffectiveListenAddress.family, binding->second.Binding.GuestPort));
+
+    m_portBindings.erase(binding);
+
+    WSL_LOG(
+        "HcsUnbindPortEnd",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(Binding.Value, "bindingId"));
+}
+
+IpAddress HcsVirtualMachineBackend::CreateVirtualAddress(VmDeviceId Device, const IpAddress& Destination)
+{
+    ExecutionContext context(Context::ConfigureNetworking);
+
+    WSL_LOG(
+        "HcsCreateVirtualAddressBegin",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(Device.Value, "deviceId"),
+        TraceLoggingValue(wsl::windows::common::string::IpAddressToWstring(Destination).c_str(), "destination"));
+
+    auto lock = m_lock.lock_exclusive();
+    auto device = GetUserModeNatDeviceLocked(Device);
+
+    auto destination = Destination;
+    IpAddress virtualAddress{};
+    THROW_IF_FAILED(device->CreateVirtualAddress(&destination, &virtualAddress));
+
+    WSL_LOG(
+        "HcsCreateVirtualAddressEnd",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(Device.Value, "deviceId"),
+        TraceLoggingValue(wsl::windows::common::string::IpAddressToWstring(virtualAddress).c_str(), "virtualAddress"));
+
+    return virtualAddress;
+}
+
+void HcsVirtualMachineBackend::CreateDnsRecord(VmDeviceId Device, const VmDnsRecord& Record)
+{
+    ExecutionContext context(Context::ConfigureNetworking);
+
+    THROW_HR_IF_MSG(E_INVALIDARG, Record.Name.empty(), "A DNS record requires a name");
+    THROW_HR_IF_MSG(c_notSupported, Record.Type != DnsRecordType_A, "Only A records are supported");
+    THROW_HR_IF(E_INVALIDARG, Record.Address.family != IpAddressFamily_V4);
+    const auto address = wsl::windows::common::string::IpAddressToString(Record.Address);
+
+    WSL_LOG(
+        "HcsCreateDnsRecordBegin",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(Device.Value, "deviceId"),
+        TraceLoggingValue(Record.Name.c_str(), "name"),
+        TraceLoggingValue(address.c_str(), "address"));
+
+    auto lock = m_lock.lock_exclusive();
+    auto device = GetUserModeNatDeviceLocked(Device);
+    THROW_IF_FAILED(device->CreateDNSRecord(Record.Type, Record.Name.c_str(), address.c_str()));
+
+    WSL_LOG(
+        "HcsCreateDnsRecordEnd",
+        TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(Device.Value, "deviceId"),
+        TraceLoggingValue(Record.Name.c_str(), "name"));
 }
 
 void CALLBACK HcsVirtualMachineBackend::OnSystemEvent(HCS_EVENT* Event, void* Context) noexcept

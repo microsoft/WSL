@@ -44,8 +44,12 @@ public:
     void RemoveFileSystemShare(VmShareId Share) override;
 
     VmNetworkAttachment AddNetworkAdapter(const VmNetworkAdapterRequest& Request) override;
+    void UpdateNetworkAdapter(VmDeviceId Device, const VmNetworkConfiguration& Configuration) override;
+    void RemoveNetworkAdapter(VmDeviceId Device) override;
     VmPortBinding BindPort(VmDeviceId Device, const VmPortBindingRequest& Request) override;
     void UnbindPort(VmPortBindingId Binding) override;
+    IpAddress CreateVirtualAddress(VmDeviceId Device, const IpAddress& Destination) override;
+    void CreateDnsRecord(VmDeviceId Device, const VmDnsRecord& Record) override;
 
 private:
     struct VmConfiguration
@@ -86,6 +90,21 @@ private:
         // Token the share was created with, if any. A Plan 9 share is removed under the same identity
         // that added it. Unset shares fall back to the VM identity token.
         wil::shared_handle UserToken;
+    };
+
+    struct NetworkAdapter
+    {
+        VmNetworkAttachment Attachment;
+        // Resource path the adapter was added at. Set only for host endpoint networks, which are
+        // removed from the compute system at the same path that added them.
+        std::wstring ResourcePath;
+    };
+
+    struct PortBinding
+    {
+        VmPortBinding Binding;
+        // Tag of the user-mode NAT device that owns the binding.
+        std::wstring Tag;
     };
 
     HcsVirtualMachineBackend();
@@ -133,6 +152,34 @@ private:
     _Requires_lock_held_(m_lock)
     void RemovePlan9ShareLocked(const FileSystemDevice& Device, const std::wstring& AccessName, HANDLE UserToken) const;
 
+    _Requires_lock_held_(m_lock)
+    std::map<std::uint64_t, NetworkAdapter>::iterator FindNetworkAdapterLocked(VmDeviceId Device);
+
+    /// <summary>
+    /// Returns the virtio-net device that backs a user-mode NAT adapter, failing the call when the
+    /// adapter is served by a host endpoint instead.
+    /// </summary>
+    _Requires_lock_held_(m_lock)
+    wil::com_ptr<IWslVirtioNetDevice> GetUserModeNatDeviceLocked(VmDeviceId Device) const;
+
+    /// <summary>
+    /// Adds or removes a host endpoint adapter at ResourcePath. HCS reports transient failures while
+    /// the host network stack settles, so the modification is retried.
+    /// </summary>
+    _Requires_lock_held_(m_lock)
+    void ModifyHostEndpointLocked(
+        const VmHostEndpointNetwork& Configuration, const std::wstring& ResourcePath, wsl::windows::common::hcs::ModifyRequestType RequestType) const;
+
+    /// <summary>
+    /// Removes the adapter's tracked state, tearing down the resource that serves it. Port bindings
+    /// on the adapter are dropped because the device that tracked them is gone.
+    /// </summary>
+    _Requires_lock_held_(m_lock)
+    void RemoveNetworkAdapterLocked(std::map<std::uint64_t, NetworkAdapter>::iterator Adapter);
+
+    _Requires_lock_held_(m_lock)
+    void CloseNetworkAdaptersLocked() noexcept;
+
     NON_COPYABLE(HcsVirtualMachineBackend);
     NON_MOVABLE(HcsVirtualMachineBackend);
 
@@ -153,6 +200,10 @@ private:
     _Guarded_by_(m_lock) std::uint64_t m_nextDeviceId = 1;
     _Guarded_by_(m_lock) std::map<std::uint64_t, FileSystemShare> m_fileSystemShares;
     _Guarded_by_(m_lock) std::uint64_t m_nextShareId = 1;
+    _Guarded_by_(m_lock) std::vector<VmNetworkAdapterRequest> m_pendingNetworkAdapters;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, NetworkAdapter> m_networkAdapters;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, PortBinding> m_portBindings;
+    _Guarded_by_(m_lock) std::uint64_t m_nextPortBindingId = 1;
     wil::unique_handle m_restrictedToken;
 
     _Guarded_by_(m_lock) std::shared_ptr<GuestDeviceManager> m_guestDeviceManager;

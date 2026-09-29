@@ -54,8 +54,12 @@ public:
     void RemoveFileSystemShare(VmShareId Share) override;
 
     VmNetworkAttachment AddNetworkAdapter(const VmNetworkAdapterRequest& Request) override;
+    void UpdateNetworkAdapter(VmDeviceId Device, const VmNetworkConfiguration& Configuration) override;
+    void RemoveNetworkAdapter(VmDeviceId Device) override;
     VmPortBinding BindPort(VmDeviceId Device, const VmPortBindingRequest& Request) override;
     void UnbindPort(VmPortBindingId Binding) override;
+    IpAddress CreateVirtualAddress(VmDeviceId Device, const IpAddress& Destination) override;
+    void CreateDnsRecord(VmDeviceId Device, const VmDnsRecord& Record) override;
 
 private:
     OpenVmmVirtualMachineBackend();
