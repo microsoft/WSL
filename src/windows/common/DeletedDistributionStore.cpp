@@ -92,8 +92,21 @@ bool IsRegisteredDisk(HKEY lxssKey, HANDLE file)
                     return true;
                 }
             }
+            else
+            {
+                const auto error = GetLastError();
+                if (error != ERROR_FILE_NOT_FOUND && error != ERROR_PATH_NOT_FOUND)
+                {
+                    // Cannot establish that this is unrelated to an active registration; retry later.
+                    return true;
+                }
+            }
         }
-        CATCH_LOG()
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            return true;
+        }
     }
     return false;
 }
@@ -156,10 +169,12 @@ bool DeletedDistributionStore::Retain(HKEY lxssKey, const GUID& id, const std::f
     THROW_IF_WIN32_ERROR(RegFlushKey(key.get()));
     RenameDisk(file.get(), target);
     moved = true;
+    WriteQword(key.get(), nullptr, DeletedAt, Now());
     WriteDword(key.get(), nullptr, L"State", LxssDistributionStateDeleted);
     THROW_IF_WIN32_ERROR(RegRenameKey(lxssKey, KeyName(id).c_str(), KeyName(id, true).c_str()));
     rollback.release();
     removeEmptyDirectory.release();
+    THROW_IF_WIN32_ERROR(RegFlushKey(key.get()));
     return true;
 }
 
@@ -212,6 +227,7 @@ void DeletedDistributionStore::Restore(HKEY lxssKey, const Entry& distribution, 
     WriteDword(key.get(), nullptr, L"State", LxssDistributionStateInstalled);
     THROW_IF_WIN32_ERROR(RegFlushKey(key.get()));
     THROW_IF_WIN32_ERROR(RegRenameKey(lxssKey, KeyName(distribution.Id, true).c_str(), KeyName(distribution.Id).c_str()));
+    THROW_IF_WIN32_ERROR(RegFlushKey(key.get()));
     // Atomic key rename removes the disk from the cleanup set before success is reported.
     try
     {

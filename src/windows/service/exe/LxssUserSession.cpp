@@ -588,10 +588,12 @@ try
     const auto token = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     const auto key = s_OpenLxssUserKey(token.get());
     std::lock_guard lock(m_instanceLock);
-    auto impersonate = wil::impersonate_token(token.get());
-    DeletedDistributionStore::RecoverPending(key.get());
-    DeletedDistributionStore::Cleanup(key.get());
-    const auto entries = DeletedDistributionStore::Enumerate(key.get());
+    const auto entries = [&] {
+        auto impersonate = wil::impersonate_token(token.get());
+        DeletedDistributionStore::RecoverPending(key.get());
+        DeletedDistributionStore::Cleanup(key.get());
+        return DeletedDistributionStore::Enumerate(key.get());
+    }();
     const auto requestedId = wsl::shared::string::ToGuid(DistributionName);
     const DeletedDistributionStore::Entry* match = nullptr;
     for (const auto& entry : entries)
@@ -625,10 +627,12 @@ try
     const auto token = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     const auto key = s_OpenLxssUserKey(token.get());
     std::lock_guard lock(m_instanceLock);
-    auto impersonate = wil::impersonate_token(token.get());
-    DeletedDistributionStore::RecoverPending(key.get());
-    DeletedDistributionStore::Cleanup(key.get());
-    const auto entries = DeletedDistributionStore::Enumerate(key.get());
+    const auto entries = [&] {
+        auto impersonate = wil::impersonate_token(token.get());
+        DeletedDistributionStore::RecoverPending(key.get());
+        DeletedDistributionStore::Cleanup(key.get());
+        return DeletedDistributionStore::Enumerate(key.get());
+    }();
     auto result = wil::make_unique_cotaskmem<LXSS_ENUMERATE_INFO[]>(entries.size());
     for (size_t index = 0; index < entries.size(); ++index)
     {

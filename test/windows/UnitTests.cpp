@@ -7410,10 +7410,14 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         const auto originalId = GetDistributionId(name.c_str());
         VERIFY_IS_TRUE(originalId.has_value());
         const auto originalKey = wsl::shared::string::GuidToString<wchar_t>(*originalId);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--set-default {}", name)), 0u);
+        auto restoreDefault = wil::scope_exit_log(
+            WI_DIAGNOSTICS_INFO, [&] { LxsstuLaunchWsl(std::format(L"--set-default {}", LXSS_DISTRO_NAME_TEST_L)); });
         const auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--unregister {}", name));
         VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
         VERIFY_ARE_EQUAL(err, L"");
         VERIFY_IS_FALSE(GetDistributionId(name.c_str()).has_value());
+        VERIFY_IS_FALSE(IsEqualGUID(wsl::windows::common::SvcComm{}.GetDefaultDistribution(), *originalId));
         if (!LxsstuVmMode())
         {
             VERIFY_IS_FALSE(std::filesystem::exists(install / L"rootfs"));
@@ -7428,8 +7432,22 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_IS_TRUE(list.find(originalKey) != std::wstring::npos);
         VERIFY_ARE_EQUAL(listErr, L"");
         VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(std::format(L"--restore-distribution {}", name)), 0u);
+        const auto replacementId = GetDistributionId(name.c_str());
+        VERIFY_IS_TRUE(replacementId.has_value());
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {}", name)), 0u);
+        auto [ambiguous, ambiguousErr] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--restore-distribution {}", name), -1);
+        VERIFY_IS_TRUE(ambiguous.find(L"More than one deleted distribution") != std::wstring::npos);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(std::format(L"--restore-distribution {}", wsl::shared::string::GuidToString<wchar_t>(*replacementId))), 0u);
         RestartWslService();
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--restore-distribution {} --name {}", originalKey, restoredName)), 0u);
+        const auto restoreCommand = std::format(L"--restore-distribution {} --name {}", originalKey, restoredName);
+        auto restore = [&] {
+            wsl::windows::common::SubProcess process(nullptr, LxssGenerateWslCommandLine(restoreCommand.c_str()).c_str());
+            return process.RunAndCaptureOutput().ExitCode;
+        };
+        auto firstRestore = std::async(std::launch::async, restore);
+        const auto secondRestore = restore();
+        VERIFY_IS_TRUE((firstRestore.get() == 0) != (secondRestore == 0));
         auto [data, dataErr] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -u root -- cat /root/recovery-marker", restoredName));
         VERIFY_ARE_EQUAL(data, L"retained-data\n");
         VERIFY_ARE_EQUAL(dataErr, L"");
@@ -7450,9 +7468,24 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         registry::WriteQword(expiredKey.get(), nullptr, L"DeletedAt", Store::Now() - Store::Retention - 1);
         std::filesystem::create_directories(install);
         std::ofstream(install / L"keep.txt") << "must survive";
+        // Wait for the service timer without invoking any command that itself triggers cleanup.
+        VERIFY_NO_THROW(
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&] { THROW_HR_IF(E_PENDING, std::filesystem::exists(expired->Path)); }, std::chrono::seconds(1), std::chrono::seconds(90)));
+        VERIFY_IS_FALSE(std::filesystem::exists(expired->Path));
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(import), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {}", name)), 0u);
+        const auto pendingEntries = Store::Enumerate(userKey.get());
+        const auto pending =
+            std::find_if(pendingEntries.begin(), pendingEntries.end(), [&](const auto& entry) { return entry.Name == name; });
+        VERIFY_IS_TRUE(pending != pendingEntries.end());
+        const auto pendingKey = registry::OpenKey(
+            userKey.get(), (L"Deleted-" + wsl::shared::string::GuidToString<wchar_t>(pending->Id)).c_str(), KEY_READ | KEY_WRITE);
+        registry::WriteQword(pendingKey.get(), nullptr, L"DeletedAt", Store::Now() - Store::Retention - 1);
         RestartWslService();
         LxsstuLaunchWslAndCaptureOutput(L"--list --deleted");
-        VERIFY_IS_FALSE(std::filesystem::exists(expired->Path));
+        VERIFY_IS_FALSE(std::filesystem::exists(pending->Path));
         VERIFY_IS_TRUE(std::filesystem::exists(install / L"keep.txt"));
         VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(std::format(L"--restore-distribution {}", name)), 0u);
     }
