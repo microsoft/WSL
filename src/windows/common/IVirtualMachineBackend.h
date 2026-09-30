@@ -33,7 +33,18 @@ Abstract:
 #include <variant>
 #include <vector>
 #include "defs.h"
+#include "ExecutionContext.h"
 #include "stringshared.h"
+
+namespace wsl::windows::common::vm {
+
+inline constexpr UINT64 c_mib = 1024 * 1024;
+inline constexpr UINT32 c_maximumDisks = 254;
+inline constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+
+std::unique_ptr<ExecutionContext> CreateExecutionContext(Context Context);
+
+} // namespace wsl::windows::common::vm
 
 enum class BackendKind
 {

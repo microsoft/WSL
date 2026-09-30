@@ -19,12 +19,19 @@ Abstract:
 #include "IVirtualMachineBackend.h"
 #include "OpenVmmVirtualMachineBackend.h"
 
-namespace {
+using wsl::windows::common::Context;
+using wsl::windows::common::ExecutionContext;
 
-constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
-constexpr UINT32 c_maximumDisks = 254;
+std::unique_ptr<ExecutionContext> wsl::windows::common::vm::CreateExecutionContext(Context Context)
+{
+    const auto* current = ExecutionContext::Current();
+    if (current != nullptr && current->CurrentContext() >= static_cast<ULONGLONG>(Context))
+    {
+        return {};
+    }
 
-} // namespace
+    return std::make_unique<ExecutionContext>(Context);
+}
 
 wsl::shared::string::MacAddress VmUserModeNatNetwork::ClientMacAddress() const
 {

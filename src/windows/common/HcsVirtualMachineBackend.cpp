@@ -13,34 +13,21 @@ Abstract:
 --*/
 
 #include "precomp.h"
-#include "ExecutionContext.h"
 #include "HcsVirtualMachineBackend.h"
 #include "WslCoreNetworkEndpointSettings.h"
 #include "hvsocket.hpp"
 
 using wsl::windows::common::Context;
-using wsl::windows::common::ExecutionContext;
+using wsl::windows::common::vm::c_maximumDisks;
+using wsl::windows::common::vm::c_mib;
+using wsl::windows::common::vm::c_notSupported;
+using wsl::windows::common::vm::CreateExecutionContext;
 
 namespace validation = wsl::windows::common::vm::validation;
 
 namespace {
 
 namespace schema = wsl::windows::common::hcs;
-
-constexpr UINT64 c_mib = 1024 * 1024;
-constexpr UINT32 c_maximumDisks = 254;
-constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
-
-std::unique_ptr<ExecutionContext> CreateExecutionContext(Context Context)
-{
-    const auto* current = ExecutionContext::Current();
-    if (current != nullptr && current->CurrentContext() >= static_cast<ULONGLONG>(Context))
-    {
-        return {};
-    }
-
-    return std::make_unique<ExecutionContext>(Context);
-}
 
 template <typename... Visitors>
 struct Overloaded : Visitors...
