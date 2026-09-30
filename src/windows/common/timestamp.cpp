@@ -316,10 +316,11 @@ std::string wsl::windows::common::timestamp::Rfc3339ToUtcDisplayTime(std::string
 
 std::string wsl::windows::common::timestamp::EpochToRfc3339Nano(std::int64_t epochNanoseconds, std::chrono::seconds offset)
 {
-    const std::chrono::sys_time<std::chrono::nanoseconds> time{std::chrono::nanoseconds{epochNanoseconds}};
+    // The offset is applied to whole seconds, since adding it at nanosecond precision can overflow near the int64 limits.
+    const auto seconds = std::chrono::floor<std::chrono::seconds>(std::chrono::nanoseconds{epochNanoseconds});
+    const auto fraction = (epochNanoseconds % 1'000'000'000 + 1'000'000'000) % 1'000'000'000;
 
-    // %T prints all nine fractional digits because the time point has nanosecond precision.
-    auto output = std::format("{:%FT%T}", time + offset);
+    auto output = std::format("{:%FT%T}.{:09}", std::chrono::sys_seconds{seconds} + offset, fraction);
     if (offset == std::chrono::seconds::zero())
     {
         output.push_back('Z');

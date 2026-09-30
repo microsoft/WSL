@@ -7190,13 +7190,13 @@ class WSLCTests
         return stream;
     }
 
-    std::vector<wsl::windows::common::wslc_schema::Event> ReadEvents(IWSLCEventStream* Stream, size_t Count)
+    std::vector<wsl::windows::common::wslc_schema::Event> ReadEvents(IWSLCEventStream* Stream, size_t Count, HANDLE CancelEvent = nullptr)
     {
         std::vector<wsl::windows::common::wslc_schema::Event> events;
         wil::unique_cotaskmem_ansistring eventJson;
         for (size_t index = 0; index < Count; ++index)
         {
-            VERIFY_SUCCEEDED(Stream->GetNext(nullptr, &eventJson));
+            VERIFY_SUCCEEDED(Stream->GetNext(CancelEvent, &eventJson));
             events.push_back(wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(eventJson.get()));
         }
 
@@ -7407,7 +7407,16 @@ class WSLCTests
             wil::com_ptr<IWSLCEventStream> stream;
             VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, 32'503'680'000, &filter, 1, &stream));
 
-            verifyEvents(ReadEvents(stream.get(), 5), id, {"create", "start", "kill", "stop", "destroy"});
+            // The stream stays open until year 3000, so a missing event would otherwise block instead of failing.
+            wil::unique_event timedOut{wil::EventOptions::ManualReset};
+            wil::unique_threadpool_timer timeout{CreateThreadpoolTimer(
+                [](PTP_CALLBACK_INSTANCE, PVOID context, PTP_TIMER) { SetEvent(static_cast<HANDLE>(context)); }, timedOut.get(), nullptr)};
+            VERIFY_IS_NOT_NULL(timeout.get());
+
+            FILETIME dueTime = wil::filetime::from_int64(-wil::filetime_duration::one_second * 60);
+            SetThreadpoolTimer(timeout.get(), &dueTime, 0, 0);
+
+            verifyEvents(ReadEvents(stream.get(), 5, timedOut.get()), id, {"create", "start", "kill", "stop", "destroy"});
         }
 
         // A since-time later than a non-zero until-time describes a backwards window and is rejected.
