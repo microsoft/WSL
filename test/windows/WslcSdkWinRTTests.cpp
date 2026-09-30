@@ -1659,7 +1659,9 @@ class WslcSdkWinRtTests
         // The backing VHD file must exist on disk.
         const auto expectedVhdPath = vhdSessionStorage / "volumes" / (std::wstring(c_volumeName) + L".vhdx");
         VERIFY_IS_TRUE(std::filesystem::exists(expectedVhdPath));
-        VERIFY_IS_TRUE(WI_IsFlagSet(GetFileAttributesW(expectedVhdPath.c_str()), FILE_ATTRIBUTE_SPARSE_FILE));
+        const auto volumeAttributes = GetFileAttributesW(expectedVhdPath.c_str());
+        VERIFY_IS_FALSE(volumeAttributes == INVALID_FILE_ATTRIBUTES);
+        VERIFY_IS_TRUE(WI_IsFlagSet(volumeAttributes, FILE_ATTRIBUTE_SPARSE_FILE));
 
         // Positive: write a marker via a container that mounts the named volume.
         {
