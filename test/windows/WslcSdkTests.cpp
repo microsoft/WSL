@@ -129,6 +129,48 @@ ProcessOutput WaitForProcessOutput(WslcProcess process, std::chrono::millisecond
 }
 
 //
+// Initializes process settings with the given command line and flags. The command line storage must
+// outlive the settings, since only a pointer to it is stored.
+//
+void InitProcessSettings(WslcProcessSettings& processSettings, std::span<const char* const> commandLine, WslcProcessFlags flags = WSLC_PROCESS_FLAG_NONE)
+{
+    THROW_IF_FAILED(WslcInitProcessSettings(&processSettings));
+    THROW_IF_FAILED(WslcSetProcessSettingsCmdLine(&processSettings, commandLine.data(), commandLine.size()));
+    THROW_IF_FAILED(WslcSetProcessSettingsFlags(&processSettings, flags));
+}
+
+//
+// Writes the given input to a process's stdin and closes the handle so that the process sees EOF.
+// Requires WSLC_PROCESS_FLAG_STDIN.
+//
+void WriteToProcessStdin(WslcProcess process, std::string_view input)
+{
+    wil::unique_handle stdinHandle;
+    THROW_IF_FAILED(WslcGetProcessIOHandle(process, WSLC_PROCESS_IO_HANDLE_STDIN, &stdinHandle));
+
+    const auto size = static_cast<DWORD>(input.size());
+    DWORD written = 0;
+    THROW_IF_WIN32_BOOL_FALSE(WriteFile(stdinHandle.get(), input.data(), size, &written, nullptr));
+    THROW_HR_IF(E_UNEXPECTED, written != size);
+}
+
+//
+// Creates a container whose init process is described by the given settings and starts it.
+//
+UniqueContainer StartContainerWithInitProcess(WslcSession session, const char* image, WslcProcessSettings& initProcessSettings, WslcContainerStartFlags startFlags)
+{
+    WslcContainerSettings containerSettings;
+    THROW_IF_FAILED(WslcInitContainerSettings(image, &containerSettings));
+    THROW_IF_FAILED(WslcSetContainerSettingsInitProcess(&containerSettings, &initProcessSettings));
+
+    UniqueContainer container;
+    THROW_IF_FAILED(WslcCreateContainer(session, &containerSettings, &container, nullptr));
+    THROW_IF_FAILED(WslcStartContainer(container.get(), startFlags, nullptr));
+
+    return container;
+}
+
+//
 // Runs a container with the given argv, waits up to timeoutMs for it to exit,
 // and returns the captured stdout / stderr output.
 //
@@ -1357,6 +1399,88 @@ class WslcSdkTests
 
             auto output = RunContainerAndCapture(m_defaultSession, containerSettings);
             VERIFY_ARE_EQUAL(output.stdoutOutput, "hello-from-test\n");
+        }
+    }
+
+    WSLC_TEST_METHOD(ProcessFlags)
+    {
+        constexpr const char* c_catArgv[] = {"/bin/cat"};
+        constexpr const char* c_sleepArgv[] = {"/bin/sleep", "99"};
+        constexpr const char* c_initInput = "hello-from-stdin\n";
+        constexpr const char* c_execInput = "hello-from-exec-stdin\n";
+
+        // Negative: unknown flag bits must be rejected (TTY is not exposed by the SDK).
+        {
+            WslcProcessSettings procSettings;
+            VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+            VERIFY_ARE_EQUAL(WslcSetProcessSettingsFlags(&procSettings, static_cast<WslcProcessFlags>(0x00000002)), E_INVALIDARG);
+        }
+
+        // Negative: null settings pointer must fail.
+        VERIFY_ARE_EQUAL(WslcSetProcessSettingsFlags(nullptr, WSLC_PROCESS_FLAG_STDIN), E_POINTER);
+
+        // Functional (init process): without WSLC_PROCESS_FLAG_STDIN, stdin is closed immediately so cat produces no output.
+        {
+            WslcProcessSettings procSettings;
+            InitProcessSettings(procSettings, c_catArgv);
+
+            WslcContainerSettings containerSettings;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+            auto output = RunContainerAndCapture(m_defaultSession, containerSettings);
+            VERIFY_ARE_EQUAL(output.stdoutOutput, "");
+        }
+
+        // Functional (init process): with WSLC_PROCESS_FLAG_STDIN, input written to stdin is echoed back by cat.
+        {
+            WslcProcessSettings procSettings;
+            InitProcessSettings(procSettings, c_catArgv, WSLC_PROCESS_FLAG_STDIN);
+
+            auto container = StartContainerWithInitProcess(m_defaultSession, "debian:latest", procSettings, WSLC_CONTAINER_START_FLAG_ATTACH);
+
+            UniqueProcess process;
+            VERIFY_SUCCEEDED(WslcGetContainerInitProcess(container.get(), &process));
+
+            WriteToProcessStdin(process.get(), c_initInput);
+
+            auto output = WaitForProcessOutput(process.get());
+            VERIFY_ARE_EQUAL(output.stdoutOutput, c_initInput);
+        }
+
+        // Functional (exec): the flag is also honored for processes created in an already running container.
+        {
+            WslcProcessSettings initProcSettings;
+            InitProcessSettings(initProcSettings, c_sleepArgv);
+
+            auto container =
+                StartContainerWithInitProcess(m_defaultSession, "debian:latest", initProcSettings, WSLC_CONTAINER_START_FLAG_NONE);
+
+            // Without WSLC_PROCESS_FLAG_STDIN, stdin is closed immediately so cat produces no output.
+            {
+                WslcProcessSettings execProcSettings;
+                InitProcessSettings(execProcSettings, c_catArgv);
+
+                UniqueProcess execProcess;
+                VERIFY_SUCCEEDED(WslcCreateContainerProcess(container.get(), &execProcSettings, &execProcess, nullptr));
+
+                auto output = WaitForProcessOutput(execProcess.get());
+                VERIFY_ARE_EQUAL(output.stdoutOutput, "");
+            }
+
+            // With WSLC_PROCESS_FLAG_STDIN, input written to stdin is echoed back by cat.
+            {
+                WslcProcessSettings execProcSettings;
+                InitProcessSettings(execProcSettings, c_catArgv, WSLC_PROCESS_FLAG_STDIN);
+
+                UniqueProcess execProcess;
+                VERIFY_SUCCEEDED(WslcCreateContainerProcess(container.get(), &execProcSettings, &execProcess, nullptr));
+
+                WriteToProcessStdin(execProcess.get(), c_execInput);
+
+                auto output = WaitForProcessOutput(execProcess.get());
+                VERIFY_ARE_EQUAL(output.stdoutOutput, c_execInput);
+            }
         }
     }
 
