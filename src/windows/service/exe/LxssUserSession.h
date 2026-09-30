@@ -550,6 +550,7 @@ private:
         GUID InstanceId{};
         ULONG ClientId{};
         DWORD Timeout{};
+        bool TimedOut{};
         wil::shared_event Event{wil::EventOptions::ManualReset};
     };
 

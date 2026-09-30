@@ -2551,7 +2551,7 @@ std::vector<LxssUserSessionImpl::PidTermination> LxssUserSessionImpl::_GetPidTer
     std::vector<PidTermination> pidTerminations;
     for (const auto& termination : m_pidTerminations)
     {
-        if (IsEqualGUID(termination.second.DistroId, DistroGuid))
+        if (IsEqualGUID(termination.second.DistroId, DistroGuid) && !termination.second.TimedOut)
         {
             pidTerminations.push_back(termination.second);
         }
@@ -2583,6 +2583,15 @@ try
                                                               : termination.Timeout - gsl::narrow_cast<DWORD>(elapsed);
         if (!termination.Event.wait(timeout))
         {
+            {
+                std::lock_guard lock(m_instanceLock);
+                if (const auto pending = m_pidTerminations.find(termination.InstanceId); pending != m_pidTerminations.end())
+                {
+                    // Keep the launch identity for a late exit, but do not wait for it again.
+                    pending->second.TimedOut = true;
+                }
+            }
+
             WSL_LOG(
                 "PidTerminationTimeout",
                 TraceLoggingValue(termination.ClientId, "pid"),
