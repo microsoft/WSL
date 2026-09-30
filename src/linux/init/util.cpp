@@ -749,7 +749,7 @@ CreateProcessAndWaitEnd:
     return Result;
 }
 
-int UtilExecCommandLine(const char* CommandLine, std::string* Output, std::initializer_list<int> ExpectedStatuses, bool PrintError)
+int UtilExecCommandLine(const char* CommandLine, std::string* Output, const std::vector<int>& ExpectedStatuses, bool PrintError)
 
 /*++
 
@@ -2286,7 +2286,7 @@ Return Value:
     return Output;
 }
 
-int UtilProcessChildExitCode(int Status, const char* Name, std::initializer_list<int> ExpectedStatuses, bool PrintError)
+int UtilProcessChildExitCode(int Status, const char* Name, const std::vector<int>& ExpectedStatuses, bool PrintError)
 
 /*++
 

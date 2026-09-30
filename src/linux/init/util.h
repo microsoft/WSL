@@ -29,7 +29,6 @@ Abstract:
 #include <filesystem>
 #include <vector>
 #include <source_location>
-#include <initializer_list>
 #include "lxinitshared.h"
 #include "lxdef.h"
 #include "common.h"
@@ -233,7 +232,7 @@ void UtilCreateWorkerThread(const char* Name, TMethod&& ThreadFunction)
     Promise.get_future().wait();
 }
 
-int UtilExecCommandLine(const char* CommandLine, std::string* Output = nullptr, std::initializer_list<int> ExpectedStatuses = {0}, bool PrintError = true);
+int UtilExecCommandLine(const char* CommandLine, std::string* Output = nullptr, const std::vector<int>& ExpectedStatuses = {0}, bool PrintError = true);
 
 std::string UtilFindMount(const char* MountInfoFile, const char* Path, bool WinPath, size_t* PrefixLength);
 
@@ -281,7 +280,7 @@ std::string UtilParsePlan9MountSource(std::string_view MountOptions);
 
 std::vector<char> UtilParseWslEnv(char* NtEnvironment);
 
-int UtilProcessChildExitCode(int Status, const char* Name, std::initializer_list<int> ExpectedStatuses = {0}, bool PrintError = true);
+int UtilProcessChildExitCode(int Status, const char* Name, const std::vector<int>& ExpectedStatuses = {0}, bool PrintError = true);
 
 ssize_t UtilRead(int Fd, void* Buffer, size_t BufferSize, int Timeout = -1);
 
