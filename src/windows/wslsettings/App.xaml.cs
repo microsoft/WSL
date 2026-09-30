@@ -90,6 +90,8 @@ public partial class App : Application
             services.AddTransient<DockerDesktopIntegrationPage>();
             services.AddTransient<GeneralViewModel>();
             services.AddTransient<GeneralPage>();
+            services.AddTransient<WSLContainerViewModel>();
+            services.AddTransient<WSLContainerPage>();
             services.AddTransient<GPUAccelerationViewModel>();
             services.AddTransient<GPUAccelerationPage>();
             services.AddTransient<GUIAppsViewModel>();

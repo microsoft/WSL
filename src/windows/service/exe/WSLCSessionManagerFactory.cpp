@@ -16,6 +16,7 @@ Abstract:
 
 #include "WSLCSessionManagerFactory.h"
 #include "WSLCSessionManager.h"
+#include "wslpolicies.h"
 
 using wsl::windows::service::wslc::WSLCSessionManagerFactory;
 using wsl::windows::service::wslc::WSLCSessionManagerImpl;
@@ -37,6 +38,14 @@ HRESULT WSLCSessionManagerFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_
 
     try
     {
+        wsl::windows::common::COMServiceExecutionContext context;
+
+        namespace policies = wsl::windows::policies;
+        THROW_HR_WITH_USER_ERROR_IF(
+            WSLC_E_CONTAINER_DISABLED,
+            wsl::shared::Localization::MessageWSLContainerDisabled(),
+            !policies::IsFeatureAllowed(policies::OpenPoliciesKey().get(), policies::c_allowWSLContainer));
+
         std::lock_guard lock{g_mutex};
 
         THROW_HR_IF(CO_E_SERVER_STOPPING, !g_sessionManagerImpl.has_value());
@@ -48,13 +57,7 @@ HRESULT WSLCSessionManagerFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_
 
         THROW_IF_FAILED(g_sessionManager.CopyTo(riid, ppCreated));
     }
-    catch (...)
-    {
-        const auto result = wil::ResultFromCaughtException();
-
-        // Note: S_FALSE will cause COM to retry if the service is stopping.
-        return result == CO_E_SERVER_STOPPING ? S_FALSE : result;
-    }
+    CATCH_RETURN()
 
     return S_OK;
 }

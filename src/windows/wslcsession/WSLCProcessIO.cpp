@@ -20,7 +20,7 @@ using wsl::windows::service::wslc::RelayedProcessIO;
 using wsl::windows::service::wslc::TTYProcessIO;
 using wsl::windows::service::wslc::TypedHandle;
 using wsl::windows::service::wslc::VMProcessIO;
-using namespace wsl::windows::common::relay;
+using namespace wsl::windows::common::io;
 
 RelayedProcessIO::RelayedProcessIO(std::map<ULONG, TypedHandle>&& fds) : m_relayedHandles(std::move(fds))
 {

@@ -27,8 +27,9 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ContainerInspectCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ContainerId, true, NO_LIMIT),
-        Argument::Create(ArgType::Session),
+        Argument::Create(ArgType::ContainerId, {.Required = true, .Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::Size),
+        Argument::Create(ArgType::InspectFormat),
     };
 }
 
@@ -46,7 +47,7 @@ std::wstring ContainerInspectCommand::LongDescription() const
 void ContainerInspectCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context
-        << CreateSession
+        << ResolveSession
         << InspectContainers;
 }
 // clang-format on

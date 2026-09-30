@@ -18,20 +18,27 @@ using namespace wsl::windows::wslc::execution;
 using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
+
+using namespace wsl::windows::wslc::cli;
 // Container Root Command
-std::vector<std::unique_ptr<Command>> ContainerCommand::GetCommands() const
+std::vector<std::unique_ptr<Command>> ContainerCommand::CreateCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<ContainerAttachCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerCpCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerCreateCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerExecCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerExportCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerInspectCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerKillCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerLogsCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerListCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerPruneCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerRemoveCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerRestartCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerRunCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerStartCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerStatsCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerStopCommand>(FullName()));
     return commands;
 }
@@ -53,6 +60,6 @@ std::wstring ContainerCommand::LongDescription() const
 
 void ContainerCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    OutputHelp();
+    OutputHelp(context.Terminal);
 }
 } // namespace wsl::windows::wslc

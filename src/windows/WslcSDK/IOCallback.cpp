@@ -14,10 +14,10 @@ Abstract:
 #include "precomp.h"
 #include "WslcsdkPrivate.h"
 
-IOCallback::IOCallback(IWSLCProcess* process, const WslcContainerProcessIOCallbackOptions& options) :
+IOCallback::IOCallback(IWSLCCompatProcess* process, const WslcContainerProcessIOCallbackOptions& options) :
     m_process(process), m_callbackOptions(std::make_unique<WslcContainerProcessIOCallbackOptions>(options))
 {
-    using namespace wsl::windows::common::relay;
+    using namespace wsl::windows::common::io;
 
     auto addIOCallback = [&](WslcProcessIOHandle ioHandle, WslcStdIOCallback callback, PVOID context) {
         std::function<void(const gsl::span<char>& Buffer)> function;
@@ -79,17 +79,34 @@ IOCallback::IOCallback(IWSLCProcess* process, const WslcContainerProcessIOCallba
 }
 
 IOCallback::~IOCallback()
+try
 {
     Cancel();
-    if (m_thread.joinable())
-    {
-        m_thread.join();
-    }
+    Complete();
 }
+CATCH_LOG();
 
 void IOCallback::Cancel()
 {
     m_cancelEvent.SetEvent();
+}
+
+void IOCallback::Complete()
+{
+    // Complete can be called by multiple threads. Make sure that it's only ever called once since join() is not thread safe.
+    std::call_once(m_join, [this]() {
+        if (m_thread.joinable())
+        {
+            THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE), IsOnIOCallbackThread());
+
+            m_thread.join();
+        }
+    });
+}
+
+bool IOCallback::IsOnIOCallbackThread() const noexcept
+{
+    return m_thread.get_id() == std::this_thread::get_id();
 }
 
 bool IOCallback::HasIOCallback(const WslcContainerProcessOptionsInternal* options)
@@ -102,11 +119,12 @@ bool IOCallback::HasIOCallback(const WslcContainerProcessIOCallbackOptions& opti
     return options.onStdOut || options.onStdErr || options.onExit;
 }
 
-wil::unique_handle IOCallback::GetIOHandle(IWSLCProcess* process, WslcProcessIOHandle ioHandle)
+wil::unique_handle IOCallback::GetIOHandle(IWSLCCompatProcess* process, WslcProcessIOHandle ioHandle)
 {
-    wsl::windows::common::wslutil::COMOutputHandle handle;
+    WSLCCompatHandle handle{};
 
     THROW_IF_FAILED(process->GetStdHandle(static_cast<WSLCFD>(static_cast<std::underlying_type_t<WslcProcessIOHandle>>(ioHandle)), &handle));
 
-    return handle.Release();
+    // The handle value is the same regardless of the union member that was populated.
+    return wil::unique_handle{handle.Handle.File};
 }

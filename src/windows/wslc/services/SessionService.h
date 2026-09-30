@@ -14,9 +14,12 @@ Abstract:
 #pragma once
 
 #include "SessionModel.h"
+#include "Terminal.h"
 #include <wslc.h>
 
 namespace wsl::windows::wslc::services {
+
+using namespace wsl::windows::wslc::cli;
 struct SessionInformation
 {
     ULONG SessionId;
@@ -24,14 +27,32 @@ struct SessionInformation
     std::wstring DisplayName;
 };
 
+struct EventStreamOptions
+{
+    LONGLONG Since{};
+    LONGLONG Until{};
+    std::vector<std::pair<std::string, std::string>> Filters;
+};
+
 struct SessionService
 {
-    static int Attach(const std::wstring& name);
-    // Creates a default session with server-determined name and settings.
-    static wsl::windows::wslc::models::Session CreateDefaultSession();
-    static int Enter(const std::wstring& storagePath, const std::wstring& displayName);
+    static int Attach(Terminal& terminal, const wsl::windows::wslc::models::Session& session);
+    static int Enter(Terminal& terminal, const std::wstring& storagePath, const std::wstring& displayName);
     static std::vector<SessionInformation> List();
-    static wsl::windows::wslc::models::Session OpenSession(const std::wstring& displayName);
-    static int TerminateSession(const std::wstring& displayName);
+    static WSLCVersion ManagerVersion();
+    // Opens an existing session by name. Throws if not found.
+    static wsl::windows::wslc::models::Session OpenSession(const std::wstring& name);
+    // Opens the default session. Throws WSLC_E_SESSION_NOT_FOUND if no default session exists.
+    static wsl::windows::wslc::models::Session OpenDefaultSession();
+    // Opens or creates the default session.
+    static wsl::windows::wslc::models::Session OpenOrCreateDefaultSession(Terminal& terminal);
+    // Runs the given command and arguments in a session without a TTY, resolving the executable from PATH.
+    static int Run(Terminal& terminal, const wsl::windows::wslc::models::Session& session, const std::vector<std::string>& arguments);
+    static void StreamEvents(Terminal& terminal, const wsl::windows::wslc::models::Session& session, const EventStreamOptions& options, HANDLE cancelEvent);
+    static int TerminateSession(Terminal& terminal, const wsl::windows::wslc::models::Session& session);
+
+private:
+    // Common open-only session lookup with unified error handling.
+    static wsl::windows::wslc::models::Session OpenSessionByName(const wil::com_ptr<IWSLCSessionManager>& manager, LPCWSTR displayName);
 };
 } // namespace wsl::windows::wslc::services

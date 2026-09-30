@@ -34,11 +34,9 @@ void wsl::core::filesystem::CreateVhd(_In_ LPCWSTR target, _In_ ULONGLONG maximu
         !wsl::windows::common::string::IsPathComponentEqual(
             std::filesystem::path{target}.extension().native(), windows::common::wslutil::c_vhdxFileExtension));
 
-    // Disable creation of sparse VHDs while data corruption is being debugged.
     if (sparse)
     {
-        sparse = false;
-        EMIT_USER_WARNING(wsl::shared::Localization::MessageSparseVhdDisabled());
+        EMIT_USER_WARNING(wsl::shared::Localization::MessageSparseVhdUnsafe());
     }
 
     VIRTUAL_STORAGE_TYPE storageType{};
@@ -90,6 +88,16 @@ wil::unique_handle wsl::core::filesystem::OpenVhd(_In_ LPCWSTR Path, _In_ VIRTUA
     THROW_IF_WIN32_ERROR(OpenVirtualDisk(&storageType, Path, Mask, OPEN_VIRTUAL_DISK_FLAG_NONE, nullptr, &disk));
 
     return disk;
+}
+
+void wsl::core::filesystem::CompactVhd(_In_ LPCWSTR Path)
+{
+    auto diskHandle = OpenVhd(Path, VIRTUAL_DISK_ACCESS_GET_INFO | VIRTUAL_DISK_ACCESS_METAOPS);
+
+    COMPACT_VIRTUAL_DISK_PARAMETERS compact{};
+    compact.Version = COMPACT_VIRTUAL_DISK_VERSION_1;
+
+    THROW_IF_WIN32_ERROR(CompactVirtualDisk(diskHandle.get(), COMPACT_VIRTUAL_DISK_FLAG_NONE, &compact, nullptr));
 }
 
 void wsl::core::filesystem::ResizeExistingVhd(_In_ HANDLE diskHandle, _In_ ULONGLONG maximumSize, _In_ RESIZE_VIRTUAL_DISK_FLAG resizeFlag)

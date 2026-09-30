@@ -4,6 +4,8 @@ on:
   release:
     types: [released]
 
+permissions: {}
+
 jobs:
   publish:
     if: github.event.release.prerelease == false

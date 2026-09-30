@@ -18,7 +18,9 @@ def main(repo_path: str, token: str, committer: str, message: str, branch: str, 
     try:
         repo = Repo(repo_path)
 
-        changed_files = [e.a_path for e in repo.index.diff(None)]
+        modified_files = [e.a_path for e in repo.index.diff(None)]
+        untracked_files = list(repo.untracked_files)
+        changed_files = modified_files + untracked_files
 
         if not changed_files:
             print('No files changed, skipping')
@@ -33,7 +35,9 @@ def main(repo_path: str, token: str, committer: str, message: str, branch: str, 
             config.set_value("user", "email", COMMITTER_EMAIL)
             config.set_value("user", "name", committer)
 
-        repo.git.commit('-a', m=message)
+        # 'git add -A' so newly created files in new directories are staged too.
+        repo.git.add(A=True)
+        repo.git.commit(m=message)
         repo.git.push('origin', branch)
 
         headers = {'Accept': 'application/vnd.github+json', 'Authorization': 'Bearer ' + token}

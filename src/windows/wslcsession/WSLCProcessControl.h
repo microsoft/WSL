@@ -63,7 +63,6 @@ class DockerExecProcessControl : public WSLCProcessControl
 {
 public:
     DockerExecProcessControl(WSLCContainerImpl& Container, const std::string& Id, DockerHTTPClient& DockerClient, DockerEventTracker& EventTracker);
-    ~DockerExecProcessControl();
     void Signal(int Signal) override;
     void ResizeTty(ULONG Rows, ULONG Columns) override;
     int GetPid() const override;
@@ -73,7 +72,7 @@ public:
     void SetExitCode(int ExitCode);
 
 private:
-    void OnEvent(ContainerEvent Event, std::optional<int> ExitCode, std::uint64_t eventTime);
+    void OnEvent(ContainerEvent Event, std::optional<int> ExitCode, std::int64_t eventTimeNano);
 
     mutable std::mutex m_lock;
     std::string m_id;

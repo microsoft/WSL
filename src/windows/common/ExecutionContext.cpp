@@ -15,14 +15,16 @@ thread_local ExecutionContext* g_currentContext = nullptr;
 static bool g_enabled = false;
 bool g_runningInService = false;
 bool g_useComErrors = false;
+bool g_enableNotifications = false;
 static HANDLE g_eventLog = nullptr;
 
-void wsl::windows::common::EnableContextualizedErrors(bool service, bool useComErrors)
+void wsl::windows::common::EnableContextualizedErrors(bool service, bool useComErrors, bool enableNotifications)
 {
     WI_ASSERT(!g_enabled);
     g_enabled = true;
     g_runningInService = service;
     g_useComErrors = useComErrors;
+    g_enableNotifications = enableNotifications;
 }
 
 ExecutionContext::ExecutionContext(Context context, FILE* warningsFile) noexcept :
@@ -169,7 +171,7 @@ void ExecutionContext::EmitUserWarning(const std::wstring& warning, const std::s
         return;
     }
 
-    if (!CollectUserWarning(std::format(L"wsl: {}\n", warning)))
+    if (!CollectUserWarning(std::format(L"wsl: {}\n", warning)) && g_enableNotifications)
     {
         static std::atomic<bool> displayed = false;
         if (!displayed.exchange(true))

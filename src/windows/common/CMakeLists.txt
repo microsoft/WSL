@@ -1,7 +1,9 @@
 set(SOURCES
+    APICompat.cpp
     ConsoleProgressBar.cpp
     ConsoleProgressIndicator.cpp
     ConsoleState.cpp
+    wslc/models/ContainerModel.cpp
     DeviceHostProxy.cpp
     disk.cpp
     Distribution.cpp
@@ -17,13 +19,22 @@ set(SOURCES
     hcs.cpp
     helpers.cpp
     hvsocket.cpp
+    wslc/services/ICredentialStorage.cpp
+    wslc/services/FileCredStorage.cpp
+    wslc/services/WinCredStorage.cpp
+    wslc/cli/InputChannel.cpp
+    wslc/cli/OutputChannel.cpp
+    wslc/cli/Terminal.cpp
+    wslc/cli/TableOutput.cpp
     interop.cpp
+    HandleIO.cpp
     Localization.cpp
     lxssbusclient.cpp
     lxssclient.cpp
     LxssMessagePort.cpp
     LxssSecurity.cpp
     LxssServerPort.cpp
+    MountSpecParsing.cpp
     NatNetworking.cpp
     notifications.cpp
     Redirector.cpp
@@ -34,9 +45,11 @@ set(SOURCES
     string.cpp
     SubProcess.cpp
     svccomm.cpp
+    timestamp.cpp
+    VTSupport.cpp
     WindowsUpdateIntegration.cpp
     WSLCContainerLauncher.cpp
-    VirtioNetworking.cpp
+    ConsommeNetworking.cpp
     WSLCProcessLauncher.cpp
     WslClient.cpp
     WslCoreConfig.cpp
@@ -47,14 +60,16 @@ set(SOURCES
     WslCoreNetworkingSupport.cpp
     WslInstall.cpp
     WslSecurity.cpp
+    SlowOperationWatcher.cpp
     WslTelemetry.cpp
     wslutil.cpp
     install.cpp
-    WSLCUserSettings.cpp
+    wslc/settings/WSLCUserSettings.cpp
     notifications.cpp)
 
 set(HEADERS
     ../../../generated/Localization.h
+    APICompat.h
     ../inc/docker_schema.h
     ../inc/wslc_schema.h
     ../inc/lxssbusclient.h
@@ -83,6 +98,7 @@ set(HEADERS
     ConsoleProgressBar.h
     ConsoleProgressIndicator.h
     ConsoleState.h
+    wslc/models/ContainerModel.h
     DeviceHostProxy.h
     disk.hpp
     Distribution.h
@@ -99,12 +115,21 @@ set(HEADERS
     hcs_schema.h
     helpers.hpp
     hvsocket.hpp
+    wslc/services/ICredentialStorage.h
+    wslc/services/FileCredStorage.h
+    wslc/services/WinCredStorage.h
+    wslc/cli/InputChannel.h
+    wslc/cli/OutputChannel.h
+    wslc/cli/Terminal.h
+    wslc/cli/TableOutput.h
     INetworkingEngine.h
     interop.hpp
+    HandleIO.h
     LxssMessagePort.h
     LxssPort.h
     LxssSecurity.h
     LxssServerPort.h
+    MountSpecParsing.h
     NatNetworking.h
     notifications.h
     precomp.h
@@ -117,9 +142,12 @@ set(HEADERS
     Stringify.h
     SubProcess.h
     svccomm.hpp
+    timestamp.hpp
+    VTSupport.h
     WindowsUpdateIntegration.h
     WSLCContainerLauncher.h
-    VirtioNetworking.h
+    WSLCContainerEntry.h
+    ConsommeNetworking.h
     WSLCProcessLauncher.h
     WslClient.h
     WslCoreConfig.h
@@ -131,21 +159,32 @@ set(HEADERS
     WslCoreNetworkingSupport.h
     WslInstall.h
     WslSecurity.h
+    SlowOperationWatcher.h
     WslTelemetry.h
     wslutil.h
-    EnumVariantMap.h
-    WSLCUserSettings.h
-    WSLCSessionDefaults.h
+    wslc/EnumVariantMap.h
+    wslc/settings/WSLCUserSettings.h
+    wslc/WSLCSessionDefaults.h
     )
 
 add_library(common STATIC ${SOURCES} ${HEADERS})
-add_dependencies(common wslserviceidl localization wslservicemc wslinstalleridl yaml-cpp)
+add_dependencies(common wslserviceidl wsldevicehostidl localization wslservicemc wslinstalleridl yaml-cpp)
 
 target_precompile_headers(common PRIVATE precomp.h)
 set_target_properties(common PROPERTIES FOLDER windows)
 target_include_directories(common PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/../service/mc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
 
+# common calls into HCS, HNS, the IP helper API, the VHD APIs, MSI, WinTrust and
+# the config file parser, so anything linking common needs those libraries too.
+# PUBLIC propagates them instead of making each consumer restate them.
+# yaml-cpp backs WSLCUserSettings, advapi32 the credential manager APIs used by
+# WinCredStorage, and Crypt32 the data protection APIs used by FileCredStorage.
+target_link_libraries(common PUBLIC ${HCS_LINK_LIBRARIES} ${MSI_LINK_LIBRARIES} VirtDisk.lib configfile yaml-cpp advapi32 Crypt32.lib)
+
 # WSLCUserSettings.cpp uses yaml-cpp headers.
-set_source_files_properties(WSLCUserSettings.cpp PROPERTIES
+# The per-source include path and definition below only apply when the file is
+# compiled on its own, so keep it out of the unity sources.
+set_source_files_properties(wslc/settings/WSLCUserSettings.cpp PROPERTIES
     INCLUDE_DIRECTORIES "${yaml-cpp_SOURCE_DIR}/include"
-    COMPILE_DEFINITIONS "YAML_CPP_STATIC_DEFINE")
+    COMPILE_DEFINITIONS "YAML_CPP_STATIC_DEFINE"
+    SKIP_UNITY_BUILD_INCLUSION ON)

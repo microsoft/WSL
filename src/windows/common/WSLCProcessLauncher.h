@@ -15,6 +15,7 @@ Abstract:
 --*/
 
 #pragma once
+#include "HandleIO.h"
 #include "wslc.h"
 #include <variant>
 #include <vector>
@@ -35,9 +36,9 @@ public:
     NON_COPYABLE(RunningWSLCProcess);
     DEFAULT_MOVABLE(RunningWSLCProcess);
 
-    ProcessResult WaitAndCaptureOutput(DWORD TimeoutMs = INFINITE, std::vector<std::unique_ptr<relay::OverlappedIOHandle>>&& ExtraHandles = {});
+    ProcessResult WaitAndCaptureOutput(DWORD TimeoutMs = INFINITE, std::vector<std::unique_ptr<io::OverlappedIOHandle>>&& ExtraHandles = {});
     int Wait(DWORD TimeoutMs = INFINITE);
-    virtual wil::unique_handle GetStdHandle(int Index) = 0;
+    virtual io::HandleWrapper GetStdHandle(int Index) = 0;
     virtual wil::unique_event GetExitEvent() = 0;
     int GetExitCode();
     WSLCProcessState State();
@@ -57,7 +58,7 @@ public:
     DEFAULT_MOVABLE(ClientRunningWSLCProcess);
 
     ClientRunningWSLCProcess(wil::com_ptr<IWSLCProcess>&& process, WSLCProcessFlags Flags);
-    wil::unique_handle GetStdHandle(int Index) override;
+    io::HandleWrapper GetStdHandle(int Index) override;
     wil::unique_event GetExitEvent() override;
     IWSLCProcess& Get();
 
@@ -109,8 +110,8 @@ protected:
     std::optional<std::string> m_detachKeys;
     std::vector<std::string> m_arguments;
     std::vector<std::string> m_environment;
-    DWORD m_rows = 0;
-    DWORD m_columns = 0;
+    DWORD m_rows = 24;
+    DWORD m_columns = 80;
 };
 
 } // namespace wsl::windows::common

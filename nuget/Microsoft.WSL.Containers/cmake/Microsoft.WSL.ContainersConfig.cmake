@@ -55,3 +55,190 @@ unset(_wslcsdk_arch)
 unset(_wslcsdk_root)
 unset(_wslcsdk_include_dir)
 unset(_wslcsdk_lib_dir)
+
+#[[
+  wslc_add_image(<target>
+      IMAGE <ref> DOCKERFILE <path> CONTEXT <dir>
+      [SOURCES <file>...] [TAR_LOCATION <path>]
+      [BUILD_ARGS <KEY=VALUE>...] [LABELS <KEY=VALUE>...])
+
+  Adds a target that builds a container image with 'wslc image build' and saves
+  it to a tarball with 'wslc image save'. The image is rebuilt when the
+  Dockerfile, a tracked source file, or an image build option changes.
+
+  Required:
+    <target>       Name of the CMake target to create (first, positional).
+    IMAGE          Image reference to tag; ':latest' is appended when the
+                   reference has no tag.
+    DOCKERFILE     Path to the Dockerfile.
+    CONTEXT        Path to the build context directory.
+
+  Optional:
+    SOURCES        Files whose changes trigger a rebuild (globs allowed).
+                   Defaults to every file under CONTEXT.
+    TAR_LOCATION   Output path for the saved tarball.
+                   Defaults to ${CMAKE_CURRENT_BINARY_DIR}/<target>.tar.
+    BUILD_ARGS     Build-time variables (KEY=VALUE), each passed as --build-arg.
+    LABELS         Image labels (KEY=VALUE), each passed as --label.
+
+  Global variables (apply to every target created by wslc_add_image):
+    WSLC_IMAGE_BUILD_PULL
+                   Always attempt to pull newer base images (--pull).
+    WSLC_IMAGE_BUILD_NO_CACHE
+                   Build images without the layer cache (--no-cache).
+    WSLC_PRUNE_AFTER_BUILD
+                   Run 'wslc image prune' after each image is saved.
+    WSLC_TREAT_PRUNE_FAILURE_AS_ERROR
+                   Fail the build when the post-build prune fails. By default a
+                   prune failure is ignored.
+
+  Example:
+    find_package(Microsoft.WSL.Containers REQUIRED)
+
+    wslc_add_image(my-server
+        IMAGE      ghcr.io/myorg/my-server:latest
+        DOCKERFILE container/Dockerfile
+        CONTEXT    container/
+        BUILD_ARGS VERSION=1.2.3 COMMIT=abcdef
+        LABELS     org.opencontainers.image.source=https://example.com/repo)
+
+    add_dependencies(my_app my-server)
+]]
+
+function(wslc_add_image _target_name)
+    cmake_parse_arguments(
+        PARSE_ARGV 1 ARG
+        ""                                           # options (boolean flags)
+        "IMAGE;DOCKERFILE;CONTEXT;TAR_LOCATION"      # one-value keywords
+        "SOURCES;BUILD_ARGS;LABELS"                  # multi-value keywords
+    )
+
+    # Reject typos / unknown keywords so they can't silently slip through.
+    if(ARG_UNPARSED_ARGUMENTS)
+        message(FATAL_ERROR "wslc_add_image: unknown argument(s): ${ARG_UNPARSED_ARGUMENTS}")
+    endif()
+
+    # Validate required arguments
+    if(NOT ARG_IMAGE)
+        message(FATAL_ERROR "wslc_add_image: IMAGE is required")
+    endif()
+    if(NOT ARG_DOCKERFILE)
+        message(FATAL_ERROR "wslc_add_image: DOCKERFILE is required")
+    endif()
+    if(NOT ARG_CONTEXT)
+        message(FATAL_ERROR "wslc_add_image: CONTEXT is required")
+    endif()
+
+    # Append :latest when IMAGE has no tag. Detect by looking for ':' after the
+    # last '/', so registry-port refs like localhost:5000/repo aren't misread.
+    string(FIND "${ARG_IMAGE}" "/" _last_slash_pos REVERSE)
+    string(FIND "${ARG_IMAGE}" ":" _last_colon_pos REVERSE)
+    if(_last_colon_pos GREATER _last_slash_pos)
+        set(_image_ref "${ARG_IMAGE}")
+    else()
+        set(_image_ref "${ARG_IMAGE}:latest")
+    endif()
+
+    # Defaults
+    if(NOT ARG_TAR_LOCATION)
+        set(ARG_TAR_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/${_target_name}.tar")
+    endif()
+    # Normalize TAR_LOCATION to an absolute path. A bare filename or relative
+    # path would leave _tar_dir empty below and break `make_directory ""`.
+    # Skip the normalization when the path contains a generator expression
+    # (e.g. $<TARGET_FILE_DIR:...>) — those resolve to absolute paths at
+    # build time and would otherwise get BASE_DIR prepended at configure
+    # time, producing a doubled path like build/$<...>/foo.tar.
+    if(NOT ARG_TAR_LOCATION MATCHES "\\$<")
+        get_filename_component(ARG_TAR_LOCATION "${ARG_TAR_LOCATION}" ABSOLUTE
+                               BASE_DIR "${CMAKE_CURRENT_BINARY_DIR}")
+    endif()
+
+    # Find wslc CLI on PATH (the WSL MSI puts it there).
+    if(NOT WSLC_CLI_PATH)
+        find_program(WSLC_CLI_PATH wslc)
+        if(NOT WSLC_CLI_PATH)
+            message(FATAL_ERROR "wslc CLI not found on PATH. Install WSL by running 'wsl --install --no-distribution', or set the WSLC_CLI_PATH variable to a specific wslc.exe path.")
+        endif()
+    endif()
+
+    # Validate target name (used as CMake target id and default tar filename).
+    string(REGEX MATCH "[^a-zA-Z0-9_.+-]" _bad_char "${_target_name}")
+    if(_bad_char)
+        message(FATAL_ERROR "wslc_add_image: '${_target_name}' contains unsupported character '${_bad_char}'. The target name is used as a CMake target identifier and as the default tar filename, so it must be limited to letters, digits, '_', '.', '+', and '-'.")
+    endif()
+
+    # Normalize paths to be independent of the build directory
+    get_filename_component(_dockerfile_path "${ARG_DOCKERFILE}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+    get_filename_component(_context_path "${ARG_CONTEXT}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+
+    # Resolve source globs to file lists; default to CONTEXT contents if SOURCES omitted
+    if(ARG_SOURCES)
+        file(GLOB_RECURSE _resolved_sources CONFIGURE_DEPENDS ${ARG_SOURCES})
+    else()
+        file(GLOB_RECURSE _resolved_sources CONFIGURE_DEPENDS "${_context_path}/*")
+    endif()
+
+    get_filename_component(_tar_dir "${ARG_TAR_LOCATION}" DIRECTORY)
+
+    set(_build_options "")
+    list(APPEND _build_options -t "${_image_ref}")
+    foreach(_build_arg IN LISTS ARG_BUILD_ARGS)
+        if(NOT _build_arg STREQUAL "")
+            list(APPEND _build_options --build-arg "${_build_arg}")
+        endif()
+    endforeach()
+    foreach(_label IN LISTS ARG_LABELS)
+        if(NOT _label STREQUAL "")
+            list(APPEND _build_options --label "${_label}")
+        endif()
+    endforeach()
+    if(WSLC_IMAGE_BUILD_PULL)
+        list(APPEND _build_options --pull)
+    endif()
+    if(WSLC_IMAGE_BUILD_NO_CACHE)
+        list(APPEND _build_options --no-cache)
+    endif()
+    list(APPEND _build_options -f "${_dockerfile_path}")
+
+    # Track the effective build command as an input. file(GENERATE) preserves
+    # the timestamp when content is unchanged, so only option changes make the
+    # custom command out of date.
+    set(_build_signature_file "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${_target_name}-$<CONFIG>.wslc-options")
+    string(JOIN "\n" _build_signature ${_build_options} "${_context_path}")
+    file(GENERATE OUTPUT "${_build_signature_file}" CONTENT "${_build_signature}\n")
+
+    set(_prune_command "")
+    set(_prune_comment "")
+    if(WSLC_PRUNE_AFTER_BUILD)
+        if(WSLC_TREAT_PRUNE_FAILURE_AS_ERROR)
+            set(_prune_command COMMAND "${WSLC_CLI_PATH}" image prune)
+        else()
+            set(_prune_wrapper "${CMAKE_CURRENT_BINARY_DIR}/wslc_prune_ignore_failure.cmake")
+            if(NOT EXISTS "${_prune_wrapper}")
+                file(WRITE "${_prune_wrapper}"
+                    "execute_process(COMMAND \"\${WSLC}\" image prune)\n")
+            endif()
+            set(_prune_command COMMAND "${CMAKE_COMMAND}" "-DWSLC=${WSLC_CLI_PATH}" -P "${_prune_wrapper}")
+        endif()
+        set(_prune_comment ", and pruning dangling images")
+    endif()
+
+    # Save to a .tmp and atomically rename on success — wslc image save uses
+    # CREATE_ALWAYS, which truncates the destination on entry, so a failed
+    # save would otherwise leave a partial tar with newer mtime than sources
+    # (and break incremental). The rename only happens if save succeeded.
+    add_custom_command(
+        OUTPUT "${ARG_TAR_LOCATION}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${_tar_dir}"
+        COMMAND "${WSLC_CLI_PATH}" image build ${_build_options} "${_context_path}"
+        COMMAND "${WSLC_CLI_PATH}" image save -o "${ARG_TAR_LOCATION}.tmp" "${_image_ref}"
+        COMMAND ${CMAKE_COMMAND} -E rename "${ARG_TAR_LOCATION}.tmp" "${ARG_TAR_LOCATION}"
+        ${_prune_command}
+        DEPENDS ${_resolved_sources} "${_dockerfile_path}" "${_build_signature_file}"
+        COMMENT "WSLC: Building image '${_image_ref}', saving to '${ARG_TAR_LOCATION}'${_prune_comment}..."
+        VERBATIM
+    )
+
+    add_custom_target(${_target_name} DEPENDS "${ARG_TAR_LOCATION}")
+endfunction()

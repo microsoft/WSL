@@ -294,6 +294,7 @@ wsl::windows::common::SvcComm::LaunchProcess(
     //
 
     ConsoleState Io;
+    Io.SetInteractiveMode();
     COORD WindowSize = Io.GetWindowSize();
     ULONG Flags = LXSS_CREATE_INSTANCE_FLAGS_ALLOW_FS_UPGRADE;
     if (WI_IsFlagSet(LaunchFlags, LXSS_LAUNCH_FLAG_USE_SYSTEM_DISTRO))
@@ -650,6 +651,13 @@ wsl::windows::common::SvcComm::ResizeDistribution(_In_ LPCGUID DistroGuid, _In_ 
     outputRelay.Sync();
 
     RETURN_HR(result);
+}
+
+HRESULT
+wsl::windows::common::SvcComm::CompactDistribution(_In_ LPCGUID DistroGuid) const
+{
+    ClientExecutionContext context;
+    RETURN_HR(m_userSession->CompactDistribution(DistroGuid, context.OutError()));
 }
 
 HRESULT

@@ -1070,6 +1070,21 @@ Return Value:
     LxtCheckEqual(Stat.st_size, 11, "%lld");
 
     //
+    // Verify ftruncate succeeds on a descriptor opened with O_APPEND | O_WRONLY.
+    // Regression test for a virtiofs bug where ftruncate returned EACCES on an
+    // append-mode descriptor (GitHub issue #40987).
+    //
+
+    LxtCheckErrno(Fd = open(DRVFS_BASIC_PREFIX "/test", O_WRONLY | O_APPEND, 0666));
+    LxtCheckErrno(Size = write(Fd, "hello", 5));
+    LxtCheckEqual(Size, 5, "%ld");
+    LxtCheckErrnoZeroSuccess(ftruncate(Fd, 0));
+    LxtCheckErrnoZeroSuccess(ftruncate(Fd, 1));
+    LxtCheckClose(Fd);
+    LxtCheckErrnoZeroSuccess(stat(DRVFS_BASIC_PREFIX "/test", &Stat));
+    LxtCheckEqual(Stat.st_size, 1, "%lld");
+
+    //
     // Creating/removing items relative to the current working directory.
     //
 
@@ -1725,10 +1740,10 @@ Return Value:
     // directory entries are cached.
     //
     // N.B. This is not the case with Plan 9 because Linux doesn't know the
-    //      file system is case-insensitive.
+    //      file system is case-insensitive. The same applies to virtiofs.
     //
 
-    if (g_LxtFsInfo.FsType != LxtFsTypePlan9)
+    if (g_LxtFsInfo.FsType != LxtFsTypePlan9 && g_LxtFsInfo.FsType != LxtFsTypeVirtioFs)
     {
         LxtCheckErrno(Fd = open(DRVFS_CASE_INSENSITIVE_TEST_DIR "/foo", O_RDONLY));
         LxtCheckErrno(Fd2 = open(DRVFS_CASE_INSENSITIVE_TEST_DIR "/FOO", O_RDONLY));
@@ -1792,11 +1807,11 @@ Return Value:
     int Result;
 
     //
-    // This test does not apply to VM mode because Plan 9 doesn't support
-    // junction point symlinks.
+    // This test does not apply to VM mode because Plan 9 and virtiofs don't
+    // support junction point symlinks.
     //
 
-    if (g_LxtFsInfo.FsType == LxtFsTypePlan9)
+    if (g_LxtFsInfo.FsType == LxtFsTypePlan9 || g_LxtFsInfo.FsType == LxtFsTypeVirtioFs)
     {
         LxtLogInfo("This test is not relevant in VM mode.");
         Result = 0;

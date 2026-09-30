@@ -23,6 +23,7 @@ typedef struct _LXSS_SHARED_DIRECTORY
 
 #define LXSS_LIB_PREFIX "/usr/lib/wsl"
 #define LXSS_LIB_PATH LXSS_LIB_PREFIX "/lib"
+#define LXSS_GPU_DRIVERS_PATH LXSS_LIB_PREFIX "/drivers"
 #define LXSS_GPU_DRIVERS_SHARE "drivers"
 #define LXSS_GPU_LIB_SHARE "lib"
 #define LXSS_GPU_INBOX_LIB_SHARE LXSS_GPU_LIB_SHARE "_inbox"
@@ -32,4 +33,4 @@ typedef struct _LXSS_SHARED_DIRECTORY
 // Shared directories for GPU compute support.
 //
 
-constexpr LXSS_SHARED_DIRECTORY g_gpuShares[] = {{LXSS_GPU_DRIVERS_SHARE, LXSS_LIB_PREFIX "/drivers"}, {LXSS_GPU_LIB_SHARE, LXSS_LIB_PATH}};
+constexpr LXSS_SHARED_DIRECTORY g_gpuShares[] = {{LXSS_GPU_DRIVERS_SHARE, LXSS_GPU_DRIVERS_PATH}, {LXSS_GPU_LIB_SHARE, LXSS_LIB_PATH}};

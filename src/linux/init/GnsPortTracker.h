@@ -5,8 +5,8 @@
 #include <set>
 #include <utility>
 #include <optional>
+#include <variant>
 #include <NetlinkChannel.h>
-#include <future>
 #include <functional>
 #include <memory>
 #include <time.h>
@@ -15,11 +15,16 @@
 #include "waitablevalue.h"
 #include "SecCompDispatcher.h"
 #include "SocketChannel.h"
+#include "lxinitshared.h"
 
 class GnsPortTracker
 {
 public:
-    GnsPortTracker(std::shared_ptr<wsl::shared::SocketChannel> hvSocketChannel, NetlinkChannel&& netlinkChannel, std::shared_ptr<SecCompDispatcher> seccompDispatcher);
+    GnsPortTracker(
+        std::shared_ptr<wsl::shared::SocketChannel> hvSocketChannel,
+        NetlinkChannel&& netlinkChannel,
+        std::shared_ptr<SecCompDispatcher> seccompDispatcher,
+        LX_MINI_INIT_NETWORKING_MODE networkingMode);
 
     GnsPortTracker(const GnsPortTracker&) = delete;
     GnsPortTracker(GnsPortTracker&&) = delete;
@@ -116,29 +121,43 @@ public:
         std::uint64_t CallId;
     };
 
-    struct PortRefreshResult
+private:
+    using ActivePortSet = std::set<std::pair<std::uint16_t, int>>;
+
+    struct ActivePorts
     {
-        std::set<PortAllocation> Ports;
-        time_t Timestamp;
-        std::function<void()> Resume;
+        std::set<PortAllocation> FullAllocations;
+        ActivePortSet PortProtocolPairs; // Always populated, but only used in mirrored mode
     };
 
-private:
-    void OnRefreshAllocatedPorts(const std::set<PortAllocation>& Ports, time_t Timestamp);
+    struct ListPortsResult
+    {
+        ActivePorts Ports;
+        time_t Timestamp;
+    };
 
-    void RunPortRefresh();
+    using TrackerEvent = std::variant<seccomp_notif, ListPortsResult>;
 
-    std::set<PortAllocation> ListAllocatedPorts();
+    bool IsMirroredMode() const
+    {
+        return m_networkingMode == LxMiniInitNetworkingModeMirrored;
+    }
 
-    std::optional<BindCall> ReadNextRequest();
+    void ReconcileAllocatedPorts(const ActivePorts& Ports, time_t Timestamp);
 
-    std::optional<BindCall> GetCallInfo(uint64_t CallId, pid_t Pid, int Arch, int SysCallNumber, const gsl::span<unsigned long long>& Arguments);
+    void RunPortListing();
+
+    ActivePorts ListBoundPorts();
+
+    BindCall ReadRequest(const seccomp_notif& Notification);
+
+    BindCall GetCallInfo(uint64_t CallId, pid_t Pid, int Arch, int SysCallNumber, const gsl::span<const unsigned long long>& Arguments);
 
     int RequestPort(const PortAllocation& Port, bool Allocate);
 
     int HandleRequest(const PortAllocation& Request);
 
-    void CompleteRequest(uint64_t Id, int Result);
+    void CompleteRequest(int Result);
 
     static int GetSocketProtocol(int Pid, int Fd);
 
@@ -151,12 +170,14 @@ private:
     std::map<PortAllocation, std::optional<time_t>> m_allocatedPorts;
     std::shared_ptr<wsl::shared::SocketChannel> m_hvSocketChannel;
     NetlinkChannel m_channel;
-    std::promise<PortRefreshResult> m_allocatedPortsRefresh;
 
-    WaitableValue<seccomp_notif> m_request;
+    WaitableValue<TrackerEvent> m_eventQueue;
     WaitableValue<int> m_reply;
+    WaitableValue<bool> m_portListingResume;
 
     std::shared_ptr<SecCompDispatcher> m_seccompDispatcher;
+
+    LX_MINI_INIT_NETWORKING_MODE m_networkingMode;
 
     std::string m_networkNamespace;
 };

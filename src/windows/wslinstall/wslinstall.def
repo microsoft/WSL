@@ -14,3 +14,5 @@ EXPORTS
     RemoveRegistryKeyProtections
     UnregisterLspCategories
     CalculateWslSettingsProtocolIds
+    DisableWslService
+    EnableWslService

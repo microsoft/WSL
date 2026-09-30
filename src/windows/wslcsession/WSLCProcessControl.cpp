@@ -101,7 +101,15 @@ void DockerContainerProcessControl::OnContainerReleased() noexcept
     // Signal the exit event to prevent callers from being blocked on it.
     if (!m_exitEvent.is_signaled())
     {
-        m_exitedCode = 128 + WSLCSignalSIGKILL;
+        // If the container already produced a real exit code (recorded by SetExitCode but not yet
+        // signaled — e.g. an --rm container whose init-exit signal is deferred to the Destroy
+        // event), preserve it. Only synthesize SIGKILL when the container is released without ever
+        // having produced an exit code (an abrupt teardown of a still-running container).
+        if (!m_exitedCode.has_value())
+        {
+            m_exitedCode = 128 + WSLCSignalSIGKILL;
+        }
+
         m_exitEvent.SetEvent();
     }
 }
@@ -114,15 +122,6 @@ DockerExecProcessControl::DockerExecProcessControl(
     m_eventTrackingReference(EventTracker.RegisterExecStateUpdates(
         Container.ID(), Id, std::bind(&DockerExecProcessControl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)))
 {
-}
-
-DockerExecProcessControl::~DockerExecProcessControl()
-{
-    std::lock_guard lock{m_lock};
-    if (m_container != nullptr)
-    {
-        m_container->OnProcessReleased(this);
-    }
 }
 
 int DockerExecProcessControl::GetPid() const
@@ -151,6 +150,12 @@ void DockerExecProcessControl::SetPid(int Pid)
 {
     std::lock_guard lock{m_lock};
 
+    // Pid must be a real (forked) process. Docker reports Pid=0 in the brief
+    // window between StartExec returning and runc actually forking the user
+    // process; treating 0 as a valid PID causes the exec wait to hang forever
+    // because Docker never emits exec_die for a process that never spawned
+    // (see PR #40550). Callers must filter Pid > 0 themselves.
+    WI_ASSERT(Pid > 0);
     WI_ASSERT(!m_pid.has_value());
 
     m_pid = Pid;
@@ -167,7 +172,7 @@ void DockerExecProcessControl::SetExitCode(int ExitCode)
     }
 }
 
-void DockerExecProcessControl::OnEvent(ContainerEvent Event, std::optional<int> ExitCode, std::uint64_t /*eventTime*/)
+void DockerExecProcessControl::OnEvent(ContainerEvent Event, std::optional<int> ExitCode, std::int64_t)
 {
     if (Event == ContainerEvent::ExecDied && !m_exitEvent.is_signaled())
     {
@@ -201,7 +206,7 @@ void DockerExecProcessControl::OnContainerReleased() noexcept
 }
 
 VMProcessControl::VMProcessControl(WSLCVirtualMachine& VirtualMachine, int Pid, wil::unique_socket&& TtyControl) :
-    m_pid(Pid), m_ttyControlChannel(std::move(TtyControl), "TtyControl", VirtualMachine.TerminatingEvent()), m_vm(&VirtualMachine)
+    m_pid(Pid), m_ttyControlChannel(std::move(TtyControl), "TtyControl", {VirtualMachine.TerminatingEvent()}), m_vm(&VirtualMachine)
 {
 }
 

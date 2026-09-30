@@ -12,7 +12,7 @@ GnsPortTrackerChannel::GnsPortTrackerChannel(
     const std::function<void(const std::string&, bool)>& InterfaceStateCallback) :
     m_callback(Callback),
     m_interfaceStateCallback(InterfaceStateCallback),
-    m_channel(std::move(Socket), "GNSPortTracker", m_stopEvent.get())
+    m_channel(std::move(Socket), "GNSPortTracker", {m_stopEvent.get()})
 {
     m_thread = std::thread{std::bind(&GnsPortTrackerChannel::Run, this)};
 }

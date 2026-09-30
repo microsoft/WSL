@@ -15,6 +15,15 @@
       <BufferSize Value="512"/>
       <Buffers Value="4096"/>
     </EventCollector>
+
+    <!--
+      Separate collector used by sub-profiles. Using the same provider in a sub-profile
+      would replace the base provider instead of extending it.
+    -->
+    <EventCollector Id="Collector_extra" Name="Collector_extra">
+      <BufferSize Value="512"/>
+      <Buffers Value="4096"/>
+    </EventCollector>
    
     <!-- Event Providers -->
     <EventProvider Id="9p" Name="e13c8d52-b153-571f-78c5-1d4098af2a1e"/>
@@ -339,7 +348,7 @@
       Base="WSL.Verbose.File"
       >
       <Collectors>
-        <EventCollectorId Value="Collector">
+        <EventCollectorId Value="Collector_extra">
           <EventProviders>
             <!-- Additional storage-specific providers -->
             <EventProviderId Value="storvsp_io"/>
@@ -359,7 +368,7 @@
       Base="WSL.Verbose.File"
       >
       <Collectors>
-        <EventCollectorId Value="Collector">
+        <EventCollectorId Value="Collector_extra">
           <EventProviders>
             <!-- Additional networking-specific providers -->
             <EventProviderId Value="aad_WPP"/>
@@ -521,7 +530,7 @@
       Base="WSL.Verbose.File"
       >
       <Collectors>
-        <EventCollectorId Value="Collector">
+        <EventCollectorId Value="Collector_extra">
           <EventProviders>
             <!-- Additional providers specific to HvSocket profile -->
             <EventProviderId Value="EventProvider_HvSocketTraceProvider"/>

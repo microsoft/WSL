@@ -44,6 +44,9 @@ struct WslDistributionConfig;
 
 #define CGROUP_MOUNTPOINT "/sys/fs/cgroup"
 #define CGROUP2_DEVICE "cgroup2"
+#define WSL_USER_CGROUP_PATH CGROUP_MOUNTPOINT "/wsl-user"
+#define WSL_USER_NON_SYSTEMD_CGROUP_DIR "/non-systemd"
+#define WSL_USER_NON_DISTRO_CGROUP_PATH WSL_USER_CGROUP_PATH "/non-distro"
 #define MOUNT_COMMAND "/bin/mount"
 #define MOUNT_FSTAB_ARG "-a"
 #define MOUNT_INTERNAL_ONLY_ARG "-i"
@@ -136,8 +139,12 @@ wil::unique_fd UtilConnectVsock(
 // Needs to be declared before UtilCreateChildProcess().
 void UtilSetThreadName(const char* Name);
 
+int UtilMoveSelfToDistroCgroup(const std::string& CgroupPath, const std::string& LogSubject);
+
+int UtilEnterCgroupNamespace(int NamespaceFd, const std::string& LogSubject);
+
 template <typename TMethod>
-int UtilCreateChildProcess(const char* ChildName, TMethod&& ChildFunction, std::optional<int> CloneFlags = {})
+int UtilCreateChildProcess(const char* ChildName, TMethod&& ChildFunction, std::optional<int> CloneFlags = {}, int CgroupNamespaceFd = -1)
 
 /*++
 
@@ -153,6 +160,8 @@ Arguments:
 
     CloneFlags - Supplies an optional value containing flags to use for the clone syscall.
         If no flags are specified, fork is used instead.
+
+    CgroupNamespaceFd - Supplies an optional cgroup namespace to enter after moving the child process.
 
 Return Value:
 
@@ -184,6 +193,12 @@ Return Value:
 
     try
     {
+        if (CgroupNamespaceFd >= 0)
+        {
+            THROW_LAST_ERROR_IF(UtilMoveSelfToDistroCgroup(CGROUP_MOUNTPOINT WSL_USER_NON_SYSTEMD_CGROUP_DIR, ChildName) < 0);
+            THROW_LAST_ERROR_IF(UtilEnterCgroupNamespace(CgroupNamespaceFd, ChildName) < 0);
+        }
+
         UtilSetThreadName(ChildName);
         ChildFunction();
     }
@@ -311,8 +326,27 @@ std::wstring UtilReadFileContentW(std::string_view path);
 
 std::string UtilReadFileContent(std::string_view path);
 
+// Holds the hv_pci swiotlb pool the WSL kernel reserved at boot and published
+// under /sys/bus/vmbus/drivers/hv_pci/swiotlb_{base,size}. Both fields are zero
+// when running on a kernel that does not publish these files.
+struct HvPciSwiotlbPool
+{
+    uint64_t Base = 0;
+    uint64_t Size = 0;
+};
+
+HvPciSwiotlbPool UtilReadHvPciSwiotlbPool();
+
 uint16_t UtilWinAfToLinuxAf(uint16_t AddressFamily);
 
-int WriteToFile(const char* Path, const char* Content, int permissions = 0644);
+int WriteToFile(const char* Path, const char* Content, int OpenFlags = O_WRONLY | O_CLOEXEC | O_CREAT, int Permissions = 0644);
 
-int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer);
+// Starts a background thread that performs memory compaction and optional cache reclaim when the VM is idle.
+void StartMemoryReductionThread(LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode);
+
+int ProcessCreateProcessMessage(
+    wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer, const std::optional<std::string>& DistroCgroupPath, int CgroupNamespaceFd = -1);
+
+std::string UtilGetDistroCgroupPath(pid_t DistroInitPid);
+
+int UtilEnableAllCgroupControllers(const std::string& CgroupPath);

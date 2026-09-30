@@ -18,8 +18,10 @@ using namespace wsl::windows::wslc::execution;
 using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
+
+using namespace wsl::windows::wslc::cli;
 // Image Root Command
-std::vector<std::unique_ptr<Command>> ImageCommand::GetCommands() const
+std::vector<std::unique_ptr<Command>> ImageCommand::CreateCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<ImageBuildCommand>(FullName()));
@@ -27,6 +29,7 @@ std::vector<std::unique_ptr<Command>> ImageCommand::GetCommands() const
     commands.push_back(std::make_unique<ImageInspectCommand>(FullName()));
     commands.push_back(std::make_unique<ImageListCommand>(FullName()));
     commands.push_back(std::make_unique<ImageLoadCommand>(FullName()));
+    commands.push_back(std::make_unique<ImageImportCommand>(FullName()));
     commands.push_back(std::make_unique<ImagePruneCommand>(FullName()));
     commands.push_back(std::make_unique<ImagePullCommand>(FullName()));
     commands.push_back(std::make_unique<ImagePushCommand>(FullName()));
@@ -52,6 +55,6 @@ std::wstring ImageCommand::LongDescription() const
 
 void ImageCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    OutputHelp();
+    OutputHelp(context.Terminal);
 }
 } // namespace wsl::windows::wslc

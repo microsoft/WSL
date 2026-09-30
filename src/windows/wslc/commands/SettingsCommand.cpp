@@ -22,8 +22,10 @@ using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 
+using namespace wsl::windows::wslc::cli;
+
 // SettingsCommand
-std::vector<std::unique_ptr<Command>> SettingsCommand::GetCommands() const
+std::vector<std::unique_ptr<Command>> SettingsCommand::CreateCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<SettingsResetCommand>(FullName()));
@@ -83,7 +85,7 @@ std::wstring SettingsResetCommand::LongDescription() const
 void SettingsResetCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     settings::User().Reset();
-    PrintMessage(Localization::WSLCCLI_SettingsResetConfirm());
+    context.Terminal.Output(L"{}\n", Localization::WSLCCLI_SettingsResetConfirm());
 }
 
 } // namespace wsl::windows::wslc

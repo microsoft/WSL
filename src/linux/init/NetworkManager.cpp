@@ -281,8 +281,30 @@ void NetworkManager::EnableLoopbackRouting(Interface& interface)
     loopback interface. Every packet that arrives in the guest having a loopback destination address will
     arrive on the GELNIC.
 */
-void NetworkManager::InitializeLoopbackConfiguration(Interface& gelnic)
+void NetworkManager::InitializeLoopbackConfiguration(Interface& gelnic, wsl::shared::hns::CreateDeviceFlags flags)
 {
+    if (WI_IsFlagSet(flags, wsl::shared::hns::CreateDeviceFlags::DisableDAD))
+    {
+        try
+        {
+            gelnic.DisableNetworkSetting("accept_dad", AF_INET6);
+            gelnic.DisableNetworkSetting("dad_transmits", AF_INET6);
+
+            // Toggle ipv6 to reset our temporary address.
+            gelnic.EnableNetworkSetting("disable_ipv6", AF_INET6);
+            gelnic.DisableNetworkSetting("disable_ipv6", AF_INET6);
+        }
+        catch (const SyscallError& e)
+        {
+            if (e.GetErrno() != ENOENT || std::filesystem::exists("/proc/sys/net/ipv6"))
+            {
+                throw;
+            }
+
+            GNS_LOG_INFO("Ignoring IPv6 loopback configuration error because IPv6 is disabled: {}", e.what());
+        }
+    }
+
     // Enable routing of IPv4 loopback on the GELNIC.
     GNS_LOG_INFO("Enabling IPv4 loopback routing on GELNIC adapter {}", gelnic.Name().c_str());
     EnableLoopbackRouting(gelnic);

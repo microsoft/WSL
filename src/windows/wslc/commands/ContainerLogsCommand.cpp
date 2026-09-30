@@ -27,10 +27,13 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ContainerLogsCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ContainerId, true),
-        Argument::Create(ArgType::Session),
+        Argument::Create(ArgType::ContainerId, {.Required = true}),
+        Argument::Create(ArgType::Details),
         Argument::Create(ArgType::Follow),
         Argument::Create(ArgType::Tail),
+        Argument::Create(ArgType::Timestamps),
+        Argument::Create(ArgType::Since),
+        Argument::Create(ArgType::Until),
     };
 }
 
@@ -46,8 +49,8 @@ std::wstring ContainerLogsCommand::LongDescription() const
 
 void ContainerLogsCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << ViewContainerLogs;
 }
 } // namespace wsl::windows::wslc

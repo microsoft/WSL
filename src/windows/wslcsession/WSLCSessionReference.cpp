@@ -33,6 +33,8 @@ wslc::WSLCSessionReference::~WSLCSessionReference() = default;
 
 HRESULT wslc::WSLCSessionReference::OpenSession(_Out_ IWSLCSession** Session)
 {
+    RETURN_HR_IF_NULL(E_POINTER, Session);
+
     *Session = nullptr;
 
     Microsoft::WRL::ComPtr<IWSLCSession> lockedSession;

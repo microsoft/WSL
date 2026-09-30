@@ -59,6 +59,27 @@ std::vector<sockaddr_storage> QueryListeningSockets(NetlinkChannel& channel)
                     static_assert(sizeof(ipv6->sin6_addr.s6_addr32) == sizeof(payload->id.idiag_src));
                     memcpy(ipv6->sin6_addr.s6_addr32, payload->id.idiag_src, sizeof(ipv6->sin6_addr.s6_addr32));
                     ipv6->sin6_port = payload->id.idiag_sport;
+
+                    if (IN6_IS_ADDR_UNSPECIFIED(&ipv6->sin6_addr))
+                    {
+                        try
+                        {
+                            const auto ipv6Only = e.Attributes<uint8_t>(INET_DIAG_SKV6ONLY);
+                            if (ipv6Only.size() == 1 && *ipv6Only.front() == 0)
+                            {
+                                sockaddr_storage ipv4Socket{};
+                                auto* ipv4 = reinterpret_cast<sockaddr_in*>(&ipv4Socket);
+                                ipv4->sin_family = AF_INET;
+                                ipv4->sin_addr.s_addr = htonl(INADDR_ANY);
+                                ipv4->sin_port = ipv6->sin6_port;
+                                sockets.emplace_back(ipv4Socket);
+                            }
+                        }
+                        catch (const NetlinkParseException& exception)
+                        {
+                            LOG_ERROR("Failed to read listening socket IPv6-only attribute: {}", exception.what());
+                        }
+                    }
                 }
 
                 sockets.emplace_back(sock);
@@ -301,6 +322,7 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
 
                 if (TEMP_FAILURE_RETRY(connect(tcpSocket.get(), socketAddress, socketAddressSize)) < 0)
                 {
+                    LOG_ERROR("Failed to connect to port: {}, family: {}, errno: {}", message->Port, message->Family, errno);
                     return;
                 }
 
@@ -408,7 +430,9 @@ int RunPortTracker(int Argc, char** Argv)
                             " fd]"
                             " [" INIT_NETLINK_FD_ARG
                             " fd]"
-                            " [" INIT_PORT_TRACKER_LOCALHOST_RELAY " fd]\n";
+                            " [" INIT_PORT_TRACKER_LOCALHOST_RELAY
+                            " fd]"
+                            " [" INIT_PORT_TRACKER_NETWORKING_MODE_ARG " mode]\n";
 
     // This is only supported on VM mode.
     if (!UtilIsUtilityVm())
@@ -423,12 +447,14 @@ int RunPortTracker(int Argc, char** Argv)
     int PortTrackerFd = -1;
     int NetlinkSocketFd = -1;
     int GuestRelayFd = -1;
+    int NetworkingMode = static_cast<int>(LxMiniInitNetworkingModeNone);
 
     ArgumentParser parser(Argc, Argv);
     parser.AddArgument(Integer{BpfFd}, INIT_BPF_FD_ARG);
     parser.AddArgument(Integer{PortTrackerFd}, INIT_PORT_TRACKER_FD_ARG);
     parser.AddArgument(Integer{NetlinkSocketFd}, INIT_NETLINK_FD_ARG);
     parser.AddArgument(Integer{GuestRelayFd}, INIT_PORT_TRACKER_LOCALHOST_RELAY);
+    parser.AddArgument(Integer{NetworkingMode}, INIT_PORT_TRACKER_NETWORKING_MODE_ARG);
 
     try
     {
@@ -437,6 +463,12 @@ int RunPortTracker(int Argc, char** Argv)
     catch (const wil::ExceptionWithUserMessage& e)
     {
         std::cerr << e.what() << "\n" << Usage;
+        return 1;
+    }
+
+    if (NetworkingMode < LxMiniInitNetworkingModeNone || NetworkingMode > LxMiniInitNetworkingModeConsomme)
+    {
+        std::cerr << "Invalid networking mode (" << NetworkingMode << ")\n";
         return 1;
     }
 
@@ -469,10 +501,16 @@ int RunPortTracker(int Argc, char** Argv)
 
     auto seccompDispatcher = std::make_shared<SecCompDispatcher>(BpfFd);
 
-    GnsPortTracker portTracker(hvSocketChannel, std::move(channel), seccompDispatcher);
+    GnsPortTracker portTracker(hvSocketChannel, std::move(channel), seccompDispatcher, static_cast<LX_MINI_INIT_NETWORKING_MODE>(NetworkingMode));
 
     seccompDispatcher->RegisterHandler(
         __NR_bind, [&portTracker](seccomp_notif* notification) { return portTracker.ProcessSecCompNotification(notification); });
+
+    // listen() can perform an implicit autobind (assigning an ephemeral port) when called on a
+    // socket that was never explicitly bind()'d. That autobind is otherwise invisible to the
+    // port tracker, so listen() needs to be intercepted the same way bind() is.
+    seccompDispatcher->RegisterHandler(
+        __NR_listen, [&portTracker](seccomp_notif* notification) { return portTracker.ProcessSecCompNotification(notification); });
 
 #ifdef __x86_64__
     seccompDispatcher->RegisterHandler(I386_NR_socketcall, [&portTracker](seccomp_notif* notification) {
@@ -480,6 +518,9 @@ int RunPortTracker(int Argc, char** Argv)
     });
 #else
     seccompDispatcher->RegisterHandler(ARMV7_NR_bind, [&portTracker](seccomp_notif* notification) {
+        return portTracker.ProcessSecCompNotification(notification);
+    });
+    seccompDispatcher->RegisterHandler(ARMV7_NR_listen, [&portTracker](seccomp_notif* notification) {
         return portTracker.ProcessSecCompNotification(notification);
     });
 #endif

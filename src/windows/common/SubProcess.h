@@ -40,6 +40,7 @@ public:
     void SetToken(HANDLE Token);
     void SetShowWindow(WORD Show);
     void SetFlags(DWORD Flag);
+    void SetJobObject(HANDLE JobObject);
 
     wil::unique_handle Start();
     DWORD Run(DWORD Timeout = INFINITE);
@@ -64,6 +65,7 @@ private:
     HANDLE m_stdOut = nullptr;
     HANDLE m_stdErr = nullptr;
     HPCON m_pseudoConsole = nullptr;
+    HANDLE m_jobObject = nullptr;
     std::optional<DWORD> m_desktopAppPolicy;
     std::optional<WORD> m_showWindow;
     std::vector<HANDLE> m_inheritHandles;

@@ -28,7 +28,7 @@ std::vector<Argument> ImageLoadCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::Input),
-        Argument::Create(ArgType::Session),
+        Argument::Create(ArgType::Quiet, {.Desc = Localization::WSLCCLI_ImageLoadQuietArgDescription()}),
     };
 }
 
@@ -44,8 +44,8 @@ std::wstring ImageLoadCommand::LongDescription() const
 
 void ImageLoadCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << LoadImage;
 }
 } // namespace wsl::windows::wslc

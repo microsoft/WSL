@@ -35,6 +35,7 @@ public sealed partial class OptionalFeaturesPage : Page
     {
         OptionalFeaturesPageRoot.Focus(FocusState.Programmatic);
         RuntimeHelper.SetupExpanderFocusManagementByName(this, "VMIdleTimeoutExpander", "VMIdleTimeoutTextBox");
+        RuntimeHelper.SetupExpanderFocusManagementByName(this, "InstanceIdleTimeoutExpander", "InstanceIdleTimeoutTextBox");
     }
 
     override protected void OnNavigatedFrom(NavigationEventArgs e)
@@ -61,5 +62,15 @@ public sealed partial class OptionalFeaturesPage : Page
 
         TextBox? textBox = sender as TextBox;
         ViewModel.SetVMIdleTimeout_ResetEnabled(textBox!.Text);
+    }
+
+    private void InstanceIdleTimeoutTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (sender is not TextBox textBox)
+        {
+            return;
+        }
+
+        ViewModel.SetInstanceIdleTimeout_ResetEnabled(textBox.Text);
     }
 }

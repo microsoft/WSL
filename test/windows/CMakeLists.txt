@@ -4,13 +4,17 @@ set(SOURCES
     MountTests.cpp
     NetworkTests.cpp
     Plan9Tests.cpp
+    Plan9ProtocolTests.cpp
     DrvFsTests.cpp
+    FilesystemUnitTests.cpp
+    StringUnitTests.cpp
     Common.cpp
     PluginTests.cpp
     PolicyTests.cpp
     InstallerTests.cpp
     WSLCTests.cpp
     WslcSdkTests.cpp
+    WslcSdkWinRtTests.cpp
     WindowsUpdateTests.cpp)
 
 set(HEADERS
@@ -22,7 +26,12 @@ add_compile_definitions(INLINE_TEST_METHOD_MARKUP)
 
 add_library(wsltests SHARED ${SOURCES} ${HEADERS})
 
-target_include_directories(wsltests PRIVATE ${CMAKE_SOURCE_DIR}/src/windows/WslcSDK)
+target_include_directories(wsltests PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/linux/plan9
+    ${CMAKE_SOURCE_DIR}/src/windows/WslcSDK
+    ${CMAKE_BINARY_DIR}/src/windows/WslcSDK/winrt/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
+set_property(SOURCE NetworkTests.cpp APPEND PROPERTY INCLUDE_DIRECTORIES
+    ${CMAKE_SOURCE_DIR}/src/windows/service/exe)
 target_link_directories(wsltests PRIVATE ${BIN})
 target_precompile_headers(wsltests REUSE_FROM common)
 target_link_libraries(wsltests
@@ -38,9 +47,10 @@ target_link_libraries(wsltests
                       VirtDisk.lib
                       Wer.lib
                       sfc.lib
-                      Crypt32.lib)
+                      Crypt32.lib
+                      Ncrypt.lib)
 
-add_dependencies(wsltests wslserviceidl wslclib wslc wslcsdk)
+add_dependencies(wsltests wslserviceidl wslclib wslc wslcsdk wslcsdkwinrtidl)
 add_subdirectory(testplugin)
 add_subdirectory(wslc)
 

@@ -137,6 +137,21 @@ void EnsureDirectoryWithAttributes(_In_ PCWSTR Path, _In_ ULONG Mode, _In_ ULONG
 
 bool FileExists(_In_ LPCWSTR Path);
 
+/// <summary>
+/// Resolves Path to an absolute, canonical form. The path is made absolute against the current
+/// directory first because std::filesystem::weakly_canonical does not reliably resolve a relative
+/// path on its own. '..' components are collapsed and symlinks are resolved for the portion of the
+/// path that exists, so a path naming a file that does not exist yet still succeeds.
+/// Throws on failure.
+/// </summary>
+std::filesystem::path GetCanonicalPath(const std::filesystem::path& Path);
+
+/// <summary>
+/// Non-throwing overload of GetCanonicalPath. On failure Error is set and an empty path is
+/// returned; on success Error is cleared.
+/// </summary>
+std::filesystem::path GetCanonicalPath(const std::filesystem::path& Path, std::error_code& Error);
+
 std::filesystem::path GetFullPath(_In_ LPCWSTR Path);
 
 std::pair<std::string, std::string> GetHostAndDomainNames();
@@ -157,6 +172,13 @@ std::filesystem::path GetTempFilename();
 std::filesystem::path GetTempFolderPath(_In_ HANDLE userToken);
 
 std::string GetWindowsHosts(const std::filesystem::path& Path);
+
+/// <summary>
+/// Creates a uniquely named staging directory under Parent and returns its path. The name is
+/// derived from a fresh GUID so concurrent callers never collide. Throws if the directory cannot
+/// be created.
+/// </summary>
+std::filesystem::path MakeStagingDirectory(const std::filesystem::path& Parent);
 
 /// <summary>
 /// Opens a directory handle with read/execute, optionally also write, & full sharing. The path
@@ -192,6 +214,14 @@ std::pair<NTSTATUS, wil::unique_hfile> OpenRelativeFileNoThrow(
     _In_ ULONG CreateOptions,
     _In_opt_ PVOID EaBuffer = nullptr,
     _In_ ULONG EaSize = 0);
+
+/// <summary>
+/// Container paths are POSIX. Returns the last path component, ignoring trailing separators.
+/// Dot components and the root carry no name of their own and yield an empty string. The result is
+/// a POSIX name, which may hold characters that no Windows file name can, so a caller building a
+/// Windows path from it has to validate it first.
+/// </summary>
+std::string PosixBaseName(std::string_view Path);
 
 wil::unique_hfile ReopenFile(_In_ HANDLE Handle, _In_ ACCESS_MASK DesiredAccess, _In_ ULONG CreateOptions);
 

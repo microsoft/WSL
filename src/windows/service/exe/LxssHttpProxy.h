@@ -199,6 +199,12 @@ private:
     QueryState m_queryState{QueryState::NoQuery};
 
     /// <summary>
+    /// Synchronizes request startup and teardown.
+    /// </summary>
+    wil::critical_section m_requestLock{};
+    _Guarded_by_(m_requestLock) bool m_stopping = false;
+
+    /// <summary>
     /// Used to impersonate user, as it is required for the proxy queries to run as the user; otherwise, the results will be incorrect.
     /// </summary>
     wil::unique_handle m_userToken{};
@@ -229,8 +235,8 @@ private:
     wil::slim_event_manual_reset m_requestFinished{true};
 
     // Handles associated with the request
-    wil::unique_winhttp_hinternet m_session{};
-    wil::unique_winhttp_hinternet m_resolver{};
+    _Guarded_by_(m_requestLock) wil::unique_winhttp_hinternet m_session {};
+    _Guarded_by_(m_requestLock) wil::unique_winhttp_hinternet m_resolver {};
 
     /// <summary>
     /// Single-threaded queue to trigger work from winhttp callbacks.

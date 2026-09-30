@@ -45,6 +45,7 @@ Abstract:
 #include <poll.h>
 #include <utility>
 #include <format>
+#include <type_traits>
 #include <new>
 #include <thread>
 #include <vector>
@@ -98,10 +99,28 @@ extern struct sigaction g_SavedSignalActions[_NSIG];
         } \
     }
 
+template <typename T>
+T&& NormalizeLogArgument(T&& Argument)
+{
+    using ArgumentType = std::remove_cv_t<std::remove_reference_t<T>>;
+
+    if constexpr (std::is_same_v<ArgumentType, char*> || std::is_same_v<ArgumentType, const char*>)
+    {
+        if (Argument == nullptr)
+        {
+            static char NullString[] = "<null>";
+            static ArgumentType NullArgument = NullString;
+            return static_cast<T&&>(NullArgument);
+        }
+    }
+
+    return std::forward<T>(Argument);
+}
+
 template <typename... Args>
 auto LogImpl(int fd, const std::format_string<Args...>& format, Args&&... args)
 {
-    auto logline = std::format(format, std::forward<Args>(args)...);
+    auto logline = std::format(format, NormalizeLogArgument(std::forward<Args>(args))...);
     if (logline.empty())
     {
         return;

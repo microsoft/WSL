@@ -9,6 +9,7 @@ set(SOURCES
 
     # Session and container implementation
     WSLCSession.cpp
+    WSLCSessionRuntime.cpp
     WSLCContainer.cpp
     WSLCVirtualMachine.cpp
 
@@ -25,21 +26,29 @@ set(SOURCES
     # Supporting classes
     DockerEventTracker.cpp
     DockerHTTPClient.cpp
+    EventStore.cpp
     IORelay.cpp
+    OptionParser.cpp
     ServiceProcessLauncher.cpp
+    WindowsCertStore.cpp
     )
 
 set(HEADERS
     DockerEventTracker.h
     DockerHTTPClient.h
+    EventStore.h
     IORelay.h
+    OptionParser.h
     ServiceProcessLauncher.h
     WSLCContainer.h
     WSLCContainerMetadata.h
+    WindowsCertStore.h
     WSLCProcess.h
     WSLCProcessControl.h
     WSLCProcessIO.h
     WSLCSession.h
+    WSLCSessionRuntime.h
+    WSLCIdleState.h
     WSLCSessionFactory.h
     WSLCSessionReference.h
     WSLCVirtualMachine.h
@@ -58,7 +67,10 @@ target_link_libraries(wslcsession
                       common
                       legacy_stdio_definitions
                       VirtDisk.lib
-                      Crypt32.lib)
+                      Crypt32.lib
+                      delayimp.lib)
+
+set_target_properties(wslcsession PROPERTIES LINK_FLAGS "/DELAYLOAD:msi.dll /DELAYLOAD:WINTRUST.dll")
 
 target_precompile_headers(wslcsession REUSE_FROM common)
 set_target_properties(wslcsession PROPERTIES FOLDER windows)

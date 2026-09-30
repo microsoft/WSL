@@ -12,13 +12,15 @@ Abstract:
 
 --*/
 #pragma once
-#include "ArgumentTypes.h"
+#include "ArgMap.h"
 #include "ExecutionContextData.h"
+#include "Terminal.h"
 #include <optional>
 
 namespace wsl::windows::wslc::execution {
-// The context within which all commands execute.
-// Contains arguments via Args.
+
+using namespace wsl::windows::wslc::cli;
+
 struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 {
     CLIExecutionContext() : wsl::windows::common::ExecutionContext(wsl::windows::common::Context::WslC)
@@ -27,28 +29,33 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
     ~CLIExecutionContext() override = default;
 
     NON_COPYABLE(CLIExecutionContext);
-    CLIExecutionContext(CLIExecutionContext&&) = default;
-    CLIExecutionContext& operator=(CLIExecutionContext&&) = default;
+    NON_MOVABLE(CLIExecutionContext);
 
+    // Arguments accumulated from the selected command path.
     argument::ArgMap Args;
 
     // Map of data stored in the context.
     DataMap Data;
 
-    // Process exit code set by tasks like Run/Exec. When set, CoreMain returns this
-    // instead of the HRESULT, enabling `wslc run ... && echo success` patterns.
+    // Central output terminal for all user-facing status messages.
+    Terminal Terminal;
+
+    // Process exit code set by tasks like Run/Exec.
     std::optional<int> ExitCode;
 
-    // Event signaled when the user presses Ctrl-C. Starts null; long-running operations
-    // that support cancellation create it via CreateCancelEvent() before passing it to
-    // COM APIs that accept a CancelEvent handle.
+    // Event signaled when the user presses Ctrl-C.
     wil::unique_event CancelEvent;
 
-    HANDLE CreateCancelEvent()
-    {
-        WI_ASSERT(!CancelEvent);
-        CancelEvent.create(wil::EventOptions::ManualReset);
-        return CancelEvent.get();
-    }
+    HANDLE CreateCancelEvent();
+
+    // Applies terminal configuration from parsed arguments and freezes those values for the invocation.
+    void ApplyTerminalOptions();
+
+    // Prints a caught error to stderr.
+    void ReportError(HRESULT result);
+
+    // Drops the collected error so a later failure in the same invocation reports its own message.
+    void ClearError();
 };
+
 } // namespace wsl::windows::wslc::execution

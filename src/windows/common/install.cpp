@@ -77,9 +77,9 @@ bool PromptForKeyPressWithTimeout()
     return waitResult == std::future_status::ready && future.get();
 }
 
-int UpdatePackageImpl(bool preRelease, bool repair)
+int UpdatePackageImpl(bool preRelease, bool repair, bool callerOwnsProcess)
 {
-    if (!repair)
+    if (!repair && callerOwnsProcess)
     {
         PrintMessage(Localization::MessageCheckingForUpdates());
     }
@@ -88,25 +88,34 @@ int UpdatePackageImpl(bool preRelease, bool repair)
 
     if (!repair && ParseWslPackageVersion(version) <= wsl::shared::PackageVersion)
     {
-        PrintMessage(Localization::MessageUpdateNotNeeded());
+        if (callerOwnsProcess)
+        {
+            PrintMessage(Localization::MessageUpdateNotNeeded());
+        }
         return 0;
     }
 
-    PrintMessage(Localization::MessageUpdatingToVersion(version.c_str()));
+    if (callerOwnsProcess)
+    {
+        PrintMessage(Localization::MessageUpdatingToVersion(version.c_str()));
+    }
 
     const bool msiInstall = wsl::shared::string::EndsWith<wchar_t>(release.name, L".msi");
-    const auto downloadPath = DownloadFile(release.url, release.name);
+    const auto downloadPath = DownloadFile(release.url, release.name, callerOwnsProcess);
     if (msiInstall)
     {
         auto logFile = std::filesystem::temp_directory_path() / L"wsl-install-logs.txt";
         auto clearLogs =
             wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&logFile]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFile(logFile.c_str())); });
 
-        const auto exitCode = UpgradeViaMsi(downloadPath.c_str(), L"", logFile.c_str(), &MsiMessageCallback);
+        const auto exitCode = UpgradeViaMsi(downloadPath.c_str(), L"", logFile.c_str(), callerOwnsProcess ? &MsiMessageCallback : nullptr);
 
         if (exitCode == ERROR_SUCCESS_REBOOT_REQUIRED)
         {
-            PrintSystemError(ERROR_SUCCESS_REBOOT_REQUIRED);
+            if (callerOwnsProcess)
+            {
+                PrintSystemError(ERROR_SUCCESS_REBOOT_REQUIRED);
+            }
         }
         else if (exitCode != 0)
         {
@@ -131,7 +140,7 @@ int UpdatePackageImpl(bool preRelease, bool repair)
 
         THROW_IF_FAILED(result.get().ExtendedErrorCode());
 
-        // Note: If the installation is successful, this process is expected to receive and Ctrl-C and exit
+        // Note: If the installation is successful, this process is expected to receive a Ctrl-C and exit
     }
 
     return 0;
@@ -333,24 +342,34 @@ void wsl::windows::common::install::MsiMessageCallback(INSTALLMESSAGE type, LPCW
     }
 }
 
-int wsl::windows::common::install::UpdatePackage(bool PreRelease, bool Repair)
+int wsl::windows::common::install::UpdatePackage(bool PreRelease, bool Repair, bool CallerOwnsProcess)
 {
-    // Register a console control handler so "^C" is not printed when the app platform terminates the process.
-    THROW_IF_WIN32_BOOL_FALSE(SetConsoleCtrlHandler(
-        [](DWORD ctrlType) {
-            if (ctrlType == CTRL_C_EVENT)
-            {
-                ExitProcess(0);
-            }
-            return FALSE;
-        },
-        TRUE));
+    bool clearHandler = false;
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+        if (clearHandler)
+        {
+            SetConsoleCtrlHandler(nullptr, FALSE);
+        }
+    });
 
-    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [] { SetConsoleCtrlHandler(nullptr, FALSE); });
+    if (CallerOwnsProcess)
+    {
+        // Register a console control handler so "^C" is not printed when the app platform terminates the process.
+        THROW_IF_WIN32_BOOL_FALSE(SetConsoleCtrlHandler(
+            [](DWORD ctrlType) {
+                if (ctrlType == CTRL_C_EVENT)
+                {
+                    ExitProcess(0);
+                }
+                return FALSE;
+            },
+            TRUE));
+        clearHandler = true;
+    }
 
     try
     {
-        return UpdatePackageImpl(PreRelease, Repair);
+        return UpdatePackageImpl(PreRelease, Repair, CallerOwnsProcess);
     }
     catch (...)
     {
@@ -431,16 +450,33 @@ try
 {
     static std::wstring path = wil::GetWindowsDirectoryW<std::wstring>() + L"\\temp\\wsl-install-log.txt";
 
+    WriteInstallLogImpl(path, Content);
+}
+CATCH_LOG();
+
+void wsl::windows::common::install::WriteInstallLogImpl(const std::wstring& Path, const std::string& Content)
+{
     // Wait up to 10 seconds for the log file mutex
     wil::unique_handle mutex{CreateMutex(nullptr, true, L"Global\\WslInstallLog")};
     THROW_LAST_ERROR_IF(!mutex);
 
     THROW_LAST_ERROR_IF(WaitForSingleObject(mutex.get(), 10 * 1000) != WAIT_OBJECT_0);
 
-    wil::unique_handle file{CreateFile(
-        path.c_str(), GENERIC_ALL, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_ALWAYS, 0, nullptr)};
+    wil::unique_hfile file{CreateFileW(
+        Path.c_str(), GENERIC_WRITE | FILE_READ_ATTRIBUTES, FILE_SHARE_READ, nullptr, OPEN_ALWAYS, FILE_FLAG_OPEN_REPARSE_POINT, nullptr)};
 
     THROW_LAST_ERROR_IF(!file);
+
+    BY_HANDLE_FILE_INFORMATION info{};
+    THROW_IF_WIN32_BOOL_FALSE(GetFileInformationByHandle(file.get(), &info));
+
+    THROW_HR_IF_MSG(
+        E_ACCESSDENIED,
+        WI_IsAnyFlagSet(info.dwFileAttributes, FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_DIRECTORY) || info.nNumberOfLinks != 1,
+        "Refusing to write to %ls. Attributes: %u, links: %u",
+        Path.c_str(),
+        info.dwFileAttributes,
+        info.nNumberOfLinks);
 
     LARGE_INTEGER size{};
     THROW_IF_WIN32_BOOL_FALSE(GetFileSizeEx(file.get(), &size));
@@ -461,4 +497,3 @@ try
     DWORD bytesWritten{};
     THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.get(), logLine.c_str(), static_cast<DWORD>(logLine.size()), &bytesWritten, nullptr));
 }
-CATCH_LOG();

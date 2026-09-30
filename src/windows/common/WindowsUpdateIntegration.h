@@ -31,11 +31,8 @@ struct WindowsUpdateContext
     // Create a context using the default class factory and WSL product.
     WindowsUpdateContext();
 
-    // Create a context using the default class factory.
-    WindowsUpdateContext(std::wstring product);
-
     // Create a context using the provided class factory.
-    WindowsUpdateContext(std::unique_ptr<WindowsUpdateClassFactory> factory, std::wstring product);
+    WindowsUpdateContext(std::unique_ptr<WindowsUpdateClassFactory> factory);
 
     NON_COPYABLE(WindowsUpdateContext);
     DEFAULT_MOVABLE(WindowsUpdateContext);
@@ -45,7 +42,8 @@ struct WindowsUpdateContext
 
     // Ensures that the product is registered in with the Windows Update system.
     // This is required to use the system for initial installs.
-    void EnsureProductRegistryEntry() const;
+    // When `reset` is true, always sets the entry to a value that will result in an install.
+    void EnsureProductRegistryEntry(bool reset = false) const;
 
     // Searches for updates for the product.
     // Returns the number of updates found.
@@ -65,11 +63,17 @@ struct WindowsUpdateContext
     static constexpr uint32_t DownloadProgressPercent = 70;
     static constexpr uint32_t InstallProgressPercent = 30;
 
-    // Performs a complete update flow. This is a convenience method to remove the need to call and coordinate the individual actions.
-    // When `forceInstall` is true, `EnsureProductRegistryEntry` is called.
-    // Calls the progress callback, if provided, with the overall update progress estimate.
+    enum class UpdateOptions
+    {
+        None,
+        EnsureProductRegistration,
+        ResetProductRegistration,
+    };
+
+    // Performs a complete update flow. This is a convenience method to remove the need to call and coordinate the individual
+    // actions. Calls the progress callback, if provided, with the overall update progress estimate.
     //  Download and install phases are split according to the values defined above.
-    void RunUpdateFlow(bool forceInstall = false, const std::function<void(uint32_t)>& progress = {});
+    void RunUpdateFlow(UpdateOptions options = UpdateOptions::EnsureProductRegistration, const std::function<void(uint32_t)>& progress = {});
 
 private:
     using ActivityType = TraceLoggingActivity<g_hTraceLoggingProvider, MICROSOFT_KEYWORD_MEASURES>;

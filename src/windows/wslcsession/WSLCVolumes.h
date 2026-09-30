@@ -18,6 +18,7 @@ Abstract:
 #include "WSLCVolumeMetadata.h"
 #include "DockerHTTPClient.h"
 #include "DockerEventTracker.h"
+#include <wslc_schema.h>
 
 namespace wsl::windows::service::wslc {
 
@@ -40,17 +41,26 @@ public:
 
     void DeleteVolume(_In_ LPCSTR Name);
 
-    std::vector<WSLCVolumeInformation> ListVolumes() const;
+    std::vector<wsl::windows::common::wslc_schema::VolumeListEntry> ListVolumes(std::map<std::string, std::vector<std::string>>&& Filters) const;
+
+    struct PruneVolumesResult
+    {
+        std::vector<std::string> Volumes;
+        std::uint64_t SpaceReclaimed{};
+    };
+
+    PruneVolumesResult PruneVolumes(_In_ const std::map<std::string, std::vector<std::string>>& Filters);
+
     std::string InspectVolume(_In_ const std::string& Name) const;
 
-    bool ContainsVolume(_In_ const std::string& Name) const;
+    std::pair<HRESULT, std::string> GetVolumeStatus(_In_ const std::string& Name) const;
 
 private:
     __requires_lock_held(m_lock) void OpenVolumeExclusiveLockHeld(const wsl::windows::common::docker_schema::Volume& vol);
     __requires_lock_held(m_lock) void OpenVolumeExclusiveLockHeld(const std::string& volumeName);
     __requires_lock_held(m_lock) void OnVolumeDeletedExclusiveLockHeld(const std::string& volumeName);
 
-    void OnVolumeEvent(const std::string& volumeName, VolumeEvent event, std::uint64_t eventTime);
+    void OnVolumeEvent(const std::string& volumeName, VolumeEvent event, std::int64_t eventTimeNano);
 
     mutable wil::srwlock m_lock;
     _Guarded_by_(m_lock) std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>> m_volumes;

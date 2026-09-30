@@ -54,7 +54,10 @@ internal static class WinRTActivation
     private static IntPtr GetActivationFactory(string typeName, Guid iid)
     {
         // Convert the type name to HSTRING
-        WindowsCreateString(typeName, (uint)typeName.Length, out var hstring);
+        if (WindowsCreateString(typeName, (uint)typeName.Length, out var hstring) < 0)
+        {
+            return IntPtr.Zero;
+        }
         try
         {
             if (s_getDllFactory(hstring, out var factory) < 0)

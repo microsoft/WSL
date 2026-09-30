@@ -30,6 +30,7 @@ namespace MountTests {
 
 // Disks sometimes take a bit of time to become available when attached back to the host.
 constexpr auto c_diskOpenTimeoutMs = 120000;
+constexpr auto c_testDiskSize = 20 * _1MB;
 
 class SetAutoMountPolicy
 {
@@ -139,7 +140,7 @@ class MountTests
 
         try
         {
-            LxsstuLaunchPowershellAndCaptureOutput(L"New-Vhd -Path " TEST_MOUNT_DISK " -SizeBytes 20MB");
+            LxsstuLaunchPowershellAndCaptureOutput(std::format(L"New-Vhd -Path " TEST_MOUNT_DISK " -SizeBytes {}", c_testDiskSize));
         }
         CATCH_LOG()
 
@@ -156,7 +157,7 @@ class MountTests
         // Create a 20MB vhd for testing mount --vhd
         DeleteFileW(TEST_MOUNT_VHD);
 
-        LxsstuLaunchPowershellAndCaptureOutput(L"New-Vhd -Path " TEST_MOUNT_VHD " -SizeBytes 20MB");
+        LxsstuLaunchPowershellAndCaptureOutput(std::format(L"New-Vhd -Path " TEST_MOUNT_VHD " -SizeBytes {}", c_testDiskSize));
 
         VhdDevice = wsl::windows::common::filesystem::GetFullPath(TEST_MOUNT_VHD);
         LogInfo("Create mount --vhd test vhd as %ls", VhdDevice.c_str());
@@ -303,7 +304,7 @@ class MountTests
 
         // Mount it
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(mountCommand + L" --partition 1"), (DWORD)0);
-        auto disk = GetBlockDeviceInWsl();
+        auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         // Validate that the mount succeeded
@@ -325,7 +326,7 @@ class MountTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(mountCommand + L" --partition 1 --options \"data=ordered\""), (DWORD)0);
 
         // Validate that the mount option was properly passed
-        disk = GetBlockDeviceInWsl();
+        disk = GetBlockDeviceInWsl(c_testDiskSize);
         ValidateMountPoint(disk + L"1", mountTarget, L"data=ordered");
         ValidateDiskState({VhdDevice, {{1, {}, L"data=ordered"}}}, keepAlive);
 
@@ -333,12 +334,36 @@ class MountTests
         WaitForVmTimeout(keepAlive);
 
         // Validate that the disk is re-mounted in the same place
-        disk = GetBlockDeviceInWsl();
+        disk = GetBlockDeviceInWsl(c_testDiskSize);
         ValidateMountPoint(disk + L"1", mountTarget);
 
         // Unmount the disk
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount " + VhdDevice), (DWORD)0);
         WaitForDiskReady();
+    }
+
+    WSL2_TEST_METHOD(SpecifyInvalidMountName)
+    {
+        SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
+
+        FormatDisk({L"ext4"}, true);
+
+        for (const auto* name : {L"\"\"", L".", L"..", L"foo/bar"})
+        {
+            const auto mountCommand = std::format(L"--mount {} --vhd --name {} --partition 1", VhdDevice, name);
+            const auto [output, error] = LxsstuLaunchWslAndCaptureOutput(mountCommand, -1);
+            VERIFY_ARE_EQUAL(
+                output,
+                FormatErrorMessage(
+                    L"The mount name cannot be empty, '.', '..', or contain '/'. Please retry with a valid mount name.",
+                    L"Wsl/Service/MountDisk/WSL_E_VM_MODE_INVALID_MOUNT_NAME"),
+                name);
+            VERIFY_ARE_EQUAL(error, L"", name);
+        }
+
+        const auto disk = GetBlockDeviceInWsl(c_testDiskSize);
+        VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
+        VERIFY_IS_FALSE(GetBlockDeviceMount(disk + L"1").has_value());
     }
 
     // Test ensuring that name collision detection works in --mount --name
@@ -355,7 +380,7 @@ class MountTests
         // Attempt to mount both partitions with the same mount name; partition 2 should fail
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(mountCommand + L" --partition 1"), (DWORD)0);
         VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(mountCommand + L" --partition 2 --type vfat"), (DWORD)0);
-        const auto disk = GetBlockDeviceInWsl();
+        const auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         // Validate that the mount first mount did succeed
@@ -382,7 +407,7 @@ class MountTests
         // Attempt to mount both partitions with the same mount name; partition 2 should fail
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(mountCommandOne + L" --partition 1"), (DWORD)0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(mountCommandTwo + L" --partition 2 --type vfat"), (DWORD)0);
-        const auto disk = GetBlockDeviceInWsl();
+        const auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         // Validate that the mount first mount did succeed
@@ -402,7 +427,7 @@ class MountTests
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " TEST_MOUNT_VHD L" --vhd --bare"), (DWORD)0);
 
-        const auto disk = GetBlockDeviceInWsl();
+        const auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount " TEST_MOUNT_VHD), (DWORD)0);
@@ -414,7 +439,7 @@ class MountTests
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " TEST_MOUNT_VHD L" --vhd --bare"), (DWORD)0);
 
-        const auto disk = GetBlockDeviceInWsl();
+        const auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         // Try unmounting a VHD not created and verify that it was not successful
@@ -426,7 +451,7 @@ class MountTests
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " TEST_MOUNT_VHD L" --vhd --bare"), (DWORD)0);
 
-        const auto disk = GetBlockDeviceInWsl();
+        const auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         const auto absolutePath = std::filesystem::absolute(TEST_MOUNT_VHD);
@@ -446,7 +471,7 @@ class MountTests
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " TEST_MOUNT_VHD L" --vhd --bare"), (DWORD)0);
 
-        const auto disk = GetBlockDeviceInWsl();
+        const auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         WaitForVmTimeout(keepAlive);
@@ -458,6 +483,65 @@ class MountTests
 
         // Validate the unmounting by absolute path is successful
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount " + absolutePath.wstring()), (DWORD)0);
+    }
+
+    // A VHD whose path is a symbolic link is a legitimate, supported scenario: the link is
+    // followed and the real VHD is attached. Access is granted while impersonating the user,
+    // so the user can only ever attach a file they can already reach; there is no need to
+    // reject reparse points in the path.
+    WSL2_TEST_METHOD(MountVhdThroughSymlinkSucceeds)
+    {
+        SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
+
+        const auto symlink = std::filesystem::absolute(L"TestVhdSymlink.vhd");
+        DeleteFileW(symlink.c_str());
+
+        const auto absoluteTarget = std::filesystem::absolute(TEST_MOUNT_VHD);
+
+        // Create a file symbolic link pointing at the real VHD.
+        VERIFY_IS_TRUE(CreateSymbolicLinkW(symlink.c_str(), absoluteTarget.c_str(), SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE));
+
+        auto cleanup = wil::scope_exit([&]() { DeleteFileW(symlink.c_str()); });
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " + symlink.wstring() + L" --vhd --bare"), (DWORD)0);
+
+        const auto disk = GetBlockDeviceInWsl(c_testDiskSize);
+        VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount " + symlink.wstring()), (DWORD)0);
+    }
+
+    // A symlinked VHD must still be restored after the VM is torn down on idle. Restore runs
+    // under the mounting user's identity (the disk-mount state is stored per-SID for the
+    // current boot), so the same access check applies and the symlinked VHD re-attaches.
+    WSL2_TEST_METHOD(MountVhdThroughSymlinkSurvivesVmTimeout)
+    {
+        SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
+
+        const auto symlink = std::filesystem::absolute(L"TestVhdSymlinkRestore.vhd");
+        DeleteFileW(symlink.c_str());
+
+        const auto absoluteTarget = std::filesystem::absolute(TEST_MOUNT_VHD);
+
+        VERIFY_IS_TRUE(CreateSymbolicLinkW(symlink.c_str(), absoluteTarget.c_str(), SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE));
+
+        auto cleanup = wil::scope_exit([&]() { DeleteFileW(symlink.c_str()); });
+
+        WslKeepAlive keepAlive;
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " + symlink.wstring() + L" --vhd --bare"), (DWORD)0);
+
+        auto disk = GetBlockDeviceInWsl(c_testDiskSize);
+        VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
+
+        WaitForVmTimeout(keepAlive);
+
+        // Recreating the VM restores the persisted disk mount; the symlinked VHD must re-attach. The
+        // block device name is not guaranteed to be stable across the VM teardown, so re-query it.
+        disk = GetBlockDeviceInWsl(c_testDiskSize);
+        VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount " + symlink.wstring()), (DWORD)0);
     }
 
     // Attach a disk, but don't mount it
@@ -482,12 +566,12 @@ class MountTests
         ValidateOffline(true);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " + DiskDevice + L" --bare"), (DWORD)0);
 
-        auto disk = GetBlockDeviceInWsl();
+        auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         ValidateDiskState({DiskDevice, {}}, keepAlive);
 
-        disk = GetBlockDeviceInWsl();
+        disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_FALSE(GetBlockDeviceMount(disk).has_value());
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount " + DiskDevice), (DWORD)0);
@@ -528,7 +612,7 @@ class MountTests
         // Mount it
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " + DiskDevice + L" --partition 1" + L" --type vfat"), (DWORD)0);
 
-        const auto disk = GetBlockDeviceInWsl();
+        const auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         // Validate that the mount succeeded
@@ -570,13 +654,13 @@ class MountTests
 
         // Mount it
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " + DiskDevice + L" --partition 1 --type ext4"), (DWORD)0);
-        auto disk = GetBlockDeviceInWsl();
+        auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         ValidateDiskState({DiskDevice, {{1, {L"ext4"}, {}}}}, keepAlive);
 
         // Check that the disk is still mounted properly (ValidateDiskState restarts the VM)
-        disk = GetBlockDeviceInWsl();
+        disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
         std::wstring trimmedDiskName(DiskDevice);
         Trim(trimmedDiskName);
@@ -594,7 +678,7 @@ class MountTests
         keepAlive.Set();
 
         // The disk should be present
-        disk = GetBlockDeviceInWsl();
+        disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         // But not mounted
@@ -641,7 +725,7 @@ class MountTests
         ValidateDiskState({DiskDevice, {{1, {}, {}}, {2, {L"vfat"}, {}}}}, keepAlive);
 
         // Validate that our disk is still mounted
-        const auto disk = GetBlockDeviceInWsl();
+        const auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         // Validate that the mount succeeded
@@ -665,7 +749,7 @@ class MountTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " + DiskDevice + L" --partition 1"), (DWORD)0);
 
         ValidateDiskState({DiskDevice, {{1, {}, {}}}}, keepAlive);
-        auto disk = GetBlockDeviceInWsl();
+        auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         // Let the UVM timeout
@@ -679,7 +763,7 @@ class MountTests
         keepAlive.Set();
 
         // Validate that our disk is still attached
-        disk = GetBlockDeviceInWsl();
+        disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         // Validate that the mount succeeded
@@ -712,7 +796,7 @@ class MountTests
         // Mount it
         ValidateOffline(false);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " + DiskDevice + L" --partition 1"), (DWORD)0);
-        const auto disk = GetBlockDeviceInWsl();
+        const auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
         ValidateOffline(true);
 
@@ -813,7 +897,7 @@ class MountTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " + DiskDevice + L" --partition 1 --type vfat"), (DWORD)0);
 
         // Validate that the file content is correct
-        const auto disk = GetBlockDeviceInWsl();
+        const auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         // Validate that the mount succeeded
@@ -836,7 +920,7 @@ class MountTests
 
         // Mount it
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " + DiskDevice + L" --partition 1 --options sync"), (DWORD)0);
-        auto disk = GetBlockDeviceInWsl();
+        auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         // Validate that the mount succeeded
@@ -855,7 +939,7 @@ class MountTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " + DiskDevice + L" --partition 1 --options data=ordered,sync"), (DWORD)0);
 
         // Validate that the mount option was properly passed
-        disk = GetBlockDeviceInWsl();
+        disk = GetBlockDeviceInWsl(c_testDiskSize);
 
         ValidateMountPoint(disk + L"1", mountTarget, L"ync,relatime,data=ordered");
 
@@ -872,13 +956,20 @@ class MountTests
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
         // Attempt to mount a disk with only a WSL1 distro
         wsl::windows::common::SvcComm service;
+
+        if (std::ranges::any_of(service.EnumerateDistributions(), [](const auto& e) { return e.Version != 1; }))
+        {
+            LogSkipped("Skipping test because a WSL2 distro is present");
+            return;
+        }
+
         VERIFY_ARE_EQUAL(service.AttachDisk(L"Dummy", LXSS_ATTACH_MOUNT_FLAGS_PASS_THROUGH), WSL_E_WSL2_NEEDED);
     }
 
     WSL2_TEST_METHOD(VhdWithSpaces)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
-        LxsstuLaunchPowershellAndCaptureOutput(L"New-Vhd -Path 'vhd with spaces.vhdx' -SizeBytes 20MB");
+        LxsstuLaunchPowershellAndCaptureOutput(std::format(L"New-Vhd -Path 'vhd with spaces.vhdx' -SizeBytes {}", c_testDiskSize));
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
             WslShutdown();
@@ -893,7 +984,7 @@ class MountTests
 
         // Validate that relative path mounting and unmounting works
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount \"vhd with spaces.vhdx\" --bare --vhd"), (DWORD)0);
-        auto disk = GetBlockDeviceInWsl();
+        auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount \"vhd with spaces.vhdx\""), (DWORD)0);
@@ -901,7 +992,7 @@ class MountTests
         // Validate that absolute path mounting and unmounting works
         const std::wstring fullPath = wsl::windows::common::filesystem::GetFullPath(L"vhd with spaces.vhdx");
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount \"" + fullPath + L"\" --bare --vhd"), (DWORD)0);
-        disk = GetBlockDeviceInWsl();
+        disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount \"" + fullPath + L"\""), (DWORD)0);
@@ -934,49 +1025,6 @@ class MountTests
     {
         const auto disk = wsl::windows::common::disk::OpenDevice(DiskDevice.c_str(), FILE_READ_ATTRIBUTES, c_diskOpenTimeoutMs);
         VERIFY_ARE_EQUAL(!offline, wsl::windows::common::disk::IsDiskOnline(disk.get()));
-    }
-
-    static std::wstring GetBlockDeviceInWsl()
-    {
-        // Wait for the disk to be attached
-        const auto timeout = std::chrono::steady_clock::now() + std::chrono::seconds(30);
-
-        bool done = false;
-        while (true)
-        {
-            for (wchar_t name = 'a'; name < 'z'; name++)
-            {
-                std::wstring cmd = L"-u root blockdev --getsize64 /dev/sd";
-                cmd += name;
-
-                std::wstring out;
-                try
-                {
-                    out = LxsstuLaunchWslAndCaptureOutput(cmd.data()).first;
-                }
-                CATCH_LOG()
-
-                Trim(out);
-
-                // Disk size is 20MB, so 20 * 1024 * 1024 bytes
-                if (out == L"20971520")
-                {
-                    return std::wstring(L"/dev/sd") + name;
-                }
-            }
-
-            if (done)
-            {
-                break;
-            }
-
-            done = std::chrono::steady_clock::now() > timeout;
-        }
-
-        VERIFY_FAIL(L"Failed to find the block device in WSL");
-
-        // Unreachable.
-        return {};
     }
 
     static bool IsBlockDevicePresent(const std::wstring& Device)
@@ -1098,7 +1146,7 @@ class MountTests
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " + deviceName + L" --bare"), (DWORD)0);
         }
 
-        const auto disk = GetBlockDeviceInWsl();
+        const auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         // Create a partition table
@@ -1188,7 +1236,7 @@ class MountTests
             ValidateOffline(true);
         }
 
-        const auto disk = GetBlockDeviceInWsl();
+        const auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         VERIFY_IS_FALSE(GetBlockDeviceMount(disk).has_value());
@@ -1215,7 +1263,7 @@ class MountTests
 
         // Mount it
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(mountCommand + L" --partition 1"), (DWORD)0);
-        auto disk = GetBlockDeviceInWsl();
+        auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         // Validate that the mount succeeded
@@ -1243,7 +1291,7 @@ class MountTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(mountCommand + L" --partition 1 --options \"data=ordered\""), (DWORD)0);
 
         // Validate that the mount option was properly passed
-        disk = GetBlockDeviceInWsl();
+        disk = GetBlockDeviceInWsl(c_testDiskSize);
         ValidateMountPoint(disk + L"1", mountTarget, L"data=ordered");
         ValidateDiskState({deviceName, {{1, {}, L"data=ordered"}}}, keepAlive);
 
@@ -1270,7 +1318,7 @@ class MountTests
         // Mount then both
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(mountCommand + L" --partition 1"), (DWORD)0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(mountCommand + L" --partition 2 --type vfat"), (DWORD)0);
-        const auto disk = GetBlockDeviceInWsl();
+        const auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         // Validate that the mount succeeded
@@ -1307,7 +1355,7 @@ class MountTests
         ValidateDiskState({deviceName, {{1, {}, {}}}}, keepAlive);
 
         // Validate that our disk is still mounted
-        const auto disk = GetBlockDeviceInWsl();
+        const auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         // Validate that the mount succeeded
@@ -1329,7 +1377,7 @@ class MountTests
 
         // Format the volume as ext4
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(mountCommand + L" --bare"), (DWORD)0);
-        const auto disk = GetBlockDeviceInWsl();
+        const auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkfs.ext4 -F " + disk), (DWORD)0);
 
@@ -1365,7 +1413,7 @@ class MountTests
 
         // Mount it
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(mountCommand + L" --partition 1 --type ext4"), (DWORD)0);
-        const auto disk = GetBlockDeviceInWsl();
+        const auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         ValidateDiskState({deviceName, {{1, {L"ext4"}, {}}}}, keepAlive);
@@ -1393,7 +1441,7 @@ class MountTests
 
         // Format the volume as fat
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(mountCommand + L" --bare"), (DWORD)0);
-        const auto disk = GetBlockDeviceInWsl();
+        const auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkfs.fat --mbr=no -I " + disk), (DWORD)0);
 
@@ -1430,7 +1478,7 @@ class MountTests
         // Mount then both (filesystems should be detected).
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(mountCommand + L" --partition 1"), (DWORD)0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(mountCommand + L" --partition 2"), (DWORD)0);
-        const auto disk = GetBlockDeviceInWsl();
+        const auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         // Validate that the mount succeeded
@@ -1460,7 +1508,7 @@ class MountTests
 
         // Write zeroes in the disk
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(mountCommand + L" --bare"), (DWORD)0);
-        const auto disk = GetBlockDeviceInWsl();
+        const auto disk = GetBlockDeviceInWsl(c_testDiskSize);
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"dd bs=4M count=1 if=/dev/zero of=" + disk), (DWORD)0);
 

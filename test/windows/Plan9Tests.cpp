@@ -445,7 +445,7 @@ class Plan9Tests
         // Create a user for this test
         CreateUser(L"plan9testuser", &Uid, &Gid);
 
-        // Create a folder that's unaccessible to plan9testuser
+        // Create a folder that's inaccessible to plan9testuser
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(L"mkdir -p /tmp/plan9-group-test && groupadd -f plan9testgroup && chown root:plan9testgroup "
                             L"/tmp/plan9-group-test && "

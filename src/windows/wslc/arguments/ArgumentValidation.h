@@ -16,7 +16,11 @@ Abstract:
 #include "Exceptions.h"
 #include "ContainerModel.h"
 #include "InspectModel.h"
+#include "ArgumentConvertedTypes.h"
+#include "SpecParsing.h"
 #include <string>
+#include <string_view>
+#include <tuple>
 #include <vector>
 #include <charconv>
 #include <wslc.h>
@@ -60,17 +64,18 @@ T GetIntegerFromString(
 }
 
 void ValidateWSLCSignalFromString(const std::vector<std::wstring>& values, const std::wstring& argName);
-WSLCSignal GetWSLCSignalFromString(const std::wstring& input, const std::wstring& argName = {});
 
 void ValidateMemorySize(const std::vector<std::wstring>& values, const std::wstring& argName);
-ULONGLONG GetMemorySizeFromString(const std::wstring& input, const std::wstring& argName = {});
+
+void ValidateDuration(const std::vector<std::wstring>& values, const std::wstring& argName);
+
+void ValidateTimestamp(const std::vector<std::wstring>& values, const std::wstring& argName);
+void ValidateNanoCpus(const std::vector<std::wstring>& values, const std::wstring& argName);
+
+void ValidateUlimit(const std::vector<std::wstring>& values, const std::wstring& argName);
 
 void ValidateFormatTypeFromString(const std::vector<std::wstring>& values, const std::wstring& argName);
-FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring& argName = {});
-
-InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName);
 
 void ValidateGpus(const std::vector<std::wstring>& values, const std::wstring& argName);
-void ValidateVolumeMount(const std::vector<std::wstring>& values);
 
 } // namespace wsl::windows::wslc::validation

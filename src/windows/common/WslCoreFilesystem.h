@@ -37,6 +37,8 @@ void CreateVhd(_In_ LPCWSTR target, _In_ ULONGLONG maximumSize, _In_ PSID userSi
 
 wil::unique_handle OpenVhd(_In_ LPCWSTR Path, _In_ VIRTUAL_DISK_ACCESS_MASK Mask);
 
+void CompactVhd(_In_ LPCWSTR Path);
+
 void ResizeExistingVhd(_In_ HANDLE diskHandle, _In_ ULONGLONG maximumSize, _In_ RESIZE_VIRTUAL_DISK_FLAG resizeFlag);
 
 ULONGLONG GetDiskSize(_In_ HANDLE diskHandle);
