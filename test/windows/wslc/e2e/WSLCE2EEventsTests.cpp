@@ -304,10 +304,12 @@ class WSLCE2EEventsTests
         // Network removal doesn't wait for its event to be recorded, so retry until the whole lifecycle is visible.
         std::vector<nlohmann::json> events;
         const auto queryEvents = [&]() {
+            const auto until = EpochSeconds() + 1;
             const auto query = RunWslc(std::format(
-                L"events --since {} --until {} --filter type=network --filter network={} --format json",
+                L"events --since {} --until {} --filter type=network "
+                L"--filter network={} --format json",
                 since,
-                EpochSeconds() + 1,
+                until,
                 networkName));
             THROW_HR_IF(E_FAIL, query.ExitCode != 0u);
 
