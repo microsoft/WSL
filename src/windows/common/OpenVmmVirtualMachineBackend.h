@@ -43,7 +43,6 @@ public:
     void Terminate() override;
 
     VmGuestListener CreateGuestListener(GuestServicePort Port) override;
-    wil::unique_socket AcceptGuestConnection(VmListenerId Listener) override;
     wil::unique_socket ConnectGuest(GuestServicePort Port) override;
     void CloseGuestListener(VmListenerId Listener) override;
 

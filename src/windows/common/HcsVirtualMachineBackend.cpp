@@ -123,8 +123,6 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
     auto signalEarlyTermination = wil::scope_exit([&] { m_terminatingEvent.SetEvent(); });
 
     THROW_HR_IF(E_INVALIDARG, IsEqualGUID(Request.Identity.VmId, GUID_NULL));
-    m_restrictedToken = wsl::windows::common::security::CreateRestrictedToken(Request.Identity.UserToken.get());
-
     VmConfiguration configuration{};
     configuration.Settings.Owner = Request.Owner;
     configuration.Settings.ShouldTerminateOnLastHandleClosed = true;
@@ -243,36 +241,14 @@ VmPlatformCapabilities HcsVirtualMachineBackend::QueryCapabilities()
 {
     VmPlatformCapabilities capabilities{};
     capabilities.Backend = BackendKind::Hcs;
-    for (const auto operation :
-         {VmOperation::Create,
-          VmOperation::Start,
-          VmOperation::Terminate,
-          VmOperation::CreateGuestListener,
-          VmOperation::AcceptGuestConnection,
-          VmOperation::ConnectGuest,
-          VmOperation::CloseGuestListener,
-          VmOperation::AttachDisk,
-          VmOperation::DetachDisk})
-    {
-        capabilities.Operations.set(static_cast<size_t>(operation));
-    }
-
     for (const auto feature :
-         {VmFeature::LinuxFirmwareBoot, VmFeature::MemoryOvercommit, VmFeature::DeferredMemoryCommit, VmFeature::ColdDiscard, VmFeature::Vhd, VmFeature::Vhdx, VmFeature::PhysicalDisk})
+         {VmFeature::NestedVirtualization, VmFeature::DeferredMemoryCommit, VmFeature::ColdDiscard, VmFeature::PhysicalDisk})
     {
         capabilities.Features.set(static_cast<size_t>(feature));
     }
 
-    if constexpr (!wsl::shared::Arm64)
-    {
-        capabilities.Features.set(static_cast<size_t>(VmFeature::LinuxDirectBoot));
-    }
-
-    if (schema::IsNestedVirtualizationSupported())
-    {
-        capabilities.Features.set(static_cast<size_t>(VmFeature::NestedVirtualization));
-    }
-
+    capabilities.Features.set(
+        static_cast<size_t>(VmFeature::NestedVirtualization), schema::IsNestedVirtualizationSupported());
     const auto [perfmonPmuSupported, perfmonLbrSupported] = schema::GetPerfmonCapabilities();
     capabilities.Features.set(static_cast<size_t>(VmFeature::PerfmonPmu), perfmonPmuSupported);
     capabilities.Features.set(static_cast<size_t>(VmFeature::PerfmonLbr), perfmonLbrSupported);
@@ -335,11 +311,6 @@ VmGuestListener HcsVirtualMachineBackend::CreateGuestListener(GuestServicePort P
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
     return RegisterGuestListenerLocked(m_configuration.Description.Identity, Port);
-}
-
-wil::unique_socket HcsVirtualMachineBackend::AcceptGuestConnection(VmListenerId Listener)
-{
-    return AcceptGuestListenerConnection(Listener, m_configuration.Description.Identity);
 }
 
 wil::unique_socket HcsVirtualMachineBackend::ConnectGuest(GuestServicePort Port)
@@ -515,7 +486,7 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
         {
             // Grant the VM access to the disk.
             schema::GrantVmWorkerProcessAccessToDisk(
-                m_vmIdString.c_str(), path.c_str(), m_configuration.Description.Identity.UserToken.get());
+                m_vmIdString.c_str(), path.c_str(), Request.UserToken.get());
             WI_SetFlag(diskFlags, wsl::windows::common::disk::DiskStateFlags::AccessGranted);
 
             // Set the disk offline if needed.

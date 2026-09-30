@@ -43,6 +43,8 @@ struct VmInstanceId
     wil::shared_handle UserToken{};
 };
 
+struct VmGuestListenerState;
+
 template <typename Tag>
 struct VmResourceId
 {
@@ -84,82 +86,30 @@ struct VmRequestedValue
 
 enum class VmFeature
 {
-    LinuxDirectBoot,
-    LinuxFirmwareBoot,
     NestedVirtualization,
     PerfmonPmu,
     PerfmonLbr,
-    SmallPageMemory,
-    MemoryOvercommit,
     DeferredMemoryCommit,
     ColdDiscard,
+    PhysicalDisk,
     SerialConsole,
     VirtioConsole,
-    Vhd,
-    Vhdx,
-    PhysicalDisk,
-    PersistentMemory,
-    Plan9Socket,
-    Plan9Virtio,
     VirtioFsFileBacked,
-    VirtioFsAggregate,
-    SectionBackedSharedMemory,
-    MirroredGpu,
-    GpuVendorExtension,
-    GpuDisableGdiAcceleration,
-    GpuDisablePresentation,
     SavedStateOnCrash,
-    GuestDmaWindow,
-    HostEndpointNetwork,
     UserModeNatNetwork,
     TcpPortBinding,
     UdpPortBinding,
     Ipv6PortBinding,
     ScopedIpv6PortBinding,
-    DynamicHostPort,
-    VirtualHostAddress,
-    StaticDnsARecord,
     Count
 };
 
-static_assert(static_cast<size_t>(VmFeature::Count) == 35);
-
-enum class VmOperation
-{
-    Create,
-    Start,
-    Terminate,
-    CreateGuestListener,
-    AcceptGuestConnection,
-    ConnectGuest,
-    CloseGuestListener,
-    AttachDisk,
-    DetachDisk,
-    AddPersistentMemory,
-    CreateFileSystemDevice,
-    AddFileSystemShare,
-    RemoveFileSystemShare,
-    GetFileSystemDeviceStatus,
-    AddGpu,
-    AddSharedMemory,
-    ConfigureGuestDma,
-    RemoveDevice,
-    AddNetworkAdapter,
-    UpdateNetworkAdapter,
-    BindPort,
-    UnbindPort,
-    CreateVirtualAddress,
-    CreateDnsRecord,
-    Count
-};
-
-static_assert(static_cast<size_t>(VmOperation::Count) == 24);
+static_assert(static_cast<size_t>(VmFeature::Count) == 15);
 
 struct VmPlatformCapabilities
 {
     BackendKind Backend;
     std::bitset<static_cast<size_t>(VmFeature::Count)> Features;
-    std::bitset<static_cast<size_t>(VmOperation::Count)> Operations;
 };
 
 enum class VmState
@@ -179,6 +129,9 @@ struct VmGuestListener
 {
     VmListenerId Id;
     GuestServicePort Port;
+    std::shared_ptr<VmGuestListenerState> State;
+
+    wil::unique_socket Accept() const;
 };
 
 struct VmGuestListenerState
@@ -295,6 +248,7 @@ struct VmDiskRequest
     bool UserDisk = false;
     // Timeout applied to host disk state changes and to retries when attaching a physical disk.
     std::chrono::milliseconds DeviceTimeout{5000};
+    wil::shared_handle UserToken{};
 };
 
 struct VmBootDiskRequest
@@ -519,7 +473,6 @@ public:
     void RegisterTerminationCallback(TerminationCallback Callback);
 
     virtual VmGuestListener CreateGuestListener(GuestServicePort Port) = 0;
-    virtual wil::unique_socket AcceptGuestConnection(VmListenerId Listener) = 0;
     virtual wil::unique_socket ConnectGuest(GuestServicePort Port) = 0;
     virtual void CloseGuestListener(VmListenerId Listener) = 0;
 
@@ -542,7 +495,6 @@ protected:
     // These helpers require m_lock to be held exclusively. ConfigureGuestListener runs while
     // m_lock is held and must not re-enter another listener helper.
     VmGuestListener RegisterGuestListenerLocked(const VmInstanceId& Identity, GuestServicePort Port);
-    wil::unique_socket AcceptGuestListenerConnection(VmListenerId Listener, const VmInstanceId& Identity) const;
     std::shared_ptr<VmGuestListenerState> RemoveGuestListenerLocked(VmListenerId Listener, const VmInstanceId& Identity);
     void CloseGuestListenersLocked(const VmInstanceId& Identity) noexcept;
     void NotifyTerminated(const VmInstanceId& Identity) noexcept;

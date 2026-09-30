@@ -411,35 +411,9 @@ VmPlatformCapabilities OpenVmmVirtualMachineBackend::QueryCapabilities()
 {
     VmPlatformCapabilities capabilities;
     capabilities.Backend = BackendKind::OpenVmm;
-    // Report known OpenVMM support independently of which backend methods are wired through the C ABI.
-    for (const auto operation :
-         {VmOperation::Create,
-          VmOperation::Start,
-          VmOperation::Terminate,
-          VmOperation::CreateGuestListener,
-          VmOperation::AcceptGuestConnection,
-          VmOperation::ConnectGuest,
-          VmOperation::CloseGuestListener,
-          VmOperation::AttachDisk,
-          VmOperation::DetachDisk,
-          VmOperation::CreateFileSystemDevice,
-          VmOperation::AddFileSystemShare,
-          VmOperation::RemoveFileSystemShare,
-          VmOperation::RemoveDevice,
-          VmOperation::UpdateNetworkAdapter,
-          VmOperation::BindPort,
-          VmOperation::UnbindPort})
-    {
-        capabilities.Operations.set(static_cast<size_t>(operation));
-    }
     for (const auto feature :
-         {VmFeature::LinuxDirectBoot,
-          VmFeature::LinuxFirmwareBoot,
-          VmFeature::MemoryOvercommit,
-          VmFeature::SerialConsole,
+            {VmFeature::SerialConsole,
           VmFeature::VirtioConsole,
-          VmFeature::Vhd,
-          VmFeature::Vhdx,
           VmFeature::VirtioFsFileBacked,
           VmFeature::SavedStateOnCrash,
           VmFeature::UserModeNatNetwork,
@@ -574,11 +548,6 @@ VmGuestListener OpenVmmVirtualMachineBackend::CreateGuestListener(GuestServicePo
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
     return RegisterGuestListenerLocked(m_description.Identity, Port);
-}
-
-wil::unique_socket OpenVmmVirtualMachineBackend::AcceptGuestConnection(VmListenerId Listener)
-{
-    return AcceptGuestListenerConnection(Listener, m_description.Identity);
 }
 
 wil::unique_socket OpenVmmVirtualMachineBackend::ConnectGuest(GuestServicePort Port)

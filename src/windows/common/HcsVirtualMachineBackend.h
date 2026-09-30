@@ -32,7 +32,6 @@ public:
     void Terminate() override;
 
     VmGuestListener CreateGuestListener(GuestServicePort Port) override;
-    wil::unique_socket AcceptGuestConnection(VmListenerId Listener) override;
     wil::unique_socket ConnectGuest(GuestServicePort Port) override;
     void CloseGuestListener(VmListenerId Listener) override;
 
@@ -97,5 +96,4 @@ private:
     _Guarded_by_(m_lock) wsl::windows::common::hcs::unique_hcs_system m_system;
     _Guarded_by_(m_lock) std::map<std::uint64_t, AttachedDisk> m_attachedDisks;
     _Guarded_by_(m_lock) std::uint64_t m_nextDiskId = 1;
-    wil::unique_handle m_restrictedToken;
 };

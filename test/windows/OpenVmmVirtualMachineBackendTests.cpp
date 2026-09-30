@@ -290,38 +290,10 @@ class OpenVmmVirtualMachineBackendTests
         const auto capabilities = OpenVmmVirtualMachineBackend::QueryCapabilities();
         VERIFY_ARE_EQUAL(BackendKind::OpenVmm, capabilities.Backend);
 
-        decltype(capabilities.Operations) expectedOperations;
-        for (const auto operation :
-             {VmOperation::Create,
-              VmOperation::Start,
-              VmOperation::Terminate,
-              VmOperation::CreateGuestListener,
-              VmOperation::AcceptGuestConnection,
-              VmOperation::ConnectGuest,
-              VmOperation::CloseGuestListener,
-              VmOperation::AttachDisk,
-              VmOperation::DetachDisk,
-              VmOperation::CreateFileSystemDevice,
-              VmOperation::AddFileSystemShare,
-              VmOperation::RemoveFileSystemShare,
-              VmOperation::RemoveDevice,
-              VmOperation::UpdateNetworkAdapter,
-              VmOperation::BindPort,
-              VmOperation::UnbindPort})
-        {
-            expectedOperations.set(static_cast<size_t>(operation));
-        }
-        VERIFY_IS_TRUE(capabilities.Operations == expectedOperations);
-
         decltype(capabilities.Features) expectedFeatures;
         for (const auto feature :
-             {VmFeature::LinuxDirectBoot,
-              VmFeature::LinuxFirmwareBoot,
-              VmFeature::MemoryOvercommit,
-              VmFeature::SerialConsole,
+               {VmFeature::SerialConsole,
               VmFeature::VirtioConsole,
-              VmFeature::Vhd,
-              VmFeature::Vhdx,
               VmFeature::VirtioFsFileBacked,
               VmFeature::SavedStateOnCrash,
               VmFeature::UserModeNatNetwork,
