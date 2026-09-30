@@ -2481,6 +2481,13 @@ bool IsHyperVFirewallSupported() noexcept
     return true;
 }
 
+bool IsMirroredNetworkingSupported()
+{
+    // Windows Server can expose the Hyper-V firewall APIs without supporting mirrored networking.
+    return !IsWindowsServer() && wsl::windows::common::helpers::IsWindows11OrAbove() &&
+           AreExperimentalNetworkingFeaturesSupported() && IsHyperVFirewallSupported();
+}
+
 std::optional<GUID> GetDistributionId(LPCWSTR Name)
 {
     // Get the GUID of the test distro

@@ -75,6 +75,8 @@ Available skip macros:
 - `WINDOWS_11_TEST_ONLY()` — skip on pre-Windows 11
 - `WSL_TEST_VERSION_REQUIRED(version)` — skip if WSL version too old
 
+Use `IsMirroredNetworkingSupported()` for tests that require mirrored networking; Hyper-V firewall API availability alone is insufficient on Windows Server. Check support before configuring mirrored networking in class setup, not only in test methods. Gate only the mirrored portion of tests that also cover other networking modes.
+
 ### RAII Test Helpers
 - `WslKeepAlive` — prevents UVM timeout during long-running tests; create at test start
 - `WslConfigChange` — RAII wrapper that applies a temporary `.wslconfig` and restores the original on destruction:

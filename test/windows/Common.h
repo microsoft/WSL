@@ -610,6 +610,8 @@ bool AreExperimentalNetworkingFeaturesSupported();
 
 bool IsHyperVFirewallSupported() noexcept;
 
+bool IsMirroredNetworkingSupported();
+
 bool WslShutdown();
 
 void TerminateDistribution(LPCWSTR DistributionName = LXSS_DISTRO_NAME_TEST_L);

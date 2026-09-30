@@ -72,8 +72,7 @@ bool TryLoadWinhttpProxyMethods() noexcept
 
 #define MIRRORED_NETWORKING_TEST_ONLY() \
     { \
-        WINDOWS_11_TEST_ONLY(); \
-        if (!AreExperimentalNetworkingFeaturesSupported() || !IsHyperVFirewallSupported() && !IsWindowsServer()) \
+        if (!IsMirroredNetworkingSupported()) \
         { \
             LogSkipped("Mirrored networking not supported on this OS. Skipping test.."); \
             return; \
@@ -2004,6 +2003,11 @@ class NetworkTests
         {
             LogSkipped("Bridged networking requires the Default Switch. Skipping test...");
             return;
+        }
+
+        if (networkingMode == wsl::core::NetworkingMode::Mirrored)
+        {
+            MIRRORED_NETWORKING_TEST_ONLY();
         }
 
         LogInfo("HostToGuestLoopback (networkingMode=%hs)", ToString(networkingMode));
@@ -4213,6 +4217,12 @@ class MirroredTests
     TEST_CLASS_SETUP(TestClassSetup)
     {
         VERIFY_ARE_EQUAL(LxsstuInitialize(false), TRUE);
+
+        if (LxsstuVmMode() && !IsMirroredNetworkingSupported())
+        {
+            LogSkipped("Mirrored networking not supported on this OS. Skipping test class...");
+            return true;
+        }
 
         // Build the Linux unit tests used by the port tracking tests.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(LXSST_TESTS_INSTALL_COMMAND_LINE), (DWORD)0);
