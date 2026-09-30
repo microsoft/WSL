@@ -9,6 +9,16 @@ class HcsSchemaUnitTests
 {
     WSL_TEST_CLASS(HcsSchemaUnitTests)
 
+    // Verify that the optional NUMA field remains absent for unsupported Windows versions.
+    TEST_METHOD(TopologyWithoutNumaOmitsNumaObject)
+    {
+        const wsl::windows::common::hcs::Topology topology{};
+
+        const auto json = nlohmann::json(topology);
+
+        VERIFY_IS_FALSE(json.contains("Numa"));
+    }
+
     // Verify that enabling automatic vNUMA emits the empty object HCS uses to derive the topology.
     TEST_METHOD(TopologyWithAutomaticNumaSerializesNumaObject)
     {
