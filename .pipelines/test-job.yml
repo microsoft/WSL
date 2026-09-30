@@ -17,7 +17,7 @@ parameters:
 
 jobs:
   - job: test_${{ parameters.branch }}_${{ parameters.version }}
-    displayName: "${{ parameters.version }} tests - ${{ parameters.branch }}"
+    displayName: "${{ parameters.version }} tests - ${{ parameters.branch }}${{ iif(eq(parameters.branch, 'ge_release'), ' (server)', '') }}"
     dependsOn: []
     condition: and(succeeded(), eq('${{ parameters.run }}', true))
     variables:
@@ -34,7 +34,7 @@ jobs:
     steps:
       - task: CloudTestServerBuildTask@2
         inputs:
-          DisplayName: "${{ parameters.version }} tests - ${{ parameters.branch }}"
+          DisplayName: "${{ parameters.version }} tests - ${{ parameters.branch }}${{ iif(eq(parameters.branch, 'ge_release'), ' (server)', '') }}"
           connectedServiceName: "CloudTest-PROD"
           cloudTestTenant: "wsl"
           testMapLocation: 'testbin\x64\cloudtest\wsl-test-image-${{ parameters.image }}-${{ parameters.version}}\TestMap.xml'
