@@ -3142,7 +3142,7 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(WSLCContainerSt
 
     m_state = State;
     m_stateGeneration++;
-    m_stateChangedAt = TimeNano / 1'000'000'000;
+    m_stateChangedAt = std::chrono::floor<std::chrono::seconds>(std::chrono::nanoseconds{TimeNano}).count();
 
     RecordEvent(WSLCStateToEventAction(State), TimeNano, ExitCode);
 
