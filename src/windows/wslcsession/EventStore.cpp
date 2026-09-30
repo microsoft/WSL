@@ -24,6 +24,11 @@ namespace {
         return std::min(std::chrono::sys_seconds{std::chrono::seconds{TimeSeconds}}, c_maxBound);
     }
 
+    std::chrono::sys_seconds EventTime(const wsl::windows::common::wslc_schema::Event& Event)
+    {
+        return std::chrono::sys_seconds{std::chrono::floor<std::chrono::seconds>(std::chrono::nanoseconds{Event.timeNano})};
+    }
+
 } // namespace
 
 void EventStore::Append(wsl::windows::common::wslc_schema::Event Event)
@@ -33,7 +38,7 @@ void EventStore::Append(wsl::windows::common::wslc_schema::Event Event)
     // Events are recorded in Docker's delivery order, which is also timestamp order to the second. Subscribers rely on
     // this: they resume from a sequence number, so an out-of-order event could never be inserted where it
     // belongs without hiding it from readers that already moved past that point.
-    WI_ASSERT(m_events.empty() || m_events.back().timeNano / 1'000'000'000 <= Event.timeNano / 1'000'000'000);
+    WI_ASSERT(m_events.empty() || EventTime(m_events.back()) <= EventTime(Event));
 
     m_events.push_back(std::move(Event));
 
@@ -255,7 +260,7 @@ std::optional<wsl::windows::common::wslc_schema::Event> EventStore::Get(
         const auto event = GetLockHeld(SequenceNumber.value()).value();
 
         // Compared in seconds, since converting a far-future Since or Until bound to nanoseconds would overflow.
-        const std::chrono::sys_seconds eventTime{std::chrono::floor<std::chrono::seconds>(std::chrono::nanoseconds{event.timeNano})};
+        const auto eventTime = EventTime(event);
 
         // Advance in delivery order before applying the time window.
         SequenceNumber.value()++;

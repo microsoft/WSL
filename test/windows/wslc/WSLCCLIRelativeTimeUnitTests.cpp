@@ -142,6 +142,14 @@ class WSLCCLIRelativeTimeUnitTests
             EpochToRfc3339Nano(c_seconds * 1'000'000'000 + 123456789, -std::chrono::hours{7}));
         VERIFY_ARE_EQUAL(std::string{"2023-11-14T22:13:20.100758600Z"}, EpochToRfc3339Nano(c_seconds * 1'000'000'000 + 100758600, utc));
         VERIFY_ARE_EQUAL(std::string{"2023-11-14T22:13:20.000000000Z"}, EpochToRfc3339Nano(c_seconds * 1'000'000'000, utc));
+
+        // Applying an offset at either limit of a nanosecond timestamp must not overflow.
+        VERIFY_ARE_EQUAL(
+            std::string{"2262-04-12T13:47:16.854775807+14:00"},
+            EpochToRfc3339Nano(std::numeric_limits<std::int64_t>::max(), std::chrono::hours{14}));
+        VERIFY_ARE_EQUAL(
+            std::string{"1677-09-20T12:12:43.145224192-12:00"},
+            EpochToRfc3339Nano(std::numeric_limits<std::int64_t>::min(), -std::chrono::hours{12}));
     }
 };
 
