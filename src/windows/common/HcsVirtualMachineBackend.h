@@ -26,6 +26,13 @@ public:
     static std::unique_ptr<HcsVirtualMachineBackend> Create(const VmCreateRequest& Request);
     static VmPlatformCapabilities QueryCapabilities();
 
+    // N.B. Transitional escape hatches for WSL networking implementations that still operate
+    // directly on HCS and GuestDeviceManager. The returned HCS handle is valid only while this
+    // backend remains alive and has not been terminated. New backend-independent code must use
+    // IVirtualMachineBackend instead.
+    HCS_SYSTEM GetComputeSystemHandle() const;
+    std::shared_ptr<GuestDeviceManager> GetGuestDeviceManager() const;
+
     VmPlatformCapabilities GetCapabilities() const override;
     VmDescription GetDescription() const override;
     VmState GetState() const override;
@@ -61,12 +68,6 @@ public:
     void CreateDnsRecord(VmDeviceId Device, const VmDnsRecord& Record) override;
 
 private:
-    struct VmConfiguration
-    {
-        VmDescription Description;
-        wsl::windows::common::hcs::ComputeSystem Settings;
-    };
-
     struct AttachedDisk
     {
         VmDiskAttachment Attachment;
@@ -77,6 +78,16 @@ private:
         // Timeout applied when the host disk state changes performed to attach the disk are undone.
         std::chrono::milliseconds DeviceTimeout{wsl::windows::common::disk::c_defaultDiskTimeoutMs};
         wil::unique_hfile BackingFile;
+    };
+
+    struct VmConfiguration
+    {
+        VmDescription Description;
+        wsl::windows::common::hcs::ComputeSystem Settings;
+        // Disks attached as part of the compute system settings, tracked so that the host state
+        // changes made to attach them are undone when the VM goes away.
+        std::map<std::uint64_t, AttachedDisk> BootDisks;
+        std::uint64_t NextDiskId = 1;
     };
 
     struct FileSystemDevice

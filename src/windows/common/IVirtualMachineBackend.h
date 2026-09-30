@@ -263,6 +263,9 @@ struct VmDiskRequest
     std::variant<VmVirtualDiskSource, VmPhysicalDiskSource> Source;
     bool ReadOnly = true;
     std::optional<VmScsiPlacement> Placement;
+    // Token whose identity is used to grant access to the disk. The VM identity token is used when
+    // this is unset.
+    wil::shared_handle UserToken{};
     // Set for disks that the user explicitly attached (for instance via 'wsl --mount'), as opposed
     // to disks that WSL attaches on the user's behalf.
     bool UserDisk = false;
@@ -275,6 +278,9 @@ struct VmBootDiskRequest
 {
     VmBootResourceKey Key;
     VmDiskRequest Disk;
+    // Set for disks whose path the user supplied, which the VM identity may not be able to reach yet.
+    // Inbox disks are left alone so that their ACL does not grow on every boot.
+    bool GrantHostAccess = false;
 };
 
 struct VmDiskAttachment
@@ -368,6 +374,7 @@ struct VmCreateRequest
 {
     VmInstanceId Identity;
     std::wstring Owner;
+    bool EnableTelemetry = true;
     VmProcessorRequest Processor;
     VmMemoryRequest Memory;
     VmMmioRequest Mmio;
@@ -703,6 +710,13 @@ protected:
     std::shared_ptr<VmGuestListenerState> RemoveGuestListenerLocked(VmListenerId Listener, const VmInstanceId& Identity);
     void CloseGuestListenersLocked(const VmInstanceId& Identity) noexcept;
     void NotifyTerminated(const VmInstanceId& Identity) noexcept;
+
+    /// <summary>
+    /// Cancels pending accepts without dropping the listeners. Backends call this when the VM exits
+    /// without a termination request, so that callers blocked on the guest do not wait forever.
+    /// </summary>
+    /// <remarks>Acquires m_lock, so it must not be called while the lock is held.</remarks>
+    void CancelGuestListeners() noexcept;
 
 private:
     virtual std::shared_ptr<VmGuestListenerState> ConfigureGuestListener(const VmGuestListener& Listener) = 0;

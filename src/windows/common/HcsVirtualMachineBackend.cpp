@@ -178,6 +178,47 @@ VmEffectiveMemory ConfigureMemory(const VmMemoryRequest& Request, const VmMmioRe
     return memory;
 }
 
+// Maps console requests onto the HCS devices that serve them. A serial console is served by a COM
+// port and a virtio console by a port on the virtio-serial controller.
+//
+// N.B. The ordering of virtio ports is significant because it determines the order the guest
+//      enumerates them as /dev/hvc devices, so ports are addressed by the caller-supplied index.
+void ConfigureConsoles(const std::vector<VmConsoleRequest>& Requests, schema::Devices& Settings)
+{
+    for (const auto& request : Requests)
+    {
+        std::visit(
+            Overloaded{
+                [&](const VmSerialConsole& console) {
+                    THROW_HR_IF(E_INVALIDARG, console.NamedPipe.empty());
+                    const auto port = std::to_string(console.Port);
+                    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), Settings.ComPorts.contains(port));
+                    Settings.ComPorts[port] = schema::ComPort{console.NamedPipe.native()};
+                },
+                [&](const VmVirtioConsole& console) {
+                    THROW_HR_IF(E_INVALIDARG, console.NamedPipe.empty() || console.GuestName.empty());
+                    if (!Settings.VirtioSerial.has_value())
+                    {
+                        Settings.VirtioSerial.emplace();
+                    }
+
+                    const auto port = std::to_string(console.Port);
+                    auto& ports = Settings.VirtioSerial->Ports;
+                    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), ports.contains(port));
+
+                    // The guest addresses a virtio console by name, so names must be unique.
+                    THROW_HR_IF(
+                        HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
+                        std::any_of(ports.begin(), ports.end(), [&](const auto& entry) {
+                            return entry.second.Name == console.GuestName;
+                        }));
+
+                    ports[port] = schema::VirtioSerialPort{console.GuestName, console.NamedPipe.native(), true};
+                }},
+            request.Device);
+    }
+}
+
 VmEffectiveBoot ConfigureBoot(const VmLinuxBootRequest& Request, schema::Chipset& Settings)
 {
     VmEffectiveBoot boot{};
@@ -238,13 +279,76 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
     configuration.Settings.ShouldTerminateOnLastHandleClosed = true;
     configuration.Settings.SchemaVersion.Major = 2;
     configuration.Settings.SchemaVersion.Minor = wsl::windows::common::helpers::IsWindows11OrAbove() ? 7 : 3;
+    configuration.Settings.VirtualMachine.StopOnReset = true;
     auto& description = configuration.Description;
     description.Identity = Request.Identity;
     description.Backend = BackendKind::Hcs;
     description.Processor = ConfigureProcessor(Request.Processor, configuration.Settings.VirtualMachine.ComputeTopology.Processor);
     description.Memory = ConfigureMemory(Request.Memory, Request.Mmio, configuration.Settings.VirtualMachine.ComputeTopology.Memory);
     description.Boot = ConfigureBoot(Request.Boot, configuration.Settings.VirtualMachine.Chipset);
-    configuration.Settings.VirtualMachine.Devices.Scsi["0"] = {};
+    description.Boot.Consoles = Request.Consoles;
+    ConfigureConsoles(Request.Consoles, configuration.Settings.VirtualMachine.Devices);
+    auto& scsi = configuration.Settings.VirtualMachine.Devices.Scsi["0"];
+    scsi = {};
+
+    // Attach the disks the VM boots from up front so that the guest can reach them without waiting
+    // for a hot add. Their LUNs are reported so that the caller can name them in the guest.
+    const auto vmIdString = wsl::shared::string::GuidToString<wchar_t>(Request.Identity.VmId, wsl::shared::string::GuidToStringFlags::None);
+    std::uint32_t nextLun = 0;
+    for (const auto& bootDisk : Request.BootDisks)
+    {
+        THROW_HR_IF(E_INVALIDARG, bootDisk.Key.empty());
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), description.BootDisks.contains(bootDisk.Key));
+        THROW_HR_IF_MSG(
+            c_notSupported, !std::holds_alternative<VmVirtualDiskSource>(bootDisk.Disk.Source), "HCS boot disks must be virtual disks");
+
+        const auto& path = validation::ValidateDiskSource(bootDisk.Disk);
+        std::uint32_t lun = nextLun;
+        if (bootDisk.Disk.Placement)
+        {
+            THROW_HR_IF(c_notSupported, bootDisk.Disk.Placement->Address.Controller != 0);
+            lun = bootDisk.Disk.Placement->Address.Lun;
+        }
+
+        THROW_HR_IF(E_BOUNDS, lun >= c_maximumDisks);
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), scsi.Attachments.contains(std::to_string(lun)));
+        nextLun = lun + 1;
+
+        // Best effort: failures (for instance no WRITE_DAC on a SYSTEM-owned VHD) are swallowed
+        // since the VM worker process may already have access via inherited ACLs; otherwise
+        // starting the VM surfaces E_ACCESSDENIED.
+        wsl::windows::common::disk::DiskStateFlags diskFlags{};
+        if (bootDisk.GrantHostAccess)
+        {
+            try
+            {
+                auto runAsUser = wil::impersonate_token(Request.Identity.UserToken.get());
+                schema::GrantVmAccess(vmIdString.c_str(), path.c_str());
+                WI_SetFlag(diskFlags, wsl::windows::common::disk::DiskStateFlags::AccessGranted);
+            }
+            CATCH_LOG()
+        }
+
+        auto backingFile = wsl::windows::common::disk::OpenVhdBackingFile(path.c_str());
+
+        schema::Attachment attachment{};
+        attachment.Type = schema::AttachmentType::VirtualDisk;
+        attachment.Path = path;
+        attachment.ReadOnly = bootDisk.Disk.ReadOnly;
+        attachment.SupportCompressedVolumes = true;
+        attachment.AlwaysAllowSparseFiles = true;
+        attachment.SupportEncryptedFiles = true;
+        scsi.Attachments[std::to_string(lun)] = std::move(attachment);
+
+        const VmDiskAttachment diskAttachment{
+            {Request.Identity, configuration.NextDiskId}, {0, lun}, bootDisk.Disk.ReadOnly, bootDisk.Disk.UserDisk};
+        description.BootDisks.emplace(bootDisk.Key, diskAttachment);
+        configuration.BootDisks.emplace(
+            diskAttachment.Id.Value,
+            AttachedDisk{diskAttachment, false, path, diskFlags, bootDisk.Disk.DeviceTimeout, std::move(backingFile)});
+
+        ++configuration.NextDiskId;
+    }
 
     if (Request.CrashCapture && Request.CrashCapture->SavedStateFolder)
     {
@@ -322,7 +426,7 @@ HcsVirtualMachineBackend::~HcsVirtualMachineBackend() noexcept
 
 std::unique_ptr<HcsVirtualMachineBackend> HcsVirtualMachineBackend::Create(const VmCreateRequest& Request)
 {
-    ExecutionContext context(Context::CreateVm);
+    const auto context = CreateExecutionContext(Context::CreateVm);
     auto newInstance = std::unique_ptr<HcsVirtualMachineBackend>{new HcsVirtualMachineBackend{}};
     try
     {
@@ -383,13 +487,20 @@ void HcsVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     auto configuration = BuildConfiguration(Request);
     const auto id = wsl::shared::string::GuidToString<wchar_t>(Request.Identity.VmId, wsl::shared::string::GuidToStringFlags::None);
     const auto settings = wsl::shared::ToJsonW(configuration.Settings);
+    auto bootDisks = std::move(configuration.BootDisks);
+    const auto nextDiskId = configuration.NextDiskId;
     m_configuration = std::move(configuration);
     m_vmIdString = id;
     auto lock = m_lock.lock_exclusive();
+
+    // Track the boot disks before the compute system is created so that the host state changes made
+    // to attach them are undone even if creation fails.
+    m_attachedDisks = std::move(bootDisks);
+    m_nextDiskId = nextDiskId;
     m_system = schema::CreateComputeSystem(id.c_str(), settings.c_str());
     m_state = VmState::Created;
     m_runtimeId = wsl::windows::common::hcs::GetRuntimeId(m_system.get());
-    m_guestDeviceManager = std::make_shared<GuestDeviceManager>(id, m_runtimeId, true);
+    m_guestDeviceManager = std::make_shared<GuestDeviceManager>(id, m_runtimeId, Request.EnableTelemetry);
     m_pendingNetworkAdapters = Request.NetworkAdapters;
     schema::RegisterCallback(m_system.get(), OnSystemEvent, this);
 }
@@ -397,6 +508,20 @@ void HcsVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
 VmPlatformCapabilities HcsVirtualMachineBackend::GetCapabilities() const
 {
     return QueryCapabilities();
+}
+
+HCS_SYSTEM HcsVirtualMachineBackend::GetComputeSystemHandle() const
+{
+    auto lock = m_lock.lock_shared();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
+    return m_system.get();
+}
+
+std::shared_ptr<GuestDeviceManager> HcsVirtualMachineBackend::GetGuestDeviceManager() const
+{
+    auto lock = m_lock.lock_shared();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system || !m_guestDeviceManager);
+    return m_guestDeviceManager;
 }
 
 VmPlatformCapabilities HcsVirtualMachineBackend::QueryCapabilities()
@@ -599,11 +724,13 @@ void HcsVirtualMachineBackend::CleanupAttachedDisks(std::map<std::uint64_t, Atta
 
 VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Request)
 {
-    ExecutionContext context(Context::MountDisk);
+    const auto context = CreateExecutionContext(Context::MountDisk);
 
     const auto& path = validation::ValidateDiskSource(Request);
     const bool passThrough = std::holds_alternative<VmPhysicalDiskSource>(Request.Source);
     const auto timeoutMs = static_cast<size_t>(Request.DeviceTimeout.count());
+    HANDLE userToken = Request.UserToken ? Request.UserToken.get() : m_configuration.Description.Identity.UserToken.get();
+    THROW_HR_IF_MSG(E_UNEXPECTED, !userToken, "UserToken not set for the disk request");
 
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
@@ -688,7 +815,8 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
         if (passThrough)
         {
             // Grant the VM access to the disk.
-            schema::GrantVmWorkerProcessAccessToDisk(m_vmIdString.c_str(), path.c_str(), Request.UserToken.get());
+            schema::GrantVmWorkerProcessAccessToDisk(
+                m_vmIdString.c_str(), path.c_str(), userToken);
             WI_SetFlag(diskFlags, wsl::windows::common::disk::DiskStateFlags::AccessGranted);
 
             // Set the disk offline if needed.
@@ -712,7 +840,7 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
                 path.c_str(),
                 lun,
                 Request.ReadOnly,
-                m_configuration.Description.Identity.UserToken.get(),
+                userToken,
                 diskFlags);
         }
     });
@@ -737,7 +865,7 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
 
 void HcsVirtualMachineBackend::DetachDisk(VmDiskId Disk)
 {
-    ExecutionContext context(Context::DetachDisk);
+    const auto context = CreateExecutionContext(Context::DetachDisk);
 
     WSL_LOG(
         "HcsDetachDiskBegin",
@@ -876,7 +1004,7 @@ VmPersistentMemoryDevice HcsVirtualMachineBackend::AddPersistentMemory(const VmP
 
 VmGpuAttachment HcsVirtualMachineBackend::AddGpu(const VmGpuRequest& Request)
 {
-    ExecutionContext context(Context::ConfigureGpu);
+    const auto context = CreateExecutionContext(Context::ConfigureGpu);
     THROW_HR_IF(c_notSupported, Request.AssignmentMode != VmGpuAssignmentMode::Mirror);
 
     const auto disableVgpuSettingsSupported = schema::IsDisableVgpuSettingsSupported();
@@ -1509,7 +1637,7 @@ wil::com_ptr<IWslVirtioNetDevice> HcsVirtualMachineBackend::GetUserModeNatDevice
 
 VmNetworkAttachment HcsVirtualMachineBackend::AddNetworkAdapter(const VmNetworkAdapterRequest& Request)
 {
-    ExecutionContext context(Context::ConfigureNetworking);
+    const auto context = CreateExecutionContext(Context::ConfigureNetworking);
 
     WSL_LOG(
         "HcsAddNetworkAdapterBegin",
@@ -1637,7 +1765,7 @@ VmNetworkAttachment HcsVirtualMachineBackend::AddNetworkAdapter(const VmNetworkA
 
 void HcsVirtualMachineBackend::UpdateNetworkAdapter(VmDeviceId Device, const VmNetworkConfiguration& Configuration)
 {
-    ExecutionContext context(Context::ConfigureNetworking);
+    const auto context = CreateExecutionContext(Context::ConfigureNetworking);
 
     WSL_LOG(
         "HcsUpdateNetworkAdapterBegin",
@@ -1703,7 +1831,7 @@ void HcsVirtualMachineBackend::RemoveNetworkAdapterLocked(std::map<std::uint64_t
 
 void HcsVirtualMachineBackend::RemoveNetworkAdapter(VmDeviceId Device)
 {
-    ExecutionContext context(Context::ConfigureNetworking);
+    const auto context = CreateExecutionContext(Context::ConfigureNetworking);
 
     WSL_LOG(
         "HcsRemoveNetworkAdapterBegin",
@@ -1750,7 +1878,7 @@ void HcsVirtualMachineBackend::CloseNetworkAdaptersLocked() noexcept
 
 VmPortBinding HcsVirtualMachineBackend::BindPort(VmDeviceId Device, const VmPortBindingRequest& Request)
 {
-    ExecutionContext context(Context::ConfigureNetworking);
+    const auto context = CreateExecutionContext(Context::ConfigureNetworking);
 
     THROW_HR_IF(E_INVALIDARG, Request.GuestPort == 0);
     THROW_HR_IF(E_INVALIDARG, Request.Protocol != TransportProtocol_Tcp && Request.Protocol != TransportProtocol_Udp);
@@ -1804,7 +1932,7 @@ VmPortBinding HcsVirtualMachineBackend::BindPort(VmDeviceId Device, const VmPort
 
 void HcsVirtualMachineBackend::UnbindPort(VmPortBindingId Binding)
 {
-    ExecutionContext context(Context::ConfigureNetworking);
+    const auto context = CreateExecutionContext(Context::ConfigureNetworking);
 
     WSL_LOG(
         "HcsUnbindPortBegin",
@@ -1832,7 +1960,7 @@ void HcsVirtualMachineBackend::UnbindPort(VmPortBindingId Binding)
 
 IpAddress HcsVirtualMachineBackend::CreateVirtualAddress(VmDeviceId Device, const IpAddress& Destination)
 {
-    ExecutionContext context(Context::ConfigureNetworking);
+    const auto context = CreateExecutionContext(Context::ConfigureNetworking);
 
     WSL_LOG(
         "HcsCreateVirtualAddressBegin",
@@ -1858,7 +1986,7 @@ IpAddress HcsVirtualMachineBackend::CreateVirtualAddress(VmDeviceId Device, cons
 
 void HcsVirtualMachineBackend::CreateDnsRecord(VmDeviceId Device, const VmDnsRecord& Record)
 {
-    ExecutionContext context(Context::ConfigureNetworking);
+    const auto context = CreateExecutionContext(Context::ConfigureNetworking);
 
     THROW_HR_IF_MSG(E_INVALIDARG, Record.Name.empty(), "A DNS record requires a name");
     THROW_HR_IF_MSG(c_notSupported, Record.Type != DnsRecordType_A, "Only A records are supported");
@@ -1972,6 +2100,9 @@ void HcsVirtualMachineBackend::OnExit(const HCS_EVENT* Event)
     }
 
     m_exitEvent.SetEvent();
+
+    // Callers blocked on the guest must not wait forever when the VM exits on its own.
+    CancelGuestListeners();
 
     if (!m_terminatingEvent.is_signaled())
     {

@@ -145,6 +145,15 @@ std::shared_ptr<VmGuestListenerState> IVirtualMachineBackend::RemoveGuestListene
     return result;
 }
 
+void IVirtualMachineBackend::CancelGuestListeners() noexcept
+{
+    auto lock = m_lock.lock_shared();
+    for (const auto& entry : m_guestListeners)
+    {
+        LOG_IF_WIN32_BOOL_FALSE(SetEvent(entry.second->CancellationEvent.get()));
+    }
+}
+
 void IVirtualMachineBackend::CloseGuestListenersLocked(const VmInstanceId& Identity) noexcept
 {
     WSL_LOG(

@@ -36,6 +36,17 @@ constexpr std::wstring_view c_vsockServiceIdSuffix = L"-facb-11e6-bd58-64006a798
 
 using validation::ValidateResourceId;
 
+std::unique_ptr<ExecutionContext> CreateExecutionContext(Context Context)
+{
+    const auto* current = ExecutionContext::Current();
+    if (current != nullptr && current->CurrentContext() >= static_cast<ULONGLONG>(Context))
+    {
+        return {};
+    }
+
+    return std::make_unique<ExecutionContext>(Context);
+}
+
 void DestroyConfig(WslOpenVmmConfig* Config) noexcept
 {
     WslOpenVmmDestroyConfig(&Config);
@@ -226,7 +237,7 @@ OpenVmmVirtualMachineBackend::~OpenVmmVirtualMachineBackend() noexcept
 
 std::unique_ptr<OpenVmmVirtualMachineBackend> OpenVmmVirtualMachineBackend::Create(const VmCreateRequest& Request)
 {
-    ExecutionContext context(Context::CreateVm);
+    const auto context = CreateExecutionContext(Context::CreateVm);
     const auto startTimeMs = GetTickCount64();
     WSL_LOG(
         "OpenVmmCreateVmBegin",

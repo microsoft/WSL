@@ -15,6 +15,7 @@ Abstract:
 #pragma once
 
 #include "hcs.hpp"
+#include "IVirtualMachineBackend.h"
 #include "GnsChannel.h"
 #include "LxssPort.h"
 #include "GnsRpcServer.h"
@@ -29,7 +30,6 @@ Abstract:
 #include "INetworkingEngine.h"
 #include "SocketChannel.h"
 #include "DeviceHostProxy.h"
-#include "GuestDeviceManager.h"
 
 #define UTILITY_VM_SHUTDOWN_TIMEOUT (30 * 1000)
 #define UTILITY_VM_TERMINATE_TIMEOUT (30 * 1000)
@@ -130,9 +130,6 @@ public:
     _Requires_lock_held_(m_guestDeviceLock)
     void VerifyPlan9Servers();
 
-    // Tracks the host state changes performed to attach a disk, so they can be undone.
-    using DiskStateFlags = wsl::windows::common::disk::DiskStateFlags;
-
     void TraceLoggingRundown() const noexcept;
 
     void ValidateNetworkingMode();
@@ -159,7 +156,7 @@ private:
     {
         ULONG Lun;
         std::map<ULONG, Mount> Mounts;
-        DiskStateFlags Flags;
+        VmDiskId BackendId;
         wil::unique_hfile BackingFile;
     };
 
@@ -209,10 +206,7 @@ private:
     _Requires_lock_held_(m_guestDeviceLock)
     std::optional<VirtioFsShare> FindVirtioFsShare(_In_ PCWSTR tag, _In_ std::optional<bool> Admin = {}) const;
 
-    _Requires_lock_held_(m_lock)
-    void FreeLun(_In_ ULONG Lun);
-
-    std::wstring GenerateConfigJson();
+    VmCreateRequest GenerateBackendRequest(const GUID& VmId);
 
     static std::pair<int, LX_MINI_MOUNT_STEP> GetMountResult(_In_ wsl::shared::SocketChannel& Channel);
 
@@ -231,16 +225,9 @@ private:
 
     void WaitForPmemDeviceInVm(_In_ ULONG PmemId);
 
-    void OnCrash(_In_ LPCWSTR Details);
-
     void OnExit(_In_opt_ PCWSTR ExitDetails);
 
     void ReadGuestCapabilities();
-
-    _Requires_lock_held_(m_lock)
-    ULONG ReserveLun(_In_ std::optional<ULONG> Lun = {});
-
-    void RestorePassthroughDiskState(_In_ LPCWSTR Disk) const;
 
     _Requires_lock_held_(m_lock)
     static void SaveDiskState(_In_ HKEY Key, _In_ const AttachedDisk& Disk, _In_ const DiskState& State, _In_ const DiskType& DiskType);
@@ -257,16 +244,13 @@ private:
 
     static std::string s_GetMountTargetName(_In_ PCWSTR Disk, _In_opt_ PCWSTR Name, _In_ int PartitionIndex);
 
-    static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);
-
     wil::srwlock m_guestDeviceLock;
-    std::shared_ptr<GuestDeviceManager> m_guestDeviceManager;
     _Guarded_by_(m_guestDeviceLock) std::future<bool> m_drvfsInitialResult;
     _Guarded_by_(m_guestDeviceLock) wil::unique_handle m_drvfsToken;
     _Guarded_by_(m_guestDeviceLock) wil::unique_handle m_adminDrvfsToken;
     _Guarded_by_(m_guestDeviceLock) std::map<VirtioFsShare, std::wstring> m_virtioFsShares;
-    _Guarded_by_(m_guestDeviceLock) std::optional<GUID> m_virtioFsDevice;
-    _Guarded_by_(m_guestDeviceLock) std::optional<GUID> m_adminVirtioFsDevice;
+    _Guarded_by_(m_guestDeviceLock) std::optional<VmDeviceId> m_virtioFsDevice;
+    _Guarded_by_(m_guestDeviceLock) std::optional<VmDeviceId> m_adminVirtioFsDevice;
     _Guarded_by_(m_guestDeviceLock) std::map<UINT32, wil::com_ptr<IPlan9FileSystem>> m_plan9Servers;
     wil::srwlock m_lock;
     _Guarded_by_(m_lock) wil::com_ptr<IPlan9FileSystem> m_pluginPlan9Server;
@@ -298,14 +282,13 @@ private:
     LX_MINI_INIT_MOUNT_DEVICE_TYPE m_systemDistroDeviceType = LxMiniInitMountDeviceTypeInvalid;
     ULONG m_systemDistroDeviceId = ULONG_MAX;
     ULONG m_kernelModulesDeviceId = ULONG_MAX;
-    wsl::windows::common::hcs::unique_hcs_system m_system;
+    std::unique_ptr<IVirtualMachineBackend> m_backend;
     wil::unique_socket m_listenSocket;
     std::function<void(GUID)> m_onExit;
     wsl::shared::SocketChannel m_miniInitChannel;
     wil::unique_socket m_notifyChannel;
     SE_SID m_userSid;
     std::shared_ptr<LxssRunningInstance> m_systemDistro;
-    _Guarded_by_(m_lock) std::bitset<MAX_VHD_COUNT> m_lunBitmap;
     _Guarded_by_(m_lock) std::map<AttachedDisk, DiskState> m_attachedDisks;
     std::tuple<std::uint32_t, std::uint32_t, std::uint32_t> m_kernelVersion;
     std::wstring m_kernelVersionString;
@@ -322,9 +305,6 @@ private:
     std::thread m_distroExitThread;
     std::thread m_virtioFsThread;
     std::thread m_crashDumpCollectionThread;
-
-    wil::srwlock m_persistentMemoryLock;
-    _Guarded_by_(m_persistentMemoryLock) ULONG m_nextPersistentMemoryId = 0;
 
     std::unique_ptr<wsl::core::INetworkingEngine> m_networkingEngine;
 
