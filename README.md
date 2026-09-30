@@ -1,3 +1,20 @@
+# WSL community investigation
+
+This fork contains historical WSL issue-reporting material and a community investigation of WSL 1 on older Windows hardware. It is not an official Microsoft support channel or a new WSL implementation.
+
+## Older-hardware investigation
+
+**Verified on one machine, 30 September 2026:** Ubuntu 22.04.5 LTS installed, launched and completed package upgrades under WSL 1 on an Intel Core 2 Duo T9600. Package audit and dependency checks completed without findings. This does not establish universal application compatibility or enable WSL 2 on CPUs without SLAT.
+
+- [Installation guide and verified test record](docs/WSL1-OLDER-HARDWARE.md)
+- [Draft follow-up for upstream issue #6808](docs/ISSUE-6808-FOLLOW-UP.md)
+- [Existing community troubleshooting notes](docs/TroubleShooting.md)
+- [Current upstream contribution guidance](https://github.com/microsoft/WSL/blob/master/CONTRIBUTING.md)
+
+## Historical upstream README
+
+The material below is retained from the fork's 2021 snapshot. Its labels, links and reporting instructions may be outdated; consult current upstream guidance before submitting a report.
+
 This repo is for:
 
 - Reporting of issues found within and when using Windows Subsystem for Linux.
