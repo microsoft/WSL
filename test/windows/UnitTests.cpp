@@ -3378,7 +3378,21 @@ EOF
         THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
             vhdPath.data(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION, nullptr, nullptr, acl.get(), nullptr));
 
-        const auto nonElevatedToken = GetNonElevatedToken();
+        // Restrict administrator groups before converting to a primary token for process creation.
+        const auto nonElevatedToken = GetNonElevatedToken(TokenImpersonation);
+        VERIFY_IS_FALSE(wsl::windows::common::security::IsTokenElevated(nonElevatedToken.get()));
+
+        const auto tokenGroups = wil::get_token_information<TOKEN_GROUPS_AND_PRIVILEGES>(nonElevatedToken.get());
+        for (DWORD index = 0; index < tokenGroups->SidCount; ++index)
+        {
+            const auto& group = tokenGroups->Sids[index];
+            if (IsWellKnownSid(group.Sid, WinBuiltinAdministratorsSid))
+            {
+                // Sanity check.
+                VERIFY_IS_FALSE(WI_IsFlagSet(group.Attributes, SE_GROUP_ENABLED));
+            }
+        }
+
         for (const auto elevated : {true, false})
         {
             for (const auto sparse : {true, false})
