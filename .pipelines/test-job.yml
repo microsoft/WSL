@@ -33,8 +33,9 @@ jobs:
       pool: ${{ parameters.pool }}
     steps:
       - task: CloudTestServerBuildTask@2
+        displayName: "${{ parameters.version }} tests - ${{ parameters.branch }}${{ iif(eq(parameters.branch, 'ge_release'), ' (server)', '') }}"
         inputs:
-          DisplayName: "${{ parameters.version }} tests - ${{ parameters.branch }}${{ iif(eq(parameters.branch, 'ge_release'), ' (server)', '') }}"
+          displayName: "${{ parameters.version }} tests - ${{ parameters.branch }}${{ iif(eq(parameters.branch, 'ge_release'), ' (server)', '') }}"
           connectedServiceName: "CloudTest-PROD"
           cloudTestTenant: "wsl"
           testMapLocation: 'testbin\x64\cloudtest\wsl-test-image-${{ parameters.image }}-${{ parameters.version}}\TestMap.xml'
