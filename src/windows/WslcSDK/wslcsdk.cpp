@@ -285,7 +285,9 @@ bool NeedsVirtualMachineServicesInstalled()
 bool DoesWslRuntimeVersionSupportWslc(const std::optional<std::tuple<uint32_t, uint32_t, uint32_t>>& version)
 {
     constexpr auto minimalPackageVersion = std::tuple<uint32_t, uint32_t, uint32_t>{WSLC_API_MIN_VERSION_SUPPORTED};
-    return version.has_value() && version >= minimalPackageVersion;
+    constexpr auto sdkVersion =
+        std::tuple<uint32_t, uint32_t, uint32_t>{WSL_PACKAGE_VERSION_MAJOR, WSL_PACKAGE_VERSION_MINOR, WSL_PACKAGE_VERSION_REVISION};
+    return version.has_value() && (version >= minimalPackageVersion || version == sdkVersion);
 }
 
 enum class WslRuntimeState
