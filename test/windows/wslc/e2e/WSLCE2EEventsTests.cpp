@@ -290,8 +290,8 @@ class WSLCE2EEventsTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto networkId = InspectNetwork(networkName).Id;
 
-        result = RunWslc(
-            std::format(L"container run -d --name {} --network {} {} sleep infinity", containerName, networkName, DebianImage.NameAndTag()));
+        result = RunWslc(std::format(
+            L"container run -d --name {} --network {} {} sleep infinity", containerName, networkName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto containerId = wsl::shared::string::WideToMultiByte(result.GetStdoutOneLine());
 
@@ -303,18 +303,21 @@ class WSLCE2EEventsTests
 
         // Network removal doesn't wait for its event to be recorded, so retry until the whole lifecycle is visible.
         std::vector<nlohmann::json> events;
-        VERIFY_NO_THROW(
-            wsl::shared::retry::RetryWithTimeout<void>(
-                [&]() {
-                    const auto query = RunWslc(
-                        std::format(L"events --since {} --until {} --filter type=network --filter network={} --format json", since, EpochSeconds() + 1, networkName));
-                    THROW_HR_IF(E_FAIL, query.ExitCode != 0u);
+        const auto queryEvents = [&]() {
+            const auto query = RunWslc(std::format(
+                L"events --since {} --until {} --filter type=network --filter network={} --format json",
+                since,
+                EpochSeconds() + 1,
+                networkName));
+            THROW_HR_IF(E_FAIL, query.ExitCode != 0u);
 
-                    events = ParseNdjsonOutput(query);
-                    THROW_HR_IF(E_ABORT, events.size() < 4);
-                },
-                std::chrono::milliseconds(200),
-                std::chrono::seconds(30)));
+            events = ParseNdjsonOutput(query);
+            THROW_HR_IF(E_ABORT, events.size() < 4);
+        };
+
+        const auto retryPeriod = std::chrono::milliseconds(200);
+        const auto timeout = std::chrono::seconds(30);
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(queryEvents, retryPeriod, timeout));
 
         const std::vector<std::string> expectedActions{"create", "connect", "disconnect", "destroy"};
         VERIFY_ARE_EQUAL(expectedActions.size(), events.size());
