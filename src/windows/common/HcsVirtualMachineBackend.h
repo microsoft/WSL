@@ -68,9 +68,8 @@ public:
     void CreateDnsRecord(VmDeviceId Device, const VmDnsRecord& Record) override;
 
 private:
-    struct AttachedDisk
+    struct HcsDisk
     {
-        VmDiskAttachment Attachment;
         // Set for pass-through disks, cleared for virtual disks.
         bool PassThrough = false;
         std::wstring Path;
@@ -79,6 +78,8 @@ private:
         std::chrono::milliseconds DeviceTimeout{wsl::windows::common::disk::c_defaultDiskTimeoutMs};
         wil::unique_hfile BackingFile;
     };
+
+    using AttachedDisk = VmResource<VmDiskAttachment, HcsDisk>;
 
     struct VmConfiguration
     {
@@ -90,18 +91,19 @@ private:
         std::uint64_t NextDiskId = 1;
     };
 
-    struct FileSystemDevice
+    struct HcsFileSystemDevice
     {
-        VmFileSystemDevice Device;
-        VmFileSystemDeviceTransport Transport;
+        // Required effective identity, resolved from the request or VM identity at creation.
+        wil::shared_handle UserToken;
         // Mount options applied when the virtio-fs device is created.
         std::wstring MountOptions;
         wil::com_ptr<IPlan9FileSystem> Plan9Server;
     };
 
+    using FileSystemDevice = VmResource<VmFileSystemDevice, HcsFileSystemDevice>;
     using FileSystemDeviceMap = std::map<std::uint64_t, FileSystemDevice>;
 
-    struct FileSystemShare
+    struct HcsFileSystemShare
     {
         VmFileSystemShare Share;
         // Effective options used to distinguish equivalent requests from name collisions.
@@ -112,20 +114,16 @@ private:
         wil::shared_handle UserToken;
     };
 
-    struct NetworkAdapter
+    using FileSystemShare = VmResource<VmFileSystemShare, HcsFileSystemShare>;
+
+    struct HcsNetworkAdapter
     {
-        VmNetworkAttachment Attachment;
         // Resource path the adapter was added at. Set only for host endpoint networks, which are
         // removed from the compute system at the same path that added them.
         std::wstring ResourcePath;
     };
 
-    struct PortBinding
-    {
-        VmPortBinding Binding;
-        // Tag of the user-mode NAT device that owns the binding.
-        std::wstring Tag;
-    };
+    using NetworkAdapter = VmResource<VmNetworkAttachment, HcsNetworkAdapter>;
 
     HcsVirtualMachineBackend();
     void Initialize(const VmCreateRequest& Request);
@@ -165,7 +163,7 @@ private:
     /// Resolves the token used to reach a host path, returning the first of Tokens that is set and
     /// falling back to the identity that created the VM. Callers list Tokens most specific first.
     /// </summary>
-    HANDLE ResolveUserToken(std::initializer_list<std::reference_wrapper<const wil::shared_handle>> Tokens) const;
+    wil::shared_handle ResolveUserToken(std::initializer_list<std::reference_wrapper<const wil::shared_handle>> Tokens) const;
 
     /// <summary>
     /// Adds a share to a Plan 9 device and returns the name the guest uses to reach it.
@@ -234,7 +232,7 @@ private:
     _Guarded_by_(m_lock) std::uint64_t m_nextShareId = 1;
     _Guarded_by_(m_lock) std::vector<VmNetworkAdapterRequest> m_pendingNetworkAdapters;
     _Guarded_by_(m_lock) std::map<std::uint64_t, NetworkAdapter> m_networkAdapters;
-    _Guarded_by_(m_lock) std::map<std::uint64_t, PortBinding> m_portBindings;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, VmPortBinding> m_portBindings;
     _Guarded_by_(m_lock) std::uint64_t m_nextPortBindingId = 1;
     _Guarded_by_(m_lock) std::shared_ptr<GuestDeviceManager> m_guestDeviceManager;
     _Guarded_by_(m_lock) GUID m_runtimeId {};

@@ -1959,8 +1959,10 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
             const PCWSTR deviceTag = Admin ? TEXT(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) : TEXT(LX_INIT_DRVFS_VIRTIO_TAG);
             if (!device.has_value())
             {
-                device = m_backend->CreateFileSystemDevice(
-                                      {VmVirtioFsDevice{deviceTag, VmVirtioFsLayout::Aggregate}})
+                device = m_backend
+                             ->CreateFileSystemDevice(
+                                 {VmVirtioFsDevice{deviceTag, VmVirtioFsLayout::Aggregate},
+                                  wil::shared_handle{wsl::windows::common::wslutil::DuplicateHandle(UserToken)}})
                              .Id;
             }
             VmFileSystemShareRequest request{};
