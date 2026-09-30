@@ -161,6 +161,51 @@ class WSLCE2EEventsTests
         VerifyEventLine(lines[3], std::format(L" container destroy {} (image={}, name={})", containerId, DebianImage.NameAndTag(), c_eventContainerName));
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Events_JsonFormat)
+    {
+        const auto since = EpochSeconds();
+        auto result = RunWslc(std::format(L"container create --name {} {} sleep 60", c_eventContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto containerId = result.GetStdoutOneLine();
+
+        result = RunWslc(std::format(L"container rm {}", containerId));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"events --since {} --until {} --filter container={} --format json", since, EpochSeconds() + 1, containerId));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto events = ParseNdjsonOutput(result);
+        VERIFY_ARE_EQUAL(2u, events.size());
+        VERIFY_ARE_EQUAL(std::string{"create"}, events[0].at("Action").get<std::string>());
+        VERIFY_ARE_EQUAL(std::string{"destroy"}, events[1].at("Action").get<std::string>());
+
+        for (const auto& event : events)
+        {
+            VERIFY_ARE_EQUAL(std::string{"container"}, event.at("Type").get<std::string>());
+            VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(containerId), event.at("Actor").at("ID").get<std::string>());
+            VERIFY_ARE_EQUAL(
+                wsl::shared::string::WideToMultiByte(c_eventContainerName),
+                event.at("Actor").at("Attributes").at("name").get<std::string>());
+            VERIFY_ARE_EQUAL(std::string{"local"}, event.at("scope").get<std::string>());
+
+            VERIFY_ARE_EQUAL(event.at("Action").get<std::string>(), event.at("status").get<std::string>());
+            VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(containerId), event.at("id").get<std::string>());
+            VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(DebianImage.NameAndTag()), event.at("from").get<std::string>());
+
+            const auto timeNano = event.at("timeNano").get<std::int64_t>();
+            VERIFY_IS_GREATER_THAN(timeNano, 0LL);
+            VERIFY_ARE_EQUAL(timeNano / 1'000'000'000, event.at("time").get<std::int64_t>());
+        }
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Events_InvalidFormatOption)
+    {
+        auto result = RunWslc(L"events --format invalid");
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            L"Invalid format value: invalid is not a recognized format type. Supported format types are: json, table."));
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Events_NetworkLifecycle)
     {
         GUID runId{};
