@@ -660,12 +660,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
                 // N.B. Consomme still hosts its virtio-net device through GuestDeviceManager.
                 m_networkingEngine = std::make_unique<wsl::core::ConsommeNetworking>(
-                    std::move(gnsChannel),
-                    flags,
-                    LX_INIT_RESOLVCONF_FULL_HEADER,
-                    nullptr,
-                    hcsBackend.GetGuestDeviceManager(),
-                    m_userToken);
+                    std::move(gnsChannel), flags, LX_INIT_RESOLVCONF_FULL_HEADER, nullptr, hcsBackend.GetGuestDeviceManager(), m_userToken);
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::Bridged)
             {
@@ -1049,8 +1044,7 @@ ULONG WslCoreVm::AttachDiskLockHeld(
         {
             const std::filesystem::path path{Disk};
             VmDiskFormat format;
-            if (wsl::windows::common::string::IsPathComponentEqual(
-                    path.extension().native(), wsl::windows::common::wslutil::c_vhdFileExtension))
+            if (wsl::windows::common::string::IsPathComponentEqual(path.extension().native(), wsl::windows::common::wslutil::c_vhdFileExtension))
             {
                 format = VmDiskFormat::Vhd;
             }
@@ -1058,8 +1052,7 @@ ULONG WslCoreVm::AttachDiskLockHeld(
             {
                 THROW_HR_IF(
                     E_INVALIDARG,
-                    !wsl::windows::common::string::IsPathComponentEqual(
-                        path.extension().native(), wsl::windows::common::wslutil::c_vhdxFileExtension));
+                    !wsl::windows::common::string::IsPathComponentEqual(path.extension().native(), wsl::windows::common::wslutil::c_vhdxFileExtension));
                 format = VmDiskFormat::Vhdx;
             }
 
@@ -1084,8 +1077,7 @@ ULONG WslCoreVm::AttachDiskLockHeld(
             backingFile = wsl::windows::common::disk::OpenVhdBackingFile(Disk);
         }
         m_attachedDisks.emplace(
-            AttachedDisk{Type, Disk, IsUserDisk},
-            DiskState{attachment.GuestAddress.Lun, {}, attachment.Id, std::move(backingFile)});
+            AttachedDisk{Type, Disk, IsUserDisk}, DiskState{attachment.GuestAddress.Lun, {}, attachment.Id, std::move(backingFile)});
         return attachment.GuestAddress.Lun;
     }
     catch (...)
@@ -1407,10 +1399,8 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
     request.Owner = wsl::windows::common::wslutil::c_vmOwner;
     request.EnableTelemetry = m_vmConfig.EnableTelemetry;
     request.Processor.Count = m_vmConfig.ProcessorCount;
-    request.Processor.NestedVirtualization =
-        m_vmConfig.EnableNestedVirtualization ? VmFeatureRequest::Preferred : VmFeatureRequest::Disabled;
-    request.Processor.PerfmonPmu =
-        m_vmConfig.EnableHardwarePerformanceCounters ? VmFeatureRequest::Preferred : VmFeatureRequest::Disabled;
+    request.Processor.NestedVirtualization = m_vmConfig.EnableNestedVirtualization ? VmFeatureRequest::Preferred : VmFeatureRequest::Disabled;
+    request.Processor.PerfmonPmu = m_vmConfig.EnableHardwarePerformanceCounters ? VmFeatureRequest::Preferred : VmFeatureRequest::Disabled;
     request.Processor.PerfmonLbr = request.Processor.PerfmonPmu;
 
     request.Memory.SizeBytes = (m_vmConfig.MemorySizeBytes / (2 * _1MB)) * (2 * _1MB);
@@ -1493,12 +1483,10 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
         if (m_vmConfig.EnableEarlyBootLogging)
         {
             kernelCmdLine += wsl::shared::Arm64 ? L" earlycon=pl011,0xeffec000,115200" : L" earlycon=uart8250,io,0x3f8,115200";
-            request.Consoles.push_back(
-                {VmConsoleRole::EarlyBoot, VmSerialConsole{0, m_dmesgCollector->EarlyConsoleName()}});
+            request.Consoles.push_back({VmConsoleRole::EarlyBoot, VmSerialConsole{0, m_dmesgCollector->EarlyConsoleName()}});
         }
         kernelCmdLine += L" console=hvc0 debug";
-        request.Consoles.push_back(
-            {VmConsoleRole::KernelConsole, VmVirtioConsole{0, L"hvc0", m_dmesgCollector->VirtioConsoleName()}});
+        request.Consoles.push_back({VmConsoleRole::KernelConsole, VmVirtioConsole{0, L"hvc0", m_dmesgCollector->VirtioConsoleName()}});
     }
     else if (m_vmConfig.EnableDebugConsole)
     {
@@ -1508,13 +1496,11 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
     if (m_gnsTelemetryLogger)
     {
         request.Consoles.push_back(
-            {VmConsoleRole::Telemetry,
-             VmVirtioConsole{1, TEXT(LX_INIT_HVC_TELEMETRY), m_gnsTelemetryLogger->GetPipeName()}});
+            {VmConsoleRole::Telemetry, VmVirtioConsole{1, TEXT(LX_INIT_HVC_TELEMETRY), m_gnsTelemetryLogger->GetPipeName()}});
     }
     if (!m_debugShellPipe.empty())
     {
-        request.Consoles.push_back(
-            {VmConsoleRole::DebugShell, VmVirtioConsole{2, TEXT(LX_INIT_HVC_DEBUG_SHELL), m_debugShellPipe}});
+        request.Consoles.push_back({VmConsoleRole::DebugShell, VmVirtioConsole{2, TEXT(LX_INIT_HVC_DEBUG_SHELL), m_debugShellPipe}});
     }
 
     if (m_vmConfig.KernelDebugPort != 0)
@@ -1543,8 +1529,8 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
     if (m_vmConfig.MaxCrashDumpCount >= 0)
     {
         kernelCmdLine += L" " WSL_ENABLE_CRASH_DUMP_ENV L"=1";
-        request.CrashCapture = VmCrashCaptureRequest{
-            m_vmConfig.CrashDumpFolder, gsl::narrow_cast<std::uint32_t>(m_vmConfig.MaxCrashDumpCount)};
+        request.CrashCapture =
+            VmCrashCaptureRequest{m_vmConfig.CrashDumpFolder, gsl::narrow_cast<std::uint32_t>(m_vmConfig.MaxCrashDumpCount)};
     }
     if (!m_vmConfig.KernelCommandLine.empty())
     {
@@ -1612,8 +1598,7 @@ void WslCoreVm::InitializeGuest()
         {
             try
             {
-                const auto sharedMemory =
-                    m_backend->AddSharedMemory({L"wslg", L"wslg", WSLG_SHARED_MEMORY_SIZE_MB * _1MB, m_userToken});
+                const auto sharedMemory = m_backend->AddSharedMemory({L"wslg", L"wslg", WSLG_SHARED_MEMORY_SIZE_MB * _1MB, m_userToken});
                 m_sharedMemoryRoot = sharedMemory.ObjectPath;
             }
             CATCH_LOG()
@@ -1975,8 +1960,7 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
         }
         else
         {
-            const auto device =
-                m_backend->CreateFileSystemDevice({VmVirtioFsDevice{shareName, VmVirtioFsLayout::SingleShare}});
+            const auto device = m_backend->CreateFileSystemDevice({VmVirtioFsDevice{shareName, VmVirtioFsLayout::SingleShare}});
             VmFileSystemShareRequest request{};
             request.HostPath = sharePath;
             request.ReadOnly = false;

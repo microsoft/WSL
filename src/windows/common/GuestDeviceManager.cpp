@@ -157,8 +157,8 @@ GUID GuestDeviceManager::AddSharedMemoryDevice(_In_ PCWSTR Tag, _In_ PCWSTR Path
     auto guestDeviceLock = m_lock.lock_exclusive();
     auto objectLifetime = CreateSectionObjectRoot(Path, UserToken);
 
-    const auto instanceId = m_deviceHostSupport->AddVirtiofsDevice(
-        UserToken, Tag, objectLifetime.Path, VirtiofsShareKind_SectionBacked, SizeMb, L"");
+    const auto instanceId =
+        m_deviceHostSupport->AddVirtiofsDevice(UserToken, Tag, objectLifetime.Path, VirtiofsShareKind_SectionBacked, SizeMb, L"");
     auto removeOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { m_deviceHostSupport->RemoveDevice(instanceId); });
     m_objectDirectories.emplace(instanceId, std::move(objectLifetime));
     removeOnFailure.release();

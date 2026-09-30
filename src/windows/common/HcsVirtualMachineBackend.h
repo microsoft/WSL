@@ -186,8 +186,7 @@ private:
     /// the host network stack settles, so the modification is retried.
     /// </summary>
     _Requires_lock_held_(m_lock)
-    void ModifyHostEndpointLocked(
-        const VmHostEndpointNetwork& Configuration, const std::wstring& ResourcePath, wsl::windows::common::hcs::ModifyRequestType RequestType) const;
+    void ModifyHostEndpointLocked(const VmHostEndpointNetwork& Configuration, const std::wstring& ResourcePath, wsl::windows::common::hcs::ModifyRequestType RequestType) const;
 
     /// <summary>
     /// Removes the adapter's tracked state, tearing down the resource that serves it. Port bindings

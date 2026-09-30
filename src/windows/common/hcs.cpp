@@ -63,16 +63,14 @@ std::filesystem::path wsl::windows::common::hcs::WriteVmCrashLog(
     return filePath;
 }
 
-std::filesystem::path wsl::windows::common::hcs::CreateVmSavedStateFile(
-    const std::filesystem::path& Folder, const GUID& VmId, HANDLE UserToken)
+std::filesystem::path wsl::windows::common::hcs::CreateVmSavedStateFile(const std::filesystem::path& Folder, const GUID& VmId, HANDLE UserToken)
 {
     auto runAsUser = wil::impersonate_token(UserToken);
     wsl::windows::common::filesystem::EnsureDirectory(Folder.c_str());
 
     const auto vmId = wsl::shared::string::GuidToString<wchar_t>(VmId, wsl::shared::string::GuidToStringFlags::None);
     const auto filePath = Folder / std::format(L"saved-state-{}-{}.vmrs", std::time(nullptr), vmId);
-    wil::unique_handle file{
-        CreateFileW(filePath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY, nullptr)};
+    wil::unique_handle file{CreateFileW(filePath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY, nullptr)};
     THROW_LAST_ERROR_IF(!file);
     auto removeOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { std::filesystem::remove(filePath); });
     GrantVmAccess(vmId.c_str(), filePath.c_str());
@@ -80,8 +78,7 @@ std::filesystem::path wsl::windows::common::hcs::CreateVmSavedStateFile(
     return filePath;
 }
 
-void wsl::windows::common::hcs::EnforceVmSavedStateFileLimit(
-    const std::filesystem::path& Folder, size_t MaxFileCount, HANDLE UserToken)
+void wsl::windows::common::hcs::EnforceVmSavedStateFileLimit(const std::filesystem::path& Folder, size_t MaxFileCount, HANDLE UserToken)
 {
     auto runAsUser = wil::impersonate_token(UserToken);
     const auto predicate = [](const auto& entry) {
@@ -134,8 +131,7 @@ void wsl::windows::common::hcs::AddVhd(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWST
     ModifyComputeSystem(ComputeSystem, wsl::shared::ToJsonW(request).c_str());
 }
 
-void wsl::windows::common::hcs::AddPassThroughDisk(
-    _In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun, _In_ bool ReadOnly)
+void wsl::windows::common::hcs::AddPassThroughDisk(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun, _In_ bool ReadOnly)
 {
     ModifySettingRequest<Attachment> request{};
     request.RequestType = ModifyRequestType::Add;
@@ -147,8 +143,7 @@ void wsl::windows::common::hcs::AddPassThroughDisk(
     ModifyComputeSystem(ComputeSystem, wsl::shared::ToJsonW(request).c_str());
 }
 
-void wsl::windows::common::hcs::AddPassThroughDiskWithRetry(
-    _In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun, _In_ bool ReadOnly, _In_ size_t TimeoutMs)
+void wsl::windows::common::hcs::AddPassThroughDiskWithRetry(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun, _In_ bool ReadOnly, _In_ size_t TimeoutMs)
 {
     wsl::shared::retry::RetryWithTimeout<void>(
         std::bind(AddPassThroughDisk, ComputeSystem, Disk, Lun, ReadOnly),
@@ -427,11 +422,7 @@ void wsl::windows::common::hcs::RemoveDiskWithAccess(
     }
 }
 
-void wsl::windows::common::hcs::AddMirroredGpu(
-    _In_ HCS_SYSTEM ComputeSystem,
-    _In_ bool AllowVendorExtension,
-    _In_ bool DisableGdiAcceleration,
-    _In_ bool DisablePresentation)
+void wsl::windows::common::hcs::AddMirroredGpu(_In_ HCS_SYSTEM ComputeSystem, _In_ bool AllowVendorExtension, _In_ bool DisableGdiAcceleration, _In_ bool DisablePresentation)
 {
     ModifySettingRequest<GpuConfiguration> request{};
     request.ResourcePath = c_gpuResourcePath;

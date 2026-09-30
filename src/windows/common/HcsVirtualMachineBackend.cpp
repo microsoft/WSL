@@ -120,8 +120,7 @@ VmEffectiveMemory ConfigureMemory(const VmMemoryRequest& Request, const VmMmioRe
         validation::ValidateFeature(Request.SmallPageBacking, L"small-page memory", schema::IsSmallPageMemorySupported());
     THROW_HR_IF(
         E_INVALIDARG,
-        (memory.SmallPageBacking || Request.FaultClusterSizeShift.has_value() ||
-         Request.DirectMapFaultClusterSizeShift.has_value()) &&
+        (memory.SmallPageBacking || Request.FaultClusterSizeShift.has_value() || Request.DirectMapFaultClusterSizeShift.has_value()) &&
             !memory.AllowOvercommit);
     memory.FaultClusterSizeShift = Request.FaultClusterSizeShift;
     memory.DirectMapFaultClusterSizeShift = Request.DirectMapFaultClusterSizeShift;
@@ -193,11 +192,9 @@ void ConfigureConsoles(const std::vector<VmConsoleRequest>& Requests, schema::De
                     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), ports.contains(port));
 
                     // The guest addresses a virtio console by name, so names must be unique.
-                    THROW_HR_IF(
-                        HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
-                        std::any_of(ports.begin(), ports.end(), [&](const auto& entry) {
-                            return entry.second.Name == console.GuestName;
-                        }));
+                    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), std::any_of(ports.begin(), ports.end(), [&](const auto& entry) {
+                                    return entry.second.Name == console.GuestName;
+                                }));
 
                     ports[port] = schema::VirtioSerialPort{console.GuestName, console.NamedPipe.native(), true};
                 }},
@@ -288,7 +285,9 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
         THROW_HR_IF(E_INVALIDARG, bootDisk.Key.empty());
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), description.BootDisks.contains(bootDisk.Key));
         THROW_HR_IF_MSG(
-            c_notSupported, !std::holds_alternative<VmVirtualDiskSource>(bootDisk.Disk.Source), "HCS boot disks must be virtual disks");
+            c_notSupported,
+            !std::holds_alternative<VmVirtualDiskSource>(bootDisk.Disk.Source),
+            "HCS boot disks must be virtual disks");
 
         const auto& path = validation::ValidateDiskSource(bootDisk.Disk);
         std::uint32_t lun = nextLun;
@@ -885,14 +884,7 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
         {
             backingFile = wsl::windows::common::disk::OpenVhdBackingFile(path.c_str());
 
-            schema::AddVhdWithAccess(
-                m_system.get(),
-                m_vmIdString.c_str(),
-                path.c_str(),
-                lun,
-                Request.ReadOnly,
-                userToken,
-                diskFlags);
+            schema::AddVhdWithAccess(m_system.get(), m_vmIdString.c_str(), path.c_str(), lun, Request.ReadOnly, userToken, diskFlags);
         }
     });
 
@@ -1060,8 +1052,7 @@ VmGpuAttachment HcsVirtualMachineBackend::AddGpu(const VmGpuRequest& Request)
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_gpu.has_value());
     THROW_HR_IF(E_BOUNDS, m_nextDeviceId == UINT64_MAX);
 
-    schema::AddMirroredGpu(
-        m_system.get(), attachment.VendorExtension, attachment.GdiAccelerationDisabled, attachment.PresentationDisabled);
+    schema::AddMirroredGpu(m_system.get(), attachment.VendorExtension, attachment.GdiAccelerationDisabled, attachment.PresentationDisabled);
 
     attachment.Id = {m_configuration.Description.Identity, m_nextDeviceId++};
     m_gpu = attachment;
@@ -1648,8 +1639,7 @@ VmNetworkAttachment HcsVirtualMachineBackend::AddNetworkAdapter(const VmNetworkA
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system || !m_guestDeviceManager);
     THROW_HR_IF(E_BOUNDS, m_nextDeviceId == std::numeric_limits<std::uint64_t>::max());
-    THROW_HR_IF(
-        HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_configuration.Description.NetworkAdapters.contains(Request.Tag));
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_configuration.Description.NetworkAdapters.contains(Request.Tag));
 
     VmNetworkAttachment attachment{};
     attachment.Id = VmDeviceId{m_configuration.Description.Identity, m_nextDeviceId};
@@ -1678,8 +1668,7 @@ VmNetworkAttachment HcsVirtualMachineBackend::AddNetworkAdapter(const VmNetworkA
     std::visit(
         Overloaded{
             [&](const VmHostEndpointNetwork& configuration) {
-                THROW_HR_IF(
-                    E_INVALIDARG, IsEqualGUID(configuration.EndpointId, GUID_NULL) || IsEqualGUID(configuration.InstanceId, GUID_NULL));
+                THROW_HR_IF(E_INVALIDARG, IsEqualGUID(configuration.EndpointId, GUID_NULL) || IsEqualGUID(configuration.InstanceId, GUID_NULL));
                 resourcePath = wsl::core::networking::c_networkAdapterPrefix +
                                wsl::shared::string::GuidToString<wchar_t>(configuration.InstanceId);
                 ModifyHostEndpointLocked(configuration, resourcePath, schema::ModifyRequestType::Add);
@@ -1727,12 +1716,9 @@ void HcsVirtualMachineBackend::UpdateNetworkAdapter(VmDeviceId Device, const VmN
     auto adapter = FindNetworkAdapterLocked(Device);
     auto device = GetUserModeNatDeviceLocked(Device);
     IpAddress emptyNameserver{};
-    auto* nameservers =
-        configuration->Nameservers.empty() ? &emptyNameserver : const_cast<IpAddress*>(configuration->Nameservers.data());
+    auto* nameservers = configuration->Nameservers.empty() ? &emptyNameserver : const_cast<IpAddress*>(configuration->Nameservers.data());
     THROW_IF_FAILED(device->Update(
-        const_cast<WslVirtioNetConfig*>(&configuration->Configuration),
-        gsl::narrow_cast<UINT32>(configuration->Nameservers.size()),
-        nameservers));
+        const_cast<WslVirtioNetConfig*>(&configuration->Configuration), gsl::narrow_cast<UINT32>(configuration->Nameservers.size()), nameservers));
 
     adapter->second.EffectiveConfiguration = Configuration;
     m_configuration.Description.NetworkAdapters[adapter->second.Tag] = adapter->second;
@@ -1832,7 +1818,8 @@ VmPortBinding HcsVirtualMachineBackend::BindPort(VmDeviceId Device, const VmPort
         TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
         TraceLoggingValue(Device.Value, "deviceId"),
         TraceLoggingValue(
-            wsl::windows::common::string::IpAddressToWstring(Request.ListenAddress, Request.ListenScopeId).c_str(), "listenAddress"),
+            wsl::windows::common::string::IpAddressToWstring(Request.ListenAddress, Request.ListenScopeId).c_str(),
+            "listenAddress"),
         TraceLoggingValue(Request.GuestPort, "guestPort"));
 
     auto lock = m_lock.lock_exclusive();

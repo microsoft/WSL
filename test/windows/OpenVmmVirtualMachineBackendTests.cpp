@@ -126,11 +126,10 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_IS_FALSE(IsEqualGUID(GUID_NULL, adapter.GuestInstanceId.value()));
         const auto& effectiveConfiguration = std::get<VmUserModeNatNetwork>(adapter.EffectiveConfiguration).Configuration;
         const auto& requestedConfiguration = std::get<VmUserModeNatNetwork>(request.NetworkAdapters[0].Configuration).Configuration;
-        VERIFY_IS_TRUE(
-            std::equal(
-                std::begin(effectiveConfiguration.clientMac.bytes),
-                std::end(effectiveConfiguration.clientMac.bytes),
-                std::begin(requestedConfiguration.clientMac.bytes)));
+        VERIFY_IS_TRUE(std::equal(
+            std::begin(effectiveConfiguration.clientMac.bytes),
+            std::end(effectiveConfiguration.clientMac.bytes),
+            std::begin(requestedConfiguration.clientMac.bytes)));
 
         THROW_IF_FAILED(CoCreateGuid(&request.Identity.VmId));
         const auto other = ValidateCreateRequest(request).NetworkAdapters.at(L"eth0");

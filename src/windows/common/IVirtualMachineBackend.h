@@ -518,8 +518,7 @@ struct VmPlan9VirtioDevice
     VmPlan9ServerFactory ServerFactory;
 };
 
-using VmFileSystemDeviceTransport =
-    std::variant<VmVirtioFsDevice, VmPlan9SocketDevice, VmPlan9HostedDevice, VmPlan9VirtioDevice>;
+using VmFileSystemDeviceTransport = std::variant<VmVirtioFsDevice, VmPlan9SocketDevice, VmPlan9HostedDevice, VmPlan9VirtioDevice>;
 
 struct VmFileSystemDeviceRequest
 {
