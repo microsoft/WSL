@@ -25,6 +25,7 @@ Abstract:
 #include "MsiQuery.h"
 #include "WslInstall.h"
 #include <Dbghelp.h>
+#include <Dbghelp.h>
 
 using winrt::Windows::Foundation::Uri;
 using winrt::Windows::Management::Deployment::DeploymentOptions;
@@ -346,6 +347,31 @@ constexpr unsigned long EndianSwap(unsigned long value)
     return gsl::narrow_cast<unsigned long>(EndianSwap(gsl::narrow_cast<uint32_t>(value)));
 }
 
+constexpr bool IsCrashException(DWORD exceptionCode)
+{
+    switch (exceptionCode)
+    {
+    case EXCEPTION_ACCESS_VIOLATION:
+    case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+    case EXCEPTION_ILLEGAL_INSTRUCTION:
+    case EXCEPTION_IN_PAGE_ERROR:
+    case EXCEPTION_INT_DIVIDE_BY_ZERO:
+    case EXCEPTION_INT_OVERFLOW:
+    case EXCEPTION_INVALID_DISPOSITION:
+    case EXCEPTION_NONCONTINUABLE_EXCEPTION:
+    case EXCEPTION_PRIV_INSTRUCTION:
+    case EXCEPTION_STACK_OVERFLOW:
+    case 0x40000015: // EXCEPTION_FATAL_APP_EXIT
+    case 0xC0000374: // EXCEPTION_HEAP_CORRUPT
+    case 0xC0000409: // EXCEPTION_STACK_BUFFER_OVERRUN
+    case 0xC0000602: // EXCEPTION_FAIL_FAST
+        return true;
+
+    default:
+        return false;
+    }
+}
+
 constexpr GUID EndianSwap(GUID value)
 {
     value.Data1 = EndianSwap(value.Data1);
@@ -356,6 +382,11 @@ constexpr GUID EndianSwap(GUID value)
 
 static LONG WINAPI OnException(_EXCEPTION_POINTERS* exception)
 {
+    if (!IsCrashException(exception->ExceptionRecord->ExceptionCode))
+    {
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+
     try
     {
         static std::atomic<bool> handlingException = false;
@@ -363,6 +394,8 @@ static LONG WINAPI OnException(_EXCEPTION_POINTERS* exception)
         {
             return EXCEPTION_CONTINUE_SEARCH; // Don't keep trying if we crash during exception handling.
         }
+
+        auto resetFlag = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { handlingException.store(false); });
 
         // Collect a crash dump if enabled.
         auto image = std::filesystem::path(wil::GetModuleFileNameW<std::wstring>()).filename();
@@ -465,7 +498,10 @@ void wsl::windows::common::wslutil::CoInitializeSecurity()
 
 void wsl::windows::common::wslutil::ConfigureCrashHandler()
 {
-    AddVectoredExceptionHandler(1, OnException);
+    if constexpr (!wsl::shared::OfficialBuild)
+    {
+        AddVectoredExceptionHandler(1, OnException);
+    }
 }
 
 void wsl::windows::common::wslutil::ConfigureCrt()
