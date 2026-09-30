@@ -26,7 +26,7 @@ extern "C" int LLVMFuzzerInitialize(int*, char***)
     winrt::init_apartment();
 
     // Fail before fuzzing if activation or host setup cannot start a session.
-    const auto sessionName = L"WslcWinRtFuzzing-Probe-" + std::to_wstring(GetCurrentProcessId());
+    const auto sessionName = GetFuzzSessionName(L"WslcWinRtFuzzing-Probe");
     SessionSettings sessionSettings{sessionName, GetFuzzStoragePath(L"WslcWinRtFuzzing")};
     sessionSettings.CpuCount(1);
     sessionSettings.MemorySizeInMB(1024);
@@ -51,7 +51,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     try
     {
         // Read session parameters from corpus
-        std::wstring sessionName = input.ReadWideString();
+        const auto sessionName = GetFuzzSessionName(input.ReadWideString());
         const auto storagePath = GetFuzzStoragePath(L"WslcWinRtFuzzing");
 
         // Build session settings via WinRT

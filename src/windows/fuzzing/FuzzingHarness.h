@@ -16,7 +16,17 @@
 
 inline std::wstring GetFuzzStoragePath(std::wstring_view harnessName)
 {
-    return (std::filesystem::temp_directory_path() / harnessName).wstring();
+    return (std::filesystem::temp_directory_path() / harnessName / std::to_wstring(GetCurrentProcessId())).wstring();
+}
+
+inline std::wstring GetFuzzSessionName(std::wstring_view sessionName)
+{
+    if (sessionName.empty())
+    {
+        return {};
+    }
+
+    return std::wstring{sessionName} + L"-" + std::to_wstring(GetCurrentProcessId());
 }
 
 // Cursor over fuzz input bytes. Harnesses construct this from LLVMFuzzerTestOneInput args

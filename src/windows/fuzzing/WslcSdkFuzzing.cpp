@@ -21,7 +21,7 @@ extern "C" int LLVMFuzzerInitialize(int*, char***)
     (void)coInitialize;
 
     // Fail before fuzzing if the VM cannot start a session; fuzz inputs are expected to fail, host setup is not.
-    const auto sessionName = L"WslcSdkFuzzing-Probe-" + std::to_wstring(GetCurrentProcessId());
+    const auto sessionName = GetFuzzSessionName(L"WslcSdkFuzzing-Probe");
     const auto storagePath = GetFuzzStoragePath(L"WslcSdkFuzzing");
     WslcSessionSettings sessionSettings{};
     THROW_IF_FAILED(WslcInitSessionSettings(sessionName.c_str(), storagePath.c_str(), &sessionSettings));
@@ -47,7 +47,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     FuzzInput input{data, size};
 
     // Read session parameters from corpus
-    std::wstring sessionName = input.ReadWideString();
+    const auto sessionName = GetFuzzSessionName(input.ReadWideString());
     const auto storagePath = GetFuzzStoragePath(L"WslcSdkFuzzing");
 
     // Initialize session settings
