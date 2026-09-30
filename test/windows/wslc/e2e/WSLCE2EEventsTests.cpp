@@ -23,7 +23,6 @@ namespace WSLCE2ETests {
 namespace {
 
     constexpr auto c_eventContainerName = L"wslc-events-test";
-    constexpr size_t c_eventTimestampLength = 35;
 
     LONGLONG EpochSeconds()
     {
@@ -38,21 +37,14 @@ namespace {
 
     void VerifyEventLine(std::wstring_view line, std::wstring_view expectedEvent)
     {
-        VERIFY_ARE_EQUAL(c_eventTimestampLength + expectedEvent.size(), line.size());
-        if (line.size() < c_eventTimestampLength)
-        {
-            return;
-        }
+        // The offset is 'Z' on a UTC machine and numeric elsewhere, so the timestamp length varies.
+        const std::wregex timestampPattern(LR"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{9}(Z|[+-]\d{2}:\d{2}))");
 
-        VERIFY_ARE_EQUAL(L'-', line[4]);
-        VERIFY_ARE_EQUAL(L'-', line[7]);
-        VERIFY_ARE_EQUAL(L'T', line[10]);
-        VERIFY_ARE_EQUAL(L':', line[13]);
-        VERIFY_ARE_EQUAL(L':', line[16]);
-        VERIFY_ARE_EQUAL(L'.', line[19]);
-        VERIFY_IS_TRUE(line[29] == L'+' || line[29] == L'-');
-        VERIFY_ARE_EQUAL(L':', line[32]);
-        VERIFY_ARE_EQUAL(std::wstring{expectedEvent}, std::wstring{line.substr(c_eventTimestampLength)});
+        const auto separator = line.find(L' ');
+        VERIFY_ARE_NOT_EQUAL(std::wstring_view::npos, separator);
+
+        VERIFY_IS_TRUE(std::regex_match(std::wstring{line.substr(0, separator)}, timestampPattern));
+        VERIFY_ARE_EQUAL(std::wstring{expectedEvent}, std::wstring{line.substr(separator)});
     }
 
 } // namespace
