@@ -63,6 +63,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         // Attempt to create session
         Session session{sessionSettings};
         session.Start();
+        auto terminateSession = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { session.Terminate(); });
 
         // Read container parameters from corpus
         std::string imageName = input.ReadString();
@@ -102,7 +103,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
 
         // Cleanup
         container.Delete(DeleteContainerOption::Force);
-        session.Terminate();
     }
     catch (...)
     {
