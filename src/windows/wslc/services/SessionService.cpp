@@ -65,7 +65,7 @@ namespace {
             {"Action", event.Action},
             {"Actor", event.Actor},
             {"scope", "local"},
-            {"time", event.timeNano / 1'000'000'000},
+            {"time", std::chrono::floor<std::chrono::seconds>(std::chrono::nanoseconds{event.timeNano}).count()},
             {"timeNano", event.timeNano}};
 
         // Docker still reports these deprecated fields for container events.
