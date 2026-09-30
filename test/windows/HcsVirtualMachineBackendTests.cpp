@@ -109,6 +109,8 @@ class HcsVirtualMachineBackendTests
         auto backend = HcsVirtualMachineBackend::Create(request);
         const auto description = backend->GetDescription();
 
+        VERIFY_IS_NOT_NULL(backend->GetComputeSystemHandle());
+        VERIFY_IS_NOT_NULL(backend->GetGuestDeviceManager().get());
         VERIFY_IS_TRUE(IsEqualGUID(request.Identity.VmId, description.Identity.VmId));
         VERIFY_ARE_EQUAL(BackendKind::Hcs, description.Backend);
         VERIFY_ARE_EQUAL(request.Processor.Count, description.Processor.Count);
@@ -335,6 +337,8 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->GetFileSystemDeviceStatus(device); }));
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->RemoveDevice(device); }));
         backend->Terminate();
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), OperationResult([&] { backend->GetComputeSystemHandle(); }));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), OperationResult([&] { backend->GetGuestDeviceManager(); }));
     }
 
     TEST_METHOD(SharesHostDirectoriesPerElevationLevel)
