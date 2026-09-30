@@ -337,13 +337,27 @@ inline void to_json(nlohmann::json& j, const Processor& processor)
     OMIT_IF_EMPTY(j, processor, EnablePerfmonLbr)
 }
 
+struct Numa
+{
+};
+
+inline void to_json(nlohmann::json& j, const Numa&)
+{
+    j = nlohmann::json::object();
+}
+
 struct Topology
 {
     Processor Processor;
     Memory Memory;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(Topology, Processor, Memory);
+    std::optional<Numa> Numa;
 };
+
+inline void to_json(nlohmann::json& j, const Topology& topology)
+{
+    j = nlohmann::json{{"Processor", topology.Processor}, {"Memory", topology.Memory}};
+    OMIT_IF_EMPTY(j, topology, Numa)
+}
 
 struct VirtioSerialPort
 {

@@ -1568,6 +1568,9 @@ std::wstring WslCoreVm::GenerateConfigJson()
     // Configure the number of processors.
     vmSettings.ComputeTopology.Processor.Count = m_vmConfig.ProcessorCount;
 
+    // Let HCS derive a virtual NUMA topology from the requested resources and the host topology.
+    vmSettings.ComputeTopology.Numa.emplace();
+
     // Set the vmmem suffix which will change the process name in task manager.
     if (helpers::IsVmemmSuffixSupported())
     {

@@ -7,6 +7,7 @@ set(SOURCES
     Plan9ProtocolTests.cpp
     DrvFsTests.cpp
     FilesystemUnitTests.cpp
+    HcsSchemaUnitTests.cpp
     StringUnitTests.cpp
     Common.cpp
     PluginTests.cpp

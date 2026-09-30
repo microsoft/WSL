@@ -2441,6 +2441,20 @@ Usage:
         auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"nproc --all");
         VERIFY_ARE_EQUAL(L"1\n", output);
         VERIFY_ARE_EQUAL(L"", warnings);
+
+        const int logicalProcessorCount = wsl::windows::common::wslutil::GetLogicalProcessorCount();
+        if (logicalProcessorCount > 256)
+        {
+            configChange.Update(LxssGenerateTestConfig());
+            std::tie(output, warnings) = LxsstuLaunchWslAndCaptureOutput(L"nproc --all");
+            VERIFY_ARE_EQUAL(std::format(L"{}\n", logicalProcessorCount), output);
+            VERIFY_ARE_EQUAL(L"", warnings);
+
+            configChange.Update(LxssGenerateTestConfig() + std::format(L"\nprocessors={}", logicalProcessorCount));
+            std::tie(output, warnings) = LxsstuLaunchWslAndCaptureOutput(L"nproc --all");
+            VERIFY_ARE_EQUAL(std::format(L"{}\n", logicalProcessorCount), output);
+            VERIFY_ARE_EQUAL(L"", warnings);
+        }
     }
 
     WSL2_TEST_METHOD(DmesgCollection)

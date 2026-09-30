@@ -122,6 +122,9 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     vmSettings.ComputeTopology.Memory.EnableColdDiscardHint = true;
     vmSettings.ComputeTopology.Processor.Count = Settings->CpuCount;
 
+    // Let HCS derive a virtual NUMA topology from the requested resources and the host topology.
+    vmSettings.ComputeTopology.Numa.emplace();
+
     // Configure backing page size, fault cluster shift size, and page reporting order to favor density (lower vmmem usage).
     //
     // N.B. Page reporting order must be >= fault cluster size shift.
