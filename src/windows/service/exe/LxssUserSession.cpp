@@ -1584,8 +1584,9 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
                         VhdSize = config.VhdSizeBytes;
                     }
 
+                    const bool fixed = WI_IsFlagSet(Flags, LXSS_IMPORT_DISTRO_FLAGS_FIXED_VHD);
                     wsl::core::filesystem::CreateVhd(
-                        configuration.VhdFilePath.c_str(), VhdSize, GetUserSid(), config.EnableSparseVhd, WI_IsFlagSet(Flags, LXSS_IMPORT_DISTRO_FLAGS_FIXED_VHD));
+                        configuration.VhdFilePath.c_str(), VhdSize, GetUserSid(), config.EnableSparseVhd && !fixed, fixed);
 
                     deleteFlags = LXSS_DELETE_DISTRO_FLAGS_VHD;
                 }
@@ -1761,6 +1762,8 @@ CATCH_RETURN()
 HRESULT LxssUserSessionImpl::SetSparse(_In_ LPCGUID DistroGuid, _In_ BOOLEAN Sparse, _In_ BOOLEAN AllowUnsafe)
 try
 {
+    UNREFERENCED_PARAMETER(AllowUnsafe);
+
     const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     const wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
     auto runAsUser = wil::impersonate_token(userToken.get());
@@ -1773,12 +1776,6 @@ try
     if (WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE))
     {
         THROW_HR_WITH_USER_ERROR(WSL_E_VM_MODE_INVALID_STATE, wsl::shared::Localization::MessageSparseVhdWsl2Only());
-    }
-
-    // Allow disabling sparse mode but not enabling until the data corruption issue has been resolved.
-    if (Sparse && !AllowUnsafe)
-    {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageSparseVhdDisabled());
     }
 
     // Don't attempt if running
@@ -1803,6 +1800,11 @@ try
         .SetSparse = Sparse,
     };
     THROW_IF_WIN32_BOOL_FALSE(::DeviceIoControl(vhd.get(), FSCTL_SET_SPARSE, &buffer, sizeof(buffer), nullptr, 0, nullptr, nullptr));
+
+    if (Sparse)
+    {
+        EMIT_USER_WARNING(wsl::shared::Localization::MessageSparseVhdUnsafe());
+    }
 
     return S_OK;
 }
