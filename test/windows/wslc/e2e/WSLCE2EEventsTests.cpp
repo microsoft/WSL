@@ -273,6 +273,84 @@ class WSLCE2EEventsTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Events_NetworkJsonFormat)
+    {
+        GUID runId{};
+        VERIFY_SUCCEEDED(CoCreateGuid(&runId));
+        const auto suffix = wsl::shared::string::GuidToString<wchar_t>(runId, wsl::shared::string::GuidToStringFlags::None);
+        const auto networkName = L"wslc-events-json-network-" + suffix;
+        const auto containerName = L"wslc-events-json-container-" + suffix;
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            EnsureContainerDoesNotExist(containerName);
+            EnsureNetworkDoesNotExist(networkName);
+        });
+
+        const auto since = EpochSeconds();
+        auto result = RunWslc(std::format(L"network create --driver bridge {}", networkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto networkId = InspectNetwork(networkName).Id;
+
+        result = RunWslc(
+            std::format(L"container run -d --name {} --network {} {} sleep infinity", containerName, networkName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto containerId = wsl::shared::string::WideToMultiByte(result.GetStdoutOneLine());
+
+        result = RunWslc(std::format(L"container rm -f {}", containerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"network rm {}", networkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Network removal doesn't wait for its event to be recorded, so retry until the whole lifecycle is visible.
+        std::vector<nlohmann::json> events;
+        VERIFY_NO_THROW(
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() {
+                    const auto query = RunWslc(
+                        std::format(L"events --since {} --until {} --filter type=network --filter network={} --format json", since, EpochSeconds() + 1, networkName));
+                    THROW_HR_IF(E_FAIL, query.ExitCode != 0u);
+
+                    events = ParseNdjsonOutput(query);
+                    THROW_HR_IF(E_ABORT, events.size() < 4);
+                },
+                std::chrono::milliseconds(200),
+                std::chrono::seconds(30)));
+
+        const std::vector<std::string> expectedActions{"create", "connect", "disconnect", "destroy"};
+        VERIFY_ARE_EQUAL(expectedActions.size(), events.size());
+
+        for (size_t index = 0; index < events.size(); ++index)
+        {
+            const auto& event = events[index];
+            const auto action = event.at("Action").get<std::string>();
+            VERIFY_ARE_EQUAL(expectedActions[index], action);
+            VERIFY_ARE_EQUAL(std::string{"network"}, event.at("Type").get<std::string>());
+            VERIFY_ARE_EQUAL(networkId, event.at("Actor").at("ID").get<std::string>());
+
+            const auto& attributes = event.at("Actor").at("Attributes");
+            VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(networkName), attributes.at("name").get<std::string>());
+            VERIFY_ARE_EQUAL(std::string{"bridge"}, attributes.at("type").get<std::string>());
+
+            const bool endpointEvent = action == "connect" || action == "disconnect";
+            VERIFY_ARE_EQUAL(endpointEvent, attributes.contains("container"));
+            if (endpointEvent)
+            {
+                VERIFY_ARE_EQUAL(containerId, attributes.at("container").get<std::string>());
+            }
+
+            VERIFY_ARE_EQUAL(std::string{"local"}, event.at("scope").get<std::string>());
+
+            const auto timeNano = event.at("timeNano").get<std::int64_t>();
+            VERIFY_IS_GREATER_THAN(timeNano, 0LL);
+            VERIFY_ARE_EQUAL(timeNano / 1'000'000'000, event.at("time").get<std::int64_t>());
+
+            // Docker only reports its legacy fields for container events.
+            VERIFY_IS_FALSE(event.contains("status"));
+            VERIFY_IS_FALSE(event.contains("id"));
+            VERIFY_IS_FALSE(event.contains("from"));
+        }
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Events_RejectsUnsupportedFilter)
     {
         auto session = OpenDefaultElevatedSession();
