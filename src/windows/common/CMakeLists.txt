@@ -3,6 +3,7 @@ set(SOURCES
     ConsoleProgressBar.cpp
     ConsoleProgressIndicator.cpp
     ConsoleState.cpp
+    CrashReporting.cpp
     wslc/models/ContainerModel.cpp
     DeviceHostProxy.cpp
     disk.cpp
@@ -98,6 +99,7 @@ set(HEADERS
     ConsoleProgressBar.h
     ConsoleProgressIndicator.h
     ConsoleState.h
+    CrashReporting.h
     wslc/models/ContainerModel.h
     DeviceHostProxy.h
     disk.hpp
@@ -178,8 +180,9 @@ target_include_directories(common PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/../service/
 # the config file parser, so anything linking common needs those libraries too.
 # PUBLIC propagates them instead of making each consumer restate them.
 # yaml-cpp backs WSLCUserSettings, advapi32 the credential manager APIs used by
-# WinCredStorage, and Crypt32 the data protection APIs used by FileCredStorage.
-target_link_libraries(common PUBLIC ${HCS_LINK_LIBRARIES} ${MSI_LINK_LIBRARIES} VirtDisk.lib configfile yaml-cpp advapi32 Crypt32.lib)
+# WinCredStorage, Crypt32 the data protection APIs used by FileCredStorage, and wer.lib the
+# Windows Error Reporting APIs used by CrashReporting.
+target_link_libraries(common PUBLIC ${HCS_LINK_LIBRARIES} ${MSI_LINK_LIBRARIES} VirtDisk.lib configfile yaml-cpp advapi32 Crypt32.lib wer.lib)
 
 # WSLCUserSettings.cpp uses yaml-cpp headers.
 # The per-source include path and definition below only apply when the file is

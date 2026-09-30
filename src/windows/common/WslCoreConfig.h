@@ -270,6 +270,7 @@ namespace ConfigSetting {
     static constexpr auto SafeMode = "wsl2.safeMode";
     static constexpr auto DefaultVhdSize = "wsl2.defaultVhdSize";
     static constexpr auto CrashDumpFolder = "wsl2.crashDumpFolder";
+    static constexpr auto CrashDumpReporting = "wsl2.crashDumpReporting";
     static constexpr auto MaxCrashDumpCount = "wsl2.maxCrashDumpCount";
     static constexpr auto DistributionInstallPath = "general.distributionInstallPath";
     static constexpr auto InstanceIdleTimeout = "general.instanceIdleTimeout";
@@ -382,6 +383,9 @@ struct Config
     bool EnableHostAddressLoopback = false;
     std::filesystem::path CrashDumpFolder;
     int MaxCrashDumpCount = 10;
+
+    // Off by default: reports carry the crashing process's full ELF core, so submission is opt-in.
+    bool CrashDumpReporting = false;
     UINT64 SwiotlbSizeBytes = 0;
     bool IsolateDistroCgroup = true;
 

@@ -105,6 +105,7 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         ConfigKey(ConfigSetting::SafeMode, EnableSafeMode),
         ConfigKey(ConfigSetting::DefaultVhdSize, MemoryString(VhdSizeBytes)),
         ConfigKey(ConfigSetting::CrashDumpFolder, CrashDumpFolder),
+        ConfigKey(ConfigSetting::CrashDumpReporting, CrashDumpReporting),
         ConfigKey(ConfigSetting::MaxCrashDumpCount, MaxCrashDumpCount),
         ConfigKey(ConfigSetting::DistributionInstallPath, DefaultDistributionLocation),
         ConfigKey(ConfigSetting::InstanceIdleTimeout, InstanceIdleTimeout),

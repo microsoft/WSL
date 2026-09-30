@@ -24,6 +24,7 @@ Abstract:
 #include "WslCoreFirewallSupport.h"
 #include "DnsResolver.h"
 #include "ConsommeNetworking.h"
+#include "CrashReporting.h"
 
 #include <TraceLoggingProvider.h>
 
@@ -1212,6 +1213,15 @@ void WslCoreVm::CollectCrashDumps(wil::unique_socket&& listenSocket) const
             transaction.SendResultMessage<std::int32_t>(0);
 
             wsl::windows::common::relay::InterruptableRelay(reinterpret_cast<HANDLE>(channel.Socket()), file.get(), nullptr);
+
+            if (m_vmConfig.CrashDumpReporting)
+            {
+                // The core has to be closed before its path is handed to Windows Error Reporting.
+                file.reset();
+
+                LOG_IF_FAILED(wsl::windows::common::crashreporting::ReportLinuxCrash(
+                    {process, message.Pid, message.Signal, message.Timestamp, fullPath}));
+            }
         }
         CATCH_LOG();
     }

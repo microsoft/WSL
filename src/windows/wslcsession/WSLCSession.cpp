@@ -24,6 +24,7 @@ Abstract:
 #include "WSLCSessionDefaults.h"
 #include "wslpolicies.h"
 #include "APICompat.h"
+#include "CrashReporting.h"
 #include "WSLCContainerEntry.h"
 
 using namespace wsl::windows::common;
@@ -3621,25 +3622,49 @@ void WSLCSession::RemoveCrashDumpCallback(CrashDumpCallbackList::iterator It) no
 }
 
 void WSLCSession::OnCrashDumpWritten(const std::wstring& DumpPath, const std::string& ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp)
-try
 {
-    // Snapshot the callback list under the lock so that cross-process callback invocations don't
-    // hold m_crashDumpLock (and can't deadlock with Register/Remove on the same thread that the
-    // callback might in turn use).
-    std::vector<wil::com_ptr<ICrashDumpCallback>> snapshot;
+    // Report the crash against the application that created this session, so the report is routed
+    // to whoever owns that application rather than to WSL itself.
+    //
+    // This runs before the subscriber fan-out and in its own scope. Reporting invokes no user
+    // callback, so it must not be tied to RegisterUserCOMCallback(), which refuses once the session
+    // is terminating. A crash dump routinely lands while the session is tearing down, so sharing a
+    // scope with the fan-out would drop the report exactly when there is something to report.
+    try
     {
-        auto lock = m_crashDumpLock.lock_shared();
-        snapshot.assign(m_crashDumpCallbacks.begin(), m_crashDumpCallbacks.end());
+        if (wsl::windows::common::crashreporting::IsReportingEnabled())
+        {
+            LOG_IF_FAILED(wsl::windows::common::crashreporting::ReportLinuxCrash(
+                {ProcessName, Pid, Signal, Timestamp, DumpPath, m_creatorProcessName}));
+        }
     }
+    CATCH_LOG()
 
-    auto comCall = RegisterUserCOMCallback();
-
-    for (const auto& callback : snapshot)
+    try
     {
-        LOG_IF_FAILED(callback->OnCrashDump(DumpPath.c_str(), ProcessName.c_str(), Pid, Signal, Timestamp));
+        // Snapshot the callback list under the lock so that cross-process callback invocations don't
+        // hold m_crashDumpLock (and can't deadlock with Register/Remove on the same thread that the
+        // callback might in turn use).
+        std::vector<wil::com_ptr<ICrashDumpCallback>> snapshot;
+        {
+            auto lock = m_crashDumpLock.lock_shared();
+            snapshot.assign(m_crashDumpCallbacks.begin(), m_crashDumpCallbacks.end());
+        }
+
+        if (snapshot.empty())
+        {
+            return;
+        }
+
+        auto comCall = RegisterUserCOMCallback();
+
+        for (const auto& callback : snapshot)
+        {
+            LOG_IF_FAILED(callback->OnCrashDump(DumpPath.c_str(), ProcessName.c_str(), Pid, Signal, Timestamp));
+        }
     }
+    CATCH_LOG()
 }
-CATCH_LOG();
 
 HRESULT WSLCSession::MountWindowsFolder(LPCWSTR WindowsPath, LPCSTR LinuxPath, BOOL ReadOnly, BOOL AcquireVmLease)
 try
