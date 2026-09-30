@@ -67,7 +67,7 @@ public:
     using VolumeEventCallback = std::function<void(const std::string&, VolumeEvent, std::int64_t)>;
     using NetworkEventCallback =
         std::function<void(const std::string&, const std::string&, const std::map<std::string, std::string>&, std::int64_t)>;
-    using ContainerCreateCallback = std::function<void(const std::string& ContainerId, std::int64_t Time)>;
+    using ContainerCreateCallback = std::function<void(const std::string& ContainerId, std::int64_t TimeNano)>;
 
     explicit DockerEventTracker(WSLCSession& session);
     ~DockerEventTracker();
@@ -87,10 +87,10 @@ public:
 
 private:
     void OnEvent(const std::string_view& event);
-    void OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime);
-    void OnContainerCreated(const nlohmann::json& parsed, std::int64_t eventTime);
-    void OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime);
-    void OnNetworkEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime);
+    void OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano);
+    void OnContainerCreated(const nlohmann::json& parsed, std::int64_t eventTimeNano);
+    void OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano);
+    void OnNetworkEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano);
 
     // Callbacks are invoked without holding m_lock so that a callback can register or unregister callbacks, and so
     // that a callback taking its own lock can't invert with a thread that registers a callback under that same lock.

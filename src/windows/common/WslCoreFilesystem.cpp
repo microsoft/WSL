@@ -34,11 +34,9 @@ void wsl::core::filesystem::CreateVhd(_In_ LPCWSTR target, _In_ ULONGLONG maximu
         !wsl::windows::common::string::IsPathComponentEqual(
             std::filesystem::path{target}.extension().native(), windows::common::wslutil::c_vhdxFileExtension));
 
-    // Disable creation of sparse VHDs while data corruption is being debugged.
     if (sparse)
     {
-        sparse = false;
-        EMIT_USER_WARNING(wsl::shared::Localization::MessageSparseVhdDisabled());
+        EMIT_USER_WARNING(wsl::shared::Localization::MessageSparseVhdUnsafe());
     }
 
     VIRTUAL_STORAGE_TYPE storageType{};

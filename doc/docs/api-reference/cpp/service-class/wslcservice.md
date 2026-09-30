@@ -6,21 +6,34 @@ Static entry points over the service-level C API.
 
 - `GetMissingComponents()`
 - `GetVersion()`
-- `InstallWithDependencies()`
-- `InstallWithDependenciesAsync()`
+- `InstallWithDependencies(InstallOptions options)`
+- `InstallWithDependenciesAsync(InstallOptions options)`
 
 **Behavior notes**
 
-- `GetMissingComponents()` returns a `Component` bitmask.
+- `GetMissingComponents()` returns a view of missing `Component` values.
 - `GetVersion()` returns a `ServiceVersion` constructed from `major`, `minor`, and `revision`.
-- `InstallWithDependencies()` installs dependencies synchronously.
+- `InstallWithDependencies()` installs the selected components synchronously.
 - `InstallWithDependenciesAsync()` runs on a background thread and reports `InstallProgress`.
+- If `GetMissingComponents()` returns `Component::SdkNeedsUpdate`, installation cannot resolve the
+  SDK compatibility error.
 
 ```cpp
 auto missing = WslcService::GetMissingComponents();
-if (missing != static_cast<Component>(0))
+for (auto component : missing)
 {
-    auto install = WslcService::InstallWithDependenciesAsync();
+    if (component == Component::SdkNeedsUpdate)
+    {
+        // Installing components cannot resolve this compatibility error.
+        co_return;
+    }
+}
+
+if (missing.Size() != 0)
+{
+    InstallOptions options;
+    options.Components(missing);
+    auto install = WslcService::InstallWithDependenciesAsync(options);
     install.Progress([](auto&&, InstallProgress const& p)
     {
         printf("install %u/%u\n", p.Progress(), p.Total());
@@ -31,7 +44,5 @@ if (missing != static_cast<Component>(0))
 
 ```cpp
 auto version = WslcService::GetVersion();
-(void)version; 
+(void)version;
 ```
-
----

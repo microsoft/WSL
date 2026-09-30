@@ -12,18 +12,6 @@ namespace wsl::windows::service::wslc {
 
 namespace {
 
-    bool IsSignaled(HANDLE Handle)
-    {
-        if (Handle == nullptr)
-        {
-            return false;
-        }
-
-        const auto result = WaitForSingleObject(Handle, 0);
-        THROW_LAST_ERROR_IF(result == WAIT_FAILED);
-        return result == WAIT_OBJECT_0;
-    }
-
     std::optional<std::chrono::sys_seconds> ToTimeBound(int64_t TimeSeconds)
     {
         if (TimeSeconds == 0)
@@ -36,16 +24,21 @@ namespace {
         return std::min(std::chrono::sys_seconds{std::chrono::seconds{TimeSeconds}}, c_maxBound);
     }
 
+    std::chrono::sys_seconds EventTime(const wsl::windows::common::wslc_schema::Event& Event)
+    {
+        return std::chrono::sys_seconds{std::chrono::floor<std::chrono::seconds>(std::chrono::nanoseconds{Event.timeNano})};
+    }
+
 } // namespace
 
 void EventStore::Append(wsl::windows::common::wslc_schema::Event Event)
 {
     std::lock_guard lock(m_lock);
 
-    // Events are recorded in Docker's delivery order, which is also timestamp order. Subscribers rely on
+    // Events are recorded in Docker's delivery order, which is also timestamp order to the second. Subscribers rely on
     // this: they resume from a sequence number, so an out-of-order event could never be inserted where it
     // belongs without hiding it from readers that already moved past that point.
-    WI_ASSERT(m_events.empty() || m_events.back().time <= Event.time);
+    WI_ASSERT(m_events.empty() || EventTime(m_events.back()) <= EventTime(Event));
 
     m_events.push_back(std::move(Event));
 
@@ -58,7 +51,7 @@ void EventStore::Append(wsl::windows::common::wslc_schema::Event Event)
     m_updated.notify_all();
 }
 
-void EventStore::Record(std::string&& Type, std::string&& Action, const std::string& ActorId, std::map<std::string, std::string> ActorAttributes, std::int64_t Time) noexcept
+void EventStore::Record(std::string&& Type, std::string&& Action, const std::string& ActorId, std::map<std::string, std::string> ActorAttributes, std::int64_t TimeNano) noexcept
 try
 {
     wsl::windows::common::wslc_schema::Event event;
@@ -66,7 +59,7 @@ try
     event.Action = std::move(Action);
     event.Actor.ID = ActorId;
     event.Actor.Attributes = std::move(ActorAttributes);
-    event.time = Time;
+    event.timeNano = TimeNano;
 
     Append(std::move(event));
 }
@@ -173,11 +166,25 @@ std::optional<wsl::windows::common::wslc_schema::Event> EventStore::GetLockHeld(
 }
 
 bool EventStore::WaitForEvent(
-    std::unique_lock<std::mutex>& Lock, uint64_t SequenceNumber, std::optional<std::chrono::sys_seconds> Until, HANDLE CancelEvent, HANDLE CallerProcess)
+    std::unique_lock<std::mutex>& Lock, uint64_t SequenceNumber, std::optional<std::chrono::sys_seconds> Until, gsl::span<const HANDLE> WaitHandles)
 {
     // Eviction also makes this true, so the caller can report the gap after waking.
     const auto eventAvailable = [&] { return SequenceNumber < m_firstSequenceNumber + m_events.size(); };
-    const auto aborted = [&] { return m_terminating || IsSignaled(CancelEvent) || IsSignaled(CallerProcess); };
+    const auto aborted = [&] {
+        if (m_terminating)
+        {
+            return true;
+        }
+
+        if (WaitHandles.empty())
+        {
+            return false;
+        }
+
+        const auto result = WaitForMultipleObjects(gsl::narrow_cast<DWORD>(WaitHandles.size()), WaitHandles.data(), FALSE, 0);
+        THROW_LAST_ERROR_IF(result == WAIT_FAILED);
+        return result < WAIT_OBJECT_0 + WaitHandles.size();
+    };
     const auto ready = [&] { return aborted() || eventAvailable(); };
 
     if (Until.has_value())
@@ -204,16 +211,18 @@ std::optional<wsl::windows::common::wslc_schema::Event> EventStore::Get(
     HANDLE CancelEvent)
 {
     const auto callerProcess = wsl::windows::common::wslutil::OpenCallingProcess(SYNCHRONIZE);
-    const std::array handles{CancelEvent, callerProcess.get()};
+    std::array<HANDLE, 2> handles{};
+    size_t handleCount = 0;
 
     // Destroy the waits after releasing m_lock and before closing the process handle. Taking
     // m_lock in the callback prevents a notification being lost between the predicate and wait.
     std::array<wil::unique_threadpool_wait, 2> waits;
-    for (size_t i = 0; i < handles.size(); ++i)
+    for (const auto handle : {CancelEvent, callerProcess.get()})
     {
-        if (handles[i] != nullptr)
+        if (handle != nullptr)
         {
-            waits[i].reset(CreateThreadpoolWait(
+            handles[handleCount] = handle;
+            waits[handleCount].reset(CreateThreadpoolWait(
                 [](PTP_CALLBACK_INSTANCE, PVOID context, PTP_WAIT, TP_WAIT_RESULT) {
                     auto* store = static_cast<EventStore*>(context);
                     std::lock_guard lock(store->m_lock);
@@ -221,18 +230,20 @@ std::optional<wsl::windows::common::wslc_schema::Event> EventStore::Get(
                 },
                 this,
                 nullptr));
-            THROW_LAST_ERROR_IF(!waits[i]);
-            SetThreadpoolWait(waits[i].get(), handles[i], nullptr);
+            THROW_LAST_ERROR_IF(!waits[handleCount]);
+            SetThreadpoolWait(waits[handleCount].get(), handle, nullptr);
+            ++handleCount;
         }
     }
 
+    const gsl::span<const HANDLE> waitHandles{handles.data(), handleCount};
     std::unique_lock lock(m_lock);
 
     // Position the reader. A first read (no sequence number yet) starts at the oldest buffered
     // event
     SequenceNumber = SequenceNumber.value_or(m_firstSequenceNumber);
 
-    while (WaitForEvent(lock, SequenceNumber.value(), Until, CancelEvent, callerProcess.get()))
+    while (WaitForEvent(lock, SequenceNumber.value(), Until, waitHandles))
     {
         // A reader that has fallen behind the ring missed events to eviction: reset it so the
         // next call starts fresh at the oldest buffered event, and report the gap.
@@ -247,7 +258,9 @@ std::optional<wsl::windows::common::wslc_schema::Event> EventStore::Get(
         // so that every parked reader is guaranteed to observe an event before the next write can evict
         // it.
         const auto event = GetLockHeld(SequenceNumber.value()).value();
-        const std::chrono::sys_seconds eventTime{std::chrono::seconds{event.time}};
+
+        // Compared in seconds, since converting a far-future Since or Until bound to nanoseconds would overflow.
+        const auto eventTime = EventTime(event);
 
         // Advance in delivery order before applying the time window.
         SequenceNumber.value()++;
