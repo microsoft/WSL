@@ -94,30 +94,27 @@ private:
         wil::unique_hfile SocketFile;
     };
 
-    struct FileSystemDevice
+    struct OpenVmmFileSystemDevice
     {
-        VmFileSystemDevice Device;
-        VmVirtioFsDevice Transport;
         std::optional<std::uint64_t> Share;
     };
 
-    struct FileSystemShare
-    {
-        VmFileSystemShare Share;
-    };
+    using FileSystemDevice = VmResource<VmFileSystemDevice, OpenVmmFileSystemDevice>;
 
-    struct NetworkAdapter
+    struct OpenVmmNetworkAdapter
     {
-        VmNetworkAttachment Attachment;
         std::wstring NicId;
     };
 
-    struct PortBinding
+    using NetworkAdapter = VmResource<VmNetworkAttachment, OpenVmmNetworkAdapter>;
+
+    struct OpenVmmPortBinding
     {
-        VmPortBinding Binding;
         std::wstring NicId;
         std::wstring HostAddress;
     };
+
+    using PortBinding = VmResource<VmPortBinding, OpenVmmPortBinding>;
 
     struct SessionFileSystemResources
     {
@@ -131,7 +128,7 @@ private:
     _Guarded_by_(m_lock) std::map<std::uint64_t, VmDiskAttachment> m_attachedDisks;
     _Guarded_by_(m_lock) std::uint64_t m_nextDiskId = 1;
     _Guarded_by_(m_lock) std::map<std::uint64_t, FileSystemDevice> m_fileSystemDevices;
-    _Guarded_by_(m_lock) std::map<std::uint64_t, FileSystemShare> m_fileSystemShares;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, VmFileSystemShare> m_fileSystemShares;
     _Guarded_by_(m_lock) std::map<std::uint64_t, NetworkAdapter> m_networkAdapters;
     _Guarded_by_(m_lock) std::map<std::uint64_t, PortBinding> m_portBindings;
     _Guarded_by_(m_lock) std::uint64_t m_nextDeviceId = 1;

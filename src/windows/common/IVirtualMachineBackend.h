@@ -44,6 +44,7 @@ enum class BackendKind
 struct VmInstanceId
 {
     GUID VmId{};
+    // Required VM identity; unlike request overrides, this token cannot be omitted.
     wil::shared_handle UserToken{};
 };
 
@@ -65,6 +66,13 @@ using VmDeviceId = VmResourceId<VmDeviceTag>;
 using VmShareId = VmResourceId<VmShareTag>;
 using VmListenerId = VmResourceId<VmListenerTag>;
 using VmPortBindingId = VmResourceId<VmPortBindingTag>;
+
+// Backends own the extended resource; API methods return only its description by value.
+template <typename Description, typename BackendState>
+struct VmResource : Description
+{
+    BackendState Backend;
+};
 
 enum class VmFeatureRequest
 {
@@ -300,9 +308,9 @@ struct VmDiskRequest
     std::variant<VmVirtualDiskSource, VmPhysicalDiskSource> Source;
     bool ReadOnly = true;
     std::optional<VmScsiPlacement> Placement;
-    // Token whose identity is used to grant access to the disk. The VM identity token is used when
-    // this is unset.
-    wil::shared_handle UserToken{};
+    // VHD access uses this token, falling back to the VM identity when unset. Physical disk
+    // requests require an elevated token; an unset token is reserved for service-authorized restore.
+    std::optional<wil::shared_handle> UserToken;
     // Set for disks that the user explicitly attached (for instance via 'wsl --mount'), as opposed
     // to disks that WSL attaches on the user's behalf.
     bool UserDisk = false;
@@ -516,6 +524,9 @@ using VmFileSystemDeviceTransport =
 struct VmFileSystemDeviceRequest
 {
     VmFileSystemDeviceTransport Transport;
+    // Host identity for the device, defaulting to the VM identity. Aggregate virtio-fs children
+    // inherit this identity because the device host does not accept a token when adding a child.
+    std::optional<wil::shared_handle> UserToken;
 };
 
 enum class VmFileSystemDeviceState
@@ -532,6 +543,7 @@ struct VmFileSystemDevice
     // Set once the device exists in the VM. Backends that create the device when its first share is
     // added report a prepared device without a guest instance id.
     std::optional<GUID> GuestInstanceId;
+    VmFileSystemDeviceTransport Transport;
 };
 
 struct VmPlan9ShareOptions
@@ -552,10 +564,9 @@ struct VmFileSystemShareRequest
     std::wstring Name;
     bool ReadOnly = true;
     VmFileSystemShareOptions Options;
-    // Token whose identity is used to reach the host path. Elevated and unelevated callers share the
-    // same VM, so a share carries its own token instead of reusing the one that created the VM. The
-    // VM identity token is used when this is unset.
-    wil::shared_handle UserToken{};
+    // Token whose identity is used to reach the host path, defaulting to the device identity.
+    // Aggregate virtio-fs shares always use the device identity; set its token at device creation.
+    std::optional<wil::shared_handle> UserToken;
 };
 
 struct VmVirtioFsShareAddress
@@ -600,7 +611,7 @@ struct VmPersistentMemoryRequest
     bool ReadOnly = true;
     // Token whose identity is used to reach the backing file. The VM identity token is used when
     // this is unset.
-    wil::shared_handle UserToken{};
+    std::optional<wil::shared_handle> UserToken;
     VmPersistentMemoryReadyCallback WaitForGuestDevice;
 };
 
@@ -645,7 +656,8 @@ struct VmSharedMemoryRequest
     std::wstring Tag;
     std::wstring Path;
     std::uint64_t SizeBytes = 0;
-    wil::shared_handle UserToken{};
+    // Host identity for the section, defaulting to the VM identity when omitted.
+    std::optional<wil::shared_handle> UserToken;
 };
 
 struct VmSharedMemoryDevice
