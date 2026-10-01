@@ -1296,10 +1296,22 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     unique_com_disconnect comWrapper;
     std::shared_ptr<StateTransition> transition;
 
-    if (event == ContainerEvent::Kill)
+    switch (event)
     {
+    case ContainerEvent::Kill:
         RecordEvent("kill", eventTimeNano);
         return;
+    case ContainerEvent::HealthStarting:
+        RecordEvent("health_status: starting", eventTimeNano);
+        return;
+    case ContainerEvent::HealthHealthy:
+        RecordEvent("health_status: healthy", eventTimeNano);
+        return;
+    case ContainerEvent::HealthUnhealthy:
+        RecordEvent("health_status: unhealthy", eventTimeNano);
+        return;
+    default:
+        break;
     }
 
     {

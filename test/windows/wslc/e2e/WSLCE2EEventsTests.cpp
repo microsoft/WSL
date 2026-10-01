@@ -198,6 +198,82 @@ class WSLCE2EEventsTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Events_ContainerHealth)
+    {
+        const auto since = EpochSeconds();
+        auto result = RunWslc(std::format(
+            LR"(container create --health-cmd "test -f /tmp/healthy" --health-interval 1s --health-timeout 3s --health-retries 1 --name {} {} sleep infinity)",
+            c_eventContainerName,
+            DebianImage.NameAndTag()));
+
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto containerId = result.GetStdoutOneLine();
+        const auto filters = std::format(
+            LR"(--filter type=container --filter container={} --filter "event=health_status: healthy" --filter "event=health_status: unhealthy")",
+            containerId);
+
+        auto events = RunWslcInteractive(
+            std::format(L"events --since {} {}", since, filters), ElevationType::Elevated, std::nullopt, ProcessGroup::Create);
+
+        auto stopReader = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            if (events.IsRunning())
+            {
+                events.SendCtrlBreak();
+            }
+        });
+
+        RunWslc(std::format(L"container start {}", containerId)).Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto expectedEvent = [&](std::wstring_view status) {
+            return std::format(L" container health_status: {} {} (image={}, name={})", status, containerId, DebianImage.NameAndTag(), c_eventContainerName);
+        };
+
+        const auto unhealthyEvent = expectedEvent(L"unhealthy");
+        WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(unhealthyEvent));
+        VerifyContainerIsListed(containerId, L"running");
+
+        RunWslc(std::format(L"container exec {} touch /tmp/healthy", containerId)).Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto healthyEvent = expectedEvent(L"healthy");
+        WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(healthyEvent));
+        VerifyContainerIsListed(containerId, L"running");
+
+        stopReader.reset();
+        VERIFY_ARE_EQUAL(0, events.Wait());
+        events.VerifyNoErrors();
+
+        const WSLCExecutionResult output{.Stdout = wsl::shared::string::MultiByteToWide(events.GetStdoutData())};
+        const auto lines = output.GetStdoutLines();
+        VERIFY_ARE_EQUAL(2u, lines.size());
+
+        VerifyEventLine(lines[0], unhealthyEvent);
+        VerifyEventLine(lines[1], healthyEvent);
+
+        result = RunWslc(std::format(L"events --since {} --until {} {} --format json", since, EpochSeconds() + 1, filters));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto history = ParseNdjsonOutput(result);
+
+        VERIFY_ARE_EQUAL(2u, history.size());
+        VERIFY_ARE_EQUAL(std::string{"health_status: unhealthy"}, history[0].at("Action").get<std::string>());
+        VERIFY_ARE_EQUAL(std::string{"health_status: healthy"}, history[1].at("Action").get<std::string>());
+
+        for (const auto& event : history)
+        {
+            VERIFY_ARE_EQUAL(std::string{"container"}, event.at("Type").get<std::string>());
+            VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(containerId), event.at("Actor").at("ID").get<std::string>());
+            const auto& attributes = event.at("Actor").at("Attributes");
+            VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(c_eventContainerName), attributes.at("name").get<std::string>());
+            VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(DebianImage.NameAndTag()), attributes.at("image").get<std::string>());
+            VERIFY_IS_FALSE(attributes.contains("exitCode"));
+            VERIFY_ARE_EQUAL(event.at("Action").get<std::string>(), event.at("status").get<std::string>());
+            const auto timeNano = event.at("timeNano").get<std::int64_t>();
+            VERIFY_IS_GREATER_THAN_OR_EQUAL(timeNano, since * 1'000'000'000);
+            VERIFY_ARE_EQUAL(timeNano / 1'000'000'000, event.at("time").get<std::int64_t>());
+        }
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Events_InvalidFormatOption)
     {
         auto result = RunWslc(L"events --format invalid");
