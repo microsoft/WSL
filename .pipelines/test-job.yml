@@ -11,13 +11,17 @@ parameters:
   - name: run
     type: boolean
 
+  - name: server
+    type: boolean
+    default: false
+
   - name: pool
     type: string
     default: ''
 
 jobs:
   - job: test_${{ parameters.branch }}_${{ parameters.version }}
-    displayName: "${{ parameters.version }} tests - ${{ parameters.branch }}${{ iif(eq(parameters.branch, 'ge_release'), ' (server)', '') }}"
+    displayName: "${{ parameters.version }} tests - ${{ parameters.branch }}${{ iif(parameters.server, ' (server)', '') }}"
     dependsOn: []
     condition: and(succeeded(), eq('${{ parameters.run }}', true))
     variables:
@@ -33,9 +37,9 @@ jobs:
       pool: ${{ parameters.pool }}
     steps:
       - task: CloudTestServerBuildTask@2
-        displayName: "${{ parameters.version }} tests - ${{ parameters.branch }}${{ iif(eq(parameters.branch, 'ge_release'), ' (server)', '') }}"
+        displayName: "${{ parameters.version }} tests - ${{ parameters.branch }}${{ iif(parameters.server, ' (server)', '') }}"
         inputs:
-          displayName: "${{ parameters.version }} tests - ${{ parameters.branch }}${{ iif(eq(parameters.branch, 'ge_release'), ' (server)', '') }}"
+          displayName: "${{ parameters.version }} tests - ${{ parameters.branch }}${{ iif(parameters.server, ' (server)', '') }}"
           connectedServiceName: "CloudTest-PROD"
           cloudTestTenant: "wsl"
           testMapLocation: 'testbin\x64\cloudtest\wsl-test-image-${{ parameters.image }}-${{ parameters.version}}\TestMap.xml'
