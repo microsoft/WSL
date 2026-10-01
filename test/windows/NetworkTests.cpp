@@ -2105,7 +2105,14 @@ class NetworkTests
         VerifyLoopbackGuestToGuest(address, IPPROTO_TCP);
     }
 
-    static wil::unique_socket BindHostPort(uint16_t Port, int Type, int Protocol, bool ExpectSuccess, bool Ipv6 = false, bool Localhost = false)
+    static wil::unique_socket BindHostPort(
+        uint16_t Port,
+        int Type,
+        int Protocol,
+        bool ExpectSuccess,
+        bool Ipv6 = false,
+        bool Localhost = false,
+        std::chrono::seconds BindTimeout = std::chrono::seconds::zero())
     {
         int AddressFamily{};
         const SOCKADDR* Address{};
@@ -2140,7 +2147,28 @@ class NetworkTests
         wil::unique_socket listenSocket(socket(AddressFamily, Type, Protocol));
         VERIFY_IS_TRUE(!!listenSocket);
 
-        VERIFY_ARE_EQUAL(bind(listenSocket.get(), Address, AddressSize) != SOCKET_ERROR, ExpectSuccess);
+        bool bound = false;
+        int error = 0;
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                bound = bind(listenSocket.get(), Address, AddressSize) != SOCKET_ERROR;
+                error = bound ? 0 : WSAGetLastError();
+                THROW_HR_IF_MSG(
+                    HRESULT_FROM_WIN32(error),
+                    ExpectSuccess && !bound,
+                    "Host bind failed: port=%u protocol=%d family=%d WSAGetLastError=%d",
+                    Port,
+                    Protocol,
+                    AddressFamily,
+                    error);
+            },
+            std::chrono::milliseconds(100),
+            BindTimeout,
+            [&]() {
+                return ExpectSuccess && BindTimeout > std::chrono::seconds::zero() && (error == WSAEADDRINUSE || error == WSAEACCES);
+            }));
+
+        VERIFY_ARE_EQUAL(bound, ExpectSuccess);
 
         return listenSocket;
     }
@@ -4584,13 +4612,16 @@ class MirroredTests
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
+        WslKeepAlive keepAlive;
+
+        // Short-lived guest binds can retain their host reservation until the port tracker's 60-second timeout.
         {
-            auto hostPort = NetworkTests::BindHostPort(1234, SOCK_STREAM, IPPROTO_TCP, true);
+            auto hostPort = NetworkTests::BindHostPort(1234, SOCK_STREAM, IPPROTO_TCP, true, false, false, std::chrono::minutes(2));
             NetworkTests::BindGuestPort(L"TCP4-LISTEN:1234", false);
         }
 
         {
-            auto hostPort = NetworkTests::BindHostPort(1234, SOCK_DGRAM, IPPROTO_UDP, true);
+            auto hostPort = NetworkTests::BindHostPort(1234, SOCK_DGRAM, IPPROTO_UDP, true, false, false, std::chrono::minutes(2));
             NetworkTests::BindGuestPort(L"UDP4-LISTEN:1234", false);
         }
     }
@@ -5754,6 +5785,31 @@ class ConsommeTests
         {
             VERIFY_IS_TRUE(out.find(L"search ") != std::wstring::npos);
         }
+    }
+
+    WSL2_TEST_METHOD(ConfigurationNoIpv6)
+    {
+        CONSOMME_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .kernelCommandLine = L"ipv6.disable=1"}));
+
+        auto [networkingMode, warnings] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --networking-mode", 0);
+        VERIFY_IS_TRUE(warnings.empty());
+        VERIFY_ARE_EQUAL(wsl::shared::string::Trim(networkingMode), L"consomme");
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /proc/sys/net/ipv6"), 1L);
+
+        const auto state = NetworkTests::GetInterfaceState(L"eth0");
+        VERIFY_IS_TRUE(state.Up);
+        VERIFY_IS_FALSE(state.V4Addresses.empty());
+        VERIFY_IS_TRUE(state.V6Addresses.empty());
+        VERIFY_IS_TRUE(state.Gateway.has_value());
+
+        const auto loopbackState = NetworkTests::GetInterfaceState(L"loopback0");
+        VERIFY_IS_TRUE(loopbackState.Up);
+        VERIFY_ARE_EQUAL(loopbackState.V4Addresses.size(), 1u);
+        VERIFY_ARE_EQUAL(loopbackState.V4Addresses[0].Address, L"169.254.73.250");
+        VERIFY_ARE_EQUAL(loopbackState.V4Addresses[0].PrefixLength, 28u);
+        VERIFY_IS_TRUE(loopbackState.V6Addresses.empty());
     }
 
     WSL2_TEST_METHOD(ValidateMacAddress)
