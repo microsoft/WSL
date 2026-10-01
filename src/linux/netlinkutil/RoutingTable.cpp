@@ -36,13 +36,26 @@ std::vector<Route> RoutingTable::ListRoutes(int family)
             }
 
             auto readOptionalAddress = [&](int type) -> std::optional<Address> {
-                auto attribute = e.UniqueAttribute<const void*>(type);
-                if (!attribute.has_value())
+                const void* address = nullptr;
+                if (message->rtm_family == AF_INET)
+                {
+                    address = e.UniqueAttribute<in_addr>(type).value_or(nullptr);
+                }
+                else if (message->rtm_family == AF_INET6)
+                {
+                    address = e.UniqueAttribute<in6_addr>(type).value_or(nullptr);
+                }
+                else
+                {
+                    throw RuntimeErrorWithSourceLocation(std::format("Unexpected address family: {}", message->rtm_family));
+                }
+
+                if (address == nullptr)
                 {
                     return {};
                 }
 
-                return Address::FromBinary(message->rtm_family, message->rtm_dst_len, attribute.value());
+                return Address::FromBinary(message->rtm_family, message->rtm_dst_len, address);
             };
 
             auto to = readOptionalAddress(RTA_DST);

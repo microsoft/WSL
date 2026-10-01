@@ -23,7 +23,7 @@ class EventStore
 public:
     static constexpr size_t c_eventRingCapacity = 256;
 
-    void Record(std::string&& Type, std::string&& Action, const std::string& ActorId, std::map<std::string, std::string> ActorAttributes, std::int64_t Time) noexcept;
+    void Record(std::string&& Type, std::string&& Action, const std::string& ActorId, std::map<std::string, std::string> ActorAttributes, std::int64_t TimeNano) noexcept;
 
     Microsoft::WRL::ComPtr<IWSLCEventStream> CreateStream(
         Microsoft::WRL::ComPtr<WSLCSession> Session, int64_t SinceTime, int64_t UntilTime, std::map<std::string, std::vector<std::string>> Filters);
@@ -47,9 +47,9 @@ private:
     void Append(wsl::windows::common::wslc_schema::Event Event);
 
     // Blocks until the event at SequenceNumber is buffered, its slot is evicted, or the session
-    // terminates, CancelEvent is signaled, or the caller exits. Returns false when Until elapsed
+    // terminates, or any handle in WaitHandles is signaled. Returns false when Until elapsed
     // with no event ready. Throws E_ABORT on cancellation, session termination, or caller exit.
-    bool WaitForEvent(std::unique_lock<std::mutex>& Lock, uint64_t SequenceNumber, std::optional<std::chrono::sys_seconds> Until, HANDLE CancelEvent, HANDLE CallerProcess);
+    bool WaitForEvent(std::unique_lock<std::mutex>& Lock, uint64_t SequenceNumber, std::optional<std::chrono::sys_seconds> Until, gsl::span<const HANDLE> WaitHandles);
 
     std::optional<wsl::windows::common::wslc_schema::Event> GetLockHeld(uint64_t SequenceNumber);
 

@@ -73,6 +73,15 @@ struct FlagsTraits<WslcDeleteContainerFlags>
     WSLC_FLAG_VALUE_ASSERT(WSLC_DELETE_CONTAINER_FLAG_FORCE, WSLCDeleteFlagsForce);
 };
 
+template <>
+struct FlagsTraits<WslcProcessFlags>
+{
+    using WslcType = WSLCProcessFlags;
+    // WSLCProcessFlagsTty is intentionally not exposed by the SDK yet.
+    constexpr static WslcProcessFlags Mask = WSLC_PROCESS_FLAG_STDIN;
+    WSLC_FLAG_VALUE_ASSERT(WSLC_PROCESS_FLAG_STDIN, WSLCProcessFlagsStdin);
+};
+
 template <typename Flags>
 typename FlagsTraits<Flags>::WslcType ConvertFlags(Flags flags)
 {
@@ -218,9 +227,9 @@ bool CopyProcessSettingsToRuntime(WSLCCompatProcessOptions& runtimeOptions, cons
         runtimeOptions.CommandLine.Count = initProcessOptions->commandLineCount;
         runtimeOptions.Environment.Values = initProcessOptions->environment;
         runtimeOptions.Environment.Count = initProcessOptions->environmentCount;
+        runtimeOptions.Flags = ConvertFlags(initProcessOptions->flags);
 
         // TODO: No user access
-        // containerOptions.InitProcessOptions.Flags;
         // containerOptions.InitProcessOptions.TtyRows;
         // containerOptions.InitProcessOptions.TtyColumns;
         // containerOptions.InitProcessOptions.User;
@@ -1296,6 +1305,20 @@ try
 }
 CATCH_RETURN();
 
+STDAPI WslcSetProcessSettingsFlags(_In_ WslcProcessSettings* processSettings, _In_ WslcProcessFlags flags)
+try
+{
+    auto internalType = CheckAndGetInternalType(processSettings);
+
+    // Reject unknown flag bits so future additions can't be silently ignored.
+    RETURN_HR_IF(E_INVALIDARG, WI_IsAnyFlagSet(flags, ~FlagsTraits<WslcProcessFlags>::Mask));
+
+    internalType->flags = flags;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
 // PROCESS MANAGEMENT
 
 STDAPI WslcGetProcessPid(_In_ WslcProcess process, _Out_ uint32_t* pid)
@@ -1799,8 +1822,7 @@ try
 
         if (wuContext.GetUpdateCount() == 0)
         {
-            // During the preview period, the package may not be published yet, so fall back to getting it from GH.
-            // When moving to GA, change this to an error like WSL_E_NO_UPDATE_AVAILABLE or similar.
+            // If Windows Update has no matching package, fall back to getting it from GitHub.
             if (callback)
             {
                 callback(0);

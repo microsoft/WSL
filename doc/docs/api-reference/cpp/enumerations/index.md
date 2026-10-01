@@ -16,4 +16,5 @@ For enums that are directly `static_cast` to/from the C API, the numeric values 
 - [ProcessState](processstate.md)
 - [VhdType](vhdtype.md)
 - [ImageProgressStatus](imageprogressstatus.md)
+- [IdentityTokenType](identitytokentype.md)
 - [SessionTerminationReason](sessionterminationreason.md)

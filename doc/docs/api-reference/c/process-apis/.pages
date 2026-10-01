@@ -5,6 +5,7 @@ nav:
   - wslcsetprocesssettingsworkingdirectory.md
   - wslcsetprocesssettingscmdline.md
   - wslcsetprocesssettingsenvvariables.md
+  - wslcsetprocesssettingsflags.md
   - wslcsetprocesssettingscallbacks.md
   - wslcgetprocesspid.md
   - wslcgetprocessexitevent.md

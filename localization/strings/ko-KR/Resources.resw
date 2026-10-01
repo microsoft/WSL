@@ -2734,6 +2734,10 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>복사된 항목과 유형이 다르므로 '{0}' 덮어쓸 수 없습니다.</value>
     <comment>{0} is the destination path. Shown when a file would replace a directory, or a directory would replace a file.</comment>
   </data>
+  <data name="WSLCCLI_CpSourceNameNotRepresentableError" xml:space="preserve">
+    <value>'{0}' 이름을 Windows 파일 이름으로 사용할 수 없으므로 복사할 수 없습니다.</value>
+    <comment>{0} is the source path. Shown when the container source name holds a character that is not valid in a Windows file name.</comment>
+  </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>컨테이너를 검사합니다.</value>
   </data>

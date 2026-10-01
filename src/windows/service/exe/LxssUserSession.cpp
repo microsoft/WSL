@@ -1501,10 +1501,12 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
 
             _ValidateDistributionNameAndPathNotInUse(lxssKey.get(), distributionPath.c_str(), DistributionName);
 
-            if (!std::filesystem::exists(distributionPath))
             {
                 auto impersonate = wil::CoImpersonateClient();
-                wil::CreateDirectoryDeep(distributionPath.c_str());
+                if (!std::filesystem::exists(distributionPath))
+                {
+                    wil::CreateDirectoryDeep(distributionPath.c_str());
+                }
             }
 
             // If importing a vhd, determine if it is a .vhd or .vhdx.
@@ -1586,8 +1588,9 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
                         VhdSize = config.VhdSizeBytes;
                     }
 
+                    const bool fixed = WI_IsFlagSet(Flags, LXSS_IMPORT_DISTRO_FLAGS_FIXED_VHD);
                     wsl::core::filesystem::CreateVhd(
-                        configuration.VhdFilePath.c_str(), VhdSize, GetUserSid(), config.EnableSparseVhd, WI_IsFlagSet(Flags, LXSS_IMPORT_DISTRO_FLAGS_FIXED_VHD));
+                        configuration.VhdFilePath.c_str(), VhdSize, GetUserSid(), config.EnableSparseVhd && !fixed, fixed);
 
                     deleteFlags = LXSS_DELETE_DISTRO_FLAGS_VHD;
                 }
@@ -1763,6 +1766,8 @@ CATCH_RETURN()
 HRESULT LxssUserSessionImpl::SetSparse(_In_ LPCGUID DistroGuid, _In_ BOOLEAN Sparse, _In_ BOOLEAN AllowUnsafe)
 try
 {
+    UNREFERENCED_PARAMETER(AllowUnsafe);
+
     const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     const wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
     auto runAsUser = wil::impersonate_token(userToken.get());
@@ -1775,12 +1780,6 @@ try
     if (WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE))
     {
         THROW_HR_WITH_USER_ERROR(WSL_E_VM_MODE_INVALID_STATE, wsl::shared::Localization::MessageSparseVhdWsl2Only());
-    }
-
-    // Allow disabling sparse mode but not enabling until the data corruption issue has been resolved.
-    if (Sparse && !AllowUnsafe)
-    {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageSparseVhdDisabled());
     }
 
     // Don't attempt if running
@@ -1805,6 +1804,11 @@ try
         .SetSparse = Sparse,
     };
     THROW_IF_WIN32_BOOL_FALSE(::DeviceIoControl(vhd.get(), FSCTL_SET_SPARSE, &buffer, sizeof(buffer), nullptr, 0, nullptr, nullptr));
+
+    if (Sparse)
+    {
+        EMIT_USER_WARNING(wsl::shared::Localization::MessageSparseVhdUnsafe());
+    }
 
     return S_OK;
 }
@@ -1873,7 +1877,6 @@ CATCH_RETURN()
 HRESULT LxssUserSessionImpl::CompactDistribution(_In_ LPCGUID DistroGuid)
 try
 {
-    auto runAsUser = wil::CoImpersonateClient();
     std::filesystem::path vhdPath;
     LXSS_DISTRO_CONFIGURATION configuration{};
     std::vector<PidTermination> pidTerminations;
@@ -1919,6 +1922,7 @@ try
         CATCH_LOG();
     }
 
+    auto runAsUser = wil::CoImpersonateClient();
     THROW_IF_FAILED_MSG(
         wil::ResultFromException([&] { wsl::core::filesystem::CompactVhd(vhdPath.c_str()); }),
         "Failed to compact VHD: %ls",
@@ -4049,6 +4053,7 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
 
     if (Path != nullptr)
     {
+        auto impersonate = wil::CoImpersonateClient();
         canonicalPath = wsl::windows::common::filesystem::GetCanonicalPath(Path, error);
         if (error)
         {
@@ -4093,6 +4098,7 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
 
         if (Path != nullptr)
         {
+            auto impersonate = wil::CoImpersonateClient();
             auto canonicalDistroPath = wsl::windows::common::filesystem::GetCanonicalPath(configuration.BasePath, error);
             if (error)
             {
