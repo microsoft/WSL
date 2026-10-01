@@ -19,13 +19,6 @@ Abstract:
 #include "IVirtualMachineBackend.h"
 #include "OpenVmmVirtualMachineBackend.h"
 
-namespace {
-
-constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
-constexpr UINT32 c_maximumDisks = 254;
-
-} // namespace
-
 wsl::shared::string::MacAddress VmUserModeNatNetwork::ClientMacAddress() const
 {
     wsl::shared::string::MacAddress address{};

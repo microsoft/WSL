@@ -35,6 +35,14 @@ Abstract:
 #include "defs.h"
 #include "stringshared.h"
 
+namespace wsl::windows::common::vm {
+
+inline constexpr UINT64 c_mib = 1024 * 1024;
+inline constexpr UINT32 c_maximumDisks = 254;
+inline constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+
+} // namespace wsl::windows::common::vm
+
 enum class BackendKind
 {
     Hcs,

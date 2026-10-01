@@ -20,16 +20,15 @@ Abstract:
 
 using wsl::windows::common::Context;
 using wsl::windows::common::ExecutionContext;
+using wsl::windows::common::vm::c_maximumDisks;
+using wsl::windows::common::vm::c_mib;
+using wsl::windows::common::vm::c_notSupported;
 
 namespace validation = wsl::windows::common::vm::validation;
 
 namespace {
 
 namespace schema = wsl::windows::common::hcs;
-
-constexpr UINT64 c_mib = 1024 * 1024;
-constexpr UINT32 c_maximumDisks = 254;
-constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
 
 template <typename... Visitors>
 struct Overloaded : Visitors...
