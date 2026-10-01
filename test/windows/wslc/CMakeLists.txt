@@ -1,9 +1,6 @@
 # WSLC Tests
 #
-# Shared helpers live in helpers/. Unit tests live in unit/, grouped by the layer under
-# test: arguments/, commands/, models/, cli/ and common/. End-to-end tests live in
-# e2e/, grouped by how they drive the product: e2e/service/ calls the COM API directly,
-# e2e/cli/ runs wslc.exe and e2e/sdk/ exercises the WslcSDK and its WinRT projection.
+# Shared fixtures and helpers live in ../common/.
 
 file(GLOB_RECURSE WSLC_TEST_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
@@ -28,9 +25,6 @@ target_include_directories(wsltests PRIVATE
     ${CMAKE_SOURCE_DIR}/test/windows
     ${CMAKE_SOURCE_DIR}/test/windows/common
     ${CMAKE_SOURCE_DIR}/test/windows/wslc
-    ${CMAKE_SOURCE_DIR}/test/windows/wslc/helpers
-    ${CMAKE_SOURCE_DIR}/test/windows/wslc/unit
-    ${CMAKE_SOURCE_DIR}/test/windows/wslc/e2e
     ${CMAKE_SOURCE_DIR}/src/windows/wslc/core
     ${CMAKE_SOURCE_DIR}/src/windows/wslc/commands
     ${CMAKE_SOURCE_DIR}/src/windows/wslc/arguments

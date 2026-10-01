@@ -2193,7 +2193,7 @@ Return Value:
     return true;
 }
 
-// Defined in wslc/helpers/WSLCTestBase.cpp.
+// Defined in common/WSLCTestBase.cpp.
 void WSLCTestFixtureCleanup();
 
 bool ModuleCleanup(VOID)

@@ -1,26 +1,23 @@
-set(SOURCES
-    common/Common.cpp)
+# common/ holds the fixtures and helpers shared by the wsl/ and wslc/ tests, along
+# with the unit tests for src/windows/common.
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/common/*.cpp
+)
 
-set(HEADERS
-    common/Common.h
-    common/lxsstest.h)
-
-# Unit tests for src/windows/common live in common/unit/. Tests for the
-# src/windows/common/wslc/ subtree stay under wslc/unit/ with the rest of WSLC.
-file(GLOB_RECURSE COMMON_TEST_SOURCES CONFIGURE_DEPENDS
-    ${CMAKE_CURRENT_SOURCE_DIR}/common/unit/*.cpp
+file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/common/*.h
 )
 
 add_compile_definitions(INLINE_TEST_METHOD_MARKUP)
 
-add_library(wsltests SHARED ${SOURCES} ${HEADERS} ${COMMON_TEST_SOURCES})
+add_library(wsltests SHARED ${SOURCES} ${HEADERS})
 
 target_include_directories(wsltests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/common
     ${CMAKE_SOURCE_DIR}/src/linux/plan9
     ${CMAKE_SOURCE_DIR}/src/windows/WslcSDK
     ${CMAKE_BINARY_DIR}/src/windows/WslcSDK/winrt/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
-set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/wsl/e2e/NetworkTests.cpp APPEND PROPERTY INCLUDE_DIRECTORIES
+set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/wsl/NetworkTests.cpp APPEND PROPERTY INCLUDE_DIRECTORIES
     ${CMAKE_SOURCE_DIR}/src/windows/service/exe)
 target_link_directories(wsltests PRIVATE ${BIN})
 target_precompile_headers(wsltests REUSE_FROM common)
