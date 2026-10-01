@@ -126,7 +126,7 @@ public:
     // Re-registers a stopped container's VM-scoped port allocations against the restarted VM.
     void RecoverPorts(const common::docker_schema::ContainerInfo& dockerContainer);
 
-    __requires_lock_held(m_lock) void CommitState(WSLCContainerState State, std::int64_t Time, std::optional<int> ExitCode = std::nullopt) noexcept;
+    __requires_lock_held(m_lock) void CommitState(WSLCContainerState State, std::int64_t TimeNano, std::optional<int> ExitCode = std::nullopt) noexcept;
 
     const std::string& ID() const noexcept;
 
@@ -157,7 +157,7 @@ public:
 
     // Appends an event for this container to the session's event stream. Must be called from the Docker
     // event stream thread so that recorded events keep Docker's delivery order.
-    void RecordEvent(std::string&& Action, std::int64_t Time, std::optional<int> ExitCode = std::nullopt) noexcept;
+    void RecordEvent(std::string&& Action, std::int64_t TimeNano, std::optional<int> ExitCode = std::nullopt) noexcept;
 
 private:
     enum class TransitionKind
@@ -192,7 +192,7 @@ private:
     __requires_exclusive_lock_held(m_lock) void RequestDeleteExclusiveLockHeld(WSLCDeleteFlags Flags);
 
     void AllocateBridgedModePorts();
-    void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::int64_t eventTime) noexcept;
+    void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::int64_t eventTimeNano) noexcept;
 
     __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> StartTransition(TransitionKind kind, ContainerEvent expectedEvent);
 
@@ -225,7 +225,7 @@ private:
     __requires_exclusive_lock_held(m_lock) void ReleaseProcesses();
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect PrepareDisconnectComWrapper();
 
-    __requires_exclusive_lock_held(m_lock) void OnStopped(int exitCode, std::int64_t stopTime);
+    __requires_exclusive_lock_held(m_lock) void OnStopped(int exitCode, std::int64_t stopTimeNano);
 
     void SetExitCode(int ExitCode) noexcept;
     void SignalInitProcessExit() noexcept;

@@ -614,6 +614,8 @@ bool WslShutdown();
 
 void TerminateDistribution(LPCWSTR DistributionName = LXSS_DISTRO_NAME_TEST_L);
 
+void VerifyNoVmAccessToVhd(LPCWSTR VhdPath);
+
 std::wstring GetBlockDeviceInWsl(ULONGLONG SizeBytes);
 
 void Trim(std::wstring& string);
