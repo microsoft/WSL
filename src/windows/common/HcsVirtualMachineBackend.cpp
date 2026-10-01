@@ -108,8 +108,7 @@ VmEffectiveMemory ConfigureMemory(const VmMemoryRequest& Request, const VmMmioRe
         validation::ValidateFeature(Request.SmallPageBacking, L"small-page memory", schema::IsSmallPageMemorySupported());
     THROW_HR_IF(
         E_INVALIDARG,
-        (memory.SmallPageBacking || Request.FaultClusterSizeShift.has_value() ||
-         Request.DirectMapFaultClusterSizeShift.has_value()) &&
+        (memory.SmallPageBacking || Request.FaultClusterSizeShift.has_value() || Request.DirectMapFaultClusterSizeShift.has_value()) &&
             !memory.AllowOvercommit);
     memory.FaultClusterSizeShift = Request.FaultClusterSizeShift;
     memory.DirectMapFaultClusterSizeShift = Request.DirectMapFaultClusterSizeShift;
@@ -279,10 +278,10 @@ HcsVirtualMachineBackend::~HcsVirtualMachineBackend() noexcept
     try
     {
         auto crashLock = m_crashInformationLock.lock_shared();
+        auto runAsUser = wil::impersonate_token(m_configuration.Description.Identity.UserToken.get());
         if (m_vmSavedStateFile && std::filesystem::exists(m_vmSavedStateFile.value()) &&
             std::filesystem::is_empty(m_vmSavedStateFile.value()))
         {
-            auto runAsUser = wil::impersonate_token(m_configuration.Description.Identity.UserToken.get());
             std::filesystem::remove(m_vmSavedStateFile.value());
         }
     }
@@ -676,8 +675,7 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
         if (passThrough)
         {
             // Grant the VM access to the disk.
-            schema::GrantVmWorkerProcessAccessToDisk(
-                m_vmIdString.c_str(), path.c_str(), Request.UserToken.get());
+            schema::GrantVmWorkerProcessAccessToDisk(m_vmIdString.c_str(), path.c_str(), Request.UserToken.get());
             WI_SetFlag(diskFlags, wsl::windows::common::disk::DiskStateFlags::AccessGranted);
 
             // Set the disk offline if needed.
@@ -882,8 +880,7 @@ VmGpuAttachment HcsVirtualMachineBackend::AddGpu(const VmGpuRequest& Request)
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_gpu.has_value());
     THROW_HR_IF(E_BOUNDS, m_nextDeviceId == UINT64_MAX);
 
-    schema::AddMirroredGpu(
-        m_system.get(), attachment.VendorExtension, attachment.GdiAccelerationDisabled, attachment.PresentationDisabled);
+    schema::AddMirroredGpu(m_system.get(), attachment.VendorExtension, attachment.GdiAccelerationDisabled, attachment.PresentationDisabled);
 
     attachment.Id = {m_configuration.Description.Identity, m_nextDeviceId++};
     m_gpu = attachment;
@@ -1420,8 +1417,8 @@ void HcsVirtualMachineBackend::RemoveDevice(VmDeviceId Device)
 
     const auto device = m_fileSystemDevices.find(Device.Value);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), device == m_fileSystemDevices.end());
-    const auto hasShares = std::ranges::any_of(
-        m_fileSystemShares, [&](const auto& entry) { return entry.second.Share.Device.Value == Device.Value; });
+    const auto hasShares =
+        std::ranges::any_of(m_fileSystemShares, [&](const auto& entry) { return entry.second.Share.Device.Value == Device.Value; });
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_BUSY), hasShares);
 
     std::visit(
@@ -1477,47 +1474,6 @@ wil::com_ptr<IWslVirtioNetDevice> HcsVirtualMachineBackend::GetUserModeNatDevice
     return device;
 }
 
-void HcsVirtualMachineBackend::ModifyHostEndpointLocked(
-    const VmHostEndpointNetwork& Configuration, const std::wstring& ResourcePath, schema::ModifyRequestType RequestType) const
-{
-    schema::ModifySettingRequest<schema::NetworkAdapter> request{};
-    request.ResourcePath = ResourcePath;
-    request.RequestType = RequestType;
-    request.Settings.EndpointId = Configuration.EndpointId;
-    request.Settings.InstanceId = Configuration.InstanceId;
-    request.Settings.MacAddress = Configuration.MacAddress;
-    const auto settings = wsl::shared::ToJsonW(request);
-
-    auto retryCount = 0ul;
-    const auto hr = wsl::shared::retry::RetryWithTimeout<HRESULT>(
-        [&] {
-            const auto attemptResult =
-                wil::ResultFromException([&] { schema::ModifyComputeSystem(m_system.get(), settings.c_str()); });
-
-            WSL_LOG(
-                "HcsModifyNetworkAdapter",
-                TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
-                TraceLoggingValue(Configuration.EndpointId, "endpointId"),
-                TraceLoggingValue(static_cast<std::uint32_t>(RequestType), "requestType"),
-                TraceLoggingValue(retryCount, "retryCount"),
-                TraceLoggingHResult(attemptResult, "result"));
-
-            ++retryCount;
-            return THROW_IF_FAILED(attemptResult);
-        },
-        wsl::core::networking::AddEndpointRetryPeriod,
-        wsl::core::networking::AddEndpointRetryTimeout,
-        wsl::core::networking::AddEndpointRetryPredicate);
-
-    // The endpoint is already attached to the compute system, which is the state the add asked for.
-    if (RequestType == schema::ModifyRequestType::Add && hr == HCN_E_ENDPOINT_ALREADY_ATTACHED)
-    {
-        return;
-    }
-
-    THROW_IF_FAILED(hr);
-}
-
 VmNetworkAttachment HcsVirtualMachineBackend::AddNetworkAdapter(const VmNetworkAdapterRequest& Request)
 {
     ExecutionContext context(Context::ConfigureNetworking);
@@ -1531,9 +1487,50 @@ VmNetworkAttachment HcsVirtualMachineBackend::AddNetworkAdapter(const VmNetworkA
 
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system || !m_guestDeviceManager);
+
+    const auto* requestedHostEndpoint = std::get_if<VmHostEndpointNetwork>(&Request.Configuration);
+    if (requestedHostEndpoint != nullptr)
+    {
+        THROW_HR_IF(E_INVALIDARG, IsEqualGUID(requestedHostEndpoint->EndpointId, GUID_NULL) || IsEqualGUID(requestedHostEndpoint->InstanceId, GUID_NULL));
+    }
+
+    const VmNetworkAttachment* existingAttachment = nullptr;
+    for (const auto& [_, adapter] : m_networkAdapters)
+    {
+        bool duplicate = adapter.Attachment.Tag == Request.Tag;
+        if (requestedHostEndpoint != nullptr)
+        {
+            const auto* existingHostEndpoint = std::get_if<VmHostEndpointNetwork>(&adapter.Attachment.EffectiveConfiguration);
+            duplicate = duplicate || (existingHostEndpoint != nullptr &&
+                                      (IsEqualGUID(existingHostEndpoint->EndpointId, requestedHostEndpoint->EndpointId) ||
+                                       IsEqualGUID(existingHostEndpoint->InstanceId, requestedHostEndpoint->InstanceId)));
+        }
+
+        if (!duplicate)
+        {
+            continue;
+        }
+
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            existingAttachment != nullptr && existingAttachment->Id.Value != adapter.Attachment.Id.Value,
+            "The network adapter request identifies more than one existing adapter");
+        existingAttachment = &adapter.Attachment;
+    }
+
+    if (existingAttachment != nullptr)
+    {
+        WSL_LOG(
+            "HcsAddNetworkAdapterEnd",
+            TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+            TraceLoggingValue(existingAttachment->Tag.c_str(), "tag"),
+            TraceLoggingValue(existingAttachment->Id.Value, "deviceId"),
+            TraceLoggingValue(false, "created"));
+
+        return *existingAttachment;
+    }
+
     THROW_HR_IF(E_BOUNDS, m_nextDeviceId == std::numeric_limits<std::uint64_t>::max());
-    THROW_HR_IF(
-        HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_configuration.Description.NetworkAdapters.contains(Request.Tag));
 
     VmNetworkAttachment attachment{};
     attachment.Id = VmDeviceId{m_configuration.Description.Identity, m_nextDeviceId};
@@ -1548,8 +1545,14 @@ VmNetworkAttachment HcsVirtualMachineBackend::AddNetworkAdapter(const VmNetworkA
         {
             if (!resourcePath.empty())
             {
-                ModifyHostEndpointLocked(
-                    std::get<VmHostEndpointNetwork>(attachment.EffectiveConfiguration), resourcePath, schema::ModifyRequestType::Remove);
+                const auto& configuration = std::get<VmHostEndpointNetwork>(attachment.EffectiveConfiguration);
+                schema::ModifyNetworkAdapter(
+                    m_system.get(),
+                    resourcePath.c_str(),
+                    schema::ModifyRequestType::Remove,
+                    configuration.EndpointId,
+                    configuration.InstanceId,
+                    configuration.MacAddress);
             }
             else if (attachment.GuestInstanceId.has_value())
             {
@@ -1562,11 +1565,15 @@ VmNetworkAttachment HcsVirtualMachineBackend::AddNetworkAdapter(const VmNetworkA
     std::visit(
         Overloaded{
             [&](const VmHostEndpointNetwork& configuration) {
-                THROW_HR_IF(
-                    E_INVALIDARG, IsEqualGUID(configuration.EndpointId, GUID_NULL) || IsEqualGUID(configuration.InstanceId, GUID_NULL));
                 resourcePath = wsl::core::networking::c_networkAdapterPrefix +
                                wsl::shared::string::GuidToString<wchar_t>(configuration.InstanceId);
-                ModifyHostEndpointLocked(configuration, resourcePath, schema::ModifyRequestType::Add);
+                schema::ModifyNetworkAdapter(
+                    m_system.get(),
+                    resourcePath.c_str(),
+                    schema::ModifyRequestType::Add,
+                    configuration.EndpointId,
+                    configuration.InstanceId,
+                    configuration.MacAddress);
                 attachment.GuestInstanceId = configuration.InstanceId;
             },
             [&](const VmUserModeNatNetwork& configuration) {
@@ -1588,7 +1595,8 @@ VmNetworkAttachment HcsVirtualMachineBackend::AddNetworkAdapter(const VmNetworkA
         "HcsAddNetworkAdapterEnd",
         TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
         TraceLoggingValue(Request.Tag.c_str(), "tag"),
-        TraceLoggingValue(attachment.Id.Value, "deviceId"));
+        TraceLoggingValue(attachment.Id.Value, "deviceId"),
+        TraceLoggingValue(true, "created"));
 
     return attachment;
 }
@@ -1611,12 +1619,9 @@ void HcsVirtualMachineBackend::UpdateNetworkAdapter(VmDeviceId Device, const VmN
     auto adapter = FindNetworkAdapterLocked(Device);
     auto device = GetUserModeNatDeviceLocked(Device);
     IpAddress emptyNameserver{};
-    auto* nameservers =
-        configuration->Nameservers.empty() ? &emptyNameserver : const_cast<IpAddress*>(configuration->Nameservers.data());
+    auto* nameservers = configuration->Nameservers.empty() ? &emptyNameserver : const_cast<IpAddress*>(configuration->Nameservers.data());
     THROW_IF_FAILED(device->Update(
-        const_cast<WslVirtioNetConfig*>(&configuration->Configuration),
-        gsl::narrow_cast<UINT32>(configuration->Nameservers.size()),
-        nameservers));
+        const_cast<WslVirtioNetConfig*>(&configuration->Configuration), gsl::narrow_cast<UINT32>(configuration->Nameservers.size()), nameservers));
 
     adapter->second.Attachment.EffectiveConfiguration = Configuration;
     m_configuration.Description.NetworkAdapters[adapter->second.Attachment.Tag] = adapter->second.Attachment;
@@ -1633,7 +1638,13 @@ void HcsVirtualMachineBackend::RemoveNetworkAdapterLocked(std::map<std::uint64_t
     std::visit(
         Overloaded{
             [&](const VmHostEndpointNetwork& configuration) {
-                ModifyHostEndpointLocked(configuration, Adapter->second.ResourcePath, schema::ModifyRequestType::Remove);
+                schema::ModifyNetworkAdapter(
+                    m_system.get(),
+                    Adapter->second.ResourcePath.c_str(),
+                    schema::ModifyRequestType::Remove,
+                    configuration.EndpointId,
+                    configuration.InstanceId,
+                    configuration.MacAddress);
             },
             [&](const VmUserModeNatNetwork&) {
                 // Tearing down the relay is best effort: the device is removed either way, and a
@@ -1717,7 +1728,8 @@ VmPortBinding HcsVirtualMachineBackend::BindPort(VmDeviceId Device, const VmPort
         TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
         TraceLoggingValue(Device.Value, "deviceId"),
         TraceLoggingValue(
-            wsl::windows::common::string::IpAddressToWstring(Request.ListenAddress, Request.ListenScopeId).c_str(), "listenAddress"),
+            wsl::windows::common::string::IpAddressToWstring(Request.ListenAddress, Request.ListenScopeId).c_str(),
+            "listenAddress"),
         TraceLoggingValue(Request.GuestPort, "guestPort"));
 
     auto lock = m_lock.lock_exclusive();
@@ -1886,7 +1898,6 @@ void HcsVirtualMachineBackend::OnCrash(PCWSTR Details)
             static_cast<size_t>(m_crashCapture->MaxSavedStateCount) + 1,
             m_configuration.Description.Identity.UserToken.get());
     }
-
 }
 
 void HcsVirtualMachineBackend::OnExit(PCWSTR ExitDetails)

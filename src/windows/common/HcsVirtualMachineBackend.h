@@ -181,14 +181,6 @@ private:
     wil::com_ptr<IWslVirtioNetDevice> GetUserModeNatDeviceLocked(VmDeviceId Device) const;
 
     /// <summary>
-    /// Adds or removes a host endpoint adapter at ResourcePath. HCS reports transient failures while
-    /// the host network stack settles, so the modification is retried.
-    /// </summary>
-    _Requires_lock_held_(m_lock)
-    void ModifyHostEndpointLocked(
-        const VmHostEndpointNetwork& Configuration, const std::wstring& ResourcePath, wsl::windows::common::hcs::ModifyRequestType RequestType) const;
-
-    /// <summary>
     /// Removes the adapter's tracked state, tearing down the resource that serves it. Port bindings
     /// on the adapter are dropped because the device that tracked them is gone.
     /// </summary>

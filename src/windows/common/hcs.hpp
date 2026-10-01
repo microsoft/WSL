@@ -58,8 +58,7 @@ void AddPassThroughDisk(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ UL
 /// <summary>
 /// Adds a pass-through disk to a compute system, retrying while the disk is still in use by the host.
 /// </summary>
-void AddPassThroughDiskWithRetry(
-    _In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun, _In_ bool ReadOnly, _In_ size_t TimeoutMs);
+void AddPassThroughDiskWithRetry(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun, _In_ bool ReadOnly, _In_ size_t TimeoutMs);
 
 /// <summary>
 /// Adds a VHD to a compute system, granting the VM access to the file if needed.
@@ -98,13 +97,22 @@ void GrantVmWorkerProcessAccessToDisk(_In_ PCWSTR VmId, _In_ PCWSTR Disk, _In_op
 /// Assigns the host GPUs to a running compute system using mirrored assignment. The GDI acceleration
 /// and presentation settings are only sent to hosts that support them.
 /// </summary>
-void AddMirroredGpu(
-    _In_ HCS_SYSTEM ComputeSystem,
-    _In_ bool AllowVendorExtension = true,
-    _In_ bool DisableGdiAcceleration = true,
-    _In_ bool DisablePresentation = true);
+void AddMirroredGpu(_In_ HCS_SYSTEM ComputeSystem, _In_ bool AllowVendorExtension = true, _In_ bool DisableGdiAcceleration = true, _In_ bool DisablePresentation = true);
 
 void ModifyComputeSystem(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Configuration, _In_opt_ HANDLE Identity = nullptr);
+
+/// <summary>
+/// Adds or removes a host endpoint adapter, retrying while the host network stack settles.
+/// Adding an endpoint that is already attached is treated as success because the requested state
+/// has already been reached.
+/// </summary>
+void ModifyNetworkAdapter(
+    _In_ HCS_SYSTEM ComputeSystem,
+    _In_ PCWSTR ResourcePath,
+    _In_ ModifyRequestType RequestType,
+    _In_ const GUID& EndpointId,
+    _In_ const GUID& InstanceId,
+    _In_ const wsl::shared::string::MacAddress& MacAddress);
 
 unique_hcs_system OpenComputeSystem(_In_ PCWSTR Id, _In_ DWORD RequestedAccess);
 

@@ -60,6 +60,24 @@ VmDiskRequest CreateDiskRequest(const std::filesystem::path& Path, std::optional
     return request;
 }
 
+VmNetworkAdapterRequest CreateNetworkRequest()
+{
+    VmNetworkAdapterRequest request;
+    request.Tag = L"eth0";
+    VmUserModeNatNetwork configuration;
+    configuration.Configuration.clientIp.value = htonl(0x0a000002);
+    constexpr std::array<BYTE, 6> clientMac{0x00, 0x15, 0x5d, 0x01, 0x02, 0x03};
+    std::copy(clientMac.begin(), clientMac.end(), std::begin(configuration.Configuration.clientMac.bytes));
+    configuration.Configuration.gatewayIp.value = htonl(0x0a000001);
+    constexpr std::array<BYTE, 6> gatewayMac{0x52, 0x55, 0x0a, 0x00, 0x00, 0x01};
+    std::copy(gatewayMac.begin(), gatewayMac.end(), std::begin(configuration.Configuration.gatewayMac.bytes));
+    constexpr std::array<BYTE, 6> gatewayMacIpv6{0x52, 0x55, 0x0a, 0x00, 0x01, 0x02};
+    std::copy(gatewayMacIpv6.begin(), gatewayMacIpv6.end(), std::begin(configuration.Configuration.gatewayMacIpv6.bytes));
+    configuration.Configuration.netmask.value = htonl(0xffffff00);
+    request.Configuration = configuration;
+    return request;
+}
+
 std::filesystem::path ChangePathCase(const std::filesystem::path& Path)
 {
     auto value = Path.native();
@@ -135,7 +153,6 @@ class HcsVirtualMachineBackendTests
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::UdpPortBinding)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::Ipv6PortBinding)));
         backend->Terminate();
-
     }
 
     TEST_METHOD(BootsAndTerminates)
@@ -246,6 +263,28 @@ class HcsVirtualMachineBackendTests
         auto backend = HcsVirtualMachineBackend::Create(request);
 
         VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->Start(); }));
+        backend->Terminate();
+    }
+
+    TEST_METHOD(ReusesDuplicateNetworkAdapterRequests)
+    {
+        SKIP_TEST_ARM64();
+        auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        backend->Start();
+
+        const auto request = CreateNetworkRequest();
+        const auto first = backend->AddNetworkAdapter(request);
+        const auto duplicate = backend->AddNetworkAdapter(request);
+        VERIFY_ARE_EQUAL(first.Id.Value, duplicate.Id.Value);
+        VERIFY_ARE_EQUAL(first.Tag, duplicate.Tag);
+        VERIFY_IS_TRUE(first.GuestInstanceId == duplicate.GuestInstanceId);
+        const auto description = backend->GetDescription();
+        VERIFY_ARE_EQUAL(size_t{1}, description.NetworkAdapters.size());
+        VERIFY_ARE_EQUAL(first.Id.Value, description.NetworkAdapters.at(request.Tag).Id.Value);
+
+        backend->RemoveNetworkAdapter(first.Id);
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->RemoveNetworkAdapter(duplicate.Id); }));
+        VERIFY_IS_TRUE(backend->GetDescription().NetworkAdapters.empty());
         backend->Terminate();
     }
 
