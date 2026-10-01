@@ -216,8 +216,12 @@ void FormatImageOutput(CLIExecutionContext& context)
         }
 
         context.Data.Add<Data::Table>(std::move(table));
+        return;
     }
-    else if (format == FormatType::Json)
+
+    switch (format)
+    {
+    case FormatType::Json:
     {
         std::vector<std::wstring> json;
         json.reserve(images.size());
@@ -228,8 +232,9 @@ void FormatImageOutput(CLIExecutionContext& context)
         }
 
         context.Data.Add<Data::Json>(std::move(json));
+        break;
     }
-    else if (format == FormatType::Table)
+    case FormatType::Table:
     {
         using enum ColumnOverflow;
 
@@ -268,9 +273,9 @@ void FormatImageOutput(CLIExecutionContext& context)
         }
 
         context.Data.Add<Data::Table>(std::move(table));
+        break;
     }
-    else
-    {
+    default:
         THROW_HR(E_UNEXPECTED);
     }
 }

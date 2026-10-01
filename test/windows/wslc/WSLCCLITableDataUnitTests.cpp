@@ -80,6 +80,17 @@ class WSLCCLITableDataUnitTests
         VERIFY_ARE_EQUAL(static_cast<size_t>(7), layout.ColumnWidths[1]);
     }
 
+    TEST_METHOD(TableData_DefaultMinCellWidth_ProducesExactSpacing)
+    {
+        TableData table{L"A", L"B", L"C"};
+        table.AddRow({L"x", L"y", L"z"});
+
+        const auto layout = TableRenderer::Layout(table, LayoutOptions{.ConsoleWidth = 120});
+
+        VERIFY_ARE_EQUAL(std::wstring{L"A         B         C"}, layout.Lines[0]);
+        VERIFY_ARE_EQUAL(std::wstring{L"x         y         z"}, layout.Lines[1]);
+    }
+
     TEST_METHOD(TableRenderer_Layout_ConsoleWidthConstrainsColumns)
     {
         TableData table({L"NAME", L"STATUS"});

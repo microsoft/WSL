@@ -209,8 +209,12 @@ void FormatVolumeOutput(CLIExecutionContext& context)
         }
 
         context.Data.Add<Data::Table>(std::move(table));
+        return;
     }
-    else if (format == FormatType::Json)
+
+    switch (format)
+    {
+    case FormatType::Json:
     {
         std::vector<std::wstring> json;
         json.reserve(volumes.size());
@@ -221,8 +225,9 @@ void FormatVolumeOutput(CLIExecutionContext& context)
         }
 
         context.Data.Add<Data::Json>(std::move(json));
+        break;
     }
-    else if (format == FormatType::Table)
+    case FormatType::Table:
     {
         TableData table{Localization::WSLCCLI_TableHeaderDriver(), Localization::WSLCCLI_TableHeaderVolumeName()};
         table.Reserve(volumes.size());
@@ -236,9 +241,9 @@ void FormatVolumeOutput(CLIExecutionContext& context)
         }
 
         context.Data.Add<Data::Table>(std::move(table));
+        break;
     }
-    else
-    {
+    default:
         THROW_HR(E_UNEXPECTED);
     }
 }
