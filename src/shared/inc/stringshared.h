@@ -13,15 +13,20 @@ Abstract:
 --*/
 
 #pragma once
+#include <algorithm>
+#include <cctype>
+#include <cwctype>
 #include <set>
 #include <vector>
 #include <string>
+#include <string_view>
 #include <sstream>
 #include <fstream>
 #include <optional>
 #include <gsl/gsl>
 #include <format>
 #include <source_location>
+#include <type_traits>
 
 #ifndef WIN32
 #include <string.h>
@@ -131,6 +136,27 @@ inline std::vector<std::basic_string<T>> Split(const std::basic_string<T>& Strin
         {
             Output.emplace_back(std::move(Entry));
         }
+    }
+
+    return Output;
+}
+
+template <class T>
+inline std::vector<std::basic_string_view<T>> SplitPreserveEmpty(const std::basic_string_view<T> String, T Separator)
+{
+    std::vector<std::basic_string_view<T>> Output;
+    size_t Start = 0;
+    while (Start <= String.size())
+    {
+        const auto End = String.find(Separator, Start);
+        if (End == std::basic_string_view<T>::npos)
+        {
+            Output.emplace_back(String.substr(Start));
+            break;
+        }
+
+        Output.emplace_back(String.substr(Start, End - Start));
+        Start = End + 1;
     }
 
     return Output;
@@ -490,6 +516,21 @@ inline bool IsEqual(const std::wstring_view String1, const std::wstring_view Str
     }
 
     return (Compare(String1, String2, CaseInsensitive) == String1.size());
+}
+
+template <class T>
+inline bool IsEmptyOrWhitespace(const std::basic_string_view<T> String)
+{
+    return String.empty() || std::all_of(String.begin(), String.end(), [](T Ch) {
+               if constexpr (std::is_same_v<T, wchar_t>)
+               {
+                   return std::iswspace(static_cast<wint_t>(Ch));
+               }
+               else
+               {
+                   return std::isspace(static_cast<unsigned char>(Ch));
+               }
+           });
 }
 
 // Parses a boolean from a string. By default only "1"/"0" and "true"/"false"
@@ -1012,30 +1053,6 @@ struct CaseInsensitiveCompare
     }
 };
 
-inline std::wstring FormatBytes(uint64_t bytes)
-{
-    constexpr double c_kB = 1000.0;
-    constexpr double c_MB = 1000.0 * 1000.0;
-    constexpr double c_GB = 1000.0 * 1000.0 * 1000.0;
-
-    if (bytes >= static_cast<uint64_t>(c_GB))
-    {
-        return std::format(L"{:.2f} GB", bytes / c_GB);
-    }
-    else if (bytes >= static_cast<uint64_t>(c_MB))
-    {
-        return std::format(L"{:.2f} MB", bytes / c_MB);
-    }
-    else if (bytes >= static_cast<uint64_t>(c_kB))
-    {
-        return std::format(L"{:.2f} KB", bytes / c_kB);
-    }
-    else
-    {
-        return std::format(L"{} B", bytes);
-    }
-}
-
 template <typename TChar>
 inline std::basic_string<TChar> Trim(const std::basic_string<TChar>& input)
 {
@@ -1236,7 +1253,7 @@ struct std::formatter<char*, wchar_t>
     template <typename TCtx>
     auto format(const char* str, TCtx& ctx) const
     {
-        return std::format_to(ctx.out(), "{}", wsl::shared::string::MultiByteToWide(str));
+        return std::format_to(ctx.out(), L"{}", wsl::shared::string::MultiByteToWide(str));
     }
 };
 
@@ -1252,7 +1269,7 @@ struct std::formatter<const char*, wchar_t>
     template <typename TCtx>
     auto format(const char* str, TCtx& ctx) const
     {
-        return std::format_to(ctx.out(), "{}", wsl::shared::string::MultiByteToWide(str));
+        return std::format_to(ctx.out(), L"{}", wsl::shared::string::MultiByteToWide(str));
     }
 };
 
@@ -1268,7 +1285,7 @@ struct std::formatter<char[N], wchar_t>
     template <typename TCtx>
     auto format(const char str[N], TCtx& ctx) const
     {
-        return std::format_to(ctx.out(), "{}", wsl::shared::string::MultiByteToWide(str));
+        return std::format_to(ctx.out(), L"{}", wsl::shared::string::MultiByteToWide(str));
     }
 };
 
@@ -1284,7 +1301,7 @@ struct std::formatter<std::basic_string<char, Traits, Allocator>, wchar_t>
     template <typename TCtx>
     auto format(const std::basic_string<char, Traits, Allocator>& str, TCtx& ctx) const
     {
-        return std::format_to(ctx.out(), "{}", wsl::shared::string::MultiByteToWide(str));
+        return std::format_to(ctx.out(), L"{}", wsl::shared::string::MultiByteToWide(str));
     }
 };
 

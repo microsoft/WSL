@@ -124,13 +124,13 @@ jobs:
         displayName: "CMake ${{ parameters.platform }}"
         inputs:
           workingDirectory: "."
-          cmakeArgs: . --fresh -A ${{ parameters.platform }} -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_VERSION=10.0.26100.0 -DPACKAGE_VERSION=$(version.WSL_PACKAGE_VERSION) -DWSL_NUGET_PACKAGE_VERSION=$(version.WSL_NUGET_PACKAGE_VERSION) -DSKIP_PACKAGE_SIGNING=${{ parameters.isRelease }} -DOFFICIAL_BUILD=${{ parameters.isRelease }} -DINCLUDE_PACKAGE_STAGE=${{ or(parameters.isRelease, parameters.isNightly) }} -DPIPELINE_BUILD_ID=$(Build.BuildId) -DVSO_ORG=${{ parameters.vsoOrg }} -DVSO_PROJECT=${{ parameters.vsoProject }} -DWSL_BUILD_WSL_SETTINGS=true -DWSL_INCLUDE_SDK_CSHARP=true $(packageInputDirArg)\${{ parameters.platform }}
+          cmakeArgs: . --fresh -A ${{ parameters.platform }} -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_VERSION=10.0.26100.0 -DPACKAGE_VERSION=$(version.WSL_PACKAGE_VERSION) -DWSL_NUGET_PACKAGE_VERSION=$(version.WSL_NUGET_PACKAGE_VERSION) -DSKIP_PACKAGE_SIGNING=${{ parameters.isRelease }} -DOFFICIAL_BUILD=${{ parameters.isRelease }} -DINCLUDE_PACKAGE_STAGE=${{ or(parameters.isRelease, parameters.isNightly) }} -DPIPELINE_BUILD_ID=$(Build.BuildId) -DVSO_ORG=${{ parameters.vsoOrg }} -DVSO_PROJECT=${{ parameters.vsoProject }} -DWSL_BUILD_WSL_SETTINGS=true -DWSL_INCLUDE_SDK_CSHARP=true -DWSL_UNITY_BATCH_SIZE=4 $(packageInputDirArg)\${{ parameters.platform }}
 
       # Workaround for WSL Settings NuGet restore authentication issue
       - script: _deps\nuget.exe restore -NonInteractive
 
       - ${{ each target in parameters.targets }}:
-          - script: cmake --build . --config Release --target ${{ target.target }} -- -m
+          - script: cmake --build . --config Release --target ${{ target.target }} -- -m /bl:$(ob_outputDirectory)\binlogs\${{ parameters.platform }}-${{ replace(target.target, ';', '-') }}.binlog
             displayName: "Build ${{ target.target }} (${{ parameters.platform }})"
 
           - ${{ if eq(parameters.isRelease, true) }}:
@@ -154,7 +154,7 @@ jobs:
                   inlineOperation: |
                     [
                           {
-                              "KeyCode": "CP-230012",
+                              "KeyCode": "CP-501332",
                               "OperationCode": "SigntoolSign",
                               "Parameters" : {
                                     "OpusName" : "Microsoft",
@@ -167,7 +167,7 @@ jobs:
                                 "ToolVersion" : "1.0"
                             },
                             {
-                                "KeyCode" : "CP-230012",
+                                "KeyCode" : "CP-501332",
                                 "OperationCode" : "SigntoolVerify",
                                 "Parameters" : {},
                                 "ToolName" : "sign",
@@ -196,7 +196,7 @@ jobs:
                           }
                       }
 
-      - script: cmake --build . --config Release -- -m
+      - script: cmake --build . --config Release -- -m /bl:$(ob_outputDirectory)\binlogs\${{ parameters.platform }}.binlog
         displayName: "Build remaining targets (${{ parameters.platform }})"
 
       - task: PowerShell@2
@@ -267,7 +267,7 @@ jobs:
               inlineOperation: |
                 [
                       {
-                          "KeyCode": "CP-230012",
+                          "KeyCode": "CP-501332",
                           "OperationCode": "SigntoolSign",
                           "Parameters" : {
                                 "OpusName" : "Microsoft",
@@ -280,7 +280,7 @@ jobs:
                             "ToolVersion" : "1.0"
                         },
                         {
-                            "KeyCode" : "CP-230012",
+                            "KeyCode" : "CP-501332",
                             "OperationCode" : "SigntoolVerify",
                             "Parameters" : {},
                             "ToolName" : "sign",

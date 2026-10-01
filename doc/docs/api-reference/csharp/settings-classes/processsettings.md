@@ -9,6 +9,7 @@ public sealed class ProcessSettings
     public IList<string> CommandLine { get; set; }
     public IDictionary<string, string> EnvironmentVariables { get; set; }
     public ProcessOutputMode OutputMode { get; set; }
+    public bool EnableStandardInput { get; set; }
 }
 ```
 
@@ -18,6 +19,7 @@ Notes:
 - The init process is started by `Container.Start()`, not by `Process.Start()`.
 - `OutputMode.Event` enables `OutputReceived` / `ErrorReceived`.
 - `OutputMode.Stream` enables `GetOutputStream(...)`.
+- `EnableStandardInput` defaults to `false`. Must be set before `Process.Start()` or `Session.CreateContainer()` to have effect.
 
 Example:
 

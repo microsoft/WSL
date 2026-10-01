@@ -41,7 +41,7 @@ public:
     // IWSLCCompatProcess - converts the WSLCCompat types to the wslc.idl types and forwards to the methods above.
     IFACEMETHOD(GetStdHandle)(_In_ WSLCFD Fd, _Out_ WSLCCompatHandle* Handle) override;
 
-    wil::unique_handle GetStdHandle(int Index);
+    common::io::HandleWrapper GetStdHandle(int Index);
     HANDLE GetExitEvent();
     int GetPid() const;
 

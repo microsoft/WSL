@@ -28,8 +28,9 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ImagePruneCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::All, std::nullopt, std::nullopt, Localization::WSLCCLI_ImagePruneAllArgDescription()),
-        Argument::Create(ArgType::Filter, false, Limit::Unlimited),
+        Argument::Create(ArgType::All, {.Desc = Localization::WSLCCLI_ImagePruneAllArgDescription()}),
+        Argument::Create(ArgType::Filter, {.Alias = NO_ALIAS, .Limit = Limit::Unlimited, .Desc = Localization::WSLCCLI_PruneFilterArgDescription()}),
+        Argument::Create(ArgType::Force, {.Desc = Localization::WSLCCLI_PruneForceArgDescription()}),
     };
 }
 

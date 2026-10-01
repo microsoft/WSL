@@ -24,8 +24,10 @@ using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 
+using namespace wsl::windows::wslc::cli;
+
 // Registry Root Command
-std::vector<std::unique_ptr<Command>> RegistryCommand::GetCommands() const
+std::vector<std::unique_ptr<Command>> RegistryCommand::CreateCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<RegistryLoginCommand>(FullName()));
@@ -78,12 +80,14 @@ void RegistryLoginCommand::ValidateArgumentsInternal(ArgMap& execArgs) const
 {
     if (execArgs.Contains(ArgType::Password) && execArgs.GetValue<ArgType::PasswordStdin>())
     {
-        throw CommandException(Localization::WSLCCLI_LoginPasswordAndStdinMutuallyExclusive());
+        throw ArgumentException(
+            Localization::WSLCCLI_LoginPasswordAndStdinMutuallyExclusive(), GetArgumentsForHelp({ArgType::Password, ArgType::PasswordStdin}));
     }
 
     if (execArgs.GetValue<ArgType::PasswordStdin>() && !execArgs.Contains(ArgType::Username))
     {
-        throw CommandException(Localization::WSLCCLI_LoginPasswordStdinRequiresUsername());
+        throw ArgumentException(
+            Localization::WSLCCLI_LoginPasswordStdinRequiresUsername(), GetArgumentsForHelp({ArgType::PasswordStdin, ArgType::Username}));
     }
 }
 

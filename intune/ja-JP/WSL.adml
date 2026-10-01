@@ -55,6 +55,9 @@
         <string id="AllowWSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->WSL コンテナーを許可する</string>
         <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->このポリシーは、このマシンで WSL コンテナーを使用できるかどうかを制御します。有効にするか未構成の場合、ユーザーと Windows アプリケーションは WSL を介して Linux コンテナーを実行できます。無効に設定すると、WSL コンテナーはすべてのユーザーに対してブロックされ、Windows アプリは Linux コンテナーを実行できません。警告: これを 'Disabled' に設定すると、Linux コンテナーに依存する Windows アプリに問題が発生する可能性があります。</string>
 
+        <string id="AllowWSLContainerPrivileged"><!-- _locComment_text='{Locked="WSL"}' -->特権 WSL コンテナーを許可する</string>
+        <string id="AllowWSLContainerPrivilegedExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->このポリシーは WSL コンテナーをこのマシンで特権モードで実行できるかどうかを制御します。有効にした場合、または構成しなかった場合、ユーザーと Windows アプリケーションは特権コンテナーを開始できます。'Disabled' に設定すると、すべてのユーザーと Windows アプリに対して、特権コンテナーの開始要求が拒否されます。特権コンテナーは、昇格された Linux 機能で実行され、コンテナー ホストからの分離が軽減されます。</string>
+
         <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->WSL コンテナー レジストリの許可リスト</string>
         <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment_text='{Locked="WSL"}' -->有効にすると、WSL コンテナーは、ここに一覧表示されているレジストリからのみイメージをプルできます。これは、WSL コンテナー CLI と、WSL コンテナー API を使用するすべてのアプリケーションの両方に影響します。</string>
     </stringTable>

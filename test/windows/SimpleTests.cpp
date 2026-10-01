@@ -106,37 +106,16 @@ class SimpleTests
         ValidateOutput(
             std::format(L"{} {} {} {}", WSL_IMPORT_ARG, tempDistro, vhdDir.wstring(), tar.wstring()).c_str(),
             L"The operation completed successfully. \r\n",
-            L"wsl: Sparse VHD support is currently disabled due to potential data corruption.\r\n"
-            L"To force a distribution to use a sparse VHD, please run:\r\n"
-            L"wsl.exe --manage <DistributionName> --set-sparse true --allow-unsafe\r\n",
+            L"wsl: Sparse VHDs are currently experimental. If you encounter unexpected behavior, please file an issue at "
+            L"https://github.com/microsoft/WSL.\r\n",
             0);
 
         std::filesystem::path vhdPath = vhdDir / LXSS_VM_MODE_VHD_NAME;
-        VerifySparse(vhdPath.c_str(), false);
+        VerifySparse(vhdPath.c_str(), true);
 
         WslShutdown();
 
-        // Setting a distro VHD to sparse requires the allow unsafe flag.
-        ValidateOutput(
-            std::format(L"{} {} {} {}", WSL_MANAGE_ARG, tempDistro, WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG, L"true").c_str(),
-            L"Sparse VHD support is currently disabled due to potential data corruption.\r\n"
-            L"To force a distribution to use a sparse VHD, please run:\r\n"
-            L"wsl.exe --manage <DistributionName> --set-sparse true --allow-unsafe\r\nError code: Wsl/Service/E_INVALIDARG\r\n",
-            L"",
-            -1);
-
-        VerifySparse(vhdPath.c_str(), false);
-
-        ValidateOutput(
-            std::format(L"{} {} {} {} {}", WSL_MANAGE_ARG, tempDistro, WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG, L"true", WSL_MANAGE_ARG_ALLOW_UNSAFE)
-                .c_str(),
-            L"The operation completed successfully. \r\n",
-            L"",
-            0);
-
-        VerifySparse(vhdPath.c_str(), true);
-
-        // Disabling sparse on a VHD does not require the allow unsafe flag.
+        // Sparse mode can be disabled without the allow unsafe flag.
         ValidateOutput(
             std::format(L"{} {} {} {}", WSL_MANAGE_ARG, tempDistro, WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG, L"false").c_str(),
             L"The operation completed successfully. \r\n",
@@ -144,6 +123,33 @@ class SimpleTests
             0);
 
         VerifySparse(vhdPath.c_str(), false);
+
+        // Enabling sparse mode no longer requires the allow unsafe flag.
+        ValidateOutput(
+            std::format(L"{} {} {} {}", WSL_MANAGE_ARG, tempDistro, WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG, L"true").c_str(),
+            L"The operation completed successfully. \r\n",
+            L"wsl: Sparse VHDs are currently experimental. If you encounter unexpected behavior, please file an issue at "
+            L"https://github.com/microsoft/WSL.\r\n",
+            0);
+
+        VerifySparse(vhdPath.c_str(), true);
+
+        // The legacy allow unsafe flag remains accepted for compatibility.
+        ValidateOutput(
+            std::format(L"{} {} {} {}", WSL_MANAGE_ARG, tempDistro, WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG, L"false").c_str(),
+            L"The operation completed successfully. \r\n",
+            L"",
+            0);
+
+        ValidateOutput(
+            std::format(L"{} {} {} {} {}", WSL_MANAGE_ARG, tempDistro, WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG, L"true", WSL_MANAGE_ARG_ALLOW_UNSAFE)
+                .c_str(),
+            L"The operation completed successfully. \r\n",
+            L"wsl: Sparse VHDs are currently experimental. If you encounter unexpected behavior, please file an issue at "
+            L"https://github.com/microsoft/WSL.\r\n",
+            0);
+
+        VerifySparse(vhdPath.c_str(), true);
     }
 
     TEST_METHOD(StringHelpers)
@@ -221,33 +227,6 @@ class SimpleTests
 
             std::wstring wideString = wsl::shared::string::MultiByteToWide(input);
             VERIFY_ARE_EQUAL(expected, wsl::shared::string::ParseBool(wideString.c_str(), true));
-        }
-
-        // Test wsl::shared::string::ParseMemoryString
-        const std::vector<std::pair<LPCSTR, std::optional<uint64_t>>> testCases{
-            {"0", 0},
-            {"1", 1},
-            {" 1", 1},
-            {"1B", 1},
-            {"1K", 1024},
-            {"1KB", 1024},
-            {"2M", 2 * 1024 * 1024},
-            {"100MB", 100 * 1024 * 1024},
-            {"9G", 9 * 1024ULL * 1024ULL * 1024ULL},
-            {"44GB", 44 * 1024ULL * 1024ULL * 1024ULL},
-            {"1TB", 1ULL << 40},
-            {"2T", 2ULL << 40},
-            {"1 B", std::nullopt},
-            {nullptr, std::nullopt},
-            {"", std::nullopt},
-            {"foo", std::nullopt}};
-
-        for (const auto& [input, expected] : testCases)
-        {
-            VERIFY_ARE_EQUAL(wsl::shared::string::ParseMemorySize(input), expected);
-
-            const auto wideInput = wsl::shared::string::MultiByteToWide(input);
-            VERIFY_ARE_EQUAL(wsl::shared::string::ParseMemorySize(wideInput.c_str()), expected);
         }
 
         // Test wsl::shared::string GUID helpers

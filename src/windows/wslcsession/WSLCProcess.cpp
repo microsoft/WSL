@@ -80,7 +80,7 @@ try
 }
 CATCH_RETURN();
 
-wil::unique_handle WSLCProcess::GetStdHandle(int Index)
+wsl::windows::common::io::HandleWrapper WSLCProcess::GetStdHandle(int Index)
 {
     THROW_WIN32_IF(ERROR_INVALID_STATE, !m_io);
 

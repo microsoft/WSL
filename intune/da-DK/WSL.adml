@@ -55,6 +55,9 @@
         <string id="AllowWSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->Tillad WSL-objektbeholder</string>
         <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Denne politik styrer, om en WSL-objektbeholder kan bruges på denne enhed. Når den er aktiveret eller ikke konfigureret, kan brugere og Windows-programmer køre Linux-containere via WSL. Når den er indstillet til deaktiveret, blokeres WSL-objektbeholderen for alle brugere, og Windows-apps kan ikke køre Linux-objektbeholdere. Advarsel: Hvis du indstiller denne til "Disabled", kan det ødelægge Windows-apps, der er afhængige af Linux-objektbeholdere.</string>
 
+        <string id="AllowWSLContainerPrivileged"><!-- _locComment_text='{Locked="WSL"}' -->Tillad privilegerede WSL-objektbeholdere</string>
+        <string id="AllowWSLContainerPrivilegedExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Denne politik styrer, om WSL objektbeholdere kan køre i privilegeret tilstand på denne computer. Når indstillingen er aktiveret eller ikke konfigureret, kan brugere og Windows-programmer starte objektbeholdere med rettigheder. Når den er indstillet til 'Disabled', afvises anmodninger om at starte en privilegeret objektbeholder for alle brugere og Windows-apps. Privilegerede objektbeholdere kører med øgede Linux-funktioner og reduceret isolation fra objektbeholderværten.</string>
+
         <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->Liste over tilladte registreringsdatabaser for WSL-objektbeholdere</string>
         <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment_text='{Locked="WSL"}' -->Når den er aktiveret, har WSL-objektbeholderen kun tilladelse til at hente billeder fra de registreringsdatabaser, der er angivet her. Dette påvirker både WSL-objektbeholderens CLI og alle programmer, der bruger WSL-objektbeholder-API'et.</string>
     </stringTable>

@@ -22,6 +22,8 @@ using namespace wsl::windows::common::wslutil;
 
 namespace wsl::windows::wslc::services {
 
+using namespace wsl::windows::wslc::cli;
+
 void NetworkService::Create(Terminal& terminal, models::Session& session, const models::CreateNetworkOptions& createOptions)
 {
     WarningCallback warningCallback(terminal);
@@ -75,20 +77,21 @@ void NetworkService::Delete(models::Session& session, const std::string& name)
     THROW_IF_FAILED(session.Get()->DeleteNetwork(name.c_str()));
 }
 
-std::vector<WSLCNetworkInformation> NetworkService::List(models::Session& session)
+std::vector<wsl::windows::common::wslc_schema::NetworkListEntry> NetworkService::List(
+    models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters)
 {
-    wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> rawNetworks;
-    ULONG count = 0;
-    THROW_IF_FAILED(session.Get()->ListNetworks(&rawNetworks, &count));
-
-    std::vector<WSLCNetworkInformation> networks;
-    networks.reserve(count);
-    for (auto ptr = rawNetworks.get(), end = rawNetworks.get() + count; ptr != end; ++ptr)
+    std::vector<WSLCFilter> filterEntries;
+    filterEntries.reserve(filters.size());
+    for (const auto& [key, value] : filters)
     {
-        networks.push_back(*ptr);
+        filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
     }
 
-    return networks;
+    wil::unique_cotaskmem_ansistring output;
+    THROW_IF_FAILED(session.Get()->ListNetworks(
+        filterEntries.empty() ? nullptr : filterEntries.data(), static_cast<ULONG>(filterEntries.size()), &output));
+
+    return FromJson<std::vector<wsl::windows::common::wslc_schema::NetworkListEntry>>(output.get());
 }
 
 wsl::windows::common::wslc_schema::Network NetworkService::Inspect(models::Session& session, const std::string& name)

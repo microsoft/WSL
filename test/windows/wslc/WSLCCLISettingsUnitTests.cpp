@@ -153,6 +153,22 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::File), static_cast<int>(s.Get<Setting::CredentialStore>()));
     }
 
+    TEST_METHOD(LoadSettings_StorageSizeFormats_YieldExpectedValues)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  memorySize: \" 1.5GiB\"\n"
+            "  maxStorageSize: 20.5GB\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(1536u, s.Get<Setting::SessionMemoryMb>());
+        VERIFY_ARE_EQUAL(20992u, s.Get<Setting::SessionStorageSizeMb>());
+    }
+
     // An empty settings file is valid YAML (null document) but not a mapping;
     // a structure warning is emitted and all settings use defaults.
     TEST_METHOD(LoadSettings_EmptySettings_WarnsInvalidStructure)
@@ -234,6 +250,39 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(
             Loc::WSLCUserSettings_Warning_InvalidValue(L"session.memorySize", s.SettingsFilePath().wstring(), 2),
             s.GetWarnings().front().Message);
+    }
+
+    TEST_METHOD(Validation_MemoryMb_Limits_AreEnforced)
+    {
+        struct TestCase
+        {
+            std::string Value;
+            uint32_t Expected;
+            bool IsValid;
+        };
+
+        const std::vector<TestCase> TestCases{
+            {"0.5MiB", 0, false},
+            {"4294967295MiB", std::numeric_limits<uint32_t>::max(), true},
+            {"4294967296MiB", 0, false},
+        };
+
+        for (const auto& TestCase : TestCases)
+        {
+            auto dir = UniqueTempDir();
+            WriteFile(dir / L"settings.yaml", std::format("session:\n  memorySize: {}\n", TestCase.Value));
+
+            UserSettingsTest s{dir};
+
+            VERIFY_ARE_EQUAL(TestCase.Expected, s.Get<Setting::SessionMemoryMb>());
+            VERIFY_ARE_EQUAL(TestCase.IsValid ? 0u : 1u, s.GetWarnings().size());
+            if (!TestCase.IsValid)
+            {
+                VERIFY_ARE_EQUAL(
+                    Loc::WSLCUserSettings_Warning_InvalidValue(L"session.memorySize", s.SettingsFilePath().wstring(), 2),
+                    s.GetWarnings().front().Message);
+            }
+        }
     }
 
     // maxStorageSize: 0 must be rejected; the default is used.

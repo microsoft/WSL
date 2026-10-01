@@ -85,6 +85,7 @@ struct WslDistributionConfig
 
     bool GuiAppsEnabled = false;
     std::optional<int> FeatureFlags;
+    std::optional<std::string> KernelPerfPath;
     std::optional<LX_MINI_INIT_NETWORKING_MODE> NetworkingMode;
     std::optional<std::string> VmId;
 
@@ -96,7 +97,7 @@ struct WslDistributionConfig
     wil::unique_fd BootStartWriteSocket;
     wsl::shared::SocketChannel Plan9ControlChannel;
     std::optional<pid_t> InitPid;
-    std::optional<std::string> CgroupPath;
+    wil::unique_fd CgroupNamespace;
 };
 
 } // namespace wsl::linux

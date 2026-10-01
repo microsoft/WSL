@@ -219,6 +219,7 @@ namespace Microsoft.WSL.Containers
         IVector<String> CommandLine;
         IMap<String, String> EnvironmentVariables;
         ProcessOutputMode OutputMode;
+        Boolean EnableStandardInput;
     };
 
     enum ProcessState
@@ -381,5 +382,6 @@ namespace Microsoft.WSL.Containers
         ContainerDisabled = 0x8004060C,
         RegistryBlockedByPolicy = 0x8004060D,
         VolumeNotAvailable = 0x8004060E,
+        ContainerDeleted = 0x80040613,
     };
 }

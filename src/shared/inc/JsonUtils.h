@@ -62,12 +62,12 @@ std::wstring ToJsonW(const T& Value, int indent = -1)
     return wsl::shared::string::MultiByteToWide(ToJson(Value, indent));
 }
 
-template <typename T, typename TJson = nlohmann::json>
-T FromJson(const char* Value)
+template <typename T, typename Iterator, typename TJson = nlohmann::json>
+T FromJson(Iterator First, Iterator Last)
 {
     try
     {
-        auto json = TJson::parse(Value);
+        auto json = TJson::parse(First, Last);
         T object{};
         from_json(json, object);
 
@@ -75,14 +75,15 @@ T FromJson(const char* Value)
     }
     catch (const TJson::exception& e)
     {
+        const std::string value{First, Last};
 
 #ifdef WIN32
 
         THROW_HR_WITH_USER_ERROR_MSG(
-            WSL_E_INVALID_JSON, wsl::shared::Localization::MessageInvalidJson(e.what()), "Invalid JSON: %hs", Value);
+            WSL_E_INVALID_JSON, wsl::shared::Localization::MessageInvalidJson(e.what()), "Invalid JSON: %hs", value.c_str());
 
 #else
-        LOG_ERROR("Failed to deserialize json: '{}'. Error: {}", Value, e.what());
+        LOG_ERROR("Failed to deserialize json: '{}'. Error: {}", value, e.what());
         THROW_ERRNO(EINVAL);
 
 #endif
@@ -90,9 +91,16 @@ T FromJson(const char* Value)
 }
 
 template <typename T, typename TJson = nlohmann::json>
+T FromJson(const char* Value)
+{
+    return FromJson<T, const char*, TJson>(Value, Value + strlen(Value));
+}
+
+template <typename T, typename TJson = nlohmann::json>
 T FromJson(const wchar_t* Value)
 {
-    return FromJson<T, TJson>(wsl::shared::string::WideToMultiByte(Value).c_str());
+    const auto value = wsl::shared::string::WideToMultiByte(Value);
+    return FromJson<T, decltype(value.begin()), TJson>(value.begin(), value.end());
 }
 
 template <typename T>
@@ -184,45 +192,5 @@ struct adl_serializer<wsl::shared::string::MacAddress>
         }
     }
 };
-
-#ifdef WIN32
-template <>
-struct adl_serializer<WSLCVolumeInformation>
-{
-    static void to_json(json& j, const WSLCVolumeInformation& volume)
-    {
-        j = json{{"Name", std::string(volume.Name)}, {"Driver", std::string(volume.Driver)}};
-    }
-
-    static void from_json(const json& j, WSLCVolumeInformation& volume)
-    {
-        std::string name = j.at("Name").get<std::string>();
-        std::string driver = j.at("Driver").get<std::string>();
-
-        strncpy_s(volume.Name, sizeof(volume.Name), name.c_str(), _TRUNCATE);
-        strncpy_s(volume.Driver, sizeof(volume.Driver), driver.c_str(), _TRUNCATE);
-    }
-};
-
-template <>
-struct adl_serializer<WSLCNetworkInformation>
-{
-    static void to_json(json& j, const WSLCNetworkInformation& network)
-    {
-        j = json{{"Name", std::string(network.Name)}, {"Id", std::string(network.Id)}, {"Driver", std::string(network.Driver)}};
-    }
-
-    static void from_json(const json& j, WSLCNetworkInformation& network)
-    {
-        std::string name = j.at("Name").get<std::string>();
-        std::string id = j.at("Id").get<std::string>();
-        std::string driver = j.at("Driver").get<std::string>();
-
-        strncpy_s(network.Name, sizeof(network.Name), name.c_str(), _TRUNCATE);
-        strncpy_s(network.Id, sizeof(network.Id), id.c_str(), _TRUNCATE);
-        strncpy_s(network.Driver, sizeof(network.Driver), driver.c_str(), _TRUNCATE);
-    }
-};
-#endif
 
 } // namespace nlohmann

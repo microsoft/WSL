@@ -107,8 +107,9 @@ class WSLCE2EVolumeCreateTests
 
         VerifyVolumeIsListed(TestVolumeName);
         auto inspect = InspectVolume(TestVolumeName);
-        VERIFY_ARE_EQUAL("1", inspect.Labels["A"]);
-        VERIFY_ARE_EQUAL("2", inspect.Labels["B"]);
+        VERIFY_IS_TRUE(inspect.Labels.has_value());
+        VERIFY_ARE_EQUAL("1", inspect.Labels->at("A"));
+        VERIFY_ARE_EQUAL("2", inspect.Labels->at("B"));
     }
 
 private:

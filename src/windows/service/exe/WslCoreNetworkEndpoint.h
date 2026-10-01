@@ -3,6 +3,7 @@
 #pragma once
 #include <memory>
 #include <optional>
+#include <utility>
 #include <hcs.hpp>
 
 #include "WslCoreNetworkEndpointSettings.h"
@@ -16,15 +17,29 @@ struct NetworkEndpoint
 
     ~NetworkEndpoint() noexcept
     {
-        if (Endpoint)
-        {
-            wil::unique_cotaskmem_string error;
-            LOG_IF_FAILED_MSG(::HcnDeleteEndpoint(EndpointId, &error), "error message: %ls", error.get());
-        }
+        DeleteEndpoint();
     }
 
     NetworkEndpoint(NetworkEndpoint&&) = default;
-    NetworkEndpoint& operator=(NetworkEndpoint&& source) = default;
+    NetworkEndpoint& operator=(NetworkEndpoint&& source) noexcept
+    {
+        if (this != &source)
+        {
+            DeleteEndpoint();
+            StateTracking.reset();
+
+            Network = std::move(source.Network);
+            NetworkId = source.NetworkId;
+            EndpointId = source.EndpointId;
+            InterfaceGuid = source.InterfaceGuid;
+            InterfaceLuid = source.InterfaceLuid;
+            Endpoint = std::move(source.Endpoint);
+            StateTracking = std::move(source.StateTracking);
+        }
+
+        return *this;
+    }
+
     NetworkEndpoint(const NetworkEndpoint&) = delete;
     NetworkEndpoint& operator=(const NetworkEndpoint&) = delete;
 
@@ -35,6 +50,16 @@ struct NetworkEndpoint
     NET_LUID InterfaceLuid{};
     windows::common::hcs::unique_hcn_endpoint Endpoint{};
     std::optional<IpStateTracking> StateTracking;
+
+    void DeleteEndpoint() noexcept
+    {
+        if (Endpoint)
+        {
+            wil::unique_cotaskmem_string error;
+            LOG_IF_FAILED_MSG(::HcnDeleteEndpoint(EndpointId, &error), "error message: %ls", error.get());
+            Endpoint.reset();
+        }
+    }
 
     void TraceLoggingRundown() const
     {

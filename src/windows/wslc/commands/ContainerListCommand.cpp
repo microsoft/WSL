@@ -29,12 +29,13 @@ std::vector<Argument> ContainerListCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::All),
-        Argument::Create(ArgType::Filter, false, Limit::Unlimited),
+        Argument::Create(ArgType::Filter, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::Format),
         Argument::Create(ArgType::Last),
         Argument::Create(ArgType::Latest),
         Argument::Create(ArgType::NoTrunc),
         Argument::Create(ArgType::Quiet),
+        Argument::Create(ArgType::Size),
     };
 }
 
@@ -62,7 +63,9 @@ void ContainerListCommand::ValidateArgumentsInternal(ArgMap& execArgs) const
 {
     if (execArgs.Contains(ArgType::Last) && execArgs.GetValue<ArgType::Latest>())
     {
-        throw CommandException(Localization::WSLCCLI_MultipleExclusiveArgumentsProvided(L"--last, --latest"));
+        throw ArgumentException(
+            Localization::WSLCCLI_MultipleExclusiveArgumentsProvided(L"--last, --latest"),
+            GetArgumentsForHelp({ArgType::Last, ArgType::Latest}));
     }
 }
 } // namespace wsl::windows::wslc
