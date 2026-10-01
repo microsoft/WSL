@@ -1015,8 +1015,9 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, Options);
 
-    // The build context is either a Windows directory or a stream (tar archive or Dockerfile) relayed to
-    // docker's stdin, never both. A streamed context occupies stdin, so it cannot carry a Dockerfile handle.
+    // The build context is either a Windows directory or a stream relayed to docker's stdin, never both. The stream is
+    // a tar archive, or a bare Dockerfile that is built with an empty context. A streamed context occupies stdin, so it
+    // cannot also carry a Dockerfile handle.
     const bool streamContext = Options->ContextHandle.Type != WSLCHandleTypeUnknown;
     const bool hasContextPath = Options->ContextPath != nullptr && *Options->ContextPath != L'\0';
     RETURN_HR_IF(E_INVALIDARG, streamContext == hasContextPath);
