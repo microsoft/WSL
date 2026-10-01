@@ -11,6 +11,8 @@ To allow Windows process creation from Linux, WSL registers a [binfmt interprete
 
 To perform the registration, WSL writes to `/proc/sys/fs/binfmt_misc` and creates a `WSLInterop` entry, which points to `/init`. For WSL1 registration, the entry is written by [init](init.md) for each distribution, for WSL2 [mini_init](mini_init.md) registers the binfmt interpreter at the virtual machine level. 
 
+With systemd enabled, WSL also restores `WSLInterop` after `systemd-binfmt.service` and `binfmt-support.service` have started. A monitor watches subsequent binfmt registrations and restores its priority when another handler is registered, including during package installation or upgrades. Only one monitor updates the VM-wide registry at a time; another takes over when its distro exits. Since the most recently registered matching handler takes precedence, this keeps distro-provided `MZ` handlers from intercepting Windows executables. Setting `[boot] protectBinfmt=false` in `/etc/wsl.conf` disables this distro's monitor and its protection against VM-wide binfmt removal at shutdown.
+
 Note: The `/init` executable is the entrypoint for different WSL processes ([init](init.md), [plan9](plan9.md), [localhost](localhost.md), etc). This executable looks at `argv[0]` to determine which logic to run. In the case of interop, `/init` will run the Windows process creation logic if its `argv[0]` value doesn't match any of the known entrypoints.
 
 See: `WslEntryPoint()` in `src/linux/init.cpp`.
