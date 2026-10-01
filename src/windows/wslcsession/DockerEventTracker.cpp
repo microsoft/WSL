@@ -156,7 +156,6 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
         {"destroy", ContainerEvent::Destroy},
         {"exec_die", ContainerEvent::ExecDied},
         {"restart", ContainerEvent::Restart},
-        {"health_status: starting", ContainerEvent::HealthStarting},
         {"health_status: healthy", ContainerEvent::HealthHealthy},
         {"health_status: unhealthy", ContainerEvent::HealthUnhealthy}};
 

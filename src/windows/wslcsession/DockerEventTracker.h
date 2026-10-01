@@ -32,7 +32,6 @@ enum class ContainerEvent
     Destroy,
     ExecDied,
     Kill,
-    HealthStarting,
     HealthHealthy,
     HealthUnhealthy
 };
