@@ -297,6 +297,27 @@ bool DoesWslRuntimeVersionSupportWslc(const std::optional<std::tuple<uint32_t, u
     return version.has_value() && version >= minimalPackageVersion;
 }
 
+constexpr std::tuple<uint32_t, uint32_t, uint32_t> c_sparseVhdMinimumVersion{3, 0, 2};
+
+void EnsureWslRuntimeVersionSupports(
+    IWSLCCompatSessionManager* sessionManager, const std::tuple<uint32_t, uint32_t, uint32_t>& minimumVersion)
+{
+    WSLCCompatVersion version{};
+    THROW_IF_FAILED(sessionManager->GetVersion(&version));
+
+    const std::tuple<uint32_t, uint32_t, uint32_t> currentVersion{version.Major, version.Minor, version.Revision};
+    // Allow lockstep development builds before the feature's release version is assigned.
+    const std::tuple<uint32_t, uint32_t, uint32_t> clientVersion{
+        WSL_PACKAGE_VERSION_MAJOR, WSL_PACKAGE_VERSION_MINOR, WSL_PACKAGE_VERSION_REVISION};
+    THROW_HR_IF_MSG(
+        WSLC_E_WSL_UPDATE_NEEDED,
+        currentVersion < minimumVersion && currentVersion != clientVersion,
+        "The installed WSL version does not support the requested operation. Current version: %lu.%lu.%lu",
+        version.Major,
+        version.Minor,
+        version.Revision);
+}
+
 enum class WslRuntimeState
 {
     NotInstalled,
@@ -435,6 +456,10 @@ try
     auto internalType = CheckAndGetInternalType(sessionSettings);
 
     wil::com_ptr<IWSLCCompatSessionManager> sessionManager = CreateSessionManager();
+    if (internalType->vhdRequirements.type == WSLC_VHD_TYPE_SPARSE)
+    {
+        EnsureWslRuntimeVersionSupports(sessionManager.get(), c_sparseVhdMinimumVersion);
+    }
 
     auto result = std::make_unique<WslcSessionImpl>();
     WSLCCompatSessionSettings runtimeSettings{};
@@ -524,6 +549,7 @@ try
         break;
 
     case WSLC_VHD_TYPE_SPARSE:
+        EnsureWslRuntimeVersionSupports(CreateSessionManager().get(), c_sparseVhdMinimumVersion);
         driverOpts.push_back({"Sparse", "true"});
         break;
 
