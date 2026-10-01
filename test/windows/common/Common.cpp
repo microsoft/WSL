@@ -2193,9 +2193,6 @@ Return Value:
     return true;
 }
 
-// Defined in common/WSLCTestBase.cpp.
-void WSLCTestFixtureCleanup();
-
 bool ModuleCleanup(VOID)
 
 /*++
@@ -2216,8 +2213,6 @@ Return Value:
 
 {
     LogInfo("Exiting UnitTests module");
-
-    WSLCTestFixtureCleanup();
 
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
         WslTraceLoggingUninitialize();
