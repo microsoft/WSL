@@ -40,7 +40,10 @@ enum class BackendKind
 struct VmInstanceId
 {
     GUID VmId{};
+    wil::shared_handle UserToken{};
 };
+
+struct VmGuestListenerState;
 
 template <typename Tag>
 struct VmResourceId
@@ -83,82 +86,30 @@ struct VmRequestedValue
 
 enum class VmFeature
 {
-    LinuxDirectBoot,
-    LinuxFirmwareBoot,
     NestedVirtualization,
     PerfmonPmu,
     PerfmonLbr,
-    SmallPageMemory,
-    MemoryOvercommit,
     DeferredMemoryCommit,
     ColdDiscard,
+    PhysicalDisk,
     SerialConsole,
     VirtioConsole,
-    Vhd,
-    Vhdx,
-    PhysicalDisk,
-    PersistentMemory,
-    Plan9Socket,
-    Plan9Virtio,
     VirtioFsFileBacked,
-    VirtioFsAggregate,
-    SectionBackedSharedMemory,
-    MirroredGpu,
-    GpuVendorExtension,
-    GpuDisableGdiAcceleration,
-    GpuDisablePresentation,
     SavedStateOnCrash,
-    GuestDmaWindow,
-    HostEndpointNetwork,
     UserModeNatNetwork,
     TcpPortBinding,
     UdpPortBinding,
     Ipv6PortBinding,
     ScopedIpv6PortBinding,
-    DynamicHostPort,
-    VirtualHostAddress,
-    StaticDnsARecord,
     Count
 };
 
-static_assert(static_cast<size_t>(VmFeature::Count) == 35);
-
-enum class VmOperation
-{
-    Create,
-    Start,
-    Terminate,
-    CreateGuestListener,
-    AcceptGuestConnection,
-    ConnectGuest,
-    CloseGuestListener,
-    AttachDisk,
-    DetachDisk,
-    AddPersistentMemory,
-    CreateFileSystemDevice,
-    AddFileSystemShare,
-    RemoveFileSystemShare,
-    GetFileSystemDeviceStatus,
-    AddGpu,
-    AddSharedMemory,
-    ConfigureGuestDma,
-    RemoveDevice,
-    AddNetworkAdapter,
-    UpdateNetworkAdapter,
-    BindPort,
-    UnbindPort,
-    CreateVirtualAddress,
-    CreateDnsRecord,
-    Count
-};
-
-static_assert(static_cast<size_t>(VmOperation::Count) == 24);
+static_assert(static_cast<size_t>(VmFeature::Count) == 15);
 
 struct VmPlatformCapabilities
 {
     BackendKind Backend;
     std::bitset<static_cast<size_t>(VmFeature::Count)> Features;
-    std::bitset<static_cast<size_t>(VmOperation::Count)> Operations;
 };
 
 enum class VmState
@@ -178,6 +129,16 @@ struct VmGuestListener
 {
     VmListenerId Id;
     GuestServicePort Port;
+    std::shared_ptr<VmGuestListenerState> State;
+
+    wil::unique_socket Accept() const;
+};
+
+struct VmGuestListenerState
+{
+    VmGuestListener Listener;
+    wil::unique_socket Socket;
+    wil::unique_event CancellationEvent{wil::EventOptions::ManualReset};
 };
 
 struct VmProcessorRequest
@@ -186,6 +147,12 @@ struct VmProcessorRequest
     VmFeatureRequest NestedVirtualization = VmFeatureRequest::Disabled;
     VmFeatureRequest PerfmonPmu = VmFeatureRequest::Disabled;
     VmFeatureRequest PerfmonLbr = VmFeatureRequest::Disabled;
+};
+
+struct VmMmioRequest
+{
+    std::uint64_t HighWindowSizeBytes = 0;
+    std::optional<std::uint8_t> MaximumGuestAddressBits;
 };
 
 struct VmMemoryRequest
@@ -208,9 +175,7 @@ struct VmLinuxBootRequest
     std::filesystem::path KernelPath;
     std::filesystem::path InitrdPath;
     VmBootMethod Method = VmBootMethod::Automatic;
-    std::wstring GuestCommandLine;
-    std::wstring UserCommandLine;
-    std::optional<std::uint64_t> RequestedDmaBounceBufferBytes;
+    std::wstring KernelCommandLine;
 };
 
 enum class VmConsoleRole
@@ -278,6 +243,12 @@ struct VmDiskRequest
     std::variant<VmVirtualDiskSource, VmPhysicalDiskSource> Source;
     bool ReadOnly = true;
     std::optional<VmScsiPlacement> Placement;
+    // Set for disks that the user explicitly attached (for instance via 'wsl --mount'), as opposed
+    // to disks that WSL attaches on the user's behalf.
+    bool UserDisk = false;
+    // Timeout applied to host disk state changes and to retries when attaching a physical disk.
+    std::chrono::milliseconds DeviceTimeout{5000};
+    wil::shared_handle UserToken{};
 };
 
 struct VmBootDiskRequest
@@ -291,11 +262,13 @@ struct VmDiskAttachment
     VmDiskId Id;
     VmGuestDiskAddress GuestAddress;
     bool ReadOnly = true;
+    bool UserDisk = false;
 };
 
 struct VmCrashCaptureRequest
 {
-    std::filesystem::path SavedStatePath;
+    std::filesystem::path Path;
+    std::uint32_t MaxCrashLogCount = 10;
     VmSelectionPolicy Policy = VmSelectionPolicy::Required;
 };
 
@@ -321,7 +294,6 @@ struct VmEffectiveBoot
 {
     VmBootMethod Method = VmBootMethod::Automatic;
     std::wstring KernelCommandLine;
-    std::optional<std::uint32_t> PageReportingOrder;
     std::vector<VmConsoleRequest> Consoles;
 };
 
@@ -377,7 +349,8 @@ struct VmNetworkAttachment
 
 struct VmCreateRequest
 {
-    GUID VmId{};
+    VmInstanceId Identity;
+    std::wstring Owner;
     VmProcessorRequest Processor;
     VmMemoryRequest Memory;
     VmLinuxBootRequest Boot;
@@ -487,6 +460,8 @@ struct VmFileSystemShare
 class IVirtualMachineBackend
 {
 public:
+    using TerminationCallback = std::function<void(GUID)>;
+
     virtual ~IVirtualMachineBackend() noexcept = default;
 
     virtual VmPlatformCapabilities GetCapabilities() const = 0;
@@ -495,9 +470,9 @@ public:
     virtual wil::unique_handle GetTerminationEvent() const = 0;
     virtual void Start() = 0;
     virtual void Terminate() = 0;
+    void RegisterTerminationCallback(TerminationCallback Callback);
 
     virtual VmGuestListener CreateGuestListener(GuestServicePort Port) = 0;
-    virtual wil::unique_socket AcceptGuestConnection(VmListenerId Listener) = 0;
     virtual wil::unique_socket ConnectGuest(GuestServicePort Port) = 0;
     virtual void CloseGuestListener(VmListenerId Listener) = 0;
 
@@ -511,8 +486,51 @@ public:
     virtual VmNetworkAttachment AddNetworkAdapter(const VmNetworkAdapterRequest& Request) = 0;
     virtual VmPortBinding BindPort(VmDeviceId Device, const VmPortBindingRequest& Request) = 0;
     virtual void UnbindPort(VmPortBindingId Binding) = 0;
+
+protected:
+    // Protects all mutable backend state, including the base listener registry. Callers must
+    // release it before performing blocking I/O or waiting for a callback.
+    mutable wil::srwlock m_lock;
+
+    // These helpers require m_lock to be held exclusively. ConfigureGuestListener runs while
+    // m_lock is held and must not re-enter another listener helper.
+    VmGuestListener RegisterGuestListenerLocked(const VmInstanceId& Identity, GuestServicePort Port);
+    std::shared_ptr<VmGuestListenerState> RemoveGuestListenerLocked(VmListenerId Listener, const VmInstanceId& Identity);
+    void CloseGuestListenersLocked(const VmInstanceId& Identity) noexcept;
+    void NotifyTerminated(const VmInstanceId& Identity) noexcept;
+
+private:
+    virtual std::shared_ptr<VmGuestListenerState> ConfigureGuestListener(const VmGuestListener& Listener) = 0;
+
+    _Guarded_by_(m_lock) std::map<std::uint64_t, std::shared_ptr<VmGuestListenerState>> m_guestListeners;
+    _Guarded_by_(m_lock) std::uint64_t m_nextListenerId = 1;
+    wil::srwlock m_terminationCallbackLock;
+    _Guarded_by_(m_terminationCallbackLock) bool m_terminated = false;
+    _Guarded_by_(m_terminationCallbackLock) GUID m_terminatedVmId {};
+    _Guarded_by_(m_terminationCallbackLock) TerminationCallback m_terminationCallback;
 };
 
 VmPlatformCapabilities QueryVirtualMachineBackendCapabilities(BackendKind Kind);
 
 std::unique_ptr<IVirtualMachineBackend> CreateVirtualMachineBackend(BackendKind Kind, const VmCreateRequest& Request);
+
+namespace wsl::windows::common::vm::validation {
+
+/// <summary>
+/// Validates that a resource id was issued by the backend that owns the VM it is used with.
+/// </summary>
+template <typename Tag>
+void ValidateResourceId(const VmResourceId<Tag>& Id, const VmInstanceId& Owner)
+{
+    THROW_HR_IF(E_INVALIDARG, Id.Value == 0 || !IsEqualGUID(Id.Owner.VmId, Owner.VmId));
+}
+
+bool ValidateFeature(VmFeatureRequest Request, PCWSTR Setting, bool Supported = false);
+
+void ValidateDiskPlacement(const VmDiskRequest& Request);
+
+const VmVirtualDiskSource& ValidateDiskRequest(const VmDiskRequest& Request);
+
+const std::wstring& ValidateDiskSource(const VmDiskRequest& Request);
+
+} // namespace wsl::windows::common::vm::validation

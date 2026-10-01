@@ -30,6 +30,8 @@ class OpenVmmVirtualMachineBackend : public IVirtualMachineBackend
 public:
     ~OpenVmmVirtualMachineBackend() noexcept override;
 
+    // Networking supports one creation-time Consomme NIC: 10.0.0.2/24, gateway 10.0.0.1,
+    // default gateway MACs, automatic guest IPv6 and host DNS. Custom settings and hot-add are unsupported.
     static std::unique_ptr<OpenVmmVirtualMachineBackend> Create(const VmCreateRequest& Request);
 
     static VmPlatformCapabilities QueryCapabilities();
@@ -41,7 +43,6 @@ public:
     void Terminate() override;
 
     VmGuestListener CreateGuestListener(GuestServicePort Port) override;
-    wil::unique_socket AcceptGuestConnection(VmListenerId Listener) override;
     wil::unique_socket ConnectGuest(GuestServicePort Port) override;
     void CloseGuestListener(VmListenerId Listener) override;
 
@@ -68,15 +69,14 @@ private:
     static void DestroyVm(WslOpenVmmVm* Vm) noexcept;
     using UniqueVm = wil::unique_any<WslOpenVmmVm*, decltype(&DestroyVm), DestroyVm>;
 
-    struct GuestListener
+    std::shared_ptr<VmGuestListenerState> ConfigureGuestListener(const VmGuestListener& Listener) override;
+
+    struct GuestListener : VmGuestListenerState
     {
         ~GuestListener() noexcept;
         std::optional<wil::unique_socket> Accept();
 
-        VmGuestListener Listener;
-        wil::unique_socket Socket;
         wil::unique_hfile SocketFile;
-        wil::unique_event CancellationEvent{wil::EventOptions::ManualReset};
     };
 
     struct FileSystemDevice
@@ -112,15 +112,9 @@ private:
         bool DirectoryCreated = false;
     };
 
-    wil::srwlock m_lock;
-    _Requires_lock_held_(m_lock)
-    void CloseGuestListeners() noexcept;
-
     VmDescription m_description{};
     _Guarded_by_(m_lock) std::map<std::uint64_t, VmDiskAttachment> m_attachedDisks;
     _Guarded_by_(m_lock) std::uint64_t m_nextDiskId = 1;
-    _Guarded_by_(m_lock) std::map<std::uint64_t, std::shared_ptr<GuestListener>> m_guestListeners;
-    _Guarded_by_(m_lock) std::uint64_t m_nextListenerId = 1;
     _Guarded_by_(m_lock) std::map<std::uint64_t, FileSystemDevice> m_fileSystemDevices;
     _Guarded_by_(m_lock) std::map<std::uint64_t, FileSystemShare> m_fileSystemShares;
     _Guarded_by_(m_lock) std::map<std::uint64_t, NetworkAdapter> m_networkAdapters;

@@ -16,6 +16,7 @@ Abstract:
 #include "precomp.h"
 #include "hcs.hpp"
 #include <ComputeCore.h>
+#include "wslutil.h"
 
 #pragma hdrstop
 
@@ -25,6 +26,41 @@ using wsl::windows::common::ExecutionContext;
 constexpr auto c_processorCapabilities = "ProcessorCapabilities";
 constexpr LPCWSTR c_processorCapabilitiesQuery = L"{ \"PropertyQueries\": {\"ProcessorCapabilities\" : {}}}";
 constexpr LPCWSTR c_scsiResourcePath = L"VirtualMachine/Devices/Scsi/0/Attachments/";
+
+std::filesystem::path wsl::windows::common::hcs::WriteVmCrashLog(
+    const std::filesystem::path& Folder, std::uint32_t MaxFileCount, const GUID& VmId, HANDLE UserToken, std::wstring_view CrashLog)
+{
+    auto runAsUser = wil::impersonate_token(UserToken);
+
+    std::error_code error;
+    std::filesystem::create_directories(Folder, error);
+    if (error.value())
+    {
+        THROW_WIN32_MSG(error.value(), "Failed to create folder: %ls", Folder.c_str());
+    }
+
+    constexpr auto c_extension = L".txt";
+    constexpr auto c_prefix = L"kernel-panic-";
+    const auto vmId = wsl::shared::string::GuidToString<wchar_t>(VmId, wsl::shared::string::GuidToStringFlags::None);
+    const auto fileName = std::format(L"{}{}-{}{}", c_prefix, std::time(nullptr), vmId, c_extension);
+    const auto filePath = Folder / fileName;
+
+    auto pred = [&c_extension, &c_prefix](const auto& entry) {
+        return WI_IsFlagSet(GetFileAttributes(entry.path().c_str()), FILE_ATTRIBUTE_TEMPORARY) && entry.path().has_extension() &&
+               entry.path().extension() == c_extension && entry.path().has_filename() &&
+               entry.path().filename().wstring().find(c_prefix) == 0;
+    };
+
+    wslutil::EnforceFileLimit(Folder.c_str(), MaxFileCount, pred);
+
+    {
+        std::wofstream outputFile(filePath.wstring());
+        THROW_HR_IF(E_UNEXPECTED, !outputFile.is_open() || !(outputFile << CrashLog));
+    }
+
+    THROW_IF_WIN32_BOOL_FALSE(SetFileAttributesW(filePath.c_str(), FILE_ATTRIBUTE_TEMPORARY));
+    return filePath;
+}
 
 void wsl::windows::common::hcs::AddPlan9Share(
     _In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Name, _In_ PCWSTR AccessName, _In_ PCWSTR Path, _In_ UINT32 Port, _In_ Plan9ShareFlags Flags, _In_opt_ HANDLE UserToken)
@@ -68,15 +104,61 @@ void wsl::windows::common::hcs::AddVhd(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWST
     ModifyComputeSystem(ComputeSystem, wsl::shared::ToJsonW(request).c_str());
 }
 
-void wsl::windows::common::hcs::AddPassThroughDisk(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun)
+void wsl::windows::common::hcs::AddPassThroughDisk(
+    _In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun, _In_ bool ReadOnly)
 {
     ModifySettingRequest<Attachment> request{};
     request.RequestType = ModifyRequestType::Add;
     request.Settings.Path = Disk;
+    request.Settings.ReadOnly = ReadOnly;
     request.ResourcePath = c_scsiResourcePath + std::to_wstring(Lun);
     request.Settings.Type = AttachmentType::PassThru;
 
     ModifyComputeSystem(ComputeSystem, wsl::shared::ToJsonW(request).c_str());
+}
+
+void wsl::windows::common::hcs::AddPassThroughDiskWithRetry(
+    _In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun, _In_ bool ReadOnly, _In_ size_t TimeoutMs)
+{
+    wsl::shared::retry::RetryWithTimeout<void>(
+        std::bind(AddPassThroughDisk, ComputeSystem, Disk, Lun, ReadOnly),
+        wsl::windows::common::disk::c_diskOperationRetry,
+        std::chrono::milliseconds(TimeoutMs),
+        []() { return wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION); });
+}
+
+void wsl::windows::common::hcs::AddVhdWithAccess(
+    _In_ HCS_SYSTEM ComputeSystem,
+    _In_ PCWSTR VmId,
+    _In_ PCWSTR VhdPath,
+    _In_ ULONG Lun,
+    _In_ bool ReadOnly,
+    _In_opt_ HANDLE UserToken,
+    _Inout_ wsl::windows::common::disk::DiskStateFlags& Flags)
+{
+    auto grantDiskAccess = [&]() {
+        auto runAsUser = wil::impersonate_token(UserToken);
+        GrantVmAccess(VmId, VhdPath);
+        WI_SetFlag(Flags, wsl::windows::common::disk::DiskStateFlags::AccessGranted);
+    };
+
+    // Grant the VM access to the disk.
+    if (!ReadOnly)
+    {
+        grantDiskAccess();
+    }
+
+    const auto result = wil::ResultFromException([&]() { AddVhd(ComputeSystem, VhdPath, Lun, ReadOnly); });
+
+    if (result == HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED) && WI_IsFlagClear(Flags, wsl::windows::common::disk::DiskStateFlags::AccessGranted))
+    {
+        grantDiskAccess();
+        AddVhd(ComputeSystem, VhdPath, Lun, ReadOnly);
+    }
+    else
+    {
+        THROW_IF_FAILED(result);
+    }
 }
 
 wsl::windows::common::hcs::unique_hcs_operation wsl::windows::common::hcs::CreateOperation()
@@ -132,6 +214,37 @@ const std::vector<std::string>& wsl::windows::common::hcs::GetProcessorFeatures(
     });
 
     return g_processorFeatures;
+}
+
+bool wsl::windows::common::hcs::IsNestedVirtualizationSupported()
+{
+    if constexpr (wsl::shared::Arm64)
+    {
+        return false;
+    }
+
+    if (!helpers::IsWindows11OrAbove())
+    {
+        return false;
+    }
+
+    const auto& processorFeatures = GetProcessorFeatures();
+    return std::find(processorFeatures.begin(), processorFeatures.end(), "NestedVirt") != processorFeatures.end();
+}
+
+std::pair<bool, bool> wsl::windows::common::hcs::GetPerfmonCapabilities()
+{
+#ifdef _AMD64_
+
+    HV_X64_HYPERVISOR_HARDWARE_FEATURES hardwareFeatures{};
+    __cpuid(reinterpret_cast<int*>(&hardwareFeatures), HvCpuIdFunctionMsHvHardwareFeatures);
+    return {hardwareFeatures.ChildPerfmonPmuSupported != 0, hardwareFeatures.ChildPerfmonLbrSupported != 0};
+
+#else
+
+    return {};
+
+#endif
 }
 
 wsl::shared::hns::HNSEndpoint wsl::windows::common::hcs::GetEndpointProperties(HCN_ENDPOINT Endpoint)
@@ -209,6 +322,18 @@ void wsl::windows::common::hcs::GrantVmAccess(_In_ PCWSTR VmId, _In_ PCWSTR File
     THROW_IF_FAILED_MSG(::HcsGrantVmAccess(VmId, FilePath), "HcsGrantVmAccess(%ls, %ls)", VmId, FilePath);
 }
 
+void wsl::windows::common::hcs::GrantVmWorkerProcessAccessToDisk(_In_ PCWSTR VmId, _In_ PCWSTR Disk, _In_opt_ HANDLE UserToken)
+{
+    if (ARGUMENT_PRESENT(UserToken))
+    {
+        // Impersonating the user doesn't let us access a block device,
+        // check for an elevated token instead.
+        THROW_HR_IF(WSL_E_ELEVATION_NEEDED_TO_MOUNT_DISK, ((!wsl::windows::common::security::IsTokenElevated(UserToken))));
+    }
+
+    GrantVmAccess(VmId, Disk);
+}
+
 void wsl::windows::common::hcs::ModifyComputeSystem(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Configuration, _In_opt_ HANDLE Identity)
 {
     WSL_LOG_DEBUG("HcsModifyComputeSystem", TraceLoggingValue(Configuration, "configuration"));
@@ -248,6 +373,28 @@ void wsl::windows::common::hcs::RegisterCallback(_In_ HCS_SYSTEM ComputeSystem, 
     ExecutionContext context(Context::HCS);
 
     THROW_IF_FAILED(::HcsSetComputeSystemCallback(ComputeSystem, HcsEventOptionNone, Context, Callback));
+}
+
+void wsl::windows::common::hcs::RemoveDiskWithAccess(
+    _In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR VmId, _In_ PCWSTR Disk, _In_ ULONG Lun, _In_ wsl::windows::common::disk::DiskStateFlags Flags, _In_ size_t TimeoutMs)
+{
+    RemoveScsiDisk(ComputeSystem, Lun);
+    if (WI_IsFlagSet(Flags, wsl::windows::common::disk::DiskStateFlags::AccessGranted))
+    {
+        RevokeVmAccess(VmId, Disk);
+    }
+
+    // If the disk was online before being attached, revert to that state.
+    //
+    // N.B. Failures are logged and ignored because the disk is no longer attached to the VM.
+    if (WI_IsFlagSet(Flags, wsl::windows::common::disk::DiskStateFlags::Online))
+    {
+        try
+        {
+            wsl::windows::common::disk::BringOnline(Disk, TimeoutMs);
+        }
+        CATCH_LOG()
+    }
 }
 
 void wsl::windows::common::hcs::RemoveScsiDisk(_In_ HCS_SYSTEM ComputeSystem, _In_ ULONG Lun)

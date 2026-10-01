@@ -130,11 +130,8 @@ public:
     _Requires_lock_held_(m_guestDeviceLock)
     void VerifyPlan9Servers();
 
-    enum DiskStateFlags
-    {
-        Online = 0x1,
-        AccessGranted = 0x2
-    };
+    // Tracks the host state changes performed to attach a disk, so they can be undone.
+    using DiskStateFlags = wsl::windows::common::disk::DiskStateFlags;
 
     void TraceLoggingRundown() const noexcept;
 
@@ -218,8 +215,6 @@ private:
     std::wstring GenerateConfigJson();
 
     static std::pair<int, LX_MINI_MOUNT_STEP> GetMountResult(_In_ wsl::shared::SocketChannel& Channel);
-
-    void GrantVmWorkerProcessAccessToDisk(_In_ PCWSTR Disk, _In_opt_ HANDLE UserToken) const;
 
     void Initialize(const GUID& VmId, const wil::shared_handle& UserToken);
 
@@ -337,7 +332,5 @@ private:
     // when the VM shuts down.
     wil::unique_handle m_processJobObject;
 };
-
-DEFINE_ENUM_FLAG_OPERATORS(WslCoreVm::DiskStateFlags);
 
 DEFINE_ENUM_FLAG_OPERATORS(WslCoreVm::MountFlags);

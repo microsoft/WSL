@@ -15,8 +15,12 @@ Abstract:
 #pragma once
 #include "hcs_schema.h"
 #include "hns_schema.h"
+#include "disk.hpp"
 #include <ComputeNetwork.h>
 #include <ComputeCore.h>
+#include <cstdint>
+#include <filesystem>
+#include <string_view>
 
 namespace wsl::windows::common::hcs {
 
@@ -49,7 +53,26 @@ void RemovePlan9Share(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR AccessName, _In
 
 void AddVhd(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR VhdPath, _In_ ULONG Lun, _In_ bool ReadOnly = false);
 
-void AddPassThroughDisk(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun);
+void AddPassThroughDisk(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun, _In_ bool ReadOnly);
+
+/// <summary>
+/// Adds a pass-through disk to a compute system, retrying while the disk is still in use by the host.
+/// </summary>
+void AddPassThroughDiskWithRetry(
+    _In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun, _In_ bool ReadOnly, _In_ size_t TimeoutMs);
+
+/// <summary>
+/// Adds a VHD to a compute system, granting the VM access to the file if needed.
+/// Flags is updated as soon as access is granted so callers can revoke access if this fails.
+/// </summary>
+void AddVhdWithAccess(
+    _In_ HCS_SYSTEM ComputeSystem,
+    _In_ PCWSTR VmId,
+    _In_ PCWSTR VhdPath,
+    _In_ ULONG Lun,
+    _In_ bool ReadOnly,
+    _In_opt_ HANDLE UserToken,
+    _Inout_ wsl::windows::common::disk::DiskStateFlags& Flags);
 
 unique_hcs_system CreateComputeSystem(_In_ PCWSTR Id, _In_ PCWSTR Configuration);
 
@@ -65,11 +88,29 @@ std::pair<uint32_t, uint32_t> GetSchemaVersion();
 
 void GrantVmAccess(_In_ PCWSTR VmId, _In_ PCWSTR FilePath);
 
+/// <summary>
+/// Grants the VM worker process access to a physical disk.
+/// An elevated user token is required because a block device cannot be accessed via impersonation.
+/// </summary>
+void GrantVmWorkerProcessAccessToDisk(_In_ PCWSTR VmId, _In_ PCWSTR Disk, _In_opt_ HANDLE UserToken);
+
 void ModifyComputeSystem(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Configuration, _In_opt_ HANDLE Identity = nullptr);
 
 unique_hcs_system OpenComputeSystem(_In_ PCWSTR Id, _In_ DWORD RequestedAccess);
 
 void RegisterCallback(_In_ HCS_SYSTEM ComputeSystem, _In_ HCS_EVENT_CALLBACK Callback, _In_ void* Context);
+
+/// <summary>
+/// Removes a disk from a compute system, undoing the host state changes that were performed to attach it.
+/// Access is revoked if it was granted, and the disk is brought back online if it was taken offline.
+/// </summary>
+void RemoveDiskWithAccess(
+    _In_ HCS_SYSTEM ComputeSystem,
+    _In_ PCWSTR VmId,
+    _In_ PCWSTR Disk,
+    _In_ ULONG Lun,
+    _In_ wsl::windows::common::disk::DiskStateFlags Flags,
+    _In_ size_t TimeoutMs = wsl::windows::common::disk::c_defaultDiskTimeoutMs);
 
 void RemoveScsiDisk(_In_ HCS_SYSTEM ComputeSystem, _In_ ULONG Lun);
 
@@ -79,11 +120,18 @@ void StartComputeSystem(_In_ HCS_SYSTEM ComputeSystem, _In_ LPCWSTR Configuratio
 
 void TerminateComputeSystem(_In_ HCS_SYSTEM ComputeSystem);
 
+std::filesystem::path WriteVmCrashLog(
+    const std::filesystem::path& Folder, std::uint32_t MaxFileCount, const GUID& VmId, HANDLE UserToken, std::wstring_view CrashLog);
+
 unique_hcn_service_callback RegisterServiceCallback(_In_ HCS_NOTIFICATION_CALLBACK Callback, _In_ PVOID Context);
 
 unique_hcn_guest_network_service_callback RegisterGuestNetworkServiceCallback(
     _In_ const unique_hcn_guest_network_service& GuestNetworkService, _In_ HCS_NOTIFICATION_CALLBACK Callback, _In_ PVOID Context);
 
 bool IsDisableVgpuSettingsSupported();
+
+bool IsNestedVirtualizationSupported();
+
+std::pair<bool, bool> GetPerfmonCapabilities();
 
 } // namespace wsl::windows::common::hcs
