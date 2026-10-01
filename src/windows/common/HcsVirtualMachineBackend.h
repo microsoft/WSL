@@ -142,12 +142,20 @@ private:
     /// Returns the share of Device that already serves HostPath with MountOptions, if there is one.
     /// </summary>
     _Requires_lock_held_(m_lock)
-    const FileSystemShare* FindFileSystemShareLocked(VmDeviceId Device, const std::wstring& HostPath, const std::wstring& MountOptions) const;
+    const FileSystemShare* FindFileSystemShareLocked(
+        VmDeviceId Device, const std::wstring& HostPath, const std::wstring& MountOptions, const std::wstring& Name) const;
 
     /// <summary>
-    /// Resolves the token used to reach the host path of a share, preferring the one on the request.
+    /// Returns the Plan 9 share of Device with Name, if there is one.
     /// </summary>
-    HANDLE ResolveShareUserToken(const VmFileSystemShareRequest& Request) const;
+    _Requires_lock_held_(m_lock)
+    std::optional<VmFileSystemShare> FindPlan9ShareByNameLocked(VmDeviceId Device, const std::wstring& Name) const;
+
+    /// <summary>
+    /// Resolves the token used to reach a host path, returning the first of Tokens that is set and
+    /// falling back to the identity that created the VM. Callers list Tokens most specific first.
+    /// </summary>
+    HANDLE ResolveUserToken(std::initializer_list<std::reference_wrapper<const wil::shared_handle>> Tokens) const;
 
     /// <summary>
     /// Adds a share to a Plan 9 device and returns the name the guest uses to reach it.

@@ -176,6 +176,9 @@ struct VmMemoryRequest
     VmFeatureRequest SmallPageBacking = VmFeatureRequest::Disabled;
     std::optional<std::uint32_t> FaultClusterSizeShift;
     std::optional<std::uint32_t> DirectMapFaultClusterSizeShift;
+    // Order of the page blocks the guest reports back to the host. Reporting blocks smaller than a
+    // fault cluster hands back memory the next fault immediately reclaims, so this must be at least
+    // as large as the fault cluster size shifts above.
     std::optional<std::uint32_t> PageReportingOrder;
     std::optional<std::wstring> HostingProcessNameSuffix;
 };
@@ -428,14 +431,20 @@ constexpr std::size_t c_maxVirtioFsTagLength = 36;
 struct VmVirtioFsShareOptions
 {
     std::map<std::wstring, std::wstring> MountOptions;
+    // Identity the virtio-fs device reaches its host paths through. A virtio-fs device serves every
+    // path it exposes through a single identity, so an aggregate device declares it here rather than
+    // inheriting it from the first share; callers that need a second identity create a second
+    // device. The VM identity token is used when this is unset.
+    wil::shared_handle UserToken{};
 };
 
 struct VmVirtioFsDevice
 {
     std::wstring Tag;
     VmVirtioFsLayout Layout = VmVirtioFsLayout::Aggregate;
-    // Mount options applied to the device itself. Shares of an aggregate device carry their own
-    // options; a single-share device inherits the options of the share that it serves.
+    // Options applied to the device itself, including the identity it serves through. Shares of an
+    // aggregate device carry their own mount options; a single-share device inherits the options of
+    // the share that it serves, so it must leave these unset.
     VmVirtioFsShareOptions Options;
 };
 

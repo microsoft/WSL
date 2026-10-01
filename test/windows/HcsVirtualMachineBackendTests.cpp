@@ -124,6 +124,9 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(request.Boot.KernelCommandLine, description.Boot.KernelCommandLine);
         const auto capabilities = backend->GetCapabilities();
         VERIFY_ARE_EQUAL(BackendKind::Hcs, capabilities.Backend);
+        VERIFY_ARE_EQUAL(
+            wsl::windows::common::helpers::IsWindows11OrAbove(),
+            capabilities.Features.test(static_cast<size_t>(VmFeature::SavedStateOnCrash)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::SerialConsole)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::VirtioConsole)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::VirtioFsFileBacked)));
@@ -132,6 +135,7 @@ class HcsVirtualMachineBackendTests
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::UdpPortBinding)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::Ipv6PortBinding)));
         backend->Terminate();
+
     }
 
     TEST_METHOD(BootsAndTerminates)
@@ -300,6 +304,8 @@ class HcsVirtualMachineBackendTests
         std::memcpy(bindingRequest.ListenAddress.bytes, &loopbackAddress, sizeof(loopbackAddress));
         bindingRequest.GuestPort = 80;
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->BindPort(device, bindingRequest); }));
+        bindingRequest.ListenScopeId = 1;
+        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->BindPort(device, bindingRequest); }));
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->UnbindPort(binding); }));
         VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddPersistentMemory({}); }));
         VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddSharedMemory({}); }));
@@ -320,8 +326,10 @@ class HcsVirtualMachineBackendTests
 
         // Elevated and unelevated callers share one VM, so each elevation level gets its own device
         // just as WslCoreVm::AddDrvFsShare uses a separate Plan 9 port and virtio-fs tag for each.
+        // An aggregate device is created with the identity it serves its children under.
         const auto userDevice = backend->CreateFileSystemDevice({VmVirtioFsDevice{L"drvfs-user", VmVirtioFsLayout::Aggregate}});
-        const auto adminDevice = backend->CreateFileSystemDevice({VmVirtioFsDevice{L"drvfs-admin", VmVirtioFsLayout::Aggregate}});
+        const auto adminDevice = backend->CreateFileSystemDevice({VmVirtioFsDevice{
+            L"drvfs-admin", VmVirtioFsLayout::Aggregate, VmVirtioFsShareOptions{{}, wil::shared_handle{GetElevatedTestToken().release()}}}});
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Serving, userDevice.State);
         VERIFY_IS_TRUE(userDevice.GuestInstanceId.has_value());
         VERIFY_ARE_NOT_EQUAL(userDevice.Id.Value, adminDevice.Id.Value);
@@ -351,6 +359,21 @@ class HcsVirtualMachineBackendTests
         const auto reused = backend->AddFileSystemShare(userDevice.Id, request);
         VERIFY_ARE_EQUAL(share.Id.Value, reused.Id.Value);
 
+        auto namedRequest = request;
+        namedRequest.Name = L"first";
+        const auto firstNamedShare = backend->AddFileSystemShare(userDevice.Id, namedRequest);
+        const auto& firstNamedAddress = std::get<VmVirtioFsShareAddress>(firstNamedShare.GuestAddress);
+        VERIFY_IS_TRUE(firstNamedAddress.ChildName.has_value());
+        VERIFY_ARE_EQUAL(std::wstring{L"first"}, firstNamedAddress.ChildName.value());
+        VERIFY_ARE_EQUAL(firstNamedShare.Id.Value, backend->AddFileSystemShare(userDevice.Id, namedRequest).Id.Value);
+
+        namedRequest.Name = L"second";
+        const auto secondNamedShare = backend->AddFileSystemShare(userDevice.Id, namedRequest);
+        const auto& secondNamedAddress = std::get<VmVirtioFsShareAddress>(secondNamedShare.GuestAddress);
+        VERIFY_ARE_NOT_EQUAL(firstNamedShare.Id.Value, secondNamedShare.Id.Value);
+        VERIFY_IS_TRUE(secondNamedAddress.ChildName.has_value());
+        VERIFY_ARE_EQUAL(std::wstring{L"second"}, secondNamedAddress.ChildName.value());
+
         // Mount options are part of a share's identity, so a read-only mount is a separate share.
         auto readOnlyRequest = request;
         readOnlyRequest.ReadOnly = true;
@@ -370,6 +393,13 @@ class HcsVirtualMachineBackendTests
             HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->RemoveFileSystemShare(replacementShare.Id); }));
 
         const auto singleShareDevice = backend->CreateFileSystemDevice({VmVirtioFsDevice{L"drvfs-single", VmVirtioFsLayout::SingleShare}});
+        // A single-share device inherits the options of the share that it serves, so device-level
+        // options would never reach the guest.
+        VERIFY_ARE_EQUAL(
+            E_INVALIDARG, OperationResult([&] {
+                backend->CreateFileSystemDevice({VmVirtioFsDevice{
+                    L"drvfs-single-options", VmVirtioFsLayout::SingleShare, VmVirtioFsShareOptions{{{L"dax", L""}}}}});
+            }));
         const auto singleShare = backend->AddFileSystemShare(singleShareDevice.Id, request);
         VERIFY_IS_FALSE(std::get<VmVirtioFsShareAddress>(singleShare.GuestAddress).ChildName.has_value());
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_BUSY), OperationResult([&] { backend->RemoveDevice(singleShareDevice.Id); }));
@@ -381,15 +411,18 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(
             HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->GetFileSystemDeviceStatus(singleShareDevice.Id); }));
 
-        // A share carries its own token, so the elevated device reaches the same directory without
-        // reusing the share that the unelevated device serves.
-        auto adminRequest = request;
-        adminRequest.UserToken = wil::shared_handle{GetElevatedTestToken().release()};
-        const auto adminShare = backend->AddFileSystemShare(adminDevice.Id, adminRequest);
+        // The elevated device reaches the same directory under its own identity without reusing the
+        // share that the unelevated device serves. A child of an aggregate device cannot name a
+        // second identity, so a share token is rejected rather than silently ignored.
+        const auto adminShare = backend->AddFileSystemShare(adminDevice.Id, request);
         VERIFY_ARE_EQUAL(adminDevice.Id.Value, adminShare.Device.Value);
         VERIFY_ARE_NOT_EQUAL(share.Id.Value, adminShare.Id.Value);
         VERIFY_ARE_EQUAL(std::wstring{L"drvfs-admin"}, std::get<VmVirtioFsShareAddress>(adminShare.GuestAddress).Tag);
         VERIFY_ARE_EQUAL(share.EffectiveHostPath.native(), adminShare.EffectiveHostPath.native());
+
+        auto tokenRequest = request;
+        tokenRequest.UserToken = wil::shared_handle{GetElevatedTestToken().release()};
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddFileSystemShare(userDevice.Id, tokenRequest); }));
 
         // Exercise the remaining file-system transports as well: Plan 9 socket and Plan 9 virtio.
         const auto createPlan9Server = [](HANDLE userToken) {
@@ -397,15 +430,23 @@ class HcsVirtualMachineBackendTests
         };
 
         VmPlan9SocketDevice socketDevice{GuestServicePort{LX_INIT_UTILITY_VM_PLAN9_PORT}, createPlan9Server};
+        // The port is handed straight to the Plan 9 server, so an unassigned one must be rejected
+        // rather than listened on.
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] {
+                             backend->CreateFileSystemDevice({VmPlan9SocketDevice{GuestServicePort{}, createPlan9Server}});
+                         }));
         const auto socketDeviceResult = backend->CreateFileSystemDevice({socketDevice});
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Serving, socketDeviceResult.State);
         VmFileSystemShareRequest socketRequest;
         socketRequest.HostPath = directory;
         socketRequest.Options = VmPlan9ShareOptions{};
         socketRequest.ReadOnly = false;
+        socketRequest.Name = L"socket-share";
         const auto socketShare = backend->AddFileSystemShare(socketDeviceResult.Id, socketRequest);
         VERIFY_ARE_EQUAL(socketDevice.Port.Value, std::get<VmPlan9SocketShareAddress>(socketShare.GuestAddress).Port.Value);
         VERIFY_IS_FALSE(socketShare.ReadOnly);
+        const auto duplicateSocketShare = backend->AddFileSystemShare(socketDeviceResult.Id, socketRequest);
+        VERIFY_ARE_EQUAL(socketShare.Id.Value, duplicateSocketShare.Id.Value);
 
         // A Plan 9 device keeps serving after one of its shares is removed, so the share can be added again.
         backend->RemoveFileSystemShare(socketShare.Id);
