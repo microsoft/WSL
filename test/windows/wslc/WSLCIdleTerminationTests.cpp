@@ -82,12 +82,6 @@ class WSLCIdleTerminationTests : public WSLCTestBase
             std::chrono::minutes{2});
     }
 
-    // Returns true if any running VM is owned by the given name.
-    static bool IsVmRunning(const std::wstring& owner)
-    {
-        return std::ranges::any_of(ListVms(), [&](const auto& vm) { return vm.Owner == owner; });
-    }
-
     WSLC_TEST_METHOD(VmKillTerminatesSession)
     {
         constexpr auto c_sessionName = L"wslc-vm-kill-test";

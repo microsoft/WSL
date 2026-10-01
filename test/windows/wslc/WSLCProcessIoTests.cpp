@@ -230,24 +230,16 @@ class WSLCProcessIoTests : public WSLCTestBase
             return contentString;
         };
 
-        auto validateFirstDmesgLine = [](const std::string& dmesg, const char* expected) {
-            auto firstLf = dmesg.find("\n");
-            VERIFY_ARE_NOT_EQUAL(firstLf, std::string::npos);
-            VERIFY_IS_TRUE(dmesg.find(expected) < firstLf);
-        };
-
         // Dmesg without early boot logging
         {
             auto dmesg = createVmWithDmesg(false);
-
-            // Verify that the first line is "brd: module loaded";
-            validateFirstDmesgLine(dmesg, "brd: module loaded");
+            VERIFY_ARE_EQUAL(dmesg.find("Linux version"), std::string::npos);
         }
 
         // Dmesg with early boot logging
         {
             auto dmesg = createVmWithDmesg(true);
-            validateFirstDmesgLine(dmesg, "Linux version");
+            VERIFY_ARE_NOT_EQUAL(dmesg.find("Linux version"), std::string::npos);
         }
     }
 

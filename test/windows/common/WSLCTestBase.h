@@ -158,6 +158,46 @@ protected:
         return wil::scope_exit([this]() { m_defaultSession = CreateSession(m_defaultSessionSettings); });
     }
 
+    // Drains a bounded event stream to completion (GetNext returns WSLC_E_EVENT_STREAM_FINISHED
+    // once the until-time has passed and the backlog is exhausted), parsing each event's JSON.
+    std::vector<wsl::windows::common::wslc_schema::Event> DrainEventStream(IWSLCEventStream* Stream)
+    {
+        std::vector<wsl::windows::common::wslc_schema::Event> events;
+
+        wil::unique_cotaskmem_ansistring eventJson;
+        HRESULT result;
+        while (SUCCEEDED(result = Stream->GetNext(nullptr, &eventJson)))
+        {
+            events.push_back(wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(eventJson.get()));
+        }
+
+        VERIFY_ARE_EQUAL(WSLC_E_EVENT_STREAM_FINISHED, result);
+        return events;
+    }
+
+    std::vector<wsl::windows::common::wslc_schema::Event> ReadEvents(IWSLCEventStream* Stream, size_t Count, HANDLE CancelEvent = nullptr)
+    {
+        std::vector<wsl::windows::common::wslc_schema::Event> events;
+        wil::unique_cotaskmem_ansistring eventJson;
+        for (size_t index = 0; index < Count; ++index)
+        {
+            VERIFY_SUCCEEDED(Stream->GetNext(CancelEvent, &eventJson));
+            events.push_back(wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(eventJson.get()));
+        }
+
+        return events;
+    }
+
+    wil::com_ptr<IWSLCEventStream> OpenEventStream(const std::vector<WSLCFilter>& Filters)
+    {
+        constexpr LONGLONG c_eventWaitSeconds = 120;
+        const LONGLONG until = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() + c_eventWaitSeconds;
+
+        wil::com_ptr<IWSLCEventStream> stream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, until, Filters.data(), static_cast<ULONG>(Filters.size()), &stream));
+        return stream;
+    }
+
     static wil::com_ptr<IWSLCSessionManager> OpenSessionManager()
     {
         wil::com_ptr<IWSLCSessionManager> sessionManager;
@@ -383,6 +423,12 @@ protected:
         }
 
         return vms;
+    }
+
+    // Returns true if any running VM is owned by the given name.
+    static bool IsVmRunning(const std::wstring& Owner)
+    {
+        return std::ranges::any_of(ListVms(), [&](const auto& vm) { return vm.Owner == Owner; });
     }
 
     void ExpectImagePresent(IWSLCSession& Session, const char* Image, bool Present = true)
