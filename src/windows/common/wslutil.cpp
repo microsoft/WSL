@@ -25,7 +25,6 @@ Abstract:
 #include "MsiQuery.h"
 #include "WslInstall.h"
 #include <Dbghelp.h>
-#include <Dbghelp.h>
 
 using winrt::Windows::Foundation::Uri;
 using winrt::Windows::Management::Deployment::DeploymentOptions;
