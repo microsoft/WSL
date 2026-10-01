@@ -12,27 +12,15 @@ struct VirtioFsShareOptions
     UINT32 SharedMemorySizeMb = 0;
 };
 
-//
-// Formats virtio-fs mount options as the semicolon separated 'name[=value]' list that the device host expects.
-//
 std::wstring FormatVirtioFsMountOptions(_In_ const std::map<std::wstring, std::wstring>& Options);
 
-//
-// Parses the semicolon separated 'name[=value]' list that the device host expects into a map, so that shares
-// whose options differ only in order (for example "uid=1000;gid=1000" and "gid=1000;uid=1000") can share a
-// single device. Empty options are ignored.
-//
+// Normalizes option order so equivalent requests can reuse a device.
 std::map<std::wstring, std::wstring> ParseVirtioFsMountOptions(_In_ std::wstring_view Options);
 
-//
-// Returns the canonical form of a file system share path with a trailing path separator, so that requests
-// naming the same directory resolve to the same share.
-//
+// Adds a trailing separator before canonicalization to preserve the directory as the share root.
 std::wstring NormalizeSharePath(_In_ const std::filesystem::path& Path);
 
-//
-// Adds a path to a Plan9 file system server, treating a share that is already present as success.
-//
+// Treats an equivalent existing share as an idempotent add.
 void AddPlan9SharePath(_In_ const wil::com_ptr<IPlan9FileSystem>& Server, _In_ PCWSTR AccessName, _In_ PCWSTR Path, _In_ UINT32 Flags);
 
 //

@@ -58,8 +58,7 @@ void AddPassThroughDisk(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ UL
 /// <summary>
 /// Adds a pass-through disk to a compute system, retrying while the disk is still in use by the host.
 /// </summary>
-void AddPassThroughDiskWithRetry(
-    _In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun, _In_ bool ReadOnly, _In_ size_t TimeoutMs);
+void AddPassThroughDiskWithRetry(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun, _In_ bool ReadOnly, _In_ size_t TimeoutMs);
 
 /// <summary>
 /// Adds a VHD to a compute system, granting the VM access to the file if needed.
@@ -94,15 +93,8 @@ void GrantVmAccess(_In_ PCWSTR VmId, _In_ PCWSTR FilePath);
 /// </summary>
 void GrantVmWorkerProcessAccessToDisk(_In_ PCWSTR VmId, _In_ PCWSTR Disk, _In_opt_ HANDLE UserToken);
 
-/// <summary>
-/// Assigns the host GPUs to a running compute system using mirrored assignment. The GDI acceleration
-/// and presentation settings are only sent to hosts that support them.
-/// </summary>
-void AddMirroredGpu(
-    _In_ HCS_SYSTEM ComputeSystem,
-    _In_ bool AllowVendorExtension = true,
-    _In_ bool DisableGdiAcceleration = true,
-    _In_ bool DisablePresentation = true);
+// Optional vGPU settings are omitted on hosts whose schema rejects them.
+void AddMirroredGpu(_In_ HCS_SYSTEM ComputeSystem, _In_ bool AllowVendorExtension = true, _In_ bool DisableGdiAcceleration = true, _In_ bool DisablePresentation = true);
 
 void ModifyComputeSystem(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Configuration, _In_opt_ HANDLE Identity = nullptr);
 
