@@ -13,6 +13,7 @@ Abstract:
 --*/
 #pragma once
 
+#include "ContainerModel.h"
 #include "SessionModel.h"
 #include "Terminal.h"
 #include <wslc.h>
@@ -32,6 +33,7 @@ struct EventStreamOptions
     LONGLONG Since{};
     LONGLONG Until{};
     std::vector<std::pair<std::string, std::string>> Filters;
+    models::FormatType Format{models::FormatType::Table};
 };
 
 struct SessionService
