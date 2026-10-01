@@ -974,12 +974,7 @@ void ContainerService::CopyFromContainerIntoLocalDir(
     std::optional<std::wstring> rebaseName;
     if (followLink)
     {
-        auto requestedName = MultiByteToWide(PosixBaseName(srcPath));
-
-        THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG, Localization::WSLCCLI_CpSourceNameNotRepresentableError(MultiByteToWide(srcPath)), !IsRepresentableFileName(requestedName));
-
-        rebaseName = std::move(requestedName);
+        rebaseName = MultiByteToWide(PosixBaseName(srcPath));
     }
 
     ExtractArchiveInto(canonicalTarget, rebaseName, [&](HANDLE archive) {

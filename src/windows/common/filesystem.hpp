@@ -212,7 +212,8 @@ private:
 /// <summary>
 /// Returns Path as a string with trailing separators removed, leaving at least one character. tar.exe
 /// receives directories enclosed in quotes, and the CRT reads a '\' immediately before the closing quote
-/// as an escape, which would swallow the quote and run the argument into the next one.
+/// as an escape, which would swallow the quote and run the argument into the next one. A root such as
+/// "C:\" keeps its separator, doubled, so it still names the root once unquoted.
 /// </summary>
 std::wstring StripTrailingSeparators(const std::filesystem::path& Path);
 
@@ -220,7 +221,9 @@ std::wstring StripTrailingSeparators(const std::filesystem::path& Path);
 /// Extracts a tar stream into Destination, calling WriteArchive with the handle to write the archive to.
 /// tar.exe cannot rename entries, so a set RebaseName is applied after extraction: a lone entry takes that
 /// name, several entries are gathered under a directory carrying it. A set but empty name still stages,
-/// which merges the entries under their own names.
+/// which merges the entries under their own names. Entries are held to Destination: tar.exe contains entry
+/// names and hard link targets that point outside it, and an entry underneath a symbolic link entry, which
+/// tar.exe would follow, is refused before any of the archive is extracted.
 /// </summary>
 void ExtractArchiveInto(const std::filesystem::path& Destination, const std::optional<std::wstring>& RebaseName, const std::function<void(HANDLE)>& WriteArchive);
 

@@ -56,6 +56,11 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 
     // Drops the collected error so a later failure in the same invocation reports its own message.
     void ClearError();
+
+protected:
+    // Routes warnings raised in-process onto the terminal, so they read the same as the ones the
+    // service raises through WarningCallback.
+    bool CollectUserWarning(const std::wstring& warning) override;
 };
 
 } // namespace wsl::windows::wslc::execution

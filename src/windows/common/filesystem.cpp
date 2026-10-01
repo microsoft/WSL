@@ -1013,16 +1013,19 @@ bool wsl::windows::common::filesystem::IsRepresentableFileName(std::wstring_view
         return false;
     }
 
-    // A device name resolves to the device even when it carries an extension, so match on the stem.
-    const auto stem = wsl::shared::string::AsciiToLower(Name.substr(0, Name.find(L'.')));
-    if (stem == L"con" || stem == L"prn" || stem == L"aux" || stem == L"nul" || stem == L"conin$" || stem == L"conout$")
+    const auto lowerName = wsl::shared::string::AsciiToLower(Name);
+
+    // These names are reserved by Windows. A name carrying an extension is left alone, so whether
+    // something like "nul.txt" resolves to the device is decided by Win32 when the entry is created.
+    // https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#naming-conventions
+    if (lowerName == L"con" || lowerName == L"prn" || lowerName == L"aux" || lowerName == L"nul")
     {
         return false;
     }
 
     // COM1-COM9 and LPT1-LPT9, along with the superscript forms Windows resolves to ports 1 through 3.
-    if (stem.size() == 4 && (stem.starts_with(L"com") || stem.starts_with(L"lpt")) &&
-        ((stem[3] >= L'1' && stem[3] <= L'9') || stem[3] == L'\u00b9' || stem[3] == L'\u00b2' || stem[3] == L'\u00b3'))
+    if (lowerName.size() == 4 && (lowerName.starts_with(L"com") || lowerName.starts_with(L"lpt")) &&
+        ((lowerName[3] >= L'1' && lowerName[3] <= L'9') || lowerName[3] == L'\u00b9' || lowerName[3] == L'\u00b2' || lowerName[3] == L'\u00b3'))
     {
         return false;
     }
@@ -1077,6 +1080,13 @@ static void MoveOver(const std::filesystem::path& From, const std::filesystem::p
 
 std::wstring wsl::windows::common::filesystem::StripTrailingSeparators(const std::filesystem::path& Path)
 {
+    // A root cannot lose its separator: "C:" names the current directory of drive C, not its root. The
+    // separator is doubled instead, which the CRT reads as one literal '\' ahead of the closing quote.
+    if (Path.has_root_directory() && !Path.has_relative_path())
+    {
+        return Path.root_name().wstring() + L"\\\\";
+    }
+
     auto text = Path.wstring();
     while (text.size() > 1 && (text.back() == L'\\' || text.back() == L'/'))
     {
@@ -1086,34 +1096,386 @@ std::wstring wsl::windows::common::filesystem::StripTrailingSeparators(const std
     return text;
 }
 
+namespace {
+
+// POSIX ustar: every entry begins with a 512 byte header, and file contents follow it padded out to
+// the next multiple of that size.
+constexpr size_t c_tarBlockSize = 512;
+
+// A name or extended header longer than this is not something an archiver produces.
+constexpr uint64_t c_tarMaxMetadataSize = 1 * _1MB;
+
+#pragma pack(push, 1)
+struct TarHeader
+{
+    char Name[100];
+    char Mode[8];
+    char Uid[8];
+    char Gid[8];
+    char Size[12];
+    char ModifiedTime[12];
+    char Checksum[8];
+    char TypeFlag;
+    char LinkName[100];
+    char Magic[6];
+    char Version[2];
+    char UserName[32];
+    char GroupName[32];
+    char DeviceMajor[8];
+    char DeviceMinor[8];
+    char Prefix[155];
+    char Padding[12];
+};
+#pragma pack(pop)
+
+static_assert(sizeof(TarHeader) == c_tarBlockSize);
+
+constexpr char c_tarTypeSymlink = '2';
+constexpr char c_tarTypeLongName = 'L';
+constexpr char c_tarTypeLongLinkName = 'K';
+constexpr char c_tarTypePaxExtended = 'x';
+constexpr char c_tarTypePaxExtendedAlternate = 'X';
+constexpr char c_tarTypePaxGlobal = 'g';
+
+// Reads Size bytes, returning false only when the archive ends exactly where the read began. Anything
+// shorter leaves the position inside an entry, so the entries after it cannot be read.
+bool ReadArchiveBytes(HANDLE Archive, void* Buffer, size_t Size)
+{
+    auto* const out = static_cast<char*>(Buffer);
+    size_t total = 0;
+    while (total < Size)
+    {
+        DWORD read = 0;
+        THROW_IF_WIN32_BOOL_FALSE(ReadFile(Archive, out + total, static_cast<DWORD>(Size - total), &read, nullptr));
+        if (read == 0)
+        {
+            THROW_HR_IF_MSG(E_FAIL, total > 0, "Archive ended inside an entry");
+            return false;
+        }
+
+        total += read;
+    }
+
+    return true;
+}
+
+// Header fields are padded with NULs, so a full field carries no terminator of its own.
+std::string TarFieldToString(const char* Field, size_t Size)
+{
+    return std::string(Field, std::find(Field, Field + Size, '\0'));
+}
+
+uint64_t TarHeaderSize(const TarHeader& Header)
+{
+    // Sizes too large for the octal field are stored big endian with the high bit of the first byte set.
+    if ((static_cast<unsigned char>(Header.Size[0]) & 0x80) != 0)
+    {
+        uint64_t value = 0;
+        for (size_t index = 1; index < sizeof(Header.Size); index++)
+        {
+            value = (value << 8) | static_cast<unsigned char>(Header.Size[index]);
+        }
+
+        return value;
+    }
+
+    uint64_t value = 0;
+    for (const char digit : Header.Size)
+    {
+        if (digit == ' ')
+        {
+            continue;
+        }
+
+        if (digit < '0' || digit > '7')
+        {
+            break;
+        }
+
+        value = (value * 8) + (digit - '0');
+    }
+
+    return value;
+}
+
+uint64_t TarDataBlocks(uint64_t Size)
+{
+    return (Size + c_tarBlockSize - 1) / c_tarBlockSize;
+}
+
+std::vector<char> ReadTarData(HANDLE Archive, uint64_t Size)
+{
+    THROW_HR_IF_MSG(E_FAIL, Size > c_tarMaxMetadataSize, "Archive metadata entry is %llu bytes", Size);
+
+    std::vector<char> data(static_cast<size_t>(TarDataBlocks(Size) * c_tarBlockSize));
+    THROW_HR_IF_MSG(
+        E_FAIL, !data.empty() && !ReadArchiveBytes(Archive, data.data(), data.size()), "Archive ended inside an entry");
+
+    data.resize(static_cast<size_t>(Size));
+    return data;
+}
+
+void SkipTarData(HANDLE Archive, uint64_t Size)
+{
+    LARGE_INTEGER distance{};
+    distance.QuadPart = static_cast<LONGLONG>(TarDataBlocks(Size) * c_tarBlockSize);
+    THROW_LAST_ERROR_IF(!SetFilePointerEx(Archive, distance, nullptr, FILE_CURRENT));
+}
+
+// pax records are "<length> <key>=<value>\n", where the length covers the whole record.
+std::optional<std::string> FindPaxPath(const std::vector<char>& Data)
+{
+    constexpr std::string_view c_pathKey = "path=";
+
+    std::string_view remaining(Data.data(), Data.size());
+    size_t position = 0;
+    while (position < remaining.size())
+    {
+        const auto space = remaining.find(' ', position);
+        if (space == std::string_view::npos)
+        {
+            break;
+        }
+
+        size_t length = 0;
+        for (size_t index = position; index < space; index++)
+        {
+            if (remaining[index] < '0' || remaining[index] > '9')
+            {
+                return {};
+            }
+
+            length = (length * 10) + (remaining[index] - '0');
+        }
+
+        // The record has to hold at least its own length field, the space, and the trailing newline.
+        if (length <= (space - position) + 2 || (position + length) > remaining.size())
+        {
+            break;
+        }
+
+        const auto record = remaining.substr(space + 1, (position + length) - space - 2);
+        if (record.starts_with(c_pathKey))
+        {
+            return std::string(record.substr(c_pathKey.size()));
+        }
+
+        position += length;
+    }
+
+    return {};
+}
+
+// Entry names are '/' separated, but '\' is legal in a Linux file name and separates on Windows, so it
+// has to count as a separator here or a component could be read as a path during extraction.
+std::vector<std::string> SplitArchivePath(std::string_view Path)
+{
+    std::vector<std::string> components;
+    std::string current;
+    const auto append = [&]() {
+        if (!current.empty() && current != ".")
+        {
+            // The destination is case insensitive, so a name differing only by case reaches the same entry.
+            std::transform(current.begin(), current.end(), current.begin(), [](char character) {
+                return (character >= 'A' && character <= 'Z') ? static_cast<char>(character - 'A' + 'a') : character;
+            });
+
+            components.push_back(current);
+        }
+
+        current.clear();
+    };
+
+    for (const char character : Path)
+    {
+        if (character == '/' || character == '\\')
+        {
+            append();
+        }
+        else
+        {
+            current += character;
+        }
+    }
+
+    append();
+
+    // tar.exe drops a leading drive letter from an entry name, so the entry it writes is the one named by
+    // the rest of the path.
+    if (!components.empty() && components.front().size() == 2 && components.front()[1] == ':' && components.front()[0] >= 'a' &&
+        components.front()[0] <= 'z')
+    {
+        components.erase(components.begin());
+    }
+
+    return components;
+}
+
+// tar.exe creates a symlink entry as a link and then resolves it while extracting the entries beneath
+// it, which places those entries wherever the link points. The entries are checked in order first, so
+// an archive carrying that pair is refused before tar.exe writes anything. tar.exe already contains
+// entry names and hard link targets that leave the destination.
+void ValidateArchiveEntries(HANDLE Archive)
+{
+    std::unordered_set<std::string> symlinks;
+    std::optional<std::string> overrideName;
+
+    for (;;)
+    {
+        TarHeader header{};
+        if (!ReadArchiveBytes(Archive, &header, sizeof(header)))
+        {
+            break;
+        }
+
+        // The archive ends with zeroed blocks, which carry no name.
+        const auto* const bytes = reinterpret_cast<const char*>(&header);
+        if (std::all_of(bytes, bytes + sizeof(header), [](char value) { return value == '\0'; }))
+        {
+            break;
+        }
+
+        const auto size = TarHeaderSize(header);
+
+        // These headers carry the next entry's metadata rather than an entry of their own.
+        if (header.TypeFlag == c_tarTypeLongName)
+        {
+            const auto data = ReadTarData(Archive, size);
+            overrideName = TarFieldToString(data.data(), data.size());
+            continue;
+        }
+
+        if (header.TypeFlag == c_tarTypePaxExtended || header.TypeFlag == c_tarTypePaxExtendedAlternate)
+        {
+            const auto data = ReadTarData(Archive, size);
+            if (auto path = FindPaxPath(data); path.has_value())
+            {
+                overrideName = std::move(path);
+            }
+
+            continue;
+        }
+
+        // A long link target or a global header belongs to the next entry but says nothing about its name.
+        if (header.TypeFlag == c_tarTypeLongLinkName || header.TypeFlag == c_tarTypePaxGlobal)
+        {
+            SkipTarData(Archive, size);
+            continue;
+        }
+
+        std::string name;
+        if (overrideName.has_value())
+        {
+            name = std::move(*overrideName);
+            overrideName.reset();
+        }
+        else
+        {
+            name = TarFieldToString(header.Name, sizeof(header.Name));
+            const auto prefix = TarFieldToString(header.Prefix, sizeof(header.Prefix));
+            if (!prefix.empty() && std::string_view(header.Magic, 5) == "ustar")
+            {
+                name = prefix + "/" + name;
+            }
+        }
+
+        SkipTarData(Archive, size);
+
+        const auto components = SplitArchivePath(name);
+        if (components.empty())
+        {
+            continue;
+        }
+
+        std::string path;
+        for (size_t index = 0; index < components.size(); index++)
+        {
+            if (!path.empty())
+            {
+                path += '/';
+            }
+
+            path += components[index];
+
+            // Only a parent of this entry resolves while the entry is written.
+            THROW_HR_IF_MSG(
+                E_FAIL,
+                index < (components.size() - 1) && symlinks.contains(path),
+                "Archive entry '%hs' is under the link '%hs'",
+                name.c_str(),
+                path.c_str());
+        }
+
+        if (header.TypeFlag == c_tarTypeSymlink)
+        {
+            symlinks.insert(path);
+        }
+    }
+}
+
+} // namespace
+
 void ExtractTarStream(const std::filesystem::path& Root, const std::function<void(HANDLE)>& WriteArchive)
 {
     const auto targetDir = wsl::windows::common::filesystem::StripTrailingSeparators(Root);
 
-    auto [pipeRead, pipeWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, false, false);
-    THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(pipeRead.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+    // The archive is written to a file so its entries can be read before tar.exe is given any of them.
+    wsl::windows::common::filesystem::TempFile archive(
+        GENERIC_READ | GENERIC_WRITE,
+        FILE_SHARE_READ,
+        CREATE_ALWAYS,
+        wsl::windows::common::filesystem::TempFileFlags::DeleteOnClose | wsl::windows::common::filesystem::TempFileFlags::InheritHandle);
+
+    WriteArchive(archive.Handle.get());
+
+    const auto rewind = [&]() {
+        LARGE_INTEGER zero{};
+        THROW_LAST_ERROR_IF(!SetFilePointerEx(archive.Handle.get(), zero, nullptr, FILE_BEGIN));
+    };
+
+    rewind();
+    ValidateArchiveEntries(archive.Handle.get());
+    rewind();
 
     auto tarCmd = std::format(L"tar.exe -xf - -C \"{}\"", targetDir);
     wsl::windows::common::SubProcess process(nullptr, tarCmd.c_str());
-    process.SetStdHandles(pipeRead.get(), nullptr, nullptr);
-    auto processHandle = process.Start();
-    pipeRead.reset();
-
-    WriteArchive(pipeWrite.get());
-    pipeWrite.reset();
-
-    const auto exitCode = wsl::windows::common::SubProcess::GetExitCode(processHandle.get());
+    process.SetStdHandles(archive.Handle.get(), nullptr, nullptr);
+    const auto exitCode = process.Run();
     THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
 }
 
 void wsl::windows::common::filesystem::ExtractArchiveInto(
     const std::filesystem::path& Destination, const std::optional<std::wstring>& RebaseName, const std::function<void(HANDLE)>& WriteArchive)
 {
+    // The rebase name becomes the name of an entry in the destination, so it has to be one Windows can
+    // hold. Win32 drops trailing spaces and dots, which would place the entry under a name other than
+    // the one it carries, so those are trimmed and the caller is told. Everything is settled before the
+    // destination is created or the archive is read, so a rejected name leaves nothing behind.
+    auto rebaseName = RebaseName;
+    if (rebaseName.has_value() && !rebaseName->empty())
+    {
+        auto trimmed = rebaseName->substr(0, rebaseName->find_last_not_of(L" .") + 1);
+
+        // Nothing but spaces and dots leaves no name to copy to. An empty name already means "merge the
+        // entries into the destination", so it cannot stand in for one that was asked for.
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, wsl::shared::Localization::WSLCCLI_CpSourceNameNotRepresentableError(*rebaseName), trimmed.empty());
+
+        if (trimmed != *rebaseName)
+        {
+            EMIT_USER_WARNING(wsl::shared::Localization::WSLCCLI_CpSourceNameTrimmedWarning(*rebaseName, trimmed));
+            rebaseName = std::move(trimmed);
+        }
+
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, wsl::shared::Localization::WSLCCLI_CpSourceNameNotRepresentableError(*rebaseName), !IsRepresentableFileName(*rebaseName));
+    }
+
     std::error_code dirError;
     std::filesystem::create_directories(Destination, dirError);
     THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", Destination.c_str());
 
-    if (!RebaseName.has_value())
+    if (!rebaseName.has_value())
     {
         ExtractTarStream(Destination, WriteArchive);
         return;
@@ -1132,17 +1494,17 @@ void wsl::windows::common::filesystem::ExtractArchiveInto(
 
     // A lone entry is the source itself and takes the name; several mean the source has no name of its own.
     auto destinationRoot = Destination;
-    if (!RebaseName->empty() && staged.size() > 1)
+    if (!rebaseName->empty() && staged.size() > 1)
     {
-        destinationRoot = Destination / *RebaseName;
+        destinationRoot = Destination / *rebaseName;
         std::filesystem::create_directories(destinationRoot, dirError);
         THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", destinationRoot.c_str());
     }
 
-    const bool rebase = !RebaseName->empty() && staged.size() == 1;
+    const bool rebase = !rebaseName->empty() && staged.size() == 1;
     for (const auto& entry : staged)
     {
-        MoveOver(entry, destinationRoot / (rebase ? *RebaseName : entry.filename().wstring()));
+        MoveOver(entry, destinationRoot / (rebase ? *rebaseName : entry.filename().wstring()));
     }
 }
 

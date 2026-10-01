@@ -23,6 +23,7 @@ using wsl::windows::common::filesystem::IsRepresentableFileName;
 using wsl::windows::common::filesystem::MakeStagingDirectory;
 using wsl::windows::common::filesystem::PosixBaseName;
 using wsl::windows::common::filesystem::StagingDirectory;
+using wsl::windows::common::filesystem::StripTrailingSeparators;
 
 namespace {
 
@@ -75,6 +76,18 @@ public:
     TarBuilder& AddDirectory(std::string_view Name)
     {
         AddEntry(std::string{Name} + "/", '5', {}, {});
+        return *this;
+    }
+
+    TarBuilder& AddHardLink(std::string_view Name, std::string_view Target)
+    {
+        AddEntry(Name, '1', {}, Target);
+        return *this;
+    }
+
+    TarBuilder& AddSymlink(std::string_view Name, std::string_view Target)
+    {
+        AddEntry(Name, '2', {}, Target);
         return *this;
     }
 
@@ -326,6 +339,42 @@ class FilesystemUnitTests
         VERIFY_ARE_EQUAL(wildcardName, PosixBaseName(wildcardPath));
     }
 
+    // The result is placed inside quotes on a tar.exe command line, so a trailing separator would be read
+    // as escaping the closing quote.
+    TEST_METHOD(StripTrailingSeparators_RemovesTrailingSeparators)
+    {
+        const std::pair<std::wstring, std::wstring> cases[] = {
+            {L"C:\\dir\\", L"C:\\dir"},
+            {L"C:\\dir\\\\", L"C:\\dir"},
+            {L"C:/dir/", L"C:/dir"},
+            {L"C:\\dir", L"C:\\dir"},
+            {L"\\\\server\\share\\", L"\\\\server\\share"},
+            {L"relative\\", L"relative"},
+        };
+
+        for (const auto& [input, expected] : cases)
+        {
+            VERIFY_ARE_EQUAL(expected, StripTrailingSeparators(input));
+        }
+    }
+
+    // Dropping a root's separator would leave "C:", the current directory of drive C rather than its
+    // root. The separator stays, doubled so the CRT reads it as one '\' ahead of the closing quote.
+    TEST_METHOD(StripTrailingSeparators_KeepsRootSeparatorEscaped)
+    {
+        const std::pair<std::wstring, std::wstring> cases[] = {
+            {L"C:\\", L"C:\\\\"},
+            {L"C:/", L"C:\\\\"},
+            {L"C:\\\\", L"C:\\\\"},
+            {L"\\", L"\\\\"},
+        };
+
+        for (const auto& [input, expected] : cases)
+        {
+            VERIFY_ARE_EQUAL(expected, StripTrailingSeparators(input));
+        }
+    }
+
     // Staging goes under the parent it was given so that moving entries out of it afterwards stays on one
     // volume, and each directory has to be distinct so concurrent copies cannot collide.
     TEST_METHOD(MakeStagingDirectory_CreatesUniqueDirectoryUnderParent)
@@ -398,22 +447,25 @@ class FilesystemUnitTests
 
     TEST_METHOD(IsRepresentableFileName_RejectsReservedDeviceNames)
     {
-        const std::wstring devices[] = {
-            L"con", L"CON", L"Prn", L"aux", L"NUL", L"com1", L"COM9", L"lpt1", L"lpt9", L"LPT9", L"conin$", L"CONOUT$"};
+        const std::wstring devices[] = {L"con", L"CON", L"Prn", L"aux", L"NUL", L"com1", L"COM9", L"lpt1", L"lpt9", L"LPT9"};
         for (const auto& name : devices)
         {
             VERIFY_IS_FALSE(IsRepresentableFileName(name), name.c_str());
         }
-
-        // A device name keeps its meaning when it carries an extension.
-        VERIFY_IS_FALSE(IsRepresentableFileName(L"con.txt"));
-        VERIFY_IS_FALSE(IsRepresentableFileName(L"NUL.tar.gz"));
     }
 
     TEST_METHOD(IsRepresentableFileName_AcceptsNamesThatOnlyLookReserved)
     {
         const std::wstring allowed[] = {L"con2", L"com0", L"lpt0", L"com10", L"console", L"nuls", L"prnt", L"auxiliary"};
         for (const auto& name : allowed)
+        {
+            VERIFY_IS_TRUE(IsRepresentableFileName(name), name.c_str());
+        }
+
+        // A name carrying an extension is a name of its own. Whether Win32 still routes it to the device
+        // is left to the file system, which is where the copy would fail if it does.
+        const std::wstring extensions[] = {L"con.txt", L"NUL.tar.gz", L"conin$", L"CONOUT$"};
+        for (const auto& name : extensions)
         {
             VERIFY_IS_TRUE(IsRepresentableFileName(name), name.c_str());
         }
@@ -606,6 +658,110 @@ class FilesystemUnitTests
         VERIFY_IS_FALSE(std::filesystem::exists(root.Path() / L"escaped.txt"));
     }
 
+    // tar.exe strips the leading '/' or drive from an absolute entry name, so the entry lands inside the
+    // destination instead of at the path the archive spelled out.
+    TEST_METHOD(ExtractArchiveInto_AbsoluteEntryNameStaysInsideDestination)
+    {
+        const StagingDirectory root(std::filesystem::temp_directory_path());
+        const auto destination = root.Path() / L"destination";
+
+        // The staging directory name is unique, so nothing already at the drive root can share it.
+        const auto unique = root.Path().filename().string();
+        const auto rooted = unique + "-rooted.txt";
+        const auto drive = unique + "-drive.txt";
+
+        ExtractArchiveInto(destination, std::nullopt, TarBuilder().AddFile("/" + rooted, "rooted").AddFile("C:/" + drive, "drive").Writer());
+
+        VERIFY_ARE_EQUAL(std::string{"rooted"}, ReadFileContent(destination / rooted));
+        VERIFY_ARE_EQUAL(std::string{"drive"}, ReadFileContent(destination / drive));
+        VERIFY_IS_FALSE(std::filesystem::exists(std::filesystem::path{L"C:\\"} / rooted));
+        VERIFY_IS_FALSE(std::filesystem::exists(std::filesystem::path{L"C:\\"} / drive));
+    }
+
+    // A hard link to a file outside the destination would let a later entry of the same name write
+    // through it, so tar.exe must refuse to create it.
+    TEST_METHOD(ExtractArchiveInto_HardLinkOutsideDestinationIsRejected)
+    {
+        const StagingDirectory root(std::filesystem::temp_directory_path());
+        const auto destination = root.Path() / L"destination";
+        const auto victim = root.Path() / L"victim.txt";
+        WriteFileContent(victim, "original");
+
+        VerifyExtractionFails([&] {
+            ExtractArchiveInto(
+                destination, std::nullopt, TarBuilder().AddHardLink("link", "../victim.txt").AddFile("link", "overwritten").Writer());
+        });
+
+        VERIFY_ARE_EQUAL(std::string{"original"}, ReadFileContent(victim));
+    }
+
+    // tar.exe creates a symbolic link entry as a link and then resolves it while extracting the entries
+    // that follow it, which would place an entry named under that link wherever the link points. The
+    // archive is refused instead. The entry ahead of the pair shows the archive is read before tar.exe
+    // is given any of it, so the refusal leaves nothing behind.
+    TEST_METHOD(ExtractArchiveInto_EntryUnderSymlinkEntryIsRejected)
+    {
+        const StagingDirectory root(std::filesystem::temp_directory_path());
+        const auto destination = root.Path() / L"destination";
+        const auto outside = root.Path() / L"outside";
+        std::filesystem::create_directories(outside);
+
+        // The same entry reaches the link spelled with either separator, or in any case, because the
+        // destination separates on both and matches names without regard to case.
+        const std::string names[] = {"link/child.txt", "link\\child.txt", "LINK/child.txt"};
+        for (const auto& name : names)
+        {
+            VerifyExtractionFails([&] {
+                ExtractArchiveInto(
+                    destination,
+                    std::nullopt,
+                    TarBuilder().AddFile("first.txt", "first").AddSymlink("link", "../outside").AddFile(name, "escaped").Writer());
+            });
+
+            VERIFY_IS_FALSE(std::filesystem::exists(outside / L"child.txt"));
+            VERIFY_IS_FALSE(std::filesystem::exists(destination / L"first.txt"));
+        }
+    }
+
+    // Only an entry underneath a link is refused. A link is content in its own right, and a container
+    // filesystem is full of links that leave the tree being copied, so extracting one has to keep
+    // working no matter where it points.
+    TEST_METHOD(ExtractArchiveInto_SymlinkEntryIsExtracted)
+    {
+        const StagingDirectory probe(std::filesystem::temp_directory_path());
+        std::error_code symlinkError;
+        std::filesystem::create_symlink(L"target", probe.Path() / L"probe", symlinkError);
+        if (symlinkError)
+        {
+            WEX::Logging::Log::Comment(L"Creating a symbolic link is not permitted on this host");
+            return;
+        }
+
+        const StagingDirectory root(std::filesystem::temp_directory_path());
+        const auto destination = root.Path() / L"destination";
+
+        ExtractArchiveInto(
+            destination,
+            std::nullopt,
+            TarBuilder().AddSymlink("relative", "../outside").AddSymlink("absolute", "/etc/passwd").AddFile("file.txt", "content").Writer());
+
+        VERIFY_IS_TRUE(std::filesystem::is_symlink(destination / L"relative"));
+        VERIFY_IS_TRUE(std::filesystem::is_symlink(destination / L"absolute"));
+        VERIFY_ARE_EQUAL(std::string{"content"}, ReadFileContent(destination / L"file.txt"));
+    }
+
+    // A link that stays inside the destination is a normal part of an archive, and the entries under it
+    // are the link's own target, so they must still extract.
+    TEST_METHOD(ExtractArchiveInto_EntryUnderDirectoryNamedLikeASymlinkIsExtracted)
+    {
+        const StagingDirectory root(std::filesystem::temp_directory_path());
+        const auto destination = root.Path() / L"destination";
+
+        ExtractArchiveInto(destination, std::nullopt, TarBuilder().AddDirectory("link").AddFile("link/child.txt", "content").Writer());
+
+        VERIFY_ARE_EQUAL(std::string{"content"}, ReadFileContent(destination / L"link" / L"child.txt"));
+    }
+
     // Staging is an implementation detail that must not outlive the call, on either outcome, or a copy
     // would leave the destination directory littered.
     TEST_METHOD(ExtractSingleFileAs_RemovesStagingDirectory)
@@ -691,6 +847,60 @@ class FilesystemUnitTests
             root.Path(), std::optional<std::wstring>{L"renamed.txt"}, TarBuilder().AddFile("original.txt", "content").Writer());
 
         VERIFY_ARE_EQUAL(static_cast<size_t>(1), CountEntries(root.Path()));
+    }
+
+    // The rebase name is what the entry ends up called, so a name Windows cannot hold is refused before
+    // the destination is touched rather than after an archive has been read.
+    TEST_METHOD(ExtractArchiveInto_RebaseNameWindowsCannotHoldIsRejected)
+    {
+        const StagingDirectory root(std::filesystem::temp_directory_path());
+        const auto destination = root.Path() / L"destination";
+
+        // "." and ".." are nothing but the characters Win32 strips, so they leave no name to copy to.
+        const std::wstring rejected[] = {L"nul", L"COM1", L"has:colon", L".", L"..", L"   ", L"sub/dir"};
+        for (const auto& name : rejected)
+        {
+            VERIFY_THROWS_SPECIFIC(
+                ExtractArchiveInto(destination, std::optional<std::wstring>{name}, TarBuilder().AddFile("file.txt", "content").Writer()),
+                wil::ResultException,
+                [](const wil::ResultException& e) { return e.GetErrorCode() == E_INVALIDARG; });
+
+            VERIFY_IS_FALSE(std::filesystem::exists(destination), name.c_str());
+        }
+    }
+
+    // Win32 drops trailing spaces and dots, so the name is trimmed up front and the entry lands under
+    // the name that is actually created rather than one that only looks like what was asked for.
+    TEST_METHOD(ExtractArchiveInto_RebaseNameTrailingDotsAndSpacesAreTrimmed)
+    {
+        const std::pair<std::wstring, std::wstring> trimmed[] = {
+            {L"trail.", L"trail"}, {L"trail ", L"trail"}, {L"trail...", L"trail"}, {L"trail . . ", L"trail"}};
+
+        for (const auto& [requested, expected] : trimmed)
+        {
+            const StagingDirectory root(std::filesystem::temp_directory_path());
+
+            ExtractArchiveInto(
+                root.Path(), std::optional<std::wstring>{requested}, TarBuilder().AddFile("original.txt", "content").Writer());
+
+            VERIFY_ARE_EQUAL(std::string{"content"}, ReadFileContent(root.Path() / expected));
+            VERIFY_ARE_EQUAL(static_cast<size_t>(1), CountEntries(root.Path()));
+        }
+    }
+
+    // Trimming applies to the name of a gathered directory too, not just a lone entry.
+    TEST_METHOD(ExtractArchiveInto_TrimmedRebaseNameGathersSeveralEntries)
+    {
+        const StagingDirectory root(std::filesystem::temp_directory_path());
+
+        ExtractArchiveInto(
+            root.Path(),
+            std::optional<std::wstring>{L"gathered. "},
+            TarBuilder().AddFile("first.txt", "one").AddFile("second.txt", "two").Writer());
+
+        VERIFY_IS_TRUE(std::filesystem::is_directory(root.Path() / L"gathered"));
+        VERIFY_ARE_EQUAL(std::string{"one"}, ReadFileContent(root.Path() / L"gathered" / L"first.txt"));
+        VERIFY_ARE_EQUAL(std::string{"two"}, ReadFileContent(root.Path() / L"gathered" / L"second.txt"));
     }
 };
 } // namespace FilesystemUnitTests
