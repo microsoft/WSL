@@ -14,7 +14,6 @@ function(add_fuzzing_harness TARGET)
     cmake_parse_arguments(ARG "" "TARGET_NAME" "TARGET_BINARIES;LINK_LIBRARIES;EXTRA_DEPENDENCIES;INCLUDE_DIRECTORIES" ${ARGN})
 
     add_executable(${TARGET} ${TARGET}.cpp)
-    target_precompile_headers(${TARGET} REUSE_FROM common)
 
     if (NOT WSL_ENABLE_FUZZING_REPLAY)
         target_compile_options(${TARGET} PRIVATE /fsanitize=fuzzer)

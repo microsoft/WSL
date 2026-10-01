@@ -19,7 +19,6 @@
 
 using namespace winrt;
 using namespace winrt::Microsoft::WSL::Containers;
-using namespace winrt::Windows::Foundation;
 
 extern "C" int LLVMFuzzerInitialize(int*, char***)
 {
