@@ -58,6 +58,31 @@ namespace {
         return output;
     }
 
+    std::string FormatEventJson(const wslc_schema::Event& event)
+    {
+        nlohmann::json output{
+            {"Type", event.Type},
+            {"Action", event.Action},
+            {"Actor", event.Actor},
+            {"scope", "local"},
+            {"time", std::chrono::floor<std::chrono::seconds>(std::chrono::nanoseconds{event.timeNano}).count()},
+            {"timeNano", event.timeNano}};
+
+        // Docker still reports these deprecated fields for container events.
+        if (event.Type == "container")
+        {
+            output["status"] = event.Action;
+            output["id"] = event.Actor.ID;
+
+            if (const auto image = event.Actor.Attributes.find("image"); image != event.Actor.Attributes.end())
+            {
+                output["from"] = image->second;
+            }
+        }
+
+        return ToJson(output, c_jsonCompactIndent);
+    }
+
 } // namespace
 
 static wil::com_ptr<IWSLCSessionManager> CreateSessionManager()
@@ -247,7 +272,7 @@ void SessionService::StreamEvents(Terminal& terminal, const Session& session, co
         if (SUCCEEDED(result))
         {
             const auto event = wsl::shared::FromJson<wslc_schema::Event>(eventJson.get());
-            terminal.Output(L"{}\n", FormatEvent(event));
+            terminal.Output(L"{}\n", options.Format == FormatType::Json ? FormatEventJson(event) : FormatEvent(event));
             terminal.Flush(Terminal::Level::Output);
         }
     }
