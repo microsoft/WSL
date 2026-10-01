@@ -263,6 +263,10 @@ Abstract:
 #define LX_WSL2_GUI_APP_SUPPORT_ENV "WSL2_GUI_APPS_ENABLED"
 #define LX_WSL2_KERNEL_MODULES_MOUNT_ENV "WSL2_KERNEL_MODULES_MOUNT"
 #define LX_WSL2_KERNEL_MODULES_PATH_ENV "WSL2_KERNEL_MODULES_PATH"
+#define LX_WSL2_KERNEL_HEADERS_MOUNT_ENV "WSL2_KERNEL_HEADERS_MOUNT"
+#define LX_WSL2_KERNEL_HEADERS_PATH_ENV "WSL2_KERNEL_HEADERS_PATH"
+#define LX_WSL2_KERNEL_PERF_MOUNT_ENV "WSL2_KERNEL_PERF_MOUNT"
+#define LX_WSL2_KERNEL_PERF_PATH_ENV "WSL2_KERNEL_PERF_PATH"
 #define LX_WSL2_SYSTEM_DISTRO_SHARE_ENV "WSL2_SYSTEM_DISTRO_SHARE"
 #define LX_WSL2_GPU_SHARE_ENV "WSL2_GPU_SHARE_ENV_"
 #define LX_WSL2_SHARED_MEMORY_OB_DIRECTORY "WSL2_SHARED_MEMORY_OB_DIRECTORY"
@@ -745,7 +749,6 @@ using PLX_INIT_CREATE_PROCESS = LX_INIT_CREATE_PROCESS*;
 
 typedef struct _LX_INIT_CREATE_NT_PROCESS_COMMON
 {
-    int64_t StdFdIds[LX_INIT_STD_FD_COUNT];
     unsigned int FilenameOffset;
     unsigned int CurrentWorkingDirectoryOffset;
     unsigned int CommandLineOffset;
@@ -755,9 +758,6 @@ typedef struct _LX_INIT_CREATE_NT_PROCESS_COMMON
     unsigned short Columns;
     bool CreatePseudoconsole;
     char Buffer[];
-
-    // Not pretty-printing command line and env since it could contain PII.
-    PRETTY_PRINT(FIELD(StdFdIds), STRING_FIELD(FilenameOffset), STRING_FIELD(CurrentWorkingDirectoryOffset), FIELD(Rows), FIELD(Columns), FIELD(CreatePseudoconsole));
 } LX_INIT_CREATE_NT_PROCESS_COMMON, *PLX_INIT_CREATE_NT_PROCESS_COMMON;
 
 using PCLX_INIT_CREATE_NT_PROCESS_COMMON = const LX_INIT_CREATE_NT_PROCESS_COMMON*;
@@ -770,7 +770,15 @@ typedef struct _LX_INIT_CREATE_NT_PROCESS
     int64_t StdFdIds[LX_INIT_STD_FD_COUNT];
     LX_INIT_CREATE_NT_PROCESS_COMMON Common;
 
-    PRETTY_PRINT(FIELD(Header), FIELD(StdFdIds), FIELD(Common));
+    // Not pretty-printing command line and env since it could contain PII.
+    PRETTY_PRINT(
+        FIELD(Header),
+        FIELD(StdFdIds),
+        STRING_FIELD(Common.FilenameOffset),
+        STRING_FIELD(Common.CurrentWorkingDirectoryOffset),
+        FIELD(Common.Rows),
+        FIELD(Common.Columns),
+        FIELD(Common.CreatePseudoconsole));
 
 } LX_INIT_CREATE_NT_PROCESS, *PLX_INIT_CREATE_NT_PROCESS;
 
@@ -784,7 +792,16 @@ typedef struct _LX_INIT_CREATE_NT_PROCESS_UTILITY_VM
     unsigned int Port;
     LX_INIT_CREATE_NT_PROCESS_COMMON Common;
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Port), FIELD(Common));
+    // Not pretty-printing command line and env since it could contain PII.
+    PRETTY_PRINT(
+        FIELD(Header),
+        FIELD(Port),
+        STRING_FIELD(Common.FilenameOffset),
+        STRING_FIELD(Common.CurrentWorkingDirectoryOffset),
+        FIELD(Common.Rows),
+        FIELD(Common.Columns),
+        FIELD(Common.CreatePseudoconsole));
+
 } LX_INIT_CREATE_NT_PROCESS_UTILITY_VM, *PLX_INIT_CREATE_NT_PROCESS_UTILITY_VM;
 
 using PCLX_INIT_CREATE_NT_PROCESS_UTILITY_VM = const LX_INIT_CREATE_NT_PROCESS_UTILITY_VM*;

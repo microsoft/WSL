@@ -65,6 +65,7 @@ WslcSetProcessSettingsCallbacks
 WslcSetProcessSettingsWorkingDirectory
 WslcSetProcessSettingsCmdLine
 WslcSetProcessSettingsEnvVariables
+WslcSetProcessSettingsFlags
 WslcGetProcessPid
 WslcGetProcessExitEvent
 WslcGetProcessState

@@ -100,7 +100,7 @@ class WSLCCLICommandUnitTests
     {
         const auto arguments = SystemEventsCommand(L"root:system").GetArguments();
 
-        VERIFY_ARE_EQUAL(3u, arguments.size());
+        VERIFY_ARE_EQUAL(4u, arguments.size());
 
         VERIFY_ARE_EQUAL(ArgType::Since, arguments[0].Type());
         VERIFY_ARE_EQUAL(wsl::shared::Localization::WSLCCLI_EventsSinceArgDescription(), arguments[0].Description());
@@ -110,10 +110,14 @@ class WSLCCLICommandUnitTests
         VERIFY_ARE_EQUAL(wsl::shared::Localization::WSLCCLI_EventsUntilArgDescription(), arguments[1].Description());
         VERIFY_IS_TRUE(arguments[1].IsSingle());
 
-        VERIFY_ARE_EQUAL(ArgType::EventFilter, arguments[2].Type());
+        VERIFY_ARE_EQUAL(ArgType::Filter, arguments[2].Type());
         VERIFY_ARE_EQUAL(std::wstring(L"filter"), arguments[2].Name());
         VERIFY_ARE_EQUAL(std::wstring(L"f"), arguments[2].Alias());
         VERIFY_IS_TRUE(arguments[2].IsUnlimited());
+
+        VERIFY_ARE_EQUAL(ArgType::Format, arguments[3].Type());
+        VERIFY_ARE_EQUAL(std::wstring(L"format"), arguments[3].Name());
+        VERIFY_IS_TRUE(arguments[3].IsSingle());
     }
 
     TEST_METHOD(RootCommand_RetainsSubcommands)

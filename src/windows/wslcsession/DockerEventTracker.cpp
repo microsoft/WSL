@@ -96,6 +96,7 @@ DockerEventTracker::~DockerEventTracker()
     // N.B. No callback should be left when the tracker is destroyed.
     WI_ASSERT(m_containerCallbacks.empty());
     WI_ASSERT(m_volumeCallbacks.empty());
+    WI_ASSERT(m_networkCallbacks.empty());
     WI_ASSERT(m_containerCreateCallbacks.empty());
 }
 
@@ -112,10 +113,14 @@ void DockerEventTracker::OnEvent(const std::string_view& event)
     auto action = parsed.find("Action");
     THROW_HR_IF_MSG(E_INVALIDARG, action == parsed.end(), "Failed to parse json: %.*hs", static_cast<int>(event.size()), event.data());
 
-    auto timeEntry = parsed.find("time");
+    auto timeNanoEntry = parsed.find("timeNano");
     THROW_HR_IF_MSG(
-        E_INVALIDARG, timeEntry == parsed.end(), "Failed to parse time from event: %.*hs", static_cast<int>(event.size()), event.data());
-    std::int64_t eventTime = timeEntry->get<std::int64_t>();
+        E_INVALIDARG,
+        timeNanoEntry == parsed.end(),
+        "Failed to parse timeNano from event: %.*hs",
+        static_cast<int>(event.size()),
+        event.data());
+    std::int64_t eventTimeNano = timeNanoEntry->get<std::int64_t>();
 
     auto actionStr = action->get<std::string>();
 
@@ -125,20 +130,24 @@ void DockerEventTracker::OnEvent(const std::string_view& event)
 
     if (typeStr == "container")
     {
-        OnContainerEvent(parsed, actionStr, eventTime);
+        OnContainerEvent(parsed, actionStr, eventTimeNano);
 
         if (actionStr == "create")
         {
-            OnContainerCreated(parsed, eventTime);
+            OnContainerCreated(parsed, eventTimeNano);
         }
     }
     else if (typeStr == "volume")
     {
-        OnVolumeEvent(parsed, actionStr, eventTime);
+        OnVolumeEvent(parsed, actionStr, eventTimeNano);
+    }
+    else if (typeStr == "network")
+    {
+        OnNetworkEvent(parsed, actionStr, eventTimeNano);
     }
 }
 
-void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime)
+void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano)
 {
     static std::map<std::string, ContainerEvent> events{
         {"start", ContainerEvent::Start},
@@ -196,10 +205,10 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
         }
     }
 
-    InvokeCallbacks(callbacks, [&](const ContainerCallback& e) { e.Callback(it->second, exitCode, eventTime); });
+    InvokeCallbacks(callbacks, [&](const ContainerCallback& e) { e.Callback(it->second, exitCode, eventTimeNano); });
 }
 
-void DockerEventTracker::OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime)
+void DockerEventTracker::OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano)
 {
     static std::map<std::string, VolumeEvent> events{{"create", VolumeEvent::Create}, {"destroy", VolumeEvent::Destroy}};
 
@@ -223,10 +232,44 @@ void DockerEventTracker::OnVolumeEvent(const nlohmann::json& parsed, const std::
         callbacks = m_volumeCallbacks;
     }
 
-    InvokeCallbacks(callbacks, [&](const VolumeCallback& e) { e.Callback(volumeName, it->second, eventTime); });
+    InvokeCallbacks(callbacks, [&](const VolumeCallback& e) { e.Callback(volumeName, it->second, eventTimeNano); });
 }
 
-void DockerEventTracker::OnContainerCreated(const nlohmann::json& parsed, std::int64_t eventTime)
+void DockerEventTracker::OnNetworkEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano)
+{
+    auto actor = parsed.find("Actor");
+    THROW_HR_IF_MSG(E_INVALIDARG, actor == parsed.end(), "Missing Actor in network event");
+
+    std::string networkId;
+    auto id = actor->find("ID");
+    if (id != actor->end())
+    {
+        networkId = id->get<std::string>();
+    }
+    else
+    {
+        // Docker's aggregate prune event reports no network.
+        THROW_HR_IF_MSG(E_INVALIDARG, action != "prune", "Missing Actor.ID in network event");
+    }
+
+    std::map<std::string, std::string> attributes;
+    auto attributesEntry = actor->find("Attributes");
+    if (attributesEntry != actor->end())
+    {
+        attributes = attributesEntry->get<std::map<std::string, std::string>>();
+    }
+
+    std::vector<std::shared_ptr<NetworkCallback>> callbacks;
+    {
+        std::lock_guard lock{m_lock};
+        callbacks = m_networkCallbacks;
+    }
+
+    InvokeCallbacks(
+        callbacks, [&](const NetworkCallback& callback) { callback.Callback(networkId, action, attributes, eventTimeNano); });
+}
+
+void DockerEventTracker::OnContainerCreated(const nlohmann::json& parsed, std::int64_t eventTimeNano)
 {
     auto actor = parsed.find("Actor");
     THROW_HR_IF_MSG(E_INVALIDARG, actor == parsed.end(), "Missing Actor in container event");
@@ -242,7 +285,7 @@ void DockerEventTracker::OnContainerCreated(const nlohmann::json& parsed, std::i
         callbacks = m_containerCreateCallbacks;
     }
 
-    InvokeCallbacks(callbacks, [&](const ContainerCreateCallbackEntry& e) { e.Callback(containerId, eventTime); });
+    InvokeCallbacks(callbacks, [&](const ContainerCreateCallbackEntry& e) { e.Callback(containerId, eventTimeNano); });
 }
 
 DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterContainerStateUpdates(
@@ -280,6 +323,17 @@ DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterVolumeUpd
     return EventTrackingReference{this, id};
 }
 
+DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterNetworkUpdates(NetworkEventCallback&& Callback) noexcept
+{
+    auto id = m_callbackId++;
+    auto entry = std::make_shared<NetworkCallback>(id, std::move(Callback));
+
+    std::lock_guard lock{m_lock};
+    m_networkCallbacks.emplace_back(std::move(entry));
+
+    return EventTrackingReference{this, id};
+}
+
 DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterContainerCreate(ContainerCreateCallback&& Callback) noexcept
 {
     auto id = m_callbackId++;
@@ -312,7 +366,7 @@ void DockerEventTracker::UnregisterCallback(size_t Id) noexcept
             return true;
         };
 
-        if (!take(m_containerCallbacks) && !take(m_volumeCallbacks) && !take(m_containerCreateCallbacks))
+        if (!take(m_containerCallbacks) && !take(m_volumeCallbacks) && !take(m_networkCallbacks) && !take(m_containerCreateCallbacks))
         {
             WI_ASSERT(false);
         }

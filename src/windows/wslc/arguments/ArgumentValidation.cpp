@@ -22,7 +22,6 @@ Abstract:
 #include "Localization.h"
 #include "MountSpecParsing.h"
 #include <algorithm>
-#include <array>
 #include <type_traits>
 #include <utility>
 #include <wslc.h>
@@ -48,8 +47,6 @@ namespace argument::details {
 
 namespace {
     using argument::details::RawArgMapAccess;
-
-    constexpr std::array<std::string_view, 4> c_eventFilterKeys{"type", "event", "container", "image"};
 
     // Converts each raw value for argument A using the provided converter and caches the result on
     // the ArgMap. This is the single point where an argument's string input is converted; execution
@@ -219,18 +216,6 @@ void Argument::Validate(ArgMap& execArgs) const
     case ArgType::Filter:
         CacheConverted<ArgType::Filter>(
             execArgs, m_name, [](const std::wstring& value, const std::wstring&) { return validation::ParseFilter(value); });
-        break;
-
-    case ArgType::EventFilter:
-        CacheConverted<ArgType::EventFilter>(execArgs, m_name, [](const std::wstring& value, const std::wstring&) {
-            auto filter = validation::ParseFilter(value);
-            if (std::ranges::find(c_eventFilterKeys, filter.first) == c_eventFilterKeys.end())
-            {
-                throw ArgumentException(Localization::MessageWslcInvalidFilter(MultiByteToWide(filter.first)));
-            }
-
-            return filter;
-        });
         break;
 
     case ArgType::Label:

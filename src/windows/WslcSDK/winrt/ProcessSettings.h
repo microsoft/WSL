@@ -42,6 +42,8 @@ struct ProcessSettings : ProcessSettingsT<ProcessSettings>
     void EnvironmentVariables(winrt::Windows::Foundation::Collections::IMap<hstring, hstring> const& value);
     winrt::Microsoft::WSL::Containers::ProcessOutputMode OutputMode();
     void OutputMode(winrt::Microsoft::WSL::Containers::ProcessOutputMode const& value);
+    bool EnableStandardInput();
+    void EnableStandardInput(bool value);
 
     WslcProcessSettings* ToStructPointer();
 
@@ -50,6 +52,7 @@ private:
     winrt::Windows::Foundation::Collections::IVector<hstring> m_commandLine{winrt::single_threaded_vector<hstring>()};
     winrt::Windows::Foundation::Collections::IMap<hstring, hstring> m_environmentVariables{winrt::single_threaded_map<hstring, hstring>()};
     winrt::Microsoft::WSL::Containers::ProcessOutputMode m_outputMode{winrt::Microsoft::WSL::Containers::ProcessOutputMode::Discard};
+    bool m_enableStandardInput{false};
 
     std::unique_ptr<WslcProcessSettings> m_processSettings;
     StringArray m_commandLineStrings;

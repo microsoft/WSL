@@ -503,6 +503,9 @@ try
     m_containerEventTracking = m_runtime.Events().RegisterContainerCreate(
         std::bind(&WSLCSession::OnContainerCreated, this, std::placeholders::_1, std::placeholders::_2));
 
+    m_networkEventTracking = m_runtime.Events().RegisterNetworkUpdates(std::bind(
+        &WSLCSession::OnNetworkEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
+
     return S_OK;
 }
 CATCH_RETURN()
@@ -1693,7 +1696,7 @@ std::optional<std::string> WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRe
             return;
         }
 
-        auto parsed = shared::FromJson<docker_schema::ImageLoadResult>(std::string(buffer.begin(), buffer.end()).c_str());
+        auto parsed = shared::FromJson<docker_schema::ImageLoadResult>(buffer.begin(), buffer.end());
 
         if (parsed.errorDetail.has_value())
         {
@@ -2533,7 +2536,7 @@ void WSLCSession::WaitForConflictingCreateToComplete(std::unique_lock<std::mutex
     }
 }
 
-void WSLCSession::OnContainerCreated(const std::string& ContainerId, std::int64_t Time) noexcept
+void WSLCSession::OnContainerCreated(const std::string& ContainerId, std::int64_t TimeNano) noexcept
 try
 {
     std::lock_guard containersLock{m_containersLock};
@@ -2551,7 +2554,7 @@ try
     {
         // Key the map by Docker's container ID, which is set in the WSLCContainerImpl constructor and stable for its lifetime.
         WI_VERIFY(m_containers.emplace(ContainerId, pendingCreate->Container).second);
-        pendingCreate->Container->RecordEvent("create", Time);
+        pendingCreate->Container->RecordEvent("create", TimeNano);
     }
     catch (...)
     {
@@ -2560,6 +2563,14 @@ try
     }
 
     CompletePendingCreate(pendingCreate, std::move(exception));
+}
+CATCH_LOG()
+
+void WSLCSession::OnNetworkEvent(
+    const std::string& NetworkId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t TimeNano) noexcept
+try
+{
+    m_eventStore.Record("network", std::string{Action}, NetworkId, Attributes, TimeNano);
 }
 CATCH_LOG()
 
@@ -3198,19 +3209,22 @@ try
         THROW_DOCKER_USER_ERROR_MSG(e, "Failed to create network '%hs'", name.c_str());
     }
 
+    // Docker published a create event for this network, and publishes a destroy for the removal below.
+    auto removeNetworkCleanup =
+        wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, &name]() { m_runtime.Docker().RemoveNetwork(name); });
+
     if (!createResult.Warning.empty())
     {
         EMIT_USER_WARNING(wsl::shared::string::MultiByteToWide(createResult.Warning));
     }
-
-    auto removeNetworkCleanup =
-        wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, &name]() { m_runtime.Docker().RemoveNetwork(name); });
 
     // Inspect the newly created network to cache full properties (IPAM, Scope, etc.)
     // since CreateNetworkResponse only returns {Id, Warning}.
     docker_schema::Network full;
     try
     {
+        THROW_HR_IF(E_FAIL, m_failCreateInspectForTest.exchange(false));
+
         full = m_runtime.Docker().InspectNetwork(name);
     }
     catch (const DockerHTTPException& e)
@@ -3439,33 +3453,32 @@ try
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to prune networks");
 
-    if (!pruneResult.NetworksDeleted.has_value() || pruneResult.NetworksDeleted->empty())
+    std::vector<std::string> deleted;
+    if (pruneResult.NetworksDeleted.has_value())
     {
-        return S_OK;
+        deleted.reserve(pruneResult.NetworksDeleted->size());
+        for (const auto& name : *pruneResult.NetworksDeleted)
+        {
+            const auto network = m_networks.find(name);
+            if (network == m_networks.end())
+            {
+                WSL_LOG("PrunedUnknownNetwork", TraceLoggingValue(name.c_str(), "NetworkName"));
+                continue;
+            }
+
+            deleted.push_back(name);
+        }
     }
 
-    std::vector<std::string> deleted;
-    deleted.reserve(pruneResult.NetworksDeleted->size());
-    for (const auto& name : *pruneResult.NetworksDeleted)
+    // Docker has already pruned these networks, so update m_networks before marshalling.
+    for (const auto& name : deleted)
     {
-        // Only report networks that we manage.
-        if (!m_networks.contains(name))
-        {
-            WSL_LOG("PrunedUnknownNetwork", TraceLoggingValue(name.c_str(), "NetworkName"));
-            continue;
-        }
-        deleted.push_back(name);
+        m_networks.erase(name);
     }
 
     if (deleted.empty())
     {
         return S_OK;
-    }
-
-    // Erase before marshalling: docker has already pruned these, so m_networks must stay in sync.
-    for (const auto& name : deleted)
-    {
-        m_networks.erase(name);
     }
 
     WSL_LOG("NetworksPruned", TraceLoggingValue(static_cast<ULONG>(deleted.size()), "Count"));
@@ -3746,6 +3759,17 @@ try
     THROW_HR_IF_NULL(E_POINTER, WasAlreadyIdle);
 
     *WasAlreadyIdle = m_runtime.TriggerIdleTerminationForTest() ? TRUE : FALSE;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::SetNetworkFaultsForTest(BOOL FailCreateInspect)
+try
+{
+    WSLCExecutionContext context(this);
+
+    m_failCreateInspectForTest.store(FailCreateInspect != FALSE);
 
     return S_OK;
 }

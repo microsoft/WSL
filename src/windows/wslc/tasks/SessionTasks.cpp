@@ -110,7 +110,8 @@ void StreamEvents(CLIExecutionContext& context)
     const EventStreamOptions options{
         .Since = context.Args.GetValue<ArgType::Since>(now),
         .Until = context.Args.GetValue<ArgType::Until>(0),
-        .Filters = context.Args.GetAllValues<ArgType::EventFilter>(),
+        .Filters = context.Args.GetAllValues<ArgType::Filter>(),
+        .Format = context.Args.GetValue<ArgType::Format>(FormatType::Table),
     };
     SessionService::StreamEvents(context.Terminal, session, options, context.CreateCancelEvent());
 }

@@ -354,9 +354,9 @@ HcsVirtualMachine::~HcsVirtualMachine()
     // on in-flight HCS exit/crash callbacks, which may themselves need m_lock. OnExit() is lock-free,
     // and closing the compute system drains all callbacks, so the rest of teardown needs no lock.
 
-    // Wait up to 5 seconds for the VM to terminate gracefully.
+    // Wait up to 30 seconds for the VM to terminate gracefully.
     bool forceTerminate = false;
-    if (!m_vmExitEvent.wait(5000))
+    if (!m_vmExitEvent.wait(30000))
     {
         forceTerminate = true;
         try
@@ -387,7 +387,7 @@ HcsVirtualMachine::~HcsVirtualMachine()
         {
             if (e.second.AccessGranted)
             {
-                hcs::RevokeVmAccess(m_vmIdString.c_str(), e.second.Path.c_str());
+                hcs::RevokeVmAccess(m_vmIdString.c_str(), e.second.Path.c_str(), m_userToken.get());
             }
         }
         CATCH_LOG()
@@ -537,7 +537,7 @@ try
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
         if (disk.AccessGranted)
         {
-            hcs::RevokeVmAccess(m_vmIdString.c_str(), disk.Path.c_str());
+            hcs::RevokeVmAccess(m_vmIdString.c_str(), disk.Path.c_str(), m_userToken.get());
         }
 
         FreeLun(allocatedLun);
@@ -589,7 +589,7 @@ try
 
     if (it->second.AccessGranted)
     {
-        hcs::RevokeVmAccess(m_vmIdString.c_str(), it->second.Path.c_str());
+        hcs::RevokeVmAccess(m_vmIdString.c_str(), it->second.Path.c_str(), m_userToken.get());
     }
 
     m_attachedDisks.erase(it);

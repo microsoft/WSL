@@ -828,6 +828,10 @@ interface IWSLCSession : IUnknown
     // RPC_E_DISCONNECTED. The client holds the returned token for the whole operation; releasing
     // it (or the client exiting) lets the VM idle-terminate again.
     HRESULT BeginContainerOperation([out] IUnknown** Operation);
+
+    // Used only for testing. Fails the next CreateNetwork after dockerd created the network, so the
+    // rollback path can be exercised.
+    HRESULT SetNetworkFaultsForTest([in] BOOL FailCreateInspect);
 }
 
 //
