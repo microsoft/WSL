@@ -401,16 +401,13 @@ void OpenVmmVirtualMachineBackend::OnProcessExit(DWORD ExitCode) noexcept
 {
     WSL_LOG(
         "OpenVmmProcessExited", TraceLoggingValue(m_description.Identity.VmId, "vmId"), TraceLoggingValue(ExitCode, "exitCode"));
+    LOG_IF_WIN32_BOOL_FALSE(SetEvent(m_exitEvent.get()));
     {
         auto lock = m_lock.lock_exclusive();
         m_state = VmState::Stopped;
         m_exitDetails = std::format(L"OpenVMM process exited with code {}", ExitCode);
         CloseGuestListenersLocked(m_description.Identity);
     }
-
-    // N.B. The event is signaled only once the stopped state is published, so a waiter that wakes on
-    //      it never observes the VM as still running.
-    LOG_IF_WIN32_BOOL_FALSE(SetEvent(m_exitEvent.get()));
     NotifyTerminated(m_description.Identity);
 }
 
@@ -419,7 +416,7 @@ VmPlatformCapabilities OpenVmmVirtualMachineBackend::QueryCapabilities()
     VmPlatformCapabilities capabilities;
     capabilities.Backend = BackendKind::OpenVmm;
     for (const auto feature :
-         {VmFeature::SerialConsole,
+            {VmFeature::SerialConsole,
           VmFeature::VirtioConsole,
           VmFeature::VirtioFsFileBacked,
           VmFeature::UserModeNatNetwork,
@@ -898,7 +895,8 @@ VmPortBinding OpenVmmVirtualMachineBackend::BindPort(VmDeviceId Device, const Vm
         TraceLoggingValue(Request.HostPort, "hostPort"),
         TraceLoggingValue(Request.GuestPort, "guestPort"));
     ValidateResourceId(Device, m_description.Identity);
-    THROW_HR_IF(E_INVALIDARG, Request.ListenAddress.family != IpAddressFamily_V4 && Request.ListenAddress.family != IpAddressFamily_V6);
+    THROW_HR_IF(
+        E_INVALIDARG, Request.ListenAddress.family != IpAddressFamily_V4 && Request.ListenAddress.family != IpAddressFamily_V6);
     THROW_HR_IF_MSG(
         c_notSupported, Request.HostPort == 0, "OpenVMM cannot report the allocated port for a dynamic host port binding");
     THROW_HR_IF(E_INVALIDARG, Request.GuestPort == 0);

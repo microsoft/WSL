@@ -321,8 +321,9 @@ struct VmEffectiveBoot
     std::vector<VmConsoleRequest> Consoles;
 };
 
-// User-mode NAT configuration uses the guest device host ABI because the NAT is implemented by that
-// device rather than the host network stack.
+// Network served by a user-mode NAT that runs on the host and reaches the guest through a virtio-net
+// device. The device configuration is described with the guest device host ABI types so that the
+// NAT's view of the guest is not restated by every backend.
 struct VmUserModeNatNetwork
 {
     WslVirtioNetConfig Configuration{};
@@ -331,13 +332,15 @@ struct VmUserModeNatNetwork
     wsl::shared::string::MacAddress ClientMacAddress() const;
 };
 
-// The host network stack owns address assignment and name resolution for endpoint-backed networks;
-// the backend only attaches the endpoint to the VM.
+// Network served by an endpoint that the caller created on the host network stack. The mirrored and
+// NAT networking modes use this: the host owns the network, address assignment and name resolution,
+// so the backend only has to attach the endpoint to the VM as an adapter.
 struct VmHostEndpointNetwork
 {
     GUID EndpointId{};
-    // Mirrored networking uses the host interface ID so the guest adapter remains stable while its
-    // endpoint is replaced. NAT reuses the endpoint ID.
+    // Identifies the adapter inside the VM. Mirrored networking sets this to the interface id of the
+    // host interface being mirrored so that an interface keeps the same adapter as its endpoint is
+    // added and removed; NAT has no host interface to match and reuses the endpoint id.
     GUID InstanceId{};
     wsl::shared::string::MacAddress MacAddress{};
 };
@@ -407,6 +410,7 @@ struct VmPortBinding
 struct VmDnsRecord
 {
     DnsRecordType Type = DnsRecordType_A;
+    // Name the guest resolves and the address returned for it.
     std::string Name;
     IpAddress Address;
 };
@@ -433,9 +437,6 @@ struct VmVirtioFsDevice
     // Mount options applied to the device itself. Shares of an aggregate device carry their own
     // options; a single-share device inherits the options of the share that it serves.
     VmVirtioFsShareOptions Options;
-    // One device host serves all children of an aggregate device, so its serving identity is
-    // device-scoped. The VM identity is used when unset; single-share devices use the share token.
-    wil::shared_handle UserToken{};
 };
 
 using VmPlan9ServerFactory = std::function<wil::com_ptr<IPlan9FileSystem>(HANDLE UserToken)>;
@@ -446,7 +447,8 @@ struct VmPlan9SocketDevice
     VmPlan9ServerFactory ServerFactory;
 };
 
-// HCS-hosted Plan 9 transport for shares that must remain available independently of DrvFs.
+// Plan 9 server hosted directly by HCS rather than by an out-of-process IPlan9FileSystem server.
+// This is used for shares that must remain available independently of DrvFs.
 struct VmPlan9HostedDevice
 {
     GuestServicePort Port;
@@ -462,7 +464,8 @@ struct VmPlan9VirtioDevice
     VmPlan9ServerFactory ServerFactory;
 };
 
-using VmFileSystemDeviceTransport = std::variant<VmVirtioFsDevice, VmPlan9SocketDevice, VmPlan9HostedDevice, VmPlan9VirtioDevice>;
+using VmFileSystemDeviceTransport =
+    std::variant<VmVirtioFsDevice, VmPlan9SocketDevice, VmPlan9HostedDevice, VmPlan9VirtioDevice>;
 
 struct VmFileSystemDeviceRequest
 {
@@ -480,7 +483,8 @@ struct VmFileSystemDevice
 {
     VmDeviceId Id;
     VmFileSystemDeviceState State = VmFileSystemDeviceState::Prepared;
-    // Remains unset while a backend defers device creation until the first share is added.
+    // Set once the device exists in the VM. Backends that create the device when its first share is
+    // added report a prepared device without a guest instance id.
     std::optional<GUID> GuestInstanceId;
 };
 
@@ -502,8 +506,9 @@ struct VmFileSystemShareRequest
     std::wstring Name;
     bool ReadOnly = true;
     VmFileSystemShareOptions Options;
-    // Identity used to reach HostPath; defaults to the VM identity. Aggregate virtio-fs shares must
-    // match the device identity because their common device host cannot impersonate per child.
+    // Token whose identity is used to reach the host path. Elevated and unelevated callers share the
+    // same VM, so a share carries its own token instead of reusing the one that created the VM. The
+    // VM identity token is used when this is unset.
     wil::shared_handle UserToken{};
 };
 
@@ -536,8 +541,11 @@ struct VmFileSystemShare
     bool ReadOnly = true;
 };
 
-// Runs while additions remain serialized so callers can wait for /dev/pmem<index> before the next
-// device is added. The device is already tracked, so a callback failure does not reuse its index.
+// Invoked with the index of a newly added persistent memory device while the backend still
+// serializes persistent memory additions. Callers that name devices after the order in which the
+// guest enumerated them (/dev/pmem<index>) use this to wait for the device to appear before the
+// next one is added. The device is already added and tracked when this runs, so throwing fails
+// AddPersistentMemory without reusing the device's index.
 using VmPersistentMemoryReadyCallback = std::function<void(std::uint32_t DeviceIndex)>;
 
 struct VmPersistentMemoryRequest
@@ -554,7 +562,9 @@ struct VmPersistentMemoryDevice
 {
     VmDeviceId Id;
     GUID GuestInstanceId{};
-    // Addition order, corresponding to /dev/pmem<Index> when devices are added through the backend.
+    // Position of the device among the persistent memory devices added to this VM. The guest names
+    // the device after the order in which it enumerated it, so this matches /dev/pmem<Index> as
+    // long as every device is added through the backend.
     std::uint32_t Index = 0;
     std::filesystem::path EffectiveHostPath;
     bool ReadOnly = true;
@@ -639,8 +649,15 @@ public:
     virtual VmDiskAttachment AttachDisk(const VmDiskRequest& Request) = 0;
     virtual void DetachDisk(VmDiskId Disk) = 0;
 
+    /// <summary>
+    /// Exposes a host file to the guest as a persistent memory device. Additions are serialized so
+    /// that devices are enumerated by the guest in the order they were added.
+    /// </summary>
     virtual VmPersistentMemoryDevice AddPersistentMemory(const VmPersistentMemoryRequest& Request) = 0;
 
+    /// <summary>
+    /// Assigns the host GPUs to the VM and reports the settings that were applied.
+    /// </summary>
     virtual VmGpuAttachment AddGpu(const VmGpuRequest& Request) = 0;
 
     virtual VmFileSystemDevice CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request) = 0;

@@ -84,6 +84,7 @@ private:
     {
         VmFileSystemDevice Device;
         VmFileSystemDeviceTransport Transport;
+        // Mount options applied when the virtio-fs device is created.
         std::wstring MountOptions;
         wil::com_ptr<IPlan9FileSystem> Plan9Server;
     };
@@ -93,22 +94,26 @@ private:
     struct FileSystemShare
     {
         VmFileSystemShare Share;
-        // Combined with the host path to identify reusable virtio-fs shares.
+        // Options the share was created with. Together with the host path these identify a virtio-fs
+        // share, so a repeated request reuses the existing share instead of creating a second one.
         std::wstring MountOptions;
-        // Retained so Plan 9 removal uses the identity that added the share.
+        // Token the share was created with, if any. A Plan 9 share is removed under the same identity
+        // that added it. Unset shares fall back to the VM identity token.
         wil::shared_handle UserToken;
     };
 
     struct NetworkAdapter
     {
         VmNetworkAttachment Attachment;
-        // HCS requires host endpoint adapters to be removed from the path used to add them.
+        // Resource path the adapter was added at. Set only for host endpoint networks, which are
+        // removed from the compute system at the same path that added them.
         std::wstring ResourcePath;
     };
 
     struct PortBinding
     {
         VmPortBinding Binding;
+        // Tag of the user-mode NAT device that owns the binding.
         std::wstring Tag;
     };
 
@@ -133,34 +138,52 @@ private:
     _Requires_lock_held_(m_lock)
     FileSystemDeviceMap::iterator FindFileSystemDeviceLocked(VmDeviceId Device);
 
-    // A named request can reuse only the share with that guest-visible name.
+    /// <summary>
+    /// Returns the share of Device that already serves HostPath with MountOptions, if there is one.
+    /// </summary>
     _Requires_lock_held_(m_lock)
-    const FileSystemShare* FindFileSystemShareLocked(
-        VmDeviceId Device, const std::wstring& HostPath, const std::wstring& MountOptions, const std::wstring& Name) const;
+    const FileSystemShare* FindFileSystemShareLocked(VmDeviceId Device, const std::wstring& HostPath, const std::wstring& MountOptions) const;
 
-    _Requires_lock_held_(m_lock)
-    const FileSystemShare* FindFileSystemShareByNameLocked(VmDeviceId Device, const std::wstring& Name) const;
-
+    /// <summary>
+    /// Resolves the token used to reach the host path of a share, preferring the one on the request.
+    /// </summary>
     HANDLE ResolveShareUserToken(const VmFileSystemShareRequest& Request) const;
 
+    /// <summary>
+    /// Adds a share to a Plan 9 device and returns the name the guest uses to reach it.
+    /// </summary>
     _Requires_lock_held_(m_lock)
     std::wstring AddPlan9ShareLocked(
         const FileSystemDevice& Device, const VmFileSystemShareRequest& Request, HANDLE UserToken, const std::wstring& HostPath) const;
 
+    /// <summary>
+    /// Removes a share from a Plan 9 device by the name the guest uses to reach it.
+    /// </summary>
     _Requires_lock_held_(m_lock)
     void RemovePlan9ShareLocked(const FileSystemDevice& Device, const std::wstring& AccessName, HANDLE UserToken) const;
 
     _Requires_lock_held_(m_lock)
     std::map<std::uint64_t, NetworkAdapter>::iterator FindNetworkAdapterLocked(VmDeviceId Device);
 
-    // Host endpoint adapters have no device-host virtio-net device.
+    /// <summary>
+    /// Returns the virtio-net device that backs a user-mode NAT adapter, failing the call when the
+    /// adapter is served by a host endpoint instead.
+    /// </summary>
     _Requires_lock_held_(m_lock)
     wil::com_ptr<IWslVirtioNetDevice> GetUserModeNatDeviceLocked(VmDeviceId Device) const;
 
-    // HCS can report transient failures while the host network stack settles.
+    /// <summary>
+    /// Adds or removes a host endpoint adapter at ResourcePath. HCS reports transient failures while
+    /// the host network stack settles, so the modification is retried.
+    /// </summary>
     _Requires_lock_held_(m_lock)
-    void ModifyHostEndpointLocked(const VmHostEndpointNetwork& Configuration, const std::wstring& ResourcePath, wsl::windows::common::hcs::ModifyRequestType RequestType) const;
+    void ModifyHostEndpointLocked(
+        const VmHostEndpointNetwork& Configuration, const std::wstring& ResourcePath, wsl::windows::common::hcs::ModifyRequestType RequestType) const;
 
+    /// <summary>
+    /// Removes the adapter's tracked state, tearing down the resource that serves it. Port bindings
+    /// on the adapter are dropped because the device that tracked them is gone.
+    /// </summary>
     _Requires_lock_held_(m_lock)
     void RemoveNetworkAdapterLocked(std::map<std::uint64_t, NetworkAdapter>::iterator Adapter);
 

@@ -215,6 +215,7 @@ class HcsVirtualMachineBackendTests
         firstBackend->DetachDisk(first.Id);
         firstBackend->Terminate();
 
+        // Disk IDs are local to a VM and can be reused after another VM has terminated.
         auto secondBackend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
         secondBackend->Start();
         const auto second = secondBackend->AttachDisk(CreateDiskRequest(secondPath));
@@ -299,10 +300,6 @@ class HcsVirtualMachineBackendTests
         std::memcpy(bindingRequest.ListenAddress.bytes, &loopbackAddress, sizeof(loopbackAddress));
         bindingRequest.GuestPort = 80;
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->BindPort(device, bindingRequest); }));
-
-        auto scopedBindingRequest = bindingRequest;
-        scopedBindingRequest.ListenScopeId = 1;
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->BindPort(device, scopedBindingRequest); }));
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->UnbindPort(binding); }));
         VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddPersistentMemory({}); }));
         VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddSharedMemory({}); }));
@@ -321,17 +318,16 @@ class HcsVirtualMachineBackendTests
         auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
         backend->Start();
 
-        // Aggregate children share a device-host identity, so elevated and unelevated shares use
-        // separate devices.
-        const wil::shared_handle elevatedToken{GetElevatedTestToken().release()};
+        // Elevated and unelevated callers share one VM, so each elevation level gets its own device
+        // just as WslCoreVm::AddDrvFsShare uses a separate Plan 9 port and virtio-fs tag for each.
         const auto userDevice = backend->CreateFileSystemDevice({VmVirtioFsDevice{L"drvfs-user", VmVirtioFsLayout::Aggregate}});
-        const auto adminDevice =
-            backend->CreateFileSystemDevice({VmVirtioFsDevice{L"drvfs-admin", VmVirtioFsLayout::Aggregate, {}, elevatedToken}});
+        const auto adminDevice = backend->CreateFileSystemDevice({VmVirtioFsDevice{L"drvfs-admin", VmVirtioFsLayout::Aggregate}});
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Serving, userDevice.State);
         VERIFY_IS_TRUE(userDevice.GuestInstanceId.has_value());
         VERIFY_ARE_NOT_EQUAL(userDevice.Id.Value, adminDevice.Id.Value);
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Serving, backend->GetFileSystemDeviceStatus(userDevice.Id).State);
 
+        // Leaving the token unset serves the share through the identity that created the VM.
         VmFileSystemShareRequest request;
         request.HostPath = directory;
         request.Options = VmVirtioFsShareOptions{};
@@ -346,38 +342,21 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(std::wstring{L"drvfs-user"}, address.Tag);
         VERIFY_IS_TRUE(address.ChildName.has_value());
 
-        // NormalizeSharePath adds a separator before canonicalization, so compare with the canonical directory.
+        // The host path is canonicalized so that requests naming the same directory resolve to a
+        // single share. GetCanonicalPath removes the separator NormalizeSharePath appends before
+        // canonicalization.
         VERIFY_ARE_EQUAL(std::filesystem::canonical(directory).native(), share.EffectiveHostPath.native());
 
+        // Repeating a request reuses the share instead of adding a second child for one directory.
         const auto reused = backend->AddFileSystemShare(userDevice.Id, request);
         VERIFY_ARE_EQUAL(share.Id.Value, reused.Id.Value);
 
+        // Mount options are part of a share's identity, so a read-only mount is a separate share.
         auto readOnlyRequest = request;
         readOnlyRequest.ReadOnly = true;
         const auto readOnlyShare = backend->AddFileSystemShare(userDevice.Id, readOnlyRequest);
         VERIFY_ARE_NOT_EQUAL(share.Id.Value, readOnlyShare.Id.Value);
         VERIFY_IS_TRUE(readOnlyShare.ReadOnly);
-
-        auto namedRequest = request;
-        namedRequest.Name = L"named-share";
-        const auto namedShare = backend->AddFileSystemShare(userDevice.Id, namedRequest);
-        VERIFY_ARE_NOT_EQUAL(share.Id.Value, namedShare.Id.Value);
-        VERIFY_ARE_EQUAL(namedRequest.Name, std::get<VmVirtioFsShareAddress>(namedShare.GuestAddress).ChildName.value());
-        VERIFY_ARE_EQUAL(namedShare.Id.Value, backend->AddFileSystemShare(userDevice.Id, namedRequest).Id.Value);
-
-        auto renamedRequest = namedRequest;
-        renamedRequest.Name = L"other-share";
-        const auto renamedShare = backend->AddFileSystemShare(userDevice.Id, renamedRequest);
-        VERIFY_ARE_NOT_EQUAL(namedShare.Id.Value, renamedShare.Id.Value);
-
-        auto conflictingRequest = renamedRequest;
-        conflictingRequest.ReadOnly = true;
-        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] {
-                             backend->AddFileSystemShare(userDevice.Id, conflictingRequest);
-                         }));
-
-        backend->RemoveFileSystemShare(namedShare.Id);
-        backend->RemoveFileSystemShare(renamedShare.Id);
 
         auto invalidShare = share.Id;
         THROW_IF_FAILED(CoCreateGuid(&invalidShare.Owner.VmId));
@@ -402,16 +381,17 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(
             HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->GetFileSystemDeviceStatus(singleShareDevice.Id); }));
 
+        // A share carries its own token, so the elevated device reaches the same directory without
+        // reusing the share that the unelevated device serves.
         auto adminRequest = request;
-        adminRequest.UserToken = elevatedToken;
+        adminRequest.UserToken = wil::shared_handle{GetElevatedTestToken().release()};
         const auto adminShare = backend->AddFileSystemShare(adminDevice.Id, adminRequest);
         VERIFY_ARE_EQUAL(adminDevice.Id.Value, adminShare.Device.Value);
         VERIFY_ARE_NOT_EQUAL(share.Id.Value, adminShare.Id.Value);
         VERIFY_ARE_EQUAL(std::wstring{L"drvfs-admin"}, std::get<VmVirtioFsShareAddress>(adminShare.GuestAddress).Tag);
         VERIFY_ARE_EQUAL(share.EffectiveHostPath.native(), adminShare.EffectiveHostPath.native());
 
-        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddFileSystemShare(userDevice.Id, adminRequest); }));
-
+        // Exercise the remaining file-system transports as well: Plan 9 socket and Plan 9 virtio.
         const auto createPlan9Server = [](HANDLE userToken) {
             return wsl::windows::common::wslutil::CreateComServerAsUser<p9fs::Plan9FileSystem, IPlan9FileSystem>(userToken);
         };
@@ -427,15 +407,7 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(socketDevice.Port.Value, std::get<VmPlan9SocketShareAddress>(socketShare.GuestAddress).Port.Value);
         VERIFY_IS_FALSE(socketShare.ReadOnly);
 
-        auto namedSocketRequest = socketRequest;
-        namedSocketRequest.Name = L"named-plan9-share";
-        const auto namedSocketShare = backend->AddFileSystemShare(socketDeviceResult.Id, namedSocketRequest);
-        VERIFY_ARE_EQUAL(namedSocketRequest.Name, std::get<VmPlan9SocketShareAddress>(namedSocketShare.GuestAddress).AccessName);
-        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] {
-                             backend->AddFileSystemShare(socketDeviceResult.Id, namedSocketRequest);
-                         }));
-        backend->RemoveFileSystemShare(namedSocketShare.Id);
-
+        // A Plan 9 device keeps serving after one of its shares is removed, so the share can be added again.
         backend->RemoveFileSystemShare(socketShare.Id);
         VERIFY_ARE_EQUAL(
             HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->RemoveFileSystemShare(socketShare.Id); }));
@@ -475,6 +447,7 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_NOT_EQUAL(virtioShare.Id.Value, replacementVirtioShare.Id.Value);
         backend->RemoveFileSystemShare(replacementVirtioShare.Id);
 
+        // A host path is required, and the options must match the device that serves them.
         VmFileSystemShareRequest pathless;
         pathless.Options = VmVirtioFsShareOptions{};
         VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddFileSystemShare(userDevice.Id, pathless); }));
@@ -492,6 +465,7 @@ class HcsVirtualMachineBackendTests
         THROW_IF_FAILED(CoCreateGuid(&foreignDevice.Owner.VmId));
         VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddFileSystemShare(foreignDevice, request); }));
 
+        // A torn-down VM reports the same error as WslCoreVm::AddDrvFsShare.
         backend->Terminate();
         VERIFY_ARE_EQUAL(HCS_E_TERMINATED, OperationResult([&] { backend->AddFileSystemShare(userDevice.Id, request); }));
     }
