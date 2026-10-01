@@ -376,6 +376,13 @@ class UnitTests
             auto cleanupVm = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
             auto cleanupSystemd = EnableSystemd();
 
+            VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() {
+                    THROW_HR_IF(E_UNEXPECTED, LxsstuLaunchWsl(L"systemctl is-active --quiet wsl-binfmt-priority.service") != 0);
+                },
+                std::chrono::seconds(1),
+                std::chrono::minutes(1)));
+
             // /status is its own mount point.
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mountpoint -q /proc/sys/fs/binfmt_misc/status"), 0u);
 
@@ -419,6 +426,39 @@ class UnitTests
                 auto [cmd, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
                 VERIFY_ARE_EQUAL(cmd, L"ok\r\n");
             }
+
+            // A distro handler registered later for the same MZ magic must not
+            // keep precedence without manually restarting the priority unit.
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(L"sh -c 'echo \":wsltestmz:M::MZ::/bin/false:\" > /proc/sys/fs/binfmt_misc/register'"), 0L);
+            auto cleanupMzEntry = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+                LxsstuLaunchWsl(L"sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/wsltestmz 2>/dev/null || true'");
+            });
+            VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { THROW_HR_IF(E_UNEXPECTED, LxsstuLaunchWsl(L"cmd.exe /c echo restored") != 0); },
+                std::chrono::milliseconds(100),
+                std::chrono::seconds(10)));
+            {
+                auto [cmd, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo restored");
+                VERIFY_ARE_EQUAL(cmd, L"restored\r\n");
+            }
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/wsltestmz'"), 0L);
+            cleanupMzEntry.release();
+        }
+
+        // A distro with local interop disabled can still register an MZ handler
+        // that would break interop in every other distro in the VM.
+        {
+            auto cleanupVm = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
+            auto cleanupSystemd = EnableSystemd("[interop]\nenabled=false\n");
+
+            VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() {
+                    THROW_HR_IF(E_UNEXPECTED, LxsstuLaunchWsl(L"systemctl is-active --quiet wsl-binfmt-priority.service") != 0);
+                },
+                std::chrono::seconds(1),
+                std::chrono::minutes(1)));
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -e /proc/sys/fs/binfmt_misc/WSLInterop"), 0L);
         }
 
         // protectBinfmt=false: bind-mount must NOT be installed (kill switch).
@@ -434,6 +474,7 @@ class UnitTests
             auto cleanupSystemd = EnableSystemd("protectBinfmt=false");
 
             VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(L"mountpoint -q /proc/sys/fs/binfmt_misc/status"), 0L);
+            VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(L"test -e /run/systemd/generator/wsl-binfmt-priority.service"), 0L);
         }
     }
 
@@ -537,6 +578,39 @@ class UnitTests
             auto [flags, _] = LxsstuLaunchWslAndCaptureOutput(L"grep ^flags /proc/sys/fs/binfmt_misc/WSLInterop");
             VERIFY_IS_TRUE(flags.find(L"F") != std::wstring::npos);
         }
+
+        // Restart the peer while the primary distro is still monitoring the
+        // VM-global registry, then terminate the primary to transfer leadership.
+        {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -- cmd.exe /c echo ready", peerDistroName));
+            VERIFY_ARE_EQUAL(out, L"ready\r\n");
+        }
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(std::format(L"-d {} -- systemctl is-active --quiet wsl-binfmt-priority.service", peerDistroName)), 0L);
+        TerminateDistribution(LXSS_DISTRO_NAME_TEST_L);
+
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(
+                std::format(L"-d {} -- sh -c 'echo \":wsltestmz:M::MZ::/bin/false:\" > /proc/sys/fs/binfmt_misc/register'", peerDistroName)),
+            0L);
+        auto cleanupTestEntry = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LxsstuLaunchWsl(std::format(
+                L"-d {} -- sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/wsltestmz 2>/dev/null || true'", peerDistroName));
+        });
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                THROW_HR_IF(
+                    E_UNEXPECTED, LxsstuLaunchWsl(std::format(L"-d {} -- cmd.exe /c echo recovered", peerDistroName)) != 0);
+            },
+            std::chrono::milliseconds(100),
+            std::chrono::seconds(10)));
+        {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -- cmd.exe /c echo recovered", peerDistroName));
+            VERIFY_ARE_EQUAL(out, L"recovered\r\n");
+        }
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(std::format(L"-d {} -- sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/wsltestmz'", peerDistroName)), 0L);
+        cleanupTestEntry.release();
     }
 
     WSL2_TEST_METHOD(SharedMountSurvivesDistroTermination)

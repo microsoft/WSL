@@ -14,6 +14,7 @@ Abstract:
 
 #include <cassert>
 #include <sys/eventfd.h>
+#include <sys/file.h>
 #include <sys/mount.h>
 #include <sys/prctl.h>
 #include <sys/signalfd.h>
@@ -21,6 +22,7 @@ Abstract:
 #include <sys/epoll.h>
 #include <sys/syscall.h>
 #include <linux/filter.h>
+#include <linux/fanotify.h>
 #include <pty.h>
 #include <utmp.h>
 #include <libgen.h>
@@ -144,6 +146,8 @@ void LockBinfmtStatusReadOnly();
 
 int GenerateSystemdUnits(int Argc, char** Argv);
 
+int MonitorBinfmt();
+
 int GenerateUserSystemdUnits(int Argc, char** Argv);
 
 void HardenMirroredNetworkingSettingsAgainstSystemd();
@@ -227,6 +231,10 @@ int WslEntryPoint(int Argc, char* Argv[])
         else if (strcmp(BaseName, LX_INIT_WSL_GENERATOR) == 0)
         {
             ExitCode = GenerateSystemdUnits(Argc, Argv);
+        }
+        else if (strcmp(BaseName, LX_INIT_WSL_BINFMT_MONITOR) == 0)
+        {
+            ExitCode = MonitorBinfmt();
         }
         else if (strcmp(BaseName, LX_INIT_WSL_USER_GENERATOR) == 0)
         {
@@ -334,6 +342,7 @@ int GenerateSystemdUnits(int Argc, char** Argv)
         LOG_INFO("Generating WSL systemd units in {}", installPath);
 
         bool enableGuiApps = true;
+        bool protectBinfmt = true;
         std::string automountRoot = "/mnt";
 
         wil::unique_file File{fopen("/etc/wsl.conf", "r")};
@@ -341,6 +350,7 @@ int GenerateSystemdUnits(int Argc, char** Argv)
         {
             std::vector<ConfigKey> ConfigKeys = {
                 ConfigKey(wsl::linux::c_ConfigEnableGuiAppsOption, enableGuiApps),
+                ConfigKey(wsl::linux::c_ConfigBootProtectBinfmtOption, protectBinfmt),
                 ConfigKey(wsl::linux::c_ConfigAutoMountRoot, automountRoot),
 
             };
@@ -381,6 +391,21 @@ ExecStop=-/bin/mount --make-rslave {})",
             sharedMountPath,
             sharedMountPath);
         InstallSystemdUnit(installPath, "wsl-mnt-guard", mountGuardUnitContent.c_str());
+
+        if (protectBinfmt)
+        {
+            constexpr auto* binfmtPriorityUnit = R"([Unit]
+Description=Restore WSL Windows executable handler priority
+After=systemd-binfmt.service binfmt-support.service
+
+[Service]
+Type=simple
+ExecStart=/run/wsl/wsl-binfmt-monitor
+Restart=on-failure
+RestartSec=1
+)";
+            InstallSystemdUnit(installPath, "wsl-binfmt-priority", binfmtPriorityUnit);
+        }
 
         // Only create the wslg unit if both enabled in wsl.conf, and if the wslg folder actually exists.
         if (enableGuiApps && access("/mnt/wslg/runtime-dir", F_OK) == 0)
@@ -2908,6 +2933,12 @@ try
         HardenMirroredNetworkingSettingsAgainstSystemd();
     }
 
+    if (Config.BootProtectBinfmt)
+    {
+        THROW_LAST_ERROR_IF(UtilMkdirPath("/run/wsl", 0755) < 0);
+        THROW_LAST_ERROR_IF(symlink("/init", "/run/wsl/" LX_INIT_WSL_BINFMT_MONITOR) < 0);
+    }
+
     constexpr auto folder = "/run/systemd/system-generators";
 
     THROW_LAST_ERROR_IF(UtilMkdirPath(folder, 0755) < 0);
@@ -2922,6 +2953,72 @@ try
     }
 }
 CATCH_LOG();
+
+void RegisterPriorityBinfmt(int RegisterFd)
+{
+    const wil::unique_fd entry{open(BINFMT_MISC_MOUNT_TARGET "/" LX_INIT_BINFMT_NAME, O_WRONLY | O_CLOEXEC)};
+    if (entry)
+    {
+        const auto result = write(entry.get(), "-1", 2);
+        THROW_LAST_ERROR_IF(result < 0);
+        if (result != 2)
+        {
+            THROW_ERRNO(EIO);
+        }
+    }
+    else
+    {
+        THROW_LAST_ERROR_IF(errno != ENOENT);
+    }
+
+    constexpr std::string_view registration{BINFMT_INTEROP_REGISTRATION_STRING_VM(LX_INIT_BINFMT_NAME) "\n"};
+    const auto result = write(RegisterFd, registration.data(), registration.size());
+    THROW_LAST_ERROR_IF(result < 0);
+    if (result != registration.size())
+    {
+        THROW_ERRNO(EIO);
+    }
+}
+
+int MonitorBinfmt()
+try
+{
+    const wil::unique_fd registerFd{open(BINFMT_MISC_REGISTER_FILE, O_WRONLY | O_CLOEXEC)};
+    THROW_LAST_ERROR_IF(!registerFd);
+    THROW_LAST_ERROR_IF(TEMP_FAILURE_RETRY(flock(registerFd.get(), LOCK_EX)) < 0);
+
+    const wil::unique_fd fanotifyFd{static_cast<int>(syscall(SYS_fanotify_init, FAN_CLOEXEC, O_RDONLY | O_CLOEXEC))};
+    THROW_LAST_ERROR_IF(!fanotifyFd);
+    THROW_LAST_ERROR_IF(syscall(SYS_fanotify_mark, fanotifyFd.get(), FAN_MARK_ADD, FAN_MODIFY, AT_FDCWD, BINFMT_MISC_REGISTER_FILE) < 0);
+
+    RegisterPriorityBinfmt(registerFd.get());
+
+    alignas(fanotify_event_metadata) std::array<char, 4096> buffer{};
+    for (;;)
+    {
+        auto remaining = TEMP_FAILURE_RETRY(read(fanotifyFd.get(), buffer.data(), buffer.size()));
+        THROW_LAST_ERROR_IF(remaining < 0);
+        if (remaining == 0)
+        {
+            THROW_ERRNO(EIO);
+        }
+        for (auto* event = reinterpret_cast<fanotify_event_metadata*>(buffer.data()); FAN_EVENT_OK(event, remaining);
+             event = FAN_EVENT_NEXT(event, remaining))
+        {
+            if (event->vers != FANOTIFY_METADATA_VERSION)
+            {
+                THROW_ERRNO(EPROTO);
+            }
+
+            const wil::unique_fd eventFd{event->fd};
+            if ((event->mask & FAN_Q_OVERFLOW) != 0 || ((event->mask & FAN_MODIFY) != 0 && event->pid != getpid()))
+            {
+                RegisterPriorityBinfmt(registerFd.get());
+            }
+        }
+    }
+}
+CATCH_RETURN_ERRNO();
 
 void LockBinfmtStatusReadOnly()
 
