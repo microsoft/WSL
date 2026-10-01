@@ -172,16 +172,50 @@ wsl::windows::common::filesystem::TempFile SpoolConsoleInput(HANDLE console)
     return file;
 }
 
-// Returns a relayable stdin handle, spooling interactive console input into input.ConsoleInput first.
+// Returns a relayable stdin handle. Character devices need a file because COM cannot relay their handles.
 HANDLE OpenStdin(BuildContextInput& input)
 {
     auto handle = GetStdHandle(STD_INPUT_HANDLE);
+    if (IsConsoleHandle(handle))
+    {
+        input.ConsoleInput.emplace(SpoolConsoleInput(handle));
+        return input.ConsoleInput->Handle.get();
+    }
+
     if (GetFileType(handle) != FILE_TYPE_CHAR)
     {
         return handle;
     }
 
-    input.ConsoleInput.emplace(SpoolConsoleInput(handle));
+    input.ConsoleInput.emplace(
+        GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, wsl::windows::common::filesystem::TempFileFlags::DeleteOnClose);
+    std::array<char, 4096> buffer{};
+    for (;;)
+    {
+        DWORD read{};
+        if (!ReadFile(handle, buffer.data(), static_cast<DWORD>(buffer.size()), &read, nullptr))
+        {
+            const auto error = GetLastError();
+            // NUL reports ERROR_INVALID_FUNCTION instead of EOF when read as a character device.
+            if (error == ERROR_INVALID_FUNCTION)
+            {
+                break;
+            }
+
+            THROW_WIN32(error);
+        }
+
+        if (read == 0)
+        {
+            break;
+        }
+
+        DWORD written{};
+        THROW_IF_WIN32_BOOL_FALSE(WriteFile(input.ConsoleInput->Handle.get(), buffer.data(), read, &written, nullptr));
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_WRITE_FAULT), written != read);
+    }
+
+    THROW_LAST_ERROR_IF(SetFilePointer(input.ConsoleInput->Handle.get(), 0, nullptr, FILE_BEGIN) == INVALID_SET_FILE_POINTER);
     return input.ConsoleInput->Handle.get();
 }
 

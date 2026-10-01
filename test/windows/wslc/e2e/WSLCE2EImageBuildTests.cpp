@@ -1562,6 +1562,31 @@ class WSLCE2EImageBuildTests
         VERIFY_ARE_EQUAL(BuiltImageStdinDockerfile.NameAndTag(), wsl::shared::string::MultiByteToWide(inspectData.RepoTags.value()[0]));
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_StdinDockerfile_PseudoConsole_Success)
+    {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageStdinConsole);
+        auto session = RunWslcInteractive(
+            std::format(L"build - -t {} --progress=quiet", BuiltImageStdinConsole.NameAndTag()), ElevationType::Elevated, PseudoConsole{120, 30});
+        session.Write("FROM debian:latest\r\nLABEL typed=\"caf\xc3\xa9\"\r\n\x1a\r\n");
+        const auto exitCode = session.Wait();
+        VERIFY_ARE_EQUAL(0, exitCode, string::MultiByteToWide(session.GetStdoutData()).c_str());
+
+        auto inspectData = InspectImage(BuiltImageStdinConsole.NameAndTag());
+        VERIFY_IS_TRUE(inspectData.Config.has_value());
+        VERIFY_IS_TRUE(inspectData.Config.value().Labels.has_value());
+        const auto& labels = inspectData.Config.value().Labels.value();
+        const auto label = labels.find("typed");
+        VERIFY_IS_TRUE(label != labels.end());
+        VERIFY_ARE_EQUAL(std::string("caf\xc3\xa9"), label->second);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_StdinNul_ReachesBuilder)
+    {
+        auto result = RunWslc(L"build - --progress=quiet");
+        VERIFY_ARE_EQUAL(1u, result.ExitCode.value());
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"failed to read dockerfile"), result.Stderr.value().c_str());
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_StdinContextAndStdinDockerfile_Fails)
     {
         auto buildResult = RunWslc(L"build - -f -");
@@ -1612,6 +1637,7 @@ private:
     const TestImage BuiltImageStdinGzip{L"wslc-e2e-build-stdin-gzip", L"latest", L""};
     const TestImage BuiltImageStdinTarFile{L"wslc-e2e-build-stdin-tar-file", L"latest", L""};
     const TestImage BuiltImageStdinDockerfile{L"wslc-e2e-build-stdin-dockerfile", L"latest", L""};
+    const TestImage BuiltImageStdinConsole{L"wslc-e2e-build-stdin-console", L"latest", L""};
 
     // Archives a context holding a Dockerfile (at dockerfileInContext) and a marker file, streams it to
     // `wslc build -` over stdin, and verifies the build could COPY the marker out of the streamed context.
