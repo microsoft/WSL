@@ -219,11 +219,11 @@ std::wstring StripTrailingSeparators(const std::filesystem::path& Path);
 
 /// <summary>
 /// Extracts a tar stream into Destination, calling WriteArchive with the handle to write the archive to.
-/// tar.exe cannot rename entries, so a set RebaseName is applied after extraction: a lone entry takes that
-/// name, several entries are gathered under a directory carrying it. A set but empty name still stages,
-/// which merges the entries under their own names. Entries are held to Destination: tar.exe contains entry
-/// names and hard link targets that point outside it, and an entry underneath a symbolic link entry, which
-/// tar.exe would follow, is refused before any of the archive is extracted.
+/// tar.exe cannot rename entries, so a set RebaseName is applied after extraction: one archive root takes
+/// that name, several archive roots are gathered under a directory carrying it. A set but empty name merges
+/// the entries under their own names. Extraction always uses staging so existing destination links cannot
+/// redirect tar.exe; merging replaces destination links without following them. tar.exe contains entry names
+/// and hard link targets that point outside staging, and entries underneath an archive symlink are rejected.
 /// </summary>
 void ExtractArchiveInto(const std::filesystem::path& Destination, const std::optional<std::wstring>& RebaseName, const std::function<void(HANDLE)>& WriteArchive);
 
@@ -231,8 +231,8 @@ void ExtractArchiveInto(const std::filesystem::path& Destination, const std::opt
 /// Extracts a tar stream holding a single file and places it at DestinationFile, creating the parent
 /// directory if it is missing. tar.exe cannot rename entries, so the entry is staged beside the
 /// destination and moved into place under the requested name. A file path names one entry, so an
-/// archive that is empty, holds several entries, or holds a directory is rejected before anything
-/// is moved.
+/// archive that is empty, holds several members (even if they collide on disk), or holds a directory is
+/// rejected before anything is moved.
 /// </summary>
 void ExtractSingleFileAs(const std::filesystem::path& DestinationFile, const std::function<void(HANDLE)>& WriteArchive);
 

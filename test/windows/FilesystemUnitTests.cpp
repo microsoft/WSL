@@ -565,6 +565,17 @@ class FilesystemUnitTests
         VERIFY_IS_FALSE(std::filesystem::exists(destination));
     }
 
+    TEST_METHOD(ExtractSingleFileAs_CollidingEntriesAreRejected)
+    {
+        const StagingDirectory root(std::filesystem::temp_directory_path());
+        const auto destination = root.Path() / L"file.txt";
+
+        VerifyExtractionFails(
+            [&] { ExtractSingleFileAs(destination, TarBuilder().AddFile("name", "one").AddFile("NAME", "two").Writer()); });
+
+        VERIFY_IS_FALSE(std::filesystem::exists(destination));
+    }
+
     // A directory carries a tree, so giving it a file path would produce a directory named like a file.
     TEST_METHOD(ExtractSingleFileAs_DirectoryEntryIsRejected)
     {
@@ -787,6 +798,41 @@ class FilesystemUnitTests
         VERIFY_ARE_EQUAL(std::string{"two"}, ReadFileContent(root.Path() / L"second.txt"));
     }
 
+    TEST_METHOD(ExtractArchiveInto_MergesExistingDirectories)
+    {
+        const StagingDirectory root(std::filesystem::temp_directory_path());
+        const auto existing = root.Path() / L"dir";
+        std::filesystem::create_directories(existing);
+        WriteFileContent(existing / L"old.txt", "old");
+
+        ExtractArchiveInto(root.Path(), std::nullopt, TarBuilder().AddFile("dir/new.txt", "new").Writer());
+
+        VERIFY_ARE_EQUAL(std::string{"old"}, ReadFileContent(existing / L"old.txt"));
+        VERIFY_ARE_EQUAL(std::string{"new"}, ReadFileContent(existing / L"new.txt"));
+    }
+
+    TEST_METHOD(ExtractArchiveInto_DoesNotFollowExistingDestinationSymlink)
+    {
+        const StagingDirectory root(std::filesystem::temp_directory_path());
+        const auto destination = root.Path() / L"destination";
+        const auto outside = root.Path() / L"outside";
+        std::filesystem::create_directories(destination);
+        std::filesystem::create_directories(outside);
+        std::error_code error;
+        std::filesystem::create_directory_symlink(outside, destination / L"link", error);
+        if (error)
+        {
+            WEX::Logging::Log::Comment(L"Creating a directory symbolic link is not permitted on this host");
+            return;
+        }
+
+        VerifyExtractionFails(
+            [&] { ExtractArchiveInto(destination, std::nullopt, TarBuilder().AddFile("link/child.txt", "content").Writer()); });
+
+        VERIFY_IS_FALSE(std::filesystem::exists(outside / L"child.txt"));
+        VERIFY_IS_TRUE(std::filesystem::is_symlink(destination / L"link"));
+    }
+
     // A lone entry is the source itself, so it takes the requested name.
     TEST_METHOD(ExtractArchiveInto_RebasesLoneEntry)
     {
@@ -813,6 +859,29 @@ class FilesystemUnitTests
         VERIFY_IS_TRUE(std::filesystem::is_directory(root.Path() / L"gathered"));
         VERIFY_ARE_EQUAL(std::string{"one"}, ReadFileContent(root.Path() / L"gathered" / L"first.txt"));
         VERIFY_ARE_EQUAL(std::string{"two"}, ReadFileContent(root.Path() / L"gathered" / L"second.txt"));
+    }
+
+    TEST_METHOD(ExtractArchiveInto_CollidingRootNamesStillGatherUnderRebaseName)
+    {
+        const StagingDirectory root(std::filesystem::temp_directory_path());
+
+        ExtractArchiveInto(
+            root.Path(), std::optional<std::wstring>{L"gathered"}, TarBuilder().AddFile("name", "one").AddFile("NAME", "two").Writer());
+
+        VERIFY_IS_TRUE(std::filesystem::is_directory(root.Path() / L"gathered"));
+        VERIFY_ARE_EQUAL(std::string{"two"}, ReadFileContent(root.Path() / L"gathered" / L"name"));
+    }
+
+    TEST_METHOD(ExtractArchiveInto_RebasesDirectoryWithSeveralArchiveMembers)
+    {
+        const StagingDirectory root(std::filesystem::temp_directory_path());
+
+        ExtractArchiveInto(
+            root.Path(),
+            std::optional<std::wstring>{L"renamed"},
+            TarBuilder().AddDirectory("original").AddFile("original/child.txt", "content").Writer());
+
+        VERIFY_ARE_EQUAL(std::string{"content"}, ReadFileContent(root.Path() / L"renamed" / L"child.txt"));
     }
 
     // A set but empty name still stages, which merges the entries into the destination under their own

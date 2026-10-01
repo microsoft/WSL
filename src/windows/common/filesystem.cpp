@@ -1052,6 +1052,22 @@ const std::filesystem::path& wsl::windows::common::filesystem::StagingDirectory:
 
 static void MoveOver(const std::filesystem::path& From, const std::filesystem::path& To)
 {
+    std::error_code statusError;
+    const auto toLinkStatus = std::filesystem::symlink_status(To, statusError);
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(statusError.value()),
+        statusError && statusError != std::errc::no_such_file_or_directory,
+        "Failed to inspect destination: %ls",
+        To.c_str());
+    const auto attributes = GetFileAttributesW(To.c_str());
+    if (std::filesystem::is_symlink(toLinkStatus) ||
+        (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0))
+    {
+        // Do not let the fallback copy follow an existing reparse point when rename cannot replace it.
+        std::filesystem::remove(To, statusError);
+        THROW_HR_IF_MSG(HRESULT_FROM_WIN32(statusError.value()), !!statusError, "Failed to remove link: %ls", To.c_str());
+    }
+
     std::error_code error;
     std::filesystem::rename(From, To, error);
     if (!error)
@@ -1060,7 +1076,6 @@ static void MoveOver(const std::filesystem::path& From, const std::filesystem::p
     }
 
     // std::filesystem::copy would place a file underneath a directory carrying the same name.
-    std::error_code statusError;
     const auto fromStatus = std::filesystem::status(From, statusError);
     const auto toStatus = std::filesystem::status(To, statusError);
     THROW_HR_WITH_USER_ERROR_IF(
@@ -1076,6 +1091,40 @@ static void MoveOver(const std::filesystem::path& From, const std::filesystem::p
         std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing | std::filesystem::copy_options::copy_symlinks,
         copyError);
     THROW_HR_IF_MSG(HRESULT_FROM_WIN32(copyError.value()), !!copyError, "Failed to copy to: %ls", To.c_str());
+}
+
+static void MergeStagedEntry(const std::filesystem::path& From, const std::filesystem::path& To)
+{
+    std::error_code error;
+    const auto fromStatus = std::filesystem::symlink_status(From, error);
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error.value()), !!error, "Failed to inspect source: %ls", From.c_str());
+    const auto toStatus = std::filesystem::symlink_status(To, error);
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(error.value()),
+        error && error != std::errc::no_such_file_or_directory,
+        "Failed to inspect destination: %ls",
+        To.c_str());
+
+    const auto attributes = GetFileAttributesW(To.c_str());
+    THROW_HR_IF_MSG(
+        E_FAIL,
+        std::filesystem::is_directory(fromStatus) &&
+            (std::filesystem::is_symlink(toStatus) ||
+             (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0)),
+        "Cannot extract a directory through a destination reparse point: %ls",
+        To.c_str());
+
+    if (std::filesystem::is_directory(fromStatus) && std::filesystem::is_directory(toStatus))
+    {
+        for (const auto& entry : std::filesystem::directory_iterator(From))
+        {
+            MergeStagedEntry(entry.path(), To / entry.path().filename());
+        }
+    }
+    else
+    {
+        MoveOver(From, To);
+    }
 }
 
 std::wstring wsl::windows::common::filesystem::StripTrailingSeparators(const std::filesystem::path& Path)
@@ -1268,7 +1317,7 @@ std::optional<std::string> FindPaxPath(const std::vector<char>& Data)
 
 // Entry names are '/' separated, but '\' is legal in a Linux file name and separates on Windows, so it
 // has to count as a separator here or a component could be read as a path during extraction.
-std::vector<std::string> SplitArchivePath(std::string_view Path)
+std::vector<std::string> SplitArchivePath(std::string_view Path, bool FoldCase = true)
 {
     std::vector<std::string> components;
     std::string current;
@@ -1276,9 +1325,12 @@ std::vector<std::string> SplitArchivePath(std::string_view Path)
         if (!current.empty() && current != ".")
         {
             // The destination is case insensitive, so a name differing only by case reaches the same entry.
-            std::transform(current.begin(), current.end(), current.begin(), [](char character) {
-                return (character >= 'A' && character <= 'Z') ? static_cast<char>(character - 'A' + 'a') : character;
-            });
+            if (FoldCase)
+            {
+                std::transform(current.begin(), current.end(), current.begin(), [](char character) {
+                    return (character >= 'A' && character <= 'Z') ? static_cast<char>(character - 'A' + 'a') : character;
+                });
+            }
 
             components.push_back(current);
         }
@@ -1302,8 +1354,8 @@ std::vector<std::string> SplitArchivePath(std::string_view Path)
 
     // tar.exe drops a leading drive letter from an entry name, so the entry it writes is the one named by
     // the rest of the path.
-    if (!components.empty() && components.front().size() == 2 && components.front()[1] == ':' && components.front()[0] >= 'a' &&
-        components.front()[0] <= 'z')
+    if (!components.empty() && components.front().size() == 2 && components.front()[1] == ':' &&
+        ((components.front()[0] >= 'a' && components.front()[0] <= 'z') || (components.front()[0] >= 'A' && components.front()[0] <= 'Z')))
     {
         components.erase(components.begin());
     }
@@ -1315,10 +1367,17 @@ std::vector<std::string> SplitArchivePath(std::string_view Path)
 // it, which places those entries wherever the link points. The entries are checked in order first, so
 // an archive carrying that pair is refused before tar.exe writes anything. tar.exe already contains
 // entry names and hard link targets that leave the destination.
-void ValidateArchiveEntries(HANDLE Archive)
+struct ArchiveEntries
+{
+    size_t MemberCount = 0;
+    std::unordered_set<std::string> TopLevelNames;
+};
+
+ArchiveEntries ValidateArchiveEntries(HANDLE Archive)
 {
     std::unordered_set<std::string> symlinks;
     std::optional<std::string> overrideName;
+    ArchiveEntries entries;
 
     for (;;)
     {
@@ -1387,6 +1446,9 @@ void ValidateArchiveEntries(HANDLE Archive)
             continue;
         }
 
+        ++entries.MemberCount;
+        entries.TopLevelNames.insert(SplitArchivePath(name, false).front());
+
         std::string path;
         for (size_t index = 0; index < components.size(); index++)
         {
@@ -1411,11 +1473,13 @@ void ValidateArchiveEntries(HANDLE Archive)
             symlinks.insert(path);
         }
     }
+
+    return entries;
 }
 
 } // namespace
 
-void ExtractTarStream(const std::filesystem::path& Root, const std::function<void(HANDLE)>& WriteArchive)
+ArchiveEntries ExtractTarStream(const std::filesystem::path& Root, const std::function<void(HANDLE)>& WriteArchive)
 {
     const auto targetDir = wsl::windows::common::filesystem::StripTrailingSeparators(Root);
 
@@ -1434,7 +1498,7 @@ void ExtractTarStream(const std::filesystem::path& Root, const std::function<voi
     };
 
     rewind();
-    ValidateArchiveEntries(archive.Handle.get());
+    auto entries = ValidateArchiveEntries(archive.Handle.get());
     rewind();
 
     auto tarCmd = std::format(L"tar.exe -xf - -C \"{}\"", targetDir);
@@ -1442,6 +1506,7 @@ void ExtractTarStream(const std::filesystem::path& Root, const std::function<voi
     process.SetStdHandles(archive.Handle.get(), nullptr, nullptr);
     const auto exitCode = process.Run();
     THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
+    return entries;
 }
 
 void wsl::windows::common::filesystem::ExtractArchiveInto(
@@ -1475,15 +1540,9 @@ void wsl::windows::common::filesystem::ExtractArchiveInto(
     std::filesystem::create_directories(Destination, dirError);
     THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", Destination.c_str());
 
-    if (!rebaseName.has_value())
-    {
-        ExtractTarStream(Destination, WriteArchive);
-        return;
-    }
-
     // Staging inside the destination keeps the moves below on one volume, so they stay renames.
     const StagingDirectory staging(Destination);
-    ExtractTarStream(staging.Path(), WriteArchive);
+    const auto entries = ExtractTarStream(staging.Path(), WriteArchive);
 
     // Moving entries invalidates an open directory iterator, so the listing is taken first.
     std::vector<std::filesystem::path> staged;
@@ -1494,17 +1553,30 @@ void wsl::windows::common::filesystem::ExtractArchiveInto(
 
     // A lone entry is the source itself and takes the name; several mean the source has no name of its own.
     auto destinationRoot = Destination;
-    if (!rebaseName->empty() && staged.size() > 1)
+    if (rebaseName.has_value() && !rebaseName->empty() && entries.TopLevelNames.size() > 1)
     {
         destinationRoot = Destination / *rebaseName;
+        const auto destinationStatus = std::filesystem::symlink_status(destinationRoot, dirError);
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(dirError.value()),
+            dirError && dirError != std::errc::no_such_file_or_directory,
+            "Failed to inspect destination: %ls",
+            destinationRoot.c_str());
+        const auto attributes = GetFileAttributesW(destinationRoot.c_str());
+        THROW_HR_IF_MSG(
+            E_FAIL,
+            std::filesystem::is_symlink(destinationStatus) ||
+                (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0),
+            "Destination is a reparse point: %ls",
+            destinationRoot.c_str());
         std::filesystem::create_directories(destinationRoot, dirError);
         THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", destinationRoot.c_str());
     }
 
-    const bool rebase = !rebaseName->empty() && staged.size() == 1;
+    const bool rebase = rebaseName.has_value() && !rebaseName->empty() && entries.TopLevelNames.size() == 1;
     for (const auto& entry : staged)
     {
-        MoveOver(entry, destinationRoot / (rebase ? *rebaseName : entry.filename().wstring()));
+        MergeStagedEntry(entry, destinationRoot / (rebase ? *rebaseName : entry.filename().wstring()));
     }
 }
 
@@ -1518,7 +1590,7 @@ void wsl::windows::common::filesystem::ExtractSingleFileAs(const std::filesystem
 
     // Staging inside the destination directory keeps the move below on one volume, so it stays a rename.
     const StagingDirectory staging(destinationDirectory);
-    ExtractTarStream(staging.Path(), WriteArchive);
+    const auto entries = ExtractTarStream(staging.Path(), WriteArchive);
 
     std::vector<std::filesystem::path> staged;
     for (const auto& entry : std::filesystem::directory_iterator(staging.Path()))
@@ -1535,7 +1607,7 @@ void wsl::windows::common::filesystem::ExtractSingleFileAs(const std::filesystem
     THROW_HR_WITH_USER_ERROR_IF(
         E_FAIL,
         wsl::shared::Localization::WSLCCLI_CpSourceIsDirectoryError(),
-        staged.size() > 1 || (!statusError && std::filesystem::is_directory(stagedStatus)));
+        entries.MemberCount != 1 || staged.size() != 1 || (!statusError && std::filesystem::is_directory(stagedStatus)));
 
     MoveOver(staged.front(), DestinationFile);
 }
