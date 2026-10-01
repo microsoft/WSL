@@ -10,4 +10,5 @@ Underlying values:
 vhdOptions.Type(VhdType::Dynamic);
 ```
 
-`Sparse` creates a dynamically expanding VHD backed by a sparse host file. This feature is currently experimental.
+`Sparse` creates a dynamically expanding VHD backed by a sparse host file. This feature is currently experimental and requires WSL 3.0.2
+or later.
