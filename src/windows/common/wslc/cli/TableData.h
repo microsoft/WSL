@@ -13,9 +13,8 @@ Abstract:
     cell that occupies the whole line.
 
     Column widths are measured across every row, so a table must hold the
-    complete result set before it is rendered.
-
-    See TableRenderer.h for layout and emission.
+    complete result set before it is rendered. See TableRenderer.h for layout
+    and emission.
 
 --*/
 #pragma once
@@ -32,8 +31,7 @@ namespace wsl::windows::cli::table {
 
 using wsl::windows::common::vt::Sequence;
 
-// A VT sequence owned by the cell that carries it. IsColor marks the sequences that --no-color
-// suppresses.
+// IsColor marks the sequences that --no-color suppresses.
 struct CellSequence
 {
     std::wstring Text;
@@ -45,8 +43,8 @@ struct CellSequence
     }
 };
 
-// A single table cell. Prefix and Suffix are emitted around Text when the destination supports
-// VT; they contribute no display width.
+// Prefix and Suffix are emitted around Text when the destination supports VT; they contribute no
+// display width.
 struct Cell
 {
     std::wstring Text;
@@ -93,8 +91,8 @@ struct Row
     std::vector<Cell> Cells;
     bool Spanning = false;
 
-    // Cells accumulate here for rows whose shape varies with the column set. The row is not part of
-    // the table until it is handed to TableData::AddRow, which validates the cell count.
+    // For rows whose shape varies with the column set. The cell count is validated by
+    // TableData::AddRow.
     Row& AddCell(Cell cell)
     {
         Cells.emplace_back(std::move(cell));
@@ -137,19 +135,16 @@ struct ColumnDefinition
     ColumnWidthConfig Config;
 };
 
-// Spacing inserted between columns.
 inline constexpr size_t c_defaultColumnPadding = 3;
 
-// Minimum total width of a column including its padding. The final column is exempt: it emits no
-// trailing padding, so a minimum there would only add trailing whitespace.
+// Minimum total width of a column including its padding. The final column is exempt.
 inline constexpr size_t c_defaultMinCellWidth = 10;
 
-// The column set is open until the first row is added, after which it is fixed so every row keeps a
-// matching cell count. Only each column's width configuration stays mutable.
+// The column set is fixed once the first row is added, so every row keeps a matching cell count.
+// Only each column's width configuration stays mutable.
 class TableData
 {
 public:
-    // Emits the column names as a leading row.
     bool ShowHeader = true;
 
     // Spaces prepended to every non-spanning row. Does not affect column width calculations.
@@ -171,15 +166,14 @@ public:
         m_rows.reserve(rowCount);
     }
 
-    // Clears the width configuration of every subsequently added column, for callers that disable
-    // truncation wholesale.
+    // Clears the width configuration of every subsequently added column.
     TableData& Truncate(bool enabled)
     {
         m_truncate = enabled;
         return *this;
     }
 
-    // Appends a column. Only valid before the first row is added.
+    // Only valid before the first row is added.
     TableData& AddColumn(std::wstring name, ColumnWidthConfig config = {});
 
     TableData& AddColumnIf(bool condition, std::wstring name, ColumnWidthConfig config = {})
@@ -187,7 +181,7 @@ public:
         return condition ? AddColumn(std::move(name), config) : *this;
     }
 
-    // Appends a data row. The cell count must match the column count.
+    // The cell count must match the column count.
     void AddRow(std::vector<Cell> cells);
 
     void AddRow(Row row);

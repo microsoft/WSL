@@ -8,8 +8,8 @@ Module Name:
 
 Abstract:
 
-    Cell rendering, table construction helpers and the word-wrap helper for the
-    CLI table data model.
+    Cell rendering, table construction and word wrapping for the CLI table
+    data model.
 
 --*/
 #include "precomp.h"

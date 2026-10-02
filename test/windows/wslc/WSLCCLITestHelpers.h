@@ -212,11 +212,10 @@ struct CaptureTerminal
     }
 };
 
-// Helper: capture all lines emitted by rendering a TableData into a vector<wstring>.
+// Captures all lines emitted by rendering a TableData.
 //
-// MinCellWidth is cleared so these tests exercise the generic layout mechanics (padding, shrink,
-// wrap) without the list-output minimum shifting every expectation. Tests that cover the minimum
-// itself set it explicitly.
+// MinCellWidth is cleared so these tests exercise the generic layout mechanics without the
+// list-output minimum shifting every expectation. Tests covering the minimum set it explicitly.
 struct TableCapture
 {
     CaptureTerminal capture;

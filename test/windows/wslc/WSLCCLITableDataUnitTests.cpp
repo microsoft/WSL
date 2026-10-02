@@ -1011,8 +1011,7 @@ class WSLCCLITableDataUnitTests
         TableCapture cap(std::vector<ColumnDefinition>{{L"", configs[0]}, {L"", configs[1]}}, true);
         cap.table.ShowHeader = false;
 
-        // Text that wraps into 3 lines: "aa bb cc" at width 5 -> "aa bb" / "cc"
-        // Actually at width 5: "aa" "bb" "cc" (word-break at spaces)
+        // "aa bb cc dd" at width 5 breaks at spaces into multiple lines.
         cap.table.AddRow({L"cmd", Cell(L"aa bb cc dd", Format::Fg::BrightCyan)});
         cap.Render();
 

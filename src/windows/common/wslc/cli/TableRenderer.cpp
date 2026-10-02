@@ -71,8 +71,8 @@ namespace {
                 column.MinWidth = std::max(column.MinWidth, config.MinWidth);
             }
 
-            // The final column emits no trailing padding, so a minimum cell width there would only
-            // produce trailing whitespace.
+            // The final column emits no trailing padding, so a minimum there would only add
+            // trailing whitespace.
             if (i + 1 < columnCount && table.MinCellWidth > table.ColumnPadding)
             {
                 column.MinWidth = std::max(column.MinWidth, table.MinCellWidth - table.ColumnPadding);
@@ -103,8 +103,7 @@ namespace {
         {
             column.Width = std::max(column.Width, column.MinWidth);
 
-            // A column with nothing to show emits neither a value nor padding, so it must not
-            // reserve any width.
+            // A column with nothing to show emits neither a value nor padding.
             if (column.Width == 0)
             {
                 column.SpaceAfter = false;
@@ -252,7 +251,7 @@ TableLayout TableRenderer::Layout(const TableData& table, const LayoutOptions& o
 
     ShrinkColumns(columns, availableWidth, table.ColumnPadding);
 
-    // Skipped when the destination is redirected so the receiver controls its own width.
+    // Skipped when redirected so the receiver controls its own width.
     if (options.ConsoleWidth.has_value())
     {
         FitWrapColumns(columns, availableWidth, table.ColumnPadding);

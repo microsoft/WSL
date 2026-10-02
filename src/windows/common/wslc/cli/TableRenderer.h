@@ -12,9 +12,6 @@ Abstract:
     passes over a fully populated table: measure each column against its rows,
     fit the columns to the available console width, then emit.
 
-    Renderers share the layout and differ only in the options they supply and
-    in how the resulting lines reach the terminal.
-
 --*/
 #pragma once
 
@@ -27,8 +24,7 @@ namespace wsl::windows::cli::table {
 
 using wsl::windows::wslc::cli::Terminal;
 
-// Fallback used when the destination is redirected. The wrap pass is skipped in that case so the
-// receiver controls its own width.
+// Fallback used when the destination is redirected.
 inline constexpr size_t c_redirectedConsoleWidth = 2000;
 
 struct LayoutOptions
@@ -48,7 +44,7 @@ struct TableLayout
 };
 
 // Render() lays the table out and hands the result to Emit(); derived classes customize the layout
-// options and the emission, but not the layout itself.
+// options and the emission, but not the layout.
 class TableRenderer
 {
 public:
@@ -65,7 +61,7 @@ public:
 
     void Render(const TableData& table);
 
-    // Measures and fits the table's columns and formats every line it emits.
+    // Measures and fits the columns, then formats every line.
     static TableLayout Layout(const TableData& table, const LayoutOptions& options);
 
 protected:
@@ -88,7 +84,7 @@ protected:
     void Emit(const TableLayout& layout) override;
 };
 
-// Lays out and writes the table to the terminal with a StaticTableRenderer.
+// Lays out and writes the table with a StaticTableRenderer.
 void RenderTable(Terminal& terminal, const TableData& table, Terminal::Level level = Terminal::Level::Output, std::optional<size_t> consoleWidth = std::nullopt);
 
 } // namespace wsl::windows::cli::table
