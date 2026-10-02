@@ -610,6 +610,9 @@ try
     {
         RETURN_HR_IF(E_INVALIDARG, vhdRequirements->sizeBytes == 0);
         RETURN_HR_IF(E_NOTIMPL, vhdRequirements->type != WSLC_VHD_TYPE_DYNAMIC && vhdRequirements->type != WSLC_VHD_TYPE_SPARSE);
+
+        // Owner is only honored on named volumes; reject here so callers can't
+        // mistakenly believe it applied to the session rootfs VHD.
         RETURN_HR_IF(E_INVALIDARG, vhdRequirements->flags != WSLC_VHD_REQ_FLAG_NONE);
 
         internalType->vhdRequirements = *vhdRequirements;
