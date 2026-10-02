@@ -706,8 +706,8 @@ void WaitForPseudoConsoleOutput(const WSLCInteractiveSession& session, const std
         const std::string data = session.GetStdoutData();
         VERIFY_FAIL(std::format(
                         L"Timed out waiting for \"{}\". Captured pseudoconsole output: \"{}\"",
-                        wsl::shared::string::MultiByteToWide(EscapeString(expected)),
-                        wsl::shared::string::MultiByteToWide(EscapeString(data)))
+                        MultiByteToWide(EscapeString(expected)),
+                        MultiByteToWide(EscapeString(data)))
                         .c_str());
     }
 }
