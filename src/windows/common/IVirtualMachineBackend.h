@@ -16,6 +16,9 @@ Abstract:
 
 #include <winsock2.h>
 #include <windows.h>
+#include <ws2ipdef.h>
+#include <windowsdefs.h>
+#include <WslDeviceHost.h>
 #include <wil/resource.h>
 #include <array>
 #include <bitset>
@@ -30,6 +33,15 @@ Abstract:
 #include <variant>
 #include <vector>
 #include "defs.h"
+#include "stringshared.h"
+
+namespace wsl::windows::common::vm {
+
+inline constexpr UINT64 c_mib = 1024 * 1024;
+inline constexpr UINT32 c_maximumDisks = 254;
+inline constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+
+} // namespace wsl::windows::common::vm
 
 enum class BackendKind
 {
@@ -161,6 +173,14 @@ struct VmMemoryRequest
     VmFeatureRequest AllowOvercommit = VmFeatureRequest::Disabled;
     VmFeatureRequest DeferredCommit = VmFeatureRequest::Disabled;
     VmFeatureRequest ColdDiscard = VmFeatureRequest::Disabled;
+    VmFeatureRequest SmallPageBacking = VmFeatureRequest::Disabled;
+    std::optional<std::uint32_t> FaultClusterSizeShift;
+    std::optional<std::uint32_t> DirectMapFaultClusterSizeShift;
+    // Order of the page blocks the guest reports back to the host. Reporting blocks smaller than a
+    // fault cluster hands back memory the next fault immediately reclaims, so this must be at least
+    // as large as the fault cluster size shifts above.
+    std::optional<std::uint32_t> PageReportingOrder;
+    std::optional<std::wstring> HostingProcessNameSuffix;
 };
 
 enum class VmBootMethod
@@ -269,6 +289,8 @@ struct VmCrashCaptureRequest
 {
     std::filesystem::path Path;
     std::uint32_t MaxCrashLogCount = 10;
+    std::optional<std::filesystem::path> SavedStateFolder;
+    std::uint32_t MaxSavedStateCount = 10;
     VmSelectionPolicy Policy = VmSelectionPolicy::Required;
 };
 
@@ -286,6 +308,11 @@ struct VmEffectiveMemory
     bool AllowOvercommit = false;
     bool DeferredCommit = false;
     bool ColdDiscard = false;
+    bool SmallPageBacking = false;
+    std::optional<std::uint32_t> FaultClusterSizeShift;
+    std::optional<std::uint32_t> DirectMapFaultClusterSizeShift;
+    std::optional<std::uint32_t> PageReportingOrder;
+    std::optional<std::wstring> HostingProcessNameSuffix;
     std::optional<std::uint64_t> HighMmioBaseBytes;
     std::optional<std::uint64_t> HighMmioSizeBytes;
 };
@@ -297,46 +324,36 @@ struct VmEffectiveBoot
     std::vector<VmConsoleRequest> Consoles;
 };
 
-struct VmIpv4Address
-{
-    std::array<std::uint8_t, 4> Bytes{};
-};
-
-struct VmIpv6Address
-{
-    std::array<std::uint8_t, 16> Bytes{};
-    std::uint32_t ScopeId = 0;
-};
-
-using VmIpAddress = std::variant<VmIpv4Address, VmIpv6Address>;
-
-struct VmEthernetAddress
-{
-    std::array<std::uint8_t, 6> Bytes{};
-};
-
-struct VmIpEndpoint
-{
-    VmIpAddress Address;
-    std::uint16_t Port = 0;
-};
-
+// Network served by a user-mode NAT that runs on the host and reaches the guest through a virtio-net
+// device. The device configuration is described with the guest device host ABI types so that the
+// NAT's view of the guest is not restated by every backend.
 struct VmUserModeNatNetwork
 {
-    VmIpv4Address ClientIpv4;
-    std::optional<VmIpv6Address> ClientIpv6;
-    VmEthernetAddress ClientMac;
-    VmIpv4Address GatewayIpv4;
-    VmEthernetAddress GatewayMacIpv4;
-    VmEthernetAddress GatewayMacIpv6;
-    VmIpv4Address Netmask;
-    std::vector<VmIpAddress> Nameservers;
+    WslVirtioNetConfig Configuration{};
+    std::vector<IpAddress> Nameservers;
+
+    wsl::shared::string::MacAddress ClientMacAddress() const;
 };
+
+// Network served by an endpoint that the caller created on the host network stack. The mirrored and
+// NAT networking modes use this: the host owns the network, address assignment and name resolution,
+// so the backend only has to attach the endpoint to the VM as an adapter.
+struct VmHostEndpointNetwork
+{
+    GUID EndpointId{};
+    // Identifies the adapter inside the VM. Mirrored networking sets this to the interface id of the
+    // host interface being mirrored so that an interface keeps the same adapter as its endpoint is
+    // added and removed; NAT has no host interface to match and reuses the endpoint id.
+    GUID InstanceId{};
+    wsl::shared::string::MacAddress MacAddress{};
+};
+
+using VmNetworkConfiguration = std::variant<VmHostEndpointNetwork, VmUserModeNatNetwork>;
 
 struct VmNetworkAdapterRequest
 {
     std::wstring Tag;
-    VmUserModeNatNetwork Configuration;
+    VmNetworkConfiguration Configuration;
 };
 
 struct VmNetworkAttachment
@@ -344,7 +361,7 @@ struct VmNetworkAttachment
     VmDeviceId Id;
     std::wstring Tag;
     std::optional<GUID> GuestInstanceId;
-    VmUserModeNatNetwork EffectiveConfiguration;
+    VmNetworkConfiguration EffectiveConfiguration;
 };
 
 struct VmCreateRequest
@@ -353,6 +370,7 @@ struct VmCreateRequest
     std::wstring Owner;
     VmProcessorRequest Processor;
     VmMemoryRequest Memory;
+    VmMmioRequest Mmio;
     VmLinuxBootRequest Boot;
     std::vector<VmBootDiskRequest> BootDisks;
     std::vector<VmConsoleRequest> Consoles;
@@ -371,16 +389,13 @@ struct VmDescription
     std::map<std::wstring, VmNetworkAttachment> NetworkAdapters;
 };
 
-enum class VmTransportProtocol
-{
-    Tcp,
-    Udp
-};
-
 struct VmPortBindingRequest
 {
-    VmTransportProtocol Protocol = VmTransportProtocol::Tcp;
-    VmIpEndpoint Listen;
+    TransportProtocol Protocol = TransportProtocol_Tcp;
+    // Host endpoint to listen on. A zero HostPort asks the backend to allocate one.
+    IpAddress ListenAddress;
+    std::uint32_t ListenScopeId = 0;
+    std::uint16_t HostPort = 0;
     std::uint16_t GuestPort = 0;
 };
 
@@ -388,15 +403,19 @@ struct VmPortBinding
 {
     VmPortBindingId Id;
     VmDeviceId Device;
-    VmTransportProtocol Protocol = VmTransportProtocol::Tcp;
-    VmIpEndpoint EffectiveListen;
+    TransportProtocol Protocol = TransportProtocol_Tcp;
+    IpAddress EffectiveListenAddress;
+    std::uint32_t EffectiveListenScopeId = 0;
+    std::uint16_t EffectiveHostPort = 0;
     std::uint16_t GuestPort = 0;
 };
 
 struct VmDnsRecord
 {
+    DnsRecordType Type = DnsRecordType_A;
+    // Name the guest resolves and the address returned for it.
     std::string Name;
-    VmIpv4Address Address;
+    IpAddress Address;
 };
 
 enum class VmVirtioFsLayout
@@ -405,15 +424,61 @@ enum class VmVirtioFsLayout
     Aggregate
 };
 
+// The guest identifies a virtio-fs device by its tag, which cannot exceed the length of a GUID
+// without braces.
+constexpr std::size_t c_maxVirtioFsTagLength = 36;
+
+struct VmVirtioFsShareOptions
+{
+    std::map<std::wstring, std::wstring> MountOptions;
+    // Identity the virtio-fs device reaches its host paths through. A virtio-fs device serves every
+    // path it exposes through a single identity, so an aggregate device declares it here rather than
+    // inheriting it from the first share; callers that need a second identity create a second
+    // device. The VM identity token is used when this is unset.
+    wil::shared_handle UserToken{};
+};
+
 struct VmVirtioFsDevice
 {
     std::wstring Tag;
     VmVirtioFsLayout Layout = VmVirtioFsLayout::Aggregate;
+    // Options applied to the device itself, including the identity it serves through. Shares of an
+    // aggregate device carry their own mount options; a single-share device inherits the options of
+    // the share that it serves, so it must leave these unset.
+    VmVirtioFsShareOptions Options;
 };
+
+using VmPlan9ServerFactory = std::function<wil::com_ptr<IPlan9FileSystem>(HANDLE UserToken)>;
+
+struct VmPlan9SocketDevice
+{
+    GuestServicePort Port;
+    VmPlan9ServerFactory ServerFactory;
+};
+
+// Plan 9 server hosted directly by HCS rather than by an out-of-process IPlan9FileSystem server.
+// This is used for shares that must remain available independently of DrvFs.
+struct VmPlan9HostedDevice
+{
+    GuestServicePort Port;
+};
+
+struct VmPlan9VirtioDevice
+{
+    std::wstring Tag;
+    // Used to register a virtio server with the guest device host.
+    GUID FileSystemClassId{};
+    // Used to create the initial virtio device for the server.
+    GUID DeviceType{};
+    VmPlan9ServerFactory ServerFactory;
+};
+
+using VmFileSystemDeviceTransport =
+    std::variant<VmVirtioFsDevice, VmPlan9SocketDevice, VmPlan9HostedDevice, VmPlan9VirtioDevice>;
 
 struct VmFileSystemDeviceRequest
 {
-    VmVirtioFsDevice Transport;
+    VmFileSystemDeviceTransport Transport;
 };
 
 enum class VmFileSystemDeviceState
@@ -427,19 +492,33 @@ struct VmFileSystemDevice
 {
     VmDeviceId Id;
     VmFileSystemDeviceState State = VmFileSystemDeviceState::Prepared;
+    // Set once the device exists in the VM. Backends that create the device when its first share is
+    // added report a prepared device without a guest instance id.
+    std::optional<GUID> GuestInstanceId;
 };
 
-struct VmVirtioFsShareOptions
+struct VmPlan9ShareOptions
 {
-    std::map<std::wstring, std::wstring> MountOptions;
+    bool LinuxMetadata = false;
+    bool CaseSensitive = false;
+    bool UseShareRootIdentity = false;
+    bool AllowOptions = false;
+    bool AllowSubPaths = false;
 };
+
+using VmFileSystemShareOptions = std::variant<VmVirtioFsShareOptions, VmPlan9ShareOptions>;
 
 struct VmFileSystemShareRequest
 {
     std::filesystem::path HostPath;
+    // Child name for aggregate virtio-fs devices or access name for Plan9 shares. Generated when empty.
     std::wstring Name;
     bool ReadOnly = true;
-    VmVirtioFsShareOptions Options;
+    VmFileSystemShareOptions Options;
+    // Token whose identity is used to reach the host path. Elevated and unelevated callers share the
+    // same VM, so a share carries its own token instead of reusing the one that created the VM. The
+    // VM identity token is used when this is unset.
+    wil::shared_handle UserToken{};
 };
 
 struct VmVirtioFsShareAddress
@@ -448,13 +527,110 @@ struct VmVirtioFsShareAddress
     std::optional<std::wstring> ChildName;
 };
 
+struct VmPlan9SocketShareAddress
+{
+    GuestServicePort Port;
+    std::wstring AccessName;
+};
+
+struct VmPlan9VirtioShareAddress
+{
+    std::wstring Tag;
+    std::wstring AccessName;
+};
+
+using VmFileSystemShareAddress = std::variant<VmVirtioFsShareAddress, VmPlan9SocketShareAddress, VmPlan9VirtioShareAddress>;
+
 struct VmFileSystemShare
 {
     VmShareId Id;
     VmDeviceId Device;
-    VmVirtioFsShareAddress GuestAddress;
+    VmFileSystemShareAddress GuestAddress;
     std::filesystem::path EffectiveHostPath;
     bool ReadOnly = true;
+};
+
+// Invoked with the index of a newly added persistent memory device while the backend still
+// serializes persistent memory additions. Callers that name devices after the order in which the
+// guest enumerated them (/dev/pmem<index>) use this to wait for the device to appear before the
+// next one is added. The device is already added and tracked when this runs, so throwing fails
+// AddPersistentMemory without reusing the device's index.
+using VmPersistentMemoryReadyCallback = std::function<void(std::uint32_t DeviceIndex)>;
+
+struct VmPersistentMemoryRequest
+{
+    std::filesystem::path Path;
+    bool ReadOnly = true;
+    // Token whose identity is used to reach the backing file. The VM identity token is used when
+    // this is unset.
+    wil::shared_handle UserToken{};
+    VmPersistentMemoryReadyCallback WaitForGuestDevice;
+};
+
+struct VmPersistentMemoryDevice
+{
+    VmDeviceId Id;
+    GUID GuestInstanceId{};
+    // Position of the device among the persistent memory devices added to this VM. The guest names
+    // the device after the order in which it enumerated it, so this matches /dev/pmem<Index> as
+    // long as every device is added through the backend.
+    std::uint32_t Index = 0;
+    std::filesystem::path EffectiveHostPath;
+    bool ReadOnly = true;
+};
+
+enum class VmGpuAssignmentMode
+{
+    Mirror
+};
+
+struct VmGpuRequest
+{
+    VmGpuAssignmentMode AssignmentMode = VmGpuAssignmentMode::Mirror;
+    VmFeatureRequest VendorExtension = VmFeatureRequest::Preferred;
+    // Presentation and GDI acceleration are only controllable on hosts that support the setting; a
+    // preferred request leaves them at the host default elsewhere.
+    VmFeatureRequest DisableGdiAcceleration = VmFeatureRequest::Preferred;
+    VmFeatureRequest DisablePresentation = VmFeatureRequest::Preferred;
+};
+
+struct VmGpuAttachment
+{
+    VmDeviceId Id;
+    VmGpuAssignmentMode AssignmentMode = VmGpuAssignmentMode::Mirror;
+    bool VendorExtension = false;
+    bool GdiAccelerationDisabled = false;
+    bool PresentationDisabled = false;
+};
+
+struct VmSharedMemoryRequest
+{
+    std::wstring Tag;
+    std::wstring Path;
+    std::uint64_t SizeBytes = 0;
+    wil::shared_handle UserToken{};
+};
+
+struct VmSharedMemoryDevice
+{
+    VmDeviceId Id;
+    GUID GuestInstanceId{};
+    std::wstring Tag;
+    std::wstring ObjectPath;
+    std::uint64_t SizeBytes = 0;
+};
+
+struct VmGuestDmaRequest
+{
+    std::uint64_t BaseAddress = 0;
+    std::uint64_t SizeBytes = 0;
+};
+
+struct VmCrashInformation
+{
+    bool Crashed = false;
+    std::optional<std::filesystem::path> CrashLogFile;
+    std::optional<std::filesystem::path> SavedStateFile;
 };
 
 class IVirtualMachineBackend
@@ -467,6 +643,9 @@ public:
     virtual VmPlatformCapabilities GetCapabilities() const = 0;
     // Returns the effective creation-time configuration, including IDs used for boot resource operations.
     virtual VmDescription GetDescription() const = 0;
+    virtual VmState GetState() const = 0;
+    virtual std::wstring GetExitDetails() const = 0;
+    virtual VmCrashInformation GetCrashInformation() const = 0;
     virtual wil::unique_handle GetTerminationEvent() const = 0;
     virtual void Start() = 0;
     virtual void Terminate() = 0;
@@ -479,13 +658,32 @@ public:
     virtual VmDiskAttachment AttachDisk(const VmDiskRequest& Request) = 0;
     virtual void DetachDisk(VmDiskId Disk) = 0;
 
+    /// <summary>
+    /// Exposes a host file to the guest as a persistent memory device. Additions are serialized so
+    /// that devices are enumerated by the guest in the order they were added.
+    /// </summary>
+    virtual VmPersistentMemoryDevice AddPersistentMemory(const VmPersistentMemoryRequest& Request) = 0;
+
+    /// <summary>
+    /// Assigns the host GPUs to the VM and reports the settings that were applied.
+    /// </summary>
+    virtual VmGpuAttachment AddGpu(const VmGpuRequest& Request) = 0;
+
     virtual VmFileSystemDevice CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request) = 0;
+    virtual VmFileSystemDevice GetFileSystemDeviceStatus(VmDeviceId Device) = 0;
     virtual VmFileSystemShare AddFileSystemShare(VmDeviceId Device, const VmFileSystemShareRequest& Request) = 0;
     virtual void RemoveFileSystemShare(VmShareId Share) = 0;
+    virtual VmSharedMemoryDevice AddSharedMemory(const VmSharedMemoryRequest& Request) = 0;
+    virtual void ConfigureGuestDma(const VmGuestDmaRequest& Request) = 0;
+    virtual void RemoveDevice(VmDeviceId Device) = 0;
 
     virtual VmNetworkAttachment AddNetworkAdapter(const VmNetworkAdapterRequest& Request) = 0;
+    virtual void UpdateNetworkAdapter(VmDeviceId Device, const VmNetworkConfiguration& Configuration) = 0;
+    virtual void RemoveNetworkAdapter(VmDeviceId Device) = 0;
     virtual VmPortBinding BindPort(VmDeviceId Device, const VmPortBindingRequest& Request) = 0;
     virtual void UnbindPort(VmPortBindingId Binding) = 0;
+    virtual IpAddress CreateVirtualAddress(VmDeviceId Device, const IpAddress& Destination) = 0;
+    virtual void CreateDnsRecord(VmDeviceId Device, const VmDnsRecord& Record) = 0;
 
 protected:
     // Protects all mutable backend state, including the base listener registry. Callers must

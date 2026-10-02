@@ -407,9 +407,7 @@ void ConsommeNetworking::SetupHostLoopback()
     uint32_t addressBytes{};
     std::memcpy(&addressBytes, &virtualAddress.bytes[0], sizeof(addressBytes));
 
-    std::string virtualAddressString(INET_ADDRSTRLEN, '\0');
-    RtlIpv4AddressToStringA(reinterpret_cast<const IN_ADDR*>(&virtualAddress.bytes[0]), virtualAddressString.data());
-    virtualAddressString.resize(std::strlen(virtualAddressString.data()));
+    const auto virtualAddressString = wsl::windows::common::string::IpAddressToString(virtualAddress);
 
     const auto eth0 = m_guestDeviceManager->GetVirtioNetDevice(c_eth0DeviceName);
     THROW_IF_FAILED(eth0->CreateDNSRecord(DnsRecordType_A, m_hostLoopback.c_str(), virtualAddressString.c_str()));

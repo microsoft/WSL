@@ -15,15 +15,16 @@ Abstract:
 #include "precomp.h"
 #include "HcsVirtualMachineBackend.h"
 #include "socket.hpp"
+#include "string.hpp"
 #include "IVirtualMachineBackend.h"
 #include "OpenVmmVirtualMachineBackend.h"
 
-namespace {
-
-constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
-constexpr UINT32 c_maximumDisks = 254;
-
-} // namespace
+wsl::shared::string::MacAddress VmUserModeNatNetwork::ClientMacAddress() const
+{
+    wsl::shared::string::MacAddress address{};
+    std::copy(std::begin(Configuration.clientMac.bytes), std::end(Configuration.clientMac.bytes), address.begin());
+    return address;
+}
 
 bool wsl::windows::common::vm::validation::ValidateFeature(VmFeatureRequest Request, PCWSTR Setting, bool Supported)
 {

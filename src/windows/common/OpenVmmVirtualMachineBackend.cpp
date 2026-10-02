@@ -22,15 +22,15 @@ Abstract:
 
 using wsl::windows::common::Context;
 using wsl::windows::common::ExecutionContext;
+using wsl::windows::common::vm::c_maximumDisks;
+using wsl::windows::common::vm::c_mib;
+using wsl::windows::common::vm::c_notSupported;
 
 namespace validation = wsl::windows::common::vm::validation;
 
 namespace {
 
-constexpr UINT64 c_mib = 1024 * 1024;
-constexpr UINT32 c_maximumDisks = 254;
 constexpr UINT32 c_rpcTimeoutMs = 30000;
-constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
 // Hybrid vsock embeds the AF_VSOCK port in the first field of this AF_HYPERV service ID.
 constexpr std::wstring_view c_vsockServiceIdSuffix = L"-facb-11e6-bd58-64006a7986d3";
 
@@ -71,21 +71,6 @@ SOCKADDR_UN GetUnixSocketAddress(const std::filesystem::path& Path)
     return address;
 }
 
-std::wstring FormatIpAddress(const VmIpAddress& Address)
-{
-    if (const auto* ipv4 = std::get_if<VmIpv4Address>(&Address))
-    {
-        return wsl::windows::common::string::IntegerIpv4ToWstring(std::bit_cast<std::uint32_t>(ipv4->Bytes));
-    }
-
-    const auto& ipv6 = std::get<VmIpv6Address>(Address);
-    SOCKADDR_INET address{};
-    address.Ipv6.sin6_family = AF_INET6;
-    address.Ipv6.sin6_scope_id = ipv6.ScopeId;
-    std::copy(ipv6.Bytes.begin(), ipv6.Bytes.end(), address.Ipv6.sin6_addr.u.Byte);
-    return wsl::windows::common::string::SockAddrInetToWstring(address);
-}
-
 } // namespace
 
 OpenVmmVirtualMachineBackend::GuestListener::~GuestListener() noexcept
@@ -117,6 +102,12 @@ VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmC
     validation::ValidateFeature(Request.Memory.AllowOvercommit, L"memory overcommit");
     validation::ValidateFeature(Request.Memory.DeferredCommit, L"deferred memory commit");
     validation::ValidateFeature(Request.Memory.ColdDiscard, L"cold discard");
+    validation::ValidateFeature(Request.Memory.SmallPageBacking, L"small-page memory");
+    THROW_HR_IF(
+        c_notSupported,
+        Request.Memory.FaultClusterSizeShift.has_value() || Request.Memory.DirectMapFaultClusterSizeShift.has_value() ||
+            Request.Memory.PageReportingOrder.has_value() || Request.Memory.HostingProcessNameSuffix.has_value());
+    THROW_HR_IF(c_notSupported, Request.Mmio.HighWindowSizeBytes != 0 || Request.Mmio.MaximumGuestAddressBits.has_value());
 
     if (Request.CrashCapture)
     {
@@ -176,6 +167,13 @@ VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmC
     THROW_HR_IF_MSG(c_notSupported, Request.NetworkAdapters.size() > 1, "OpenVMM supports one creation-time network adapter");
     for (const auto& adapter : Request.NetworkAdapters)
     {
+        // OpenVMM serves its NIC with a built-in user-mode NAT and has no host network stack to
+        // attach an endpoint created on the host to.
+        THROW_HR_IF_MSG(
+            c_notSupported,
+            !std::holds_alternative<VmUserModeNatNetwork>(adapter.Configuration),
+            "OpenVMM only supports user-mode NAT networks");
+
         GUID nicId{};
         THROW_IF_FAILED(CoCreateGuid(&nicId));
         description.NetworkAdapters.emplace(
@@ -312,7 +310,8 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     {
         const auto nicId =
             wsl::shared::string::GuidToString<wchar_t>(attachment.GuestInstanceId.value(), wsl::shared::string::GuidToStringFlags::None);
-        const auto macAddress = wsl::shared::string::FormatMacAddress(attachment.EffectiveConfiguration.ClientMac.Bytes, L'-');
+        const auto& configuration = std::get<VmUserModeNatNetwork>(attachment.EffectiveConfiguration);
+        const auto macAddress = wsl::shared::string::FormatMacAddress(configuration.ClientMacAddress(), L'-');
         THROW_IF_FAILED(WslOpenVmmConfigSetConsommeNic(config.get(), nicId.c_str(), macAddress.c_str()));
         m_networkAdapters.emplace(attachment.Id.Value, NetworkAdapter{attachment, nicId});
         m_nextDeviceId = attachment.Id.Value + 1;
@@ -374,6 +373,10 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     THROW_LAST_ERROR_IF(result == WAIT_FAILED);
     THROW_HR_WITH_USER_ERROR_IF(WSL_E_VM_CRASHED, wsl::shared::Localization::MessageWSL2Crashed(), result == WAIT_OBJECT_0);
     THROW_IF_FAILED_MSG(createResult, "Failed to create OpenVMM VM");
+    {
+        auto lock = m_lock.lock_exclusive();
+        m_state = VmState::Created;
+    }
 }
 
 void OpenVmmVirtualMachineBackend::ReadProcessLog(wil::unique_hfile Pipe) noexcept
@@ -401,10 +404,14 @@ void OpenVmmVirtualMachineBackend::OnProcessExit(DWORD ExitCode) noexcept
 {
     WSL_LOG(
         "OpenVmmProcessExited", TraceLoggingValue(m_description.Identity.VmId, "vmId"), TraceLoggingValue(ExitCode, "exitCode"));
+    {
+        auto lock = m_lock.lock_exclusive();
+        m_state = VmState::Stopped;
+        m_exitDetails = std::format(L"OpenVMM process exited with code {}", ExitCode);
+        CloseGuestListenersLocked(m_description.Identity);
+    }
     LOG_IF_WIN32_BOOL_FALSE(SetEvent(m_exitEvent.get()));
     NotifyTerminated(m_description.Identity);
-    auto lock = m_lock.lock_exclusive();
-    CloseGuestListenersLocked(m_description.Identity);
 }
 
 VmPlatformCapabilities OpenVmmVirtualMachineBackend::QueryCapabilities()
@@ -415,7 +422,6 @@ VmPlatformCapabilities OpenVmmVirtualMachineBackend::QueryCapabilities()
             {VmFeature::SerialConsole,
           VmFeature::VirtioConsole,
           VmFeature::VirtioFsFileBacked,
-          VmFeature::SavedStateOnCrash,
           VmFeature::UserModeNatNetwork,
           VmFeature::TcpPortBinding,
           VmFeature::UdpPortBinding,
@@ -437,6 +443,23 @@ VmDescription OpenVmmVirtualMachineBackend::GetDescription() const
     return m_description;
 }
 
+VmState OpenVmmVirtualMachineBackend::GetState() const
+{
+    auto lock = m_lock.lock_shared();
+    return m_state;
+}
+
+std::wstring OpenVmmVirtualMachineBackend::GetExitDetails() const
+{
+    auto lock = m_lock.lock_shared();
+    return m_exitDetails;
+}
+
+VmCrashInformation OpenVmmVirtualMachineBackend::GetCrashInformation() const
+{
+    return {};
+}
+
 wil::unique_handle OpenVmmVirtualMachineBackend::GetTerminationEvent() const
 {
     return wil::unique_handle{wsl::windows::common::wslutil::DuplicateHandle(m_exitEvent.get())};
@@ -455,6 +478,7 @@ void OpenVmmVirtualMachineBackend::Start()
         TraceLoggingHResult(result, "result"),
         TraceLoggingValue(GetTickCount64() - startTimeMs, "durationMs"));
     THROW_IF_FAILED(result);
+    m_state = VmState::Running;
 }
 
 void OpenVmmVirtualMachineBackend::Terminate()
@@ -487,6 +511,7 @@ void OpenVmmVirtualMachineBackend::Terminate()
     }
 
     m_vm.reset();
+    m_state = VmState::Stopped;
     m_attachedDisks.clear();
     m_fileSystemShares.clear();
     m_fileSystemDevices.clear();
@@ -683,37 +708,62 @@ void OpenVmmVirtualMachineBackend::DetachDisk(VmDiskId Disk)
     m_attachedDisks.erase(disk);
 }
 
+VmPersistentMemoryDevice OpenVmmVirtualMachineBackend::AddPersistentMemory(const VmPersistentMemoryRequest&)
+{
+    THROW_HR_MSG(c_notSupported, "OpenVMM does not support persistent memory devices");
+}
+
+VmGpuAttachment OpenVmmVirtualMachineBackend::AddGpu(const VmGpuRequest&)
+{
+    THROW_HR_MSG(c_notSupported, "OpenVMM does not support GPU assignment");
+}
+
 VmFileSystemDevice OpenVmmVirtualMachineBackend::CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request)
 {
+    const auto* transport = std::get_if<VmVirtioFsDevice>(&Request.Transport);
     WSL_LOG(
         "OpenVmmCreateFileSystemDeviceBegin",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
-        TraceLoggingValue(Request.Transport.Tag.c_str(), "tag"),
-        TraceLoggingValue(static_cast<UINT32>(Request.Transport.Layout), "layout"));
+        TraceLoggingValue(transport ? transport->Tag.c_str() : L"", "tag"));
+    THROW_HR_IF(c_notSupported, !transport);
     THROW_HR_IF_MSG(
         c_notSupported,
-        Request.Transport.Layout != VmVirtioFsLayout::SingleShare,
+        transport->Layout != VmVirtioFsLayout::SingleShare,
         "OpenVMM currently supports only single-share virtio-fs devices");
+    // WslOpenVmmVmAddShare carries neither mount options nor an identity, so device options are
+    // rejected rather than silently dropped, just as share-level mount options are.
+    THROW_HR_IF_MSG(c_notSupported, !transport->Options.MountOptions.empty(), "OpenVMM does not support virtio-fs mount options");
+    THROW_HR_IF_MSG(
+        c_notSupported, !!transport->Options.UserToken, "OpenVMM does not support serving a virtio-fs device under a user token");
 
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
     THROW_HR_IF(E_BOUNDS, m_nextDeviceId == UINT64_MAX);
     for (const auto& entry : m_fileSystemDevices)
     {
-        THROW_HR_IF(
-            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), wsl::shared::string::IsEqual(entry.second.Transport.Tag, Request.Transport.Tag, false));
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), wsl::shared::string::IsEqual(entry.second.Transport.Tag, transport->Tag, false));
     }
 
     VmFileSystemDevice device{{m_description.Identity, m_nextDeviceId}, VmFileSystemDeviceState::Prepared};
-    const auto inserted = m_fileSystemDevices.emplace(device.Id.Value, FileSystemDevice{device, Request.Transport, {}}).second;
+    const auto inserted = m_fileSystemDevices.emplace(device.Id.Value, FileSystemDevice{device, *transport, {}}).second;
     WI_ASSERT(inserted);
     ++m_nextDeviceId;
     WSL_LOG(
         "OpenVmmCreateFileSystemDeviceEnd",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
         TraceLoggingValue(device.Id.Value, "deviceId"),
-        TraceLoggingValue(Request.Transport.Tag.c_str(), "tag"));
+        TraceLoggingValue(transport->Tag.c_str(), "tag"));
     return device;
+}
+
+VmFileSystemDevice OpenVmmVirtualMachineBackend::GetFileSystemDeviceStatus(VmDeviceId Device)
+{
+    validation::ValidateResourceId(Device, m_description.Identity);
+    auto lock = m_lock.lock_shared();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
+    const auto device = m_fileSystemDevices.find(Device.Value);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), device == m_fileSystemDevices.end());
+    return device->second.Device;
 }
 
 VmFileSystemShare OpenVmmVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device, const VmFileSystemShareRequest& Request)
@@ -726,7 +776,10 @@ VmFileSystemShare OpenVmmVirtualMachineBackend::AddFileSystemShare(VmDeviceId De
     ValidateResourceId(Device, m_description.Identity);
     THROW_HR_IF_MSG(
         E_INVALIDARG, !Request.Name.empty(), "A single-share OpenVMM virtio-fs device does not accept a child share name");
-    THROW_HR_IF_MSG(c_notSupported, !Request.Options.MountOptions.empty(), "OpenVMM does not support virtio-fs mount options");
+    const auto* options = std::get_if<VmVirtioFsShareOptions>(&Request.Options);
+    THROW_HR_IF_MSG(c_notSupported, !options, "OpenVMM supports only virtio-fs share options");
+    THROW_HR_IF_MSG(c_notSupported, !options->MountOptions.empty(), "OpenVMM does not support virtio-fs mount options");
+    THROW_HR_IF_MSG(c_notSupported, !!options->UserToken, "OpenVMM does not support serving a virtio-fs share under a user token");
     const auto hostPath = wsl::windows::common::filesystem::GetCanonicalPath(Request.HostPath);
     const auto attributes = GetFileAttributesW(hostPath.c_str());
     THROW_LAST_ERROR_IF(attributes == INVALID_FILE_ATTRIBUTES);
@@ -740,7 +793,13 @@ VmFileSystemShare OpenVmmVirtualMachineBackend::AddFileSystemShare(VmDeviceId De
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), device->second.Share.has_value());
     THROW_HR_IF(E_BOUNDS, m_nextShareId == UINT64_MAX);
 
-    VmFileSystemShare share{{m_description.Identity, m_nextShareId}, Device, {device->second.Transport.Tag, {}}, hostPath, Request.ReadOnly};
+    VmFileSystemShare share{
+        {m_description.Identity, m_nextShareId},
+        Device,
+        VmVirtioFsShareAddress{device->second.Transport.Tag, {}},
+        hostPath,
+        Request.ReadOnly};
+    const auto& guestAddress = std::get<VmVirtioFsShareAddress>(share.GuestAddress);
     const auto [entry, inserted] = m_fileSystemShares.emplace(share.Id.Value, FileSystemShare{share});
     WI_ASSERT(inserted);
     device->second.Share = share.Id.Value;
@@ -750,13 +809,13 @@ VmFileSystemShare OpenVmmVirtualMachineBackend::AddFileSystemShare(VmDeviceId De
         device->second.Device.State = VmFileSystemDeviceState::Prepared;
         m_fileSystemShares.erase(entry);
     });
-    const auto result = WslOpenVmmVmAddShare(m_vm.get(), share.GuestAddress.Tag.c_str(), hostPath.c_str(), Request.ReadOnly);
+    const auto result = WslOpenVmmVmAddShare(m_vm.get(), guestAddress.Tag.c_str(), hostPath.c_str(), Request.ReadOnly);
     WSL_LOG(
         "OpenVmmAddFileSystemShareEnd",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
         TraceLoggingValue(Device.Value, "deviceId"),
         TraceLoggingValue(share.Id.Value, "shareId"),
-        TraceLoggingValue(share.GuestAddress.Tag.c_str(), "tag"),
+        TraceLoggingValue(guestAddress.Tag.c_str(), "tag"),
         TraceLoggingHResult(result, "result"));
     THROW_IF_FAILED(result);
     ++m_nextShareId;
@@ -778,13 +837,14 @@ void OpenVmmVirtualMachineBackend::RemoveFileSystemShare(VmShareId Share)
     const auto device = m_fileSystemDevices.find(share->second.Share.Device.Value);
     THROW_HR_IF(E_UNEXPECTED, device == m_fileSystemDevices.end() || device->second.Share != Share.Value);
 
-    const auto result = WslOpenVmmVmRemoveShare(m_vm.get(), share->second.Share.GuestAddress.Tag.c_str());
+    const auto& guestAddress = std::get<VmVirtioFsShareAddress>(share->second.Share.GuestAddress);
+    const auto result = WslOpenVmmVmRemoveShare(m_vm.get(), guestAddress.Tag.c_str());
     WSL_LOG(
         "OpenVmmRemoveFileSystemShareEnd",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
         TraceLoggingValue(Share.Value, "shareId"),
         TraceLoggingValue(device->second.Device.Id.Value, "deviceId"),
-        TraceLoggingValue(share->second.Share.GuestAddress.Tag.c_str(), "tag"),
+        TraceLoggingValue(guestAddress.Tag.c_str(), "tag"),
         TraceLoggingHResult(result, "result"));
     THROW_IF_FAILED(result);
     device->second.Share.reset();
@@ -792,10 +852,45 @@ void OpenVmmVirtualMachineBackend::RemoveFileSystemShare(VmShareId Share)
     m_fileSystemShares.erase(share);
 }
 
+VmSharedMemoryDevice OpenVmmVirtualMachineBackend::AddSharedMemory(const VmSharedMemoryRequest&)
+{
+    THROW_HR_MSG(c_notSupported, "OpenVMM does not support section-backed shared memory devices");
+}
+
+void OpenVmmVirtualMachineBackend::ConfigureGuestDma(const VmGuestDmaRequest&)
+{
+    THROW_HR_MSG(c_notSupported, "OpenVMM does not support configuring a guest DMA window");
+}
+
+void OpenVmmVirtualMachineBackend::RemoveDevice(VmDeviceId Device)
+{
+    validation::ValidateResourceId(Device, m_description.Identity);
+    auto lock = m_lock.lock_exclusive();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
+    const auto device = m_fileSystemDevices.find(Device.Value);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), device == m_fileSystemDevices.end());
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_BUSY), device->second.Share.has_value());
+    m_fileSystemDevices.erase(device);
+}
+
 VmNetworkAttachment OpenVmmVirtualMachineBackend::AddNetworkAdapter(const VmNetworkAdapterRequest& Request)
 {
     ExecutionContext context(Context::ConfigureNetworking);
     THROW_HR_MSG(c_notSupported, "OpenVMM network adapter '%ls' must be configured at VM creation time", Request.Tag.c_str());
+}
+
+void OpenVmmVirtualMachineBackend::UpdateNetworkAdapter(VmDeviceId Device, const VmNetworkConfiguration&)
+{
+    ExecutionContext context(Context::ConfigureNetworking);
+    validation::ValidateResourceId(Device, m_description.Identity);
+    THROW_HR_MSG(c_notSupported, "OpenVMM network adapters cannot be updated after VM creation");
+}
+
+void OpenVmmVirtualMachineBackend::RemoveNetworkAdapter(VmDeviceId Device)
+{
+    ExecutionContext context(Context::ConfigureNetworking);
+    validation::ValidateResourceId(Device, m_description.Identity);
+    THROW_HR_MSG(c_notSupported, "OpenVMM network adapters cannot be removed after VM creation");
 }
 
 VmPortBinding OpenVmmVirtualMachineBackend::BindPort(VmDeviceId Device, const VmPortBindingRequest& Request)
@@ -806,20 +901,22 @@ VmPortBinding OpenVmmVirtualMachineBackend::BindPort(VmDeviceId Device, const Vm
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
         TraceLoggingValue(Device.Value, "deviceId"),
         TraceLoggingValue(static_cast<UINT32>(Request.Protocol), "protocol"),
-        TraceLoggingValue(Request.Listen.Port, "hostPort"),
+        TraceLoggingValue(Request.HostPort, "hostPort"),
         TraceLoggingValue(Request.GuestPort, "guestPort"));
     ValidateResourceId(Device, m_description.Identity);
+    THROW_HR_IF(
+        E_INVALIDARG, Request.ListenAddress.family != IpAddressFamily_V4 && Request.ListenAddress.family != IpAddressFamily_V6);
     THROW_HR_IF_MSG(
-        c_notSupported, Request.Listen.Port == 0, "OpenVMM cannot report the allocated port for a dynamic host port binding");
+        c_notSupported, Request.HostPort == 0, "OpenVMM cannot report the allocated port for a dynamic host port binding");
     THROW_HR_IF(E_INVALIDARG, Request.GuestPort == 0);
-    const auto hostAddress = FormatIpAddress(Request.Listen.Address);
+    const auto hostAddress = wsl::windows::common::string::IpAddressToWstring(Request.ListenAddress, Request.ListenScopeId);
     bool tcp = false;
     switch (Request.Protocol)
     {
-    case VmTransportProtocol::Tcp:
+    case TransportProtocol_Tcp:
         tcp = true;
         break;
-    case VmTransportProtocol::Udp:
+    case TransportProtocol_Udp:
         break;
     default:
         THROW_HR(E_INVALIDARG);
@@ -831,12 +928,19 @@ VmPortBinding OpenVmmVirtualMachineBackend::BindPort(VmDeviceId Device, const Vm
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), adapter == m_networkAdapters.end());
     THROW_HR_IF(E_BOUNDS, m_nextPortBindingId == UINT64_MAX);
 
-    VmPortBinding binding{{m_description.Identity, m_nextPortBindingId}, Device, Request.Protocol, Request.Listen, Request.GuestPort};
+    VmPortBinding binding{
+        {m_description.Identity, m_nextPortBindingId},
+        Device,
+        Request.Protocol,
+        Request.ListenAddress,
+        Request.ListenScopeId,
+        Request.HostPort,
+        Request.GuestPort};
     const auto [entry, inserted] = m_portBindings.emplace(binding.Id.Value, PortBinding{binding, adapter->second.NicId, hostAddress});
     WI_ASSERT(inserted);
     auto rollback = wil::scope_exit([this, &entry] { m_portBindings.erase(entry); });
     const auto result =
-        WslOpenVmmVmBindPort(m_vm.get(), adapter->second.NicId.c_str(), Request.Listen.Port, Request.GuestPort, tcp, hostAddress.c_str());
+        WslOpenVmmVmBindPort(m_vm.get(), adapter->second.NicId.c_str(), Request.HostPort, Request.GuestPort, tcp, hostAddress.c_str());
     WSL_LOG(
         "OpenVmmBindPortEnd",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
@@ -865,9 +969,9 @@ void OpenVmmVirtualMachineBackend::UnbindPort(VmPortBindingId Binding)
     const auto result = WslOpenVmmVmUnbindPort(
         m_vm.get(),
         binding->second.NicId.c_str(),
-        binding->second.Binding.EffectiveListen.Port,
+        binding->second.Binding.EffectiveHostPort,
         binding->second.Binding.GuestPort,
-        binding->second.Binding.Protocol == VmTransportProtocol::Tcp,
+        binding->second.Binding.Protocol == TransportProtocol_Tcp,
         binding->second.HostAddress.c_str());
     WSL_LOG(
         "OpenVmmUnbindPortEnd",
@@ -877,4 +981,18 @@ void OpenVmmVirtualMachineBackend::UnbindPort(VmPortBindingId Binding)
         TraceLoggingHResult(result, "result"));
     THROW_IF_FAILED(result);
     m_portBindings.erase(binding);
+}
+
+IpAddress OpenVmmVirtualMachineBackend::CreateVirtualAddress(VmDeviceId Device, const IpAddress&)
+{
+    ExecutionContext context(Context::ConfigureNetworking);
+    validation::ValidateResourceId(Device, m_description.Identity);
+    THROW_HR_MSG(c_notSupported, "OpenVMM does not support virtual host addresses");
+}
+
+void OpenVmmVirtualMachineBackend::CreateDnsRecord(VmDeviceId Device, const VmDnsRecord&)
+{
+    ExecutionContext context(Context::ConfigureNetworking);
+    validation::ValidateResourceId(Device, m_description.Identity);
+    THROW_HR_MSG(c_notSupported, "OpenVMM does not support static DNS records");
 }
