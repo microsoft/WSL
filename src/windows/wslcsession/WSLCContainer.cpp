@@ -1317,6 +1317,20 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     unique_com_disconnect comWrapper;
     std::shared_ptr<StateTransition> transition;
 
+    switch (event)
+    {
+    case ContainerEvent::HealthHealthy:
+        RecordEvent("health_status: healthy", eventTimeNano);
+        return;
+
+    case ContainerEvent::HealthUnhealthy:
+        RecordEvent("health_status: unhealthy", eventTimeNano);
+        return;
+
+    default:
+        break;
+    }
+
     {
         auto lifecycleLock = m_lifecycleLock.lock_exclusive();
         auto lock = m_lock.lock_exclusive();

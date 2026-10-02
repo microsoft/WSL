@@ -155,7 +155,9 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
         {"die", ContainerEvent::Exit},
         {"destroy", ContainerEvent::Destroy},
         {"exec_die", ContainerEvent::ExecDied},
-        {"restart", ContainerEvent::Restart}};
+        {"restart", ContainerEvent::Restart},
+        {"health_status: healthy", ContainerEvent::HealthHealthy},
+        {"health_status: unhealthy", ContainerEvent::HealthUnhealthy}};
 
     auto actor = parsed.find("Actor");
     THROW_HR_IF_MSG(E_INVALIDARG, actor == parsed.end(), "Missing Actor in container event");
