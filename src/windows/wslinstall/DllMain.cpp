@@ -852,7 +852,14 @@ void RegisterLspCategoriesImpl(DWORD flags)
     THROW_HR_IF(E_INVALIDARG, !installRoot.has_value());
 
     for (const auto& e :
-         {L"wsl.exe", L"wslhost.exe", L"wslrelay.exe", L"wslg.exe", L"wslservice.exe", L"wslc.exe", L"wslcsession.exe"})
+         {L"wsl.exe",
+          L"wslhost.exe",
+          L"wslrelay.exe",
+          L"wslg.exe",
+          L"wslservice.exe",
+          L"wslc.exe",
+          L"container.exe",
+          L"wslcsession.exe"})
     {
         auto executable = installRoot.value() + e;
         INT error{};
