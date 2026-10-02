@@ -137,6 +137,8 @@ struct WslcSessionImpl
         return m_session2;
     }
 
+   WSLCCompatVersion runtimeVersion{};
+
 private:
     wil::com_ptr<IWSLCCompatSession> m_session;
     IWSLCCompatSession2* m_session2 = nullptr;
