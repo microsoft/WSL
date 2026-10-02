@@ -2494,6 +2494,10 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Invalid value for option '{}': '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcMutuallyExclusiveVolumeOptions" xml:space="preserve">
+    <value>Options '{}' and '{}' cannot both be enabled.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name = "MessageWslcUnknownVolumeOption" xml:space = "preserve" >
     <value>Unknown option: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
