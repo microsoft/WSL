@@ -1945,9 +1945,10 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
             if (!device.has_value())
             {
                 device = m_backend
-                             ->CreateFileSystemDevice(
-                                 {VmVirtioFsDevice{deviceTag, VmVirtioFsLayout::Aggregate},
-                                  wil::shared_handle{wsl::windows::common::wslutil::DuplicateHandle(UserToken)}})
+                             ->CreateFileSystemDevice({VmVirtioFsDevice{
+                                 deviceTag,
+                                 VmVirtioFsLayout::Aggregate,
+                                 VmVirtioFsShareOptions{{}, wil::shared_handle{wsl::windows::common::wslutil::DuplicateHandle(UserToken)}}}})
                              .Id;
             }
             VmFileSystemShareRequest request{};
@@ -1955,7 +1956,6 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
             request.Name = shareName;
             request.ReadOnly = false;
             request.Options = VmVirtioFsShareOptions{key.Options};
-            request.UserToken = wil::shared_handle{wsl::windows::common::wslutil::DuplicateHandle(UserToken)};
             m_backend->AddFileSystemShare(device.value(), request);
         }
         else
