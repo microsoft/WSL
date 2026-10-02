@@ -135,16 +135,6 @@ public:
     void ValidateNetworkingMode();
 
 private:
-    struct AttachedDisk
-    {
-        DiskType Type;
-        std::wstring Path;
-        bool User;
-
-        bool operator<(const AttachedDisk& other) const;
-        bool operator==(const AttachedDisk& other) const;
-    };
-
     struct Mount
     {
         std::wstring Name;
@@ -152,12 +142,9 @@ private:
         std::optional<std::wstring> Type;
     };
 
-    struct DiskState
+    struct DiskMountState
     {
-        ULONG Lun;
         std::map<ULONG, Mount> Mounts;
-        VmDiskId BackendId;
-        wil::unique_hfile BackingFile;
     };
 
     struct VirtioFsShare
@@ -230,13 +217,13 @@ private:
     void ReadGuestCapabilities();
 
     _Requires_lock_held_(m_lock)
-    static void SaveDiskState(_In_ HKEY Key, _In_ const AttachedDisk& Disk, _In_ const DiskState& State, _In_ const DiskType& DiskType);
+    static void SaveDiskState(_In_ HKEY Key, _In_ const VmDiskAttachment& Disk, _In_ const DiskMountState& State);
 
     _Requires_lock_held_(m_lock)
-    std::pair<int, LX_MINI_MOUNT_STEP> UnmountDisk(_In_ const AttachedDisk& Disk, _Inout_ DiskState& State);
+    std::pair<int, LX_MINI_MOUNT_STEP> UnmountDisk(_In_ const VmDiskAttachment& Disk, _Inout_ DiskMountState& State);
 
     _Requires_lock_held_(m_lock)
-    std::pair<int, LX_MINI_MOUNT_STEP> UnmountVolume(_In_ const AttachedDisk& Disk, _In_ ULONG PartitionIndex, _In_ PCWSTR Name);
+    std::pair<int, LX_MINI_MOUNT_STEP> UnmountVolume(_In_ PCWSTR Name);
 
     void VirtioFsWorker(_In_ const wil::unique_socket& socket);
 
@@ -251,7 +238,6 @@ private:
     _Guarded_by_(m_guestDeviceLock) std::map<VirtioFsShare, std::wstring> m_virtioFsShares;
     _Guarded_by_(m_guestDeviceLock) std::optional<VmDeviceId> m_virtioFsDevice;
     _Guarded_by_(m_guestDeviceLock) std::optional<VmDeviceId> m_adminVirtioFsDevice;
-    _Guarded_by_(m_guestDeviceLock) std::map<UINT32, wil::com_ptr<IPlan9FileSystem>> m_plan9Servers;
     wil::srwlock m_lock;
     _Guarded_by_(m_lock) wil::com_ptr<IPlan9FileSystem> m_pluginPlan9Server;
     _Guarded_by_(m_lock) wil::unique_event m_terminatingEvent { wil::EventOptions::ManualReset };
@@ -289,7 +275,7 @@ private:
     wil::unique_socket m_notifyChannel;
     SE_SID m_userSid;
     std::shared_ptr<LxssRunningInstance> m_systemDistro;
-    _Guarded_by_(m_lock) std::map<AttachedDisk, DiskState> m_attachedDisks;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, DiskMountState> m_diskMounts;
     std::tuple<std::uint32_t, std::uint32_t, std::uint32_t> m_kernelVersion;
     std::wstring m_kernelVersionString;
     bool m_seccompAvailable;

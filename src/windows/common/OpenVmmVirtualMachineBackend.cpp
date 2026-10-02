@@ -161,7 +161,13 @@ VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmC
             THROW_HR_IF(WSL_E_TOO_MANY_DISKS_ATTACHED, lun == c_maximumDisks);
             allocated.set(lun);
         }
-        description.BootDisks.at(disk.Key) = {{description.Identity, nextId++}, {0, lun}, disk.Disk.ReadOnly};
+        description.BootDisks.at(disk.Key) = {
+            {description.Identity, nextId++},
+            {0, lun},
+            disk.Disk.ReadOnly,
+            disk.Disk.UserDisk,
+            std::get<VmVirtualDiskSource>(disk.Disk.Source).Path.native(),
+            false};
     }
 
     // OpenVMM's port RPC channel targets only the first Consomme NIC.
@@ -669,7 +675,8 @@ VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& R
     }
 
     THROW_HR_IF(E_BOUNDS, m_nextDiskId == UINT64_MAX);
-    const VmDiskAttachment attachment{{m_description.Identity, m_nextDiskId}, {0, lun}, Request.ReadOnly};
+    const VmDiskAttachment attachment{
+        {m_description.Identity, m_nextDiskId}, {0, lun}, Request.ReadOnly, Request.UserDisk, source.Path.native(), false};
     const auto [disk, inserted] = m_attachedDisks.emplace(attachment.Id.Value, attachment);
     WI_ASSERT(inserted);
     auto rollback = wil::scope_exit([this, &disk] { m_attachedDisks.erase(disk); });
@@ -687,6 +694,18 @@ VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& R
     ++m_nextDiskId;
     rollback.release();
     return attachment;
+}
+
+std::vector<VmDiskAttachment> OpenVmmVirtualMachineBackend::GetAttachedDisks() const
+{
+    auto lock = m_lock.lock_shared();
+    std::vector<VmDiskAttachment> disks;
+    disks.reserve(m_attachedDisks.size());
+    for (const auto& entry : m_attachedDisks)
+    {
+        disks.push_back(entry.second);
+    }
+    return disks;
 }
 
 void OpenVmmVirtualMachineBackend::DetachDisk(VmDiskId Disk)
@@ -758,6 +777,18 @@ VmFileSystemDevice OpenVmmVirtualMachineBackend::CreateFileSystemDevice(const Vm
         TraceLoggingValue(device.Id.Value, "deviceId"),
         TraceLoggingValue(transport->Tag.c_str(), "tag"));
     return device;
+}
+
+std::vector<VmFileSystemDevice> OpenVmmVirtualMachineBackend::GetFileSystemDevices() const
+{
+    auto lock = m_lock.lock_shared();
+    std::vector<VmFileSystemDevice> devices;
+    devices.reserve(m_fileSystemDevices.size());
+    for (const auto& entry : m_fileSystemDevices)
+    {
+        devices.push_back(entry.second);
+    }
+    return devices;
 }
 
 VmFileSystemDevice OpenVmmVirtualMachineBackend::GetFileSystemDeviceStatus(VmDeviceId Device)

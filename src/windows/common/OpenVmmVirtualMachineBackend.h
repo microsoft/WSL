@@ -50,12 +50,14 @@ public:
     void CloseGuestListener(VmListenerId Listener) override;
 
     VmDiskAttachment AttachDisk(const VmDiskRequest& Request) override;
+    std::vector<VmDiskAttachment> GetAttachedDisks() const override;
     void DetachDisk(VmDiskId Disk) override;
 
     VmPersistentMemoryDevice AddPersistentMemory(const VmPersistentMemoryRequest& Request) override;
     VmGpuAttachment AddGpu(const VmGpuRequest& Request) override;
 
     VmFileSystemDevice CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request) override;
+    std::vector<VmFileSystemDevice> GetFileSystemDevices() const override;
     VmFileSystemDevice GetFileSystemDeviceStatus(VmDeviceId Device) override;
     VmFileSystemShare AddFileSystemShare(VmDeviceId Device, const VmFileSystemShareRequest& Request) override;
     void RemoveFileSystemShare(VmShareId Share) override;

@@ -313,11 +313,10 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
         scsi.Attachments[std::to_string(lun)] = std::move(attachment);
 
         const VmDiskAttachment diskAttachment{
-            {Request.Identity, configuration.NextDiskId}, {0, lun}, bootDisk.Disk.ReadOnly, bootDisk.Disk.UserDisk};
+            {Request.Identity, configuration.NextDiskId}, {0, lun}, bootDisk.Disk.ReadOnly, bootDisk.Disk.UserDisk, path, false};
         description.BootDisks.emplace(bootDisk.Key, diskAttachment);
         configuration.BootDisks.emplace(
-            diskAttachment.Id.Value,
-            AttachedDisk{diskAttachment, {false, path, diskFlags, bootDisk.Disk.DeviceTimeout, std::move(backingFile)}});
+            diskAttachment.Id.Value, AttachedDisk{diskAttachment, {diskFlags, bootDisk.Disk.DeviceTimeout, std::move(backingFile)}});
 
         ++configuration.NextDiskId;
     }
@@ -678,8 +677,7 @@ std::map<std::uint64_t, HcsVirtualMachineBackend::AttachedDisk>::iterator HcsVir
     bool PassThrough, const std::wstring& Path)
 {
     return std::find_if(m_attachedDisks.begin(), m_attachedDisks.end(), [&](const auto& entry) {
-        return entry.second.Backend.PassThrough == PassThrough &&
-               wsl::windows::common::string::IsPathComponentEqual(entry.second.Backend.Path, Path);
+        return entry.second.PassThrough == PassThrough && wsl::windows::common::string::IsPathComponentEqual(entry.second.Path, Path);
     });
 }
 
@@ -687,8 +685,8 @@ void HcsVirtualMachineBackend::CleanupAttachedDisks(std::map<std::uint64_t, Atta
 {
     for (const auto& entry : Disks)
     {
-        const auto& disk = entry.second.Backend;
-        if (WI_IsFlagSet(disk.Flags, wsl::windows::common::disk::DiskStateFlags::AccessGranted))
+        const auto& disk = entry.second;
+        if (WI_IsFlagSet(disk.Backend.Flags, wsl::windows::common::disk::DiskStateFlags::AccessGranted))
         {
             try
             {
@@ -697,11 +695,11 @@ void HcsVirtualMachineBackend::CleanupAttachedDisks(std::map<std::uint64_t, Atta
             CATCH_LOG()
         }
 
-        if (WI_IsFlagSet(disk.Flags, wsl::windows::common::disk::DiskStateFlags::Online))
+        if (WI_IsFlagSet(disk.Backend.Flags, wsl::windows::common::disk::DiskStateFlags::Online))
         {
             try
             {
-                wsl::windows::common::disk::BringOnline(disk.Path.c_str(), static_cast<size_t>(disk.DeviceTimeout.count()));
+                wsl::windows::common::disk::BringOnline(disk.Path.c_str(), static_cast<size_t>(disk.Backend.DeviceTimeout.count()));
             }
             CATCH_LOG()
         }
@@ -781,7 +779,7 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
         schema::RemoveDiskWithAccess(
             m_system.get(),
             m_vmIdString.c_str(),
-            found->second.Backend.Path.c_str(),
+            found->second.Path.c_str(),
             found->second.GuestAddress.Lun,
             found->second.Backend.Flags,
             static_cast<size_t>(found->second.Backend.DeviceTimeout.count()));
@@ -824,9 +822,9 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
         }
     });
 
-    const VmDiskAttachment attachment{{m_configuration.Description.Identity, m_nextDiskId}, {0, lun}, Request.ReadOnly, Request.UserDisk};
-    m_attachedDisks.emplace(
-        attachment.Id.Value, AttachedDisk{attachment, {passThrough, path, diskFlags, Request.DeviceTimeout, std::move(backingFile)}});
+    const VmDiskAttachment attachment{
+        {m_configuration.Description.Identity, m_nextDiskId}, {0, lun}, Request.ReadOnly, Request.UserDisk, path, passThrough};
+    m_attachedDisks.emplace(attachment.Id.Value, AttachedDisk{attachment, {diskFlags, Request.DeviceTimeout, std::move(backingFile)}});
     ++m_nextDiskId;
     cleanup.release();
 
@@ -840,6 +838,18 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
         TraceLoggingValue(Request.ReadOnly, "readOnly"));
 
     return attachment;
+}
+
+std::vector<VmDiskAttachment> HcsVirtualMachineBackend::GetAttachedDisks() const
+{
+    auto lock = m_lock.lock_shared();
+    std::vector<VmDiskAttachment> disks;
+    disks.reserve(m_attachedDisks.size());
+    for (const auto& entry : m_attachedDisks)
+    {
+        disks.push_back(entry.second);
+    }
+    return disks;
 }
 
 void HcsVirtualMachineBackend::DetachDisk(VmDiskId Disk)
@@ -867,7 +877,7 @@ void HcsVirtualMachineBackend::DetachDisk(VmDiskId Disk)
     schema::RemoveDiskWithAccess(
         m_system.get(),
         m_vmIdString.c_str(),
-        disk->second.Backend.Path.c_str(),
+        disk->second.Path.c_str(),
         disk->second.GuestAddress.Lun,
         disk->second.Backend.Flags,
         static_cast<size_t>(disk->second.Backend.DeviceTimeout.count()));
@@ -878,7 +888,7 @@ void HcsVirtualMachineBackend::DetachDisk(VmDiskId Disk)
         TraceLoggingValue(Disk.Value, "diskId"),
         TraceLoggingValue(disk->second.GuestAddress.Controller, "controller"),
         TraceLoggingValue(disk->second.GuestAddress.Lun, "lun"),
-        TraceLoggingValue(disk->second.Backend.PassThrough, "passThrough"));
+        TraceLoggingValue(disk->second.PassThrough, "passThrough"));
 
     m_attachedDisks.erase(disk);
 }
@@ -1133,6 +1143,18 @@ VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFile
         TraceLoggingValue(device.GuestInstanceId.has_value(), "created"));
 
     return device;
+}
+
+std::vector<VmFileSystemDevice> HcsVirtualMachineBackend::GetFileSystemDevices() const
+{
+    auto lock = m_lock.lock_shared();
+    std::vector<VmFileSystemDevice> devices;
+    devices.reserve(m_fileSystemDevices.size());
+    for (const auto& entry : m_fileSystemDevices)
+    {
+        devices.push_back(entry.second);
+    }
+    return devices;
 }
 
 VmFileSystemDevice HcsVirtualMachineBackend::GetFileSystemDeviceStatus(VmDeviceId Device)
@@ -1551,7 +1573,15 @@ void HcsVirtualMachineBackend::RemoveDevice(VmDeviceId Device)
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), device == m_fileSystemDevices.end());
     const auto hasShares =
         std::ranges::any_of(m_fileSystemShares, [&](const auto& entry) { return entry.second.Device.Value == Device.Value; });
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_BUSY), hasShares);
+    const bool unavailablePlan9 = device->second.State == VmFileSystemDeviceState::Unavailable &&
+                                  (std::holds_alternative<VmPlan9SocketDevice>(device->second.Transport) ||
+                                   std::holds_alternative<VmPlan9VirtioDevice>(device->second.Transport));
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_BUSY), hasShares && !unavailablePlan9);
+
+    if (unavailablePlan9)
+    {
+        std::erase_if(m_fileSystemShares, [&](const auto& entry) { return entry.second.Device.Value == Device.Value; });
+    }
 
     std::visit(
         Overloaded{
@@ -1571,7 +1601,14 @@ void HcsVirtualMachineBackend::RemoveDevice(VmDeviceId Device)
             [&](const VmPlan9SocketDevice&) {
                 if (device->second.Backend.Plan9Server)
                 {
-                    THROW_IF_FAILED(device->second.Backend.Plan9Server->Teardown());
+                    if (unavailablePlan9)
+                    {
+                        LOG_IF_FAILED(device->second.Backend.Plan9Server->Teardown());
+                    }
+                    else
+                    {
+                        THROW_IF_FAILED(device->second.Backend.Plan9Server->Teardown());
+                    }
                 }
             },
             [&](const VmPlan9HostedDevice&) {}},
