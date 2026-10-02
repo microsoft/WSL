@@ -297,6 +297,10 @@ struct VmDiskAttachment
     VmGuestDiskAddress GuestAddress;
     bool ReadOnly = true;
     bool UserDisk = false;
+    // Host path backing the disk: a virtual disk image, or a physical disk for pass-through.
+    std::wstring Path;
+    // Set for pass-through disks, cleared for virtual disks.
+    bool PassThrough = false;
 };
 
 struct VmCrashCaptureRequest
@@ -681,6 +685,7 @@ public:
     virtual void CloseGuestListener(VmListenerId Listener) = 0;
 
     virtual VmDiskAttachment AttachDisk(const VmDiskRequest& Request) = 0;
+    virtual std::vector<VmDiskAttachment> GetAttachedDisks() const = 0;
     virtual void DetachDisk(VmDiskId Disk) = 0;
 
     /// <summary>
@@ -695,6 +700,7 @@ public:
     virtual VmGpuAttachment AddGpu(const VmGpuRequest& Request) = 0;
 
     virtual VmFileSystemDevice CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request) = 0;
+    virtual std::vector<VmFileSystemDevice> GetFileSystemDevices() const = 0;
     virtual VmFileSystemDevice GetFileSystemDeviceStatus(VmDeviceId Device) = 0;
     virtual VmFileSystemShare AddFileSystemShare(VmDeviceId Device, const VmFileSystemShareRequest& Request) = 0;
     virtual void RemoveFileSystemShare(VmShareId Share) = 0;

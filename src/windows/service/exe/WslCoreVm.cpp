@@ -348,25 +348,11 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     if (systemDistro != description.BootDisks.end())
     {
         m_systemDistroDeviceId = systemDistro->second.GuestAddress.Lun;
-        m_attachedDisks.emplace(
-            AttachedDisk{DiskType::VHD, m_vmConfig.SystemDistroPath, false},
-            DiskState{
-                m_systemDistroDeviceId,
-                {},
-                systemDistro->second.Id,
-                wsl::windows::common::disk::OpenVhdBackingFile(m_vmConfig.SystemDistroPath.c_str())});
     }
     const auto kernelModules = description.BootDisks.find(L"kernel-modules");
     if (kernelModules != description.BootDisks.end())
     {
         m_kernelModulesDeviceId = kernelModules->second.GuestAddress.Lun;
-        m_attachedDisks.emplace(
-            AttachedDisk{DiskType::VHD, m_vmConfig.KernelModulesPath, false},
-            DiskState{
-                m_kernelModulesDeviceId,
-                {},
-                kernelModules->second.Id,
-                wsl::windows::common::disk::OpenVhdBackingFile(m_vmConfig.KernelModulesPath.c_str())});
     }
 
     // N.B. The backend listener API does not yet support WSL's accept timeout and source-location
@@ -839,12 +825,6 @@ WslCoreVm::~WslCoreVm() noexcept
         m_pluginPlan9Server.reset();
     }
 
-    // This loops helps against a potential crash in build <= Windows 11 22H2.
-    for (const auto& e : m_plan9Servers)
-    {
-        LOG_IF_FAILED(e.second->Teardown());
-    }
-
     // Release the backend after WSL-owned device servers have stopped. The backend closes the
     // compute system, guest device manager, disks, and host-side disk state.
     m_backend.reset();
@@ -948,60 +928,60 @@ _Requires_lock_held_(m_guestDeviceLock)
 void WslCoreVm::AddPlan9Share(
     _In_ PCWSTR AccessName, _In_ PCWSTR Path, [[maybe_unused]] _In_ UINT32 Port, _In_ hcs::Plan9ShareFlags Flags, _In_ HANDLE UserToken, _In_opt_ PCWSTR VirtIoTag)
 {
-    // N.B. The dynamic Plan 9 device callback model is not represented by
-    // IVirtualMachineBackend yet, so this WSL protocol path temporarily uses the HCS escape hatch.
-    const auto guestDeviceManager = static_cast<HcsVirtualMachineBackend&>(*m_backend).GetGuestDeviceManager();
-    bool addNewDevice = false;
-    wil::com_ptr<IPlan9FileSystem> server;
+    const auto serverFactory = [](HANDLE userToken) {
+        return wsl::windows::common::wslutil::CreateComServerAsUser<p9fs::Plan9FileSystem, IPlan9FileSystem>(userToken);
+    };
 
-    {
-        auto revert = wil::impersonate_token(UserToken);
-
-        // This is called from AddDrvFsShare, which is called from InitializeDrvFs, so m_guestDeviceLock is
-        // already held.
-
+    const auto& devices = m_backend->GetFileSystemDevices();
+    auto matchingDevice = std::find_if(devices.begin(), devices.end(), [&](const VmFileSystemDevice& device) {
         if (m_vmConfig.EnableVirtio9p)
         {
-            server = guestDeviceManager->GetRemoteFileSystem(__uuidof(p9fs::Plan9FileSystem), VirtIoTag);
+            const auto* virtio = std::get_if<VmPlan9VirtioDevice>(&device.Transport);
+            return virtio && virtio->Tag == VirtIoTag;
+        }
+
+        const auto* socket = std::get_if<VmPlan9SocketDevice>(&device.Transport);
+        return socket && socket->Port.Value == Port;
+    });
+
+    VmFileSystemDevice device;
+    if (matchingDevice == devices.end())
+    {
+        VmFileSystemDeviceRequest request{};
+        if (m_vmConfig.EnableVirtio9p)
+        {
+            request.Transport = VmPlan9VirtioDevice{
+                VirtIoTag ? VirtIoTag : L"",
+                __uuidof(p9fs::Plan9FileSystem),
+                VIRTIO_PLAN9_DEVICE_ID,
+                serverFactory,
+            };
         }
         else
         {
-            const auto existingServer = m_plan9Servers.find(Port);
-            if (existingServer != m_plan9Servers.end())
-            {
-                server = existingServer->second;
-            }
+            request.Transport = VmPlan9SocketDevice{GuestServicePort{Port}, serverFactory};
         }
 
-        if (!server)
-        {
-            server = wsl::windows::common::wslutil::CreateComServerAsUser<p9fs::Plan9FileSystem, IPlan9FileSystem>(UserToken);
-            if (m_vmConfig.EnableVirtio9p)
-            {
-                guestDeviceManager->AddRemoteFileSystem(__uuidof(p9fs::Plan9FileSystem), VirtIoTag, server);
-
-                // Start with one device to handle the first mount request. After
-                // each mount, the Plan9 file-system will request additional
-                // devices via the IPlan9FileSystemHost::NotifyAllDevicesInUse
-                // callback.
-                addNewDevice = true;
-            }
-            else
-            {
-                THROW_IF_FAILED(server->Init(&m_runtimeId, Port));
-                THROW_IF_FAILED(server->Resume());
-                m_plan9Servers.insert(std::make_pair(Port, server));
-            }
-        }
-
-        AddPlan9SharePath(server, AccessName, Path, static_cast<UINT32>(Flags));
+        device = m_backend->CreateFileSystemDevice(request);
     }
-
-    if (addNewDevice)
+    else
     {
-        // This requires more privileges than the user may have, so impersonation is disabled.
-        (void)guestDeviceManager->AddNewDevice(VIRTIO_PLAN9_DEVICE_ID, server, VirtIoTag);
+        device = *matchingDevice;
     }
+
+    VmFileSystemShareRequest request{};
+    request.HostPath = Path;
+    request.Name = AccessName;
+    request.ReadOnly = WI_IsFlagSet(Flags, hcs::Plan9ShareFlags::ReadOnly);
+    request.Options = VmPlan9ShareOptions{
+        WI_IsFlagSet(Flags, hcs::Plan9ShareFlags::LinuxMetadata),
+        WI_IsFlagSet(Flags, hcs::Plan9ShareFlags::CaseSensitive),
+        WI_IsFlagSet(Flags, hcs::Plan9ShareFlags::UseShareRootIdentity),
+        WI_IsFlagSet(Flags, hcs::Plan9ShareFlags::AllowOptions),
+        WI_IsFlagSet(Flags, hcs::Plan9ShareFlags::AllowSubPaths),
+    };
+    request.UserToken = wil::shared_handle{wsl::windows::common::wslutil::DuplicateHandle(UserToken)};
+    m_backend->AddFileSystemShare(device.Id, request);
 }
 
 ULONG WslCoreVm::AttachDisk(_In_ PCWSTR Disk, _In_ DiskType Type, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_ HANDLE UserToken)
@@ -1017,24 +997,6 @@ ULONG WslCoreVm::AttachDiskLockHeld(
 
     try
     {
-        auto found = m_attachedDisks.find({Type, Disk});
-        if (found != m_attachedDisks.end())
-        {
-            if (Type == DiskType::PassThrough)
-            {
-                THROW_HR_WITH_USER_ERROR(WSL_E_DISK_ALREADY_ATTACHED, Localization::MessageDiskAlreadyAttached(Disk));
-            }
-
-            THROW_HR_IF(WSL_E_USER_VHD_ALREADY_ATTACHED, found->first.User);
-            if (wsl::windows::common::disk::IsBackingVolumeMounted(found->second.BackingFile.get()))
-            {
-                return found->second.Lun;
-            }
-
-            m_backend->DetachDisk(found->second.BackendId);
-            m_attachedDisks.erase(found);
-        }
-
         VmDiskRequest request{};
         if (Type == DiskType::PassThrough)
         {
@@ -1071,13 +1033,11 @@ ULONG WslCoreVm::AttachDiskLockHeld(
         }
 
         const auto attachment = m_backend->AttachDisk(request);
-        wil::unique_hfile backingFile;
-        if (Type == DiskType::VHD)
-        {
-            backingFile = wsl::windows::common::disk::OpenVhdBackingFile(Disk);
-        }
-        m_attachedDisks.emplace(
-            AttachedDisk{Type, Disk, IsUserDisk}, DiskState{attachment.GuestAddress.Lun, {}, attachment.Id, std::move(backingFile)});
+        const auto attachedDisks = m_backend->GetAttachedDisks();
+        std::erase_if(m_diskMounts, [&](const auto& entry) {
+            return std::ranges::none_of(attachedDisks, [&](const VmDiskAttachment& disk) { return disk.Id.Value == entry.first; });
+        });
+        m_diskMounts.try_emplace(attachment.Id.Value);
         return attachment.GuestAddress.Lun;
     }
     catch (...)
@@ -1301,51 +1261,43 @@ wil::unique_socket WslCoreVm::CreateListeningSocket() const
 std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::DetachDisk(_In_opt_ PCWSTR Disk)
 {
     bool deleted = !ARGUMENT_PRESENT(Disk);
-    std::vector<AttachedDisk> selectedDisks;
 
-    auto diskMatches = [TargetPath = Disk](const AttachedDisk& disk) {
-        if (!disk.User)
+    auto diskMatches = [TargetPath = Disk](const VmDiskAttachment& disk) {
+        if (!disk.UserDisk)
         {
-            // Only user mounted disks can be detached
+            // Only user mounted disks can be detached.
             return false;
         }
 
-        if (disk.Type == DiskType::VHD)
+        if (!disk.PassThrough)
         {
-            // N.B. std::filesystem::equivalent can throw if the path is malformed so use the noexcept variant.
             std::error_code error{};
             return TargetPath == nullptr || std::filesystem::equivalent(disk.Path, TargetPath, error);
         }
-        else if (disk.Type == DiskType::PassThrough)
-        {
-            return TargetPath == nullptr || wsl::windows::common::string::IsPathComponentEqual(disk.Path, TargetPath);
-        }
 
-        return false;
+        return TargetPath == nullptr || wsl::windows::common::string::IsPathComponentEqual(disk.Path, TargetPath);
     };
 
     auto lock = m_lock.lock_exclusive();
-    for (auto it = m_attachedDisks.begin(); it != m_attachedDisks.end();)
+    for (const auto& disk : m_backend->GetAttachedDisks())
     {
-        if (diskMatches(it->first))
+        if (!diskMatches(disk))
         {
-            // Unmount any mounted volumes inside the utility VM.
-            const auto result = UnmountDisk(it->first, it->second);
+            continue;
+        }
+
+        if (const auto mountState = m_diskMounts.find(disk.Id.Value); mountState != m_diskMounts.end())
+        {
+            const auto result = UnmountDisk(disk, mountState->second);
             if (result.first != 0)
             {
                 return result;
             }
-
-            // The backend detaches the device and restores all host-side state it changed.
-            m_backend->DetachDisk(it->second.BackendId);
-
-            deleted = true;
-            it = m_attachedDisks.erase(it);
         }
-        else
-        {
-            ++it;
-        }
+
+        m_backend->DetachDisk(disk.Id);
+        m_diskMounts.erase(disk.Id.Value);
+        deleted = true;
     }
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), !deleted);
@@ -1362,19 +1314,21 @@ void WslCoreVm::EjectVhd(_In_ PCWSTR VhdPath)
 _Requires_lock_held_(m_lock)
 void WslCoreVm::EjectVhdLockHeld(_In_ PCWSTR VhdPath)
 {
-    const auto search = m_attachedDisks.find({DiskType::VHD, VhdPath});
-    if (search != m_attachedDisks.end())
+    const auto disks = m_backend->GetAttachedDisks();
+    const auto disk = std::find_if(disks.begin(), disks.end(), [VhdPath](const VmDiskAttachment& entry) {
+        return !entry.PassThrough && wsl::windows::common::string::IsPathComponentEqual(entry.Path, VhdPath);
+    });
+    if (disk != disks.end())
     {
         EJECT_VHD_MESSAGE message;
         message.Header.MessageSize = sizeof(message);
         message.Header.MessageType = LxMiniInitMessageEjectVhd;
-        message.Lun = search->second.Lun;
+        message.Lun = disk->GuestAddress.Lun;
         const auto& result = m_miniInitChannel.Transaction(message);
         LOG_HR_IF_MSG(E_UNEXPECTED, result.Result != 0, "VHD eject failed: %u", result.Result);
 
-        m_backend->DetachDisk(search->second.BackendId);
-
-        m_attachedDisks.erase(search);
+        m_backend->DetachDisk(disk->Id);
+        m_diskMounts.erase(disk->Id.Value);
     }
 }
 
@@ -1737,7 +1691,10 @@ bool WslCoreVm::IsDnsTunnelingSupported() const
 bool WslCoreVm::IsVhdAttached(_In_ PCWSTR VhdPath)
 {
     auto lock = m_lock.lock_exclusive();
-    return m_attachedDisks.contains({DiskType::VHD, VhdPath});
+    const auto attachedDisks = m_backend->GetAttachedDisks();
+    return std::any_of(attachedDisks.begin(), attachedDisks.end(), [VhdPath](const VmDiskAttachment& disk) {
+        return !disk.PassThrough && wsl::windows::common::string::IsPathComponentEqual(disk.Path.c_str(), VhdPath);
+    });
 }
 
 WslCoreVm::DiskMountResult WslCoreVm::MountDisk(
@@ -1750,15 +1707,21 @@ WslCoreVm::DiskMountResult WslCoreVm::MountDisk(
 WslCoreVm::DiskMountResult WslCoreVm::MountDiskLockHeld(
     _In_ PCWSTR Disk, _In_ DiskType MountDiskType, _In_ ULONG PartitionIndex, _In_opt_ PCWSTR Name, _In_opt_ PCWSTR Type, _In_opt_ PCWSTR Options)
 {
-    const auto it = m_attachedDisks.find({MountDiskType, Disk});
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), (it == m_attachedDisks.end()));
-    THROW_HR_IF(WSL_E_DISK_ALREADY_MOUNTED, it->second.Mounts.find(PartitionIndex) != it->second.Mounts.end());
+    const auto disks = m_backend->GetAttachedDisks();
+    const auto disk = std::find_if(disks.begin(), disks.end(), [&](const VmDiskAttachment& entry) {
+        return entry.PassThrough == (MountDiskType == DiskType::PassThrough) &&
+               wsl::windows::common::string::IsPathComponentEqual(entry.Path, Disk);
+    });
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), disk == disks.end());
+
+    auto& mountState = m_diskMounts[disk->Id.Value];
+    THROW_HR_IF(WSL_E_DISK_ALREADY_MOUNTED, mountState.Mounts.contains(PartitionIndex));
 
     // Get the name for the mountpoint
     auto targetName = s_GetMountTargetName(Disk, Name, PartitionIndex);
     auto targetNameWide = wsl::shared::string::MultiByteToWide(targetName);
     // For each attachedDisk pair
-    const auto nameCollision = std::any_of(m_attachedDisks.begin(), m_attachedDisks.end(), [&](const auto& diskEntry) {
+    const auto nameCollision = std::any_of(m_diskMounts.begin(), m_diskMounts.end(), [&](const auto& diskEntry) {
         // Check if the targetName matches the name of any Mount already present
         return (std::any_of(diskEntry.second.Mounts.begin(), diskEntry.second.Mounts.end(), [&](const auto& mountEntry) {
             return wsl::shared::string::IsEqual(mountEntry.second.Name, targetNameWide, false);
@@ -1770,7 +1733,7 @@ WslCoreVm::DiskMountResult WslCoreVm::MountDiskLockHeld(
 
     wsl::shared::MessageWriter<LX_MINI_INIT_MOUNT_MESSAGE> message(LxMiniInitMessageMount);
     message->PartitionIndex = PartitionIndex;
-    message->ScsiLun = it->second.Lun;
+    message->ScsiLun = disk->GuestAddress.Lun;
     message.WriteString(message->TypeOffset, Type);
     message.WriteString(message->TargetNameOffset, targetName);
     message.WriteString(message->OptionsOffset, Options);
@@ -1801,7 +1764,7 @@ WslCoreVm::DiskMountResult WslCoreVm::MountDiskLockHeld(
             mount.Options = Options;
         }
 
-        it->second.Mounts.emplace(PartitionIndex, std::move(mount));
+        mountState.Mounts.emplace(PartitionIndex, std::move(mount));
     }
 
     return {std::move(targetName), mountResult, step};
@@ -2190,26 +2153,30 @@ try
 {
     auto lock = m_lock.lock_exclusive();
     const auto key = wsl::windows::common::registry::OpenOrCreateLxssDiskMountsKey(&m_userSid.Sid);
-    for (const auto& e : m_attachedDisks)
+    for (const auto& disk : m_backend->GetAttachedDisks())
     {
-        if (e.first.User)
+        if (!disk.UserDisk)
         {
-            SaveDiskState(key.get(), e.first, e.second, e.first.Type);
+            continue;
         }
+
+        const auto mountState = m_diskMounts.find(disk.Id.Value);
+        SaveDiskState(key.get(), disk, mountState != m_diskMounts.end() ? mountState->second : DiskMountState{});
     }
 
     return;
 }
 CATCH_LOG()
 
-void WslCoreVm::SaveDiskState(_In_ HKEY Key, _In_ const AttachedDisk& Disk, _In_ const DiskState& State, _In_ const DiskType& SaveDiskType)
+void WslCoreVm::SaveDiskState(_In_ HKEY Key, _In_ const VmDiskAttachment& Disk, _In_ const DiskMountState& State)
 {
-    const auto keyPath = std::to_wstring(State.Lun);
+    const auto keyPath = std::to_wstring(Disk.GuestAddress.Lun);
     const auto diskKey = wsl::windows::common::registry::CreateKey(Key, keyPath.c_str(), KEY_ALL_ACCESS, nullptr, REG_OPTION_VOLATILE);
 
     wsl::windows::common::registry::WriteString(diskKey.get(), nullptr, c_diskValueName, Disk.Path.c_str());
 
-    wsl::windows::common::registry::WriteDword(diskKey.get(), nullptr, c_disktypeValueName, static_cast<DWORD>(SaveDiskType));
+    const auto diskType = Disk.PassThrough ? DiskType::PassThrough : DiskType::VHD;
+    wsl::windows::common::registry::WriteDword(diskKey.get(), nullptr, c_disktypeValueName, static_cast<DWORD>(diskType));
 
     for (const auto& e : State.Mounts)
     {
@@ -2230,12 +2197,12 @@ void WslCoreVm::SaveDiskState(_In_ HKEY Key, _In_ const AttachedDisk& Disk, _In_
     }
 }
 
-std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::UnmountDisk(_In_ const AttachedDisk& Disk, _Inout_ DiskState& State)
+std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::UnmountDisk(_In_ const VmDiskAttachment& Disk, _Inout_ DiskMountState& State)
 {
     // Iterate through the mountpoints to unmount and delete them
     for (auto it = State.Mounts.begin(); it != State.Mounts.end(); it = State.Mounts.erase(it))
     {
-        const auto result = UnmountVolume(Disk, it->first, it->second.Name.c_str());
+        const auto result = UnmountVolume(it->second.Name.c_str());
         if (result.first != 0)
         {
             return result;
@@ -2246,7 +2213,7 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::UnmountDisk(_In_ const AttachedDis
     LX_MINI_INIT_DETACH_MESSAGE message{};
     message.Header.MessageType = LxMiniInitMessageDetach;
     message.Header.MessageSize = sizeof(message);
-    message.ScsiLun = State.Lun;
+    message.ScsiLun = Disk.GuestAddress.Lun;
 
     auto transaction = m_miniInitChannel.StartTransaction();
     transaction.Send(message);
@@ -2258,7 +2225,7 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::UnmountDisk(_In_ const AttachedDis
     return GetMountResult(channel);
 }
 
-std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::UnmountVolume(_In_ const AttachedDisk& Disk, _In_ ULONG PartitionIndex, _In_ PCWSTR Name)
+std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::UnmountVolume(_In_ PCWSTR Name)
 {
     wsl::shared::MessageWriter<LX_MINI_INIT_UNMOUNT_MESSAGE> message(LxMiniInitMessageUnmount);
     message.WriteString(Name);
@@ -2277,35 +2244,32 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::UnmountVolume(_In_ const AttachedD
 _Requires_lock_held_(m_guestDeviceLock)
 void WslCoreVm::VerifyPlan9Servers()
 {
-    for (auto it = m_plan9Servers.begin(); it != m_plan9Servers.end();)
+    for (const auto& device : m_backend->GetFileSystemDevices())
     {
-        const HRESULT result = it->second->IsRunning();
-
-        // If the server process was terminated (which can happen e.g. if the user logged out and
-        // back in), attempting to make a COM call will return
-        // HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE). For this and other errors, remove the
-        // server from the list and mark DrvFs for that port uninitialized.
-        // N.B. The call will return S_FALSE if the server is not running. That should never
-        //      happen since this service never calls Pause(), but in case it does that is also
-        //      treated as an error.
-        if (result != S_OK)
+        const auto* socket = std::get_if<VmPlan9SocketDevice>(&device.Transport);
+        if (!socket)
         {
-            if (it->first == LX_INIT_UTILITY_VM_PLAN9_DRVFS_ADMIN_PORT)
+            continue;
+        }
+
+        if (socket->Port.Value != LX_INIT_UTILITY_VM_PLAN9_DRVFS_ADMIN_PORT && socket->Port.Value != LX_INIT_UTILITY_VM_PLAN9_DRVFS_PORT)
+        {
+            continue;
+        }
+
+        const auto status = m_backend->GetFileSystemDeviceStatus(device.Id);
+        if (status.State != VmFileSystemDeviceState::Serving)
+        {
+            m_backend->RemoveDevice(device.Id);
+            if (socket->Port.Value == LX_INIT_UTILITY_VM_PLAN9_DRVFS_ADMIN_PORT)
             {
                 m_adminDrvfsToken.reset();
             }
             else
             {
-                WI_ASSERT(it->first == LX_INIT_UTILITY_VM_PLAN9_DRVFS_PORT);
-
+                WI_ASSERT(socket->Port.Value == LX_INIT_UTILITY_VM_PLAN9_DRVFS_PORT);
                 m_drvfsToken.reset();
             }
-
-            it = m_plan9Servers.erase(it);
-        }
-        else
-        {
-            ++it;
         }
     }
 }
@@ -2453,26 +2417,6 @@ std::string WslCoreVm::s_GetMountTargetName(_In_ PCWSTR Disk, _In_opt_ PCWSTR Na
     }
 
     return target;
-}
-
-bool WslCoreVm::AttachedDisk::operator<(const AttachedDisk& other) const
-{
-    if (Type < other.Type)
-    {
-        return true;
-    }
-
-    if (Type == other.Type)
-    {
-        return _wcsicmp(Path.c_str(), other.Path.c_str()) < 0;
-    }
-
-    return false;
-}
-
-bool WslCoreVm::AttachedDisk::operator==(const AttachedDisk& other) const
-{
-    return Type == other.Type && wsl::windows::common::string::IsPathComponentEqual(Path, other.Path);
 }
 
 WslCoreVm::VirtioFsShare::VirtioFsShare(PCWSTR Path, PCWSTR Options, bool Admin) :

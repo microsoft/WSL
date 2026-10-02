@@ -341,11 +341,10 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
         scsi.Attachments[std::to_string(lun)] = std::move(attachment);
 
         const VmDiskAttachment diskAttachment{
-            {Request.Identity, configuration.NextDiskId}, {0, lun}, bootDisk.Disk.ReadOnly, bootDisk.Disk.UserDisk};
+            {Request.Identity, configuration.NextDiskId}, {0, lun}, bootDisk.Disk.ReadOnly, bootDisk.Disk.UserDisk, path, false};
         description.BootDisks.emplace(bootDisk.Key, diskAttachment);
         configuration.BootDisks.emplace(
-            diskAttachment.Id.Value,
-            AttachedDisk{diskAttachment, false, path, diskFlags, bootDisk.Disk.DeviceTimeout, std::move(backingFile)});
+            diskAttachment.Id.Value, AttachedDisk{diskAttachment, {diskFlags, bootDisk.Disk.DeviceTimeout, std::move(backingFile)}});
 
         ++configuration.NextDiskId;
     }
@@ -660,7 +659,7 @@ std::uint32_t HcsVirtualMachineBackend::ReserveLunLocked(const std::optional<VmS
     const auto lunInUse = [this](std::uint32_t Lun) {
         for (const auto& entry : m_attachedDisks)
         {
-            if (entry.second.Attachment.GuestAddress.Lun == Lun)
+            if (entry.second.GuestAddress.Lun == Lun)
             {
                 return true;
             }
@@ -702,7 +701,7 @@ void HcsVirtualMachineBackend::CleanupAttachedDisks(std::map<std::uint64_t, Atta
     for (const auto& entry : Disks)
     {
         const auto& disk = entry.second;
-        if (WI_IsFlagSet(disk.Flags, wsl::windows::common::disk::DiskStateFlags::AccessGranted))
+        if (WI_IsFlagSet(disk.Backend.Flags, wsl::windows::common::disk::DiskStateFlags::AccessGranted))
         {
             try
             {
@@ -711,11 +710,11 @@ void HcsVirtualMachineBackend::CleanupAttachedDisks(std::map<std::uint64_t, Atta
             CATCH_LOG()
         }
 
-        if (WI_IsFlagSet(disk.Flags, wsl::windows::common::disk::DiskStateFlags::Online))
+        if (WI_IsFlagSet(disk.Backend.Flags, wsl::windows::common::disk::DiskStateFlags::Online))
         {
             try
             {
-                wsl::windows::common::disk::BringOnline(disk.Path.c_str(), static_cast<size_t>(disk.DeviceTimeout.count()));
+                wsl::windows::common::disk::BringOnline(disk.Path.c_str(), static_cast<size_t>(disk.Backend.DeviceTimeout.count()));
             }
             CATCH_LOG()
         }
@@ -783,12 +782,12 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
         }
 
         // Prevent user from launching a distro vhd after manually mounting it; otherwise, return the attachment of the mounted disk.
-        THROW_HR_IF(WSL_E_USER_VHD_ALREADY_ATTACHED, found->second.Attachment.UserDisk);
+        THROW_HR_IF(WSL_E_USER_VHD_ALREADY_ATTACHED, found->second.UserDisk);
 
         // Check if the attachment is still valid. It could be stale if the backing volume is reattached.
-        if (wsl::windows::common::disk::IsBackingVolumeMounted(found->second.BackingFile.get()))
+        if (wsl::windows::common::disk::IsBackingVolumeMounted(found->second.Backend.BackingFile.get()))
         {
-            existingAttachment = found->second.Attachment;
+            existingAttachment = found->second;
             return;
         }
 
@@ -796,9 +795,9 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
             m_system.get(),
             m_vmIdString.c_str(),
             found->second.Path.c_str(),
-            found->second.Attachment.GuestAddress.Lun,
-            found->second.Flags,
-            static_cast<size_t>(found->second.DeviceTimeout.count()));
+            found->second.GuestAddress.Lun,
+            found->second.Backend.Flags,
+            static_cast<size_t>(found->second.Backend.DeviceTimeout.count()));
 
         m_attachedDisks.erase(found);
     });
@@ -845,9 +844,9 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
         }
     });
 
-    const VmDiskAttachment attachment{{m_configuration.Description.Identity, m_nextDiskId}, {0, lun}, Request.ReadOnly, Request.UserDisk};
-    m_attachedDisks.emplace(
-        attachment.Id.Value, AttachedDisk{attachment, passThrough, path, diskFlags, Request.DeviceTimeout, std::move(backingFile)});
+    const VmDiskAttachment attachment{
+        {m_configuration.Description.Identity, m_nextDiskId}, {0, lun}, Request.ReadOnly, Request.UserDisk, path, passThrough};
+    m_attachedDisks.emplace(attachment.Id.Value, AttachedDisk{attachment, {diskFlags, Request.DeviceTimeout, std::move(backingFile)}});
     ++m_nextDiskId;
     cleanup.release();
 
@@ -861,6 +860,18 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
         TraceLoggingValue(Request.ReadOnly, "readOnly"));
 
     return attachment;
+}
+
+std::vector<VmDiskAttachment> HcsVirtualMachineBackend::GetAttachedDisks() const
+{
+    auto lock = m_lock.lock_shared();
+    std::vector<VmDiskAttachment> disks;
+    disks.reserve(m_attachedDisks.size());
+    for (const auto& entry : m_attachedDisks)
+    {
+        disks.push_back(entry.second);
+    }
+    return disks;
 }
 
 void HcsVirtualMachineBackend::DetachDisk(VmDiskId Disk)
@@ -889,16 +900,16 @@ void HcsVirtualMachineBackend::DetachDisk(VmDiskId Disk)
         m_system.get(),
         m_vmIdString.c_str(),
         disk->second.Path.c_str(),
-        disk->second.Attachment.GuestAddress.Lun,
-        disk->second.Flags,
-        static_cast<size_t>(disk->second.DeviceTimeout.count()));
+        disk->second.GuestAddress.Lun,
+        disk->second.Backend.Flags,
+        static_cast<size_t>(disk->second.Backend.DeviceTimeout.count()));
 
     WSL_LOG(
         "HcsDetachDiskEnd",
         TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
         TraceLoggingValue(Disk.Value, "diskId"),
-        TraceLoggingValue(disk->second.Attachment.GuestAddress.Controller, "controller"),
-        TraceLoggingValue(disk->second.Attachment.GuestAddress.Lun, "lun"),
+        TraceLoggingValue(disk->second.GuestAddress.Controller, "controller"),
+        TraceLoggingValue(disk->second.GuestAddress.Lun, "lun"),
         TraceLoggingValue(disk->second.PassThrough, "passThrough"));
 
     m_attachedDisks.erase(disk);
@@ -909,9 +920,9 @@ void HcsVirtualMachineBackend::CloseGuestDevicesLocked() noexcept
 {
     for (const auto& entry : m_fileSystemDevices)
     {
-        if (entry.second.Plan9Server)
+        if (entry.second.Backend.Plan9Server)
         {
-            LOG_IF_FAILED(entry.second.Plan9Server->Teardown());
+            LOG_IF_FAILED(entry.second.Backend.Plan9Server->Teardown());
         }
     }
 
@@ -1149,17 +1160,29 @@ VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFile
     return device;
 }
 
+std::vector<VmFileSystemDevice> HcsVirtualMachineBackend::GetFileSystemDevices() const
+{
+    auto lock = m_lock.lock_shared();
+    std::vector<VmFileSystemDevice> devices;
+    devices.reserve(m_fileSystemDevices.size());
+    for (const auto& entry : m_fileSystemDevices)
+    {
+        devices.push_back(entry.second);
+    }
+    return devices;
+}
+
 VmFileSystemDevice HcsVirtualMachineBackend::GetFileSystemDeviceStatus(VmDeviceId Device)
 {
     validation::ValidateResourceId(Device, m_configuration.Description.Identity);
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
     const auto device = FindFileSystemDeviceLocked(Device);
-    if (device->second.Plan9Server && device->second.Plan9Server->IsRunning() != S_OK)
+    if (device->second.Backend.Plan9Server && device->second.Backend.Plan9Server->IsRunning() != S_OK)
     {
         device->second.Device.State = VmFileSystemDeviceState::Unavailable;
     }
-    else if (device->second.Plan9Server)
+    else if (device->second.Backend.Plan9Server)
     {
         device->second.Device.State = VmFileSystemDeviceState::Serving;
     }
@@ -1263,7 +1286,7 @@ std::wstring HcsVirtualMachineBackend::AddPlan9ShareLocked(
     const FileSystemDevice& Device, const VmFileSystemShareRequest& Request, HANDLE UserToken, const std::wstring& HostPath) const
 {
     const auto flags = GetPlan9ShareFlags(Request);
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !Device.Plan9Server);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !Device.Backend.Plan9Server);
 
     // Allow the Plan 9 server to create NT symlinks.
     //
@@ -1273,7 +1296,7 @@ std::wstring HcsVirtualMachineBackend::AddPlan9ShareLocked(
 
     auto accessName = Request.Name.empty() ? GenerateShareName() : Request.Name;
     auto runAsUser = wil::impersonate_token(UserToken);
-    AddPlan9SharePath(Device.Plan9Server, accessName.c_str(), HostPath.c_str(), static_cast<UINT32>(flags));
+    AddPlan9SharePath(Device.Backend.Plan9Server, accessName.c_str(), HostPath.c_str(), static_cast<UINT32>(flags));
 
     return accessName;
 }
@@ -1281,10 +1304,10 @@ std::wstring HcsVirtualMachineBackend::AddPlan9ShareLocked(
 _Requires_lock_held_(m_lock)
 void HcsVirtualMachineBackend::RemovePlan9ShareLocked(const FileSystemDevice& Device, const std::wstring& AccessName, HANDLE UserToken) const
 {
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !Device.Plan9Server);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !Device.Backend.Plan9Server);
 
     auto runAsUser = wil::impersonate_token(UserToken);
-    THROW_IF_FAILED(Device.Plan9Server->RemoveShare(AccessName.c_str()));
+    THROW_IF_FAILED(Device.Backend.Plan9Server->RemoveShare(AccessName.c_str()));
 }
 
 VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device, const VmFileSystemShareRequest& Request)
@@ -1579,8 +1602,16 @@ void HcsVirtualMachineBackend::RemoveDevice(VmDeviceId Device)
     const auto device = m_fileSystemDevices.find(Device.Value);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), device == m_fileSystemDevices.end());
     const auto hasShares =
-        std::ranges::any_of(m_fileSystemShares, [&](const auto& entry) { return entry.second.Share.Device.Value == Device.Value; });
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_BUSY), hasShares);
+        std::ranges::any_of(m_fileSystemShares, [&](const auto& entry) { return entry.second.Device.Value == Device.Value; });
+    const bool unavailablePlan9 = device->second.State == VmFileSystemDeviceState::Unavailable &&
+                                  (std::holds_alternative<VmPlan9SocketDevice>(device->second.Transport) ||
+                                   std::holds_alternative<VmPlan9VirtioDevice>(device->second.Transport));
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_BUSY), hasShares && !unavailablePlan9);
+
+    if (unavailablePlan9)
+    {
+        std::erase_if(m_fileSystemShares, [&](const auto& entry) { return entry.second.Device.Value == Device.Value; });
+    }
 
     std::visit(
         Overloaded{
@@ -1598,9 +1629,16 @@ void HcsVirtualMachineBackend::RemoveDevice(VmDeviceId Device)
                 m_guestDeviceManager->RemoveRemoteFileSystem(transport.FileSystemClassId, transport.Tag);
             },
             [&](const VmPlan9SocketDevice&) {
-                if (device->second.Plan9Server)
+                if (device->second.Backend.Plan9Server)
                 {
-                    THROW_IF_FAILED(device->second.Plan9Server->Teardown());
+                    if (unavailablePlan9)
+                    {
+                        LOG_IF_FAILED(device->second.Backend.Plan9Server->Teardown());
+                    }
+                    else
+                    {
+                        THROW_IF_FAILED(device->second.Backend.Plan9Server->Teardown());
+                    }
                 }
             },
             [&](const VmPlan9HostedDevice&) {}},
@@ -1627,10 +1665,10 @@ wil::com_ptr<IWslVirtioNetDevice> HcsVirtualMachineBackend::GetUserModeNatDevice
     // addresses and name resolution for the adapter. Only a user-mode NAT exposes them to the backend.
     THROW_HR_IF_MSG(
         c_notSupported,
-        !std::holds_alternative<VmUserModeNatNetwork>(adapter->second.Attachment.EffectiveConfiguration),
+        !std::holds_alternative<VmUserModeNatNetwork>(adapter->second.EffectiveConfiguration),
         "The adapter is not served by a user-mode NAT");
 
-    auto device = m_guestDeviceManager->GetVirtioNetDevice(adapter->second.Attachment.Tag.c_str());
+    auto device = m_guestDeviceManager->GetVirtioNetDevice(adapter->second.Tag.c_str());
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), !device);
     return device;
 }
@@ -1658,10 +1696,10 @@ VmNetworkAttachment HcsVirtualMachineBackend::AddNetworkAdapter(const VmNetworkA
     const VmNetworkAttachment* existingAttachment = nullptr;
     for (const auto& [_, adapter] : m_networkAdapters)
     {
-        bool duplicate = adapter.Attachment.Tag == Request.Tag;
+        bool duplicate = adapter.Tag == Request.Tag;
         if (requestedHostEndpoint != nullptr)
         {
-            const auto* existingHostEndpoint = std::get_if<VmHostEndpointNetwork>(&adapter.Attachment.EffectiveConfiguration);
+            const auto* existingHostEndpoint = std::get_if<VmHostEndpointNetwork>(&adapter.EffectiveConfiguration);
             duplicate = duplicate || (existingHostEndpoint != nullptr &&
                                       (IsEqualGUID(existingHostEndpoint->EndpointId, requestedHostEndpoint->EndpointId) ||
                                        IsEqualGUID(existingHostEndpoint->InstanceId, requestedHostEndpoint->InstanceId)));
@@ -1674,9 +1712,9 @@ VmNetworkAttachment HcsVirtualMachineBackend::AddNetworkAdapter(const VmNetworkA
 
         THROW_HR_IF_MSG(
             E_INVALIDARG,
-            existingAttachment != nullptr && existingAttachment->Id.Value != adapter.Attachment.Id.Value,
+            existingAttachment != nullptr && existingAttachment->Id.Value != adapter.Id.Value,
             "The network adapter request identifies more than one existing adapter");
-        existingAttachment = &adapter.Attachment;
+        existingAttachment = &adapter;
     }
 
     if (existingAttachment != nullptr)
@@ -1785,8 +1823,8 @@ void HcsVirtualMachineBackend::UpdateNetworkAdapter(VmDeviceId Device, const VmN
     THROW_IF_FAILED(device->Update(
         const_cast<WslVirtioNetConfig*>(&configuration->Configuration), gsl::narrow_cast<UINT32>(configuration->Nameservers.size()), nameservers));
 
-    adapter->second.Attachment.EffectiveConfiguration = Configuration;
-    m_configuration.Description.NetworkAdapters[adapter->second.Attachment.Tag] = adapter->second.Attachment;
+    adapter->second.EffectiveConfiguration = Configuration;
+    m_configuration.Description.NetworkAdapters[adapter->second.Tag] = adapter->second;
 
     WSL_LOG(
         "HcsUpdateNetworkAdapterEnd",
@@ -1796,7 +1834,7 @@ void HcsVirtualMachineBackend::UpdateNetworkAdapter(VmDeviceId Device, const VmN
 
 void HcsVirtualMachineBackend::RemoveNetworkAdapterLocked(std::map<std::uint64_t, NetworkAdapter>::iterator Adapter)
 {
-    const auto& attachment = Adapter->second.Attachment;
+    const auto& attachment = Adapter->second;
     std::visit(
         Overloaded{
             [&](const VmHostEndpointNetwork& configuration) {
@@ -1859,11 +1897,11 @@ void HcsVirtualMachineBackend::CloseNetworkAdaptersLocked() noexcept
     // outlive it, have to be torn down.
     for (const auto& entry : m_networkAdapters)
     {
-        if (std::holds_alternative<VmUserModeNatNetwork>(entry.second.Attachment.EffectiveConfiguration) && m_guestDeviceManager)
+        if (std::holds_alternative<VmUserModeNatNetwork>(entry.second.EffectiveConfiguration) && m_guestDeviceManager)
         {
             try
             {
-                if (auto device = m_guestDeviceManager->GetVirtioNetDevice(entry.second.Attachment.Tag.c_str()))
+                if (auto device = m_guestDeviceManager->GetVirtioNetDevice(entry.second.Tag.c_str()))
                 {
                     LOG_IF_FAILED(device->Teardown());
                 }
@@ -1913,7 +1951,7 @@ VmPortBinding HcsVirtualMachineBackend::BindPort(VmDeviceId Device, const VmPort
     binding.GuestPort = Request.GuestPort;
     // A zero listen port asks the relay to allocate one, so report the port it actually listens on.
 
-    const auto inserted = m_portBindings.emplace(binding.Id.Value, PortBinding{binding, adapter->second.Attachment.Tag}).second;
+    const auto inserted = m_portBindings.emplace(binding.Id.Value, PortBinding{binding, adapter->second.Tag}).second;
     WI_ASSERT(inserted);
     ++m_nextPortBindingId;
 
