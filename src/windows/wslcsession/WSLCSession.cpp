@@ -506,6 +506,9 @@ try
     m_networkEventTracking = m_runtime.Events().RegisterNetworkUpdates(std::bind(
         &WSLCSession::OnNetworkEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 
+    m_containerActionTracking = m_runtime.Events().RegisterContainerActions(std::bind(
+        &WSLCSession::OnContainerAction, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
+
     return S_OK;
 }
 CATCH_RETURN()
@@ -2571,6 +2574,18 @@ void WSLCSession::OnNetworkEvent(
 try
 {
     m_eventStore.Record("network", std::string{Action}, NetworkId, Attributes, TimeNano);
+}
+CATCH_LOG()
+
+void WSLCSession::OnContainerAction(
+    const std::string& ContainerId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t TimeNano) noexcept
+try
+{
+    auto attributes = WSLCContainerImpl::GetEventAttributes(Attributes);
+    if (attributes.has_value())
+    {
+        m_eventStore.Record("container", std::string{Action}, ContainerId, std::move(attributes.value()), TimeNano);
+    }
 }
 CATCH_LOG()
 

@@ -144,7 +144,7 @@ class WSLCE2EEventsTests
         const auto until = EpochSeconds() + 1;
         result = RunWslc(std::format(
             L"events --since {} --until {} --filter type=container --filter container={} --filter image={} "
-            L"--filter event=create --filter event=start --filter event=stop --filter event=destroy",
+            L"--filter event=create --filter event=start --filter event=die --filter event=destroy",
             since,
             until,
             containerId,
@@ -155,9 +155,22 @@ class WSLCE2EEventsTests
         VERIFY_ARE_EQUAL(4u, lines.size());
         VerifyEventLine(lines[0], std::format(L" container create {} (image={}, name={})", containerId, DebianImage.NameAndTag(), c_eventContainerName));
         VerifyEventLine(lines[1], std::format(L" container start {} (image={}, name={})", containerId, DebianImage.NameAndTag(), c_eventContainerName));
+
+        // execDuration is how long the container ran, so it's read from the line rather than predicted.
+        const auto execDurationStart = lines[2].find(L"execDuration=");
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, execDurationStart);
+        const auto execDurationValueStart = execDurationStart + wcslen(L"execDuration=");
+        const auto execDuration =
+            lines[2].substr(execDurationValueStart, lines[2].find(L',', execDurationValueStart) - execDurationValueStart);
         VerifyEventLine(
             lines[2],
-            std::format(L" container stop {} (exitCode={}, image={}, name={})", containerId, 128 + WSLCSignalSIGKILL, DebianImage.NameAndTag(), c_eventContainerName));
+            std::format(
+                L" container die {} (execDuration={}, exitCode={}, image={}, name={})",
+                containerId,
+                execDuration,
+                128 + WSLCSignalSIGKILL,
+                DebianImage.NameAndTag(),
+                c_eventContainerName));
         VerifyEventLine(lines[3], std::format(L" container destroy {} (image={}, name={})", containerId, DebianImage.NameAndTag(), c_eventContainerName));
     }
 
@@ -168,16 +181,29 @@ class WSLCE2EEventsTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto containerId = result.GetStdoutOneLine();
 
+        result = RunWslc(std::format(L"container start {}", containerId));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container kill {}", containerId));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
         result = RunWslc(std::format(L"container rm {}", containerId));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"events --since {} --until {} --filter container={} --format json", since, EpochSeconds() + 1, containerId));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
+        const std::vector<std::string> expectedActions{"create", "start", "kill", "die", "destroy"};
         const auto events = ParseNdjsonOutput(result);
-        VERIFY_ARE_EQUAL(2u, events.size());
-        VERIFY_ARE_EQUAL(std::string{"create"}, events[0].at("Action").get<std::string>());
-        VERIFY_ARE_EQUAL(std::string{"destroy"}, events[1].at("Action").get<std::string>());
+        VERIFY_ARE_EQUAL(expectedActions.size(), events.size());
+
+        for (size_t i = 0; i < events.size(); ++i)
+        {
+            VERIFY_ARE_EQUAL(expectedActions[i], events[i].at("Action").get<std::string>());
+        }
+
+        VERIFY_ARE_EQUAL(std::to_string(128 + WSLCSignalSIGKILL), events[3].at("Actor").at("Attributes").at("exitCode").get<std::string>());
+        VERIFY_IS_TRUE(events[3].at("Actor").at("Attributes").contains("execDuration"));
 
         for (const auto& event : events)
         {
@@ -223,10 +249,8 @@ class WSLCE2EEventsTests
             }
         });
 
-        const auto expectedEvent = [&](std::wstring_view action, std::optional<int> exitCode = std::nullopt) {
-            const auto exitCodeAttribute = exitCode.has_value() ? std::format(L"exitCode={}, ", exitCode.value()) : std::wstring{};
-            return std::format(
-                L" container {} {} ({}image={}, name={})", action, containerId, exitCodeAttribute, DebianImage.NameAndTag(), c_eventContainerName);
+        const auto expectedEvent = [&](std::wstring_view action) {
+            return std::format(L" container {} {} (image={}, name={})", action, containerId, DebianImage.NameAndTag(), c_eventContainerName);
         };
 
         const auto createEvent = expectedEvent(L"create");
@@ -247,7 +271,7 @@ class WSLCE2EEventsTests
         VerifyContainerIsListed(containerId, L"running");
 
         RunWslc(std::format(L"container stop {} -t 0", containerId)).Verify({.Stderr = L"", .ExitCode = 0});
-        const auto stopEvent = expectedEvent(L"stop", 128 + WSLCSignalSIGKILL);
+        const auto stopEvent = expectedEvent(L"stop");
         WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(stopEvent));
         VerifyContainerIsListed(containerId, L"exited");
 
@@ -284,13 +308,7 @@ class WSLCE2EEventsTests
             const auto& attributes = event.at("Actor").at("Attributes");
             VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(c_eventContainerName), attributes.at("name").get<std::string>());
             VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(DebianImage.NameAndTag()), attributes.at("image").get<std::string>());
-
-            const bool stopped = expectedActions[index] == "stop";
-            VERIFY_ARE_EQUAL(stopped, attributes.contains("exitCode"));
-            if (stopped)
-            {
-                VERIFY_ARE_EQUAL(std::to_string(128 + WSLCSignalSIGKILL), attributes.at("exitCode").get<std::string>());
-            }
+            VERIFY_IS_FALSE(attributes.contains("exitCode"));
 
             VERIFY_ARE_EQUAL(event.at("Action").get<std::string>(), event.at("status").get<std::string>());
 
