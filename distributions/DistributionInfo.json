@@ -95,6 +95,34 @@
                 }
             }
         ],
+        "RLCPlus": [
+            {
+                "Name": "RLCPlus-9",
+                "FriendlyName": "Rocky Linux Plus 9 (CIQ)",
+                "Default": false,
+                "Amd64Url": {
+                    "Url": "https://github.com/ctrliq/rlcplus-wsl-images/releases/download/v20260812/RLCPlus-9-WSL-9-20260812.0.x86_64.wsl",
+                    "Sha256": "202ba60ac09205b3bb574f69bcad69c5c2463fd243019fc1067437a4bc9af939"
+                },
+                "Arm64Url": {
+                    "Url": "https://github.com/ctrliq/rlcplus-wsl-images/releases/download/v20260812/RLCPlus-9-WSL-9-20260812.0.aarch64.wsl",
+                    "Sha256": "5b24a384fdfbf004e75441d5e7ade4ef9579e52d58223741b195c41075a28b1b"
+                }
+            },
+            {
+                "Name": "RLCPlus-10",
+                "FriendlyName": "Rocky Linux Plus 10 (CIQ)",
+                "Default": true,
+                "Amd64Url": {
+                    "Url": "https://github.com/ctrliq/rlcplus-wsl-images/releases/download/v20260812/RLCPlus-10-WSL-10-20260812.0.x86_64.wsl",
+            "Sha256": "2b181172c9aa3160a803d5ecaee517d237f59b41eb21848ee60699b89d5b8d84"
+        },
+        "Arm64Url": {
+            "Url": "https://github.com/ctrliq/rlcplus-wsl-images/releases/download/v20260812/RLCPlus-10-WSL-10-20260812.0.aarch64.wsl",
+            "Sha256": "b87c820232b2ce1b76be3643be615c4fee7ebc6bb31de4ac222d52b58d9cdd67"
+        }
+    }
+],
         "SUSE": [
             {
                 "Name": "SUSE-Linux-Enterprise-15-SP7",
