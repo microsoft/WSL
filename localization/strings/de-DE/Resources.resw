@@ -132,6 +132,7 @@
     "DNS"     — Domain Name System. Do not translate (protocol acronym).
     "proxy"   — Network proxy server. Translate per locale standard networking term.
     "safe mode" — Minimal/diagnostic startup mode. Use standard OS term per locale.
+    "image"   — A container image, as in Docker. Not a picture or photo.
   -->
   <data name="AppName" xml:space="preserve">
     <value>Windows-Subsystem für Linux</value>
@@ -1197,11 +1198,9 @@ Wenn dieser Fehler unerwartet war, suchen Sie nach vorhandenen Problemen, oder e
     <value>Aufgrund eines aktuellen Kompatibilitätsproblems mit dem globalen Client für sicheren Zugriff ist DNS-Tunneling deaktiviert.</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
-  <data name="MessageSparseVhdDisabled" xml:space="preserve">
-    <value>Die Unterstützung von Sparse VHD ist derzeit wegen möglicher Datenbeschädigung deaktiviert.
-Um eine Distribution zu zwingen, eine spärliche VHD zu verwenden, führen Sie bitte Folgendes aus:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
+  <data name="MessageSparseVhdUnsafe" xml:space="preserve">
+    <value>Sparse VHDs sind derzeit experimentell. Wenn unerwartetes Verhalten auftritt, melden Sie ein Problem unter https://github.com/microsoft/WSL.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale. {Locked="https://github.com/microsoft/WSL"}The URL should not be translated.</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>Fehler beim Bereitstellen von {}. Weitere Informationen finden Sie in der DMESG.</value>
@@ -2420,7 +2419,7 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
   </data>
   <data name="MessageWslcInvalidImage" xml:space="preserve">
     <value>Ungültiges Bild: „{}“</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="MessageWslcInvalidFilter" xml:space="preserve">
     <value>Ungültiger Filter: „{}“</value>
@@ -2852,12 +2851,14 @@ Beispiel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImageImportDesc" xml:space="preserve">
     <value>Ein Image aus einem Tarball importieren.</value>
+    <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
     <value>Importiert den Inhalt eines Tarballs, um ein Dateisystem-Image zu erstellen. Markieren Sie das Image optional mit einem Repository und einem Tagnamen.</value>
   </data>
   <data name="WSLCCLI_ImageListAllArgDescription" xml:space="preserve">
     <value>Alle Bilder anzeigen (standardmäßig werden Zwischenbilder ausgeblendet).</value>
+    <comment>"Images" means container images, as in Docker, not pictures or photos.</comment>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>Bilder auflisten.</value>
@@ -2889,6 +2890,7 @@ Beispiel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImagePruneDeletedHeader" xml:space="preserve">
     <value>Gelöschte Bilder:</value>
+    <comment>"Images" means container images, as in Docker, not pictures or photos.</comment>
   </data>
   <data name="WSLCCLI_ImagePruneDesc" xml:space="preserve">
     <value>Nicht verwendete Images entfernen.</value>
@@ -3464,6 +3466,7 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   </data>
   <data name="WSLCCLI_PullAllTagsArgDescription" xml:space="preserve">
     <value>Laden Sie alle markierten Images im Repository herunter.</value>
+    <comment>"Images" means container images, as in Docker, not pictures or photos.</comment>
   </data>
   <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
     <value>Ausführliche Ausgabe unterdrücken</value>
@@ -3704,11 +3707,11 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   </data>
   <data name="WSLCCLI_ImageLoaded" xml:space="preserve">
     <value>Geladenes Bild: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="WSLCCLI_ImageLoadedId" xml:space="preserve">
     <value>Geladene Bild-ID: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
     <value>Netzwerke verwalten.</value>
@@ -3915,6 +3918,7 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   </data>
   <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
     <value>BILD</value>
+    <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="WSLCCLI_TableHeaderCreated" xml:space="preserve">
     <value>ERSTELLT</value>
@@ -4078,6 +4082,7 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>Fehler beim Parsen des Bildimportfortschritts</value>
+    <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="MessageWslcVolumeUnmountFailed" xml:space="preserve">
     <value>Fehler beim Aufheben der Einbindung des Volumes „{}“: {}</value>
