@@ -7505,8 +7505,8 @@ class WSLCTests
         auto marker = launcher.Launch(*m_defaultSession);
         const auto markerId = marker.Id();
 
-        auto runResult =
-            ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "run", "-d", "debian:latest", "sleep", "99999"}, 0);
+        auto runResult = ExpectCommandResult(
+            m_defaultSession.get(), {"/usr/bin/docker", "run", "-d", "--rm", "debian:latest", "sleep", "99999"}, 0);
         auto externalId = runResult.Output[1];
         while (!externalId.empty() && (externalId.back() == '\n' || externalId.back() == '\r'))
         {
