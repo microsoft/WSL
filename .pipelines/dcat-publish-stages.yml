@@ -1,0 +1,83 @@
+parameters:
+  - name: platforms
+    type: object
+    default: [x64, arm64]
+
+  - name: isProduction
+    type: boolean
+
+  - name: dcat
+    type: object
+
+stages:
+  # Internal ring. Runs automatically.
+  - stage: dcat_internal
+    displayName: DCAT - internal ring
+    dependsOn: []
+    jobs:
+      - template: dcat-submit-job.yml
+        parameters:
+          name: submit_msflight
+          displayName: Submit MSFlight content
+          distributionIntent: MSFlight
+          platforms: ${{ parameters.platforms }}
+          isProduction: ${{ parameters.isProduction }}
+          dcat: ${{ parameters.dcat }}
+
+      - template: dcat-audience-job.yml
+        parameters:
+          name: add_internal_audience
+          displayName: Add internal audience
+          audience: Internal
+          dependsOn: [submit_msflight]
+          platforms: ${{ parameters.platforms }}
+          isProduction: ${{ parameters.isProduction }}
+          dcat: ${{ parameters.dcat }}
+
+  # Preview ring.
+  - template: publish-gate-stage.yml
+    parameters:
+      name: gate_preview
+      displayName: Gate - preview ring
+
+  - stage: dcat_preview
+    displayName: DCAT - preview ring
+    dependsOn: [gate_preview, dcat_internal]
+    jobs:
+      - template: dcat-submit-job.yml
+        parameters:
+          name: submit_external
+          displayName: Submit External content
+          distributionIntent: External
+          platforms: ${{ parameters.platforms }}
+          isProduction: ${{ parameters.isProduction }}
+          dcat: ${{ parameters.dcat }}
+
+      - template: dcat-audience-job.yml
+        parameters:
+          name: add_insider_audience
+          displayName: Add insider audience
+          audience: Insider
+          dependsOn: [submit_external]
+          platforms: ${{ parameters.platforms }}
+          isProduction: ${{ parameters.isProduction }}
+          dcat: ${{ parameters.dcat }}
+
+  - template: publish-gate-stage.yml
+    parameters:
+      name: gate_broad
+      displayName: Gate - broad ring
+
+  # Public release.
+  - stage: dcat_broad
+    displayName: DCAT - broad ring
+    dependsOn: [gate_broad, dcat_preview]
+    jobs:
+      - template: dcat-audience-job.yml
+        parameters:
+          name: add_public_audience
+          displayName: Add public audience
+          audience: Public
+          platforms: ${{ parameters.platforms }}
+          isProduction: ${{ parameters.isProduction }}
+          dcat: ${{ parameters.dcat }}

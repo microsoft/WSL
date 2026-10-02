@@ -1,0 +1,64 @@
+parameters:
+  - name: name
+    type: string
+
+  - name: displayName
+    type: string
+
+  - name: audience
+    type: string
+    values:
+      - Internal
+      - Insider
+      - Public
+
+  - name: dependsOn
+    type: object
+    default: []
+
+  - name: platforms
+    type: object
+    default: [x64, arm64]
+
+  - name: isProduction
+    type: boolean
+
+  - name: dcat
+    type: object
+
+jobs:
+  - job: ${{ parameters.name }}
+    displayName: ${{ parameters.displayName }}
+    dependsOn: ${{ parameters.dependsOn }}
+    pool:
+      name: Azure-Pipelines-1ESPT-ExDShared-StaticIP
+      image: windows-2022
+      os: windows
+
+    variables:
+      dcatSubmissionPath: $(Pipeline.Workspace)\dcat
+
+    templateContext:
+      type: releaseJob
+      isProduction: ${{ parameters.isProduction }}
+      inputs:
+        - input: pipelineArtifact
+          pipeline: releaseBuild
+          artifactName: drop_wsl_dcat
+          targetPath: $(Pipeline.Workspace)\dcat
+
+    steps:
+      - checkout: none
+
+      - ${{ each platform in parameters.platforms }}:
+          - task: dcat-publishing@1
+            displayName: Add ${{ parameters.audience }} audience (${{ platform }})
+            inputs:
+              serviceConnectionId: ${{ parameters.dcat.serviceConnection }}
+              tenantId: ${{ parameters.dcat.tenantId }}
+              clientId: ${{ parameters.dcat.clientId }}
+              environment: ${{ parameters.dcat.environment }}
+              action: add
+              publisher: ${{ parameters.dcat.publisher }}
+              metadataFile: $(dcatSubmissionPath)\add-audience-${{ parameters.audience }}-${{ platform }}.json
+              pollingEnabled: false

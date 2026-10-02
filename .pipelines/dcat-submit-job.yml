@@ -1,0 +1,115 @@
+parameters:
+  - name: name
+    type: string
+
+  - name: displayName
+    type: string
+
+  - name: distributionIntent
+    type: string
+    values:
+      - MSFlight
+      - External
+
+  - name: dependsOn
+    type: object
+    default: []
+
+  - name: platforms
+    type: object
+    default: [x64, arm64]
+
+  - name: isProduction
+    type: boolean
+
+  - name: dcat
+    type: object
+
+jobs:
+  - job: ${{ parameters.name }}
+    displayName: ${{ parameters.displayName }}
+    dependsOn: ${{ parameters.dependsOn }}
+    timeoutInMinutes: 30
+    pool:
+      name: Azure-Pipelines-1ESPT-ExDShared-StaticIP
+      image: windows-2022
+      os: windows
+
+    variables:
+      dcatSubmissionPath: $(Pipeline.Workspace)\dcat
+      dcatContentPath: $(Pipeline.Workspace)\dcat-content
+
+    templateContext:
+      type: releaseJob
+      isProduction: ${{ parameters.isProduction }}
+      inputs:
+        - input: pipelineArtifact
+          pipeline: releaseBuild
+          artifactName: drop_wsl_dcat
+          targetPath: $(Pipeline.Workspace)\dcat
+
+        # The build artifacts are large, so only pull the CABs that are actually submitted.
+        - input: pipelineArtifact
+          pipeline: releaseBuild
+          artifactName: drop_wsl_build
+          targetPath: $(Pipeline.Workspace)\drop_x64
+          itemPattern: bundle/*.cab
+
+        - input: pipelineArtifact
+          pipeline: releaseBuild
+          artifactName: drop_wsl_build_arm64
+          targetPath: $(Pipeline.Workspace)\drop_arm64
+          itemPattern: bundle/*.cab
+
+    steps:
+      - checkout: none
+
+      - pwsh: |
+          # Surface the version being published as the run name. The version is extracted from the CAB file name.
+          $anyCab = Get-ChildItem -Path '$(Pipeline.Workspace)' -Recurse -Filter '*.cab' | Select-Object -First 1
+          if (-not $anyCab) {
+              throw 'No CAB file found in downloaded artifacts.'
+          }
+          if ($anyCab.Name -notmatch '^wsl\.(?<version>[\d.]+)\.(x64|arm64)\.cab$') {
+              throw "Unrecognized CAB file name '$($anyCab.Name)'."
+          }
+          Write-Host "##vso[build.updatebuildnumber]$($Matches.version)"
+        displayName: Determine published version
+
+      - ${{ each platform in parameters.platforms }}:
+          - pwsh: |
+              New-Item -ItemType Directory -Path '$(dcatContentPath)' -Force | Out-Null
+
+              $cabs = @(Get-ChildItem -Path '$(Pipeline.Workspace)\drop_${{ platform }}\bundle' -Filter '*.cab')
+              if ($cabs.Count -ne 1) {
+                  throw "Expected exactly one ${{ platform }} CAB file, found $($cabs.Count)."
+              }
+              Copy-Item $cabs[0].FullName '$(dcatContentPath)'
+
+              # The submission metadata embeds the absolute CAB path from the agent that generated it,
+              # which isn't valid on this agent. Rewrite it to the CAB file staged above.
+              $submissionFile = '$(dcatSubmissionPath)\submit-${{ parameters.distributionIntent }}-${{ platform }}.json'
+              $stagedPath = (Join-Path '$(dcatContentPath)' $cabs[0].Name) -replace '\\', '\\'
+
+              $content = Get-Content -LiteralPath $submissionFile -Raw
+              $updated = $content -replace '("FilePath":\s*)"[^"]*\.cab"', "`$1""$stagedPath"""
+              if ($updated -eq $content) {
+                  throw "No CAB file path found in $submissionFile."
+              }
+
+              Write-Host $updated
+              Set-Content -LiteralPath $submissionFile -Value $updated -NoNewline
+            displayName: Stage ${{ platform }} content and rewrite submission path
+
+          - task: dcat-publishing@1
+            displayName: Submit ${{ parameters.distributionIntent }} content (${{ platform }})
+            inputs:
+              serviceConnectionId: ${{ parameters.dcat.serviceConnection }}
+              tenantId: ${{ parameters.dcat.tenantId }}
+              clientId: ${{ parameters.dcat.clientId }}
+              environment: ${{ parameters.dcat.environment }}
+              action: submit
+              publisher: ${{ parameters.dcat.publisher }}
+              contentPath: $(dcatContentPath)
+              metadataFile: $(dcatSubmissionPath)\submit-${{ parameters.distributionIntent }}-${{ platform }}.json
+              pollingEnabled: true
