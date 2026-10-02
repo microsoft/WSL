@@ -851,7 +851,8 @@ void RegisterLspCategoriesImpl(DWORD flags)
     const auto installRoot = wsl::windows::common::wslutil::GetMsiPackagePath();
     THROW_HR_IF(E_INVALIDARG, !installRoot.has_value());
 
-    for (const auto& e : {L"wsl.exe", L"wslhost.exe", L"wslrelay.exe", L"wslg.exe", L"wslservice.exe"})
+    for (const auto& e :
+         {L"wsl.exe", L"wslhost.exe", L"wslrelay.exe", L"wslg.exe", L"wslservice.exe", L"wslc.exe", L"wslcsession.exe"})
     {
         auto executable = installRoot.value() + e;
         INT error{};
