@@ -97,7 +97,7 @@ class WSLCE2EContainerCreateTests
 
         auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, reference));
 
-        const auto expectedError = std::format(L"Image '{}' not found locally, pulling\r\n", reference) +
+        const auto expectedError = std::format(L"Unable to find image '{}' locally, pulling\r\n", reference) +
                                    FormatErrorMessage(
                                        std::format(L"manifest for {} not found: manifest unknown: manifest unknown", reference),
                                        L"WSLC_E_IMAGE_NOT_FOUND");
