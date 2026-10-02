@@ -1651,6 +1651,12 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         newConfig += L"[wsl2]\n";
     }
 
+    if (Default.ephemeralPortRangeSize.has_value())
+    {
+        newConfig +=
+            L"\n[experimental]\nephemeralPortRangeSize=" + std::to_wstring(*Default.ephemeralPortRangeSize) + L"\n[wsl2]\n";
+    }
+
     if (Default.virtioFsAggregateShares.has_value())
     {
         newConfig += L"\n[experimental]\n";
