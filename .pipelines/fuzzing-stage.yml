@@ -1,0 +1,80 @@
+# Fuzzing stage — builds fuzz harnesses with ASAN/SanCov and submits to OneFuzz.
+
+parameters:
+  - name: fuzzTargets
+    type: object
+    default:
+      - WslcCliArgumentFuzzing
+      - WslcSdkFuzzing
+      - WslcWinRtFuzzing
+
+stages:
+  - stage: fuzzing
+    dependsOn: []
+    jobs:
+      - job: fuzzing_x64
+        displayName: "Build and submit WSLC fuzz targets (x64)"
+        timeoutInMinutes: 120
+        pool:
+          type: windows
+
+        # OneFuzz job notification (a team alias) and the bug assignee (a person) must be defined as secret pipeline variables.
+        variables:
+          - template: variables.yml
+          - name: ob_outputDirectory
+            value: '$(Build.SourcesDirectory)\out'
+          - name: fuzzingBinDir
+            value: '$(Build.SourcesDirectory)\bin\x64\Release'
+          - name: fuzzingStagingDir
+            value: '$(ob_outputDirectory)\fuzzing'
+
+        steps:
+          - task: CMake@1
+            displayName: "CMake configure (fuzzing)"
+            inputs:
+              workingDirectory: "."
+              cmakeArgs: . --fresh -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_VERSION=$(cmakeSystemVersion) -DWSL_BUILD_FUZZING=true -DONEFUZZ_NOTIFICATION_EMAIL=$(oneFuzzNotificationEmail) -DONEFUZZ_ASSIGNED_TO=$(oneFuzzAssignedTo)
+
+          # Build the fuzzing targets, and the MSI for setting up the VMs
+          - task: CMake@1
+            displayName: "CMake build (fuzzing)"
+            inputs:
+              workingDirectory: "."
+              cmakeArgs: --build . --config Release --target ${{ join(' ', parameters.fuzzTargets) }} msipackage -- -m
+
+          - ${{ each target in parameters.fuzzTargets }}:
+            - task: PowerShell@2
+              displayName: "Stage ${{ target }} binaries"
+              inputs:
+                targetType: inline
+                script: |
+                  $binDir = "$(fuzzingBinDir)"
+                  $dropDir = "$(fuzzingStagingDir)"
+                  New-Item -ItemType Directory -Path $dropDir -Force
+                  Copy-Item "$binDir\${{ target }}.*" $dropDir
+
+          - task: PowerShell@2
+            displayName: "Stage shared fuzzing artifacts"
+            inputs:
+              targetType: inline
+              script: |
+                $binDir = "$(fuzzingBinDir)"
+                $dropDir = "$(fuzzingStagingDir)"
+
+                # CMake places OneFuzzConfig.json, setup.ps1, and per-harness extra dependencies
+                # (e.g. wslcsdk.dll/pdb) under the fuzzing output dir.
+                Copy-Item "$binDir\fuzzing\*" $dropDir -Force
+
+                # Shared runtime deps. CMake copies the ASAN runtime next to the build output.
+                Copy-Item "$binDir\wsl.msi" $dropDir
+                Copy-Item "$binDir\clang_rt.asan_dynamic*.dll" $dropDir
+
+                Get-ChildItem $dropDir -Recurse | Format-Table Name, Length
+
+          - task: onefuzz-task@0
+            displayName: "Submit to OneFuzz"
+            inputs:
+              onefuzzOSes: 'Windows'
+            env:
+              onefuzzDropDirectory: $(fuzzingStagingDir)
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
