@@ -155,7 +155,8 @@ struct VmGuestListener
     GuestServicePort Port;
     std::shared_ptr<VmGuestListenerState> State;
 
-    wil::unique_socket Accept() const;
+    wil::unique_socket Accept(DWORD Timeout = INFINITE, const std::source_location& Location = std::source_location::current()) const;
+    SOCKET Socket() const;
 };
 
 struct VmGuestListenerState
@@ -520,6 +521,7 @@ struct VmFileSystemDevice
     // added report a prepared device without a guest instance id.
     std::optional<GUID> GuestInstanceId;
     VmFileSystemDeviceTransport Transport;
+    bool Elevated = false;
 };
 
 struct VmPlan9ShareOptions
@@ -572,7 +574,12 @@ struct VmFileSystemShare
     VmFileSystemShareAddress GuestAddress;
     std::filesystem::path EffectiveHostPath;
     bool ReadOnly = true;
+    std::map<std::wstring, std::wstring> MountOptions;
+    bool Elevated = false;
 };
+
+using VmFileSystemDevicePredicate = std::function<bool(const VmFileSystemDevice&)>;
+using VmFileSystemSharePredicate = std::function<bool(const VmFileSystemShare&)>;
 
 // Invoked with the index of a newly added persistent memory device while the backend still
 // serializes persistent memory additions. Callers that name devices after the order in which the
@@ -696,9 +703,10 @@ public:
     virtual VmGpuAttachment AddGpu(const VmGpuRequest& Request) = 0;
 
     virtual VmFileSystemDevice CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request) = 0;
-    virtual std::vector<VmFileSystemDevice> GetFileSystemDevices() const = 0;
+    virtual std::optional<VmFileSystemDevice> GetFileSystemDevice(const VmFileSystemDevicePredicate& Predicate) const = 0;
     virtual VmFileSystemDevice GetFileSystemDeviceStatus(VmDeviceId Device) = 0;
     virtual VmFileSystemShare AddFileSystemShare(VmDeviceId Device, const VmFileSystemShareRequest& Request) = 0;
+    virtual std::optional<VmFileSystemShare> GetFileSystemShare(const VmFileSystemSharePredicate& Predicate) const = 0;
     virtual void RemoveFileSystemShare(VmShareId Share) = 0;
     virtual VmSharedMemoryDevice AddSharedMemory(const VmSharedMemoryRequest& Request) = 0;
     virtual void ConfigureGuestDma(const VmGuestDmaRequest& Request) = 0;

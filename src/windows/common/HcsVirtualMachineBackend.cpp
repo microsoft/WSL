@@ -1055,7 +1055,11 @@ VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFile
     }
 
     VmFileSystemDevice device{
-        {m_configuration.Description.Identity, m_nextDeviceId}, VmFileSystemDeviceState::Prepared, {}, Request.Transport};
+        {m_configuration.Description.Identity, m_nextDeviceId},
+        VmFileSystemDeviceState::Prepared,
+        {},
+        Request.Transport,
+        wsl::windows::common::security::IsTokenElevated(userToken.get())};
     std::wstring mountOptions;
     wil::com_ptr<IPlan9FileSystem> plan9Server;
     std::optional<GUID> guestInstanceId;
@@ -1145,16 +1149,17 @@ VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFile
     return device;
 }
 
-std::vector<VmFileSystemDevice> HcsVirtualMachineBackend::GetFileSystemDevices() const
+std::optional<VmFileSystemDevice> HcsVirtualMachineBackend::GetFileSystemDevice(const VmFileSystemDevicePredicate& Predicate) const
 {
     auto lock = m_lock.lock_shared();
-    std::vector<VmFileSystemDevice> devices;
-    devices.reserve(m_fileSystemDevices.size());
     for (const auto& entry : m_fileSystemDevices)
     {
-        devices.push_back(entry.second);
+        if (Predicate(entry.second))
+        {
+            return entry.second;
+        }
     }
-    return devices;
+    return {};
 }
 
 VmFileSystemDevice HcsVirtualMachineBackend::GetFileSystemDeviceStatus(VmDeviceId Device)
@@ -1320,6 +1325,7 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
     // prefix such as '\\?' so that the guest can mount arbitrary subpaths below it.
     std::wstring hostPath;
     std::wstring mountOptions;
+    std::map<std::wstring, std::wstring> effectiveMountOptions;
     std::optional<VmFileSystemShare> reused;
     VmFileSystemShareAddress guestAddress;
     std::visit(
@@ -1342,6 +1348,7 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
                     shareOptions[L"ro"] = {};
                 }
 
+                effectiveMountOptions = shareOptions;
                 mountOptions = FormatVirtioFsMountOptions(shareOptions);
 
                 // Repeating a request for the same path and options reuses the existing share so that
@@ -1427,6 +1434,8 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
     share.Device = Device;
     share.GuestAddress = std::move(guestAddress);
     share.EffectiveHostPath = hostPath;
+    share.MountOptions = std::move(effectiveMountOptions);
+    share.Elevated = device->second.Elevated;
     share.ReadOnly = Request.ReadOnly;
 
     const auto inserted = m_fileSystemShares.emplace(share.Id.Value, FileSystemShare{share, {std::move(mountOptions), userToken}}).second;
@@ -1441,6 +1450,19 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
         TraceLoggingValue(true, "created"));
 
     return share;
+}
+
+std::optional<VmFileSystemShare> HcsVirtualMachineBackend::GetFileSystemShare(const VmFileSystemSharePredicate& Predicate) const
+{
+    auto lock = m_lock.lock_shared();
+    for (const auto& entry : m_fileSystemShares)
+    {
+        if (Predicate(entry.second))
+        {
+            return entry.second;
+        }
+    }
+    return {};
 }
 
 void HcsVirtualMachineBackend::RemoveFileSystemShare(VmShareId Share)
