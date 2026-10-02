@@ -244,6 +244,7 @@ Abstract:
 #define LX_INIT_WSL_CAPTURE_CRASH "wsl-capture-crash"
 
 #define LX_INIT_WSL_GENERATOR "wsl-generator"
+#define LX_INIT_WSL_BINFMT_MONITOR "wsl-binfmt-monitor"
 
 #define LX_INIT_WSL_USER_GENERATOR "wsl-user-generator"
 
