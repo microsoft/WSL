@@ -372,7 +372,8 @@ void NatNetworking::AttachEndpoint(wsl::core::networking::EphemeralHcnEndpoint&&
         ModifyRequestType::Add,
         properties.ID,
         properties.ID,
-        wsl::shared::string::ParseMacAddress(properties.MacAddress));
+        wsl::shared::string::ParseMacAddress(properties.MacAddress),
+        true);
 
     m_endpoint = std::move(endpoint);
     m_networkSettings = GetEndpointSettings(properties);

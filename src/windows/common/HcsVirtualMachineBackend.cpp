@@ -206,8 +206,6 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
 
     THROW_HR_IF(E_INVALIDARG, IsEqualGUID(Request.Identity.VmId, GUID_NULL));
 
-    m_restrictedToken = wsl::windows::common::security::CreateRestrictedToken(Request.Identity.UserToken.get());
-
     VmConfiguration configuration{};
     configuration.Settings.Owner = Request.Owner;
     configuration.Settings.ShouldTerminateOnLastHandleClosed = true;
@@ -1573,7 +1571,8 @@ VmNetworkAttachment HcsVirtualMachineBackend::AddNetworkAdapter(const VmNetworkA
                     schema::ModifyRequestType::Add,
                     configuration.EndpointId,
                     configuration.InstanceId,
-                    configuration.MacAddress);
+                    configuration.MacAddress,
+                    true);
                 attachment.GuestInstanceId = configuration.InstanceId;
             },
             [&](const VmUserModeNatNetwork& configuration) {

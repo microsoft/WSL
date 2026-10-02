@@ -224,8 +224,6 @@ private:
     _Guarded_by_(m_lock) std::map<std::uint64_t, NetworkAdapter> m_networkAdapters;
     _Guarded_by_(m_lock) std::map<std::uint64_t, PortBinding> m_portBindings;
     _Guarded_by_(m_lock) std::uint64_t m_nextPortBindingId = 1;
-    wil::unique_handle m_restrictedToken;
-
     _Guarded_by_(m_lock) std::shared_ptr<GuestDeviceManager> m_guestDeviceManager;
     _Guarded_by_(m_lock) GUID m_runtimeId {};
 };

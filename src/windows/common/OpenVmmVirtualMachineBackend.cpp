@@ -373,7 +373,10 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     THROW_LAST_ERROR_IF(result == WAIT_FAILED);
     THROW_HR_WITH_USER_ERROR_IF(WSL_E_VM_CRASHED, wsl::shared::Localization::MessageWSL2Crashed(), result == WAIT_OBJECT_0);
     THROW_IF_FAILED_MSG(createResult, "Failed to create OpenVMM VM");
-    m_state = VmState::Created;
+    {
+        auto lock = m_lock.lock_exclusive();
+        m_state = VmState::Created;
+    }
 }
 
 void OpenVmmVirtualMachineBackend::ReadProcessLog(wil::unique_hfile Pipe) noexcept

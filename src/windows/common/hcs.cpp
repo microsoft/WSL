@@ -386,7 +386,8 @@ void wsl::windows::common::hcs::ModifyNetworkAdapter(
     _In_ ModifyRequestType RequestType,
     _In_ const GUID& EndpointId,
     _In_ const GUID& InstanceId,
-    _In_ const wsl::shared::string::MacAddress& MacAddress)
+    _In_ const wsl::shared::string::MacAddress& MacAddress,
+    _In_ bool Retry)
 {
     ModifySettingRequest<NetworkAdapter> request{};
     request.ResourcePath = ResourcePath;
@@ -397,23 +398,27 @@ void wsl::windows::common::hcs::ModifyNetworkAdapter(
     const auto settings = wsl::shared::ToJsonW(request);
 
     auto retryCount = 0ul;
-    const auto result = wsl::shared::retry::RetryWithTimeout<HRESULT>(
-        [&] {
-            const auto attemptResult = wil::ResultFromException([&] { ModifyComputeSystem(ComputeSystem, settings.c_str()); });
+    const auto attempt = [&] {
+        const auto attemptResult = wil::ResultFromException([&] { ModifyComputeSystem(ComputeSystem, settings.c_str()); });
 
-            WSL_LOG(
-                "HcsModifyNetworkAdapter",
-                TraceLoggingValue(EndpointId, "endpointId"),
-                TraceLoggingValue(static_cast<std::uint32_t>(RequestType), "requestType"),
-                TraceLoggingValue(retryCount, "retryCount"),
-                TraceLoggingHResult(attemptResult, "result"));
+        WSL_LOG(
+            "HcsModifyNetworkAdapter",
+            TraceLoggingValue(EndpointId, "endpointId"),
+            TraceLoggingValue(static_cast<std::uint32_t>(RequestType), "requestType"),
+            TraceLoggingValue(retryCount, "retryCount"),
+            TraceLoggingHResult(attemptResult, "result"));
 
-            ++retryCount;
-            return THROW_IF_FAILED(attemptResult);
-        },
-        wsl::core::networking::AddEndpointRetryPeriod,
-        wsl::core::networking::AddEndpointRetryTimeout,
-        wsl::core::networking::AddEndpointRetryPredicate);
+        ++retryCount;
+        return attemptResult;
+    };
+
+    const auto result = Retry && RequestType == ModifyRequestType::Add
+                            ? wsl::shared::retry::RetryWithTimeout<HRESULT>(
+                                  [&] { return THROW_IF_FAILED(attempt()); },
+                                  wsl::core::networking::AddEndpointRetryPeriod,
+                                  wsl::core::networking::AddEndpointRetryTimeout,
+                                  wsl::core::networking::AddEndpointRetryPredicate)
+                            : attempt();
 
     if (RequestType == ModifyRequestType::Add && result == HCN_E_ENDPOINT_ALREADY_ATTACHED)
     {
