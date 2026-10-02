@@ -31,7 +31,7 @@ body:
   attributes:
     label: Are you using WSL 1, WSL 2, or WSLC?
     description: |
-      Select all that apply to your issue. For WSL distributions, run `wsl -l -v` to identify WSL 1 or WSL 2.
+      For WSL distributions, run `wsl -l -v` to identify WSL 1 or WSL 2.
       Select WSLC if the issue involves WSL Containers (`wslc`).
     options:
       - label: "WSL 2"
