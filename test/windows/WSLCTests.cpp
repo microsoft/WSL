@@ -7444,16 +7444,59 @@ class WSLCTests
 
         auto stream = OpenEventStream({{"container", id.c_str()}, {"event", "die"}, {"event", "stop"}});
 
-        // Stopping, unlike killing, makes Docker report its own 'stop' event, which can arrive before or after the 'die'.
+        // Stopping, unlike killing, makes Docker report its own 'stop' event, which WSLC publishes once the container has exited.
         VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
 
-        auto events = ReadEvents(stream.get(), 2);
-        std::ranges::sort(events, {}, &wsl::windows::common::wslc_schema::Event::Action);
+        const auto events = ReadEvents(stream.get(), 2);
 
         VERIFY_ARE_EQUAL(std::string{"die"}, events[0].Action);
         VERIFY_ARE_EQUAL(std::to_string(128 + WSLCSignalSIGKILL), events[0].Actor.Attributes.at("exitCode"));
         VERIFY_ARE_EQUAL(std::string{"stop"}, events[1].Action);
         VERIFY_IS_FALSE(events[1].Actor.Attributes.contains("exitCode"));
+        VERIFY_IS_TRUE(events[1].timeNano >= events[0].timeNano);
+    }
+
+    WSLC_TEST_METHOD(EventStreamRecordsOneStopPerStop)
+    {
+        WSLCContainerLauncher launcher("debian:latest", "wslc-test-event-one-stop", {"sleep", "99999"});
+        auto container = launcher.Launch(*m_defaultSession);
+        const auto id = container.Id();
+
+        auto now = [] { return duration_cast<seconds>(system_clock::now().time_since_epoch()).count(); };
+        const LONGLONG since = now();
+
+        // The second run ends with a kill, so a 'stop' from the first run must not carry over into it.
+        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+        VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+        VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
+
+        WSLCFilter filters[]{{"container", id.c_str()}, {"event", "die"}, {"event", "stop"}};
+        wil::com_ptr<IWSLCEventStream> stream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, now() + 1, filters, ARRAYSIZE(filters), &stream));
+
+        std::vector<std::string> actions;
+        std::ranges::transform(DrainEventStream(stream.get()), std::back_inserter(actions), &wsl::windows::common::wslc_schema::Event::Action);
+        VERIFY_ARE_EQUAL(std::string{"die,stop,die"}, wsl::shared::string::Join(actions, ','));
+    }
+
+    WSLC_TEST_METHOD(EventStreamStopNotObservedWhileRunning)
+    {
+        // Docker can report 'stop' before 'die', so repeat to give that ordering a chance to occur.
+        for (int iteration = 0; iteration < 20; ++iteration)
+        {
+            WSLCContainerLauncher launcher("debian:latest", "wslc-test-event-stop-state", {"sleep", "99999"});
+            auto container = launcher.Launch(*m_defaultSession);
+            const auto id = container.Id();
+
+            auto stream = OpenEventStream({{"container", id.c_str()}, {"event", "stop"}});
+            auto stopResult = std::async(std::launch::async, [&]() {
+                return RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "stop", "-t", "0", id});
+            });
+
+            ReadEvents(stream.get(), 1);
+            VERIFY_ARE_NOT_EQUAL(container.State(), WslcContainerStateRunning);
+            VERIFY_ARE_EQUAL(0, stopResult.get().Code);
+        }
     }
 
     WSLC_TEST_METHOD(EventStreamRecordsStopForAutoRemoveContainer)
@@ -7473,11 +7516,11 @@ class WSLCTests
         VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(id.c_str(), &openedContainer), WSLC_E_CONTAINER_NOT_FOUND);
 
         auto events = ReadEvents(stream.get(), 2);
-        std::ranges::sort(events, {}, &wsl::windows::common::wslc_schema::Event::Action);
         VERIFY_ARE_EQUAL(std::string{"die"}, events[0].Action);
         VERIFY_ARE_EQUAL(std::to_string(128 + WSLCSignalSIGKILL), events[0].Actor.Attributes.at("exitCode"));
         VERIFY_ARE_EQUAL(std::string{"stop"}, events[1].Action);
         VERIFY_IS_FALSE(events[1].Actor.Attributes.contains("exitCode"));
+        VERIFY_IS_TRUE(events[1].timeNano >= events[0].timeNano);
     }
 
     WSLC_TEST_METHOD(EventStreamReportsRequestedImageForPublishAllContainer)

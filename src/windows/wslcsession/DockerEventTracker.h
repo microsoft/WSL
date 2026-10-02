@@ -31,7 +31,9 @@ enum class ContainerEvent
     Destroy,
     ExecDied,
     HealthHealthy,
-    HealthUnhealthy
+    HealthUnhealthy,
+    Kill,
+    Stop
 };
 
 enum class VolumeEvent
@@ -87,8 +89,8 @@ public:
     // this isn't keyed by container id, because the id isn't known until Docker assigns it.
     EventTrackingReference RegisterContainerCreate(ContainerCreateCallback&& Callback) noexcept;
 
-    // Invoked for container actions that don't change state ('kill', 'stop'), which can arrive after the
-    // container's own state callback was unregistered.
+    // Invoked for 'kill' and 'stop' when no container state callback handled them, such as after the container
+    // stopped listening for its events.
     EventTrackingReference RegisterContainerActions(ContainerActionCallback&& Callback) noexcept;
     void UnregisterCallback(size_t Id) noexcept;
 
@@ -176,17 +178,22 @@ private:
     _Guarded_by_(m_lock) std::vector<std::shared_ptr<ContainerActionCallbackEntry>> m_containerActionCallbacks;
 
     // Invokes a snapshot of callbacks taken under m_lock, skipping registrations that have since been unregistered.
+    // Returns whether any callback ran.
     template <typename TCallback, typename TInvoke>
-    static void InvokeCallbacks(const std::vector<std::shared_ptr<TCallback>>& Callbacks, const TInvoke& Invoke)
+    static bool InvokeCallbacks(const std::vector<std::shared_ptr<TCallback>>& Callbacks, const TInvoke& Invoke)
     {
+        bool invoked = false;
         for (const auto& e : Callbacks)
         {
             std::lock_guard invokeLock{e->InvokeLock};
             if (!e->Unregistered)
             {
                 Invoke(*e);
+                invoked = true;
             }
         }
+
+        return invoked;
     }
 
     WSLCSession& m_session;

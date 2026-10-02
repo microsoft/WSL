@@ -1338,6 +1338,10 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         RecordEvent("health_status: unhealthy", eventTimeNano, attributes);
         return;
 
+    case ContainerEvent::Kill:
+        RecordEvent("kill", eventTimeNano, attributes);
+        return;
+
     default:
         break;
     }
@@ -1347,7 +1351,19 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         auto lock = m_lock.lock_exclusive();
         transition = m_transition;
 
-        if (event == ContainerEvent::Start)
+        if (event == ContainerEvent::Stop)
+        {
+            // Docker can report 'stop' before 'die', so it's published with the exit transition instead.
+            if (m_state == WslcContainerStateRunning)
+            {
+                m_pendingStopAttributes = attributes;
+            }
+            else
+            {
+                RecordEvent("stop", eventTimeNano, attributes);
+            }
+        }
+        else if (event == ContainerEvent::Start)
         {
             // Only WSLC should start the container, so if we receive a start event, it must be expected by a transition.
             // Otherwise the container was started externally. Log if the container was started externally.
@@ -3190,6 +3206,12 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(
     m_stateChangedAt = std::chrono::floor<std::chrono::seconds>(std::chrono::nanoseconds{TimeNano}).count();
 
     RecordEvent(WSLCStateToEventAction(State), TimeNano, DockerAttributes);
+
+    // A held 'stop' takes the exit's time so it stays in timestamp order, and never outlives the run it belongs to.
+    if (auto pendingStop = std::exchange(m_pendingStopAttributes, std::nullopt); pendingStop.has_value() && State == WslcContainerStateExited)
+    {
+        RecordEvent("stop", TimeNano, pendingStop.value());
+    }
 
     if (State == WslcContainerStateRunning)
     {

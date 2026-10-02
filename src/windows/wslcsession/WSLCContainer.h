@@ -285,6 +285,7 @@ private:
     std::int64_t m_stateChangedAt{static_cast<std::int64_t>(std::time(nullptr))};
     std::int64_t m_createdAt{};
     WSLCContainerState m_state = WslcContainerStateInvalid;
+    __guarded_by(m_lock) std::optional<std::map<std::string, std::string>> m_pendingStopAttributes;
 
     // Bumped on every state change so a thread that released m_lock can detect a state cycle, not just a difference.
     std::uint64_t m_stateGeneration{};

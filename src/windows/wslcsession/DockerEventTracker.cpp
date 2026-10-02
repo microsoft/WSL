@@ -157,7 +157,9 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
         {"exec_die", ContainerEvent::ExecDied},
         {"restart", ContainerEvent::Restart},
         {"health_status: healthy", ContainerEvent::HealthHealthy},
-        {"health_status: unhealthy", ContainerEvent::HealthUnhealthy}};
+        {"health_status: unhealthy", ContainerEvent::HealthUnhealthy},
+        {"kill", ContainerEvent::Kill},
+        {"stop", ContainerEvent::Stop}};
 
     auto actor = parsed.find("Actor");
     THROW_HR_IF_MSG(E_INVALIDARG, actor == parsed.end(), "Missing Actor in container event");
@@ -171,12 +173,6 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
     if (const auto attributesEntry = actor->find("Attributes"); attributesEntry != actor->end())
     {
         attributes = attributesEntry->get<std::map<std::string, std::string>>();
-    }
-
-    if (action == "kill" || action == "stop")
-    {
-        OnContainerAction(containerId, action, attributes, eventTimeNano);
-        return;
     }
 
     auto it = events.find(action);
@@ -213,7 +209,13 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
         }
     }
 
-    InvokeCallbacks(callbacks, [&](const ContainerCallback& e) { e.Callback(it->second, exitCode, attributes, eventTimeNano); });
+    const bool handled =
+        InvokeCallbacks(callbacks, [&](const ContainerCallback& e) { e.Callback(it->second, exitCode, attributes, eventTimeNano); });
+
+    if (!handled && (it->second == ContainerEvent::Kill || it->second == ContainerEvent::Stop))
+    {
+        OnContainerAction(containerId, action, attributes, eventTimeNano);
+    }
 }
 
 void DockerEventTracker::OnContainerAction(
