@@ -144,7 +144,7 @@ class WSLCE2EEventsTests
         const auto until = EpochSeconds() + 1;
         result = RunWslc(std::format(
             L"events --since {} --until {} --filter type=container --filter container={} --filter image={} "
-            L"--filter event=create --filter event=start --filter event=stop --filter event=destroy",
+            L"--filter event=create --filter event=start --filter event=die --filter event=destroy",
             since,
             until,
             containerId,
@@ -157,7 +157,7 @@ class WSLCE2EEventsTests
         VerifyEventLine(lines[1], std::format(L" container start {} (image={}, name={})", containerId, DebianImage.NameAndTag(), c_eventContainerName));
         VerifyEventLine(
             lines[2],
-            std::format(L" container stop {} (exitCode={}, image={}, name={})", containerId, 128 + WSLCSignalSIGKILL, DebianImage.NameAndTag(), c_eventContainerName));
+            std::format(L" container die {} (exitCode={}, image={}, name={})", containerId, 128 + WSLCSignalSIGKILL, DebianImage.NameAndTag(), c_eventContainerName));
         VerifyEventLine(lines[3], std::format(L" container destroy {} (image={}, name={})", containerId, DebianImage.NameAndTag(), c_eventContainerName));
     }
 
@@ -168,16 +168,28 @@ class WSLCE2EEventsTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto containerId = result.GetStdoutOneLine();
 
+        result = RunWslc(std::format(L"container start {}", containerId));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container kill {}", containerId));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
         result = RunWslc(std::format(L"container rm {}", containerId));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"events --since {} --until {} --filter container={} --format json", since, EpochSeconds() + 1, containerId));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
+        const std::vector<std::string> expectedActions{"create", "start", "kill", "die", "destroy"};
         const auto events = ParseNdjsonOutput(result);
-        VERIFY_ARE_EQUAL(2u, events.size());
-        VERIFY_ARE_EQUAL(std::string{"create"}, events[0].at("Action").get<std::string>());
-        VERIFY_ARE_EQUAL(std::string{"destroy"}, events[1].at("Action").get<std::string>());
+        VERIFY_ARE_EQUAL(expectedActions.size(), events.size());
+
+        for (size_t i = 0; i < events.size(); ++i)
+        {
+            VERIFY_ARE_EQUAL(expectedActions[i], events[i].at("Action").get<std::string>());
+        }
+
+        VERIFY_ARE_EQUAL(std::to_string(128 + WSLCSignalSIGKILL), events[3].at("Actor").at("Attributes").at("exitCode").get<std::string>());
 
         for (const auto& event : events)
         {

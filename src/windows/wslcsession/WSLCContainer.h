@@ -123,6 +123,9 @@ public:
     WSLCContainerState State() const noexcept;
     std::vector<WSLCPortMapping> GetPorts() const;
 
+    // Returns the attributes to record for a Docker container event, or nothing if WSLC didn't create the container.
+    static std::optional<std::map<std::string, std::string>> GetEventAttributes(std::map<std::string, std::string> DockerAttributes);
+
     // Re-registers a stopped container's VM-scoped port allocations against the restarted VM.
     void RecoverPorts(const common::docker_schema::ContainerInfo& dockerContainer);
 

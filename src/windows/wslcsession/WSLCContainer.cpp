@@ -481,7 +481,7 @@ std::string WSLCStateToEventAction(WSLCContainerState state)
     case WslcContainerStateRunning:
         return "start";
     case WslcContainerStateExited:
-        return "stop";
+        return "die";
     case WslcContainerStateDeleted:
         return "destroy";
     default:
@@ -1290,17 +1290,32 @@ try
 }
 CATCH_LOG()
 
+std::optional<std::map<std::string, std::string>> WSLCContainerImpl::GetEventAttributes(std::map<std::string, std::string> DockerAttributes)
+{
+    // Containers WSLC didn't create, such as BuildKit's, carry no metadata and aren't reported.
+    const auto metadataIt = DockerAttributes.find(WSLCContainerMetadataLabel);
+    if (metadataIt == DockerAttributes.end())
+    {
+        return std::nullopt;
+    }
+
+    auto metadata = ParseContainerMetadata(metadataIt->second);
+    auto attributes = StripInternalLabels(std::move(DockerAttributes));
+
+    // Docker reports the image ID when the container was created from a resolved image (e.g. publish-all).
+    if (!metadata.Image.empty())
+    {
+        attributes["image"] = std::move(metadata.Image);
+    }
+
+    return attributes;
+}
+
 void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode, std::int64_t eventTimeNano) noexcept
 {
     // Either owner may disconnect the COM wrapper, so both must outlive m_lock.
     unique_com_disconnect comWrapper;
     std::shared_ptr<StateTransition> transition;
-
-    if (event == ContainerEvent::Kill)
-    {
-        RecordEvent("kill", eventTimeNano);
-        return;
-    }
 
     {
         auto lifecycleLock = m_lifecycleLock.lock_exclusive();
@@ -1322,7 +1337,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
                 WSL_LOG("UnexpectedContainerStart", TraceLoggingValue(m_id.c_str(), "Id"));
             }
         }
-        else if (event == ContainerEvent::Stop)
+        else if (event == ContainerEvent::Exit)
         {
             WI_ASSERT(exitCode.has_value());
             OnStopped(exitCode.value(), eventTimeNano);
@@ -1412,7 +1427,7 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
             ValidateStopTimeout(TimeoutSeconds, true);
 
             // Don't wait for the container to stop if we're not sending SIGKILL, since it may not stop the container.
-            // N.B. If the signal was SIGTERM for instance, we'll receive the stop notification via OnEvent().
+            // N.B. If the signal was SIGTERM for instance, we'll receive the exit notification via OnEvent().
             bool waitForStop = !Kill || (SignalArg.value_or(WSLCSignalSIGKILL) == WSLCSignalSIGKILL);
             const auto generation = m_stateGeneration;
 
@@ -1460,12 +1475,12 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
                 transition = m_transition;
 
                 // The container can exit and start again while the locks are released, so an unchanged generation is
-                // the only proof that the stop event this call is waiting for is still to come.
+                // the only proof that the exit event this call is waiting for is still to come.
                 if (m_stateGeneration == generation)
                 {
                     if (!transition)
                     {
-                        transition = StartTransition(TransitionKind::Stop, ContainerEvent::Stop);
+                        transition = StartTransition(TransitionKind::Stop, ContainerEvent::Exit);
                     }
                 }
                 // The run already ended: keep waiting on the work it triggered (e.g. auto-remove), never on a start
@@ -1579,7 +1594,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
 {
     auto transition = m_transition;
 
-    // A Stop while expecting Start should not occur normally: Docker emits start before die, and the event stream processes
+    // An exit while expecting Start should not occur normally: Docker emits start before die, and the event stream processes
     // them serially. It would indicate external manipulation. Ignoring it avoids applying an old exit code to the newly
     // staged init process.
     if (transition && (transition->ExpectedEvent == ContainerEvent::Start))
@@ -1608,7 +1623,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
         ReleaseRuntimeResources();
     }
 
-    // Ignore duplicate or late Stop events so they do not overwrite an already committed state.
+    // Ignore duplicate or late exit events so they do not overwrite an already committed state.
     if (m_state == WslcContainerStateRunning)
     {
         CommitState(WslcContainerStateExited, stopTimeNano, exitCode);
@@ -2636,6 +2651,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     WSLCContainerMetadataV1 metadata;
     metadata.Flags = containerOptions.Flags;
     metadata.InitProcessFlags = containerOptions.InitProcessOptions.Flags;
+    metadata.Image = containerOptions.Image;
     metadata.Volumes = volumes;
 
     for (const auto& e : mappedPorts)
@@ -2807,13 +2823,16 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         }
     }
 
+    // Containers created before the image was persisted fall back to what Docker reports.
+    std::string image = metadata.Image.empty() ? dockerContainer.Image : std::move(metadata.Image);
+
     auto container = std::make_shared<WSLCContainerImpl>(
         wslcSession,
         runtime,
         pluginNotifier,
         std::string(dockerContainer.Id),
         std::move(name),
-        std::string(dockerContainer.Image),
+        std::move(image),
         std::move(networkMode),
         std::move(metadata.Volumes),
         std::move(namedVolumes),

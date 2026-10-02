@@ -98,6 +98,7 @@ DockerEventTracker::~DockerEventTracker()
     WI_ASSERT(m_volumeCallbacks.empty());
     WI_ASSERT(m_networkCallbacks.empty());
     WI_ASSERT(m_containerCreateCallbacks.empty());
+    WI_ASSERT(m_containerActionCallbacks.empty());
 }
 
 void DockerEventTracker::OnEvent(const std::string_view& event)
@@ -151,8 +152,7 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
 {
     static std::map<std::string, ContainerEvent> events{
         {"start", ContainerEvent::Start},
-        {"die", ContainerEvent::Stop},
-        {"kill", ContainerEvent::Kill},
+        {"die", ContainerEvent::Exit},
         {"destroy", ContainerEvent::Destroy},
         {"exec_die", ContainerEvent::ExecDied},
         {"restart", ContainerEvent::Restart}};
@@ -164,6 +164,12 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
     THROW_HR_IF_MSG(E_INVALIDARG, id == actor->end(), "Missing Actor.ID in container event");
 
     auto containerId = id->get<std::string>();
+
+    if (action == "kill" || action == "stop")
+    {
+        OnContainerAction(*actor, containerId, action, eventTimeNano);
+        return;
+    }
 
     auto it = events.find(action);
     if (it == events.end())
@@ -206,6 +212,25 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
     }
 
     InvokeCallbacks(callbacks, [&](const ContainerCallback& e) { e.Callback(it->second, exitCode, eventTimeNano); });
+}
+
+void DockerEventTracker::OnContainerAction(const nlohmann::json& actor, const std::string& containerId, const std::string& action, std::int64_t eventTimeNano)
+{
+    std::map<std::string, std::string> attributes;
+    auto attributesEntry = actor.find("Attributes");
+    if (attributesEntry != actor.end())
+    {
+        attributes = attributesEntry->get<std::map<std::string, std::string>>();
+    }
+
+    std::vector<std::shared_ptr<ContainerActionCallbackEntry>> callbacks;
+    {
+        std::lock_guard lock{m_lock};
+        callbacks = m_containerActionCallbacks;
+    }
+
+    InvokeCallbacks(
+        callbacks, [&](const ContainerActionCallbackEntry& e) { e.Callback(containerId, action, attributes, eventTimeNano); });
 }
 
 void DockerEventTracker::OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano)
@@ -345,6 +370,17 @@ DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterContainer
     return EventTrackingReference{this, id};
 }
 
+DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterContainerActions(ContainerActionCallback&& Callback) noexcept
+{
+    auto id = m_callbackId++;
+    auto entry = std::make_shared<ContainerActionCallbackEntry>(id, std::move(Callback));
+
+    std::lock_guard lock{m_lock};
+    m_containerActionCallbacks.emplace_back(std::move(entry));
+
+    return EventTrackingReference{this, id};
+}
+
 void DockerEventTracker::UnregisterCallback(size_t Id) noexcept
 {
     std::shared_ptr<CallbackRegistration> registration;
@@ -366,7 +402,8 @@ void DockerEventTracker::UnregisterCallback(size_t Id) noexcept
             return true;
         };
 
-        if (!take(m_containerCallbacks) && !take(m_volumeCallbacks) && !take(m_networkCallbacks) && !take(m_containerCreateCallbacks))
+        if (!take(m_containerCallbacks) && !take(m_volumeCallbacks) && !take(m_networkCallbacks) &&
+            !take(m_containerCreateCallbacks) && !take(m_containerActionCallbacks))
         {
             WI_ASSERT(false);
         }

@@ -27,11 +27,9 @@ enum class ContainerEvent
     Create,
     Start,
     Restart,
-    Stop,
     Exit,
     Destroy,
-    ExecDied,
-    Kill
+    ExecDied
 };
 
 enum class VolumeEvent
@@ -68,6 +66,8 @@ public:
     using NetworkEventCallback =
         std::function<void(const std::string&, const std::string&, const std::map<std::string, std::string>&, std::int64_t)>;
     using ContainerCreateCallback = std::function<void(const std::string& ContainerId, std::int64_t TimeNano)>;
+    using ContainerActionCallback =
+        std::function<void(const std::string& ContainerId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t TimeNano)>;
 
     explicit DockerEventTracker(WSLCSession& session);
     ~DockerEventTracker();
@@ -83,11 +83,16 @@ public:
     // Invoked for every container create event, after the per-container state callbacks. Unlike those,
     // this isn't keyed by container id, because the id isn't known until Docker assigns it.
     EventTrackingReference RegisterContainerCreate(ContainerCreateCallback&& Callback) noexcept;
+
+    // Invoked for container actions that don't change state ('kill', 'stop'), which can arrive after the
+    // container's own state callback was unregistered.
+    EventTrackingReference RegisterContainerActions(ContainerActionCallback&& Callback) noexcept;
     void UnregisterCallback(size_t Id) noexcept;
 
 private:
     void OnEvent(const std::string_view& event);
     void OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano);
+    void OnContainerAction(const nlohmann::json& actor, const std::string& containerId, const std::string& action, std::int64_t eventTimeNano);
     void OnContainerCreated(const nlohmann::json& parsed, std::int64_t eventTimeNano);
     void OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano);
     void OnNetworkEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano);
@@ -151,10 +156,21 @@ private:
         const ContainerCreateCallback Callback;
     };
 
+    struct ContainerActionCallbackEntry : CallbackRegistration
+    {
+        ContainerActionCallbackEntry(size_t Id, ContainerActionCallback&& Callback) :
+            CallbackRegistration(Id), Callback(std::move(Callback))
+        {
+        }
+
+        const ContainerActionCallback Callback;
+    };
+
     _Guarded_by_(m_lock) std::vector<std::shared_ptr<ContainerCallback>> m_containerCallbacks;
     _Guarded_by_(m_lock) std::vector<std::shared_ptr<VolumeCallback>> m_volumeCallbacks;
     _Guarded_by_(m_lock) std::vector<std::shared_ptr<NetworkCallback>> m_networkCallbacks;
     _Guarded_by_(m_lock) std::vector<std::shared_ptr<ContainerCreateCallbackEntry>> m_containerCreateCallbacks;
+    _Guarded_by_(m_lock) std::vector<std::shared_ptr<ContainerActionCallbackEntry>> m_containerActionCallbacks;
 
     // Invokes a snapshot of callbacks taken under m_lock, skipping registrations that have since been unregistered.
     template <typename TCallback, typename TInvoke>
