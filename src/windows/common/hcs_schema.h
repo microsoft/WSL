@@ -337,20 +337,11 @@ inline void to_json(nlohmann::json& j, const Processor& processor)
     OMIT_IF_EMPTY(j, processor, EnablePerfmonLbr)
 }
 
-struct Numa
-{
-};
-
-inline void to_json(nlohmann::json& j, const Numa&)
-{
-    j = nlohmann::json::object();
-}
-
 struct Topology
 {
     Processor Processor;
     Memory Memory;
-    std::optional<Numa> Numa;
+    std::optional<wsl::shared::EmptyObject> Numa;
 };
 
 inline void to_json(nlohmann::json& j, const Topology& topology)
