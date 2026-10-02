@@ -1650,7 +1650,7 @@ class WslcSdkWinRtTests
         session.LoadImageAsync(debianTar.wstring()).get();
 
         const auto storageAttributes = GetFileAttributesW((vhdSessionStorage / L"storage.vhdx").c_str());
-        VERIFY_IS_FALSE(storageAttributes == INVALID_FILE_ATTRIBUTES);
+        VERIFY_ARE_NOT_EQUAL(INVALID_FILE_ATTRIBUTES, storageAttributes);
         VERIFY_IS_TRUE(WI_IsFlagSet(storageAttributes, FILE_ATTRIBUTE_SPARSE_FILE));
 
         // Positive: create a named VHD volume.
@@ -1660,7 +1660,7 @@ class WslcSdkWinRtTests
         const auto expectedVhdPath = vhdSessionStorage / "volumes" / (std::wstring(c_volumeName) + L".vhdx");
         VERIFY_IS_TRUE(std::filesystem::exists(expectedVhdPath));
         const auto volumeAttributes = GetFileAttributesW(expectedVhdPath.c_str());
-        VERIFY_IS_FALSE(volumeAttributes == INVALID_FILE_ATTRIBUTES);
+        VERIFY_ARE_NOT_EQUAL(INVALID_FILE_ATTRIBUTES, volumeAttributes);
         VERIFY_IS_TRUE(WI_IsFlagSet(volumeAttributes, FILE_ATTRIBUTE_SPARSE_FILE));
 
         // Positive: write a marker via a container that mounts the named volume.
