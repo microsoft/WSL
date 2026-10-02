@@ -128,12 +128,13 @@ std::unique_ptr<WslCoreVm> WslCoreVm::Create(
             // A kernel panic can cause an hvsocket error. If we hit this, wait one second for an HCS notification to give a better error for the user.
             if (newInstance->m_vmCrashEvent.wait(1000))
             {
-                if (newInstance->m_vmCrashLogFile.has_value())
+                const auto crashInformation = newInstance->m_backend->GetCrashInformation();
+                if (crashInformation.CrashLogFile.has_value())
                 {
                     THROW_HR_WITH_USER_ERROR(
                         WSL_E_VM_CRASHED,
                         wsl::shared::Localization::MessageWSL2Crashed() + L"\r\n" +
-                            Localization::MessageWSL2CrashedStackTrace(newInstance->m_vmCrashLogFile.value()));
+                            Localization::MessageWSL2CrashedStackTrace(crashInformation.CrashLogFile.value()));
                 }
                 else
                 {
@@ -355,16 +356,12 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         m_kernelModulesDeviceId = kernelModules->second.GuestAddress.Lun;
     }
 
-    // N.B. The backend listener API does not yet support WSL's accept timeout and source-location
-    // diagnostics, so WSL protocol listeners remain here for now.
-    m_listenSocket = wsl::windows::common::hvsocket::Listen(m_runtimeId, LX_INIT_UTILITY_VM_INIT_PORT);
+    m_guestListener = m_backend->CreateGuestListener(GuestServicePort{LX_INIT_UTILITY_VM_INIT_PORT});
 
     if (m_vmConfig.MaxCrashDumpCount >= 0)
     {
-        auto crashDumpSocket = wsl::windows::common::hvsocket::Listen(m_runtimeId, LX_INIT_UTILITY_VM_CRASH_DUMP_PORT);
-        THROW_LAST_ERROR_IF(!crashDumpSocket);
-        m_crashDumpCollectionThread =
-            std::thread{[this, socket = std::move(crashDumpSocket)]() mutable { CollectCrashDumps(std::move(socket)); }};
+        m_crashDumpListener = m_backend->CreateGuestListener(GuestServicePort{LX_INIT_UTILITY_VM_CRASH_DUMP_PORT});
+        m_crashDumpCollectionThread = std::thread{&WslCoreVm::CollectCrashDumps, this, m_crashDumpListener.value()};
     }
 
     // Register before starting so an early exit cannot be missed.
@@ -372,10 +369,9 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         const auto crashInformation = m_backend->GetCrashInformation();
         if (crashInformation.Crashed)
         {
-            m_vmCrashLogFile = crashInformation.CrashLogFile;
             m_vmCrashEvent.SetEvent();
         }
-        OnExit(m_backend->GetExitDetails().c_str());
+        OnExit();
     });
     signalEarlyTermination.release();
 
@@ -763,6 +759,22 @@ WslCoreVm::~WslCoreVm() noexcept
 
     if (m_backend)
     {
+        auto closeListener = [&](const VmGuestListener& listener) {
+            if (listener.Id.Value != 0)
+            {
+                LOG_IF_FAILED(wil::ResultFromException([&] { m_backend->CloseGuestListener(listener.Id); }));
+            }
+        };
+        closeListener(m_guestListener);
+        if (m_crashDumpListener)
+        {
+            closeListener(m_crashDumpListener.value());
+        }
+        if (m_virtioFsListener)
+        {
+            closeListener(m_virtioFsListener.value());
+        }
+
         bool unexpectedTerminate = m_vmExitEvent.is_signaled();
         bool forcedTerminate = false;
 
@@ -789,6 +801,7 @@ WslCoreVm::~WslCoreVm() noexcept
 
         m_vmExitEvent.wait(UTILITY_VM_TERMINATE_TIMEOUT);
 
+        const auto exitDetails = m_backend->GetExitDetails();
         TraceLoggingWriteTagged(
             activity,
             "TerminateVm",
@@ -799,7 +812,7 @@ WslCoreVm::~WslCoreVm() noexcept
             TraceLoggingValue(forcedTerminate, "forceTerminate"),
             TraceLoggingValue(unexpectedTerminate, "unexpectedTerminate"),
             TraceLoggingValue(m_vmExitEvent.is_signaled(), "terminationCallbackReceived"),
-            TraceLoggingValue(m_exitDetails.c_str(), "exitDetails"));
+            TraceLoggingValue(exitDetails.c_str(), "exitDetails"));
     }
 
     // Wait for the distro exit callback thread to exit.
@@ -869,16 +882,14 @@ WslCoreVm::~WslCoreVm() noexcept
 
 wil::unique_socket WslCoreVm::AcceptConnection(_In_ DWORD ReceiveTimeout, _In_ const std::source_location& Location) const
 {
-    auto socket = wsl::windows::common::socket::CancellableAccept(
-        m_listenSocket.get(), m_vmConfig.KernelBootTimeout, m_terminatingEvent.get(), Location);
-    THROW_HR_IF(E_ABORT, !socket.has_value());
+    auto socket = m_guestListener.Accept(m_vmConfig.KernelBootTimeout, Location);
 
     if (ReceiveTimeout != 0)
     {
-        THROW_LAST_ERROR_IF(setsockopt(socket->get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&ReceiveTimeout, sizeof(ReceiveTimeout)) == SOCKET_ERROR);
+        THROW_LAST_ERROR_IF(setsockopt(socket.get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&ReceiveTimeout, sizeof(ReceiveTimeout)) == SOCKET_ERROR);
     }
 
-    return std::move(socket.value());
+    return socket;
 }
 
 _Requires_lock_held_(m_guestDeviceLock)
@@ -932,8 +943,7 @@ void WslCoreVm::AddPlan9Share(
         return wsl::windows::common::wslutil::CreateComServerAsUser<p9fs::Plan9FileSystem, IPlan9FileSystem>(userToken);
     };
 
-    const auto& devices = m_backend->GetFileSystemDevices();
-    auto matchingDevice = std::find_if(devices.begin(), devices.end(), [&](const VmFileSystemDevice& device) {
+    const auto matchingDevice = m_backend->GetFileSystemDevice([&](const VmFileSystemDevice& device) {
         if (m_vmConfig.EnableVirtio9p)
         {
             const auto* virtio = std::get_if<VmPlan9VirtioDevice>(&device.Transport);
@@ -945,7 +955,7 @@ void WslCoreVm::AddPlan9Share(
     });
 
     VmFileSystemDevice device;
-    if (matchingDevice == devices.end())
+    if (!matchingDevice)
     {
         VmFileSystemDeviceRequest request{};
         if (m_vmConfig.EnableVirtio9p)
@@ -966,7 +976,7 @@ void WslCoreVm::AddPlan9Share(
     }
     else
     {
-        device = *matchingDevice;
+        device = matchingDevice.value();
     }
 
     VmFileSystemShareRequest request{};
@@ -1048,7 +1058,7 @@ ULONG WslCoreVm::AttachDiskLockHeld(
     }
 }
 
-void WslCoreVm::CollectCrashDumps(wil::unique_socket&& listenSocket) const
+void WslCoreVm::CollectCrashDumps(VmGuestListener Listener) const
 {
     wsl::windows::common::wslutil::SetThreadDescription(L"CrashDumpCollection");
 
@@ -1056,16 +1066,12 @@ void WslCoreVm::CollectCrashDumps(wil::unique_socket&& listenSocket) const
     {
         try
         {
-            auto socket = wsl::windows::common::socket::CancellableAccept(listenSocket.get(), INFINITE, m_terminatingEvent.get());
-            if (!socket.has_value())
-            {
-                break; // VM is exiting.
-            }
+            auto socket = Listener.Accept();
 
             DWORD receiveTimeout = m_vmConfig.KernelBootTimeout;
-            THROW_LAST_ERROR_IF(setsockopt(socket->get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&receiveTimeout, sizeof(receiveTimeout)) == SOCKET_ERROR);
+            THROW_LAST_ERROR_IF(setsockopt(socket.get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&receiveTimeout, sizeof(receiveTimeout)) == SOCKET_ERROR);
 
-            auto channel = wsl::shared::SocketChannel{std::move(socket.value()), "crash_dump", {m_terminatingEvent.get()}};
+            auto channel = wsl::shared::SocketChannel{std::move(socket), "crash_dump", {m_terminatingEvent.get()}};
 
             auto transaction = channel.ReceiveTransaction();
             gsl::span<gsl::byte> responseSpan;
@@ -1251,13 +1257,6 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstanceInternal(
     return instance;
 }
 
-wil::unique_socket WslCoreVm::CreateListeningSocket() const
-{
-    // N.B. Dynamic WSL protocol ports need the effective ephemeral port, which the backend listener
-    // API does not currently expose.
-    return wsl::windows::common::hvsocket::Listen(m_runtimeId, 0);
-}
-
 std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::DetachDisk(_In_opt_ PCWSTR Disk)
 {
     bool deleted = !ARGUMENT_PRESENT(Disk);
@@ -1333,17 +1332,18 @@ void WslCoreVm::EjectVhdLockHeld(_In_ PCWSTR VhdPath)
 }
 
 _Requires_lock_held_(m_guestDeviceLock)
-std::optional<WslCoreVm::VirtioFsShare> WslCoreVm::FindVirtioFsShare(_In_ PCWSTR tag, _In_ std::optional<bool> Admin) const
+std::optional<VmFileSystemShare> WslCoreVm::FindVirtioFsShare(_In_ PCWSTR Tag, _In_ std::optional<bool> Admin) const
 {
-    for (const auto& share : m_virtioFsShares)
-    {
-        if ((share.second == tag) && (!Admin.has_value() || Admin.value() == share.first.Admin))
+    return m_backend->GetFileSystemShare([&](const VmFileSystemShare& share) {
+        const auto* address = std::get_if<VmVirtioFsShareAddress>(&share.GuestAddress);
+        if (!address)
         {
-            return share.first;
+            return false;
         }
-    }
 
-    return {};
+        const auto& name = address->ChildName ? address->ChildName.value() : address->Tag;
+        return name == Tag && (!Admin.has_value() || share.Elevated == Admin.value());
+    });
 }
 
 VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
@@ -1883,14 +1883,14 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
 
     // Ensure that the path has a trailing path separator.
     std::wstring sharePath = NormalizeSharePath(Path);
+    const auto mountOptions = ParseVirtioFsMountOptions(Options);
 
-    std::wstring effectiveOptions(Options);
-
-    // Check if a matching share already exists.
     bool created = false;
-    std::wstring shareName;
-    VirtioFsShare key(sharePath.c_str(), effectiveOptions.c_str(), Admin);
-    if (!m_virtioFsShares.contains(key))
+    auto share = m_backend->GetFileSystemShare([&](const VmFileSystemShare& candidate) {
+        return std::holds_alternative<VmVirtioFsShareAddress>(candidate.GuestAddress) && candidate.Elevated == Admin &&
+               !candidate.ReadOnly && candidate.EffectiveHostPath.native() == sharePath && candidate.MountOptions == mountOptions;
+    });
+    if (!share)
     {
         // Generate a new unique tag for the share.
         //
@@ -1898,86 +1898,84 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
         GUID tagGuid{};
         THROW_IF_FAILED(CoCreateGuid(&tagGuid));
 
-        shareName = wsl::shared::string::GuidToString<wchar_t>(tagGuid, wsl::shared::string::None);
+        const auto shareName = wsl::shared::string::GuidToString<wchar_t>(tagGuid, wsl::shared::string::None);
         WI_ASSERT(!FindVirtioFsShare(shareName.c_str(), Admin));
 
+        VmFileSystemDevice device;
         if (m_vmConfig.EnableVirtioFsAggregateShares)
         {
-            auto& device = Admin ? m_adminVirtioFsDevice : m_virtioFsDevice;
             const PCWSTR deviceTag = Admin ? TEXT(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) : TEXT(LX_INIT_DRVFS_VIRTIO_TAG);
-            if (!device.has_value())
+            const auto existingDevice = m_backend->GetFileSystemDevice([&](const VmFileSystemDevice& candidate) {
+                const auto* virtio = std::get_if<VmVirtioFsDevice>(&candidate.Transport);
+                return virtio && virtio->Layout == VmVirtioFsLayout::Aggregate && virtio->Tag == deviceTag && candidate.Elevated == Admin;
+            });
+            if (existingDevice)
             {
-                device = m_backend
-                             ->CreateFileSystemDevice({VmVirtioFsDevice{
-                                 deviceTag,
-                                 VmVirtioFsLayout::Aggregate,
-                                 VmVirtioFsShareOptions{{}, wil::shared_handle{wsl::windows::common::wslutil::DuplicateHandle(UserToken)}}}})
-                             .Id;
+                device = existingDevice.value();
             }
+            else
+            {
+                VmFileSystemDeviceRequest request{};
+                request.Transport = VmVirtioFsDevice{deviceTag, VmVirtioFsLayout::Aggregate};
+                request.UserToken = wil::shared_handle{wsl::windows::common::wslutil::DuplicateHandle(UserToken)};
+                device = m_backend->CreateFileSystemDevice(request);
+            }
+
             VmFileSystemShareRequest request{};
             request.HostPath = sharePath;
             request.Name = shareName;
             request.ReadOnly = false;
-            request.Options = VmVirtioFsShareOptions{key.Options};
-            m_backend->AddFileSystemShare(device.value(), request);
+            request.Options = VmVirtioFsShareOptions{mountOptions};
+            share = m_backend->AddFileSystemShare(device.Id, request);
         }
         else
         {
-            const auto device = m_backend->CreateFileSystemDevice({VmVirtioFsDevice{shareName, VmVirtioFsLayout::SingleShare}});
+            VmFileSystemDeviceRequest deviceRequest{};
+            deviceRequest.Transport = VmVirtioFsDevice{shareName, VmVirtioFsLayout::SingleShare};
+            deviceRequest.UserToken = wil::shared_handle{wsl::windows::common::wslutil::DuplicateHandle(UserToken)};
+            device = m_backend->CreateFileSystemDevice(deviceRequest);
+
             VmFileSystemShareRequest request{};
             request.HostPath = sharePath;
             request.ReadOnly = false;
-            request.Options = VmVirtioFsShareOptions{key.Options};
-            request.UserToken = wil::shared_handle{wsl::windows::common::wslutil::DuplicateHandle(UserToken)};
-            m_backend->AddFileSystemShare(device.Id, request);
+            request.Options = VmVirtioFsShareOptions{mountOptions};
+            share = m_backend->AddFileSystemShare(device.Id, request);
         }
 
-        m_virtioFsShares.emplace(std::move(key), shareName);
         created = true;
     }
-    else
-    {
-        shareName = m_virtioFsShares[key];
-    }
 
-    const std::wstring deviceTag = m_vmConfig.EnableVirtioFsAggregateShares
-                                       ? (Admin ? TEXT(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) : TEXT(LX_INIT_DRVFS_VIRTIO_TAG))
-                                       : shareName;
-    const std::wstring childName = m_vmConfig.EnableVirtioFsAggregateShares ? shareName : L"";
+    const auto& address = std::get<VmVirtioFsShareAddress>(share->GuestAddress);
+    const auto childName = address.ChildName.value_or(L"");
 
     WSL_LOG(
         "WslCoreVmAddVirtioFsShare",
         TraceLoggingValue(Admin, "admin"),
         TraceLoggingValue(sharePath.c_str(), "path"),
-        TraceLoggingValue(effectiveOptions.c_str(), "options"),
-        TraceLoggingValue(deviceTag.c_str(), "tag"),
+        TraceLoggingValue(Options, "options"),
+        TraceLoggingValue(address.Tag.c_str(), "tag"),
         TraceLoggingValue(childName.c_str(), "childName"),
         TraceLoggingValue(m_vmConfig.EnableVirtioFsAggregateShares, "aggregate"),
-        TraceLoggingValue(created, "created"),
-        TraceLoggingValue(m_virtioFsShares.size(), "shareCount"));
+        TraceLoggingValue(created, "created"));
 
-    return {deviceTag, childName, sharePath};
+    return {address.Tag, childName, share->EffectiveHostPath.native()};
 }
 
-void WslCoreVm::OnExit(_In_opt_ PCWSTR ExitDetails)
+void WslCoreVm::OnExit()
 {
     // Indicate that the VM has exited and wake any waiting threads. The backend owns and drains the
     // underlying platform callbacks before it is destroyed.
     std::function<void(GUID)> terminationCallback{};
     {
         auto exitLock = m_exitCallbackLock.lock_exclusive();
-        if (ARGUMENT_PRESENT(ExitDetails))
-        {
-            m_exitDetails = ExitDetails;
-        }
-
         m_vmExitEvent.SetEvent();
 
         // If we reach this block and 'm_terminatingEvent' is not signaled, then this is abnormal shutdown.
         // If that happens, set m_terminatingEvent so all pending socket operations can be properly cancelled.
         if (!m_terminatingEvent.is_signaled())
         {
-            WSL_LOG("AbnormalVmExit", TraceLoggingValue(ExitDetails, "Details"));
+            const auto exitDetails = m_backend->GetExitDetails();
+            WSL_LOG("AbnormalVmExit", TraceLoggingValue(exitDetails.c_str(), "Details"));
             m_terminatingEvent.SetEvent();
         }
 
@@ -2100,8 +2098,8 @@ void WslCoreVm::RegisterCallbacks(_In_ const std::function<void(ULONG)>& DistroE
     if (m_vmConfig.EnableHostFileSystemAccess && m_vmConfig.EnableVirtioFs)
     {
         // Create a thread listening for handling virtiofs requests.
-        auto listenSocket = wsl::windows::common::hvsocket::Listen(m_runtimeId, LX_INIT_UTILITY_VM_VIRTIOFS_PORT);
-        m_virtioFsThread = std::thread(&WslCoreVm::VirtioFsWorker, this, std::move(listenSocket));
+        m_virtioFsListener = m_backend->CreateGuestListener(GuestServicePort{LX_INIT_UTILITY_VM_VIRTIOFS_PORT});
+        m_virtioFsThread = std::thread(&WslCoreVm::VirtioFsWorker, this, m_virtioFsListener.value());
     }
 }
 
@@ -2244,44 +2242,42 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::UnmountVolume(_In_ PCWSTR Name)
 _Requires_lock_held_(m_guestDeviceLock)
 void WslCoreVm::VerifyPlan9Servers()
 {
-    for (const auto& device : m_backend->GetFileSystemDevices())
+    for (const auto port : {LX_INIT_UTILITY_VM_PLAN9_DRVFS_ADMIN_PORT, LX_INIT_UTILITY_VM_PLAN9_DRVFS_PORT})
     {
-        const auto* socket = std::get_if<VmPlan9SocketDevice>(&device.Transport);
-        if (!socket)
+        const auto device = m_backend->GetFileSystemDevice([&](const VmFileSystemDevice& candidate) {
+            const auto* socket = std::get_if<VmPlan9SocketDevice>(&candidate.Transport);
+            return socket && socket->Port.Value == port;
+        });
+
+        if (!device)
         {
             continue;
         }
 
-        if (socket->Port.Value != LX_INIT_UTILITY_VM_PLAN9_DRVFS_ADMIN_PORT && socket->Port.Value != LX_INIT_UTILITY_VM_PLAN9_DRVFS_PORT)
-        {
-            continue;
-        }
-
-        const auto status = m_backend->GetFileSystemDeviceStatus(device.Id);
+        const auto status = m_backend->GetFileSystemDeviceStatus(device->Id);
         if (status.State != VmFileSystemDeviceState::Serving)
         {
-            m_backend->RemoveDevice(device.Id);
-            if (socket->Port.Value == LX_INIT_UTILITY_VM_PLAN9_DRVFS_ADMIN_PORT)
+            m_backend->RemoveDevice(device->Id);
+            if (port == LX_INIT_UTILITY_VM_PLAN9_DRVFS_ADMIN_PORT)
             {
                 m_adminDrvfsToken.reset();
             }
             else
             {
-                WI_ASSERT(socket->Port.Value == LX_INIT_UTILITY_VM_PLAN9_DRVFS_PORT);
                 m_drvfsToken.reset();
             }
         }
     }
 }
 
-void WslCoreVm::VirtioFsWorker(_In_ const wil::unique_socket& listenSocket)
+void WslCoreVm::VirtioFsWorker(VmGuestListener Listener)
 try
 {
     wsl::windows::common::wslutil::SetThreadDescription(L"VirtioFs - Worker");
 
     io::MultiHandleWait io;
 
-    io.AddHandle(std::make_unique<io::AcceptHandle>(listenSocket.get(), false, [this, &io](wil::unique_socket&& socket) {
+    io.AddHandle(std::make_unique<io::AcceptHandle>(Listener.Socket(), false, [this, &io](wil::unique_socket&& socket) {
         auto channel = std::make_shared<wsl::shared::SocketChannel>(std::move(socket), "VirtioFs");
         auto buffer = std::make_shared<std::vector<gsl::byte>>();
         auto pendingBytes = std::make_shared<std::vector<gsl::byte>>();
@@ -2379,10 +2375,11 @@ std::vector<char> WslCoreVm::ProcessVirtioFsRequest(_In_ gsl::span<gsl::byte> Re
             const auto foundShare = FindVirtioFsShare(tagWide.c_str(), !remountShare->Admin);
             THROW_HR_IF_MSG(E_UNEXPECTED, !foundShare.has_value(), "Unknown tag %ls", tagWide.c_str());
 
+            const auto options = FormatVirtioFsMountOptions(foundShare->MountOptions);
             std::tie(newTag, childName, source) =
-                AddVirtioFsShare(remountShare->Admin, foundShare->Path.c_str(), foundShare->OptionsString().c_str());
+                AddVirtioFsShare(remountShare->Admin, foundShare->EffectiveHostPath.c_str(), options.c_str());
 
-            WI_ASSERT(source == foundShare->Path);
+            WI_ASSERT(source == foundShare->EffectiveHostPath);
         });
 
         return buildResponse(newTag, childName, source, result);
@@ -2417,34 +2414,6 @@ std::string WslCoreVm::s_GetMountTargetName(_In_ PCWSTR Disk, _In_opt_ PCWSTR Na
     }
 
     return target;
-}
-
-WslCoreVm::VirtioFsShare::VirtioFsShare(PCWSTR Path, PCWSTR Options, bool Admin) :
-    Path(Path), Options(ParseVirtioFsMountOptions(Options)), Admin(Admin)
-{
-    if constexpr (wsl::shared::Debug)
-    {
-        auto optionsVector = wsl::shared::string::Split(std::wstring{Options}, L';');
-        const auto originalSet = std::set<std::wstring>(optionsVector.begin(), optionsVector.end());
-        auto newVector = wsl::shared::string::Split(OptionsString(), L';');
-        const auto newSet = std::set<std::wstring>(newVector.begin(), newVector.end());
-        WI_ASSERT_MSG(originalSet == newSet, "mount options do not match");
-    }
-}
-
-std::wstring WslCoreVm::VirtioFsShare::OptionsString() const
-{
-    return FormatVirtioFsMountOptions(Options);
-}
-
-bool WslCoreVm::VirtioFsShare::operator<(const VirtioFsShare& other) const
-{
-    return std::tie(Path, Options, Admin) < std::tie(other.Path, other.Options, other.Admin);
-}
-
-bool WslCoreVm::VirtioFsShare::operator==(const VirtioFsShare& other) const
-{
-    return Path == other.Path && Options == other.Options && Admin == other.Admin;
 }
 
 void WslCoreVm::TraceLoggingRundown() const noexcept

@@ -774,7 +774,12 @@ VmFileSystemDevice OpenVmmVirtualMachineBackend::CreateFileSystemDevice(const Vm
             wsl::shared::string::IsEqual(std::get<VmVirtioFsDevice>(entry.second.Transport).Tag, transport->Tag, false));
     }
 
-    VmFileSystemDevice device{{m_description.Identity, m_nextDeviceId}, VmFileSystemDeviceState::Prepared, {}, Request.Transport};
+    VmFileSystemDevice device{
+        {m_description.Identity, m_nextDeviceId},
+        VmFileSystemDeviceState::Prepared,
+        {},
+        Request.Transport,
+        wsl::windows::common::security::IsTokenElevated(m_description.Identity.UserToken.get())};
     const auto inserted = m_fileSystemDevices.emplace(device.Id.Value, FileSystemDevice{device, {}}).second;
     WI_ASSERT(inserted);
     ++m_nextDeviceId;
@@ -786,16 +791,17 @@ VmFileSystemDevice OpenVmmVirtualMachineBackend::CreateFileSystemDevice(const Vm
     return device;
 }
 
-std::vector<VmFileSystemDevice> OpenVmmVirtualMachineBackend::GetFileSystemDevices() const
+std::optional<VmFileSystemDevice> OpenVmmVirtualMachineBackend::GetFileSystemDevice(const VmFileSystemDevicePredicate& Predicate) const
 {
     auto lock = m_lock.lock_shared();
-    std::vector<VmFileSystemDevice> devices;
-    devices.reserve(m_fileSystemDevices.size());
     for (const auto& entry : m_fileSystemDevices)
     {
-        devices.push_back(entry.second);
+        if (Predicate(entry.second))
+        {
+            return entry.second;
+        }
     }
-    return devices;
+    return {};
 }
 
 VmFileSystemDevice OpenVmmVirtualMachineBackend::GetFileSystemDeviceStatus(VmDeviceId Device)
@@ -840,7 +846,9 @@ VmFileSystemShare OpenVmmVirtualMachineBackend::AddFileSystemShare(VmDeviceId De
         Device,
         VmVirtioFsShareAddress{std::get<VmVirtioFsDevice>(device->second.Transport).Tag, {}},
         hostPath,
-        Request.ReadOnly};
+        Request.ReadOnly,
+        options->MountOptions,
+        device->second.Elevated};
     const auto& guestAddress = std::get<VmVirtioFsShareAddress>(share.GuestAddress);
     const auto [entry, inserted] = m_fileSystemShares.emplace(share.Id.Value, share);
     WI_ASSERT(inserted);
@@ -863,6 +871,19 @@ VmFileSystemShare OpenVmmVirtualMachineBackend::AddFileSystemShare(VmDeviceId De
     ++m_nextShareId;
     rollback.release();
     return share;
+}
+
+std::optional<VmFileSystemShare> OpenVmmVirtualMachineBackend::GetFileSystemShare(const VmFileSystemSharePredicate& Predicate) const
+{
+    auto lock = m_lock.lock_shared();
+    for (const auto& entry : m_fileSystemShares)
+    {
+        if (Predicate(entry.second))
+        {
+            return entry.second;
+        }
+    }
+    return {};
 }
 
 void OpenVmmVirtualMachineBackend::RemoveFileSystemShare(VmShareId Share)

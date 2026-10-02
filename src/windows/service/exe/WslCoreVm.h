@@ -79,8 +79,6 @@ public:
         _In_ ULONG ExportFlags = 0,
         _Out_opt_ ULONG* ConnectPort = nullptr);
 
-    wil::unique_socket CreateListeningSocket() const;
-
     wil::unique_socket CreateRootNamespaceProcess(_In_ LPCSTR Path, _In_ LPCSTR* Arguments);
 
     std::pair<int, LX_MINI_MOUNT_STEP> DetachDisk(_In_opt_ PCWSTR Disk);
@@ -147,20 +145,6 @@ private:
         std::map<ULONG, Mount> Mounts;
     };
 
-    struct VirtioFsShare
-    {
-        VirtioFsShare(PCWSTR Path, PCWSTR Options, bool Admin);
-
-        std::wstring Path;
-        // Mount options are stored as a map so mounts that specify mount options in different orders can be shared.
-        std::map<std::wstring, std::wstring> Options;
-        bool Admin;
-
-        std::wstring OptionsString() const;
-        bool operator<(const VirtioFsShare& other) const;
-        bool operator==(const VirtioFsShare& other) const;
-    };
-
     WslCoreVm(_In_ wsl::core::Config&& VmConfig, _In_ InitializeDrvFsCallback InitializeDrvFs);
 
     _Requires_lock_held_(m_guestDeviceLock)
@@ -176,7 +160,7 @@ private:
     _Requires_lock_held_(m_lock)
     ULONG AttachDiskLockHeld(_In_ PCWSTR Disk, _In_ DiskType Type, _In_ MountFlags Flags, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_ HANDLE UserToken);
 
-    void CollectCrashDumps(wil::unique_socket&& socket) const;
+    void CollectCrashDumps(VmGuestListener Listener) const;
 
     std::shared_ptr<LxssRunningInstance> CreateInstanceInternal(
         _In_ const GUID& InstanceId,
@@ -191,7 +175,7 @@ private:
     void EjectVhdLockHeld(_In_ PCWSTR VhdPath);
 
     _Requires_lock_held_(m_guestDeviceLock)
-    std::optional<VirtioFsShare> FindVirtioFsShare(_In_ PCWSTR tag, _In_ std::optional<bool> Admin = {}) const;
+    std::optional<VmFileSystemShare> FindVirtioFsShare(_In_ PCWSTR Tag, _In_ std::optional<bool> Admin = {}) const;
 
     VmCreateRequest GenerateBackendRequest(const GUID& VmId);
 
@@ -212,7 +196,7 @@ private:
 
     void WaitForPmemDeviceInVm(_In_ ULONG PmemId);
 
-    void OnExit(_In_opt_ PCWSTR ExitDetails);
+    void OnExit();
 
     void ReadGuestCapabilities();
 
@@ -225,7 +209,7 @@ private:
     _Requires_lock_held_(m_lock)
     std::pair<int, LX_MINI_MOUNT_STEP> UnmountVolume(_In_ PCWSTR Name);
 
-    void VirtioFsWorker(_In_ const wil::unique_socket& socket);
+    void VirtioFsWorker(VmGuestListener Listener);
 
     std::vector<char> ProcessVirtioFsRequest(_In_ gsl::span<gsl::byte> Request);
 
@@ -235,18 +219,13 @@ private:
     _Guarded_by_(m_guestDeviceLock) std::future<bool> m_drvfsInitialResult;
     _Guarded_by_(m_guestDeviceLock) wil::unique_handle m_drvfsToken;
     _Guarded_by_(m_guestDeviceLock) wil::unique_handle m_adminDrvfsToken;
-    _Guarded_by_(m_guestDeviceLock) std::map<VirtioFsShare, std::wstring> m_virtioFsShares;
-    _Guarded_by_(m_guestDeviceLock) std::optional<VmDeviceId> m_virtioFsDevice;
-    _Guarded_by_(m_guestDeviceLock) std::optional<VmDeviceId> m_adminVirtioFsDevice;
     wil::srwlock m_lock;
     _Guarded_by_(m_lock) wil::com_ptr<IPlan9FileSystem> m_pluginPlan9Server;
     _Guarded_by_(m_lock) wil::unique_event m_terminatingEvent { wil::EventOptions::ManualReset };
     _Guarded_by_(m_lock) wil::unique_event m_vmExitEvent { wil::EventOptions::ManualReset };
     wil::unique_event m_vmCrashEvent{wil::EventOptions::ManualReset};
-    std::optional<std::filesystem::path> m_vmCrashLogFile;
 
     wil::srwlock m_exitCallbackLock;
-    std::wstring m_exitDetails;
     std::wstring m_machineId;
     GUID m_runtimeId;
     wsl::core::Config m_vmConfig;
@@ -269,7 +248,9 @@ private:
     ULONG m_systemDistroDeviceId = ULONG_MAX;
     ULONG m_kernelModulesDeviceId = ULONG_MAX;
     std::unique_ptr<IVirtualMachineBackend> m_backend;
-    wil::unique_socket m_listenSocket;
+    VmGuestListener m_guestListener;
+    std::optional<VmGuestListener> m_crashDumpListener;
+    std::optional<VmGuestListener> m_virtioFsListener;
     std::function<void(GUID)> m_onExit;
     wsl::shared::SocketChannel m_miniInitChannel;
     wil::unique_socket m_notifyChannel;

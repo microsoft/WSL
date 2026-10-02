@@ -56,9 +56,10 @@ public:
     VmGpuAttachment AddGpu(const VmGpuRequest& Request) override;
 
     VmFileSystemDevice CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request) override;
-    std::vector<VmFileSystemDevice> GetFileSystemDevices() const override;
+    std::optional<VmFileSystemDevice> GetFileSystemDevice(const VmFileSystemDevicePredicate& Predicate) const override;
     VmFileSystemDevice GetFileSystemDeviceStatus(VmDeviceId Device) override;
     VmFileSystemShare AddFileSystemShare(VmDeviceId Device, const VmFileSystemShareRequest& Request) override;
+    std::optional<VmFileSystemShare> GetFileSystemShare(const VmFileSystemSharePredicate& Predicate) const override;
     void RemoveFileSystemShare(VmShareId Share) override;
     VmSharedMemoryDevice AddSharedMemory(const VmSharedMemoryRequest& Request) override;
     void ConfigureGuestDma(const VmGuestDmaRequest& Request) override;
