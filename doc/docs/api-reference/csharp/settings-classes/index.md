@@ -5,6 +5,7 @@
 
 - [SessionSettings](sessionsettings.md)
 - [VhdOptions](vhdoptions.md)
+- [InstallOptions](installoptions.md)
 - [PullImageOptions](pullimageoptions.md)
 - [PushImageOptions](pushimageoptions.md)
 - [TagImageOptions](tagimageoptions.md)

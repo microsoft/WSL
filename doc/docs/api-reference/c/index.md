@@ -5,8 +5,6 @@ The WSL container API exposes a C API for creating sessions, creating containers
 > **Header:** `wslcsdk.h`
 >
 > **Library:** `wslcsdk.lib` / `wslcsdk.dll`
->
-> **PREVIEW NOTICE:** This API is currently in preview and is subject to breaking changes in future releases without prior notice. Do not rely on API stability for production workloads. Features, function signatures, and behaviors may change between releases during the preview period.
 
 ---
 

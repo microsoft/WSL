@@ -130,9 +130,9 @@ public:
 
     __requires_lock_held(m_lock) void CommitState(
         WSLCContainerState State,
-        std::int64_t StateTime,
+        std::int64_t TimeNano,
         std::optional<int> ExitCode = std::nullopt,
-        std::optional<std::int64_t> EventTime = std::nullopt) noexcept;
+        std::optional<std::int64_t> EventTimeNano = std::nullopt) noexcept;
 
     const std::string& ID() const noexcept;
 
@@ -163,7 +163,7 @@ public:
 
     // Appends an event for this container to the session's event stream. Direct Docker transitions use
     // the Docker event time; asynchronous reconciliation uses its publication time to preserve order.
-    void RecordEvent(std::string&& Action, std::int64_t Time, std::optional<int> ExitCode = std::nullopt) noexcept;
+    void RecordEvent(std::string&& Action, std::int64_t TimeNano, std::optional<int> ExitCode = std::nullopt) noexcept;
 
 private:
     enum class TransitionKind
@@ -213,8 +213,8 @@ private:
     __requires_exclusive_lock_held(m_lock) void RequestDeleteExclusiveLockHeld(WSLCDeleteFlags Flags);
 
     void AllocateBridgedModePorts();
-    void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::int64_t eventTime, std::optional<std::int64_t> eventTimeNanoseconds) noexcept;
-    __requires_exclusive_lock_held(m_lock) [[nodiscard]] bool PrepareForUnexpectedStartLockHeld(std::int64_t eventTime) noexcept;
+    void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::int64_t eventTimeNano) noexcept;
+    __requires_exclusive_lock_held(m_lock) [[nodiscard]] bool PrepareForUnexpectedStartLockHeld(std::int64_t eventTimeNano) noexcept;
 
     __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> StartTransition(TransitionKind kind, ContainerEvent expectedEvent);
 
@@ -249,8 +249,7 @@ private:
     __requires_exclusive_lock_held(m_lock) void ReleaseProcesses();
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect PrepareDisconnectComWrapper();
 
-    __requires_exclusive_lock_held(m_lock)
-        [[nodiscard]] bool OnStopped(int exitCode, std::int64_t stopTime, std::optional<std::int64_t> stopTimeNanoseconds);
+    __requires_exclusive_lock_held(m_lock) [[nodiscard]] bool OnStopped(int exitCode, std::int64_t stopTimeNano);
     __requires_exclusive_lock_held(m_lock) void NotifyContainerStoppingLockHeld() noexcept;
     __requires_exclusive_lock_held(m_lock) void ArmPolicyRestartLockHeld();
 

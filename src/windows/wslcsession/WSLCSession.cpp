@@ -1698,7 +1698,7 @@ std::optional<std::string> WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRe
             return;
         }
 
-        auto parsed = shared::FromJson<docker_schema::ImageLoadResult>(std::string(buffer.begin(), buffer.end()).c_str());
+        auto parsed = shared::FromJson<docker_schema::ImageLoadResult>(buffer.begin(), buffer.end());
 
         if (parsed.errorDetail.has_value())
         {
@@ -2538,7 +2538,7 @@ void WSLCSession::WaitForConflictingCreateToComplete(std::unique_lock<std::mutex
     }
 }
 
-void WSLCSession::OnContainerCreated(const std::string& ContainerId, std::int64_t Time) noexcept
+void WSLCSession::OnContainerCreated(const std::string& ContainerId, std::int64_t TimeNano) noexcept
 try
 {
     std::lock_guard containersLock{m_containersLock};
@@ -2556,7 +2556,7 @@ try
     {
         // Key the map by Docker's container ID, which is set in the WSLCContainerImpl constructor and stable for its lifetime.
         WI_VERIFY(m_containers.emplace(ContainerId, pendingCreate->Container).second);
-        pendingCreate->Container->RecordEvent("create", Time);
+        pendingCreate->Container->RecordEvent("create", TimeNano);
     }
     catch (...)
     {
@@ -2569,10 +2569,10 @@ try
 CATCH_LOG()
 
 void WSLCSession::OnNetworkEvent(
-    const std::string& NetworkId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t Time) noexcept
+    const std::string& NetworkId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t TimeNano) noexcept
 try
 {
-    m_eventStore.Record("network", std::string{Action}, NetworkId, Attributes, Time);
+    m_eventStore.Record("network", std::string{Action}, NetworkId, Attributes, TimeNano);
 }
 CATCH_LOG()
 

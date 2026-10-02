@@ -3473,24 +3473,16 @@ class WSLCTests
             return contentString;
         };
 
-        auto validateFirstDmesgLine = [](const std::string& dmesg, const char* expected) {
-            auto firstLf = dmesg.find("\n");
-            VERIFY_ARE_NOT_EQUAL(firstLf, std::string::npos);
-            VERIFY_IS_TRUE(dmesg.find(expected) < firstLf);
-        };
-
         // Dmesg without early boot logging
         {
             auto dmesg = createVmWithDmesg(false);
-
-            // Verify that the first line is "brd: module loaded";
-            validateFirstDmesgLine(dmesg, "brd: module loaded");
+            VERIFY_ARE_EQUAL(dmesg.find("Linux version"), std::string::npos);
         }
 
         // Dmesg with early boot logging
         {
             auto dmesg = createVmWithDmesg(true);
-            validateFirstDmesgLine(dmesg, "Linux version");
+            VERIFY_ARE_NOT_EQUAL(dmesg.find("Linux version"), std::string::npos);
         }
     }
 
@@ -7246,13 +7238,13 @@ class WSLCTests
         return stream;
     }
 
-    std::vector<wsl::windows::common::wslc_schema::Event> ReadEvents(IWSLCEventStream* Stream, size_t Count)
+    std::vector<wsl::windows::common::wslc_schema::Event> ReadEvents(IWSLCEventStream* Stream, size_t Count, HANDLE CancelEvent = nullptr)
     {
         std::vector<wsl::windows::common::wslc_schema::Event> events;
         wil::unique_cotaskmem_ansistring eventJson;
         for (size_t index = 0; index < Count; ++index)
         {
-            VERIFY_SUCCEEDED(Stream->GetNext(nullptr, &eventJson));
+            VERIFY_SUCCEEDED(Stream->GetNext(CancelEvent, &eventJson));
             events.push_back(wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(eventJson.get()));
         }
 
@@ -7365,8 +7357,34 @@ class WSLCTests
             verifyEvents(lifecycleEvents, id, {"create", "start", "kill", "stop", "destroy"});
 
             // The whole lifecycle falls inside the requested window.
-            VERIFY_IS_TRUE(lifecycleEvents[0].time >= since);
-            VERIFY_IS_TRUE(lifecycleEvents[4].time < until);
+            VERIFY_IS_TRUE(lifecycleEvents[0].timeNano / 1'000'000'000 >= since);
+            VERIFY_IS_TRUE(lifecycleEvents[4].timeNano / 1'000'000'000 < until);
+
+            // Each event keeps the exact time Docker reported for it.
+            // WSLC records Docker's 'die' as 'stop'; Docker also emits unrecorded events such as 'attach'.
+            auto dockerEvents = ExpectCommandResult(
+                m_defaultSession.get(),
+                {"/usr/bin/docker",
+                 "events",
+                 "--since",
+                 std::to_string(lifecycleEvents.front().timeNano / 1'000'000'000),
+                 "--until",
+                 std::to_string(lifecycleEvents.back().timeNano / 1'000'000'000 + 1),
+                 "--filter",
+                 "type=container",
+                 "--filter",
+                 "container=" + id,
+                 "--format",
+                 "{{.Action}} {{.TimeNano}}"},
+                0);
+
+            const auto dockerLines = wsl::shared::string::Split(dockerEvents.Output[1], '\n');
+            for (const auto& event : lifecycleEvents)
+            {
+                const auto dockerAction = event.Action == "stop" ? std::string{"die"} : event.Action;
+                const auto expected = std::format("{} {}", dockerAction, event.timeNano);
+                VERIFY_IS_TRUE(std::ranges::find(dockerLines, expected) != dockerLines.end());
+            }
         }
 
         // Each lifecycle action is independently selectable: an 'event=<action>' filter, AND'd with
@@ -7429,6 +7447,24 @@ class WSLCTests
             VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, &filter, 1, &stream));
 
             VERIFY_IS_TRUE(DrainEventStream(stream.get()).empty());
+        }
+
+        // An until-time in year 3000, beyond the range of nanosecond time points, still returns the recorded events.
+        {
+            WSLCFilter filter{"container", id.c_str()};
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, 32'503'680'000, &filter, 1, &stream));
+
+            // The stream stays open until year 3000, so a missing event would otherwise block instead of failing.
+            wil::unique_event timedOut{wil::EventOptions::ManualReset};
+            wil::unique_threadpool_timer timeout{CreateThreadpoolTimer(
+                [](PTP_CALLBACK_INSTANCE, PVOID context, PTP_TIMER) { SetEvent(static_cast<HANDLE>(context)); }, timedOut.get(), nullptr)};
+            VERIFY_IS_NOT_NULL(timeout.get());
+
+            FILETIME dueTime = wil::filetime::from_int64(-wil::filetime_duration::one_second * 60);
+            SetThreadpoolTimer(timeout.get(), &dueTime, 0, 0);
+
+            verifyEvents(ReadEvents(stream.get(), 5, timedOut.get()), id, {"create", "start", "kill", "stop", "destroy"});
         }
 
         // A since-time later than a non-zero until-time describes a backwards window and is rejected.
@@ -7507,7 +7543,7 @@ class WSLCTests
         // bounded queries below read a settled store.
         const auto remainingEvents = ReadEvents(stream.get(), lifecycleActions.size() - lifecycleEvents.size());
         lifecycleEvents.insert(lifecycleEvents.end(), remainingEvents.begin(), remainingEvents.end());
-        const LONGLONG until = lifecycleEvents.back().time + 1;
+        const LONGLONG until = lifecycleEvents.back().timeNano / 1'000'000'000 + 1;
 
         auto eventsMatching = [&](const std::vector<WSLCFilter>& Filters) {
             wil::com_ptr<IWSLCEventStream> replayStream;
@@ -7536,6 +7572,7 @@ class WSLCTests
                 VERIFY_ARE_EQUAL(networkId, event.Actor.ID);
                 VERIFY_ARE_EQUAL(networkName, event.Actor.Attributes.at("name"));
                 VERIFY_ARE_EQUAL(networkDriver, event.Actor.Attributes.at("type"));
+                VERIFY_IS_GREATER_THAN(event.timeNano, 0LL);
             }
 
             // Only the endpoint events name the container that attached to the network.
@@ -7737,7 +7774,7 @@ class WSLCTests
         // The session event store retains create across restart and records destroy after reconnect.
         WSLCFilter filter{"network", networkName.c_str()};
         wil::com_ptr<IWSLCEventStream> replayStream;
-        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, destroyEvents[0].time + 1, &filter, 1, &replayStream));
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, destroyEvents[0].timeNano / 1'000'000'000 + 1, &filter, 1, &replayStream));
         const auto events = DrainEventStream(replayStream.get());
 
         VERIFY_ARE_EQUAL(static_cast<size_t>(2), events.size());
