@@ -130,6 +130,7 @@ class WSLCTests
         settings.CpuCount = 4;
         settings.MemoryMb = 2048;
         settings.BootTimeoutMs = 30 * 1000;
+        settings.EngineBootTimeoutMs = settings.BootTimeoutMs;
         settings.StoragePath = enableStorage ? m_storagePath.c_str() : nullptr;
         settings.MaximumStorageSizeMb = 1024 * 20; // 20GB.
         settings.NetworkingMode = networkingMode;
@@ -12297,6 +12298,57 @@ class WSLCTests
             // Verify container is no longer accessible
             wil::com_ptr<IWSLCContainer> notFound;
             VERIFY_ARE_EQUAL(session->OpenContainer(containerName.c_str(), &notFound), WSLC_E_CONTAINER_NOT_FOUND);
+        }
+    }
+
+    WSLC_TEST_METHOD(EngineBootTimeoutControlsInitialization)
+    {
+        auto restore = ResetTestSession();
+        constexpr auto c_sessionName = L"engine-boot-timeout-test";
+        constexpr auto c_connectionCount = "awk '/docker.sock$/ && $6 == \"03\" {count++} END {print count+0}' /proc/net/unix";
+
+        for (const ULONG timeout : {0ul, 30000ul})
+        {
+            auto settings = GetDefaultSessionSettings(c_sessionName, true);
+            settings.EngineBootTimeoutMs = timeout;
+            auto session = CreateSession(settings);
+
+            // A persistent /events connection proves that Docker initialization ran. VM-only
+            // operations must not establish it when initialization is deferred.
+            const auto verifyConnections = [&](bool initialized) {
+                auto result = RunCommand(session.get(), {"/bin/sh", "-c", c_connectionCount});
+                VERIFY_ARE_EQUAL(0, result.Code);
+                VERIFY_ARE_EQUAL(initialized, std::stoi(result.Output.at(1)) > 0);
+            };
+            verifyConnections(timeout != 0);
+
+            WSLCContainerLauncher launcher("debian:latest", "engine-boot-timeout-container", {"sleep", "9999"});
+            auto container = launcher.Create(*session);
+            verifyConnections(true);
+
+            for (int iteration = 0; iteration < 2; ++iteration)
+            {
+                BOOL wasAlreadyIdle = TRUE;
+                VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+                VERIFY_IS_FALSE(wasAlreadyIdle);
+                VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
+
+                verifyConnections(timeout != 0);
+                if (timeout == 0)
+                {
+                    // Unrecovered containers must not be mistaken for idle state.
+                    VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+                    VERIFY_IS_TRUE(IsVmRunning(c_sessionName));
+                    verifyConnections(false);
+                }
+
+                VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+                VERIFY_ARE_EQUAL(WslcContainerStateRunning, container.State());
+                verifyConnections(true);
+
+                VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+                VERIFY_ARE_EQUAL(WslcContainerStateExited, container.State());
+            }
         }
     }
 

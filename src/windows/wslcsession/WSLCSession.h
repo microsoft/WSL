@@ -319,7 +319,7 @@ private:
     // VM, so it is served by the running one -- including one committed to stopping -- or rejected.
     [[nodiscard]] static constexpr WSLCSessionRuntime::VmLeasePolicy LeasePolicyFor(BOOL AcquireVmLease) noexcept
     {
-        return AcquireVmLease ? WSLCSessionRuntime::VmLeasePolicy::Acquire : WSLCSessionRuntime::VmLeasePolicy::ExistingOnly;
+        return AcquireVmLease ? WSLCSessionRuntime::VmLeasePolicy::VmOnly : WSLCSessionRuntime::VmLeasePolicy::ExistingOnly;
     }
 
     __requires_lock_held(m_userHandlesLock) void CancelUserHandleIO();

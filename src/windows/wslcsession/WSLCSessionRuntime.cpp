@@ -419,9 +419,9 @@ void WSLCSessionRuntime::StartVmLockHeld()
     m_ioRelay->AddHandle(
         std::make_unique<windows::common::io::EventHandle>(m_vmExitedEvent.get(), std::bind(&WSLCSessionRuntime::OnVmExited, this)));
 
-    if (m_hooks.RecoverState)
+    if (m_settings->EngineBootTimeoutMs != 0)
     {
-        m_hooks.RecoverState();
+        InitializeDockerLockHeld();
     }
 
     m_vmState.store(VmState::Running);
@@ -433,18 +433,41 @@ void WSLCSessionRuntime::StartVmLockHeld()
 void WSLCSessionRuntime::InitializeDockerRuntime(const std::filesystem::path& storagePath)
 {
     // Wait for dockerd to be ready before starting the event tracker.
-    THROW_WIN32_IF_MSG(
-        ERROR_TIMEOUT, !m_dockerdReadyEvent.wait(m_settings->BootTimeoutMs), "Timed out waiting for dockerd to start");
+    const auto timeout = m_settings->EngineBootTimeoutMs != 0 ? m_settings->EngineBootTimeoutMs : wsl::windows::wslc::DefaultBootTimeoutMs;
+    THROW_WIN32_IF_MSG(ERROR_TIMEOUT, !m_dockerdReadyEvent.wait(timeout), "Timed out waiting for dockerd to start");
 
-    [[maybe_unused]] auto [pid, ptyMaster, channel] = m_virtualMachine->Fork(WSLC_FORK::Thread);
+    // Preserve completed stages if a deferred initialization fails and a later operation retries it.
+    if (!m_dockerClient)
+    {
+        [[maybe_unused]] auto [pid, ptyMaster, channel] = m_virtualMachine->Fork(WSLC_FORK::Thread);
 
-    m_dockerClient.emplace(std::move(channel), m_virtualMachine->TerminatingEvent(), m_virtualMachine->VmId(), 10 * 1000);
+        m_dockerClient.emplace(std::move(channel), m_virtualMachine->TerminatingEvent(), m_virtualMachine->VmId(), 10 * 1000);
+    }
 
     // (Re)bind the session-scoped event tracker to this VM's docker client and relay. Existing
     // container subscriptions are preserved across restarts.
-    m_eventTracker->Connect(m_dockerClient.value(), *m_ioRelay);
+    if (!m_dockerEventsConnected)
+    {
+        m_eventTracker->Connect(m_dockerClient.value(), *m_ioRelay);
+        m_dockerEventsConnected = true;
+    }
 
-    m_volumes.emplace(m_dockerClient.value(), m_virtualMachine.value(), m_eventTracker.value(), storagePath);
+    if (!m_volumes)
+    {
+        m_volumes.emplace(m_dockerClient.value(), m_virtualMachine.value(), m_eventTracker.value(), storagePath);
+    }
+}
+
+void WSLCSessionRuntime::InitializeDockerLockHeld()
+{
+    if (!m_dockerInitialized)
+    {
+        if (m_hooks.RecoverState)
+        {
+            m_hooks.RecoverState();
+        }
+        m_dockerInitialized = true;
+    }
 }
 
 void WSLCSessionRuntime::StopVmLockHeld()
@@ -513,6 +536,8 @@ void WSLCSessionRuntime::TearDownVmLockHeld(bool CaptureTerminationReason)
     // The session-scoped event tracker is intentionally not reset. Its stream handle dies with the IO
     // relay above, and InitializeDockerRuntime re-binds it on the next start.
     m_dockerClient.reset();
+    m_dockerInitialized = false;
+    m_dockerEventsConnected = false;
 
     if (CaptureTerminationReason)
     {
@@ -620,7 +645,9 @@ try
     // Re-check every teardown precondition under the lock. The activity count is the single
     // source of truth for "the VM is needed"; a 0->1 transition since the timer fired (cancel
     // raced the callback) is caught here.
-    if (m_terminating->load() || m_vmState.load() != VmState::Running || m_idleState->ActivityCount() != 0)
+    // Until recovery completes, dockerd may have restarted containers whose activity holds we
+    // have not acquired yet. Do not mistake an unrecovered VM for an idle one.
+    if (m_terminating->load() || m_vmState.load() != VmState::Running || !m_dockerInitialized || m_idleState->ActivityCount() != 0)
     {
         return;
     }
@@ -715,7 +742,7 @@ bool WSLCSessionRuntime::TriggerIdleTerminationForTest()
             }
 
             // Match the production idle timer: an active container or operation keeps the VM alive.
-            if (m_idleState->ActivityCount() != 0)
+            if (!m_dockerInitialized || m_idleState->ActivityCount() != 0)
             {
                 return;
             }
@@ -797,7 +824,7 @@ WSLCSessionRuntime::VmLease::VmLease(WSLCSessionRuntime& Runtime, VmLeasePolicy 
     // Activity increment may race with idle teardown. Retry until we hold the lock with VM running.
     for (;;)
     {
-        if (Policy == VmLeasePolicy::Acquire)
+        if (Policy != VmLeasePolicy::ExistingOnly)
         {
             m_runtime->EnsureVmRunning();
         }
@@ -811,6 +838,19 @@ WSLCSessionRuntime::VmLease::VmLease(WSLCSessionRuntime& Runtime, VmLeasePolicy 
             // callers are exempt and are served by the stopping VM -- see VmLeasePolicy.
             if (Policy == VmLeasePolicy::ExistingOnly || !m_runtime->m_vmStopPending.load())
             {
+                if (Policy == VmLeasePolicy::Acquire && !m_runtime->m_dockerInitialized)
+                {
+                    m_lock.reset();
+                    auto lock = m_runtime->m_lock.lock_exclusive();
+                    THROW_HR_IF(
+                        HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+                        m_runtime->m_terminating->load() || m_runtime->m_sessionTerminatedEvent.is_signaled());
+                    if (m_runtime->m_vmState.load() == VmState::Running && !m_runtime->m_vmStopPending.load())
+                    {
+                        m_runtime->InitializeDockerLockHeld();
+                    }
+                    continue;
+                }
                 break;
             }
 

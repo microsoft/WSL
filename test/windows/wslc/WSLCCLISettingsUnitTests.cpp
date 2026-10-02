@@ -95,6 +95,7 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(0u, map.GetOrDefault<Setting::SessionCpuCount>());
         VERIFY_ARE_EQUAL(0u, map.GetOrDefault<Setting::SessionMemoryMb>());
         VERIFY_ARE_EQUAL(1048576u, map.GetOrDefault<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(30000u, map.GetOrDefault<Setting::SessionEngineBootTimeout>());
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(map.GetOrDefault<Setting::CredentialStore>()));
     }
 
@@ -122,6 +123,7 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
         VERIFY_ARE_EQUAL(1048576u, s.Get<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(30000u, s.Get<Setting::SessionEngineBootTimeout>());
         VERIFY_ARE_EQUAL(std::string("host.wslc.internal"), s.Get<Setting::SessionHostLoopback>());
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(s.Get<Setting::CredentialStore>()));
     }
@@ -316,6 +318,34 @@ class WSLCCLISettingsUnitTests
             s.GetWarnings().front().Message);
     }
 
+    TEST_METHOD(Validation_EngineBootTimeout_ConvertsSecondsAndAcceptsZero)
+    {
+        for (const auto& [value, expected] :
+             std::vector<std::pair<std::string, uint32_t>>{{"0", 0}, {"\"0\"", 0}, {"1", 1000}, {"60", 60000}, {"4294967", 4294967000u}})
+        {
+            auto dir = UniqueTempDir();
+            WriteFile(dir / L"settings.yaml", std::format("session:\n  engineBootTimeout: {}\n", value));
+
+            UserSettingsTest s{dir};
+            VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+            VERIFY_ARE_EQUAL(expected, s.Get<Setting::SessionEngineBootTimeout>());
+        }
+    }
+
+    TEST_METHOD(Validation_EngineBootTimeout_InvalidValuesWarnAndUseDefault)
+    {
+        for (const auto value : {"-1", "1.5", "true", "invalid", "4294968", "4294967295", "4294967296", "[]"})
+        {
+            auto dir = UniqueTempDir();
+            WriteFile(dir / L"settings.yaml", std::format("session:\n  engineBootTimeout: {}\n", value));
+
+            UserSettingsTest s{dir};
+            VERIFY_ARE_EQUAL(30000u, s.Get<Setting::SessionEngineBootTimeout>());
+            VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+            VERIFY_ARE_EQUAL(std::wstring(L"session.engineBootTimeout"), s.GetWarnings().front().SettingPath);
+        }
+    }
+
     // Absent keys must silently use defaults — no warnings emitted.
     TEST_METHOD(Validation_AbsentKeys_NoWarningsAndDefaults)
     {
@@ -345,6 +375,7 @@ class WSLCCLISettingsUnitTests
             "  hostFileShareMode: default\n"
             "  dnsTunneling: default\n"
             "  hostLoopback: default\n"
+            "  engineBootTimeout: default\n"
             "experimental:\n"
             "  portRelay: default\n"
             "credentialStore: default\n");
@@ -360,6 +391,7 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(static_cast<int>(HostFileShareMode::VirtioFs), static_cast<int>(s.Get<Setting::SessionHostFileShareMode>()));
         VERIFY_IS_TRUE(s.Get<Setting::SessionDnsTunneling>());
         VERIFY_ARE_EQUAL(std::string("host.wslc.internal"), s.Get<Setting::SessionHostLoopback>());
+        VERIFY_ARE_EQUAL(30000u, s.Get<Setting::SessionEngineBootTimeout>());
         VERIFY_ARE_EQUAL(static_cast<int>(PortRelayType::VirtioNet), static_cast<int>(s.Get<Setting::SessionPortRelay>()));
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(s.Get<Setting::CredentialStore>()));
     }

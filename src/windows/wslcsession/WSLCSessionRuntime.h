@@ -92,8 +92,9 @@ public:
 
     // Whether a lease may bring a VM up, or must be served by whatever VM is already running.
     //
-    // Acquire is correct for every ordinary caller: it starts the VM if there is none, and because an
-    // announced stop always happens, a VM with one pending is unusable even though it is still
+    // Acquire initializes Docker as well as the VM. VmOnly skips deferred Docker initialization.
+    // Both start the VM if there is none. Because an announced stop always happens,
+    // a VM with one pending is unusable even though it is still
     // running -- the lease waits for the teardown and is then served by a fresh VM.
     //
     // ExistingOnly is for plugins. A plugin call is a side effect of the session's own activity, never
@@ -105,6 +106,7 @@ public:
     enum class VmLeasePolicy
     {
         Acquire,
+        VmOnly,
         ExistingOnly,
     };
 
@@ -200,6 +202,9 @@ public:
     void Shutdown(wil::rwlock_release_exclusive_scope_exit& runtimeLock, WSLCVirtualMachineTerminationReason& terminationReason, std::wstring& terminationDetails);
 
 private:
+    _Requires_exclusive_lock_held_(m_lock)
+    void InitializeDockerLockHeld();
+
     bool IdleTerminationEnabled() const noexcept;
     int StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
 
@@ -248,6 +253,8 @@ private:
     std::optional<DockerEventTracker> m_eventTracker;
     std::optional<DockerHTTPClient> m_dockerClient;
     std::optional<WSLCVolumes> m_volumes;
+    _Guarded_by_(m_lock) bool m_dockerInitialized { false };
+    _Guarded_by_(m_lock) bool m_dockerEventsConnected { false };
     std::optional<ServiceRunningProcess> m_containerdProcess;
     std::optional<ServiceRunningProcess> m_dockerdProcess;
     wil::unique_event m_vmExitedEvent;

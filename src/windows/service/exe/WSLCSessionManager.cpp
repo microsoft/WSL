@@ -123,6 +123,7 @@ private:
         Settings.MemoryMb = memoryMb > 0 ? memoryMb : SessionSettings::DefaultMemoryMb();
         Settings.MaximumStorageSizeMb = userSettings.Get<settings::Setting::SessionStorageSizeMb>();
         Settings.BootTimeoutMs = wsl::windows::wslc::DefaultBootTimeoutMs;
+        Settings.EngineBootTimeoutMs = userSettings.Get<settings::Setting::SessionEngineBootTimeout>();
         Settings.IdleTimeoutSec = userSettings.Get<settings::Setting::SessionIdleTimeout>();
         Settings.NetworkingMode = userSettings.Get<settings::Setting::SessionNetworkingMode>();
 
@@ -476,6 +477,7 @@ WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
     sessionSettings.StoragePath = Settings->StoragePath;
     sessionSettings.MaximumStorageSizeMb = Settings->MaximumStorageSizeMb;
     sessionSettings.BootTimeoutMs = Settings->BootTimeoutMs;
+    sessionSettings.EngineBootTimeoutMs = Settings->EngineBootTimeoutMs;
     sessionSettings.NetworkingMode = Settings->NetworkingMode;
     sessionSettings.FeatureFlags = Settings->FeatureFlags;
     sessionSettings.RootVhdTypeOverride = Settings->RootVhdTypeOverride;

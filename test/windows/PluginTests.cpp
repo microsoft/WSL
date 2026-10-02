@@ -671,6 +671,7 @@ class PluginTests
         settings.CpuCount = 4;
         settings.MemoryMb = 4096;
         settings.BootTimeoutMs = 30 * 1000;
+        settings.EngineBootTimeoutMs = settings.BootTimeoutMs;
         settings.NetworkingMode = NetworkingMode;
         settings.StoragePath = StoragePath;
         settings.MaximumStorageSizeMb = 1024 * 20; // 20GB, only used when StoragePath is set.
@@ -823,6 +824,7 @@ class PluginTests
         settings.CpuCount = 4;
         settings.MemoryMb = 2048;
         settings.BootTimeoutMs = 30 * 1000;
+        settings.EngineBootTimeoutMs = settings.BootTimeoutMs;
         settings.MaximumStorageSizeMb = 1024 * 20;
         settings.NetworkingMode = WSLCNetworkingModeNone;
 

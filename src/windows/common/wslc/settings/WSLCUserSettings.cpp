@@ -64,6 +64,12 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  # Seconds an idle session VM stays running before it is torn down (default: 30)\n"
     "  # idleTimeout: default\n"
     "\n"
+    "  # Seconds to wait for dockerd at VM boot (default: 30).\n"
+    "  # Set to 0 to skip the wait and container, network, and volume recovery at boot.\n"
+    "  # Docker initialization is deferred until the first engine operation, which waits up to 30 seconds.\n"
+    "  # Idle VM teardown is disabled until that initialization completes.\n"
+    "  # engineBootTimeout: default\n"
+    "\n"
     "# Credential storage backend: \"wincred\" or \"file\" (default: wincred)\n"
     "# credentialStore: wincred\n";
 
@@ -191,6 +197,11 @@ namespace details {
     WSLC_VALIDATE_SETTING(SessionIdleTimeout)
     {
         return value > 0 ? std::optional{value} : std::nullopt;
+    }
+
+    WSLC_VALIDATE_SETTING(SessionEngineBootTimeout)
+    {
+        return value <= (INFINITE - 1) / 1000 ? std::optional<uint32_t>{value * 1000} : std::nullopt;
     }
 
     WSLC_VALIDATE_SETTING(CredentialStore)

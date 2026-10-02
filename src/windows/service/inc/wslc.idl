@@ -551,6 +551,8 @@ typedef struct _WSLCSessionSettings {
     WSLCHandle DmesgOutput;
     WSLCSessionStorageFlags StorageFlags;
     ULONG IdleTimeoutSec;
+    // Zero defers Docker initialization until the first engine operation.
+    ULONG EngineBootTimeoutMs;
 
     // Below options are used for debugging purposes only.
     [unique] LPCWSTR RootVhdOverride;
@@ -707,6 +709,7 @@ typedef struct _WSLCSessionInitSettings
     WSLCFeatureFlags FeatureFlags;
     [unique] LPCSTR RootVhdTypeOverride;
     ULONG IdleTimeoutSec;
+    ULONG EngineBootTimeoutMs;
 } WSLCSessionInitSettings;
 
 [

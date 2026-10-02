@@ -374,6 +374,7 @@ SessionSettingsConversion::SessionSettingsConversion(const WSLCCompatSessionSett
     m_value.CpuCount = Settings.CpuCount;
     m_value.MemoryMb = Settings.MemoryMb;
     m_value.BootTimeoutMs = Settings.BootTimeoutMs;
+    m_value.EngineBootTimeoutMs = Settings.BootTimeoutMs;
     m_value.NetworkingMode = Settings.NetworkingMode;
 
     m_value.FeatureFlags = Settings.FeatureFlags;

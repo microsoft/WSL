@@ -400,6 +400,7 @@ class WSLCE2EGlobalTests
             settings.CpuCount = 4;
             settings.MemoryMb = 2048;
             settings.BootTimeoutMs = 30000;
+            settings.EngineBootTimeoutMs = settings.BootTimeoutMs;
             settings.MaximumStorageSizeMb = 4096;
 
             wil::com_ptr<IWSLCSession> session;
@@ -419,6 +420,7 @@ class WSLCE2EGlobalTests
             settings.CpuCount = 4;
             settings.MemoryMb = 2048;
             settings.BootTimeoutMs = 30000;
+            settings.EngineBootTimeoutMs = settings.BootTimeoutMs;
             settings.MaximumStorageSizeMb = 4096;
 
             wil::com_ptr<IWSLCSession> session;
@@ -444,6 +446,7 @@ class WSLCE2EGlobalTests
             settings.CpuCount = 4;
             settings.MemoryMb = 2048;
             settings.BootTimeoutMs = 30000;
+            settings.EngineBootTimeoutMs = settings.BootTimeoutMs;
             settings.MaximumStorageSizeMb = 4096;
 
             wil::com_ptr<IWSLCSession> session;

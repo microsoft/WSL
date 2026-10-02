@@ -446,11 +446,10 @@ try
         // VM instance is not observed.
         m_runtime.ResetDockerdReady();
         StartDockerd();
-
-        m_runtime.InitializeDockerRuntime(m_storageVhdPath.parent_path());
     };
 
     hooks.RecoverState = [this]() {
+        m_runtime.InitializeDockerRuntime(m_storageVhdPath.parent_path());
         RecoverExistingNetworks();
         RecoverExistingContainers();
     };
@@ -2981,7 +2980,7 @@ try
 
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(Path), !std::filesystem::path(Path).is_absolute());
 
-    auto lock = AcquireLease();
+    auto lock = AcquireLease(WSLCSessionRuntime::VmLeasePolicy::VmOnly);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
     // Attach the disk to the VM (AttachDisk() performs the access check for the VHD file).
@@ -3675,7 +3674,7 @@ try
 {
     WSLCExecutionContext context(this);
 
-    auto lock = AcquireLease();
+    auto lock = AcquireLease(WSLCSessionRuntime::VmLeasePolicy::VmOnly);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
     std::lock_guard allocatedPortsLock(m_runtime.AllocatedPortsLock());
@@ -3722,7 +3721,7 @@ try
 {
     WSLCExecutionContext context(this);
 
-    auto lock = AcquireLease();
+    auto lock = AcquireLease(WSLCSessionRuntime::VmLeasePolicy::VmOnly);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
     std::lock_guard allocatedPortsLock(m_runtime.AllocatedPortsLock());
@@ -4209,15 +4208,13 @@ void WSLCSession::RecoverExistingNetworks()
 
     for (const auto& network : networks)
     {
-        if (!network.Labels.contains(WSLCNetworkManagedLabel))
+        if (!network.Labels.contains(WSLCNetworkManagedLabel) || m_networks.contains(network.Name))
         {
             continue;
         }
 
         try
         {
-            WI_ASSERT(!m_networks.contains(network.Name));
-
             NetworkEntry entry;
             entry.Id = network.Id;
             entry.Driver = network.Driver;

@@ -73,6 +73,7 @@ namespace {
         settings.CpuCount = 4;
         settings.MemoryMb = 2048;
         settings.BootTimeoutMs = 30 * 1000;
+        settings.EngineBootTimeoutMs = settings.BootTimeoutMs;
         settings.StoragePath = storagePath;
         settings.MaximumStorageSizeMb = 4096; // 4GB.
         settings.NetworkingMode = networkingMode;
