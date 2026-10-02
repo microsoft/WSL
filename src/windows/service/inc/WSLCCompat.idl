@@ -200,6 +200,44 @@ typedef struct _WSLCCompatContainerOptions
     ULONG UlimitsCount;
 } WSLCCompatContainerOptions;
 
+typedef struct _WSLCCompatContainerOptions2
+{
+    LPCSTR Image;
+    [unique] LPCSTR Name;
+    WSLCCompatStringArray Entrypoint;
+    WSLCCompatProcessOptions InitProcessOptions;
+    [unique, size_is(VolumesCount)] WSLCCompatVolume* Volumes;
+    ULONG VolumesCount;
+    [unique, size_is(PortsCount)] WSLCCompatPortMapping* Ports;
+    ULONG PortsCount;
+    [unique, size_is(LabelsCount)] const WSLCCompatLabel* Labels;
+    ULONG LabelsCount;
+    WSLCContainerFlags Flags;
+    WSLCSignal StopSignal;
+    [unique] LPCSTR HostName;
+    [unique] LPCSTR DomainName;
+
+    WSLCCompatStringArray DnsServers;
+    WSLCCompatStringArray DnsSearchDomains;
+    WSLCCompatStringArray DnsOptions;
+
+    LONGLONG ShmSize;
+    WSLCCompatContainerNetwork ContainerNetwork;
+    [unique, size_is(TmpfsCount)] const WSLCCompatTmpfsMount* Tmpfs;
+    ULONG TmpfsCount;
+
+    [unique, size_is(NamedVolumesCount)] WSLCCompatNamedVolume* NamedVolumes;
+    ULONG NamedVolumesCount;
+
+    LONGLONG MemoryBytes;
+    LONGLONG NanoCpus;
+    [unique, size_is(UlimitsCount)] const WSLCCompatUlimit* Ulimits;
+    ULONG UlimitsCount;
+
+    WSLCCompatStringArray CapAdd;
+    WSLCCompatStringArray CapDrop;
+} WSLCCompatContainerOptions2;
+
 typedef char WSLCCompatContainerId[WSLCCompat_CONTAINER_ID_LENGTH + 1];
 
 typedef [system_handle(sh_file)] HANDLE WSLCCompatFileHandle;
@@ -347,6 +385,16 @@ interface IWSLCCompatSession : IUnknown
     HRESULT PushImage([in] LPCSTR Image, [in] LPCSTR RegistryAuthenticationInformation, [in, unique] IWSLCCompatProgressCallback* ProgressCallback, [in, unique] IWSLCCompatWarningCallback* WarningCallback);
 
     HRESULT RegisterCrashDumpCallback([in] IWSLCCompatCrashDumpCallback* Callback, [out] IUnknown** Subscription);
+}
+
+[
+    uuid(EB761F0D-8C17-4D6D-9FF9-84086A81C5A3),
+    pointer_default(unique),
+    object
+]
+interface IWSLCCompatSession2 : IWSLCCompatSession
+{
+    HRESULT CreateContainer2([in] const WSLCCompatContainerOptions2* Options, [in, unique] IWSLCCompatWarningCallback* WarningCallback, [out] IWSLCCompatContainer** Container);
 }
 
 [

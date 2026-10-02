@@ -17,3 +17,4 @@
 | `RegistryBlockedByPolicy` | `-2147219955` | `0x8004060D` | Registry access is blocked by policy. |
 | `VolumeNotAvailable` | `-2147219954` | `0x8004060E` | The requested volume is not available. |
 | `ContainerDeleted` | `-2147219949` | `0x80040613` | The container was deleted. |
+| `CapabilityAdditionsDisabled` | `-2147219948` | `0x80040614` | `--cap-add` is disabled by policy |

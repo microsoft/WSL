@@ -18,6 +18,8 @@ Abstract:
 #include "WslcsdkPrivate.h"
 #include "WSLCContainerLauncher.h"
 #include "wslutil.h"
+#include "wslc_schema.h"
+#include "wslpolicies.h"
 #include "wslc/e2e/WSLCE2EHelpers.h"
 
 #include "winrt/Session.h"
@@ -943,7 +945,11 @@ class WslcSdkWinRtTests
 
     WSLC_TEST_METHOD(ContainerInspect)
     {
-        auto container = m_defaultSession.CreateContainer(WSLCSDK::ContainerSettings(L"debian:latest"));
+        auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+        containerSettings.CapabilityAdditions(winrt::single_threaded_vector<winrt::hstring>({L"NET_ADMIN", L"SYS_TIME"}));
+        containerSettings.CapabilityDrops(winrt::single_threaded_vector<winrt::hstring>({L"NET_RAW", L"CHOWN"}));
+
+        auto container = m_defaultSession.CreateContainer(containerSettings);
         auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
         const auto inspectJson = container.Inspect();
@@ -952,8 +958,18 @@ class WslcSdkWinRtTests
         const auto id = container.Id();
         VERIFY_IS_FALSE(id.empty());
 
-        // The inspect JSON must contain the container ID.
-        VERIFY_IS_TRUE(winrt::to_string(inspectJson).find(winrt::to_string(id)) != std::string::npos);
+        const auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(inspectJson.c_str());
+        VERIFY_ARE_EQUAL(winrt::to_string(id), inspect.Id);
+        VERIFY_ARE_EQUAL(2u, inspect.HostConfig.CapAdd.size());
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("NET_ADMIN"); }));
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("SYS_TIME"); }));
+        VERIFY_ARE_EQUAL(2u, inspect.HostConfig.CapDrop.size());
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapDrop, [](const auto& capability) { return capability.ends_with("NET_RAW"); }));
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapDrop, [](const auto& capability) { return capability.ends_with("CHOWN"); }));
 
         container.Delete(WSLCSDK::DeleteContainerOption::None);
         cleanup.release();
@@ -1026,6 +1042,31 @@ class WslcSdkWinRtTests
         StartContainerAndWaitForInitProcessExit(container);
         VERIFY_ARE_EQUAL(container.InitProcess().ExitCode(), 0);
         container.Delete(WSLCSDK::DeleteContainerOption::Force);
+    }
+
+    WSLC_TEST_METHOD(ContainerCapabilityAdditions)
+    {
+        auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+        containerSettings.CapabilityAdditions(winrt::single_threaded_vector<winrt::hstring>({L"NET_ADMIN"}));
+
+        auto container = m_defaultSession.CreateContainer(containerSettings);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+        const auto inspectJson = container.Inspect();
+        const auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(inspectJson.c_str());
+        VERIFY_ARE_EQUAL(1u, inspect.HostConfig.CapAdd.size());
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("NET_ADMIN"); }));
+    }
+
+    WSLC_TEST_METHOD(ContainerCapabilityAdditionsBlockedByPolicy)
+    {
+        namespace policies = wsl::windows::policies;
+        RegistryKeyChange<DWORD> policy(HKEY_LOCAL_MACHINE, policies::c_registryKey, policies::c_allowWSLContainerPrivileged, 0);
+
+        auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+        containerSettings.CapabilityAdditions(winrt::single_threaded_vector<winrt::hstring>({L"NET_ADMIN"}));
+        VERIFY_THROWS_HR(m_defaultSession.CreateContainer(containerSettings), static_cast<HRESULT>(WSLCSDK::Error::CapabilityAdditionsDisabled));
     }
 
     // -----------------------------------------------------------------------

@@ -289,12 +289,14 @@ bool NeedsVirtualMachineServicesInstalled()
     return !wsl::windows::common::wslutil::IsVirtualMachinePlatformInstalled();
 }
 
-#define WSLC_API_MIN_VERSION_SUPPORTED 2, 8, 0
+#define WSLC_API_MIN_VERSION_SUPPORTED 3, 0, 2
 
 bool DoesWslRuntimeVersionSupportWslc(const std::optional<std::tuple<uint32_t, uint32_t, uint32_t>>& version)
 {
     constexpr auto minimalPackageVersion = std::tuple<uint32_t, uint32_t, uint32_t>{WSLC_API_MIN_VERSION_SUPPORTED};
-    return version.has_value() && version >= minimalPackageVersion;
+    constexpr auto sdkVersion =
+        std::tuple<uint32_t, uint32_t, uint32_t>{WSL_PACKAGE_VERSION_MAJOR, WSL_PACKAGE_VERSION_MINOR, WSL_PACKAGE_VERSION_REVISION};
+    return version.has_value() && (version >= minimalPackageVersion || version == sdkVersion);
 }
 
 enum class WslRuntimeState
@@ -352,7 +354,7 @@ wil::com_ptr<IWSLCCompatSessionManager> CreateSessionManager()
         THROW_WIN32_IF_MSG(
             ERROR_NOT_SUPPORTED,
             currentState == WslRuntimeState::InstalledWithoutWslcSupport,
-            "The currently installed WSL version does not support WSLC.");
+            "The installed WSL version does not support this SDK version.");
         THROW_HR_IF_MSG(
             hr,
             currentState == WslRuntimeState::InstalledWithWslcSupport,
@@ -364,6 +366,16 @@ wil::com_ptr<IWSLCCompatSessionManager> CreateSessionManager()
     wsl::windows::common::security::ConfigureForCOMImpersonation(result.get());
 
     return result;
+}
+
+void ValidateStringArray(PCSTR const* strings, uint32_t count)
+{
+    THROW_HR_IF(E_INVALIDARG, (strings == nullptr && count != 0) || (strings != nullptr && count == 0));
+
+    for (uint32_t index = 0; index < count; ++index)
+    {
+        THROW_HR_IF_NULL(E_INVALIDARG, strings[index]);
+    }
 }
 
 } // namespace
@@ -449,9 +461,10 @@ try
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsDnsTunneling);
 
-    if (SUCCEEDED(errorInfoWrapper.CaptureResult(
-            sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, nullptr, &result->session))))
+    wil::com_ptr<IWSLCCompatSession> compatSession;
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, nullptr, &compatSession))))
     {
+        result->session = compatSession.query<IWSLCCompatSession2>();
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->session.get());
         *session = reinterpret_cast<WslcSession>(result.release());
     }
@@ -781,7 +794,7 @@ try
 
     auto result = std::make_unique<WslcContainerImpl>();
 
-    WSLCCompatContainerOptions containerOptions{};
+    WSLCCompatContainerOptions2 containerOptions{};
     std::unique_ptr<WSLCCompatPortMapping[]> convertedPorts; // this must stay in same scope as containerOptions since containerOptions.Ports is getting a raw pointer to the array owned by convertedPorts.
 
     containerOptions.Image = internalContainerSettings->image;
@@ -895,13 +908,17 @@ try
     // SDK only exposes the network mode (no additional endpoints today).
     containerOptions.ContainerNetwork.NetworkMode = internalContainerSettings->networkMode;
 
+    containerOptions.CapAdd = {
+        internalContainerSettings->capabilityAdditions, static_cast<ULONG>(internalContainerSettings->capabilityAdditionsCount)};
+    containerOptions.CapDrop = {internalContainerSettings->capabilityDrops, static_cast<ULONG>(internalContainerSettings->capabilityDropsCount)};
+
     // TODO: No user access
     // containerOptions.Labels;
     // containerOptions.LabelsCount;
     // containerOptions.StopSignal;
     // containerOptions.ShmSize;
 
-    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalSession->session->CreateContainer(&containerOptions, nullptr, &result->container))))
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalSession->session->CreateContainer2(&containerOptions, nullptr, &result->container))))
     {
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->container.get());
 
@@ -1110,6 +1127,34 @@ try
 
     internalType->namedVolumes = namedVolumes;
     internalType->namedVolumesCount = namedVolumeCount;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+STDAPI WslcSetContainerSettingsCapabilityAdditions(
+    _In_ WslcContainerSettings* containerSettings, _In_reads_opt_(capabilityCount) PCSTR const* capabilities, _In_ uint32_t capabilityCount)
+try
+{
+    auto internalType = CheckAndGetInternalType(containerSettings);
+    ValidateStringArray(capabilities, capabilityCount);
+
+    internalType->capabilityAdditions = capabilities;
+    internalType->capabilityAdditionsCount = capabilityCount;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+STDAPI WslcSetContainerSettingsCapabilityDrops(
+    _In_ WslcContainerSettings* containerSettings, _In_reads_opt_(capabilityCount) PCSTR const* capabilities, _In_ uint32_t capabilityCount)
+try
+{
+    auto internalType = CheckAndGetInternalType(containerSettings);
+    ValidateStringArray(capabilities, capabilityCount);
+
+    internalType->capabilityDrops = capabilities;
+    internalType->capabilityDropsCount = capabilityCount;
 
     return S_OK;
 }
@@ -1720,6 +1765,10 @@ try
     else if (FAILED(hr))
     {
         THROW_HR(hr);
+    }
+    else if (CheckWslRuntimeState() != WslRuntimeState::InstalledWithWslcSupport)
+    {
+        WI_SetFlag(componentCheck, WSLC_COMPONENT_FLAG_WSL_PACKAGE);
     }
 
     *missingComponents = componentCheck;
