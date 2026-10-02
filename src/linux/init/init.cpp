@@ -655,7 +655,7 @@ try
                 _exit(1);
             }
 
-            if (UtilProcessChildExitCode(Status, OobeCommand.c_str(), 0, false) < 0)
+            if (UtilProcessChildExitCode(Status, OobeCommand.c_str(), {0}, false) < 0)
             {
                 OobeResult = -1;
                 fprintf(stderr, "OOBE command \"%s\" failed, exiting\n", OobeCommand.c_str());
@@ -3633,7 +3633,7 @@ void WaitForBootProcess(wsl::linux::WslDistributionConfig& Config)
                 [&]() {
                     std::string Output;
                     THROW_LAST_ERROR_IF(
-                        UtilExecCommandLine("systemctl is-system-running | grep -E \"running|degraded\"", &Output, 0, false) < 0);
+                        UtilExecCommandLine("systemctl is-system-running | grep -E \"running|degraded\"", &Output, {0}, false) < 0);
                 },
                 std::chrono::milliseconds{250},
                 std::chrono::milliseconds{Config.BootInitTimeout});
