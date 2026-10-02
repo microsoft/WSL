@@ -353,6 +353,100 @@ class UnitTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /tmp/.X11-unix"), 0L);
     }
 
+    WSL2_TEST_METHOD(SystemdBinfmtIsRestored)
+    {
+        // Override WSL's binfmt interpreter
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkdir -p /usr/lib/binfmt.d && echo ':WSLInterop:M::MZ::/bin/echo:PF' > /usr/lib/binfmt.d/dummy.conf"), 0L);
+
+        auto cleanupBinfmt = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+            LxsstuLaunchWsl(L"rm /usr/lib/binfmt.d/dummy.conf");
+            WslShutdown(); // Required since this test registers a custom binfmt interpreter.
+        });
+
+        {
+            // Enable systemd (restarts distro).
+            auto cleanupSystemd = EnableSystemd();
+
+            auto validateBinfmt = []() {
+                // Validate that WSL's binfmt interpreter is still in place.
+                auto [cmdOutput, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
+                VERIFY_ARE_EQUAL(cmdOutput, L"ok\r\n");
+            };
+
+            validateBinfmt();
+
+            // Validate that this still works after restarting the distribution.
+            TerminateDistribution();
+            validateBinfmt();
+
+            // Validate that stopping or restarting systemd-binfmt doesn't break interop.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl stop systemd-binfmt.service"), 0u);
+            validateBinfmt();
+
+            auto restartBinfmt = []() {
+                // Some systemd versions fail the service when the protected /status flush fails.
+                const auto exitCode = LxsstuLaunchWsl(L"systemctl restart systemd-binfmt.service");
+                if (exitCode != 0)
+                {
+                    VERIFY_ARE_EQUAL(exitCode, 1u);
+                    VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl is-failed --quiet systemd-binfmt.service"), 0u);
+                }
+            };
+
+            restartBinfmt();
+            validateBinfmt();
+
+            // Validate that the unit is regenerated after a daemon-reload.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl daemon-reload"), 0u);
+            restartBinfmt();
+            validateBinfmt();
+
+            // Exercise both hooks independently of the distro's systemd-binfmt exit behavior.
+            constexpr auto overridePath = L"/run/systemd/system/systemd-binfmt.service.d/wsl-test.conf";
+            auto cleanupOverride = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                LxsstuLaunchWsl(std::format(L"rm -f {} && systemctl daemon-reload", overridePath));
+            });
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkdir -p /run/systemd/system/systemd-binfmt.service.d"), 0u);
+            for (const bool failStartup : {false, true})
+            {
+                VERIFY_ARE_EQUAL(
+                    LxsstuLaunchWsl(std::format(
+                        L"printf '[Service]\\nExecStart=\\nExecStart=/bin/{}\\n' > {} && systemctl daemon-reload",
+                        failStartup ? L"false" : L"true",
+                        overridePath)),
+                    0u);
+                VERIFY_ARE_EQUAL(
+                    LxsstuLaunchWsl(L"echo -1 > /proc/sys/fs/binfmt_misc/WSLInterop && "
+                                    L"echo ':WSLInterop:M::MZ::/bin/echo:PF' > /proc/sys/fs/binfmt_misc/register"),
+                    0u);
+
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl restart systemd-binfmt.service"), failStartup ? 1u : 0u);
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl is-failed --quiet systemd-binfmt.service"), failStartup ? 0u : 1u);
+                validateBinfmt();
+
+                if (!failStartup)
+                {
+                    // A normal stop must not re-register the entry.
+                    const auto inodeBefore = LxsstuLaunchWslAndCaptureOutput(L"stat -c %i /proc/sys/fs/binfmt_misc/WSLInterop").first;
+                    VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl stop systemd-binfmt.service"), 0u);
+                    const auto inodeAfter = LxsstuLaunchWslAndCaptureOutput(L"stat -c %i /proc/sys/fs/binfmt_misc/WSLInterop").first;
+                    VERIFY_ARE_EQUAL(inodeBefore, inodeAfter);
+                    validateBinfmt();
+                }
+            }
+        }
+
+        {
+            // Enable systemd (restarts distro).
+            auto cleanupSystemd = EnableSystemd("protectBinfmt=false");
+
+            // Validate that WSL's binfmt interpreter is overridden
+            auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
+            VERIFY_IS_TRUE(wsl::shared::string::IsEqual(output, L"/mnt/c/Windows/system32/cmd.exe cmd.exe /c echo ok\n", true));
+        }
+    }
+
     WSL2_TEST_METHOD(BinfmtStatusIsLocked)
     {
         //
