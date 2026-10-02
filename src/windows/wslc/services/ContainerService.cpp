@@ -830,7 +830,6 @@ void ContainerService::Export(Session& session, const std::string& id, HANDLE ou
 bool ContainerService::IsCopyingToContainer(const std::wstring& source, const std::wstring& target)
 {
     // Determine copy direction by looking for CONTAINER:PATH patterns.
-    // A single letter before ':' is a Windows drive path (e.g. C:\path), not a container reference.
     auto isContainerPath = [](const std::wstring& path) -> bool {
         auto colonPos = path.find(L':');
         if (colonPos == std::wstring::npos || colonPos == 0)
@@ -860,7 +859,7 @@ bool ContainerService::IsCopyingToContainer(const std::wstring& source, const st
         return false;
     }
 
-    // Either both sides name the container or both name the host, neither of which is a copy across it.
+    // Both sides name the container, or both name the host.
     THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_CpInvalidDirectionError());
 }
 
@@ -890,7 +889,7 @@ void ContainerService::CopyStdinToContainer(models::Session& session, const std:
         contentSize = static_cast<ULONGLONG>(fileSize.QuadPart);
     }
 
-    // The --archive/-a flag is accepted but does nothing here: the tar headers already carry uid/gid ownership.
+    // --archive is a no-op: tar headers already carry uid/gid.
     ContainerService::CopyToContainer(session, containerId, destPath, inputHandle, contentSize);
 }
 
@@ -900,7 +899,6 @@ void ContainerService::CopyContainerPathToStdout(models::Session& session, const
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG, Localization::WSLCCLI_CpStdoutIsTerminalError(), wsl::windows::common::wslutil::IsConsoleHandle(outputHandle));
 
-    // The archive is written out exactly as it arrives, so the caller decides how to unpack it.
     ContainerService::CopyFromContainer(session, containerId, srcPath, followLink, outputHandle);
 }
 
@@ -920,8 +918,7 @@ void ContainerService::CopyLocalPathToContainer(
         absPath = absPath.parent_path();
     }
 
-    // tar's -h dereferences every link it walks, so it is limited to a source that is itself a link
-    // to a single file, where there is nothing to recurse into.
+    // tar -h dereferences every link it walks, so only use it for a link to a single file.
     std::optional<StagingDirectory> staging;
 
     bool dereference = false;
@@ -969,8 +966,7 @@ void ContainerService::CopyLocalPathToContainer(
 void ContainerService::CopyFromContainerIntoLocalDir(
     models::Session& session, const std::string& containerId, const std::string& srcPath, const std::filesystem::path& canonicalTarget, bool followLink)
 {
-    // A followed link produces an archive named after the link's target, but the copy keeps the
-    // name that was asked for.
+    // A followed link's archive is named after its target; keep the requested name.
     std::optional<std::wstring> rebaseName;
     if (followLink)
     {

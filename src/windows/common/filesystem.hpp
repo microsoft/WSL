@@ -177,10 +177,8 @@ std::filesystem::path GetTempFolderPath(_In_ HANDLE userToken);
 std::string GetWindowsHosts(const std::filesystem::path& Path);
 
 /// <summary>
-/// True when Name can be created as a Windows file name under that exact name. A POSIX name bars only
-/// '/' and NUL, so it can hold characters Windows rejects, end in a space or dot that Win32 would strip,
-/// or name a reserved device such as CON or COM1. An empty name is accepted; it stands for a path with
-/// no name of its own, which the caller handles separately.
+/// True when Name can be created on Windows unchanged: no invalid characters, no trailing space or dot,
+/// and not a reserved device name. An empty name is accepted.
 /// </summary>
 bool IsRepresentableFileName(std::wstring_view Name);
 
@@ -210,29 +208,22 @@ private:
 };
 
 /// <summary>
-/// Returns Path as a string with trailing separators removed, leaving at least one character. tar.exe
-/// receives directories enclosed in quotes, and the CRT reads a '\' immediately before the closing quote
-/// as an escape, which would swallow the quote and run the argument into the next one. A root such as
-/// "C:\" keeps its separator, doubled, so it still names the root once unquoted.
+/// Returns Path without trailing separators, for quoting on a tar.exe command line where a trailing '\'
+/// would escape the closing quote. A root keeps its separator, doubled.
 /// </summary>
 std::wstring StripTrailingSeparators(const std::filesystem::path& Path);
 
 /// <summary>
-/// Extracts a tar stream into Destination, calling WriteArchive with the handle to write the archive to.
-/// tar.exe cannot rename entries, so a set RebaseName is applied after extraction: one archive root takes
-/// that name, several archive roots are gathered under a directory carrying it. A set but empty name merges
-/// the entries under their own names. Extraction always uses staging so existing destination links cannot
-/// redirect tar.exe; merging replaces destination links without following them. tar.exe contains entry names
-/// and hard link targets that point outside staging, and entries underneath an archive symlink are rejected.
+/// Extracts the tar stream written by WriteArchive into Destination through a staging directory. A set
+/// RebaseName renames a single archive root, or gathers several roots under a directory of that name; an
+/// empty name merges entries under their own names. Entries under an archive symlink are rejected, and
+/// existing destination links are replaced, not followed.
 /// </summary>
 void ExtractArchiveInto(const std::filesystem::path& Destination, const std::optional<std::wstring>& RebaseName, const std::function<void(HANDLE)>& WriteArchive);
 
 /// <summary>
-/// Extracts a tar stream holding a single file and places it at DestinationFile, creating the parent
-/// directory if it is missing. tar.exe cannot rename entries, so the entry is staged beside the
-/// destination and moved into place under the requested name. A file path names one entry, so an
-/// archive that is empty, holds several members (even if they collide on disk), or holds a directory is
-/// rejected before anything is moved.
+/// Extracts a tar stream holding exactly one file to DestinationFile, creating the parent directory if
+/// needed. Empty, multi-member and directory archives are rejected before anything is moved.
 /// </summary>
 void ExtractSingleFileAs(const std::filesystem::path& DestinationFile, const std::function<void(HANDLE)>& WriteArchive);
 

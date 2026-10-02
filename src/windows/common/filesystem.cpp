@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include "filesystem.hpp"
+#include <set>
 
 #define FULL_PATH_PREFIX L"\\\\?\\"
 #define LXSS_DOMAIN_NAME_DEFAULT "localdomain"
@@ -990,7 +991,7 @@ std::filesystem::path wsl::windows::common::filesystem::MakeStagingDirectory(con
 
 bool wsl::windows::common::filesystem::IsRepresentableFileName(std::wstring_view Name)
 {
-    // An empty name stands for a path with no name of its own, which the caller handles separately.
+    // An empty name means the path has no name; the caller handles it.
     if (Name.empty())
     {
         return true;
@@ -1006,8 +1007,7 @@ bool wsl::windows::common::filesystem::IsRepresentableFileName(std::wstring_view
         }
     }
 
-    // Win32 drops a trailing space or dot, so the entry would land under a name other than the one that
-    // was asked for. This also covers "." and "..", which name a directory rather than an entry in one.
+    // Win32 strips trailing spaces and dots, which would change the name. Also covers "." and "..".
     if (Name.back() == L' ' || Name.back() == L'.')
     {
         return false;
@@ -1015,8 +1015,7 @@ bool wsl::windows::common::filesystem::IsRepresentableFileName(std::wstring_view
 
     const auto lowerName = wsl::shared::string::AsciiToLower(Name);
 
-    // These names are reserved by Windows. A name carrying an extension is left alone, so whether
-    // something like "nul.txt" resolves to the device is decided by Win32 when the entry is created.
+    // Reserved device names. Names with an extension, such as "nul.txt", are left to Win32.
     // https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#naming-conventions
     if (lowerName == L"con" || lowerName == L"prn" || lowerName == L"aux" || lowerName == L"nul")
     {
@@ -1083,7 +1082,6 @@ static void MoveOver(const std::filesystem::path& From, const std::filesystem::p
         wsl::shared::Localization::WSLCCLI_CpDestinationTypeMismatchError(To.wstring()),
         std::filesystem::exists(toStatus) && std::filesystem::is_directory(fromStatus) != std::filesystem::is_directory(toStatus));
 
-    // copy_symlinks keeps an entry pointing outside the staging tree from pulling in unrelated content.
     std::error_code copyError;
     std::filesystem::copy(
         From,
@@ -1129,8 +1127,6 @@ static void MergeStagedEntry(const std::filesystem::path& From, const std::files
 
 std::wstring wsl::windows::common::filesystem::StripTrailingSeparators(const std::filesystem::path& Path)
 {
-    // A root cannot lose its separator: "C:" names the current directory of drive C, not its root. The
-    // separator is doubled instead, which the CRT reads as one literal '\' ahead of the closing quote.
     if (Path.has_root_directory() && !Path.has_relative_path())
     {
         return Path.root_name().wstring() + L"\\\\";
@@ -1147,11 +1143,10 @@ std::wstring wsl::windows::common::filesystem::StripTrailingSeparators(const std
 
 namespace {
 
-// POSIX ustar: every entry begins with a 512 byte header, and file contents follow it padded out to
-// the next multiple of that size.
+// ustar entries are a 512 byte header followed by content padded to the block size.
 constexpr size_t c_tarBlockSize = 512;
 
-// A name or extended header longer than this is not something an archiver produces.
+// Upper bound on a long name or pax header.
 constexpr uint64_t c_tarMaxMetadataSize = 1 * _1MB;
 
 #pragma pack(push, 1)
@@ -1186,8 +1181,6 @@ constexpr char c_tarTypePaxExtended = 'x';
 constexpr char c_tarTypePaxExtendedAlternate = 'X';
 constexpr char c_tarTypePaxGlobal = 'g';
 
-// Reads Size bytes, returning false only when the archive ends exactly where the read began. Anything
-// shorter leaves the position inside an entry, so the entries after it cannot be read.
 bool ReadArchiveBytes(HANDLE Archive, void* Buffer, size_t Size)
 {
     auto* const out = static_cast<char*>(Buffer);
@@ -1208,7 +1201,6 @@ bool ReadArchiveBytes(HANDLE Archive, void* Buffer, size_t Size)
     return true;
 }
 
-// Header fields are padded with NULs, so a full field carries no terminator of its own.
 std::string TarFieldToString(const char* Field, size_t Size)
 {
     return std::string(Field, std::find(Field, Field + Size, '\0'));
@@ -1271,7 +1263,6 @@ void SkipTarData(HANDLE Archive, uint64_t Size)
     THROW_LAST_ERROR_IF(!SetFilePointerEx(Archive, distance, nullptr, FILE_CURRENT));
 }
 
-// pax records are "<length> <key>=<value>\n", where the length covers the whole record.
 std::optional<std::string> FindPaxPath(const std::vector<char>& Data)
 {
     constexpr std::string_view c_pathKey = "path=";
@@ -1315,23 +1306,13 @@ std::optional<std::string> FindPaxPath(const std::vector<char>& Data)
     return {};
 }
 
-// Entry names are '/' separated, but '\' is legal in a Linux file name and separates on Windows, so it
-// has to count as a separator here or a component could be read as a path during extraction.
-std::vector<std::string> SplitArchivePath(std::string_view Path, bool FoldCase = true)
+std::vector<std::string> SplitArchivePath(std::string_view Path)
 {
     std::vector<std::string> components;
     std::string current;
     const auto append = [&]() {
         if (!current.empty() && current != ".")
         {
-            // The destination is case insensitive, so a name differing only by case reaches the same entry.
-            if (FoldCase)
-            {
-                std::transform(current.begin(), current.end(), current.begin(), [](char character) {
-                    return (character >= 'A' && character <= 'Z') ? static_cast<char>(character - 'A' + 'a') : character;
-                });
-            }
-
             components.push_back(current);
         }
 
@@ -1352,8 +1333,7 @@ std::vector<std::string> SplitArchivePath(std::string_view Path, bool FoldCase =
 
     append();
 
-    // tar.exe drops a leading drive letter from an entry name, so the entry it writes is the one named by
-    // the rest of the path.
+    // tar.exe drops a leading drive letter from an entry name.
     if (!components.empty() && components.front().size() == 2 && components.front()[1] == ':' &&
         ((components.front()[0] >= 'a' && components.front()[0] <= 'z') || (components.front()[0] >= 'A' && components.front()[0] <= 'Z')))
     {
@@ -1363,19 +1343,26 @@ std::vector<std::string> SplitArchivePath(std::string_view Path, bool FoldCase =
     return components;
 }
 
-// tar.exe creates a symlink entry as a link and then resolves it while extracting the entries beneath
-// it, which places those entries wherever the link points. The entries are checked in order first, so
-// an archive carrying that pair is refused before tar.exe writes anything. tar.exe already contains
-// entry names and hard link targets that leave the destination.
 struct ArchiveEntries
 {
     size_t MemberCount = 0;
     std::unordered_set<std::string> TopLevelNames;
 };
 
+struct WindowsPathLess
+{
+    bool operator()(std::wstring_view Left, std::wstring_view Right) const
+    {
+        const auto result =
+            CompareStringOrdinal(Left.data(), static_cast<int>(Left.size()), Right.data(), static_cast<int>(Right.size()), TRUE);
+        THROW_LAST_ERROR_IF(result == 0);
+        return result == CSTR_LESS_THAN;
+    }
+};
+
 ArchiveEntries ValidateArchiveEntries(HANDLE Archive)
 {
-    std::unordered_set<std::string> symlinks;
+    std::set<std::wstring, WindowsPathLess> symlinks;
     std::optional<std::string> overrideName;
     ArchiveEntries entries;
 
@@ -1447,17 +1434,17 @@ ArchiveEntries ValidateArchiveEntries(HANDLE Archive)
         }
 
         ++entries.MemberCount;
-        entries.TopLevelNames.insert(SplitArchivePath(name, false).front());
+        entries.TopLevelNames.insert(components.front());
 
-        std::string path;
+        std::wstring path;
         for (size_t index = 0; index < components.size(); index++)
         {
             if (!path.empty())
             {
-                path += '/';
+                path += L'/';
             }
 
-            path += components[index];
+            path += wsl::windows::common::string::MultiByteToWide(components[index]);
 
             // Only a parent of this entry resolves while the entry is written.
             THROW_HR_IF_MSG(
@@ -1465,7 +1452,7 @@ ArchiveEntries ValidateArchiveEntries(HANDLE Archive)
                 index < (components.size() - 1) && symlinks.contains(path),
                 "Archive entry '%hs' is under the link '%hs'",
                 name.c_str(),
-                path.c_str());
+                components[index].c_str());
         }
 
         if (header.TypeFlag == c_tarTypeSymlink)
@@ -1483,7 +1470,7 @@ ArchiveEntries ExtractTarStream(const std::filesystem::path& Root, const std::fu
 {
     const auto targetDir = wsl::windows::common::filesystem::StripTrailingSeparators(Root);
 
-    // The archive is written to a file so its entries can be read before tar.exe is given any of them.
+    // Buffer the archive so its entries are validated before tar.exe sees them.
     wsl::windows::common::filesystem::TempFile archive(
         GENERIC_READ | GENERIC_WRITE,
         FILE_SHARE_READ,
@@ -1512,17 +1499,14 @@ ArchiveEntries ExtractTarStream(const std::filesystem::path& Root, const std::fu
 void wsl::windows::common::filesystem::ExtractArchiveInto(
     const std::filesystem::path& Destination, const std::optional<std::wstring>& RebaseName, const std::function<void(HANDLE)>& WriteArchive)
 {
-    // The rebase name becomes the name of an entry in the destination, so it has to be one Windows can
-    // hold. Win32 drops trailing spaces and dots, which would place the entry under a name other than
-    // the one it carries, so those are trimmed and the caller is told. Everything is settled before the
-    // destination is created or the archive is read, so a rejected name leaves nothing behind.
+    // Validate the rebase name before touching the destination. Trailing spaces and dots, which Win32
+    // strips, are trimmed and reported.
     auto rebaseName = RebaseName;
     if (rebaseName.has_value() && !rebaseName->empty())
     {
         auto trimmed = rebaseName->substr(0, rebaseName->find_last_not_of(L" .") + 1);
 
-        // Nothing but spaces and dots leaves no name to copy to. An empty name already means "merge the
-        // entries into the destination", so it cannot stand in for one that was asked for.
+        // An empty name means merge, so a name of only spaces and dots is rejected.
         THROW_HR_WITH_USER_ERROR_IF(
             E_INVALIDARG, wsl::shared::Localization::WSLCCLI_CpSourceNameNotRepresentableError(*rebaseName), trimmed.empty());
 
@@ -1540,7 +1524,7 @@ void wsl::windows::common::filesystem::ExtractArchiveInto(
     std::filesystem::create_directories(Destination, dirError);
     THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", Destination.c_str());
 
-    // Staging inside the destination keeps the moves below on one volume, so they stay renames.
+    // Stage on the destination volume so the moves are renames.
     const StagingDirectory staging(Destination);
     const auto entries = ExtractTarStream(staging.Path(), WriteArchive);
 
@@ -1588,7 +1572,7 @@ void wsl::windows::common::filesystem::ExtractSingleFileAs(const std::filesystem
     std::filesystem::create_directories(destinationDirectory, dirError);
     THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", destinationDirectory.c_str());
 
-    // Staging inside the destination directory keeps the move below on one volume, so it stays a rename.
+    // Stage on the destination volume so the move is a rename.
     const StagingDirectory staging(destinationDirectory);
     const auto entries = ExtractTarStream(staging.Path(), WriteArchive);
 
@@ -1600,8 +1584,7 @@ void wsl::windows::common::filesystem::ExtractSingleFileAs(const std::filesystem
 
     THROW_HR_WITH_USER_ERROR_IF(E_FAIL, wsl::shared::Localization::WSLCCLI_CpNoFileExtractedError(), staged.empty());
 
-    // symlink_status keeps a link to a directory classed as the single entry it is, rather than as the
-    // tree it points at. A name that cannot be queried is left to the move below, which reports why.
+    // symlink_status so a link to a directory counts as a single entry.
     std::error_code statusError;
     const auto stagedStatus = std::filesystem::symlink_status(staged.front(), statusError);
     THROW_HR_WITH_USER_ERROR_IF(

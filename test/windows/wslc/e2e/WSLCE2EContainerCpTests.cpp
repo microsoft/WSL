@@ -774,17 +774,13 @@ class WSLCE2EContainerCpTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_StdoutIsTerminal)
     {
-        // A pseudo console gives wslc a console stdout, which a copy to '-' must reject: a tar stream
-        // written to a terminal would be rendered as text rather than captured.
+        // A tar stream must not be written to a console.
         auto session = RunWslcInteractive(L"container cp fakecontainer:/path -", ElevationType::Elevated, PseudoConsole{200, 50});
 
         WaitForPseudoConsoleOutput(session, string::WideToMultiByte(Localization::WSLCCLI_CpStdoutIsTerminalError()));
         VERIFY_ARE_EQUAL(1, session.Wait());
     }
 
-    // The container to local file destination path against one container. The rejection rules themselves
-    // are covered by the ExtractSingleFileAs unit tests, so what is proven here is that a cp reaches
-    // them, and that the stdout destination produces a real archive.
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ContainerToLocal_FileDestinationBehavior)
     {
         auto runResult =
@@ -801,15 +797,13 @@ class WSLCE2EContainerCpTests
         std::filesystem::create_directories(workDir);
         auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(workDir); });
 
-        // '-' as the target writes the archive itself to standard output, rather than the file contents,
-        // so the stream can be piped into another tar.
+        // '-' writes the archive itself, not the file contents.
         const auto cpResult = RunWslcAndRedirectToFile(std::format(L"container cp {}:/tmp/stdoutfile.txt -", WslcContainerName), TarPath);
         cpResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(std::filesystem::exists(TarPath));
 
-        // The first header block names the entry and carries the ustar magic, which distinguishes an
-        // archive from the file's own contents.
+        // The first header carries the entry name and ustar magic.
         const auto header = ReadFileBytes(TarPath, 512);
         VERIFY_IS_TRUE(header.size() >= 512);
         VERIFY_ARE_EQUAL(std::string{"stdoutfile.txt"}, std::string{header.data()});
@@ -821,8 +815,7 @@ class WSLCE2EContainerCpTests
         RunTar(std::format(L"tar.exe -xf \"{}\" -C \"{}\"", TarPath.wstring(), extractDir.wstring()));
         VERIFY_ARE_EQUAL(std::wstring(L"stdout-dest-test\n"), ReadFileContent((extractDir / L"stdoutfile.txt").wstring()));
 
-        // A directory cannot be given a file path. The copy has to fail without creating the destination,
-        // and without leaving staging behind in the directory that would have held it.
+        // Copying a directory to a file path fails and leaves nothing behind.
         const auto rejectedDir = workDir / L"rejected";
         std::filesystem::create_directories(rejectedDir);
         const auto targetFile = rejectedDir / L"target.txt";
@@ -844,8 +837,6 @@ private:
 
     std::filesystem::path TarPath{};
 
-    // Reads up to Count bytes, so a binary artifact can be inspected without going through the text
-    // helpers that the rest of these tests use.
     static std::string ReadFileBytes(const std::filesystem::path& Path, size_t Count)
     {
         std::ifstream file(Path, std::ios::binary);

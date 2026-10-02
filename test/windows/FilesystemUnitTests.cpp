@@ -60,10 +60,8 @@ std::filesystem::path ExistingFile()
     return {wil::GetModuleFileNameW<std::wstring>(wil::GetModuleInstanceHandle())};
 }
 
-// Builds a ustar archive in memory. tar.exe is the extractor under test, so archives are assembled here
-// rather than produced by tar, which keeps entry names, types and ordering under the test's control. It
-// also reaches archives tar.exe cannot be asked for on Windows: one holding no entries, which tar refuses
-// to write, and entries named "a*b", "trail." or "nul", which cannot exist as files for tar to read.
+// Builds ustar archives in memory, so tests control entry names, types and order, including empty
+// archives and names that cannot exist as Windows files.
 class TarBuilder
 {
 public:
@@ -188,16 +186,12 @@ size_t CountEntries(const std::filesystem::path& Directory)
     return static_cast<size_t>(std::distance(std::filesystem::directory_iterator(Directory), std::filesystem::directory_iterator{}));
 }
 
-// Extraction throws after the archive has been examined but before anything is moved into place. Every
-// rejection reports E_FAIL, so the assertion covers the code alongside the fact that it threw.
 void VerifyExtractionFails(const std::function<void()>& Extraction)
 {
     VERIFY_THROWS_SPECIFIC(
         Extraction(), wil::ResultException, [](const wil::ResultException& e) { return e.GetErrorCode() == E_FAIL; });
 }
 
-// A name that cannot be addressed once it is in staging fails inside the move rather than through a
-// validation check, so the code it carries is whatever Win32 reported.
 void VerifyExtractionThrows(const std::function<void()>& Extraction)
 {
     VERIFY_THROWS_SPECIFIC(Extraction(), wil::ResultException, [](const wil::ResultException&) { return true; });
@@ -339,8 +333,6 @@ class FilesystemUnitTests
         VERIFY_ARE_EQUAL(wildcardName, PosixBaseName(wildcardPath));
     }
 
-    // The result is placed inside quotes on a tar.exe command line, so a trailing separator would be read
-    // as escaping the closing quote.
     TEST_METHOD(StripTrailingSeparators_RemovesTrailingSeparators)
     {
         const std::pair<std::wstring, std::wstring> cases[] = {
@@ -358,8 +350,6 @@ class FilesystemUnitTests
         }
     }
 
-    // Dropping a root's separator would leave "C:", the current directory of drive C rather than its
-    // root. The separator stays, doubled so the CRT reads it as one '\' ahead of the closing quote.
     TEST_METHOD(StripTrailingSeparators_KeepsRootSeparatorEscaped)
     {
         const std::pair<std::wstring, std::wstring> cases[] = {
@@ -400,15 +390,12 @@ class FilesystemUnitTests
         VERIFY_ARE_NOT_EQUAL(first.wstring(), second.wstring());
     }
 
-    // A POSIX name bars only '/' and NUL, so a name taken from a container path can hold characters that
-    // no Windows file name can. Those have to be caught before a path is built from them.
     TEST_METHOD(IsRepresentableFileName_AcceptsNamesWindowsCanCreate)
     {
         VERIFY_IS_TRUE(IsRepresentableFileName(L"thelink.txt"));
         VERIFY_IS_TRUE(IsRepresentableFileName(L"name with spaces"));
         VERIFY_IS_TRUE(IsRepresentableFileName(L"dots.in.name"));
 
-        // An empty name stands for a path with no name of its own, which the caller handles separately.
         VERIFY_IS_TRUE(IsRepresentableFileName(L""));
     }
 
@@ -430,8 +417,6 @@ class FilesystemUnitTests
         VERIFY_IS_FALSE(IsRepresentableFileName(newline));
     }
 
-    // Win32 strips a trailing space or dot, so accepting one would copy the entry under a name other
-    // than the one the caller asked for.
     TEST_METHOD(IsRepresentableFileName_RejectsTrailingSpaceOrDot)
     {
         const std::wstring stripped[] = {L"file.", L"file ", L"file...", L"file   ", L".", L".."};
@@ -462,8 +447,7 @@ class FilesystemUnitTests
             VERIFY_IS_TRUE(IsRepresentableFileName(name), name.c_str());
         }
 
-        // A name carrying an extension is a name of its own. Whether Win32 still routes it to the device
-        // is left to the file system, which is where the copy would fail if it does.
+        // Names with an extension are left to Win32.
         const std::wstring extensions[] = {L"con.txt", L"NUL.tar.gz", L"conin$", L"CONOUT$"};
         for (const auto& name : extensions)
         {
@@ -471,8 +455,6 @@ class FilesystemUnitTests
         }
     }
 
-    // The directory has to survive for the whole scope and be gone once it closes, since the copy that
-    // uses it leaves entries behind that must not reach the destination.
     TEST_METHOD(StagingDirectory_RemovesItselfWhenScopeEnds)
     {
         std::filesystem::path recorded;
@@ -492,8 +474,6 @@ class FilesystemUnitTests
         VERIFY_IS_FALSE(std::filesystem::exists(recorded));
     }
 
-    // The destination name is supplied by the caller, so the name the entry carries inside the archive is
-    // discarded. tar.exe cannot rename an entry while extracting, which is why the entry is staged first.
     TEST_METHOD(ExtractSingleFileAs_PlacesEntryUnderRequestedName)
     {
         const StagingDirectory root(std::filesystem::temp_directory_path());
@@ -517,7 +497,6 @@ class FilesystemUnitTests
         VERIFY_ARE_EQUAL(std::string{}, ReadFileContent(destination));
     }
 
-    // The whole leading path is created, so a copy does not have to be preceded by a mkdir.
     TEST_METHOD(ExtractSingleFileAs_CreatesMissingParentDirectories)
     {
         const StagingDirectory root(std::filesystem::temp_directory_path());
@@ -539,8 +518,6 @@ class FilesystemUnitTests
         VERIFY_ARE_EQUAL(std::string{"fresh"}, ReadFileContent(destination));
     }
 
-    // A file path names one entry, so an archive carrying nothing cannot satisfy it. Reporting this
-    // matters because the alternative is to succeed having written no file at all.
     TEST_METHOD(ExtractSingleFileAs_EmptyArchiveIsRejected)
     {
         const StagingDirectory root(std::filesystem::temp_directory_path());
@@ -551,8 +528,6 @@ class FilesystemUnitTests
         VERIFY_IS_FALSE(std::filesystem::exists(destination));
     }
 
-    // Several entries cannot be named by one file path. Without this the entries would be silently
-    // reduced to whichever one was moved last.
     TEST_METHOD(ExtractSingleFileAs_SeveralEntriesAreRejected)
     {
         const StagingDirectory root(std::filesystem::temp_directory_path());
@@ -576,7 +551,6 @@ class FilesystemUnitTests
         VERIFY_IS_FALSE(std::filesystem::exists(destination));
     }
 
-    // A directory carries a tree, so giving it a file path would produce a directory named like a file.
     TEST_METHOD(ExtractSingleFileAs_DirectoryEntryIsRejected)
     {
         const StagingDirectory root(std::filesystem::temp_directory_path());
@@ -587,8 +561,6 @@ class FilesystemUnitTests
         VERIFY_IS_FALSE(std::filesystem::exists(destination));
     }
 
-    // A directory holding content is the same rejection, reached through the entry count rather than the
-    // type of the single entry, since tar creates the parent directory for the entries beneath it.
     TEST_METHOD(ExtractSingleFileAs_PopulatedDirectoryIsRejected)
     {
         const StagingDirectory root(std::filesystem::temp_directory_path());
@@ -601,9 +573,6 @@ class FilesystemUnitTests
         VERIFY_IS_FALSE(std::filesystem::exists(destination));
     }
 
-    // A rejected archive must leave a file that is already there untouched, so a copy that cannot be
-    // satisfied does not destroy the destination. The archive is examined only after extraction, so this
-    // holds solely because extraction goes to staging rather than to the destination itself.
     TEST_METHOD(ExtractSingleFileAs_LeavesExistingDestinationIntactWhenRejected)
     {
         const StagingDirectory root(std::filesystem::temp_directory_path());
@@ -617,11 +586,6 @@ class FilesystemUnitTests
         VERIFY_ARE_EQUAL(std::string{"original"}, ReadFileContent(destination));
     }
 
-    // A POSIX name can hold characters no Windows file name can. tar.exe replaces those characters, and
-    // drops a leading element that reads as a drive letter, so the entry lands in staging under a name
-    // Windows accepts. The destination name comes from the caller, so neither the original name nor the
-    // replacement reaches the result. This is why no name check is needed here, unlike a copy onto a
-    // directory, where the entry keeps its own name.
     TEST_METHOD(ExtractSingleFileAs_SanitizedEntryNameDoesNotReachTheResult)
     {
         const std::string names[] = {"a:b", "a*b", "a|b", "a<b", "a?b"};
@@ -637,10 +601,6 @@ class FilesystemUnitTests
         }
     }
 
-    // A trailing dot or space, and a bare device name, survive extraction because tar.exe creates them
-    // through a path form that bypasses the Win32 parsing rules. Nothing else can address them
-    // afterwards, so the entry cannot be moved out of staging and the copy fails rather than producing a
-    // file under some other name.
     TEST_METHOD(ExtractSingleFileAs_EntryNameWindowsCannotAddressFails)
     {
         const std::string names[] = {"trail.", "trail ", "nul"};
@@ -655,8 +615,6 @@ class FilesystemUnitTests
         }
     }
 
-    // An entry that climbs out of the directory it is extracted into is refused by tar.exe itself, which
-    // keeps an archive from reaching a path the copy never named.
     TEST_METHOD(ExtractSingleFileAs_EntryEscapingTheDestinationIsRejected)
     {
         const StagingDirectory root(std::filesystem::temp_directory_path());
@@ -669,8 +627,6 @@ class FilesystemUnitTests
         VERIFY_IS_FALSE(std::filesystem::exists(root.Path() / L"escaped.txt"));
     }
 
-    // tar.exe strips the leading '/' or drive from an absolute entry name, so the entry lands inside the
-    // destination instead of at the path the archive spelled out.
     TEST_METHOD(ExtractArchiveInto_AbsoluteEntryNameStaysInsideDestination)
     {
         const StagingDirectory root(std::filesystem::temp_directory_path());
@@ -689,8 +645,6 @@ class FilesystemUnitTests
         VERIFY_IS_FALSE(std::filesystem::exists(std::filesystem::path{L"C:\\"} / drive));
     }
 
-    // A hard link to a file outside the destination would let a later entry of the same name write
-    // through it, so tar.exe must refuse to create it.
     TEST_METHOD(ExtractArchiveInto_HardLinkOutsideDestinationIsRejected)
     {
         const StagingDirectory root(std::filesystem::temp_directory_path());
@@ -706,10 +660,6 @@ class FilesystemUnitTests
         VERIFY_ARE_EQUAL(std::string{"original"}, ReadFileContent(victim));
     }
 
-    // tar.exe creates a symbolic link entry as a link and then resolves it while extracting the entries
-    // that follow it, which would place an entry named under that link wherever the link points. The
-    // archive is refused instead. The entry ahead of the pair shows the archive is read before tar.exe
-    // is given any of it, so the refusal leaves nothing behind.
     TEST_METHOD(ExtractArchiveInto_EntryUnderSymlinkEntryIsRejected)
     {
         const StagingDirectory root(std::filesystem::temp_directory_path());
@@ -717,8 +667,7 @@ class FilesystemUnitTests
         const auto outside = root.Path() / L"outside";
         std::filesystem::create_directories(outside);
 
-        // The same entry reaches the link spelled with either separator, or in any case, because the
-        // destination separates on both and matches names without regard to case.
+        // Windows treats both separators alike and ignores case.
         const std::string names[] = {"link/child.txt", "link\\child.txt", "LINK/child.txt"};
         for (const auto& name : names)
         {
@@ -734,9 +683,28 @@ class FilesystemUnitTests
         }
     }
 
-    // Only an entry underneath a link is refused. A link is content in its own right, and a container
-    // filesystem is full of links that leave the tree being copied, so extracting one has to keep
-    // working no matter where it points.
+    TEST_METHOD(ExtractArchiveInto_UnicodeCaseVariantUnderSymlinkIsRejected)
+    {
+        const StagingDirectory root(std::filesystem::temp_directory_path());
+        const auto destination = root.Path() / L"destination";
+        const auto outside = root.Path() / L"outside";
+        std::filesystem::create_directories(outside);
+
+        VerifyExtractionFails([&] {
+            ExtractArchiveInto(
+                destination,
+                std::nullopt,
+                TarBuilder()
+                    .AddFile("first.txt", "first")
+                    .AddSymlink("\xC3\x84", "../../outside")
+                    .AddFile("\xC3\xA4/child.txt", "escaped")
+                    .Writer());
+        });
+
+        VERIFY_IS_FALSE(std::filesystem::exists(outside / L"child.txt"));
+        VERIFY_IS_FALSE(std::filesystem::exists(destination / L"first.txt"));
+    }
+
     TEST_METHOD(ExtractArchiveInto_SymlinkEntryIsExtracted)
     {
         const StagingDirectory probe(std::filesystem::temp_directory_path());
@@ -761,8 +729,6 @@ class FilesystemUnitTests
         VERIFY_ARE_EQUAL(std::string{"content"}, ReadFileContent(destination / L"file.txt"));
     }
 
-    // A link that stays inside the destination is a normal part of an archive, and the entries under it
-    // are the link's own target, so they must still extract.
     TEST_METHOD(ExtractArchiveInto_EntryUnderDirectoryNamedLikeASymlinkIsExtracted)
     {
         const StagingDirectory root(std::filesystem::temp_directory_path());
@@ -773,8 +739,6 @@ class FilesystemUnitTests
         VERIFY_ARE_EQUAL(std::string{"content"}, ReadFileContent(destination / L"link" / L"child.txt"));
     }
 
-    // Staging is an implementation detail that must not outlive the call, on either outcome, or a copy
-    // would leave the destination directory littered.
     TEST_METHOD(ExtractSingleFileAs_RemovesStagingDirectory)
     {
         const StagingDirectory root(std::filesystem::temp_directory_path());
@@ -786,8 +750,6 @@ class FilesystemUnitTests
         VERIFY_ARE_EQUAL(static_cast<size_t>(1), CountEntries(root.Path()));
     }
 
-    // Without a rebase name the archive is extracted as it stands, which is what a copy onto a directory
-    // that keeps the source names needs.
     TEST_METHOD(ExtractArchiveInto_WithoutRebaseNameKeepsEntryNames)
     {
         const StagingDirectory root(std::filesystem::temp_directory_path());
@@ -833,7 +795,6 @@ class FilesystemUnitTests
         VERIFY_IS_TRUE(std::filesystem::is_symlink(destination / L"link"));
     }
 
-    // A lone entry is the source itself, so it takes the requested name.
     TEST_METHOD(ExtractArchiveInto_RebasesLoneEntry)
     {
         const StagingDirectory root(std::filesystem::temp_directory_path());
@@ -845,8 +806,6 @@ class FilesystemUnitTests
         VERIFY_IS_FALSE(std::filesystem::exists(root.Path() / L"original.txt"));
     }
 
-    // Several entries mean the source has no name of its own, so the name becomes a directory holding
-    // them rather than being applied to any one of them.
     TEST_METHOD(ExtractArchiveInto_GathersSeveralEntriesUnderRebaseName)
     {
         const StagingDirectory root(std::filesystem::temp_directory_path());
@@ -884,8 +843,6 @@ class FilesystemUnitTests
         VERIFY_ARE_EQUAL(std::string{"content"}, ReadFileContent(root.Path() / L"renamed" / L"child.txt"));
     }
 
-    // A set but empty name still stages, which merges the entries into the destination under their own
-    // names instead of creating a directory named after nothing.
     TEST_METHOD(ExtractArchiveInto_EmptyRebaseNameMergesEntries)
     {
         const StagingDirectory root(std::filesystem::temp_directory_path());
@@ -907,7 +864,6 @@ class FilesystemUnitTests
         VERIFY_ARE_EQUAL(std::string{"content"}, ReadFileContent(destination / L"file.txt"));
     }
 
-    // Staging must not survive the call, so the destination holds only what the archive carried.
     TEST_METHOD(ExtractArchiveInto_RemovesStagingDirectory)
     {
         const StagingDirectory root(std::filesystem::temp_directory_path());
@@ -918,14 +874,12 @@ class FilesystemUnitTests
         VERIFY_ARE_EQUAL(static_cast<size_t>(1), CountEntries(root.Path()));
     }
 
-    // The rebase name is what the entry ends up called, so a name Windows cannot hold is refused before
-    // the destination is touched rather than after an archive has been read.
     TEST_METHOD(ExtractArchiveInto_RebaseNameWindowsCannotHoldIsRejected)
     {
         const StagingDirectory root(std::filesystem::temp_directory_path());
         const auto destination = root.Path() / L"destination";
 
-        // "." and ".." are nothing but the characters Win32 strips, so they leave no name to copy to.
+        // "." and ".." trim to an empty name.
         const std::wstring rejected[] = {L"nul", L"COM1", L"has:colon", L".", L"..", L"   ", L"sub/dir"};
         for (const auto& name : rejected)
         {
@@ -938,8 +892,6 @@ class FilesystemUnitTests
         }
     }
 
-    // Win32 drops trailing spaces and dots, so the name is trimmed up front and the entry lands under
-    // the name that is actually created rather than one that only looks like what was asked for.
     TEST_METHOD(ExtractArchiveInto_RebaseNameTrailingDotsAndSpacesAreTrimmed)
     {
         const std::pair<std::wstring, std::wstring> trimmed[] = {
@@ -957,7 +909,6 @@ class FilesystemUnitTests
         }
     }
 
-    // Trimming applies to the name of a gathered directory too, not just a lone entry.
     TEST_METHOD(ExtractArchiveInto_TrimmedRebaseNameGathersSeveralEntries)
     {
         const StagingDirectory root(std::filesystem::temp_directory_path());

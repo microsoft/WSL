@@ -58,8 +58,7 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
     void ClearError();
 
 protected:
-    // Routes warnings raised in-process onto the terminal, so they read the same as the ones the
-    // service raises through WarningCallback.
+    // Writes in-process warnings to the terminal, matching those raised through WarningCallback.
     bool CollectUserWarning(const std::wstring& warning) override;
 };
 
