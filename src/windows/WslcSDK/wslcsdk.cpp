@@ -304,13 +304,12 @@ void EnsureWslRuntimeVersionSupports(const WSLCCompatVersion& version, const std
     const std::tuple<uint32_t, uint32_t, uint32_t> currentVersion{version.Major, version.Minor, version.Revision};
     // Allow lockstep development builds before the feature's release version is assigned.
     const std::tuple<uint32_t, uint32_t, uint32_t> clientVersion{WSL_PACKAGE_VERSION_MAJOR, WSL_PACKAGE_VERSION_MINOR, WSL_PACKAGE_VERSION_REVISION};
-    THROW_HR_IF_MSG(
+    THROW_HR_WITH_USER_ERROR_IF(
         WSLC_E_WSL_UPDATE_NEEDED,
-        currentVersion < minimumVersion && currentVersion != clientVersion,
-        "The installed WSL version does not support the requested operation. Current version: %lu.%lu.%lu",
-        version.Major,
-        version.Minor,
-        version.Revision);
+        wsl::shared::Localization::MessageWslcOperationRequiresWslVersion(
+            std::format("{}.{}.{}", version.Major, version.Minor, version.Revision),
+            std::format("{}.{}.{}", std::get<0>(minimumVersion), std::get<1>(minimumVersion), std::get<2>(minimumVersion))),
+        currentVersion < minimumVersion && currentVersion != clientVersion);
 }
 
 enum class WslRuntimeState

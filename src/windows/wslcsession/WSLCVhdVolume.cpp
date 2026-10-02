@@ -53,7 +53,7 @@ namespace {
             opts.Fixed = parser.OptionalBool(c_fixedOpt).value_or(false);
             opts.Sparse = parser.OptionalBool(c_sparseOpt).value_or(false);
             THROW_HR_WITH_USER_ERROR_IF(
-                E_INVALIDARG, Localization::MessageWslcInvalidVolumeOption(c_sparseOpt, "true"), opts.Fixed && opts.Sparse);
+                E_INVALIDARG, Localization::MessageWslcMutuallyExclusiveVolumeOptions(c_fixedOpt, c_sparseOpt), opts.Fixed && opts.Sparse);
 
             // Uid and Gid must be supplied together — leaving one as the
             // mkfs default (root) is a confusing footgun.
