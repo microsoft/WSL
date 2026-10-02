@@ -123,6 +123,256 @@ class WSLCE2EContainerRunTests
         VERIFY_IS_FALSE(result.Stdout->empty());
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_RestartPolicy)
+    {
+        auto result = RunWslc(std::format(
+            L"container run --detach --restart unless-stopped --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_ARE_EQUAL(std::string("unless-stopped"), inspect.HostConfig.RestartPolicy.Name);
+        VERIFY_ARE_EQUAL(0LL, inspect.HostConfig.RestartPolicy.MaximumRetryCount);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_OnFailureRestartsContainer)
+    {
+        const auto hostDirectory = EnvTestFile2.parent_path();
+        const auto outputFileName = EnvTestFile2.filename().wstring();
+        VERIFY_IS_TRUE(DeleteFileW(EnvTestFile2.c_str()));
+
+        auto result = RunWslc(std::format(
+            L"container run --detach --restart on-failure:1 --name {} -p {}:{} --mount \"type=bind,source={},target=/data\" {} "
+            L"sh -c \"if [ -e /tmp/wslc-first-run ]; then echo wslc-restarted > /data/{}; python3 -u -m http.server {}; "
+            L"else touch /tmp/wslc-first-run; exit 1; fi\"",
+            WslcContainerName,
+            HostTestPort1,
+            ContainerTestPort,
+            hostDirectory.wstring(),
+            PythonImage.NameAndTag(),
+            outputFileName,
+            ContainerTestPort));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        WaitForContainerOutput(WslcContainerName, "Serving HTTP on");
+
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                const auto execResult = RunWslc(std::format(L"container exec {} true", WslcContainerName));
+                THROW_HR_IF(E_FAIL, !execResult.ExitCode.has_value() || execResult.ExitCode.value() != 0);
+            },
+            std::chrono::milliseconds(200),
+            std::chrono::seconds(30)));
+
+        VERIFY_IS_TRUE(InspectContainer(WslcContainerName).State.Running);
+        VERIFY_ARE_EQUAL(std::wstring(L"wslc-restarted\n"), ReadFileContent(EnvTestFile2.wstring()));
+        ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", HostTestPort1).c_str(), HTTP_STATUS_OK, true);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_OnFailureDoesNotRestartAfterSuccessfulExit)
+    {
+        const auto hostDirectory = EnvTestFile2.parent_path();
+        const auto outputFileName = EnvTestFile2.filename().wstring();
+        VERIFY_IS_TRUE(DeleteFileW(EnvTestFile2.c_str()));
+
+        auto result = RunWslc(std::format(
+            L"container run --detach --restart on-failure --name {} --mount \"type=bind,source={},target=/data\" {} "
+            L"sh -c \"echo run >> /data/{}; exit 0\"",
+            WslcContainerName,
+            hostDirectory.wstring(),
+            DebianImage.NameAndTag(),
+            outputFileName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                THROW_HR_IF(E_FAIL, !std::filesystem::exists(EnvTestFile2));
+                THROW_HR_IF(E_FAIL, ReadFileContent(EnvTestFile2.wstring()) != L"run\n");
+
+                const auto inspect = InspectContainer(WslcContainerName);
+                THROW_HR_IF(E_FAIL, inspect.State.Running || inspect.State.Status != "exited");
+            },
+            std::chrono::milliseconds(200),
+            std::chrono::seconds(30)));
+
+        VERIFY_ARE_EQUAL(std::wstring(L"run\n"), ReadFileContent(EnvTestFile2.wstring()));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_AlwaysRestartsAfterSuccessfulExit)
+    {
+        const auto hostDirectory = EnvTestFile2.parent_path();
+        const auto outputFileName = EnvTestFile2.filename().wstring();
+        VERIFY_IS_TRUE(DeleteFileW(EnvTestFile2.c_str()));
+
+        auto result = RunWslc(std::format(
+            L"container run --detach --restart always --name {} --mount \"type=bind,source={},target=/data\" {} "
+            L"sh -c \"if [ -e /tmp/wslc-first-run ]; then echo wslc-restarted > /data/{}; sleep infinity; "
+            L"else touch /tmp/wslc-first-run; exit 0; fi\"",
+            WslcContainerName,
+            hostDirectory.wstring(),
+            DebianImage.NameAndTag(),
+            outputFileName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                THROW_HR_IF(E_FAIL, !std::filesystem::exists(EnvTestFile2));
+                THROW_HR_IF(E_FAIL, ReadFileContent(EnvTestFile2.wstring()) != L"wslc-restarted\n");
+            },
+            std::chrono::milliseconds(200),
+            std::chrono::seconds(30)));
+
+        VERIFY_IS_TRUE(InspectContainer(WslcContainerName).State.Running);
+        RunWslc(std::format(L"container exec {} true", WslcContainerName)).Verify({.Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_OnFailureStopsRestartingAfterMaximumRetriesAndReleasesPort)
+    {
+        const auto hostDirectory = EnvTestFile2.parent_path();
+        const auto outputFileName = EnvTestFile2.filename().wstring();
+        VERIFY_IS_TRUE(DeleteFileW(EnvTestFile2.c_str()));
+
+        auto result = RunWslc(std::format(
+            L"container run --detach --restart on-failure:2 --name {} -p {}:{} "
+            L"--mount \"type=bind,source={},target=/data\" {} sh -c \"echo run >> /data/{}; exit 1\"",
+            WslcContainerName,
+            HostTestPort1,
+            ContainerTestPort,
+            hostDirectory.wstring(),
+            DebianImage.NameAndTag(),
+            outputFileName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const std::wstring expectedRuns = L"run\nrun\nrun\n";
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                THROW_HR_IF(E_FAIL, !std::filesystem::exists(EnvTestFile2));
+                THROW_HR_IF(E_FAIL, ReadFileContent(EnvTestFile2.wstring()) != expectedRuns);
+
+                const auto inspect = InspectContainer(WslcContainerName);
+                THROW_HR_IF(E_FAIL, inspect.State.Running || inspect.State.Status != "exited");
+            },
+            std::chrono::milliseconds(200),
+            std::chrono::seconds(30)));
+
+        VERIFY_ARE_EQUAL(expectedRuns, ReadFileContent(EnvTestFile2.wstring()));
+
+        result = RunWslc(std::format(
+            L"container create --name {} -p {}:{} {} sleep infinity",
+            WslcContainerName2,
+            HostTestPort1,
+            ContainerTestPort,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                const auto startResult = RunWslc(std::format(L"container start {}", WslcContainerName2));
+                THROW_HR_IF(E_FAIL, !startResult.ExitCode.has_value() || startResult.ExitCode.value() != 0);
+            },
+            std::chrono::milliseconds(200),
+            std::chrono::seconds(30)));
+
+        VERIFY_IS_TRUE(InspectContainer(WslcContainerName2).State.Running);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_StopCancelsRestartPolicyDuringBackoff)
+    {
+        const auto hostDirectory = EnvTestFile2.parent_path();
+        const auto outputFileName = EnvTestFile2.filename().wstring();
+        VERIFY_IS_TRUE(DeleteFileW(EnvTestFile2.c_str()));
+
+        auto result = RunWslc(std::format(
+            L"container run --detach --restart always --name {} --mount \"type=bind,source={},target=/data\" {} "
+            L"sh -c \"echo run >> /data/{}; exit 1\"",
+            WslcContainerName,
+            hostDirectory.wstring(),
+            DebianImage.NameAndTag(),
+            outputFileName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                THROW_HR_IF(E_FAIL, !std::filesystem::exists(EnvTestFile2));
+                const auto content = ReadFileContent(EnvTestFile2.wstring());
+                THROW_HR_IF(E_FAIL, std::count(content.begin(), content.end(), L'\n') < 6);
+                const auto inspect = InspectContainer(WslcContainerName);
+                THROW_HR_IF(E_FAIL, inspect.State.Status != "restarting" || !inspect.State.Restarting);
+            },
+            std::chrono::milliseconds(100),
+            std::chrono::seconds(30)));
+
+        result = RunWslc(std::format(L"container stop {} -t 0", WslcContainerName));
+        result.Verify({.Stdout = std::format(L"{}\r\n", WslcContainerName), .Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_IS_FALSE(inspect.State.Running);
+        VERIFY_IS_FALSE(inspect.State.Restarting);
+        VERIFY_ARE_EQUAL(std::string("exited"), inspect.State.Status);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_ExplicitRestartCancelsPolicyBackoff)
+    {
+        const auto hostDirectory = EnvTestFile2.parent_path();
+        const auto controlFileName = EnvTestFile1.filename().wstring();
+        const auto outputFileName = EnvTestFile2.filename().wstring();
+        VERIFY_IS_TRUE(DeleteFileW(EnvTestFile1.c_str()));
+        VERIFY_IS_TRUE(DeleteFileW(EnvTestFile2.c_str()));
+
+        auto result = RunWslc(std::format(
+            L"container run --detach --restart always --name {} --mount \"type=bind,source={},target=/data\" {} "
+            L"sh -c \"if [ -e /data/{} ]; then echo restarted >> /data/{}; sleep infinity; "
+            L"else echo failed >> /data/{}; exit 1; fi\"",
+            WslcContainerName,
+            hostDirectory.wstring(),
+            DebianImage.NameAndTag(),
+            controlFileName,
+            outputFileName,
+            outputFileName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                THROW_HR_IF(E_FAIL, !std::filesystem::exists(EnvTestFile2));
+                const auto content = ReadFileContent(EnvTestFile2.wstring());
+                THROW_HR_IF(E_FAIL, std::count(content.begin(), content.end(), L'\n') < 6);
+                THROW_HR_IF(E_FAIL, InspectContainer(WslcContainerName).State.Status != "restarting");
+            },
+            std::chrono::milliseconds(100),
+            std::chrono::seconds(30)));
+
+        WriteTestFileContent(EnvTestFile1, "continue");
+        result = RunWslc(std::format(L"container restart {} -t 0", WslcContainerName));
+        result.Verify({.Stdout = std::format(L"{}\r\n", WslcContainerName), .Stderr = L"", .ExitCode = 0});
+
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                const auto execResult = RunWslc(std::format(L"container exec {} true", WslcContainerName));
+                THROW_HR_IF(E_FAIL, !execResult.ExitCode.has_value() || execResult.ExitCode.value() != 0);
+            },
+            std::chrono::milliseconds(200),
+            std::chrono::seconds(30)));
+
+        VERIFY_IS_TRUE(InspectContainer(WslcContainerName).State.Running);
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, ReadFileContent(EnvTestFile2.wstring()).find(L"restarted\n"));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_RestartPolicyConflictsWithRemove)
+    {
+        auto result =
+            RunWslc(std::format(L"container run --restart always --rm --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Conflicting options: cannot specify both --restart and --rm"));
+        VerifyContainerIsNotListed(WslcContainerName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_NoRestartPolicyAllowsRemove)
+    {
+        auto result =
+            RunWslc(std::format(L"container run --restart no --rm --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+        VerifyContainerIsNotListed(WslcContainerName);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_CIDFile_Valid)
     {
         // Prepare a CID file path that does not exist

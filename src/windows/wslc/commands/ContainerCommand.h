@@ -58,6 +58,7 @@ struct ContainerCreateCommand final : public Command
     std::wstring LongDescription() const override;
 
 protected:
+    void ValidateArgumentsInternal(ArgMap& execArgs) const override;
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
@@ -209,6 +210,7 @@ struct ContainerRunCommand final : public Command
     std::wstring LongDescription() const override;
 
 protected:
+    void ValidateArgumentsInternal(ArgMap& execArgs) const override;
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 

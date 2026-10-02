@@ -62,12 +62,13 @@ struct ContainerInspectState
 {
     std::string Status;
     bool Running{};
+    bool Restarting{};
     int ExitCode{};
     std::string StartedAt;
     std::string FinishedAt;
     std::optional<Health> Health;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInspectState, Status, Running, ExitCode, StartedAt, FinishedAt, Health);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInspectState, Status, Running, Restarting, ExitCode, StartedAt, FinishedAt, Health);
 };
 
 struct Ulimit
@@ -79,14 +80,23 @@ struct Ulimit
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Ulimit, Name, Soft, Hard);
 };
 
+struct RestartPolicyConfig
+{
+    std::string Name{"no"};
+    std::int64_t MaximumRetryCount{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(RestartPolicyConfig, Name, MaximumRetryCount);
+};
+
 struct InspectHostConfig
 {
     std::string NetworkMode;
     std::int64_t Memory{};
     std::int64_t NanoCpus{};
     std::vector<Ulimit> Ulimits;
+    RestartPolicyConfig RestartPolicy;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectHostConfig, NetworkMode, Memory, NanoCpus, Ulimits);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectHostConfig, NetworkMode, Memory, NanoCpus, Ulimits, RestartPolicy);
 };
 
 struct HealthConfig
