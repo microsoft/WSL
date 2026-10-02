@@ -150,7 +150,7 @@ try
 
     sockaddr_vm SocketAddress;
     wil::unique_fd Sockets[LX_INIT_CREATE_NT_PROCESS_SOCKETS];
-    wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, COUNT_OF(Sockets))};
+    wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, COUNT_OF(Sockets), true, LX_INIT_HVSOCKET_LISTEN_BUFFER_SIZE)};
     if (!ListenSocket)
     {
         return ExitCode;
