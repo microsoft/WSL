@@ -847,7 +847,7 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_labels(std::move(labels)),
     m_comWrapper(wil::MakeOrThrow<WSLCContainer>(wslcSession, std::move(onDeleted))),
     m_containerEvents(runtime.Events().RegisterContainerStateUpdates(
-        m_id, std::bind(&WSLCContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3))),
+        m_id, std::bind(&WSLCContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4))),
     m_eventStore(eventStore),
     m_state(InitialState),
     m_createdAt(CreatedAt),
@@ -1274,19 +1274,30 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::CompleteTransitio
     transition->Completed.SetEvent();
 }
 
-void WSLCContainerImpl::RecordEvent(std::string&& Action, std::int64_t TimeNano, std::optional<int> ExitCode) noexcept
-try
+std::map<std::string, std::string> WSLCContainerImpl::BuildEventAttributes() const
 {
     auto attributes = StripInternalLabels(m_labels);
     attributes["name"] = m_name;
     attributes["image"] = m_image;
+    return attributes;
+}
 
-    if (ExitCode.has_value())
-    {
-        attributes["exitCode"] = std::to_string(ExitCode.value());
-    }
+void WSLCContainerImpl::RecordEvent(std::string&& Action, std::int64_t TimeNano) noexcept
+try
+{
+    m_eventStore.Record("container", std::move(Action), m_id, BuildEventAttributes(), TimeNano);
+}
+CATCH_LOG()
 
-    m_eventStore.Record("container", std::move(Action), m_id, std::move(attributes), TimeNano);
+void WSLCContainerImpl::RecordEvent(std::string&& Action, std::int64_t TimeNano, const std::map<std::string, std::string>& DockerAttributes) noexcept
+try
+{
+    auto attributes = GetEventAttributes(DockerAttributes);
+
+    // Containers are only tracked once created or opened with WSLC's metadata label, which Docker copies into every event.
+    WI_ASSERT(attributes.has_value());
+
+    m_eventStore.Record("container", std::move(Action), m_id, std::move(attributes.value()), TimeNano);
 }
 CATCH_LOG()
 
@@ -1311,7 +1322,7 @@ std::optional<std::map<std::string, std::string>> WSLCContainerImpl::GetEventAtt
     return attributes;
 }
 
-void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode, std::int64_t eventTimeNano) noexcept
+void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode, const std::map<std::string, std::string>& attributes, std::int64_t eventTimeNano) noexcept
 {
     // Either owner may disconnect the COM wrapper, so both must outlive m_lock.
     unique_com_disconnect comWrapper;
@@ -1320,11 +1331,11 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     switch (event)
     {
     case ContainerEvent::HealthHealthy:
-        RecordEvent("health_status: healthy", eventTimeNano);
+        RecordEvent("health_status: healthy", eventTimeNano, attributes);
         return;
 
     case ContainerEvent::HealthUnhealthy:
-        RecordEvent("health_status: unhealthy", eventTimeNano);
+        RecordEvent("health_status: unhealthy", eventTimeNano, attributes);
         return;
 
     default:
@@ -1343,7 +1354,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
             if (transition && transition->ExpectedEvent == ContainerEvent::Start)
             {
                 WI_ASSERT(m_state == WslcContainerStateCreated || m_state == WslcContainerStateExited);
-                CommitState(WslcContainerStateRunning, eventTimeNano);
+                CommitState(WslcContainerStateRunning, eventTimeNano, attributes);
                 CompleteTransition(transition);
             }
             else
@@ -1354,13 +1365,13 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         else if (event == ContainerEvent::Exit)
         {
             WI_ASSERT(exitCode.has_value());
-            OnStopped(exitCode.value(), eventTimeNano);
+            OnStopped(exitCode.value(), attributes, eventTimeNano);
         }
         else if (event == ContainerEvent::Destroy)
         {
             if (m_state != WslcContainerStateDeleted)
             {
-                CommitState(WslcContainerStateDeleted, eventTimeNano);
+                CommitState(WslcContainerStateDeleted, eventTimeNano, attributes);
                 comWrapper = ReleaseResources();
             }
 
@@ -1604,7 +1615,7 @@ __requires_exclusive_lock_held(m_lock) std::shared_ptr<WSLCContainerImpl::StateT
     return StartTransition(TransitionKind::Delete, ContainerEvent::Destroy);
 }
 
-__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exitCode, std::int64_t stopTimeNano)
+__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exitCode, const std::map<std::string, std::string>& attributes, std::int64_t stopTimeNano)
 {
     auto transition = m_transition;
 
@@ -1640,7 +1651,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
     // Ignore duplicate or late exit events so they do not overwrite an already committed state.
     if (m_state == WslcContainerStateRunning)
     {
-        CommitState(WslcContainerStateExited, stopTimeNano, exitCode);
+        CommitState(WslcContainerStateExited, stopTimeNano, attributes);
     }
 
     std::exception_ptr transitionException;
@@ -3162,7 +3173,8 @@ __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::
     return unique_com_disconnect{std::exchange(m_comWrapper, nullptr)};
 }
 
-__requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(WSLCContainerState State, std::int64_t TimeNano, std::optional<int> ExitCode) noexcept
+__requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(
+    WSLCContainerState State, std::int64_t TimeNano, const std::map<std::string, std::string>& DockerAttributes) noexcept
 {
     // N.B. A deleted container cannot transition back to any other state.
     WI_ASSERT(m_state != WslcContainerStateDeleted);
@@ -3177,7 +3189,7 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(WSLCContainerSt
     m_stateGeneration++;
     m_stateChangedAt = std::chrono::floor<std::chrono::seconds>(std::chrono::nanoseconds{TimeNano}).count();
 
-    RecordEvent(WSLCStateToEventAction(State), TimeNano, ExitCode);
+    RecordEvent(WSLCStateToEventAction(State), TimeNano, DockerAttributes);
 
     if (State == WslcContainerStateRunning)
     {

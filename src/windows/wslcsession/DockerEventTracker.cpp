@@ -167,9 +167,15 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
 
     auto containerId = id->get<std::string>();
 
+    std::map<std::string, std::string> attributes;
+    if (const auto attributesEntry = actor->find("Attributes"); attributesEntry != actor->end())
+    {
+        attributes = attributesEntry->get<std::map<std::string, std::string>>();
+    }
+
     if (action == "kill" || action == "stop")
     {
-        OnContainerAction(*actor, containerId, action, eventTimeNano);
+        OnContainerAction(containerId, action, attributes, eventTimeNano);
         return;
     }
 
@@ -180,21 +186,15 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
     }
 
     std::optional<int> exitCode;
-    std::optional<std::string> execId;
-    auto attributes = actor->find("Attributes");
-    if (attributes != actor->end())
+    if (const auto exitCodeEntry = attributes.find("exitCode"); exitCodeEntry != attributes.end())
     {
-        auto exitCodeEntry = attributes->find("exitCode");
-        if (exitCodeEntry != attributes->end())
-        {
-            exitCode = std::stoi(exitCodeEntry->get<std::string>());
-        }
+        exitCode = std::stoi(exitCodeEntry->second);
+    }
 
-        auto execIdEntry = attributes->find("execID");
-        if (execIdEntry != attributes->end())
-        {
-            execId = execIdEntry->get<std::string>();
-        }
+    std::optional<std::string> execId;
+    if (const auto execIdEntry = attributes.find("execID"); execIdEntry != attributes.end())
+    {
+        execId = execIdEntry->second;
     }
 
     // Snapshot the matching callbacks so that they can be invoked without holding m_lock. Callbacks can register and
@@ -213,18 +213,12 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
         }
     }
 
-    InvokeCallbacks(callbacks, [&](const ContainerCallback& e) { e.Callback(it->second, exitCode, eventTimeNano); });
+    InvokeCallbacks(callbacks, [&](const ContainerCallback& e) { e.Callback(it->second, exitCode, attributes, eventTimeNano); });
 }
 
-void DockerEventTracker::OnContainerAction(const nlohmann::json& actor, const std::string& containerId, const std::string& action, std::int64_t eventTimeNano)
+void DockerEventTracker::OnContainerAction(
+    const std::string& containerId, const std::string& action, const std::map<std::string, std::string>& attributes, std::int64_t eventTimeNano)
 {
-    std::map<std::string, std::string> attributes;
-    auto attributesEntry = actor.find("Attributes");
-    if (attributesEntry != actor.end())
-    {
-        attributes = attributesEntry->get<std::map<std::string, std::string>>();
-    }
-
     std::vector<std::shared_ptr<ContainerActionCallbackEntry>> callbacks;
     {
         std::lock_guard lock{m_lock};

@@ -155,9 +155,22 @@ class WSLCE2EEventsTests
         VERIFY_ARE_EQUAL(4u, lines.size());
         VerifyEventLine(lines[0], std::format(L" container create {} (image={}, name={})", containerId, DebianImage.NameAndTag(), c_eventContainerName));
         VerifyEventLine(lines[1], std::format(L" container start {} (image={}, name={})", containerId, DebianImage.NameAndTag(), c_eventContainerName));
+
+        // execDuration is how long the container ran, so it's read from the line rather than predicted.
+        const auto execDurationStart = lines[2].find(L"execDuration=");
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, execDurationStart);
+        const auto execDurationValueStart = execDurationStart + wcslen(L"execDuration=");
+        const auto execDuration =
+            lines[2].substr(execDurationValueStart, lines[2].find(L',', execDurationValueStart) - execDurationValueStart);
         VerifyEventLine(
             lines[2],
-            std::format(L" container die {} (exitCode={}, image={}, name={})", containerId, 128 + WSLCSignalSIGKILL, DebianImage.NameAndTag(), c_eventContainerName));
+            std::format(
+                L" container die {} (execDuration={}, exitCode={}, image={}, name={})",
+                containerId,
+                execDuration,
+                128 + WSLCSignalSIGKILL,
+                DebianImage.NameAndTag(),
+                c_eventContainerName));
         VerifyEventLine(lines[3], std::format(L" container destroy {} (image={}, name={})", containerId, DebianImage.NameAndTag(), c_eventContainerName));
     }
 
@@ -190,6 +203,7 @@ class WSLCE2EEventsTests
         }
 
         VERIFY_ARE_EQUAL(std::to_string(128 + WSLCSignalSIGKILL), events[3].at("Actor").at("Attributes").at("exitCode").get<std::string>());
+        VERIFY_IS_TRUE(events[3].at("Actor").at("Attributes").contains("execDuration"));
 
         for (const auto& event : events)
         {

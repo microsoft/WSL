@@ -7274,6 +7274,8 @@ class WSLCTests
                 {
                     VERIFY_ARE_EQUAL(std::to_string(WSLCSignalSIGKILL), event.Actor.Attributes.at("signal"));
                 }
+
+                VERIFY_ARE_EQUAL(action == "die", event.Actor.Attributes.contains("execDuration"));
             }
         };
 
@@ -7312,28 +7314,38 @@ class WSLCTests
 
             // Each event keeps the exact time Docker reported for it.
             // Docker also emits container events that aren't recorded, such as 'attach'.
-            auto dockerEvents = ExpectCommandResult(
-                m_defaultSession.get(),
-                {"/usr/bin/docker",
-                 "events",
-                 "--since",
-                 std::to_string(lifecycleEvents.front().timeNano / 1'000'000'000),
-                 "--until",
-                 std::to_string(lifecycleEvents.back().timeNano / 1'000'000'000 + 1),
-                 "--filter",
-                 "type=container",
-                 "--filter",
-                 "container=" + id,
-                 "--format",
-                 "{{.Action}} {{.TimeNano}}"},
-                0);
+            const auto dockerEvents = [&](const std::string& format, std::initializer_list<std::string> extraFilters = {}) {
+                std::vector<std::string> command{
+                    "/usr/bin/docker",
+                    "events",
+                    "--since",
+                    std::to_string(lifecycleEvents.front().timeNano / 1'000'000'000),
+                    "--until",
+                    std::to_string(lifecycleEvents.back().timeNano / 1'000'000'000 + 1),
+                    "--filter",
+                    "type=container",
+                    "--filter",
+                    "container=" + id,
+                    "--format",
+                    format};
 
-            const auto dockerLines = wsl::shared::string::Split(dockerEvents.Output[1], '\n');
+                for (const auto& filter : extraFilters)
+                {
+                    command.insert(command.end(), {"--filter", filter});
+                }
+
+                return ExpectCommandResult(m_defaultSession.get(), command, 0);
+            };
+
+            const auto dockerLines = wsl::shared::string::Split(dockerEvents("{{.Action}} {{.TimeNano}}").Output[1], '\n');
             for (const auto& event : lifecycleEvents)
             {
                 const auto expected = std::format("{} {}", event.Action, event.timeNano);
                 VERIFY_IS_TRUE(std::ranges::find(dockerLines, expected) != dockerLines.end());
             }
+
+            const auto dockerExecDuration = dockerEvents(R"({{index .Actor.Attributes "execDuration"}})", {"event=die"}).Output[1];
+            VERIFY_ARE_EQUAL(std::format("{}\n", lifecycleEvents[3].Actor.Attributes.at("execDuration")), dockerExecDuration);
         }
 
         // Each lifecycle action is independently selectable: an 'event=<action>' filter, AND'd with
