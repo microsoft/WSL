@@ -101,6 +101,20 @@ void AddMirroredGpu(_In_ HCS_SYSTEM ComputeSystem, _In_ bool AllowVendorExtensio
 
 void ModifyComputeSystem(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Configuration, _In_opt_ HANDLE Identity = nullptr);
 
+/// <summary>
+/// Adds or removes a host endpoint adapter, optionally retrying additions while the host network stack settles.
+/// Adding an endpoint that is already attached is treated as success because the requested state
+/// has already been reached.
+/// </summary>
+void ModifyNetworkAdapter(
+    _In_ HCS_SYSTEM ComputeSystem,
+    _In_ PCWSTR ResourcePath,
+    _In_ ModifyRequestType RequestType,
+    _In_ const GUID& EndpointId,
+    _In_ const GUID& InstanceId,
+    _In_ const wsl::shared::string::MacAddress& MacAddress,
+    _In_ bool Retry = false);
+
 unique_hcs_system OpenComputeSystem(_In_ PCWSTR Id, _In_ DWORD RequestedAccess);
 
 void RegisterCallback(_In_ HCS_SYSTEM ComputeSystem, _In_ HCS_EVENT_CALLBACK Callback, _In_ void* Context);

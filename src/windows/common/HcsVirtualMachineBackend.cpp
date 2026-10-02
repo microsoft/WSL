@@ -244,8 +244,6 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
 
     THROW_HR_IF(E_INVALIDARG, IsEqualGUID(Request.Identity.VmId, GUID_NULL));
 
-    m_restrictedToken = wsl::windows::common::security::CreateRestrictedToken(Request.Identity.UserToken.get());
-
     VmConfiguration configuration{};
     configuration.Settings.Owner = Request.Owner;
     configuration.Settings.ShouldTerminateOnLastHandleClosed = true;
@@ -327,10 +325,23 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
     if (Request.CrashCapture && Request.CrashCapture->SavedStateFolder)
     {
         THROW_HR_IF(E_INVALIDARG, Request.CrashCapture->SavedStateFolder->empty());
-        const auto savedStatePath = schema::CreateVmSavedStateFile(
-            Request.CrashCapture->SavedStateFolder.value(), Request.Identity.VmId, Request.Identity.UserToken.get());
-        configuration.Settings.VirtualMachine.DebugOptions.BugcheckSavedStateFileName = savedStatePath.native();
-        m_vmSavedStateFile = savedStatePath;
+
+        // Saved-state capture is configured through the DebugOptions of schema 2.7, so it is left
+        // unconfigured on Windows 10 just as WslCoreVm does.
+        if (wsl::windows::common::helpers::IsWindows11OrAbove())
+        {
+            const auto savedStatePath = schema::CreateVmSavedStateFile(
+                Request.CrashCapture->SavedStateFolder.value(), Request.Identity.VmId, Request.Identity.UserToken.get());
+            configuration.Settings.VirtualMachine.DebugOptions.BugcheckSavedStateFileName = savedStatePath.native();
+            m_vmSavedStateFile = savedStatePath;
+        }
+        else
+        {
+            THROW_HR_IF_MSG(
+                c_notSupported,
+                Request.CrashCapture->Policy == VmSelectionPolicy::Required,
+                "Saved-state crash capture requires Windows 11 or above");
+        }
     }
 
     // Permit the VM identity and SYSTEM to bind and connect Hyper-V sockets. Plan 9 socket
@@ -368,10 +379,10 @@ HcsVirtualMachineBackend::~HcsVirtualMachineBackend() noexcept
     try
     {
         auto crashLock = m_crashInformationLock.lock_shared();
+        auto runAsUser = wil::impersonate_token(m_configuration.Description.Identity.UserToken.get());
         if (m_vmSavedStateFile && std::filesystem::exists(m_vmSavedStateFile.value()) &&
             std::filesystem::is_empty(m_vmSavedStateFile.value()))
         {
-            auto runAsUser = wil::impersonate_token(m_configuration.Description.Identity.UserToken.get());
             std::filesystem::remove(m_vmSavedStateFile.value());
         }
     }
@@ -489,86 +500,26 @@ VmPlatformCapabilities HcsVirtualMachineBackend::QueryCapabilities()
 {
     VmPlatformCapabilities capabilities{};
     capabilities.Backend = BackendKind::Hcs;
-    for (const auto operation :
-         {VmOperation::Create,
-          VmOperation::Start,
-          VmOperation::Terminate,
-          VmOperation::CreateGuestListener,
-          VmOperation::AcceptGuestConnection,
-          VmOperation::ConnectGuest,
-          VmOperation::CloseGuestListener,
-          VmOperation::AttachDisk,
-          VmOperation::DetachDisk,
-          VmOperation::AddPersistentMemory,
-          VmOperation::AddGpu,
-          VmOperation::CreateFileSystemDevice,
-          VmOperation::GetFileSystemDeviceStatus,
-          VmOperation::AddFileSystemShare,
-          VmOperation::RemoveFileSystemShare,
-          VmOperation::AddSharedMemory,
-          VmOperation::ConfigureGuestDma,
-          VmOperation::RemoveDevice,
-          VmOperation::AddNetworkAdapter,
-          VmOperation::UpdateNetworkAdapter,
-          VmOperation::RemoveNetworkAdapter,
-          VmOperation::BindPort,
-          VmOperation::UnbindPort,
-          VmOperation::CreateVirtualAddress,
-          VmOperation::CreateDnsRecord})
-    {
-        capabilities.Operations.set(static_cast<size_t>(operation));
-    }
-
     for (const auto feature :
-         {VmFeature::LinuxFirmwareBoot,
-          VmFeature::MemoryOvercommit,
+         {VmFeature::NestedVirtualization,
           VmFeature::DeferredMemoryCommit,
           VmFeature::ColdDiscard,
           VmFeature::SerialConsole,
           VmFeature::VirtioConsole,
-          VmFeature::Vhd,
-          VmFeature::Vhdx,
           VmFeature::PhysicalDisk,
-          VmFeature::PersistentMemory,
-          VmFeature::Plan9Socket,
-          VmFeature::Plan9Virtio,
           VmFeature::VirtioFsFileBacked,
-          VmFeature::VirtioFsAggregate,
-          VmFeature::SectionBackedSharedMemory,
-          VmFeature::MirroredGpu,
-          VmFeature::GpuVendorExtension,
-          VmFeature::SavedStateOnCrash,
-          VmFeature::GuestDmaWindow,
-          VmFeature::HostEndpointNetwork,
           VmFeature::UserModeNatNetwork,
           VmFeature::TcpPortBinding,
           VmFeature::UdpPortBinding,
-          VmFeature::Ipv6PortBinding,
-          VmFeature::DynamicHostPort,
-          VmFeature::VirtualHostAddress,
-          VmFeature::StaticDnsARecord})
+          VmFeature::Ipv6PortBinding})
     {
         capabilities.Features.set(static_cast<size_t>(feature));
     }
 
-    if constexpr (!wsl::shared::Arm64)
-    {
-        capabilities.Features.set(static_cast<size_t>(VmFeature::LinuxDirectBoot));
-    }
-
+    capabilities.Features.set(static_cast<size_t>(VmFeature::NestedVirtualization), schema::IsNestedVirtualizationSupported());
     capabilities.Features.set(static_cast<size_t>(VmFeature::SmallPageMemory), schema::IsSmallPageMemorySupported());
-
-    if (schema::IsNestedVirtualizationSupported())
-    {
-        capabilities.Features.set(static_cast<size_t>(VmFeature::NestedVirtualization));
-    }
-
-    if (schema::IsDisableVgpuSettingsSupported())
-    {
-        capabilities.Features.set(static_cast<size_t>(VmFeature::GpuDisableGdiAcceleration));
-        capabilities.Features.set(static_cast<size_t>(VmFeature::GpuDisablePresentation));
-    }
-
+    // Saved-state crash capture needs the DebugOptions of schema 2.7, which Windows 10 does not have.
+    capabilities.Features.set(static_cast<size_t>(VmFeature::SavedStateOnCrash), wsl::windows::common::helpers::IsWindows11OrAbove());
     const auto [perfmonPmuSupported, perfmonLbrSupported] = schema::GetPerfmonCapabilities();
     capabilities.Features.set(static_cast<size_t>(VmFeature::PerfmonPmu), perfmonPmuSupported);
     capabilities.Features.set(static_cast<size_t>(VmFeature::PerfmonLbr), perfmonLbrSupported);
@@ -634,6 +585,9 @@ void HcsVirtualMachineBackend::Start()
 
 void HcsVirtualMachineBackend::Terminate()
 {
+    // AddPersistentMemory releases m_lock while the device host attaches the device and the caller
+    // waits for it. Serialize termination with that entire lifecycle.
+    auto persistentMemoryLock = m_persistentMemoryLock.lock_exclusive();
     schema::unique_hcs_system system;
     std::map<std::uint64_t, AttachedDisk> attachedDisks;
     {
@@ -670,11 +624,6 @@ VmGuestListener HcsVirtualMachineBackend::CreateGuestListener(GuestServicePort P
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
     return RegisterGuestListenerLocked(m_configuration.Description.Identity, Port);
-}
-
-wil::unique_socket HcsVirtualMachineBackend::AcceptGuestConnection(VmListenerId Listener)
-{
-    return AcceptGuestListenerConnection(Listener, m_configuration.Description.Identity);
 }
 
 wil::unique_socket HcsVirtualMachineBackend::ConnectGuest(GuestServicePort Port)
@@ -963,12 +912,14 @@ VmPersistentMemoryDevice HcsVirtualMachineBackend::AddPersistentMemory(const VmP
     auto persistentMemoryLock = m_persistentMemoryLock.lock_exclusive();
 
     std::shared_ptr<GuestDeviceManager> guestDeviceManager;
+    HCS_SYSTEM system{};
     HANDLE userToken{};
     VmPersistentMemoryDevice device{};
     {
         auto lock = m_lock.lock_exclusive();
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system || !m_guestDeviceManager);
         THROW_HR_IF(E_BOUNDS, m_nextDeviceId == UINT64_MAX);
+        system = m_system.get();
         guestDeviceManager = m_guestDeviceManager;
         userToken = Request.UserToken.has_value() ? Request.UserToken->get() : m_configuration.Description.Identity.UserToken.get();
         THROW_HR_IF_MSG(E_UNEXPECTED, !userToken, "UserToken not set for the persistent memory request");
@@ -997,6 +948,9 @@ VmPersistentMemoryDevice HcsVirtualMachineBackend::AddPersistentMemory(const VmP
     // addition reuse this device's guest name.
     {
         auto lock = m_lock.lock_exclusive();
+        THROW_HR_IF(
+            HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+            !m_system || m_system.get() != system || m_guestDeviceManager != guestDeviceManager || m_state == VmState::Stopped);
         const auto inserted = m_persistentMemoryDevices.emplace(device.Id.Value, device).second;
         WI_ASSERT(inserted);
     }
@@ -1008,6 +962,13 @@ VmPersistentMemoryDevice HcsVirtualMachineBackend::AddPersistentMemory(const VmP
     if (Request.WaitForGuestDevice)
     {
         Request.WaitForGuestDevice(device.Index);
+    }
+
+    {
+        auto lock = m_lock.lock_shared();
+        THROW_HR_IF(
+            HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+            !m_system || m_system.get() != system || m_guestDeviceManager != guestDeviceManager || m_state == VmState::Stopped);
     }
 
     WSL_LOG(
@@ -1107,15 +1068,24 @@ VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFile
     std::visit(
         Overloaded{
             [&](const VmVirtioFsDevice& transport) {
-                mountOptions = FormatVirtioFsMountOptions(transport.Options.MountOptions);
+                // A single-share device is created from the share that it serves, so device options
+                // would never reach the guest.
+                THROW_HR_IF_MSG(
+                    E_INVALIDARG,
+                    transport.Layout == VmVirtioFsLayout::SingleShare &&
+                        (!transport.Options.MountOptions.empty() || !!transport.Options.UserToken),
+                    "A single-share virtio-fs device takes its options from the share that it serves");
 
-                // An aggregate device serves each of its shares as a child, so it can be created
-                // before any share exists. A single-share device is created once its share is added.
+                mountOptions = FormatVirtioFsMountOptions(transport.Options.MountOptions);
                 if (transport.Layout == VmVirtioFsLayout::Aggregate)
                 {
                     const VirtioFsShareOptions options{.Kind = VirtiofsShareKind_Aggregate};
-                    guestInstanceId =
-                        m_guestDeviceManager->AddVirtiofsDevice(transport.Tag.c_str(), mountOptions.c_str(), L"", userToken.get(), options);
+                    guestInstanceId = m_guestDeviceManager->AddVirtiofsDevice(
+                        transport.Tag.c_str(),
+                        mountOptions.c_str(),
+                        L"",
+                        ResolveUserToken({transport.Options.UserToken, userToken}).get(),
+                        options);
                     device.State = VmFileSystemDeviceState::Serving;
                 }
             },
@@ -1131,6 +1101,7 @@ VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFile
             },
             [&](const VmPlan9SocketDevice& transport) {
                 THROW_HR_IF(E_INVALIDARG, !transport.ServerFactory);
+                THROW_HR_IF(E_INVALIDARG, transport.Port.Value == 0);
                 plan9Server = transport.ServerFactory(userToken.get());
                 THROW_HR_IF(E_UNEXPECTED, !plan9Server);
 
@@ -1190,13 +1161,19 @@ HcsVirtualMachineBackend::FileSystemDeviceMap::iterator HcsVirtualMachineBackend
 }
 
 const HcsVirtualMachineBackend::FileSystemShare* HcsVirtualMachineBackend::FindFileSystemShareLocked(
-    VmDeviceId Device, const std::wstring& HostPath, const std::wstring& MountOptions) const
+    VmDeviceId Device, const std::wstring& HostPath, const std::wstring& MountOptions, const std::wstring& Name) const
 {
     for (const auto& entry : m_fileSystemShares)
     {
         const auto& share = entry.second;
         if ((share.Device.Value == Device.Value) && (share.EffectiveHostPath.native() == HostPath) && (share.Backend.MountOptions == MountOptions))
         {
+            const auto& address = std::get<VmVirtioFsShareAddress>(share.GuestAddress);
+            if (!Name.empty() && address.ChildName != Name)
+            {
+                continue;
+            }
+
             return &share;
         }
     }
@@ -1204,10 +1181,47 @@ const HcsVirtualMachineBackend::FileSystemShare* HcsVirtualMachineBackend::FindF
     return nullptr;
 }
 
-wil::shared_handle HcsVirtualMachineBackend::ResolveShareUserToken(const FileSystemDevice& Device, const VmFileSystemShareRequest& Request) const
+std::optional<VmFileSystemShare> HcsVirtualMachineBackend::FindPlan9ShareByNameLocked(VmDeviceId Device, const std::wstring& Name) const
 {
-    auto userToken = Request.UserToken.value_or(Device.Backend.UserToken);
-    THROW_HR_IF_MSG(E_UNEXPECTED, !userToken, "UserToken not set for the file system share request");
+    if (Name.empty())
+    {
+        return std::nullopt;
+    }
+
+    for (const auto& entry : m_fileSystemShares)
+    {
+        if (entry.second.Device.Value != Device.Value)
+        {
+            continue;
+        }
+
+        const bool match = std::visit(
+            Overloaded{
+                [](const VmVirtioFsShareAddress&) { return false; },
+                [&](const VmPlan9SocketShareAddress& address) { return address.AccessName == Name; },
+                [&](const VmPlan9VirtioShareAddress& address) { return address.AccessName == Name; }},
+            entry.second.GuestAddress);
+        if (match)
+        {
+            return entry.second;
+        }
+    }
+
+    return std::nullopt;
+}
+
+wil::shared_handle HcsVirtualMachineBackend::ResolveUserToken(std::initializer_list<std::reference_wrapper<const wil::shared_handle>> Tokens) const
+{
+    for (const auto& token : Tokens)
+    {
+        if (token.get())
+        {
+            return token.get();
+        }
+    }
+
+    auto userToken = m_configuration.Description.Identity.UserToken;
+    THROW_HR_IF_MSG(E_UNEXPECTED, !userToken, "UserToken not set");
 
     return userToken;
 }
@@ -1266,7 +1280,19 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
     THROW_HR_IF(HCS_E_TERMINATED, !m_system || !m_guestDeviceManager);
     THROW_HR_IF(E_BOUNDS, m_nextShareId == std::numeric_limits<std::uint64_t>::max());
     const auto device = FindFileSystemDeviceLocked(Device);
-    const auto userToken = ResolveShareUserToken(device->second, Request);
+    const auto userToken = Request.UserToken.value_or(device->second.Backend.UserToken);
+    THROW_HR_IF_MSG(E_UNEXPECTED, !userToken, "UserToken not set for the file system share request");
+    if (auto existing = FindPlan9ShareByNameLocked(Device, Request.Name))
+    {
+        WSL_LOG(
+            "HcsAddFileSystemShareEnd",
+            TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+            TraceLoggingValue(Device.Value, "deviceId"),
+            TraceLoggingValue(existing->Id.Value, "shareId"),
+            TraceLoggingValue(false, "created"));
+
+        return std::move(existing).value();
+    }
 
     // A virtio-fs share resolves to a canonical directory, while a Plan 9 share may be rooted at a
     // prefix such as '\\?' so that the guest can mount arbitrary subpaths below it.
@@ -1280,6 +1306,12 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
                 const auto* options = std::get_if<VmVirtioFsShareOptions>(&Request.Options);
                 THROW_HR_IF_MSG(E_INVALIDARG, !options, "A virtio-fs device requires virtio-fs share options");
 
+                // Validate identity even when the request would reuse an existing share.
+                THROW_HR_IF_MSG(
+                    E_INVALIDARG,
+                    transport.Layout == VmVirtioFsLayout::Aggregate && (Request.UserToken.has_value() || !!options->UserToken),
+                    "A share of an aggregate virtio-fs device is served under the identity of the device");
+
                 hostPath = NormalizeSharePath(Request.HostPath);
 
                 auto shareOptions = options->MountOptions;
@@ -1292,7 +1324,7 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
 
                 // Repeating a request for the same path and options reuses the existing share so that
                 // multiple guest mounts of one host directory are backed by a single virtio-fs share.
-                if (const auto* existing = FindFileSystemShareLocked(Device, hostPath, mountOptions))
+                if (const auto* existing = FindFileSystemShareLocked(Device, hostPath, mountOptions, Request.Name))
                 {
                     reused = *existing;
                     return;
@@ -1313,7 +1345,10 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
                         E_INVALIDARG, !Request.Name.empty(), "A single-share virtio-fs device does not accept a share name");
                     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), device->second.GuestInstanceId.has_value());
                     device->second.GuestInstanceId = m_guestDeviceManager->AddVirtiofsDevice(
-                        transport.Tag.c_str(), mountOptions.c_str(), hostPath.c_str(), userToken.get());
+                        transport.Tag.c_str(),
+                        mountOptions.c_str(),
+                        hostPath.c_str(),
+                        ResolveUserToken({options->UserToken, userToken}).get());
                 }
 
                 device->second.State = VmFileSystemDeviceState::Serving;
@@ -1571,47 +1606,6 @@ wil::com_ptr<IWslVirtioNetDevice> HcsVirtualMachineBackend::GetUserModeNatDevice
     return device;
 }
 
-void HcsVirtualMachineBackend::ModifyHostEndpointLocked(
-    const VmHostEndpointNetwork& Configuration, const std::wstring& ResourcePath, schema::ModifyRequestType RequestType) const
-{
-    schema::ModifySettingRequest<schema::NetworkAdapter> request{};
-    request.ResourcePath = ResourcePath;
-    request.RequestType = RequestType;
-    request.Settings.EndpointId = Configuration.EndpointId;
-    request.Settings.InstanceId = Configuration.InstanceId;
-    request.Settings.MacAddress = Configuration.MacAddress;
-    const auto settings = wsl::shared::ToJsonW(request);
-
-    auto retryCount = 0ul;
-    const auto hr = wsl::shared::retry::RetryWithTimeout<HRESULT>(
-        [&] {
-            const auto attemptResult =
-                wil::ResultFromException([&] { schema::ModifyComputeSystem(m_system.get(), settings.c_str()); });
-
-            WSL_LOG(
-                "HcsModifyNetworkAdapter",
-                TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
-                TraceLoggingValue(Configuration.EndpointId, "endpointId"),
-                TraceLoggingValue(static_cast<std::uint32_t>(RequestType), "requestType"),
-                TraceLoggingValue(retryCount, "retryCount"),
-                TraceLoggingHResult(attemptResult, "result"));
-
-            ++retryCount;
-            return THROW_IF_FAILED(attemptResult);
-        },
-        wsl::core::networking::AddEndpointRetryPeriod,
-        wsl::core::networking::AddEndpointRetryTimeout,
-        wsl::core::networking::AddEndpointRetryPredicate);
-
-    // The endpoint is already attached to the compute system, which is the state the add asked for.
-    if (RequestType == schema::ModifyRequestType::Add && hr == HCN_E_ENDPOINT_ALREADY_ATTACHED)
-    {
-        return;
-    }
-
-    THROW_IF_FAILED(hr);
-}
-
 VmNetworkAttachment HcsVirtualMachineBackend::AddNetworkAdapter(const VmNetworkAdapterRequest& Request)
 {
     const auto context = CreateExecutionContext(Context::ConfigureNetworking);
@@ -1625,8 +1619,50 @@ VmNetworkAttachment HcsVirtualMachineBackend::AddNetworkAdapter(const VmNetworkA
 
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system || !m_guestDeviceManager);
+
+    const auto* requestedHostEndpoint = std::get_if<VmHostEndpointNetwork>(&Request.Configuration);
+    if (requestedHostEndpoint != nullptr)
+    {
+        THROW_HR_IF(E_INVALIDARG, IsEqualGUID(requestedHostEndpoint->EndpointId, GUID_NULL) || IsEqualGUID(requestedHostEndpoint->InstanceId, GUID_NULL));
+    }
+
+    const VmNetworkAttachment* existingAttachment = nullptr;
+    for (const auto& [_, adapter] : m_networkAdapters)
+    {
+        bool duplicate = adapter.Tag == Request.Tag;
+        if (requestedHostEndpoint != nullptr)
+        {
+            const auto* existingHostEndpoint = std::get_if<VmHostEndpointNetwork>(&adapter.EffectiveConfiguration);
+            duplicate = duplicate || (existingHostEndpoint != nullptr &&
+                                      (IsEqualGUID(existingHostEndpoint->EndpointId, requestedHostEndpoint->EndpointId) ||
+                                       IsEqualGUID(existingHostEndpoint->InstanceId, requestedHostEndpoint->InstanceId)));
+        }
+
+        if (!duplicate)
+        {
+            continue;
+        }
+
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            existingAttachment != nullptr && existingAttachment->Id.Value != adapter.Id.Value,
+            "The network adapter request identifies more than one existing adapter");
+        existingAttachment = &adapter;
+    }
+
+    if (existingAttachment != nullptr)
+    {
+        WSL_LOG(
+            "HcsAddNetworkAdapterEnd",
+            TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+            TraceLoggingValue(existingAttachment->Tag.c_str(), "tag"),
+            TraceLoggingValue(existingAttachment->Id.Value, "deviceId"),
+            TraceLoggingValue(false, "created"));
+
+        return *existingAttachment;
+    }
+
     THROW_HR_IF(E_BOUNDS, m_nextDeviceId == std::numeric_limits<std::uint64_t>::max());
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_configuration.Description.NetworkAdapters.contains(Request.Tag));
 
     VmNetworkAttachment attachment{};
     attachment.Id = VmDeviceId{m_configuration.Description.Identity, m_nextDeviceId};
@@ -1641,8 +1677,14 @@ VmNetworkAttachment HcsVirtualMachineBackend::AddNetworkAdapter(const VmNetworkA
         {
             if (!resourcePath.empty())
             {
-                ModifyHostEndpointLocked(
-                    std::get<VmHostEndpointNetwork>(attachment.EffectiveConfiguration), resourcePath, schema::ModifyRequestType::Remove);
+                const auto& configuration = std::get<VmHostEndpointNetwork>(attachment.EffectiveConfiguration);
+                schema::ModifyNetworkAdapter(
+                    m_system.get(),
+                    resourcePath.c_str(),
+                    schema::ModifyRequestType::Remove,
+                    configuration.EndpointId,
+                    configuration.InstanceId,
+                    configuration.MacAddress);
             }
             else if (attachment.GuestInstanceId.has_value())
             {
@@ -1655,10 +1697,16 @@ VmNetworkAttachment HcsVirtualMachineBackend::AddNetworkAdapter(const VmNetworkA
     std::visit(
         Overloaded{
             [&](const VmHostEndpointNetwork& configuration) {
-                THROW_HR_IF(E_INVALIDARG, IsEqualGUID(configuration.EndpointId, GUID_NULL) || IsEqualGUID(configuration.InstanceId, GUID_NULL));
                 resourcePath = wsl::core::networking::c_networkAdapterPrefix +
                                wsl::shared::string::GuidToString<wchar_t>(configuration.InstanceId);
-                ModifyHostEndpointLocked(configuration, resourcePath, schema::ModifyRequestType::Add);
+                schema::ModifyNetworkAdapter(
+                    m_system.get(),
+                    resourcePath.c_str(),
+                    schema::ModifyRequestType::Add,
+                    configuration.EndpointId,
+                    configuration.InstanceId,
+                    configuration.MacAddress,
+                    true);
                 attachment.GuestInstanceId = configuration.InstanceId;
             },
             [&](const VmUserModeNatNetwork& configuration) {
@@ -1680,7 +1728,8 @@ VmNetworkAttachment HcsVirtualMachineBackend::AddNetworkAdapter(const VmNetworkA
         "HcsAddNetworkAdapterEnd",
         TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
         TraceLoggingValue(Request.Tag.c_str(), "tag"),
-        TraceLoggingValue(attachment.Id.Value, "deviceId"));
+        TraceLoggingValue(attachment.Id.Value, "deviceId"),
+        TraceLoggingValue(true, "created"));
 
     return attachment;
 }
@@ -1722,7 +1771,13 @@ void HcsVirtualMachineBackend::RemoveNetworkAdapterLocked(std::map<std::uint64_t
     std::visit(
         Overloaded{
             [&](const VmHostEndpointNetwork& configuration) {
-                ModifyHostEndpointLocked(configuration, Adapter->second.Backend.ResourcePath, schema::ModifyRequestType::Remove);
+                schema::ModifyNetworkAdapter(
+                    m_system.get(),
+                    Adapter->second.Backend.ResourcePath.c_str(),
+                    schema::ModifyRequestType::Remove,
+                    configuration.EndpointId,
+                    configuration.InstanceId,
+                    configuration.MacAddress);
             },
             [&](const VmUserModeNatNetwork&) {
                 // Tearing down the relay is best effort: the device is removed either way, and a
@@ -1798,6 +1853,7 @@ VmPortBinding HcsVirtualMachineBackend::BindPort(VmDeviceId Device, const VmPort
 
     THROW_HR_IF(E_INVALIDARG, Request.GuestPort == 0);
     THROW_HR_IF(E_INVALIDARG, Request.Protocol != TransportProtocol_Tcp && Request.Protocol != TransportProtocol_Udp);
+    THROW_HR_IF_MSG(c_notSupported, Request.ListenScopeId != 0, "HCS user-mode NAT does not support scoped listen addresses");
     const auto& listenAddress = Request.ListenAddress;
 
     WSL_LOG(

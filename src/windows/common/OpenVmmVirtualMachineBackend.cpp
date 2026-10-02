@@ -374,7 +374,10 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     THROW_LAST_ERROR_IF(result == WAIT_FAILED);
     THROW_HR_WITH_USER_ERROR_IF(WSL_E_VM_CRASHED, wsl::shared::Localization::MessageWSL2Crashed(), result == WAIT_OBJECT_0);
     THROW_IF_FAILED_MSG(createResult, "Failed to create OpenVMM VM");
-    m_state = VmState::Created;
+    {
+        auto lock = m_lock.lock_exclusive();
+        m_state = VmState::Created;
+    }
 }
 
 void OpenVmmVirtualMachineBackend::ReadProcessLog(wil::unique_hfile Pipe) noexcept
@@ -402,13 +405,13 @@ void OpenVmmVirtualMachineBackend::OnProcessExit(DWORD ExitCode) noexcept
 {
     WSL_LOG(
         "OpenVmmProcessExited", TraceLoggingValue(m_description.Identity.VmId, "vmId"), TraceLoggingValue(ExitCode, "exitCode"));
-    LOG_IF_WIN32_BOOL_FALSE(SetEvent(m_exitEvent.get()));
     {
         auto lock = m_lock.lock_exclusive();
         m_state = VmState::Stopped;
         m_exitDetails = std::format(L"OpenVMM process exited with code {}", ExitCode);
         CloseGuestListenersLocked(m_description.Identity);
     }
+    LOG_IF_WIN32_BOOL_FALSE(SetEvent(m_exitEvent.get()));
     NotifyTerminated(m_description.Identity);
 }
 
@@ -416,33 +419,9 @@ VmPlatformCapabilities OpenVmmVirtualMachineBackend::QueryCapabilities()
 {
     VmPlatformCapabilities capabilities;
     capabilities.Backend = BackendKind::OpenVmm;
-    // Report known OpenVMM support independently of which backend methods are wired through the C ABI.
-    for (const auto operation :
-         {VmOperation::Create,
-          VmOperation::Start,
-          VmOperation::Terminate,
-          VmOperation::CreateGuestListener,
-          VmOperation::AcceptGuestConnection,
-          VmOperation::ConnectGuest,
-          VmOperation::CloseGuestListener,
-          VmOperation::AttachDisk,
-          VmOperation::DetachDisk,
-          VmOperation::CreateFileSystemDevice,
-          VmOperation::GetFileSystemDeviceStatus,
-          VmOperation::AddFileSystemShare,
-          VmOperation::RemoveFileSystemShare,
-          VmOperation::RemoveDevice,
-          VmOperation::BindPort,
-          VmOperation::UnbindPort})
-    {
-        capabilities.Operations.set(static_cast<size_t>(operation));
-    }
     for (const auto feature :
-         {VmFeature::LinuxDirectBoot,
-          VmFeature::SerialConsole,
+         {VmFeature::SerialConsole,
           VmFeature::VirtioConsole,
-          VmFeature::Vhd,
-          VmFeature::Vhdx,
           VmFeature::VirtioFsFileBacked,
           VmFeature::UserModeNatNetwork,
           VmFeature::TcpPortBinding,
@@ -595,11 +574,6 @@ VmGuestListener OpenVmmVirtualMachineBackend::CreateGuestListener(GuestServicePo
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
     return RegisterGuestListenerLocked(m_description.Identity, Port);
-}
-
-wil::unique_socket OpenVmmVirtualMachineBackend::AcceptGuestConnection(VmListenerId Listener)
-{
-    return AcceptGuestListenerConnection(Listener, m_description.Identity);
 }
 
 wil::unique_socket OpenVmmVirtualMachineBackend::ConnectGuest(GuestServicePort Port)
@@ -758,6 +732,11 @@ VmFileSystemDevice OpenVmmVirtualMachineBackend::CreateFileSystemDevice(const Vm
         c_notSupported,
         transport->Layout != VmVirtioFsLayout::SingleShare,
         "OpenVMM currently supports only single-share virtio-fs devices");
+    // WslOpenVmmVmAddShare carries neither mount options nor an identity, so device options are
+    // rejected rather than silently dropped, just as share-level mount options are.
+    THROW_HR_IF_MSG(c_notSupported, !transport->Options.MountOptions.empty(), "OpenVMM does not support virtio-fs mount options");
+    THROW_HR_IF_MSG(
+        c_notSupported, !!transport->Options.UserToken, "OpenVMM does not support serving a virtio-fs device under a user token");
 
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
@@ -804,6 +783,7 @@ VmFileSystemShare OpenVmmVirtualMachineBackend::AddFileSystemShare(VmDeviceId De
     const auto* options = std::get_if<VmVirtioFsShareOptions>(&Request.Options);
     THROW_HR_IF_MSG(c_notSupported, !options, "OpenVMM supports only virtio-fs share options");
     THROW_HR_IF_MSG(c_notSupported, !options->MountOptions.empty(), "OpenVMM does not support virtio-fs mount options");
+    THROW_HR_IF_MSG(c_notSupported, !!options->UserToken, "OpenVMM does not support serving a virtio-fs share under a user token");
     const auto hostPath = wsl::windows::common::filesystem::GetCanonicalPath(Request.HostPath);
     const auto attributes = GetFileAttributesW(hostPath.c_str());
     THROW_LAST_ERROR_IF(attributes == INVALID_FILE_ATTRIBUTES);

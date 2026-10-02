@@ -77,14 +77,13 @@ void IVirtualMachineBackend::RegisterTerminationCallback(TerminationCallback Cal
         vmId = m_terminatedVmId;
     }
 
-    std::thread([callback = std::move(Callback), vmId]() {
-        try
-        {
-            wsl::windows::common::wslutil::SetThreadDescription(L"VmTerminationCallback");
-            callback(vmId);
-        }
-        CATCH_LOG();
-    }).detach();
+    // If the termination callback was registered after the VM has already terminated,
+    // invoke it immediately with the terminated VM's ID.
+    try
+    {
+        Callback(vmId);
+    }
+    CATCH_LOG();
 }
 
 void IVirtualMachineBackend::NotifyTerminated(const VmInstanceId& Identity) noexcept
@@ -120,36 +119,29 @@ VmGuestListener IVirtualMachineBackend::RegisterGuestListenerLocked(const VmInst
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), entry.second->Listener.Port.Value == Port.Value);
     }
 
-    const VmGuestListener listener{{Identity, m_nextListenerId}, Port};
+    VmGuestListener listener{{Identity, m_nextListenerId}, Port};
     auto state = ConfigureGuestListener(listener);
     THROW_HR_IF(E_UNEXPECTED, !state);
     THROW_HR_IF(E_UNEXPECTED, state->Listener.Id.Value != listener.Id.Value || state->Listener.Port.Value != listener.Port.Value);
 
     const auto inserted = m_guestListeners.emplace(listener.Id.Value, std::move(state)).second;
     WI_ASSERT(inserted);
+    listener.State = m_guestListeners.at(listener.Id.Value);
     ++m_nextListenerId;
     return listener;
 }
 
-wil::unique_socket IVirtualMachineBackend::AcceptGuestListenerConnection(VmListenerId Listener, const VmInstanceId& Identity) const
+wil::unique_socket VmGuestListener::Accept() const
 {
-    WSL_LOG(
-        "VmAcceptGuestConnectionBegin", TraceLoggingValue(Identity.VmId, "vmId"), TraceLoggingValue(Listener.Value, "listenerId"));
-    THROW_HR_IF(E_INVALIDARG, Listener.Value == 0 || !IsEqualGUID(Listener.Owner.VmId, Identity.VmId));
-    std::shared_ptr<VmGuestListenerState> listener;
-    {
-        auto lock = m_lock.lock_shared();
-        const auto entry = m_guestListeners.find(Listener.Value);
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), entry == m_guestListeners.end());
-        listener = entry->second;
-    }
+    THROW_HR_IF(E_INVALIDARG, Id.Value == 0 || !State);
+    WSL_LOG("VmAcceptGuestConnectionBegin", TraceLoggingValue(Id.Owner.VmId, "vmId"), TraceLoggingValue(Id.Value, "listenerId"));
 
-    auto socket = wsl::windows::common::socket::CancellableAccept(listener->Socket.get(), INFINITE, listener->CancellationEvent.get());
+    auto socket = wsl::windows::common::socket::CancellableAccept(State->Socket.get(), INFINITE, State->CancellationEvent.get());
     WSL_LOG(
         "VmAcceptGuestConnectionEnd",
-        TraceLoggingValue(Identity.VmId, "vmId"),
-        TraceLoggingValue(Listener.Value, "listenerId"),
-        TraceLoggingValue(listener->Listener.Port.Value, "port"),
+        TraceLoggingValue(Id.Owner.VmId, "vmId"),
+        TraceLoggingValue(Id.Value, "listenerId"),
+        TraceLoggingValue(Port.Value, "port"),
         TraceLoggingHResult(socket ? S_OK : E_ABORT, "result"));
     THROW_HR_IF(E_ABORT, !socket);
     return std::move(*socket);

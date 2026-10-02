@@ -59,6 +59,8 @@ struct VmInstanceId
     wil::shared_handle UserToken{};
 };
 
+struct VmGuestListenerState;
+
 template <typename Tag>
 struct VmResourceId
 {
@@ -107,83 +109,31 @@ struct VmRequestedValue
 
 enum class VmFeature
 {
-    LinuxDirectBoot,
-    LinuxFirmwareBoot,
     NestedVirtualization,
     PerfmonPmu,
     PerfmonLbr,
     SmallPageMemory,
-    MemoryOvercommit,
     DeferredMemoryCommit,
     ColdDiscard,
+    PhysicalDisk,
     SerialConsole,
     VirtioConsole,
-    Vhd,
-    Vhdx,
-    PhysicalDisk,
-    PersistentMemory,
-    Plan9Socket,
-    Plan9Virtio,
     VirtioFsFileBacked,
-    VirtioFsAggregate,
-    SectionBackedSharedMemory,
-    MirroredGpu,
-    GpuVendorExtension,
-    GpuDisableGdiAcceleration,
-    GpuDisablePresentation,
     SavedStateOnCrash,
-    GuestDmaWindow,
-    HostEndpointNetwork,
     UserModeNatNetwork,
     TcpPortBinding,
     UdpPortBinding,
     Ipv6PortBinding,
     ScopedIpv6PortBinding,
-    DynamicHostPort,
-    VirtualHostAddress,
-    StaticDnsARecord,
     Count
 };
 
-static_assert(static_cast<size_t>(VmFeature::Count) == 35);
-
-enum class VmOperation
-{
-    Create,
-    Start,
-    Terminate,
-    CreateGuestListener,
-    AcceptGuestConnection,
-    ConnectGuest,
-    CloseGuestListener,
-    AttachDisk,
-    DetachDisk,
-    AddPersistentMemory,
-    CreateFileSystemDevice,
-    AddFileSystemShare,
-    RemoveFileSystemShare,
-    GetFileSystemDeviceStatus,
-    AddGpu,
-    AddSharedMemory,
-    ConfigureGuestDma,
-    RemoveDevice,
-    AddNetworkAdapter,
-    UpdateNetworkAdapter,
-    RemoveNetworkAdapter,
-    BindPort,
-    UnbindPort,
-    CreateVirtualAddress,
-    CreateDnsRecord,
-    Count
-};
-
-static_assert(static_cast<size_t>(VmOperation::Count) == 25);
+static_assert(static_cast<size_t>(VmFeature::Count) == 16);
 
 struct VmPlatformCapabilities
 {
     BackendKind Backend;
     std::bitset<static_cast<size_t>(VmFeature::Count)> Features;
-    std::bitset<static_cast<size_t>(VmOperation::Count)> Operations;
 };
 
 enum class VmState
@@ -203,6 +153,9 @@ struct VmGuestListener
 {
     VmListenerId Id;
     GuestServicePort Port;
+    std::shared_ptr<VmGuestListenerState> State;
+
+    wil::unique_socket Accept() const;
 };
 
 struct VmGuestListenerState
@@ -235,6 +188,9 @@ struct VmMemoryRequest
     VmFeatureRequest SmallPageBacking = VmFeatureRequest::Disabled;
     std::optional<std::uint32_t> FaultClusterSizeShift;
     std::optional<std::uint32_t> DirectMapFaultClusterSizeShift;
+    // Order of the page blocks the guest reports back to the host. Reporting blocks smaller than a
+    // fault cluster hands back memory the next fault immediately reclaims, so this must be at least
+    // as large as the fault cluster size shifts above.
     std::optional<std::uint32_t> PageReportingOrder;
     std::optional<std::wstring> HostingProcessNameSuffix;
 };
@@ -493,14 +449,20 @@ constexpr std::size_t c_maxVirtioFsTagLength = 36;
 struct VmVirtioFsShareOptions
 {
     std::map<std::wstring, std::wstring> MountOptions;
+    // Identity the virtio-fs device reaches its host paths through. A virtio-fs device serves every
+    // path it exposes through a single identity, so an aggregate device declares it here rather than
+    // inheriting it from the first share; callers that need a second identity create a second
+    // device. The VM identity token is used when this is unset.
+    wil::shared_handle UserToken{};
 };
 
 struct VmVirtioFsDevice
 {
     std::wstring Tag;
     VmVirtioFsLayout Layout = VmVirtioFsLayout::Aggregate;
-    // Mount options applied to the device itself. Shares of an aggregate device carry their own
-    // options; a single-share device inherits the options of the share that it serves.
+    // Options applied to the device itself, including the identity it serves through. Shares of an
+    // aggregate device carry their own mount options; a single-share device inherits the options of
+    // the share that it serves, so it must leave these unset.
     VmVirtioFsShareOptions Options;
 };
 
@@ -711,7 +673,6 @@ public:
     void RegisterTerminationCallback(TerminationCallback Callback);
 
     virtual VmGuestListener CreateGuestListener(GuestServicePort Port) = 0;
-    virtual wil::unique_socket AcceptGuestConnection(VmListenerId Listener) = 0;
     virtual wil::unique_socket ConnectGuest(GuestServicePort Port) = 0;
     virtual void CloseGuestListener(VmListenerId Listener) = 0;
 
@@ -753,7 +714,6 @@ protected:
     // These helpers require m_lock to be held exclusively. ConfigureGuestListener runs while
     // m_lock is held and must not re-enter another listener helper.
     VmGuestListener RegisterGuestListenerLocked(const VmInstanceId& Identity, GuestServicePort Port);
-    wil::unique_socket AcceptGuestListenerConnection(VmListenerId Listener, const VmInstanceId& Identity) const;
     std::shared_ptr<VmGuestListenerState> RemoveGuestListenerLocked(VmListenerId Listener, const VmInstanceId& Identity);
     void CloseGuestListenersLocked(const VmInstanceId& Identity) noexcept;
     void NotifyTerminated(const VmInstanceId& Identity) noexcept;

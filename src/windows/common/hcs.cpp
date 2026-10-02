@@ -16,6 +16,7 @@ Abstract:
 #include "precomp.h"
 #include "hcs.hpp"
 #include <ComputeCore.h>
+#include "WslCoreNetworkEndpointSettings.h"
 #include "wslutil.h"
 
 #pragma hdrstop
@@ -377,6 +378,53 @@ void wsl::windows::common::hcs::ModifyComputeSystem(_In_ HCS_SYSTEM ComputeSyste
         LOG_HR_MSG(result, "HcsModifyComputeSystem(%ls)", Configuration);
         THROW_HR_MSG(result, "HcsModifyComputeSystem failed (error string: %ls)", resultDocument.get());
     }
+}
+
+void wsl::windows::common::hcs::ModifyNetworkAdapter(
+    _In_ HCS_SYSTEM ComputeSystem,
+    _In_ PCWSTR ResourcePath,
+    _In_ ModifyRequestType RequestType,
+    _In_ const GUID& EndpointId,
+    _In_ const GUID& InstanceId,
+    _In_ const wsl::shared::string::MacAddress& MacAddress,
+    _In_ bool Retry)
+{
+    ModifySettingRequest<NetworkAdapter> request{};
+    request.ResourcePath = ResourcePath;
+    request.RequestType = RequestType;
+    request.Settings.EndpointId = EndpointId;
+    request.Settings.InstanceId = InstanceId;
+    request.Settings.MacAddress = MacAddress;
+    const auto settings = wsl::shared::ToJsonW(request);
+
+    auto retryCount = 0ul;
+    const auto attempt = [&] {
+        const auto attemptResult = wil::ResultFromException([&] { ModifyComputeSystem(ComputeSystem, settings.c_str()); });
+
+        WSL_LOG(
+            "HcsModifyNetworkAdapter",
+            TraceLoggingValue(EndpointId, "endpointId"),
+            TraceLoggingValue(static_cast<std::uint32_t>(RequestType), "requestType"),
+            TraceLoggingValue(retryCount, "retryCount"),
+            TraceLoggingHResult(attemptResult, "result"));
+
+        ++retryCount;
+        return attemptResult;
+    };
+
+    const auto result = Retry && RequestType == ModifyRequestType::Add ? wsl::shared::retry::RetryWithTimeout<HRESULT>(
+                                                                             [&] { return THROW_IF_FAILED(attempt()); },
+                                                                             wsl::core::networking::AddEndpointRetryPeriod,
+                                                                             wsl::core::networking::AddEndpointRetryTimeout,
+                                                                             wsl::core::networking::AddEndpointRetryPredicate)
+                                                                       : attempt();
+
+    if (RequestType == ModifyRequestType::Add && result == HCN_E_ENDPOINT_ALREADY_ATTACHED)
+    {
+        return;
+    }
+
+    THROW_IF_FAILED(result);
 }
 
 wsl::windows::common::hcs::unique_hcs_system wsl::windows::common::hcs::OpenComputeSystem(_In_ PCWSTR Id, _In_ DWORD RequestedAccess)

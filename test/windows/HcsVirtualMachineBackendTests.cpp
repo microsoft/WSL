@@ -61,6 +61,24 @@ VmDiskRequest CreateDiskRequest(const std::filesystem::path& Path, std::optional
     return request;
 }
 
+VmNetworkAdapterRequest CreateNetworkRequest()
+{
+    VmNetworkAdapterRequest request;
+    request.Tag = L"eth0";
+    VmUserModeNatNetwork configuration;
+    configuration.Configuration.clientIp.value = htonl(0x0a000002);
+    constexpr std::array<BYTE, 6> clientMac{0x00, 0x15, 0x5d, 0x01, 0x02, 0x03};
+    std::copy(clientMac.begin(), clientMac.end(), std::begin(configuration.Configuration.clientMac.bytes));
+    configuration.Configuration.gatewayIp.value = htonl(0x0a000001);
+    constexpr std::array<BYTE, 6> gatewayMac{0x52, 0x55, 0x0a, 0x00, 0x00, 0x01};
+    std::copy(gatewayMac.begin(), gatewayMac.end(), std::begin(configuration.Configuration.gatewayMac.bytes));
+    constexpr std::array<BYTE, 6> gatewayMacIpv6{0x52, 0x55, 0x0a, 0x00, 0x01, 0x02};
+    std::copy(gatewayMacIpv6.begin(), gatewayMacIpv6.end(), std::begin(configuration.Configuration.gatewayMacIpv6.bytes));
+    configuration.Configuration.netmask.value = htonl(0xffffff00);
+    request.Configuration = configuration;
+    return request;
+}
+
 std::filesystem::path ChangePathCase(const std::filesystem::path& Path)
 {
     auto value = Path.native();
@@ -201,41 +219,19 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(request.Boot.KernelCommandLine, description.Boot.KernelCommandLine);
         const auto capabilities = backend->GetCapabilities();
         VERIFY_ARE_EQUAL(BackendKind::Hcs, capabilities.Backend);
-        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::CreateFileSystemDevice)));
-        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::AddFileSystemShare)));
-        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::RemoveFileSystemShare)));
-        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::AddNetworkAdapter)));
-        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::UpdateNetworkAdapter)));
-        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::RemoveNetworkAdapter)));
-        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::BindPort)));
-        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::UnbindPort)));
-        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::CreateVirtualAddress)));
-        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::CreateDnsRecord)));
-        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::AddPersistentMemory)));
-        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::AddGpu)));
-        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::GetFileSystemDeviceStatus)));
-        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::AddSharedMemory)));
-        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::ConfigureGuestDma)));
-        VERIFY_IS_TRUE(capabilities.Operations.test(static_cast<size_t>(VmOperation::RemoveDevice)));
-        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::PersistentMemory)));
         VERIFY_ARE_EQUAL(
             wsl::windows::common::hcs::IsSmallPageMemorySupported(),
             capabilities.Features.test(static_cast<size_t>(VmFeature::SmallPageMemory)));
+        VERIFY_ARE_EQUAL(
+            wsl::windows::common::helpers::IsWindows11OrAbove(),
+            capabilities.Features.test(static_cast<size_t>(VmFeature::SavedStateOnCrash)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::SerialConsole)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::VirtioConsole)));
-        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::Plan9Socket)));
-        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::Plan9Virtio)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::VirtioFsFileBacked)));
-        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::VirtioFsAggregate)));
-        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::SectionBackedSharedMemory)));
-        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::GuestDmaWindow)));
-        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::MirroredGpu)));
-        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::GpuVendorExtension)));
-        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::HostEndpointNetwork)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::UserModeNatNetwork)));
-        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::DynamicHostPort)));
-        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::VirtualHostAddress)));
-        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::StaticDnsARecord)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::TcpPortBinding)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::UdpPortBinding)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::Ipv6PortBinding)));
         backend->Terminate();
     }
 
@@ -350,6 +346,28 @@ class HcsVirtualMachineBackendTests
         backend->Terminate();
     }
 
+    TEST_METHOD(ReusesDuplicateNetworkAdapterRequests)
+    {
+        SKIP_TEST_ARM64();
+        auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        backend->Start();
+
+        const auto request = CreateNetworkRequest();
+        const auto first = backend->AddNetworkAdapter(request);
+        const auto duplicate = backend->AddNetworkAdapter(request);
+        VERIFY_ARE_EQUAL(first.Id.Value, duplicate.Id.Value);
+        VERIFY_ARE_EQUAL(first.Tag, duplicate.Tag);
+        VERIFY_IS_TRUE(first.GuestInstanceId == duplicate.GuestInstanceId);
+        const auto description = backend->GetDescription();
+        VERIFY_ARE_EQUAL(size_t{1}, description.NetworkAdapters.size());
+        VERIFY_ARE_EQUAL(first.Id.Value, description.NetworkAdapters.at(request.Tag).Id.Value);
+
+        backend->RemoveNetworkAdapter(first.Id);
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->RemoveNetworkAdapter(duplicate.Id); }));
+        VERIFY_IS_TRUE(backend->GetDescription().NetworkAdapters.empty());
+        backend->Terminate();
+    }
+
     TEST_METHOD(NotifiesTerminationCallbacksWithoutHoldingBackendLock)
     {
         SKIP_TEST_ARM64();
@@ -405,6 +423,8 @@ class HcsVirtualMachineBackendTests
         std::memcpy(bindingRequest.ListenAddress.bytes, &loopbackAddress, sizeof(loopbackAddress));
         bindingRequest.GuestPort = 80;
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->BindPort(device, bindingRequest); }));
+        bindingRequest.ListenScopeId = 1;
+        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->BindPort(device, bindingRequest); }));
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->UnbindPort(binding); }));
         VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddPersistentMemory({}); }));
         VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddSharedMemory({}); }));
@@ -427,10 +447,10 @@ class HcsVirtualMachineBackendTests
 
         // Elevated and unelevated callers share one VM, so each elevation level gets its own device
         // just as WslCoreVm::AddDrvFsShare uses a separate Plan 9 port and virtio-fs tag for each.
+        // An aggregate device is created with the identity it serves its children under.
         const auto userDevice = backend->CreateFileSystemDevice({VmVirtioFsDevice{L"drvfs-user", VmVirtioFsLayout::Aggregate}});
-        const auto adminToken = wil::shared_handle{GetElevatedTestToken().release()};
-        const auto adminDevice =
-            backend->CreateFileSystemDevice({VmVirtioFsDevice{L"drvfs-admin", VmVirtioFsLayout::Aggregate}, adminToken});
+        const auto adminDevice = backend->CreateFileSystemDevice({VmVirtioFsDevice{
+            L"drvfs-admin", VmVirtioFsLayout::Aggregate, VmVirtioFsShareOptions{{}, wil::shared_handle{GetElevatedTestToken().release()}}}});
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Serving, userDevice.State);
         VERIFY_ARE_EQUAL(std::wstring{L"drvfs-user"}, std::get<VmVirtioFsDevice>(userDevice.Transport).Tag);
         VERIFY_ARE_EQUAL(VmVirtioFsLayout::Aggregate, std::get<VmVirtioFsDevice>(userDevice.Transport).Layout);
@@ -462,6 +482,21 @@ class HcsVirtualMachineBackendTests
         const auto reused = backend->AddFileSystemShare(userDevice.Id, request);
         VERIFY_ARE_EQUAL(share.Id.Value, reused.Id.Value);
 
+        auto namedRequest = request;
+        namedRequest.Name = L"first";
+        const auto firstNamedShare = backend->AddFileSystemShare(userDevice.Id, namedRequest);
+        const auto& firstNamedAddress = std::get<VmVirtioFsShareAddress>(firstNamedShare.GuestAddress);
+        VERIFY_IS_TRUE(firstNamedAddress.ChildName.has_value());
+        VERIFY_ARE_EQUAL(std::wstring{L"first"}, firstNamedAddress.ChildName.value());
+        VERIFY_ARE_EQUAL(firstNamedShare.Id.Value, backend->AddFileSystemShare(userDevice.Id, namedRequest).Id.Value);
+
+        namedRequest.Name = L"second";
+        const auto secondNamedShare = backend->AddFileSystemShare(userDevice.Id, namedRequest);
+        const auto& secondNamedAddress = std::get<VmVirtioFsShareAddress>(secondNamedShare.GuestAddress);
+        VERIFY_ARE_NOT_EQUAL(firstNamedShare.Id.Value, secondNamedShare.Id.Value);
+        VERIFY_IS_TRUE(secondNamedAddress.ChildName.has_value());
+        VERIFY_ARE_EQUAL(std::wstring{L"second"}, secondNamedAddress.ChildName.value());
+
         // Mount options are part of a share's identity, so a read-only mount is a separate share.
         auto readOnlyRequest = request;
         readOnlyRequest.ReadOnly = true;
@@ -481,6 +516,13 @@ class HcsVirtualMachineBackendTests
             HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->RemoveFileSystemShare(replacementShare.Id); }));
 
         const auto singleShareDevice = backend->CreateFileSystemDevice({VmVirtioFsDevice{L"drvfs-single", VmVirtioFsLayout::SingleShare}});
+        // A single-share device inherits the options of the share that it serves, so device-level
+        // options would never reach the guest.
+        VERIFY_ARE_EQUAL(
+            E_INVALIDARG, OperationResult([&] {
+                backend->CreateFileSystemDevice({VmVirtioFsDevice{
+                    L"drvfs-single-options", VmVirtioFsLayout::SingleShare, VmVirtioFsShareOptions{{{L"dax", L""}}}}});
+            }));
         const auto singleShare = backend->AddFileSystemShare(singleShareDevice.Id, request);
         const auto servingDevice = backend->GetFileSystemDeviceStatus(singleShareDevice.Id);
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Prepared, singleShareDevice.State);
@@ -499,12 +541,18 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(
             HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->GetFileSystemDeviceStatus(singleShareDevice.Id); }));
 
-        // The share inherits the elevated device's token without reusing the unelevated share.
+        // The elevated device reaches the same directory under its own identity without reusing the
+        // share that the unelevated device serves. A child of an aggregate device cannot name a
+        // second identity, so a share token is rejected rather than silently ignored.
         const auto adminShare = backend->AddFileSystemShare(adminDevice.Id, request);
         VERIFY_ARE_EQUAL(adminDevice.Id.Value, adminShare.Device.Value);
         VERIFY_ARE_NOT_EQUAL(share.Id.Value, adminShare.Id.Value);
         VERIFY_ARE_EQUAL(std::wstring{L"drvfs-admin"}, std::get<VmVirtioFsShareAddress>(adminShare.GuestAddress).Tag);
         VERIFY_ARE_EQUAL(share.EffectiveHostPath.native(), adminShare.EffectiveHostPath.native());
+
+        auto tokenRequest = request;
+        tokenRequest.UserToken = wil::shared_handle{GetElevatedTestToken().release()};
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddFileSystemShare(userDevice.Id, tokenRequest); }));
 
         // Exercise the remaining file-system transports as well: Plan 9 socket and Plan 9 virtio.
         const auto createPlan9Server = [](HANDLE userToken) {
@@ -512,6 +560,11 @@ class HcsVirtualMachineBackendTests
         };
 
         VmPlan9SocketDevice socketDevice{GuestServicePort{LX_INIT_UTILITY_VM_PLAN9_PORT}, createPlan9Server};
+        // The port is handed straight to the Plan 9 server, so an unassigned one must be rejected
+        // rather than listened on.
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] {
+                             backend->CreateFileSystemDevice({VmPlan9SocketDevice{GuestServicePort{}, createPlan9Server}});
+                         }));
         const auto socketDeviceResult = backend->CreateFileSystemDevice({socketDevice});
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Serving, socketDeviceResult.State);
         VERIFY_ARE_EQUAL(socketDevice.Port.Value, std::get<VmPlan9SocketDevice>(socketDeviceResult.Transport).Port.Value);
@@ -519,9 +572,12 @@ class HcsVirtualMachineBackendTests
         socketRequest.HostPath = directory;
         socketRequest.Options = VmPlan9ShareOptions{};
         socketRequest.ReadOnly = false;
+        socketRequest.Name = L"socket-share";
         const auto socketShare = backend->AddFileSystemShare(socketDeviceResult.Id, socketRequest);
         VERIFY_ARE_EQUAL(socketDevice.Port.Value, std::get<VmPlan9SocketShareAddress>(socketShare.GuestAddress).Port.Value);
         VERIFY_IS_FALSE(socketShare.ReadOnly);
+        const auto duplicateSocketShare = backend->AddFileSystemShare(socketDeviceResult.Id, socketRequest);
+        VERIFY_ARE_EQUAL(socketShare.Id.Value, duplicateSocketShare.Id.Value);
 
         // A Plan 9 device keeps serving after one of its shares is removed, so the share can be added again.
         backend->RemoveFileSystemShare(socketShare.Id);

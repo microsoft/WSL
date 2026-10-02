@@ -43,7 +43,6 @@ public:
     void Terminate() override;
 
     VmGuestListener CreateGuestListener(GuestServicePort Port) override;
-    wil::unique_socket AcceptGuestConnection(VmListenerId Listener) override;
     wil::unique_socket ConnectGuest(GuestServicePort Port) override;
     void CloseGuestListener(VmListenerId Listener) override;
 
@@ -151,12 +150,20 @@ private:
     /// Returns the share of Device that already serves HostPath with MountOptions, if there is one.
     /// </summary>
     _Requires_lock_held_(m_lock)
-    const FileSystemShare* FindFileSystemShareLocked(VmDeviceId Device, const std::wstring& HostPath, const std::wstring& MountOptions) const;
+    const FileSystemShare* FindFileSystemShareLocked(
+        VmDeviceId Device, const std::wstring& HostPath, const std::wstring& MountOptions, const std::wstring& Name) const;
 
     /// <summary>
-    /// Returns shared ownership of the token used to reach the host path, preferring the request's token.
+    /// Returns the Plan 9 share of Device with Name, if there is one.
     /// </summary>
-    wil::shared_handle ResolveShareUserToken(const FileSystemDevice& Device, const VmFileSystemShareRequest& Request) const;
+    _Requires_lock_held_(m_lock)
+    std::optional<VmFileSystemShare> FindPlan9ShareByNameLocked(VmDeviceId Device, const std::wstring& Name) const;
+
+    /// <summary>
+    /// Resolves the token used to reach a host path, returning the first of Tokens that is set and
+    /// falling back to the identity that created the VM. Callers list Tokens most specific first.
+    /// </summary>
+    wil::shared_handle ResolveUserToken(std::initializer_list<std::reference_wrapper<const wil::shared_handle>> Tokens) const;
 
     /// <summary>
     /// Adds a share to a Plan 9 device and returns the name the guest uses to reach it.
@@ -180,13 +187,6 @@ private:
     /// </summary>
     _Requires_lock_held_(m_lock)
     wil::com_ptr<IWslVirtioNetDevice> GetUserModeNatDeviceLocked(VmDeviceId Device) const;
-
-    /// <summary>
-    /// Adds or removes a host endpoint adapter at ResourcePath. HCS reports transient failures while
-    /// the host network stack settles, so the modification is retried.
-    /// </summary>
-    _Requires_lock_held_(m_lock)
-    void ModifyHostEndpointLocked(const VmHostEndpointNetwork& Configuration, const std::wstring& ResourcePath, wsl::windows::common::hcs::ModifyRequestType RequestType) const;
 
     /// <summary>
     /// Removes the adapter's tracked state, tearing down the resource that serves it. Port bindings
@@ -232,8 +232,6 @@ private:
     _Guarded_by_(m_lock) std::map<std::uint64_t, NetworkAdapter> m_networkAdapters;
     _Guarded_by_(m_lock) std::map<std::uint64_t, VmPortBinding> m_portBindings;
     _Guarded_by_(m_lock) std::uint64_t m_nextPortBindingId = 1;
-    wil::unique_handle m_restrictedToken;
-
     _Guarded_by_(m_lock) std::shared_ptr<GuestDeviceManager> m_guestDeviceManager;
     _Guarded_by_(m_lock) GUID m_runtimeId {};
 };
