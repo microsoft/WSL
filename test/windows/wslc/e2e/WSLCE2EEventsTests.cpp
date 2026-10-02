@@ -198,6 +198,108 @@ class WSLCE2EEventsTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Events_ContainerHealth)
+    {
+        const auto since = EpochSeconds();
+        auto result = RunWslc(std::format(
+            LR"(container create --health-cmd "test -f /tmp/healthy" --health-interval 1s --health-timeout 3s --health-retries 1 --name {} {} sleep infinity)",
+            c_eventContainerName,
+            DebianImage.NameAndTag()));
+
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto containerId = result.GetStdoutOneLine();
+        const auto filters = std::format(
+            LR"(--filter type=container --filter container={} --filter event=create --filter event=start --filter event=stop --filter "event=health_status: healthy" --filter "event=health_status: unhealthy")",
+            containerId);
+
+        auto events = RunWslcInteractive(
+            std::format(L"events --since {} {}", since, filters), ElevationType::Elevated, std::nullopt, ProcessGroup::Create);
+
+        auto stopReader = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            if (events.IsRunning())
+            {
+                events.SendCtrlBreak();
+            }
+        });
+
+        const auto expectedEvent = [&](std::wstring_view action, std::optional<int> exitCode = std::nullopt) {
+            const auto exitCodeAttribute = exitCode.has_value() ? std::format(L"exitCode={}, ", exitCode.value()) : std::wstring{};
+            return std::format(
+                L" container {} {} ({}image={}, name={})", action, containerId, exitCodeAttribute, DebianImage.NameAndTag(), c_eventContainerName);
+        };
+
+        const auto createEvent = expectedEvent(L"create");
+        WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(createEvent));
+
+        RunWslc(std::format(L"container start {}", containerId)).Verify({.Stderr = L"", .ExitCode = 0});
+        const auto startEvent = expectedEvent(L"start");
+        WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(startEvent));
+
+        const auto unhealthyEvent = expectedEvent(L"health_status: unhealthy");
+        WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(unhealthyEvent));
+        VerifyContainerIsListed(containerId, L"running");
+
+        RunWslc(std::format(L"container exec {} touch /tmp/healthy", containerId)).Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto healthyEvent = expectedEvent(L"health_status: healthy");
+        WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(healthyEvent));
+        VerifyContainerIsListed(containerId, L"running");
+
+        RunWslc(std::format(L"container stop {} -t 0", containerId)).Verify({.Stderr = L"", .ExitCode = 0});
+        const auto stopEvent = expectedEvent(L"stop", 128 + WSLCSignalSIGKILL);
+        WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(stopEvent));
+        VerifyContainerIsListed(containerId, L"exited");
+
+        stopReader.reset();
+        VERIFY_ARE_EQUAL(0, events.Wait());
+
+        events.VerifyNoErrors();
+
+        const WSLCExecutionResult output{.Stdout = wsl::shared::string::MultiByteToWide(events.GetStdoutData())};
+        const auto lines = output.GetStdoutLines();
+        const std::vector<std::wstring> expected{createEvent, startEvent, unhealthyEvent, healthyEvent, stopEvent};
+        VERIFY_ARE_EQUAL(expected.size(), lines.size());
+        for (size_t index = 0; index < expected.size(); ++index)
+        {
+            VerifyEventLine(lines[index], expected[index]);
+        }
+
+        result = RunWslc(std::format(L"events --since {} --until {} {} --format json", since, EpochSeconds() + 1, filters));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto history = ParseNdjsonOutput(result);
+
+        const std::vector<std::string> expectedActions{
+            "create", "start", "health_status: unhealthy", "health_status: healthy", "stop"};
+        VERIFY_ARE_EQUAL(expectedActions.size(), history.size());
+
+        for (size_t index = 0; index < history.size(); ++index)
+        {
+            const auto& event = history[index];
+            VERIFY_ARE_EQUAL(expectedActions[index], event.at("Action").get<std::string>());
+            VERIFY_ARE_EQUAL(std::string{"container"}, event.at("Type").get<std::string>());
+            VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(containerId), event.at("Actor").at("ID").get<std::string>());
+
+            const auto& attributes = event.at("Actor").at("Attributes");
+            VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(c_eventContainerName), attributes.at("name").get<std::string>());
+            VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(DebianImage.NameAndTag()), attributes.at("image").get<std::string>());
+
+            const bool stopped = expectedActions[index] == "stop";
+            VERIFY_ARE_EQUAL(stopped, attributes.contains("exitCode"));
+            if (stopped)
+            {
+                VERIFY_ARE_EQUAL(std::to_string(128 + WSLCSignalSIGKILL), attributes.at("exitCode").get<std::string>());
+            }
+
+            VERIFY_ARE_EQUAL(event.at("Action").get<std::string>(), event.at("status").get<std::string>());
+
+            const auto timeNano = event.at("timeNano").get<std::int64_t>();
+            VERIFY_IS_GREATER_THAN_OR_EQUAL(timeNano, since * 1'000'000'000);
+            VERIFY_ARE_EQUAL(timeNano / 1'000'000'000, event.at("time").get<std::int64_t>());
+        }
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Events_InvalidFormatOption)
     {
         auto result = RunWslc(L"events --format invalid");

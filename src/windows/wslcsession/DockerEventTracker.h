@@ -31,7 +31,9 @@ enum class ContainerEvent
     Exit,
     Destroy,
     ExecDied,
-    Kill
+    Kill,
+    HealthHealthy,
+    HealthUnhealthy
 };
 
 enum class VolumeEvent
