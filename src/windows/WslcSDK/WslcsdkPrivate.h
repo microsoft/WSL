@@ -106,6 +106,7 @@ const WslcContainerOptionsInternal* GetInternalType(const WslcContainerSettings*
 struct WslcSessionImpl
 {
     wil::com_ptr<IWSLCCompatSession> session;
+    WSLCCompatVersion runtimeVersion{};
 };
 
 WslcSessionImpl* GetInternalType(WslcSession handle);
