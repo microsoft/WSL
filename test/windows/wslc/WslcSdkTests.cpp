@@ -2948,7 +2948,7 @@ class WslcSdkTests
         std::filesystem::path debianTar = GetTestImagePath("debian:latest");
         VERIFY_SUCCEEDED(WslcLoadSessionImageFromFile(session.get(), debianTar.c_str(), nullptr, nullptr));
         const auto storageAttributes = GetFileAttributesW((vhdSessionStorage / L"storage.vhdx").c_str());
-        VERIFY_IS_FALSE(storageAttributes == INVALID_FILE_ATTRIBUTES);
+        VERIFY_ARE_NOT_EQUAL(INVALID_FILE_ATTRIBUTES, storageAttributes);
         VERIFY_IS_TRUE(WI_IsFlagSet(storageAttributes, FILE_ATTRIBUTE_SPARSE_FILE));
 
         // Positive: create a named VHD volume in the session.
@@ -2964,7 +2964,7 @@ class WslcSdkTests
             std::filesystem::path expectedVhdPath = vhdSessionStorage / "volumes" / (std::string(c_volumeName) + ".vhdx");
             VERIFY_IS_TRUE(std::filesystem::exists(expectedVhdPath));
             const auto volumeAttributes = GetFileAttributesW(expectedVhdPath.c_str());
-            VERIFY_IS_FALSE(volumeAttributes == INVALID_FILE_ATTRIBUTES);
+            VERIFY_ARE_NOT_EQUAL(INVALID_FILE_ATTRIBUTES, volumeAttributes);
             VERIFY_IS_TRUE(WI_IsFlagSet(volumeAttributes, FILE_ATTRIBUTE_SPARSE_FILE));
         }
 
