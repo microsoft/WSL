@@ -7,7 +7,7 @@ Manager operations to `wslc`.
 
 - Repository: <https://github.com/microsoft/WSL>
 - Branch:
-  [`user/ptrivedi/wslc-fleet-prototype`](https://github.com/microsoft/WSL/tree/user/ptrivedi/wslc-fleet-prototype)
+  [`user/ptrivedi/wslc-aks-everywhere-prototype`](https://github.com/microsoft/WSL/tree/user/ptrivedi/wslc-aks-everywhere-prototype)
 
 The prototype includes:
 
