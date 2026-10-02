@@ -27,11 +27,13 @@ enum class ContainerEvent
     Create,
     Start,
     Restart,
-    Stop,
     Exit,
     Destroy,
     ExecDied,
-    Kill
+    HealthHealthy,
+    HealthUnhealthy,
+    Kill,
+    Stop
 };
 
 enum class VolumeEvent
@@ -63,11 +65,14 @@ public:
         DockerEventTracker* m_tracker = nullptr;
     };
 
-    using ContainerStateChangeCallback = std::function<void(ContainerEvent, std::optional<int>, std::int64_t)>;
+    using ContainerStateChangeCallback =
+        std::function<void(ContainerEvent, std::optional<int>, const std::map<std::string, std::string>&, std::int64_t)>;
     using VolumeEventCallback = std::function<void(const std::string&, VolumeEvent, std::int64_t)>;
     using NetworkEventCallback =
         std::function<void(const std::string&, const std::string&, const std::map<std::string, std::string>&, std::int64_t)>;
     using ContainerCreateCallback = std::function<void(const std::string& ContainerId, std::int64_t TimeNano)>;
+    using ContainerActionCallback =
+        std::function<void(const std::string& ContainerId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t TimeNano)>;
 
     explicit DockerEventTracker(WSLCSession& session);
     ~DockerEventTracker();
@@ -83,11 +88,16 @@ public:
     // Invoked for every container create event, after the per-container state callbacks. Unlike those,
     // this isn't keyed by container id, because the id isn't known until Docker assigns it.
     EventTrackingReference RegisterContainerCreate(ContainerCreateCallback&& Callback) noexcept;
+
+    // Invoked for 'kill' and 'stop' when no container state callback handled them, such as after the container
+    // stopped listening for its events.
+    EventTrackingReference RegisterContainerActions(ContainerActionCallback&& Callback) noexcept;
     void UnregisterCallback(size_t Id) noexcept;
 
 private:
     void OnEvent(const std::string_view& event);
     void OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano);
+    void OnContainerAction(const std::string& containerId, const std::string& action, const std::map<std::string, std::string>& attributes, std::int64_t eventTimeNano);
     void OnContainerCreated(const nlohmann::json& parsed, std::int64_t eventTimeNano);
     void OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano);
     void OnNetworkEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano);
@@ -151,23 +161,39 @@ private:
         const ContainerCreateCallback Callback;
     };
 
+    struct ContainerActionCallbackEntry : CallbackRegistration
+    {
+        ContainerActionCallbackEntry(size_t Id, ContainerActionCallback&& Callback) :
+            CallbackRegistration(Id), Callback(std::move(Callback))
+        {
+        }
+
+        const ContainerActionCallback Callback;
+    };
+
     _Guarded_by_(m_lock) std::vector<std::shared_ptr<ContainerCallback>> m_containerCallbacks;
     _Guarded_by_(m_lock) std::vector<std::shared_ptr<VolumeCallback>> m_volumeCallbacks;
     _Guarded_by_(m_lock) std::vector<std::shared_ptr<NetworkCallback>> m_networkCallbacks;
     _Guarded_by_(m_lock) std::vector<std::shared_ptr<ContainerCreateCallbackEntry>> m_containerCreateCallbacks;
+    _Guarded_by_(m_lock) std::vector<std::shared_ptr<ContainerActionCallbackEntry>> m_containerActionCallbacks;
 
     // Invokes a snapshot of callbacks taken under m_lock, skipping registrations that have since been unregistered.
+    // Returns whether any callback ran.
     template <typename TCallback, typename TInvoke>
-    static void InvokeCallbacks(const std::vector<std::shared_ptr<TCallback>>& Callbacks, const TInvoke& Invoke)
+    static bool InvokeCallbacks(const std::vector<std::shared_ptr<TCallback>>& Callbacks, const TInvoke& Invoke)
     {
+        bool invoked = false;
         for (const auto& e : Callbacks)
         {
             std::lock_guard invokeLock{e->InvokeLock};
             if (!e->Unregistered)
             {
                 Invoke(*e);
+                invoked = true;
             }
         }
+
+        return invoked;
     }
 
     WSLCSession& m_session;

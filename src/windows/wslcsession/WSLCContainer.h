@@ -123,10 +123,14 @@ public:
     WSLCContainerState State() const noexcept;
     std::vector<WSLCPortMapping> GetPorts() const;
 
+    // Returns the attributes to record for a Docker container event, or nothing if WSLC didn't create the container.
+    static std::optional<std::map<std::string, std::string>> GetEventAttributes(std::map<std::string, std::string> DockerAttributes);
+
     // Re-registers a stopped container's VM-scoped port allocations against the restarted VM.
     void RecoverPorts(const common::docker_schema::ContainerInfo& dockerContainer);
 
-    __requires_lock_held(m_lock) void CommitState(WSLCContainerState State, std::int64_t TimeNano, std::optional<int> ExitCode = std::nullopt) noexcept;
+    __requires_lock_held(m_lock) void CommitState(
+        WSLCContainerState State, std::int64_t TimeNano, const std::map<std::string, std::string>& DockerAttributes) noexcept;
 
     const std::string& ID() const noexcept;
 
@@ -157,7 +161,8 @@ public:
 
     // Appends an event for this container to the session's event stream. Must be called from the Docker
     // event stream thread so that recorded events keep Docker's delivery order.
-    void RecordEvent(std::string&& Action, std::int64_t TimeNano, std::optional<int> ExitCode = std::nullopt) noexcept;
+    void RecordEvent(std::string&& Action, std::int64_t TimeNano) noexcept;
+    void RecordEvent(std::string&& Action, std::int64_t TimeNano, const std::map<std::string, std::string>& DockerAttributes) noexcept;
 
 private:
     enum class TransitionKind
@@ -192,7 +197,7 @@ private:
     __requires_exclusive_lock_held(m_lock) void RequestDeleteExclusiveLockHeld(WSLCDeleteFlags Flags);
 
     void AllocateBridgedModePorts();
-    void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::int64_t eventTimeNano) noexcept;
+    void OnEvent(ContainerEvent event, std::optional<int> exitCode, const std::map<std::string, std::string>& attributes, std::int64_t eventTimeNano) noexcept;
 
     __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> StartTransition(TransitionKind kind, ContainerEvent expectedEvent);
 
@@ -225,7 +230,9 @@ private:
     __requires_exclusive_lock_held(m_lock) void ReleaseProcesses();
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect PrepareDisconnectComWrapper();
 
-    __requires_exclusive_lock_held(m_lock) void OnStopped(int exitCode, std::int64_t stopTimeNano);
+    __requires_exclusive_lock_held(m_lock) void OnStopped(int exitCode, const std::map<std::string, std::string>& attributes, std::int64_t stopTimeNano);
+
+    std::map<std::string, std::string> BuildEventAttributes() const;
 
     void SetExitCode(int ExitCode) noexcept;
     void SignalInitProcessExit() noexcept;
@@ -278,6 +285,7 @@ private:
     std::int64_t m_stateChangedAt{static_cast<std::int64_t>(std::time(nullptr))};
     std::int64_t m_createdAt{};
     WSLCContainerState m_state = WslcContainerStateInvalid;
+    __guarded_by(m_lock) std::optional<std::map<std::string, std::string>> m_pendingStopAttributes;
 
     // Bumped on every state change so a thread that released m_lock can detect a state cycle, not just a difference.
     std::uint64_t m_stateGeneration{};
