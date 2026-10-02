@@ -193,6 +193,7 @@ struct VmMemoryRequest
     // fault cluster hands back memory the next fault immediately reclaims, so this must be at least
     // as large as the fault cluster size shifts above.
     std::optional<std::uint32_t> PageReportingOrder;
+    // HCS omits this cosmetic suffix on hosts that do not support it.
     std::optional<std::wstring> HostingProcessNameSuffix;
 };
 
@@ -528,6 +529,8 @@ struct VmPlan9ShareOptions
 {
     bool LinuxMetadata = false;
     bool CaseSensitive = false;
+    // HCS-hosted shares pass the resolved user token to HCS only when this is requested;
+    // otherwise they retain the default HCS share identity used by GPU shares.
     bool UseShareRootIdentity = false;
     bool AllowOptions = false;
     bool AllowSubPaths = false;
@@ -544,6 +547,7 @@ struct VmFileSystemShareRequest
     VmFileSystemShareOptions Options;
     // Token whose identity is used to reach the host path, defaulting to the device identity.
     // Aggregate virtio-fs shares always use the device identity; set its token at device creation.
+    // HCS-hosted Plan9 shares use this token only when UseShareRootIdentity is set.
     std::optional<wil::shared_handle> UserToken;
 };
 

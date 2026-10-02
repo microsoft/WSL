@@ -112,7 +112,10 @@ VmEffectiveMemory ConfigureMemory(const VmMemoryRequest& Request, const VmMmioRe
     memory.FaultClusterSizeShift = Request.FaultClusterSizeShift;
     memory.DirectMapFaultClusterSizeShift = Request.DirectMapFaultClusterSizeShift;
     memory.PageReportingOrder = Request.PageReportingOrder;
-    memory.HostingProcessNameSuffix = Request.HostingProcessNameSuffix;
+    if (wsl::windows::common::helpers::IsVmemmSuffixSupported())
+    {
+        memory.HostingProcessNameSuffix = Request.HostingProcessNameSuffix;
+    }
 
     Settings.SizeInMB = memory.SizeBytes / c_mib;
     Settings.AllowOvercommit = memory.AllowOvercommit;
@@ -1407,7 +1410,7 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
                     hostPath.c_str(),
                     transport.Port.Value,
                     flags,
-                    userToken.get());
+                    options->UseShareRootIdentity ? userToken.get() : nullptr);
                 guestAddress = VmPlan9SocketShareAddress{transport.Port, accessName};
             },
             [&](const VmPlan9VirtioDevice& transport) {

@@ -212,7 +212,11 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(UINT32{4}, description.Memory.FaultClusterSizeShift.value());
         VERIFY_ARE_EQUAL(UINT32{4}, description.Memory.DirectMapFaultClusterSizeShift.value());
         VERIFY_ARE_EQUAL(UINT32{5}, description.Memory.PageReportingOrder.value());
-        VERIFY_ARE_EQUAL(std::wstring{L"WSL"}, description.Memory.HostingProcessNameSuffix.value());
+        VERIFY_ARE_EQUAL(wsl::windows::common::helpers::IsVmemmSuffixSupported(), description.Memory.HostingProcessNameSuffix.has_value());
+        if (description.Memory.HostingProcessNameSuffix)
+        {
+            VERIFY_ARE_EQUAL(std::wstring{L"WSL"}, description.Memory.HostingProcessNameSuffix.value());
+        }
         VERIFY_ARE_EQUAL(UINT64{24 * c_mib}, description.Memory.HighMmioSizeBytes.value());
         VERIFY_ARE_EQUAL((UINT64{1} << 36) - (24 * c_mib), description.Memory.HighMmioBaseBytes.value());
         VERIFY_ARE_EQUAL(VmBootMethod::LinuxDirect, description.Boot.Method);
