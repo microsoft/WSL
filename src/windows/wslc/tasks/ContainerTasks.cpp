@@ -23,7 +23,7 @@ Abstract:
 #include "MountSpecParsing.h"
 #include "SessionModel.h"
 #include "SessionService.h"
-#include "TableOutput.h"
+#include "TableData.h"
 #include <wil/result_macros.h>
 #include <filesystem.hpp>
 #include <wslc_schema.h>
@@ -215,6 +215,7 @@ ContainerOutputInformation ToContainerOutput(const ContainerInformation& contain
 namespace wsl::windows::wslc::task {
 
 using namespace wsl::windows::wslc::cli;
+using namespace wsl::windows::cli::table;
 
 // Every container is attempted even if an earlier one fails; the command still exits nonzero.
 template <typename TAction>
@@ -757,7 +758,7 @@ void ContainerCp(CLIExecutionContext& context)
     }
 }
 
-void ListContainers(CLIExecutionContext& context)
+void FormatContainerOutput(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Containers));
     auto& containers = context.Data.Get<Data::Containers>();
@@ -765,83 +766,76 @@ void ListContainers(CLIExecutionContext& context)
     // Note: --all and --filter status= are honored by the Docker daemon when
     // GetContainers ran; no post-filtering needed here.
 
+    const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
+    const bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
+
     if (context.Args.GetValue<ArgType::Quiet>())
     {
-        // Print only the container ids
-        bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
+        wsl::windows::cli::table::TableData table{Localization::WSLCCLI_TableHeaderContainerId()};
+        table.ShowHeader = false;
+        table.Reserve(containers.size());
+
         for (const auto& container : containers)
         {
-            context.Terminal.Output(L"{}\n", MultiByteToWide(trunc ? TruncateId(container.Id) : container.Id));
+            table.AddRow({MultiByteToWide(trunc ? TruncateId(container.Id) : container.Id)});
         }
 
+        context.Data.Add<Data::Table>(std::move(table));
         return;
     }
-
-    const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
-    bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
 
     switch (format)
     {
     case FormatType::Json:
     {
+        std::vector<std::wstring> json;
+        json.reserve(containers.size());
+
         for (const auto& container : containers)
         {
-            context.Terminal.Output(L"{}\n", ToJsonW(ToContainerOutput(container, trunc, FormatType::Json), c_jsonCompactIndent));
+            json.push_back(ToJsonW(ToContainerOutput(container, trunc, FormatType::Json), c_jsonCompactIndent));
         }
 
+        context.Data.Add<Data::Json>(std::move(json));
         break;
     }
     case FormatType::Table:
     {
         using enum ColumnOverflow;
 
-        // SIZE trails the other columns. It is always declared, and is left empty and hidden unless
-        // --size was passed.
-        constexpr size_t c_sizeColumn = 7;
         const bool showSize = context.Args.GetValue<ArgType::Size>();
 
-        // Create table with or without column limits based on --no-trunc flag
-        auto table = trunc ? wsl::windows::wslc::cli::TableOutput<8>(
-                                 context.Terminal,
-                                 {{{Localization::WSLCCLI_TableHeaderContainerId(), {.MaxWidth = 12, .Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderImage(), {.MaxWidth = 20, .Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderCommand(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderCreated(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderStatus(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderPorts(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderNames(), {.MaxWidth = 20, .Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderSize(), {.Overflow = Shrink}}}},
-                                 containers.size())
-                           : wsl::windows::wslc::cli::TableOutput<8>(
-                                 context.Terminal,
-                                 {Localization::WSLCCLI_TableHeaderContainerId(),
-                                  Localization::WSLCCLI_TableHeaderImage(),
-                                  Localization::WSLCCLI_TableHeaderCommand(),
-                                  Localization::WSLCCLI_TableHeaderCreated(),
-                                  Localization::WSLCCLI_TableHeaderStatus(),
-                                  Localization::WSLCCLI_TableHeaderPorts(),
-                                  Localization::WSLCCLI_TableHeaderNames(),
-                                  Localization::WSLCCLI_TableHeaderSize()});
+        wsl::windows::cli::table::TableData table;
+        table.Truncate(trunc)
+            .AddColumn(Localization::WSLCCLI_TableHeaderContainerId(), {.MaxWidth = 12, .Overflow = Shrink})
+            .AddColumn(Localization::WSLCCLI_TableHeaderImage(), {.MaxWidth = 20, .Overflow = Shrink})
+            .AddColumn(Localization::WSLCCLI_TableHeaderCommand(), {.Overflow = Shrink})
+            .AddColumn(Localization::WSLCCLI_TableHeaderCreated(), {.Overflow = Shrink})
+            .AddColumn(Localization::WSLCCLI_TableHeaderStatus(), {.Overflow = Shrink})
+            .AddColumn(Localization::WSLCCLI_TableHeaderPorts(), {.Overflow = Shrink})
+            .AddColumn(Localization::WSLCCLI_TableHeaderNames(), {.MaxWidth = 20, .Overflow = Shrink})
+            .AddColumnIf(showSize, Localization::WSLCCLI_TableHeaderSize(), {.Overflow = Shrink});
 
-        table.SetColumnHidden(c_sizeColumn, !showSize);
+        table.Reserve(containers.size());
 
         for (const auto& container : containers)
         {
             const auto entry = ToContainerOutput(container, trunc, FormatType::Table);
-            table.WriteRow({
-                MultiByteToWide(entry.ID),
-                MultiByteToWide(entry.Image),
-                MultiByteToWide(entry.Command),
-                MultiByteToWide(entry.RunningFor),
-                MultiByteToWide(entry.Status),
-                MultiByteToWide(entry.Ports),
-                MultiByteToWide(entry.Names),
-                showSize ? MultiByteToWide(entry.Size) : std::wstring{},
-            });
+
+            Row row;
+            row.AddCell(MultiByteToWide(entry.ID))
+                .AddCell(MultiByteToWide(entry.Image))
+                .AddCell(MultiByteToWide(entry.Command))
+                .AddCell(MultiByteToWide(entry.RunningFor))
+                .AddCell(MultiByteToWide(entry.Status))
+                .AddCell(MultiByteToWide(entry.Ports))
+                .AddCell(MultiByteToWide(entry.Names))
+                .AddCellIf(showSize, MultiByteToWide(entry.Size));
+
+            table.AddRow(std::move(row));
         }
 
-        table.Complete();
-
+        context.Data.Add<Data::Table>(std::move(table));
         break;
     }
     default:
@@ -1116,7 +1110,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
     context.Data.Add<Data::ContainerOptions>(std::move(options));
 }
 
-void ShowContainerStats(CLIExecutionContext& context)
+void FormatContainerStatsOutput(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
@@ -1183,11 +1177,15 @@ void ShowContainerStats(CLIExecutionContext& context)
     {
     case FormatType::Json:
     {
+        std::vector<std::wstring> json;
+        json.reserve(statsJson.size());
+
         for (const auto& entry : statsJson)
         {
-            context.Terminal.Output(L"{}\n", ToJsonW(entry, c_jsonCompactIndent));
+            json.push_back(ToJsonW(entry, c_jsonCompactIndent));
         }
 
+        context.Data.Add<Data::Json>(std::move(json));
         break;
     }
     case FormatType::Table:
@@ -1195,32 +1193,23 @@ void ShowContainerStats(CLIExecutionContext& context)
         bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
         using enum ColumnOverflow;
 
-        auto table = trunc ? wsl::windows::wslc::cli::TableOutput<8>(
-                                 context.Terminal,
-                                 {{{Localization::WSLCCLI_TableHeaderContainerId(), {.MaxWidth = 12, .Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderName(), {.MaxWidth = 20, .Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderCpuPercent(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderMemUsageLimit(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderMemPercent(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderNetIo(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderBlockIo(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderPids(), {.Overflow = Shrink}}}},
-                                 statsJson.size())
-                           : wsl::windows::wslc::cli::TableOutput<8>(
-                                 context.Terminal,
-                                 {Localization::WSLCCLI_TableHeaderContainerId(),
-                                  Localization::WSLCCLI_TableHeaderName(),
-                                  Localization::WSLCCLI_TableHeaderCpuPercent(),
-                                  Localization::WSLCCLI_TableHeaderMemUsageLimit(),
-                                  Localization::WSLCCLI_TableHeaderMemPercent(),
-                                  Localization::WSLCCLI_TableHeaderNetIo(),
-                                  Localization::WSLCCLI_TableHeaderBlockIo(),
-                                  Localization::WSLCCLI_TableHeaderPids()});
+        wsl::windows::cli::table::TableData table;
+        table.Truncate(trunc)
+            .AddColumn(Localization::WSLCCLI_TableHeaderContainerId(), {.MaxWidth = 12, .Overflow = Shrink})
+            .AddColumn(Localization::WSLCCLI_TableHeaderName(), {.MaxWidth = 20, .Overflow = Shrink})
+            .AddColumn(Localization::WSLCCLI_TableHeaderCpuPercent(), {.Overflow = Shrink})
+            .AddColumn(Localization::WSLCCLI_TableHeaderMemUsageLimit(), {.Overflow = Shrink})
+            .AddColumn(Localization::WSLCCLI_TableHeaderMemPercent(), {.Overflow = Shrink})
+            .AddColumn(Localization::WSLCCLI_TableHeaderNetIo(), {.Overflow = Shrink})
+            .AddColumn(Localization::WSLCCLI_TableHeaderBlockIo(), {.Overflow = Shrink})
+            .AddColumn(Localization::WSLCCLI_TableHeaderPids(), {.Overflow = Shrink});
+
+        table.Reserve(statsJson.size());
 
         for (const auto& entry : statsJson)
         {
             const auto id = entry["ID"].get<std::string>();
-            table.WriteRow({
+            table.AddRow({
                 MultiByteToWide(trunc ? TruncateId(id) : id),
                 MultiByteToWide(entry["Name"].get<std::string>()),
                 MultiByteToWide(entry["CPUPerc"].get<std::string>()),
@@ -1232,7 +1221,7 @@ void ShowContainerStats(CLIExecutionContext& context)
             });
         }
 
-        table.Complete();
+        context.Data.Add<Data::Table>(std::move(table));
         break;
     }
     default:
