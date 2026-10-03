@@ -5,6 +5,7 @@ if (${TARGET_PLATFORM} STREQUAL x64)
     set(CLOUDTEST_IMAGES
         "wsl-test-image-rs_prerelease-2025-01-30"
         "wsl-test-image-ge_current-2026-09-28"
+        "wsl-test-image-2025-datacenter-g2-2026-09-29"
         "wsl-test-image-win11-23h2-ent-2024-11-18"
         "wsl-test-image-2022-datacenter-g2-2024-09-10"
         "wsl-test-image-win10-22h2-ent-g2-2024-09-10")
@@ -14,6 +15,7 @@ if (${TARGET_PLATFORM} STREQUAL x64)
     # Skip the WSLC test suite on Server images until the host issue is
     # resolved.
     set(CLOUDTEST_SERVER_IMAGES
+        "wsl-test-image-2025-datacenter-g2-2026-09-29"
         "wsl-test-image-2022-datacenter-g2-2024-09-10")
 
     set(CLOUDTEST_TEST_PACKAGES "Test_Packages_2025_07_28")
