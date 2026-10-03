@@ -128,7 +128,8 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         ConfigKey(ConfigSetting::Experimental::HostAddressLoopback, EnableHostAddressLoopback),
         ConfigKey(ConfigSetting::Experimental::SetVersionDebug, SetVersionDebug),
         ConfigKey(ConfigSetting::Experimental::Swiotlb, MemoryString(SwiotlbSizeBytes)),
-        ConfigKey(ConfigSetting::Experimental::VirtioFsAggregateShares, EnableVirtioFsAggregateShares)};
+        ConfigKey(ConfigSetting::Experimental::VirtioFsAggregateShares, EnableVirtioFsAggregateShares),
+        ConfigKey(ConfigSetting::Experimental::DrvFsTransports, DrvFsTransports)};
 
     wil::unique_file ConfigFile;
     if (ConfigFilePath != nullptr)
@@ -436,6 +437,7 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
         VALIDATE_CONFIG_OPTION(EnableSafeMode, NetworkingMode, NetworkingMode::None);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableDnsTunneling, false);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableAutoProxy, false);
+        VALIDATE_CONFIG_OPTION(EnableSafeMode, DrvFsTransports, false);
     }
 
     if (!EnableVirtio)
@@ -443,12 +445,18 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
         VALIDATE_CONFIG_OPTION(!EnableVirtio, EnableVirtio9p, false);
         VALIDATE_CONFIG_OPTION(!EnableVirtio, EnableVirtioFs, false);
         VALIDATE_CONFIG_OPTION(!EnableVirtio, SwiotlbSizeBytes, 0);
+        VALIDATE_CONFIG_OPTION(!EnableVirtio, DrvFsTransports, false);
 
         if (NetworkingMode == NetworkingMode::Consomme)
         {
             NetworkingMode = (defaultNetworkingMode == NetworkingMode::Consomme) ? NetworkingMode::None : NetworkingMode::Nat;
             EMIT_USER_WARNING(wsl::shared::Localization::MessageConsommeRequiresVirtio(ToString(NetworkingMode)));
         }
+    }
+
+    if (!EnableHostFileSystemAccess)
+    {
+        VALIDATE_CONFIG_OPTION(!EnableHostFileSystemAccess, DrvFsTransports, false);
     }
 
     if (EnableVirtio9p)
