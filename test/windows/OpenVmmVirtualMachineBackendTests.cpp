@@ -66,6 +66,19 @@ class OpenVmmVirtualMachineBackendTests
 {
     WSL_TEST_CLASS(OpenVmmVirtualMachineBackendTests)
 
+    TEST_CLASS_SETUP(TestClassSetup)
+    {
+        WSADATA data{};
+        THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &data));
+        return true;
+    }
+
+    TEST_CLASS_CLEANUP(TestClassCleanup)
+    {
+        VERIFY_ARE_EQUAL(0, WSACleanup());
+        return true;
+    }
+
     TEST_METHOD(PreservesCallerIdentityAndBootInputs)
     {
         SKIP_TEST_ARM64();
@@ -278,7 +291,7 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AddNetworkAdapter(networkRequest); }));
 
         // Consomme processes port requests once the guest has initialized its network queues.
-        backend->Start();
+        auto guest = StartGuest(*backend);
         VmPortBindingRequest bindingRequest;
         bindingRequest.ListenAddress.family = IpAddressFamily_V4;
         const auto loopbackAddress = htonl(INADDR_LOOPBACK);

@@ -958,6 +958,7 @@ void WslCoreVm::AddPlan9Share(
     if (!matchingDevice)
     {
         VmFileSystemDeviceRequest request{};
+        request.UserToken = wil::shared_handle{wsl::windows::common::wslutil::DuplicateHandle(UserToken)};
         if (m_vmConfig.EnableVirtio9p)
         {
             request.Transport = VmPlan9VirtioDevice{

@@ -96,6 +96,28 @@ class HcsVirtualMachineBackendTests
 {
     WSL_TEST_CLASS(HcsVirtualMachineBackendTests)
 
+    TEST_CLASS_SETUP(TestClassSetup)
+    {
+        WSADATA data{};
+        THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &data));
+        return true;
+    }
+
+    TEST_CLASS_CLEANUP(TestClassCleanup)
+    {
+        const auto module = GetModuleHandleW(L"wsldevicehostproxystub.dll");
+        if (module)
+        {
+            const auto canUnload = reinterpret_cast<HRESULT(STDAPICALLTYPE*)()>(GetProcAddress(module, "DllCanUnloadNow"));
+            VERIFY_IS_NOT_NULL(canUnload);
+            LogInfo("Device-host proxy unload status before COM cleanup: 0x%08x", canUnload());
+        }
+        CoFreeUnusedLibrariesEx(0, 0);
+        VERIFY_IS_NULL(GetModuleHandleW(L"wsldevicehostproxystub.dll"));
+        VERIFY_ARE_EQUAL(0, WSACleanup());
+        return true;
+    }
+
     TEST_METHOD(FileSystemRequestsDefaultToVirtioFs)
     {
         const VmFileSystemDeviceRequest device;
@@ -260,7 +282,7 @@ class HcsVirtualMachineBackendTests
         CreateVhd(invalidPath);
 
         auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
-        backend->Start();
+        auto guest = StartGuest(*backend);
         const auto automatic = backend->AttachDisk(CreateDiskRequest(automaticPath));
         const auto exact = backend->AttachDisk(CreateDiskRequest(exactPath, 2));
         const auto replacement = backend->AttachDisk(CreateDiskRequest(replacementPath));
@@ -311,7 +333,7 @@ class HcsVirtualMachineBackendTests
         CreateVhd(secondPath);
 
         auto firstBackend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
-        firstBackend->Start();
+        auto firstGuest = StartGuest(*firstBackend);
         const auto first = firstBackend->AttachDisk(CreateDiskRequest(firstPath, 253));
 
         VERIFY_ARE_EQUAL(UINT32{253}, first.GuestAddress.Lun);
@@ -322,7 +344,7 @@ class HcsVirtualMachineBackendTests
 
         // Disk IDs are local to a VM and can be reused after another VM has terminated.
         auto secondBackend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
-        secondBackend->Start();
+        auto secondGuest = StartGuest(*secondBackend);
         const auto second = secondBackend->AttachDisk(CreateDiskRequest(secondPath));
 
         VERIFY_ARE_EQUAL(first.Id.Value, second.Id.Value);
@@ -354,7 +376,7 @@ class HcsVirtualMachineBackendTests
     {
         SKIP_TEST_ARM64();
         auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
-        backend->Start();
+        auto guest = StartGuest(*backend);
 
         const auto request = CreateNetworkRequest();
         const auto first = backend->AddNetworkAdapter(request);
@@ -370,6 +392,31 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->RemoveNetworkAdapter(duplicate.Id); }));
         VERIFY_IS_TRUE(backend->GetDescription().NetworkAdapters.empty());
         backend->Terminate();
+    }
+
+    TEST_METHOD(KeepsOtherVmDeviceHostsAlive)
+    {
+        SKIP_TEST_ARM64();
+        const auto directory = CreateTestDirectory();
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { std::filesystem::remove_all(directory); });
+
+        auto first = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        auto firstGuest = StartGuest(*first);
+        first->CreateFileSystemDevice({VmVirtioFsDevice{L"first", VmVirtioFsLayout::Aggregate}});
+
+        auto second = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        auto secondGuest = StartGuest(*second);
+        const auto device = second->CreateFileSystemDevice({VmVirtioFsDevice{L"second", VmVirtioFsLayout::Aggregate}});
+
+        first.reset();
+
+        VmFileSystemShareRequest request;
+        request.HostPath = directory;
+        request.Options = VmVirtioFsShareOptions{};
+        const auto share = second->AddFileSystemShare(device.Id, request);
+        VERIFY_ARE_EQUAL(device.Id.Value, share.Device.Value);
+        second->RemoveFileSystemShare(share.Id);
+        second->Terminate();
     }
 
     TEST_METHOD(NotifiesTerminationCallbacksWithoutHoldingBackendLock)
@@ -447,7 +494,7 @@ class HcsVirtualMachineBackendTests
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { std::filesystem::remove_all(directory); });
 
         auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
-        backend->Start();
+        auto guest = StartGuest(*backend);
 
         // Elevated and unelevated callers share one VM, so each elevation level gets its own device
         // just as WslCoreVm::AddDrvFsShare uses a separate Plan 9 port and virtio-fs tag for each.
