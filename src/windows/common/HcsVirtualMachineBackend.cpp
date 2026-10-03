@@ -389,18 +389,25 @@ HcsVirtualMachineBackend::HcsVirtualMachineBackend() = default;
 
 HcsVirtualMachineBackend::~HcsVirtualMachineBackend() noexcept
 {
+    std::shared_ptr<GuestDeviceManager> guestDeviceManager;
     schema::unique_hcs_system system;
     std::map<std::uint64_t, AttachedDisk> attachedDisks;
     {
         auto lock = m_lock.lock_exclusive();
         CloseNetworkAdaptersLocked();
+        guestDeviceManager = std::move(m_guestDeviceManager);
         CloseGuestDevicesLocked();
         system = std::move(m_system);
         attachedDisks = std::move(m_attachedDisks);
         CloseGuestListenersLocked(m_configuration.Description.Identity);
     }
 
+    if (system)
+    {
+        LOG_IF_FAILED(wil::ResultFromException([&] { schema::TerminateComputeSystem(system.get()); }));
+    }
     system.reset();
+    guestDeviceManager.reset();
     CleanupAttachedDisks(std::move(attachedDisks));
 
     try
@@ -602,12 +609,14 @@ void HcsVirtualMachineBackend::Terminate()
     // AddPersistentMemory releases m_lock while the device host attaches the device and the caller
     // waits for it. Serialize termination with that entire lifecycle.
     auto persistentMemoryLock = m_persistentMemoryLock.lock_exclusive();
+    std::shared_ptr<GuestDeviceManager> guestDeviceManager;
     schema::unique_hcs_system system;
     std::map<std::uint64_t, AttachedDisk> attachedDisks;
     {
         auto lock = m_lock.lock_exclusive();
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
         CloseNetworkAdaptersLocked();
+        guestDeviceManager = std::move(m_guestDeviceManager);
         CloseGuestDevicesLocked();
         system = std::move(m_system);
         m_state = VmState::Stopped;
@@ -617,6 +626,7 @@ void HcsVirtualMachineBackend::Terminate()
 
     auto cleanup = wil::scope_exit([&] {
         system.reset();
+        guestDeviceManager.reset();
         CleanupAttachedDisks(std::move(attachedDisks));
         m_terminatingEvent.SetEvent();
         NotifyTerminated(m_configuration.Description.Identity);
@@ -926,8 +936,7 @@ void HcsVirtualMachineBackend::CloseGuestDevicesLocked() noexcept
         }
     }
 
-    // Device hosts must be shut down while the compute system and callback context still exist.
-    m_guestDeviceManager.reset();
+    // The caller retains the device manager until HCS has finished with its hosts.
     m_fileSystemShares.clear();
     m_fileSystemDevices.clear();
     m_persistentMemoryDevices.clear();

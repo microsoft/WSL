@@ -841,6 +841,10 @@ class UnitTests
         const auto wslSupport =
             wil::CoCreateInstance<LxssUserSession, IWslSupport>(CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA);
 
+        // REVIEW: The test process initializes COM with static cloaking, so configure this raw proxy for dynamic
+        // cloaking to let the service impersonate the caller instead of failing with ERROR_BAD_IMPERSONATION_LEVEL.
+        wsl::windows::common::security::ConfigureForCOMImpersonation(wslSupport.get());
+
         ULONG Version;
         ULONG DefaultUid;
         wil::unique_cotaskmem_array_ptr<wil::unique_cotaskmem_ansistring> DefaultEnvironment{};

@@ -134,7 +134,7 @@ class InstallerTests
     {
         // Note: canonical is required because msiexec seems to be unable to deal with symlinks.
         static int counter = 0;
-        return std::format(L"{}\\msi-install-{}.txt", std::filesystem::canonical(g_dumpFolder).c_str(), counter++);
+        return std::format(L"{}\\msi-install-{}-{}.txt", std::filesystem::canonical(g_dumpFolder).c_str(), GetCurrentProcessId(), counter++);
     }
 
     bool IsInstallerMsixInstalled() const

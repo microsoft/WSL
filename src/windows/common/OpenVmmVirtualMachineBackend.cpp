@@ -330,7 +330,7 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
         const auto& configuration = std::get<VmUserModeNatNetwork>(attachment.EffectiveConfiguration);
         const auto macAddress = wsl::shared::string::FormatMacAddress(configuration.ClientMacAddress(), L'-');
         THROW_IF_FAILED(WslOpenVmmConfigSetConsommeNic(config.get(), nicId.c_str(), macAddress.c_str(), L""));
-        m_networkAdapters.emplace(attachment.Id.Value, NetworkAdapter{attachment, nicId});
+        m_networkAdapters.emplace(attachment.Id.Value, NetworkAdapter{attachment, {nicId}});
         m_nextDeviceId = attachment.Id.Value + 1;
     }
     for (const auto& disk : Request.BootDisks)
