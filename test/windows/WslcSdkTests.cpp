@@ -2208,6 +2208,26 @@ class WslcSdkTests
     // Storage tests
     // -----------------------------------------------------------------------
 
+    WSLC_TEST_METHOD(SparseVhdRequiresWslUpdate)
+    {
+        // Simulate an older service using the version cached on the SDK session handle.
+        auto* internalSession = reinterpret_cast<WslcSessionImpl*>(m_defaultSession);
+        const auto originalVersion = internalSession->runtimeVersion;
+        auto restoreVersion = wil::scope_exit([&]() { internalSession->runtimeVersion = originalVersion; });
+        internalSession->runtimeVersion = {2, 9, 5};
+
+        WslcVhdRequirements vhd{};
+        vhd.name = "wslc-test-unsupported-sparse-volume";
+        vhd.sizeBytes = _1GB;
+        vhd.type = WSLC_VHD_TYPE_SPARSE;
+
+        wil::unique_cotaskmem_string errorMessage;
+        VERIFY_ARE_EQUAL(WSLC_E_WSL_UPDATE_NEEDED, WslcCreateSessionVhdVolume(m_defaultSession, &vhd, &errorMessage));
+        VERIFY_IS_NOT_NULL(errorMessage.get());
+        VERIFY_ARE_EQUAL(
+            wsl::shared::Localization::MessageWslcOperationRequiresWslVersion("2.9.5", "3.0.2"), std::wstring(errorMessage.get()));
+    }
+
     WSLC_TEST_METHOD(SessionCreateVhd)
     {
         constexpr auto c_volumeName = "wslc-test-data-vol";
@@ -2229,7 +2249,7 @@ class WslcSdkTests
 
         WslcVhdRequirements sessionVhd{};
         sessionVhd.sizeBytes = 4 * _1GB;
-        sessionVhd.type = WSLC_VHD_TYPE_DYNAMIC;
+        sessionVhd.type = WSLC_VHD_TYPE_SPARSE;
         VERIFY_SUCCEEDED(WslcSetSessionSettingsVhd(&sessionSettings, &sessionVhd));
 
         UniqueSession session;
@@ -2238,19 +2258,25 @@ class WslcSdkTests
         // Load debian so we have a container image to work with.
         std::filesystem::path debianTar = GetTestImagePath("debian:latest");
         VERIFY_SUCCEEDED(WslcLoadSessionImageFromFile(session.get(), debianTar.c_str(), nullptr, nullptr));
+        const auto storageAttributes = GetFileAttributesW((vhdSessionStorage / L"storage.vhdx").c_str());
+        VERIFY_ARE_NOT_EQUAL(INVALID_FILE_ATTRIBUTES, storageAttributes);
+        VERIFY_IS_TRUE(WI_IsFlagSet(storageAttributes, FILE_ATTRIBUTE_SPARSE_FILE));
 
         // Positive: create a named VHD volume in the session.
         {
             WslcVhdRequirements vhd{};
             vhd.name = c_volumeName;
             vhd.sizeBytes = c_vhdSizeBytes;
-            vhd.type = WSLC_VHD_TYPE_DYNAMIC;
+            vhd.type = WSLC_VHD_TYPE_SPARSE;
             wil::unique_cotaskmem_string errorMsg;
             VERIFY_SUCCEEDED(WslcCreateSessionVhdVolume(session.get(), &vhd, &errorMsg));
 
             // The backing VHD file must exist on disk.
             std::filesystem::path expectedVhdPath = vhdSessionStorage / "volumes" / (std::string(c_volumeName) + ".vhdx");
             VERIFY_IS_TRUE(std::filesystem::exists(expectedVhdPath));
+            const auto volumeAttributes = GetFileAttributesW(expectedVhdPath.c_str());
+            VERIFY_ARE_NOT_EQUAL(INVALID_FILE_ATTRIBUTES, volumeAttributes);
+            VERIFY_IS_TRUE(WI_IsFlagSet(volumeAttributes, FILE_ATTRIBUTE_SPARSE_FILE));
         }
 
         // Positive: write a marker via a container that mounts the named volume.

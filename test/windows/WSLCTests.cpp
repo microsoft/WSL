@@ -496,7 +496,7 @@ class WSLCTests
         // Reject invalid storage flags.
         {
             auto settings = GetDefaultSessionSettings(L"invalid-storage-flags");
-            settings.StorageFlags = static_cast<WSLCSessionStorageFlags>(0x4);
+            settings.StorageFlags = static_cast<WSLCSessionStorageFlags>(0x8);
             wil::com_ptr<IWSLCSession> session;
             VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session), E_INVALIDARG);
         }
@@ -5199,6 +5199,13 @@ class WSLCTests
 
         WSLCDriverOption emptyFixed[] = {{"SizeBytes", "1073741824"}, {"Fixed", ""}};
         validateInvalidOptionsFailure(emptyFixed, ARRAYSIZE(emptyFixed), E_INVALIDARG, L"Invalid value for option 'Fixed': ''");
+
+        WSLCDriverOption fixedAndSparse[] = {{"SizeBytes", "1073741824"}, {"Fixed", "true"}, {"Sparse", "true"}};
+        validateInvalidOptionsFailure(
+            fixedAndSparse,
+            ARRAYSIZE(fixedAndSparse),
+            E_INVALIDARG,
+            wsl::shared::Localization::MessageWslcMutuallyExclusiveVolumeOptions("Fixed", "Sparse"));
 
         // Invalid Uid values. Tests pair Uid with a valid Gid because Parse
         // requires both to be present together.

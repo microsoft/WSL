@@ -98,7 +98,8 @@ struct SessionSettings
 
         // wslcsession emits the custom-location warning when it actually creates the VHD, so the notice
         // fires once at creation without a service-side callback that could stall CreateSession.
-        const auto storageFlags = customConfigured ? WSLCSessionStorageFlagsWarnCustomLocation : WSLCSessionStorageFlagsNone;
+        auto storageFlags = customConfigured ? WSLCSessionStorageFlagsWarnCustomLocation : WSLCSessionStorageFlagsNone;
+        WI_SetFlagIf(storageFlags, WSLCSessionStorageFlagsSparse, userSettings.Get<settings::Setting::SessionSparseVhd>());
 
         return std::unique_ptr<SessionSettings>(new SessionSettings(std::wstring(ResolvedName), storageDir.wstring(), storageFlags, userSettings));
     }
