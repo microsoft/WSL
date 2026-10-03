@@ -45,7 +45,13 @@ enum class PluginTestType
     WslcVmRestart,
     WslcVmStopCommitted,
     WslcVmNeverStarted,
-    MountFolderAccess
+    MountFolderAccess,
+    HostCrash,
+    ConcurrentApiCalls,
+    AsyncApiCall,
+    CallbackDuringTermination,
+    ParallelWslcWithCallbacks,
+    WslcAsyncCallbackPostReturn
 };
 
 constexpr auto c_testType = L"TestType";
