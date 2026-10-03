@@ -1288,6 +1288,7 @@ typedef struct _LX_MINI_INIT_MESSAGE
     unsigned int UserProfileOffset;
     unsigned int Flags;
     unsigned int ConnectPort;
+    unsigned int ScratchLun;
     char Buffer[];
 
     PRETTY_PRINT(
@@ -1301,7 +1302,8 @@ typedef struct _LX_MINI_INIT_MESSAGE
         STRING_FIELD(InstallPathOffset),
         STRING_FIELD(UserProfileOffset),
         FIELD(Flags),
-        FIELD(ConnectPort));
+        FIELD(ConnectPort),
+        FIELD(ScratchLun));
 
 } LX_MINI_INIT_MESSAGE, *PLX_MINI_INIT_MESSAGE;
 
