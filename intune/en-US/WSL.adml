@@ -58,6 +58,9 @@
         <string id="AllowWSLContainerPrivileged"><!-- _locComment_text='{Locked="WSL"}' -->Allow privileged WSL containers</string>
         <string id="AllowWSLContainerPrivilegedExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->This policy controls whether WSL containers can run in privileged mode on this machine. When enabled or not configured, users and Windows applications can start privileged containers. When set to 'Disabled', requests to start a privileged container are refused for all users and Windows apps. Privileged containers run with elevated Linux capabilities and reduced isolation from the container host.</string>
 
+        <string id="AllowWSLContainerNestedVirtualization"><!-- _locComment_text='{Locked="WSL"}' -->Allow nested virtualization for WSL containers</string>
+        <string id="AllowWSLContainerNestedVirtualizationExplain"><!-- _locComment_text='{Locked="WSL"}' -->This policy controls whether WSL container sessions can enable nested virtualization. When enabled or not configured, applications can request nested virtualization for WSL container sessions. When set to disabled, requests to create WSL container sessions with nested virtualization enabled are rejected.</string>
+
         <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->Allowlist for WSL container registries</string>
         <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment_text='{Locked="WSL"}' -->When enabled, WSL container will only be allowed to pull images from the registries listed here. This affects both the WSL container CLI and all applications using the WSL container API.</string>
     </stringTable>

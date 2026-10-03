@@ -43,8 +43,10 @@ template <>
 struct FlagsTraits<WslcSessionFeatureFlags>
 {
     using WslcType = WSLCFeatureFlags;
-    constexpr static WslcSessionFeatureFlags Mask = WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU;
+    constexpr static WslcSessionFeatureFlags Mask =
+        static_cast<WslcSessionFeatureFlags>(WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU | WSLC_SESSION_FEATURE_FLAG_NESTED_VIRTUALIZATION);
     WSLC_FLAG_VALUE_ASSERT(WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU, WslcFeatureFlagsGPU);
+    WSLC_FLAG_VALUE_ASSERT(WSLC_SESSION_FEATURE_FLAG_NESTED_VIRTUALIZATION, WslcFeatureFlagsNestedVirtualization);
 };
 
 template <>
