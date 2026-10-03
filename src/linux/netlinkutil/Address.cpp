@@ -73,8 +73,8 @@ Address Address::FromPrefixString(int family, const std::string& prefix)
     int err = inet_pton(family, match.str(1).c_str(), &tmpAddr);
     if (err != 1)
     {
-        throw RuntimeErrorWithSourceLocation(std::format(
-            "Parsed invalid address ({}) from prefix: {} and family: {} with error {} and errno {}", match.str(1), prefix, family, err, errno));
+        throw RuntimeErrorWithSourceLocation(
+            std::format("Parsed invalid address ({}) from prefix: {} and family: {} with error {} and errno {}", match.str(1), prefix, family, err, errno));
     }
 
     return Address{family, std::stoul(match.str(2)), match.str(1)};

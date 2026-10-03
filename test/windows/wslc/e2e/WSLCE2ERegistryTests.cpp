@@ -75,8 +75,8 @@ class WSLCE2ERegistryTests
             VerifyAuthFailure(result);
 
             // Login and verify that saved credentials are used for push/pull.
-            result = RunWslc(std::format(
-                L"login -u {} -p {} {}", string::MultiByteToWide(c_username), string::MultiByteToWide(c_password), registryAddressW));
+            result = RunWslc(
+                std::format(L"login -u {} -p {} {}", string::MultiByteToWide(c_username), string::MultiByteToWide(c_password), registryAddressW));
             result.Verify({.Stdout = Localization::WSLCCLI_LoginSucceeded() + L"\r\n", .Stderr = L"", .ExitCode = 0});
 
             registryImageName = TagImageForRegistry(testImage.NameAndTag(), registryAddressW);
@@ -163,8 +163,8 @@ class WSLCE2ERegistryTests
 
             // Login with correct credentials should still succeed after failed attempts.
             {
-                auto result = RunWslc(std::format(
-                    L"login -u {} -p {} {}", string::MultiByteToWide(c_username), string::MultiByteToWide(c_password), registryAddressW));
+                auto result = RunWslc(
+                    std::format(L"login -u {} -p {} {}", string::MultiByteToWide(c_username), string::MultiByteToWide(c_password), registryAddressW));
                 result.Verify({.Stdout = Localization::WSLCCLI_LoginSucceeded() + L"\r\n", .Stderr = L"", .ExitCode = 0});
 
                 VerifyLogoutSucceeds(registryAddressW);

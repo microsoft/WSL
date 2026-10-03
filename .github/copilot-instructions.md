@@ -199,10 +199,10 @@ When adding settings to `src/shared/configfile/`:
 - Visual Studio with these components:
   - Windows SDK 26100
   - MSBuild
-  - Universal Windows platform support for v143 build tools (X64 and ARM64)
-  - MSVC v143 - VS 2022 C++ ARM64 build tools (Latest + Spectre) (X64 and ARM64)
+  - Universal Windows platform support for v145 build tools (X64 and ARM64)
+  - MSVC v145 - VS 2026 C++ ARM64 build tools (Latest + Spectre) (X64 and ARM64)
   - C++ core features
-  - C++ ATL for latest v143 tools (X64 and ARM64)
+  - C++ ATL for latest v145 tools (X64 and ARM64)
   - C++ Clang compiler for Windows
   - .NET desktop development
   - .NET WinUI app development tools
