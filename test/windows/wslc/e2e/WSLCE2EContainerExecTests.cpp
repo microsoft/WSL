@@ -108,7 +108,7 @@ class WSLCE2EContainerExecTests
 
         const auto& prompt = ">";
         auto result =
-            RunWslc(std::format(L"container run -itd -e PS1={} --name {} {}", prompt, WslcContainerName, DebianImage.NameAndTag()));
+            RunWslc(std::format(L"container run -itd -e PS1={} --name {} {}", L">", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         auto containerId = result.GetStdoutOneLine();
 
@@ -426,8 +426,8 @@ class WSLCE2EContainerExecTests
 
         auto inspect = InspectContainer(WslcContainerName);
         result = RunWslc(std::format(L"container exec {} echo should-fail", WslcContainerName));
-        auto errorMessage =
-            FormatErrorMessage(std::format(L"Container '{}' is not running.", inspect.Id), L"WSLC_E_CONTAINER_NOT_RUNNING");
+        auto errorMessage = FormatErrorMessage(
+            std::format(L"Container '{}' is not running.", wsl::shared::string::MultiByteToWide(inspect.Id)), L"WSLC_E_CONTAINER_NOT_RUNNING");
         result.Verify({.Stderr = errorMessage, .ExitCode = 1});
     }
 

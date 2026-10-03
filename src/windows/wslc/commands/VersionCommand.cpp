@@ -44,7 +44,7 @@ std::wstring VersionCommand::LongDescription() const
 
 void VersionCommand::PrintVersion(Terminal& terminal)
 {
-    terminal.Output(L"{} {}\n", s_ExecutableName, WSL_PACKAGE_VERSION);
+    terminal.Output(L"{} {}\n", s_ExecutableName, STRING_TO_WIDE_STRING(WSL_PACKAGE_VERSION));
 }
 
 void VersionCommand::ExecuteInternal(CLIExecutionContext& context) const
