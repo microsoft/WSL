@@ -341,6 +341,13 @@ try
                 {
                     continue;
                 }
+                FILE_ATTRIBUTE_TAG_INFO attributes{};
+                THROW_IF_WIN32_BOOL_FALSE(
+                    GetFileInformationByHandleEx(directory.get(), FileAttributeTagInfo, &attributes, sizeof(attributes)));
+                if (WI_IsFlagSet(attributes.FileAttributes, FILE_ATTRIBUTE_REPARSE_POINT))
+                {
+                    continue;
+                }
                 FILE_ID_INFO expected{};
                 DWORD size = sizeof(expected);
                 THROW_IF_WIN32_ERROR(RegGetValueW(key.get(), nullptr, RecoveryFileId, RRF_RT_REG_BINARY, nullptr, &expected, &size));

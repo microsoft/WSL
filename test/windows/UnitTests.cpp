@@ -7722,6 +7722,32 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
             VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
         }
+        // Missing-disk cleanup must preserve a replacement directory link and its recovery record.
+        {
+            const auto [id, path] = create();
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            const auto parent = entry.Path.parent_path();
+            const auto saved = directory / L"saved-directory";
+            const auto target = directory / L"unrelated-directory";
+            std::filesystem::rename(parent, saved);
+            std::filesystem::create_directory(target);
+            std::ofstream(target / L"keep.txt") << "unrelated contents";
+            VERIFY_WIN32_BOOL_SUCCEEDED(CreateSymbolicLinkW(
+                parent.c_str(), target.c_str(), SYMBOLIC_LINK_FLAG_DIRECTORY | SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE));
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_IS_TRUE(std::filesystem::is_symlink(parent));
+            VERIFY_IS_TRUE(entryFor(id).Path == entry.Path);
+            VERIFY_ARE_EQUAL(contents(saved / entry.Path.filename()), "original disk contents");
+            VERIFY_ARE_EQUAL(contents(target / L"keep.txt"), "unrelated contents");
+            VERIFY_WIN32_BOOL_SUCCEEDED(RemoveDirectoryW(parent.c_str()));
+            std::filesystem::rename(saved, parent);
+            // A genuinely missing disk in the original directory can still be cleaned up.
+            std::filesystem::remove(entry.Path);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_IS_FALSE(std::filesystem::exists(parent));
+            VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
+        }
         // Startup finishes the journal after a move, before the registration rename committed.
         {
             const auto [id, path] = create();
@@ -7824,6 +7850,24 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--export {} \"{}\"", LXSS_DISTRO_NAME_TEST_L, archive.wstring())), 0u);
         const auto import =
             std::format(L"--import {} \"{}\" \"{}\" --version {}", name, install.wstring(), archive.wstring(), LxsstuVmMode() ? 2 : 1);
+        // The deprecated command keeps its permanent deletion contract, including its short alias.
+        for (const auto option : {L"/unregister", L"/u"})
+        {
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(import), 0u);
+            const auto [out, err] = LxsstuLaunchWslAndCaptureOutput(
+                std::format(L"{} {}", option, name),
+                0,
+                nullptr,
+                nullptr,
+                CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT,
+                L"wslconfig.exe");
+            VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
+            VERIFY_ARE_EQUAL(err, L"");
+            VERIFY_IS_FALSE(GetDistributionId(name.c_str()).has_value());
+            VERIFY_IS_FALSE(std::filesystem::exists(install / (LxsstuVmMode() ? L"ext4.vhdx" : L"rootfs")));
+            const auto entries = Store::Enumerate(userKey.get());
+            VERIFY_IS_TRUE(std::none_of(entries.begin(), entries.end(), [&](const auto& entry) { return entry.Name == name; }));
+        }
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(import), 0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} -u root -- sh -c 'echo retained-data > /root/recovery-marker'", name)), 0u);
         const auto originalId = GetDistributionId(name.c_str());

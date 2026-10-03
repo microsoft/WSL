@@ -1426,7 +1426,7 @@ int WslconfigMain(_In_ int argc, _In_reads_(argc) LPWSTR* argv)
     }
     else if ((argc >= 3) && ((IsEqual(argv[1], WSLCONFIG_COMMAND_UNREGISTER_DISTRIBUTION, true)) || (IsEqual(argv[1], WSLCONFIG_COMMAND_UNREGISTER_DISTRIBUTION_SHORT, true))))
     {
-        exitCode = UnregisterDistribution(argv[2], false);
+        exitCode = UnregisterDistribution(argv[2], true);
     }
     else
     {
