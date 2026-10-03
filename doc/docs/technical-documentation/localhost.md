@@ -17,6 +17,8 @@ When `wsl2.networkingMode` is set to `Consomme`, the VM is given a virtio-net ad
 
 Bound guest ports are tracked and forwarded to the host, optionally via [wslrelay.exe](wslrelay.exe.md).
 
+When guest IPv6 is disabled at boot with `kernelCommandLine=ipv6.disable=1`, loopback initialization ignores missing IPv6 sysctl errors and continues configuring IPv4 localhost forwarding.
+
 See `src/windows/common/ConsommeNetworking.cpp`.
 
 See `src/linux/init/localhost.cpp`.

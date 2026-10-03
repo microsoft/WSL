@@ -24,16 +24,21 @@ namespace {
         return std::min(std::chrono::sys_seconds{std::chrono::seconds{TimeSeconds}}, c_maxBound);
     }
 
+    std::chrono::sys_seconds EventTime(const wsl::windows::common::wslc_schema::Event& Event)
+    {
+        return std::chrono::sys_seconds{std::chrono::floor<std::chrono::seconds>(std::chrono::nanoseconds{Event.timeNano})};
+    }
+
 } // namespace
 
 void EventStore::Append(wsl::windows::common::wslc_schema::Event Event)
 {
     std::lock_guard lock(m_lock);
 
-    // Events are recorded in Docker's delivery order, which is also timestamp order. Subscribers rely on
+    // Events are recorded in Docker's delivery order, which is also timestamp order to the second. Subscribers rely on
     // this: they resume from a sequence number, so an out-of-order event could never be inserted where it
     // belongs without hiding it from readers that already moved past that point.
-    WI_ASSERT(m_events.empty() || m_events.back().time <= Event.time);
+    WI_ASSERT(m_events.empty() || EventTime(m_events.back()) <= EventTime(Event));
 
     m_events.push_back(std::move(Event));
 
@@ -46,7 +51,7 @@ void EventStore::Append(wsl::windows::common::wslc_schema::Event Event)
     m_updated.notify_all();
 }
 
-void EventStore::Record(std::string&& Type, std::string&& Action, const std::string& ActorId, std::map<std::string, std::string> ActorAttributes, std::int64_t Time) noexcept
+void EventStore::Record(std::string&& Type, std::string&& Action, const std::string& ActorId, std::map<std::string, std::string> ActorAttributes, std::int64_t TimeNano) noexcept
 try
 {
     wsl::windows::common::wslc_schema::Event event;
@@ -54,7 +59,7 @@ try
     event.Action = std::move(Action);
     event.Actor.ID = ActorId;
     event.Actor.Attributes = std::move(ActorAttributes);
-    event.time = Time;
+    event.timeNano = TimeNano;
 
     Append(std::move(event));
 }
@@ -253,7 +258,9 @@ std::optional<wsl::windows::common::wslc_schema::Event> EventStore::Get(
         // so that every parked reader is guaranteed to observe an event before the next write can evict
         // it.
         const auto event = GetLockHeld(SequenceNumber.value()).value();
-        const std::chrono::sys_seconds eventTime{std::chrono::seconds{event.time}};
+
+        // Compared in seconds, since converting a far-future Since or Until bound to nanoseconds would overflow.
+        const auto eventTime = EventTime(event);
 
         // Advance in delivery order before applying the time window.
         SequenceNumber.value()++;

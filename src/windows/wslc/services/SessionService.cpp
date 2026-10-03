@@ -33,31 +33,10 @@ namespace wslutil = wsl::windows::common::wslutil;
 
 namespace {
 
-    std::string FormatEventTimestamp(std::int64_t timestamp)
-    {
-        using namespace std::chrono;
-
-        const sys_seconds time{seconds{timestamp}};
-        const time_zone* zone;
-        try
-        {
-            zone = current_zone();
-        }
-        catch (const std::runtime_error&)
-        {
-            // The time zone database is unavailable, so report UTC rather than failing the stream.
-            LOG_CAUGHT_EXCEPTION();
-            return std::format("{:%FT%T.000000000+00:00}", time);
-        }
-
-        auto output = std::format("{:%FT%T.000000000%z}", zoned_time{zone, time});
-        output.insert(output.size() - 2, ":");
-        return output;
-    }
-
     std::string FormatEvent(const wslc_schema::Event& event)
     {
-        auto output = std::format("{} {} {} {}", FormatEventTimestamp(event.time), event.Type, event.Action, event.Actor.ID);
+        auto output =
+            std::format("{} {} {} {}", timestamp::EpochToLocalRfc3339Nano(event.timeNano), event.Type, event.Action, event.Actor.ID);
         if (!event.Actor.Attributes.empty())
         {
             output.append(" (");
@@ -77,6 +56,31 @@ namespace {
         }
 
         return output;
+    }
+
+    std::string FormatEventJson(const wslc_schema::Event& event)
+    {
+        nlohmann::json output{
+            {"Type", event.Type},
+            {"Action", event.Action},
+            {"Actor", event.Actor},
+            {"scope", "local"},
+            {"time", std::chrono::floor<std::chrono::seconds>(std::chrono::nanoseconds{event.timeNano}).count()},
+            {"timeNano", event.timeNano}};
+
+        // Docker still reports these deprecated fields for container events.
+        if (event.Type == "container")
+        {
+            output["status"] = event.Action;
+            output["id"] = event.Actor.ID;
+
+            if (const auto image = event.Actor.Attributes.find("image"); image != event.Actor.Attributes.end())
+            {
+                output["from"] = image->second;
+            }
+        }
+
+        return ToJson(output, c_jsonCompactIndent);
     }
 
 } // namespace
@@ -268,7 +272,7 @@ void SessionService::StreamEvents(Terminal& terminal, const Session& session, co
         if (SUCCEEDED(result))
         {
             const auto event = wsl::shared::FromJson<wslc_schema::Event>(eventJson.get());
-            terminal.Output(L"{}\n", FormatEvent(event));
+            terminal.Output(L"{}\n", options.Format == FormatType::Json ? FormatEventJson(event) : FormatEvent(event));
             terminal.Flush(Terminal::Level::Output);
         }
     }

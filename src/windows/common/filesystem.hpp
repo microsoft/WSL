@@ -14,6 +14,9 @@ Abstract:
 
 #pragma once
 
+#include <functional>
+#include <optional>
+
 #include "wslservice.h"
 
 #define LXSS_FS_TYPE_DRVFS "drvfs"
@@ -174,11 +177,62 @@ std::filesystem::path GetTempFolderPath(_In_ HANDLE userToken);
 std::string GetWindowsHosts(const std::filesystem::path& Path);
 
 /// <summary>
+/// True when Name can be created on Windows unchanged: no invalid characters, no trailing space or dot,
+/// and not a reserved device name. An empty name is accepted.
+/// </summary>
+bool IsRepresentableFileName(std::wstring_view Name);
+
+/// <summary>
 /// Creates a uniquely named staging directory under Parent and returns its path. The name is
 /// derived from a fresh GUID so concurrent callers never collide. Throws if the directory cannot
 /// be created.
 /// </summary>
 std::filesystem::path MakeStagingDirectory(const std::filesystem::path& Parent);
+
+/// <summary>
+/// A staging directory that is removed, with everything under it, once it goes out of scope.
+/// </summary>
+class StagingDirectory
+{
+public:
+    explicit StagingDirectory(const std::filesystem::path& Parent);
+    ~StagingDirectory();
+
+    NON_COPYABLE(StagingDirectory);
+    NON_MOVABLE(StagingDirectory);
+
+    const std::filesystem::path& Path() const noexcept;
+
+private:
+    std::filesystem::path m_path;
+};
+
+/// <summary>
+/// Returns Path without trailing separators, for quoting on a tar.exe command line where a trailing '\'
+/// would escape the closing quote. A root keeps its separator, doubled.
+/// </summary>
+std::wstring StripTrailingSeparators(const std::filesystem::path& Path);
+
+/// <summary>
+/// Extracts the tar stream written by WriteArchive into Destination through a staging directory. A set
+/// RebaseName renames a single archive root, or gathers several roots under a directory of that name; an
+/// empty name merges entries under their own names. Entries under an archive symlink are rejected, and
+/// existing destination links are replaced, not followed.
+/// </summary>
+void ExtractArchiveInto(const std::filesystem::path& Destination, const std::optional<std::wstring>& RebaseName, const std::function<void(HANDLE)>& WriteArchive);
+
+/// <summary>
+/// Extracts a tar stream holding exactly one file to DestinationFile, creating the parent directory if
+/// needed. Empty, multi-member and directory archives are rejected before anything is moved.
+/// </summary>
+void ExtractSingleFileAs(const std::filesystem::path& DestinationFile, const std::function<void(HANDLE)>& WriteArchive);
+
+/// <summary>
+/// Copies the tree at Resolved to LinkName under StagingRoot and returns the copied path. Links inside the
+/// tree are kept as links, so only the one that was named is dereferenced.
+/// </summary>
+std::filesystem::path StageDereferencedTree(
+    const std::filesystem::path& StagingRoot, const std::filesystem::path& LinkName, const std::filesystem::path& Resolved);
 
 /// <summary>
 /// Opens a directory handle with read/execute, optionally also write, & full sharing. The path

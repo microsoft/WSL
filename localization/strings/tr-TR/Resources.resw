@@ -132,6 +132,7 @@
     "DNS"     — Domain Name System. Do not translate (protocol acronym).
     "proxy"   — Network proxy server. Translate per locale standard networking term.
     "safe mode" — Minimal/diagnostic startup mode. Use standard OS term per locale.
+    "image"   — A container image, as in Docker. Not a picture or photo.
   -->
   <data name="AppName" xml:space="preserve">
     <value>Linux için Windows Alt Sistemi</value>
@@ -1191,11 +1192,9 @@ Bu beklenmeyen bir hataysa, https://github.com/microsoft/WSL/issues adresinde me
     <value>Küresel Güvenli Erişim İstemcisiyle ilgili mevcut bir uyumluluk sorunu nedeniyle DNS Tünelleme devre dışı bırakıldı.</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
-  <data name="MessageSparseVhdDisabled" xml:space="preserve">
-    <value>Seyrek VHD desteği olası veri bozulması nedeniyle şu anda devre dışı bırakılmıştır.
-Bir dağıtımı seyrek VHD kullanmaya zorlamak için lütfen şu komutu çalıştırın:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
+  <data name="MessageSparseVhdUnsafe" xml:space="preserve">
+    <value>Seyrek VHD'ler şu anda deneyseldir. Beklenmeyen bir davranışla karşılaşırsanız lütfen https://github.com/microsoft/WSL adresinde sorun bildirin.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale. {Locked="https://github.com/microsoft/WSL"}The URL should not be translated.</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>{} bağlanamadı, daha fazla ayrıntı için dmesg komutuna bakın.</value>
@@ -2414,7 +2413,7 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   </data>
   <data name="MessageWslcInvalidImage" xml:space="preserve">
     <value>Geçersiz resim: '{}'</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="MessageWslcInvalidFilter" xml:space="preserve">
     <value>Geçersiz filtre: '{}'</value>
@@ -2707,6 +2706,9 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
     <value>tar.exe bulunamadı. Yerel dosya kopyalama için Windows tar gereklidir.</value>
     <comment>{Locked="tar.exe"}</comment>
   </data>
+  <data name="WSLCCLI_CpStdoutIsTerminalError" xml:space="preserve">
+    <value>Kopya çıktısı konsola yazılamıyor.</value>
+  </data>
   <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
     <value>Geçersiz kopyalama yönü. Ya kaynak ya da hedef olarak CONTAINER:PATH kullanın.</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
@@ -2730,7 +2732,11 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
   </data>
   <data name="WSLCCLI_CpSourceNameNotRepresentableError" xml:space="preserve">
     <value>Windows dosya adı olarak kullanılamadığı için '{0}' kopyalanamıyor.</value>
-    <comment>{0} is the source path. Shown when the container source name holds a character that is not valid in a Windows file name.</comment>
+    <comment>{0} is the file name being copied. Shown when the name cannot be used as a Windows file name.</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceNameTrimmedWarning" xml:space="preserve">
+    <value>Windows dosya adlarından sondaki boşlukları ve noktaları kaldırır, bu nedenle '{}', '{}' olarak kopyalanır.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Bir kapsayıcıyı incele.</value>
@@ -2846,12 +2852,14 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
   </data>
   <data name="WSLCCLI_ImageImportDesc" xml:space="preserve">
     <value>Bir tarball’dan bir görüntü içeri aktarın.</value>
+    <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
     <value>Bir dosya sistemi görüntüsü oluşturmak için bir tar dosyasının içeriğini içe aktarır. İsteğe bağlı olarak, görüntüyü bir depo ve etiket adıyla etiketleyin.</value>
   </data>
   <data name="WSLCCLI_ImageListAllArgDescription" xml:space="preserve">
     <value>Tüm görüntüleri göster (varsayılan olarak ara görüntüler gizlenir).</value>
+    <comment>"Images" means container images, as in Docker, not pictures or photos.</comment>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>Görüntüleri listele.</value>
@@ -2883,6 +2891,7 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
   </data>
   <data name="WSLCCLI_ImagePruneDeletedHeader" xml:space="preserve">
     <value>Silinen Resimler:</value>
+    <comment>"Images" means container images, as in Docker, not pictures or photos.</comment>
   </data>
   <data name="WSLCCLI_ImagePruneDesc" xml:space="preserve">
     <value>Kullanılmayan görüntüleri kaldırın.</value>
@@ -3458,6 +3467,7 @@ Windows sürümü: {}</value>
   </data>
   <data name="WSLCCLI_PullAllTagsArgDescription" xml:space="preserve">
     <value>Depodaki tüm etiketlenmiş resimleri indir.</value>
+    <comment>"Images" means container images, as in Docker, not pictures or photos.</comment>
   </data>
   <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
     <value>Ayrıntılı çıktıyı durdur</value>
@@ -3698,11 +3708,11 @@ Windows sürümü: {}</value>
   </data>
   <data name="WSLCCLI_ImageLoaded" xml:space="preserve">
     <value>Yüklenen görüntü: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="WSLCCLI_ImageLoadedId" xml:space="preserve">
     <value>Yüklenen görüntü kimliği: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
     <value>Ağları yönet.</value>
@@ -3909,6 +3919,7 @@ Windows sürümü: {}</value>
   </data>
   <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
     <value>RESİM</value>
+    <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="WSLCCLI_TableHeaderCreated" xml:space="preserve">
     <value>OLUŞTURULDU</value>
@@ -3939,6 +3950,30 @@ Windows sürümü: {}</value>
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PID’LER</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderRepository" xml:space="preserve">
+    <value>REPOSITORY</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderTag" xml:space="preserve">
+    <value>TAG</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderDigest" xml:space="preserve">
+    <value>DIGEST</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderImageId" xml:space="preserve">
+    <value>IMAGE ID</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderNetworkId" xml:space="preserve">
+    <value>NETWORK ID</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderDriver" xml:space="preserve">
+    <value>DRIVER</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderScope" xml:space="preserve">
+    <value>SCOPE</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderVolumeName" xml:space="preserve">
+    <value>VOLUME NAME</value>
   </data>
   <data name="WSLCCLI_ContainerStateCreated" xml:space="preserve">
     <value>oluşturuldu</value>
@@ -4072,6 +4107,7 @@ Windows sürümü: {}</value>
   </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>Görüntü içeri aktarma ilerleme durumu ayrıştırılamadı</value>
+    <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="MessageWslcVolumeUnmountFailed" xml:space="preserve">
     <value>'{}' birimi çıkarılamadı: {}</value>
