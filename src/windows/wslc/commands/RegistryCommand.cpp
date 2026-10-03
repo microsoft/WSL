@@ -96,7 +96,7 @@ void RegistryLoginCommand::ExecuteInternal(CLIExecutionContext& context) const
     if (!context.Args.Contains(ArgType::Username))
     {
         auto username = context.Terminal.PromptForLine(Localization::WSLCCLI_LoginUsernamePrompt());
-        context.Args.Add(ArgType::Username, std::move(username));
+        context.Args.Add(ArgType::Username, std::move(username), Source::Input);
     }
 
     // Resolve password: --password, --password-stdin, or interactive prompt.
@@ -104,12 +104,12 @@ void RegistryLoginCommand::ExecuteInternal(CLIExecutionContext& context) const
     {
         if (context.Args.GetValue<ArgType::PasswordStdin>())
         {
-            context.Args.Add(ArgType::Password, context.Terminal.ReadLine().value_or(std::wstring{}));
+            context.Args.Add(ArgType::Password, context.Terminal.ReadLine().value_or(std::wstring{}), Source::Input);
         }
         else
         {
             auto password = context.Terminal.PromptForLine(Localization::WSLCCLI_LoginPasswordPrompt(), true);
-            context.Args.Add(ArgType::Password, std::move(password));
+            context.Args.Add(ArgType::Password, std::move(password), Source::Input);
         }
     }
 

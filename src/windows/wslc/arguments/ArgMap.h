@@ -25,6 +25,17 @@ Abstract:
 
 namespace wsl::windows::wslc::argument {
 
+enum class Source : uint32_t
+{
+    None = 0x0,
+    Default = 0x1,
+    Environment = 0x2,
+    Settings = 0x4,
+    CommandLine = 0x8,
+    Input = 0x10,
+};
+DEFINE_ENUM_FLAG_OPERATORS(Source);
+
 struct ArgMap;
 
 namespace details {
@@ -57,7 +68,7 @@ void EnsureArgumentValidated(ArgMap& map, ArgType type);
 // values update that ArgType's validation state.
 inline void ArgMapInvalidateValidatedCache(const void* map, ArgType type, EnumBasedVariantMapAction action);
 
-// This is the main ArgType map used for storing parsed arguments.
+// This is the main ArgType map used for storing parsed arguments and their provenance.
 struct ArgMap : private wsl::windows::wslc::EnumBasedVariantMap<ArgType, wsl::windows::wslc::argument::details::ArgDataMapping, &ArgMapInvalidateValidatedCache>
 {
 private:
@@ -77,16 +88,46 @@ public:
     ArgMap& operator=(const ArgMap&) = delete;
     ArgMap& operator=(ArgMap&&) = delete;
 
-    using Base::Add;
     using Base::Contains;
     using Base::Count;
     using Base::GetCount;
     using Base::GetKeys;
     using Base::IsMatchingType;
-    using Base::Remove;
 
     template <ArgType E>
     using value_t = typename details::ArgValueTraits<E>::value_t;
+
+    template <ArgType E>
+    using raw_value_t = typename details::ArgDataMapping<E>::value_t;
+
+    template <ArgType E>
+    void Add(raw_value_t<E> value, Source source)
+    {
+        AddWithSource(E, source, [&]() { Base::template Add<E>(std::move(value)); });
+    }
+
+    template <typename V>
+    void Add(ArgType type, V&& value, Source source)
+    {
+        AddWithSource(type, source, [&]() { Base::Add(type, std::forward<V>(value)); });
+    }
+
+    void Remove(ArgType type)
+    {
+        Base::Remove(type);
+        m_sources.erase(type);
+    }
+
+    Source GetSource(ArgType type) const noexcept
+    {
+        if (m_resolvedDefaults.contains(type))
+        {
+            return Source::Default;
+        }
+
+        const auto source = m_sources.find(type);
+        return source != m_sources.end() ? source->second : Source::None;
+    }
 
     // Validated-value cache. Argument validation converts raw strings into typed values and caches
     // them here so execution reuses them without re-parsing. The store is type-erased (std::any keyed
@@ -235,6 +276,41 @@ public:
     }
 
 private:
+    template <typename AddValue>
+    void AddWithSource(ArgType type, Source source, AddValue&& addValue)
+    {
+        const auto value = static_cast<uint32_t>(source);
+        constexpr auto c_validSources = static_cast<uint32_t>(Source::Default) | static_cast<uint32_t>(Source::Environment) |
+                                        static_cast<uint32_t>(Source::Settings) | static_cast<uint32_t>(Source::CommandLine) |
+                                        static_cast<uint32_t>(Source::Input);
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            value == 0 || (value & (value - 1)) != 0 || (value & ~c_validSources) != 0,
+            "ArgMap source must contain exactly one source value: 0x%x",
+            value);
+
+        auto [sourceEntry, inserted] = m_sources.try_emplace(type, source);
+        const auto previousSource = sourceEntry->second;
+        sourceEntry->second |= source;
+        try
+        {
+            std::forward<AddValue>(addValue)();
+        }
+        catch (...)
+        {
+            if (inserted)
+            {
+                m_sources.erase(sourceEntry);
+            }
+            else
+            {
+                sourceEntry->second = previousSource;
+            }
+
+            throw;
+        }
+    }
+
     // Validates `type` against its current raw values unless already recorded as validated. The
     // record is set by a completed validation and cleared by the map-action callback on any raw
     // Add/Remove, so an argument added or overwritten after the up-front pass is validated on
@@ -338,6 +414,9 @@ private:
 
     std::multimap<ArgType, std::any> m_validated;
     std::map<ArgType, std::any> m_resolvedDefaults;
+
+    // Accumulated values OR their contributors into one mask; Remove clears the mask.
+    std::map<ArgType, Source> m_sources;
 
     // ArgTypes validated against their current raw values. Distinct from m_validated (only converted
     // arguments populate that), so validate-only arguments are covered too. Cleared per type by

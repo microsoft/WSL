@@ -103,6 +103,11 @@ class WSLCCLIParserUnitTests
 
                 succeeded = true;
 
+                for (const auto type : args.GetKeys())
+                {
+                    VERIFY_ARE_EQUAL(Source::CommandLine, args.GetSource(type));
+                }
+
                 if (!helpRequested && testCase.commandLine.find(L"image1") != std::wstring::npos && testCase.argumentSet == ArgumentSet::Run)
                 {
                     VERIFY_IS_TRUE(args.Contains(ArgType::ImageId));
