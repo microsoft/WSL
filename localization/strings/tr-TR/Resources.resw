@@ -2706,6 +2706,9 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
     <value>tar.exe bulunamadı. Yerel dosya kopyalama için Windows tar gereklidir.</value>
     <comment>{Locked="tar.exe"}</comment>
   </data>
+  <data name="WSLCCLI_CpStdoutIsTerminalError" xml:space="preserve">
+    <value>Kopya çıktısı konsola yazılamıyor.</value>
+  </data>
   <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
     <value>Geçersiz kopyalama yönü. Ya kaynak ya da hedef olarak CONTAINER:PATH kullanın.</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
@@ -2729,7 +2732,11 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
   </data>
   <data name="WSLCCLI_CpSourceNameNotRepresentableError" xml:space="preserve">
     <value>Windows dosya adı olarak kullanılamadığı için '{0}' kopyalanamıyor.</value>
-    <comment>{0} is the source path. Shown when the container source name holds a character that is not valid in a Windows file name.</comment>
+    <comment>{0} is the file name being copied. Shown when the name cannot be used as a Windows file name.</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceNameTrimmedWarning" xml:space="preserve">
+    <value>Windows dosya adlarından sondaki boşlukları ve noktaları kaldırır, bu nedenle '{}', '{}' olarak kopyalanır.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Bir kapsayıcıyı incele.</value>
@@ -3943,6 +3950,30 @@ Windows sürümü: {}</value>
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PID’LER</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderRepository" xml:space="preserve">
+    <value>REPOSITORY</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderTag" xml:space="preserve">
+    <value>TAG</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderDigest" xml:space="preserve">
+    <value>DIGEST</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderImageId" xml:space="preserve">
+    <value>IMAGE ID</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderNetworkId" xml:space="preserve">
+    <value>NETWORK ID</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderDriver" xml:space="preserve">
+    <value>DRIVER</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderScope" xml:space="preserve">
+    <value>SCOPE</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderVolumeName" xml:space="preserve">
+    <value>VOLUME NAME</value>
   </data>
   <data name="WSLCCLI_ContainerStateCreated" xml:space="preserve">
     <value>oluşturuldu</value>
