@@ -2208,6 +2208,26 @@ class WslcSdkTests
     // Storage tests
     // -----------------------------------------------------------------------
 
+    WSLC_TEST_METHOD(SparseVhdRequiresWslUpdate)
+    {
+        // Simulate an older service using the version cached on the SDK session handle.
+        auto* internalSession = reinterpret_cast<WslcSessionImpl*>(m_defaultSession);
+        const auto originalVersion = internalSession->runtimeVersion;
+        auto restoreVersion = wil::scope_exit([&]() { internalSession->runtimeVersion = originalVersion; });
+        internalSession->runtimeVersion = {2, 9, 5};
+
+        WslcVhdRequirements vhd{};
+        vhd.name = "wslc-test-unsupported-sparse-volume";
+        vhd.sizeBytes = _1GB;
+        vhd.type = WSLC_VHD_TYPE_SPARSE;
+
+        wil::unique_cotaskmem_string errorMessage;
+        VERIFY_ARE_EQUAL(WSLC_E_WSL_UPDATE_NEEDED, WslcCreateSessionVhdVolume(m_defaultSession, &vhd, &errorMessage));
+        VERIFY_IS_NOT_NULL(errorMessage.get());
+        VERIFY_ARE_EQUAL(
+            wsl::shared::Localization::MessageWslcOperationRequiresWslVersion("2.9.5", "3.0.2"), std::wstring(errorMessage.get()));
+    }
+
     WSLC_TEST_METHOD(SessionCreateVhd)
     {
         constexpr auto c_volumeName = "wslc-test-data-vol";
