@@ -1529,6 +1529,71 @@ class WSLCE2EImageBuildTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_StdinTarContext_Success)
+    {
+        BuildFromStdinArchive(BuiltImageStdinTar, L"-cf", L"Dockerfile", L"");
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_StdinGzipTarContext_Success)
+    {
+        BuildFromStdinArchive(BuiltImageStdinGzip, L"-czf", L"Dockerfile", L"");
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_StdinTarContext_FileInArchive_Success)
+    {
+        // The backslash is converted so the path resolves inside the Linux build context.
+        BuildFromStdinArchive(BuiltImageStdinTarFile, L"-cf", L"sub\\custom.Dockerfile", L"sub\\custom.Dockerfile");
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_StdinDockerfile_EmptyContext_Success)
+    {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageStdinDockerfile);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-stdin-dockerfile";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"stdin-dockerfile-ok\"]\n");
+
+        auto buildResult = RunWslcWithStdinFile(std::format(L"build - -t {}", BuiltImageStdinDockerfile.NameAndTag()), dockerfilePath);
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
+
+        auto inspectData = InspectImage(BuiltImageStdinDockerfile.NameAndTag());
+        VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
+        VERIFY_ARE_EQUAL(BuiltImageStdinDockerfile.NameAndTag(), wsl::shared::string::MultiByteToWide(inspectData.RepoTags.value()[0]));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_StdinDockerfile_PseudoConsole_Success)
+    {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageStdinConsole);
+        auto session = RunWslcInteractive(
+            std::format(L"build - -t {} --progress=quiet", BuiltImageStdinConsole.NameAndTag()), ElevationType::Elevated, PseudoConsole{120, 30});
+        session.Write("FROM debian:latest\r\nLABEL typed=\"caf\xc3\xa9\"\r\n\x1a\r\n");
+        const auto exitCode = session.Wait();
+        VERIFY_ARE_EQUAL(0, exitCode, string::MultiByteToWide(session.GetStdoutData()).c_str());
+
+        auto inspectData = InspectImage(BuiltImageStdinConsole.NameAndTag());
+        VERIFY_IS_TRUE(inspectData.Config.has_value());
+        VERIFY_IS_TRUE(inspectData.Config.value().Labels.has_value());
+        const auto& labels = inspectData.Config.value().Labels.value();
+        const auto label = labels.find("typed");
+        VERIFY_IS_TRUE(label != labels.end());
+        VERIFY_ARE_EQUAL(std::string("caf\xc3\xa9"), label->second);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_StdinNul_ReachesBuilder)
+    {
+        auto result = RunWslc(L"build - --progress=quiet");
+        VERIFY_ARE_EQUAL(1u, result.ExitCode.value());
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"failed to read dockerfile"), result.Stderr.value().c_str());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_StdinContextAndStdinDockerfile_Fails)
+    {
+        auto buildResult = RunWslc(L"build - -f -");
+        buildResult.Verify(
+            {.Stderr = FormatErrorMessage(L"Can't use stdin for both the build context and the Dockerfile.", L"E_INVALIDARG"), .ExitCode = 1});
+    }
+
 private:
     const TestImage BuiltImage{L"wslc-e2e-build-empty-context", L"latest", L""};
     const TestImage BuiltImageTag1{L"wslc-e2e-build-args-tags", L"v1", L""};
@@ -1568,6 +1633,38 @@ private:
     const TestImage BuiltImageProgressPlain{L"wslc-e2e-build-progress-plain", L"latest", L""};
     const TestImage BuiltImageProgressQuiet{L"wslc-e2e-build-progress-quiet", L"latest", L""};
     const TestImage BuiltImageIidFileRelative{L"wslc-e2e-build-iidfile-relative", L"latest", L""};
+    const TestImage BuiltImageStdinTar{L"wslc-e2e-build-stdin-tar", L"latest", L""};
+    const TestImage BuiltImageStdinGzip{L"wslc-e2e-build-stdin-gzip", L"latest", L""};
+    const TestImage BuiltImageStdinTarFile{L"wslc-e2e-build-stdin-tar-file", L"latest", L""};
+    const TestImage BuiltImageStdinDockerfile{L"wslc-e2e-build-stdin-dockerfile", L"latest", L""};
+    const TestImage BuiltImageStdinConsole{L"wslc-e2e-build-stdin-console", L"latest", L""};
+
+    // Archives a context holding a Dockerfile (at dockerfileInContext) and a marker file, streams it to
+    // `wslc build -` over stdin, and verifies the build could COPY the marker out of the streamed context.
+    void BuildFromStdinArchive(const TestImage& image, std::wstring_view tarFlags, std::wstring_view dockerfileInContext, std::wstring_view fileArg)
+    {
+        auto imageCleanup = DeleteImageOnExit(image);
+        auto testRoot = std::filesystem::current_path() / image.Name;
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::filesystem::create_directories((contextDir / dockerfileInContext).parent_path());
+        WriteTestFileContent(contextDir / dockerfileInContext, "FROM debian:latest\nCOPY marker.txt /marker.txt\n");
+        WriteTestFileContent(contextDir / L"marker.txt", "stdin-context-marker\n");
+
+        auto tarPath = testRoot / L"context.tar";
+        auto tarCmd = std::format(L"tar.exe {} \"{}\" -C \"{}\" .", tarFlags, tarPath.wstring(), contextDir.wstring());
+        wsl::windows::common::SubProcess tar(nullptr, tarCmd.c_str());
+        VERIFY_ARE_EQUAL(0u, tar.RunAndCaptureOutput().ExitCode, L"tar.exe failed to create the build context archive");
+
+        auto fileOption = fileArg.empty() ? std::wstring{} : std::format(L" -f {}", fileArg);
+        auto buildResult = RunWslcWithStdinFile(std::format(L"build -{} -t {}", fileOption, image.NameAndTag()), tarPath);
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
+
+        auto inspectData = InspectImage(image.NameAndTag());
+        VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
+        VERIFY_ARE_EQUAL(image.NameAndTag(), wsl::shared::string::MultiByteToWide(inspectData.RepoTags.value()[0]));
+    }
 
     // Runs `tar.exe -tf <path>` and returns the member listing so tests can assert an exporter produced a
     // valid, non-empty archive that contains an expected entry.
