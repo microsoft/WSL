@@ -7646,6 +7646,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             std::ofstream(path) << "replacement";
             Store::Restore(key.get(), entry, L"restored-test");
             VERIFY_IS_TRUE(isActive(id));
+            VERIFY_ARE_EQUAL(registry::ReadString(key.get(), nullptr, L"DefaultDistribution"), keyName(id));
             VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
             const auto registration = registry::OpenKey(key.get(), keyName(id).c_str(), KEY_READ);
             VERIFY_ARE_EQUAL(registry::ReadString(registration.get(), nullptr, L"DistributionName"), L"restored-test");

@@ -133,6 +133,18 @@ bool IsRegisteredDisk(HKEY lxssKey, HANDLE file)
     return false;
 }
 
+void CommitRestore(HKEY lxssKey, const GUID& id)
+{
+    const auto defaultName = ReadOptionalString(lxssKey, nullptr, L"DefaultDistribution");
+    const auto defaultId = defaultName ? wsl::shared::string::ToGuid(*defaultName) : std::nullopt;
+    if (!defaultId || FAILED(OpenKeyNoThrow(lxssKey, KeyName(*defaultId).c_str(), KEY_READ).second))
+    {
+        WriteString(lxssKey, nullptr, L"DefaultDistribution", KeyName(id).c_str());
+    }
+    // Persist the registration and default selection before clearing the restore journal.
+    THROW_IF_WIN32_ERROR(RegFlushKey(lxssKey));
+}
+
 void ClearRecoveryValues(HKEY key)
 {
     for (const auto value : {RecoveryPath, RecoveryFileId, RecoveryDirectoryId, DeletedAt, Restored, PreviousState})
@@ -256,7 +268,7 @@ void DeletedDistributionStore::Restore(HKEY lxssKey, const Entry& distribution, 
     WriteDword(key.get(), nullptr, L"State", LxssDistributionStateInstalled);
     THROW_IF_WIN32_ERROR(RegFlushKey(key.get()));
     THROW_IF_WIN32_ERROR(RegRenameKey(lxssKey, KeyName(distribution.Id, true).c_str(), KeyName(distribution.Id).c_str()));
-    THROW_IF_WIN32_ERROR(RegFlushKey(key.get()));
+    CommitRestore(lxssKey, distribution.Id);
     // Atomic key rename removes the disk from the cleanup set before success is reported.
     try
     {
@@ -285,13 +297,7 @@ try
                 {
                     THROW_IF_WIN32_ERROR(RegRenameKey(lxssKey, name.c_str(), KeyName(id).c_str()));
                 }
-                const auto defaultName = ReadOptionalString(lxssKey, nullptr, L"DefaultDistribution");
-                const auto defaultId = defaultName ? wsl::shared::string::ToGuid(*defaultName) : std::nullopt;
-                if (!defaultId || FAILED(OpenKeyNoThrow(lxssKey, KeyName(*defaultId).c_str(), KEY_READ).second))
-                {
-                    WriteString(lxssKey, nullptr, L"DefaultDistribution", KeyName(id).c_str());
-                }
-                THROW_IF_WIN32_ERROR(RegFlushKey(lxssKey));
+                CommitRestore(lxssKey, id);
                 ClearRecoveryValues(key.get());
                 continue;
             }
