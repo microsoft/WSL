@@ -7748,6 +7748,102 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             VERIFY_IS_FALSE(std::filesystem::exists(parent));
             VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
         }
+        // Even an ordinary same-volume replacement directory is not owned by recovery.
+        for (const bool moveDisk : {false, true})
+        {
+            const auto [id, path] = create();
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            const auto parent = entry.Path.parent_path();
+            const auto saved = directory / L"original-directory";
+            std::filesystem::rename(parent, saved);
+            std::filesystem::create_directory(parent);
+            if (moveDisk)
+            {
+                std::filesystem::rename(saved / entry.Path.filename(), entry.Path);
+            }
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_IS_TRUE(std::filesystem::exists(parent));
+            VERIFY_IS_TRUE(entryFor(id).Path == entry.Path);
+            VERIFY_ARE_EQUAL(contents(moveDisk ? entry.Path : saved / entry.Path.filename()), "original disk contents");
+            if (moveDisk)
+            {
+                std::filesystem::rename(entry.Path, saved / entry.Path.filename());
+            }
+            std::filesystem::remove(parent);
+            std::filesystem::rename(saved, parent);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_IS_FALSE(std::filesystem::exists(parent));
+            VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
+        }
+        // Older or damaged records without a usable directory identity remain untouched.
+        for (const bool corrupt : {false, true})
+        {
+            const auto [id, path] = create();
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            const auto deleted = registry::OpenKey(key.get(), (L"Deleted-" + keyName(id)).c_str(), KEY_READ | KEY_WRITE);
+            FILE_ID_INFO identity{};
+            DWORD size = sizeof(identity);
+            VERIFY_ARE_EQUAL(
+                RegGetValueW(deleted.get(), nullptr, L"RecoveryDirectoryId", RRF_RT_REG_BINARY, nullptr, &identity, &size), ERROR_SUCCESS);
+            registry::DeleteValue(deleted.get(), L"RecoveryDirectoryId");
+            if (corrupt)
+            {
+                registry::WriteDword(deleted.get(), nullptr, L"RecoveryDirectoryId", 0);
+            }
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
+            VERIFY_IS_TRUE(entryFor(id).Path == entry.Path);
+            VERIFY_ARE_EQUAL(
+                RegSetValueExW(deleted.get(), L"RecoveryDirectoryId", 0, REG_BINARY, reinterpret_cast<const BYTE*>(&identity), sizeof(identity)),
+                ERROR_SUCCESS);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_IS_FALSE(std::filesystem::exists(entry.Path.parent_path()));
+            VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
+        }
+        // A committed restore journal survives expiry, before or after its registry-key rename.
+        for (const bool renamed : {false, true})
+        {
+            const auto [id, path] = create();
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            const auto deletedName = L"Deleted-" + keyName(id);
+            const auto pending = registry::OpenKey(key.get(), deletedName.c_str(), KEY_READ | KEY_WRITE);
+            registry::WriteString(pending.get(), nullptr, L"BasePath", entry.Path.parent_path().c_str());
+            registry::WriteString(pending.get(), nullptr, L"DistributionName", L"pending-restore");
+            registry::WriteDword(pending.get(), nullptr, L"RecoveryRestored", 1);
+            if (renamed)
+            {
+                VERIFY_ARE_EQUAL(RegRenameKey(key.get(), deletedName.c_str(), keyName(id).c_str()), ERROR_SUCCESS);
+                // Recovery must also finish when clearing the journal was interrupted.
+                registry::DeleteValue(pending.get(), L"RecoveryPath");
+            }
+            else
+            {
+                // A failed rename must not expose the pending restore to expiry cleanup.
+                const auto collision = registry::CreateKey(key.get(), keyName(id).c_str());
+                registry::WriteString(collision.get(), nullptr, L"BasePath", path.parent_path().c_str());
+                registry::WriteString(collision.get(), nullptr, L"DistributionName", L"unrelated-registration");
+                Store::RecoverPending(key.get());
+                Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+                VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
+                VERIFY_IS_TRUE(entryFor(id).Path == entry.Path);
+                VERIFY_ARE_EQUAL(registry::ReadString(collision.get(), nullptr, L"DistributionName"), L"unrelated-registration");
+                registry::DeleteKey(key.get(), keyName(id).c_str());
+            }
+            Store::RecoverPending(key.get());
+            Store::RecoverPending(key.get());
+            VERIFY_IS_TRUE(isActive(id));
+            VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
+            const auto restored = registry::OpenKey(key.get(), keyName(id).c_str(), KEY_READ);
+            VERIFY_ARE_EQUAL(registry::ReadDword(restored.get(), nullptr, L"State", 0), static_cast<DWORD>(LxssDistributionStateInstalled));
+            VERIFY_ARE_EQUAL(registry::ReadDword(restored.get(), nullptr, L"DefaultUid", 0), 1234u);
+            VERIFY_ARE_EQUAL(registry::ReadDword(restored.get(), nullptr, L"RecoveryRestored", 0), 0u);
+            VERIFY_IS_FALSE(registry::ReadOptionalString(restored.get(), nullptr, L"RecoveryPath").has_value());
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
+        }
         // Startup finishes the journal after a move, before the registration rename committed.
         {
             const auto [id, path] = create();
