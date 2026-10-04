@@ -285,7 +285,13 @@ try
                 {
                     THROW_IF_WIN32_ERROR(RegRenameKey(lxssKey, name.c_str(), KeyName(id).c_str()));
                 }
-                THROW_IF_WIN32_ERROR(RegFlushKey(key.get()));
+                const auto defaultName = ReadOptionalString(lxssKey, nullptr, L"DefaultDistribution");
+                const auto defaultId = defaultName ? wsl::shared::string::ToGuid(*defaultName) : std::nullopt;
+                if (!defaultId || FAILED(OpenKeyNoThrow(lxssKey, KeyName(*defaultId).c_str(), KEY_READ).second))
+                {
+                    WriteString(lxssKey, nullptr, L"DefaultDistribution", KeyName(id).c_str());
+                }
+                THROW_IF_WIN32_ERROR(RegFlushKey(lxssKey));
                 ClearRecoveryValues(key.get());
                 continue;
             }

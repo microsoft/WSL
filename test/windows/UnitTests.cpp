@@ -7805,6 +7805,11 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         // A committed restore journal survives expiry, before or after its registry-key rename.
         for (const bool renamed : {false, true})
         {
+            if (!renamed)
+            {
+                registry::DeleteValue(key.get(), L"DefaultDistribution");
+            }
+            const auto defaultBefore = registry::ReadOptionalString(key.get(), nullptr, L"DefaultDistribution");
             const auto [id, path] = create();
             VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
             const auto entry = entryFor(id);
@@ -7838,6 +7843,8 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
             const auto restored = registry::OpenKey(key.get(), keyName(id).c_str(), KEY_READ);
             VERIFY_ARE_EQUAL(registry::ReadDword(restored.get(), nullptr, L"State", 0), static_cast<DWORD>(LxssDistributionStateInstalled));
+            VERIFY_ARE_EQUAL(
+                registry::ReadString(key.get(), nullptr, L"DefaultDistribution"), defaultBefore.value_or(keyName(id)));
             VERIFY_ARE_EQUAL(registry::ReadDword(restored.get(), nullptr, L"DefaultUid", 0), 1234u);
             VERIFY_ARE_EQUAL(registry::ReadDword(restored.get(), nullptr, L"RecoveryRestored", 0), 0u);
             VERIFY_IS_FALSE(registry::ReadOptionalString(restored.get(), nullptr, L"RecoveryPath").has_value());
