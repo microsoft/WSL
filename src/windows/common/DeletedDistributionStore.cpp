@@ -41,12 +41,12 @@ wil::unique_hfile OpenDisk(const std::filesystem::path& path)
     return file;
 }
 
-wil::unique_hfile OpenDirectory(const std::filesystem::path& path)
+wil::unique_hfile OpenDirectory(const std::filesystem::path& path, DWORD sharing = FILE_SHARE_READ)
 {
     wil::unique_hfile directory{CreateFileW(
         path.c_str(),
         DELETE | FILE_READ_ATTRIBUTES,
-        FILE_SHARE_READ,
+        sharing,
         nullptr,
         OPEN_EXISTING,
         FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
@@ -185,7 +185,9 @@ bool DeletedDistributionStore::Retain(HKEY lxssKey, const GUID& id, const std::f
     THROW_IF_WIN32_BOOL_FALSE(CreateDirectoryW(directory.c_str(), nullptr));
     const auto target = directory / originalPath.filename();
     auto removeEmptyDirectory = wil::scope_exit([&] { RemoveDirectoryW(directory.c_str()); });
-    const auto directoryHandle = OpenDirectory(directory);
+    // Moving a file here opens its destination directory for write access. Keep
+    // delete sharing disabled so the directory cannot be replaced during the move.
+    const auto directoryHandle = OpenDirectory(directory, FILE_SHARE_READ | FILE_SHARE_WRITE);
     const auto key = OpenKey(lxssKey, KeyName(id).c_str(), KEY_READ | KEY_WRITE);
     const auto originalState = ReadDword(key.get(), nullptr, L"State", LxssDistributionStateInstalled);
     bool moved = false;
