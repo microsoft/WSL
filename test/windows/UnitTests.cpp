@@ -7697,7 +7697,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             VERIFY_FAILED(wil::ResultFromException([&] { Store::Retain(key.get(), id, path); }));
             VERIFY_IS_TRUE(isActive(id));
             VERIFY_ARE_EQUAL(contents(offline / path.filename()), "original disk contents");
-            const auto unavailableVolume = std::filesystem::path(L"\\?\Volume" + keyName(id) + L"\ext4.vhdx");
+            const auto unavailableVolume = std::filesystem::path(LR"(\\?\Volume)" + keyName(id) + LR"(\ext4.vhdx)");
             VERIFY_FAILED(wil::ResultFromException([&] { Store::Retain(key.get(), id, unavailableVolume); }));
             VERIFY_IS_TRUE(isActive(id));
             std::filesystem::rename(offline, path.parent_path());
