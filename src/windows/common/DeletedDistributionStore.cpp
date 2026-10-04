@@ -245,8 +245,16 @@ bool DeletedDistributionStore::Retain(HKEY lxssKey, const GUID& id, const std::f
     auto rollback = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
         if (moved)
         {
-            // A failed reverse move exits this guard before clearing the durable recovery journal.
-            RenameDisk(file.get(), originalPath);
+            try
+            {
+                RenameDisk(file.get(), originalPath);
+            }
+            catch (...)
+            {
+                // Keep the journal intact; RecoverPending can finish the forward move.
+                LOG_CAUGHT_EXCEPTION();
+                return;
+            }
         }
         WriteDword(key.get(), nullptr, L"State", originalState);
         ClearRecoveryValues(key.get());
