@@ -2713,7 +2713,7 @@ Uso: wslc container cp [OPZIONI] SORGENTE DEST
     <comment>{Locked="tar.exe"}</comment>
   </data>
   <data name="WSLCCLI_CpStdoutIsTerminalError" xml:space="preserve">
-    <value>Cannot write copy output to the console.</value>
+    <value>Non è possibile scrivere l'output della copia nella console.</value>
   </data>
   <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
     <value>Direzione di copia non valida. Usa CONTAINER:PATH come origine o destinazione.</value>
@@ -3967,19 +3967,19 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>DIGEST</value>
   </data>
   <data name="WSLCCLI_TableHeaderImageId" xml:space="preserve">
-    <value>IMAGE ID</value>
+    <value>ID IMMAGINE</value>
   </data>
   <data name="WSLCCLI_TableHeaderNetworkId" xml:space="preserve">
-    <value>NETWORK ID</value>
+    <value>ID RETE</value>
   </data>
   <data name="WSLCCLI_TableHeaderDriver" xml:space="preserve">
     <value>DRIVER</value>
   </data>
   <data name="WSLCCLI_TableHeaderScope" xml:space="preserve">
-    <value>SCOPE</value>
+    <value>AMBITO</value>
   </data>
   <data name="WSLCCLI_TableHeaderVolumeName" xml:space="preserve">
-    <value>VOLUME NAME</value>
+    <value>NOME DEL VOLUME</value>
   </data>
   <data name="WSLCCLI_ContainerStateCreated" xml:space="preserve">
     <value>creato</value>

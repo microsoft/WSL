@@ -3953,28 +3953,28 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>PIDS</value>
   </data>
   <data name="WSLCCLI_TableHeaderRepository" xml:space="preserve">
-    <value>REPOSITORY</value>
+    <value>LAGRINGSPLATS</value>
   </data>
   <data name="WSLCCLI_TableHeaderTag" xml:space="preserve">
     <value>TAG</value>
   </data>
   <data name="WSLCCLI_TableHeaderDigest" xml:space="preserve">
-    <value>DIGEST</value>
+    <value>SAMMANDRAG</value>
   </data>
   <data name="WSLCCLI_TableHeaderImageId" xml:space="preserve">
-    <value>IMAGE ID</value>
+    <value>BILD-ID</value>
   </data>
   <data name="WSLCCLI_TableHeaderNetworkId" xml:space="preserve">
-    <value>NETWORK ID</value>
+    <value>NÄTVERKS-ID</value>
   </data>
   <data name="WSLCCLI_TableHeaderDriver" xml:space="preserve">
     <value>DRIVER</value>
   </data>
   <data name="WSLCCLI_TableHeaderScope" xml:space="preserve">
-    <value>SCOPE</value>
+    <value>OMFATTNING</value>
   </data>
   <data name="WSLCCLI_TableHeaderVolumeName" xml:space="preserve">
-    <value>VOLUME NAME</value>
+    <value>VOLYMNAMN</value>
   </data>
   <data name="WSLCCLI_ContainerStateCreated" xml:space="preserve">
     <value>skapat</value>
