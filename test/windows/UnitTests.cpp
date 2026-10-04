@@ -7566,7 +7566,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             "#Comment 127.0.0.1 microsoft.com windows.microsoft.com\n#AnotherComment\n127.0.0.1 wsl.dev", "127.0.0.1\twsl.dev\n");
     }
 
-    // Validate that a distribution can be unregistered even if its BasePath doesn't exist.
+    // Validate that an unavailable BasePath is preserved unless permanent removal is requested.
     // See https://github.com/microsoft/WSL/issues/13004
     TEST_METHOD(BrokenDistroUnregister)
     {
@@ -7584,7 +7584,9 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, L"State", LxssDistributionStateInstalled);
         wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, L"Flags", LXSS_DISTRO_FLAGS_VM_MODE);
 
-        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"--unregister DummyBrokenDistro");
+        LxsstuLaunchWslAndCaptureOutput(L"--unregister DummyBrokenDistro", -1);
+        VERIFY_IS_TRUE(GetDistributionId(L"DummyBrokenDistro").has_value());
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"--unregister DummyBrokenDistro --force");
 
         VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
         VERIFY_ARE_EQUAL(err, L"");
@@ -7686,6 +7688,23 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             std::filesystem::remove(path);
             VERIFY_IS_FALSE(Store::Retain(key.get(), id, path));
             VERIFY_IS_TRUE(isActive(id));
+        }
+        // An unavailable parent or volume must not be mistaken for a missing disk.
+        {
+            const auto [id, path] = create();
+            const auto offline = directory / L"offline-source";
+            std::filesystem::rename(path.parent_path(), offline);
+            VERIFY_FAILED(wil::ResultFromException([&] { Store::Retain(key.get(), id, path); }));
+            VERIFY_IS_TRUE(isActive(id));
+            VERIFY_ARE_EQUAL(contents(offline / path.filename()), "original disk contents");
+            const auto unavailableVolume = std::filesystem::path(L"\\?\Volume" + keyName(id) + L"\ext4.vhdx");
+            VERIFY_FAILED(wil::ResultFromException([&] { Store::Retain(key.get(), id, unavailableVolume); }));
+            VERIFY_IS_TRUE(isActive(id));
+            std::filesystem::rename(offline, path.parent_path());
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
         }
         // A short-lived handle left by disk teardown is retried, matching existing unregister behavior.
         {
@@ -7802,6 +7821,66 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
             VERIFY_IS_FALSE(std::filesystem::exists(entry.Path.parent_path()));
             VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
+        }
+        // Failed directory deletion must keep a retry record, including when the disk is already gone.
+        for (const bool missingDisk : {false, true})
+        {
+            const auto [id, path] = create();
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            if (missingDisk)
+            {
+                std::filesystem::remove(entry.Path);
+            }
+            const auto extra = entry.Path.parent_path() / L"keep.txt";
+            std::ofstream(extra) << "unrelated contents";
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
+            VERIFY_IS_TRUE(entryFor(id).Path == entry.Path);
+            VERIFY_ARE_EQUAL(contents(extra), "unrelated contents");
+            std::filesystem::remove(extra);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_IS_FALSE(std::filesystem::exists(entry.Path.parent_path()));
+            VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
+        }
+        // A failed reverse move leaves the journal intact; startup can finish the forward move.
+        for (const bool failRollback : {false, true})
+        {
+            const auto [id, path] = create();
+            const auto deletedName = L"Deleted-" + keyName(id);
+            registry::CreateKey(key.get(), deletedName.c_str()); // Force the registration rename to fail.
+            wil::unique_hfile directoryLock;
+            if (failRollback)
+            {
+                // Deny the write access required to move a file back into its original directory.
+                directoryLock.reset(CreateFileW(
+                    path.parent_path().c_str(), DELETE | FILE_READ_ATTRIBUTES, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
+                    FILE_FLAG_BACKUP_SEMANTICS, nullptr));
+                VERIFY_IS_TRUE(!!directoryLock);
+            }
+            VERIFY_FAILED(wil::ResultFromException([&] { Store::Retain(key.get(), id, path); }));
+            const auto registration = registry::OpenKey(key.get(), keyName(id).c_str(), KEY_READ);
+            const auto recovery = registry::ReadOptionalString(registration.get(), nullptr, L"RecoveryPath");
+            VERIFY_ARE_EQUAL(recovery.has_value(), failRollback);
+            directoryLock.reset();
+            registry::DeleteKey(key.get(), deletedName.c_str());
+            if (failRollback)
+            {
+                VERIFY_IS_FALSE(std::filesystem::exists(path));
+                VERIFY_ARE_EQUAL(contents(std::filesystem::path(*recovery)), "original disk contents");
+                Store::RecoverPending(key.get());
+                VERIFY_IS_FALSE(isActive(id));
+                const auto entry = entryFor(id);
+                Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+                VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
+            }
+            else
+            {
+                VERIFY_IS_TRUE(isActive(id));
+                VERIFY_ARE_EQUAL(contents(path), "original disk contents");
+                VERIFY_ARE_EQUAL(
+                    registry::ReadDword(registration.get(), nullptr, L"State", 0), static_cast<DWORD>(LxssDistributionStateInstalled));
+            }
         }
         // A committed restore journal survives expiry, before or after its registry-key rename.
         for (const bool renamed : {false, true})
@@ -7972,6 +8051,16 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             const auto entries = Store::Enumerate(userKey.get());
             VERIFY_IS_TRUE(std::none_of(entries.begin(), entries.end(), [&](const auto& entry) { return entry.Name == name; }));
         }
+        // The pre-existing name-based COM API has no retention option and remains permanent.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(import), 0u);
+        const auto wslSupport =
+            wil::CoCreateInstance<LxssUserSession, IWslSupport>(CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA);
+        VERIFY_SUCCEEDED(wslSupport->UnregisterDistribution(name.c_str()));
+        VERIFY_IS_FALSE(GetDistributionId(name.c_str()).has_value());
+        VERIFY_IS_FALSE(std::filesystem::exists(install / (LxsstuVmMode() ? L"ext4.vhdx" : L"rootfs")));
+        const auto legacyEntries = Store::Enumerate(userKey.get());
+        VERIFY_IS_TRUE(
+            std::none_of(legacyEntries.begin(), legacyEntries.end(), [&](const auto& entry) { return entry.Name == name; }));
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(import), 0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} -u root -- sh -c 'echo retained-data > /root/recovery-marker'", name)), 0u);
         const auto originalId = GetDistributionId(name.c_str());
@@ -8082,11 +8171,15 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         const auto basePath = std::filesystem::temp_directory_path() / distroName;
         VERIFY_IS_FALSE(std::filesystem::exists(basePath));
         const auto userKey = registry::OpenLxssUserKey();
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { registry::DeleteKey(userKey.get(), keyName.c_str()); });
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+            registry::DeleteKey(userKey.get(), keyName.c_str());
+            std::filesystem::remove_all(basePath);
+        });
 
-        // A registration with a missing BasePath never risks a real distribution's files.
+        // A missing VHD in an accessible directory never risks a real distribution's files.
         auto registerDistro = [&](const std::wstring& name) {
             VERIFY_IS_FALSE(GetDistributionId(name.c_str()).has_value());
+            std::filesystem::create_directory(basePath);
             const auto distroKey = registry::CreateKey(userKey.get(), keyName.c_str());
             registry::WriteString(distroKey.get(), nullptr, L"BasePath", basePath.c_str());
             registry::WriteString(distroKey.get(), nullptr, L"DistributionName", name.c_str());

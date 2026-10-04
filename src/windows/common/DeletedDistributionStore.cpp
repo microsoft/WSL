@@ -20,14 +20,14 @@ std::wstring KeyName(const GUID& id, bool deleted = false)
     return (deleted ? std::wstring(DeletedPrefix) : L"") + wsl::shared::string::GuidToString<wchar_t>(id);
 }
 
-wil::unique_hfile OpenDisk(const std::filesystem::path& path)
+wil::unique_hfile OpenDisk(const std::filesystem::path& path, bool allowMissingParent = true)
 {
     wil::unique_hfile file{CreateFileW(
         path.c_str(), DELETE | FILE_READ_ATTRIBUTES, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr)};
     if (!file)
     {
         const auto error = GetLastError();
-        if (error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND)
+        if (error == ERROR_FILE_NOT_FOUND || (allowMissingParent && error == ERROR_PATH_NOT_FOUND))
         {
             return {};
         }
@@ -166,7 +166,7 @@ bool DeletedDistributionStore::Retain(HKEY lxssKey, const GUID& id, const std::f
     // HCS may briefly keep a handle after ejecting the disk. Match the existing
     // unregister retry window for sharing violations rather than failing a normal teardown.
     auto file = wsl::shared::retry::RetryWithTimeout<wil::unique_hfile>(
-        [&] { return OpenDisk(vhdPath); }, std::chrono::milliseconds(100), std::chrono::seconds(10), {HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION)});
+        [&] { return OpenDisk(vhdPath, false); }, std::chrono::milliseconds(100), std::chrono::seconds(10), {HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION)});
     if (!file)
     {
         // Broken registrations with no filesystem must still be removable.
@@ -194,6 +194,7 @@ bool DeletedDistributionStore::Retain(HKEY lxssKey, const GUID& id, const std::f
     auto rollback = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
         if (moved)
         {
+            // A failed reverse move exits this guard before clearing the durable recovery journal.
             RenameDisk(file.get(), originalPath);
         }
         WriteDword(key.get(), nullptr, L"State", originalState);
@@ -387,7 +388,7 @@ try
             }
             // Delete only this verified directory, and only if it is empty.
             FILE_DISPOSITION_INFO disposition{TRUE};
-            LOG_IF_WIN32_BOOL_FALSE(SetFileInformationByHandle(directory.get(), FileDispositionInfo, &disposition, sizeof(disposition)));
+            THROW_IF_WIN32_BOOL_FALSE(SetFileInformationByHandle(directory.get(), FileDispositionInfo, &disposition, sizeof(disposition)));
             DeleteKey(lxssKey, KeyName(entry.Id, true).c_str());
         }
         CATCH_LOG()

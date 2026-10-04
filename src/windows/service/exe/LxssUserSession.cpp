@@ -567,7 +567,7 @@ try
     GUID distroGuid;
     RETURN_IF_FAILED(GetDistributionId(DistributionName, 0, nullptr, &distroGuid));
 
-    return UnregisterDistribution(&distroGuid, FALSE, nullptr);
+    return UnregisterDistribution(&distroGuid, TRUE, nullptr);
 }
 CATCH_RETURN()
 
