@@ -3354,6 +3354,12 @@ std::vector<DistributionRegistration> LxssUserSessionImpl::_EnumerateDistributio
         }
 
         auto registration = DistributionRegistration::Open(LxssKey, distro.first);
+        // A journaled registration is retained only so recovery can finish an
+        // interrupted unregister; it is not an available distribution.
+        if (registration.Read(Property::RecoveryPath).has_value())
+        {
+            continue;
+        }
 
         // Add the distribution to the list if the caller requested all, or if
         // it is installed or upgrading.

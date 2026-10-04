@@ -10,9 +10,13 @@ namespace {
 constexpr auto RecoveryPath = L"RecoveryPath";
 constexpr auto RecoveryFileId = L"RecoveryFileId";
 constexpr auto RecoveryDirectoryId = L"RecoveryDirectoryId";
+constexpr auto RecoveryAnchorId = L"RecoveryAnchorId";
 constexpr auto DeletedAt = L"DeletedAt";
 constexpr auto PreviousState = L"RecoveryPreviousState";
 constexpr auto Restored = L"RecoveryRestored";
+constexpr auto RestorePending = L"RecoveryRestorePending";
+constexpr auto RestoreName = L"RecoveryRestoreName";
+constexpr auto CleanupPending = L"RecoveryCleanupPending";
 constexpr std::wstring_view DeletedPrefix = L"Deleted-";
 
 std::wstring KeyName(const GUID& id, bool deleted = false)
@@ -147,10 +151,56 @@ void CommitRestore(HKEY lxssKey, const GUID& id)
 
 void ClearRecoveryValues(HKEY key)
 {
-    for (const auto value : {RecoveryPath, RecoveryFileId, RecoveryDirectoryId, DeletedAt, Restored, PreviousState})
+    for (const auto value : {RecoveryPath, RecoveryFileId, RecoveryDirectoryId, RecoveryAnchorId, DeletedAt, Restored, RestorePending, RestoreName, CleanupPending, PreviousState})
     {
         DeleteValue(key, value);
     }
+}
+
+void CompleteRestore(HKEY lxssKey, HKEY key, const GUID& id, bool deleted)
+{
+    const auto path = std::filesystem::path(ReadString(key, nullptr, RecoveryPath));
+    const auto name = ReadString(key, nullptr, RestoreName);
+    WriteString(key, nullptr, L"BasePath", path.parent_path().c_str());
+    WriteString(key, nullptr, L"VhdFileName", path.filename().c_str());
+    WriteString(key, nullptr, L"DistributionName", name.c_str());
+    // A restored store distro becomes independently managed, like an imported VHD.
+    for (const auto value : {L"PackageFamilyName", L"ShortcutPath", L"TerminalProfilePath"})
+    {
+        DeleteValue(key, value);
+    }
+    WriteDword(key, nullptr, Restored, 1);
+    WriteDword(key, nullptr, L"State", LxssDistributionStateInstalled);
+    THROW_IF_WIN32_ERROR(RegFlushKey(key));
+    if (deleted)
+    {
+        THROW_IF_WIN32_ERROR(RegRenameKey(lxssKey, KeyName(id, true).c_str(), KeyName(id).c_str()));
+    }
+    CommitRestore(lxssKey, id);
+    ClearRecoveryValues(key);
+}
+
+bool RecoveryDirectoryWasDeleted(HKEY key, const std::filesystem::path& directory)
+{
+    FILE_ID_INFO expected{};
+    DWORD size = sizeof(expected);
+    THROW_IF_WIN32_ERROR(RegGetValueW(key, nullptr, RecoveryDirectoryId, RRF_RT_REG_BINARY, nullptr, &expected, &size));
+    THROW_HR_IF(E_INVALIDARG, size != sizeof(expected));
+    const auto anchor = OpenDirectory(directory.parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE);
+    VerifyIdentity(key, anchor.get(), RecoveryAnchorId);
+    const auto anchorId = Identity(anchor.get());
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_FILE_INVALID), expected.VolumeSerialNumber != anchorId.VolumeSerialNumber);
+    SetLastError(ERROR_SUCCESS);
+    if (GetFileAttributesW(directory.c_str()) != INVALID_FILE_ATTRIBUTES)
+    {
+        return false;
+    }
+    const auto error = GetLastError();
+    if (error == ERROR_FILE_NOT_FOUND)
+    {
+        return true;
+    }
+    THROW_WIN32(error);
 }
 } // namespace
 
@@ -188,6 +238,7 @@ bool DeletedDistributionStore::Retain(HKEY lxssKey, const GUID& id, const std::f
     // Moving a file here opens its destination directory for write access. Keep
     // delete sharing disabled so the directory cannot be replaced during the move.
     const auto directoryHandle = OpenDirectory(directory, FILE_SHARE_READ | FILE_SHARE_WRITE);
+    const auto anchorHandle = OpenDirectory(directory.parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE);
     const auto key = OpenKey(lxssKey, KeyName(id).c_str(), KEY_READ | KEY_WRITE);
     const auto originalState = ReadDword(key.get(), nullptr, L"State", LxssDistributionStateInstalled);
     bool moved = false;
@@ -209,6 +260,9 @@ bool DeletedDistributionStore::Retain(HKEY lxssKey, const GUID& id, const std::f
     const auto directoryIdentity = Identity(directoryHandle.get());
     THROW_IF_WIN32_ERROR(RegSetValueExW(
         key.get(), RecoveryDirectoryId, 0, REG_BINARY, reinterpret_cast<const BYTE*>(&directoryIdentity), sizeof(directoryIdentity)));
+    const auto anchorIdentity = Identity(anchorHandle.get());
+    THROW_IF_WIN32_ERROR(RegSetValueExW(
+        key.get(), RecoveryAnchorId, 0, REG_BINARY, reinterpret_cast<const BYTE*>(&anchorIdentity), sizeof(anchorIdentity)));
     // Persist the journal before moving the file. Startup repairs an interrupted transition.
     THROW_IF_WIN32_ERROR(RegFlushKey(key.get()));
     RenameDisk(file.get(), target);
@@ -257,27 +311,12 @@ void DeletedDistributionStore::Restore(HKEY lxssKey, const Entry& distribution, 
         HRESULT_FROM_WIN32(ERROR_TIMEOUT),
         distribution.DeletedAt != 0 && now >= distribution.DeletedAt && now - distribution.DeletedAt >= Retention);
 
-    // Keep the disk at its recovery location. Restoring never overwrites the original
-    // path, which may now contain a replacement distribution or other user files.
-    WriteString(key.get(), nullptr, L"BasePath", distribution.Path.parent_path().c_str());
-    WriteString(key.get(), nullptr, L"VhdFileName", distribution.Path.filename().c_str());
-    WriteString(key.get(), nullptr, L"DistributionName", name);
-    // A restored store distro becomes independently managed, like an imported VHD.
-    for (const auto value : {L"PackageFamilyName", L"ShortcutPath", L"TerminalProfilePath"})
-    {
-        DeleteValue(key.get(), value);
-    }
-    WriteDword(key.get(), nullptr, Restored, 1);
-    WriteDword(key.get(), nullptr, L"State", LxssDistributionStateInstalled);
+    // Persist the intended restore before changing registration fields. Startup can
+    // complete the operation even if the process stops between individual writes.
+    WriteString(key.get(), nullptr, RestoreName, name);
+    WriteDword(key.get(), nullptr, RestorePending, 1);
     THROW_IF_WIN32_ERROR(RegFlushKey(key.get()));
-    THROW_IF_WIN32_ERROR(RegRenameKey(lxssKey, KeyName(distribution.Id, true).c_str(), KeyName(distribution.Id).c_str()));
-    CommitRestore(lxssKey, distribution.Id);
-    // Atomic key rename removes the disk from the cleanup set before success is reported.
-    try
-    {
-        ClearRecoveryValues(key.get());
-    }
-    CATCH_LOG()
+    CompleteRestore(lxssKey, key.get(), distribution.Id, true);
 }
 
 void DeletedDistributionStore::RecoverPending(HKEY lxssKey) noexcept
@@ -293,6 +332,19 @@ try
         try
         {
             const auto key = OpenKey(lxssKey, name.c_str(), KEY_READ | KEY_WRITE);
+            if (ReadDword(key.get(), nullptr, RestorePending, 0))
+            {
+                // Clearing the restore journal may have been interrupted after the
+                // registration and default selection were durably committed.
+                if (!name.starts_with(DeletedPrefix) && !ReadOptionalString(key.get(), nullptr, RecoveryPath))
+                {
+                    CommitRestore(lxssKey, id);
+                    ClearRecoveryValues(key.get());
+                    continue;
+                }
+                CompleteRestore(lxssKey, key.get(), id, name.starts_with(DeletedPrefix));
+                continue;
+            }
             if (ReadDword(key.get(), nullptr, Restored, 0))
             {
                 WriteDword(key.get(), nullptr, L"State", LxssDistributionStateInstalled);
@@ -365,14 +417,20 @@ try
         }
         try
         {
-            const auto key = OpenKey(lxssKey, KeyName(entry.Id, true).c_str(), KEY_READ);
+            const auto key = OpenKey(lxssKey, KeyName(entry.Id, true).c_str(), KEY_READ | KEY_WRITE);
             // A failed or interrupted restore must never become eligible for deletion again.
             if (ReadDword(key.get(), nullptr, Restored, 0))
             {
                 continue;
             }
+            const auto recoveryDirectory = entry.Path.parent_path();
+            if (ReadDword(key.get(), nullptr, CleanupPending, 0) && RecoveryDirectoryWasDeleted(key.get(), recoveryDirectory))
+            {
+                DeleteKey(lxssKey, KeyName(entry.Id, true).c_str());
+                continue;
+            }
             // Keep the verified directory locked against replacement until deletion completes.
-            const auto directory = OpenDirectory(entry.Path.parent_path());
+            const auto directory = OpenDirectory(recoveryDirectory);
             VerifyIdentity(key.get(), directory.get(), RecoveryDirectoryId);
             auto file = OpenDisk(entry.Path);
             if (file)
@@ -386,6 +444,10 @@ try
                 THROW_IF_WIN32_BOOL_FALSE(SetFileInformationByHandle(file.get(), FileDispositionInfo, &disposition, sizeof(disposition)));
                 file.reset();
             }
+            // Persist intent before deleting the directory so startup can remove the
+            // tombstone if the process stops after the directory has been removed.
+            WriteDword(key.get(), nullptr, CleanupPending, 1);
+            THROW_IF_WIN32_ERROR(RegFlushKey(key.get()));
             // Delete only this verified directory, and only if it is empty.
             FILE_DISPOSITION_INFO disposition{TRUE};
             THROW_IF_WIN32_BOOL_FALSE(SetFileInformationByHandle(directory.get(), FileDispositionInfo, &disposition, sizeof(disposition)));
