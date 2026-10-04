@@ -72,8 +72,7 @@ bool TryLoadWinhttpProxyMethods() noexcept
 
 #define MIRRORED_NETWORKING_TEST_ONLY() \
     { \
-        WINDOWS_11_TEST_ONLY(); \
-        if (!AreExperimentalNetworkingFeaturesSupported() || !IsHyperVFirewallSupported()) \
+        if (!IsMirroredNetworkingSupported()) \
         { \
             LogSkipped("Mirrored networking not supported on this OS. Skipping test.."); \
             return; \
@@ -122,6 +121,21 @@ static const std::wstring c_dnsTunnelingDefaultIp = L"10.255.255.254";
 static constexpr bool ManualConnectivityValidation = false;
 
 namespace {
+
+bool DefaultSwitchExists()
+{
+    for (const auto& id : wsl::core::networking::EnumerateNetworks())
+    {
+        const auto network = wsl::core::networking::OpenNetwork(id);
+        const auto [properties, propertiesString] = wsl::core::networking::QueryNetworkProperties(network.get());
+        if (properties.Name == L"Default Switch")
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
 
 std::wstring GetMacAddress(const std::wstring& adapter = L"eth0")
 {
@@ -1983,6 +1997,17 @@ class NetworkTests
                 return;
             }
             break;
+        }
+
+        if (networkingMode == wsl::core::NetworkingMode::Bridged && !DefaultSwitchExists())
+        {
+            LogSkipped("Bridged networking requires the Default Switch. Skipping test...");
+            return;
+        }
+
+        if (networkingMode == wsl::core::NetworkingMode::Mirrored)
+        {
+            MIRRORED_NETWORKING_TEST_ONLY();
         }
 
         LogInfo("HostToGuestLoopback (networkingMode=%hs)", ToString(networkingMode));
@@ -4221,6 +4246,12 @@ class MirroredTests
     {
         VERIFY_ARE_EQUAL(LxsstuInitialize(false), TRUE);
 
+        if (LxsstuVmMode() && !IsMirroredNetworkingSupported())
+        {
+            LogSkipped("Mirrored networking not supported on this OS. Skipping test class...");
+            return true;
+        }
+
         // Build the Linux unit tests used by the port tracking tests.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(LXSST_TESTS_INSTALL_COMMAND_LINE), (DWORD)0);
 
@@ -5542,6 +5573,12 @@ class BridgedTests
 
         if (LxsstuVmMode())
         {
+            if (!DefaultSwitchExists())
+            {
+                LogSkipped("Bridged networking requires the Default Switch. Skipping test class...");
+                return true;
+            }
+
             m_config.emplace(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Bridged, .vmSwitch = L"Default Switch"}));
         }
 

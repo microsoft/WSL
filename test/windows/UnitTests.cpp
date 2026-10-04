@@ -1094,7 +1094,7 @@ class UnitTests
             WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::None}));
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'none'"), 0u);
 
-            if (AreExperimentalNetworkingFeaturesSupported() && IsHyperVFirewallSupported())
+            if (IsMirroredNetworkingSupported())
             {
                 config.Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
                 VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'mirrored'"), 0u);
