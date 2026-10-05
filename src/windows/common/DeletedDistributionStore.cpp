@@ -316,6 +316,27 @@ bool DeleteOriginalDisk(HKEY lxssKey, HKEY key, const GUID* excludedId = nullptr
     return true;
 }
 
+bool IsUsableDefault(HKEY key)
+{
+    if (ReadDword(key, nullptr, L"State", LxssDistributionStateInvalid) != LxssDistributionStateInstalled ||
+        ReadOptionalString(key, nullptr, c_recoveryPath))
+    {
+        return false;
+    }
+    const auto package = ReadString(key, nullptr, L"PackageFamilyName", L"");
+    if (package.empty())
+    {
+        return true;
+    }
+    const auto base = std::filesystem::path(ReadString(key, nullptr, L"BasePath"));
+    const auto flags = ReadDword(key, nullptr, L"Flags", LXSS_DISTRO_FLAGS_DEFAULT);
+    const auto path = WI_IsFlagSet(flags, LXSS_DISTRO_FLAGS_VM_MODE) ? base / ReadString(key, nullptr, L"VhdFileName", LXSS_VM_MODE_VHD_NAME)
+                                                                     : base / LXSS_ROOTFS_DIRECTORY;
+    // Match service validation under the owner's token: a packaged default is
+    // orphaned only when both its filesystem and its package are missing.
+    return !helpers::IsDistributionOrphaned(package.c_str(), path.c_str());
+}
+
 void CommitRestore(HKEY lxssKey, const GUID& id)
 {
     const auto defaultName = ReadOptionalString(lxssKey, nullptr, L"DefaultDistribution");
@@ -324,24 +345,7 @@ void CommitRestore(HKEY lxssKey, const GUID& id)
     if (defaultId)
     {
         const auto [key, result] = OpenKeyNoThrow(lxssKey, KeyName(*defaultId).c_str(), KEY_READ);
-        validDefault = SUCCEEDED(result) &&
-                       ReadDword(key.get(), nullptr, L"State", LxssDistributionStateInvalid) == LxssDistributionStateInstalled &&
-                       !ReadOptionalString(key.get(), nullptr, c_recoveryPath);
-        if (validDefault)
-        {
-            const auto package = ReadString(key.get(), nullptr, L"PackageFamilyName", L"");
-            if (!package.empty())
-            {
-                const auto base = std::filesystem::path(ReadString(key.get(), nullptr, L"BasePath"));
-                const auto flags = ReadDword(key.get(), nullptr, L"Flags", LXSS_DISTRO_FLAGS_DEFAULT);
-                const auto path = WI_IsFlagSet(flags, LXSS_DISTRO_FLAGS_VM_MODE)
-                                      ? base / ReadString(key.get(), nullptr, L"VhdFileName", LXSS_VM_MODE_VHD_NAME)
-                                      : base / LXSS_ROOTFS_DIRECTORY;
-                // Use the same orphan check as the service, under the owner's
-                // current token during both explicit restore and startup repair.
-                validDefault = !helpers::IsDistributionOrphaned(package.c_str(), path.c_str());
-            }
-        }
+        validDefault = SUCCEEDED(result) && IsUsableDefault(key.get());
     }
     if (!validDefault)
     {
@@ -756,21 +760,43 @@ try
         CATCH_LOG()
     }
 
-    // An interrupted unregister may have committed the key rename before choosing a new default.
+    // An interrupted unregister may have renamed its key, or deleted the old
+    // default value, before choosing a replacement. Repair both crash states.
     const auto defaultName = ReadOptionalString(lxssKey, nullptr, L"DefaultDistribution");
-    if (defaultName && FAILED(OpenKeyNoThrow(lxssKey, defaultName->c_str(), KEY_READ).second) &&
-        SUCCEEDED(OpenKeyNoThrow(lxssKey, (std::wstring(c_deletedPrefix) + *defaultName).c_str(), KEY_READ).second))
+    bool defaultWasDeleted = false;
+    if (defaultName)
     {
-        DeleteValue(lxssKey, L"DefaultDistribution");
+        const auto [key, result] = OpenKeyNoThrow(lxssKey, defaultName->c_str(), KEY_READ);
+        if (result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND))
+        {
+            const auto [deletedKey, deletedResult] =
+                OpenKeyNoThrow(lxssKey, (std::wstring(c_deletedPrefix) + *defaultName).c_str(), KEY_READ);
+            THROW_HR_IF(deletedResult, deletedResult != S_OK && deletedResult != HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));
+            defaultWasDeleted = SUCCEEDED(deletedResult);
+        }
+        else
+        {
+            THROW_IF_FAILED(result);
+        }
+    }
+    if (!defaultName || defaultWasDeleted)
+    {
         for (const auto& [id, name] : EnumGuidKeys(lxssKey))
         {
             const auto key = OpenKey(lxssKey, name.c_str(), KEY_READ);
-            if (ReadDword(key.get(), nullptr, L"State", LxssDistributionStateInvalid) == LxssDistributionStateInstalled &&
-                !ReadOptionalString(key.get(), nullptr, c_recoveryPath))
+            if (IsUsableDefault(key.get()))
             {
+                // Replace the value directly so a crash cannot erase a usable
+                // replacement between deletion and the write.
                 WriteString(lxssKey, nullptr, L"DefaultDistribution", name.c_str());
-                break;
+                THROW_IF_WIN32_ERROR(RegFlushKey(lxssKey));
+                return;
             }
+        }
+        if (defaultWasDeleted)
+        {
+            DeleteValue(lxssKey, L"DefaultDistribution");
+            THROW_IF_WIN32_ERROR(RegFlushKey(lxssKey));
         }
     }
 }

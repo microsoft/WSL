@@ -8655,7 +8655,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                 {
                     registry::DeleteValue(key.get(), L"DefaultDistribution");
                 }
-                const auto defaultBefore = registry::ReadOptionalString(key.get(), nullptr, L"DefaultDistribution");
+                auto expectedDefault = registry::ReadOptionalString(key.get(), nullptr, L"DefaultDistribution");
                 const auto [id, path] = create();
                 VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
                 const auto entry = entryFor(id);
@@ -8678,6 +8678,17 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                     registry::WriteString(collision.get(), nullptr, L"BasePath", path.parent_path().c_str());
                     registry::WriteString(collision.get(), nullptr, L"DistributionName", L"unrelated-registration");
                     Store::RecoverPending(key.get());
+                    if (!expectedDefault)
+                    {
+                        // Startup may select an existing installed distro while this restore remains blocked.
+                        expectedDefault = registry::ReadOptionalString(key.get(), nullptr, L"DefaultDistribution");
+                        if (expectedDefault)
+                        {
+                            const auto selected = registry::OpenKey(key.get(), expectedDefault->c_str(), KEY_READ);
+                            VERIFY_ARE_EQUAL(registry::ReadDword(selected.get(), nullptr, L"State", 0), static_cast<DWORD>(LxssDistributionStateInstalled));
+                            VERIFY_IS_FALSE(registry::ReadOptionalString(selected.get(), nullptr, L"RecoveryPath").has_value());
+                        }
+                    }
                     Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
                     VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
                     VERIFY_IS_TRUE(entryFor(id).Path == entry.Path);
@@ -8691,7 +8702,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                 VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
                 const auto restored = registry::OpenKey(key.get(), keyName(id).c_str(), KEY_READ);
                 VERIFY_ARE_EQUAL(registry::ReadDword(restored.get(), nullptr, L"State", 0), static_cast<DWORD>(LxssDistributionStateInstalled));
-                VERIFY_ARE_EQUAL(registry::ReadString(key.get(), nullptr, L"DefaultDistribution"), defaultBefore.value_or(keyName(id)));
+                VERIFY_ARE_EQUAL(registry::ReadString(key.get(), nullptr, L"DefaultDistribution"), expectedDefault.value_or(keyName(id)));
                 VERIFY_ARE_EQUAL(registry::ReadDword(restored.get(), nullptr, L"DefaultUid", 0), 1234u);
                 VERIFY_ARE_EQUAL(registry::ReadDword(restored.get(), nullptr, L"RecoveryRestored", 0), 0u);
                 VERIFY_IS_FALSE(registry::ReadOptionalString(restored.get(), nullptr, L"RecoveryPath").has_value());
@@ -8874,6 +8885,71 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                 VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
             }
         });
+    }
+
+    TEST_METHOD(UnregisterRecoveryStoreDefaultSelection)
+    {
+        using Store = wsl::windows::common::DeletedDistributionStore;
+        namespace registry = wsl::windows::common::registry;
+        constexpr auto missingPackage = L"Microsoft.AppThatIsntInstalledForSure.1.0.0.0_8wekyb3d8bbwe";
+        VERIFY_IS_FALSE(wsl::windows::common::helpers::IsPackageInstalled(missingPackage));
+        for (const bool defaultValueRemoved : {false, true})
+        {
+            for (const bool vmMode : {false, true})
+            {
+                WithRecoveryStore(
+                    [&](const auto& key, const auto& directory, const auto& keyName, const auto& create, const auto& entryFor, const auto& isActive, const auto& contents) {
+                        const auto [removedId, removedPath] = create();
+                        VERIFY_IS_TRUE(Store::Retain(key.get(), removedId, removedPath));
+                        const auto retained = entryFor(removedId);
+                        if (!defaultValueRemoved)
+                        {
+                            registry::WriteString(key.get(), nullptr, L"DefaultDistribution", keyName(removedId).c_str());
+                        }
+                        // Uninstalled, journaled, and orphaned registrations cannot become the replacement default.
+                        const auto [uninstalledId, uninstalledPath] = create();
+                        const auto uninstalled = registry::OpenKey(key.get(), keyName(uninstalledId).c_str(), KEY_READ | KEY_WRITE);
+                        registry::WriteDword(uninstalled.get(), nullptr, L"State", LxssDistributionStateUninstalling);
+                        const auto [pendingId, pendingPath] = create();
+                        const auto pending = registry::OpenKey(key.get(), keyName(pendingId).c_str(), KEY_READ | KEY_WRITE);
+                        registry::WriteString(pending.get(), nullptr, L"RecoveryPath", (directory / L"offline-recovery.vhdx").c_str());
+                        const auto [orphanId, orphanPath] = create();
+                        const auto orphan = registry::OpenKey(key.get(), keyName(orphanId).c_str(), KEY_READ | KEY_WRITE);
+                        registry::WriteString(orphan.get(), nullptr, L"PackageFamilyName", missingPackage);
+                        registry::WriteDword(orphan.get(), nullptr, L"Flags", vmMode ? LXSS_DISTRO_FLAGS_VM_MODE : 0);
+                        std::filesystem::remove(orphanPath);
+                        const auto [usableId, usablePath] = create();
+                        for (int replay = 0; replay < 2; ++replay)
+                        {
+                            Store::RecoverPending(key.get());
+                            VERIFY_ARE_EQUAL(registry::ReadString(key.get(), nullptr, L"DefaultDistribution"), keyName(usableId));
+                            VERIFY_ARE_EQUAL(contents(usablePath), "original disk contents");
+                            VERIFY_ARE_EQUAL(contents(retained.Path), "original disk contents");
+                            VERIFY_IS_TRUE(registry::ReadOptionalString(pending.get(), nullptr, L"RecoveryPath").has_value());
+                        }
+                        // Once repaired, a usable default is preserved even if another registration becomes available.
+                        const auto [otherId, otherPath] = create();
+                        Store::RecoverPending(key.get());
+                        VERIFY_ARE_EQUAL(registry::ReadString(key.get(), nullptr, L"DefaultDistribution"), keyName(usableId));
+                        VERIFY_ARE_EQUAL(contents(otherPath), "original disk contents");
+                    });
+            }
+        }
+        // With no installed replacement, remove the stale default while leaving the retained disk recoverable.
+        WithRecoveryStore(
+            [](const auto& key, const auto& directory, const auto& keyName, const auto& create, const auto& entryFor, const auto& isActive, const auto& contents) {
+                const auto [id, path] = create();
+                VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+                const auto retained = entryFor(id);
+                registry::WriteString(key.get(), nullptr, L"DefaultDistribution", keyName(id).c_str());
+                for (int replay = 0; replay < 2; ++replay)
+                {
+                    Store::RecoverPending(key.get());
+                    VERIFY_IS_FALSE(registry::ReadOptionalString(key.get(), nullptr, L"DefaultDistribution").has_value());
+                    VERIFY_ARE_EQUAL(contents(retained.Path), "original disk contents");
+                    VERIFY_ARE_EQUAL(entryFor(id).Path, retained.Path);
+                }
+            });
     }
 
     TEST_METHOD(UnregisterRecoveryStorePending)
