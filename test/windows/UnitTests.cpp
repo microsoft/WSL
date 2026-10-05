@@ -7787,6 +7787,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             };
             VERIFY_IS_TRUE(Store::Retain(key.get(), id, path, cleanupArtifacts));
             VERIFY_ARE_EQUAL(calls, 1u);
+            VERIFY_IS_FALSE(std::filesystem::exists(path.parent_path()));
             const auto entry = entryFor(id);
             // A restart after the move/key rename has no old artifact cleanup left to resume.
             Store::RecoverPending(key.get());
@@ -7794,6 +7795,17 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
             Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
+        }
+        // Pre-retention cleanup preserves unrelated source-directory contents.
+        {
+            const auto [id, path] = create();
+            const auto keep = path.parent_path() / L"keep.txt";
+            std::ofstream(keep) << "unrelated contents";
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path, [](const auto&) {}));
+            VERIFY_ARE_EQUAL(contents(keep), "unrelated contents");
+            const auto entry = entryFor(id);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
+            VERIFY_ARE_EQUAL(contents(keep), "unrelated contents");
         }
         // Interrupted pre-retention cleanup leaves the original VHD and registration recoverable.
         {

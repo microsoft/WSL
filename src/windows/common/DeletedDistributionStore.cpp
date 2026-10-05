@@ -87,6 +87,28 @@ void VerifyIdentity(HKEY key, HANDLE file, LPCWSTR value = c_recoveryFileId)
             memcmp(&expected.FileId, &actual.FileId, sizeof(expected.FileId)) != 0);
 }
 
+void RemoveEmptySourceDirectory(const std::filesystem::path& path, const FILE_ID_INFO& expected) noexcept
+try
+{
+    const auto directory = OpenDirectory(path, FILE_SHARE_READ | FILE_SHARE_WRITE, true);
+    if (!directory)
+    {
+        return;
+    }
+    const auto actual = Identity(directory.get());
+    THROW_HR_IF(
+        HRESULT_FROM_WIN32(ERROR_FILE_INVALID),
+        expected.VolumeSerialNumber != actual.VolumeSerialNumber || memcmp(&expected.FileId, &actual.FileId, sizeof(expected.FileId)) != 0);
+    // Delete only the verified directory itself. Unknown files and replacements stay intact.
+    FILE_DISPOSITION_INFO disposition{TRUE};
+    if (!SetFileInformationByHandle(directory.get(), FileDispositionInfo, &disposition, sizeof(disposition)))
+    {
+        const auto error = GetLastError();
+        THROW_WIN32_IF(error, error != ERROR_DIR_NOT_EMPTY);
+    }
+}
+CATCH_LOG()
+
 bool OriginalDiskExists(HKEY key)
 {
     const auto path =
@@ -245,8 +267,9 @@ bool DeletedDistributionStore::Retain(
     // Resolve ancestor aliases once, then open the disk through this verified parent.
     // Attribute-only opens do not enforce share access; include directory-list
     // access so denying delete sharing prevents a concurrent replacement.
-    const auto sourceDirectory =
+    auto sourceDirectory =
         OpenDirectory(vhdPath.parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE, false, FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES);
+    const auto sourceIdentity = Identity(sourceDirectory.get());
     std::wstring resolvedDirectory;
     THROW_IF_FAILED(wil::GetFinalPathNameByHandleW(sourceDirectory.get(), resolvedDirectory));
     const auto originalPath = std::filesystem::path(resolvedDirectory) / vhdPath.filename();
@@ -329,6 +352,11 @@ bool DeletedDistributionStore::Retain(
     rollback.release();
     removeEmptyDirectory.release();
     THROW_IF_WIN32_ERROR(RegFlushKey(key.get()));
+    if (cleanupArtifacts)
+    {
+        sourceDirectory.reset();
+        RemoveEmptySourceDirectory(originalPath.parent_path(), sourceIdentity);
+    }
     return true;
 }
 

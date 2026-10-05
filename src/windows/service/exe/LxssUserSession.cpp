@@ -2698,12 +2698,10 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid, boo
                 }
             }
 
-            if (!recoveryPending)
+            if (!retained && !recoveryPending)
             {
                 auto runAsUser = wil::CoImpersonateClient();
-                // Retention already cleaned the old artifacts before moving the VHD.
-                // Only remove an empty install directory now; never revisit its contents.
-                _DeleteDistributionLockHeld(configuration, retained ? 0 : LXSS_DELETE_DISTRO_FLAGS_ALL);
+                _DeleteDistributionLockHeld(configuration);
             }
 
             WslOfflineDistributionInformation distributionInfo;
