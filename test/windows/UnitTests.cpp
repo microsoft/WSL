@@ -7660,6 +7660,31 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
             VERIFY_ARE_EQUAL(contents(path), "replacement");
         }
+        // A competing rename handle must prevent retention before any journal is committed.
+        {
+            const auto [id, path] = create();
+            wil::unique_hfile renameAccess{CreateFileW(
+                directory.c_str(),
+                DELETE | FILE_READ_ATTRIBUTES,
+                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                nullptr,
+                OPEN_EXISTING,
+                FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
+                nullptr)};
+            VERIFY_IS_TRUE(!!renameAccess);
+            VERIFY_ARE_EQUAL(wil::ResultFromException([&] { Store::Retain(key.get(), id, path); }), HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION));
+            VERIFY_IS_TRUE(isActive(id));
+            VERIFY_ARE_EQUAL(contents(path), "original disk contents");
+            const auto registration = registry::OpenKey(key.get(), keyName(id).c_str(), KEY_READ);
+            VERIFY_IS_FALSE(registry::ReadOptionalString(registration.get(), nullptr, L"RecoveryPath").has_value());
+            renameAccess.reset();
+            // Once the competing handle is closed, normal retention and cleanup still succeed.
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
+        }
         // Force deletion of an offline journal retries safely after the volume returns.
         for (const bool unmoved : {false, true})
         {

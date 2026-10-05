@@ -252,9 +252,10 @@ bool DeletedDistributionStore::Retain(HKEY lxssKey, const GUID& id, const std::f
     const auto target = directory / originalPath.filename();
     auto removeEmptyDirectory = wil::scope_exit([&] { RemoveDirectoryW(directory.c_str()); });
     // Moving a file here opens its destination directory for write access. Keep
-    // delete sharing disabled so the directory cannot be replaced during the move.
+    // delete sharing disabled on both the directory and its anchor so the
+    // destination namespace cannot be replaced during the move.
     const auto directoryHandle = OpenDirectory(directory, FILE_SHARE_READ | FILE_SHARE_WRITE);
-    const auto anchorHandle = OpenDirectory(directory.parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE);
+    const auto anchorHandle = OpenDirectory(directory.parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE);
     const auto key = OpenKey(lxssKey, KeyName(id).c_str(), KEY_READ | KEY_WRITE);
     const auto originalState = ReadDword(key.get(), nullptr, L"State", LxssDistributionStateInstalled);
     bool moved = false;
