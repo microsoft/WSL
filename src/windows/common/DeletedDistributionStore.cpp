@@ -427,7 +427,7 @@ try
         {
             const auto key = OpenKey(lxssKey, KeyName(entry.Id, true).c_str(), KEY_READ | KEY_WRITE);
             // A failed or interrupted restore must never become eligible for deletion again.
-            if (ReadDword(key.get(), nullptr, Restored, 0))
+            if (ReadDword(key.get(), nullptr, Restored, 0) || ReadDword(key.get(), nullptr, RestorePending, 0))
             {
                 continue;
             }

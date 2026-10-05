@@ -7961,6 +7961,22 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
             VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
         }
+        // A pending restore remains protected from expiry even if recovery cannot complete it.
+        {
+            const auto [id, path] = create();
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            const auto deletedName = L"Deleted-" + keyName(id);
+            const auto deleted = registry::OpenKey(key.get(), deletedName.c_str(), KEY_READ | KEY_WRITE);
+            registry::WriteDword(deleted.get(), nullptr, L"RecoveryRestorePending", 1);
+            Store::RecoverPending(key.get());
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
+            VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 1u);
+            registry::DeleteValue(deleted.get(), L"RecoveryRestorePending");
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
+        }
         // Startup finishes the journal after a move, before the registration rename committed.
         {
             const auto [id, path] = create();
