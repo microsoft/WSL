@@ -1274,7 +1274,8 @@ int Unmount(_In_ const std::wstring& arg)
 int UnregisterDistribution(_In_ LPCWSTR distributionName, bool permanent)
 {
     wsl::windows::common::SvcComm service;
-    const GUID distroGuid = service.GetDistributionId(distributionName, LXSS_GET_DISTRO_ID_LIST_ALL);
+    const GUID distroGuid =
+        service.GetDistributionId(distributionName, LXSS_GET_DISTRO_ID_LIST_ALL | (permanent ? LXSS_GET_DISTRO_ID_INCLUDE_RECOVERY : 0));
 
     auto progress = wsl::windows::common::ConsoleProgressIndicator(wsl::shared::Localization::MessageStatusUnregistering(), true);
     service.UnregisterDistribution(&distroGuid, permanent);
@@ -1307,17 +1308,42 @@ int Unregister(_In_ std::wstring_view arguments)
     return UnregisterDistribution(argv[2], force);
 }
 
-int RestoreDistribution(_In_ std::wstring_view commandLine)
+int RestoreDistribution(_In_ std::wstring_view arguments)
 {
-    std::wstring name;
+    const auto commandLine = std::wstring{WSL_BINARY_NAME} + L" " + std::wstring{arguments};
+    int argc{};
+    wil::unique_hlocal_ptr<LPWSTR[]> argv{CommandLineToArgvW(commandLine.c_str(), &argc)};
+    THROW_LAST_ERROR_IF(!argv);
+    std::optional<std::wstring> name;
     std::optional<std::wstring> newName;
-    ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
-    parser.AddPositionalArgument(name, 0);
-    parser.AddArgument(newName, L"--name");
-    parser.Parse();
-    THROW_HR_IF(WSL_E_INVALID_USAGE, name.empty());
+    bool literalArguments = false;
+    for (int index = 2; index < argc; ++index)
+    {
+        if (!literalArguments && wsl::shared::string::IsEqual(argv[index], L"--"))
+        {
+            literalArguments = true;
+        }
+        else if (!literalArguments && wsl::shared::string::IsEqual(argv[index], L"--name"))
+        {
+            if (index + 1 >= argc)
+            {
+                THROW_USER_ERROR(Localization::MessageMissingArgument(argv[index], WSL_BINARY_NAME));
+            }
+            newName = argv[++index];
+        }
+        else if (!name)
+        {
+            // Keep the selector positional, including names beginning with '-'.
+            name = argv[index];
+        }
+        else
+        {
+            THROW_USER_ERROR(Localization::MessageInvalidCommandLine(argv[index], WSL_BINARY_NAME));
+        }
+    }
+    THROW_HR_IF(WSL_E_INVALID_USAGE, !name || name->empty());
     wsl::windows::common::SvcComm service;
-    service.RestoreDistribution(name.c_str(), newName ? newName->c_str() : nullptr);
+    service.RestoreDistribution(name->c_str(), newName ? newName->c_str() : nullptr);
     wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
     return 0;
 }

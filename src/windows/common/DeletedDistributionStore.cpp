@@ -17,6 +17,7 @@ constexpr auto Restored = L"RecoveryRestored";
 constexpr auto RestorePending = L"RecoveryRestorePending";
 constexpr auto RestoreName = L"RecoveryRestoreName";
 constexpr auto CleanupPending = L"RecoveryCleanupPending";
+constexpr auto PermanentDelete = L"RecoveryPermanentDelete";
 constexpr std::wstring_view DeletedPrefix = L"Deleted-";
 
 std::wstring KeyName(const GUID& id, bool deleted = false)
@@ -167,7 +168,8 @@ void CommitRestore(HKEY lxssKey, const GUID& id)
 
 void ClearRecoveryValues(HKEY key)
 {
-    for (const auto value : {RecoveryPath, RecoveryFileId, RecoveryDirectoryId, RecoveryAnchorId, DeletedAt, Restored, RestorePending, RestoreName, CleanupPending, PreviousState})
+    for (const auto value :
+         {RecoveryPath, RecoveryFileId, RecoveryDirectoryId, RecoveryAnchorId, DeletedAt, Restored, RestorePending, RestoreName, CleanupPending, PreviousState, PermanentDelete})
     {
         DeleteValue(key, value);
     }
@@ -298,7 +300,7 @@ bool DeletedDistributionStore::Retain(HKEY lxssKey, const GUID& id, const std::f
     return true;
 }
 
-std::vector<DeletedDistributionStore::Entry> DeletedDistributionStore::Enumerate(HKEY lxssKey)
+std::vector<DeletedDistributionStore::Entry> DeletedDistributionStore::Enumerate(HKEY lxssKey, bool includePermanentDelete)
 {
     std::vector<Entry> result;
     for (const auto& [name, key] : EnumKeys(lxssKey, KEY_READ))
@@ -309,6 +311,10 @@ std::vector<DeletedDistributionStore::Entry> DeletedDistributionStore::Enumerate
         }
         try
         {
+            if (!includePermanentDelete && ReadDword(key.get(), nullptr, PermanentDelete, 0))
+            {
+                continue;
+            }
             const auto id = wsl::shared::string::ToGuid(name.substr(DeletedPrefix.size()));
             THROW_HR_IF(E_INVALIDARG, !id);
             result.push_back(
@@ -325,6 +331,7 @@ std::vector<DeletedDistributionStore::Entry> DeletedDistributionStore::Enumerate
 void DeletedDistributionStore::Restore(HKEY lxssKey, const Entry& distribution, LPCWSTR name)
 {
     const auto key = OpenKey(lxssKey, KeyName(distribution.Id, true).c_str(), KEY_READ | KEY_WRITE);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED), ReadDword(key.get(), nullptr, PermanentDelete, 0) != 0);
     auto file = OpenDisk(distribution.Path);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), !file);
     VerifyIdentity(key.get(), file.get());
@@ -341,11 +348,31 @@ void DeletedDistributionStore::Restore(HKEY lxssKey, const Entry& distribution, 
     CompleteRestore(lxssKey, key.get(), distribution.Id, true);
 }
 
+void DeletedDistributionStore::Purge(HKEY lxssKey, const GUID& id)
+{
+    auto [key, result] = OpenKeyNoThrow(lxssKey, KeyName(id).c_str(), KEY_READ | KEY_WRITE);
+    if (FAILED(result))
+    {
+        THROW_HR_IF(result, result != HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));
+        key = OpenKey(lxssKey, KeyName(id, true).c_str(), KEY_READ | KEY_WRITE);
+    }
+    THROW_HR_IF(E_INVALIDARG, !ReadOptionalString(key.get(), nullptr, RecoveryPath));
+    // Commit permanent intent first. An unavailable disk keeps its identity
+    // journal for deletion when it returns, and can never be restored afterward.
+    WriteDword(key.get(), nullptr, PermanentDelete, 1);
+    THROW_IF_WIN32_ERROR(RegFlushKey(key.get()));
+    DeleteValue(key.get(), RestorePending);
+    DeleteValue(key.get(), Restored);
+    THROW_IF_WIN32_ERROR(RegFlushKey(key.get()));
+    RecoverPending(lxssKey);
+    Cleanup(lxssKey);
+}
+
 void DeletedDistributionStore::RecoverPending(HKEY lxssKey) noexcept
 try
 {
     auto registrations = EnumGuidKeys(lxssKey);
-    for (const auto& entry : Enumerate(lxssKey))
+    for (const auto& entry : Enumerate(lxssKey, true))
     {
         registrations.emplace_back(entry.Id, KeyName(entry.Id, true));
     }
@@ -354,6 +381,37 @@ try
         try
         {
             const auto key = OpenKey(lxssKey, name.c_str(), KEY_READ | KEY_WRITE);
+            if (ReadDword(key.get(), nullptr, PermanentDelete, 0))
+            {
+                const auto path = std::filesystem::path(ReadString(key.get(), nullptr, RecoveryPath));
+                const auto directory = OpenDirectory(path.parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE);
+                VerifyIdentity(key.get(), directory.get(), RecoveryDirectoryId);
+                auto file = OpenDisk(path);
+                if (!file)
+                {
+                    const auto originalPath = std::filesystem::path(ReadString(key.get(), nullptr, L"BasePath")) /
+                                              ReadString(key.get(), nullptr, L"VhdFileName", LXSS_VM_MODE_VHD_NAME);
+                    file = OpenDisk(originalPath, false);
+                    if (file)
+                    {
+                        VerifyIdentity(key.get(), file.get());
+                        RenameDisk(file.get(), path);
+                    }
+                }
+                if (file)
+                {
+                    VerifyIdentity(key.get(), file.get());
+                }
+                DeleteValue(key.get(), RestorePending);
+                DeleteValue(key.get(), Restored);
+                WriteDword(key.get(), nullptr, L"State", LxssDistributionStateDeleted);
+                THROW_IF_WIN32_ERROR(RegFlushKey(key.get()));
+                if (!name.starts_with(DeletedPrefix))
+                {
+                    THROW_IF_WIN32_ERROR(RegRenameKey(lxssKey, name.c_str(), KeyName(id, true).c_str()));
+                }
+                continue;
+            }
             const bool pendingRestore = ReadDword(key.get(), nullptr, RestorePending, 0) != 0;
             if (pendingRestore || ReadDword(key.get(), nullptr, Restored, 0))
             {
@@ -460,16 +518,18 @@ CATCH_LOG()
 void DeletedDistributionStore::Cleanup(HKEY lxssKey, ULONG64 currentTime) noexcept
 try
 {
-    for (const auto& entry : Enumerate(lxssKey))
+    for (const auto& entry : Enumerate(lxssKey, true))
     {
-        // Missing/corrupt timestamps and clocks moving backwards never cause early deletion.
-        if (entry.DeletedAt == 0 || currentTime < entry.DeletedAt || currentTime - entry.DeletedAt < Retention)
-        {
-            continue;
-        }
         try
         {
             const auto key = OpenKey(lxssKey, KeyName(entry.Id, true).c_str(), KEY_READ | KEY_WRITE);
+            // Permanent deletion is explicit; ordinary retention still protects
+            // missing/corrupt timestamps and clocks moving backwards.
+            if (!ReadDword(key.get(), nullptr, PermanentDelete, 0) &&
+                (entry.DeletedAt == 0 || currentTime < entry.DeletedAt || currentTime - entry.DeletedAt < Retention))
+            {
+                continue;
+            }
             // A failed or interrupted restore must never become eligible for deletion again.
             if (ReadDword(key.get(), nullptr, Restored, 0) || ReadDword(key.get(), nullptr, RestorePending, 0))
             {
