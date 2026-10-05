@@ -646,7 +646,7 @@ class UnitTests
             auto cleanupVm = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
             auto cleanupSystemd = EnableSystemd(extraConfig);
 
-            LxsstuLaunchWsl(std::format(L"--unregister {}", peerDistroName));
+            LxsstuLaunchWsl(std::format(L"--unregister {} --force", peerDistroName));
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", peerDistroName, g_testDistroPath)), 0L);
             auto cleanupPeer = wil::scope_exit_log(
                 WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"--unregister {} --force", peerDistroName)); });
@@ -4829,7 +4829,7 @@ localhostForwarding=true
             WslShutdown();
             VERIFY_ARE_EQUAL(
                 LxsstuLaunchWsl(std::format(L"--export {} \"{}\" --vhd", testDistro.DistroName, testDistroVhdPathExported.c_str())), 0u);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {}", testDistro.DistroName)), 0u);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {} --force", testDistro.DistroName)), 0u);
             VERIFY_IS_FALSE(std::filesystem::exists(testDistroVhdPath));
             VERIFY_IS_TRUE(service.EnumerateDistributions().empty());
 
@@ -4848,7 +4848,7 @@ localhostForwarding=true
 
             WslShutdown();
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--export {} \"{}\"", testDistro.DistroName, testDistroExported.c_str())), 0u);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {}", testDistro.DistroName)), 0u);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {} --force", testDistro.DistroName)), 0u);
             VERIFY_IS_FALSE(std::filesystem::exists(testDistroRootfsPath));
             VERIFY_IS_TRUE(service.EnumerateDistributions().empty());
             VERIFY_ARE_EQUAL(
@@ -4980,7 +4980,7 @@ VERSION_ID="Invalid|Format"
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} echo -e 'VERSION_ID=v' > /etc/os-release", tmpDistroName).c_str()), 0L);
             validateFlavorVersion(tmpDistroName, L"", L"v");
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {}", tmpDistroName).c_str()), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {} --force", tmpDistroName).c_str()), 0L);
         }
 
         // Validate that importing and then converting also behaves correctly when there's no os-release
@@ -4995,7 +4995,7 @@ VERSION_ID="Invalid|Format"
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} echo -e 'VERSION_ID=v2' > /etc/os-release", tmpDistroName).c_str()), 0L);
             validateFlavorVersion(tmpDistroName, L"", L"v2");
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {}", tmpDistroName).c_str()), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {} --force", tmpDistroName).c_str()), 0L);
         }
 
         // Verify that importing a distribution with an os-release as then converting works as well
@@ -6091,25 +6091,25 @@ VERSION_ID="Invalid|Format"
                     L"--list --online'.",
                     L"Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND"));
 
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister debian-12"), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister debian-12 --force"), 0L);
 
             // Verify that name matching is not case-sensitive on the version.
             ValidateInstall(L"Debian-12 --no-launch --name debian-12");
             ValidateDistributionStarts(L"debian-12");
 
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister debian-12"), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister debian-12 --force"), 0L);
 
             // Verify that name matching is not case-sensitive on the flavor.
             ValidateInstall(L"Debian --no-launch --name debian-12");
             ValidateDistributionStarts(L"debian-12");
 
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister debian-12"), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister debian-12 --force"), 0L);
 
             // Validate an install with a vhd size.
             ValidateInstall(L"Debian --no-launch --name debian-12 --vhd-size 1GB");
             ValidateDistributionStarts(L"debian-12");
 
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister debian-12"), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister debian-12 --force"), 0L);
 
             // Validate an install with a vhd size and fixed vhd.
             ValidateInstall(L"Debian --no-launch --name debian-12 --vhd-size 1GB --fixed-vhd");
@@ -7660,11 +7660,64 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
             VERIFY_ARE_EQUAL(contents(path), "replacement");
         }
-        // A competing rename handle must prevent retention before any journal is committed.
+        // A redirected install directory must not move an unrelated target disk into recovery.
+        for (const bool junction : {false, true})
         {
             const auto [id, path] = create();
+            const auto base = path.parent_path();
+            const auto saved = directory / L"original-source-directory";
+            const auto target = directory / L"unrelated-source-target";
+            std::filesystem::rename(base, saved);
+            std::filesystem::create_directory(target);
+            std::ofstream(target / path.filename()) << "unrelated target contents";
+            if (junction)
+            {
+                wsl::windows::common::SubProcess process(
+                    nullptr, std::format(L"cmd.exe /d /c mklink /j \"{}\" \"{}\"", base.wstring(), target.wstring()).c_str());
+                VERIFY_ARE_EQUAL(process.RunAndCaptureOutput(5000).ExitCode, 0u);
+            }
+            else
+            {
+                VERIFY_WIN32_BOOL_SUCCEEDED(CreateSymbolicLinkW(
+                    base.c_str(), target.c_str(), SYMBOLIC_LINK_FLAG_DIRECTORY | SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE));
+            }
+            VERIFY_ARE_EQUAL(wil::ResultFromException([&] { Store::Retain(key.get(), id, path); }), HRESULT_FROM_WIN32(ERROR_REPARSE_TAG_INVALID));
+            VERIFY_IS_TRUE(isActive(id));
+            VERIFY_ARE_EQUAL(contents(saved / path.filename()), "original disk contents");
+            VERIFY_ARE_EQUAL(contents(target / path.filename()), "unrelated target contents");
+            const auto registration = registry::OpenKey(key.get(), keyName(id).c_str(), KEY_READ);
+            VERIFY_IS_FALSE(registry::ReadOptionalString(registration.get(), nullptr, L"RecoveryPath").has_value());
+            VERIFY_WIN32_BOOL_SUCCEEDED(RemoveDirectoryW(base.c_str()));
+            std::filesystem::rename(saved, base);
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
+            VERIFY_ARE_EQUAL(contents(target / path.filename()), "unrelated target contents");
+            std::filesystem::remove_all(target);
+        }
+        // An ancestor alias still resolves to the verified physical install directory.
+        {
+            const auto [id, path] = create();
+            const auto alias = directory / L"source-ancestor-alias";
+            wsl::windows::common::SubProcess process(
+                nullptr, std::format(L"cmd.exe /d /c mklink /j \"{}\" \"{}\"", alias.wstring(), directory.wstring()).c_str());
+            VERIFY_ARE_EQUAL(process.RunAndCaptureOutput(5000).ExitCode, 0u);
+            auto removeAlias =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { THROW_IF_WIN32_BOOL_FALSE(RemoveDirectoryW(alias.c_str())); });
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, alias / path.parent_path().filename() / path.filename()));
+            const auto entry = entryFor(id);
+            VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
+        }
+        // Competing source-parent or recovery-anchor rename handles prevent retention before journaling.
+        for (const bool sourceParent : {false, true})
+        {
+            const auto [id, path] = create();
+            const auto lockedDirectory = sourceParent ? path.parent_path() : directory;
             wil::unique_hfile renameAccess{CreateFileW(
-                directory.c_str(),
+                lockedDirectory.c_str(),
                 DELETE | FILE_READ_ATTRIBUTES,
                 FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                 nullptr,
@@ -8023,17 +8076,33 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             VERIFY_IS_FALSE(std::filesystem::exists(entry.Path.parent_path()));
             VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
         }
-        // Cleanup can finish after the recovery directory was deleted but before its tombstone was removed.
+        // A verified removed directory must not leave a tombstone, even before cleanup has written its journal.
+        for (const bool cleanupPending : {false, true})
         {
-            const auto [id, path] = create();
-            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
-            const auto entry = entryFor(id);
-            const auto deleted = registry::OpenKey(key.get(), (L"Deleted-" + keyName(id)).c_str(), KEY_READ | KEY_WRITE);
-            registry::WriteDword(deleted.get(), nullptr, L"RecoveryCleanupPending", 1);
-            std::filesystem::remove(entry.Path);
-            std::filesystem::remove(entry.Path.parent_path());
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
-            VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
+            for (const bool permanent : {false, true})
+            {
+                const auto [id, path] = create();
+                VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+                const auto entry = entryFor(id);
+                const auto deleted = registry::OpenKey(key.get(), (L"Deleted-" + keyName(id)).c_str(), KEY_READ | KEY_WRITE);
+                if (cleanupPending)
+                {
+                    registry::WriteDword(deleted.get(), nullptr, L"RecoveryCleanupPending", 1);
+                }
+                std::filesystem::remove(entry.Path);
+                std::filesystem::remove(entry.Path.parent_path());
+                if (permanent)
+                {
+                    Store::Purge(key.get(), id);
+                }
+                else
+                {
+                    Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention - 1);
+                    VERIFY_IS_TRUE(entryFor(id).Path == entry.Path);
+                    Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+                }
+                VERIFY_ARE_EQUAL(Store::Enumerate(key.get(), true).size(), 0u);
+            }
         }
         // A dangling replacement link must not be mistaken for a deleted recovery directory.
         for (const bool junction : {false, true})
@@ -8081,8 +8150,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             {
                 // Deny the write access required to move a file back into its original directory.
                 directoryLock.reset(CreateFileW(
-                    path.parent_path().c_str(), DELETE | FILE_READ_ATTRIBUTES, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
-                    FILE_FLAG_BACKUP_SEMANTICS, nullptr));
+                    path.parent_path().c_str(), FILE_READ_ATTRIBUTES, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr));
                 VERIFY_IS_TRUE(!!directoryLock);
             }
             VERIFY_FAILED(wil::ResultFromException([&] { Store::Retain(key.get(), id, path); }));
@@ -8320,20 +8388,22 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             VERIFY_ARE_EQUAL(contents(path), "original disk contents");
             VERIFY_IS_FALSE(std::filesystem::exists(entry.Path.parent_path()));
         }
-        // An unavailable recovery directory must not discard the durable cleanup record.
+        // An unavailable recovery anchor must not be mistaken for an individually removed directory.
         {
             const auto [id, path] = create();
             VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
             const auto entry = entryFor(id);
-            const auto offline = directory / L"offline";
-            std::filesystem::rename(entry.Path.parent_path(), offline);
+            const auto offline = directory.parent_path() / (directory.filename().wstring() + L"-offline");
+            std::filesystem::rename(directory, offline);
+            auto bringOnline = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { std::filesystem::rename(offline, directory); });
             Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
             VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 1u);
             VERIFY_ARE_EQUAL(RegRenameKey(key.get(), (L"Deleted-" + keyName(id)).c_str(), keyName(id).c_str()), ERROR_SUCCESS);
             Store::RecoverPending(key.get());
             const auto pending = registry::OpenKey(key.get(), keyName(id).c_str(), KEY_READ);
             VERIFY_IS_TRUE(registry::ReadOptionalString(pending.get(), nullptr, L"RecoveryPath").has_value());
-            std::filesystem::rename(offline, entry.Path.parent_path());
+            std::filesystem::rename(offline, directory);
+            bringOnline.release();
             Store::RecoverPending(key.get());
             VERIFY_IS_FALSE(isActive(id));
             Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
@@ -8518,6 +8588,27 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         const auto legacyEntries = Store::Enumerate(userKey.get());
         VERIFY_IS_TRUE(
             std::none_of(legacyEntries.begin(), legacyEntries.end(), [&](const auto& entry) { return entry.Name == name; }));
+        if (LxsstuVmMode())
+        {
+            // The OOBE export/unregister/import-in-place sequence must keep its backup and leave no retained fixture.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(import), 0u);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} -u root -- sh -c 'echo oobe-backup > /root/oobe-marker'", name)), 0u);
+            const auto backup = install / L"oobe-exported.vhdx";
+            const auto disk = install / L"ext4.vhdx";
+            WslShutdown();
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--export {} \"{}\" --vhd", name, backup.wstring())), 0u);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {} --force", name)), 0u);
+            VERIFY_IS_FALSE(std::filesystem::exists(disk));
+            VERIFY_IS_TRUE(std::filesystem::exists(backup));
+            const auto entries = Store::Enumerate(userKey.get());
+            VERIFY_IS_TRUE(std::none_of(entries.begin(), entries.end(), [&](const auto& entry) { return entry.Name == name; }));
+            std::filesystem::rename(backup, disk);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import-in-place {} \"{}\"", name, disk.wstring())), 0u);
+            const auto [data, dataErr] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -u root -- cat /root/oobe-marker", name));
+            VERIFY_ARE_EQUAL(data, L"oobe-backup\n");
+            VERIFY_ARE_EQUAL(dataErr, L"");
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {} --force", name)), 0u);
+        }
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(import), 0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} -u root -- sh -c 'echo retained-data > /root/recovery-marker'", name)), 0u);
         const auto originalId = GetDistributionId(name.c_str());
@@ -9655,7 +9746,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
 
         // Ensure no stale state from a previous run.
         LxsstuLaunchWsl(std::format(L"--terminate {}", secondDistroName));
-        LxsstuLaunchWsl(std::format(L"--unregister {}", secondDistroName));
+        LxsstuLaunchWsl(std::format(L"--unregister {} --force", secondDistroName));
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
             LxsstuLaunchWsl(std::format(L"--terminate {}", secondDistroName));

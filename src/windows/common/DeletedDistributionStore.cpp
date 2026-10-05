@@ -46,16 +46,10 @@ wil::unique_hfile OpenDisk(const std::filesystem::path& path, bool allowMissingP
     return file;
 }
 
-wil::unique_hfile OpenDirectory(const std::filesystem::path& path, DWORD sharing = FILE_SHARE_READ, bool allowMissing = false)
+wil::unique_hfile OpenDirectory(const std::filesystem::path& path, DWORD sharing = FILE_SHARE_READ, bool allowMissing = false, DWORD access = DELETE | FILE_READ_ATTRIBUTES)
 {
     wil::unique_hfile directory{CreateFileW(
-        path.c_str(),
-        DELETE | FILE_READ_ATTRIBUTES,
-        sharing,
-        nullptr,
-        OPEN_EXISTING,
-        FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
-        nullptr)};
+        path.c_str(), access, sharing, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, nullptr)};
     if (!directory)
     {
         const auto error = GetLastError();
@@ -229,19 +223,25 @@ ULONG64 DeletedDistributionStore::Now()
 
 bool DeletedDistributionStore::Retain(HKEY lxssKey, const GUID& id, const std::filesystem::path& vhdPath)
 {
+    // Reject a redirected install directory and keep it locked against replacement.
+    // Resolve ancestor aliases once, then open the disk through this verified parent.
+    const auto sourceDirectory = OpenDirectory(vhdPath.parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE, false, FILE_READ_ATTRIBUTES);
+    std::wstring resolvedDirectory;
+    THROW_IF_FAILED(wil::GetFinalPathNameByHandleW(sourceDirectory.get(), resolvedDirectory));
+    const auto originalPath = std::filesystem::path(resolvedDirectory) / vhdPath.filename();
     // HCS may briefly keep a handle after ejecting the disk. Match the existing
     // unregister retry window for sharing violations rather than failing a normal teardown.
     auto file = wsl::shared::retry::RetryWithTimeout<wil::unique_hfile>(
-        [&] { return OpenDisk(vhdPath, false); }, std::chrono::milliseconds(100), std::chrono::seconds(10), {HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION)});
+        [&] { return OpenDisk(originalPath, false); },
+        std::chrono::milliseconds(100),
+        std::chrono::seconds(10),
+        {HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION)});
     if (!file)
     {
         // Broken registrations with no filesystem must still be removable.
         return false;
     }
 
-    std::wstring resolvedPath;
-    THROW_IF_FAILED(wil::GetFinalPathNameByHandleW(file.get(), resolvedPath));
-    const std::filesystem::path originalPath{resolvedPath};
     GUID storageId{};
     THROW_IF_FAILED(CoCreateGuid(&storageId));
     // Stay on the disk's volume: an atomic rename avoids copying a potentially huge VHD.
@@ -542,7 +542,7 @@ try
                 continue;
             }
             const auto recoveryDirectory = entry.Path.parent_path();
-            if (ReadDword(key.get(), nullptr, CleanupPending, 0) && RecoveryDirectoryWasDeleted(key.get(), recoveryDirectory))
+            if (RecoveryDirectoryWasDeleted(key.get(), recoveryDirectory))
             {
                 DeleteKey(lxssKey, KeyName(entry.Id, true).c_str());
                 continue;
