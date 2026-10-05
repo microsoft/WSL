@@ -32,6 +32,7 @@ Abstract:
 #include <nlohmann/json.hpp>
 #include "Distribution.h"
 #include "DeletedDistributionStore.h"
+#include "ExecutionContext.h"
 #include "WslCoreConfigInterface.h"
 #include "WslCoreFilesystem.h"
 #include "CommandLine.h"
@@ -9214,7 +9215,8 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                 {
                     const auto session =
                         wil::CoCreateInstance<LxssUserSession, ILxssUserSession>(CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA);
-                    VERIFY_SUCCEEDED(session->UnregisterDistribution(&*retainedId, nullptr));
+                    wsl::windows::common::ClientExecutionContext context;
+                    VERIFY_SUCCEEDED(session->UnregisterDistribution(&*retainedId, context.OutError()));
                 }
                 else if (std::wstring_view(option) == L"--unregister")
                 {
@@ -9250,7 +9252,10 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_IS_TRUE(legacyId.has_value());
         const auto legacySession =
             wil::CoCreateInstance<LxssUserSession, ILxssUserSession>(CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA);
-        VERIFY_SUCCEEDED(legacySession->UnregisterDistribution(&*legacyId, nullptr));
+        {
+            wsl::windows::common::ClientExecutionContext context;
+            VERIFY_SUCCEEDED(legacySession->UnregisterDistribution(&*legacyId, context.OutError()));
+        }
         VERIFY_IS_FALSE(GetDistributionId(name.c_str()).has_value());
         VERIFY_IS_FALSE(std::filesystem::exists(install / (LxsstuVmMode() ? L"ext4.vhdx" : L"rootfs")));
         const auto legacyEntries = Store::Enumerate(userKey.get());
@@ -9568,7 +9573,11 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         const auto legacySession =
             wil::CoCreateInstance<LxssUserSession, ILxssUserSession>(CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA);
         wil::unique_cotaskmem_array_ptr<LXSS_ENUMERATE_INFO> legacyDistributions;
-        VERIFY_SUCCEEDED(legacySession->EnumerateDistributions(legacyDistributions.size_address<ULONG>(), &legacyDistributions, nullptr));
+        {
+            wsl::windows::common::ClientExecutionContext context;
+            VERIFY_SUCCEEDED(legacySession->EnumerateDistributions(
+                legacyDistributions.size_address<ULONG>(), &legacyDistributions, context.OutError()));
+        }
         const auto currentDistributions = wsl::windows::common::SvcComm{}.EnumerateDistributions();
         VERIFY_ARE_EQUAL(legacyDistributions.size(), currentDistributions.size());
         for (size_t index = 0; index < legacyDistributions.size(); ++index)
@@ -9577,7 +9586,10 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                 return IsEqualGUID(current.DistroGuid, legacyDistributions[index].DistroGuid);
             }));
         }
-        VERIFY_ARE_EQUAL(legacySession->CompactDistribution(&id, nullptr), WSL_E_DISTRO_NOT_FOUND);
+        {
+            wsl::windows::common::ClientExecutionContext context;
+            VERIFY_ARE_EQUAL(legacySession->CompactDistribution(&id, context.OutError()), WSL_E_DISTRO_NOT_FOUND);
+        }
 
         // A missing VHD in an accessible directory never risks a real distribution's files.
         auto registerDistro = [&](const std::wstring& name) {
