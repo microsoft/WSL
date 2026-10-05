@@ -2622,8 +2622,10 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid, boo
             }
             catch (...)
             {
-                // A timer may have finished the journal's key rename after force lookup.
-                if (!Permanent || wil::ResultFromCaughtException() != HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND))
+                // A retained distribution has no active key; a timer may also have
+                // finished the journal's key rename after force lookup. Open maps
+                // the missing registry key to the public distribution-not-found error.
+                if (!Permanent || wil::ResultFromCaughtException() != WSL_E_DISTRO_NOT_FOUND)
                 {
                     throw;
                 }
