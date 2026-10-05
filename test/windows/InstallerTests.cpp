@@ -1425,7 +1425,9 @@ class InstallerTests
         // wsl.exe itself) until reboot, which is an MSI/environment characteristic outside
         // this feature's control rather than a regression in the reboot-required warning
         // logic above (which is the behavior this test is primarily validating).
-        std::wstring versionCmd = wsl::windows::common::wslutil::GetMsiPackagePath().value_or(L"") + L"\\wsl.exe --version";
+        auto msiPackagePath = wsl::windows::common::wslutil::GetMsiPackagePath();
+        VERIFY_IS_TRUE(msiPackagePath.has_value());
+        std::wstring versionCmd = L"\"" + msiPackagePath.value() + L"\\wsl.exe\" --version";
         std::wstring versionOutput;
         int versionExitCode = -1;
         auto tryVersionCommand = [&]() {

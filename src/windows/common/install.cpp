@@ -270,8 +270,9 @@ void wsl::windows::common::install::ClearRebootRequiredMarker()
 {
     // Best-effort. registry::DeleteKey treats ERROR_FILE_NOT_FOUND as a no-op,
     // so this is safe to call on any successful install path even if no marker
-    // was previously set.
-    const auto lxssKey = OpenLxssMachineKey(KEY_WRITE);
+    // was previously set. DeleteKey uses RegDeleteTreeW, which requires DELETE
+    // access on the handle; KEY_WRITE alone does not grant that.
+    const auto lxssKey = OpenLxssMachineKey(KEY_WRITE | DELETE);
     wsl::windows::common::registry::DeleteKey(lxssKey.get(), c_rebootPendingSubkey);
 }
 
