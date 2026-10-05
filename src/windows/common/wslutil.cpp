@@ -1309,6 +1309,28 @@ std::string wsl::windows::common::wslutil::RepositoryReference::GetCanonical() c
     return std::format("{}/{}", Server, Path);
 }
 
+std::string wsl::windows::common::wslutil::RepositoryReference::GetFamiliar() const
+{
+    // See: https://github.com/distribution/reference/blob/ff14fafe2236e51c2894ac07d4bdfc778e96d682/normalize.go#L179
+
+    constexpr auto defaultDomain = "docker.io";
+    constexpr std::string_view officialPrefix = "library/";
+
+    if (Server != defaultDomain)
+    {
+        return GetCanonical();
+    }
+
+    // Only a single-component official repository drops its prefix, so "library/a/b" stays as is.
+    const std::string_view path{Path};
+    if (path.starts_with(officialPrefix) && path.find('/', officialPrefix.size()) == std::string_view::npos)
+    {
+        return std::string{path.substr(officialPrefix.size())};
+    }
+
+    return Path;
+}
+
 std::pair<wil::unique_hfile, wil::unique_hfile> wsl::windows::common::wslutil::OpenAnonymousPipe(DWORD Size, bool ReadPipeOverlapped, bool WritePipeOverlapped)
 {
     // Default to 4096 byte buffer, just like CreatePipe().

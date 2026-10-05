@@ -7569,7 +7569,7 @@ class WSLCTests
 
     WSLC_TEST_METHOD(EventStreamRejectsUnsupportedFilterKeys)
     {
-        for (const auto* key : {"unsupported", "label", "Type", ""})
+        for (const auto* key : {"unsupported", "Type", ""})
         {
             WSLCFilter filters[]{{"type", "network"}, {key, "test"}};
             wil::com_ptr<IWSLCEventStream> stream;
@@ -7582,6 +7582,75 @@ class WSLCTests
         wil::com_ptr<IWSLCEventStream> stream;
         VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, 1, &filter, 1, &stream));
         VERIFY_IS_TRUE(DrainEventStream(stream.get()).empty());
+    }
+
+    WSLC_TEST_METHOD(EventStreamFilters)
+    {
+        constexpr auto c_containerName = "wslc-test-event-filters";
+
+        // The image is recorded exactly as given, so a full registry path shows that filter values aren't normalized.
+        WSLCContainerLauncher launcher("docker.io/library/debian:latest", c_containerName, {"sleep", "99999"});
+        launcher.AddLabel("role", "web");
+        launcher.AddLabel("expression", "a=b");
+        auto container = launcher.Launch(*m_defaultSession);
+        const auto id = container.Id();
+        const auto idPrefix = id.substr(0, 12);
+
+        // Wait for the create event, then bound every query to its second.
+        auto stream = OpenEventStream({{"container", id.c_str()}, {"event", "create"}});
+        const LONGLONG since = ReadEvents(stream.get(), 1)[0].timeNano / 1'000'000'000;
+
+        // Every query is narrowed to container create events, so a match returns only those events' container ids.
+        auto matchingIds = [&](std::vector<WSLCFilter> filters) {
+            filters.insert(filters.end(), {{"type", "container"}, {"event", "create"}});
+            wil::com_ptr<IWSLCEventStream> replayStream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, since + 1, filters.data(), static_cast<ULONG>(filters.size()), &replayStream));
+
+            std::vector<std::string> ids;
+            std::ranges::transform(
+                DrainEventStream(replayStream.get()), std::back_inserter(ids), [](const auto& event) { return event.Actor.ID; });
+            return wsl::shared::string::Join(ids, ',');
+        };
+
+        // Other containers may have been created in the same second, so image and label queries also require this container's id.
+        auto matchingThisContainer = [&](std::vector<WSLCFilter> filters) {
+            filters.push_back({"container", id.c_str()});
+            return matchingIds(std::move(filters));
+        };
+
+        const std::string none;
+
+        // A container matches by its full id, an id prefix or a name prefix. Repeated values are OR'd.
+        VERIFY_ARE_EQUAL(id, matchingIds({{"container", id.c_str()}}));
+        VERIFY_ARE_EQUAL(id, matchingIds({{"container", idPrefix.c_str()}}));
+        VERIFY_ARE_EQUAL(id, matchingIds({{"container", "wslc-test-event-fil"}}));
+        VERIFY_ARE_EQUAL(none, matchingIds({{"container", "event-filters"}}));
+        VERIFY_ARE_EQUAL(id, matchingIds({{"container", "event-filters"}, {"container", idPrefix.c_str()}}));
+
+        // The recorded image matches exactly or by its familiar name, while the filter value is compared as written.
+        // Repeated values are OR'd.
+        VERIFY_ARE_EQUAL(id, matchingThisContainer({{"image", "docker.io/library/debian:latest"}}));
+        VERIFY_ARE_EQUAL(id, matchingThisContainer({{"image", "debian"}}));
+        VERIFY_ARE_EQUAL(none, matchingThisContainer({{"image", "debian:latest"}}));
+        VERIFY_ARE_EQUAL(none, matchingThisContainer({{"image", "docker.io/library/debian"}}));
+        VERIFY_ARE_EQUAL(none, matchingThisContainer({{"image", "Debian"}}));
+        VERIFY_ARE_EQUAL(id, matchingThisContainer({{"image", "debian:latest"}, {"image", "debian"}}));
+
+        // A label filter requires the key, and the value when one is given. Only the first '=' separates the two.
+        VERIFY_ARE_EQUAL(id, matchingThisContainer({{"label", "role"}}));
+        VERIFY_ARE_EQUAL(id, matchingThisContainer({{"label", "role=web"}}));
+        VERIFY_ARE_EQUAL(id, matchingThisContainer({{"label", "expression=a=b"}}));
+        VERIFY_ARE_EQUAL(none, matchingThisContainer({{"label", "role=db"}}));
+        VERIFY_ARE_EQUAL(none, matchingThisContainer({{"label", "role="}}));
+        VERIFY_ARE_EQUAL(none, matchingThisContainer({{"label", "missing"}}));
+
+        // Unlike other keys, every label value must match.
+        VERIFY_ARE_EQUAL(id, matchingThisContainer({{"label", "role=web"}, {"label", "expression=a=b"}}));
+        VERIFY_ARE_EQUAL(none, matchingThisContainer({{"label", "role=web"}, {"label", "missing"}}));
+
+        // Distinct keys are AND'd.
+        VERIFY_ARE_EQUAL(id, matchingIds({{"container", "wslc-test-event-fil"}, {"image", "debian"}, {"label", "role=web"}}));
+        VERIFY_ARE_EQUAL(none, matchingIds({{"container", "wslc-test-event-fil"}, {"image", "debian"}, {"label", "role=db"}}));
     }
 
     WSLC_TEST_METHOD(NetworkEventStream)
@@ -14493,6 +14562,29 @@ class WSLCTests
         Validate(
             "ubuntu:22.04@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
             "docker.io/library/ubuntu:22.04@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
+    }
+
+    TEST_METHOD(FamiliarImageReference)
+    {
+        auto Validate = [](const std::string& input, const std::string& expected) {
+            VERIFY_ARE_EQUAL(ImageReference::Parse(input).Repository.GetFamiliar(), expected);
+        };
+
+        // Docker Hub references drop the default registry and the official "library/" prefix, along with any tag or digest.
+        Validate("ubuntu", "ubuntu");
+        Validate("ubuntu:22.04", "ubuntu");
+        Validate("docker.io/ubuntu:22.04", "ubuntu");
+        Validate("docker.io/library/ubuntu", "ubuntu");
+        Validate("index.docker.io/library/ubuntu:22.04", "ubuntu");
+        Validate("ubuntu@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30", "ubuntu");
+
+        // Other Docker Hub namespaces keep their path, as does a nested path under "library/".
+        Validate("someorg/ubuntu:22.04", "someorg/ubuntu");
+        Validate("docker.io/library/foo/bar", "library/foo/bar");
+
+        // Custom registries keep their domain and path.
+        Validate("ghcr.io/owner/repo:sha-abc123", "ghcr.io/owner/repo");
+        Validate("localhost:5000/myimage:latest", "localhost:5000/myimage");
     }
 
     WSLC_TEST_METHOD(ElevatedTokenCanOpenNonElevatedHandles)

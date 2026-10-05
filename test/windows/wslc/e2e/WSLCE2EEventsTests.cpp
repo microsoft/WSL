@@ -476,12 +476,69 @@ class WSLCE2EEventsTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Events_FilteredReplayAndLiveOutput)
+    {
+        // A per-run label value keeps events from an earlier run of this test out of the stream.
+        GUID runId{};
+        VERIFY_SUCCEEDED(CoCreateGuid(&runId));
+        const auto label =
+            L"wslc.events.filter=" + wsl::shared::string::GuidToString<wchar_t>(runId, wsl::shared::string::GuidToStringFlags::None);
+
+        const auto since = EpochSeconds();
+        auto result = RunWslc(
+            std::format(L"container create --name {} --label {} {} sleep 60", c_eventContainerName, label, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto containerId = result.GetStdoutOneLine();
+
+        // The container is selected by a prefix of its name, its image without the tag, and its label.
+        auto events = RunWslcInteractive(
+            std::format(
+                L"events --since {} --filter container=wslc-events-te --filter image={} --filter label={} "
+                L"--filter event=create --filter event=start",
+                since,
+                DebianImage.Name,
+                label),
+            ElevationType::Elevated,
+            std::nullopt,
+            ProcessGroup::Create);
+
+        auto stopReader = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            if (events.IsRunning())
+            {
+                events.SendCtrlBreak();
+            }
+        });
+
+        const auto expectedEvent = [&](std::wstring_view action) {
+            return std::format(L" container {} {} (image={}, name={}, {})", action, containerId, DebianImage.NameAndTag(), c_eventContainerName, label);
+        };
+
+        // The create event was recorded before the stream opened, so it's replayed.
+        const auto createEvent = expectedEvent(L"create");
+        WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(createEvent));
+
+        // The start event happens after the stream opened, so it's delivered live.
+        RunWslc(std::format(L"container start {}", containerId)).Verify({.Stderr = L"", .ExitCode = 0});
+        const auto startEvent = expectedEvent(L"start");
+        WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(startEvent));
+
+        stopReader.reset();
+        VERIFY_ARE_EQUAL(0, events.Wait());
+        events.VerifyNoErrors();
+
+        const WSLCExecutionResult output{.Stdout = wsl::shared::string::MultiByteToWide(events.GetStdoutData())};
+        const auto lines = output.GetStdoutLines();
+        VERIFY_ARE_EQUAL(2u, lines.size());
+        VerifyEventLine(lines[0], createEvent);
+        VerifyEventLine(lines[1], startEvent);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Events_RejectsUnsupportedFilter)
     {
         auto session = OpenDefaultElevatedSession();
         for (const auto* command : {L"events", L"system events"})
         {
-            for (const auto* key : {L"unsupported", L"label", L""})
+            for (const auto* key : {L"unsupported", L""})
             {
                 const auto result = RunWslc(std::format(L"{} --filter {}=test", command, key));
                 result.Verify({.Stdout = L"", .ExitCode = 1});
