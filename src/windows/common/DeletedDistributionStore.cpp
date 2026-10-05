@@ -143,7 +143,7 @@ bool DirectoryWasDeleted(HKEY key, const std::filesystem::path& directory, LPCWS
     // Validate lookup support with a known live identity before interpreting
     // a stale NTFS file ID, which reports ERROR_INVALID_PARAMETER after deletion.
     const auto control = openById(anchorId);
-    THROW_IF_WIN32_BOOL_FALSE(!!control);
+    THROW_LAST_ERROR_IF(!control);
     const auto original = openById(expected);
     if (original)
     {
