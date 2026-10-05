@@ -8150,7 +8150,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             {
                 // Deny the write access required to move a file back into its original directory.
                 directoryLock.reset(CreateFileW(
-                    path.parent_path().c_str(), FILE_READ_ATTRIBUTES, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr));
+                    path.parent_path().c_str(), FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr));
                 VERIFY_IS_TRUE(!!directoryLock);
             }
             VERIFY_FAILED(wil::ResultFromException([&] { Store::Retain(key.get(), id, path); }));

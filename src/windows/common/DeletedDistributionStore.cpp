@@ -225,7 +225,10 @@ bool DeletedDistributionStore::Retain(HKEY lxssKey, const GUID& id, const std::f
 {
     // Reject a redirected install directory and keep it locked against replacement.
     // Resolve ancestor aliases once, then open the disk through this verified parent.
-    const auto sourceDirectory = OpenDirectory(vhdPath.parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE, false, FILE_READ_ATTRIBUTES);
+    // Attribute-only opens do not enforce share access; include directory-list
+    // access so denying delete sharing prevents a concurrent replacement.
+    const auto sourceDirectory =
+        OpenDirectory(vhdPath.parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE, false, FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES);
     std::wstring resolvedDirectory;
     THROW_IF_FAILED(wil::GetFinalPathNameByHandleW(sourceDirectory.get(), resolvedDirectory));
     const auto originalPath = std::filesystem::path(resolvedDirectory) / vhdPath.filename();
