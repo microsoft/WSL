@@ -5884,22 +5884,29 @@ class ConsommeTests
         auto tcpPort = NetworkTests::BindGuestPort(L"TCP4-LISTEN:2345", true);
     }
 
+    static auto SetTestEphemeralPortRange()
+    {
+        auto [originalRange, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range", 0);
+        originalRange = wsl::shared::string::Trim(originalRange);
+
+        auto revert = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [originalRange = std::move(originalRange)] {
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"echo '{}' > /proc/sys/net/ipv4/ip_local_port_range", originalRange)), 0);
+        });
+
+        // Keep anonymous guest binds out of the host's ephemeral port range, where an existing host bind
+        // would prevent consomme from forwarding the selected port.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"echo '1234 1239' > /proc/sys/net/ipv4/ip_local_port_range"), 0);
+
+        return revert;
+    }
+
     WSL2_TEST_METHOD(PortZeroBindIsTracked)
     {
         CONSOMME_TEST_ONLY();
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
 
-        auto [originalRange, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range", 0);
-        originalRange = wsl::shared::string::Trim(originalRange);
-
-        auto revert = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&originalRange] {
-            LxsstuLaunchWsl(std::format(L"echo '{}' > /proc/sys/net/ipv4/ip_local_port_range", originalRange));
-        });
-
-        // Keep anonymous guest binds out of the host's ephemeral port range, where an existing host bind
-        // would prevent consomme from forwarding the selected port.
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"echo '1234 1239' > /proc/sys/net/ipv4/ip_local_port_range"), 0);
+        auto revertEphemeralPortRange = SetTestEphemeralPortRange();
 
         NetworkTests::VerifyPortZeroBindIsTracked();
 
@@ -5912,6 +5919,8 @@ class ConsommeTests
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
 
+        auto revertEphemeralPortRange = SetTestEphemeralPortRange();
+
         NetworkTests::VerifyListenWithoutBindIsTracked();
     }
 
@@ -5920,6 +5929,8 @@ class ConsommeTests
         CONSOMME_TEST_ONLY();
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+
+        auto revertEphemeralPortRange = SetTestEphemeralPortRange();
 
         NetworkTests::VerifyPortZeroRebindSucceeds();
     }
