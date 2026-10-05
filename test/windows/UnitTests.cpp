@@ -8669,6 +8669,54 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             VERIFY_ARE_EQUAL(contents(entryFor(id).Path), "original disk contents");
             Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
         }
+        // A moved disk cannot commit an unregister with a missing, damaged, or replaced directory identity.
+        for (const auto scenario : {L"missing", L"damaged", L"replaced"})
+        {
+            const auto [id, path] = create();
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            const auto deletedName = L"Deleted-" + keyName(id);
+            VERIFY_ARE_EQUAL(RegRenameKey(key.get(), deletedName.c_str(), keyName(id).c_str()), ERROR_SUCCESS);
+            const auto journal = registry::OpenKey(key.get(), keyName(id).c_str(), KEY_READ | KEY_WRITE);
+            FILE_ID_INFO identity{};
+            DWORD size = sizeof(identity);
+            VERIFY_ARE_EQUAL(RegGetValueW(journal.get(), nullptr, L"RecoveryDirectoryId", RRF_RT_REG_BINARY, nullptr, &identity, &size), ERROR_SUCCESS);
+            const auto recoveryDirectory = entry.Path.parent_path();
+            const auto saved = directory / L"moved-original-directory";
+            if (std::wstring_view{scenario} == L"missing")
+            {
+                registry::DeleteValue(journal.get(), L"RecoveryDirectoryId");
+            }
+            else if (std::wstring_view{scenario} == L"damaged")
+            {
+                registry::WriteDword(journal.get(), nullptr, L"RecoveryDirectoryId", 0);
+            }
+            else
+            {
+                std::filesystem::rename(recoveryDirectory, saved);
+                std::filesystem::create_directory(recoveryDirectory);
+                std::filesystem::rename(saved / entry.Path.filename(), entry.Path);
+            }
+            Store::RecoverPending(key.get());
+            VERIFY_SUCCEEDED(registry::OpenKeyNoThrow(key.get(), keyName(id).c_str(), KEY_READ).second);
+            VERIFY_FAILED(registry::OpenKeyNoThrow(key.get(), deletedName.c_str(), KEY_READ).second);
+            VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
+            VERIFY_ARE_EQUAL(registry::ReadString(journal.get(), nullptr, L"RecoveryPath"), entry.Path.wstring());
+            if (std::wstring_view{scenario} == L"replaced")
+            {
+                std::filesystem::rename(entry.Path, saved / entry.Path.filename());
+                std::filesystem::remove(recoveryDirectory);
+                std::filesystem::rename(saved, recoveryDirectory);
+            }
+            VERIFY_ARE_EQUAL(
+                RegSetValueExW(journal.get(), L"RecoveryDirectoryId", 0, REG_BINARY, reinterpret_cast<const BYTE*>(&identity), sizeof(identity)),
+                ERROR_SUCCESS);
+            Store::RecoverPending(key.get());
+            VERIFY_FAILED(registry::OpenKeyNoThrow(key.get(), keyName(id).c_str(), KEY_READ).second);
+            VERIFY_SUCCEEDED(registry::OpenKeyNoThrow(key.get(), deletedName.c_str(), KEY_READ).second);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
+            VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
+        }
         // An unmoved journal is cleared only after removing the original empty recovery directory.
         for (const auto scenario : {L"empty", L"nonempty", L"replaced", L"removed"})
         {

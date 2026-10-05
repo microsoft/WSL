@@ -697,6 +697,8 @@ try
             auto file = OpenDisk(*path);
             if (file)
             {
+                const auto directory = OpenDirectory(std::filesystem::path(*path).parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE);
+                VerifyIdentity(key.get(), directory.get(), c_recoveryDirectoryId);
                 VerifyIdentity(key.get(), file.get());
                 WriteDword(key.get(), nullptr, L"State", LxssDistributionStateDeleted);
                 THROW_IF_WIN32_ERROR(RegRenameKey(lxssKey, name.c_str(), KeyName(id, true).c_str()));
