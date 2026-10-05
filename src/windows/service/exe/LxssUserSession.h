@@ -114,7 +114,7 @@ public:
         _Out_ LXSS_ERROR_INFO* Error) override;
 
     /// <summary>
-    /// Enumerates all registered distributions.
+    /// Enumerates registered distributions, or retained distributions when Deleted is TRUE.
     /// </summary>
     IFACEMETHOD(EnumerateDistributions)(
         _In_ BOOL Deleted, _Out_ PULONG DistributionCount, _Out_ LXSS_ENUMERATE_INFO** Distributions, _Out_ LXSS_ERROR_INFO* Error) override;
