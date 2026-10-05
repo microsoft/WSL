@@ -7260,7 +7260,7 @@ class WSLCTests
                 VERIFY_ARE_EQUAL(c_labelValue, event.Actor.Attributes.at(c_labelKey));
                 VERIFY_IS_FALSE(event.Actor.Attributes.contains("com.microsoft.wsl.container.metadata"));
 
-                if (action == "stop")
+                if (action == "die")
                 {
                     VERIFY_ARE_EQUAL(expectedExitCode, event.Actor.Attributes.at("exitCode"));
                 }
@@ -7268,10 +7268,18 @@ class WSLCTests
                 {
                     VERIFY_IS_FALSE(event.Actor.Attributes.contains("exitCode"));
                 }
+
+                VERIFY_ARE_EQUAL(action == "kill", event.Actor.Attributes.contains("signal"));
+                if (action == "kill")
+                {
+                    VERIFY_ARE_EQUAL(std::to_string(WSLCSignalSIGKILL), event.Actor.Attributes.at("signal"));
+                }
+
+                VERIFY_ARE_EQUAL(action == "die", event.Actor.Attributes.contains("execDuration"));
             }
         };
 
-        // Run a container through its create/start/kill/stop lifecycle inside a bounded time window.
+        // Run a container through its create/start/kill/die lifecycle inside a bounded time window.
         const LONGLONG since = now();
         std::string id;
         {
@@ -7290,7 +7298,7 @@ class WSLCTests
         const LONGLONG until = now() + 1;
         std::vector<wsl::windows::common::wslc_schema::Event> lifecycleEvents;
 
-        // The container's create, start, kill, stop, then destroy events are reported in order, each carrying
+        // The container's create, start, kill, die, then destroy events are reported in order, each carrying
         // the container's 64-hex id as the actor.
         {
             WSLCFilter filter{"container", id.c_str()};
@@ -7298,37 +7306,46 @@ class WSLCTests
             VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, &filter, 1, &stream));
 
             lifecycleEvents = DrainEventStream(stream.get());
-            verifyEvents(lifecycleEvents, id, {"create", "start", "kill", "stop", "destroy"});
+            verifyEvents(lifecycleEvents, id, {"create", "start", "kill", "die", "destroy"});
 
             // The whole lifecycle falls inside the requested window.
             VERIFY_IS_TRUE(lifecycleEvents[0].timeNano / 1'000'000'000 >= since);
             VERIFY_IS_TRUE(lifecycleEvents[4].timeNano / 1'000'000'000 < until);
 
             // Each event keeps the exact time Docker reported for it.
-            // WSLC records Docker's 'die' as 'stop'; Docker also emits unrecorded events such as 'attach'.
-            auto dockerEvents = ExpectCommandResult(
-                m_defaultSession.get(),
-                {"/usr/bin/docker",
-                 "events",
-                 "--since",
-                 std::to_string(lifecycleEvents.front().timeNano / 1'000'000'000),
-                 "--until",
-                 std::to_string(lifecycleEvents.back().timeNano / 1'000'000'000 + 1),
-                 "--filter",
-                 "type=container",
-                 "--filter",
-                 "container=" + id,
-                 "--format",
-                 "{{.Action}} {{.TimeNano}}"},
-                0);
+            // Docker also emits container events that aren't recorded, such as 'attach'.
+            const auto dockerEvents = [&](const std::string& format, std::initializer_list<std::string> extraFilters = {}) {
+                std::vector<std::string> command{
+                    "/usr/bin/docker",
+                    "events",
+                    "--since",
+                    std::to_string(lifecycleEvents.front().timeNano / 1'000'000'000),
+                    "--until",
+                    std::to_string(lifecycleEvents.back().timeNano / 1'000'000'000 + 1),
+                    "--filter",
+                    "type=container",
+                    "--filter",
+                    "container=" + id,
+                    "--format",
+                    format};
 
-            const auto dockerLines = wsl::shared::string::Split(dockerEvents.Output[1], '\n');
+                for (const auto& filter : extraFilters)
+                {
+                    command.insert(command.end(), {"--filter", filter});
+                }
+
+                return ExpectCommandResult(m_defaultSession.get(), command, 0);
+            };
+
+            const auto dockerLines = wsl::shared::string::Split(dockerEvents("{{.Action}} {{.TimeNano}}").Output[1], '\n');
             for (const auto& event : lifecycleEvents)
             {
-                const auto dockerAction = event.Action == "stop" ? std::string{"die"} : event.Action;
-                const auto expected = std::format("{} {}", dockerAction, event.timeNano);
+                const auto expected = std::format("{} {}", event.Action, event.timeNano);
                 VERIFY_IS_TRUE(std::ranges::find(dockerLines, expected) != dockerLines.end());
             }
+
+            const auto dockerExecDuration = dockerEvents(R"({{index .Actor.Attributes "execDuration"}})", {"event=die"}).Output[1];
+            VERIFY_ARE_EQUAL(std::format("{}\n", lifecycleEvents[3].Actor.Attributes.at("execDuration")), dockerExecDuration);
         }
 
         // Each lifecycle action is independently selectable: an 'event=<action>' filter, AND'd with
@@ -7344,7 +7361,7 @@ class WSLCTests
         verifyEventFilter("create");
         verifyEventFilter("start");
         verifyEventFilter("kill");
-        verifyEventFilter("stop");
+        verifyEventFilter("die");
         verifyEventFilter("destroy");
 
         // Image filters match the image attribute carried by container events.
@@ -7353,7 +7370,7 @@ class WSLCTests
             wil::com_ptr<IWSLCEventStream> stream;
             VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, filters, ARRAYSIZE(filters), &stream));
 
-            verifyEvents(DrainEventStream(stream.get()), id, {"create", "start", "kill", "stop", "destroy"});
+            verifyEvents(DrainEventStream(stream.get()), id, {"create", "start", "kill", "die", "destroy"});
         }
 
         // A non-matching image excludes the same container's events.
@@ -7408,7 +7425,7 @@ class WSLCTests
             FILETIME dueTime = wil::filetime::from_int64(-wil::filetime_duration::one_second * 60);
             SetThreadpoolTimer(timeout.get(), &dueTime, 0, 0);
 
-            verifyEvents(ReadEvents(stream.get(), 5, timedOut.get()), id, {"create", "start", "kill", "stop", "destroy"});
+            verifyEvents(ReadEvents(stream.get(), 5, timedOut.get()), id, {"create", "start", "kill", "die", "destroy"});
         }
 
         // A since-time later than a non-zero until-time describes a backwards window and is rejected.
@@ -7417,6 +7434,137 @@ class WSLCTests
             VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->GetEvents(since + 1, since, nullptr, 0, &stream));
             ValidateCOMErrorMessage(wsl::shared::Localization::MessageWslcEventsInvalidTimeWindow(since + 1, since));
         }
+    }
+
+    WSLC_TEST_METHOD(EventStreamRecordsDieAndStop)
+    {
+        WSLCContainerLauncher launcher("debian:latest", "wslc-test-event-die-stop", {"sleep", "99999"});
+        auto container = launcher.Launch(*m_defaultSession);
+        const auto id = container.Id();
+
+        auto stream = OpenEventStream({{"container", id.c_str()}, {"event", "die"}, {"event", "stop"}});
+
+        // Stopping, unlike killing, makes Docker report its own 'stop' event, which WSLC publishes once the container has exited.
+        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+
+        const auto events = ReadEvents(stream.get(), 2);
+
+        VERIFY_ARE_EQUAL(std::string{"die"}, events[0].Action);
+        VERIFY_ARE_EQUAL(std::to_string(128 + WSLCSignalSIGKILL), events[0].Actor.Attributes.at("exitCode"));
+        VERIFY_ARE_EQUAL(std::string{"stop"}, events[1].Action);
+        VERIFY_IS_FALSE(events[1].Actor.Attributes.contains("exitCode"));
+        VERIFY_IS_TRUE(events[1].timeNano >= events[0].timeNano);
+    }
+
+    WSLC_TEST_METHOD(EventStreamRecordsOneStopPerStop)
+    {
+        WSLCContainerLauncher launcher("debian:latest", "wslc-test-event-one-stop", {"sleep", "99999"});
+        auto container = launcher.Launch(*m_defaultSession);
+        const auto id = container.Id();
+
+        auto now = [] { return duration_cast<seconds>(system_clock::now().time_since_epoch()).count(); };
+        const LONGLONG since = now();
+
+        // The second run ends with a kill, so a 'stop' from the first run must not carry over into it.
+        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+        VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+        VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
+
+        WSLCFilter filters[]{{"container", id.c_str()}, {"event", "die"}, {"event", "stop"}};
+        wil::com_ptr<IWSLCEventStream> stream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, now() + 1, filters, ARRAYSIZE(filters), &stream));
+
+        std::vector<std::string> actions;
+        std::ranges::transform(DrainEventStream(stream.get()), std::back_inserter(actions), &wsl::windows::common::wslc_schema::Event::Action);
+        VERIFY_ARE_EQUAL(std::string{"die,stop,die"}, wsl::shared::string::Join(actions, ','));
+    }
+
+    WSLC_TEST_METHOD(EventStreamStopNotObservedWhileRunning)
+    {
+        // Docker can report 'stop' before 'die', so repeat to give that ordering a chance to occur.
+        for (int iteration = 0; iteration < 20; ++iteration)
+        {
+            WSLCContainerLauncher launcher("debian:latest", "wslc-test-event-stop-state", {"sleep", "99999"});
+            auto container = launcher.Launch(*m_defaultSession);
+            const auto id = container.Id();
+
+            auto stream = OpenEventStream({{"container", id.c_str()}, {"event", "stop"}});
+            auto stopResult = std::async(std::launch::async, [&]() {
+                return RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "stop", "-t", "0", id});
+            });
+
+            ReadEvents(stream.get(), 1);
+            VERIFY_ARE_NOT_EQUAL(container.State(), WslcContainerStateRunning);
+            VERIFY_ARE_EQUAL(0, stopResult.get().Code);
+        }
+    }
+
+    WSLC_TEST_METHOD(EventStreamRecordsStopForAutoRemoveContainer)
+    {
+        WSLCContainerLauncher launcher("debian:latest", "wslc-test-event-rm-stop", {"sleep", "99999"});
+        launcher.SetContainerFlags(WSLCContainerFlagsRm);
+        auto container = launcher.Launch(*m_defaultSession);
+        const auto id = container.Id();
+
+        auto stream = OpenEventStream({{"container", id.c_str()}, {"event", "die"}, {"event", "stop"}});
+
+        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateDeleted);
+
+        // Purge the auto-removed container so its own event registration is released before reading the recorded events.
+        wil::com_ptr<IWSLCContainer> openedContainer;
+        VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(id.c_str(), &openedContainer), WSLC_E_CONTAINER_NOT_FOUND);
+
+        auto events = ReadEvents(stream.get(), 2);
+        VERIFY_ARE_EQUAL(std::string{"die"}, events[0].Action);
+        VERIFY_ARE_EQUAL(std::to_string(128 + WSLCSignalSIGKILL), events[0].Actor.Attributes.at("exitCode"));
+        VERIFY_ARE_EQUAL(std::string{"stop"}, events[1].Action);
+        VERIFY_IS_FALSE(events[1].Actor.Attributes.contains("exitCode"));
+        VERIFY_IS_TRUE(events[1].timeNano >= events[0].timeNano);
+    }
+
+    WSLC_TEST_METHOD(EventStreamReportsRequestedImageForPublishAllContainer)
+    {
+        constexpr auto c_imageName = "debian:latest";
+
+        // Publish-all creates the container from the resolved image ID, which Docker then reports as the image.
+        WSLCContainerLauncher launcher(c_imageName, "wslc-test-event-publish-all", {"sleep", "99999"}, {}, "bridge");
+        launcher.SetContainerFlags(WSLCContainerFlagsPublishAll);
+        auto container = launcher.Launch(*m_defaultSession);
+        const auto id = container.Id();
+
+        auto stream = OpenEventStream({{"container", id.c_str()}, {"event", "kill"}});
+        VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
+
+        const auto events = ReadEvents(stream.get(), 1);
+        VERIFY_ARE_EQUAL(c_imageName, events[0].Actor.Attributes.at("image"));
+        VERIFY_ARE_EQUAL(std::to_string(WSLCSignalSIGKILL), events[0].Actor.Attributes.at("signal"));
+        VERIFY_IS_FALSE(events[0].Actor.Attributes.contains("com.microsoft.wsl.container.metadata"));
+    }
+
+    WSLC_TEST_METHOD(EventStreamIgnoresContainersNotCreatedByWslc)
+    {
+        WSLCContainerLauncher launcher("debian:latest", "wslc-test-event-marker", {"sleep", "99999"});
+        auto marker = launcher.Launch(*m_defaultSession);
+        const auto markerId = marker.Id();
+
+        auto runResult = ExpectCommandResult(
+            m_defaultSession.get(), {"/usr/bin/docker", "run", "-d", "--rm", "debian:latest", "sleep", "99999"}, 0);
+        auto externalId = runResult.Output[1];
+        while (!externalId.empty() && (externalId.back() == '\n' || externalId.back() == '\r'))
+        {
+            externalId.pop_back();
+        }
+
+        auto cleanup = wil::scope_exit([&]() { RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "rm", "-f", externalId}); });
+
+        auto stream = OpenEventStream({{"container", externalId.c_str()}, {"container", markerId.c_str()}, {"event", "kill"}});
+        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "kill", externalId}, 0);
+
+        // Docker delivers events in order, so the marker's kill can only be first if the external one was dropped.
+        VERIFY_SUCCEEDED(marker.Get().Kill(WSLCSignalSIGKILL));
+        const auto events = ReadEvents(stream.get(), 1);
+        VERIFY_ARE_EQUAL(markerId, events[0].Actor.ID);
     }
 
     WSLC_TEST_METHOD(EventStreamRejectsUnsupportedFilterKeys)
@@ -12297,6 +12445,35 @@ class WSLCTests
             // Verify container is no longer accessible
             wil::com_ptr<IWSLCContainer> notFound;
             VERIFY_ARE_EQUAL(session->OpenContainer(containerName.c_str(), &notFound), WSLC_E_CONTAINER_NOT_FOUND);
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerRecoveryKeepsRequestedImage)
+    {
+        auto restore = ResetTestSession(); // Required to access the storage folder.
+
+        constexpr auto c_imageName = "debian:latest";
+        const std::string containerName = "test-container-recovered-image";
+
+        // Publish-all creates the container from the resolved image ID, which Docker then reports as the image.
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(L"recovery-image-test", true));
+
+            WSLCContainerLauncher launcher(c_imageName, containerName.c_str(), {"sleep", "9999"}, {}, "bridge");
+            launcher.SetContainerFlags(WSLCContainerFlagsPublishAll);
+
+            auto container = launcher.Launch(*session);
+            container.SetDeleteOnClose(false);
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+        }
+
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(L"recovery-image-test", true));
+
+            auto container = OpenContainer(session.get(), containerName);
+            VERIFY_ARE_EQUAL(c_imageName, container.Inspect().Config.Image);
+
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
         }
     }
 
