@@ -332,6 +332,8 @@ void DeletedDistributionStore::Restore(HKEY lxssKey, const Entry& distribution, 
 {
     const auto key = OpenKey(lxssKey, KeyName(distribution.Id, true).c_str(), KEY_READ | KEY_WRITE);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED), ReadDword(key.get(), nullptr, PermanentDelete, 0) != 0);
+    const auto directory = OpenDirectory(distribution.Path.parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE);
+    VerifyIdentity(key.get(), directory.get(), RecoveryDirectoryId);
     auto file = OpenDisk(distribution.Path);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), !file);
     VerifyIdentity(key.get(), file.get());
@@ -416,9 +418,12 @@ try
             if (pendingRestore || ReadDword(key.get(), nullptr, Restored, 0))
             {
                 const auto path = ReadOptionalString(key.get(), nullptr, RecoveryPath);
+                wil::unique_hfile directory;
                 wil::unique_hfile file;
                 if (path)
                 {
+                    directory = OpenDirectory(std::filesystem::path(*path).parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE);
+                    VerifyIdentity(key.get(), directory.get(), RecoveryDirectoryId);
                     file = OpenDisk(*path);
                     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), !file);
                     VerifyIdentity(key.get(), file.get());
@@ -430,8 +435,8 @@ try
                         name.starts_with(DeletedPrefix) ||
                             ReadDword(key.get(), nullptr, L"State", LxssDistributionStateInvalid) != LxssDistributionStateInstalled);
                 }
-                // Keep the verified disk handle open through registration and
-                // journal updates so the file cannot be replaced during recovery.
+                // Keep the verified directory and disk handles open through
+                // registration and journal updates so neither can be replaced.
                 // Clearing the restore journal may have been interrupted after the
                 // registration and default selection were durably committed.
                 if (!path)

@@ -7864,6 +7864,93 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             VERIFY_IS_FALSE(std::filesystem::exists(parent));
             VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
         }
+        // Restore rejects replacement parents even when they expose the original disk identity.
+        for (const int stage : {0, 1, 2}) // Direct, pending, and committed restore.
+        {
+            for (const bool renamed : {false, true})
+            {
+                if (stage == 0 && renamed)
+                {
+                    continue;
+                }
+                for (const int replacement : {0, 1, 2}) // Ordinary directory, symlink, and junction.
+                {
+                    const auto [id, path] = create();
+                    VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+                    const auto entry = entryFor(id);
+                    const auto deletedName = L"Deleted-" + keyName(id);
+                    const auto journal = registry::OpenKey(key.get(), deletedName.c_str(), KEY_READ | KEY_WRITE);
+                    if (stage != 0)
+                    {
+                        registry::WriteString(journal.get(), nullptr, L"RecoveryRestoreName", L"verified-parent-restore");
+                        registry::WriteDword(journal.get(), nullptr, stage == 1 ? L"RecoveryRestorePending" : L"RecoveryRestored", 1);
+                        if (stage == 2)
+                        {
+                            registry::WriteString(journal.get(), nullptr, L"BasePath", entry.Path.parent_path().c_str());
+                            registry::WriteString(journal.get(), nullptr, L"DistributionName", L"verified-parent-restore");
+                            registry::WriteDword(journal.get(), nullptr, L"State", LxssDistributionStateInstalled);
+                        }
+                        if (renamed)
+                        {
+                            VERIFY_ARE_EQUAL(RegRenameKey(key.get(), deletedName.c_str(), keyName(id).c_str()), ERROR_SUCCESS);
+                        }
+                    }
+                    const auto parent = entry.Path.parent_path();
+                    const auto saved = directory / L"restore-original-directory";
+                    std::filesystem::rename(parent, saved);
+                    if (replacement == 0)
+                    {
+                        std::filesystem::create_directory(parent);
+                        std::filesystem::rename(saved / entry.Path.filename(), entry.Path);
+                    }
+                    else if (replacement == 1)
+                    {
+                        VERIFY_WIN32_BOOL_SUCCEEDED(CreateSymbolicLinkW(
+                            parent.c_str(), saved.c_str(), SYMBOLIC_LINK_FLAG_DIRECTORY | SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE));
+                    }
+                    else
+                    {
+                        wsl::windows::common::SubProcess process(
+                            nullptr, std::format(L"cmd.exe /d /c mklink /j \"{}\" \"{}\"", parent.wstring(), saved.wstring()).c_str());
+                        VERIFY_ARE_EQUAL(process.RunAndCaptureOutput(5000).ExitCode, 0u);
+                    }
+                    if (stage == 0)
+                    {
+                        VERIFY_ARE_EQUAL(
+                            wil::ResultFromException([&] { Store::Restore(key.get(), entry, L"verified-parent-restore"); }),
+                            HRESULT_FROM_WIN32(replacement == 0 ? ERROR_FILE_INVALID : ERROR_REPARSE_TAG_INVALID));
+                    }
+                    else
+                    {
+                        Store::RecoverPending(key.get());
+                        VERIFY_ARE_EQUAL(
+                            registry::ReadDword(journal.get(), nullptr, stage == 1 ? L"RecoveryRestorePending" : L"RecoveryRestored", 0), 1u);
+                    }
+                    VERIFY_ARE_EQUAL(isActive(id), renamed);
+                    VERIFY_ARE_EQUAL(registry::ReadString(journal.get(), nullptr, L"RecoveryPath"), entry.Path.wstring());
+                    Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+                    VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
+                    if (replacement == 0)
+                    {
+                        std::filesystem::rename(entry.Path, saved / entry.Path.filename());
+                    }
+                    VERIFY_WIN32_BOOL_SUCCEEDED(RemoveDirectoryW(parent.c_str()));
+                    std::filesystem::rename(saved, parent);
+                    if (stage == 0)
+                    {
+                        Store::Restore(key.get(), entry, L"verified-parent-restore");
+                    }
+                    else
+                    {
+                        Store::RecoverPending(key.get());
+                    }
+                    VERIFY_IS_TRUE(isActive(id));
+                    VERIFY_IS_FALSE(registry::ReadOptionalString(journal.get(), nullptr, L"RecoveryPath").has_value());
+                    VERIFY_ARE_EQUAL(registry::ReadString(journal.get(), nullptr, L"BasePath"), entry.Path.parent_path().wstring());
+                    VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
+                }
+            }
+        }
         // Older or damaged records without a usable directory identity remain untouched.
         for (const bool corrupt : {false, true})
         {
@@ -8355,6 +8442,47 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             const auto entries = Store::Enumerate(userKey.get());
             VERIFY_IS_TRUE(std::none_of(entries.begin(), entries.end(), [&](const auto& entry) { return entry.Name == name; }));
         }
+        // Permanent callers can purge a normally retained disk by name without restoring it first.
+        if (LxsstuVmMode())
+        {
+            for (const auto option : {L"--unregister", L"/unregister", L"/u", L"COM"})
+            {
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(import), 0u);
+                const auto retainedId = GetDistributionId(name.c_str());
+                VERIFY_IS_TRUE(retainedId.has_value());
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {}", name)), 0u);
+                const auto entries = Store::Enumerate(userKey.get());
+                const auto entry = std::find_if(
+                    entries.begin(), entries.end(), [&](const auto& item) { return IsEqualGUID(item.Id, *retainedId); });
+                VERIFY_IS_TRUE(entry != entries.end());
+                VERIFY_IS_TRUE(std::filesystem::exists(entry->Path));
+                if (std::wstring_view(option) == L"COM")
+                {
+                    const auto support =
+                        wil::CoCreateInstance<LxssUserSession, IWslSupport>(CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA);
+                    VERIFY_SUCCEEDED(support->UnregisterDistribution(name.c_str()));
+                }
+                else if (std::wstring_view(option) == L"--unregister")
+                {
+                    VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {} --force", name)), 0u);
+                }
+                else
+                {
+                    LxsstuLaunchWslAndCaptureOutput(
+                        std::format(L"{} {}", option, name),
+                        0,
+                        nullptr,
+                        nullptr,
+                        CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT,
+                        L"wslconfig.exe");
+                }
+                VERIFY_IS_FALSE(std::filesystem::exists(entry->Path));
+                VERIFY_FAILED(
+                    registry::OpenKeyNoThrow(
+                        userKey.get(), (L"Deleted-" + wsl::shared::string::GuidToString<wchar_t>(*retainedId)).c_str(), KEY_READ)
+                        .second);
+            }
+        }
         // The pre-existing name-based COM API has no retention option and remains permanent.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(import), 0u);
         const auto wslSupport =
@@ -8414,6 +8542,10 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {}", name)), 0u);
         auto [ambiguous, ambiguousErr] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--restore-distribution {}", name), -1);
         VERIFY_IS_TRUE(ambiguous.find(L"More than one deleted distribution") != std::wstring::npos);
+        const auto [forceAmbiguous, forceAmbiguousErr] =
+            LxsstuLaunchWslAndCaptureOutput(std::format(L"--unregister {} --force", name), -1);
+        VERIFY_IS_TRUE(forceAmbiguous.find(L"ERROR_DUP_NAME") != std::wstring::npos);
+        VERIFY_ARE_EQUAL(forceAmbiguousErr, L"");
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(std::format(L"--restore-distribution {}", wsl::shared::string::GuidToString<wchar_t>(*replacementId))), 0u);
         RestartWslService();
@@ -8550,7 +8682,9 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                     // Retrying this restore must exclude its own reservation and reach the missing-disk check.
                     const auto [restoreError, restoreStderr] =
                         LxsstuLaunchWslAndCaptureOutput(std::format(L"--restore-distribution {} --name {}", keyName, pendingName), -1);
-                    VERIFY_IS_TRUE(restoreError.find(L"ERROR_FILE_NOT_FOUND") != std::wstring::npos);
+                    VERIFY_IS_TRUE(
+                        restoreError.find(L"ERROR_FILE_NOT_FOUND") != std::wstring::npos ||
+                        restoreError.find(L"ERROR_PATH_NOT_FOUND") != std::wstring::npos);
                     VERIFY_ARE_EQUAL(restoreStderr, L"");
                 }
             }

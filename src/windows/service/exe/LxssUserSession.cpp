@@ -565,7 +565,7 @@ HRESULT STDMETHODCALLTYPE LxssUserSession::UnregisterDistribution(_In_ LPCWSTR D
 try
 {
     GUID distroGuid;
-    RETURN_IF_FAILED(GetDistributionId(DistributionName, 0, nullptr, &distroGuid));
+    RETURN_IF_FAILED(GetDistributionId(DistributionName, LXSS_GET_DISTRO_ID_INCLUDE_RECOVERY, nullptr, &distroGuid));
 
     return UnregisterDistribution(&distroGuid, TRUE, nullptr);
 }
@@ -1419,7 +1419,7 @@ try
     }
 
     // Force unregister prefers an available distribution of this name. Only
-    // fall back to a hidden journal when no available registration matches.
+    // fall back to recovery records when no available registration matches.
     if (!distroFound && WI_IsFlagSet(Flags, LXSS_GET_DISTRO_ID_INCLUDE_RECOVERY))
     {
         for (const auto& [id, keyName] : wsl::windows::common::registry::EnumGuidKeys(lxssKey.get()))
@@ -1431,6 +1431,15 @@ try
                 THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_DUP_NAME), distroFound);
                 distroFound = true;
                 *pDistroGuid = id;
+            }
+        }
+        for (const auto& entry : wsl::windows::common::DeletedDistributionStore::Enumerate(lxssKey.get(), true))
+        {
+            if (wsl::shared::string::IsEqual(DistributionName, entry.Name, true))
+            {
+                THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_DUP_NAME), distroFound);
+                distroFound = true;
+                *pDistroGuid = entry.Id;
             }
         }
     }
