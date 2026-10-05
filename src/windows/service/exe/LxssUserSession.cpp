@@ -599,8 +599,9 @@ try
     const DeletedDistributionStore::Entry* match = nullptr;
     for (const auto& entry : entries)
     {
-        if ((requestedId && IsEqualGUID(*requestedId, entry.Id)) ||
-            (!requestedId && wsl::shared::string::IsEqual(DistributionName, entry.Name, true)))
+        // A valid distro name can itself look like an unbraced GUID. Match both
+        // interpretations and reject ambiguity; a braced ID uniquely selects a disk.
+        if ((requestedId && IsEqualGUID(*requestedId, entry.Id)) || wsl::shared::string::IsEqual(DistributionName, entry.Name, true))
         {
             THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_DUP_NAME), wsl::shared::Localization::MessageRestoreAmbiguous(), match != nullptr);
             match = &entry;

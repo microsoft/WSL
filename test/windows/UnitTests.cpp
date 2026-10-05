@@ -8184,15 +8184,17 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         const auto suffix = wsl::shared::string::GuidToString<wchar_t>(testId);
         const auto name = L"recovery-test-" + suffix.substr(1, suffix.size() - 2);
         const auto restoredName = name + L"-restored";
+        const auto guidName = suffix.substr(1, suffix.size() - 2);
+        std::wstring guidCollisionName;
         const auto folder = std::filesystem::temp_directory_path() / name;
         const auto install = folder / L"install";
         const auto archive = folder / L"distro.tar";
         const auto userKey = registry::OpenLxssUserKey();
         std::filesystem::create_directory(folder);
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-            for (const auto& distro : {name, restoredName})
+            for (const auto& distro : {name, restoredName, guidName, guidCollisionName})
             {
-                if (GetDistributionId(distro.c_str()).has_value())
+                if (!distro.empty() && GetDistributionId(distro.c_str()).has_value())
                 {
                     LxsstuLaunchWsl(std::format(L"--unregister {} --force", distro));
                 }
@@ -8200,7 +8202,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             // Only remove tombstones created by this test.
             for (const auto& entry : Store::Enumerate(userKey.get()))
             {
-                if (entry.Name == name || entry.Name == restoredName)
+                if (entry.Name == name || entry.Name == restoredName || entry.Name == guidName || entry.Name == guidCollisionName)
                 {
                     registry::DeleteKey(userKey.get(), (L"Deleted-" + wsl::shared::string::GuidToString<wchar_t>(entry.Id)).c_str());
                 }
@@ -8210,6 +8212,48 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--export {} \"{}\"", LXSS_DISTRO_NAME_TEST_L, archive.wstring())), 0u);
         const auto import =
             std::format(L"--import {} \"{}\" \"{}\" --version {}", name, install.wstring(), archive.wstring(), LxsstuVmMode() ? 2 : 1);
+        if (LxsstuVmMode())
+        {
+            // GUID-shaped names remain names; overlapping name/ID selectors must never restore the wrong disk.
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(
+                    std::format(L"--import {} \"{}\" \"{}\" --version 2", guidName, (folder / L"guid-name").wstring(), archive.wstring())),
+                0u);
+            const auto guidDistroId = GetDistributionId(guidName.c_str());
+            VERIFY_IS_TRUE(guidDistroId.has_value());
+            const auto guidDistroKey = wsl::shared::string::GuidToString<wchar_t>(*guidDistroId);
+            guidCollisionName = guidDistroKey.substr(1, guidDistroKey.size() - 2);
+            VERIFY_ARE_NOT_EQUAL(guidName, guidCollisionName);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {}", guidName)), 0u);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--restore-distribution {}", guidName)), 0u);
+            VERIFY_IS_TRUE(IsEqualGUID(GetDistributionId(guidName.c_str()).value_or(GUID_NULL), *guidDistroId));
+
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(
+                    std::format(
+                        L"--import {} \"{}\" \"{}\" --version 2",
+                        guidCollisionName,
+                        (folder / L"guid-collision").wstring(),
+                        archive.wstring())),
+                0u);
+            const auto collisionId = GetDistributionId(guidCollisionName.c_str());
+            VERIFY_IS_TRUE(collisionId.has_value());
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {}", guidName)), 0u);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {}", guidCollisionName)), 0u);
+            const auto [ambiguous, ambiguousErr] =
+                LxsstuLaunchWslAndCaptureOutput(std::format(L"--restore-distribution {}", guidCollisionName), -1);
+            VERIFY_IS_TRUE(ambiguous.find(L"More than one deleted distribution") != std::wstring::npos);
+            VERIFY_ARE_EQUAL(ambiguousErr, L"");
+            VERIFY_IS_FALSE(GetDistributionId(guidName.c_str()).has_value());
+            VERIFY_IS_FALSE(GetDistributionId(guidCollisionName.c_str()).has_value());
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--restore-distribution {}", guidDistroKey)), 0u);
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(std::format(L"--restore-distribution {}", wsl::shared::string::GuidToString<wchar_t>(*collisionId))), 0u);
+            VERIFY_IS_TRUE(IsEqualGUID(GetDistributionId(guidName.c_str()).value_or(GUID_NULL), *guidDistroId));
+            VERIFY_IS_TRUE(IsEqualGUID(GetDistributionId(guidCollisionName.c_str()).value_or(GUID_NULL), *collisionId));
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {} --force", guidName)), 0u);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {} --force", guidCollisionName)), 0u);
+        }
         // The deprecated command keeps its permanent deletion contract, including its short alias.
         for (const auto option : {L"/unregister", L"/u"})
         {
@@ -8357,7 +8401,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         std::filesystem::create_directory(folder);
         const auto userKey = registry::OpenLxssUserKey();
         RegistryKeyChange defaultDistro(
-            HKEY_CURRENT_USER, L"Software\Microsoft\Windows\CurrentVersion\Lxss", L"DefaultDistribution", keyName);
+            HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Lxss", L"DefaultDistribution", keyName);
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
             registry::DeleteKey(userKey.get(), keyName.c_str());
             registry::DeleteKey(userKey.get(), deletedKeyName.c_str());
@@ -8378,8 +8422,10 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         registry::WriteDword(pending.get(), nullptr, L"Version", LXSS_DISTRO_VERSION_2);
         registry::WriteDword(pending.get(), nullptr, L"Flags", LXSS_DISTRO_FLAGS_VM_MODE);
         // An unavailable unregister journal cannot remain the default or be deleted as an orphan.
+        VERIFY_ARE_EQUAL(registry::ReadString(userKey.get(), nullptr, L"DefaultDistribution"), keyName);
         const auto selected = wsl::windows::common::SvcComm{}.GetDefaultDistribution();
         VERIFY_IS_FALSE(IsEqualGUID(selected, id));
+        VERIFY_ARE_EQUAL(registry::ReadString(userKey.get(), nullptr, L"DefaultDistribution"), wsl::shared::string::GuidToString<wchar_t>(selected));
         VERIFY_ARE_EQUAL(registry::ReadString(pending.get(), nullptr, L"RecoveryPath"), recoveryPath.wstring());
         VERIFY_SUCCEEDED(registry::OpenKeyNoThrow(userKey.get(), keyName.c_str(), KEY_READ).second);
 
