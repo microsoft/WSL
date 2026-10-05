@@ -512,6 +512,7 @@ struct VmFileSystemShareRequest
 {
     std::filesystem::path HostPath;
     // Child name for aggregate virtio-fs devices or access name for Plan9 shares. Generated when empty.
+    // Reusing an explicit name requires the same effective path, options, and serving token.
     std::wstring Name;
     bool ReadOnly = true;
     VmFileSystemShareOptions Options;

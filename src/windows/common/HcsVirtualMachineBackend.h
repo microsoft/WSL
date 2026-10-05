@@ -93,9 +93,9 @@ private:
     struct FileSystemShare
     {
         VmFileSystemShare Share;
-        // Options the share was created with. Together with the host path these identify a virtio-fs
-        // share, so a repeated request reuses the existing share instead of creating a second one.
+        // Effective options used to distinguish equivalent requests from name collisions.
         std::wstring MountOptions;
+        wsl::windows::common::hcs::Plan9ShareFlags Plan9Flags{};
         // Token the share was created with, if any. A Plan 9 share is removed under the same identity
         // that added it. Unset shares fall back to the VM identity token.
         wil::shared_handle UserToken;
@@ -138,17 +138,17 @@ private:
     FileSystemDeviceMap::iterator FindFileSystemDeviceLocked(VmDeviceId Device);
 
     /// <summary>
-    /// Returns the share of Device that already serves HostPath with MountOptions, if there is one.
+    /// Returns an equivalent virtio-fs share, rejecting conflicting requests for an explicit name.
     /// </summary>
     _Requires_lock_held_(m_lock)
     const FileSystemShare* FindFileSystemShareLocked(
-        VmDeviceId Device, const std::wstring& HostPath, const std::wstring& MountOptions, const std::wstring& Name) const;
+        VmDeviceId Device, const std::wstring& HostPath, const std::wstring& MountOptions, const VmFileSystemShareRequest& Request, HANDLE UserToken) const;
 
     /// <summary>
-    /// Returns the Plan 9 share of Device with Name, if there is one.
+    /// Returns an equivalent Plan 9 share with Name, rejecting conflicting requests for that name.
     /// </summary>
     _Requires_lock_held_(m_lock)
-    std::optional<VmFileSystemShare> FindPlan9ShareByNameLocked(VmDeviceId Device, const std::wstring& Name) const;
+    std::optional<VmFileSystemShare> FindPlan9ShareByNameLocked(VmDeviceId Device, const VmFileSystemShareRequest& Request, HANDLE UserToken) const;
 
     /// <summary>
     /// Resolves the token used to reach a host path, returning the first of Tokens that is set and

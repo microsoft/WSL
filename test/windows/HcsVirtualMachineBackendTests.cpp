@@ -45,7 +45,10 @@ wil::unique_handle GetElevatedTestToken()
 {
     wil::unique_handle token;
     THROW_IF_WIN32_BOOL_FALSE(OpenProcessToken(GetCurrentProcess(), TOKEN_ALL_ACCESS, &token));
-    return token;
+    wil::unique_handle impersonationToken;
+    THROW_IF_WIN32_BOOL_FALSE(
+        DuplicateTokenEx(token.get(), TOKEN_ALL_ACCESS, nullptr, SecurityImpersonation, TokenImpersonation, &impersonationToken));
+    return impersonationToken;
 }
 
 VmDiskRequest CreateDiskRequest(const std::filesystem::path& Path, std::optional<UINT32> Lun = std::nullopt)
@@ -406,6 +409,22 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(std::wstring{L"first"}, firstNamedAddress.ChildName.value());
         VERIFY_ARE_EQUAL(firstNamedShare.Id.Value, backend->AddFileSystemShare(userDevice.Id, namedRequest).Id.Value);
 
+        auto conflictingNamedRequest = namedRequest;
+        conflictingNamedRequest.ReadOnly = true;
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] {
+                             backend->AddFileSystemShare(userDevice.Id, conflictingNamedRequest);
+                         }));
+        conflictingNamedRequest = namedRequest;
+        conflictingNamedRequest.HostPath = directory.parent_path();
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] {
+                             backend->AddFileSystemShare(userDevice.Id, conflictingNamedRequest);
+                         }));
+        conflictingNamedRequest = namedRequest;
+        std::get<VmVirtioFsShareOptions>(conflictingNamedRequest.Options).MountOptions[L"dax"] = L"";
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] {
+                             backend->AddFileSystemShare(userDevice.Id, conflictingNamedRequest);
+                         }));
+
         namedRequest.Name = L"second";
         const auto secondNamedShare = backend->AddFileSystemShare(userDevice.Id, namedRequest);
         const auto& secondNamedAddress = std::get<VmVirtioFsShareAddress>(secondNamedShare.GuestAddress);
@@ -441,11 +460,32 @@ class HcsVirtualMachineBackendTests
             }));
         const auto singleShare = backend->AddFileSystemShare(singleShareDevice.Id, request);
         VERIFY_IS_FALSE(std::get<VmVirtioFsShareAddress>(singleShare.GuestAddress).ChildName.has_value());
+        VERIFY_ARE_EQUAL(singleShare.Id.Value, backend->AddFileSystemShare(singleShareDevice.Id, request).Id.Value);
+        auto singleShareTokenRequest = request;
+        singleShareTokenRequest.UserToken = wil::shared_handle{GetElevatedTestToken().release()};
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] {
+                             backend->AddFileSystemShare(singleShareDevice.Id, singleShareTokenRequest);
+                         }));
+        singleShareTokenRequest.UserToken.reset();
+        std::get<VmVirtioFsShareOptions>(singleShareTokenRequest.Options).UserToken = wil::shared_handle{GetElevatedTestToken().release()};
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] {
+                             backend->AddFileSystemShare(singleShareDevice.Id, singleShareTokenRequest);
+                         }));
+        auto singleShareNamedRequest = request;
+        singleShareNamedRequest.Name = L"invalid";
+        VERIFY_ARE_EQUAL(
+            E_INVALIDARG, OperationResult([&] { backend->AddFileSystemShare(singleShareDevice.Id, singleShareNamedRequest); }));
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_BUSY), OperationResult([&] { backend->RemoveDevice(singleShareDevice.Id); }));
         backend->RemoveFileSystemShare(singleShare.Id);
         const auto replacementSingleShare = backend->AddFileSystemShare(singleShareDevice.Id, request);
         VERIFY_ARE_NOT_EQUAL(singleShare.Id.Value, replacementSingleShare.Id.Value);
         backend->RemoveFileSystemShare(replacementSingleShare.Id);
+        const auto tokenShare = backend->AddFileSystemShare(singleShareDevice.Id, singleShareTokenRequest);
+        VERIFY_ARE_EQUAL(tokenShare.Id.Value, backend->AddFileSystemShare(singleShareDevice.Id, singleShareTokenRequest).Id.Value);
+        auto equivalentTokenRequest = request;
+        equivalentTokenRequest.UserToken = std::get<VmVirtioFsShareOptions>(singleShareTokenRequest.Options).UserToken;
+        VERIFY_ARE_EQUAL(tokenShare.Id.Value, backend->AddFileSystemShare(singleShareDevice.Id, equivalentTokenRequest).Id.Value);
+        backend->RemoveFileSystemShare(tokenShare.Id);
         backend->RemoveDevice(singleShareDevice.Id);
         VERIFY_ARE_EQUAL(
             HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->GetFileSystemDeviceStatus(singleShareDevice.Id); }));
@@ -481,11 +521,59 @@ class HcsVirtualMachineBackendTests
         socketRequest.Options = VmPlan9ShareOptions{};
         socketRequest.ReadOnly = false;
         socketRequest.Name = L"socket-share";
+        const auto verifyPlan9NameCollisions = [&](VmDeviceId device, const VmFileSystemShareRequest& original) {
+            auto conflicting = original;
+            conflicting.HostPath = directory.parent_path();
+            VERIFY_ARE_EQUAL(
+                HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] { backend->AddFileSystemShare(device, conflicting); }));
+            conflicting = original;
+            conflicting.ReadOnly = !original.ReadOnly;
+            VERIFY_ARE_EQUAL(
+                HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] { backend->AddFileSystemShare(device, conflicting); }));
+            for (const auto flag :
+                 {&VmPlan9ShareOptions::LinuxMetadata,
+                  &VmPlan9ShareOptions::CaseSensitive,
+                  &VmPlan9ShareOptions::UseShareRootIdentity,
+                  &VmPlan9ShareOptions::AllowOptions,
+                  &VmPlan9ShareOptions::AllowSubPaths})
+            {
+                conflicting = original;
+                auto& options = std::get<VmPlan9ShareOptions>(conflicting.Options);
+                options.*flag = !(options.*flag);
+                VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] {
+                                     backend->AddFileSystemShare(device, conflicting);
+                                 }));
+            }
+            conflicting = original;
+            conflicting.UserToken = wil::shared_handle{GetElevatedTestToken().release()};
+            VERIFY_ARE_EQUAL(
+                HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] { backend->AddFileSystemShare(device, conflicting); }));
+            conflicting = original;
+            conflicting.Options = VmVirtioFsShareOptions{};
+            VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddFileSystemShare(device, conflicting); }));
+            conflicting = original;
+            conflicting.UserToken = original.UserToken ? original.UserToken : backend->GetDescription().Identity.UserToken;
+            VERIFY_ARE_EQUAL(
+                backend->AddFileSystemShare(device, original).Id.Value, backend->AddFileSystemShare(device, conflicting).Id.Value);
+            wil::unique_handle duplicatedToken;
+            THROW_IF_WIN32_BOOL_FALSE(DuplicateHandle(
+                GetCurrentProcess(),
+                conflicting.UserToken.get(),
+                GetCurrentProcess(),
+                duplicatedToken.put(),
+                0,
+                FALSE,
+                DUPLICATE_SAME_ACCESS));
+            conflicting.UserToken = wil::shared_handle{duplicatedToken.release()};
+            VERIFY_ARE_EQUAL(
+                backend->AddFileSystemShare(device, original).Id.Value, backend->AddFileSystemShare(device, conflicting).Id.Value);
+        };
         const auto socketShare = backend->AddFileSystemShare(socketDeviceResult.Id, socketRequest);
         VERIFY_ARE_EQUAL(socketDevice.Port.Value, std::get<VmPlan9SocketShareAddress>(socketShare.GuestAddress).Port.Value);
         VERIFY_IS_FALSE(socketShare.ReadOnly);
         const auto duplicateSocketShare = backend->AddFileSystemShare(socketDeviceResult.Id, socketRequest);
         VERIFY_ARE_EQUAL(socketShare.Id.Value, duplicateSocketShare.Id.Value);
+        verifyPlan9NameCollisions(socketDeviceResult.Id, socketRequest);
 
         // A Plan 9 device keeps serving after one of its shares is removed, so the share can be added again.
         backend->RemoveFileSystemShare(socketShare.Id);
@@ -500,6 +588,7 @@ class HcsVirtualMachineBackendTests
         const auto hostedDeviceResult = backend->CreateFileSystemDevice({hostedDevice});
         const auto hostedShare = backend->AddFileSystemShare(hostedDeviceResult.Id, socketRequest);
         VERIFY_ARE_EQUAL(hostedDevice.Port.Value, std::get<VmPlan9SocketShareAddress>(hostedShare.GuestAddress).Port.Value);
+        verifyPlan9NameCollisions(hostedDeviceResult.Id, socketRequest);
         backend->RemoveFileSystemShare(hostedShare.Id);
         backend->RemoveDevice(hostedDeviceResult.Id);
 
@@ -519,9 +608,11 @@ class HcsVirtualMachineBackendTests
         virtioRequest.HostPath = directory;
         virtioRequest.Options = VmPlan9ShareOptions{};
         virtioRequest.ReadOnly = false;
+        virtioRequest.Name = L"virtio-share";
         const auto virtioShare = backend->AddFileSystemShare(virtioDeviceResult.Id, virtioRequest);
         VERIFY_ARE_EQUAL(std::wstring{L"plan9-virtio"}, std::get<VmPlan9VirtioShareAddress>(virtioShare.GuestAddress).Tag);
         VERIFY_IS_FALSE(virtioShare.ReadOnly);
+        verifyPlan9NameCollisions(virtioDeviceResult.Id, virtioRequest);
         backend->RemoveFileSystemShare(virtioShare.Id);
         const auto replacementVirtioShare = backend->AddFileSystemShare(virtioDeviceResult.Id, virtioRequest);
         VERIFY_ARE_NOT_EQUAL(virtioShare.Id.Value, replacementVirtioShare.Id.Value);

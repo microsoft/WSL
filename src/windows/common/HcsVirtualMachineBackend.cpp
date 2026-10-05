@@ -73,6 +73,33 @@ std::wstring GenerateShareName()
     return wsl::shared::string::GuidToString<wchar_t>(name, wsl::shared::string::GuidToStringFlags::None);
 }
 
+schema::Plan9ShareFlags GetPlan9ShareFlags(const VmFileSystemShareRequest& Request)
+{
+    const auto* options = std::get_if<VmPlan9ShareOptions>(&Request.Options);
+    THROW_HR_IF_MSG(E_INVALIDARG, !options, "A Plan 9 device requires Plan 9 share options");
+
+    auto flags = schema::Plan9ShareFlags::None;
+    WI_SetFlagIf(flags, schema::Plan9ShareFlags::ReadOnly, Request.ReadOnly);
+    WI_SetFlagIf(flags, schema::Plan9ShareFlags::LinuxMetadata, options->LinuxMetadata);
+    WI_SetFlagIf(flags, schema::Plan9ShareFlags::CaseSensitive, options->CaseSensitive);
+    WI_SetFlagIf(flags, schema::Plan9ShareFlags::UseShareRootIdentity, options->UseShareRootIdentity);
+    WI_SetFlagIf(flags, schema::Plan9ShareFlags::AllowOptions, options->AllowOptions);
+    WI_SetFlagIf(flags, schema::Plan9ShareFlags::AllowSubPaths, options->AllowSubPaths);
+    return flags;
+}
+
+bool AreSameTokens(HANDLE First, HANDLE Second)
+{
+    if (First == Second)
+    {
+        return true;
+    }
+
+    const auto first = wil::get_token_information<TOKEN_STATISTICS>(First);
+    const auto second = wil::get_token_information<TOKEN_STATISTICS>(Second);
+    return first.TokenId.HighPart == second.TokenId.HighPart && first.TokenId.LowPart == second.TokenId.LowPart;
+}
+
 VmEffectiveProcessor ConfigureProcessor(const VmProcessorRequest& Request, schema::Processor& Settings)
 {
     VmEffectiveProcessor processor{};
@@ -1020,30 +1047,41 @@ HcsVirtualMachineBackend::FileSystemDeviceMap::iterator HcsVirtualMachineBackend
 }
 
 const HcsVirtualMachineBackend::FileSystemShare* HcsVirtualMachineBackend::FindFileSystemShareLocked(
-    VmDeviceId Device, const std::wstring& HostPath, const std::wstring& MountOptions, const std::wstring& Name) const
+    VmDeviceId Device, const std::wstring& HostPath, const std::wstring& MountOptions, const VmFileSystemShareRequest& Request, HANDLE UserToken) const
 {
     for (const auto& entry : m_fileSystemShares)
     {
         const auto& share = entry.second;
-        if ((share.Share.Device.Value == Device.Value) && (share.Share.EffectiveHostPath.native() == HostPath) &&
-            (share.MountOptions == MountOptions))
+        if (share.Share.Device.Value == Device.Value)
         {
             const auto& address = std::get<VmVirtioFsShareAddress>(share.Share.GuestAddress);
-            if (!Name.empty() && address.ChildName != Name)
+            if (!Request.Name.empty() && address.ChildName != Request.Name)
             {
                 continue;
             }
 
-            return &share;
+            const bool equivalent = share.Share.EffectiveHostPath.native() == HostPath && share.MountOptions == MountOptions &&
+                                    share.Share.ReadOnly == Request.ReadOnly &&
+                                    AreSameTokens(ResolveUserToken({share.UserToken}), UserToken);
+            THROW_HR_IF_MSG(
+                HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
+                !Request.Name.empty() && !equivalent,
+                "A file system share with this name already exists with a different request");
+            if (equivalent)
+            {
+                return &share;
+            }
         }
     }
 
     return nullptr;
 }
 
-std::optional<VmFileSystemShare> HcsVirtualMachineBackend::FindPlan9ShareByNameLocked(VmDeviceId Device, const std::wstring& Name) const
+std::optional<VmFileSystemShare> HcsVirtualMachineBackend::FindPlan9ShareByNameLocked(
+    VmDeviceId Device, const VmFileSystemShareRequest& Request, HANDLE UserToken) const
 {
-    if (Name.empty())
+    const auto flags = GetPlan9ShareFlags(Request);
+    if (Request.Name.empty())
     {
         return std::nullopt;
     }
@@ -1058,11 +1096,17 @@ std::optional<VmFileSystemShare> HcsVirtualMachineBackend::FindPlan9ShareByNameL
         const bool match = std::visit(
             Overloaded{
                 [](const VmVirtioFsShareAddress&) { return false; },
-                [&](const VmPlan9SocketShareAddress& address) { return address.AccessName == Name; },
-                [&](const VmPlan9VirtioShareAddress& address) { return address.AccessName == Name; }},
+                [&](const VmPlan9SocketShareAddress& address) { return address.AccessName == Request.Name; },
+                [&](const VmPlan9VirtioShareAddress& address) { return address.AccessName == Request.Name; }},
             entry.second.Share.GuestAddress);
         if (match)
         {
+            const auto& share = entry.second;
+            THROW_HR_IF_MSG(
+                HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
+                share.Share.EffectiveHostPath.native() != Request.HostPath.native() || share.Plan9Flags != flags ||
+                    !AreSameTokens(ResolveUserToken({share.UserToken}), UserToken),
+                "A Plan 9 share with this name already exists with a different request");
             return entry.second.Share;
         }
     }
@@ -1089,17 +1133,8 @@ HANDLE HcsVirtualMachineBackend::ResolveUserToken(std::initializer_list<std::ref
 std::wstring HcsVirtualMachineBackend::AddPlan9ShareLocked(
     const FileSystemDevice& Device, const VmFileSystemShareRequest& Request, HANDLE UserToken, const std::wstring& HostPath) const
 {
-    const auto* options = std::get_if<VmPlan9ShareOptions>(&Request.Options);
-    THROW_HR_IF_MSG(E_INVALIDARG, !options, "A Plan 9 device requires Plan 9 share options");
+    const auto flags = GetPlan9ShareFlags(Request);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !Device.Plan9Server);
-
-    auto flags = schema::Plan9ShareFlags::None;
-    WI_SetFlagIf(flags, schema::Plan9ShareFlags::ReadOnly, Request.ReadOnly);
-    WI_SetFlagIf(flags, schema::Plan9ShareFlags::LinuxMetadata, options->LinuxMetadata);
-    WI_SetFlagIf(flags, schema::Plan9ShareFlags::CaseSensitive, options->CaseSensitive);
-    WI_SetFlagIf(flags, schema::Plan9ShareFlags::UseShareRootIdentity, options->UseShareRootIdentity);
-    WI_SetFlagIf(flags, schema::Plan9ShareFlags::AllowOptions, options->AllowOptions);
-    WI_SetFlagIf(flags, schema::Plan9ShareFlags::AllowSubPaths, options->AllowSubPaths);
 
     // Allow the Plan 9 server to create NT symlinks.
     //
@@ -1141,22 +1176,26 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
     THROW_HR_IF(HCS_E_TERMINATED, !m_system || !m_guestDeviceManager);
     THROW_HR_IF(E_BOUNDS, m_nextShareId == std::numeric_limits<std::uint64_t>::max());
     const auto device = FindFileSystemDeviceLocked(Device);
-    if (auto existing = FindPlan9ShareByNameLocked(Device, Request.Name))
+    if (!std::holds_alternative<VmVirtioFsDevice>(device->second.Transport))
     {
-        WSL_LOG(
-            "HcsAddFileSystemShareEnd",
-            TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
-            TraceLoggingValue(Device.Value, "deviceId"),
-            TraceLoggingValue(existing->Id.Value, "shareId"),
-            TraceLoggingValue(false, "created"));
+        if (auto existing = FindPlan9ShareByNameLocked(Device, Request, userToken))
+        {
+            WSL_LOG(
+                "HcsAddFileSystemShareEnd",
+                TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+                TraceLoggingValue(Device.Value, "deviceId"),
+                TraceLoggingValue(existing->Id.Value, "shareId"),
+                TraceLoggingValue(false, "created"));
 
-        return std::move(existing).value();
+            return std::move(existing).value();
+        }
     }
 
     // A virtio-fs share resolves to a canonical directory, while a Plan 9 share may be rooted at a
     // prefix such as '\\?' so that the guest can mount arbitrary subpaths below it.
     std::wstring hostPath;
     std::wstring mountOptions;
+    auto shareUserToken = Request.UserToken;
     std::optional<VmFileSystemShare> reused;
     VmFileSystemShareAddress guestAddress;
     std::visit(
@@ -1185,10 +1224,20 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
                         !!Request.UserToken || !!options->UserToken,
                         "A share of an aggregate virtio-fs device is served under the identity of the device");
                 }
+                else
+                {
+                    THROW_HR_IF_MSG(
+                        E_INVALIDARG, !Request.Name.empty(), "A single-share virtio-fs device does not accept a share name");
+                    if (options->UserToken)
+                    {
+                        shareUserToken = options->UserToken;
+                    }
+                }
 
                 // Repeating a request for the same path and options reuses the existing share so that
                 // multiple guest mounts of one host directory are backed by a single virtio-fs share.
-                if (const auto* existing = FindFileSystemShareLocked(Device, hostPath, mountOptions, Request.Name))
+                if (const auto* existing =
+                        FindFileSystemShareLocked(Device, hostPath, mountOptions, Request, ResolveUserToken({shareUserToken})))
                 {
                     reused = existing->Share;
                     return;
@@ -1204,8 +1253,6 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
                 else
                 {
                     // A single-share device is the share, so it is created on first use and cannot be shared further.
-                    THROW_HR_IF_MSG(
-                        E_INVALIDARG, !Request.Name.empty(), "A single-share virtio-fs device does not accept a share name");
                     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), device->second.Device.GuestInstanceId.has_value());
                     device->second.Device.GuestInstanceId = m_guestDeviceManager->AddVirtiofsDevice(
                         transport.Tag.c_str(),
@@ -1222,16 +1269,8 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
                 guestAddress = VmPlan9SocketShareAddress{transport.Port, AddPlan9ShareLocked(device->second, Request, userToken, hostPath)};
             },
             [&](const VmPlan9HostedDevice& transport) {
-                const auto* options = std::get_if<VmPlan9ShareOptions>(&Request.Options);
-                THROW_HR_IF_MSG(E_INVALIDARG, !options, "An HCS-hosted Plan 9 device requires Plan 9 share options");
                 hostPath = Request.HostPath.native();
-                auto flags = schema::Plan9ShareFlags::None;
-                WI_SetFlagIf(flags, schema::Plan9ShareFlags::ReadOnly, Request.ReadOnly);
-                WI_SetFlagIf(flags, schema::Plan9ShareFlags::LinuxMetadata, options->LinuxMetadata);
-                WI_SetFlagIf(flags, schema::Plan9ShareFlags::CaseSensitive, options->CaseSensitive);
-                WI_SetFlagIf(flags, schema::Plan9ShareFlags::UseShareRootIdentity, options->UseShareRootIdentity);
-                WI_SetFlagIf(flags, schema::Plan9ShareFlags::AllowOptions, options->AllowOptions);
-                WI_SetFlagIf(flags, schema::Plan9ShareFlags::AllowSubPaths, options->AllowSubPaths);
+                const auto flags = GetPlan9ShareFlags(Request);
                 const auto accessName = Request.Name.empty() ? GenerateShareName() : Request.Name;
                 schema::AddPlan9Share(
                     m_system.get(), accessName.c_str(), accessName.c_str(), hostPath.c_str(), transport.Port.Value, flags, userToken);
@@ -1262,8 +1301,12 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
     share.EffectiveHostPath = hostPath;
     share.ReadOnly = Request.ReadOnly;
 
+    const auto plan9Flags = std::holds_alternative<VmVirtioFsDevice>(device->second.Transport) ? schema::Plan9ShareFlags::None
+                                                                                           : GetPlan9ShareFlags(Request);
     const auto inserted =
-        m_fileSystemShares.emplace(share.Id.Value, FileSystemShare{share, std::move(mountOptions), Request.UserToken}).second;
+        m_fileSystemShares
+            .emplace(share.Id.Value, FileSystemShare{share, std::move(mountOptions), plan9Flags, std::move(shareUserToken)})
+            .second;
     WI_ASSERT(inserted);
     ++m_nextShareId;
 
