@@ -8848,6 +8848,54 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                 Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
                 VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
             }
+            // An import-in-place owns an unmoved VHD until its registration is removed; rollback must not create a second owner.
+            for (const bool recoveryDirectoryRemoved : {false, true})
+            {
+                for (const bool alias : {false, true})
+                {
+                    const auto [id, path] = create();
+                    VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+                    const auto entry = entryFor(id);
+                    std::filesystem::rename(entry.Path, path);
+                    VERIFY_ARE_EQUAL(RegRenameKey(key.get(), (L"Deleted-" + keyName(id)).c_str(), keyName(id).c_str()), ERROR_SUCCESS);
+                    const auto journal = registry::OpenKey(key.get(), keyName(id).c_str(), KEY_READ | KEY_WRITE);
+                    registry::WriteDword(journal.get(), nullptr, L"State", LxssDistributionStateUninstalling);
+                    const auto [ownerId, unusedPath] = create();
+                    const auto owner = registry::OpenKey(key.get(), keyName(ownerId).c_str(), KEY_READ | KEY_WRITE);
+                    const auto aliasPath = directory / L"import-in-place-alias";
+                    if (alias)
+                    {
+                        VERIFY_WIN32_BOOL_SUCCEEDED(CreateSymbolicLinkW(
+                            aliasPath.c_str(), path.parent_path().c_str(), SYMBOLIC_LINK_FLAG_DIRECTORY | SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE));
+                    }
+                    registry::WriteString(owner.get(), nullptr, L"BasePath", alias ? aliasPath.c_str() : path.parent_path().c_str());
+                    if (recoveryDirectoryRemoved)
+                    {
+                        std::filesystem::remove(entry.Path.parent_path());
+                    }
+                    for (int replay = 0; replay < 2; ++replay)
+                    {
+                        Store::RecoverPending(key.get());
+                        Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
+                        VERIFY_ARE_EQUAL(registry::ReadString(journal.get(), nullptr, L"RecoveryPath"), entry.Path.wstring());
+                        VERIFY_ARE_EQUAL(registry::ReadDword(journal.get(), nullptr, L"State", 0), static_cast<DWORD>(LxssDistributionStateUninstalling));
+                        VERIFY_IS_TRUE(isActive(ownerId));
+                        VERIFY_ARE_EQUAL(contents(path), "original disk contents");
+                        VERIFY_ARE_EQUAL(std::filesystem::exists(entry.Path.parent_path()), !recoveryDirectoryRemoved);
+                    }
+                    registry::DeleteKey(key.get(), keyName(ownerId).c_str());
+                    if (alias)
+                    {
+                        std::filesystem::remove(aliasPath);
+                    }
+                    Store::RecoverPending(key.get());
+                    VERIFY_IS_TRUE(isActive(id));
+                    VERIFY_IS_FALSE(registry::ReadOptionalString(journal.get(), nullptr, L"RecoveryPath").has_value());
+                    VERIFY_ARE_EQUAL(registry::ReadDword(journal.get(), nullptr, L"State", 0), static_cast<DWORD>(LxssDistributionStateInstalled));
+                    VERIFY_IS_FALSE(std::filesystem::exists(entry.Path.parent_path()));
+                    VERIFY_ARE_EQUAL(contents(path), "original disk contents");
+                }
+            }
             // An unmoved journal is cleared only after removing the original empty recovery directory.
             for (const auto scenario : {L"empty", L"nonempty", L"replaced", L"removed"})
             {
@@ -9213,8 +9261,24 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_IS_TRUE(ambiguous.find(L"More than one deleted distribution") != std::wstring::npos);
         const auto [forceAmbiguous, forceAmbiguousErr] =
             LxsstuLaunchWslAndCaptureOutput(std::format(L"--unregister {} --force", name), -1);
-        VERIFY_IS_TRUE(forceAmbiguous.find(L"ERROR_DUP_NAME") != std::wstring::npos);
+        WEX::Logging::Log::Comment(forceAmbiguous.c_str());
+        VERIFY_IS_TRUE(forceAmbiguous.find(wsl::windows::common::wslutil::ErrorCodeToString(HRESULT_FROM_WIN32(ERROR_DUP_NAME))) != std::wstring::npos);
         VERIFY_ARE_EQUAL(forceAmbiguousErr, L"");
+        VERIFY_ARE_EQUAL(
+            wil::ResultFromException([&] {
+                wsl::windows::common::SvcComm{}.GetDistributionId(name.c_str(), LXSS_GET_DISTRO_ID_LIST_ALL | LXSS_GET_DISTRO_ID_INCLUDE_RECOVERY);
+            }),
+            HRESULT_FROM_WIN32(ERROR_DUP_NAME));
+        const auto afterAmbiguousForce = Store::Enumerate(userKey.get());
+        for (const auto& retained : duplicateDeletedEntries)
+        {
+            const auto unchanged = std::find_if(afterAmbiguousForce.begin(), afterAmbiguousForce.end(), [&](const auto& entry) {
+                return IsEqualGUID(entry.Id, retained.Id);
+            });
+            VERIFY_IS_TRUE(unchanged != afterAmbiguousForce.end());
+            VERIFY_ARE_EQUAL(unchanged->Path, retained.Path);
+            VERIFY_IS_TRUE(std::filesystem::exists(retained.Path));
+        }
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(std::format(L"--restore-distribution {}", wsl::shared::string::GuidToString<wchar_t>(*replacementId))), 0u);
         RestartWslService();

@@ -729,6 +729,12 @@ try
                 if (original)
                 {
                     VerifyIdentity(key.get(), original.get());
+                    // The pending registration is hidden from imports. Do not
+                    // reactivate it when another registration now owns this VHD.
+                    if (IsRegisteredDisk(lxssKey, original.get(), &id))
+                    {
+                        continue;
+                    }
                     const auto recoveryDirectory = std::filesystem::path(*path).parent_path();
                     if (!DirectoryWasDeleted(key.get(), recoveryDirectory))
                     {
