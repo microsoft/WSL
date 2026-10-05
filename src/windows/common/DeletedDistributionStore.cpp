@@ -45,7 +45,7 @@ wil::unique_hfile OpenDisk(const std::filesystem::path& path, bool allowMissingP
     return file;
 }
 
-wil::unique_hfile OpenDirectory(const std::filesystem::path& path, DWORD sharing = FILE_SHARE_READ)
+wil::unique_hfile OpenDirectory(const std::filesystem::path& path, DWORD sharing = FILE_SHARE_READ, bool allowMissing = false)
 {
     wil::unique_hfile directory{CreateFileW(
         path.c_str(),
@@ -55,7 +55,15 @@ wil::unique_hfile OpenDirectory(const std::filesystem::path& path, DWORD sharing
         OPEN_EXISTING,
         FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
         nullptr)};
-    THROW_LAST_ERROR_IF(!directory);
+    if (!directory)
+    {
+        const auto error = GetLastError();
+        if (allowMissing && error == ERROR_FILE_NOT_FOUND)
+        {
+            return {};
+        }
+        THROW_WIN32(error);
+    }
     FILE_ATTRIBUTE_TAG_INFO attributes{};
     THROW_IF_WIN32_BOOL_FALSE(GetFileInformationByHandleEx(directory.get(), FileAttributeTagInfo, &attributes, sizeof(attributes)));
     THROW_HR_IF(
@@ -190,13 +198,12 @@ void CompleteRestore(HKEY lxssKey, HKEY key, const GUID& id, bool deleted)
 
 bool RecoveryDirectoryWasDeleted(HKEY key, const std::filesystem::path& directory)
 {
-    SetLastError(ERROR_SUCCESS);
-    if (GetFileAttributesW(directory.c_str()) != INVALID_FILE_ATTRIBUTES)
+    // Probe the directory itself, including a dangling link, without following
+    // its reparse point. OpenDirectory rejects every existing reparse point.
+    if (OpenDirectory(directory, FILE_SHARE_READ, true))
     {
         return false;
     }
-    const auto error = GetLastError();
-    THROW_HR_IF(HRESULT_FROM_WIN32(error), error != ERROR_FILE_NOT_FOUND);
     // A missing child is conclusive only while the original parent is available
     // and locked against replacement. An offline volume must keep its journal.
     FILE_ID_INFO expected{};
@@ -207,17 +214,7 @@ bool RecoveryDirectoryWasDeleted(HKEY key, const std::filesystem::path& director
     VerifyIdentity(key, anchor.get(), RecoveryAnchorId);
     const auto anchorId = Identity(anchor.get());
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_FILE_INVALID), expected.VolumeSerialNumber != anchorId.VolumeSerialNumber);
-    SetLastError(ERROR_SUCCESS);
-    if (GetFileAttributesW(directory.c_str()) != INVALID_FILE_ATTRIBUTES)
-    {
-        return false;
-    }
-    const auto confirmedError = GetLastError();
-    if (confirmedError == ERROR_FILE_NOT_FOUND)
-    {
-        return true;
-    }
-    THROW_WIN32(confirmedError);
+    return !OpenDirectory(directory, FILE_SHARE_READ, true);
 }
 } // namespace
 

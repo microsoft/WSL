@@ -7855,6 +7855,41 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
             VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
         }
+        // A dangling replacement link must not be mistaken for a deleted recovery directory.
+        for (const bool junction : {false, true})
+        {
+            const auto [id, path] = create();
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            const auto deleted = registry::OpenKey(key.get(), (L"Deleted-" + keyName(id)).c_str(), KEY_READ | KEY_WRITE);
+            registry::WriteDword(deleted.get(), nullptr, L"RecoveryCleanupPending", 1);
+            const auto parent = entry.Path.parent_path();
+            const auto saved = directory / L"dangling-original-directory";
+            const auto target = directory / L"dangling-target";
+            std::filesystem::rename(parent, saved);
+            if (junction)
+            {
+                std::filesystem::create_directory(target);
+                wsl::windows::common::SubProcess process(
+                    nullptr, std::format(L"cmd.exe /d /c mklink /j \"{}\" \"{}\"", parent.wstring(), target.wstring()).c_str());
+                VERIFY_ARE_EQUAL(process.RunAndCaptureOutput(5000).ExitCode, 0u);
+                std::filesystem::remove(target);
+            }
+            else
+            {
+                VERIFY_WIN32_BOOL_SUCCEEDED(CreateSymbolicLinkW(
+                    parent.c_str(), target.c_str(), SYMBOLIC_LINK_FLAG_DIRECTORY | SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE));
+            }
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_IS_TRUE(entryFor(id).Path == entry.Path);
+            VERIFY_ARE_EQUAL(contents(saved / entry.Path.filename()), "original disk contents");
+            // RemoveDirectory removes the link itself, without requiring its target.
+            VERIFY_WIN32_BOOL_SUCCEEDED(RemoveDirectoryW(parent.c_str()));
+            std::filesystem::rename(saved, parent);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_IS_FALSE(std::filesystem::exists(parent));
+            VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
+        }
         // A failed reverse move leaves the journal intact; startup can finish the forward move.
         for (const bool failRollback : {false, true})
         {
