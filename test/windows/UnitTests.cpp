@@ -7738,6 +7738,26 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
         }
+        // Recovery anchors coexist with read/list handles that deny directory deletion.
+        {
+            const auto [id, path] = create();
+            const wil::unique_hfile anchorRead{CreateFileW(
+                directory.c_str(),
+                FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES,
+                FILE_SHARE_READ | FILE_SHARE_WRITE,
+                nullptr,
+                OPEN_EXISTING,
+                FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
+                nullptr)};
+            VERIFY_IS_TRUE(!!anchorRead);
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
+            VERIFY_IS_FALSE(isActive(id));
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
+            VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
+            VERIFY_FAILED(registry::OpenKeyNoThrow(key.get(), (L"Deleted-" + keyName(id)).c_str(), KEY_READ).second);
+        }
         // Force deletion of an offline journal retries safely after the volume returns.
         for (const bool unmoved : {false, true})
         {

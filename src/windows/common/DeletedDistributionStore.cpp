@@ -222,7 +222,8 @@ bool RecoveryDirectoryWasDeleted(HKEY key, const std::filesystem::path& director
     DWORD size = sizeof(expected);
     THROW_IF_WIN32_ERROR(RegGetValueW(key, nullptr, c_recoveryDirectoryId, RRF_RT_REG_BINARY, nullptr, &expected, &size));
     THROW_HR_IF(E_INVALIDARG, size != sizeof(expected));
-    const auto anchor = OpenDirectory(directory.parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE);
+    const auto anchor =
+        OpenDirectory(directory.parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE, false, FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES);
     VerifyIdentity(key, anchor.get(), c_recoveryAnchorId);
     const auto anchorId = Identity(anchor.get());
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_FILE_INVALID), expected.VolumeSerialNumber != anchorId.VolumeSerialNumber);
@@ -274,7 +275,10 @@ bool DeletedDistributionStore::Retain(HKEY lxssKey, const GUID& id, const std::f
     // delete sharing disabled on both the directory and its anchor so the
     // destination namespace cannot be replaced during the move.
     const auto directoryHandle = OpenDirectory(directory, FILE_SHARE_READ | FILE_SHARE_WRITE);
-    const auto anchorHandle = OpenDirectory(directory.parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE);
+    // The anchor is never deleted through this handle. Read/list access also
+    // permits it to coincide with an already locked source directory at a volume root.
+    const auto anchorHandle =
+        OpenDirectory(directory.parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE, false, FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES);
     const auto key = OpenKey(lxssKey, KeyName(id).c_str(), KEY_READ | KEY_WRITE);
     const auto originalState = ReadDword(key.get(), nullptr, L"State", LxssDistributionStateInstalled);
     bool moved = false;
