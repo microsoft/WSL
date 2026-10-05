@@ -298,6 +298,9 @@ and 'wsl.exe --install &lt;Distro&gt;' to install.</value>
     <value>More than one deleted distribution has this name. Use a recovery ID from 'wsl.exe --list --deleted'.</value>
     <comment>{Locked="--list "}{Locked="--deleted'"}Command line arguments should not be translated.</comment>
   </data>
+  <data name="MessageRestoreExpired" xml:space="preserve">
+    <value>This distribution cannot be restored because its 24-hour recovery period has expired.</value>
+  </data>
   <data name="MessageUserNotFound" xml:space="preserve">
     <value>User not found.</value>
   </data>

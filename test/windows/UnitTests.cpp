@@ -7656,7 +7656,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             const auto registration = registry::OpenKey(key.get(), keyName(id).c_str(), KEY_READ);
             VERIFY_ARE_EQUAL(registry::ReadString(registration.get(), nullptr, L"DistributionName"), L"restored-test");
             VERIFY_ARE_EQUAL(registry::ReadDword(registration.get(), nullptr, L"DefaultUid", 0), 1234u);
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
             VERIFY_ARE_EQUAL(contents(path), "replacement");
         }
@@ -7691,7 +7691,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             std::filesystem::rename(saved, base);
             VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
             const auto entry = entryFor(id);
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
             VERIFY_ARE_EQUAL(contents(target / path.filename()), "unrelated target contents");
             std::filesystem::remove_all(target);
@@ -7708,7 +7708,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             VERIFY_IS_TRUE(Store::Retain(key.get(), id, alias / path.parent_path().filename() / path.filename()));
             const auto entry = entryFor(id);
             VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
         }
         // Competing source-parent or recovery-anchor rename handles prevent retention before journaling.
@@ -7735,7 +7735,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
             const auto entry = entryFor(id);
             VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
         }
         // Force deletion of an offline journal retries safely after the volume returns.
@@ -7787,6 +7787,51 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                 }
             }
         }
+        // A purge journal must not move or delete a disk re-imported at its original path.
+        for (const bool pendingJournal : {false, true})
+        {
+            for (const bool recoveryOffline : {false, true})
+            {
+                const auto [id, path] = create();
+                VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+                const auto entry = entryFor(id);
+                const auto deletedName = L"Deleted-" + keyName(id);
+                if (pendingJournal)
+                {
+                    VERIFY_ARE_EQUAL(RegRenameKey(key.get(), deletedName.c_str(), keyName(id).c_str()), ERROR_SUCCESS);
+                }
+                std::filesystem::rename(entry.Path, path);
+                const auto [protectedId, unusedPath] = create();
+                const auto protector = registry::OpenKey(key.get(), keyName(protectedId).c_str(), KEY_READ | KEY_WRITE);
+                registry::WriteString(protector.get(), nullptr, L"BasePath", path.parent_path().c_str());
+                const auto offlineDirectory = directory / (L"protected-offline-" + keyName(id));
+                if (recoveryOffline)
+                {
+                    std::filesystem::rename(entry.Path.parent_path(), offlineDirectory);
+                }
+                Store::Purge(key.get(), id);
+                Store::RecoverPending(key.get());
+                Store::Cleanup(key.get(), 0);
+                VERIFY_ARE_EQUAL(contents(path), "original disk contents");
+                VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
+                VERIFY_IS_TRUE(isActive(protectedId));
+                const auto journalName = pendingJournal ? keyName(id) : deletedName;
+                const auto journal = registry::OpenKey(key.get(), journalName.c_str(), KEY_READ);
+                VERIFY_ARE_EQUAL(registry::ReadDword(journal.get(), nullptr, L"RecoveryPermanentDelete", 0), 1u);
+                VERIFY_ARE_EQUAL(registry::ReadDword(journal.get(), nullptr, L"RecoveryCleanupPending", 0), 0u);
+                if (recoveryOffline)
+                {
+                    std::filesystem::rename(offlineDirectory, entry.Path.parent_path());
+                }
+                registry::DeleteKey(key.get(), keyName(protectedId).c_str());
+                Store::RecoverPending(key.get());
+                Store::Cleanup(key.get(), 0);
+                VERIFY_IS_FALSE(std::filesystem::exists(path));
+                VERIFY_IS_FALSE(std::filesystem::exists(entry.Path.parent_path()));
+                VERIFY_FAILED(registry::OpenKeyNoThrow(key.get(), keyName(id).c_str(), KEY_READ).second);
+                VERIFY_FAILED(registry::OpenKeyNoThrow(key.get(), deletedName.c_str(), KEY_READ).second);
+            }
+        }
         // A purged disk registered elsewhere is protected and cannot be restored again.
         {
             const auto [id, path] = create();
@@ -7809,14 +7854,14 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
             const auto entry = entryFor(id);
             Store::Cleanup(key.get(), entry.DeletedAt - 1);
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention - 1);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention - 1);
             VERIFY_IS_TRUE(std::filesystem::exists(entry.Path));
             const auto deleted = registry::OpenKey(key.get(), (L"Deleted-" + keyName(id)).c_str(), KEY_READ | KEY_WRITE);
             registry::DeleteValue(deleted.get(), L"DeletedAt");
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_TRUE(std::filesystem::exists(entry.Path));
             registry::WriteQword(deleted.get(), nullptr, L"DeletedAt", entry.DeletedAt);
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
             VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
         }
@@ -7849,7 +7894,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             std::filesystem::rename(offline, path.parent_path());
             VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
             const auto entry = entryFor(id);
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
         }
         // A short-lived handle left by disk teardown is retried, matching existing unregister behavior.
@@ -7864,7 +7909,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
             release.get();
             const auto entry = entryFor(id);
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
         }
         // Replacing a retained file cannot trick cleanup into deleting the replacement.
@@ -7875,17 +7920,17 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             const auto saved = entry.Path.parent_path() / L"saved.vhdx";
             std::filesystem::rename(entry.Path, saved);
             std::ofstream(entry.Path) << "unrelated replacement";
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_ARE_EQUAL(contents(entry.Path), "unrelated replacement");
             VERIFY_FAILED(wil::ResultFromException([&] { Store::Restore(key.get(), entry, L"wrong-file"); }));
             std::filesystem::remove(entry.Path);
             // Reparse points are refused, even when they target the original file.
             VERIFY_WIN32_BOOL_SUCCEEDED(CreateSymbolicLinkW(entry.Path.c_str(), saved.c_str(), SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE));
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_ARE_EQUAL(contents(saved), "original disk contents");
             std::filesystem::remove(entry.Path);
             std::filesystem::rename(saved, entry.Path);
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
         }
         // Missing-disk cleanup must preserve a replacement directory link and its recovery record.
@@ -7901,7 +7946,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             std::ofstream(target / L"keep.txt") << "unrelated contents";
             VERIFY_WIN32_BOOL_SUCCEEDED(CreateSymbolicLinkW(
                 parent.c_str(), target.c_str(), SYMBOLIC_LINK_FLAG_DIRECTORY | SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE));
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_TRUE(std::filesystem::is_symlink(parent));
             VERIFY_IS_TRUE(entryFor(id).Path == entry.Path);
             VERIFY_ARE_EQUAL(contents(saved / entry.Path.filename()), "original disk contents");
@@ -7910,7 +7955,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             std::filesystem::rename(saved, parent);
             // A genuinely missing disk in the original directory can still be cleaned up.
             std::filesystem::remove(entry.Path);
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_FALSE(std::filesystem::exists(parent));
             VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
         }
@@ -7928,7 +7973,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             {
                 std::filesystem::rename(saved / entry.Path.filename(), entry.Path);
             }
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_TRUE(std::filesystem::exists(parent));
             VERIFY_IS_TRUE(entryFor(id).Path == entry.Path);
             VERIFY_ARE_EQUAL(contents(moveDisk ? entry.Path : saved / entry.Path.filename()), "original disk contents");
@@ -7938,7 +7983,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             }
             std::filesystem::remove(parent);
             std::filesystem::rename(saved, parent);
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_FALSE(std::filesystem::exists(parent));
             VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
         }
@@ -8006,7 +8051,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                     }
                     VERIFY_ARE_EQUAL(isActive(id), renamed);
                     VERIFY_ARE_EQUAL(registry::ReadString(journal.get(), nullptr, L"RecoveryPath"), entry.Path.wstring());
-                    Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+                    Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
                     VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
                     if (replacement == 0)
                     {
@@ -8045,13 +8090,13 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             {
                 registry::WriteDword(deleted.get(), nullptr, L"RecoveryDirectoryId", 0);
             }
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
             VERIFY_IS_TRUE(entryFor(id).Path == entry.Path);
             VERIFY_ARE_EQUAL(
                 RegSetValueExW(deleted.get(), L"RecoveryDirectoryId", 0, REG_BINARY, reinterpret_cast<const BYTE*>(&identity), sizeof(identity)),
                 ERROR_SUCCESS);
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_FALSE(std::filesystem::exists(entry.Path.parent_path()));
             VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
         }
@@ -8067,12 +8112,12 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             }
             const auto extra = entry.Path.parent_path() / L"keep.txt";
             std::ofstream(extra) << "unrelated contents";
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
             VERIFY_IS_TRUE(entryFor(id).Path == entry.Path);
             VERIFY_ARE_EQUAL(contents(extra), "unrelated contents");
             std::filesystem::remove(extra);
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_FALSE(std::filesystem::exists(entry.Path.parent_path()));
             VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
         }
@@ -8097,9 +8142,9 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                 }
                 else
                 {
-                    Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention - 1);
+                    Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention - 1);
                     VERIFY_IS_TRUE(entryFor(id).Path == entry.Path);
-                    Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+                    Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
                 }
                 VERIFY_ARE_EQUAL(Store::Enumerate(key.get(), true).size(), 0u);
             }
@@ -8129,13 +8174,13 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                 VERIFY_WIN32_BOOL_SUCCEEDED(CreateSymbolicLinkW(
                     parent.c_str(), target.c_str(), SYMBOLIC_LINK_FLAG_DIRECTORY | SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE));
             }
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_TRUE(entryFor(id).Path == entry.Path);
             VERIFY_ARE_EQUAL(contents(saved / entry.Path.filename()), "original disk contents");
             // RemoveDirectory removes the link itself, without requiring its target.
             VERIFY_WIN32_BOOL_SUCCEEDED(RemoveDirectoryW(parent.c_str()));
             std::filesystem::rename(saved, parent);
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_FALSE(std::filesystem::exists(parent));
             VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
         }
@@ -8166,7 +8211,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                 Store::RecoverPending(key.get());
                 VERIFY_IS_FALSE(isActive(id));
                 const auto entry = entryFor(id);
-                Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+                Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
                 VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
             }
             else
@@ -8207,7 +8252,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                 registry::WriteString(collision.get(), nullptr, L"BasePath", path.parent_path().c_str());
                 registry::WriteString(collision.get(), nullptr, L"DistributionName", L"unrelated-registration");
                 Store::RecoverPending(key.get());
-                Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+                Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
                 VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
                 VERIFY_IS_TRUE(entryFor(id).Path == entry.Path);
                 VERIFY_ARE_EQUAL(registry::ReadString(collision.get(), nullptr, L"DistributionName"), L"unrelated-registration");
@@ -8224,7 +8269,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             VERIFY_ARE_EQUAL(registry::ReadDword(restored.get(), nullptr, L"DefaultUid", 0), 1234u);
             VERIFY_ARE_EQUAL(registry::ReadDword(restored.get(), nullptr, L"RecoveryRestored", 0), 0u);
             VERIFY_IS_FALSE(registry::ReadOptionalString(restored.get(), nullptr, L"RecoveryPath").has_value());
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
         }
         // Pending restore recovery must not register a replacement disk under either key name.
@@ -8253,7 +8298,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                 VERIFY_ARE_EQUAL(registry::ReadDword(pending.get(), nullptr, marker, 0), 1u);
                 VERIFY_IS_TRUE(registry::ReadOptionalString(pending.get(), nullptr, L"RecoveryPath").has_value());
                 VERIFY_ARE_EQUAL(registry::ReadDword(pending.get(), nullptr, L"State", 0), static_cast<DWORD>(LxssDistributionStateDeleted));
-                Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+                Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
                 VERIFY_ARE_EQUAL(contents(entry.Path), "unrelated replacement");
                 VERIFY_ARE_EQUAL(contents(saved), "original disk contents");
                 std::filesystem::remove(entry.Path);
@@ -8310,7 +8355,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             const auto restored = registry::OpenKey(key.get(), keyName(id).c_str(), KEY_READ);
             VERIFY_ARE_EQUAL(registry::ReadString(restored.get(), nullptr, L"DistributionName"), L"interrupted-restore");
             VERIFY_ARE_EQUAL(registry::ReadString(restored.get(), nullptr, L"BasePath"), entry.Path.parent_path().wstring());
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
         }
         // A pending restore remains protected from expiry even if recovery cannot complete it.
@@ -8322,11 +8367,11 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             const auto deleted = registry::OpenKey(key.get(), deletedName.c_str(), KEY_READ | KEY_WRITE);
             registry::WriteDword(deleted.get(), nullptr, L"RecoveryRestorePending", 1);
             Store::RecoverPending(key.get());
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
             VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 1u);
             registry::DeleteValue(deleted.get(), L"RecoveryRestorePending");
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
         }
         // Startup finishes the journal after a move, before the registration rename committed.
@@ -8338,7 +8383,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             Store::RecoverPending(key.get());
             VERIFY_IS_FALSE(isActive(id));
             VERIFY_ARE_EQUAL(contents(entryFor(id).Path), "original disk contents");
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
         }
         // An unmoved journal is cleared only after removing the original empty recovery directory.
         for (const auto scenario : {L"empty", L"nonempty", L"replaced", L"removed"})
@@ -8396,7 +8441,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             const auto offline = directory.parent_path() / (directory.filename().wstring() + L"-offline");
             std::filesystem::rename(directory, offline);
             auto bringOnline = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { std::filesystem::rename(offline, directory); });
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 1u);
             VERIFY_ARE_EQUAL(RegRenameKey(key.get(), (L"Deleted-" + keyName(id)).c_str(), keyName(id).c_str()), ERROR_SUCCESS);
             Store::RecoverPending(key.get());
@@ -8406,7 +8451,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             bringOnline.release();
             Store::RecoverPending(key.get());
             VERIFY_IS_FALSE(isActive(id));
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
         }
         // A disk manually imported in place is no longer eligible for deletion.
@@ -8417,10 +8462,10 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             const auto [activeId, unusedPath] = create();
             const auto active = registry::OpenKey(key.get(), keyName(activeId).c_str(), KEY_READ | KEY_WRITE);
             registry::WriteString(active.get(), nullptr, L"BasePath", entry.Path.parent_path().c_str());
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_TRUE(std::filesystem::exists(entry.Path));
             registry::DeleteKey(key.get(), keyName(activeId).c_str());
-            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
         }
     }
@@ -8714,7 +8759,16 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_IS_TRUE(expired != entries.end());
         const auto expiredKey = registry::OpenKey(
             userKey.get(), (L"Deleted-" + wsl::shared::string::GuidToString<wchar_t>(expired->Id)).c_str(), KEY_READ | KEY_WRITE);
-        registry::WriteQword(expiredKey.get(), nullptr, L"DeletedAt", Store::Now() - Store::Retention - 1);
+        // Keep the expired disk busy so cleanup cannot remove the record before
+        // the command reports the localized recovery deadline to the user.
+        wil::unique_hfile busyExpired{CreateFileW(expired->Path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr)};
+        VERIFY_IS_TRUE(!!busyExpired);
+        registry::WriteQword(expiredKey.get(), nullptr, L"DeletedAt", Store::Now() - Store::c_retention - 1);
+        const auto [expiredOutput, expiredError] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--restore-distribution {}", name), -1);
+        VERIFY_IS_TRUE(expiredOutput.find(L"24-hour recovery period has expired") != std::wstring::npos);
+        VERIFY_ARE_EQUAL(expiredError, L"");
+        VERIFY_IS_TRUE(std::filesystem::exists(expired->Path));
+        busyExpired.reset();
         std::filesystem::create_directories(install);
         std::ofstream(install / L"keep.txt") << "must survive";
         // Wait for the service timer without invoking any command that itself triggers cleanup.
@@ -8731,7 +8785,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_IS_TRUE(pending != pendingEntries.end());
         const auto pendingKey = registry::OpenKey(
             userKey.get(), (L"Deleted-" + wsl::shared::string::GuidToString<wchar_t>(pending->Id)).c_str(), KEY_READ | KEY_WRITE);
-        registry::WriteQword(pendingKey.get(), nullptr, L"DeletedAt", Store::Now() - Store::Retention - 1);
+        registry::WriteQword(pendingKey.get(), nullptr, L"DeletedAt", Store::Now() - Store::c_retention - 1);
         RestartWslService();
         LxsstuLaunchWslAndCaptureOutput(L"--list --deleted");
         VERIFY_IS_FALSE(std::filesystem::exists(pending->Path));

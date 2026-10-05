@@ -15,7 +15,7 @@ public:
         ULONG64 DeletedAt;
     };
 
-    static constexpr ULONG64 Retention = 24ULL * 60 * 60 * 10000000;
+    static constexpr ULONG64 c_retention = 24ULL * 60 * 60 * 10000000;
     static ULONG64 Now();
     static bool Retain(HKEY LxssKey, const GUID& Id, const std::filesystem::path& VhdPath);
     static std::vector<Entry> Enumerate(HKEY LxssKey, bool IncludePermanentDelete = false);
