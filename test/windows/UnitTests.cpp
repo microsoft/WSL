@@ -8220,6 +8220,97 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         });
     }
 
+    TEST_METHOD(UnregisterRecoveryStoreMaintenance)
+    {
+        using Store = wsl::windows::common::DeletedDistributionStore;
+        namespace registry = wsl::windows::common::registry;
+        // A busy foreground operation stops journal recovery without reactivating a pending registration.
+        WithRecoveryStore(
+            [](const auto& key, const auto& directory, const auto& keyName, const auto& create, const auto& entryFor, const auto& isActive, const auto& contents) {
+                const auto [id, path] = create();
+                VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+                const auto entry = entryFor(id);
+                std::filesystem::rename(entry.Path, path);
+                VERIFY_ARE_EQUAL(RegRenameKey(key.get(), (L"Deleted-" + keyName(id)).c_str(), keyName(id).c_str()), ERROR_SUCCESS);
+                const auto journal = registry::OpenKey(key.get(), keyName(id).c_str(), KEY_READ | KEY_WRITE);
+                registry::WriteDword(journal.get(), nullptr, L"State", LxssDistributionStateUninstalling);
+                unsigned calls{};
+                Store::RecoverPending(key.get(), [&] {
+                    ++calls;
+                    return false;
+                });
+                VERIFY_ARE_EQUAL(calls, 1u);
+                VERIFY_ARE_EQUAL(registry::ReadString(journal.get(), nullptr, L"RecoveryPath"), entry.Path.wstring());
+                VERIFY_ARE_EQUAL(registry::ReadDword(journal.get(), nullptr, L"State", 0), static_cast<DWORD>(LxssDistributionStateUninstalling));
+                VERIFY_ARE_EQUAL(contents(path), "original disk contents");
+                Store::RecoverPending(key.get());
+                VERIFY_IS_FALSE(registry::ReadOptionalString(journal.get(), nullptr, L"RecoveryPath").has_value());
+                VERIFY_ARE_EQUAL(registry::ReadDword(journal.get(), nullptr, L"State", 0), static_cast<DWORD>(LxssDistributionStateInstalled));
+            });
+        // Cleanup yields before every record and can stop after one deletion without touching the next disk.
+        WithRecoveryStore(
+            [](const auto& key, const auto& directory, const auto& keyName, const auto& create, const auto& entryFor, const auto& isActive, const auto& contents) {
+                const auto [firstId, firstPath] = create();
+                const auto [secondId, secondPath] = create();
+                VERIFY_IS_TRUE(Store::Retain(key.get(), firstId, firstPath));
+                VERIFY_IS_TRUE(Store::Retain(key.get(), secondId, secondPath));
+                const auto first = entryFor(firstId);
+                const auto second = entryFor(secondId);
+                const auto expired = std::max(first.DeletedAt, second.DeletedAt) + Store::c_retention;
+                unsigned calls{};
+                Store::Cleanup(key.get(), expired, [&] {
+                    ++calls;
+                    return false;
+                });
+                VERIFY_ARE_EQUAL(calls, 1u);
+                VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 2u);
+                VERIFY_ARE_EQUAL(contents(first.Path), "original disk contents");
+                VERIFY_ARE_EQUAL(contents(second.Path), "original disk contents");
+                calls = 0;
+                Store::Cleanup(key.get(), expired, [&] { return ++calls < 2; });
+                VERIFY_ARE_EQUAL(calls, 2u);
+                const auto remaining = Store::Enumerate(key.get());
+                VERIFY_ARE_EQUAL(remaining.size(), 1u);
+                VERIFY_ARE_EQUAL(contents(remaining.front().Path), "original disk contents");
+                Store::Cleanup(key.get(), expired);
+                VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
+            });
+        // Foreground restore/unregister can replace a snapshotted record. Cleanup must use its current path and deadline.
+        for (const bool renewDeadline : {false, true})
+        {
+            WithRecoveryStore(
+                [&](const auto& key, const auto& directory, const auto& keyName, const auto& create, const auto& entryFor, const auto& isActive, const auto& contents) {
+                    const auto [id, path] = create();
+                    VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+                    const auto entry = entryFor(id);
+                    auto refreshed = entry;
+                    unsigned calls{};
+                    Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention, [&] {
+                        VERIFY_ARE_EQUAL(++calls, 1u);
+                        Store::Restore(key.get(), entry, L"foreground-restored");
+                        VERIFY_IS_TRUE(Store::Retain(key.get(), id, entry.Path));
+                        refreshed = entryFor(id);
+                        VERIFY_IS_TRUE(refreshed.Path != entry.Path);
+                        const auto journal = registry::OpenKey(key.get(), (L"Deleted-" + keyName(id)).c_str(), KEY_READ | KEY_WRITE);
+                        refreshed.DeletedAt = entry.DeletedAt + (renewDeadline ? 1 : 0);
+                        registry::WriteQword(journal.get(), nullptr, L"DeletedAt", refreshed.DeletedAt);
+                        std::ofstream(entry.Path) << "unrelated replacement";
+                        return true;
+                    });
+                    VERIFY_ARE_EQUAL(calls, 1u);
+                    VERIFY_ARE_EQUAL(contents(entry.Path), "unrelated replacement");
+                    if (renewDeadline)
+                    {
+                        VERIFY_ARE_EQUAL(entryFor(id).Path, refreshed.Path);
+                        VERIFY_ARE_EQUAL(contents(refreshed.Path), "original disk contents");
+                        Store::Cleanup(key.get(), refreshed.DeletedAt + Store::c_retention);
+                    }
+                    VERIFY_IS_FALSE(std::filesystem::exists(refreshed.Path));
+                    VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
+                });
+        }
+    }
+
     TEST_METHOD(UnregisterRecoveryStoreDirectorySafety)
     {
         using Store = wsl::windows::common::DeletedDistributionStore;

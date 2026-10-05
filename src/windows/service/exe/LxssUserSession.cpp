@@ -675,13 +675,20 @@ try
     {
         return;
     }
-    // Keep registration changes serialized through ownership checks and disk
-    // deletion: releasing this lock after a snapshot could delete a disk that
-    // a concurrent import has just registered.
+    // Yield between records so foreground work need not wait for the entire
+    // batch. Each ownership check and disk deletion remains serialized with
+    // imports; abandon this pass if foreground work acquires the lock.
+    const auto yieldBetweenEntries = [&lock] {
+        lock.unlock();
+        return lock.try_lock();
+    };
     auto impersonate = wil::impersonate_token(self->m_recoveryToken.get());
     const auto key = wsl::windows::common::registry::OpenLxssUserKey();
-    wsl::windows::common::DeletedDistributionStore::RecoverPending(key.get());
-    wsl::windows::common::DeletedDistributionStore::Cleanup(key.get());
+    wsl::windows::common::DeletedDistributionStore::RecoverPending(key.get(), yieldBetweenEntries);
+    if (lock.owns_lock())
+    {
+        wsl::windows::common::DeletedDistributionStore::Cleanup(key.get(), wsl::windows::common::DeletedDistributionStore::Now(), yieldBetweenEntries);
+    }
 }
 CATCH_LOG()
 

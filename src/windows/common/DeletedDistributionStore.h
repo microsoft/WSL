@@ -32,8 +32,10 @@ public:
     static std::vector<Entry> Enumerate(HKEY LxssKey, bool IncludePermanentDelete = false);
     static void Restore(HKEY LxssKey, const Entry& Distribution, LPCWSTR Name);
     static void Purge(HKEY LxssKey, const GUID& Id);
-    static void RecoverPending(HKEY LxssKey) noexcept;
-    static void Cleanup(HKEY LxssKey, ULONG64 CurrentTime = Now()) noexcept;
+    // Background callers may yield their operation lock between records. The
+    // callback must reacquire it before returning true; false stops this pass.
+    static void RecoverPending(HKEY LxssKey, const std::function<bool()>& YieldBetweenEntries = {}) noexcept;
+    static void Cleanup(HKEY LxssKey, ULONG64 CurrentTime = Now(), const std::function<bool()>& YieldBetweenEntries = {}) noexcept;
 };
 
 } // namespace wsl::windows::common

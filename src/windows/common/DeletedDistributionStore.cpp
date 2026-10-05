@@ -592,7 +592,7 @@ void DeletedDistributionStore::Purge(HKEY lxssKey, const GUID& id)
     Cleanup(lxssKey);
 }
 
-void DeletedDistributionStore::RecoverPending(HKEY lxssKey) noexcept
+void DeletedDistributionStore::RecoverPending(HKEY lxssKey, const std::function<bool()>& yieldBetweenEntries) noexcept
 try
 {
     auto registrations = EnumGuidKeys(lxssKey);
@@ -602,6 +602,10 @@ try
     }
     for (const auto& [id, name] : registrations)
     {
+        if (yieldBetweenEntries && !yieldBetweenEntries())
+        {
+            return;
+        }
         try
         {
             const auto key = OpenKey(lxssKey, name.c_str(), KEY_READ | KEY_WRITE);
@@ -772,18 +776,26 @@ try
 }
 CATCH_LOG()
 
-void DeletedDistributionStore::Cleanup(HKEY lxssKey, ULONG64 currentTime) noexcept
+void DeletedDistributionStore::Cleanup(HKEY lxssKey, ULONG64 currentTime, const std::function<bool()>& yieldBetweenEntries) noexcept
 try
 {
     for (const auto& entry : Enumerate(lxssKey, true))
     {
+        if (yieldBetweenEntries && !yieldBetweenEntries())
+        {
+            return;
+        }
         try
         {
             const auto key = OpenKey(lxssKey, KeyName(entry.Id, true).c_str(), KEY_READ | KEY_WRITE);
+            // A foreground restore/unregister may have replaced this record
+            // while the operation lock was released. Use its current journal.
+            const auto deletedAt = ReadQword(key.get(), nullptr, c_deletedAt, 0);
+            const auto path = std::filesystem::path(ReadString(key.get(), nullptr, c_recoveryPath));
             // Permanent deletion is explicit; ordinary retention still protects
             // missing/corrupt timestamps and clocks moving backwards.
             if (!ReadDword(key.get(), nullptr, c_permanentDelete, 0) &&
-                (entry.DeletedAt == 0 || currentTime < entry.DeletedAt || currentTime - entry.DeletedAt < c_retention))
+                (deletedAt == 0 || currentTime < deletedAt || currentTime - deletedAt < c_retention))
             {
                 continue;
             }
@@ -792,7 +804,7 @@ try
             {
                 continue;
             }
-            const auto recoveryDirectory = entry.Path.parent_path();
+            const auto recoveryDirectory = path.parent_path();
             if (DirectoryWasDeleted(key.get(), recoveryDirectory))
             {
                 if (ReadDword(key.get(), nullptr, c_permanentDelete, 0) && !DeleteOriginalDisk(lxssKey, key.get()))
@@ -805,7 +817,7 @@ try
             // Keep the verified directory locked against replacement until deletion completes.
             const auto directory = OpenDirectory(recoveryDirectory);
             VerifyIdentity(key.get(), directory.get(), c_recoveryDirectoryId);
-            auto file = OpenDisk(entry.Path);
+            auto file = OpenDisk(path);
             if (file)
             {
                 VerifyIdentity(key.get(), file.get());
