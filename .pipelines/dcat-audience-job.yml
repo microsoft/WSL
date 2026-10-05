@@ -20,8 +20,11 @@ parameters:
     type: object
     default: [x64, arm64]
 
-  - name: isProduction
-    type: boolean
+  # Build pipeline from which to retrieve the JSON inputs for DCAT.
+  # Defaults to the current pipeline if empty.
+  - name: artifactPipeline
+    type: string
+    default: ''
 
   - name: dcat
     type: object
@@ -31,25 +34,21 @@ jobs:
     displayName: ${{ parameters.displayName }}
     dependsOn: ${{ parameters.dependsOn }}
     pool:
-      name: Azure-Pipelines-1ESPT-ExDShared-StaticIP
-      image: windows-2022
+      type: release
       os: windows
 
     variables:
       dcatSubmissionPath: $(Pipeline.Workspace)\dcat
 
     templateContext:
-      type: releaseJob
-      isProduction: ${{ parameters.isProduction }}
       inputs:
         - input: pipelineArtifact
-          pipeline: releaseBuild
+          ${{ if ne(parameters.artifactPipeline, '') }}:
+            pipeline: ${{ parameters.artifactPipeline }}
           artifactName: drop_wsl_dcat
           targetPath: $(Pipeline.Workspace)\dcat
 
     steps:
-      - checkout: none
-
       - ${{ each platform in parameters.platforms }}:
           - task: dcat-publishing@1
             displayName: Add ${{ parameters.audience }} audience (${{ platform }})

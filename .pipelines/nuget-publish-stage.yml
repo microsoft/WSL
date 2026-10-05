@@ -1,5 +1,9 @@
 # Publishes the release NuGet packages to nuget.org.
 parameters:
+  - name: bypassTests
+    type: boolean
+    default: false
+
   - name: packages
     type: object
     default:
@@ -7,31 +11,40 @@ parameters:
       - Microsoft.WSL.Containers
 
 stages:
-  - stage: nuget
-    displayName: NuGet
-    trigger: manual
-    dependsOn: []
+  - template: publish-gate-stage.yml
+    parameters:
+      name: gate_nuget_org
+      displayName: Gate - NuGet.org
+      releaseEnvironment: Production
+
+  - stage: nuget_org
+    displayName: NuGet.org
+    dependsOn:
+      - gate_nuget_org
+      - package
+      - ${{ if eq(parameters.bypassTests, false) }}:
+          - test
+    variables:
+      ob_release_environment: Production
     jobs:
-      - job: nuget
-        displayName: Push packages to NuGet.org
+      - ${{ each package in parameters.packages }}:
+          - job: nuget_${{ replace(package, '.', '_') }}
+            displayName: Push ${{ package }} to NuGet.org
+            pool:
+              type: release
+              os: windows
 
-        variables:
-          nugetPath: $(Pipeline.Workspace)\package\nuget
+            variables:
+              nugetPath: $(Pipeline.Workspace)\package\nuget
 
-        templateContext:
-          type: releaseJob
-          isProduction: true # Pushes to the real nuget.org feed.
-          inputs:
-            - input: pipelineArtifact
-              pipeline: releaseBuild
-              artifactName: drop_wsl_package
-              targetPath: $(Pipeline.Workspace)\package
-              itemPattern: nuget/*.nupkg
+            templateContext:
+              inputs:
+                - input: pipelineArtifact
+                  artifactName: drop_wsl_package
+                  targetPath: $(Pipeline.Workspace)\package
+                  itemPattern: nuget/${{ package }}.*.nupkg
 
-        steps:
-          - checkout: none
-
-          - ${{ each package in parameters.packages }}:
+            steps:
               - task: NuGetCommand@2
                 displayName: Push ${{ package }}
                 inputs:

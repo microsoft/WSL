@@ -11,10 +11,17 @@ parameters:
     type: string
     default: ''
 
+  - name: bypassTests
+    type: boolean
+    default: false
+
 stages:
   - stage: github_release
     displayName: GitHub release
-    dependsOn: [test, package]
+    dependsOn:
+      - package
+      - ${{ if eq(parameters.bypassTests, false) }}:
+          - test
     jobs:
       - job: github_release
         displayName: Create GitHub release

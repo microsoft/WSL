@@ -1,5 +1,5 @@
-# Non-production counterpart to wsl-publish.yml: publishes the artifacts produced by the
-# wsl-github-release pipeline to DCAT PPE. Does not publish to Store or NuGet.
+# Development pipeline for testing publishing changes against DCAT PPE. It uses artifacts from an
+# existing wsl-github-release run selected when the pipeline is manually queued.
 
 trigger: none
 pr: none
@@ -8,29 +8,32 @@ resources:
   pipelines:
     - pipeline: releaseBuild
       source: '\OneBranch\wsl-github-release'
-      trigger: true
 
   repositories:
-    - repository: 1ESPipelineTemplates
+    - repository: templates
       type: git
-      name: 1ESPipelineTemplates/1ESPipelineTemplates
-      ref: refs/tags/release
+      name: OneBranch.Pipelines/GovernedTemplates
+      ref: refs/heads/main
 
 extends:
-  template: v1/1ES.Unofficial.PipelineTemplate.yml@1ESPipelineTemplates
+  template: v2/Microsoft.NonOfficial.yml@templates
   parameters:
-    pool:
-      name: Azure-Pipelines-1ESPT-ExDShared
-      image: windows-2022
-      os: windows
-
-    settings:
-      networkIsolationPolicy: Permissive
+    release:
+      category: NonAzure
+    platform:
+      name: windows_undocked
+    featureFlags:
+      WindowsHostVersion: 1ESWindows2022
+    globalSdl:
+      tsa:
+        enabled: false
 
     stages:
       - template: dcat-publish-stages.yml@self
         parameters:
-          isProduction: false
+          artifactPipeline: releaseBuild
+          releaseEnvironment: PPE
+          updateRunName: true
           dcat:
             environment: PPE
             serviceConnection: wsl-dcat-publish-ppe

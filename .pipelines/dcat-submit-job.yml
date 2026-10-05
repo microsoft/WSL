@@ -19,8 +19,16 @@ parameters:
     type: object
     default: [x64, arm64]
 
-  - name: isProduction
+  # Build pipeline from which to retrieve the JSON inputs for DCAT.
+  # Defaults to the current pipeline if empty.
+  - name: artifactPipeline
+    type: string
+    default: ''
+
+  # If true, the pipeline run name will be updated to reflect the version being published.
+  - name: updateRunName
     type: boolean
+    default: false
 
   - name: dcat
     type: object
@@ -31,8 +39,7 @@ jobs:
     dependsOn: ${{ parameters.dependsOn }}
     timeoutInMinutes: 30
     pool:
-      name: Azure-Pipelines-1ESPT-ExDShared-StaticIP
-      image: windows-2022
+      type: release
       os: windows
 
     variables:
@@ -40,41 +47,41 @@ jobs:
       dcatContentPath: $(Pipeline.Workspace)\dcat-content
 
     templateContext:
-      type: releaseJob
-      isProduction: ${{ parameters.isProduction }}
       inputs:
         - input: pipelineArtifact
-          pipeline: releaseBuild
+          ${{ if ne(parameters.artifactPipeline, '') }}:
+            pipeline: ${{ parameters.artifactPipeline }}
           artifactName: drop_wsl_dcat
           targetPath: $(Pipeline.Workspace)\dcat
 
         # The build artifacts are large, so only pull the CABs that are actually submitted.
         - input: pipelineArtifact
-          pipeline: releaseBuild
+          ${{ if ne(parameters.artifactPipeline, '') }}:
+            pipeline: ${{ parameters.artifactPipeline }}
           artifactName: drop_wsl_build
           targetPath: $(Pipeline.Workspace)\drop_x64
           itemPattern: bundle/*.cab
 
         - input: pipelineArtifact
-          pipeline: releaseBuild
+          ${{ if ne(parameters.artifactPipeline, '') }}:
+            pipeline: ${{ parameters.artifactPipeline }}
           artifactName: drop_wsl_build_arm64
           targetPath: $(Pipeline.Workspace)\drop_arm64
           itemPattern: bundle/*.cab
 
     steps:
-      - checkout: none
-
-      - pwsh: |
-          # Surface the version being published as the run name. The version is extracted from the CAB file name.
-          $anyCab = Get-ChildItem -Path '$(Pipeline.Workspace)' -Recurse -Filter '*.cab' | Select-Object -First 1
-          if (-not $anyCab) {
-              throw 'No CAB file found in downloaded artifacts.'
-          }
-          if ($anyCab.Name -notmatch '^wsl\.(?<version>[\d.]+)\.(x64|arm64)\.cab$') {
-              throw "Unrecognized CAB file name '$($anyCab.Name)'."
-          }
-          Write-Host "##vso[build.updatebuildnumber]$($Matches.version)"
-        displayName: Determine published version
+      - ${{ if eq(parameters.updateRunName, true) }}:
+          - pwsh: |
+              # Surface the version being published as the run name. The version is extracted from the CAB file name.
+              $anyCab = Get-ChildItem -Path '$(Pipeline.Workspace)' -Recurse -Filter '*.cab' | Select-Object -First 1
+              if (-not $anyCab) {
+                  throw 'No CAB file found in downloaded artifacts.'
+              }
+              if ($anyCab.Name -notmatch '^wsl\.(?<version>[\d.]+)\.(x64|arm64)\.cab$') {
+                  throw "Unrecognized CAB file name '$($anyCab.Name)'."
+              }
+              Write-Host "##vso[build.updatebuildnumber]$($Matches.version)"
+            displayName: Determine published version
 
       - ${{ each platform in parameters.platforms }}:
           - pwsh: |

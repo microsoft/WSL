@@ -13,14 +13,20 @@ parameters:
   - name: displayName
     type: string
 
+  - name: releaseEnvironment
+    type: string
+
 stages:
   - stage: ${{ parameters.name }}
     displayName: ${{ parameters.displayName }}
     trigger: manual
+    variables:
+      ob_release_environment: ${{ parameters.releaseEnvironment }}
     jobs:
       - job: gate
         displayName: Gate
-        pool: server
+        pool:
+          type: server
         steps:
           - task: Delay@1
             displayName: No-op

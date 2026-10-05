@@ -3,15 +3,35 @@
 # This is transitional: Store distribution goes away once DCAT takes over, so this is a verbatim port of
 # what the release build used to do inline rather than an attempt to improve it.
 
+parameters:
+  - name: bypassTests
+    type: boolean
+    default: false
+
+  - name: publishPackage
+    type: boolean
+    default: false
+
+  - name: pushToStore
+    type: boolean
+    default: true
+
 stages:
   - stage: store_flight
     displayName: Microsoft Store - SelfHost flight
-    trigger: manual
-    dependsOn: []
+    dependsOn:
+      - package
+      - ${{ if eq(parameters.bypassTests, false) }}:
+          - test
+    variables:
+      ob_release_environment: Production
     jobs:
       - job: flight
         displayName: Flight StoreBroker package
         timeoutInMinutes: 60
+        pool:
+          type: release
+          os: windows
 
         variables:
           AppId: 9P9TQF7MRM4R
@@ -19,20 +39,16 @@ stages:
           StoreBrokerPayloadPath: $(Pipeline.Workspace)\store\StoreBrokerPayload
 
         templateContext:
-          type: releaseJob
-          isProduction: true # Flights to Partner Center, a real production system.
           inputs:
             - input: pipelineArtifact
-              pipeline: releaseBuild
               artifactName: drop_wsl_package
               targetPath: $(Pipeline.Workspace)\store
               itemPattern: StoreBrokerPayload/*
 
         steps:
-          - checkout: none
-
           - task: MS-RDX-MRO.windows-store-publish.flight-task.store-flight@3
             displayName: 'Flight StoreBroker Package to Partner Center - WSL SelfHost Flight Group'
+            condition: and(succeeded(), eq('${{ parameters.publishPackage }}', true), eq('${{ parameters.pushToStore }}', true))
             inputs:
               serviceEndpoint: 'AzureConnection-StoreBroker-WIF'
               appId: $(AppId)

@@ -3,8 +3,25 @@ parameters:
     type: object
     default: [x64, arm64]
 
-  - name: isProduction
+  - name: artifactPipeline
+    type: string
+    default: ''
+
+  - name: initialDependsOn
+    type: object
+    default: []
+
+  # OneBranch requires every release stage to declare whether it targets PPE or Production so the
+  # governed template can apply the appropriate release controls.
+  - name: releaseEnvironment
+    type: string
+    values:
+      - PPE
+      - Production
+
+  - name: updateRunName
     type: boolean
+    default: false
 
   - name: dcat
     type: object
@@ -13,7 +30,9 @@ stages:
   # Internal ring. Runs automatically.
   - stage: dcat_internal
     displayName: DCAT - internal ring
-    dependsOn: []
+    dependsOn: ${{ parameters.initialDependsOn }}
+    variables:
+      ob_release_environment: ${{ parameters.releaseEnvironment }}
     jobs:
       - template: dcat-submit-job.yml
         parameters:
@@ -21,7 +40,8 @@ stages:
           displayName: Submit MSFlight content
           distributionIntent: MSFlight
           platforms: ${{ parameters.platforms }}
-          isProduction: ${{ parameters.isProduction }}
+          artifactPipeline: ${{ parameters.artifactPipeline }}
+          updateRunName: ${{ parameters.updateRunName }}
           dcat: ${{ parameters.dcat }}
 
       - template: dcat-audience-job.yml
@@ -31,7 +51,7 @@ stages:
           audience: Internal
           dependsOn: [submit_msflight]
           platforms: ${{ parameters.platforms }}
-          isProduction: ${{ parameters.isProduction }}
+          artifactPipeline: ${{ parameters.artifactPipeline }}
           dcat: ${{ parameters.dcat }}
 
   # Preview ring.
@@ -39,10 +59,13 @@ stages:
     parameters:
       name: gate_preview
       displayName: Gate - preview ring
+      releaseEnvironment: ${{ parameters.releaseEnvironment }}
 
   - stage: dcat_preview
     displayName: DCAT - preview ring
     dependsOn: [gate_preview, dcat_internal]
+    variables:
+      ob_release_environment: ${{ parameters.releaseEnvironment }}
     jobs:
       - template: dcat-submit-job.yml
         parameters:
@@ -50,7 +73,8 @@ stages:
           displayName: Submit External content
           distributionIntent: External
           platforms: ${{ parameters.platforms }}
-          isProduction: ${{ parameters.isProduction }}
+          artifactPipeline: ${{ parameters.artifactPipeline }}
+          updateRunName: ${{ parameters.updateRunName }}
           dcat: ${{ parameters.dcat }}
 
       - template: dcat-audience-job.yml
@@ -60,18 +84,21 @@ stages:
           audience: Insider
           dependsOn: [submit_external]
           platforms: ${{ parameters.platforms }}
-          isProduction: ${{ parameters.isProduction }}
+          artifactPipeline: ${{ parameters.artifactPipeline }}
           dcat: ${{ parameters.dcat }}
 
   - template: publish-gate-stage.yml
     parameters:
       name: gate_broad
       displayName: Gate - broad ring
+      releaseEnvironment: ${{ parameters.releaseEnvironment }}
 
   # Public release.
   - stage: dcat_broad
     displayName: DCAT - broad ring
     dependsOn: [gate_broad, dcat_preview]
+    variables:
+      ob_release_environment: ${{ parameters.releaseEnvironment }}
     jobs:
       - template: dcat-audience-job.yml
         parameters:
@@ -79,5 +106,5 @@ stages:
           displayName: Add public audience
           audience: Public
           platforms: ${{ parameters.platforms }}
-          isProduction: ${{ parameters.isProduction }}
+          artifactPipeline: ${{ parameters.artifactPipeline }}
           dcat: ${{ parameters.dcat }}
