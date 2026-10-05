@@ -402,12 +402,13 @@ HcsVirtualMachineBackend::~HcsVirtualMachineBackend() noexcept
         CloseGuestListenersLocked(m_configuration.Description.Identity);
     }
 
-    if (system)
+    // Device hosts must be shut down while the compute system and callback context still exist.
+    guestDeviceManager.reset();
+    if (system && !m_exitEvent.is_signaled())
     {
         LOG_IF_FAILED(wil::ResultFromException([&] { schema::TerminateComputeSystem(system.get()); }));
     }
     system.reset();
-    guestDeviceManager.reset();
     CleanupAttachedDisks(std::move(attachedDisks));
 
     try
@@ -624,9 +625,10 @@ void HcsVirtualMachineBackend::Terminate()
         CloseGuestListenersLocked(m_configuration.Description.Identity);
     }
 
+    guestDeviceManager.reset();
+
     auto cleanup = wil::scope_exit([&] {
         system.reset();
-        guestDeviceManager.reset();
         CleanupAttachedDisks(std::move(attachedDisks));
         m_terminatingEvent.SetEvent();
         NotifyTerminated(m_configuration.Description.Identity);

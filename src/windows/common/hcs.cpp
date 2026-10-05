@@ -532,10 +532,19 @@ void wsl::windows::common::hcs::TerminateComputeSystem(_In_ HCS_SYSTEM ComputeSy
     ExecutionContext context(Context::HCS);
 
     const unique_hcs_operation operation = CreateOperation();
-    THROW_IF_FAILED(::HcsTerminateComputeSystem(ComputeSystem, operation.get(), nullptr));
+    auto result = ::HcsTerminateComputeSystem(ComputeSystem, operation.get(), nullptr);
+    if (result == HCS_E_SYSTEM_ALREADY_STOPPED)
+    {
+        return;
+    }
+    THROW_IF_FAILED(result);
 
     wil::unique_cotaskmem_string resultDocument;
-    const auto result = ::HcsWaitForOperationResult(operation.get(), INFINITE, &resultDocument);
+    result = ::HcsWaitForOperationResult(operation.get(), INFINITE, &resultDocument);
+    if (result == HCS_E_SYSTEM_ALREADY_STOPPED)
+    {
+        return;
+    }
     THROW_IF_FAILED_MSG(result, "HcsTerminateComputeSystem failed (error string: %ls)", resultDocument.get());
 }
 
