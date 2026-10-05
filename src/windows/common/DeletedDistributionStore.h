@@ -1,7 +1,11 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 #pragma once
 
+#include <filesystem>
 #include <functional>
+#include <string>
+#include <vector>
+#include <windows.h>
 
 namespace wsl::windows::common {
 

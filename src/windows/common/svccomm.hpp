@@ -116,6 +116,8 @@ public:
     void MoveDistribution(_In_ const GUID& DistroGuid, _In_ LPCWSTR Location) const;
 
 private:
+    wil::com_ptr<ILxssUserSession2> RecoverySession() const;
+
     wil::com_ptr<ILxssUserSession> m_userSession;
 };
 } // namespace wsl::windows::common

@@ -66,7 +66,12 @@ enum class ShutdownBehavior
 /// </summary>
 
 class DECLSPEC_UUID("a9b7a1b9-0671-405c-95f1-e0612cb4ce7e") LxssUserSession
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, ILxssUserSession, IWslSupport, IFastRundown>
+    : public Microsoft::WRL::RuntimeClass<
+          Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
+          ILxssUserSession,
+          ILxssUserSession2,
+          IWslSupport,
+          IFastRundown>
 {
 public:
     LxssUserSession(_In_ const std::weak_ptr<LxssUserSessionImpl>& Session);
@@ -114,9 +119,15 @@ public:
         _Out_ LXSS_ERROR_INFO* Error) override;
 
     /// <summary>
-    /// Enumerates registered distributions, or retained distributions when Deleted is TRUE.
+    /// Enumerates registered distributions using the original COM contract.
     /// </summary>
     IFACEMETHOD(EnumerateDistributions)(
+        _Out_ PULONG DistributionCount, _Out_ LXSS_ENUMERATE_INFO** Distributions, _Out_ LXSS_ERROR_INFO* Error) override;
+
+    /// <summary>
+    /// Enumerates registered distributions, or retained distributions when Deleted is TRUE.
+    /// </summary>
+    IFACEMETHOD(EnumerateDistributions2)(
         _In_ BOOL Deleted, _Out_ PULONG DistributionCount, _Out_ LXSS_ENUMERATE_INFO** Distributions, _Out_ LXSS_ERROR_INFO* Error) override;
 
     /// <summary>
@@ -268,9 +279,14 @@ public:
     IFACEMETHOD(RestoreDistribution)(_In_ LPCWSTR DistributionName, _In_opt_ LPCWSTR NewName, _Out_ LXSS_ERROR_INFO* Error) override;
 
     /// <summary>
+    /// Unregisters a distribution permanently using the original COM contract.
+    /// </summary>
+    IFACEMETHOD(UnregisterDistribution)(_In_ LPCGUID DistroGuid, _Out_ LXSS_ERROR_INFO* Error) override;
+
+    /// <summary>
     /// Unregisters a distribution, retaining its disk unless Permanent is specified.
     /// </summary>
-    IFACEMETHOD(UnregisterDistribution)(_In_ LPCGUID DistroGuid, _In_ BOOL Permanent, _Out_ LXSS_ERROR_INFO* Error) override;
+    IFACEMETHOD(UnregisterDistribution2)(_In_ LPCGUID DistroGuid, _In_ BOOL Permanent, _Out_ LXSS_ERROR_INFO* Error) override;
 
     // IWslSupport methods.
 

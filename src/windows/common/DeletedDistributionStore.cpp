@@ -392,6 +392,8 @@ ULONG64 DeletedDistributionStore::Now()
 bool DeletedDistributionStore::Retain(
     HKEY lxssKey, const GUID& id, const std::filesystem::path& vhdPath, const std::function<void(const std::filesystem::path&)>& cleanupArtifacts)
 {
+    // Keep the same deadline across preparation, disk movement, and crash recovery.
+    const auto deletedAt = Now();
     // Reject a redirected install directory and keep it locked against replacement.
     // Resolve ancestor aliases once, then open the disk through this verified parent.
     // Attribute-only opens do not enforce share access; include directory-list
@@ -465,7 +467,7 @@ bool DeletedDistributionStore::Retain(
     const auto identity = Identity(file.get());
     WriteDword(key.get(), nullptr, c_previousState, originalState);
     WriteString(key.get(), nullptr, c_recoveryPath, target.c_str());
-    WriteQword(key.get(), nullptr, c_deletedAt, Now());
+    WriteQword(key.get(), nullptr, c_deletedAt, deletedAt);
     THROW_IF_WIN32_ERROR(RegSetValueExW(key.get(), c_recoveryFileId, 0, REG_BINARY, reinterpret_cast<const BYTE*>(&identity), sizeof(identity)));
     THROW_IF_WIN32_ERROR(RegSetValueExW(
         key.get(), c_originalDirectoryId, 0, REG_BINARY, reinterpret_cast<const BYTE*>(&sourceIdentity), sizeof(sourceIdentity)));
@@ -488,7 +490,6 @@ bool DeletedDistributionStore::Retain(
     THROW_IF_WIN32_ERROR(RegFlushKey(key.get()));
     RenameDisk(file.get(), target);
     moved = true;
-    WriteQword(key.get(), nullptr, c_deletedAt, Now());
     WriteDword(key.get(), nullptr, L"State", LxssDistributionStateDeleted);
     THROW_IF_WIN32_ERROR(RegRenameKey(lxssKey, KeyName(id).c_str(), KeyName(id, true).c_str()));
     rollback.release();

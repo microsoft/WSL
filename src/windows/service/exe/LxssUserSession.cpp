@@ -197,6 +197,12 @@ try
 CATCH_RETURN()
 
 HRESULT STDMETHODCALLTYPE LxssUserSession::EnumerateDistributions(
+    _Out_ PULONG DistributionCount, _Out_ LXSS_ENUMERATE_INFO** Distributions, _Out_ LXSS_ERROR_INFO* Error)
+{
+    return EnumerateDistributions2(FALSE, DistributionCount, Distributions, Error);
+}
+
+HRESULT STDMETHODCALLTYPE LxssUserSession::EnumerateDistributions2(
     _In_ BOOL Deleted, _Out_ PULONG DistributionCount, _Out_ LXSS_ENUMERATE_INFO** Distributions, _Out_ LXSS_ERROR_INFO* Error)
 try
 {
@@ -321,7 +327,7 @@ try
 {
 
     wil::unique_cotaskmem_array_ptr<LXSS_ENUMERATE_INFO> distributions;
-    RETURN_IF_FAILED(EnumerateDistributions(FALSE, distributions.size_address<ULONG>(), &distributions, nullptr));
+    RETURN_IF_FAILED(EnumerateDistributions(distributions.size_address<ULONG>(), &distributions, nullptr));
 
     // Filter out distributions that are not in the installed or running state.
     std::vector<wil::unique_cotaskmem_string> installedDistros{};
@@ -549,7 +555,12 @@ try
 }
 CATCH_RETURN()
 
-HRESULT STDMETHODCALLTYPE LxssUserSession::UnregisterDistribution(_In_ LPCGUID DistroGuid, _In_ BOOL Permanent, _Out_ LXSS_ERROR_INFO* Error)
+HRESULT STDMETHODCALLTYPE LxssUserSession::UnregisterDistribution(_In_ LPCGUID DistroGuid, _Out_ LXSS_ERROR_INFO* Error)
+{
+    return UnregisterDistribution2(DistroGuid, TRUE, Error);
+}
+
+HRESULT STDMETHODCALLTYPE LxssUserSession::UnregisterDistribution2(_In_ LPCGUID DistroGuid, _In_ BOOL Permanent, _Out_ LXSS_ERROR_INFO* Error)
 try
 {
     ServiceExecutionContext context(Error);
@@ -567,7 +578,7 @@ try
     GUID distroGuid;
     RETURN_IF_FAILED(GetDistributionId(DistributionName, LXSS_GET_DISTRO_ID_INCLUDE_RECOVERY, nullptr, &distroGuid));
 
-    return UnregisterDistribution(&distroGuid, TRUE, nullptr);
+    return UnregisterDistribution(&distroGuid, nullptr);
 }
 CATCH_RETURN()
 

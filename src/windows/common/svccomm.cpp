@@ -32,6 +32,18 @@ Abstract:
 using wsl::windows::common::ClientExecutionContext;
 namespace {
 
+template <typename Interface>
+void EnableDynamicCloaking(const wil::com_ptr<Interface>& proxy)
+{
+    const auto clientSecurity = proxy.template query<IClientSecurity>();
+    DWORD authnSvc, authzSvc, authnLvl, capabilities;
+    THROW_IF_FAILED(clientSecurity->QueryBlanket(proxy.get(), &authnSvc, &authzSvc, nullptr, &authnLvl, nullptr, nullptr, &capabilities));
+    WI_ClearFlag(capabilities, EOAC_STATIC_CLOAKING);
+    WI_SetFlag(capabilities, EOAC_DYNAMIC_CLOAKING);
+    THROW_IF_FAILED(clientSecurity->SetBlanket(
+        proxy.get(), authnSvc, authzSvc, nullptr, authnLvl, RPC_C_IMP_LEVEL_IMPERSONATE, nullptr, capabilities));
+}
+
 BOOL GetNextCharacter(_In_ INPUT_RECORD* InputRecord, _Out_ PWCHAR NextCharacter);
 BOOL IsActionableKey(_In_ PKEY_EVENT_RECORD KeyEvent);
 void SpawnWslHost(_In_ HANDLE ServerPort, _In_ const GUID& DistroId, _In_opt_ LPCGUID VmId);
@@ -172,18 +184,16 @@ wsl::windows::common::SvcComm::SvcComm()
         std::chrono::minutes(1),
         retry_pred);
 
-    // Query client security interface.
-    auto clientSecurity = m_userSession.query<IClientSecurity>();
+    EnableDynamicCloaking(m_userSession);
+}
 
-    // Get the current proxy blanket settings.
-    DWORD authnSvc, authzSvc, authnLvl, capabilities;
-    THROW_IF_FAILED(clientSecurity->QueryBlanket(m_userSession.get(), &authnSvc, &authzSvc, NULL, &authnLvl, NULL, NULL, &capabilities));
-
-    // Make sure that dynamic cloaking is used.
-    WI_ClearFlag(capabilities, EOAC_STATIC_CLOAKING);
-    WI_SetFlag(capabilities, EOAC_DYNAMIC_CLOAKING);
-    THROW_IF_FAILED(clientSecurity->SetBlanket(
-        m_userSession.get(), authnSvc, authzSvc, NULL, authnLvl, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, capabilities));
+wil::com_ptr<ILxssUserSession2> wsl::windows::common::SvcComm::RecoverySession() const
+{
+    auto session = m_userSession.query<ILxssUserSession2>();
+    // Security blankets apply to individual proxies; the new interface also
+    // needs dynamic cloaking when a caller is impersonating another user.
+    EnableDynamicCloaking(session);
+    return session;
 }
 
 wsl::windows::common::SvcComm::~SvcComm()
@@ -214,7 +224,15 @@ std::vector<LXSS_ENUMERATE_INFO> wsl::windows::common::SvcComm::EnumerateDistrib
     ClientExecutionContext context;
 
     wil::unique_cotaskmem_array_ptr<LXSS_ENUMERATE_INFO> Distributions;
-    THROW_IF_FAILED(m_userSession->EnumerateDistributions(Deleted, Distributions.size_address<ULONG>(), &Distributions, context.OutError()));
+    if (Deleted)
+    {
+        THROW_IF_FAILED(
+            RecoverySession()->EnumerateDistributions2(TRUE, Distributions.size_address<ULONG>(), &Distributions, context.OutError()));
+    }
+    else
+    {
+        THROW_IF_FAILED(m_userSession->EnumerateDistributions(Distributions.size_address<ULONG>(), &Distributions, context.OutError()));
+    }
 
     std::vector<LXSS_ENUMERATE_INFO> DistributionList;
     for (size_t Index = 0; Index < Distributions.size(); Index += 1)
@@ -726,11 +744,18 @@ void wsl::windows::common::SvcComm::TerminateInstance(_In_opt_ LPCGUID DistroGui
 void wsl::windows::common::SvcComm::UnregisterDistribution(_In_ LPCGUID DistroGuid, bool Permanent) const
 {
     ClientExecutionContext context;
-    THROW_IF_FAILED(m_userSession->UnregisterDistribution(DistroGuid, Permanent, context.OutError()));
+    if (Permanent)
+    {
+        THROW_IF_FAILED(m_userSession->UnregisterDistribution(DistroGuid, context.OutError()));
+    }
+    else
+    {
+        THROW_IF_FAILED(RecoverySession()->UnregisterDistribution2(DistroGuid, FALSE, context.OutError()));
+    }
 }
 
 void wsl::windows::common::SvcComm::RestoreDistribution(_In_ LPCWSTR DistributionName, _In_opt_ LPCWSTR NewName) const
 {
     ClientExecutionContext context;
-    THROW_IF_FAILED(m_userSession->RestoreDistribution(DistributionName, NewName, context.OutError()));
+    THROW_IF_FAILED(RecoverySession()->RestoreDistribution(DistributionName, NewName, context.OutError()));
 }

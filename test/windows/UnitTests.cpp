@@ -7776,8 +7776,12 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             const auto marker = path.parent_path() / L"cleanup-marker";
             std::ofstream(marker) << "obsolete artifact";
             ULONG calls = 0;
+            const auto retentionStarted = Store::Now();
+            ULONG64 cleanupStarted{};
             auto cleanupArtifacts = [&](const std::filesystem::path& source) {
                 ++calls;
+                cleanupStarted = Store::Now();
+                Sleep(20); // Slow preparation must not reset the retention deadline after the move.
                 VERIFY_IS_TRUE(std::filesystem::equivalent(source, path.parent_path()));
                 VERIFY_IS_TRUE(std::filesystem::exists(source / path.filename()));
                 VERIFY_IS_TRUE(isActive(id));
@@ -7789,10 +7793,14 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             VERIFY_ARE_EQUAL(calls, 1u);
             VERIFY_IS_FALSE(std::filesystem::exists(path.parent_path()));
             const auto entry = entryFor(id);
+            VERIFY_IS_TRUE(entry.DeletedAt >= retentionStarted && entry.DeletedAt <= cleanupStarted);
             // A restart after the move/key rename has no old artifact cleanup left to resume.
             Store::RecoverPending(key.get());
             VERIFY_IS_FALSE(std::filesystem::exists(marker));
+            VERIFY_ARE_EQUAL(entryFor(id).DeletedAt, entry.DeletedAt);
             VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention - 1);
+            VERIFY_IS_TRUE(std::filesystem::exists(entry.Path));
             Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
         }
@@ -8922,7 +8930,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         // Permanent callers can purge a normally retained disk by name without restoring it first.
         if (LxsstuVmMode())
         {
-            for (const auto option : {L"--unregister", L"/unregister", L"/u", L"COM"})
+            for (const auto option : {L"--unregister", L"/unregister", L"/u", L"COM", L"GUID-COM"})
             {
                 VERIFY_ARE_EQUAL(LxsstuLaunchWsl(import), 0u);
                 const auto retainedId = GetDistributionId(name.c_str());
@@ -8938,6 +8946,12 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                     const auto support =
                         wil::CoCreateInstance<LxssUserSession, IWslSupport>(CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA);
                     VERIFY_SUCCEEDED(support->UnregisterDistribution(name.c_str()));
+                }
+                else if (std::wstring_view(option) == L"GUID-COM")
+                {
+                    const auto session =
+                        wil::CoCreateInstance<LxssUserSession, ILxssUserSession>(CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA);
+                    VERIFY_SUCCEEDED(session->UnregisterDistribution(&*retainedId, nullptr));
                 }
                 else if (std::wstring_view(option) == L"--unregister")
                 {
@@ -8965,6 +8979,15 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         const auto wslSupport =
             wil::CoCreateInstance<LxssUserSession, IWslSupport>(CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA);
         VERIFY_SUCCEEDED(wslSupport->UnregisterDistribution(name.c_str()));
+        VERIFY_IS_FALSE(GetDistributionId(name.c_str()).has_value());
+        VERIFY_IS_FALSE(std::filesystem::exists(install / (LxsstuVmMode() ? L"ext4.vhdx" : L"rootfs")));
+        // The original GUID-based interface also deletes an active distribution permanently.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(import), 0u);
+        const auto legacyId = GetDistributionId(name.c_str());
+        VERIFY_IS_TRUE(legacyId.has_value());
+        const auto legacySession =
+            wil::CoCreateInstance<LxssUserSession, ILxssUserSession>(CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA);
+        VERIFY_SUCCEEDED(legacySession->UnregisterDistribution(&*legacyId, nullptr));
         VERIFY_IS_FALSE(GetDistributionId(name.c_str()).has_value());
         VERIFY_IS_FALSE(std::filesystem::exists(install / (LxsstuVmMode() ? L"ext4.vhdx" : L"rootfs")));
         const auto legacyEntries = Store::Enumerate(userKey.get());
@@ -9261,6 +9284,21 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             registry::DeleteKey(userKey.get(), keyName.c_str());
             std::filesystem::remove_all(basePath);
         });
+
+        // Original COM signatures and the final method slot must remain usable by older clients.
+        const auto legacySession =
+            wil::CoCreateInstance<LxssUserSession, ILxssUserSession>(CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA);
+        wil::unique_cotaskmem_array_ptr<LXSS_ENUMERATE_INFO> legacyDistributions;
+        VERIFY_SUCCEEDED(legacySession->EnumerateDistributions(legacyDistributions.size_address<ULONG>(), &legacyDistributions, nullptr));
+        const auto currentDistributions = wsl::windows::common::SvcComm{}.EnumerateDistributions();
+        VERIFY_ARE_EQUAL(legacyDistributions.size(), currentDistributions.size());
+        for (size_t index = 0; index < legacyDistributions.size(); ++index)
+        {
+            VERIFY_IS_TRUE(std::any_of(currentDistributions.begin(), currentDistributions.end(), [&](const auto& current) {
+                return IsEqualGUID(current.DistroGuid, legacyDistributions[index].DistroGuid);
+            }));
+        }
+        VERIFY_ARE_EQUAL(legacySession->CompactDistribution(&id, nullptr), WSL_E_DISTRO_NOT_FOUND);
 
         // A missing VHD in an accessible directory never risks a real distribution's files.
         auto registerDistro = [&](const std::wstring& name) {

@@ -224,7 +224,6 @@ interface ILxssUserSession : IUnknown
 
     HRESULT UnregisterDistribution(
         [in] LPCGUID DistroGuid,
-        [in] BOOL Permanent,
         [in, out] LXSS_ERROR_INFO* Error);
 
     HRESULT ConfigureDistribution(
@@ -264,7 +263,6 @@ interface ILxssUserSession : IUnknown
         [in, out] LXSS_ERROR_INFO* Error);
 
     HRESULT EnumerateDistributions(
-        [in] BOOL Deleted,
         [out] ULONG *DistributionCount,
         [out, size_is(, *DistributionCount)] LXSS_ENUMERATE_INFO **Distributions,
         [in, out] LXSS_ERROR_INFO* Error);
@@ -352,13 +350,34 @@ interface ILxssUserSession : IUnknown
         [in] LPCWSTR DistributionName, 
         [ in, out ] LXSS_ERROR_INFO * Error);
 
+    HRESULT CompactDistribution(
+        [in] LPCGUID DistroGuid,
+        [in, out] LXSS_ERROR_INFO* Error);
+};
+
+// Recovery operations use their own IID; ILxssUserSession retains its original
+// method signatures and ordering for clients built against earlier releases.
+[
+    uuid(A5E35DF1-C6B3-4BC2-88E4-CD423F938E6C),
+    pointer_default(unique),
+    object
+]
+interface ILxssUserSession2 : IUnknown
+{
+    HRESULT UnregisterDistribution2(
+        [in] LPCGUID DistroGuid,
+        [in] BOOL Permanent,
+        [in, out] LXSS_ERROR_INFO* Error);
+
+    HRESULT EnumerateDistributions2(
+        [in] BOOL Deleted,
+        [out] ULONG *DistributionCount,
+        [out, size_is(, *DistributionCount)] LXSS_ENUMERATE_INFO **Distributions,
+        [in, out] LXSS_ERROR_INFO* Error);
+
     HRESULT RestoreDistribution(
         [in] LPCWSTR DistributionName,
         [in, unique] LPCWSTR NewName,
-        [in, out] LXSS_ERROR_INFO* Error);
-
-    HRESULT CompactDistribution(
-        [in] LPCGUID DistroGuid,
         [in, out] LXSS_ERROR_INFO* Error);
 };
 
