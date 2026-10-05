@@ -668,7 +668,16 @@ VOID CALLBACK LxssUserSessionImpl::s_CleanupDeletedDistributions(PTP_CALLBACK_IN
 try
 {
     auto self = static_cast<LxssUserSessionImpl*>(Context);
-    std::lock_guard lock(self->m_instanceLock);
+    // Background maintenance should not queue behind foreground work or an
+    // earlier timer callback. The next tick retries skipped cleanup.
+    std::unique_lock lock(self->m_instanceLock, std::try_to_lock);
+    if (!lock.owns_lock())
+    {
+        return;
+    }
+    // Keep registration changes serialized through ownership checks and disk
+    // deletion: releasing this lock after a snapshot could delete a disk that
+    // a concurrent import has just registered.
     auto impersonate = wil::impersonate_token(self->m_recoveryToken.get());
     const auto key = wsl::windows::common::registry::OpenLxssUserKey();
     wsl::windows::common::DeletedDistributionStore::RecoverPending(key.get());
@@ -4121,7 +4130,7 @@ bool LxssUserSessionImpl::_ValidateDistro(_In_ HKEY LxssKey, _In_ LPCGUID Distro
             // If the path is not found and the package is removed, then the distro can be considered to be uninstalled.
             // Only do this if the path is actually missing to prevent any accidental distro deletion if the store API
             // can't find the package for transient reasons.
-            if (!PathFileExistsW(path) && !wsl::windows::common::helpers::IsPackageInstalled(packageFamilyName.c_str()))
+            if (wsl::windows::common::helpers::IsDistributionOrphaned(packageFamilyName.c_str(), path))
             {
                 isValid = false;
             }

@@ -110,6 +110,7 @@ Abstract:
 #define WSL_UNREGISTER_ARG L"--unregister"
 #define WSL_UNREGISTER_OPTION_FORCE L"--force"
 #define WSL_RESTORE_DISTRIBUTION_ARG L"--restore-distribution"
+#define WSL_RESTORE_DISTRIBUTION_OPTION_NAME L"--name"
 #define WSL_LIST_ARG_DELETED_OPTION L"--deleted"
 #define WSL_UPDATE_ARG L"--update"
 #define WSL_UPDATE_ARG_CONFIRM_OPTION_LONG L"--confirm"

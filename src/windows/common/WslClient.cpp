@@ -1319,11 +1319,11 @@ int RestoreDistribution(_In_ std::wstring_view arguments)
     bool literalArguments = false;
     for (int index = 2; index < argc; ++index)
     {
-        if (!literalArguments && wsl::shared::string::IsEqual(argv[index], L"--"))
+        if (!literalArguments && wsl::shared::string::IsEqual(argv[index], WSL_STOP_PARSING_ARG))
         {
             literalArguments = true;
         }
-        else if (!literalArguments && wsl::shared::string::IsEqual(argv[index], L"--name"))
+        else if (!literalArguments && wsl::shared::string::IsEqual(argv[index], WSL_RESTORE_DISTRIBUTION_OPTION_NAME))
         {
             if (index + 1 >= argc)
             {

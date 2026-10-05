@@ -327,6 +327,21 @@ void CommitRestore(HKEY lxssKey, const GUID& id)
         validDefault = SUCCEEDED(result) &&
                        ReadDword(key.get(), nullptr, L"State", LxssDistributionStateInvalid) == LxssDistributionStateInstalled &&
                        !ReadOptionalString(key.get(), nullptr, c_recoveryPath);
+        if (validDefault)
+        {
+            const auto package = ReadString(key.get(), nullptr, L"PackageFamilyName", L"");
+            if (!package.empty())
+            {
+                const auto base = std::filesystem::path(ReadString(key.get(), nullptr, L"BasePath"));
+                const auto flags = ReadDword(key.get(), nullptr, L"Flags", LXSS_DISTRO_FLAGS_DEFAULT);
+                const auto path = WI_IsFlagSet(flags, LXSS_DISTRO_FLAGS_VM_MODE)
+                                      ? base / ReadString(key.get(), nullptr, L"VhdFileName", LXSS_VM_MODE_VHD_NAME)
+                                      : base / LXSS_ROOTFS_DIRECTORY;
+                // Use the same orphan check as the service, under the owner's
+                // current token during both explicit restore and startup repair.
+                validDefault = !helpers::IsDistributionOrphaned(package.c_str(), path.c_str());
+            }
+        }
     }
     if (!validDefault)
     {
