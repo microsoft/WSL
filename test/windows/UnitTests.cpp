@@ -8555,7 +8555,22 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_ARE_EQUAL(ordinaryListErr, L"");
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(std::format(L"--import {} \"{}\" \"{}\" --version 1", name, install.wstring(), archive.wstring())), 0u);
+        // An active same-name replacement takes precedence over the retained original.
+        const auto activeReplacementId = GetDistributionId(name.c_str());
+        VERIFY_IS_TRUE(activeReplacementId.has_value());
+        VERIFY_IS_FALSE(IsEqualGUID(*activeReplacementId, *originalId));
+        const auto retainedEntries = Store::Enumerate(userKey.get());
+        const auto retainedOriginal = std::find_if(
+            retainedEntries.begin(), retainedEntries.end(), [&](const auto& entry) { return IsEqualGUID(entry.Id, *originalId); });
+        VERIFY_IS_TRUE(retainedOriginal != retainedEntries.end());
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {} --force", name)), 0u);
+        VERIFY_IS_FALSE(GetDistributionId(name.c_str()).has_value());
+        VERIFY_IS_FALSE(std::filesystem::exists(install / L"rootfs"));
+        VERIFY_IS_TRUE(std::filesystem::exists(retainedOriginal->Path));
+        const auto afterForce = Store::Enumerate(userKey.get());
+        VERIFY_IS_TRUE(std::any_of(afterForce.begin(), afterForce.end(), [&](const auto& entry) {
+            return IsEqualGUID(entry.Id, *originalId) && entry.Path == retainedOriginal->Path;
+        }));
         // Reuse both name and location immediately, then recover the old disk under a different name.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(import), 0u);
         auto [list, listErr] = LxsstuLaunchWslAndCaptureOutput(L"--list --deleted");
@@ -8565,6 +8580,15 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         const auto replacementId = GetDistributionId(name.c_str());
         VERIFY_IS_TRUE(replacementId.has_value());
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {}", name)), 0u);
+        // No active distribution remains: the selector now matches two retained disks.
+        VERIFY_IS_FALSE(GetDistributionId(name.c_str()).has_value());
+        const auto duplicateDeletedEntries = Store::Enumerate(userKey.get());
+        VERIFY_ARE_EQUAL(
+            std::count_if(
+                duplicateDeletedEntries.begin(),
+                duplicateDeletedEntries.end(),
+                [&](const auto& entry) { return entry.Name == name; }),
+            2);
         auto [ambiguous, ambiguousErr] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--restore-distribution {}", name), -1);
         VERIFY_IS_TRUE(ambiguous.find(L"More than one deleted distribution") != std::wstring::npos);
         const auto [forceAmbiguous, forceAmbiguousErr] =
