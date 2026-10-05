@@ -2707,7 +2707,7 @@ Użycie: wslc container cp [OPTIONS] SOURCE DEST
     <comment>{Locked="tar.exe"}</comment>
   </data>
   <data name="WSLCCLI_CpStdoutIsTerminalError" xml:space="preserve">
-    <value>Cannot write copy output to the console.</value>
+    <value>Nie można zapisać danych wyjściowych kopiowania w konsoli.</value>
   </data>
   <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
     <value>Nieprawidłowy kierunek kopiowania. Użyj CONTAINER:PATH jako źródła lub miejsca docelowego.</value>
@@ -3952,28 +3952,28 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <value>PIDS</value>
   </data>
   <data name="WSLCCLI_TableHeaderRepository" xml:space="preserve">
-    <value>REPOSITORY</value>
+    <value>REPOZYTORIUM</value>
   </data>
   <data name="WSLCCLI_TableHeaderTag" xml:space="preserve">
     <value>TAG</value>
   </data>
   <data name="WSLCCLI_TableHeaderDigest" xml:space="preserve">
-    <value>DIGEST</value>
+    <value>PODSUMOWANIE</value>
   </data>
   <data name="WSLCCLI_TableHeaderImageId" xml:space="preserve">
-    <value>IMAGE ID</value>
+    <value>IDENTYFIKATOR OBRAZU</value>
   </data>
   <data name="WSLCCLI_TableHeaderNetworkId" xml:space="preserve">
-    <value>NETWORK ID</value>
+    <value>IDENTYFIKATOR SIECIOWY</value>
   </data>
   <data name="WSLCCLI_TableHeaderDriver" xml:space="preserve">
-    <value>DRIVER</value>
+    <value>STEROWNIK</value>
   </data>
   <data name="WSLCCLI_TableHeaderScope" xml:space="preserve">
-    <value>SCOPE</value>
+    <value>ZAKRES</value>
   </data>
   <data name="WSLCCLI_TableHeaderVolumeName" xml:space="preserve">
-    <value>VOLUME NAME</value>
+    <value>NAZWA WOLUMINU</value>
   </data>
   <data name="WSLCCLI_ContainerStateCreated" xml:space="preserve">
     <value>utworzono</value>

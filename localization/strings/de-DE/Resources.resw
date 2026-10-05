@@ -2713,7 +2713,7 @@ Verwendung: wslc container cp [OPTIONEN] QUELLE ZIEL
     <comment>{Locked="tar.exe"}</comment>
   </data>
   <data name="WSLCCLI_CpStdoutIsTerminalError" xml:space="preserve">
-    <value>Cannot write copy output to the console.</value>
+    <value>Die Kopierausgabe kann nicht in die Konsole geschrieben werden.</value>
   </data>
   <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
     <value>Ungültige Kopierrichtung. Verwenden Sie CONTAINER:PATH entweder als Quelle oder als Ziel.</value>
@@ -3967,19 +3967,19 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>DIGEST</value>
   </data>
   <data name="WSLCCLI_TableHeaderImageId" xml:space="preserve">
-    <value>IMAGE ID</value>
+    <value>BILD-ID</value>
   </data>
   <data name="WSLCCLI_TableHeaderNetworkId" xml:space="preserve">
-    <value>NETWORK ID</value>
+    <value>NETZWERK-ID</value>
   </data>
   <data name="WSLCCLI_TableHeaderDriver" xml:space="preserve">
     <value>TREIBER</value>
   </data>
   <data name="WSLCCLI_TableHeaderScope" xml:space="preserve">
-    <value>SCOPE</value>
+    <value>BEREICH</value>
   </data>
   <data name="WSLCCLI_TableHeaderVolumeName" xml:space="preserve">
-    <value>VOLUME NAME</value>
+    <value>VOLUMENAME</value>
   </data>
   <data name="WSLCCLI_ContainerStateCreated" xml:space="preserve">
     <value>erstellt</value>

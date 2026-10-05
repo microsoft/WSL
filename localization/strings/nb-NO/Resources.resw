@@ -2707,7 +2707,7 @@ Bruk: wslc container cp [ALTERNATIVER] KILDE DEST
     <comment>{Locked="tar.exe"}</comment>
   </data>
   <data name="WSLCCLI_CpStdoutIsTerminalError" xml:space="preserve">
-    <value>Cannot write copy output to the console.</value>
+    <value>Kan ikke skrive kopidata til konsollen.</value>
   </data>
   <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
     <value>Ugyldig kopieringsretning. Bruk CONTAINER:PATH som kilde eller mål.</value>
