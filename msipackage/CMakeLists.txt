@@ -32,6 +32,13 @@ foreach(binary ${LINUX_BINARIES})
     list(APPEND BINARIES_DEPENDENCIES "${BIN}/${binary}")
 endforeach()
 
+# When building with ASAN (fuzzing), the instrumented binaries import the dynamic ASAN runtime.
+# Ship it alongside them in INSTALLDIR so they can load at runtime.
+# ASAN_RUNTIME_DLL is resolved in the top-level CMakeLists.
+if (WSL_BUILD_FUZZING)
+    list(APPEND BINARIES_DEPENDENCIES ${ASAN_RUNTIME_DLL})
+endif()
+
 if (${WSL_BUILD_THIN_PACKAGE})
     set(COMPRESS_PACKAGE "no")
 else()
