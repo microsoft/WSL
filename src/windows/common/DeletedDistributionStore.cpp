@@ -556,10 +556,13 @@ void DeletedDistributionStore::Restore(HKEY lxssKey, const Entry& distribution, 
 void DeletedDistributionStore::Purge(HKEY lxssKey, const GUID& id)
 {
     auto [key, result] = OpenKeyNoThrow(lxssKey, KeyName(id).c_str(), KEY_READ | KEY_WRITE);
-    if (FAILED(result))
+    if (result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND))
     {
-        THROW_HR_IF(result, result != HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));
         key = OpenKey(lxssKey, KeyName(id, true).c_str(), KEY_READ | KEY_WRITE);
+    }
+    else
+    {
+        THROW_IF_FAILED(result);
     }
     THROW_HR_IF(E_INVALIDARG, !ReadOptionalString(key.get(), nullptr, c_recoveryPath));
     // Commit permanent intent first. An unavailable disk keeps its identity
