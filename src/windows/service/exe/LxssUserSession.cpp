@@ -4207,26 +4207,34 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
         }
     };
 
-    // Pending restores are hidden from ordinary enumeration, but their intended
-    // name and location stay reserved while recovery is waiting for the disk.
-    // An unregister without a pending restore still frees both immediately.
+    // Hidden recovery journals reserve any name and location that recovery can
+    // reactivate. Completed unregisters and permanent deletions free the original
+    // registration; pending restores instead reserve their intended destination.
     for (const auto& [keyName, key] : wsl::windows::common::registry::EnumKeys(LxssKey, KEY_READ))
     {
-        const auto id = wsl::shared::string::ToGuid(keyName.starts_with(L"Deleted-") ? keyName.substr(8) : keyName);
+        const bool deleted = keyName.starts_with(L"Deleted-");
+        const auto id = wsl::shared::string::ToGuid(deleted ? keyName.substr(8) : keyName);
         if (!id || (Exclude && IsEqualGUID(*Exclude, *id)))
         {
             continue;
         }
         const auto recoveryPath = wsl::windows::common::registry::ReadOptionalString(key.get(), nullptr, L"RecoveryPath");
-        if (!recoveryPath || (!wsl::windows::common::registry::ReadDword(key.get(), nullptr, L"RecoveryRestorePending", 0) &&
-                              !wsl::windows::common::registry::ReadDword(key.get(), nullptr, L"RecoveryRestored", 0)))
+        if (!recoveryPath || wsl::windows::common::registry::ReadDword(key.get(), nullptr, L"RecoveryPermanentDelete", 0))
+        {
+            continue;
+        }
+        const bool restoring = wsl::windows::common::registry::ReadDword(key.get(), nullptr, L"RecoveryRestorePending", 0) ||
+                               wsl::windows::common::registry::ReadDword(key.get(), nullptr, L"RecoveryRestored", 0);
+        if (!restoring && deleted)
         {
             continue;
         }
         const auto restoreName = wsl::windows::common::registry::ReadOptionalString(key.get(), nullptr, L"RecoveryRestoreName");
         validate(
-            restoreName ? *restoreName : wsl::windows::common::registry::ReadString(key.get(), nullptr, L"DistributionName"),
-            std::filesystem::path(*recoveryPath).parent_path(),
+            restoring && restoreName ? *restoreName
+                                     : wsl::windows::common::registry::ReadString(key.get(), nullptr, L"DistributionName"),
+            restoring ? std::filesystem::path(*recoveryPath).parent_path()
+                      : std::filesystem::path(wsl::windows::common::registry::ReadString(key.get(), nullptr, L"BasePath")),
             LxssDistributionStateInstalled);
     }
 

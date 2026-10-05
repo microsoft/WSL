@@ -9559,6 +9559,34 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_SUCCEEDED(registry::OpenKeyNoThrow(userKey.get(), keyName.c_str(), KEY_READ).second);
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--export {} \"{}\"", LXSS_DISTRO_NAME_TEST_L, archive.wstring())), 0u);
+        // An ordinary unregister can still roll back while its journal remains
+        // under the active GUID. Reserve its original name and location even when
+        // directory preparation or disk recovery cannot finish.
+        for (const bool preparing : {false, true})
+        {
+            registry::WriteDword(pending.get(), nullptr, L"RecoveryPreparingDirectory", preparing ? 1 : 0);
+            for (const auto state : {LxssDistributionStateInstalled, LxssDistributionStateUninstalling})
+            {
+                registry::WriteDword(pending.get(), nullptr, L"State", state);
+                const auto [nameError, nameStderr] = LxsstuLaunchWslAndCaptureOutput(
+                    std::format(L"--import {} \"{}\" \"{}\" --version 2", name, (folder / L"install").wstring(), archive.wstring()), -1);
+                VERIFY_IS_TRUE(nameError.find(L"A distribution with the supplied name already exists.") != std::wstring::npos);
+                VERIFY_ARE_EQUAL(nameStderr, L"");
+                const auto [pathError, pathStderr] = LxsstuLaunchWslAndCaptureOutput(
+                    std::format(L"--import {}-other \"{}\" \"{}\" --version 2", name, original.wstring(), archive.wstring()), -1);
+                VERIFY_IS_TRUE(pathError.find(L"The supplied install location is already in use.") != std::wstring::npos);
+                VERIFY_ARE_EQUAL(pathStderr, L"");
+                const auto [inplaceError, inplaceStderr] = LxsstuLaunchWslAndCaptureOutput(
+                    std::format(L"--import-in-place {}-other \"{}\"", name, (original / L"ext4.vhdx").wstring()), -1);
+                VERIFY_IS_TRUE(inplaceError.find(L"The supplied install location is already in use.") != std::wstring::npos);
+                VERIFY_ARE_EQUAL(inplaceStderr, L"");
+                VERIFY_ARE_EQUAL(registry::ReadString(pending.get(), nullptr, L"RecoveryPath"), recoveryPath.wstring());
+                VERIFY_ARE_EQUAL(registry::ReadDword(pending.get(), nullptr, L"State", 0), static_cast<DWORD>(state));
+                VERIFY_IS_FALSE(GetDistributionId((name + L"-other").c_str()).has_value());
+            }
+        }
+        registry::DeleteValue(pending.get(), L"RecoveryPreparingDirectory");
+        registry::WriteDword(pending.get(), nullptr, L"State", LxssDistributionStateInstalled);
         // Both key names and both restore journal stages reserve names and paths, even with the disk offline.
         for (const bool deleted : {false, true})
         {
