@@ -42,6 +42,7 @@ inline void VerifyBootsAndTerminates(std::unique_ptr<IVirtualMachineBackend> Bac
 {
     auto terminationEvent = Backend->GetTerminationEvent();
     VERIFY_ARE_EQUAL(VmState::Created, Backend->GetState());
+    VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), OperationResult([&] { Backend->GetTerminationReason(); }));
     Backend->Start();
     VERIFY_ARE_EQUAL(VmState::Running, Backend->GetState());
 
@@ -49,11 +50,18 @@ inline void VerifyBootsAndTerminates(std::unique_ptr<IVirtualMachineBackend> Bac
     VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), runningResult);
     if (runningResult == WAIT_TIMEOUT)
     {
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), OperationResult([&] { Backend->GetTerminationReason(); }));
         Backend->Terminate();
     }
 
     VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(terminationEvent.get(), 30 * 1000));
     VERIFY_ARE_EQUAL(VmState::Stopped, Backend->GetState());
+    const auto terminationInformation = Backend->GetTerminationReason();
+    VERIFY_ARE_EQUAL(VmTerminationReason::Shutdown, terminationInformation.Reason);
+    VERIFY_IS_FALSE(terminationInformation.Details.empty());
+    const auto repeatedInformation = Backend->GetTerminationReason();
+    VERIFY_ARE_EQUAL(terminationInformation.Reason, repeatedInformation.Reason);
+    VERIFY_ARE_EQUAL(terminationInformation.Details, repeatedInformation.Details);
 }
 
 } // namespace VirtualMachineBackendTestHelpers

@@ -39,8 +39,7 @@ public:
     VmPlatformCapabilities GetCapabilities() const override;
     VmDescription GetDescription() const override;
     VmState GetState() const override;
-    std::wstring GetExitDetails() const override;
-    VmCrashInformation GetCrashInformation() const override;
+    VmTerminationInformation GetTerminationReason() const override;
     wil::unique_handle GetTerminationEvent() const override;
     void Start() override;
     void Terminate() override;
@@ -143,5 +142,5 @@ private:
     SessionFileSystemResources m_fileSystemResources;
     wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
     _Guarded_by_(m_lock) VmState m_state = VmState::Unknown;
-    _Guarded_by_(m_lock) std::wstring m_exitDetails;
+    _Guarded_by_(m_lock) VmTerminationInformation m_terminationInformation;
 };

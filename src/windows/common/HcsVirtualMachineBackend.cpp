@@ -285,12 +285,12 @@ HcsVirtualMachineBackend::~HcsVirtualMachineBackend() noexcept
     }
     CATCH_LOG()
 
-    auto exitDetailsLock = m_exitDetailsLock.lock_shared();
+    auto terminationInformationLock = m_terminationInformationLock.lock_shared();
     WSL_LOG(
         "HcsVirtualMachineBackendDestroyed",
         TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
         TraceLoggingValue(m_exitEvent.is_signaled(), "exitEventSignaled"),
-        TraceLoggingValue(m_exitDetails.c_str(), "exitDetails"));
+        TraceLoggingValue(m_terminationInformation.Details.c_str(), "exitDetails"));
 }
 
 std::unique_ptr<HcsVirtualMachineBackend> HcsVirtualMachineBackend::Create(const VmCreateRequest& Request)
@@ -326,13 +326,13 @@ std::unique_ptr<HcsVirtualMachineBackend> HcsVirtualMachineBackend::Create(const
             // A kernel panic can cause an hvsocket error. Wait for an HCS notification to provide a better error for the user.
             if (newInstance->m_vmCrashEvent.wait(1000))
             {
-                const auto crashInformation = newInstance->GetCrashInformation();
-                if (crashInformation.CrashLogFile.has_value())
+                auto crashLock = newInstance->m_crashInformationLock.lock_shared();
+                if (newInstance->m_vmCrashLogFile.has_value())
                 {
                     THROW_HR_WITH_USER_ERROR(
                         WSL_E_VM_CRASHED,
                         wsl::shared::Localization::MessageWSL2Crashed() + L"\r\n" +
-                            wsl::shared::Localization::MessageWSL2CrashedStackTrace(crashInformation.CrashLogFile.value()));
+                            wsl::shared::Localization::MessageWSL2CrashedStackTrace(newInstance->m_vmCrashLogFile.value()));
                 }
                 else
                 {
@@ -413,23 +413,11 @@ VmState HcsVirtualMachineBackend::GetState() const
     return m_state;
 }
 
-std::wstring HcsVirtualMachineBackend::GetExitDetails() const
+VmTerminationInformation HcsVirtualMachineBackend::GetTerminationReason() const
 {
-    auto lock = m_exitDetailsLock.lock_shared();
-    return m_exitDetails;
-}
-
-VmCrashInformation HcsVirtualMachineBackend::GetCrashInformation() const
-{
-    VmCrashInformation information{};
-    information.Crashed = m_vmCrashEvent.is_signaled();
-    auto lock = m_crashInformationLock.lock_shared();
-    information.CrashLogFile = m_vmCrashLogFile;
-    if (information.Crashed)
-    {
-        information.SavedStateFile = m_vmSavedStateFile;
-    }
-    return information;
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_exitEvent.is_signaled());
+    auto lock = m_terminationInformationLock.lock_shared();
+    return m_terminationInformation;
 }
 
 wil::unique_handle HcsVirtualMachineBackend::GetTerminationEvent() const
@@ -1187,6 +1175,17 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
 
                 mountOptions = FormatVirtioFsMountOptions(shareOptions);
 
+                if (transport.Layout == VmVirtioFsLayout::Aggregate)
+                {
+                    // An aggregate device reaches every child through the identity declared in its
+                    // device options. A share cannot introduce a second one; callers that need
+                    // another identity create another device.
+                    THROW_HR_IF_MSG(
+                        E_INVALIDARG,
+                        !!Request.UserToken || !!options->UserToken,
+                        "A share of an aggregate virtio-fs device is served under the identity of the device");
+                }
+
                 // Repeating a request for the same path and options reuses the existing share so that
                 // multiple guest mounts of one host directory are backed by a single virtio-fs share.
                 if (const auto* existing = FindFileSystemShareLocked(Device, hostPath, mountOptions, Request.Name))
@@ -1198,14 +1197,6 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
                 std::optional<std::wstring> childName;
                 if (transport.Layout == VmVirtioFsLayout::Aggregate)
                 {
-                    // An aggregate device reaches every child through the identity declared in its
-                    // device options. A share cannot introduce a second one; callers that need
-                    // another identity create another device.
-                    THROW_HR_IF_MSG(
-                        E_INVALIDARG,
-                        !!Request.UserToken || !!options->UserToken,
-                        "A share of an aggregate virtio-fs device is served under the identity of the device");
-
                     childName = Request.Name.empty() ? GenerateShareName() : Request.Name;
                     m_guestDeviceManager->AddVirtiofsChild(
                         device->second.Device.GuestInstanceId.value(), childName->c_str(), mountOptions.c_str(), hostPath.c_str());
@@ -1858,14 +1849,15 @@ try
     }
     else if (Event->Type == HcsEventSystemExited || Event->Type == HcsEventServiceDisconnect)
     {
-        backend->OnExit(Event->EventData);
+        backend->OnExit(Event);
     }
 }
 CATCH_LOG();
 
 void HcsVirtualMachineBackend::OnCrash(PCWSTR Details)
 {
-    if (m_vmCrashEvent.is_signaled())
+    auto lock = m_crashInformationLock.lock_exclusive();
+    if (m_vmCrashLogCaptured && m_vmSavedStateCaptured)
     {
         return;
     }
@@ -1874,33 +1866,55 @@ void HcsVirtualMachineBackend::OnCrash(PCWSTR Details)
     WSL_LOG("GuestCrash", TraceLoggingValue(Details, "Data"));
     const auto crashInformation = wsl::shared::FromJson<wsl::windows::common::hcs::CrashReport>(Details);
 
-    if (m_crashCapture && !m_crashCapture->Path.empty())
+    if (!m_vmSavedStateCaptured && m_crashCapture && m_crashCapture->SavedStateFolder && m_vmSavedStateFile &&
+        crashInformation.GuestCrashSaveInfo && crashInformation.GuestCrashSaveInfo->SaveStateFile)
     {
-        auto lock = m_crashInformationLock.lock_exclusive();
+        schema::EnforceVmSavedStateFileLimit(
+            m_crashCapture->SavedStateFolder.value(),
+            static_cast<size_t>(m_crashCapture->MaxSavedStateCount) + 1,
+            m_configuration.Description.Identity.UserToken.get());
+        m_vmSavedStateCaptured = true;
+    }
+
+    if (!m_vmCrashLogCaptured && m_crashCapture && !m_crashCapture->Path.empty() && !crashInformation.CrashLog.empty())
+    {
         m_vmCrashLogFile = wsl::windows::common::hcs::WriteVmCrashLog(
             m_crashCapture->Path,
             m_crashCapture->MaxCrashLogCount,
             m_configuration.Description.Identity.VmId,
             m_configuration.Description.Identity.UserToken.get(),
             crashInformation.CrashLog);
-    }
-
-    std::optional<std::filesystem::path> savedStateFile;
-    {
-        auto lock = m_crashInformationLock.lock_shared();
-        savedStateFile = m_vmSavedStateFile;
-    }
-    if (m_crashCapture && m_crashCapture->SavedStateFolder && savedStateFile)
-    {
-        schema::EnforceVmSavedStateFileLimit(
-            m_crashCapture->SavedStateFolder.value(),
-            static_cast<size_t>(m_crashCapture->MaxSavedStateCount) + 1,
-            m_configuration.Description.Identity.UserToken.get());
+        m_vmCrashLogCaptured = true;
     }
 }
 
-void HcsVirtualMachineBackend::OnExit(PCWSTR ExitDetails)
+void HcsVirtualMachineBackend::OnExit(const HCS_EVENT* Event)
 {
+    VmTerminationInformation information;
+    if (Event->EventData != nullptr)
+    {
+        information.Details = Event->EventData;
+        if (Event->Type == HcsEventSystemExited)
+        {
+            const auto exitStatus = wsl::shared::FromJson<schema::SystemExitStatus>(Event->EventData);
+            if (exitStatus.ExitType.has_value())
+            {
+                switch (exitStatus.ExitType.value())
+                {
+                case schema::NotificationType::ForcedExit:
+                case schema::NotificationType::GracefulExit:
+                    information.Reason = VmTerminationReason::Shutdown;
+                    break;
+                case schema::NotificationType::UnexpectedExit:
+                    information.Reason = VmTerminationReason::Crashed;
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+    }
+
     // Closing the system drains callbacks before their event and context are destroyed.
     // An exit without a prior termination request must cancel pending operations.
     {
@@ -1909,18 +1923,15 @@ void HcsVirtualMachineBackend::OnExit(PCWSTR ExitDetails)
     }
 
     {
-        auto exitDetailsLock = m_exitDetailsLock.lock_exclusive();
-        if (ExitDetails != nullptr)
-        {
-            m_exitDetails = ExitDetails;
-        }
+        auto terminationInformationLock = m_terminationInformationLock.lock_exclusive();
+        m_terminationInformation = std::move(information);
     }
 
     m_exitEvent.SetEvent();
 
     if (!m_terminatingEvent.is_signaled())
     {
-        WSL_LOG("AbnormalVmExit", TraceLoggingValue(ExitDetails, "Details"));
+        WSL_LOG("AbnormalVmExit", TraceLoggingValue(Event->EventData, "Details"));
         m_terminatingEvent.SetEvent();
     }
 

@@ -626,11 +626,17 @@ struct VmGuestDmaRequest
     std::uint64_t SizeBytes = 0;
 };
 
-struct VmCrashInformation
+enum class VmTerminationReason
 {
-    bool Crashed = false;
-    std::optional<std::filesystem::path> CrashLogFile;
-    std::optional<std::filesystem::path> SavedStateFile;
+    Unknown,
+    Shutdown,
+    Crashed
+};
+
+struct VmTerminationInformation
+{
+    VmTerminationReason Reason = VmTerminationReason::Unknown;
+    std::wstring Details;
 };
 
 class IVirtualMachineBackend
@@ -644,8 +650,8 @@ public:
     // Returns the effective creation-time configuration, including IDs used for boot resource operations.
     virtual VmDescription GetDescription() const = 0;
     virtual VmState GetState() const = 0;
-    virtual std::wstring GetExitDetails() const = 0;
-    virtual VmCrashInformation GetCrashInformation() const = 0;
+    // Returns the cached reason and backend-specific details after exit; fails before the VM has exited.
+    virtual VmTerminationInformation GetTerminationReason() const = 0;
     virtual wil::unique_handle GetTerminationEvent() const = 0;
     virtual void Start() = 0;
     virtual void Terminate() = 0;

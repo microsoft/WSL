@@ -29,8 +29,7 @@ public:
     VmPlatformCapabilities GetCapabilities() const override;
     VmDescription GetDescription() const override;
     VmState GetState() const override;
-    std::wstring GetExitDetails() const override;
-    VmCrashInformation GetCrashInformation() const override;
+    VmTerminationInformation GetTerminationReason() const override;
     wil::unique_handle GetTerminationEvent() const override;
     void Start() override;
     void Terminate() override;
@@ -122,7 +121,7 @@ private:
     VmConfiguration BuildConfiguration(const VmCreateRequest& Request);
     static void CALLBACK OnSystemEvent(HCS_EVENT* Event, void* Context) noexcept;
     void OnCrash(PCWSTR Details);
-    void OnExit(PCWSTR ExitDetails);
+    void OnExit(const HCS_EVENT* Event);
     void CleanupAttachedDisks(std::map<std::uint64_t, AttachedDisk>&& Disks) noexcept;
     std::shared_ptr<VmGuestListenerState> ConfigureGuestListener(const VmGuestListener& Listener) override;
 
@@ -200,10 +199,12 @@ private:
     wil::unique_event m_vmCrashEvent{wil::EventOptions::ManualReset};
     std::optional<VmCrashCaptureRequest> m_crashCapture;
     mutable wil::srwlock m_crashInformationLock;
+    _Guarded_by_(m_crashInformationLock) bool m_vmCrashLogCaptured = false;
     _Guarded_by_(m_crashInformationLock) std::optional<std::filesystem::path> m_vmCrashLogFile;
+    _Guarded_by_(m_crashInformationLock) bool m_vmSavedStateCaptured = false;
     _Guarded_by_(m_crashInformationLock) std::optional<std::filesystem::path> m_vmSavedStateFile;
-    mutable wil::srwlock m_exitDetailsLock;
-    _Guarded_by_(m_exitDetailsLock) std::wstring m_exitDetails;
+    mutable wil::srwlock m_terminationInformationLock;
+    _Guarded_by_(m_terminationInformationLock) VmTerminationInformation m_terminationInformation;
     // Closing the system drains callbacks before their event and context are destroyed.
     _Guarded_by_(m_lock) wsl::windows::common::hcs::unique_hcs_system m_system;
     _Guarded_by_(m_lock) std::map<std::uint64_t, AttachedDisk> m_attachedDisks;
