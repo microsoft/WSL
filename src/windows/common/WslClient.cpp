@@ -1327,7 +1327,7 @@ int RestoreDistribution(_In_ std::wstring_view arguments)
         {
             if (index + 1 >= argc)
             {
-                THROW_USER_ERROR(Localization::MessageMissingArgument(argv[index], WSL_BINARY_NAME));
+                THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageMissingArgument(argv[index], WSL_BINARY_NAME));
             }
             newName = argv[++index];
         }
@@ -1338,7 +1338,7 @@ int RestoreDistribution(_In_ std::wstring_view arguments)
         }
         else
         {
-            THROW_USER_ERROR(Localization::MessageInvalidCommandLine(argv[index], WSL_BINARY_NAME));
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageInvalidCommandLine(argv[index], WSL_BINARY_NAME));
         }
     }
     THROW_HR_IF(WSL_E_INVALID_USAGE, !name || name->empty());

@@ -8851,6 +8851,14 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         namespace registry = wsl::windows::common::registry;
         using wsl::windows::common::SubProcess;
 
+        // Malformed restore options must report a localized usage error before contacting the service.
+        for (const auto command : {L"--restore-distribution unused --name", L"--restore-distribution unused surplus"})
+        {
+            const auto [out, err] = LxsstuLaunchWslAndCaptureOutput(command, -1);
+            VERIFY_IS_TRUE(out.find(L"E_INVALIDARG") != std::wstring::npos);
+            VERIFY_ARE_EQUAL(err, L"");
+        }
+
         GUID id{};
         VERIFY_SUCCEEDED(CoCreateGuid(&id));
         const auto keyName = wsl::shared::string::GuidToString<wchar_t>(id);
