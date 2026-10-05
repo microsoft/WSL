@@ -303,11 +303,15 @@ void WaitForContainerOutput(const std::wstring& containerName, std::string_view 
     WaitForOutput(wil::unique_handle{parentStdoutRead.release()}, expected, timeout);
 }
 
-WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine, ElevationType elevationType, std::optional<PseudoConsole> pseudoConsole)
+WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine, ElevationType elevationType, std::optional<PseudoConsole> pseudoConsole, ProcessGroup processGroup)
 {
     auto cmd = L"\"" + GetWslcPath() + L"\" " + commandLine;
 
     wsl::windows::common::SubProcess process(nullptr, cmd.c_str());
+    if (processGroup == ProcessGroup::Create)
+    {
+        process.SetFlags(CREATE_NEW_PROCESS_GROUP);
+    }
 
     wil::unique_hfile parentStdinWrite;
     wil::unique_hfile parentStdoutRead;
@@ -358,7 +362,8 @@ WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine, Eleva
         std::move(parentStderrRead),
         std::move(processHandle),
         std::move(nonElevatedToken), // Transfer token ownership to the session
-        std::move(console));
+        std::move(console),
+        processGroup);
 }
 
 PseudoConsole::PseudoConsole(SHORT columns, SHORT rows)
@@ -384,14 +389,16 @@ WSLCInteractiveSession::WSLCInteractiveSession(
     wil::unique_hfile stderrRead,
     wil::unique_handle processHandle,
     wil::unique_handle nonElevatedToken,
-    wsl::windows::common::helpers::unique_pseudo_console pseudoConsole) :
+    wsl::windows::common::helpers::unique_pseudo_console pseudoConsole,
+    ProcessGroup processGroup) :
     CommandLine(std::move(commandLine)),
     m_stdinWrite(std::move(stdinWrite)),
     m_stdoutRead(std::move(stdoutRead)),
     m_stderrRead(std::move(stderrRead)),
     m_pseudoConsole(std::move(pseudoConsole)),
     m_processHandle(std::move(processHandle)),
-    m_nonElevatedToken(std::move(nonElevatedToken))
+    m_nonElevatedToken(std::move(nonElevatedToken)),
+    m_processGroup(processGroup)
 {
     m_stdoutReader = std::make_unique<PartialHandleRead>(m_stdoutRead.get());
 
@@ -519,6 +526,12 @@ bool WSLCInteractiveSession::IsRunning() const
 void WSLCInteractiveSession::CloseStdin()
 {
     m_stdinWrite.reset();
+}
+
+void WSLCInteractiveSession::SendCtrlBreak()
+{
+    VERIFY_IS_TRUE(m_processGroup == ProcessGroup::Create);
+    THROW_IF_WIN32_BOOL_FALSE(GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, GetProcessId(m_processHandle.get())));
 }
 
 std::optional<int> WSLCInteractiveSession::GetExitCode() const

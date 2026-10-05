@@ -67,10 +67,7 @@ target_link_libraries(wslcsession
                       common
                       legacy_stdio_definitions
                       VirtDisk.lib
-                      Crypt32.lib
-                      delayimp.lib)
-
-set_target_properties(wslcsession PROPERTIES LINK_FLAGS "/DELAYLOAD:msi.dll /DELAYLOAD:WINTRUST.dll")
+                      Crypt32.lib)
 
 target_precompile_headers(wslcsession REUSE_FROM common)
 set_target_properties(wslcsession PROPERTIES FOLDER windows)

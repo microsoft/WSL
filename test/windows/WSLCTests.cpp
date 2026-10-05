@@ -3473,24 +3473,16 @@ class WSLCTests
             return contentString;
         };
 
-        auto validateFirstDmesgLine = [](const std::string& dmesg, const char* expected) {
-            auto firstLf = dmesg.find("\n");
-            VERIFY_ARE_NOT_EQUAL(firstLf, std::string::npos);
-            VERIFY_IS_TRUE(dmesg.find(expected) < firstLf);
-        };
-
         // Dmesg without early boot logging
         {
             auto dmesg = createVmWithDmesg(false);
-
-            // Verify that the first line is "brd: module loaded";
-            validateFirstDmesgLine(dmesg, "brd: module loaded");
+            VERIFY_ARE_EQUAL(dmesg.find("Linux version"), std::string::npos);
         }
 
         // Dmesg with early boot logging
         {
             auto dmesg = createVmWithDmesg(true);
-            validateFirstDmesgLine(dmesg, "Linux version");
+            VERIFY_ARE_NOT_EQUAL(dmesg.find("Linux version"), std::string::npos);
         }
     }
 
@@ -7158,6 +7150,88 @@ class WSLCTests
         }
     }
 
+    std::vector<wsl::windows::common::wslc_schema::Event> DrainEventStream(IWSLCEventStream* Stream)
+    {
+        std::vector<wsl::windows::common::wslc_schema::Event> events;
+
+        wil::unique_cotaskmem_ansistring eventJson;
+        HRESULT result;
+        while (SUCCEEDED(result = Stream->GetNext(nullptr, &eventJson)))
+        {
+            events.push_back(wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(eventJson.get()));
+        }
+
+        VERIFY_ARE_EQUAL(WSLC_E_EVENT_STREAM_FINISHED, result);
+        return events;
+    }
+
+    static std::string GenerateNetworkEventTestName(std::string_view Prefix)
+    {
+        GUID runId;
+        VERIFY_SUCCEEDED(CoCreateGuid(&runId));
+        return std::format("{}-{}", Prefix, wsl::shared::string::GuidToString<char>(runId, wsl::shared::string::GuidToStringFlags::None));
+    }
+
+    wil::com_ptr<IWSLCEventStream> OpenEventStream(const std::vector<WSLCFilter>& Filters)
+    {
+        constexpr LONGLONG c_eventWaitSeconds = 120;
+        const LONGLONG until = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() + c_eventWaitSeconds;
+
+        wil::com_ptr<IWSLCEventStream> stream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, until, Filters.data(), static_cast<ULONG>(Filters.size()), &stream));
+        return stream;
+    }
+
+    std::vector<wsl::windows::common::wslc_schema::Event> ReadEvents(IWSLCEventStream* Stream, size_t Count, HANDLE CancelEvent = nullptr)
+    {
+        std::vector<wsl::windows::common::wslc_schema::Event> events;
+        wil::unique_cotaskmem_ansistring eventJson;
+        for (size_t index = 0; index < Count; ++index)
+        {
+            VERIFY_SUCCEEDED(Stream->GetNext(CancelEvent, &eventJson));
+            events.push_back(wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(eventJson.get()));
+        }
+
+        return events;
+    }
+
+    std::vector<wsl::windows::common::wslc_schema::Event> ReadNetworkEventsThroughMarker(IWSLCEventStream* Stream)
+    {
+        const auto markerName = GenerateNetworkEventTestName("wslc-test-event-marker");
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(markerName.c_str())); });
+
+        CreateNamedNetwork(markerName);
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteNetwork(markerName.c_str()));
+        cleanup.release();
+
+        std::vector<wsl::windows::common::wslc_schema::Event> events;
+        while (true)
+        {
+            const auto nextEvents = ReadEvents(Stream, 1);
+            const auto& event = nextEvents[0];
+            const auto name = event.Actor.Attributes.find("name");
+            if (name != event.Actor.Attributes.end() && name->second == markerName)
+            {
+                if (event.Action == "destroy")
+                {
+                    return events;
+                }
+            }
+            else
+            {
+                events.push_back(event);
+            }
+        }
+    }
+
+    wil::com_ptr<IWSLCEventStream> OpenNetworkEventStreamAfterMarker()
+    {
+        auto stream = OpenEventStream({{"type", "network"}});
+        // Since zero replays buffered history, consume a unique marker to establish the starting boundary.
+        ReadNetworkEventsThroughMarker(stream.get());
+        return stream;
+    }
+
     WSLC_TEST_METHOD(EventStream)
     {
         constexpr auto c_containerName = "wslc-test-events";
@@ -7167,22 +7241,6 @@ class WSLCTests
         const auto expectedExitCode = std::to_string(128 + WSLCSignalSIGKILL);
 
         auto now = [] { return duration_cast<seconds>(system_clock::now().time_since_epoch()).count(); };
-
-        // Drains a bounded event stream to completion (GetNext returns WSLC_E_EVENT_STREAM_FINISHED
-        // once the until-time has passed and the backlog is exhausted), parsing each event's JSON.
-        auto drain = [](IWSLCEventStream* stream) {
-            std::vector<wsl::windows::common::wslc_schema::Event> events;
-
-            wil::unique_cotaskmem_ansistring eventJson;
-            HRESULT result;
-            while (SUCCEEDED(result = stream->GetNext(&eventJson)))
-            {
-                events.push_back(wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(eventJson.get()));
-            }
-
-            VERIFY_ARE_EQUAL(WSLC_E_EVENT_STREAM_FINISHED, result);
-            return events;
-        };
 
         // Verifies the given events match the expected actions in order for a given actor.
         auto verifyEvents = [&](const std::vector<wsl::windows::common::wslc_schema::Event>& events,
@@ -7202,7 +7260,7 @@ class WSLCTests
                 VERIFY_ARE_EQUAL(c_labelValue, event.Actor.Attributes.at(c_labelKey));
                 VERIFY_IS_FALSE(event.Actor.Attributes.contains("com.microsoft.wsl.container.metadata"));
 
-                if (action == "stop")
+                if (action == "die")
                 {
                     VERIFY_ARE_EQUAL(expectedExitCode, event.Actor.Attributes.at("exitCode"));
                 }
@@ -7210,10 +7268,18 @@ class WSLCTests
                 {
                     VERIFY_IS_FALSE(event.Actor.Attributes.contains("exitCode"));
                 }
+
+                VERIFY_ARE_EQUAL(action == "kill", event.Actor.Attributes.contains("signal"));
+                if (action == "kill")
+                {
+                    VERIFY_ARE_EQUAL(std::to_string(WSLCSignalSIGKILL), event.Actor.Attributes.at("signal"));
+                }
+
+                VERIFY_ARE_EQUAL(action == "die", event.Actor.Attributes.contains("execDuration"));
             }
         };
 
-        // Run a container through its create/start/kill/stop lifecycle inside a bounded time window.
+        // Run a container through its create/start/kill/die lifecycle inside a bounded time window.
         const LONGLONG since = now();
         std::string id;
         {
@@ -7232,19 +7298,54 @@ class WSLCTests
         const LONGLONG until = now() + 1;
         std::vector<wsl::windows::common::wslc_schema::Event> lifecycleEvents;
 
-        // The container's create, start, kill, stop, then destroy events are reported in order, each carrying
+        // The container's create, start, kill, die, then destroy events are reported in order, each carrying
         // the container's 64-hex id as the actor.
         {
             WSLCFilter filter{"container", id.c_str()};
             wil::com_ptr<IWSLCEventStream> stream;
             VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, &filter, 1, &stream));
 
-            lifecycleEvents = drain(stream.get());
-            verifyEvents(lifecycleEvents, id, {"create", "start", "kill", "stop", "destroy"});
+            lifecycleEvents = DrainEventStream(stream.get());
+            verifyEvents(lifecycleEvents, id, {"create", "start", "kill", "die", "destroy"});
 
             // The whole lifecycle falls inside the requested window.
-            VERIFY_IS_TRUE(lifecycleEvents[0].time >= since);
-            VERIFY_IS_TRUE(lifecycleEvents[4].time < until);
+            VERIFY_IS_TRUE(lifecycleEvents[0].timeNano / 1'000'000'000 >= since);
+            VERIFY_IS_TRUE(lifecycleEvents[4].timeNano / 1'000'000'000 < until);
+
+            // Each event keeps the exact time Docker reported for it.
+            // Docker also emits container events that aren't recorded, such as 'attach'.
+            const auto dockerEvents = [&](const std::string& format, std::initializer_list<std::string> extraFilters = {}) {
+                std::vector<std::string> command{
+                    "/usr/bin/docker",
+                    "events",
+                    "--since",
+                    std::to_string(lifecycleEvents.front().timeNano / 1'000'000'000),
+                    "--until",
+                    std::to_string(lifecycleEvents.back().timeNano / 1'000'000'000 + 1),
+                    "--filter",
+                    "type=container",
+                    "--filter",
+                    "container=" + id,
+                    "--format",
+                    format};
+
+                for (const auto& filter : extraFilters)
+                {
+                    command.insert(command.end(), {"--filter", filter});
+                }
+
+                return ExpectCommandResult(m_defaultSession.get(), command, 0);
+            };
+
+            const auto dockerLines = wsl::shared::string::Split(dockerEvents("{{.Action}} {{.TimeNano}}").Output[1], '\n');
+            for (const auto& event : lifecycleEvents)
+            {
+                const auto expected = std::format("{} {}", event.Action, event.timeNano);
+                VERIFY_IS_TRUE(std::ranges::find(dockerLines, expected) != dockerLines.end());
+            }
+
+            const auto dockerExecDuration = dockerEvents(R"({{index .Actor.Attributes "execDuration"}})", {"event=die"}).Output[1];
+            VERIFY_ARE_EQUAL(std::format("{}\n", lifecycleEvents[3].Actor.Attributes.at("execDuration")), dockerExecDuration);
         }
 
         // Each lifecycle action is independently selectable: an 'event=<action>' filter, AND'd with
@@ -7254,14 +7355,32 @@ class WSLCTests
             wil::com_ptr<IWSLCEventStream> stream;
             VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, filters, ARRAYSIZE(filters), &stream));
 
-            verifyEvents(drain(stream.get()), id, {action});
+            verifyEvents(DrainEventStream(stream.get()), id, {action});
         };
 
         verifyEventFilter("create");
         verifyEventFilter("start");
         verifyEventFilter("kill");
-        verifyEventFilter("stop");
+        verifyEventFilter("die");
         verifyEventFilter("destroy");
+
+        // Image filters match the image attribute carried by container events.
+        {
+            WSLCFilter filters[]{{"container", id.c_str()}, {"image", c_imageName}};
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, filters, ARRAYSIZE(filters), &stream));
+
+            verifyEvents(DrainEventStream(stream.get()), id, {"create", "start", "kill", "die", "destroy"});
+        }
+
+        // A non-matching image excludes the same container's events.
+        {
+            WSLCFilter filters[]{{"container", id.c_str()}, {"image", "nonexistent:image"}};
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, filters, ARRAYSIZE(filters), &stream));
+
+            VERIFY_IS_TRUE(DrainEventStream(stream.get()).empty());
+        }
 
         // Values sharing a filter key are OR'd.
         {
@@ -7269,7 +7388,7 @@ class WSLCTests
             wil::com_ptr<IWSLCEventStream> stream;
             VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, filters, ARRAYSIZE(filters), &stream));
 
-            verifyEvents(drain(stream.get()), id, {"create", "destroy"});
+            verifyEvents(DrainEventStream(stream.get()), id, {"create", "destroy"});
         }
 
         // Image events are not recorded yet, so a 'type=image' filter excludes the container's
@@ -7279,7 +7398,7 @@ class WSLCTests
             wil::com_ptr<IWSLCEventStream> stream;
             VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, &filter, 1, &stream));
 
-            VERIFY_IS_TRUE(drain(stream.get()).empty());
+            VERIFY_IS_TRUE(DrainEventStream(stream.get()).empty());
         }
 
         // An unmatched container id yields an empty stream, and GetNext validates its out-pointer.
@@ -7288,7 +7407,25 @@ class WSLCTests
             wil::com_ptr<IWSLCEventStream> stream;
             VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, &filter, 1, &stream));
 
-            VERIFY_IS_TRUE(drain(stream.get()).empty());
+            VERIFY_IS_TRUE(DrainEventStream(stream.get()).empty());
+        }
+
+        // An until-time in year 3000, beyond the range of nanosecond time points, still returns the recorded events.
+        {
+            WSLCFilter filter{"container", id.c_str()};
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, 32'503'680'000, &filter, 1, &stream));
+
+            // The stream stays open until year 3000, so a missing event would otherwise block instead of failing.
+            wil::unique_event timedOut{wil::EventOptions::ManualReset};
+            wil::unique_threadpool_timer timeout{CreateThreadpoolTimer(
+                [](PTP_CALLBACK_INSTANCE, PVOID context, PTP_TIMER) { SetEvent(static_cast<HANDLE>(context)); }, timedOut.get(), nullptr)};
+            VERIFY_IS_NOT_NULL(timeout.get());
+
+            FILETIME dueTime = wil::filetime::from_int64(-wil::filetime_duration::one_second * 60);
+            SetThreadpoolTimer(timeout.get(), &dueTime, 0, 0);
+
+            verifyEvents(ReadEvents(stream.get(), 5, timedOut.get()), id, {"create", "start", "kill", "die", "destroy"});
         }
 
         // A since-time later than a non-zero until-time describes a backwards window and is rejected.
@@ -7297,6 +7434,444 @@ class WSLCTests
             VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->GetEvents(since + 1, since, nullptr, 0, &stream));
             ValidateCOMErrorMessage(wsl::shared::Localization::MessageWslcEventsInvalidTimeWindow(since + 1, since));
         }
+    }
+
+    WSLC_TEST_METHOD(EventStreamRecordsDieAndStop)
+    {
+        WSLCContainerLauncher launcher("debian:latest", "wslc-test-event-die-stop", {"sleep", "99999"});
+        auto container = launcher.Launch(*m_defaultSession);
+        const auto id = container.Id();
+
+        auto stream = OpenEventStream({{"container", id.c_str()}, {"event", "die"}, {"event", "stop"}});
+
+        // Stopping, unlike killing, makes Docker report its own 'stop' event, which WSLC publishes once the container has exited.
+        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+
+        const auto events = ReadEvents(stream.get(), 2);
+
+        VERIFY_ARE_EQUAL(std::string{"die"}, events[0].Action);
+        VERIFY_ARE_EQUAL(std::to_string(128 + WSLCSignalSIGKILL), events[0].Actor.Attributes.at("exitCode"));
+        VERIFY_ARE_EQUAL(std::string{"stop"}, events[1].Action);
+        VERIFY_IS_FALSE(events[1].Actor.Attributes.contains("exitCode"));
+        VERIFY_IS_TRUE(events[1].timeNano >= events[0].timeNano);
+    }
+
+    WSLC_TEST_METHOD(EventStreamRecordsOneStopPerStop)
+    {
+        WSLCContainerLauncher launcher("debian:latest", "wslc-test-event-one-stop", {"sleep", "99999"});
+        auto container = launcher.Launch(*m_defaultSession);
+        const auto id = container.Id();
+
+        auto now = [] { return duration_cast<seconds>(system_clock::now().time_since_epoch()).count(); };
+        const LONGLONG since = now();
+
+        // The second run ends with a kill, so a 'stop' from the first run must not carry over into it.
+        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+        VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+        VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
+
+        WSLCFilter filters[]{{"container", id.c_str()}, {"event", "die"}, {"event", "stop"}};
+        wil::com_ptr<IWSLCEventStream> stream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, now() + 1, filters, ARRAYSIZE(filters), &stream));
+
+        std::vector<std::string> actions;
+        std::ranges::transform(DrainEventStream(stream.get()), std::back_inserter(actions), &wsl::windows::common::wslc_schema::Event::Action);
+        VERIFY_ARE_EQUAL(std::string{"die,stop,die"}, wsl::shared::string::Join(actions, ','));
+    }
+
+    WSLC_TEST_METHOD(EventStreamStopNotObservedWhileRunning)
+    {
+        // Docker can report 'stop' before 'die', so repeat to give that ordering a chance to occur.
+        for (int iteration = 0; iteration < 20; ++iteration)
+        {
+            WSLCContainerLauncher launcher("debian:latest", "wslc-test-event-stop-state", {"sleep", "99999"});
+            auto container = launcher.Launch(*m_defaultSession);
+            const auto id = container.Id();
+
+            auto stream = OpenEventStream({{"container", id.c_str()}, {"event", "stop"}});
+            auto stopResult = std::async(std::launch::async, [&]() {
+                return RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "stop", "-t", "0", id});
+            });
+
+            ReadEvents(stream.get(), 1);
+            VERIFY_ARE_NOT_EQUAL(container.State(), WslcContainerStateRunning);
+            VERIFY_ARE_EQUAL(0, stopResult.get().Code);
+        }
+    }
+
+    WSLC_TEST_METHOD(EventStreamRecordsStopForAutoRemoveContainer)
+    {
+        WSLCContainerLauncher launcher("debian:latest", "wslc-test-event-rm-stop", {"sleep", "99999"});
+        launcher.SetContainerFlags(WSLCContainerFlagsRm);
+        auto container = launcher.Launch(*m_defaultSession);
+        const auto id = container.Id();
+
+        auto stream = OpenEventStream({{"container", id.c_str()}, {"event", "die"}, {"event", "stop"}});
+
+        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateDeleted);
+
+        // Purge the auto-removed container so its own event registration is released before reading the recorded events.
+        wil::com_ptr<IWSLCContainer> openedContainer;
+        VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(id.c_str(), &openedContainer), WSLC_E_CONTAINER_NOT_FOUND);
+
+        auto events = ReadEvents(stream.get(), 2);
+        VERIFY_ARE_EQUAL(std::string{"die"}, events[0].Action);
+        VERIFY_ARE_EQUAL(std::to_string(128 + WSLCSignalSIGKILL), events[0].Actor.Attributes.at("exitCode"));
+        VERIFY_ARE_EQUAL(std::string{"stop"}, events[1].Action);
+        VERIFY_IS_FALSE(events[1].Actor.Attributes.contains("exitCode"));
+        VERIFY_IS_TRUE(events[1].timeNano >= events[0].timeNano);
+    }
+
+    WSLC_TEST_METHOD(EventStreamReportsRequestedImageForPublishAllContainer)
+    {
+        constexpr auto c_imageName = "debian:latest";
+
+        // Publish-all creates the container from the resolved image ID, which Docker then reports as the image.
+        WSLCContainerLauncher launcher(c_imageName, "wslc-test-event-publish-all", {"sleep", "99999"}, {}, "bridge");
+        launcher.SetContainerFlags(WSLCContainerFlagsPublishAll);
+        auto container = launcher.Launch(*m_defaultSession);
+        const auto id = container.Id();
+
+        auto stream = OpenEventStream({{"container", id.c_str()}, {"event", "kill"}});
+        VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
+
+        const auto events = ReadEvents(stream.get(), 1);
+        VERIFY_ARE_EQUAL(c_imageName, events[0].Actor.Attributes.at("image"));
+        VERIFY_ARE_EQUAL(std::to_string(WSLCSignalSIGKILL), events[0].Actor.Attributes.at("signal"));
+        VERIFY_IS_FALSE(events[0].Actor.Attributes.contains("com.microsoft.wsl.container.metadata"));
+    }
+
+    WSLC_TEST_METHOD(EventStreamIgnoresContainersNotCreatedByWslc)
+    {
+        WSLCContainerLauncher launcher("debian:latest", "wslc-test-event-marker", {"sleep", "99999"});
+        auto marker = launcher.Launch(*m_defaultSession);
+        const auto markerId = marker.Id();
+
+        auto runResult = ExpectCommandResult(
+            m_defaultSession.get(), {"/usr/bin/docker", "run", "-d", "--rm", "debian:latest", "sleep", "99999"}, 0);
+        auto externalId = runResult.Output[1];
+        while (!externalId.empty() && (externalId.back() == '\n' || externalId.back() == '\r'))
+        {
+            externalId.pop_back();
+        }
+
+        auto cleanup = wil::scope_exit([&]() { RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "rm", "-f", externalId}); });
+
+        auto stream = OpenEventStream({{"container", externalId.c_str()}, {"container", markerId.c_str()}, {"event", "kill"}});
+        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "kill", externalId}, 0);
+
+        // Docker delivers events in order, so the marker's kill can only be first if the external one was dropped.
+        VERIFY_SUCCEEDED(marker.Get().Kill(WSLCSignalSIGKILL));
+        const auto events = ReadEvents(stream.get(), 1);
+        VERIFY_ARE_EQUAL(markerId, events[0].Actor.ID);
+    }
+
+    WSLC_TEST_METHOD(EventStreamRejectsUnsupportedFilterKeys)
+    {
+        for (const auto* key : {"unsupported", "label", "Type", ""})
+        {
+            WSLCFilter filters[]{{"type", "network"}, {key, "test"}};
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->GetEvents(0, 0, filters, ARRAYSIZE(filters), &stream));
+            ValidateCOMErrorMessage(wsl::shared::Localization::MessageWslcInvalidFilter(wsl::shared::string::MultiByteToWide(key)));
+            VERIFY_IS_NULL(stream.get());
+        }
+
+        WSLCFilter filter{"event", "future-network-action"};
+        wil::com_ptr<IWSLCEventStream> stream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, 1, &filter, 1, &stream));
+        VERIFY_IS_TRUE(DrainEventStream(stream.get()).empty());
+    }
+
+    WSLC_TEST_METHOD(NetworkEventStream)
+    {
+        const auto networkName = GenerateNetworkEventTestName("wslc-test-network-events");
+        const std::string containerName = "wslc-test-network-events-container";
+        const std::string imageName = "debian:latest";
+        const std::string networkDriver = "bridge";
+
+        auto stream = OpenEventStream({{"network", networkName.c_str()}});
+        std::vector<wsl::windows::common::wslc_schema::Event> lifecycleEvents;
+        std::string networkId;
+        std::string containerId;
+
+        {
+            WSLCNetworkOptions options{};
+            options.Name = networkName.c_str();
+            options.Driver = networkDriver.c_str();
+            VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
+
+            auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+            // The create event is published asynchronously, so wait for it rather than assuming it landed.
+            {
+                lifecycleEvents = ReadEvents(stream.get(), 1);
+                VERIFY_ARE_EQUAL("create", lifecycleEvents[0].Action);
+            }
+
+            const auto networks = ListNetworks();
+            const auto created = std::ranges::find_if(networks, [&](const auto& network) { return network.Name == networkName; });
+            VERIFY_ARE_NOT_EQUAL(networks.end(), created);
+            networkId = created->Id;
+
+            // Running a container makes Docker attach and detach an endpoint.
+            {
+                WSLCContainerLauncher launcher(imageName, containerName, {"sleep", "99999"}, {}, networkName);
+                auto container = launcher.Launch(*m_defaultSession);
+                containerId = container.Id();
+
+                VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+            }
+
+            VERIFY_SUCCEEDED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+            cleanup.release();
+            VERIFY_IS_FALSE(NetworkIsListed(networkName));
+        }
+
+        const std::vector<std::string> lifecycleActions{"create", "connect", "disconnect", "destroy"};
+
+        // Verify lifecycle order and actor metadata. Waiting for the full sequence here also lets the
+        // bounded queries below read a settled store.
+        const auto remainingEvents = ReadEvents(stream.get(), lifecycleActions.size() - lifecycleEvents.size());
+        lifecycleEvents.insert(lifecycleEvents.end(), remainingEvents.begin(), remainingEvents.end());
+        const LONGLONG until = lifecycleEvents.back().timeNano / 1'000'000'000 + 1;
+
+        auto eventsMatching = [&](const std::vector<WSLCFilter>& Filters) {
+            wil::com_ptr<IWSLCEventStream> replayStream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, until, Filters.data(), static_cast<ULONG>(Filters.size()), &replayStream));
+
+            return DrainEventStream(replayStream.get());
+        };
+
+        auto verifyActions = [&](const std::vector<wsl::windows::common::wslc_schema::Event>& Events,
+                                 const std::vector<std::string>& ExpectedActions) {
+            VERIFY_ARE_EQUAL(ExpectedActions.size(), Events.size());
+
+            for (size_t i = 0; i < ExpectedActions.size(); ++i)
+            {
+                VERIFY_ARE_EQUAL(ExpectedActions[i], Events[i].Action);
+            }
+        };
+
+        {
+            const auto& events = lifecycleEvents;
+            verifyActions(events, lifecycleActions);
+
+            for (const auto& event : events)
+            {
+                VERIFY_ARE_EQUAL("network", event.Type);
+                VERIFY_ARE_EQUAL(networkId, event.Actor.ID);
+                VERIFY_ARE_EQUAL(networkName, event.Actor.Attributes.at("name"));
+                VERIFY_ARE_EQUAL(networkDriver, event.Actor.Attributes.at("type"));
+                VERIFY_IS_GREATER_THAN(event.timeNano, 0LL);
+            }
+
+            // Only the endpoint events name the container that attached to the network.
+            VERIFY_IS_FALSE(events[0].Actor.Attributes.contains("container"));
+            VERIFY_ARE_EQUAL(containerId, events[1].Actor.Attributes.at("container"));
+            VERIFY_ARE_EQUAL(containerId, events[2].Actor.Attributes.at("container"));
+            VERIFY_IS_FALSE(events[3].Actor.Attributes.contains("container"));
+        }
+
+        // Docker matches network filters by full or prefixed ID and name.
+        {
+            const std::string networkIdPrefix = networkId.substr(0, 12);
+            const std::string networkNamePrefix = networkName.substr(0, networkName.size() - 1);
+
+            verifyActions(eventsMatching({{"type", "network"}, {"network", networkId.c_str()}}), lifecycleActions);
+            verifyActions(eventsMatching({{"network", networkIdPrefix.c_str()}}), lifecycleActions);
+            verifyActions(eventsMatching({{"network", networkName.c_str()}}), lifecycleActions);
+            verifyActions(eventsMatching({{"network", networkNamePrefix.c_str()}}), lifecycleActions);
+        }
+
+        // Distinct filter keys are AND'd.
+        verifyActions(eventsMatching({{"network", networkName.c_str()}, {"event", "connect"}}), {"connect"});
+
+        // Values sharing a filter key are OR'd.
+        {
+            const std::vector<WSLCFilter> filters{{"network", networkName.c_str()}, {"event", "create"}, {"event", "destroy"}};
+
+            verifyActions(eventsMatching(filters), {"create", "destroy"});
+        }
+
+        // A network that never existed matches nothing.
+        VERIFY_IS_TRUE(eventsMatching({{"network", "wslc-test-no-such-network"}}).empty());
+    }
+
+    WSLC_TEST_METHOD(NetworkPruneEventStream)
+    {
+        const auto firstNetwork = GenerateNetworkEventTestName("wslc-test-prune-events-a");
+        const auto secondNetwork = GenerateNetworkEventTestName("wslc-test-prune-events-b");
+        const std::string pruneLabel = firstNetwork;
+        const std::string pruneLabelFilter = pruneLabel + "=yes";
+
+        auto cleanup = wil::scope_exit([&]() {
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(firstNetwork.c_str()));
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(secondNetwork.c_str()));
+        });
+
+        auto stream = OpenNetworkEventStreamAfterMarker();
+
+        // The label scopes this prune to the test networks.
+        CreateNamedNetwork(firstNetwork, {{pruneLabel.c_str(), "yes"}});
+        CreateNamedNetwork(secondNetwork, {{pruneLabel.c_str(), "yes"}});
+
+        WSLCFilter pruneFilter{"label", pruneLabelFilter.c_str()};
+        wil::unique_cotaskmem_array_ptr<WSLCNetworkName> deleted;
+        VERIFY_SUCCEEDED(m_defaultSession->PruneNetworks(&pruneFilter, 1, deleted.addressof(), deleted.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(static_cast<size_t>(2), deleted.size());
+
+        cleanup.release();
+
+        // Keep events for the test networks and Docker's unkeyed aggregate prune.
+        const auto isTestEvent = [&](const wsl::windows::common::wslc_schema::Event& Event) {
+            const auto name = Event.Actor.Attributes.find("name");
+            return Event.Action == "prune" ||
+                   (name != Event.Actor.Attributes.end() && (name->second == firstNetwork || name->second == secondNetwork));
+        };
+
+        const auto events = ReadNetworkEventsThroughMarker(stream.get());
+        std::vector<wsl::windows::common::wslc_schema::Event> testEvents;
+        std::ranges::copy_if(events, std::back_inserter(testEvents), isTestEvent);
+
+        // Docker emits per-network destroys before one aggregate prune.
+        VERIFY_ARE_EQUAL(static_cast<size_t>(5), testEvents.size());
+        VERIFY_ARE_EQUAL("create", testEvents[0].Action);
+        VERIFY_ARE_EQUAL("create", testEvents[1].Action);
+        VERIFY_ARE_EQUAL("destroy", testEvents[2].Action);
+        VERIFY_ARE_EQUAL("destroy", testEvents[3].Action);
+
+        const std::vector<std::string> expectedNetworks{firstNetwork, secondNetwork};
+        const std::vector<std::string> destroyed{testEvents[2].Actor.Attributes.at("name"), testEvents[3].Actor.Attributes.at("name")};
+        VerifyAreEqualUnordered(expectedNetworks, destroyed);
+
+        VERIFY_ARE_EQUAL("prune", testEvents[4].Action);
+        VERIFY_IS_TRUE(testEvents[4].Actor.ID.empty());
+        VERIFY_ARE_EQUAL("0", testEvents[4].Actor.Attributes.at("reclaimed"));
+    }
+
+    // Verify Docker emits destroy events before the aggregate prune event.
+    WSLC_TEST_METHOD(NetworkPruneEventSequenceWithExternalPrune)
+    {
+        const auto firstNetwork = GenerateNetworkEventTestName("wslc-test-prune-unrelated-a");
+        const auto secondNetwork = GenerateNetworkEventTestName("wslc-test-prune-unrelated-b");
+        const std::string pruneLabel = firstNetwork;
+        const std::string pruneLabelFilter = pruneLabel + "=yes";
+
+        auto cleanup = wil::scope_exit([&]() {
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(firstNetwork.c_str()));
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(secondNetwork.c_str()));
+        });
+
+        auto stream = OpenNetworkEventStreamAfterMarker();
+
+        // Generate an unkeyed aggregate event without changing WSLC network state.
+        ExpectCommandResult(
+            m_defaultSession.get(),
+            {"/usr/bin/docker", "network", "prune", "-f", "--filter", "label=wslc-test-prune-matches-nothing"},
+            0);
+
+        CreateNamedNetwork(firstNetwork, {{pruneLabel.c_str(), "yes"}});
+        CreateNamedNetwork(secondNetwork, {{pruneLabel.c_str(), "yes"}});
+
+        WSLCFilter pruneFilter{"label", pruneLabelFilter.c_str()};
+        wil::unique_cotaskmem_array_ptr<WSLCNetworkName> deleted;
+        VERIFY_SUCCEEDED(m_defaultSession->PruneNetworks(&pruneFilter, 1, deleted.addressof(), deleted.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(static_cast<size_t>(2), deleted.size());
+
+        cleanup.release();
+
+        const auto events = ReadNetworkEventsThroughMarker(stream.get());
+        std::vector<std::string> actions;
+        for (const auto& event : events)
+        {
+            const auto name = event.Actor.Attributes.find("name");
+            if (event.Action == "prune" ||
+                (name != event.Actor.Attributes.end() && (name->second == firstNetwork || name->second == secondNetwork)))
+            {
+                actions.push_back(event.Action);
+            }
+        }
+
+        // The external aggregate precedes this request's ordered destroy and prune events.
+        const std::vector<std::string> expected{"prune", "create", "create", "destroy", "destroy", "prune"};
+        VERIFY_ARE_EQUAL(expected, actions);
+
+        VERIFY_SUCCEEDED(m_defaultSession->PruneNetworks(&pruneFilter, 1, deleted.addressof(), deleted.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(static_cast<size_t>(0), deleted.size());
+    }
+
+    // Docker parity: a create that fails after dockerd made the network is rolled back, and both the
+    // create and the rollback's destroy are published exactly as dockerd emitted them.
+    WSLC_TEST_METHOD(NetworkCreateRollbackPublishesEvents)
+    {
+        const auto rolledBack = GenerateNetworkEventTestName("wslc-test-network-rollback");
+        auto stream = OpenEventStream({{"network", rolledBack.c_str()}});
+
+        auto cleanup = wil::scope_exit([&]() {
+            LOG_IF_FAILED(m_defaultSession->SetNetworkFaultsForTest(FALSE));
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(rolledBack.c_str()));
+        });
+
+        VERIFY_SUCCEEDED(m_defaultSession->SetNetworkFaultsForTest(TRUE));
+
+        WSLCNetworkOptions options{};
+        options.Name = rolledBack.c_str();
+        options.Driver = "bridge";
+        VERIFY_ARE_EQUAL(E_FAIL, m_defaultSession->CreateNetwork(&options, nullptr));
+
+        VERIFY_SUCCEEDED(m_defaultSession->SetNetworkFaultsForTest(FALSE));
+
+        // The rollback removed the network from dockerd, not just from the session's metadata.
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->InspectNetwork(rolledBack.c_str(), &output));
+        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "network", "inspect", rolledBack.c_str()}, 1);
+
+        const auto events = ReadEvents(stream.get(), 2);
+        VERIFY_ARE_EQUAL("create", events[0].Action);
+        VERIFY_ARE_EQUAL("destroy", events[1].Action);
+    }
+
+    // Verify callback registration survives Docker event-stream reconnection after VM restart.
+    WSLC_TEST_METHOD(NetworkEventsSurviveVmRestart)
+    {
+        const auto networkName = GenerateNetworkEventTestName("wslc-test-network-reconnect");
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        auto stream = OpenEventStream({{"network", networkName.c_str()}});
+
+        CreateNamedNetwork(networkName);
+
+        // Teardown stops the relay that delivers events, so the create must land before the restart.
+        const auto createEvents = ReadEvents(stream.get(), 1);
+        VERIFY_ARE_EQUAL("create", createEvents[0].Action);
+
+        BOOL wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(m_defaultSession->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_testSessionName));
+
+        // Listing restarts the VM and recovers the network from dockerd.
+        VERIFY_IS_TRUE(NetworkIsListed(networkName));
+        VERIFY_IS_TRUE(IsVmRunning(c_testSessionName));
+
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+        cleanup.release();
+
+        const auto destroyEvents = ReadEvents(stream.get(), 1);
+        VERIFY_ARE_EQUAL("destroy", destroyEvents[0].Action);
+
+        // The session event store retains create across restart and records destroy after reconnect.
+        WSLCFilter filter{"network", networkName.c_str()};
+        wil::com_ptr<IWSLCEventStream> replayStream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, destroyEvents[0].timeNano / 1'000'000'000 + 1, &filter, 1, &replayStream));
+        const auto events = DrainEventStream(replayStream.get());
+
+        VERIFY_ARE_EQUAL(static_cast<size_t>(2), events.size());
+        VERIFY_ARE_EQUAL("create", events[0].Action);
+        VERIFY_ARE_EQUAL("destroy", events[1].Action);
     }
 
     WSLC_TEST_METHOD(EventStreamReportsLostEvents)
@@ -7314,7 +7889,7 @@ class WSLCTests
 
         // Read one event to place the reader's cursor inside the ring.
         wil::unique_cotaskmem_ansistring eventJson;
-        VERIFY_SUCCEEDED(stream->GetNext(&eventJson));
+        VERIFY_SUCCEEDED(stream->GetNext(nullptr, &eventJson));
         const auto firstEvent = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(eventJson.get());
         VERIFY_ARE_EQUAL("create", firstEvent.Action);
         VERIFY_ARE_EQUAL(id, firstEvent.Actor.ID);
@@ -7331,10 +7906,10 @@ class WSLCTests
         VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
         VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
 
-        VERIFY_ARE_EQUAL(WSLC_E_EVENTS_LOST, stream->GetNext(&eventJson));
+        VERIFY_ARE_EQUAL(WSLC_E_EVENTS_LOST, stream->GetNext(nullptr, &eventJson));
 
         // Reporting the gap resyncs the reader, so it resumes from the oldest event still buffered.
-        VERIFY_SUCCEEDED(stream->GetNext(&eventJson));
+        VERIFY_SUCCEEDED(stream->GetNext(nullptr, &eventJson));
         const auto resumedEvent = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(eventJson.get());
         VERIFY_ARE_EQUAL("kill", resumedEvent.Action);
         VERIFY_ARE_EQUAL(id, resumedEvent.Actor.ID);
@@ -7381,14 +7956,14 @@ class WSLCTests
 
         firstReader = std::thread([&]() {
             firstReaderStarted.SetEvent();
-            firstResult = stream->GetNext(&firstEventJson);
+            firstResult = stream->GetNext(nullptr, &firstEventJson);
         });
         VERIFY_IS_TRUE(firstReaderStarted.wait(30 * 1000));
         VERIFY_ARE_EQUAL(WAIT_TIMEOUT, WaitForSingleObject(firstReader.native_handle(), 100));
 
         secondReader = std::thread([&]() {
             secondReaderStarted.SetEvent();
-            secondResult = stream->GetNext(&secondEventJson);
+            secondResult = stream->GetNext(nullptr, &secondEventJson);
         });
         VERIFY_IS_TRUE(secondReaderStarted.wait(30 * 1000));
         VERIFY_ARE_EQUAL(WAIT_TIMEOUT, WaitForSingleObject(secondReader.native_handle(), 100));
@@ -7431,7 +8006,7 @@ class WSLCTests
         std::promise<HRESULT> getNextResult;
         std::thread readerThread([&]() {
             wil::unique_cotaskmem_ansistring eventJson;
-            getNextResult.set_value(stream->GetNext(&eventJson));
+            getNextResult.set_value(stream->GetNext(nullptr, &eventJson));
         });
         auto threadCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { readerThread.join(); });
 
@@ -7444,6 +8019,172 @@ class WSLCTests
         FAIL_FAST_IF_MSG(
             future.wait_for(10s) != std::future_status::ready, "event stream reader did not abort after session termination");
         VERIFY_ARE_EQUAL(E_ABORT, future.get());
+    }
+
+    WSLC_TEST_METHOD(EventStreamCancellationAbortsReader)
+    {
+        WSLCFilter filter{"container", "nonexistent-event-stream-container"};
+        const LONGLONG now = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
+        const std::array<LONGLONG, 2> untilTimes{0, now + 120};
+
+        for (const auto until : untilTimes)
+        {
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, until, &filter, 1, &stream));
+
+            std::promise<HRESULT> getNextResult;
+            wil::unique_event readerStarted{wil::EventOptions::ManualReset};
+            wil::unique_event cancelEvent{wil::EventOptions::ManualReset};
+            wil::unique_cotaskmem_ansistring eventJson;
+            std::thread readerThread([&]() {
+                const auto coInitialize = wil::CoInitializeEx();
+                readerStarted.SetEvent();
+                getNextResult.set_value(stream->GetNext(cancelEvent.get(), &eventJson));
+            });
+            auto threadCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                cancelEvent.SetEvent();
+                FAIL_FAST_IF_MSG(
+                    WaitForSingleObject(readerThread.native_handle(), 10 * 1000) != WAIT_OBJECT_0,
+                    "event stream reader did not finish after cancellation");
+                readerThread.join();
+            });
+
+            VERIFY_IS_TRUE(readerStarted.wait(30 * 1000));
+            VERIFY_ARE_EQUAL(WAIT_TIMEOUT, WaitForSingleObject(readerThread.native_handle(), 100));
+            cancelEvent.SetEvent();
+
+            auto future = getNextResult.get_future();
+            FAIL_FAST_IF_MSG(
+                future.wait_for(10s) != std::future_status::ready, "event stream reader did not finish after cancellation");
+            VERIFY_ARE_EQUAL(E_ABORT, future.get());
+            VERIFY_IS_NULL(eventJson.get());
+        }
+    }
+
+    WSLC_TEST_METHOD(EventStreamExpiredWindowWithOptionalCancellation)
+    {
+        WSLCFilter filter{"container", "nonexistent-event-stream-container"};
+        wil::com_ptr<IWSLCEventStream> stream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, 1, &filter, 1, &stream));
+
+        wil::unique_event cancelEvent{wil::EventOptions::ManualReset};
+        wil::unique_cotaskmem_ansistring eventJson;
+        for (const auto handle : {static_cast<HANDLE>(nullptr), cancelEvent.get()})
+        {
+            VERIFY_ARE_EQUAL(WSLC_E_EVENT_STREAM_FINISHED, stream->GetNext(handle, &eventJson));
+            VERIFY_IS_NULL(eventJson.get());
+        }
+
+        cancelEvent.SetEvent();
+        VERIFY_ARE_EQUAL(E_ABORT, stream->GetNext(cancelEvent.get(), &eventJson));
+        VERIFY_IS_NULL(eventJson.get());
+
+        cancelEvent.ResetEvent();
+        VERIFY_ARE_EQUAL(WSLC_E_EVENT_STREAM_FINISHED, stream->GetNext(cancelEvent.get(), &eventJson));
+        VERIFY_IS_NULL(eventJson.get());
+    }
+
+    WSLC_TEST_METHOD(EventStreamCancellationIsolatesPendingReaders)
+    {
+        WSLCFilter filter{"container", "nonexistent-event-stream-container"};
+        const LONGLONG until = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() + 120;
+        std::array<wil::com_ptr<IWSLCEventStream>, 2> streams;
+        std::array<wil::unique_event, 2> cancelEvents;
+        std::array<wil::unique_event, 2> readerStarted;
+        std::array<wil::unique_cotaskmem_ansistring, 2> eventJson;
+        std::array<HRESULT, 2> results{};
+        std::array<std::thread, 2> readers;
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            for (size_t index = 0; index < readers.size(); ++index)
+            {
+                if (readers[index].joinable())
+                {
+                    cancelEvents[index].SetEvent();
+                    FAIL_FAST_IF_MSG(
+                        WaitForSingleObject(readers[index].native_handle(), 10 * 1000) != WAIT_OBJECT_0,
+                        "event stream reader did not finish after cancellation");
+                    readers[index].join();
+                }
+            }
+        });
+
+        for (size_t index = 0; index < readers.size(); ++index)
+        {
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, until, &filter, 1, &streams[index]));
+            cancelEvents[index].create(wil::EventOptions::ManualReset);
+            readerStarted[index].create(wil::EventOptions::ManualReset);
+            readers[index] = std::thread([&, index]() {
+                const auto coInitialize = wil::CoInitializeEx();
+                readerStarted[index].SetEvent();
+                results[index] = streams[index]->GetNext(cancelEvents[index].get(), &eventJson[index]);
+            });
+            VERIFY_IS_TRUE(readerStarted[index].wait(30 * 1000));
+            VERIFY_ARE_EQUAL(WAIT_TIMEOUT, WaitForSingleObject(readers[index].native_handle(), 100));
+        }
+
+        cancelEvents[0].SetEvent();
+        FAIL_FAST_IF_MSG(
+            WaitForSingleObject(readers[0].native_handle(), 10 * 1000) != WAIT_OBJECT_0,
+            "event stream reader did not finish after cancellation");
+        readers[0].join();
+        VERIFY_ARE_EQUAL(E_ABORT, results[0]);
+        VERIFY_IS_NULL(eventJson[0].get());
+
+        // Cancelling one stream must leave the other subscriber parked.
+        VERIFY_ARE_EQUAL(WAIT_TIMEOUT, WaitForSingleObject(readers[1].native_handle(), 1000));
+
+        cancelEvents[1].SetEvent();
+        FAIL_FAST_IF_MSG(
+            WaitForSingleObject(readers[1].native_handle(), 10 * 1000) != WAIT_OBJECT_0,
+            "event stream reader did not finish after cancellation");
+        readers[1].join();
+        VERIFY_ARE_EQUAL(E_ABORT, results[1]);
+        VERIFY_IS_NULL(eventJson[1].get());
+    }
+
+    WSLC_TEST_METHOD(EventStreamCancellationPreservesBufferedEvents)
+    {
+        WSLCContainerLauncher launcher("debian:latest", "wslc-test-event-cancellation", {"sleep", "99999"});
+        auto container = launcher.Launch(*m_defaultSession);
+        const auto id = container.Id();
+
+        WSLCFilter filter{"container", id.c_str()};
+        const LONGLONG until = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() + 1;
+        wil::com_ptr<IWSLCEventStream> stream;
+        wil::com_ptr<IWSLCEventStream> otherStream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, until, &filter, 1, &stream));
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, until, &filter, 1, &otherStream));
+
+        // Expiring the window must not discard buffered events from before the deadline.
+        std::this_thread::sleep_until(sys_seconds{seconds{until}});
+
+        wil::unique_event cancelEvent{wil::EventOptions::ManualReset};
+        for (const auto* action : {"create", "start"})
+        {
+            cancelEvent.SetEvent();
+            wil::unique_cotaskmem_ansistring eventJson;
+            VERIFY_ARE_EQUAL(E_ABORT, stream->GetNext(cancelEvent.get(), &eventJson));
+            VERIFY_IS_NULL(eventJson.get());
+
+            // Cancelling one subscription must neither affect another nor consume its own next event.
+            wil::unique_cotaskmem_ansistring otherEventJson;
+            VERIFY_SUCCEEDED(otherStream->GetNext(nullptr, &otherEventJson));
+
+            cancelEvent.ResetEvent();
+            VERIFY_SUCCEEDED(stream->GetNext(cancelEvent.get(), &eventJson));
+            VERIFY_ARE_EQUAL(std::string{otherEventJson.get()}, std::string{eventJson.get()});
+            const auto event = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(eventJson.get());
+            VERIFY_ARE_EQUAL(action, event.Action);
+            VERIFY_ARE_EQUAL(id, event.Actor.ID);
+        }
+
+        wil::unique_cotaskmem_ansistring eventJson;
+        VERIFY_ARE_EQUAL(WSLC_E_EVENT_STREAM_FINISHED, stream->GetNext(cancelEvent.get(), &eventJson));
+        VERIFY_IS_NULL(eventJson.get());
+
+        cancelEvent.SetEvent();
+        VERIFY_ARE_EQUAL(E_ABORT, stream->GetNext(cancelEvent.get(), &eventJson));
+        VERIFY_IS_NULL(eventJson.get());
     }
 
     WSLC_TEST_METHOD(OpenContainer)
@@ -11707,6 +12448,35 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerRecoveryKeepsRequestedImage)
+    {
+        auto restore = ResetTestSession(); // Required to access the storage folder.
+
+        constexpr auto c_imageName = "debian:latest";
+        const std::string containerName = "test-container-recovered-image";
+
+        // Publish-all creates the container from the resolved image ID, which Docker then reports as the image.
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(L"recovery-image-test", true));
+
+            WSLCContainerLauncher launcher(c_imageName, containerName.c_str(), {"sleep", "9999"}, {}, "bridge");
+            launcher.SetContainerFlags(WSLCContainerFlagsPublishAll);
+
+            auto container = launcher.Launch(*session);
+            container.SetDeleteOnClose(false);
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+        }
+
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(L"recovery-image-test", true));
+
+            auto container = OpenContainer(session.get(), containerName);
+            VERIFY_ARE_EQUAL(c_imageName, container.Inspect().Config.Image);
+
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
+        }
+    }
+
     WSLC_TEST_METHOD(ContainerVolumeAndPortRecoveryFromStorage)
     {
         auto restore = ResetTestSession();
@@ -14195,7 +14965,7 @@ class WSLCTests
 
         const auto messages = callback->GetMessages();
         VERIFY_IS_TRUE(std::any_of(messages.begin(), messages.end(), [](const auto& message) {
-            return message.find(L"Event: stop; Exit code: 137") != std::wstring::npos;
+            return message.find(L"Event: exit; Exit code: 137") != std::wstring::npos;
         }));
         VERIFY_IS_TRUE(std::any_of(messages.begin(), messages.end(), [](const auto& message) {
             return message.find(L"State: running -> exited; Exit code: 137") != std::wstring::npos;

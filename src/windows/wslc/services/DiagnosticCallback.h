@@ -9,6 +9,8 @@
 
 namespace wsl::windows::wslc::services {
 
+using namespace wsl::windows::wslc::cli;
+
 class DECLSPEC_UUID("20D009D8-D80C-42F8-826C-9DD91738A518") DiagnosticCallback
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IDiagnosticCallback, IFastRundown>
 {

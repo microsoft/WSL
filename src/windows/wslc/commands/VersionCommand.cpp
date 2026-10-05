@@ -23,6 +23,8 @@ using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::models;
 
 namespace wsl::windows::wslc {
+
+using namespace wsl::windows::wslc::cli;
 std::vector<Argument> VersionCommand::GetArguments() const
 {
     return {

@@ -18,7 +18,7 @@ Abstract:
 #include "NetworkModel.h"
 #include "NetworkService.h"
 #include "NetworkTasks.h"
-#include "TableOutput.h"
+#include "TableData.h"
 #include <wslc_schema.h>
 
 using namespace wsl::shared;
@@ -31,6 +31,9 @@ using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
+
+using namespace wsl::windows::wslc::cli;
+using namespace wsl::windows::cli::table;
 
 namespace {
 
@@ -199,7 +202,7 @@ void InspectNetworks(CLIExecutionContext& context)
     context.Terminal.Output(L"{}\n", MultiByteToWide(json));
 }
 
-void ListNetworks(CLIExecutionContext& context)
+void FormatNetworkOutput(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Networks));
     auto& networks = context.Data.Get<Data::Networks>();
@@ -210,13 +213,19 @@ void ListNetworks(CLIExecutionContext& context)
     const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
     const bool quiet = context.Args.GetValue<ArgType::Quiet>();
     const bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
+
     if (format == FormatType::Table && quiet)
     {
+        wsl::windows::cli::table::TableData table{Localization::WSLCCLI_TableHeaderNetworkId()};
+        table.ShowHeader = false;
+        table.Reserve(networks.size());
+
         for (const auto& network : networks)
         {
-            context.Terminal.Output(L"{}\n", MultiByteToWide(TruncateId(network.Id, trunc)));
+            table.AddRow({MultiByteToWide(TruncateId(network.Id, trunc))});
         }
 
+        context.Data.Add<Data::Table>(std::move(table));
         return;
     }
 
@@ -224,28 +233,30 @@ void ListNetworks(CLIExecutionContext& context)
     {
     case FormatType::Json:
     {
+        std::vector<std::wstring> json;
+        json.reserve(networks.size());
+
         for (const auto& network : networks)
         {
-            context.Terminal.Output(L"{}\n", ToJsonW(ToNetworkOutput(network, trunc), c_jsonCompactIndent));
+            json.push_back(ToJsonW(ToNetworkOutput(network, trunc), c_jsonCompactIndent));
         }
 
+        context.Data.Add<Data::Json>(std::move(json));
         break;
     }
     case FormatType::Table:
     {
-        // Every column has a minimum total width of ten characters, including the padding that follows it.
-        constexpr size_t c_minimumColumnWidth = 7;
-        auto table = wsl::windows::wslc::TableOutput<4>(
-            context.Terminal,
-            {L"NETWORK ID", L"NAME", L"DRIVER", L"SCOPE"},
-            {ColumnWidthConfig{.MinWidth = c_minimumColumnWidth},
-             ColumnWidthConfig{.MinWidth = c_minimumColumnWidth},
-             ColumnWidthConfig{.MinWidth = c_minimumColumnWidth},
-             ColumnWidthConfig{.MinWidth = c_minimumColumnWidth}});
+        wsl::windows::cli::table::TableData table{
+            Localization::WSLCCLI_TableHeaderNetworkId(),
+            Localization::WSLCCLI_TableHeaderName(),
+            Localization::WSLCCLI_TableHeaderDriver(),
+            Localization::WSLCCLI_TableHeaderScope()};
+        table.Reserve(networks.size());
+
         for (const auto& network : networks)
         {
             const auto entry = ToNetworkOutput(network, trunc);
-            table.WriteRow({
+            table.AddRow({
                 MultiByteToWide(entry.ID),
                 MultiByteToWide(entry.Name),
                 MultiByteToWide(entry.Driver),
@@ -253,7 +264,7 @@ void ListNetworks(CLIExecutionContext& context)
             });
         }
 
-        table.Complete();
+        context.Data.Add<Data::Table>(std::move(table));
         break;
     }
     default:

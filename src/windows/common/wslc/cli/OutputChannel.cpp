@@ -17,7 +17,7 @@ Abstract:
 #include <algorithm>
 #include <cerrno>
 
-namespace wsl::windows::wslc {
+namespace wsl::windows::wslc::cli {
 
 OutputChannel::OutputChannel(HANDLE consoleHandle, FILE* fallbackFile)
 {
@@ -97,4 +97,4 @@ bool OutputChannel::IsVTEnabled() const noexcept
     return m_vtOverride;
 }
 
-} // namespace wsl::windows::wslc
+} // namespace wsl::windows::wslc::cli

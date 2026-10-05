@@ -12,10 +12,7 @@ add_dependencies(wslhost
 target_link_libraries(wslhost
                       ${COMMON_LINK_LIBRARIES}
                       common
-                      runtimeobject.lib
-                      delayimp.lib)
-
-set_target_properties(wslhost PROPERTIES LINK_FLAGS "/DELAYLOAD:msi.dll /DELAYLOAD:WINTRUST.dll")
+                      runtimeobject.lib)
 
 target_precompile_headers(wslhost REUSE_FROM common)
 set_target_properties(wslhost PROPERTIES FOLDER windows)

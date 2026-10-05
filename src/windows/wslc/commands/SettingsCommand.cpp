@@ -22,6 +22,8 @@ using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 
+using namespace wsl::windows::wslc::cli;
+
 // SettingsCommand
 std::vector<std::unique_ptr<Command>> SettingsCommand::CreateCommands() const
 {

@@ -23,6 +23,7 @@ Abstract:
 #include "wslservice.h"
 #include "registry.hpp"
 #include "helpers.hpp"
+#include "lxinitshared.h"
 #include "svccomm.hpp"
 #include "relay.hpp"
 #include "ConsoleState.h"
@@ -31,6 +32,7 @@ Abstract:
 #include <nlohmann/json.hpp>
 #include "Distribution.h"
 #include "WslCoreConfigInterface.h"
+#include "WslCoreFilesystem.h"
 #include "CommandLine.h"
 #include "retryshared.h"
 
@@ -351,6 +353,100 @@ class UnitTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /tmp/.X11-unix"), 0L);
     }
 
+    WSL2_TEST_METHOD(SystemdBinfmtIsRestored)
+    {
+        // Override WSL's binfmt interpreter
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkdir -p /usr/lib/binfmt.d && echo ':WSLInterop:M::MZ::/bin/echo:PF' > /usr/lib/binfmt.d/dummy.conf"), 0L);
+
+        auto cleanupBinfmt = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+            LxsstuLaunchWsl(L"rm /usr/lib/binfmt.d/dummy.conf");
+            WslShutdown(); // Required since this test registers a custom binfmt interpreter.
+        });
+
+        {
+            // Enable systemd (restarts distro).
+            auto cleanupSystemd = EnableSystemd();
+
+            auto validateBinfmt = []() {
+                // Validate that WSL's binfmt interpreter is still in place.
+                auto [cmdOutput, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
+                VERIFY_ARE_EQUAL(cmdOutput, L"ok\r\n");
+            };
+
+            validateBinfmt();
+
+            // Validate that this still works after restarting the distribution.
+            TerminateDistribution();
+            validateBinfmt();
+
+            // Validate that stopping or restarting systemd-binfmt doesn't break interop.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl stop systemd-binfmt.service"), 0u);
+            validateBinfmt();
+
+            auto restartBinfmt = []() {
+                // Some systemd versions fail the service when the protected /status flush fails.
+                const auto exitCode = LxsstuLaunchWsl(L"systemctl restart systemd-binfmt.service");
+                if (exitCode != 0)
+                {
+                    VERIFY_ARE_EQUAL(exitCode, 1u);
+                    VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl is-failed --quiet systemd-binfmt.service"), 0u);
+                }
+            };
+
+            restartBinfmt();
+            validateBinfmt();
+
+            // Validate that the unit is regenerated after a daemon-reload.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl daemon-reload"), 0u);
+            restartBinfmt();
+            validateBinfmt();
+
+            // Exercise both hooks independently of the distro's systemd-binfmt exit behavior.
+            constexpr auto overridePath = L"/run/systemd/system/systemd-binfmt.service.d/wsl-test.conf";
+            auto cleanupOverride = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                LxsstuLaunchWsl(std::format(L"rm -f {} && systemctl daemon-reload", overridePath));
+            });
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkdir -p /run/systemd/system/systemd-binfmt.service.d"), 0u);
+            for (const bool failStartup : {false, true})
+            {
+                VERIFY_ARE_EQUAL(
+                    LxsstuLaunchWsl(std::format(
+                        L"printf '[Service]\\nExecStart=\\nExecStart=/bin/{}\\n' > {} && systemctl daemon-reload",
+                        failStartup ? L"false" : L"true",
+                        overridePath)),
+                    0u);
+                VERIFY_ARE_EQUAL(
+                    LxsstuLaunchWsl(L"echo -1 > /proc/sys/fs/binfmt_misc/WSLInterop && "
+                                    L"echo ':WSLInterop:M::MZ::/bin/echo:PF' > /proc/sys/fs/binfmt_misc/register"),
+                    0u);
+
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl restart systemd-binfmt.service"), failStartup ? 1u : 0u);
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl is-failed --quiet systemd-binfmt.service"), failStartup ? 0u : 1u);
+                validateBinfmt();
+
+                if (!failStartup)
+                {
+                    // A normal stop must not re-register the entry.
+                    const auto inodeBefore = LxsstuLaunchWslAndCaptureOutput(L"stat -c %i /proc/sys/fs/binfmt_misc/WSLInterop").first;
+                    VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl stop systemd-binfmt.service"), 0u);
+                    const auto inodeAfter = LxsstuLaunchWslAndCaptureOutput(L"stat -c %i /proc/sys/fs/binfmt_misc/WSLInterop").first;
+                    VERIFY_ARE_EQUAL(inodeBefore, inodeAfter);
+                    validateBinfmt();
+                }
+            }
+        }
+
+        {
+            // Enable systemd (restarts distro).
+            auto cleanupSystemd = EnableSystemd("protectBinfmt=false");
+
+            // Validate that WSL's binfmt interpreter is overridden
+            auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
+            VERIFY_IS_TRUE(wsl::shared::string::IsEqual(output, L"/mnt/c/Windows/system32/cmd.exe cmd.exe /c echo ok\n", true));
+        }
+    }
+
     WSL2_TEST_METHOD(BinfmtStatusIsLocked)
     {
         //
@@ -435,6 +531,20 @@ class UnitTests
         }
     }
 
+    static std::wstring GetWslInitPid()
+    {
+        auto [pid, _] = LxsstuLaunchWslAndCaptureOutput(
+            L"/bin/sh -c \"for pid in \\$(cat /proc/1/task/1/children); do "
+            L"case \\$(cat /proc/\\$pid/comm 2>/dev/null) in init-systemd*) echo \\$pid; break;; esac; done\"");
+        while (!pid.empty() && (pid.back() == L'\n' || pid.back() == L'\r'))
+        {
+            pid.pop_back();
+        }
+
+        VERIFY_IS_FALSE(pid.empty());
+        return pid;
+    }
+
     WSL2_TEST_METHOD(SystemdKillInitTerminatesDistro)
     {
         WslConfigChange config(LxssGenerateTestConfig() + L"[general]\ninstanceIdleTimeout=-1");
@@ -443,8 +553,9 @@ class UnitTests
         VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
             [&]() { THROW_HR_IF(E_UNEXPECTED, !IsSystemdRunning(L"--system")); }, std::chrono::seconds(1), std::chrono::minutes(1)));
 
-        // Kill the WSL init process
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"kill -9 2"), 0L);
+        // Kill the WSL init process without relying on an incidental PID allocation.
+        const auto wslInitPid = GetWslInitPid();
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"kill -9 {}", wslInitPid)), 0L);
 
         // Wait for the distro to exit.
         VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
@@ -982,7 +1093,7 @@ class UnitTests
             WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::None}));
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'none'"), 0u);
 
-            if (AreExperimentalNetworkingFeaturesSupported() && IsHyperVFirewallSupported())
+            if (IsMirroredNetworkingSupported())
             {
                 config.Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
                 VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'mirrored'"), 0u);
@@ -1974,38 +2085,24 @@ Usage:
     WSL2_TEST_METHOD(TestExistingSwapVhd)
     {
         // Create a 100MB swap vhdx.
-        auto swapVhd = wil::GetCurrentDirectoryW<std::wstring>() + L"\\TestSwap.vhdx";
+        const auto swapVhd = wil::GetCurrentDirectoryW<std::wstring>() + L"\\TestSwap.vhdx";
 
-        VIRTUAL_STORAGE_TYPE storageType{};
-        storageType.DeviceId = VIRTUAL_STORAGE_TYPE_DEVICE_VHDX;
-        storageType.VendorId = VIRTUAL_STORAGE_TYPE_VENDOR_MICROSOFT;
-
-        CREATE_VIRTUAL_DISK_PARAMETERS createVhdParameters{};
-        createVhdParameters.Version = CREATE_VIRTUAL_DISK_VERSION_2;
-        createVhdParameters.Version2.BlockSizeInBytes = 1024 * 1024;
-        createVhdParameters.Version2.MaximumSize = 100 * 1024 * 1024;
-
-        wil::unique_hfile vhd{};
-        VERIFY_ARE_EQUAL(
-            ::CreateVirtualDisk(
-                &storageType, swapVhd.c_str(), VIRTUAL_DISK_ACCESS_NONE, nullptr, CREATE_VIRTUAL_DISK_FLAG_SUPPORT_COMPRESSED_VOLUMES, 0, &createVhdParameters, nullptr, &vhd),
-            0l);
-
-        vhd.reset();
+        const auto tokenUser = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
+        wsl::core::filesystem::CreateVhd(swapVhd.c_str(), 100 * _1MB, tokenUser->User.Sid, false, false);
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
             WslShutdown();
             DeleteFile(swapVhd.c_str());
         });
 
-        // Update .wslconfig. Update the swapVhd path to replace single backslash
+        // Update .wslconfig. Escape the swapVhd path to replace single backslash
         // with double backslashes so as to be compatible with .wslconfig parsing.
         // The following regex replacement only works as intended if the path contains
         // single backslashes. Negative lookahead can be used to handle paths with double
         // backslashes but then the negative lookbehind case should also be used but the
         // latter is not supported in std::regex.
-        swapVhd = std::regex_replace(swapVhd, std::wregex(L"\\\\"), L"\\\\");
-        WslConfigChange configChange(LxssGenerateTestConfig() + L"\nswap=256MB\nswapFile=" + swapVhd);
+        const auto escapedSwapVhd = std::regex_replace(swapVhd, std::wregex(L"\\\\"), L"\\\\");
+        WslConfigChange configChange(LxssGenerateTestConfig() + L"\nswap=256MB\nswapFile=" + escapedSwapVhd);
 
         auto validateSwapSize = [](LPCWSTR Expected) {
             auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"swapon | awk 'END {print $3}'");
@@ -2016,8 +2113,11 @@ Usage:
         validateSwapSize(L"256M");
 
         // Validate that the vhdx is resized correctly if the swap size changes
-        configChange.Update(LxssGenerateTestConfig() + L"\nswap=200MB\nswapFile=" + swapVhd);
+        configChange.Update(LxssGenerateTestConfig() + L"\nswap=200MB\nswapFile=" + escapedSwapVhd);
         validateSwapSize(L"200M");
+
+        WslShutdown();
+        VerifyNoVmAccessToVhd(swapVhd.c_str());
     }
 
     TEST_METHOD(InitDoesntBlockSignals)
@@ -2254,6 +2354,10 @@ Usage:
         };
 
         const std::wstring wslConfigPath = wsl::windows::common::helpers::GetWslConfigPath();
+        const auto dnsTunnelingDisabledWarning =
+            wsl::windows::common::helpers::IsServiceRunning(L"GlobalSecureAccessTunnelingService")
+                ? std::format(L"wsl: {}\r\n", wsl::shared::Localization::MessageDnsTunnelingDisabled())
+                : L"";
 
         validateWarnings(L"a=b", std::format(L"wsl: Unknown key 'wsl2.a' in {}:22\r\n", wslConfigPath));
         validateWarnings(L"[=b", std::format(L"wsl: Invalid section name in {}:22\r\n", wslConfigPath));
@@ -2339,8 +2443,8 @@ Usage:
             if (TryLoadDnsResolverMethods())
             {
                 // Verify DNS tunneling settings are parsed correctly
-                validateWarnings(L"[experimental]\ndnsTunneling=true\nbestEffortDnsParsing=true", L"");
-                validateWarnings(L"[experimental]\ndnsTunneling=true\ndnsTunnelingIpAddress=10.255.255.1", L"");
+                validateWarnings(L"[experimental]\ndnsTunneling=true\nbestEffortDnsParsing=true", dnsTunnelingDisabledWarning);
+                validateWarnings(L"[experimental]\ndnsTunneling=true\ndnsTunnelingIpAddress=10.255.255.1", dnsTunnelingDisabledWarning);
 
                 validateWarnings(
                     L"[experimental]\ndnsTunneling=true\ndnsTunnelingIpAddress=1.2.3",
@@ -3042,6 +3146,100 @@ Usage:
         ValidateOutput(L"dmesg | grep -iF \"failed to load module 'not-found'\" | wc -l", L"1\n", L"", 0);
     }
 
+    WSL2_TEST_METHOD(KernelArtifacts)
+    {
+        // The unified kernel artifacts VHD provides the kernel headers and the perf tooling
+        // alongside the kernel modules. Headers are mounted at /usr/src/linux-headers-$(uname -r)
+        // with /lib/modules/$(uname -r)/build symlinked to that directory; perf is mounted at
+        // /usr/lib/linux-tools/$(uname -r) and exposed via $PATH.
+
+        // Headers: the build symlink and a representative uapi header are present.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -L /lib/modules/$(uname -r)/build", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"test -s /lib/modules/$(uname -r)/build/include/linux/version.h", nullptr, nullptr, nullptr, nullptr), 0u);
+
+        // Headers are usable: compile and run a tiny program that includes recent uapi headers. The
+        // identifiers below fail to compile if the headers are missing or too old (BPF_PROG_TYPE_NETFILTER
+        // added in 6.4, IORING_OP_FUTEX_WAKE added in 6.7). Their numeric values are not a stable API
+        // contract, so the program only checks that <linux/version.h> matches the running kernel.
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(
+                LR"BASH(bash -ec '
+                    d=$(mktemp -d)
+                    trap "rm -rf $d" EXIT
+                    cat > "$d/t.c" <<EOF
+#include <stdio.h>
+#include <linux/version.h>
+#include <linux/bpf.h>
+#include <linux/io_uring.h>
+int main(void){
+    (void)BPF_PROG_TYPE_NETFILTER;
+    (void)IORING_OP_FUTEX_WAKE;
+    printf("%u.%u.%u\n",
+        LINUX_VERSION_MAJOR, LINUX_VERSION_PATCHLEVEL, LINUX_VERSION_SUBLEVEL);
+    return 0;
+}
+EOF
+                    cc -isystem /lib/modules/$(uname -r)/build/include -o "$d/t" "$d/t.c"
+                    v=$("$d/t")
+                    case "$(uname -r)" in "$v"*) exit 0 ;; *) exit 8 ;; esac
+                ')BASH",
+                nullptr,
+                nullptr,
+                nullptr,
+                nullptr),
+            0u);
+
+        // perf: leave no trace in the distro's file system and make the versioned binary reachable
+        // via $PATH, with PERF_EXEC_PATH pointing at its helper scripts.
+        //
+        // N.B. The test distro does not ship perf, so nothing should be created at /usr/bin/perf.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -x /usr/lib/linux-tools/$(uname -r)/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /usr/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"test \"$(command -v perf)\" = \"/usr/lib/linux-tools/$(uname -r)/bin/perf\"", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"perf --version", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"test \"$(perf --exec-path)\" = \"/usr/lib/linux-tools/$(uname -r)/libexec/perf-core\"", nullptr, nullptr, nullptr, nullptr),
+            0u);
+
+        // Stale distro-provided artifacts are replaced or hidden after the VM restarts. A distro
+        // provided perf is shadowed by the binary matching the running kernel.
+        //
+        // N.B. The cleanup is registered before the distro's file system is modified so that a
+        //      failure can't leave a perf binary or a broken build symlink behind, which would
+        //      break subsequent runs.
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LxsstuLaunchWsl(
+                L"umount /usr/bin/distro-perf 2>/dev/null; rm -f /usr/bin/perf /usr/bin/distro-perf; ln -snf"
+                L" /usr/src/linux-headers-$(uname -r) /lib/modules/$(uname -r)/build",
+                nullptr,
+                nullptr,
+                nullptr,
+                nullptr);
+        });
+
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(
+                L"rm /lib/modules/$(uname -r)/build && ln -s /tmp /lib/modules/$(uname -r)/build && printf old-perf >"
+                L" /usr/bin/distro-perf && ln -s distro-perf /usr/bin/perf",
+                nullptr,
+                nullptr,
+                nullptr,
+                nullptr),
+            0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"test \"$(readlink /lib/modules/$(uname -r)/build)\" = \"/usr/src/linux-headers-$(uname -r)\"", nullptr, nullptr, nullptr, nullptr),
+            0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(readlink /usr/bin/perf)\" = \"distro-perf\"", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(
+                L"test \"$(stat -Lc %d:%i /usr/bin/perf)\" = \"$(stat -Lc %d:%i /usr/lib/linux-tools/$(uname -r)/bin/perf)\"", nullptr, nullptr, nullptr, nullptr),
+            0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"/usr/bin/perf --version", nullptr, nullptr, nullptr, nullptr), 0u);
+    }
+
     WSL2_TEST_METHOD(CrashCollection)
     {
         const auto folder = std::filesystem::absolute(L"test-crash-dumps");
@@ -3189,6 +3387,124 @@ Usage:
             // Validate that the distribution still starts and that the vhd hasn't moved.
             validateDistro();
             VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\ext4.vhdx", absolutePath)));
+        }
+    }
+
+    TEST_METHOD(CreateVhdPermissions)
+    {
+        const auto path = std::filesystem::path(L"wsl-test-vhd-permissions.vhdx");
+
+        const auto tokenUser = wil::get_token_information<TOKEN_USER>();
+        auto [administratorsSid, administratorsSidBuffer] =
+            wsl::windows::common::security::CreateSid(SECURITY_NT_AUTHORITY, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS);
+
+        for (const auto fixed : {false, true})
+        {
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove(path); });
+            wsl::core::filesystem::CreateVhd(path.c_str(), 16 * _1MB, tokenUser->User.Sid, false, fixed);
+
+            PSID owner{};
+            PACL dacl{};
+            wil::unique_hlocal descriptor;
+            THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
+                path.c_str(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION, &owner, nullptr, &dacl, nullptr, &descriptor));
+
+            VERIFY_IS_TRUE(EqualSid(owner, tokenUser->User.Sid));
+            VERIFY_IS_NOT_NULL(dacl);
+            VERIFY_ARE_EQUAL(2, dacl->AceCount);
+
+            SECURITY_DESCRIPTOR_CONTROL control{};
+            DWORD revision{};
+            THROW_IF_WIN32_BOOL_FALSE(GetSecurityDescriptorControl(descriptor.get(), &control, &revision));
+            VERIFY_IS_TRUE(WI_IsFlagSet(control, SE_DACL_PROTECTED));
+
+            bool foundUser = false;
+            bool foundAdministrators = false;
+            for (DWORD index = 0; index < dacl->AceCount; ++index)
+            {
+                void* ace{};
+                THROW_IF_WIN32_BOOL_FALSE(GetAce(dacl, index, &ace));
+                auto* allowed = static_cast<ACCESS_ALLOWED_ACE*>(ace);
+                VERIFY_ARE_EQUAL(ACCESS_ALLOWED_ACE_TYPE, allowed->Header.AceType);
+                VERIFY_ARE_EQUAL(0, allowed->Header.AceFlags);
+                VERIFY_ARE_EQUAL(FILE_ALL_ACCESS, allowed->Mask);
+                if (EqualSid(&allowed->SidStart, tokenUser->User.Sid))
+                {
+                    foundUser = true;
+                }
+                else
+                {
+                    VERIFY_IS_TRUE(EqualSid(&allowed->SidStart, administratorsSid));
+                    foundAdministrators = true;
+                }
+            }
+
+            VERIFY_IS_TRUE(foundUser);
+            VERIFY_IS_TRUE(foundAdministrators);
+            VERIFY_IS_TRUE(std::filesystem::remove(path));
+        }
+    }
+
+    WSL2_TEST_METHOD(SetSparseWithProtectedVhd)
+    {
+        constexpr auto name = L"sparse-protected-test-distro";
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
+        auto cleanup =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
+        WslShutdown();
+
+        const auto distroKey = OpenDistributionKey(name);
+        VERIFY_IS_NOT_NULL(distroKey.get());
+        const auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath", L"");
+        const auto vhdFileName =
+            wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"VhdFileName", L"ext4.vhdx");
+        auto vhdPath = (std::filesystem::path(basePath) / vhdFileName).wstring();
+
+        // Remove SYSTEM and Administrators access so success requires impersonating the user.
+        const auto tokenUser = wil::get_token_information<TOKEN_USER>();
+        EXPLICIT_ACCESS access{};
+        access.grfAccessMode = SET_ACCESS;
+        access.grfAccessPermissions = FILE_ALL_ACCESS;
+        access.grfInheritance = NO_INHERITANCE;
+        BuildTrusteeWithSid(&access.Trustee, tokenUser->User.Sid);
+
+        wsl::windows::common::security::unique_acl acl;
+        THROW_IF_WIN32_ERROR(SetEntriesInAcl(1, &access, nullptr, &acl));
+        THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
+            vhdPath.data(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION, nullptr, nullptr, acl.get(), nullptr));
+
+        // Restrict administrator groups before converting to a primary token for process creation.
+        const auto nonElevatedToken = GetNonElevatedToken(TokenImpersonation);
+        VERIFY_IS_FALSE(wsl::windows::common::security::IsTokenElevated(nonElevatedToken.get()));
+
+        const auto tokenGroups = wil::get_token_information<TOKEN_GROUPS_AND_PRIVILEGES>(nonElevatedToken.get());
+        for (DWORD index = 0; index < tokenGroups->SidCount; ++index)
+        {
+            const auto& group = tokenGroups->Sids[index];
+            if (IsWellKnownSid(group.Sid, WinBuiltinAdministratorsSid))
+            {
+                // Sanity check.
+                VERIFY_IS_FALSE(WI_IsFlagSet(group.Attributes, SE_GROUP_ENABLED));
+            }
+        }
+
+        for (const auto elevated : {true, false})
+        {
+            for (const auto sparse : {true, false})
+            {
+                VERIFY_ARE_EQUAL(
+                    LxsstuLaunchWsl(
+                        std::format(L"--manage {} --set-sparse {} --allow-unsafe", name, sparse ? L"true" : L"false"),
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        elevated ? nullptr : nonElevatedToken.get()),
+                    0L);
+
+                const auto attributes = GetFileAttributesW(vhdPath.c_str());
+                VERIFY_ARE_NOT_EQUAL(INVALID_FILE_ATTRIBUTES, attributes);
+                VERIFY_ARE_EQUAL(sparse, WI_IsFlagSet(attributes, FILE_ATTRIBUTE_SPARSE_FILE));
+            }
         }
     }
 
@@ -3511,9 +3827,14 @@ Usage:
         std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
         VERIFY_ARE_EQUAL(err, L"");
 
+        VerifyNoVmAccessToVhd(vhdPath.c_str());
+
         std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} echo ok", name));
         VERIFY_ARE_EQUAL(out, L"ok\n");
         VERIFY_ARE_EQUAL(err, L"");
+
+        WslShutdown();
+        VerifyNoVmAccessToVhd(vhdPath.c_str());
     }
 
     WSL2_TEST_METHOD(FileOffsets)
@@ -3649,6 +3970,8 @@ Usage:
                 {L"C:\\DoesNotExit\\ext4.vhdx", L"C:\\DoesNotExit\\ext4.vhdx"},
                 {L"\\DoesNotExit\\ext4.vhdx", L"\\DoesNotExit\\ext4.vhdx"},
                 {L"", L""},
+                // Verifies that reloading preserves BMP Chinese characters and the rocket's UTF-16 surrogate pair (U+1F680).
+                {L"C:\\中文🚀\\ext4.vhdx", L"C:\\中文🚀\\ext4.vhdx"},
             };
 
             // tuple: WslConfigSetting, expectedValue, actualValue
@@ -4719,6 +5042,25 @@ VERSION_ID="Invalid|Format"
         DistroFileChange distributionconf(L"/etc/wsl-distribution.conf", false);
         distributionconf.SetContent(L"[oobe]\ncommand = /bin/bash -c 'echo OOBE'\n");
 
+        GUID runId;
+        THROW_IF_FAILED(CoCreateGuid(&runId));
+        const auto drvFsTestPath = std::filesystem::temp_directory_path() /
+                                   std::format(L"wsl-oobe-drvfs-test-{}", wsl::shared::string::GuidToString<wchar_t>(runId));
+        std::filesystem::create_directory(drvFsTestPath);
+        auto cleanupDrvFsTestPath = wil::scope_exit([&]() {
+            std::error_code ignored;
+            std::filesystem::remove_all(drvFsTestPath, ignored);
+        });
+
+        auto cleanupUser = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+            TerminateDistribution();
+
+            const auto exitCode = LxsstuLaunchWsl(L"userdel -f -r user");
+
+            // The test may fail before OOBE creates the user (userdel exits with 6 if it does not exist).
+            VERIFY_IS_TRUE(exitCode == 0 || exitCode == 6);
+        });
+
         RegistryKeyChange<DWORD> runOOBE(lxssKey.get(), testDistroIdString.c_str(), L"RunOOBE", 1);
         const RegistryKeyChange<DWORD> defaultUid(lxssKey.get(), testDistroIdString.c_str(), L"DefaultUid", 0);
 
@@ -4774,7 +5116,38 @@ VERSION_ID="Invalid|Format"
             distributionconf.SetContent(
                 L"[oobe]\ncommand = /bin/bash -c 'echo OOBE && useradd -u 1010 -m -s /bin/bash user'\n defaultUid = 1010\n");
 
+            constexpr auto userMountPoint = L"/run/wsl-oobe-user-mount";
+            const auto userMountIdCommand = std::format(L"findmnt -n -o ID -M {}", userMountPoint);
+            const auto userMountOwnerCommand = std::format(L"stat -c %u:%g {}", userMountPoint);
+            std::wstring originalUserMountId;
+            std::optional<DistroFileChange> fstab;
+            auto cleanupUserMount = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                if (fstab.has_value())
+                {
+                    fstab.reset();
+                    TerminateDistribution();
+                }
+            });
+
+            if (LxsstuVmMode())
+            {
+                fstab.emplace(L"/etc/fstab", false);
+                fstab->SetContent(
+                    std::format(L"{} {} drvfs uid=2000,gid=2001,x-mount.mkdir 0 0\n", drvFsTestPath.root_path().generic_wstring(), userMountPoint)
+                        .c_str());
+            }
+
             TerminateDistribution();
+
+            if (LxsstuVmMode())
+            {
+                auto [mountId, warnings] = LxsstuLaunchWslAndCaptureOutput(userMountIdCommand);
+                VERIFY_IS_FALSE(mountId.empty());
+                VERIFY_ARE_EQUAL(L"", warnings);
+                originalUserMountId = std::move(mountId);
+                validateOutput(userMountOwnerCommand.c_str(), L"2000:2001\n");
+                VERIFY_ARE_EQUAL(1, runOOBE.Get());
+            }
 
             validateOutput(nullptr, L"OOBE\n");
             VERIFY_ARE_EQUAL(runOOBE.Get(), 0);
@@ -4782,6 +5155,22 @@ VERSION_ID="Invalid|Format"
             // Validate that DefaultUid was set
             validateOutput(L"id -u", L"1010\n");
             VERIFY_ARE_EQUAL(defaultUid.Get(), 1010);
+
+            if (LxsstuVmMode())
+            {
+                // DrvFs mounts created before OOBE should be refreshed to use the new default user.
+                validateOutput(
+                    std::format(
+                        L"bash -c 'path=$(wslpath -u \"{}\") && mountpoint=$(findmnt -n -o TARGET -T \"$path\") && "
+                        L"test \"$(stat -c %u:%g \"$mountpoint\")\" = \"$(id -u):$(id -g)\" && touch \"$path/probe\" && "
+                        L"chmod 0644 \"$path/probe\"'",
+                        drvFsTestPath.wstring())
+                        .c_str(),
+                    L"");
+
+                validateOutput(userMountOwnerCommand.c_str(), L"2000:2001\n");
+                validateOutput(userMountIdCommand.c_str(), originalUserMountId.c_str());
+            }
 
             // New file should be created with the correct uid.
             const std::wstring testFilePathLinux = L"/tmp/oobe_file_test";
@@ -4791,6 +5180,22 @@ VERSION_ID="Invalid|Format"
                 testFilePathWindows.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
             VERIFY_IS_TRUE(file.is_valid());
             validateOutput(std::format(L"stat -c %u {}", testFilePathLinux).c_str(), L"1010\n");
+        }
+
+        if (LxsstuVmMode())
+        {
+            runOOBE.Set(1);
+            const auto mountIdCommand =
+                std::format(L"path=$(wslpath -u \"{}\") && findmnt -n -o ID -T \"$path\"", drvFsTestPath.generic_wstring());
+            distributionconf.SetContent(
+                std::format(L"[oobe]\ncommand = /bin/bash -c '{} > \"$path/mount-id\"'\ndefaultUid = 1010\n", mountIdCommand).c_str());
+
+            TerminateDistribution();
+
+            validateOutput(nullptr, L"");
+            VERIFY_ARE_EQUAL(runOOBE.Get(), 0);
+            VERIFY_ARE_EQUAL(defaultUid.Get(), 1010);
+            validateOutput(std::format(L"bash -c '{} | cmp -s - \"$path/mount-id\"'", mountIdCommand).c_str(), L"");
         }
 
         // Verify that the default UID isn't changed if it's not present in wsl-distribution.conf.
@@ -4824,9 +5229,6 @@ VERSION_ID="Invalid|Format"
             VERIFY_ARE_EQUAL(wsl::windows::common::registry::ReadDword(distroKey.get(), nullptr, L"RunOOBE", 1), 0);
             validateOutput(nullptr, L"");
         }
-
-        // Make sure the defaultUid is reset for next test case.
-        TerminateDistribution();
     }
 
     static void ValidateDistributionStarts(LPCWSTR Name)
@@ -5112,7 +5514,10 @@ VERSION_ID="Invalid|Format"
         };
 
         InstallWithVhdSize(false);
-        InstallWithVhdSize(true);
+        {
+            WslConfigChange config(LxssGenerateTestConfig({.sparse = true}));
+            InstallWithVhdSize(true);
+        }
 
         // Distribution imported in place
         if (LxsstuVmMode())
@@ -7076,13 +7481,15 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         if (LxsstuVmMode())
         {
             constexpr auto testVhd = L"EmptyVhd.vhdx";
+            constexpr auto c_testVhdSize = 20 * _1MB;
 
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { DeleteFile(testVhd); });
 
-            LxsstuLaunchPowershellAndCaptureOutput(std::format(L"New-Vhd {}  -SizeBytes 20MB", testVhd));
+            LxsstuLaunchPowershellAndCaptureOutput(std::format(L"New-Vhd {} -SizeBytes {}", testVhd, c_testVhdSize));
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--mount {} --vhd --bare", testVhd)), 0L);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkfs.ext4 /dev/sde"), 0L);
+            const auto disk = GetBlockDeviceInWsl(c_testVhdSize);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mkfs.ext4 {}", disk)), 0L);
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount"), 0L);
 
             auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--import-in-place broken-test-distro {}", testVhd), -1);
@@ -7980,8 +8387,15 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_ARE_EQUAL(readFile(secondPath), wsl::shared::string::WideToMultiByte(fileContent));
     }
 
-    void ValidateIsolatedCgroupLayout(bool systemd)
+    void ValidateIsolatedCgroupLayout(bool systemd, bool requestCgroupV1 = false)
     {
+        VERIFY_IS_FALSE(systemd && requestCgroupV1, L"Invalid test parameters: systemd and cgroup v1 cannot both be requested.");
+
+        auto getOutput = [](const std::wstring& command) {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(command);
+            return out;
+        };
+
         constexpr auto secondDistroName = L"cgroup-test-distro";
 
         // Ensure no stale state from a previous run.
@@ -7998,47 +8412,158 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
 
         std::optional<decltype(EnableSystemd())> systemdCleanup;
         std::optional<decltype(EnableSystemd())> systemdCleanup2;
+        std::optional<DistroFileChange> cgroupConfig;
         if (systemd)
         {
             systemdCleanup.emplace(EnableSystemd());
             systemdCleanup2.emplace(EnableSystemd("", secondDistroName));
         }
 
-        auto getCgroup = [](LPCWSTR distro) {
-            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} cat -e /proc/self/cgroup", distro));
-            return out;
-        };
+        if (requestCgroupV1)
+        {
+            cgroupConfig.emplace(L"/etc/wsl.conf", false);
+            cgroupConfig->SetContent(L"[automount]\ncgroups=v1\n");
+            LxssWriteWslDistroConfig("[automount]\ncgroups=v1\n", secondDistroName);
+            TerminateDistribution();
+            TerminateDistribution(secondDistroName);
 
-        const auto cgroup1 = getCgroup(LXSS_DISTRO_NAME_TEST_L);
-        const auto cgroup2 = getCgroup(secondDistroName);
+            for (const auto* distro : {LXSS_DISTRO_NAME_TEST_L, secondDistroName})
+            {
+                const auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} /bin/true", distro));
+                VERIFY_ARE_EQUAL(output, std::wstring{});
+                LogInfo("%ls startup warnings: %ls", distro, warnings.c_str());
+                VERIFY_IS_TRUE(warnings.find(wsl::shared::Localization::MessageCgroupV1IncompatibleWithDistroIsolation()) != std::wstring::npos);
+            }
+        }
 
-        LogInfo("test_distro cgroup: %ls", cgroup1.c_str());
-        LogInfo("%ls cgroup: %ls", secondDistroName, cgroup2.c_str());
+        WslKeepAlive keepAlive(nullptr, LXSS_DISTRO_NAME_TEST_L);
+        WslKeepAlive keepAlive2(nullptr, secondDistroName);
 
-        const std::wstring prefix = L"0::/wsl-user/distro-";
-        VERIFY_IS_TRUE(cgroup1.starts_with(prefix));
-        VERIFY_IS_TRUE(cgroup2.starts_with(prefix));
-        VERIFY_ARE_NOT_EQUAL(cgroup1, cgroup2);
+        if (requestCgroupV1)
+        {
+            for (const auto* distro : {LXSS_DISTRO_NAME_TEST_L, secondDistroName})
+            {
+                VERIFY_ARE_EQUAL(getOutput(std::format(L"-d {} findmnt -n -o FSTYPE /sys/fs/cgroup", distro)), std::wstring(L"cgroup2\n"));
+            }
+        }
 
-        // Terminate both distros -- this should trigger cleanup of their per-distro cgroups.
+        const auto cgroup1 = getOutput(std::format(L"-d {} cat -e /proc/self/cgroup", LXSS_DISTRO_NAME_TEST_L));
+        const auto cgroup2 = getOutput(std::format(L"-d {} cat -e /proc/self/cgroup", secondDistroName));
+
+        VERIFY_ARE_EQUAL(cgroup1, std::wstring(L"0::/non-systemd$\n"));
+        VERIFY_ARE_EQUAL(cgroup2, std::wstring(L"0::/non-systemd$\n"));
+
+        const auto cgroupNamespace1 = getOutput(std::format(L"-d {} readlink /proc/self/ns/cgroup", LXSS_DISTRO_NAME_TEST_L));
+        const auto cgroupNamespace2 = getOutput(std::format(L"-d {} readlink /proc/self/ns/cgroup", secondDistroName));
+
+        VERIFY_ARE_NOT_EQUAL(cgroupNamespace1, cgroupNamespace2);
+
+        const auto systemDistroArguments = std::format(L"-d {} --system ", LXSS_DISTRO_NAME_TEST_L);
+        const auto systemDistroCgroup = getOutput(systemDistroArguments + L"cat -e /proc/self/cgroup");
+        const auto systemDistroCgroupNamespace = getOutput(systemDistroArguments + L"readlink /proc/self/ns/cgroup");
+        const auto systemDistroCgroupRoot = getOutput(systemDistroArguments + L"findmnt -n -o FSROOT /sys/fs/cgroup");
+
+        VERIFY_ARE_EQUAL(systemDistroCgroup, cgroup1);
+        VERIFY_ARE_EQUAL(systemDistroCgroupNamespace, cgroupNamespace1);
+        VERIFY_ARE_EQUAL(systemDistroCgroupRoot, std::wstring(L"/\n"));
+
+        const auto cgroupRoot = getOutput(L"findmnt -n -o FSROOT /sys/fs/cgroup");
+        VERIFY_ARE_EQUAL(cgroupRoot, std::wstring(L"/\n"));
+
+        const auto rootProcesses = getOutput(L"cat /sys/fs/cgroup/cgroup.procs");
+        VERIFY_ARE_EQUAL(rootProcesses, std::wstring{});
+
+        const auto wslInitPid = systemd ? GetWslInitPid() : L"1";
+        const auto wslInitCgroup = getOutput(std::format(L"cat /proc/{}/cgroup", wslInitPid));
+        VERIFY_ARE_EQUAL(wslInitCgroup, std::wstring(L"0::/../..\n"));
+
+        const auto wslInitCgroupNamespace = getOutput(std::format(L"readlink /proc/{}/ns/cgroup", wslInitPid));
+        VERIFY_ARE_NOT_EQUAL(wslInitCgroupNamespace, cgroupNamespace1);
+
+        if (systemd)
+        {
+            const auto systemdCgroup = getOutput(L"cat /proc/1/cgroup");
+            VERIFY_ARE_EQUAL(systemdCgroup, std::wstring(L"0::/init.scope\n"));
+
+            const auto systemdCgroupNamespace = getOutput(L"readlink /proc/1/ns/cgroup");
+            VERIFY_ARE_EQUAL(systemdCgroupNamespace, cgroupNamespace1);
+        }
+        else
+        {
+            VERIFY_ARE_EQUAL(getOutput(L"cat /sys/fs/cgroup/cgroup.subtree_control"), std::wstring{});
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"-u root /bin/sh -c \"echo +cpu +memory > /sys/fs/cgroup/cgroup.subtree_control\""), 0L);
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"-u root mkdir /sys/fs/cgroup/wsl-test-workload"), 0L);
+            auto cleanupWorkload = wil::scope_exit_log(
+                WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(L"-u root rmdir /sys/fs/cgroup/wsl-test-workload"); });
+
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(L"-u root /bin/sh -c \"echo 67108864 > /sys/fs/cgroup/wsl-test-workload/memory.max && "
+                                L"echo '100000 100000' > /sys/fs/cgroup/wsl-test-workload/cpu.max && "
+                                L"echo 0 > /sys/fs/cgroup/wsl-test-workload/cgroup.procs && "
+                                L"grep -qx 67108864 /sys/fs/cgroup/wsl-test-workload/memory.max && "
+                                L"grep -qx '100000 100000' /sys/fs/cgroup/wsl-test-workload/cpu.max && "
+                                L"grep -qx '0::/wsl-test-workload' /proc/self/cgroup\""),
+                0L);
+        }
+
+        keepAlive.Reset();
         TerminateDistribution(LXSS_DISTRO_NAME_TEST_L);
-        TerminateDistribution(secondDistroName);
 
-        // Re-start the default test_distro and confirm that exactly one distro-<pid> cgroup remains:
-        // the one belonging to the distro we just started to perform the check.  The stale cgroups of
-        // the two terminated distros must have been removed.
-        //
-        // N.B. Mini_init cleans up per-distro cgroups asynchronously from its SIGCHLD reaper after
-        // wsl --terminate returns. On slower hosts (e.g. CI pipelines) the cleanup of the two terminated distros
-        // can still be in flight when this check runs, so retry until cleanup completes.
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() {
-                auto [out2, _] =
-                    LxsstuLaunchWslAndCaptureOutput(L"/bin/sh -c \"ls -1 /sys/fs/cgroup/wsl-user | grep -c '^distro-'\"");
-                THROW_HR_IF(E_UNEXPECTED, out2 != std::wstring(L"1\n"));
-            },
-            std::chrono::seconds(1),
-            std::chrono::seconds(30)));
+        auto [debugInput, debugWrite] = CreateSubprocessPipe(true, false);
+        auto [debugRead, debugOutput] = CreateSubprocessPipe(false, true);
+        wil::unique_handle debugJob{CreateJobObjectW(nullptr, nullptr)};
+        VERIFY_IS_NOT_NULL(debugJob.get());
+
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobLimits{};
+        jobLimits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        VERIFY_WIN32_BOOL_SUCCEEDED(SetInformationJobObject(debugJob.get(), JobObjectExtendedLimitInformation, &jobLimits, sizeof(jobLimits)));
+
+        wsl::windows::common::SubProcess debugShell(nullptr, LxssGenerateWslCommandLine(L"--debug-shell").c_str());
+        debugShell.SetStdHandles(debugInput.get(), debugOutput.get(), debugOutput.get());
+        debugShell.SetJobObject(debugJob.get());
+        const auto debugProcess = debugShell.Start();
+        debugInput.reset();
+        debugOutput.reset();
+
+        // The debug shell echoes the script. Build "PASS" from "PA" and "SS" at runtime so the echoed command
+        // cannot satisfy the success check below.
+        constexpr auto c_checkRemainingCgroupsCommand = R"(
+{
+    if timeout 30 sh -c '
+        while true; do
+            set -- /sys/fs/cgroup/wsl-user/distro-*
+            if [ "$#" -eq 1 ] && [ -d "$1" ]; then
+                exit 0
+            fi
+            sleep 1
+        done
+    '; then
+        printf '\n%s%s\n' PA SS
+    else
+        printf '\n%s\n' FAIL
+    fi
+    busybox poweroff -f
+}
+)";
+
+        DWORD bytesWritten{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(
+            debugWrite.get(), c_checkRemainingCgroupsCommand, static_cast<DWORD>(strlen(c_checkRemainingCgroupsCommand)), &bytesWritten, nullptr));
+        VERIFY_ARE_EQUAL(bytesWritten, strlen(c_checkRemainingCgroupsCommand));
+        debugWrite.reset();
+
+        VERIFY_ARE_EQUAL(WaitForSingleObject(debugProcess.get(), 60 * 1000), WAIT_OBJECT_0);
+
+        // Ensure a clean WSL state after shutting down the VM from the debug shell.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown --force"), 0L);
+        keepAlive2.Reset();
+
+        const auto cgroupCheckOutput = ReadToString(debugRead.get());
+        VERIFY_IS_TRUE(cgroupCheckOutput.find("PASS") != std::string::npos);
+
+        TerminateDistribution(secondDistroName);
     }
 
     WSL2_TEST_METHOD(IsolatedCgroupLayout)
@@ -8049,6 +8574,11 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
     WSL2_TEST_METHOD(IsolatedCgroupLayoutSystemd)
     {
         ValidateIsolatedCgroupLayout(true);
+    }
+
+    WSL2_TEST_METHOD(IsolatedCgroupLayoutOverridesV1)
+    {
+        ValidateIsolatedCgroupLayout(false, true);
     }
 
     WSL2_TEST_METHOD(IsolatedCgroupLayoutDisabled)
@@ -8112,5 +8642,135 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_ARE_EQUAL(baselineCodePage, GetConsoleOutputCP(), L"Destruction restores the code page saved on the first call");
     }
 
-}; // namespace UnitTests
+    TEST_METHOD(PrettyPrintOutOfBoundsFields)
+    {
+        {
+            alignas(LX_INIT_NETWORK_INFORMATION) std::array<char, offsetof(LX_INIT_NETWORK_INFORMATION, Buffer) + 1> storage{};
+            auto* message = reinterpret_cast<LX_INIT_NETWORK_INFORMATION*>(storage.data());
+            message->Header.MessageSize = offsetof(LX_INIT_NETWORK_INFORMATION, Buffer);
+            message->FileHeaderIndex = message->Header.MessageSize + 1;
+
+            const auto output = message->PrettyPrint();
+            const auto expected = std::format(
+                "Header = {{MessageType = LxMiniInitMessageAny\n"
+                "MessageSize = {}\n"
+                "TransactionId = 0\n"
+                "TransactionStep = 0\n"
+                "}}\n"
+                "FileHeaderIndex = <out-of-bounds>\n"
+                "FileContentsIndex = <empty>\n",
+                message->Header.MessageSize);
+
+            VERIFY_ARE_EQUAL(expected, output);
+        }
+
+        {
+            alignas(LX_INIT_QUERY_ENVIRONMENT_VARIABLE) std::array<char, offsetof(LX_INIT_QUERY_ENVIRONMENT_VARIABLE, Buffer) + 1> storage{};
+            auto* message = reinterpret_cast<LX_INIT_QUERY_ENVIRONMENT_VARIABLE*>(storage.data());
+            message->Header.MessageSize = offsetof(LX_INIT_QUERY_ENVIRONMENT_VARIABLE, Buffer);
+
+            const auto output = message->PrettyPrint();
+            const auto expected = std::format(
+                "Header = {{MessageType = LxMiniInitMessageAny\n"
+                "MessageSize = {}\n"
+                "TransactionId = 0\n"
+                "TransactionStep = 0\n"
+                "}}\n"
+                "Buffer = <out-of-bounds>\n",
+                message->Header.MessageSize);
+
+            VERIFY_ARE_EQUAL(expected, output);
+        }
+
+        {
+            wsl::shared::MessageWriter<WSLC_LISTDIR_RESULT> message;
+
+            const auto verifyEntries = [&](std::string_view entries) {
+                const auto expected = std::format(
+                    "Header = {{MessageType = LxMessageWSLCListDirResult\n"
+                    "MessageSize = {}\n"
+                    "TransactionId = 0\n"
+                    "TransactionStep = 0\n"
+                    "}}\n"
+                    "Result = 0\n"
+                    "EntriesIndex = {}\n",
+                    message->Header.MessageSize,
+                    entries);
+
+                VERIFY_ARE_EQUAL(expected, message->PrettyPrint());
+            };
+
+            message->EntriesIndex = message->Header.MessageSize + 0x1000;
+            verifyEntries("<out-of-bounds>");
+
+            message->EntriesIndex = 0;
+            verifyEntries("<empty>");
+        }
+    }
+
+    WSL2_TEST_METHOD(SystemdBootTimeout)
+    {
+        auto cleanupVm = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
+        auto cleanupSystemd = EnableSystemd("initTimeout=1000");
+
+        DistroFileChange bootService(L"/etc/systemd/system/wsl-test-boot-timeout.service", false);
+        bootService.SetContent(
+            L"[Unit]\n"
+            L"DefaultDependencies=no\n"
+            L"Before=multi-user.target\n"
+            L"[Service]\n"
+            L"Type=oneshot\n"
+            L"ExecStart=/bin/sleep infinity\n"
+            L"TimeoutStartSec=infinity\n"
+            L"[Install]\n"
+            L"WantedBy=multi-user.target\n");
+
+        DistroFileChange enabledService(L"/etc/systemd/system/multi-user.target.wants/wsl-test-boot-timeout.service", false);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"-u root systemctl enable wsl-test-boot-timeout.service"), 0L);
+        WslShutdown();
+
+        wsl::windows::common::SubProcess process(nullptr, LxssGenerateWslCommandLine(L"-u root echo booted").c_str());
+        const auto result = process.RunAndCaptureOutput(30 * 1000);
+        VERIFY_ARE_EQUAL(result.ExitCode, 0L);
+        VERIFY_ARE_EQUAL(result.Stdout, L"booted\n");
+
+        const auto dmesg = LxsstuLaunchWslAndCaptureOutput(L"-u root dmesg").first;
+        VERIFY_ARE_NOT_EQUAL(dmesg.find(L"failed to start within 1000ms"), std::wstring::npos);
+
+        const auto cgroup = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/self/cgroup").first;
+        VERIFY_ARE_EQUAL(cgroup, L"0::/non-systemd\n");
+    }
+
+    TEST_METHOD(WriteInstallLog)
+    {
+        const auto directory = std::filesystem::current_path() / L"install-log-test";
+        VERIFY_IS_TRUE(std::filesystem::create_directory(directory));
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(directory); });
+
+        const auto verifyRejected = [](const std::filesystem::path& path) {
+            VERIFY_THROWS_SPECIFIC(
+                wsl::windows::common::install::WriteInstallLogImpl(path.wstring(), "must not be written"),
+                wil::ResultException,
+                [](const wil::ResultException& e) { return e.GetErrorCode() == E_ACCESSDENIED; });
+        };
+
+        verifyRejected(directory);
+        VERIFY_IS_TRUE(std::filesystem::is_empty(directory));
+
+        const auto target = directory / L"target.txt";
+        const auto link = directory / L"log.txt";
+        wsl::windows::common::install::WriteInstallLogImpl(target.wstring(), "original content");
+        const auto original = ReadFileContent(target.wstring());
+        VERIFY_IS_TRUE(original.ends_with(L": original content\n"));
+
+        VERIFY_IS_TRUE(CreateSymbolicLinkW(link.c_str(), target.c_str(), SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE));
+        verifyRejected(link);
+        VERIFY_ARE_EQUAL(original, ReadFileContent(target.wstring()));
+        VERIFY_IS_TRUE(std::filesystem::remove(link));
+
+        VERIFY_WIN32_BOOL_SUCCEEDED(CreateHardLinkW(link.c_str(), target.c_str(), nullptr));
+        verifyRejected(link);
+        VERIFY_ARE_EQUAL(original, ReadFileContent(target.wstring()));
+    }
+};
 } // namespace UnitTests

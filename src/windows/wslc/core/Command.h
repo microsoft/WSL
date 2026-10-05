@@ -35,6 +35,8 @@ using namespace wsl::windows::wslc::argument;
 
 namespace wsl::windows::wslc {
 
+using namespace wsl::windows::wslc::cli;
+
 enum class HelpOutput
 {
     Full,

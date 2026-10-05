@@ -29,7 +29,7 @@ Abstract:
 #include "Invocation.h"
 #include "OutputChannel.h"
 #include "Terminal.h"
-#include "TableOutput.h"
+#include "TableRenderer.h"
 
 namespace WSLCTestHelpers {
 
@@ -200,7 +200,7 @@ private:
 struct CaptureTerminal
 {
     CapturePipe pipe;
-    wsl::windows::wslc::Terminal terminal;
+    wsl::windows::wslc::cli::Terminal terminal;
 
     explicit CaptureTerminal(bool vtEnabled = false) : terminal(pipe.file(), vtEnabled, pipe.file(), vtEnabled)
     {
@@ -212,40 +212,32 @@ struct CaptureTerminal
     }
 };
 
-// Helper: capture all lines emitted by a TableOutput into a vector<wstring>.
-template <size_t N>
-struct TableOutputCapture
+// Captures all lines emitted by rendering a TableData.
+//
+// MinCellWidth is cleared so these tests exercise the generic layout mechanics without the
+// list-output minimum shifting every expectation. Tests covering the minimum set it explicitly.
+struct TableCapture
 {
     CaptureTerminal capture;
-    wsl::windows::wslc::TableOutput<N> table;
+    wsl::windows::cli::table::TableData table;
+    size_t consoleWidth = 120;
 
-    // Header + optional config + optional VT flag.
-    explicit TableOutputCapture(
-        typename wsl::windows::wslc::TableOutput<N>::header_t&& header,
-        size_t sizingBuffer = 50,
-        size_t columnPadding = wsl::windows::wslc::TableOutput<N>::DefaultColumnPadding,
-        bool vtEnabled = false) :
-        capture(vtEnabled), table(capture.terminal, std::move(header), sizingBuffer, columnPadding)
+    explicit TableCapture(std::initializer_list<std::wstring_view> headers, bool vtEnabled = false) :
+        capture(vtEnabled), table(headers)
     {
-        table.SetConsoleWidthOverride(120);
+        table.MinCellWidth = 0;
     }
 
-    // Header + column configs + optional VT flag.
-    explicit TableOutputCapture(
-        typename wsl::windows::wslc::TableOutput<N>::header_t&& header,
-        typename wsl::windows::wslc::TableOutput<N>::column_config_t&& configs,
-        bool vtEnabled = false) :
-        capture(vtEnabled),
-        table(capture.terminal, std::move(header), std::move(configs), 50, wsl::windows::wslc::TableOutput<N>::DefaultColumnPadding)
+    explicit TableCapture(std::vector<wsl::windows::cli::table::ColumnDefinition> columns, bool vtEnabled = false) :
+        capture(vtEnabled), table(std::move(columns))
     {
-        table.SetConsoleWidthOverride(120);
+        table.MinCellWidth = 0;
     }
 
-    // Column definitions.
-    explicit TableOutputCapture(typename wsl::windows::wslc::TableOutput<N>::column_def_t&& defs, bool vtEnabled = false) :
-        capture(vtEnabled), table(capture.terminal, std::move(defs))
+    // Lays out and emits the table. Call after all rows have been added.
+    void Render()
     {
-        table.SetConsoleWidthOverride(120);
+        wsl::windows::cli::table::RenderTable(capture.terminal, table, wsl::windows::wslc::cli::Terminal::Level::Output, consoleWidth);
     }
 
     // Returns captured output split into lines.

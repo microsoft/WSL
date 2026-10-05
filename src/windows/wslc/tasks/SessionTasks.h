@@ -25,5 +25,6 @@ void OpenSessionIfSpecified(CLIExecutionContext& context);
 void ResolveSession(CLIExecutionContext& context);
 void RunInSession(CLIExecutionContext& context);
 void ShowSystemInfo(CLIExecutionContext& context);
+void StreamEvents(CLIExecutionContext& context);
 void TerminateSession(CLIExecutionContext& context);
 } // namespace wsl::windows::wslc::task

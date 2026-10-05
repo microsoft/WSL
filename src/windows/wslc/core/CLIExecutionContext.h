@@ -21,6 +21,8 @@ Abstract:
 
 namespace wsl::windows::wslc::execution {
 
+using namespace wsl::windows::wslc::cli;
+
 struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 {
     CLIExecutionContext() : wsl::windows::common::ExecutionContext(wsl::windows::common::Context::WslC)
@@ -60,6 +62,10 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 
     // Drops the collected error so a later failure in the same invocation reports its own message.
     void ClearError();
+
+protected:
+    // Writes in-process warnings to the terminal, matching those raised through WarningCallback.
+    bool CollectUserWarning(const std::wstring& warning) override;
 };
 
 } // namespace wsl::windows::wslc::execution

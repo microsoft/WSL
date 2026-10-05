@@ -18,7 +18,7 @@ Abstract:
 #include "VolumeModel.h"
 #include "VolumeService.h"
 #include "VolumeTasks.h"
-#include "TableOutput.h"
+#include "TableData.h"
 #include <wslc_schema.h>
 
 using namespace wsl::shared;
@@ -31,6 +31,9 @@ using namespace wsl::windows::wslc::services;
 using wsl::windows::common::string::FormatHumanReadableSize;
 
 namespace wsl::windows::wslc::task {
+
+using namespace wsl::windows::wslc::cli;
+using namespace wsl::windows::cli::table;
 
 namespace {
 
@@ -188,46 +191,56 @@ void InspectVolumes(CLIExecutionContext& context)
     context.Terminal.Output(L"{}\n", MultiByteToWide(json));
 }
 
-void ListVolumes(CLIExecutionContext& context)
+void FormatVolumeOutput(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Volumes));
     auto& volumes = context.Data.Get<Data::Volumes>();
+    const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
 
     if (context.Args.GetValue<ArgType::Quiet>())
     {
+        TableData table{Localization::WSLCCLI_TableHeaderVolumeName()};
+        table.ShowHeader = false;
+        table.Reserve(volumes.size());
+
         for (const auto& volume : volumes)
         {
-            context.Terminal.Output(L"{}\n", MultiByteToWide(volume.Name));
+            table.AddRow({MultiByteToWide(volume.Name)});
         }
 
+        context.Data.Add<Data::Table>(std::move(table));
         return;
     }
-
-    const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
 
     switch (format)
     {
     case FormatType::Json:
     {
+        std::vector<std::wstring> json;
+        json.reserve(volumes.size());
+
         for (const auto& volume : volumes)
         {
-            context.Terminal.Output(L"{}\n", ToJsonW(ToVolumeOutput(volume), c_jsonCompactIndent));
+            json.push_back(ToJsonW(ToVolumeOutput(volume), c_jsonCompactIndent));
         }
 
+        context.Data.Add<Data::Json>(std::move(json));
         break;
     }
     case FormatType::Table:
     {
-        auto table = wsl::windows::wslc::TableOutput<2>(context.Terminal, {L"DRIVER", L"VOLUME NAME"});
+        TableData table{Localization::WSLCCLI_TableHeaderDriver(), Localization::WSLCCLI_TableHeaderVolumeName()};
+        table.Reserve(volumes.size());
+
         for (const auto& volume : volumes)
         {
-            table.WriteRow({
+            table.AddRow({
                 MultiByteToWide(volume.Driver),
                 MultiByteToWide(volume.Name),
             });
         }
 
-        table.Complete();
+        context.Data.Add<Data::Table>(std::move(table));
         break;
     }
     default:

@@ -22,6 +22,8 @@ using namespace wsl::windows::common::wslutil;
 
 namespace wsl::windows::wslc::services {
 
+using namespace wsl::windows::wslc::cli;
+
 WSLCVolumeInformation VolumeService::Create(models::Session& session, const models::CreateVolumeOptions& createOptions)
 {
     WSLCVolumeOptions options{};

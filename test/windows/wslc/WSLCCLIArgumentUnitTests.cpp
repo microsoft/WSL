@@ -402,6 +402,16 @@ class WSLCCLIArgumentUnitTests
         return values;
     }
 
+    TEST_METHOD(Filter_RejectsMalformedValues)
+    {
+        ArgMap args;
+        args.Add(ArgType::Filter, std::wstring(L"type"));
+        VERIFY_THROWS_SPECIFIC(Argument::Create(ArgType::Filter).Validate(args), ArgumentException, [](const auto& exception) {
+            return exception.Message() == wsl::shared::Localization::WSLCCLI_InvalidFilterError(L"type");
+        });
+        VERIFY_IS_FALSE(args.ContainsValidated(ArgType::Filter));
+    }
+
     // Test: Every ArgType whose validation converts its raw string into a typed value must cache
     // that value on the ArgMap during Argument::Validate, so execution reads it back without
     // re-converting. This drives the real validation + caching path for each converted ArgType.

@@ -255,12 +255,12 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCProcessGetFd(WSLCProcessHandle Process, WSLCProcessFd Fd, HANDLE* Handle)
+HRESULT WSLCProcessGetFd(WSLCProcessHandle Process, WSLCProcessFd Fd, SOCKET* Socket)
 try
 {
-    RETURN_HR_IF(E_POINTER, Process == nullptr || Handle == nullptr);
+    RETURN_HR_IF(E_POINTER, Process == nullptr || Socket == nullptr);
 
-    *Handle = nullptr;
+    *Socket = INVALID_SOCKET;
 
     auto* wrapper = static_cast<WslcProcessWrapper*>(Process);
 
@@ -294,7 +294,7 @@ try
     RETURN_IF_FAILED(result);
     WI_ASSERT(handle.Type == WSLCHandleTypeSocket);
 
-    *Handle = handle.Handle.Socket;
+    *Socket = reinterpret_cast<SOCKET>(handle.Handle.Socket);
     return S_OK;
 }
 CATCH_RETURN();

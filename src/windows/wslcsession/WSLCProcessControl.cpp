@@ -123,7 +123,9 @@ DockerExecProcessControl::DockerExecProcessControl(
     m_id(Id),
     m_client(DockerClient),
     m_eventTrackingReference(EventTracker.RegisterExecStateUpdates(
-        Container.ID(), Id, std::bind(&DockerExecProcessControl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)))
+        Container.ID(),
+        Id,
+        std::bind(&DockerExecProcessControl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4)))
 {
 }
 
@@ -175,7 +177,7 @@ void DockerExecProcessControl::SetExitCode(int ExitCode)
     }
 }
 
-void DockerExecProcessControl::OnEvent(ContainerEvent Event, std::optional<int> ExitCode, std::int64_t)
+void DockerExecProcessControl::OnEvent(ContainerEvent Event, std::optional<int> ExitCode, const std::map<std::string, std::string>&, std::int64_t)
 {
     if (Event == ContainerEvent::ExecDied && !m_exitEvent.is_signaled())
     {
