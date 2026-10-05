@@ -7915,6 +7915,124 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                 VERIFY_FAILED(registry::OpenKeyNoThrow(key.get(), deletedName.c_str(), KEY_READ).second);
             }
         }
+        // A removed recovery directory must not strand an unmoved permanent-delete journal.
+        for (const bool pendingJournal : {false, true})
+        {
+            for (const bool protectedDisk : {false, true})
+            {
+                const auto [id, path] = create();
+                VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+                const auto entry = entryFor(id);
+                const auto deletedName = L"Deleted-" + keyName(id);
+                const auto journalName = pendingJournal ? keyName(id) : deletedName;
+                if (pendingJournal)
+                {
+                    VERIFY_ARE_EQUAL(RegRenameKey(key.get(), deletedName.c_str(), keyName(id).c_str()), ERROR_SUCCESS);
+                }
+                std::filesystem::rename(entry.Path, path);
+                std::filesystem::remove(entry.Path.parent_path());
+                GUID protectedId{};
+                if (protectedDisk)
+                {
+                    const auto [otherId, unusedPath] = create();
+                    protectedId = otherId;
+                    const auto protector = registry::OpenKey(key.get(), keyName(protectedId).c_str(), KEY_WRITE);
+                    registry::WriteString(protector.get(), nullptr, L"BasePath", path.parent_path().c_str());
+                }
+                Store::Purge(key.get(), id);
+                if (protectedDisk)
+                {
+                    VERIFY_ARE_EQUAL(contents(path), "original disk contents");
+                    const auto journal = registry::OpenKey(key.get(), journalName.c_str(), KEY_READ);
+                    VERIFY_ARE_EQUAL(registry::ReadDword(journal.get(), nullptr, L"RecoveryPermanentDelete", 0), 1u);
+                    VERIFY_ARE_EQUAL(registry::ReadDword(journal.get(), nullptr, L"RecoveryCleanupPending", 0), 0u);
+                    registry::DeleteKey(key.get(), keyName(protectedId).c_str());
+                    // Startup completes the committed intent without another force command.
+                    Store::RecoverPending(key.get());
+                    Store::Cleanup(key.get(), 0);
+                }
+                VERIFY_IS_FALSE(std::filesystem::exists(path));
+                VERIFY_FAILED(registry::OpenKeyNoThrow(key.get(), keyName(id).c_str(), KEY_READ).second);
+                VERIFY_FAILED(registry::OpenKeyNoThrow(key.get(), deletedName.c_str(), KEY_READ).second);
+            }
+        }
+        // An original-path replacement cannot be deleted to finish a missing-directory purge.
+        {
+            const auto [id, path] = create();
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            const auto saved = path.parent_path() / L"saved-original.vhdx";
+            std::filesystem::rename(entry.Path, saved);
+            std::filesystem::remove(entry.Path.parent_path());
+            std::ofstream(path) << "unrelated replacement";
+            Store::Purge(key.get(), id);
+            VERIFY_ARE_EQUAL(contents(path), "unrelated replacement");
+            VERIFY_ARE_EQUAL(contents(saved), "original disk contents");
+            VERIFY_SUCCEEDED(registry::OpenKeyNoThrow(key.get(), (L"Deleted-" + keyName(id)).c_str(), KEY_READ).second);
+            std::filesystem::remove(path);
+            std::filesystem::rename(saved, path);
+            Store::RecoverPending(key.get());
+            Store::Cleanup(key.get(), 0);
+            VERIFY_IS_FALSE(std::filesystem::exists(path));
+            VERIFY_FAILED(registry::OpenKeyNoThrow(key.get(), (L"Deleted-" + keyName(id)).c_str(), KEY_READ).second);
+        }
+        // A renamed or replaced source directory remains unavailable, rather than deleted.
+        for (const bool replacement : {false, true})
+        {
+            const auto [id, path] = create();
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            std::filesystem::rename(entry.Path, path);
+            std::filesystem::remove(entry.Path.parent_path());
+            const auto saved = directory / (L"renamed-source-" + keyName(id));
+            std::filesystem::rename(path.parent_path(), saved);
+            const auto keep = path.parent_path() / L"keep.txt";
+            if (replacement)
+            {
+                std::filesystem::create_directory(path.parent_path());
+                std::ofstream(keep) << "unrelated contents";
+            }
+            Store::Purge(key.get(), id);
+            VERIFY_ARE_EQUAL(contents(saved / path.filename()), "original disk contents");
+            VERIFY_SUCCEEDED(registry::OpenKeyNoThrow(key.get(), (L"Deleted-" + keyName(id)).c_str(), KEY_READ).second);
+            if (replacement)
+            {
+                VERIFY_ARE_EQUAL(contents(keep), "unrelated contents");
+                std::filesystem::remove(keep);
+                std::filesystem::remove(path.parent_path());
+            }
+            std::filesystem::rename(saved, path.parent_path());
+            Store::RecoverPending(key.get());
+            Store::Cleanup(key.get(), 0);
+            VERIFY_IS_FALSE(std::filesystem::exists(path));
+            VERIFY_FAILED(registry::OpenKeyNoThrow(key.get(), (L"Deleted-" + keyName(id)).c_str(), KEY_READ).second);
+        }
+        // Both original and recovery directories can be conclusively removed under the saved anchor.
+        for (const bool cleanupPending : {false, true})
+        {
+            const auto [id, path] = create();
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path, [](const auto&) {}));
+            VERIFY_IS_FALSE(std::filesystem::exists(path.parent_path()));
+            const auto entry = entryFor(id);
+            if (cleanupPending)
+            {
+                const auto keep = entry.Path.parent_path() / L"keep.txt";
+                std::ofstream(keep) << "unrelated contents";
+                Store::Purge(key.get(), id);
+                VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
+                VERIFY_ARE_EQUAL(contents(keep), "unrelated contents");
+                const auto journal = registry::OpenKey(key.get(), (L"Deleted-" + keyName(id)).c_str(), KEY_READ);
+                VERIFY_ARE_EQUAL(registry::ReadDword(journal.get(), nullptr, L"RecoveryCleanupPending", 0), 1u);
+                std::filesystem::remove(keep);
+            }
+            else
+            {
+                std::filesystem::remove(entry.Path);
+            }
+            std::filesystem::remove(entry.Path.parent_path());
+            Store::Purge(key.get(), id);
+            VERIFY_FAILED(registry::OpenKeyNoThrow(key.get(), (L"Deleted-" + keyName(id)).c_str(), KEY_READ).second);
+        }
         // A purged disk registered elsewhere is protected and cannot be restored again.
         {
             const auto [id, path] = create();
@@ -8231,6 +8349,21 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                 }
                 VERIFY_ARE_EQUAL(Store::Enumerate(key.get(), true).size(), 0u);
             }
+        }
+        // Expiry must preserve a recovery directory that was renamed rather than removed.
+        {
+            const auto [id, path] = create();
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            const auto renamed = directory / (L"renamed-recovery-" + keyName(id));
+            std::filesystem::rename(entry.Path.parent_path(), renamed);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
+            VERIFY_ARE_EQUAL(contents(renamed / entry.Path.filename()), "original disk contents");
+            VERIFY_SUCCEEDED(registry::OpenKeyNoThrow(key.get(), (L"Deleted-" + keyName(id)).c_str(), KEY_READ).second);
+            std::filesystem::rename(renamed, entry.Path.parent_path());
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
+            VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
+            VERIFY_FAILED(registry::OpenKeyNoThrow(key.get(), (L"Deleted-" + keyName(id)).c_str(), KEY_READ).second);
         }
         // A dangling replacement link must not be mistaken for a deleted recovery directory.
         for (const bool junction : {false, true})

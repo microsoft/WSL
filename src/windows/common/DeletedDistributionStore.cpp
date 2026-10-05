@@ -10,6 +10,7 @@ namespace {
 constexpr auto c_recoveryPath = L"RecoveryPath";
 constexpr auto c_recoveryFileId = L"RecoveryFileId";
 constexpr auto c_recoveryDirectoryId = L"RecoveryDirectoryId";
+constexpr auto c_originalDirectoryId = L"RecoveryOriginalDirectoryId";
 constexpr auto c_recoveryAnchorId = L"RecoveryAnchorId";
 constexpr auto c_deletedAt = L"DeletedAt";
 constexpr auto c_previousState = L"RecoveryPreviousState";
@@ -109,16 +110,98 @@ try
 }
 CATCH_LOG()
 
-bool OriginalDiskExists(HKEY key)
+bool DirectoryWasDeleted(HKEY key, const std::filesystem::path& directory, LPCWSTR value = c_recoveryDirectoryId)
+{
+    // Probe the directory itself, including a dangling link, without following
+    // its reparse point. OpenDirectory rejects every existing reparse point.
+    if (OpenDirectory(directory, FILE_SHARE_READ, true))
+    {
+        return false;
+    }
+    // A missing child is conclusive only while the original parent is available
+    // and locked against replacement. An offline volume must keep its journal.
+    FILE_ID_INFO expected{};
+    DWORD size = sizeof(expected);
+    THROW_IF_WIN32_ERROR(RegGetValueW(key, nullptr, value, RRF_RT_REG_BINARY, nullptr, &expected, &size));
+    THROW_HR_IF(E_INVALIDARG, size != sizeof(expected));
+    const auto anchor =
+        OpenDirectory(directory.parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE, false, FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES);
+    VerifyIdentity(key, anchor.get(), c_recoveryAnchorId);
+    const auto anchorId = Identity(anchor.get());
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_FILE_INVALID), expected.VolumeSerialNumber != anchorId.VolumeSerialNumber);
+    const FILE_ID_128 emptyId{};
+    THROW_HR_IF(E_INVALIDARG, memcmp(&expected.FileId, &emptyId, sizeof(emptyId)) == 0);
+    auto openById = [&](const FILE_ID_INFO& id) {
+        FILE_ID_DESCRIPTOR descriptor{};
+        descriptor.dwSize = sizeof(descriptor);
+        descriptor.Type = ExtendedFileIdType;
+        descriptor.ExtendedFileId = id.FileId;
+        return wil::unique_hfile{OpenFileById(
+            anchor.get(), &descriptor, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)};
+    };
+    // Validate lookup support with a known live identity before interpreting
+    // a stale NTFS file ID, which reports ERROR_INVALID_PARAMETER after deletion.
+    const auto control = openById(anchorId);
+    THROW_IF_WIN32_BOOL_FALSE(!!control);
+    const auto original = openById(expected);
+    if (original)
+    {
+        // A rename makes the path unavailable without deleting its directory.
+        return false;
+    }
+    const auto error = GetLastError();
+    THROW_WIN32_IF(error, error != ERROR_FILE_NOT_FOUND && error != ERROR_INVALID_PARAMETER);
+    return !OpenDirectory(directory, FILE_SHARE_READ, true);
+}
+
+wil::unique_hfile OpenOriginalDisk(HKEY key)
 {
     const auto path =
         std::filesystem::path(ReadString(key, nullptr, L"BasePath")) / ReadString(key, nullptr, L"VhdFileName", LXSS_VM_MODE_VHD_NAME);
-    const auto file = OpenDisk(path, false);
-    if (file)
+    try
     {
-        VerifyIdentity(key, file.get());
+        const auto parent =
+            OpenDirectory(path.parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE, true, FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES);
+        if (!parent)
+        {
+            THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), !DirectoryWasDeleted(key, path.parent_path(), c_originalDirectoryId));
+            return {};
+        }
+        DWORD size{};
+        const auto result = RegGetValueW(key, nullptr, c_originalDirectoryId, RRF_RT_REG_BINARY, nullptr, nullptr, &size);
+        THROW_WIN32_IF(result, result != ERROR_SUCCESS && result != ERROR_FILE_NOT_FOUND);
+        if (result == ERROR_SUCCESS)
+        {
+            VerifyIdentity(key, parent.get(), c_originalDirectoryId);
+        }
+        std::wstring resolved;
+        THROW_IF_FAILED(wil::GetFinalPathNameByHandleW(parent.get(), resolved));
+        const auto physicalPath = std::filesystem::path(resolved) / path.filename();
+        const auto anchor = OpenDirectory(
+            physicalPath.parent_path().parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE, false, FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES);
+        VerifyIdentity(key, anchor.get(), c_recoveryAnchorId);
+        auto file = OpenDisk(physicalPath, false);
+        if (file)
+        {
+            VerifyIdentity(key, file.get());
+        }
+        else
+        {
+            // Legacy journals without the source identity may delete a positively
+            // identified disk, but cannot establish absence in a replacement folder.
+            THROW_HR_IF(E_INVALIDARG, result != ERROR_SUCCESS && !ReadDword(key, nullptr, c_cleanupPending, 0));
+        }
+        return file;
     }
-    return !!file;
+    catch (...)
+    {
+        const auto error = wil::ResultFromCaughtException();
+        THROW_HR_IF(error, error != HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
+        // The install directory may also have been removed. Establish absence
+        // only through the same verified, available anchor as recovery storage.
+        THROW_HR_IF(error, !DirectoryWasDeleted(key, path.parent_path(), c_originalDirectoryId));
+        return {};
+    }
 }
 
 void RenameDisk(HANDLE file, const std::filesystem::path& path)
@@ -178,6 +261,24 @@ bool IsRegisteredDisk(HKEY lxssKey, HANDLE file, const GUID* excludedId = nullpt
     return false;
 }
 
+bool DeleteOriginalDisk(HKEY lxssKey, HKEY key, const GUID* excludedId = nullptr)
+{
+    auto file = OpenOriginalDisk(key);
+    if (file)
+    {
+        if (IsRegisteredDisk(lxssKey, file.get(), excludedId))
+        {
+            return false;
+        }
+        FILE_DISPOSITION_INFO disposition{TRUE};
+        THROW_IF_WIN32_BOOL_FALSE(SetFileInformationByHandle(file.get(), FileDispositionInfo, &disposition, sizeof(disposition)));
+        file.reset();
+    }
+    WriteDword(key, nullptr, c_cleanupPending, 1);
+    THROW_IF_WIN32_ERROR(RegFlushKey(key));
+    return true;
+}
+
 void CommitRestore(HKEY lxssKey, const GUID& id)
 {
     const auto defaultName = ReadOptionalString(lxssKey, nullptr, L"DefaultDistribution");
@@ -201,7 +302,7 @@ void CommitRestore(HKEY lxssKey, const GUID& id)
 void ClearRecoveryValues(HKEY key)
 {
     for (const auto value :
-         {c_recoveryPath, c_recoveryFileId, c_recoveryDirectoryId, c_recoveryAnchorId, c_deletedAt, c_restored, c_restorePending, c_restoreName, c_cleanupPending, c_previousState, c_permanentDelete})
+         {c_recoveryPath, c_recoveryFileId, c_recoveryDirectoryId, c_originalDirectoryId, c_recoveryAnchorId, c_deletedAt, c_restored, c_restorePending, c_restoreName, c_cleanupPending, c_previousState, c_permanentDelete})
     {
         DeleteValue(key, value);
     }
@@ -230,27 +331,6 @@ void CompleteRestore(HKEY lxssKey, HKEY key, const GUID& id, bool deleted)
     ClearRecoveryValues(key);
 }
 
-bool RecoveryDirectoryWasDeleted(HKEY key, const std::filesystem::path& directory)
-{
-    // Probe the directory itself, including a dangling link, without following
-    // its reparse point. OpenDirectory rejects every existing reparse point.
-    if (OpenDirectory(directory, FILE_SHARE_READ, true))
-    {
-        return false;
-    }
-    // A missing child is conclusive only while the original parent is available
-    // and locked against replacement. An offline volume must keep its journal.
-    FILE_ID_INFO expected{};
-    DWORD size = sizeof(expected);
-    THROW_IF_WIN32_ERROR(RegGetValueW(key, nullptr, c_recoveryDirectoryId, RRF_RT_REG_BINARY, nullptr, &expected, &size));
-    THROW_HR_IF(E_INVALIDARG, size != sizeof(expected));
-    const auto anchor =
-        OpenDirectory(directory.parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE, false, FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES);
-    VerifyIdentity(key, anchor.get(), c_recoveryAnchorId);
-    const auto anchorId = Identity(anchor.get());
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_FILE_INVALID), expected.VolumeSerialNumber != anchorId.VolumeSerialNumber);
-    return !OpenDirectory(directory, FILE_SHARE_READ, true);
-}
 } // namespace
 
 ULONG64 DeletedDistributionStore::Now()
@@ -336,6 +416,8 @@ bool DeletedDistributionStore::Retain(
     WriteString(key.get(), nullptr, c_recoveryPath, target.c_str());
     WriteQword(key.get(), nullptr, c_deletedAt, Now());
     THROW_IF_WIN32_ERROR(RegSetValueExW(key.get(), c_recoveryFileId, 0, REG_BINARY, reinterpret_cast<const BYTE*>(&identity), sizeof(identity)));
+    THROW_IF_WIN32_ERROR(RegSetValueExW(
+        key.get(), c_originalDirectoryId, 0, REG_BINARY, reinterpret_cast<const BYTE*>(&sourceIdentity), sizeof(sourceIdentity)));
     const auto directoryIdentity = Identity(directoryHandle.get());
     THROW_IF_WIN32_ERROR(RegSetValueExW(
         key.get(), c_recoveryDirectoryId, 0, REG_BINARY, reinterpret_cast<const BYTE*>(&directoryIdentity), sizeof(directoryIdentity)));
@@ -447,29 +529,41 @@ try
             if (ReadDword(key.get(), nullptr, c_permanentDelete, 0))
             {
                 const auto path = std::filesystem::path(ReadString(key.get(), nullptr, c_recoveryPath));
-                const auto directory = OpenDirectory(path.parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE);
-                VerifyIdentity(key.get(), directory.get(), c_recoveryDirectoryId);
-                auto file = OpenDisk(path);
-                if (!file)
+                wil::unique_hfile directory;
+                wil::unique_hfile file;
+                const auto excludedId = name.starts_with(c_deletedPrefix) ? nullptr : &id;
+                if (DirectoryWasDeleted(key.get(), path.parent_path()))
                 {
-                    const auto originalPath = std::filesystem::path(ReadString(key.get(), nullptr, L"BasePath")) /
-                                              ReadString(key.get(), nullptr, L"VhdFileName", LXSS_VM_MODE_VHD_NAME);
-                    file = OpenDisk(originalPath, false);
+                    // There is no destination left to move into. Finish explicit
+                    // deletion through the verified original disk handle instead.
+                    if (!DeleteOriginalDisk(lxssKey, key.get(), excludedId))
+                    {
+                        continue;
+                    }
+                }
+                else
+                {
+                    directory = OpenDirectory(path.parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE);
+                    VerifyIdentity(key.get(), directory.get(), c_recoveryDirectoryId);
+                    file = OpenDisk(path);
+                    if (!file)
+                    {
+                        file = OpenOriginalDisk(key.get());
+                        if (file)
+                        {
+                            // The journal itself still references the original path. Protect
+                            // any other registration that has imported this disk in place.
+                            if (IsRegisteredDisk(lxssKey, file.get(), excludedId))
+                            {
+                                continue;
+                            }
+                            RenameDisk(file.get(), path);
+                        }
+                    }
                     if (file)
                     {
                         VerifyIdentity(key.get(), file.get());
-                        // The journal itself still references the original path. Protect
-                        // any other registration that has imported this disk in place.
-                        if (IsRegisteredDisk(lxssKey, file.get(), &id))
-                        {
-                            continue;
-                        }
-                        RenameDisk(file.get(), path);
                     }
-                }
-                if (file)
-                {
-                    VerifyIdentity(key.get(), file.get());
                 }
                 DeleteValue(key.get(), c_restorePending);
                 DeleteValue(key.get(), c_restored);
@@ -551,7 +645,7 @@ try
                 {
                     VerifyIdentity(key.get(), original.get());
                     const auto recoveryDirectory = std::filesystem::path(*path).parent_path();
-                    if (!RecoveryDirectoryWasDeleted(key.get(), recoveryDirectory))
+                    if (!DirectoryWasDeleted(key.get(), recoveryDirectory))
                     {
                         const auto directory = OpenDirectory(recoveryDirectory);
                         VerifyIdentity(key.get(), directory.get(), c_recoveryDirectoryId);
@@ -608,9 +702,9 @@ try
                 continue;
             }
             const auto recoveryDirectory = entry.Path.parent_path();
-            if (RecoveryDirectoryWasDeleted(key.get(), recoveryDirectory))
+            if (DirectoryWasDeleted(key.get(), recoveryDirectory))
             {
-                if (ReadDword(key.get(), nullptr, c_permanentDelete, 0) && OriginalDiskExists(key.get()))
+                if (ReadDword(key.get(), nullptr, c_permanentDelete, 0) && !DeleteOriginalDisk(lxssKey, key.get()))
                 {
                     continue;
                 }
@@ -632,7 +726,7 @@ try
                 THROW_IF_WIN32_BOOL_FALSE(SetFileInformationByHandle(file.get(), FileDispositionInfo, &disposition, sizeof(disposition)));
                 file.reset();
             }
-            else if (ReadDword(key.get(), nullptr, c_permanentDelete, 0) && OriginalDiskExists(key.get()))
+            else if (ReadDword(key.get(), nullptr, c_permanentDelete, 0) && !!OpenOriginalDisk(key.get()))
             {
                 // Recovery may have deferred moving a disk owned by another
                 // registration. Keep its journal until that move can complete.
