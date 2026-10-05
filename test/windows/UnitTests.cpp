@@ -9576,10 +9576,31 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                     std::format(L"--import {}-other \"{}\" \"{}\" --version 2", name, original.wstring(), archive.wstring()), -1);
                 VERIFY_IS_TRUE(pathError.find(L"The supplied install location is already in use.") != std::wstring::npos);
                 VERIFY_ARE_EQUAL(pathStderr, L"");
-                const auto [inplaceError, inplaceStderr] = LxsstuLaunchWslAndCaptureOutput(
-                    std::format(L"--import-in-place {}-other \"{}\"", name, (original / L"ext4.vhdx").wstring()), -1);
+                // The client opens the input file before contacting the service.
+                // Keep it readable to the client but unavailable to journal recovery.
+                const auto originalDisk = original / L"ext4.vhdx";
+                constexpr char diskContents[] = "pending unregister disk";
+                std::filesystem::create_directories(original);
+                wil::unique_hfile busyOriginal{CreateFileW(
+                    originalDisk.c_str(), GENERIC_READ | GENERIC_WRITE | DELETE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_NEW, 0, nullptr)};
+                VERIFY_IS_TRUE(!!busyOriginal);
+                DWORD bytesWritten{};
+                VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(busyOriginal.get(), diskContents, sizeof(diskContents) - 1, &bytesWritten, nullptr));
+                VERIFY_ARE_EQUAL(bytesWritten, static_cast<DWORD>(sizeof(diskContents) - 1));
+                VERIFY_WIN32_BOOL_SUCCEEDED(SetFilePointerEx(busyOriginal.get(), {}, nullptr, FILE_BEGIN));
+                const auto [inplaceError, inplaceStderr] =
+                    LxsstuLaunchWslAndCaptureOutput(std::format(L"--import-in-place {}-other \"{}\"", name, originalDisk.wstring()), -1);
+                WEX::Logging::Log::Comment(inplaceError.c_str());
                 VERIFY_IS_TRUE(inplaceError.find(L"The supplied install location is already in use.") != std::wstring::npos);
                 VERIFY_ARE_EQUAL(inplaceStderr, L"");
+                char contents[64]{};
+                DWORD bytesRead{};
+                VERIFY_WIN32_BOOL_SUCCEEDED(ReadFile(busyOriginal.get(), contents, sizeof(contents), &bytesRead, nullptr));
+                VERIFY_ARE_EQUAL(std::string(contents, bytesRead), std::string(diskContents));
+                FILE_DISPOSITION_INFO disposition{TRUE};
+                VERIFY_WIN32_BOOL_SUCCEEDED(
+                    SetFileInformationByHandle(busyOriginal.get(), FileDispositionInfo, &disposition, sizeof(disposition)));
+                busyOriginal.reset();
                 VERIFY_ARE_EQUAL(registry::ReadString(pending.get(), nullptr, L"RecoveryPath"), recoveryPath.wstring());
                 VERIFY_ARE_EQUAL(registry::ReadDword(pending.get(), nullptr, L"State", 0), static_cast<DWORD>(state));
                 VERIFY_IS_FALSE(GetDistributionId((name + L"-other").c_str()).has_value());
