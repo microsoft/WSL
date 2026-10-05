@@ -31,9 +31,6 @@ using helpers::WindowsBuildNumbers;
 using wsl::windows::service::wslc::HcsVirtualMachine;
 
 constexpr auto MAX_VM_CRASH_FILES = 3;
-constexpr auto SAVED_STATE_FILE_EXTENSION = L".vmrs";
-constexpr auto SAVED_STATE_FILE_PREFIX = L"saved-state-";
-
 namespace {
 
 SOCKADDR_INET CreateListenAddress(LPCSTR Address, uint16_t HostPort)
@@ -333,18 +330,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     // Add GPU to the VM if requested
     if (FeatureEnabled(WslcFeatureFlagsGPU))
     {
-        hcs::ModifySettingRequest<hcs::GpuConfiguration> gpuRequest{};
-        gpuRequest.ResourcePath = L"VirtualMachine/ComputeTopology/Gpu";
-        gpuRequest.RequestType = hcs::ModifyRequestType::Update;
-        gpuRequest.Settings.AssignmentMode = hcs::GpuAssignmentMode::Mirror;
-        gpuRequest.Settings.AllowVendorExtension = true;
-        if (wsl::windows::common::hcs::IsDisableVgpuSettingsSupported())
-        {
-            gpuRequest.Settings.DisableGdiAcceleration = true;
-            gpuRequest.Settings.DisablePresentation = true;
-        }
-
-        hcs::ModifyComputeSystem(m_computeSystem.get(), wsl::shared::ToJsonW(gpuRequest).c_str());
+        hcs::AddMirroredGpu(m_computeSystem.get());
     }
 }
 
@@ -856,31 +842,12 @@ std::filesystem::path HcsVirtualMachine::GetCrashDumpFolder()
 
 void HcsVirtualMachine::CreateVmSavedStateFile(HANDLE InUserToken)
 {
-    auto runAsUser = wil::impersonate_token(InUserToken);
-
-    const auto filename = std::format(L"saved-state-{}-{}.vmrs", std::time(nullptr), m_vmIdString);
-    auto savedStateFile = m_crashDumpFolder / filename;
-
-    wsl::windows::common::filesystem::EnsureDirectory(m_crashDumpFolder.c_str());
-
-    wil::unique_handle file{CreateFileW(savedStateFile.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY, nullptr)};
-    THROW_LAST_ERROR_IF(!file);
-
-    hcs::GrantVmAccess(m_vmIdString.c_str(), savedStateFile.c_str());
-    m_vmSavedStateFile = savedStateFile;
+    m_vmSavedStateFile = hcs::CreateVmSavedStateFile(m_crashDumpFolder, m_vmId, InUserToken);
 }
 
 void HcsVirtualMachine::EnforceVmSavedStateFileLimit()
 {
-    auto runAsUser = wil::impersonate_token(m_userToken.get());
-
-    auto pred = [](const auto& e) {
-        return WI_IsFlagSet(GetFileAttributes(e.path().c_str()), FILE_ATTRIBUTE_TEMPORARY) && e.path().has_extension() &&
-               e.path().extension() == SAVED_STATE_FILE_EXTENSION && e.path().has_filename() &&
-               e.path().filename().wstring().find(SAVED_STATE_FILE_PREFIX) == 0 && e.file_size() > 0;
-    };
-
-    wsl::windows::common::wslutil::EnforceFileLimit(m_crashDumpFolder.c_str(), MAX_VM_CRASH_FILES + 1, pred);
+    hcs::EnforceVmSavedStateFileLimit(m_crashDumpFolder, MAX_VM_CRASH_FILES + 1, m_userToken.get());
 }
 
 void HcsVirtualMachine::WriteCrashLog(const std::wstring& crashLog)

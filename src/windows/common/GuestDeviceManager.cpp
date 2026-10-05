@@ -3,6 +3,77 @@
 #include "precomp.h"
 #include "GuestDeviceManager.h"
 #include "DeviceHostProxy.h"
+#include "IVirtualMachineBackend.h"
+
+std::wstring FormatVirtioFsMountOptions(_In_ const std::map<std::wstring, std::wstring>& Options)
+{
+    std::wstring optionsString;
+    for (const auto& option : Options)
+    {
+        if (!optionsString.empty())
+        {
+            optionsString += L';';
+        }
+
+        optionsString += option.first;
+        if (!option.second.empty())
+        {
+            optionsString += L'=';
+            optionsString += option.second;
+        }
+    }
+
+    return optionsString;
+}
+
+std::map<std::wstring, std::wstring> ParseVirtioFsMountOptions(_In_ std::wstring_view Options)
+{
+    std::map<std::wstring, std::wstring> parsed;
+    for (const auto& option : wsl::shared::string::Split(std::wstring{Options}, L';'))
+    {
+        std::wstring key;
+        std::wstring value;
+        const auto pos = option.find_first_of(L'=');
+        if (pos == option.npos)
+        {
+            key = option;
+        }
+        else
+        {
+            key = option.substr(0, pos);
+            value = option.substr(pos + 1);
+        }
+
+        if (!key.empty())
+        {
+            parsed.insert({std::move(key), std::move(value)});
+        }
+    }
+
+    return parsed;
+}
+
+std::wstring NormalizeSharePath(_In_ const std::filesystem::path& Path)
+{
+    std::wstring sharePath = Path.wstring();
+    if (!sharePath.ends_with(L'\\') && !sharePath.ends_with(L'/'))
+    {
+        sharePath.push_back(L'\\');
+    }
+
+    return wsl::windows::common::filesystem::GetCanonicalPath(sharePath).wstring();
+}
+
+void AddPlan9SharePath(_In_ const wil::com_ptr<IPlan9FileSystem>& Server, _In_ PCWSTR AccessName, _In_ PCWSTR Path, _In_ UINT32 Flags)
+{
+    HRESULT result = Server->AddSharePath(AccessName, Path, Flags);
+    if (result == HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS))
+    {
+        result = S_OK;
+    }
+
+    THROW_IF_FAILED(result);
+}
 
 GuestDeviceManager::GuestDeviceManager(_In_ const std::wstring& machineId, _In_ const GUID& runtimeId, bool EnableTelemetry) :
     m_machineId(machineId), m_deviceHostSupport(wil::MakeOrThrow<DeviceHostProxy>(machineId, runtimeId, EnableTelemetry))
@@ -76,14 +147,22 @@ void GuestDeviceManager::AddRemoteFileSystem(_In_ REFCLSID clsid, _In_ PCWSTR ta
     m_deviceHostSupport->AddRemoteFileSystem(clsid, tag, server);
 }
 
-void GuestDeviceManager::AddSharedMemoryDevice(_In_ PCWSTR Tag, _In_ PCWSTR Path, _In_ UINT32 SizeMb, _In_ HANDLE UserToken)
+void GuestDeviceManager::RemoveRemoteFileSystem(_In_ REFCLSID clsid, _In_ std::wstring_view tag) noexcept
+{
+    m_deviceHostSupport->RemoveRemoteFileSystem(clsid, tag);
+}
+
+GUID GuestDeviceManager::AddSharedMemoryDevice(_In_ PCWSTR Tag, _In_ PCWSTR Path, _In_ UINT32 SizeMb, _In_ HANDLE UserToken)
 {
     auto guestDeviceLock = m_lock.lock_exclusive();
     auto objectLifetime = CreateSectionObjectRoot(Path, UserToken);
 
-    (void)m_deviceHostSupport->AddVirtiofsDevice(
+    const auto instanceId = m_deviceHostSupport->AddVirtiofsDevice(
         UserToken, Tag, objectLifetime.Path, VirtiofsShareKind_SectionBacked, SizeMb, L"");
-    m_objectDirectories.emplace_back(std::move(objectLifetime));
+    auto removeOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { m_deviceHostSupport->RemoveDevice(instanceId); });
+    m_objectDirectories.emplace(instanceId, std::move(objectLifetime));
+    removeOnFailure.release();
+    return instanceId;
 }
 
 GuestDeviceManager::DirectoryObjectLifetime GuestDeviceManager::CreateSectionObjectRoot(_In_ std::wstring_view RelativeRootPath, _In_ HANDLE UserToken) const
@@ -166,4 +245,5 @@ void GuestDeviceManager::RemoveGuestDevice(_In_ const GUID& InstanceId)
     }
 
     m_deviceHostSupport->RemoveDevice(InstanceId);
+    m_objectDirectories.erase(InstanceId);
 }
