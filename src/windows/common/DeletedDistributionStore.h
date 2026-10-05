@@ -1,6 +1,8 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 #pragma once
 
+#include <functional>
+
 namespace wsl::windows::common {
 
 // Callers serialize operations and impersonate the distribution's owner.
@@ -17,7 +19,12 @@ public:
 
     static constexpr ULONG64 c_retention = 24ULL * 60 * 60 * 10000000;
     static ULONG64 Now();
-    static bool Retain(HKEY LxssKey, const GUID& Id, const std::filesystem::path& VhdPath);
+    // Cleanup receives the verified physical source directory before the VHD moves or journaling starts.
+    static bool Retain(
+        HKEY LxssKey,
+        const GUID& Id,
+        const std::filesystem::path& VhdPath,
+        const std::function<void(const std::filesystem::path&)>& CleanupArtifacts = {});
     static std::vector<Entry> Enumerate(HKEY LxssKey, bool IncludePermanentDelete = false);
     static void Restore(HKEY LxssKey, const Entry& Distribution, LPCWSTR Name);
     static void Purge(HKEY LxssKey, const GUID& Id);

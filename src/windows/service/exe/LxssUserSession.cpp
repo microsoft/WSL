@@ -2660,7 +2660,16 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid, boo
                     {
                         m_utilityVm->EjectVhd(configuration.VhdFilePath.c_str());
                     }
-                    retained = wsl::windows::common::DeletedDistributionStore::Retain(lxssKey.get(), *DistroGuid, configuration.VhdFilePath);
+                    retained = wsl::windows::common::DeletedDistributionStore::Retain(
+                        lxssKey.get(), *DistroGuid, configuration.VhdFilePath, [&](const std::filesystem::path& source) {
+                            // Use the verified physical path while it is locked, rather than
+                            // resolving a mutable ancestor alias during artifact deletion.
+                            auto cleanupConfiguration = configuration;
+                            cleanupConfiguration.BasePath = source;
+                            _DeleteDistributionLockHeld(
+                                cleanupConfiguration,
+                                LXSS_DELETE_DISTRO_FLAGS_ALL & ~(LXSS_DELETE_DISTRO_FLAGS_VHD | LXSS_DELETE_DISTRO_FLAGS_UNMOUNT));
+                        });
                 }
             }
 
@@ -2692,12 +2701,9 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid, boo
             if (!recoveryPending)
             {
                 auto runAsUser = wil::CoImpersonateClient();
-                // Preserve legacy rootfs/temp cleanup so the install path can be reused by either WSL version.
-                // The retained VHD has moved; never unmount or delete a replacement at its old path.
-                _DeleteDistributionLockHeld(
-                    configuration,
-                    retained ? (LXSS_DELETE_DISTRO_FLAGS_ALL & ~(LXSS_DELETE_DISTRO_FLAGS_VHD | LXSS_DELETE_DISTRO_FLAGS_UNMOUNT))
-                             : LXSS_DELETE_DISTRO_FLAGS_ALL);
+                // Retention already cleaned the old artifacts before moving the VHD.
+                // Only remove an empty install directory now; never revisit its contents.
+                _DeleteDistributionLockHeld(configuration, retained ? 0 : LXSS_DELETE_DISTRO_FLAGS_ALL);
             }
 
             WslOfflineDistributionInformation distributionInfo;

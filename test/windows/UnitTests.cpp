@@ -1369,10 +1369,18 @@ class UnitTests
             std::format(L"--import {} . {} --version {}", newDistroName, newDistroTar, version).c_str(),
             L"The operation completed successfully. \r\n",
             0);
+        const auto firstImportedId = GetDistributionId(newDistroName);
+        VERIFY_IS_TRUE(firstImportedId.has_value());
         validateOutput(std::format(L"-d {} -- ln -f -s /bin/bash /bin/sh", newDistroName).c_str(), L"", 0);
         validateOutput(
             std::format(L"--export {} {}", newDistroName, newDistroTar).c_str(), L"The operation completed successfully. \r\n", 0);
-        validateOutput(std::format(L"--unregister {}", newDistroName).c_str(), L"The operation completed successfully. \r\n", 0);
+        validateOutput(
+            std::format(L"--unregister {} --force", newDistroName).c_str(), L"The operation completed successfully. \r\n", 0);
+        const auto userKey = wsl::windows::common::registry::OpenLxssUserKey();
+        const auto retained = wsl::windows::common::DeletedDistributionStore::Enumerate(userKey.get());
+        VERIFY_IS_TRUE(std::none_of(retained.begin(), retained.end(), [&](const auto& entry) {
+            return IsEqualGUID(entry.Id, *firstImportedId);
+        }));
         validateOutput(
             std::format(L"--import {} . {} --version {}", newDistroName, newDistroTar, version).c_str(),
             L"The operation completed successfully. \r\n",
@@ -7681,7 +7689,11 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                 VERIFY_WIN32_BOOL_SUCCEEDED(CreateSymbolicLinkW(
                     base.c_str(), target.c_str(), SYMBOLIC_LINK_FLAG_DIRECTORY | SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE));
             }
-            VERIFY_ARE_EQUAL(wil::ResultFromException([&] { Store::Retain(key.get(), id, path); }), HRESULT_FROM_WIN32(ERROR_REPARSE_TAG_INVALID));
+            bool cleanupCalled = false;
+            VERIFY_ARE_EQUAL(
+                wil::ResultFromException([&] { Store::Retain(key.get(), id, path, [&](const auto&) { cleanupCalled = true; }); }),
+                HRESULT_FROM_WIN32(ERROR_REPARSE_TAG_INVALID));
+            VERIFY_IS_FALSE(cleanupCalled);
             VERIFY_IS_TRUE(isActive(id));
             VERIFY_ARE_EQUAL(contents(saved / path.filename()), "original disk contents");
             VERIFY_ARE_EQUAL(contents(target / path.filename()), "unrelated target contents");
@@ -7757,6 +7769,45 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
             VERIFY_FAILED(registry::OpenKeyNoThrow(key.get(), (L"Deleted-" + keyName(id)).c_str(), KEY_READ).second);
+        }
+        // Artifact cleanup precedes any durable retention state while the verified source is locked.
+        {
+            const auto [id, path] = create();
+            const auto marker = path.parent_path() / L"cleanup-marker";
+            std::ofstream(marker) << "obsolete artifact";
+            ULONG calls = 0;
+            auto cleanupArtifacts = [&](const std::filesystem::path& source) {
+                ++calls;
+                VERIFY_IS_TRUE(std::filesystem::equivalent(source, path.parent_path()));
+                VERIFY_IS_TRUE(std::filesystem::exists(source / path.filename()));
+                VERIFY_IS_TRUE(isActive(id));
+                const auto registration = registry::OpenKey(key.get(), keyName(id).c_str(), KEY_READ);
+                VERIFY_IS_FALSE(registry::ReadOptionalString(registration.get(), nullptr, L"RecoveryPath").has_value());
+                VERIFY_IS_TRUE(std::filesystem::remove(source / marker.filename()));
+            };
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path, cleanupArtifacts));
+            VERIFY_ARE_EQUAL(calls, 1u);
+            const auto entry = entryFor(id);
+            // A restart after the move/key rename has no old artifact cleanup left to resume.
+            Store::RecoverPending(key.get());
+            VERIFY_IS_FALSE(std::filesystem::exists(marker));
+            VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
+            VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
+        }
+        // Interrupted pre-retention cleanup leaves the original VHD and registration recoverable.
+        {
+            const auto [id, path] = create();
+            VERIFY_ARE_EQUAL(
+                wil::ResultFromException([&] { Store::Retain(key.get(), id, path, [&](const auto&) { THROW_HR(E_ABORT); }); }), E_ABORT);
+            VERIFY_IS_TRUE(isActive(id));
+            VERIFY_ARE_EQUAL(contents(path), "original disk contents");
+            const auto registration = registry::OpenKey(key.get(), keyName(id).c_str(), KEY_READ);
+            VERIFY_IS_FALSE(registry::ReadOptionalString(registration.get(), nullptr, L"RecoveryPath").has_value());
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
+            VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
         }
         // Force deletion of an offline journal retries safely after the volume returns.
         for (const bool unmoved : {false, true})

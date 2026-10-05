@@ -238,7 +238,8 @@ ULONG64 DeletedDistributionStore::Now()
     return (static_cast<ULONG64>(time.dwHighDateTime) << 32) | time.dwLowDateTime;
 }
 
-bool DeletedDistributionStore::Retain(HKEY lxssKey, const GUID& id, const std::filesystem::path& vhdPath)
+bool DeletedDistributionStore::Retain(
+    HKEY lxssKey, const GUID& id, const std::filesystem::path& vhdPath, const std::function<void(const std::filesystem::path&)>& cleanupArtifacts)
 {
     // Reject a redirected install directory and keep it locked against replacement.
     // Resolve ancestor aliases once, then open the disk through this verified parent.
@@ -280,6 +281,13 @@ bool DeletedDistributionStore::Retain(HKEY lxssKey, const GUID& id, const std::f
     const auto anchorHandle =
         OpenDirectory(directory.parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE, false, FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES);
     const auto key = OpenKey(lxssKey, KeyName(id).c_str(), KEY_READ | KEY_WRITE);
+    // Attempt the existing best-effort artifact cleanup before making the disk
+    // recoverable. A crash during cleanup leaves the original registration/VHD
+    // available for retry; a crash after the move cannot skip this cleanup attempt.
+    if (cleanupArtifacts)
+    {
+        cleanupArtifacts(originalPath.parent_path());
+    }
     const auto originalState = ReadDword(key.get(), nullptr, L"State", LxssDistributionStateInstalled);
     bool moved = false;
     auto rollback = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
