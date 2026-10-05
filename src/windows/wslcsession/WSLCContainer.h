@@ -28,6 +28,7 @@ Abstract:
 #include "WSLCDiagnostics.h"
 #include "WSLCNetworkMetadata.h"
 #include "WSLCVhdVolume.h"
+#include <mutex>
 #include <unordered_map>
 
 namespace wsl::windows::service::wslc {
@@ -189,20 +190,26 @@ private:
 
         void Report(WSLCDiagnosticLevel level, LPCSTR code, LPCWSTR message)
         {
+            std::lock_guard lock(PendingLock);
             Pending.push_back({wsl::windows::wslc::events::GetCurrentTimestamp(), level, code, message != nullptr ? message : L""});
         }
 
         void Flush() noexcept
         {
-            for (const auto& event : Pending)
+            std::vector<PendingDiagnosticEvent> pending;
+            {
+                std::lock_guard lock(PendingLock);
+                pending.swap(Pending);
+            }
+
+            for (const auto& event : pending)
             {
                 Reporter.ReportAt(event.Timestamp, event.Level, event.Code.c_str(), event.Message.c_str());
             }
-
-            Pending.clear();
         }
 
         wsl::windows::wslc::diagnostics::DiagnosticReporter Reporter;
+        std::mutex PendingLock;
         std::vector<PendingDiagnosticEvent> Pending;
     };
 

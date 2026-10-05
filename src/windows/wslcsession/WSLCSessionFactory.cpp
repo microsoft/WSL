@@ -27,7 +27,7 @@ namespace wslc = wsl::windows::service::wslc;
 
 namespace {
 
-std::wstring SanitizeDisplayName(std::wstring_view displayName)
+std::wstring SanitizeDisplayName(LPCWSTR displayName)
 {
     wchar_t userName[256 + 1] = {};
     DWORD userNameLength = ARRAYSIZE(userName);
@@ -37,7 +37,7 @@ std::wstring SanitizeDisplayName(std::wstring_view displayName)
         return L"<session>";
     }
 
-    return wsl::windows::wslc::diagnostics::SanitizeUserName(displayName, userName);
+    return wsl::windows::wslc::diagnostics::SanitizeUserName(displayName != nullptr ? displayName : L"", userName);
 }
 
 } // namespace
