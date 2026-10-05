@@ -2713,7 +2713,7 @@ Windows 版本： {}</value>
     <comment>{Locked="tar.exe"}</comment>
   </data>
   <data name="WSLCCLI_CpStdoutIsTerminalError" xml:space="preserve">
-    <value>Cannot write copy output to the console.</value>
+    <value>無法將複製輸出寫入主機。</value>
   </data>
   <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
     <value>複製方向無效。使用 CONTAINER:PATH 作為來源或目的地。</value>
@@ -2741,7 +2741,7 @@ Windows 版本： {}</value>
     <comment>{0} is the file name being copied. Shown when the name cannot be used as a Windows file name.</comment>
   </data>
   <data name="WSLCCLI_CpSourceNameTrimmedWarning" xml:space="preserve">
-    <value>Windows removes trailing spaces and dots from file names, so '{}' is copied as '{}'.</value>
+    <value>Windows 會從檔案名稱移除結尾空格和點，因此 '{}' 會複製為 '{}'。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
@@ -3958,28 +3958,28 @@ Windows 版本：{}</value>
     <value>PIDS</value>
   </data>
   <data name="WSLCCLI_TableHeaderRepository" xml:space="preserve">
-    <value>REPOSITORY</value>
+    <value>存放庫</value>
   </data>
   <data name="WSLCCLI_TableHeaderTag" xml:space="preserve">
-    <value>TAG</value>
+    <value>標籤</value>
   </data>
   <data name="WSLCCLI_TableHeaderDigest" xml:space="preserve">
-    <value>DIGEST</value>
+    <value>摘要</value>
   </data>
   <data name="WSLCCLI_TableHeaderImageId" xml:space="preserve">
-    <value>IMAGE ID</value>
+    <value>影像識別碼</value>
   </data>
   <data name="WSLCCLI_TableHeaderNetworkId" xml:space="preserve">
-    <value>NETWORK ID</value>
+    <value>網路識別碼</value>
   </data>
   <data name="WSLCCLI_TableHeaderDriver" xml:space="preserve">
     <value>驅動程式</value>
   </data>
   <data name="WSLCCLI_TableHeaderScope" xml:space="preserve">
-    <value>SCOPE</value>
+    <value>範圍</value>
   </data>
   <data name="WSLCCLI_TableHeaderVolumeName" xml:space="preserve">
-    <value>VOLUME NAME</value>
+    <value>磁碟區名稱</value>
   </data>
   <data name="WSLCCLI_ContainerStateCreated" xml:space="preserve">
     <value>已建立</value>

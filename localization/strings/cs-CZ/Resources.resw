@@ -2707,7 +2707,7 @@ Použití: wslc container cp [OPTIONS] SOURCE DEST
     <comment>{Locked="tar.exe"}</comment>
   </data>
   <data name="WSLCCLI_CpStdoutIsTerminalError" xml:space="preserve">
-    <value>Cannot write copy output to the console.</value>
+    <value>Výstup kopírování nelze zapsat do konzoly.</value>
   </data>
   <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
     <value>Neplatný směr kopírování. Použijte CONTAINER:PATH jako zdroj nebo cíl.</value>
@@ -2735,7 +2735,7 @@ Příklad: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <comment>{0} is the file name being copied. Shown when the name cannot be used as a Windows file name.</comment>
   </data>
   <data name="WSLCCLI_CpSourceNameTrimmedWarning" xml:space="preserve">
-    <value>Windows removes trailing spaces and dots from file names, so '{}' is copied as '{}'.</value>
+    <value>Windows odebere koncové mezery a tečky z názvů souborů, takže '{}' se zkopíruje jako '{}'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
@@ -3952,28 +3952,28 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>PID</value>
   </data>
   <data name="WSLCCLI_TableHeaderRepository" xml:space="preserve">
-    <value>REPOSITORY</value>
+    <value>ÚLOŽIŠTĚ</value>
   </data>
   <data name="WSLCCLI_TableHeaderTag" xml:space="preserve">
-    <value>TAG</value>
+    <value>ZNAČKA</value>
   </data>
   <data name="WSLCCLI_TableHeaderDigest" xml:space="preserve">
-    <value>DIGEST</value>
+    <value>PŘEHLED</value>
   </data>
   <data name="WSLCCLI_TableHeaderImageId" xml:space="preserve">
-    <value>IMAGE ID</value>
+    <value>ID OBRÁZKU</value>
   </data>
   <data name="WSLCCLI_TableHeaderNetworkId" xml:space="preserve">
-    <value>NETWORK ID</value>
+    <value>ID SÍTĚ</value>
   </data>
   <data name="WSLCCLI_TableHeaderDriver" xml:space="preserve">
-    <value>DRIVER</value>
+    <value>OVLADAČ</value>
   </data>
   <data name="WSLCCLI_TableHeaderScope" xml:space="preserve">
-    <value>SCOPE</value>
+    <value>OBOR</value>
   </data>
   <data name="WSLCCLI_TableHeaderVolumeName" xml:space="preserve">
-    <value>VOLUME NAME</value>
+    <value>NÁZEV SVAZKU</value>
   </data>
   <data name="WSLCCLI_ContainerStateCreated" xml:space="preserve">
     <value>vytvořil</value>

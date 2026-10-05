@@ -3959,28 +3959,28 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>PIDS</value>
   </data>
   <data name="WSLCCLI_TableHeaderRepository" xml:space="preserve">
-    <value>REPOSITORY</value>
+    <value>REPOSITÓRIO</value>
   </data>
   <data name="WSLCCLI_TableHeaderTag" xml:space="preserve">
     <value>TAG</value>
   </data>
   <data name="WSLCCLI_TableHeaderDigest" xml:space="preserve">
-    <value>DIGEST</value>
+    <value>RESUMO</value>
   </data>
   <data name="WSLCCLI_TableHeaderImageId" xml:space="preserve">
-    <value>IMAGE ID</value>
+    <value>ID DA IMAGEM</value>
   </data>
   <data name="WSLCCLI_TableHeaderNetworkId" xml:space="preserve">
-    <value>NETWORK ID</value>
+    <value>ID DA REDE</value>
   </data>
   <data name="WSLCCLI_TableHeaderDriver" xml:space="preserve">
     <value>DRIVER</value>
   </data>
   <data name="WSLCCLI_TableHeaderScope" xml:space="preserve">
-    <value>SCOPE</value>
+    <value>ESCOPO</value>
   </data>
   <data name="WSLCCLI_TableHeaderVolumeName" xml:space="preserve">
-    <value>VOLUME NAME</value>
+    <value>NOME DO VOLUME</value>
   </data>
   <data name="WSLCCLI_ContainerStateCreated" xml:space="preserve">
     <value>criado</value>
