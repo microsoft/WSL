@@ -116,78 +116,24 @@ struct BuildContextInput
     HANDLE ContextHandle = nullptr;
     HANDLE DockerfileHandle = nullptr;
     wil::unique_hfile Dockerfile;
-    std::optional<wsl::windows::common::filesystem::TempFile> ConsoleInput;
+    std::optional<wsl::windows::common::filesystem::TempFile> SpooledStdin;
     std::string DockerfilePath;
 };
-
-// Reads typed console input until EOF (Ctrl+Z at the start of a line) and spools it as UTF-8 to a
-// temporary file, since a console handle cannot be relayed to the service.
-wsl::windows::common::filesystem::TempFile SpoolConsoleInput(HANDLE console)
-{
-    std::wstring text;
-    std::array<wchar_t, 1024> buffer{};
-    for (;;)
-    {
-        DWORD read{};
-        THROW_IF_WIN32_BOOL_FALSE(ReadConsoleW(console, buffer.data(), static_cast<DWORD>(buffer.size()), &read, nullptr));
-        if (read == 0)
-        {
-            break;
-        }
-
-        DWORD length = read;
-        for (DWORD i = 0; i < read; ++i)
-        {
-            const bool atLineStart = i == 0 ? text.empty() || text.back() == L'\n' : buffer[i - 1] == L'\n';
-            if (atLineStart && buffer[i] == L'\x1a')
-            {
-                length = i;
-                break;
-            }
-        }
-
-        text.append(buffer.data(), length);
-        if (length != read)
-        {
-            break;
-        }
-    }
-
-    std::erase(text, L'\r');
-    const auto utf8 = wsl::windows::common::string::WideToMultiByte(text);
-
-    wsl::windows::common::filesystem::TempFile file(
-        GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, wsl::windows::common::filesystem::TempFileFlags::DeleteOnClose);
-
-    size_t offset = 0;
-    while (offset < utf8.size())
-    {
-        DWORD written{};
-        const auto length = static_cast<DWORD>(std::min(utf8.size() - offset, static_cast<size_t>(MAXDWORD)));
-        THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.Handle.get(), utf8.data() + offset, length, &written, nullptr));
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_WRITE_FAULT), written == 0);
-        offset += written;
-    }
-    THROW_LAST_ERROR_IF(SetFilePointer(file.Handle.get(), 0, nullptr, FILE_BEGIN) == INVALID_SET_FILE_POINTER);
-    return file;
-}
 
 // Returns a relayable stdin handle. Character devices need a file because COM cannot relay their handles.
 HANDLE OpenStdin(BuildContextInput& input)
 {
     auto handle = GetStdHandle(STD_INPUT_HANDLE);
-    if (IsConsoleHandle(handle))
-    {
-        input.ConsoleInput.emplace(SpoolConsoleInput(handle));
-        return input.ConsoleInput->Handle.get();
-    }
+
+    // Intentional divergence from docker, which accepts a Dockerfile typed into an interactive terminal.
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_BuildStdinIsTerminalError(), IsConsoleHandle(handle));
 
     if (GetFileType(handle) != FILE_TYPE_CHAR)
     {
         return handle;
     }
 
-    input.ConsoleInput.emplace(
+    input.SpooledStdin.emplace(
         GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, wsl::windows::common::filesystem::TempFileFlags::DeleteOnClose);
     std::array<char, 4096> buffer{};
     for (;;)
@@ -211,12 +157,12 @@ HANDLE OpenStdin(BuildContextInput& input)
         }
 
         DWORD written{};
-        THROW_IF_WIN32_BOOL_FALSE(WriteFile(input.ConsoleInput->Handle.get(), buffer.data(), read, &written, nullptr));
+        THROW_IF_WIN32_BOOL_FALSE(WriteFile(input.SpooledStdin->Handle.get(), buffer.data(), read, &written, nullptr));
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_WRITE_FAULT), written != read);
     }
 
-    THROW_LAST_ERROR_IF(SetFilePointer(input.ConsoleInput->Handle.get(), 0, nullptr, FILE_BEGIN) == INVALID_SET_FILE_POINTER);
-    return input.ConsoleInput->Handle.get();
+    THROW_LAST_ERROR_IF(SetFilePointer(input.SpooledStdin->Handle.get(), 0, nullptr, FILE_BEGIN) == INVALID_SET_FILE_POINTER);
+    return input.SpooledStdin->Handle.get();
 }
 
 BuildContextInput OpenBuildContext(const std::wstring& contextPath, const std::wstring& dockerfilePath)

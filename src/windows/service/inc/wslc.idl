@@ -616,9 +616,9 @@ typedef struct _WSLCBuildImageOptions
     [unique, string] LPCWSTR OutputMountPath; // When set, the server mounts this Windows directory read-write into the VM and points the exporter's dest at it (plus OutputMountFile). Used for single-file exporters with a real destination; mutually exclusive with OutputHandle.
     [unique, string] LPCWSTR OutputMountFile; // Leaf filename within OutputMountPath that a single-file exporter writes to.
     [unique, string] LPCWSTR IidFilePath; // Absolute path of the client's --iidfile destination. The server mounts its parent directory read-write into the VM and passes --iidfile pointing at it, so buildx writes the image ID straight to the destination.
-        WSLCHandle ContextHandle; // When Type != WSLCHandleTypeUnknown, the server relays this stream to docker's stdin as the build context ("-"). The stream is either a tar archive (optionally compressed) or a Dockerfile built with an empty context.
-        [unique, string] LPCSTR DockerfilePath; // Dockerfile path inside the streamed context, passed as --file. Only valid with ContextHandle.
-    } WSLCBuildImageOptions;
+    WSLCHandle ContextHandle; // When Type != WSLCHandleTypeUnknown, the server relays this stream to docker's stdin as the build context ("-"). The stream is either a tar archive (optionally compressed) or a Dockerfile built with an empty context.
+    [unique, string] LPCSTR DockerfilePath; // Dockerfile path inside the streamed context, passed as --file. Only valid with ContextHandle.
+} WSLCBuildImageOptions;
 
 typedef struct _WSLCTagImageOptions
 {

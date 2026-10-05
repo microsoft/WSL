@@ -3860,6 +3860,10 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>Cannot write image to terminal. Use the -o option or redirect stdout.</value>
   </data>
+  <data name="WSLCCLI_BuildStdinIsTerminalError" xml:space="preserve">
+    <value>Cannot read build input from terminal. Pipe a Dockerfile or tar archive to stdin.</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
     <value>Cannot export container to terminal. Use the -o option or redirect stdout.</value>
   </data>
