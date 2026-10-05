@@ -11,6 +11,7 @@ constexpr auto c_recoveryPath = L"RecoveryPath";
 constexpr auto c_recoveryFileId = L"RecoveryFileId";
 constexpr auto c_recoveryDirectoryId = L"RecoveryDirectoryId";
 constexpr auto c_originalDirectoryId = L"RecoveryOriginalDirectoryId";
+constexpr auto c_preparingDirectory = L"RecoveryPreparingDirectory";
 constexpr auto c_recoveryAnchorId = L"RecoveryAnchorId";
 constexpr auto c_deletedAt = L"DeletedAt";
 constexpr auto c_previousState = L"RecoveryPreviousState";
@@ -54,7 +55,7 @@ wil::unique_hfile OpenDirectory(const std::filesystem::path& path, DWORD sharing
     if (!directory)
     {
         const auto error = GetLastError();
-        if (allowMissing && error == ERROR_FILE_NOT_FOUND)
+        if (allowMissing && (error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND))
         {
             return {};
         }
@@ -204,6 +205,42 @@ wil::unique_hfile OpenOriginalDisk(HKEY key)
     }
 }
 
+void CompleteDirectoryPreparation(HKEY key)
+{
+    const auto path = std::filesystem::path(ReadString(key, nullptr, c_recoveryPath)).parent_path();
+    const auto original = OpenOriginalDisk(key);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), !original);
+    const auto anchor =
+        OpenDirectory(path.parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE, false, FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES);
+    VerifyIdentity(key, anchor.get(), c_recoveryAnchorId);
+    DWORD size{};
+    const auto result = RegGetValueW(key, nullptr, c_recoveryDirectoryId, RRF_RT_REG_BINARY, nullptr, nullptr, &size);
+    THROW_WIN32_IF(result, result != ERROR_SUCCESS && result != ERROR_FILE_NOT_FOUND);
+    auto directory = OpenDirectory(path, FILE_SHARE_READ | FILE_SHARE_WRITE, true);
+    if (!directory)
+    {
+        // A saved identity still protects a directory temporarily renamed away.
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), result == ERROR_SUCCESS && !DirectoryWasDeleted(key, path));
+        THROW_IF_WIN32_BOOL_FALSE(CreateDirectoryW(path.c_str(), nullptr));
+        directory = OpenDirectory(path, FILE_SHARE_READ | FILE_SHARE_WRITE);
+    }
+    else if (result == ERROR_SUCCESS)
+    {
+        VerifyIdentity(key, directory.get(), c_recoveryDirectoryId);
+    }
+    else
+    {
+        // The durable preparation intent owns this unique destination name, but
+        // no disk has moved yet. Never claim a directory containing other files.
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_DIR_NOT_EMPTY), !std::filesystem::is_empty(path));
+    }
+    const auto identity = Identity(directory.get());
+    THROW_IF_WIN32_ERROR(RegSetValueExW(key, c_recoveryDirectoryId, 0, REG_BINARY, reinterpret_cast<const BYTE*>(&identity), sizeof(identity)));
+    THROW_IF_WIN32_ERROR(RegFlushKey(key));
+    DeleteValue(key, c_preparingDirectory);
+    THROW_IF_WIN32_ERROR(RegFlushKey(key));
+}
+
 void RenameDisk(HANDLE file, const std::filesystem::path& path)
 {
     const auto name = path.wstring();
@@ -302,7 +339,19 @@ void CommitRestore(HKEY lxssKey, const GUID& id)
 void ClearRecoveryValues(HKEY key)
 {
     for (const auto value :
-         {c_recoveryPath, c_recoveryFileId, c_recoveryDirectoryId, c_originalDirectoryId, c_recoveryAnchorId, c_deletedAt, c_restored, c_restorePending, c_restoreName, c_cleanupPending, c_previousState, c_permanentDelete})
+         {c_recoveryPath,
+          c_recoveryFileId,
+          c_recoveryDirectoryId,
+          c_originalDirectoryId,
+          c_preparingDirectory,
+          c_recoveryAnchorId,
+          c_deletedAt,
+          c_restored,
+          c_restorePending,
+          c_restoreName,
+          c_cleanupPending,
+          c_previousState,
+          c_permanentDelete})
     {
         DeleteValue(key, value);
     }
@@ -372,13 +421,15 @@ bool DeletedDistributionStore::Retain(
     // Use a sibling so reinstalling into or removing the original directory cannot delete the recovery copy.
     const auto directory =
         originalPath.parent_path().parent_path() / (L".wsl-recovery-" + wsl::shared::string::GuidToString<wchar_t>(storageId));
-    THROW_IF_WIN32_BOOL_FALSE(CreateDirectoryW(directory.c_str(), nullptr));
     const auto target = directory / originalPath.filename();
-    auto removeEmptyDirectory = wil::scope_exit([&] { RemoveDirectoryW(directory.c_str()); });
-    // Moving a file here opens its destination directory for write access. Keep
-    // delete sharing disabled on both the directory and its anchor so the
-    // destination namespace cannot be replaced during the move.
-    const auto directoryHandle = OpenDirectory(directory, FILE_SHARE_READ | FILE_SHARE_WRITE);
+    bool createdDirectory = false;
+    auto removeEmptyDirectory = wil::scope_exit([&] {
+        if (createdDirectory)
+        {
+            RemoveDirectoryW(directory.c_str());
+        }
+    });
+    wil::unique_hfile directoryHandle;
     // The anchor is never deleted through this handle. Read/list access also
     // permits it to coincide with an already locked source directory at a volume root.
     const auto anchorHandle =
@@ -418,13 +469,22 @@ bool DeletedDistributionStore::Retain(
     THROW_IF_WIN32_ERROR(RegSetValueExW(key.get(), c_recoveryFileId, 0, REG_BINARY, reinterpret_cast<const BYTE*>(&identity), sizeof(identity)));
     THROW_IF_WIN32_ERROR(RegSetValueExW(
         key.get(), c_originalDirectoryId, 0, REG_BINARY, reinterpret_cast<const BYTE*>(&sourceIdentity), sizeof(sourceIdentity)));
-    const auto directoryIdentity = Identity(directoryHandle.get());
-    THROW_IF_WIN32_ERROR(RegSetValueExW(
-        key.get(), c_recoveryDirectoryId, 0, REG_BINARY, reinterpret_cast<const BYTE*>(&directoryIdentity), sizeof(directoryIdentity)));
     const auto anchorIdentity = Identity(anchorHandle.get());
     THROW_IF_WIN32_ERROR(RegSetValueExW(
         key.get(), c_recoveryAnchorId, 0, REG_BINARY, reinterpret_cast<const BYTE*>(&anchorIdentity), sizeof(anchorIdentity)));
-    // Persist the journal before moving the file. Startup repairs an interrupted transition.
+    // Record the destination before creating it so startup can repair a crash
+    // before its directory identity has been saved. Artifact cleanup already ran.
+    WriteDword(key.get(), nullptr, c_preparingDirectory, 1);
+    THROW_IF_WIN32_ERROR(RegFlushKey(key.get()));
+    THROW_IF_WIN32_BOOL_FALSE(CreateDirectoryW(directory.c_str(), nullptr));
+    createdDirectory = true;
+    // Keep the destination and its anchor locked against replacement during the move.
+    directoryHandle = OpenDirectory(directory, FILE_SHARE_READ | FILE_SHARE_WRITE);
+    const auto directoryIdentity = Identity(directoryHandle.get());
+    THROW_IF_WIN32_ERROR(RegSetValueExW(
+        key.get(), c_recoveryDirectoryId, 0, REG_BINARY, reinterpret_cast<const BYTE*>(&directoryIdentity), sizeof(directoryIdentity)));
+    THROW_IF_WIN32_ERROR(RegFlushKey(key.get()));
+    DeleteValue(key.get(), c_preparingDirectory);
     THROW_IF_WIN32_ERROR(RegFlushKey(key.get()));
     RenameDisk(file.get(), target);
     moved = true;
@@ -526,6 +586,10 @@ try
         try
         {
             const auto key = OpenKey(lxssKey, name.c_str(), KEY_READ | KEY_WRITE);
+            if (ReadDword(key.get(), nullptr, c_preparingDirectory, 0))
+            {
+                CompleteDirectoryPreparation(key.get());
+            }
             if (ReadDword(key.get(), nullptr, c_permanentDelete, 0))
             {
                 const auto path = std::filesystem::path(ReadString(key.get(), nullptr, c_recoveryPath));

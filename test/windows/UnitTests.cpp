@@ -7821,6 +7821,74 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             Store::Cleanup(key.get(), entry.DeletedAt + Store::c_retention);
             VERIFY_IS_FALSE(std::filesystem::exists(entry.Path));
         }
+        // Preparation is recoverable before creation and before/after saving the directory identity.
+        for (const bool directoryCreated : {false, true})
+        {
+            for (const bool identitySaved : {false, true})
+            {
+                for (const bool permanent : {false, true})
+                {
+                    const auto [id, path] = create();
+                    VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+                    const auto entry = entryFor(id);
+                    const auto deletedName = L"Deleted-" + keyName(id);
+                    VERIFY_ARE_EQUAL(RegRenameKey(key.get(), deletedName.c_str(), keyName(id).c_str()), ERROR_SUCCESS);
+                    std::filesystem::rename(entry.Path, path);
+                    if (!directoryCreated)
+                    {
+                        std::filesystem::remove(entry.Path.parent_path());
+                    }
+                    const auto journal = registry::OpenKey(key.get(), keyName(id).c_str(), KEY_READ | KEY_WRITE);
+                    if (!identitySaved)
+                    {
+                        registry::DeleteValue(journal.get(), L"RecoveryDirectoryId");
+                    }
+                    registry::WriteDword(journal.get(), nullptr, L"RecoveryPreparingDirectory", 1);
+                    VERIFY_ARE_EQUAL(RegFlushKey(journal.get()), ERROR_SUCCESS);
+                    if (permanent)
+                    {
+                        Store::Purge(key.get(), id);
+                        VERIFY_IS_FALSE(std::filesystem::exists(path));
+                        VERIFY_FAILED(registry::OpenKeyNoThrow(key.get(), keyName(id).c_str(), KEY_READ).second);
+                    }
+                    else
+                    {
+                        Store::RecoverPending(key.get());
+                        VERIFY_ARE_EQUAL(contents(path), "original disk contents");
+                        VERIFY_IS_TRUE(isActive(id));
+                        VERIFY_ARE_EQUAL(registry::ReadDword(journal.get(), nullptr, L"State", 0), LxssDistributionStateInstalled);
+                        VERIFY_IS_FALSE(registry::ReadOptionalString(journal.get(), nullptr, L"RecoveryPath").has_value());
+                        VERIFY_ARE_EQUAL(registry::ReadDword(journal.get(), nullptr, L"RecoveryPreparingDirectory", 0), 0u);
+                    }
+                    VERIFY_IS_FALSE(std::filesystem::exists(entry.Path.parent_path()));
+                    VERIFY_FAILED(registry::OpenKeyNoThrow(key.get(), deletedName.c_str(), KEY_READ).second);
+                }
+            }
+        }
+        // A preparation without a saved directory identity must preserve unrelated contents.
+        {
+            const auto [id, path] = create();
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            const auto deletedName = L"Deleted-" + keyName(id);
+            VERIFY_ARE_EQUAL(RegRenameKey(key.get(), deletedName.c_str(), keyName(id).c_str()), ERROR_SUCCESS);
+            std::filesystem::rename(entry.Path, path);
+            const auto journal = registry::OpenKey(key.get(), keyName(id).c_str(), KEY_READ | KEY_WRITE);
+            registry::DeleteValue(journal.get(), L"RecoveryDirectoryId");
+            registry::WriteDword(journal.get(), nullptr, L"RecoveryPreparingDirectory", 1);
+            const auto keep = entry.Path.parent_path() / L"keep.txt";
+            std::ofstream(keep) << "unrelated contents";
+            Store::RecoverPending(key.get());
+            VERIFY_ARE_EQUAL(contents(path), "original disk contents");
+            VERIFY_ARE_EQUAL(contents(keep), "unrelated contents");
+            VERIFY_ARE_EQUAL(registry::ReadDword(journal.get(), nullptr, L"RecoveryPreparingDirectory", 0), 1u);
+            VERIFY_IS_TRUE(registry::ReadOptionalString(journal.get(), nullptr, L"RecoveryPath").has_value());
+            std::filesystem::remove(keep);
+            Store::RecoverPending(key.get());
+            VERIFY_ARE_EQUAL(contents(path), "original disk contents");
+            VERIFY_IS_FALSE(std::filesystem::exists(entry.Path.parent_path()));
+            VERIFY_IS_FALSE(registry::ReadOptionalString(journal.get(), nullptr, L"RecoveryPath").has_value());
+        }
         // Force deletion of an offline journal retries safely after the volume returns.
         for (const bool unmoved : {false, true})
         {

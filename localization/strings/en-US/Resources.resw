@@ -296,7 +296,7 @@ and 'wsl.exe --install &lt;Distro&gt;' to install.</value>
   </data>
   <data name="MessageRestoreAmbiguous" xml:space="preserve">
     <value>More than one deleted distribution has this name. Use a recovery ID from 'wsl.exe --list --deleted'.</value>
-    <comment>{Locked="--list "}{Locked="--deleted'"}Command line arguments should not be translated.</comment>
+    <comment>{Locked="--list "}{Locked="--deleted'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageRestoreExpired" xml:space="preserve">
     <value>This distribution cannot be restored because its 24-hour recovery period has expired.</value>
@@ -650,10 +650,10 @@ Arguments for managing distributions in Windows Subsystem for Linux:
 "}{Locked="--pre-release
 "}{Locked="--version,"}{Locked="--export "}{Locked="--format "}{Locked="--import "}{Locked="--version "}{Locked="--vhd
 "}{Locked="--import-in-place "}{Locked="--list,"}{Locked="--all
+"}{Locked="--deleted
 "}{Locked="--running
 "}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}{Locked="--force
-"}{Locked="--deleted
-"}{Locked="--restore-distribution "}{Locked="--name "}{Locked="--list "}{Locked="--deleted'"}Command line arguments, file names and string inserts should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
+"}{Locked="--restore-distribution "}{Locked="--name "}{Locked="--list "}{Locked="--deleted'"}{Locked="--name "}Command line arguments, file names and string inserts should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessagePackageVersions" xml:space="preserve">
     <value>WSL version: {}
