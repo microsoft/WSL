@@ -5051,6 +5051,15 @@ VERSION_ID="Invalid|Format"
             std::filesystem::remove_all(drvFsTestPath, ignored);
         });
 
+        auto cleanupUser = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+            TerminateDistribution();
+
+            const auto exitCode = LxsstuLaunchWsl(L"userdel -f -r user");
+
+            // The test may fail before OOBE creates the user (userdel exits with 6 if it does not exist).
+            VERIFY_IS_TRUE(exitCode == 0 || exitCode == 6);
+        });
+
         RegistryKeyChange<DWORD> runOOBE(lxssKey.get(), testDistroIdString.c_str(), L"RunOOBE", 1);
         const RegistryKeyChange<DWORD> defaultUid(lxssKey.get(), testDistroIdString.c_str(), L"DefaultUid", 0);
 
@@ -5121,7 +5130,7 @@ VERSION_ID="Invalid|Format"
 
             if (LxsstuVmMode())
             {
-                fstab.emplace(L"/etc/fstab");
+                fstab.emplace(L"/etc/fstab", false);
                 fstab->SetContent(
                     std::format(L"{} {} drvfs uid=2000,gid=2001,x-mount.mkdir 0 0\n", drvFsTestPath.root_path().generic_wstring(), userMountPoint)
                         .c_str());
@@ -5219,9 +5228,6 @@ VERSION_ID="Invalid|Format"
             VERIFY_ARE_EQUAL(wsl::windows::common::registry::ReadDword(distroKey.get(), nullptr, L"RunOOBE", 1), 0);
             validateOutput(nullptr, L"");
         }
-
-        // Make sure the defaultUid is reset for next test case.
-        TerminateDistribution();
     }
 
     static void ValidateDistributionStarts(LPCWSTR Name)
