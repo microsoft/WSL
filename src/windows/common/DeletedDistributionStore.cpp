@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft. All rights reserved.
+// Copyright (C) Microsoft Corporation. All rights reserved.
 #include "precomp.h"
 #include "DeletedDistributionStore.h"
 #include "retryshared.h"
@@ -141,7 +141,15 @@ void CommitRestore(HKEY lxssKey, const GUID& id)
 {
     const auto defaultName = ReadOptionalString(lxssKey, nullptr, L"DefaultDistribution");
     const auto defaultId = defaultName ? wsl::shared::string::ToGuid(*defaultName) : std::nullopt;
-    if (!defaultId || FAILED(OpenKeyNoThrow(lxssKey, KeyName(*defaultId).c_str(), KEY_READ).second))
+    bool validDefault = false;
+    if (defaultId)
+    {
+        const auto [key, result] = OpenKeyNoThrow(lxssKey, KeyName(*defaultId).c_str(), KEY_READ);
+        validDefault = SUCCEEDED(result) &&
+                       ReadDword(key.get(), nullptr, L"State", LxssDistributionStateInvalid) == LxssDistributionStateInstalled &&
+                       !ReadOptionalString(key.get(), nullptr, RecoveryPath);
+    }
+    if (!validDefault)
     {
         WriteString(lxssKey, nullptr, L"DefaultDistribution", KeyName(id).c_str());
     }
@@ -182,11 +190,20 @@ void CompleteRestore(HKEY lxssKey, HKEY key, const GUID& id, bool deleted)
 
 bool RecoveryDirectoryWasDeleted(HKEY key, const std::filesystem::path& directory)
 {
+    SetLastError(ERROR_SUCCESS);
+    if (GetFileAttributesW(directory.c_str()) != INVALID_FILE_ATTRIBUTES)
+    {
+        return false;
+    }
+    const auto error = GetLastError();
+    THROW_HR_IF(HRESULT_FROM_WIN32(error), error != ERROR_FILE_NOT_FOUND);
+    // A missing child is conclusive only while the original parent is available
+    // and locked against replacement. An offline volume must keep its journal.
     FILE_ID_INFO expected{};
     DWORD size = sizeof(expected);
     THROW_IF_WIN32_ERROR(RegGetValueW(key, nullptr, RecoveryDirectoryId, RRF_RT_REG_BINARY, nullptr, &expected, &size));
     THROW_HR_IF(E_INVALIDARG, size != sizeof(expected));
-    const auto anchor = OpenDirectory(directory.parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE);
+    const auto anchor = OpenDirectory(directory.parent_path(), FILE_SHARE_READ | FILE_SHARE_WRITE);
     VerifyIdentity(key, anchor.get(), RecoveryAnchorId);
     const auto anchorId = Identity(anchor.get());
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_FILE_INVALID), expected.VolumeSerialNumber != anchorId.VolumeSerialNumber);
@@ -195,12 +212,12 @@ bool RecoveryDirectoryWasDeleted(HKEY key, const std::filesystem::path& director
     {
         return false;
     }
-    const auto error = GetLastError();
-    if (error == ERROR_FILE_NOT_FOUND)
+    const auto confirmedError = GetLastError();
+    if (confirmedError == ERROR_FILE_NOT_FOUND)
     {
         return true;
     }
-    THROW_WIN32(error);
+    THROW_WIN32(confirmedError);
 }
 } // namespace
 
@@ -340,28 +357,48 @@ try
         try
         {
             const auto key = OpenKey(lxssKey, name.c_str(), KEY_READ | KEY_WRITE);
-            if (ReadDword(key.get(), nullptr, RestorePending, 0))
+            const bool pendingRestore = ReadDword(key.get(), nullptr, RestorePending, 0) != 0;
+            if (pendingRestore || ReadDword(key.get(), nullptr, Restored, 0))
             {
+                const auto path = ReadOptionalString(key.get(), nullptr, RecoveryPath);
+                wil::unique_hfile file;
+                if (path)
+                {
+                    file = OpenDisk(*path);
+                    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), !file);
+                    VerifyIdentity(key.get(), file.get());
+                }
+                else
+                {
+                    THROW_HR_IF(
+                        E_INVALIDARG,
+                        name.starts_with(DeletedPrefix) ||
+                            ReadDword(key.get(), nullptr, L"State", LxssDistributionStateInvalid) != LxssDistributionStateInstalled);
+                }
+                // Keep the verified disk handle open through registration and
+                // journal updates so the file cannot be replaced during recovery.
                 // Clearing the restore journal may have been interrupted after the
                 // registration and default selection were durably committed.
-                if (!name.starts_with(DeletedPrefix) && !ReadOptionalString(key.get(), nullptr, RecoveryPath))
+                if (!path)
                 {
                     CommitRestore(lxssKey, id);
                     ClearRecoveryValues(key.get());
                     continue;
                 }
-                CompleteRestore(lxssKey, key.get(), id, name.starts_with(DeletedPrefix));
-                continue;
-            }
-            if (ReadDword(key.get(), nullptr, Restored, 0))
-            {
-                WriteDword(key.get(), nullptr, L"State", LxssDistributionStateInstalled);
-                if (name.starts_with(DeletedPrefix))
+                if (pendingRestore)
                 {
-                    THROW_IF_WIN32_ERROR(RegRenameKey(lxssKey, name.c_str(), KeyName(id).c_str()));
+                    CompleteRestore(lxssKey, key.get(), id, name.starts_with(DeletedPrefix));
                 }
-                CommitRestore(lxssKey, id);
-                ClearRecoveryValues(key.get());
+                else
+                {
+                    WriteDword(key.get(), nullptr, L"State", LxssDistributionStateInstalled);
+                    if (name.starts_with(DeletedPrefix))
+                    {
+                        THROW_IF_WIN32_ERROR(RegRenameKey(lxssKey, name.c_str(), KeyName(id).c_str()));
+                    }
+                    CommitRestore(lxssKey, id);
+                    ClearRecoveryValues(key.get());
+                }
                 continue;
             }
             const auto path = ReadOptionalString(key.get(), nullptr, RecoveryPath);
@@ -386,6 +423,15 @@ try
                 if (original)
                 {
                     VerifyIdentity(key.get(), original.get());
+                    const auto recoveryDirectory = std::filesystem::path(*path).parent_path();
+                    if (!RecoveryDirectoryWasDeleted(key.get(), recoveryDirectory))
+                    {
+                        const auto directory = OpenDirectory(recoveryDirectory);
+                        VerifyIdentity(key.get(), directory.get(), RecoveryDirectoryId);
+                        FILE_DISPOSITION_INFO disposition{TRUE};
+                        THROW_IF_WIN32_BOOL_FALSE(
+                            SetFileInformationByHandle(directory.get(), FileDispositionInfo, &disposition, sizeof(disposition)));
+                    }
                     WriteDword(key.get(), nullptr, L"State", ReadDword(key.get(), nullptr, PreviousState, LxssDistributionStateInstalled));
                     ClearRecoveryValues(key.get());
                 }
@@ -403,7 +449,8 @@ try
         for (const auto& [id, name] : EnumGuidKeys(lxssKey))
         {
             const auto key = OpenKey(lxssKey, name.c_str(), KEY_READ);
-            if (ReadDword(key.get(), nullptr, L"State", LxssDistributionStateInvalid) == LxssDistributionStateInstalled)
+            if (ReadDword(key.get(), nullptr, L"State", LxssDistributionStateInvalid) == LxssDistributionStateInstalled &&
+                !ReadOptionalString(key.get(), nullptr, RecoveryPath))
             {
                 WriteString(lxssKey, nullptr, L"DefaultDistribution", name.c_str());
                 break;

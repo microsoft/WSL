@@ -1283,12 +1283,15 @@ int UnregisterDistribution(_In_ LPCWSTR distributionName, bool permanent)
     return 0;
 }
 
-int Unregister(_In_ std::wstring_view commandLine)
+int Unregister(_In_ std::wstring_view arguments)
 {
+    // WslMain has stripped the executable via ParseLegacyArguments. Supply an
+    // executable token so CommandLineToArgvW parses a complete process command line.
+    const auto commandLine = std::wstring{WSL_BINARY_NAME} + L" " + std::wstring{arguments};
     int argc{};
-    wil::unique_hlocal_ptr<LPWSTR[]> argv{CommandLineToArgvW(std::wstring{commandLine}.c_str(), &argc)};
+    wil::unique_hlocal_ptr<LPWSTR[]> argv{CommandLineToArgvW(commandLine.c_str(), &argc)};
     THROW_LAST_ERROR_IF(!argv);
-    if (argc < 2 || argv[1][0] == L'\0')
+    if (argc < 3 || argv[2][0] == L'\0')
     {
         wsl::windows::common::wslutil::PrintMessage(Localization::MessageRequiredParameterMissing(WSL_UNREGISTER_ARG), stdout);
         return -1;
@@ -1296,12 +1299,12 @@ int Unregister(_In_ std::wstring_view commandLine)
 
     // Preserve the legacy positional name (including leading hyphens) and ignored trailing arguments.
     bool force = false;
-    for (int index = 2; index < argc; index++)
+    for (int index = 3; index < argc; index++)
     {
         force |= wsl::shared::string::IsEqual(argv[index], WSL_UNREGISTER_OPTION_FORCE);
     }
 
-    return UnregisterDistribution(argv[1], force);
+    return UnregisterDistribution(argv[2], force);
 }
 
 int RestoreDistribution(_In_ std::wstring_view commandLine)
