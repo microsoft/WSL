@@ -609,7 +609,7 @@ try
     RETURN_HR_IF(WSL_E_DISTRO_NOT_FOUND, match == nullptr);
     const auto name = NewName ? NewName : match->Name.c_str();
     s_ValidateDistroName(name);
-    _ValidateDistributionNameAndPathNotInUse(key.get(), match->Path.parent_path().c_str(), name);
+    _ValidateDistributionNameAndPathNotInUse(key.get(), match->Path.parent_path().c_str(), name, match->Id);
     {
         auto runAsUser = wil::impersonate_token(token.get());
         DeletedDistributionStore::Restore(key.get(), *match, name);
@@ -3421,13 +3421,18 @@ GUID LxssUserSessionImpl::_GetDefaultDistro(_In_ HKEY LxssKey)
         THROW_HR_IF(WSL_E_DEFAULT_DISTRO_NOT_FOUND, !defaultDistro.has_value());
 
         // Ensure that the default distribution is valid.
-        if (!_ValidateDistro(LxssKey, &defaultDistro->Id()))
+        const bool recoveryPending = defaultDistro->Read(Property::RecoveryPath).has_value();
+        if (recoveryPending || !_ValidateDistro(LxssKey, &defaultDistro->Id()))
         {
             // Delete the old default distribution.
             DistributionRegistration::DeleteDefault(LxssKey);
 
-            const auto configuration = s_GetDistributionConfiguration(defaultDistro.value());
-            _UnregisterDistributionLockHeld(LxssKey, configuration);
+            // A journaled registration must survive until recovery can finish.
+            if (!recoveryPending)
+            {
+                const auto configuration = s_GetDistributionConfiguration(defaultDistro.value());
+                _UnregisterDistributionLockHeld(LxssKey, configuration);
+            }
 
             // Validate remaining WSL distributions, if there are any remaining
             // set the first one found to the new default.
@@ -4094,15 +4099,58 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
         }
     }
 
+    auto validate = [&](const std::wstring& distributionName, const std::filesystem::path& basePath, DWORD state) {
+        if (Name != nullptr && wsl::shared::string::IsEqual(Name, distributionName, true))
+        {
+            THROW_HR_WITH_USER_ERROR_IF(
+                HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), wsl::shared::Localization::MessageDistroNameAlreadyExists(), state == LxssDistributionStateInstalled);
+
+            THROW_HR_MSG(E_ILLEGAL_STATE_CHANGE, "%ls already registered (state = %d)", Name, state);
+        }
+
+        if (Path != nullptr)
+        {
+            auto impersonate = wil::CoImpersonateClient();
+            auto canonicalDistroPath = wsl::windows::common::filesystem::GetCanonicalPath(basePath, error);
+            if (error)
+            {
+                LOG_WIN32(error.value());
+            }
+
+            // Ensure another distribution by a different name is not already registered to the same location.
+            THROW_HR_WITH_USER_ERROR_IF(
+                HRESULT_FROM_WIN32(ERROR_FILE_EXISTS),
+                wsl::shared::Localization::MessageDistroInstallPathAlreadyExists(),
+                wsl::windows::common::string::IsPathComponentEqual(error ? basePath.native() : canonicalDistroPath.native(), Path));
+        }
+    };
+
+    // Pending restores are hidden from ordinary enumeration, but their intended
+    // name and location stay reserved while recovery is waiting for the disk.
+    // An unregister without a pending restore still frees both immediately.
+    for (const auto& [keyName, key] : wsl::windows::common::registry::EnumKeys(LxssKey, KEY_READ))
+    {
+        const auto id = wsl::shared::string::ToGuid(keyName.starts_with(L"Deleted-") ? keyName.substr(8) : keyName);
+        if (!id || (Exclude && IsEqualGUID(*Exclude, *id)))
+        {
+            continue;
+        }
+        const auto recoveryPath = wsl::windows::common::registry::ReadOptionalString(key.get(), nullptr, L"RecoveryPath");
+        if (!recoveryPath || (!wsl::windows::common::registry::ReadDword(key.get(), nullptr, L"RecoveryRestorePending", 0) &&
+                              !wsl::windows::common::registry::ReadDword(key.get(), nullptr, L"RecoveryRestored", 0)))
+        {
+            continue;
+        }
+        const auto restoreName = wsl::windows::common::registry::ReadOptionalString(key.get(), nullptr, L"RecoveryRestoreName");
+        validate(
+            restoreName ? *restoreName : wsl::windows::common::registry::ReadString(key.get(), nullptr, L"DistributionName"),
+            std::filesystem::path(*recoveryPath).parent_path(),
+            LxssDistributionStateInstalled);
+    }
+
     // Ensure no existing distributions have the same name or install path.
     for (const auto& distro : _EnumerateDistributions(LxssKey, true, Exclude))
     {
-        // Return an appropriate failure code for the two possible
-        // conditions here:
-        //
-        //     1. The distribution is already registered successfully.
-        //     2. The distribution is currently being registered or unregistered by another thread.
-
         LXSS_DISTRO_CONFIGURATION configuration{};
         try
         {
@@ -4114,32 +4162,7 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
             LOG_CAUGHT_EXCEPTION();
             continue;
         }
-
-        if (Name != nullptr && wsl::shared::string::IsEqual(Name, configuration.Name, true))
-        {
-            THROW_HR_WITH_USER_ERROR_IF(
-                HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
-                wsl::shared::Localization::MessageDistroNameAlreadyExists(),
-                configuration.State == LxssDistributionStateInstalled);
-
-            THROW_HR_MSG(E_ILLEGAL_STATE_CHANGE, "%ls already registered (state = %d)", Name, configuration.State);
-        }
-
-        if (Path != nullptr)
-        {
-            auto impersonate = wil::CoImpersonateClient();
-            auto canonicalDistroPath = wsl::windows::common::filesystem::GetCanonicalPath(configuration.BasePath, error);
-            if (error)
-            {
-                LOG_WIN32(error.value());
-            }
-
-            // Ensure another distribution by a different name is not already registered to the same location.
-            THROW_HR_WITH_USER_ERROR_IF(
-                HRESULT_FROM_WIN32(ERROR_FILE_EXISTS),
-                wsl::shared::Localization::MessageDistroInstallPathAlreadyExists(),
-                wsl::windows::common::string::IsPathComponentEqual(error ? configuration.BasePath.native() : canonicalDistroPath.native(), Path));
-        }
+        validate(configuration.Name, configuration.BasePath, configuration.State);
     }
 }
 

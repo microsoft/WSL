@@ -8340,6 +8340,94 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(std::format(L"--restore-distribution {}", name)), 0u);
     }
 
+    TEST_METHOD(UnregisterPendingRecovery)
+    {
+        namespace registry = wsl::windows::common::registry;
+        GUID id{};
+        VERIFY_SUCCEEDED(CoCreateGuid(&id));
+        const auto keyName = wsl::shared::string::GuidToString<wchar_t>(id);
+        const auto deletedKeyName = L"Deleted-" + keyName;
+        const auto name = L"pending-recovery-" + keyName.substr(1, keyName.size() - 2);
+        const auto pendingName = name + L"-pending";
+        const auto folder = std::filesystem::temp_directory_path() / name;
+        const auto original = folder / L"original";
+        const auto reserved = folder / L"unavailable";
+        const auto recoveryPath = reserved / L"ext4.vhdx";
+        const auto archive = folder / L"distro.tar";
+        std::filesystem::create_directory(folder);
+        const auto userKey = registry::OpenLxssUserKey();
+        RegistryKeyChange defaultDistro(
+            HKEY_CURRENT_USER, L"Software\Microsoft\Windows\CurrentVersion\Lxss", L"DefaultDistribution", keyName);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+            registry::DeleteKey(userKey.get(), keyName.c_str());
+            registry::DeleteKey(userKey.get(), deletedKeyName.c_str());
+            for (const auto& testName : {pendingName, name + L"-other"})
+            {
+                if (GetDistributionId(testName.c_str()).has_value())
+                {
+                    LxsstuLaunchWsl(std::format(L"--unregister {} --force", testName));
+                }
+            }
+            std::filesystem::remove_all(folder);
+        });
+        const auto pending = registry::CreateKey(userKey.get(), keyName.c_str());
+        registry::WriteString(pending.get(), nullptr, L"DistributionName", name.c_str());
+        registry::WriteString(pending.get(), nullptr, L"BasePath", original.c_str());
+        registry::WriteString(pending.get(), nullptr, L"RecoveryPath", recoveryPath.c_str());
+        registry::WriteDword(pending.get(), nullptr, L"State", LxssDistributionStateInstalled);
+        registry::WriteDword(pending.get(), nullptr, L"Version", LXSS_DISTRO_VERSION_2);
+        registry::WriteDword(pending.get(), nullptr, L"Flags", LXSS_DISTRO_FLAGS_VM_MODE);
+        // An unavailable unregister journal cannot remain the default or be deleted as an orphan.
+        const auto selected = wsl::windows::common::SvcComm{}.GetDefaultDistribution();
+        VERIFY_IS_FALSE(IsEqualGUID(selected, id));
+        VERIFY_ARE_EQUAL(registry::ReadString(pending.get(), nullptr, L"RecoveryPath"), recoveryPath.wstring());
+        VERIFY_SUCCEEDED(registry::OpenKeyNoThrow(userKey.get(), keyName.c_str(), KEY_READ).second);
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--export {} \"{}\"", LXSS_DISTRO_NAME_TEST_L, archive.wstring())), 0u);
+        // Both key names and both restore journal stages reserve names and paths, even with the disk offline.
+        for (const bool deleted : {false, true})
+        {
+            if (deleted)
+            {
+                VERIFY_ARE_EQUAL(RegRenameKey(userKey.get(), keyName.c_str(), deletedKeyName.c_str()), ERROR_SUCCESS);
+            }
+            for (const bool legacyCommitted : {false, true})
+            {
+                registry::WriteDword(pending.get(), nullptr, L"RecoveryRestorePending", legacyCommitted ? 0 : 1);
+                registry::WriteDword(pending.get(), nullptr, L"RecoveryRestored", legacyCommitted ? 1 : 0);
+                if (legacyCommitted)
+                {
+                    registry::DeleteValue(pending.get(), L"RecoveryRestoreName");
+                    registry::WriteString(pending.get(), nullptr, L"DistributionName", pendingName.c_str());
+                }
+                else
+                {
+                    registry::WriteString(pending.get(), nullptr, L"RecoveryRestoreName", pendingName.c_str());
+                    registry::WriteString(pending.get(), nullptr, L"DistributionName", name.c_str());
+                }
+                const auto [nameError, nameStderr] = LxsstuLaunchWslAndCaptureOutput(
+                    std::format(L"--import {}-PENDING \"{}\" \"{}\" --version 2", name, (folder / L"install").wstring(), archive.wstring()), -1);
+                VERIFY_IS_TRUE(nameError.find(L"A distribution with the supplied name already exists.") != std::wstring::npos);
+                VERIFY_ARE_EQUAL(nameStderr, L"");
+                const auto [pathError, pathStderr] = LxsstuLaunchWslAndCaptureOutput(
+                    std::format(L"--import {}-other \"{}\" \"{}\" --version 2", name, reserved.wstring(), archive.wstring()), -1);
+                VERIFY_IS_TRUE(pathError.find(L"The supplied install location is already in use.") != std::wstring::npos);
+                VERIFY_ARE_EQUAL(pathStderr, L"");
+                VERIFY_ARE_EQUAL(registry::ReadString(pending.get(), nullptr, L"RecoveryPath"), recoveryPath.wstring());
+                VERIFY_ARE_EQUAL(registry::ReadDword(pending.get(), nullptr, L"RecoveryRestorePending", 0), legacyCommitted ? 0u : 1u);
+                VERIFY_ARE_EQUAL(registry::ReadDword(pending.get(), nullptr, L"RecoveryRestored", 0), legacyCommitted ? 1u : 0u);
+                if (deleted)
+                {
+                    // Retrying this restore must exclude its own reservation and reach the missing-disk check.
+                    const auto [restoreError, restoreStderr] =
+                        LxsstuLaunchWslAndCaptureOutput(std::format(L"--restore-distribution {} --name {}", keyName, pendingName), -1);
+                    VERIFY_IS_TRUE(restoreError.find(L"ERROR_FILE_NOT_FOUND") != std::wstring::npos);
+                    VERIFY_ARE_EQUAL(restoreStderr, L"");
+                }
+            }
+        }
+    }
+
     TEST_METHOD(UnregisterCompatibility)
     {
         namespace registry = wsl::windows::common::registry;
