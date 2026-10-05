@@ -8594,10 +8594,15 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             std::format(L"--import {} \"{}\" \"{}\" --version {}", name, install.wstring(), archive.wstring(), LxsstuVmMode() ? 2 : 1);
         if (LxsstuVmMode())
         {
-            VERIFY_ARE_EQUAL(
-                LxsstuLaunchWsl(
-                    std::format(L"--import --version 2 -- {} \"{}\" \"{}\"", hyphenName, (folder / L"hyphen").wstring(), archive.wstring())),
-                0u);
+            // Create this fixture through the service: the shared import parser
+            // does not advance its positional index for a leading-hyphen name.
+            const auto hyphenPath = folder / L"hyphen";
+            std::filesystem::create_directory(hyphenPath);
+            const wil::unique_hfile archiveHandle{
+                CreateFileW(archive.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_TRUE(!!archiveHandle);
+            wsl::windows::common::SvcComm{}.RegisterDistribution(
+                hyphenName.c_str(), LXSS_WSL_VERSION_2, archiveHandle.get(), hyphenPath.c_str(), LXSS_IMPORT_DISTRO_FLAGS_NO_OOBE);
             const auto hyphenId = GetDistributionId(hyphenName.c_str());
             VERIFY_IS_TRUE(hyphenId.has_value());
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {}", hyphenName)), 0u);
