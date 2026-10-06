@@ -33,6 +33,7 @@ Abstract:
 #include "Distribution.h"
 #include "WslCoreConfigInterface.h"
 #include "WslCoreFilesystem.h"
+#include "WslSecurity.h"
 #include "CommandLine.h"
 #include "retryshared.h"
 
@@ -939,6 +940,7 @@ class UnitTests
 
         const auto wslSupport =
             wil::CoCreateInstance<LxssUserSession, IWslSupport>(CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA);
+        wsl::windows::common::security::ConfigureForCOMImpersonation(wslSupport.get());
 
         ULONG Version;
         ULONG DefaultUid;
