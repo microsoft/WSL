@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "Common.h"
 #include "registry.hpp"
+#include "DeletedDistributionStore.h"
 #include "PluginTests.h"
 #include "wslc.h"
 #include "WSLCContainerLauncher.h"
@@ -556,12 +557,20 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
+    static void VerifyFixturePurged(std::wstring_view name)
+    {
+        const auto key = OpenLxssUserKey();
+        const auto entries = wsl::windows::common::DeletedDistributionStore::Enumerate(key.get());
+        VERIFY_IS_TRUE(std::none_of(entries.begin(), entries.end(), [&](const auto& entry) { return entry.Name == name; }));
+    }
+
     WSL2_TEST_METHOD(RegisterSuccess)
     {
         ConfigurePlugin(PluginTestType::Success);
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--import plugin-test-distro . \"" + g_testDistroPath + L"\" --version 2"), 0L);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister plugin-test-distro"), 0L);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister plugin-test-distro --force"), 0L);
+        VerifyFixturePurged(L"plugin-test-distro");
 
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=1
@@ -582,9 +591,11 @@ class PluginTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--import plugin-test-distro . \"" + g_testDistroPath + L"\" --version 2"), 0L);
         WslShutdown();
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--export plugin-test-distro plugin-test-distro.vhdx --format vhd"), 0L);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister plugin-test-distro"), 0L);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister plugin-test-distro --force"), 0L);
+        VerifyFixturePurged(L"plugin-test-distro");
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--import-in-place plugin-test-distro-vhd plugin-test-distro.vhdx"), 0L);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister plugin-test-distro-vhd"), 0L);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister plugin-test-distro-vhd --force"), 0L);
+        VerifyFixturePurged(L"plugin-test-distro-vhd");
 
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=1
@@ -609,7 +620,8 @@ class PluginTests
         ConfigurePlugin(PluginTestType::FailToRegisterUnregisterDistro);
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--import plugin-test-distro . \"" + g_testDistroPath + L"\" --version 2"), 0L);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister plugin-test-distro"), 0L);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister plugin-test-distro --force"), 0L);
+        VerifyFixturePurged(L"plugin-test-distro");
 
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=15

@@ -95,6 +95,7 @@ namespace Property {
     inline ExpectedProperty<LPCWSTR> BasePath{L"BasePath"};
     inline DistributionProperty<LPCWSTR> Flavor{L"Flavor"};
     inline DistributionProperty<LPCWSTR> OsVersion{L"OsVersion"};
+    inline DistributionProperty<LPCWSTR> RecoveryPath{L"RecoveryPath"};
     inline DistributionProperty<LPCWSTR> ShortcutPath{L"ShortcutPath"};
     inline DistributionProperty<LPCWSTR> TerminalProfilePath{L"TerminalProfilePath"};
 

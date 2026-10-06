@@ -41,7 +41,7 @@ public:
     HRESULT
     CreateInstanceNoThrow(_In_opt_ LPCGUID DistroGuid = nullptr, _In_ ULONG Flags = LXSS_CREATE_INSTANCE_FLAGS_ALLOW_FS_UPGRADE, LXSS_ERROR_INFO* Error = nullptr) const;
 
-    std::vector<LXSS_ENUMERATE_INFO> EnumerateDistributions() const;
+    std::vector<LXSS_ENUMERATE_INFO> EnumerateDistributions(bool Deleted = false) const;
 
     HRESULT
     ExportDistribution(_In_opt_ LPCGUID DistroGuid, _In_ HANDLE FileHandle, _In_ ULONG Flags = 0) const;
@@ -109,11 +109,15 @@ public:
 
     void TerminateInstance(_In_opt_ LPCGUID DistroGuid = nullptr) const;
 
-    void UnregisterDistribution(_In_ LPCGUID DistroGuid) const;
+    void UnregisterDistribution(_In_ LPCGUID DistroGuid, bool Permanent = false) const;
+
+    void RestoreDistribution(_In_ LPCWSTR DistributionName, _In_opt_ LPCWSTR NewName) const;
 
     void MoveDistribution(_In_ const GUID& DistroGuid, _In_ LPCWSTR Location) const;
 
 private:
+    wil::com_ptr<ILxssUserSession2> RecoverySession() const;
+
     wil::com_ptr<ILxssUserSession> m_userSession;
 };
 } // namespace wsl::windows::common

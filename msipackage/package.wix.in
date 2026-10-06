@@ -155,6 +155,14 @@
                     </RegistryKey>
                 </RegistryKey>
 
+                <!-- Recovery interface uses the same proxy DLL and preserves the original IID registration. -->
+                <RegistryKey Root="HKCR" Key="Interface\{A5E35DF1-C6B3-4BC2-88E4-CD423F938E6C}">
+                    <RegistryValue Value="ILxssUserSession2" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
                 <!-- WSLServiceProxyStub. -->
                 <RegistryKey Root="HKCR" Key="CLSID\{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}">
                     <RegistryValue Value="PSFactoryBuffer" Type="string" />

@@ -490,6 +490,13 @@ bool wsl::windows::common::helpers::IsPackageInstalled(_In_ LPCWSTR PackageFamil
     return result != STATUS_NOT_FOUND && packageCount > 0;
 }
 
+bool wsl::windows::common::helpers::IsDistributionOrphaned(_In_ LPCWSTR PackageFamilyName, _In_ LPCWSTR FilesystemPath)
+{
+    // Imported distributions remain owner-managed. A packaged distribution is
+    // orphaned only when both its filesystem and its package are missing.
+    return PackageFamilyName[0] != L'\0' && !PathFileExistsW(FilesystemPath) && !IsPackageInstalled(PackageFamilyName);
+}
+
 bool wsl::windows::common::helpers::IsServicePresent(_In_ LPCWSTR ServiceName)
 {
     const wil::unique_schandle manager{OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT)};

@@ -153,6 +153,8 @@ std::filesystem::path GetWslConfigPath(_In_opt_ HANDLE userToken = nullptr);
 
 bool IsPackageInstalled(_In_ LPCWSTR PackageFamilyName);
 
+bool IsDistributionOrphaned(_In_ LPCWSTR PackageFamilyName, _In_ LPCWSTR FilesystemPath);
+
 bool IsServicePresent(_In_ LPCWSTR ServiceName);
 
 bool IsServiceRunning(_In_ LPCWSTR ServiceName);

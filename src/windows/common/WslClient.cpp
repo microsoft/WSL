@@ -59,6 +59,7 @@ struct ListOptions
     bool running;
     bool all;
     bool online;
+    bool deleted;
 };
 
 struct ShellExecOptions
@@ -698,6 +699,7 @@ int ListDistributions(_In_ std::wstring_view commandLine)
     ListOptions options{};
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
     parser.AddArgument(options.all, WSL_LIST_ARG_ALL_OPTION);
+    parser.AddArgument(options.deleted, WSL_LIST_ARG_DELETED_OPTION);
     parser.AddArgument(options.running, WSL_LIST_ARG_RUNNING_OPTION);
     parser.AddArgument(options.quiet, WSL_LIST_ARG_QUIET_OPTION_LONG, WSL_LIST_ARG_QUIET_OPTION);
     parser.AddArgument(options.verbose, WSL_LIST_ARG_VERBOSE_OPTION_LONG, WSL_LIST_ARG_VERBOSE_OPTION);
@@ -714,6 +716,24 @@ int ListDistributionsHelper(_In_ ListOptions options)
     THROW_HR_IF(
         WSL_E_INVALID_USAGE,
         ((options.quiet && options.verbose) || (options.all && options.running)) || ((options.verbose || options.all) && options.online));
+
+    if (options.deleted)
+    {
+        THROW_HR_IF(WSL_E_INVALID_USAGE, options.all || options.running || options.online || options.verbose);
+        wsl::windows::common::SvcComm service;
+        for (const auto& distro : service.EnumerateDistributions(true))
+        {
+            if (options.quiet)
+            {
+                wprintf(L"%s\n", distro.DistroName);
+            }
+            else
+            {
+                wprintf(L"%s  %s\n", wsl::shared::string::GuidToString<wchar_t>(distro.DistroGuid).c_str(), distro.DistroName);
+            }
+        }
+        return 0;
+    }
 
     // Query all registered distributions and sort the list so the default
     // (if present) is first.
@@ -1251,13 +1271,79 @@ int Unmount(_In_ const std::wstring& arg)
     return 0;
 }
 
-int UnregisterDistribution(_In_ LPCWSTR distributionName)
+int UnregisterDistribution(_In_ LPCWSTR distributionName, bool permanent)
 {
-    auto progress = wsl::windows::common::ConsoleProgressIndicator(wsl::shared::Localization::MessageStatusUnregistering(), true);
     wsl::windows::common::SvcComm service;
-    const GUID distroGuid = service.GetDistributionId(distributionName, LXSS_GET_DISTRO_ID_LIST_ALL);
-    service.UnregisterDistribution(&distroGuid);
+    const GUID distroGuid =
+        service.GetDistributionId(distributionName, LXSS_GET_DISTRO_ID_LIST_ALL | (permanent ? LXSS_GET_DISTRO_ID_INCLUDE_RECOVERY : 0));
+
+    auto progress = wsl::windows::common::ConsoleProgressIndicator(wsl::shared::Localization::MessageStatusUnregistering(), true);
+    service.UnregisterDistribution(&distroGuid, permanent);
     progress.End();
+    wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
+    return 0;
+}
+
+int Unregister(_In_ std::wstring_view arguments)
+{
+    // WslMain has stripped the executable via ParseLegacyArguments. Supply an
+    // executable token so CommandLineToArgvW parses a complete process command line.
+    const auto commandLine = std::wstring{WSL_BINARY_NAME} + L" " + std::wstring{arguments};
+    int argc{};
+    wil::unique_hlocal_ptr<LPWSTR[]> argv{CommandLineToArgvW(commandLine.c_str(), &argc)};
+    THROW_LAST_ERROR_IF(!argv);
+    if (argc < 3 || argv[2][0] == L'\0')
+    {
+        wsl::windows::common::wslutil::PrintMessage(Localization::MessageRequiredParameterMissing(WSL_UNREGISTER_ARG), stdout);
+        return -1;
+    }
+
+    // Preserve the legacy positional name (including leading hyphens) and ignored trailing arguments.
+    bool force = false;
+    for (int index = 3; index < argc; index++)
+    {
+        force |= wsl::shared::string::IsEqual(argv[index], WSL_UNREGISTER_OPTION_FORCE);
+    }
+
+    return UnregisterDistribution(argv[2], force);
+}
+
+int RestoreDistribution(_In_ std::wstring_view arguments)
+{
+    const auto commandLine = std::wstring{WSL_BINARY_NAME} + L" " + std::wstring{arguments};
+    int argc{};
+    wil::unique_hlocal_ptr<LPWSTR[]> argv{CommandLineToArgvW(commandLine.c_str(), &argc)};
+    THROW_LAST_ERROR_IF(!argv);
+    std::optional<std::wstring> name;
+    std::optional<std::wstring> newName;
+    bool literalArguments = false;
+    for (int index = 2; index < argc; ++index)
+    {
+        if (!literalArguments && wsl::shared::string::IsEqual(argv[index], WSL_STOP_PARSING_ARG))
+        {
+            literalArguments = true;
+        }
+        else if (!literalArguments && wsl::shared::string::IsEqual(argv[index], WSL_RESTORE_DISTRIBUTION_OPTION_NAME))
+        {
+            if (index + 1 >= argc)
+            {
+                THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageMissingArgument(argv[index], WSL_BINARY_NAME));
+            }
+            newName = argv[++index];
+        }
+        else if (!name)
+        {
+            // Keep the selector positional, including names beginning with '-'.
+            name = argv[index];
+        }
+        else
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageInvalidCommandLine(argv[index], WSL_BINARY_NAME));
+        }
+    }
+    THROW_HR_IF(WSL_E_INVALID_USAGE, !name || name->empty());
+    wsl::windows::common::SvcComm service;
+    service.RestoreDistribution(name->c_str(), newName ? newName->c_str() : nullptr);
     wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
     return 0;
 }
@@ -1369,7 +1455,7 @@ int WslconfigMain(_In_ int argc, _In_reads_(argc) LPWSTR* argv)
     }
     else if ((argc >= 3) && ((IsEqual(argv[1], WSLCONFIG_COMMAND_UNREGISTER_DISTRIBUTION, true)) || (IsEqual(argv[1], WSLCONFIG_COMMAND_UNREGISTER_DISTRIBUTION_SHORT, true))))
     {
-        exitCode = UnregisterDistribution(argv[2]);
+        exitCode = UnregisterDistribution(argv[2], true);
     }
     else
     {
@@ -1716,17 +1802,13 @@ int WslMain(_In_ std::wstring_view commandLine)
 
             return TerminateDistribution(std::wstring(argument).c_str());
         }
+        else if (argument == WSL_RESTORE_DISTRIBUTION_ARG)
+        {
+            return RestoreDistribution(commandLine);
+        }
         else if (argument == WSL_UNREGISTER_ARG)
         {
-            commandLine = wsl::windows::common::helpers::ConsumeArgument(commandLine, argument);
-            argument = wsl::windows::common::helpers::ParseArgument(commandLine);
-            if (argument.empty())
-            {
-                wsl::windows::common::wslutil::PrintMessage(Localization::MessageRequiredParameterMissing(WSL_UNREGISTER_ARG), stdout);
-                return exitCode;
-            }
-
-            return UnregisterDistribution(std::wstring(argument).c_str());
+            return Unregister(commandLine);
         }
         else if (argument == WSL_SET_DEFAULT_VERSION_ARG)
         {

@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include "Localization.h"
+#include "DeletedDistributionStore.h"
 #include "LxssUserSession.h"
 #include "LxssInstance.h"
 #include "LxssSecurity.h"
@@ -197,6 +198,12 @@ CATCH_RETURN()
 
 HRESULT STDMETHODCALLTYPE LxssUserSession::EnumerateDistributions(
     _Out_ PULONG DistributionCount, _Out_ LXSS_ENUMERATE_INFO** Distributions, _Out_ LXSS_ERROR_INFO* Error)
+{
+    return EnumerateDistributions2(FALSE, DistributionCount, Distributions, Error);
+}
+
+HRESULT STDMETHODCALLTYPE LxssUserSession::EnumerateDistributions2(
+    _In_ BOOL Deleted, _Out_ PULONG DistributionCount, _Out_ LXSS_ENUMERATE_INFO** Distributions, _Out_ LXSS_ERROR_INFO* Error)
 try
 {
     ServiceExecutionContext context(Error);
@@ -204,7 +211,8 @@ try
     const auto session = m_session.lock();
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
-    return session->EnumerateDistributions(DistributionCount, Distributions);
+    return Deleted ? session->EnumerateDeletedDistributions(DistributionCount, Distributions)
+                   : session->EnumerateDistributions(DistributionCount, Distributions);
 }
 CATCH_RETURN()
 
@@ -548,6 +556,11 @@ try
 CATCH_RETURN()
 
 HRESULT STDMETHODCALLTYPE LxssUserSession::UnregisterDistribution(_In_ LPCGUID DistroGuid, _Out_ LXSS_ERROR_INFO* Error)
+{
+    return UnregisterDistribution2(DistroGuid, TRUE, Error);
+}
+
+HRESULT STDMETHODCALLTYPE LxssUserSession::UnregisterDistribution2(_In_ LPCGUID DistroGuid, _In_ BOOL Permanent, _Out_ LXSS_ERROR_INFO* Error)
 try
 {
     ServiceExecutionContext context(Error);
@@ -555,7 +568,7 @@ try
     const auto session = m_session.lock();
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
-    return session->UnregisterDistribution(DistroGuid);
+    return session->UnregisterDistribution(DistroGuid, Permanent);
 }
 CATCH_RETURN()
 
@@ -563,11 +576,121 @@ HRESULT STDMETHODCALLTYPE LxssUserSession::UnregisterDistribution(_In_ LPCWSTR D
 try
 {
     GUID distroGuid;
-    RETURN_IF_FAILED(GetDistributionId(DistributionName, 0, nullptr, &distroGuid));
+    RETURN_IF_FAILED(GetDistributionId(DistributionName, LXSS_GET_DISTRO_ID_INCLUDE_RECOVERY, nullptr, &distroGuid));
 
     return UnregisterDistribution(&distroGuid, nullptr);
 }
 CATCH_RETURN()
+
+HRESULT STDMETHODCALLTYPE LxssUserSession::RestoreDistribution(_In_ LPCWSTR DistributionName, _In_opt_ LPCWSTR NewName, _Out_ LXSS_ERROR_INFO* Error)
+try
+{
+    ServiceExecutionContext context(Error);
+    const auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+    return session->RestoreDistribution(DistributionName, NewName);
+}
+CATCH_RETURN()
+
+HRESULT LxssUserSessionImpl::RestoreDistribution(_In_ LPCWSTR DistributionName, _In_opt_ LPCWSTR NewName)
+try
+{
+    using wsl::windows::common::DeletedDistributionStore;
+    const auto token = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    const auto key = s_OpenLxssUserKey(token.get());
+    std::lock_guard lock(m_instanceLock);
+    const auto entries = [&] {
+        THROW_HR_IF_NULL(E_UNEXPECTED, m_recoveryToken.get());
+        auto impersonate = wil::impersonate_token(m_recoveryToken.get());
+        DeletedDistributionStore::RecoverPending(key.get());
+        DeletedDistributionStore::Cleanup(key.get());
+        return DeletedDistributionStore::Enumerate(key.get());
+    }();
+    const auto requestedId = wsl::shared::string::ToGuid(DistributionName);
+    const DeletedDistributionStore::Entry* match = nullptr;
+    for (const auto& entry : entries)
+    {
+        // A valid distro name can itself look like an unbraced GUID. Match both
+        // interpretations and reject ambiguity; a braced ID uniquely selects a disk.
+        if ((requestedId && IsEqualGUID(*requestedId, entry.Id)) || wsl::shared::string::IsEqual(DistributionName, entry.Name, true))
+        {
+            THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_DUP_NAME), wsl::shared::Localization::MessageRestoreAmbiguous(), match != nullptr);
+            match = &entry;
+        }
+    }
+    RETURN_HR_IF(WSL_E_DISTRO_NOT_FOUND, match == nullptr);
+    const auto name = NewName ? NewName : match->Name.c_str();
+    s_ValidateDistroName(name);
+    _ValidateDistributionNameAndPathNotInUse(key.get(), match->Path.parent_path().c_str(), name, match->Id);
+    {
+        auto runAsUser = wil::impersonate_token(token.get());
+        DeletedDistributionStore::Restore(key.get(), *match, name);
+    }
+    _SetDistributionInstalled(key.get(), match->Id);
+    const auto registration = DistributionRegistration::Open(key.get(), match->Id);
+    _SendDistributionRegisteredEvent(s_GetDistributionConfiguration(registration));
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT LxssUserSessionImpl::EnumerateDeletedDistributions(_Out_ PULONG Count, _Out_ LXSS_ENUMERATE_INFO** Distributions)
+try
+{
+    using wsl::windows::common::DeletedDistributionStore;
+    const auto token = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    const auto key = s_OpenLxssUserKey(token.get());
+    std::lock_guard lock(m_instanceLock);
+    const auto entries = [&] {
+        THROW_HR_IF_NULL(E_UNEXPECTED, m_recoveryToken.get());
+        auto impersonate = wil::impersonate_token(m_recoveryToken.get());
+        DeletedDistributionStore::RecoverPending(key.get());
+        DeletedDistributionStore::Cleanup(key.get());
+        return DeletedDistributionStore::Enumerate(key.get());
+    }();
+    auto result = wil::make_unique_cotaskmem<LXSS_ENUMERATE_INFO[]>(entries.size());
+    for (size_t index = 0; index < entries.size(); ++index)
+    {
+        auto& entry = result[index];
+        entry = {};
+        entry.DistroGuid = entries[index].Id;
+        entry.State = LxssDistributionStateDeleted;
+        entry.Version = LXSS_WSL_VERSION_2;
+        THROW_HR_IF(E_INVALIDARG, entries[index].Name.size() >= ARRAYSIZE(entry.DistroName));
+        wcscpy_s(entry.DistroName, ARRAYSIZE(entry.DistroName), entries[index].Name.c_str());
+    }
+    *Count = gsl::narrow<ULONG>(entries.size());
+    *Distributions = result.release();
+    return S_OK;
+}
+CATCH_RETURN()
+
+VOID CALLBACK LxssUserSessionImpl::s_CleanupDeletedDistributions(PTP_CALLBACK_INSTANCE, PVOID Context, PTP_TIMER)
+try
+{
+    auto self = static_cast<LxssUserSessionImpl*>(Context);
+    // Background maintenance should not queue behind foreground work or an
+    // earlier timer callback. The next tick retries skipped cleanup.
+    std::unique_lock lock(self->m_instanceLock, std::try_to_lock);
+    if (!lock.owns_lock())
+    {
+        return;
+    }
+    // Yield between records so foreground work need not wait for the entire
+    // batch. Each ownership check and disk deletion remains serialized with
+    // imports; abandon this pass if foreground work acquires the lock.
+    const auto yieldBetweenEntries = [&lock] {
+        lock.unlock();
+        return lock.try_lock();
+    };
+    auto impersonate = wil::impersonate_token(self->m_recoveryToken.get());
+    const auto key = wsl::windows::common::registry::OpenLxssUserKey();
+    wsl::windows::common::DeletedDistributionStore::RecoverPending(key.get(), yieldBetweenEntries);
+    if (lock.owns_lock())
+    {
+        wsl::windows::common::DeletedDistributionStore::Cleanup(key.get(), wsl::windows::common::DeletedDistributionStore::Now(), yieldBetweenEntries);
+    }
+}
+CATCH_LOG()
 
 LxssUserSessionImpl::LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId, _Inout_ wsl::windows::service::PluginManager& pluginManager) :
     m_sessionId(sessionId), m_pluginManager(pluginManager)
@@ -599,6 +722,32 @@ LxssUserSessionImpl::LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId
             _CreateLegacyRegistration(lxssKey.get(), userToken.get());
             wsl::windows::common::registry::DeleteKeyValue(lxssKey.get(), LXSS_LEGACY_INSTALL_VALUE);
         }
+
+        // Never retain an elevated caller's authority for later unattended deletion.
+        HANDLE cleanupToken = userToken.get();
+        TOKEN_ELEVATION_TYPE elevationType{};
+        DWORD tokenSize{};
+        THROW_IF_WIN32_BOOL_FALSE(GetTokenInformation(cleanupToken, TokenElevationType, &elevationType, sizeof(elevationType), &tokenSize));
+        wil::unique_token_linked_token linkedToken;
+        if (elevationType == TokenElevationTypeFull)
+        {
+            THROW_IF_FAILED(wil::get_token_information_nothrow(linkedToken, cleanupToken));
+            cleanupToken = linkedToken.LinkedToken;
+        }
+        wil::unique_handle impersonationToken;
+        THROW_IF_WIN32_BOOL_FALSE(
+            DuplicateTokenEx(cleanupToken, MAXIMUM_ALLOWED, nullptr, SecurityImpersonation, TokenImpersonation, &impersonationToken));
+        THROW_IF_WIN32_BOOL_FALSE(
+            ::CreateRestrictedToken(impersonationToken.get(), DISABLE_MAX_PRIVILEGE, 0, nullptr, 0, nullptr, 0, nullptr, &m_recoveryToken));
+        {
+            auto impersonate = wil::impersonate_token(m_recoveryToken.get());
+            wsl::windows::common::DeletedDistributionStore::RecoverPending(lxssKey.get());
+            wsl::windows::common::DeletedDistributionStore::Cleanup(lxssKey.get());
+        }
+        m_recoveryTimer.reset(CreateThreadpoolTimer(s_CleanupDeletedDistributions, this, nullptr));
+        THROW_IF_NULL_ALLOC(m_recoveryTimer);
+        auto recoveryDueTime = wil::filetime::from_int64(-60LL * 10000000);
+        SetThreadpoolTimer(m_recoveryTimer.get(), &recoveryDueTime, 60000, 0);
 
         // Create a threadpool timer to terminate a Linux utility VM that is idle.
         m_vmTerminationTimer.reset(CreateThreadpoolTimer(s_VmIdleTerminate, this, nullptr));
@@ -679,6 +828,13 @@ LxssUserSessionImpl::LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId
 
 LxssUserSessionImpl::~LxssUserSessionImpl()
 {
+    if (m_recoveryTimer)
+    {
+        SetThreadpoolTimer(m_recoveryTimer.get(), nullptr, 0, 0);
+        WaitForThreadpoolTimerCallbacks(m_recoveryTimer.get(), TRUE);
+        m_recoveryTimer.reset();
+    }
+
     if (m_timezoneThread.joinable())
     {
         LOG_IF_WIN32_BOOL_FALSE(PostThreadMessage(GetThreadId(m_timezoneThread.native_handle()), WM_QUIT, 0, 0));
@@ -1268,7 +1424,7 @@ try
     RETURN_HR_IF(E_INVALIDARG, (wcslen(DistributionName) == 0));
 
     // Validate flags.
-    RETURN_HR_IF(E_INVALIDARG, (WI_IsAnyFlagSet(Flags, ~LXSS_GET_DISTRO_ID_LIST_ALL)));
+    RETURN_HR_IF(E_INVALIDARG, (WI_IsAnyFlagSet(Flags, ~(LXSS_GET_DISTRO_ID_LIST_ALL | LXSS_GET_DISTRO_ID_INCLUDE_RECOVERY))));
 
     // Open the user's lxss registry key.
     const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
@@ -1286,6 +1442,32 @@ try
             distroFound = true;
             *pDistroGuid = registration.Id();
             break;
+        }
+    }
+
+    // Force unregister prefers an available distribution of this name. Only
+    // fall back to recovery records when no available registration matches.
+    if (!distroFound && WI_IsFlagSet(Flags, LXSS_GET_DISTRO_ID_INCLUDE_RECOVERY))
+    {
+        for (const auto& [id, keyName] : wsl::windows::common::registry::EnumGuidKeys(lxssKey.get()))
+        {
+            const auto registration = DistributionRegistration::Open(lxssKey.get(), id);
+            if (registration.Read(Property::RecoveryPath) &&
+                wsl::shared::string::IsEqual(DistributionName, registration.Read(Property::Name), true))
+            {
+                THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_DUP_NAME), distroFound);
+                distroFound = true;
+                *pDistroGuid = id;
+            }
+        }
+        for (const auto& entry : wsl::windows::common::DeletedDistributionStore::Enumerate(lxssKey.get(), true))
+        {
+            if (wsl::shared::string::IsEqual(DistributionName, entry.Name, true))
+            {
+                THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_DUP_NAME), distroFound);
+                distroFound = true;
+                *pDistroGuid = entry.Id;
+            }
         }
     }
 
@@ -2417,7 +2599,7 @@ try
 }
 CATCH_RETURN()
 
-HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid)
+HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid, bool Permanent)
 {
     ExecutionContext context(Context::UnregisterDistro);
 
@@ -2455,8 +2637,33 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid)
         {
             std::lock_guard lock(m_instanceLock);
 
+            if (!Permanent)
+            {
+                auto runAsUser = wil::CoImpersonateClient();
+                wsl::windows::common::DeletedDistributionStore::RecoverPending(lxssKey.get());
+            }
             // Get the configuration information about the distribution.
-            registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
+            try
+            {
+                registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
+            }
+            catch (...)
+            {
+                // A retained distribution has no active key; a timer may also have
+                // finished the journal's key rename after force lookup. Open maps
+                // the missing registry key to the public distribution-not-found error.
+                if (!Permanent || wil::ResultFromCaughtException() != WSL_E_DISTRO_NOT_FOUND)
+                {
+                    throw;
+                }
+                auto runAsUser = wil::CoImpersonateClient();
+                wsl::windows::common::DeletedDistributionStore::Purge(lxssKey.get(), *DistroGuid);
+                result = S_OK;
+                return result;
+            }
+            // Permanent deletion preserves the journal until its disk is available.
+            const bool recoveryPending = registration.Read(Property::RecoveryPath).has_value();
+            THROW_HR_IF(E_ILLEGAL_STATE_CHANGE, recoveryPending && !Permanent);
             configuration = s_GetDistributionConfiguration(registration);
 
             // Log telemetry about the distribution being removed.
@@ -2466,18 +2673,47 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid)
             // Ensure that a filesystem export is not in progress.
             _EnsureNotLocked(DistroGuid);
 
-            // After this point the distribution registry key should be deleted.
-            removeDistro = true;
-
-            // Terminate the distribution and mark it as uninstalling.
             _TerminateInstanceInternal(DistroGuid);
-            registration.Write(Property::State, LxssDistributionStateUninstalling);
+
+            bool retained = false;
+            {
+                auto runAsUser = wil::CoImpersonateClient();
+                if (recoveryPending)
+                {
+                    wsl::windows::common::DeletedDistributionStore::Purge(lxssKey.get(), *DistroGuid);
+                }
+                else if (!Permanent && WI_IsFlagSet(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE))
+                {
+                    // Release the VHD before moving it. A failed move must not fall back to deletion.
+                    if (m_utilityVm && std::filesystem::exists(configuration.VhdFilePath))
+                    {
+                        m_utilityVm->EjectVhd(configuration.VhdFilePath.c_str());
+                    }
+                    retained = wsl::windows::common::DeletedDistributionStore::Retain(
+                        lxssKey.get(), *DistroGuid, configuration.VhdFilePath, [&](const std::filesystem::path& source) {
+                            // Use the verified physical path while it is locked, rather than
+                            // resolving a mutable ancestor alias during artifact deletion.
+                            auto cleanupConfiguration = configuration;
+                            cleanupConfiguration.BasePath = source;
+                            _DeleteDistributionLockHeld(
+                                cleanupConfiguration,
+                                LXSS_DELETE_DISTRO_FLAGS_ALL & ~(LXSS_DELETE_DISTRO_FLAGS_VHD | LXSS_DELETE_DISTRO_FLAGS_UNMOUNT));
+                        });
+                }
+            }
+
+            removeDistro = !retained && !recoveryPending;
+            if (!retained && !recoveryPending)
+            {
+                registration.Write(Property::State, LxssDistributionStateUninstalling);
+            }
 
             // If the default distribution has been unregistered, search for another
             // distribution to set as the new default.
 
-            auto defaultDistribution = DistributionRegistration::OpenDefault(lxssKey.get());
-            if (defaultDistribution.has_value() && IsEqualGUID(defaultDistribution->Id(), registration.Id()))
+            const auto defaultId =
+                wsl::windows::common::registry::ReadOptionalString(lxssKey.get(), nullptr, L"DefaultDistribution");
+            if (defaultId && wsl::shared::string::IsEqual(*defaultId, removedDistroString, true))
             {
                 // Remove the old default.
                 DistributionRegistration::DeleteDefault(lxssKey.get());
@@ -2491,6 +2727,7 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid)
                 }
             }
 
+            if (!retained && !recoveryPending)
             {
                 auto runAsUser = wil::CoImpersonateClient();
                 _DeleteDistributionLockHeld(configuration);
@@ -3145,12 +3382,9 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
         // Remove the terminal profile, if any.
         try
         {
-            const auto lxssKey = wsl::windows::common::registry::OpenLxssUserKey();
-            const auto profile = DistributionRegistration::Open(lxssKey.get(), Configuration.DistroId).Read(Property::TerminalProfilePath);
-
-            if (profile.has_value())
+            if (Configuration.TerminalProfilePath.has_value())
             {
-                deleteWithRetry(profile.value());
+                deleteWithRetry(Configuration.TerminalProfilePath.value());
             }
         }
         CATCH_LOG()
@@ -3202,6 +3436,12 @@ std::vector<DistributionRegistration> LxssUserSessionImpl::_EnumerateDistributio
         }
 
         auto registration = DistributionRegistration::Open(LxssKey, distro.first);
+        // A journaled registration is retained only so recovery can finish an
+        // interrupted unregister; it is not an available distribution.
+        if (registration.Read(Property::RecoveryPath).has_value())
+        {
+            continue;
+        }
 
         // Add the distribution to the list if the caller requested all, or if
         // it is installed or upgrading.
@@ -3263,13 +3503,18 @@ GUID LxssUserSessionImpl::_GetDefaultDistro(_In_ HKEY LxssKey)
         THROW_HR_IF(WSL_E_DEFAULT_DISTRO_NOT_FOUND, !defaultDistro.has_value());
 
         // Ensure that the default distribution is valid.
-        if (!_ValidateDistro(LxssKey, &defaultDistro->Id()))
+        const bool recoveryPending = defaultDistro->Read(Property::RecoveryPath).has_value();
+        if (recoveryPending || !_ValidateDistro(LxssKey, &defaultDistro->Id()))
         {
             // Delete the old default distribution.
             DistributionRegistration::DeleteDefault(LxssKey);
 
-            const auto configuration = s_GetDistributionConfiguration(defaultDistro.value());
-            _UnregisterDistributionLockHeld(LxssKey, configuration);
+            // A journaled registration must survive until recovery can finish.
+            if (!recoveryPending)
+            {
+                const auto configuration = s_GetDistributionConfiguration(defaultDistro.value());
+                _UnregisterDistributionLockHeld(LxssKey, configuration);
+            }
 
             // Validate remaining WSL distributions, if there are any remaining
             // set the first one found to the new default.
@@ -3854,8 +4099,13 @@ bool LxssUserSessionImpl::_ValidateDistro(_In_ HKEY LxssKey, _In_ LPCGUID Distro
     std::wstring packageFamilyName;
     try
     {
-        // Ensure a subkey exists for the distribution.
-        auto configuration = s_GetDistributionConfiguration(DistributionRegistration::Open(LxssKey, *DistroGuid));
+        // Pending recovery must survive an offline volume or removal of a Store app.
+        const auto registration = DistributionRegistration::Open(LxssKey, *DistroGuid);
+        if (registration.Read(Property::RecoveryPath).has_value())
+        {
+            return true;
+        }
+        auto configuration = s_GetDistributionConfiguration(registration);
         packageFamilyName = configuration.PackageFamilyName;
 
         // If there is no package family name associated with the distribution,
@@ -3887,7 +4137,7 @@ bool LxssUserSessionImpl::_ValidateDistro(_In_ HKEY LxssKey, _In_ LPCGUID Distro
             // If the path is not found and the package is removed, then the distro can be considered to be uninstalled.
             // Only do this if the path is actually missing to prevent any accidental distro deletion if the store API
             // can't find the package for transient reasons.
-            if (!PathFileExistsW(path) && !wsl::windows::common::helpers::IsPackageInstalled(packageFamilyName.c_str()))
+            if (wsl::windows::common::helpers::IsDistributionOrphaned(packageFamilyName.c_str(), path))
             {
                 isValid = false;
             }
@@ -3931,15 +4181,66 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
         }
     }
 
+    auto validate = [&](const std::wstring& distributionName, const std::filesystem::path& basePath, DWORD state) {
+        if (Name != nullptr && wsl::shared::string::IsEqual(Name, distributionName, true))
+        {
+            THROW_HR_WITH_USER_ERROR_IF(
+                HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), wsl::shared::Localization::MessageDistroNameAlreadyExists(), state == LxssDistributionStateInstalled);
+
+            THROW_HR_MSG(E_ILLEGAL_STATE_CHANGE, "%ls already registered (state = %d)", Name, state);
+        }
+
+        if (Path != nullptr)
+        {
+            auto impersonate = wil::CoImpersonateClient();
+            auto canonicalDistroPath = wsl::windows::common::filesystem::GetCanonicalPath(basePath, error);
+            if (error)
+            {
+                LOG_WIN32(error.value());
+            }
+
+            // Ensure another distribution by a different name is not already registered to the same location.
+            THROW_HR_WITH_USER_ERROR_IF(
+                HRESULT_FROM_WIN32(ERROR_FILE_EXISTS),
+                wsl::shared::Localization::MessageDistroInstallPathAlreadyExists(),
+                wsl::windows::common::string::IsPathComponentEqual(error ? basePath.native() : canonicalDistroPath.native(), Path));
+        }
+    };
+
+    // Hidden recovery journals reserve any name and location that recovery can
+    // reactivate. Completed unregisters and permanent deletions free the original
+    // registration; pending restores instead reserve their intended destination.
+    for (const auto& [keyName, key] : wsl::windows::common::registry::EnumKeys(LxssKey, KEY_READ))
+    {
+        const bool deleted = keyName.starts_with(L"Deleted-");
+        const auto id = wsl::shared::string::ToGuid(deleted ? keyName.substr(8) : keyName);
+        if (!id || (Exclude && IsEqualGUID(*Exclude, *id)))
+        {
+            continue;
+        }
+        const auto recoveryPath = wsl::windows::common::registry::ReadOptionalString(key.get(), nullptr, L"RecoveryPath");
+        if (!recoveryPath || wsl::windows::common::registry::ReadDword(key.get(), nullptr, L"RecoveryPermanentDelete", 0))
+        {
+            continue;
+        }
+        const bool restoring = wsl::windows::common::registry::ReadDword(key.get(), nullptr, L"RecoveryRestorePending", 0) ||
+                               wsl::windows::common::registry::ReadDword(key.get(), nullptr, L"RecoveryRestored", 0);
+        if (!restoring && deleted)
+        {
+            continue;
+        }
+        const auto restoreName = wsl::windows::common::registry::ReadOptionalString(key.get(), nullptr, L"RecoveryRestoreName");
+        validate(
+            restoring && restoreName ? *restoreName
+                                     : wsl::windows::common::registry::ReadString(key.get(), nullptr, L"DistributionName"),
+            restoring ? std::filesystem::path(*recoveryPath).parent_path()
+                      : std::filesystem::path(wsl::windows::common::registry::ReadString(key.get(), nullptr, L"BasePath")),
+            LxssDistributionStateInstalled);
+    }
+
     // Ensure no existing distributions have the same name or install path.
     for (const auto& distro : _EnumerateDistributions(LxssKey, true, Exclude))
     {
-        // Return an appropriate failure code for the two possible
-        // conditions here:
-        //
-        //     1. The distribution is already registered successfully.
-        //     2. The distribution is currently being registered or unregistered by another thread.
-
         LXSS_DISTRO_CONFIGURATION configuration{};
         try
         {
@@ -3951,32 +4252,7 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
             LOG_CAUGHT_EXCEPTION();
             continue;
         }
-
-        if (Name != nullptr && wsl::shared::string::IsEqual(Name, configuration.Name, true))
-        {
-            THROW_HR_WITH_USER_ERROR_IF(
-                HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
-                wsl::shared::Localization::MessageDistroNameAlreadyExists(),
-                configuration.State == LxssDistributionStateInstalled);
-
-            THROW_HR_MSG(E_ILLEGAL_STATE_CHANGE, "%ls already registered (state = %d)", Name, configuration.State);
-        }
-
-        if (Path != nullptr)
-        {
-            auto impersonate = wil::CoImpersonateClient();
-            auto canonicalDistroPath = wsl::windows::common::filesystem::GetCanonicalPath(configuration.BasePath, error);
-            if (error)
-            {
-                LOG_WIN32(error.value());
-            }
-
-            // Ensure another distribution by a different name is not already registered to the same location.
-            THROW_HR_WITH_USER_ERROR_IF(
-                HRESULT_FROM_WIN32(ERROR_FILE_EXISTS),
-                wsl::shared::Localization::MessageDistroInstallPathAlreadyExists(),
-                wsl::windows::common::string::IsPathComponentEqual(error ? configuration.BasePath.native() : canonicalDistroPath.native(), Path));
-        }
+        validate(configuration.Name, configuration.BasePath, configuration.State);
     }
 }
 
@@ -4167,6 +4443,7 @@ LxssUserSessionImpl::s_GetDistributionConfiguration(const DistributionRegistrati
     configuration.Flavor = Distro.Read(Property::Flavor).value_or(L"");
     configuration.RunOOBE = Distro.Read(Property::RunOOBE);
     configuration.ShortcutPath = Distro.Read(Property::ShortcutPath);
+    configuration.TerminalProfilePath = Distro.Read(Property::TerminalProfilePath);
 
     if (!skipName)
     {
