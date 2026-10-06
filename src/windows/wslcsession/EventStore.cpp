@@ -77,27 +77,21 @@ namespace {
                });
     }
 
-    // Compare filter values as written against the recorded image or its familiar repository name.
+    // Compare the values as written against the actor id and the image name, and against the familiar form
+    // of each. Image events carry their image name in "name"; other events carry it in "image".
     bool MatchesImage(const wsl::windows::common::wslc_schema::Event& event, const std::vector<std::string>& values)
     {
-        if (event.Type == "image")
-        {
-            return std::ranges::find(values, event.Actor.ID) != values.end();
-        }
+        const auto nameEntry = event.Actor.Attributes.find(event.Type == "image" ? "name" : "image");
+        const std::string name = nameEntry != event.Actor.Attributes.end() ? nameEntry->second : std::string{};
 
-        const auto image = event.Actor.Attributes.find("image");
-        if (event.Type != "container" || image == event.Actor.Attributes.end())
-        {
-            return false;
-        }
+        // A reference that doesn't parse is compared as is.
+        const auto familiar = [](const std::string& image) {
+            const auto reference = wsl::windows::common::wslutil::ImageReference::TryParse(image);
+            return reference.has_value() ? reference->Repository.GetFamiliar() : image;
+        };
 
-        if (std::ranges::find(values, image->second) != values.end())
-        {
-            return true;
-        }
-
-        const auto reference = wsl::windows::common::wslutil::ImageReference::TryParse(image->second);
-        return reference.has_value() && std::ranges::find(values, reference->Repository.GetFamiliar()) != values.end();
+        const auto matches = [&](const std::string& candidate) { return std::ranges::find(values, candidate) != values.end(); };
+        return matches(event.Actor.ID) || matches(name) || matches(familiar(event.Actor.ID)) || matches(familiar(name));
     }
 
     // Every label filter must match. "key" requires the label to exist and "key=value" requires that exact value.

@@ -7636,6 +7636,10 @@ class WSLCTests
         VERIFY_ARE_EQUAL(none, matchingThisContainer({{"image", "Debian"}}));
         VERIFY_ARE_EQUAL(id, matchingThisContainer({{"image", "debian:latest"}, {"image", "debian"}}));
 
+        // The container's own id also matches, but only in full.
+        VERIFY_ARE_EQUAL(id, matchingThisContainer({{"image", id.c_str()}}));
+        VERIFY_ARE_EQUAL(none, matchingThisContainer({{"image", idPrefix.c_str()}}));
+
         // A label filter requires the key, and the value when one is given. Only the first '=' separates the two.
         VERIFY_ARE_EQUAL(id, matchingThisContainer({{"label", "role"}}));
         VERIFY_ARE_EQUAL(id, matchingThisContainer({{"label", "role=web"}}));
@@ -7753,6 +7757,9 @@ class WSLCTests
             verifyActions(eventsMatching({{"network", networkName.c_str()}}), lifecycleActions);
             verifyActions(eventsMatching({{"network", networkNamePrefix.c_str()}}), lifecycleActions);
         }
+
+        // An image filter matches any event by its actor id, so it also selects the network's events.
+        verifyActions(eventsMatching({{"image", networkId.c_str()}}), lifecycleActions);
 
         // Distinct filter keys are AND'd.
         verifyActions(eventsMatching({{"network", networkName.c_str()}, {"event", "connect"}}), {"connect"});

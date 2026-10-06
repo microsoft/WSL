@@ -736,7 +736,7 @@ interface IWSLCSession : IUnknown
     // Filters are key/value pairs. Values sharing a key are OR'd, except label values, which must all match.
     // Distinct keys are AND'd.
     //   container=X matches container events whose id or name starts with X.
-    //   image=X matches the recorded image exactly, or by its familiar name without a tag or digest
+    //   image=X matches the actor id or image name exactly, or by their familiar name without a tag or digest
     //   (e.g. image=ubuntu matches "docker.io/library/ubuntu:22.04"). X itself is compared as written.
     //   network=X matches network events whose id or name starts with X.
     //   label=K requires the actor attribute K to exist, and label=K=V requires it to equal V.
