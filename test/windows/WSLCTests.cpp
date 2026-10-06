@@ -7627,6 +7627,9 @@ class WSLCTests
         VERIFY_ARE_EQUAL(none, matchingIds({{"container", "event-filters"}}));
         VERIFY_ARE_EQUAL(id, matchingIds({{"container", "event-filters"}, {"container", idPrefix.c_str()}}));
 
+        // A network filter matches a container by its id or name too.
+        VERIFY_ARE_EQUAL(id, matchingIds({{"network", "wslc-test-event-fil"}}));
+
         // The recorded image matches exactly or by its familiar name, while the filter value is compared as written.
         // Repeated values are OR'd.
         VERIFY_ARE_EQUAL(id, matchingThisContainer({{"image", "docker.io/library/debian:latest"}}));
@@ -7760,6 +7763,10 @@ class WSLCTests
 
         // An image filter matches any event by its actor id, so it also selects the network's events.
         verifyActions(eventsMatching({{"image", networkId.c_str()}}), lifecycleActions);
+
+        // A container filter matches a network by its id or name, but not by the container recorded on its endpoint events.
+        verifyActions(eventsMatching({{"type", "network"}, {"event", "create"}, {"container", networkName.c_str()}}), {"create"});
+        VERIFY_IS_TRUE(eventsMatching({{"type", "network"}, {"container", containerId.c_str()}}).empty());
 
         // Distinct filter keys are AND'd.
         verifyActions(eventsMatching({{"network", networkName.c_str()}, {"event", "connect"}}), {"connect"});
