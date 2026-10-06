@@ -1445,7 +1445,7 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
                     hostPath.c_str(),
                     transport.Port.Value,
                     flags,
-                    userToken.get());
+                    WI_IsFlagSet(flags, schema::Plan9ShareFlags::UseShareRootIdentity) ? userToken.get() : nullptr);
                 guestAddress = VmPlan9SocketShareAddress{transport.Port, accessName};
             },
             [&](const VmPlan9VirtioDevice& transport) {
