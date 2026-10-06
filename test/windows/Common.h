@@ -36,7 +36,6 @@ using namespace std::chrono_literals;
 #define LXSS_DISTRO_NAME_TEST "test_distro"
 #define LXSS_DISTRO_NAME_TEST_L WIDEN(LXSS_DISTRO_NAME_TEST)
 
-#define LXSST_REMOVE_DISTRO_CONF_COMMAND_LINE L"-u root -e rm /etc/wsl.conf"
 #define LXSST_TESTS_INSTALL_COMMAND_LINE L"/bin/bash -c 'cd /data/test; ./build_tests.sh'"
 
 //
@@ -374,7 +373,7 @@ private:
 class DistroFileChange
 {
 public:
-    DistroFileChange(LPCWSTR Path, bool exists = true);
+    DistroFileChange(LPCWSTR Path, bool exists = true, LPCWSTR DistributionName = LXSS_DISTRO_NAME_TEST_L);
     ~DistroFileChange();
     DistroFileChange(const DistroFileChange&) = delete;
     DistroFileChange(DistroFileChange&&) = delete;
@@ -387,6 +386,7 @@ public:
 private:
     std::optional<std::wstring> m_originalContent;
     LPCWSTR m_path{};
+    std::wstring m_distributionName;
 };
 
 class PartialHandleRead
@@ -540,8 +540,6 @@ wil::unique_handle GetNonElevatedToken(TOKEN_TYPE Type = TokenPrimary);
 
 std::wstring LxssWriteWslConfig(const std::wstring& Content);
 
-std::string LxssWriteWslDistroConfig(const std::string& Content, LPCWSTR DistributionName = LXSS_DISTRO_NAME_TEST_L);
-
 enum class DrvFsMode
 {
     WSL1,
@@ -624,14 +622,13 @@ void Trim(std::wstring& string);
 
 inline auto EnableSystemd(const std::string& extraConfig = "", LPCWSTR distroName = LXSS_DISTRO_NAME_TEST_L)
 {
-    // enable systemd on the test distro by editing /etc/wsl.conf
-    LxssWriteWslDistroConfig("[boot]\nsystemd=true\n" + extraConfig, distroName);
+    auto config = std::make_unique<DistroFileChange>(L"/etc/wsl.conf", false, distroName);
+    config->SetContent(wsl::shared::string::MultiByteToWide("[boot]\nsystemd=true\n" + extraConfig).c_str());
     TerminateDistribution(distroName);
 
-    return wil::scope_exit([distroName] {
-        // clean up wsl.conf file
-        LxsstuLaunchWsl(std::format(L"-d {} " LXSST_REMOVE_DISTRO_CONF_COMMAND_LINE, distroName));
-        TerminateDistribution(distroName);
+    return wil::scope_exit([config = std::move(config), distroName = std::wstring(distroName)]() mutable {
+        config.reset();
+        TerminateDistribution(distroName.c_str());
     });
 }
 
