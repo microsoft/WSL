@@ -140,7 +140,8 @@ VmEffectiveMemory ConfigureMemory(const VmMemoryRequest& Request, const VmMmioRe
     memory.FaultClusterSizeShift = Request.FaultClusterSizeShift;
     memory.DirectMapFaultClusterSizeShift = Request.DirectMapFaultClusterSizeShift;
     memory.PageReportingOrder = Request.PageReportingOrder;
-    if (wsl::windows::common::helpers::IsVmemmSuffixSupported()) {
+    if (wsl::windows::common::helpers::IsVmemmSuffixSupported())
+    {
         memory.HostingProcessNameSuffix = Request.HostingProcessNameSuffix;
     }
     Settings.SizeInMB = memory.SizeBytes / c_mib;
