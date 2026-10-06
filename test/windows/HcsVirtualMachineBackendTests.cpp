@@ -120,6 +120,12 @@ class HcsVirtualMachineBackendTests
         return true;
     }
 
+    TEST_METHOD(SelectsBackendFromExperimentalFlag)
+    {
+        VERIFY_ARE_EQUAL(BackendKind::Hcs, SelectVirtualMachineBackendKind(false));
+        VERIFY_ARE_EQUAL(BackendKind::OpenVmm, SelectVirtualMachineBackendKind(true));
+    }
+
     TEST_METHOD(FileSystemRequestsDefaultToVirtioFs)
     {
         const VmFileSystemDeviceRequest device;

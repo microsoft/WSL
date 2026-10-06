@@ -177,7 +177,7 @@ private:
     _Requires_lock_held_(m_guestDeviceLock)
     std::optional<VmFileSystemShare> FindVirtioFsShare(_In_ PCWSTR Tag, _In_ std::optional<bool> Admin = {}) const;
 
-    VmCreateRequest GenerateBackendRequest(const GUID& VmId);
+    VmCreateRequest GenerateBackendRequest(const GUID& VmId, BackendKind Backend);
 
     static std::pair<int, LX_MINI_MOUNT_STEP> GetMountResult(_In_ wsl::shared::SocketChannel& Channel);
 

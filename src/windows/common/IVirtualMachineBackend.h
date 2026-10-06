@@ -754,6 +754,8 @@ private:
     _Guarded_by_(m_terminationCallbackLock) TerminationCallback m_terminationCallback;
 };
 
+BackendKind SelectVirtualMachineBackendKind(bool EnableOpenVmm) noexcept;
+
 VmPlatformCapabilities QueryVirtualMachineBackendCapabilities(BackendKind Kind);
 
 std::unique_ptr<IVirtualMachineBackend> CreateVirtualMachineBackend(BackendKind Kind, const VmCreateRequest& Request);

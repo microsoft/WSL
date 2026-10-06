@@ -56,11 +56,24 @@ When [wslservice.exe](wslservice.exe.md) receives the CreateInstance() call via 
 
 To start a WSL2 distribution, [wslservice.exe](wslservice.exe.md) needs a virtual machine. If the virtual machine isn't already running, it will be created as part of the `CreateInstance()` call. 
 
-The WSL2 virtual machine is created via the [Host Compute System (HCS) service](https://learn.microsoft.com/virtualization/api/hcs/overview) (see `src/windows/service/exe/WslCoreVm.cpp`).
+By default, the WSL2 virtual machine is created via the [Host Compute System (HCS) service](https://learn.microsoft.com/virtualization/api/hcs/overview). The experimental OpenVMM backend can be selected in `.wslconfig`:
 
-To create a new virtual machine, [wslservice.exe](wslservice.exe.md) generates a JSON string, which describes the virtual machine configuration. This JSON is then passed to [HcsCreateComputeSystem()](https://learn.microsoft.com/virtualization/api/hcs/reference/hcscreatecomputesystem) to create a new virtual machine.
+```ini
+[experimental]
+openVmm=true
+```
 
-See `src/windows/common/hcs_schema.h` for more details on the HCS JSON schema.
+OpenVMM currently does not support:
+
+- ARM64 or UEFI boot
+- GPU assignment or WSLg shared memory
+- Persistent-memory or physical-disk devices
+- Mirrored or bridged networking
+- Saved-state crash capture
+- Nested virtualization, performance counters, or advanced memory controls
+- Plan 9 file sharing or per-user virtio-fs options
+
+The HCS backend generates a JSON virtual machine configuration and passes it to [HcsCreateComputeSystem()](https://learn.microsoft.com/virtualization/api/hcs/reference/hcscreatecomputesystem). See `src/windows/common/hcs_schema.h` for details on the HCS JSON schema.
 
 Part of the JSON configuration includes:
 

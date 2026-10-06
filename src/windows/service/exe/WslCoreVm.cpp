@@ -328,12 +328,13 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         CATCH_LOG()
     }
 
-    // Create the utility VM through the backend. WslCoreVm owns WSL protocol and product policy;
-    // the backend owns HCS configuration and the compute-system lifetime.
-    auto backendRequest = GenerateBackendRequest(VmId);
+    // Create the utility VM through the selected backend. WslCoreVm owns WSL protocol and
+    // product policy; the backend owns the platform-specific virtual machine lifetime.
+    const auto backendKind = SelectVirtualMachineBackendKind(m_vmConfig.EnableOpenVmm);
+    auto backendRequest = GenerateBackendRequest(VmId, backendKind);
     {
-        SlowOperationWatcher slowOperation{"HcsCreateSystem"};
-        m_backend = HcsVirtualMachineBackend::Create(backendRequest);
+        SlowOperationWatcher slowOperation{backendKind == BackendKind::OpenVmm ? "OpenVmmCreateSystem" : "HcsCreateSystem"};
+        m_backend = CreateVirtualMachineBackend(backendKind, backendRequest);
     }
     m_runtimeId = m_backend->GetDescription().Identity.VmId;
     WI_ASSERT(IsEqualGUID(VmId, m_runtimeId));
@@ -1347,7 +1348,7 @@ std::optional<VmFileSystemShare> WslCoreVm::FindVirtioFsShare(_In_ PCWSTR Tag, _
     });
 }
 
-VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
+VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId, BackendKind Backend)
 {
     VmCreateRequest request{};
     request.Identity = {VmId, m_userToken};
@@ -1362,7 +1363,7 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
     request.Memory.AllowOvercommit = VmFeatureRequest::Required;
     request.Memory.DeferredCommit = VmFeatureRequest::Required;
     request.Memory.ColdDiscard = VmFeatureRequest::Required;
-    const auto backendCapabilities = QueryVirtualMachineBackendCapabilities(BackendKind::Hcs);
+    const auto backendCapabilities = QueryVirtualMachineBackendCapabilities(Backend);
     if (backendCapabilities.Features.test(static_cast<size_t>(VmFeature::SmallPageMemory)))
     {
         request.Memory.SmallPageBacking = VmFeatureRequest::Required;
