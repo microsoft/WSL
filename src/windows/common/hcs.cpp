@@ -412,13 +412,12 @@ void wsl::windows::common::hcs::ModifyNetworkAdapter(
         return attemptResult;
     };
 
-    const auto result = Retry && RequestType == ModifyRequestType::Add
-                            ? wsl::shared::retry::RetryWithTimeout<HRESULT>(
-                                  [&] { return THROW_IF_FAILED(attempt()); },
-                                  wsl::core::networking::AddEndpointRetryPeriod,
-                                  wsl::core::networking::AddEndpointRetryTimeout,
-                                  wsl::core::networking::AddEndpointRetryPredicate)
-                            : attempt();
+    const auto result = Retry && RequestType == ModifyRequestType::Add ? wsl::shared::retry::RetryWithTimeout<HRESULT>(
+                                                                             [&] { return THROW_IF_FAILED(attempt()); },
+                                                                             wsl::core::networking::AddEndpointRetryPeriod,
+                                                                             wsl::core::networking::AddEndpointRetryTimeout,
+                                                                             wsl::core::networking::AddEndpointRetryPredicate)
+                                                                       : attempt();
 
     if (RequestType == ModifyRequestType::Add && result == HCN_E_ENDPOINT_ALREADY_ATTACHED)
     {
