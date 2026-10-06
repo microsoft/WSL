@@ -1817,7 +1817,10 @@ class UnitTests
 
                 VERIFY_ARE_EQUAL(
                     FormatErrorMessage(
-                        wsl::shared::Localization::MessageInvalidCommandLine(invalidArgument, WSL_BINARY_NAME),
+                        std::format(
+                            L"Invalid command line argument: {}\r\n"
+                            L"Please use 'wsl.exe --help' to get a list of supported arguments.",
+                            invalidArgument),
                         L"Wsl/E_INVALIDARG"),
                     output);
 
@@ -7608,7 +7611,9 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
 
         VERIFY_ARE_EQUAL(
             FormatErrorMessage(
-                wsl::shared::Localization::MessageInvalidCommandLine(L"extra", WSL_BINARY_NAME), L"Wsl/E_INVALIDARG"),
+                L"Invalid command line argument: extra\r\n"
+                L"Please use 'wsl.exe --help' to get a list of supported arguments.",
+                L"Wsl/E_INVALIDARG"),
             invalidOutput);
 
         VERIFY_ARE_EQUAL(L"", invalidError);
