@@ -45,6 +45,13 @@ std::string EpochToLocalDisplayTime(LONGLONG timestamp);
 // preserved. An empty input returns an empty string; anything else that cannot be parsed throws.
 std::string Rfc3339ToUtcDisplayTime(std::string_view timestamp);
 
+// Renders nanoseconds since the unix epoch in docker's fixed layout "2006-01-02T15:04:05.000000000Z07:00",
+// shifted by offset, with 'Z' for a zero offset.
+std::string EpochToRfc3339Nano(std::int64_t epochNanoseconds, std::chrono::seconds offset);
+
+// Renders the same layout in the local time zone. Falls back to UTC when the time zone database is unavailable.
+std::string EpochToLocalRfc3339Nano(std::int64_t epochNanoseconds);
+
 // Renders an elapsed number of seconds as a coarse, localized description such as "About a minute"
 // or "3 weeks". Negative values are treated as zero.
 std::wstring FormatElapsedSeconds(LONGLONG elapsedSeconds);

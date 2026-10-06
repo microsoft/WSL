@@ -14,6 +14,7 @@ Abstract:
 
 #include "VolumeCommand.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "SessionTasks.h"
 #include "VolumeTasks.h"
 #include "Task.h"
@@ -45,8 +46,9 @@ std::wstring VolumeListCommand::LongDescription() const
 
 void VolumeListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << ResolveSession //
-            << GetVolumes     //
-            << ListVolumes;
+    context << ResolveSession     //
+            << GetVolumes         //
+            << FormatVolumeOutput //
+            << PrintFormattedOutput;
 }
 } // namespace wsl::windows::wslc

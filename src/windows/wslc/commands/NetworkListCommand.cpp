@@ -14,6 +14,7 @@ Abstract:
 
 #include "NetworkCommand.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "SessionTasks.h"
 #include "NetworkTasks.h"
 #include "Task.h"
@@ -46,8 +47,9 @@ std::wstring NetworkListCommand::LongDescription() const
 
 void NetworkListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << ResolveSession //
-            << GetNetworks    //
-            << ListNetworks;
+    context << ResolveSession      //
+            << GetNetworks         //
+            << FormatNetworkOutput //
+            << PrintFormattedOutput;
 }
 } // namespace wsl::windows::wslc
