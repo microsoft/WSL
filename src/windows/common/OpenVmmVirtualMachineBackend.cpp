@@ -420,7 +420,7 @@ VmPlatformCapabilities OpenVmmVirtualMachineBackend::QueryCapabilities()
     VmPlatformCapabilities capabilities;
     capabilities.Backend = BackendKind::OpenVmm;
     for (const auto feature :
-            {VmFeature::SerialConsole,
+         {VmFeature::SerialConsole,
           VmFeature::VirtioConsole,
           VmFeature::VirtioFsFileBacked,
           VmFeature::UserModeNatNetwork,
@@ -901,8 +901,7 @@ VmPortBinding OpenVmmVirtualMachineBackend::BindPort(VmDeviceId Device, const Vm
         TraceLoggingValue(Request.HostPort, "hostPort"),
         TraceLoggingValue(Request.GuestPort, "guestPort"));
     ValidateResourceId(Device, m_description.Identity);
-    THROW_HR_IF(
-        E_INVALIDARG, Request.ListenAddress.family != IpAddressFamily_V4 && Request.ListenAddress.family != IpAddressFamily_V6);
+    THROW_HR_IF(E_INVALIDARG, Request.ListenAddress.family != IpAddressFamily_V4 && Request.ListenAddress.family != IpAddressFamily_V6);
     THROW_HR_IF_MSG(
         c_notSupported, Request.HostPort == 0, "OpenVMM cannot report the allocated port for a dynamic host port binding");
     THROW_HR_IF(E_INVALIDARG, Request.GuestPort == 0);

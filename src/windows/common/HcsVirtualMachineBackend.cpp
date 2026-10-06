@@ -1303,7 +1303,7 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
     share.ReadOnly = Request.ReadOnly;
 
     const auto plan9Flags = std::holds_alternative<VmVirtioFsDevice>(device->second.Transport) ? schema::Plan9ShareFlags::None
-                                                                                           : GetPlan9ShareFlags(Request);
+                                                                                               : GetPlan9ShareFlags(Request);
     const auto inserted =
         m_fileSystemShares
             .emplace(share.Id.Value, FileSystemShare{share, std::move(mountOptions), plan9Flags, std::move(shareUserToken)})
