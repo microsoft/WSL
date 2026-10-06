@@ -671,15 +671,8 @@ try
 
         wsl::shared::SocketChannel channel(wil::unique_fd{ServiceSocket}, "OOBE");
 
-        std::string OobeCommand{};
-        int defaultUid = 0;
-        ConfigKeyPresence defaultUidPresent{};
-        std::vector<ConfigKey> keys = {ConfigKey("oobe.command", OobeCommand), ConfigKey("oobe.defaultUid", defaultUid, &defaultUidPresent)};
-
-        {
-            wil::unique_file File{fopen(WSL_DISTRIBUTION_CONF, "r")};
-            ParseConfigFile(keys, File.get(), (CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES), STRING_TO_WSTRING(CONFIG_FILE));
-        }
+        const auto manifest = wsl::linux::ParseWslDistributionManifest();
+        const auto& OobeCommand = manifest.OobeCommand;
 
         int32_t OobeResult = 0;
         if (!OobeCommand.empty())
@@ -704,11 +697,11 @@ try
             }
         }
 
-        if ((OobeResult == 0) && (defaultUidPresent == ConfigKeyPresence::Present) && (defaultUid >= 0) && UtilIsUtilityVm())
+        if ((OobeResult == 0) && manifest.DefaultUid.has_value() && (manifest.DefaultUid.value() >= 0) && UtilIsUtilityVm())
         {
             for (const auto Admin : {false, true})
             {
-                if (ConfigRefreshDrvFsOwner(defaultUid, Admin, Config) < 0)
+                if (ConfigRefreshDrvFsOwner(manifest.DefaultUid.value(), Admin, Config) < 0)
                 {
                     LOG_ERROR("Failed to refresh the {} DrvFs mount namespace after OOBE", Admin ? "elevated" : "non-elevated");
                 }
@@ -725,7 +718,7 @@ try
         result.Header.MessageType = LxInitOobeResult;
         result.Header.MessageSize = sizeof(result);
         result.Result = OobeResult;
-        result.DefaultUid = defaultUidPresent == ConfigKeyPresence::Present ? defaultUid : -1;
+        result.DefaultUid = manifest.DefaultUid.value_or(-1);
 
         channel.SendMessage(result);
 
@@ -734,7 +727,7 @@ try
             _exit(1);
         }
 
-        ConfigureUid(defaultUidPresent == ConfigKeyPresence::Present ? defaultUid : Common->Uid);
+        ConfigureUid(manifest.DefaultUid.has_value() ? manifest.DefaultUid.value() : Common->Uid);
     }
     else
     {
