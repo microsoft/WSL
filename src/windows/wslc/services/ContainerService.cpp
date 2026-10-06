@@ -1053,7 +1053,8 @@ void ContainerService::CopyFromContainer(Session& session, const std::string& id
     THROW_IF_FAILED(container->DownloadArchive(srcPath.c_str(), followLink, ToCOMInputHandle(outputHandle)));
 }
 
-void ContainerService::Logs(Session& session, const std::string& id, bool follow, bool timestamps, bool details, LONGLONG since, LONGLONG until, ULONGLONG tail)
+void ContainerService::Logs(
+    Session& session, const std::string& id, bool follow, bool timestamps, bool details, LONGLONG since, LONGLONG until, ULONGLONG tail, HANDLE cancelEvent)
 {
     [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
@@ -1082,7 +1083,13 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
             stderrHandle.Release(), GetStdHandle(STD_ERROR_HANDLE)));
     }
 
-    // TODO: Handle ctrl-c.
+    if (cancelEvent != nullptr)
+    {
+        io.AddHandle(
+            std::make_unique<wsl::windows::common::io::EventHandle>(cancelEvent),
+            wsl::windows::common::io::MultiHandleWait::CancelOnCompleted | wsl::windows::common::io::MultiHandleWait::NeedNotComplete);
+    }
+
     io.Run({});
 }
 
