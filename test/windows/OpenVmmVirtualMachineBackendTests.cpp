@@ -343,7 +343,7 @@ class OpenVmmVirtualMachineBackendTests
 
         decltype(capabilities.Features) expectedFeatures;
         for (const auto feature :
-               {VmFeature::SerialConsole,
+             {VmFeature::SerialConsole,
               VmFeature::VirtioConsole,
               VmFeature::VirtioFsFileBacked,
               VmFeature::UserModeNatNetwork,
