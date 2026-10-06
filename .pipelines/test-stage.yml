@@ -22,7 +22,7 @@ parameters:
     type: object
     default:
       - name: rs_prerelease
-        image: rs_prerelease-2025-01-30
+        image: rs_prerelease-2026-10-05
       - name: ni_release
         image: win11-23h2-ent-2024-11-18
       - name: fe_release
