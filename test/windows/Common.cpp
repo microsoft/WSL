@@ -3225,10 +3225,21 @@ void ValidateCOMErrorMessageContains(const std::wstring& ExpectedSubstring)
 
 std::wstring FormatErrorMessage(std::wstring_view message, std::wstring_view errorCode)
 {
+    std::wstring formattedMessage;
+    for (size_t index = 0; index < message.size(); ++index)
+    {
+        if (message[index] == L'\n' && (index == 0 || message[index - 1] != L'\r'))
+        {
+            formattedMessage += L'\r';
+        }
+
+        formattedMessage += message[index];
+    }
+
     return std::format(
         L"{}\r\nError code: {}\r\n"
         L"If this error was unexpected, please consider searching for existing issues or filing a new issue at "
         L"https://github.com/microsoft/WSL/issues.\r\n",
-        message,
+        formattedMessage,
         errorCode);
 }
