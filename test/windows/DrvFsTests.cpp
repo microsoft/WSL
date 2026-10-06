@@ -159,19 +159,10 @@ public:
 
         VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink1", L"file.txt", false));
         VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink2", L"dir", true));
-        // WSL2 uses LX symlinks for targets containing parent-relative components.
-        if (LxsstuVmMode())
-        {
-            VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink3"));
-            VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink4"));
-            VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink5"));
-        }
-        else
-        {
-            VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink3", L"..", true));
-            VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink4", L"..\\symlink\\file.txt", false));
-            VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink5", L"dir\\..\\file.txt", false));
-        }
+        // Depending on the host OS and backend, WSL2 may use LX symlinks for parent-relative targets.
+        VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink3", L"..", true, LxsstuVmMode()));
+        VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink4", L"..\\symlink\\file.txt", false, LxsstuVmMode()));
+        VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink5", L"dir\\..\\file.txt", false, LxsstuVmMode()));
 
         VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink6", L"ntlink1", false));
         VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink7", L"ntlink2", true));
@@ -179,11 +170,26 @@ public:
 
         VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink1"));
         VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink2"));
-        VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink3"));
+        if (LxsstuVmMode())
+        {
+            VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink3", L"ntlink2\\..\\file.txt", false, true));
+        }
+        else
+        {
+            VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink3"));
+        }
+
         VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink4"));
         VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink5"));
         VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink6"));
-        VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink7"));
+        if (LxsstuVmMode())
+        {
+            VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink7", L"dir\\..\\file.txt", false, true));
+        }
+        else
+        {
+            VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink7"));
+        }
 
         //
         // Check metadata is readable using Windows APIs.
@@ -1179,7 +1185,7 @@ private:
         }
     }
 
-    static VOID VerifyDrvFsSymlink(const std::wstring& Path, const std::wstring& ExpectedTarget, bool Directory)
+    static VOID VerifyDrvFsSymlink(const std::wstring& Path, const std::wstring& ExpectedTarget, bool Directory, bool AllowLxSymlink = false)
     {
 
         const std::wstring NtPath = L"\\DosDevices\\" + Path;
@@ -1195,6 +1201,12 @@ private:
 
         FILE_ATTRIBUTE_TAG_INFORMATION Info;
         THROW_IF_NTSTATUS_FAILED(NtQueryInformationFile(Symlink.get(), &IoStatus, &Info, sizeof(Info), FileAttributeTagInformation));
+
+        if (AllowLxSymlink && Info.ReparseTag == IO_REPARSE_TAG_LX_SYMLINK)
+        {
+            VerifyDrvFsLxSymlink(Path);
+            return;
+        }
 
         VERIFY_IS_TRUE((Info.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0);
         if (Directory != false)
