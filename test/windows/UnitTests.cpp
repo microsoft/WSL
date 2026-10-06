@@ -361,6 +361,9 @@ class UnitTests
             auto cleanupSystemd = EnableSystemd();
 
             auto validateBinfmt = []() {
+                const auto status = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/fs/binfmt_misc/status").first;
+                VERIFY_ARE_EQUAL(status, L"enabled\n");
+
                 // Validate that WSL's binfmt interpreter is still in place.
                 auto [cmdOutput, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
                 VERIFY_ARE_EQUAL(cmdOutput, L"ok\r\n");
@@ -376,8 +379,9 @@ class UnitTests
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl stop systemd-binfmt.service"), 0u);
             validateBinfmt();
 
-            auto restartBinfmt = []() {
+            auto restartBinfmt = [&]() {
                 VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl restart systemd-binfmt.service"), 0u);
+                validateBinfmt();
                 VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl is-active --quiet systemd-binfmt.service"), 0u);
                 const auto result =
                     LxsstuLaunchWslAndCaptureOutput(L"systemctl show --property=Result --value systemd-binfmt.service").first;
@@ -385,12 +389,10 @@ class UnitTests
             };
 
             restartBinfmt();
-            validateBinfmt();
 
             // Validate that the unit is regenerated after a daemon-reload.
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl daemon-reload"), 0u);
             restartBinfmt();
-            validateBinfmt();
 
             // Exercise both hooks independently of the distro's systemd-binfmt exit behavior.
             constexpr auto overridePath = L"/run/systemd/system/systemd-binfmt.service.d/wsl-test.conf";

@@ -409,12 +409,14 @@ ExecStart=/bin/mount -o bind,ro,X-mount.mkdir -t none /mnt/wslg/.X11-unix /tmp/.
 
         if (interopEnabled && protectBinfmt)
         {
+            // systemd-binfmt writes without O_TRUNC; reset the shadow to remove trailing data.
             const auto restoreBinfmtCommand = std::format(
-                R"((echo -1 > {}/{}) ; (echo "{}" > {}))",
+                R"((echo -1 > {}/{}) ; (echo "{}" > {}) && (echo enabled > {}/status))",
                 BINFMT_MISC_MOUNT_TARGET,
                 LX_INIT_BINFMT_NAME,
                 BINFMT_INTEROP_REGISTRATION_STRING_VM(LX_INIT_BINFMT_NAME),
-                BINFMT_MISC_REGISTER_FILE);
+                BINFMT_MISC_REGISTER_FILE,
+                BINFMT_MISC_MOUNT_TARGET);
 
             // N.B. ExecStop is required to prevent distributions from removing the WSL binfmt entry on shutdown.
             // Restore interop on both startup paths without hiding service failures.
@@ -2979,6 +2981,7 @@ Routine Description:
 
     Writes succeed without changing kernel state, allowing systemd-binfmt to
     start successfully. Reads reflect the shadow file, not the kernel status.
+    The generated service hooks restore "enabled\n" after startup.
 
 Arguments:
 
