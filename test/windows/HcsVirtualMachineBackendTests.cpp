@@ -608,13 +608,7 @@ class HcsVirtualMachineBackendTests
                 backend->AddFileSystemShare(device, original).Id.Value, backend->AddFileSystemShare(device, conflicting).Id.Value);
             wil::unique_handle duplicatedToken;
             THROW_IF_WIN32_BOOL_FALSE(DuplicateHandle(
-                GetCurrentProcess(),
-                conflicting.UserToken.get(),
-                GetCurrentProcess(),
-                duplicatedToken.put(),
-                0,
-                FALSE,
-                DUPLICATE_SAME_ACCESS));
+                GetCurrentProcess(), conflicting.UserToken->get(), GetCurrentProcess(), duplicatedToken.put(), 0, FALSE, DUPLICATE_SAME_ACCESS));
             conflicting.UserToken = wil::shared_handle{duplicatedToken.release()};
             VERIFY_ARE_EQUAL(
                 backend->AddFileSystemShare(device, original).Id.Value, backend->AddFileSystemShare(device, conflicting).Id.Value);

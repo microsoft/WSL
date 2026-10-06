@@ -1210,25 +1210,27 @@ const HcsVirtualMachineBackend::FileSystemShare* HcsVirtualMachineBackend::FindF
     for (const auto& entry : m_fileSystemShares)
     {
         const auto& share = entry.second;
-        if ((share.Device.Value == Device.Value) && (share.EffectiveHostPath.native() == HostPath) && (share.Backend.MountOptions == MountOptions))
+        if (share.Device.Value != Device.Value)
         {
-            const auto& address = std::get<VmVirtioFsShareAddress>(share.GuestAddress);
-            if (!Request.Name.empty() && address.ChildName != Request.Name)
-            {
-                continue;
-            }
+            continue;
+        }
 
-            const bool equivalent = share.EffectiveHostPath.native() == HostPath && share.Backend.MountOptions == MountOptions &&
-                                    share.ReadOnly == Request.ReadOnly &&
-                                    AreSameTokens(ResolveUserToken({share.Backend.UserToken}).get(), UserToken);
+        const auto& address = std::get<VmVirtioFsShareAddress>(share.GuestAddress);
+        const bool nameMatches = Request.Name.empty() || address.ChildName == Request.Name;
+        const bool equivalent = nameMatches && share.EffectiveHostPath.native() == HostPath &&
+                                share.Backend.MountOptions == MountOptions && share.ReadOnly == Request.ReadOnly &&
+                                AreSameTokens(ResolveUserToken({share.Backend.UserToken}).get(), UserToken);
+        if (!Request.Name.empty() && address.ChildName == Request.Name)
+        {
             THROW_HR_IF_MSG(
                 HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
-                !Request.Name.empty() && !equivalent,
+                !equivalent,
                 "A file system share with this name already exists with a different request");
-            if (equivalent)
-            {
-                return &share;
-            }
+        }
+
+        if (equivalent)
+        {
+            return &share;
         }
     }
 
