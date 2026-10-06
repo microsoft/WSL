@@ -92,6 +92,7 @@ public:
             RemoveDirectory(LXSST_DRVFS_SYMLINK_TEST_DIR "\\dir");
             DeleteFileW(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink1");
             RemoveDirectory(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink2");
+            DeleteFileW(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink3");
             RemoveDirectory(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink3");
             DeleteFileW(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink4");
             DeleteFileW(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink5");
@@ -153,45 +154,36 @@ public:
         VERIFY_ARE_EQUAL(Expected, Attributes);
 
         //
-        // Check the NT symlinks.
+        // Check symlink types and targets.
         //
 
         VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink1", L"file.txt", false));
         VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink2", L"dir", true));
-        VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink3", L"..", true));
-        VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink4", L"..\\symlink\\file.txt", false));
-        VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink5", L"dir\\..\\file.txt", false));
+        // WSL2 uses LX symlinks for targets containing parent-relative components.
+        if (LxsstuVmMode())
+        {
+            VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink3"));
+            VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink4"));
+            VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink5"));
+        }
+        else
+        {
+            VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink3", L"..", true));
+            VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink4", L"..\\symlink\\file.txt", false));
+            VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink5", L"dir\\..\\file.txt", false));
+        }
+
         VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink6", L"ntlink1", false));
         VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink7", L"ntlink2", true));
         VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink8", L"foo\uf03abar", false));
 
         VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink1"));
         VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink2"));
-
-        // Since target resolution is done on the Windows side in Plan 9 and VirtioFs, it is able to create an NT
-        // link if the target path traverses an existing NT link (this is actually better than WSL 1).
-        if (LxsstuVmMode())
-        {
-            VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink3", L"ntlink2\\..\\file.txt", false));
-        }
-        else
-        {
-            VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink3"));
-        }
-
+        VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink3"));
         VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink4"));
         VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink5"));
         VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink6"));
-
-        // Plan 9 and VirtioFs don't know about the Linux mount point on "dir", so it creates an NT link in this case.
-        if (LxsstuVmMode())
-        {
-            VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink7", L"dir\\..\\file.txt", false));
-        }
-        else
-        {
-            VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink7"));
-        }
+        VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink7"));
 
         //
         // Check metadata is readable using Windows APIs.
