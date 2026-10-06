@@ -2,6 +2,7 @@
 
 #include "precomp.h"
 #include "Common.h"
+#include "OpenVmmNatNetworking.h"
 #include "OpenVmmVirtualMachineBackend.h"
 #include "VirtualMachineBackendTestHelpers.h"
 
@@ -110,8 +111,29 @@ class OpenVmmVirtualMachineBackendTests
             VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
             *feature = VmFeatureRequest::Disabled;
         }
+
         request.Memory.HostingProcessNameSuffix = L"WSL";
         VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+    }
+
+    TEST_METHOD(OpenVmmNatUsesCreationTimeAdapterAndGuestDhcp)
+    {
+        const auto request = wsl::core::CreateOpenVmmNatNetworkAdapterRequest();
+        VERIFY_ARE_EQUAL(L"eth0", request.Tag);
+        const auto& network = std::get<VmUserModeNatNetwork>(request.Configuration);
+        constexpr wsl::shared::string::MacAddress expectedMac{0x00, 0x00, 0x00, 0x00, 0x01, 0x00};
+        VERIFY_IS_TRUE(network.ClientMacAddress() == expectedMac);
+
+        auto [client, server] = MakeSocketPair();
+        wsl::core::OpenVmmNatNetworking networking(wsl::core::GnsChannel(std::move(server)), true, 5000);
+        LX_MINI_INIT_NETWORKING_CONFIGURATION configuration{};
+        networking.FillInitialConfiguration(configuration);
+
+        VERIFY_ARE_EQUAL(LxMiniInitNetworkingModeNat, configuration.NetworkingMode);
+        VERIFY_IS_TRUE(configuration.DisableIpv6);
+        VERIFY_IS_TRUE(configuration.EnableDhcpClient);
+        VERIFY_ARE_EQUAL(5, configuration.DhcpTimeout);
+        VERIFY_ARE_EQUAL(LxMiniInitPortTrackerTypeRelay, configuration.PortTrackerType);
     }
 
     TEST_METHOD(AllowsGuestAndSavedStateCrashCapture)
@@ -243,10 +265,10 @@ class OpenVmmVirtualMachineBackendTests
     TEST_METHOD(GuestShutdownTerminatesProcess)
     {
         SKIP_TEST_ARM64();
-        auto backend = OpenVmmVirtualMachineBackend::Create(CreateRunnableRequest());
-        auto terminationEvent = backend->GetTerminationEvent();
         wil::unique_event callbackEvent{wil::EventOptions::ManualReset};
         GUID callbackVmId{};
+        auto backend = OpenVmmVirtualMachineBackend::Create(CreateRunnableRequest());
+        auto terminationEvent = backend->GetTerminationEvent();
         backend->RegisterTerminationCallback([&](GUID VmId) {
             callbackVmId = VmId;
             callbackEvent.SetEvent();

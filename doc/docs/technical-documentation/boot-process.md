@@ -63,7 +63,7 @@ By default, the WSL2 virtual machine is created via the [Host Compute System (HC
 gpuSupport=false
 guiApplications=false
 hostFileSystemAccess=false
-networkingMode=none
+networkingMode=nat
 
 [experimental]
 openVmm=true
@@ -74,7 +74,7 @@ OpenVMM currently does not support:
 - ARM64 or UEFI boot
 - GPU assignment or WSLg shared memory
 - Persistent-memory or physical-disk devices
-- Mirrored or bridged networking
+- Mirrored or bridged networking, custom NAT addressing, Hyper-V firewall, DNS tunneling, or IPv6
 - Nested virtualization, performance counters, or advanced memory controls
 - Plan 9 file sharing or per-user virtio-fs options
 

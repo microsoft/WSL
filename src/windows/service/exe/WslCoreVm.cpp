@@ -21,6 +21,7 @@ Abstract:
 #include "disk.hpp"
 #include "WslCoreInstance.h"
 #include "NatNetworking.h"
+#include "OpenVmmNatNetworking.h"
 #include "BridgedNetworking.h"
 #include "MirroredNetworking.h"
 #include "WslCoreFirewallSupport.h"
@@ -569,8 +570,9 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     message->MemoryReclaimMode = static_cast<LX_MINI_INIT_MEMORY_RECLAIM_MODE>(m_vmConfig.MemoryReclaim);
     message->EnableDebugShell = m_vmConfig.EnableDebugShell;
     message->EnableSafeMode = m_vmConfig.EnableSafeMode;
-    // Consomme forwards DNS via the host proxy, so the dedicated DNS hvsocket is only used by NAT and Mirrored modes.
-    message->EnableDnsTunneling = m_vmConfig.EnableDnsTunneling && m_vmConfig.NetworkingMode != NetworkingMode::Consomme;
+    // User-mode NAT forwards DNS via the host proxy, so the dedicated DNS hvsocket is only used by HCS NAT and Mirrored modes.
+    message->EnableDnsTunneling = m_vmConfig.EnableDnsTunneling && m_vmConfig.NetworkingMode != NetworkingMode::Consomme &&
+                                  backendKind != BackendKind::OpenVmm;
     message->DefaultKernel = m_defaultKernel;
     message->IsolateDistroCgroup = m_vmConfig.IsolateDistroCgroup;
     message->KernelModulesDeviceId = m_kernelModulesDeviceId;
@@ -600,7 +602,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         // For NAT networking, ensure the network can be created. If creating the network fails, fall back to
         // Consomme networking mode.
         wsl::windows::common::hcs::unique_hcn_network natNetwork;
-        if (m_vmConfig.NetworkingMode == NetworkingMode::Nat)
+        if (backendKind == BackendKind::Hcs && m_vmConfig.NetworkingMode == NetworkingMode::Nat)
         {
             {
                 SlowOperationWatcher slowOperation{"CreateNatNetwork"};
@@ -617,6 +619,22 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
         // Create and initialize the networking engine.
         const auto result = wil::ResultFromException(WI_DIAGNOSTICS_INFO, [&] {
+            if (backendKind == BackendKind::OpenVmm)
+            {
+                if (m_vmConfig.NetworkingMode == NetworkingMode::Nat)
+                {
+                    m_networkingEngine = std::make_unique<wsl::core::OpenVmmNatNetworking>(
+                        std::move(gnsChannel), m_vmConfig.EnableLocalhostRelay, m_vmConfig.DhcpTimeout);
+                    m_networkingEngine->Initialize();
+                }
+                else
+                {
+                    WI_ASSERT(m_vmConfig.NetworkingMode == NetworkingMode::None);
+                }
+
+                return;
+            }
+
             // N.B. The existing networking engines still manage HCS resources directly. Keep this
             // concrete escape hatch localized here until they are moved onto IVirtualMachineBackend.
             auto& hcsBackend = static_cast<HcsVirtualMachineBackend&>(*m_backend);
@@ -1363,7 +1381,9 @@ void WslCoreVm::ValidateBackendConfiguration(BackendKind Backend) const
     THROW_HR_IF_MSG(
         notSupported, m_vmConfig.EnableHostFileSystemAccess, "OpenVMM host filesystem access is not integrated with WslCoreVm");
     THROW_HR_IF_MSG(
-        notSupported, m_vmConfig.NetworkingMode != NetworkingMode::None, "OpenVMM networking is not integrated with WslCoreVm");
+        notSupported,
+        m_vmConfig.NetworkingMode != NetworkingMode::None && m_vmConfig.NetworkingMode != NetworkingMode::Nat,
+        "OpenVMM only supports NAT or disabled networking");
 }
 
 VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId, BackendKind Backend)
@@ -1549,6 +1569,10 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId, BackendKind 
     if (!m_vmConfig.KernelModulesPath.empty())
     {
         addBootDisk(L"kernel-modules", m_vmConfig.KernelModulesPath, m_privateKernelModules);
+    }
+    if (Backend == BackendKind::OpenVmm && m_vmConfig.NetworkingMode == NetworkingMode::Nat)
+    {
+        request.NetworkAdapters.emplace_back(wsl::core::CreateOpenVmmNatNetworkAdapterRequest());
     }
 
     return request;
