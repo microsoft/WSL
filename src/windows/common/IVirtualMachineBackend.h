@@ -109,14 +109,15 @@ enum class VmFeature
     NestedVirtualization,
     PerfmonPmu,
     PerfmonLbr,
+    MemoryOvercommit,
     DeferredMemoryCommit,
     ColdDiscard,
     SmallPageMemory,
+    HighMmio,
+    HostingProcessNameSuffix,
     PhysicalDisk,
     SerialConsole,
-    VirtioConsole,
     VirtioFsFileBacked,
-    SavedStateOnCrash,
     UserModeNatNetwork,
     TcpPortBinding,
     UdpPortBinding,
@@ -125,7 +126,7 @@ enum class VmFeature
     Count
 };
 
-static_assert(static_cast<size_t>(VmFeature::Count) == 16);
+static_assert(static_cast<size_t>(VmFeature::Count) == 17);
 
 struct VmPlatformCapabilities
 {

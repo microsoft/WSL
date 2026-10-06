@@ -152,6 +152,8 @@ std::unique_ptr<WslCoreVm> WslCoreVm::Create(
 void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken)
 {
     auto signalEarlyTermination = wil::scope_exit([&] { m_terminatingEvent.SetEvent(); });
+    const auto backendKind = SelectVirtualMachineBackendKind(m_vmConfig.EnableOpenVmm);
+    ValidateBackendConfiguration(backendKind);
 
     // create a restricted version of the token.
     m_userToken = UserToken;
@@ -279,7 +281,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
     // If the system supports virtio console serial ports, use dmesg capture for telemetry and/or debug output.
     // Legacy serial is much slower, so this is not enabled without virtio console support.
-    auto enableVirtioSerial = m_vmConfig.EnableVirtio && helpers::IsVirtioSerialConsoleSupported();
+    const auto enableVirtioSerial =
+        m_vmConfig.EnableVirtio && (backendKind != BackendKind::Hcs || helpers::IsVirtioSerialConsoleSupported());
     m_vmConfig.EnableDebugShell &= enableVirtioSerial;
     if (enableVirtioSerial)
     {
@@ -296,7 +299,6 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
                 m_debugShellPipe = wsl::windows::common::wslutil::GetDebugShellPipeName(&m_userSid.Sid);
             }
 
-            // Initialize the guest telemetry logger.
             m_gnsTelemetryLogger = GuestTelemetryLogger::Create(VmId, m_vmExitEvent);
         }
         CATCH_LOG()
@@ -330,10 +332,9 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
     // Create the utility VM through the selected backend. WslCoreVm owns WSL protocol and
     // product policy; the backend owns the platform-specific virtual machine lifetime.
-    const auto backendKind = SelectVirtualMachineBackendKind(m_vmConfig.EnableOpenVmm);
     auto backendRequest = GenerateBackendRequest(VmId, backendKind);
     {
-        SlowOperationWatcher slowOperation{backendKind == BackendKind::OpenVmm ? "OpenVmmCreateSystem" : "HcsCreateSystem"};
+        SlowOperationWatcher slowOperation{"CreateVirtualMachineBackend"};
         m_backend = CreateVirtualMachineBackend(backendKind, backendRequest);
     }
     m_runtimeId = m_backend->GetDescription().Identity.VmId;
@@ -1348,6 +1349,23 @@ std::optional<VmFileSystemShare> WslCoreVm::FindVirtioFsShare(_In_ PCWSTR Tag, _
     });
 }
 
+void WslCoreVm::ValidateBackendConfiguration(BackendKind Backend) const
+{
+    if (Backend == BackendKind::Hcs)
+    {
+        return;
+    }
+
+    constexpr auto notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+    THROW_HR_IF_MSG(notSupported, wsl::shared::Arm64, "OpenVMM is supported only on x64");
+    THROW_HR_IF_MSG(notSupported, m_vmConfig.EnableGpuSupport, "OpenVMM does not support GPU assignment");
+    THROW_HR_IF_MSG(notSupported, m_vmConfig.EnableGuiApps, "OpenVMM does not support GUI applications");
+    THROW_HR_IF_MSG(
+        notSupported, m_vmConfig.EnableHostFileSystemAccess, "OpenVMM host filesystem access is not integrated with WslCoreVm");
+    THROW_HR_IF_MSG(
+        notSupported, m_vmConfig.NetworkingMode != NetworkingMode::None, "OpenVMM networking is not integrated with WslCoreVm");
+}
+
 VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId, BackendKind Backend)
 {
     VmCreateRequest request{};
@@ -1360,10 +1378,13 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId, BackendKind 
     request.Processor.PerfmonLbr = request.Processor.PerfmonPmu;
 
     request.Memory.SizeBytes = (m_vmConfig.MemorySizeBytes / (2 * _1MB)) * (2 * _1MB);
-    request.Memory.AllowOvercommit = VmFeatureRequest::Required;
-    request.Memory.DeferredCommit = VmFeatureRequest::Required;
-    request.Memory.ColdDiscard = VmFeatureRequest::Required;
     const auto backendCapabilities = QueryVirtualMachineBackendCapabilities(Backend);
+    auto requestFeature = [&](VmFeature Feature) {
+        return backendCapabilities.Features.test(static_cast<size_t>(Feature)) ? VmFeatureRequest::Required : VmFeatureRequest::Disabled;
+    };
+    request.Memory.AllowOvercommit = requestFeature(VmFeature::MemoryOvercommit);
+    request.Memory.DeferredCommit = requestFeature(VmFeature::DeferredMemoryCommit);
+    request.Memory.ColdDiscard = requestFeature(VmFeature::ColdDiscard);
     if (backendCapabilities.Features.test(static_cast<size_t>(VmFeature::SmallPageMemory)))
     {
         request.Memory.SmallPageBacking = VmFeatureRequest::Required;
@@ -1377,7 +1398,7 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId, BackendKind 
         m_pageReportingOrder = 9;
     }
 
-    if (helpers::IsVmemmSuffixSupported())
+    if (backendCapabilities.Features.test(static_cast<size_t>(VmFeature::HostingProcessNameSuffix)))
     {
         request.Memory.HostingProcessNameSuffix = wsl::windows::common::wslutil::c_vmOwner;
     }
@@ -1410,19 +1431,27 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId, BackendKind 
             WSL_E_CUSTOM_SYSTEM_DISTRO_ERROR,
             m_systemDistroDeviceType == LxMiniInitMountDeviceTypeInvalid ||
                 !wsl::windows::common::filesystem::FileExists(m_vmConfig.SystemDistroPath.c_str()));
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+            Backend == BackendKind::OpenVmm && m_systemDistroDeviceType == LxMiniInitMountDeviceTypePmem,
+            "OpenVMM does not support a persistent-memory system distro");
     }
 
-    SafeInt<INT64> highMmioGapInMB = DEFAULT_HIGH_MMIO_GAP_IN_MB;
-    if (m_vmConfig.EnableGuiApps && m_vmConfig.EnableVirtio)
+    SafeInt<INT64> highMmioGapInMB = 0;
+    if (backendCapabilities.Features.test(static_cast<size_t>(VmFeature::HighMmio)))
     {
-        highMmioGapInMB += WSLG_SHARED_MEMORY_SIZE_MB + EXTRA_MMIO_SIZE_PER_VIRTIOFS_DEVICE_IN_MB;
+        highMmioGapInMB = DEFAULT_HIGH_MMIO_GAP_IN_MB;
+        if (m_vmConfig.EnableGuiApps && m_vmConfig.EnableVirtio)
+        {
+            highMmioGapInMB += WSLG_SHARED_MEMORY_SIZE_MB + EXTRA_MMIO_SIZE_PER_VIRTIOFS_DEVICE_IN_MB;
+        }
+        if (m_systemDistroDeviceType == LxMiniInitMountDeviceTypePmem)
+        {
+            highMmioGapInMB += RequiredExtraMmioSpaceForPmemFileInMb(m_vmConfig.SystemDistroPath.c_str());
+        }
+        request.Mmio.HighWindowSizeBytes = static_cast<std::uint64_t>(highMmioGapInMB) * _1MB;
+        request.Mmio.MaximumGuestAddressBits = 36;
     }
-    if (m_systemDistroDeviceType == LxMiniInitMountDeviceTypePmem)
-    {
-        highMmioGapInMB += RequiredExtraMmioSpaceForPmemFileInMb(m_vmConfig.SystemDistroPath.c_str());
-    }
-    request.Mmio.HighWindowSizeBytes = static_cast<std::uint64_t>(highMmioGapInMB) * _1MB;
-    request.Mmio.MaximumGuestAddressBits = 36;
 
     WSL_LOG(
         "InitializeSystemDistro",
@@ -1485,8 +1514,10 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId, BackendKind 
     if (m_vmConfig.MaxCrashDumpCount >= 0)
     {
         kernelCmdLine += L" " WSL_ENABLE_CRASH_DUMP_ENV L"=1";
-        request.CrashCapture =
-            VmCrashCaptureRequest{m_vmConfig.CrashDumpFolder, gsl::narrow_cast<std::uint32_t>(m_vmConfig.MaxCrashDumpCount)};
+        VmCrashCaptureRequest crashCapture{m_vmConfig.CrashDumpFolder, gsl::narrow_cast<std::uint32_t>(m_vmConfig.MaxCrashDumpCount)};
+        crashCapture.SavedStateFolder = m_vmConfig.CrashDumpFolder;
+        crashCapture.Policy = VmSelectionPolicy::Preferred;
+        request.CrashCapture = std::move(crashCapture);
     }
     if (!m_vmConfig.KernelCommandLine.empty())
     {

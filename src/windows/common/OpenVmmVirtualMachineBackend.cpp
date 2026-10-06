@@ -16,6 +16,7 @@ Abstract:
 #include "OpenVmmVirtualMachineBackend.h"
 #include <afunix.h>
 #include <bitset>
+#include <ctime>
 #include "HandleIO.h"
 #include "SubProcess.h"
 #include "wslopenvmm.h"
@@ -31,6 +32,8 @@ namespace validation = wsl::windows::common::vm::validation;
 namespace {
 
 constexpr UINT32 c_rpcTimeoutMs = 30000;
+constexpr std::wstring_view c_savedStatePrefix = L"saved-state-";
+constexpr std::wstring_view c_savedStateExtension = L".vmrs";
 // Hybrid vsock embeds the AF_VSOCK port in the first field of this AF_HYPERV service ID.
 constexpr std::wstring_view c_vsockServiceIdSuffix = L"-facb-11e6-bd58-64006a7986d3";
 
@@ -64,6 +67,20 @@ void DeleteOwnedFile(const std::filesystem::path& Path) noexcept
             LOG_WIN32(error);
         }
     }
+}
+
+std::filesystem::path PrepareCrashDumpPath(const VmCrashCaptureRequest& Request, const VmInstanceId& Identity)
+{
+    auto runAsUser = wil::impersonate_token(Identity.UserToken.get());
+    wsl::windows::common::filesystem::EnsureDirectory(Request.SavedStateFolder->c_str());
+    const auto predicate = [](const auto& entry) {
+        return entry.path().has_extension() && entry.path().extension() == c_savedStateExtension && entry.path().has_filename() &&
+               entry.path().filename().wstring().starts_with(c_savedStatePrefix) && entry.file_size() > 0;
+    };
+    wsl::windows::common::wslutil::EnforceFileLimit(Request.SavedStateFolder->c_str(), static_cast<size_t>(Request.MaxSavedStateCount), predicate);
+
+    const auto vmId = wsl::shared::string::GuidToString<wchar_t>(Identity.VmId, wsl::shared::string::GuidToStringFlags::None);
+    return Request.SavedStateFolder.value() / std::format(L"{}{}-{}{}", c_savedStatePrefix, std::time(nullptr), vmId, c_savedStateExtension);
 }
 
 std::filesystem::path GetVsockListenerPath(const std::filesystem::path& VsockPath, GuestServicePort Port)
@@ -120,20 +137,22 @@ VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmC
             Request.Memory.PageReportingOrder.has_value() || Request.Memory.HostingProcessNameSuffix.has_value());
     THROW_HR_IF(c_notSupported, Request.Mmio.HighWindowSizeBytes != 0 || Request.Mmio.MaximumGuestAddressBits.has_value());
 
-    if (Request.CrashCapture)
+    if (Request.CrashCapture && Request.CrashCapture->SavedStateFolder)
     {
-        THROW_HR_IF(c_notSupported, Request.CrashCapture->Policy == VmSelectionPolicy::Required);
+        THROW_HR_IF(E_INVALIDARG, Request.CrashCapture->SavedStateFolder->empty());
     }
 
     description.Boot.Method = VmBootMethod::LinuxDirect;
     description.Boot.KernelCommandLine = Request.Boot.KernelCommandLine;
 
+    std::uint32_t nextVirtioConsolePort = 0;
     for (const auto& console : Request.Consoles)
     {
         if (!std::holds_alternative<VmSerialConsole>(console.Device))
         {
             const auto& virtio = std::get<VmVirtioConsole>(console.Device);
-            THROW_HR_IF(c_notSupported, virtio.Port != 0 || !virtio.GuestName.empty());
+            THROW_HR_IF(c_notSupported, virtio.Port != nextVirtioConsolePort || virtio.GuestName != std::format(L"hvc{}", nextVirtioConsolePort));
+            ++nextVirtioConsolePort;
         }
         description.Boot.Consoles.push_back(console);
     }
@@ -317,12 +336,18 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
 
     UniqueConfig config;
     THROW_IF_FAILED(WslOpenVmmCreateConfig(config.put()));
+    THROW_IF_FAILED(WslOpenVmmConfigSetExitOnGuestPowerEvents(config.get()));
     THROW_IF_FAILED(WslOpenVmmConfigSetKernelPath(config.get(), Request.Boot.KernelPath.c_str()));
     THROW_IF_FAILED(WslOpenVmmConfigSetInitrdPath(config.get(), Request.Boot.InitrdPath.c_str()));
     THROW_IF_FAILED(WslOpenVmmConfigSetKernelCmdLine(config.get(), m_description.Boot.KernelCommandLine.c_str()));
     THROW_IF_FAILED(WslOpenVmmConfigSetMemoryMb(config.get(), m_description.Memory.SizeBytes / (1024 * 1024)));
     THROW_IF_FAILED(WslOpenVmmConfigSetProcessorCount(config.get(), Request.Processor.Count));
     THROW_IF_FAILED(WslOpenVmmConfigSetHvSocketPath(config.get(), m_fileSystemResources.VsockPath.c_str()));
+    if (Request.CrashCapture && Request.CrashCapture->SavedStateFolder)
+    {
+        const auto crashDumpPath = PrepareCrashDumpPath(Request.CrashCapture.value(), Request.Identity);
+        THROW_IF_FAILED(WslOpenVmmConfigSetCrashDumpPath(config.get(), crashDumpPath.c_str()));
+    }
     for (const auto& [tag, attachment] : m_description.NetworkAdapters)
     {
         const auto nicId =
@@ -351,7 +376,8 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
         }
         else
         {
-            THROW_IF_FAILED(WslOpenVmmConfigSetVirtioConsolePath(config.get(), std::get<VmVirtioConsole>(console.Device).NamedPipe.c_str()));
+            const auto& virtio = std::get<VmVirtioConsole>(console.Device);
+            THROW_IF_FAILED(WslOpenVmmConfigAddVirtioConsolePath(config.get(), virtio.NamedPipe.c_str()));
         }
     }
 
@@ -438,7 +464,6 @@ VmPlatformCapabilities OpenVmmVirtualMachineBackend::QueryCapabilities()
     capabilities.Backend = BackendKind::OpenVmm;
     for (const auto feature :
          {VmFeature::SerialConsole,
-          VmFeature::VirtioConsole,
           VmFeature::VirtioFsFileBacked,
           VmFeature::UserModeNatNetwork,
           VmFeature::TcpPortBinding,
@@ -506,7 +531,6 @@ void OpenVmmVirtualMachineBackend::Terminate()
         "OpenVmmTeardownVm",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
         TraceLoggingHResult(teardownResult, "result"));
-    THROW_IF_FAILED(teardownResult);
     const auto quitResult = WslOpenVmmVmQuit(m_vm.get());
     const auto waitResult = WaitForSingleObject(m_process.get(), c_rpcTimeoutMs);
     const auto waitError = waitResult == WAIT_FAILED ? GetLastError() : ERROR_SUCCESS;
@@ -521,6 +545,7 @@ void OpenVmmVirtualMachineBackend::Terminate()
     if (waitResult != WAIT_OBJECT_0)
     {
         THROW_IF_FAILED(quitResult);
+        THROW_IF_FAILED(teardownResult);
         THROW_HR(HRESULT_FROM_WIN32(WAIT_TIMEOUT));
     }
 

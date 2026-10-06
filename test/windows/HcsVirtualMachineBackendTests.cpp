@@ -175,11 +175,14 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(request.Boot.KernelCommandLine, description.Boot.KernelCommandLine);
         const auto capabilities = backend->GetCapabilities();
         VERIFY_ARE_EQUAL(BackendKind::Hcs, capabilities.Backend);
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::MemoryOvercommit)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::DeferredMemoryCommit)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::ColdDiscard)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::HighMmio)));
         VERIFY_ARE_EQUAL(
-            wsl::windows::common::helpers::IsWindows11OrAbove(),
-            capabilities.Features.test(static_cast<size_t>(VmFeature::SavedStateOnCrash)));
+            wsl::windows::common::helpers::IsVmemmSuffixSupported(),
+            capabilities.Features.test(static_cast<size_t>(VmFeature::HostingProcessNameSuffix)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::SerialConsole)));
-        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::VirtioConsole)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::VirtioFsFileBacked)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::UserModeNatNetwork)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::TcpPortBinding)));

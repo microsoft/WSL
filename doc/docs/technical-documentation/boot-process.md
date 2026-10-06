@@ -56,9 +56,15 @@ When [wslservice.exe](wslservice.exe.md) receives the CreateInstance() call via 
 
 To start a WSL2 distribution, [wslservice.exe](wslservice.exe.md) needs a virtual machine. If the virtual machine isn't already running, it will be created as part of the `CreateInstance()` call. 
 
-By default, the WSL2 virtual machine is created via the [Host Compute System (HCS) service](https://learn.microsoft.com/virtualization/api/hcs/overview). The experimental OpenVMM backend can be selected in `.wslconfig`:
+By default, the WSL2 virtual machine is created via the [Host Compute System (HCS) service](https://learn.microsoft.com/virtualization/api/hcs/overview). The experimental OpenVMM backend can be selected with its initial supported `.wslconfig` profile:
 
 ```ini
+[wsl2]
+gpuSupport=false
+guiApplications=false
+hostFileSystemAccess=false
+networkingMode=none
+
 [experimental]
 openVmm=true
 ```
@@ -69,7 +75,6 @@ OpenVMM currently does not support:
 - GPU assignment or WSLg shared memory
 - Persistent-memory or physical-disk devices
 - Mirrored or bridged networking
-- Saved-state crash capture
 - Nested virtualization, performance counters, or advanced memory controls
 - Plan 9 file sharing or per-user virtio-fs options
 

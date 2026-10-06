@@ -537,11 +537,12 @@ VmPlatformCapabilities HcsVirtualMachineBackend::QueryCapabilities()
     capabilities.Backend = BackendKind::Hcs;
     for (const auto feature :
          {VmFeature::NestedVirtualization,
+          VmFeature::MemoryOvercommit,
           VmFeature::DeferredMemoryCommit,
           VmFeature::ColdDiscard,
           VmFeature::SmallPageMemory,
+          VmFeature::HighMmio,
           VmFeature::SerialConsole,
-          VmFeature::VirtioConsole,
           VmFeature::PhysicalDisk,
           VmFeature::VirtioFsFileBacked,
           VmFeature::UserModeNatNetwork,
@@ -554,8 +555,7 @@ VmPlatformCapabilities HcsVirtualMachineBackend::QueryCapabilities()
 
     capabilities.Features.set(static_cast<size_t>(VmFeature::NestedVirtualization), schema::IsNestedVirtualizationSupported());
     capabilities.Features.set(static_cast<size_t>(VmFeature::SmallPageMemory), schema::IsSmallPageMemorySupported());
-    // Saved-state crash capture needs the DebugOptions of schema 2.7, which Windows 10 does not have.
-    capabilities.Features.set(static_cast<size_t>(VmFeature::SavedStateOnCrash), wsl::windows::common::helpers::IsWindows11OrAbove());
+    capabilities.Features.set(static_cast<size_t>(VmFeature::HostingProcessNameSuffix), wsl::windows::common::helpers::IsVmemmSuffixSupported());
     const auto [perfmonPmuSupported, perfmonLbrSupported] = schema::GetPerfmonCapabilities();
     capabilities.Features.set(static_cast<size_t>(VmFeature::PerfmonPmu), perfmonPmuSupported);
     capabilities.Features.set(static_cast<size_t>(VmFeature::PerfmonLbr), perfmonLbrSupported);

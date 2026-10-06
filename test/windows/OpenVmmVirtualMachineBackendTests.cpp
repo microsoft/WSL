@@ -103,8 +103,25 @@ class OpenVmmVirtualMachineBackendTests
         request.Mmio.HighWindowSizeBytes = c_mib;
         VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
         request.Mmio = {};
-        request.Memory.SmallPageBacking = VmFeatureRequest::Required;
+        for (auto* feature :
+             {&request.Memory.AllowOvercommit, &request.Memory.DeferredCommit, &request.Memory.ColdDiscard, &request.Memory.SmallPageBacking})
+        {
+            *feature = VmFeatureRequest::Required;
+            VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+            *feature = VmFeatureRequest::Disabled;
+        }
+        request.Memory.HostingProcessNameSuffix = L"WSL";
         VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+    }
+
+    TEST_METHOD(AllowsGuestAndSavedStateCrashCapture)
+    {
+        SKIP_TEST_ARM64();
+        auto request = CreateRequest();
+        request.CrashCapture = VmCrashCaptureRequest{L"C:\\crashes"};
+        VERIFY_ARE_EQUAL(S_OK, DescribeResult(request));
+        request.CrashCapture->SavedStateFolder = L"C:\\saved-state";
+        VERIFY_ARE_EQUAL(S_OK, DescribeResult(request));
     }
 
     TEST_METHOD(ReservesExactPlacementsBeforeAutomaticDisks)
@@ -203,14 +220,47 @@ class OpenVmmVirtualMachineBackendTests
         auto request = CreateRequest();
         request.Consoles = {
             {VmConsoleRole::EarlyBoot, VmSerialConsole{0, L"\\\\.\\pipe\\early"}},
-            {VmConsoleRole::KernelConsole, VmVirtioConsole{0, L"", L"\\\\.\\pipe\\console"}}};
-        VERIFY_ARE_EQUAL(size_t{2}, ValidateCreateRequest(request).Boot.Consoles.size());
+            {VmConsoleRole::KernelConsole, VmVirtioConsole{0, L"hvc0", L"\\\\.\\pipe\\console"}},
+            {VmConsoleRole::Telemetry, VmVirtioConsole{1, L"hvc1", L"\\\\.\\pipe\\telemetry"}}};
+        VERIFY_ARE_EQUAL(size_t{3}, ValidateCreateRequest(request).Boot.Consoles.size());
+
+        std::get<VmVirtioConsole>(request.Consoles[2].Device).GuestName = L"telemetry";
+        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+        std::get<VmVirtioConsole>(request.Consoles[2].Device).GuestName = L"hvc1";
+        std::get<VmVirtioConsole>(request.Consoles[2].Device).Port = 2;
+        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+        std::get<VmVirtioConsole>(request.Consoles[2].Device).Port = 1;
+        request.Consoles.push_back({VmConsoleRole::DebugShell, VmVirtioConsole{2, L"hvc2", L"\\\\.\\pipe\\debug"}});
+        VERIFY_ARE_EQUAL(size_t{4}, ValidateCreateRequest(request).Boot.Consoles.size());
     }
 
     TEST_METHOD(BootsAndTerminates)
     {
         SKIP_TEST_ARM64();
         VerifyBootsAndTerminates(OpenVmmVirtualMachineBackend::Create(CreateRunnableRequest()));
+    }
+
+    TEST_METHOD(GuestShutdownTerminatesProcess)
+    {
+        SKIP_TEST_ARM64();
+        auto backend = OpenVmmVirtualMachineBackend::Create(CreateRunnableRequest());
+        auto terminationEvent = backend->GetTerminationEvent();
+        wil::unique_event callbackEvent{wil::EventOptions::ManualReset};
+        GUID callbackVmId{};
+        backend->RegisterTerminationCallback([&](GUID VmId) {
+            callbackVmId = VmId;
+            callbackEvent.SetEvent();
+        });
+        auto [channel, notifications] = StartGuest(*backend);
+
+        channel.Close();
+        notifications.reset();
+
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(terminationEvent.get(), 30 * 1000));
+        VERIFY_IS_TRUE(callbackEvent.wait(30 * 1000));
+        VERIFY_IS_TRUE(IsEqualGUID(backend->GetDescription().Identity.VmId, callbackVmId));
+        VERIFY_ARE_EQUAL(VmState::Stopped, backend->GetState());
+        VERIFY_ARE_EQUAL(VmTerminationReason::Shutdown, backend->GetTerminationReason().Reason);
     }
 
     TEST_METHOD(ManagesFileSystemNetworkAndPortResources)
@@ -344,7 +394,6 @@ class OpenVmmVirtualMachineBackendTests
         decltype(capabilities.Features) expectedFeatures;
         for (const auto feature :
              {VmFeature::SerialConsole,
-              VmFeature::VirtioConsole,
               VmFeature::VirtioFsFileBacked,
               VmFeature::UserModeNatNetwork,
               VmFeature::TcpPortBinding,

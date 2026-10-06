@@ -185,6 +185,8 @@ private:
 
     void InitializeGuest();
 
+    void ValidateBackendConfiguration(BackendKind Backend) const;
+
     _Requires_lock_held_(m_guestDeviceLock)
     bool InitializeDrvFsLockHeld(_In_ HANDLE UserToken);
 
