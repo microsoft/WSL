@@ -111,6 +111,7 @@ enum class VmFeature
     PerfmonLbr,
     DeferredMemoryCommit,
     ColdDiscard,
+    SmallPageMemory,
     PhysicalDisk,
     SerialConsole,
     VirtioConsole,
@@ -124,7 +125,7 @@ enum class VmFeature
     Count
 };
 
-static_assert(static_cast<size_t>(VmFeature::Count) == 15);
+static_assert(static_cast<size_t>(VmFeature::Count) == 16);
 
 struct VmPlatformCapabilities
 {
@@ -280,7 +281,6 @@ struct VmDiskRequest
     bool UserDisk = false;
     // Timeout applied to host disk state changes and to retries when attaching a physical disk.
     std::chrono::milliseconds DeviceTimeout{5000};
-    wil::shared_handle UserToken{};
 };
 
 struct VmBootDiskRequest

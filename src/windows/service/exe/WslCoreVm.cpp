@@ -128,13 +128,13 @@ std::unique_ptr<WslCoreVm> WslCoreVm::Create(
             // A kernel panic can cause an hvsocket error. If we hit this, wait one second for an HCS notification to give a better error for the user.
             if (newInstance->m_vmCrashEvent.wait(1000))
             {
-                const auto crashInformation = newInstance->m_backend->GetCrashInformation();
-                if (crashInformation.CrashLogFile.has_value())
+                const auto termination = newInstance->m_backend->GetTerminationReason();
+                if (!termination.Details.empty())
                 {
                     THROW_HR_WITH_USER_ERROR(
                         WSL_E_VM_CRASHED,
                         wsl::shared::Localization::MessageWSL2Crashed() + L"\r\n" +
-                            Localization::MessageWSL2CrashedStackTrace(crashInformation.CrashLogFile.value()));
+                            Localization::MessageWSL2CrashedStackTrace(termination.Details));
                 }
                 else
                 {
@@ -366,8 +366,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
     // Register before starting so an early exit cannot be missed.
     m_backend->RegisterTerminationCallback([this](GUID) {
-        const auto crashInformation = m_backend->GetCrashInformation();
-        if (crashInformation.Crashed)
+        const auto termination = m_backend->GetTerminationReason();
+        if (termination.Reason == VmTerminationReason::Crashed)
         {
             m_vmCrashEvent.SetEvent();
         }
@@ -801,7 +801,7 @@ WslCoreVm::~WslCoreVm() noexcept
 
         m_vmExitEvent.wait(UTILITY_VM_TERMINATE_TIMEOUT);
 
-        const auto exitDetails = m_backend->GetExitDetails();
+        const auto termination = m_backend->GetTerminationReason();
         TraceLoggingWriteTagged(
             activity,
             "TerminateVm",
@@ -812,7 +812,7 @@ WslCoreVm::~WslCoreVm() noexcept
             TraceLoggingValue(forcedTerminate, "forceTerminate"),
             TraceLoggingValue(unexpectedTerminate, "unexpectedTerminate"),
             TraceLoggingValue(m_vmExitEvent.is_signaled(), "terminationCallbackReceived"),
-            TraceLoggingValue(exitDetails.c_str(), "exitDetails"));
+            TraceLoggingValue(termination.Details.c_str(), "exitDetails"));
     }
 
     // Wait for the distro exit callback thread to exit.
@@ -1975,8 +1975,8 @@ void WslCoreVm::OnExit()
         // If that happens, set m_terminatingEvent so all pending socket operations can be properly cancelled.
         if (!m_terminatingEvent.is_signaled())
         {
-            const auto exitDetails = m_backend->GetExitDetails();
-            WSL_LOG("AbnormalVmExit", TraceLoggingValue(exitDetails.c_str(), "Details"));
+            const auto termination = m_backend->GetTerminationReason();
+            WSL_LOG("AbnormalVmExit", TraceLoggingValue(termination.Details.c_str(), "Details"));
             m_terminatingEvent.SetEvent();
         }
 

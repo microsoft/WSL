@@ -105,7 +105,6 @@ private:
 
     struct HcsFileSystemShare
     {
-        VmFileSystemShare Share;
         // Effective options used to distinguish equivalent requests from name collisions.
         std::wstring MountOptions;
         wsl::windows::common::hcs::Plan9ShareFlags Plan9Flags{};
