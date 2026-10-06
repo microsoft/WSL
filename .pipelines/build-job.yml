@@ -308,6 +308,10 @@ jobs:
             Copy-Item -Path "bin\x64\release\wsltests.dll" -Destination "$(ob_outputDirectory)\testbin\x64\release\wsltests.dll"
             Copy-Item -Path "bin\x64\release\testplugin.dll" -Destination "$(ob_outputDirectory)\testbin\x64\release\testplugin.dll"
             Copy-Item -Path "bin\x64\release\wslcsdk.dll" -Destination "$(ob_outputDirectory)\testbin\x64\release\wslcsdk.dll"
+            Copy-Item -Path "bin\x64\release\wslopenvmm.dll" -Destination "$(ob_outputDirectory)\testbin\x64\release\wslopenvmm.dll"
+            Copy-Item -Path "bin\x64\release\openvmm.exe" -Destination "$(ob_outputDirectory)\testbin\x64\release\openvmm.exe"
+            Copy-Item -Path "bin\x64\release\kernel" -Destination "$(ob_outputDirectory)\testbin\x64\release\kernel"
+            Copy-Item -Path "bin\x64\release\initrd.img" -Destination "$(ob_outputDirectory)\testbin\x64\release\initrd.img"
             Copy-Item -Path "bin\x64\release\installer.msix" -Destination "$(ob_outputDirectory)\testbin\x64\release\installer.msix"
             Move-Item -Path "packages\Microsoft.Taef.$taefVersion\build\Binaries\x64" -Destination "$(ob_outputDirectory)\testbin\x64\release\taef"
 
