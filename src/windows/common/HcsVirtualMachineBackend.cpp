@@ -294,6 +294,16 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
     // Attach the disks the VM boots from up front so that the guest can reach them without waiting
     // for a hot add. Their LUNs are reported so that the caller can name them in the guest.
     const auto vmIdString = wsl::shared::string::GuidToString<wchar_t>(Request.Identity.VmId, wsl::shared::string::GuidToStringFlags::None);
+    auto cleanupBootDiskAccess = wil::scope_exit([&] {
+        for (const auto& entry : configuration.BootDisks)
+        {
+            const auto& disk = entry.second;
+            if (WI_IsFlagSet(disk.Backend.Flags, wsl::windows::common::disk::DiskStateFlags::AccessGranted))
+            {
+                LOG_IF_FAILED(wil::ResultFromException([&] { schema::RevokeVmAccess(vmIdString.c_str(), disk.Path.c_str()); }));
+            }
+        }
+    });
     const auto lunInUse = [&scsi](std::uint32_t Lun) { return scsi.Attachments.contains(std::to_string(Lun)); };
     for (const auto& bootDisk : Request.BootDisks)
     {
@@ -337,6 +347,12 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
             CATCH_LOG()
         }
 
+        auto revokeDiskAccess = wil::scope_exit([&] {
+            if (WI_IsFlagSet(diskFlags, wsl::windows::common::disk::DiskStateFlags::AccessGranted))
+            {
+                LOG_IF_FAILED(wil::ResultFromException([&] { schema::RevokeVmAccess(vmIdString.c_str(), path.c_str()); }));
+            }
+        });
         auto backingFile = wsl::windows::common::disk::OpenVhdBackingFile(path.c_str());
 
         schema::Attachment attachment{};
@@ -353,6 +369,7 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
         description.BootDisks.emplace(bootDisk.Key, diskAttachment);
         configuration.BootDisks.emplace(
             diskAttachment.Id.Value, AttachedDisk{diskAttachment, {diskFlags, bootDisk.Disk.DeviceTimeout, std::move(backingFile)}});
+        revokeDiskAccess.release();
 
         ++configuration.NextDiskId;
     }
@@ -390,6 +407,7 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
     hvSocket.DefaultConnectSecurityDescriptor = securityDescriptor;
 
     signalEarlyTermination.release();
+    cleanupBootDiskAccess.release();
     return configuration;
 }
 
@@ -599,6 +617,12 @@ wil::unique_handle HcsVirtualMachineBackend::GetTerminationEvent() const
 wil::unique_handle HcsVirtualMachineBackend::GetCrashEvent() const
 {
     return wil::unique_handle{wsl::windows::common::wslutil::DuplicateHandle(m_vmCrashEvent.get())};
+}
+
+std::optional<std::filesystem::path> HcsVirtualMachineBackend::GetCrashLogPath() const
+{
+    auto lock = m_crashInformationLock.lock_shared();
+    return m_vmCrashLogFile;
 }
 
 void HcsVirtualMachineBackend::Start()

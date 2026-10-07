@@ -128,21 +128,13 @@ std::unique_ptr<WslCoreVm> WslCoreVm::Create(
             // A kernel panic can cause an hvsocket error. If we hit this, wait one second for an HCS notification to give a better error for the user.
             if (newInstance->m_vmCrashEvent.wait(1000))
             {
-                VmTerminationInformation termination;
-                {
-                    auto exitLock = newInstance->m_exitCallbackLock.lock_shared();
-                    if (newInstance->m_terminationInformation)
-                    {
-                        termination = newInstance->m_terminationInformation.value();
-                    }
-                }
-
-                if (!termination.Details.empty())
+                const auto crashLogPath = newInstance->m_backend ? newInstance->m_backend->GetCrashLogPath() : std::nullopt;
+                if (crashLogPath)
                 {
                     THROW_HR_WITH_USER_ERROR(
                         WSL_E_VM_CRASHED,
                         wsl::shared::Localization::MessageWSL2Crashed() + L"\r\n" +
-                            Localization::MessageWSL2CrashedStackTrace(termination.Details));
+                            Localization::MessageWSL2CrashedStackTrace(crashLogPath.value()));
                 }
                 else
                 {

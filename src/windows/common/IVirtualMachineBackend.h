@@ -685,6 +685,7 @@ public:
     virtual wil::unique_handle GetTerminationEvent() const = 0;
     // Signals when the backend has identified a VM crash, which can precede termination.
     virtual wil::unique_handle GetCrashEvent() const = 0;
+    virtual std::optional<std::filesystem::path> GetCrashLogPath() const = 0;
     virtual void Start() = 0;
     virtual void Terminate() = 0;
     void RegisterTerminationCallback(TerminationCallback Callback);

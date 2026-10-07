@@ -56,6 +56,7 @@ inline void VerifyBootsAndTerminates(std::unique_ptr<IVirtualMachineBackend> Bac
 {
     auto terminationEvent = Backend->GetTerminationEvent();
     auto crashEvent = Backend->GetCrashEvent();
+    VERIFY_IS_FALSE(Backend->GetCrashLogPath().has_value());
     VERIFY_ARE_EQUAL(VmState::Created, Backend->GetState());
     VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), OperationResult([&] { Backend->GetTerminationReason(); }));
     auto guest = StartGuest(*Backend);

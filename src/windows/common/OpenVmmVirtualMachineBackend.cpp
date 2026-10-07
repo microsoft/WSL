@@ -488,6 +488,11 @@ wil::unique_handle OpenVmmVirtualMachineBackend::GetCrashEvent() const
     return wil::unique_handle{wsl::windows::common::wslutil::DuplicateHandle(m_crashEvent.get())};
 }
 
+std::optional<std::filesystem::path> OpenVmmVirtualMachineBackend::GetCrashLogPath() const
+{
+    return std::nullopt;
+}
+
 void OpenVmmVirtualMachineBackend::Start()
 {
     const auto startTimeMs = GetTickCount64();
