@@ -64,9 +64,9 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  # Seconds an idle session VM stays running before it is torn down (default: 30)\n"
     "  # idleTimeout: default\n"
     "\n"
-    "  # Create new session storage as a sparse VHD (currently experimental).\n"
-    "  # Existing session storage is not changed (default: false).\n"
-    "  # sparseVhd: false\n"
+    "  # Storage type for newly created sessions: \"default\", \"dynamic\", or \"sparse\".\n"
+    "  # Existing session storage is not changed (default: default).\n"
+    "  # storageType: default\n"
     "\n"
     "# Credential storage backend: \"wincred\" or \"file\" (default: wincred)\n"
     "# credentialStore: wincred\n";
@@ -197,9 +197,22 @@ namespace details {
         return value > 0 ? std::optional{value} : std::nullopt;
     }
 
-    WSLC_VALIDATE_SETTING(SessionSparseVhd)
+    WSLC_VALIDATE_SETTING(SessionStorageType)
     {
-        return value;
+        if (value == "default")
+        {
+            return StorageType::Default;
+        }
+        if (value == "dynamic")
+        {
+            return StorageType::Dynamic;
+        }
+        if (value == "sparse")
+        {
+            return StorageType::Sparse;
+        }
+
+        return std::nullopt;
     }
 
     WSLC_VALIDATE_SETTING(CredentialStore)
