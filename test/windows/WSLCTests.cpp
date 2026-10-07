@@ -1886,6 +1886,37 @@ class WSLCTests
         VERIFY_IS_TRUE(result.Output[1].find("Hello from a WSL container!") != std::string::npos);
     }
 
+    WSLC_TEST_METHOD(BuildImageCrlfHeredoc)
+    {
+        auto contextDir = std::filesystem::current_path() / "build-context-crlf";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-crlf:latest", WSLCDeleteImageFlagsForce).first);
+
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile", std::ios::binary);
+            dockerfile << "FROM debian:latest\r\n";
+            dockerfile << "RUN <<EOF\r\n";
+            dockerfile << "set -e\r\n";
+            dockerfile << "echo hello > /crlf-test\r\n";
+            dockerfile << "EOF\r\n";
+            dockerfile << "CMD [\"cat\", \"/crlf-test\"]\r\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-crlf:latest"));
+
+        WSLCContainerLauncher launcher("wslc-test-crlf:latest", "wslc-build-crlf-test-container");
+        auto container = launcher.Launch(*m_defaultSession);
+        auto result = container.GetInitProcess().WaitAndCaptureOutput();
+
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_ARE_EQUAL(std::string("hello\n"), result.Output[1]);
+    }
+
     // This test validates both that we can build an image with an empty CMD, and that we can run such an image.
     WSLC_TEST_METHOD(BuildImageEntrypoint)
     {
