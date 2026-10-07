@@ -957,6 +957,12 @@ try
     else if (MountVirtioFsChild(Tag, ChildName, Target, MountOptions.c_str(), ExitCode) < 0)
     {
         const auto childError = errno;
+        if (!AllowFallback)
+        {
+            errno = childError;
+            return -1;
+        }
+
         LOG_WARNING("Mounting virtiofs child for {} failed {}, falling back to Plan9", Source, childError);
 
         return MountPlan9(Source, Target, Options, Admin, Config, ExitCode);
