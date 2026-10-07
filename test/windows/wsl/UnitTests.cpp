@@ -7202,7 +7202,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         // FILE_ID_BOTH_DIR_INFORMATION buffer plus locals); the iterative implementation must
         // succeed at depths well beyond that without consuming caller stack space.
 
-        constexpr auto testDir = L"deep-case-test";
+        static constexpr auto testDir = L"deep-case-test";
         constexpr int depth = 1024;
         constexpr auto flags = wsl::windows::common::filesystem::c_case_sensitive_folders_only | LXSS_CREATE_INSTANCE_FLAGS_ALLOW_FS_UPGRADE;
 
