@@ -2488,8 +2488,10 @@ class NetworkTests
             std::chrono::minutes(2)));
     }
 
-    static void VerifyPortZeroBindFromThreadIsTracked()
+    static void VerifyPortZeroBindFromThreadIsTracked(bool verifyRelease = true)
     {
+        WslKeepAlive keepAlive;
+
         auto [stdOutRead, stdOutWrite] = CreateSubprocessPipe(false, true);
         // LXT uses one bit per variation; the threaded port-zero server is the sixth server variation.
         constexpr unsigned long long c_portZeroThreadVariationMask = 1ull << 5;
@@ -2545,6 +2547,15 @@ class NetworkTests
         };
 
         VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(connectToGuest, std::chrono::seconds(1), std::chrono::seconds(30)));
+
+        serverProcess.reset();
+
+        if (verifyRelease)
+        {
+            // Wait beyond the port tracker's grace period for the exact loopback mapping to be released.
+            // A wildcard bind can succeed while that mapping still prevents the next test from forwarding this port.
+            BindHostPort(assignedPort, SOCK_STREAM, IPPROTO_TCP, true, false, true, std::chrono::minutes(2));
+        }
     }
 
     static void VerifyPortZeroRebindSucceeds()
@@ -4703,7 +4714,7 @@ class MirroredTests
         // it — the range-level reservation remains, making release unverifiable.
         NetworkTests::VerifyPortZeroBindIsTracked(false);
 
-        NetworkTests::VerifyPortZeroBindFromThreadIsTracked();
+        NetworkTests::VerifyPortZeroBindFromThreadIsTracked(false);
     }
 
     WSL2_TEST_METHOD(ListenWithoutBindIsTracked)

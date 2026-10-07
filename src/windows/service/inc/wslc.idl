@@ -603,8 +603,8 @@ typedef struct _WSLCDeleteImageOptions
 
 typedef struct _WSLCBuildImageOptions
 {
-    LPCWSTR ContextPath;
-    WSLCHandle DockerfileHandle;
+    [unique, string] LPCWSTR ContextPath; // Windows build context directory. Must be null when ContextHandle is set.
+    WSLCHandle DockerfileHandle; // Dockerfile contents relayed to docker's stdin. Must be unset when ContextHandle is set.
     WSLCStringArray Tags;
     WSLCStringArray BuildArgs; // KEY=VALUE pairs passed as --build-arg to docker.
     LPCSTR Target;             // Target build stage name passed as --target to docker.
@@ -616,6 +616,8 @@ typedef struct _WSLCBuildImageOptions
     [unique, string] LPCWSTR OutputMountPath; // When set, the server mounts this Windows directory read-write into the VM and points the exporter's dest at it (plus OutputMountFile). Used for single-file exporters with a real destination; mutually exclusive with OutputHandle.
     [unique, string] LPCWSTR OutputMountFile; // Leaf filename within OutputMountPath that a single-file exporter writes to.
     [unique, string] LPCWSTR IidFilePath; // Absolute path of the client's --iidfile destination. The server mounts its parent directory read-write into the VM and passes --iidfile pointing at it, so buildx writes the image ID straight to the destination.
+    WSLCHandle ContextHandle; // When Type != WSLCHandleTypeUnknown, the server relays this stream to docker's stdin as the build context ("-"). The stream is either a tar archive (optionally compressed) or a Dockerfile built with an empty context.
+    [unique, string] LPCSTR DockerfilePath; // Dockerfile path inside the streamed context, passed as --file. Only valid with ContextHandle.
 } WSLCBuildImageOptions;
 
 typedef struct _WSLCTagImageOptions
@@ -733,7 +735,13 @@ interface IWSLCSession : IUnknown
     // returned stream object; events are then pulled one at a time via IWSLCEventStream::GetNext.
     // SinceTime / UntilTime bound the window by event time, in seconds since the Unix epoch. SinceTime
     // is inclusive and UntilTime is exclusive. 0 means unbounded on that end.
-    // Filters are key/value pairs. Values sharing a key are OR'd, distinct keys are AND'd.
+    // Filters are key/value pairs. Values sharing a key are OR'd, except label values, which must all match.
+    // Distinct keys are AND'd.
+    //   container=X matches container events whose id or name starts with X.
+    //   image=X matches the actor id or image name exactly, or by their familiar name without a tag or digest
+    //   (e.g. image=ubuntu matches "docker.io/library/ubuntu:22.04"). X itself is compared as written.
+    //   network=X matches network events whose id or name starts with X.
+    //   label=K requires the actor attribute K to exist, and label=K=V requires it to equal V.
     HRESULT GetEvents(
         [in] LONGLONG SinceTime,
         [in] LONGLONG UntilTime,

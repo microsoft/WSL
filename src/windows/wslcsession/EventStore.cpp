@@ -67,7 +67,46 @@ CATCH_LOG()
 
 namespace {
 
-    // Values sharing a key are OR'd, distinct keys are AND'd.
+    bool MatchesIdOrName(const wsl::windows::common::wslc_schema::Event& event, std::string_view type, const std::vector<std::string>& values)
+    {
+        const auto nameEntry = event.Actor.Attributes.find("name");
+        const std::string_view name = nameEntry != event.Actor.Attributes.end() ? std::string_view{nameEntry->second} : std::string_view{};
+
+        return event.Type == type && std::ranges::any_of(values, [&](const std::string& value) {
+                   return event.Actor.ID.starts_with(value) || name.starts_with(value);
+               });
+    }
+
+    // Compare the values as written against the actor id and the image name, and against the familiar form
+    // of each. Image events carry their image name in "name"; other events carry it in "image".
+    bool MatchesImage(const wsl::windows::common::wslc_schema::Event& event, const std::vector<std::string>& values)
+    {
+        const auto nameEntry = event.Actor.Attributes.find(event.Type == "image" ? "name" : "image");
+        const std::string name = nameEntry != event.Actor.Attributes.end() ? nameEntry->second : std::string{};
+
+        // A reference that doesn't parse is compared as is.
+        const auto familiar = [](const std::string& image) {
+            const auto reference = wsl::windows::common::wslutil::ImageReference::TryParse(image);
+            return reference.has_value() ? reference->Repository.GetFamiliar() : image;
+        };
+
+        const auto matches = [&](const std::string& candidate) { return std::ranges::find(values, candidate) != values.end(); };
+        return matches(event.Actor.ID) || matches(name) || matches(familiar(event.Actor.ID)) || matches(familiar(name));
+    }
+
+    // Every label filter must match. "key" requires the label to exist and "key=value" requires that exact value.
+    bool MatchesLabels(const wsl::windows::common::wslc_schema::Event& event, const std::vector<std::string>& values)
+    {
+        return std::ranges::all_of(values, [&](const std::string& value) {
+            const auto separator = value.find('=');
+            const auto label = event.Actor.Attributes.find(value.substr(0, separator));
+
+            return label != event.Actor.Attributes.end() &&
+                   (separator == std::string::npos || label->second == value.substr(separator + 1));
+        });
+    }
+
+    // Values sharing a key are OR'd, except label values, which must all match. Distinct keys are AND'd.
     bool EventMatchesFilters(const wsl::windows::common::wslc_schema::Event& event, const std::map<std::string, std::vector<std::string>>& filters)
     {
         for (const auto& [key, values] : filters)
@@ -88,36 +127,28 @@ namespace {
             }
             else if (key == "container")
             {
-                if (event.Type != "container" ||
-                    !std::ranges::any_of(values, [&](const std::string& v) { return event.Actor.ID == v; }))
+                if (!MatchesIdOrName(event, "container", values))
                 {
                     return false;
                 }
             }
             else if (key == "image")
             {
-                const auto image = event.Actor.Attributes.find("image");
-                const bool matches = std::ranges::any_of(values, [&](const std::string& value) {
-                    return (event.Type == "image" && event.Actor.ID == value) ||
-                           (event.Type == "container" && image != event.Actor.Attributes.end() && image->second == value);
-                });
-                if (!matches)
+                if (!MatchesImage(event, values))
                 {
                     return false;
                 }
             }
             else if (key == "network")
             {
-                const auto nameEntry = event.Actor.Attributes.find("name");
-                const std::string_view name =
-                    nameEntry != event.Actor.Attributes.end() ? std::string_view{nameEntry->second} : std::string_view{};
-
-                // Docker matches a network against its id or its name, either in full or by prefix.
-                const auto matchesIdOrName = [&](const std::string& value) {
-                    return event.Actor.ID.starts_with(value) || name.starts_with(value);
-                };
-
-                if (event.Type != "network" || !std::ranges::any_of(values, matchesIdOrName))
+                if (!MatchesIdOrName(event, "network", values))
+                {
+                    return false;
+                }
+            }
+            else if (key == "label")
+            {
+                if (!MatchesLabels(event, values))
                 {
                     return false;
                 }
@@ -137,12 +168,13 @@ Microsoft::WRL::ComPtr<IWSLCEventStream> EventStore::CreateStream(
         Localization::MessageWslcEventsInvalidTimeWindow(SinceTime, UntilTime),
         SinceTime < 0 || UntilTime < 0 || (SinceTime != 0 && UntilTime != 0 && SinceTime > UntilTime));
 
+    static constexpr std::array c_supportedFilters{"type", "event", "container", "image", "network", "label"};
     for (const auto& [key, values] : Filters)
     {
         THROW_HR_WITH_USER_ERROR_IF(
             E_INVALIDARG,
             Localization::MessageWslcInvalidFilter(wsl::shared::string::MultiByteToWide(key)),
-            key != "type" && key != "event" && key != "container" && key != "image" && key != "network");
+            std::ranges::find(c_supportedFilters, key) == c_supportedFilters.end());
     }
 
     Microsoft::WRL::ComPtr<EventStream> stream;

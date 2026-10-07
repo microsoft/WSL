@@ -2451,6 +2451,10 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <value>Nem lehet fordítási kimenetet írni a konzolra a(z) {} --output értékhez.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcBuildStdinContextAndDockerfile" xml:space="preserve">
+    <value>Can't use stdin for both the build context and the Dockerfile.</value>
+    <comment>{Locked="stdin"}{Locked="Dockerfile"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>Hiányzó kötelező opció: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3457,7 +3461,8 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>A mentett kép elérési útja</value>
   </data>
   <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
-    <value>A buildkörnyezet könyvtárának elérési útja</value>
+    <value>Path to the build context directory (use "-" to read a tar archive or Dockerfile from stdin)</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
     <value>Port közzététele tárolóból gazdagépre</value>
@@ -3861,6 +3866,10 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>A rendszerkép nem írható a terminálba. Használja az -o opciót, vagy irányítsa át a stdout-ot.</value>
+  </data>
+  <data name="WSLCCLI_BuildStdinIsTerminalError" xml:space="preserve">
+    <value>Cannot read build input from terminal. Pipe a Dockerfile or tar archive to stdin.</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
     <value>Nem lehet a tárolót a terminálba exportálni. Használja az -o opciót, vagy irányítsa át a stdout-ot.</value>
