@@ -67,14 +67,14 @@ CATCH_LOG()
 
 namespace {
 
-    bool MatchesIdOrName(const wsl::windows::common::wslc_schema::Event& event, std::string_view type, const std::vector<std::string>& values)
+    // Any event matches when its actor id or name starts with a value. The type filter is what restricts the event type.
+    bool MatchesIdOrName(const wsl::windows::common::wslc_schema::Event& event, const std::vector<std::string>& values)
     {
         const auto nameEntry = event.Actor.Attributes.find("name");
         const std::string_view name = nameEntry != event.Actor.Attributes.end() ? std::string_view{nameEntry->second} : std::string_view{};
 
-        return event.Type == type && std::ranges::any_of(values, [&](const std::string& value) {
-                   return event.Actor.ID.starts_with(value) || name.starts_with(value);
-               });
+        return std::ranges::any_of(
+            values, [&](const std::string& value) { return event.Actor.ID.starts_with(value) || name.starts_with(value); });
     }
 
     // Compare the values as written against the actor id and the image name, and against the familiar form
@@ -125,9 +125,9 @@ namespace {
                     return false;
                 }
             }
-            else if (key == "container")
+            else if (key == "container" || key == "network")
             {
-                if (!MatchesIdOrName(event, "container", values))
+                if (!MatchesIdOrName(event, values))
                 {
                     return false;
                 }
@@ -135,13 +135,6 @@ namespace {
             else if (key == "image")
             {
                 if (!MatchesImage(event, values))
-                {
-                    return false;
-                }
-            }
-            else if (key == "network")
-            {
-                if (!MatchesIdOrName(event, "network", values))
                 {
                     return false;
                 }
