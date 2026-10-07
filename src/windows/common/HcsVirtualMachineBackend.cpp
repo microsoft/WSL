@@ -827,7 +827,7 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
         if (passThrough)
         {
             // Grant the VM access to the disk.
-            schema::GrantVmWorkerProcessAccessToDisk(m_vmIdString.c_str(), path.c_str(), userToken);
+            schema::GrantVmWorkerProcessAccessToDisk(m_vmIdString.c_str(), path.c_str(), Request.UserToken ? Request.UserToken->get() : nullptr);
             WI_SetFlag(diskFlags, wsl::windows::common::disk::DiskStateFlags::AccessGranted);
 
             // Set the disk offline if needed.
@@ -1118,7 +1118,11 @@ VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFile
                 {
                     const VirtioFsShareOptions options{.Kind = VirtiofsShareKind_Aggregate};
                     guestInstanceId = m_guestDeviceManager->AddVirtiofsDevice(
-                        transport.Tag.c_str(), mountOptions.c_str(), L"", ResolveUserToken({transport.Options.UserToken}).get(), options);
+                        transport.Tag.c_str(),
+                        mountOptions.c_str(),
+                        L"",
+                        ResolveUserToken({transport.Options.UserToken, userToken}).get(),
+                        options);
                     device.State = VmFileSystemDeviceState::Serving;
                 }
             },
@@ -1325,7 +1329,6 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
     validation::ValidateResourceId(Device, m_configuration.Description.Identity);
     THROW_HR_IF_MSG(E_INVALIDARG, Request.HostPath.empty(), "A host path is required");
     const auto requestUserToken = Request.UserToken.value_or(wil::shared_handle{});
-    const auto userToken = ResolveUserToken({requestUserToken});
 
     WSL_LOG(
         "HcsAddFileSystemShareBegin",
@@ -1339,6 +1342,7 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
     THROW_HR_IF(HCS_E_TERMINATED, !m_system || !m_guestDeviceManager);
     THROW_HR_IF(E_BOUNDS, m_nextShareId == std::numeric_limits<std::uint64_t>::max());
     const auto device = FindFileSystemDeviceLocked(Device);
+    const auto userToken = ResolveUserToken({requestUserToken, device->second.Backend.UserToken});
     if (!std::holds_alternative<VmVirtioFsDevice>(device->second.Transport))
     {
         if (auto existing = FindPlan9ShareByNameLocked(Device, Request, userToken.get()))
@@ -1423,7 +1427,7 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
                         transport.Tag.c_str(),
                         mountOptions.c_str(),
                         hostPath.c_str(),
-                        ResolveUserToken({options->UserToken, requestUserToken}).get());
+                        ResolveUserToken({options->UserToken, userToken}).get());
                 }
 
                 device->second.State = VmFileSystemDeviceState::Serving;
