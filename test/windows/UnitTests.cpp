@@ -1791,6 +1791,54 @@ class UnitTests
         VerifyOutput(L"--exec echo -n \\\"", L"\"");
     }
 
+    TEST_METHOD(CommandsRejectExtraArguments)
+    {
+        for (const auto* command :
+             {L"--debug-shell",
+              L"--help",
+              L"--status",
+              L"--version",
+              L"-v",
+              L"--set-default DoesNotExist",
+              L"--setdefault DoesNotExist",
+              L"-s DoesNotExist",
+              L"--terminate DoesNotExist",
+              L"-t DoesNotExist",
+              L"--unregister DoesNotExist",
+              L"--set-default-version 2",
+              L"--set-version DoesNotExist 2"})
+        {
+            for (const auto& [arguments, invalidArgument] :
+                 {std::pair{L"extra", L"extra"},
+                  std::pair{L"extra another", L"extra"},
+                  std::pair{L"--unexpected", L"--unexpected"},
+                  std::pair{L"\"extra argument\"", L"\"extra argument\""},
+                  std::pair{L"\"\"", L"\"\""}})
+            {
+                auto [output, error] = LxsstuLaunchWslAndCaptureOutput(std::format(L"{} {}", command, arguments), -1);
+
+                VERIFY_ARE_EQUAL(
+                    FormatErrorMessage(
+                        std::format(
+                            L"Invalid command line argument: {}\r\n"
+                            L"Please use 'wsl.exe --help' to get a list of supported arguments.",
+                            invalidArgument),
+                        L"Wsl/E_INVALIDARG"),
+                    output);
+
+                VERIFY_ARE_EQUAL(L"", error);
+            }
+        }
+
+        for (const auto* command : {L"--status", L"--version", L"-v"})
+        {
+            const auto [output, error] = LxsstuLaunchWslAndCaptureOutput(command);
+            VerifyOutput(std::format(L"{} \t ", command), output);
+        }
+
+        VerifyOutput(L"--help \t ", ExpectedUsageMessage(), -1);
+    }
+
     TEST_METHOD(ManageInvalidUsage)
     {
         VerifyInvalidUsage(L"--manage " LXSS_DISTRO_NAME_TEST_L L" --compact --resize 10GB");
@@ -7560,6 +7608,18 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, L"Version", LXSS_DISTRO_VERSION_2);
         wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, L"State", LxssDistributionStateInstalled);
         wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, L"Flags", LXSS_DISTRO_FLAGS_VM_MODE);
+
+        auto [invalidOutput, invalidError] = LxsstuLaunchWslAndCaptureOutput(L"--unregister DummyBrokenDistro extra another", -1);
+
+        VERIFY_ARE_EQUAL(
+            FormatErrorMessage(
+                L"Invalid command line argument: extra\r\n"
+                L"Please use 'wsl.exe --help' to get a list of supported arguments.",
+                L"Wsl/E_INVALIDARG"),
+            invalidOutput);
+
+        VERIFY_ARE_EQUAL(L"", invalidError);
+        VERIFY_IS_TRUE(GetDistributionId(L"DummyBrokenDistro").has_value());
 
         auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"--unregister DummyBrokenDistro");
 
