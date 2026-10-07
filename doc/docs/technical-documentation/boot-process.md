@@ -62,8 +62,8 @@ By default, the WSL2 virtual machine is created via the [Host Compute System (HC
 [wsl2]
 gpuSupport=false
 guiApplications=false
-hostFileSystemAccess=false
 networkingMode=nat
+virtioFs=true
 
 [experimental]
 openVmm=true
@@ -73,10 +73,10 @@ OpenVMM currently does not support:
 
 - ARM64 or UEFI boot
 - GPU assignment or WSLg shared memory
-- Persistent-memory or physical-disk devices
+- Physical-disk devices
 - Mirrored or bridged networking, custom NAT addressing, Hyper-V firewall, DNS tunneling, or IPv6
 - Nested virtualization, performance counters, or advanced memory controls
-- Plan 9 file sharing or per-user virtio-fs options
+- Plan 9 file sharing, aggregate virtio-fs devices, or switching user/elevation context after VM creation
 
 The HCS backend generates a JSON virtual machine configuration and passes it to [HcsCreateComputeSystem()](https://learn.microsoft.com/virtualization/api/hcs/reference/hcscreatecomputesystem). See `src/windows/common/hcs_schema.h` for details on the HCS JSON schema.
 

@@ -45,7 +45,7 @@ public:
     void Terminate() override;
 
     VmGuestListener CreateGuestListener(GuestServicePort Port) override;
-    wil::unique_socket ConnectGuest(GuestServicePort Port) override;
+    wil::unique_socket ConnectGuest(GuestServicePort Port, _In_opt_ HANDLE ExitHandle = nullptr) override;
     void CloseGuestListener(VmListenerId Listener) override;
 
     VmDiskAttachment AttachDisk(const VmDiskRequest& Request) override;
@@ -128,6 +128,7 @@ private:
     VmDescription m_description{};
     _Guarded_by_(m_lock) std::map<std::uint64_t, VmDiskAttachment> m_attachedDisks;
     _Guarded_by_(m_lock) std::uint64_t m_nextDiskId = 1;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, VmPersistentMemoryDevice> m_persistentMemoryDevices;
     _Guarded_by_(m_lock) std::map<std::uint64_t, FileSystemDevice> m_fileSystemDevices;
     _Guarded_by_(m_lock) std::map<std::uint64_t, VmFileSystemShare> m_fileSystemShares;
     _Guarded_by_(m_lock) std::map<std::uint64_t, NetworkAdapter> m_networkAdapters;
@@ -135,6 +136,9 @@ private:
     _Guarded_by_(m_lock) std::uint64_t m_nextDeviceId = 1;
     _Guarded_by_(m_lock) std::uint64_t m_nextShareId = 1;
     _Guarded_by_(m_lock) std::uint64_t m_nextPortBindingId = 1;
+    // Serialize additions, including waiting for guest enumeration, so /dev/pmemN follows add order.
+    wil::srwlock m_persistentMemoryLock;
+    _Guarded_by_(m_persistentMemoryLock) std::uint32_t m_nextPersistentMemoryIndex = 0;
     UniqueVm m_vm;
     wil::unique_handle m_process;
     wil::unique_handle m_job;

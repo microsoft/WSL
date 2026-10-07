@@ -465,7 +465,10 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     // requested via the kernel command line; otherwise the kernel correctly doesn't allocate.
     if (m_hvPciSwiotlbBase != 0 && m_hvPciSwiotlbSize != 0)
     {
-        m_backend->ConfigureGuestDma({m_hvPciSwiotlbBase, m_hvPciSwiotlbSize});
+        if (m_backend->GetCapabilities().Features.test(static_cast<size_t>(VmFeature::GuestDmaWindow)))
+        {
+            m_backend->ConfigureGuestDma({m_hvPciSwiotlbBase, m_hvPciSwiotlbSize});
+        }
     }
     else if (m_vmConfig.SwiotlbSizeBytes != 0)
     {
@@ -917,17 +920,24 @@ void WslCoreVm::AddDrvFsShare(_In_ bool Admin, _In_ HANDLE UserToken)
 {
     THROW_HR_IF(HCS_E_TERMINATED, !m_backend || m_backend->GetState() == VmState::Stopped);
 
-    // Allow the Plan 9 server to create NT symlinks.
-    //
-    // N.B. This may fail for unelevated users, however symlink creation will
-    //      succeed even without this privilege if developer mode is enabled.
-    wsl::windows::common::security::EnableTokenPrivilege(UserToken, SE_CREATE_SYMBOLIC_LINK_NAME);
+    if (m_backend->GetDescription().Backend == BackendKind::Hcs)
+    {
+        // Allow the Plan 9 server to create NT symlinks.
+        //
+        // N.B. This may fail for unelevated users, however symlink creation will
+        //      succeed even without this privilege if developer mode is enabled.
+        wsl::windows::common::security::EnableTokenPrivilege(UserToken, SE_CREATE_SYMBOLIC_LINK_NAME);
 
-    // Set the 9p port and virtio tag.
-    const UINT32 port = Admin ? LX_INIT_UTILITY_VM_PLAN9_DRVFS_ADMIN_PORT : LX_INIT_UTILITY_VM_PLAN9_DRVFS_PORT;
-    const PCWSTR tag = Admin ? TEXT(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) : TEXT(LX_INIT_DRVFS_VIRTIO_TAG);
-    AddPlan9Share(
-        TEXT(LX_INIT_UTILITY_VM_DRVFS_SHARE_NAME), L"\\\\?", port, (hcs::Plan9ShareFlags::AllowOptions | hcs::Plan9ShareFlags::AllowSubPaths), UserToken, tag);
+        // Set the 9p port and virtio tag.
+        const UINT32 port = Admin ? LX_INIT_UTILITY_VM_PLAN9_DRVFS_ADMIN_PORT : LX_INIT_UTILITY_VM_PLAN9_DRVFS_PORT;
+        const PCWSTR tag = Admin ? TEXT(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) : TEXT(LX_INIT_DRVFS_VIRTIO_TAG);
+        AddPlan9Share(
+            TEXT(LX_INIT_UTILITY_VM_DRVFS_SHARE_NAME), L"\\\\?", port, (hcs::Plan9ShareFlags::AllowOptions | hcs::Plan9ShareFlags::AllowSubPaths), UserToken, tag);
+    }
+    else
+    {
+        THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), !m_vmConfig.EnableVirtioFs, "OpenVMM requires virtio-fs");
+    }
 
     const auto virtiofsInitialized = Admin ? m_adminDrvfsToken.is_valid() : m_drvfsToken.is_valid();
     if (m_vmConfig.EnableVirtioFs && !virtiofsInitialized)
@@ -1267,6 +1277,7 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstanceInternal(
         DefaultUid,
         ClientLifetimeId,
         m_initializeDrvFs,
+        [this](ULONG Port, HANDLE ExitHandle) { return m_backend->ConnectGuest(GuestServicePort{Port}, ExitHandle); },
         featureFlags,
         m_vmConfig.DistributionStartTimeout,
         m_vmConfig.InstanceIdleTimeout,
@@ -1378,8 +1389,11 @@ void WslCoreVm::ValidateBackendConfiguration(BackendKind Backend) const
     THROW_HR_IF_MSG(notSupported, wsl::shared::Arm64, "OpenVMM is supported only on x64");
     THROW_HR_IF_MSG(notSupported, m_vmConfig.EnableGpuSupport, "OpenVMM does not support GPU assignment");
     THROW_HR_IF_MSG(notSupported, m_vmConfig.EnableGuiApps, "OpenVMM does not support GUI applications");
+    THROW_HR_IF_MSG(notSupported, m_vmConfig.EnableVirtio9p, "OpenVMM does not support virtio-9p file sharing");
     THROW_HR_IF_MSG(
-        notSupported, m_vmConfig.EnableHostFileSystemAccess, "OpenVMM host filesystem access is not integrated with WslCoreVm");
+        notSupported,
+        m_vmConfig.EnableHostFileSystemAccess && !m_vmConfig.EnableVirtioFs,
+        "OpenVMM host filesystem access requires virtio-fs");
     THROW_HR_IF_MSG(
         notSupported,
         m_vmConfig.NetworkingMode != NetworkingMode::None && m_vmConfig.NetworkingMode != NetworkingMode::Nat,
@@ -1451,10 +1465,6 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId, BackendKind 
             WSL_E_CUSTOM_SYSTEM_DISTRO_ERROR,
             m_systemDistroDeviceType == LxMiniInitMountDeviceTypeInvalid ||
                 !wsl::windows::common::filesystem::FileExists(m_vmConfig.SystemDistroPath.c_str()));
-        THROW_HR_IF_MSG(
-            HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
-            Backend == BackendKind::OpenVmm && m_systemDistroDeviceType == LxMiniInitMountDeviceTypePmem,
-            "OpenVMM does not support a persistent-memory system distro");
     }
 
     SafeInt<INT64> highMmioGapInMB = 0;
@@ -1714,6 +1724,16 @@ bool WslCoreVm::InitializeDrvFsLockHeld(_In_ HANDLE UserToken)
     VerifyPlan9Servers();
 
     const auto elevated = wsl::windows::common::security::IsTokenElevated(UserToken);
+    if (m_backend->GetDescription().Backend == BackendKind::OpenVmm)
+    {
+        const auto tokenUser = wil::get_token_information<TOKEN_USER>(UserToken);
+        THROW_HR_IF(E_ACCESSDENIED, !EqualSid(&m_userSid.Sid, tokenUser->User.Sid));
+        THROW_HR_IF_MSG(
+            E_ACCESSDENIED,
+            elevated != wsl::windows::common::security::IsTokenElevated(m_userToken.get()),
+            "OpenVMM DrvFs cannot switch elevation context after VM creation");
+    }
+
     if (elevated)
     {
         if (!m_adminDrvfsToken)
@@ -1832,7 +1852,12 @@ wil::unique_socket WslCoreVm::CreateRootNamespaceProcess(_In_ LPCSTR Path, _In_ 
     auto lock = m_lock.lock_exclusive();
 
     return LxssCreateProcess::CreateLinuxProcess(
-        Path, Arguments, m_runtimeId, m_miniInitChannel, m_terminatingEvent.get(), m_vmConfig.DistributionStartTimeout);
+        Path,
+        Arguments,
+        [this](ULONG Port, HANDLE ExitHandle) { return m_backend->ConnectGuest(GuestServicePort{Port}, ExitHandle); },
+        m_miniInitChannel,
+        m_terminatingEvent.get(),
+        m_vmConfig.DistributionStartTimeout);
 }
 
 void WslCoreVm::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR GuestPath, _In_ bool ReadOnly, _In_ LPCWSTR Name)
@@ -1887,7 +1912,10 @@ WslCoreVm::MountFileAsPersistentMemory(_In_ PCWSTR FilePath, _In_ bool ReadOnly)
     VmPersistentMemoryRequest request{};
     request.Path = FilePath;
     request.ReadOnly = ReadOnly;
-    request.UserToken = m_userToken;
+    if (m_backend->GetDescription().Backend == BackendKind::Hcs)
+    {
+        request.UserToken = m_userToken;
+    }
     request.WaitForGuestDevice = [this](std::uint32_t index) { WaitForPmemDeviceInVm(index); };
     return m_backend->AddPersistentMemory(request).Index;
 }
@@ -1941,11 +1969,13 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
     // Ensure that the path has a trailing path separator.
     std::wstring sharePath = NormalizeSharePath(Path);
     const auto mountOptions = ParseVirtioFsMountOptions(Options);
+    const bool openVmm = m_backend->GetDescription().Backend == BackendKind::OpenVmm;
+    const bool readOnly = openVmm && mountOptions.contains(L"ro");
 
     bool created = false;
     auto share = m_backend->GetFileSystemShare([&](const VmFileSystemShare& candidate) {
         return std::holds_alternative<VmVirtioFsShareAddress>(candidate.GuestAddress) && candidate.Elevated == Admin &&
-               !candidate.ReadOnly && candidate.EffectiveHostPath.native() == sharePath && candidate.MountOptions == mountOptions;
+               candidate.ReadOnly == readOnly && candidate.EffectiveHostPath.native() == sharePath && candidate.MountOptions == mountOptions;
     });
     if (!share)
     {
@@ -1959,7 +1989,7 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
         WI_ASSERT(!FindVirtioFsShare(shareName.c_str(), Admin));
 
         VmFileSystemDevice device;
-        if (m_vmConfig.EnableVirtioFsAggregateShares)
+        if (m_vmConfig.EnableVirtioFsAggregateShares && !openVmm)
         {
             const PCWSTR deviceTag = Admin ? TEXT(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) : TEXT(LX_INIT_DRVFS_VIRTIO_TAG);
             const auto existingDevice = m_backend->GetFileSystemDevice([&](const VmFileSystemDevice& candidate) {
@@ -1989,12 +2019,15 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
         {
             VmFileSystemDeviceRequest deviceRequest{};
             deviceRequest.Transport = VmVirtioFsDevice{shareName, VmVirtioFsLayout::SingleShare};
-            deviceRequest.UserToken = wil::shared_handle{wsl::windows::common::wslutil::DuplicateHandle(UserToken)};
+            if (!openVmm)
+            {
+                deviceRequest.UserToken = wil::shared_handle{wsl::windows::common::wslutil::DuplicateHandle(UserToken)};
+            }
             device = m_backend->CreateFileSystemDevice(deviceRequest);
 
             VmFileSystemShareRequest request{};
             request.HostPath = sharePath;
-            request.ReadOnly = false;
+            request.ReadOnly = readOnly;
             request.Options = VmVirtioFsShareOptions{mountOptions};
             share = m_backend->AddFileSystemShare(device.Id, request);
         }
@@ -2012,7 +2045,7 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
         TraceLoggingValue(Options, "options"),
         TraceLoggingValue(address.Tag.c_str(), "tag"),
         TraceLoggingValue(childName.c_str(), "childName"),
-        TraceLoggingValue(m_vmConfig.EnableVirtioFsAggregateShares, "aggregate"),
+        TraceLoggingValue(m_vmConfig.EnableVirtioFsAggregateShares && !openVmm, "aggregate"),
         TraceLoggingValue(created, "created"));
 
     return {address.Tag, childName, share->EffectiveHostPath.native()};

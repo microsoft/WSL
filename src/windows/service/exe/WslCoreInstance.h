@@ -28,7 +28,7 @@ public:
     class WslCorePort final : public LxssPort
     {
     public:
-        WslCorePort(_In_ SOCKET Socket, _In_ const GUID& RuntimeId, _In_ DWORD SocketTimeout);
+        WslCorePort(_In_ SOCKET Socket, _In_ GuestConnectionCallback ConnectGuest, _In_ DWORD SocketTimeout);
 
         WslCorePort(const WslCorePort&) = delete;
         WslCorePort& operator=(const WslCorePort&) = delete;
@@ -45,7 +45,7 @@ public:
     private:
         wil::critical_section m_lock;
         wsl::shared::SocketChannel m_channel;
-        GUID m_runtimeId{};
+        GuestConnectionCallback m_connectGuest;
         DWORD m_socketTimeout{};
     };
 
@@ -64,6 +64,7 @@ public:
         _In_ ULONG DefaultUid,
         _In_ ULONG64 ClientLifetimeId,
         _In_ const std::function<LX_INIT_DRVFS_MOUNT(HANDLE)>& DrvFsCallback,
+        _In_ GuestConnectionCallback ConnectGuest,
         _In_ ULONG FeatureFlags,
         _In_ DWORD SocketTimeout,
         _In_ int IdleTimeout,
@@ -129,6 +130,7 @@ private:
     ULONG m_clientId{};
     ULONG m_defaultUid{};
     std::function<LX_INIT_DRVFS_MOUNT(HANDLE)> m_initializeDrvFs;
+    GuestConnectionCallback m_connectGuest;
     std::shared_ptr<WslCorePort> m_initChannel;
     std::shared_ptr<ConsoleManager> m_consoleManager;
     ULONG64 m_ntClientLifetimeId{};

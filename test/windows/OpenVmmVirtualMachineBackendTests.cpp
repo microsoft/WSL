@@ -102,7 +102,14 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_IS_FALSE(disk.ReadOnly);
 
         request.Mmio.HighWindowSizeBytes = c_mib;
+        VERIFY_ARE_EQUAL(S_OK, DescribeResult(request));
+        request.Mmio.MaximumGuestAddressBits = 36;
+        VERIFY_ARE_EQUAL(S_OK, DescribeResult(request));
+        request.Mmio.MaximumGuestAddressBits = 20;
         VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+        request.Mmio.MaximumGuestAddressBits.reset();
+        request.Mmio.HighWindowSizeBytes = c_mib + 1;
+        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
         request.Mmio = {};
         for (auto* feature :
              {&request.Memory.AllowOvercommit, &request.Memory.DeferredCommit, &request.Memory.ColdDiscard, &request.Memory.SmallPageBacking})
@@ -285,6 +292,70 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(VmTerminationReason::Shutdown, backend->GetTerminationReason().Reason);
     }
 
+    TEST_METHOD(AddsPersistentMemoryInGuestOrder)
+    {
+        SKIP_TEST_ARM64();
+        auto request = CreateRunnableRequest();
+        GUID directoryId{};
+        THROW_IF_FAILED(CoCreateGuid(&directoryId));
+        const auto directory = wsl::windows::common::filesystem::GetTempFolderPath(GetCurrentProcessToken()) /
+                               (L"OpenVmmPmemBackendTest-" +
+                                wsl::shared::string::GuidToString<wchar_t>(
+                                    directoryId, wsl::shared::string::GuidToStringFlags::None));
+        THROW_IF_WIN32_BOOL_FALSE(CreateDirectoryW(directory.c_str(), nullptr));
+        auto removeDirectory = wil::scope_exit([&] { LOG_IF_WIN32_BOOL_FALSE(RemoveDirectoryW(directory.c_str())); });
+
+        const auto firstPath = directory / L"first.img";
+        const auto secondPath = directory / L"second.img";
+        for (const auto& path : {firstPath, secondPath})
+        {
+            wil::unique_hfile file{CreateFileW(
+                path.c_str(),
+                GENERIC_READ | GENERIC_WRITE,
+                FILE_SHARE_READ | FILE_SHARE_WRITE,
+                nullptr,
+                CREATE_ALWAYS,
+                FILE_ATTRIBUTE_NORMAL,
+                nullptr)};
+            THROW_LAST_ERROR_IF(file.get() == INVALID_HANDLE_VALUE);
+            LARGE_INTEGER size{};
+            size.QuadPart = 2 * 1024 * 1024;
+            THROW_IF_WIN32_BOOL_FALSE(SetFilePointerEx(file.get(), size, nullptr, FILE_BEGIN));
+            THROW_IF_WIN32_BOOL_FALSE(SetEndOfFile(file.get()));
+        }
+
+        auto backend = OpenVmmVirtualMachineBackend::Create(request);
+        auto guest = StartGuest(*backend);
+
+        VmPersistentMemoryRequest alternateTokenRequest{};
+        alternateTokenRequest.Path = firstPath;
+        alternateTokenRequest.UserToken = request.Identity.UserToken;
+        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AddPersistentMemory(alternateTokenRequest); }));
+
+        std::vector<std::uint32_t> observed;
+        VmPersistentMemoryRequest firstRequest{};
+        firstRequest.Path = firstPath;
+        firstRequest.ReadOnly = true;
+        firstRequest.WaitForGuestDevice = [&](std::uint32_t index) { observed.push_back(index); };
+        const auto first = backend->AddPersistentMemory(firstRequest);
+
+        VmPersistentMemoryRequest secondRequest{};
+        secondRequest.Path = secondPath;
+        secondRequest.ReadOnly = false;
+        secondRequest.WaitForGuestDevice = [&](std::uint32_t index) { observed.push_back(index); };
+        const auto second = backend->AddPersistentMemory(secondRequest);
+
+        VERIFY_ARE_EQUAL(UINT32{0}, first.Index);
+        VERIFY_ARE_EQUAL(UINT32{1}, second.Index);
+        VERIFY_IS_TRUE(IsEqualGUID(request.Identity.VmId, first.Id.Owner.VmId));
+        VERIFY_IS_TRUE(IsEqualGUID(request.Identity.VmId, second.Id.Owner.VmId));
+        VERIFY_IS_TRUE(first.ReadOnly);
+        VERIFY_IS_FALSE(second.ReadOnly);
+        VERIFY_ARE_EQUAL(size_t{2}, observed.size());
+        VERIFY_ARE_EQUAL(UINT32{0}, observed[0]);
+        VERIFY_ARE_EQUAL(UINT32{1}, observed[1]);
+    }
+
     TEST_METHOD(ManagesFileSystemNetworkAndPortResources)
     {
         SKIP_TEST_ARM64();
@@ -327,9 +398,9 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest); }));
         shareRequest.Options = VmVirtioFsShareOptions{};
         auto& shareOptions = std::get<VmVirtioFsShareOptions>(shareRequest.Options);
-        shareOptions.MountOptions.emplace(L"unsupported", L"");
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest); }));
-        shareOptions.MountOptions.clear();
+        shareOptions.MountOptions.emplace(L"uid", L"1000");
+        shareOptions.MountOptions.emplace(L"gid", L"1000");
+        shareOptions.MountOptions.emplace(L"symlinkroot", L"/mnt/");
         const auto share = backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest);
         const auto servingDevice = backend->GetFileSystemDeviceStatus(fileSystemDevice.Id);
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Prepared, fileSystemDevice.State);
@@ -338,6 +409,7 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_IS_TRUE(IsEqualGUID(request.Identity.VmId, share.Id.Owner.VmId));
         VERIFY_ARE_EQUAL(fileSystemDevice.Id.Value, share.Device.Value);
         VERIFY_ARE_EQUAL(fileSystemTransport.Tag, std::get<VmVirtioFsShareAddress>(share.GuestAddress).Tag);
+        VERIFY_IS_TRUE(share.MountOptions == shareOptions.MountOptions);
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] {
                              backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest);
                          }));
@@ -416,6 +488,8 @@ class OpenVmmVirtualMachineBackendTests
         decltype(capabilities.Features) expectedFeatures;
         for (const auto feature :
              {VmFeature::SerialConsole,
+              VmFeature::HighMmio,
+              VmFeature::PersistentMemory,
               VmFeature::VirtioFsFileBacked,
               VmFeature::UserModeNatNetwork,
               VmFeature::TcpPortBinding,

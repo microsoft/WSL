@@ -48,6 +48,8 @@ using CreateLxProcessData = struct
     std::string Username;
 };
 
+using GuestConnectionCallback = std::function<wil::unique_socket(ULONG, HANDLE)>;
+
 class LxssCreateProcess
 {
 public:
@@ -72,7 +74,12 @@ public:
         _In_ ULONG Flags);
 
     static inline wil::unique_socket CreateLinuxProcess(
-        _In_ LPCSTR Path, _In_ LPCSTR* Arguments, const GUID& RuntimeId, wsl::shared::SocketChannel& channel, HANDLE terminatingEvent, DWORD Timeout)
+        _In_ LPCSTR Path,
+        _In_ LPCSTR* Arguments,
+        _In_ const GuestConnectionCallback& ConnectGuest,
+        wsl::shared::SocketChannel& channel,
+        _In_opt_ HANDLE terminatingEvent,
+        DWORD Timeout)
     {
         std::vector<char> ArgumentsData;
         for (const auto* e = Arguments; *e != nullptr; e++)
@@ -93,7 +100,7 @@ public:
             return message.Result;
         };
 
-        auto processSocket = wsl::windows::common::hvsocket::Connect(RuntimeId, readResult(), terminatingEvent);
+        auto processSocket = ConnectGuest(readResult(), terminatingEvent);
         const auto execResult = readResult();
         THROW_HR_IF_MSG(E_FAIL, execResult != 0, "Failed to execute '%hs', error=%d", Path, execResult);
 

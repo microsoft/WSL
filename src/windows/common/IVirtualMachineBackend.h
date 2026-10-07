@@ -116,6 +116,8 @@ enum class VmFeature
     HighMmio,
     HostingProcessNameSuffix,
     PhysicalDisk,
+    PersistentMemory,
+    GuestDmaWindow,
     SerialConsole,
     VirtioFsFileBacked,
     UserModeNatNetwork,
@@ -126,7 +128,7 @@ enum class VmFeature
     Count
 };
 
-static_assert(static_cast<size_t>(VmFeature::Count) == 17);
+static_assert(static_cast<size_t>(VmFeature::Count) == 19);
 
 struct VmPlatformCapabilities
 {
@@ -689,7 +691,7 @@ public:
     void RegisterTerminationCallback(TerminationCallback Callback);
 
     virtual VmGuestListener CreateGuestListener(GuestServicePort Port) = 0;
-    virtual wil::unique_socket ConnectGuest(GuestServicePort Port) = 0;
+    virtual wil::unique_socket ConnectGuest(GuestServicePort Port, _In_opt_ HANDLE ExitHandle = nullptr) = 0;
     virtual void CloseGuestListener(VmListenerId Listener) = 0;
 
     virtual VmDiskAttachment AttachDisk(const VmDiskRequest& Request) = 0;

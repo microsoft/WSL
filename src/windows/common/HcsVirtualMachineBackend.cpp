@@ -140,7 +140,8 @@ VmEffectiveMemory ConfigureMemory(const VmMemoryRequest& Request, const VmMmioRe
     memory.FaultClusterSizeShift = Request.FaultClusterSizeShift;
     memory.DirectMapFaultClusterSizeShift = Request.DirectMapFaultClusterSizeShift;
     memory.PageReportingOrder = Request.PageReportingOrder;
-    if (wsl::windows::common::helpers::IsVmemmSuffixSupported()) {
+    if (wsl::windows::common::helpers::IsVmemmSuffixSupported())
+    {
         memory.HostingProcessNameSuffix = Request.HostingProcessNameSuffix;
     }
     Settings.SizeInMB = memory.SizeBytes / c_mib;
@@ -544,6 +545,8 @@ VmPlatformCapabilities HcsVirtualMachineBackend::QueryCapabilities()
           VmFeature::HighMmio,
           VmFeature::SerialConsole,
           VmFeature::PhysicalDisk,
+          VmFeature::PersistentMemory,
+          VmFeature::GuestDmaWindow,
           VmFeature::VirtioFsFileBacked,
           VmFeature::UserModeNatNetwork,
           VmFeature::TcpPortBinding,
@@ -654,11 +657,11 @@ VmGuestListener HcsVirtualMachineBackend::CreateGuestListener(GuestServicePort P
     return RegisterGuestListenerLocked(m_configuration.Description.Identity, Port);
 }
 
-wil::unique_socket HcsVirtualMachineBackend::ConnectGuest(GuestServicePort Port)
+wil::unique_socket HcsVirtualMachineBackend::ConnectGuest(GuestServicePort Port, _In_opt_ HANDLE ExitHandle)
 {
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
-    return wsl::windows::common::hvsocket::Connect(m_configuration.Description.Identity.VmId, Port.Value);
+    return wsl::windows::common::hvsocket::Connect(m_configuration.Description.Identity.VmId, Port.Value, ExitHandle);
 }
 
 void HcsVirtualMachineBackend::CloseGuestListener(VmListenerId Listener)
