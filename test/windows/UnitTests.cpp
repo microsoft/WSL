@@ -362,6 +362,9 @@ class UnitTests
             auto cleanupSystemd = EnableSystemd();
 
             auto validateBinfmt = []() {
+                const auto status = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/fs/binfmt_misc/status").first;
+                VERIFY_ARE_EQUAL(status, L"enabled\n");
+
                 // Validate that WSL's binfmt interpreter is still in place.
                 auto [cmdOutput, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
                 VERIFY_ARE_EQUAL(cmdOutput, L"ok\r\n");
@@ -377,23 +380,20 @@ class UnitTests
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl stop systemd-binfmt.service"), 0u);
             validateBinfmt();
 
-            auto restartBinfmt = []() {
-                // Some systemd versions fail the service when the protected /status flush fails.
-                const auto exitCode = LxsstuLaunchWsl(L"systemctl restart systemd-binfmt.service");
-                if (exitCode != 0)
-                {
-                    VERIFY_ARE_EQUAL(exitCode, 1u);
-                    VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl is-failed --quiet systemd-binfmt.service"), 0u);
-                }
+            auto restartBinfmt = [&]() {
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl restart systemd-binfmt.service"), 0u);
+                validateBinfmt();
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl is-active --quiet systemd-binfmt.service"), 0u);
+                const auto result =
+                    LxsstuLaunchWslAndCaptureOutput(L"systemctl show --property=Result --value systemd-binfmt.service").first;
+                VERIFY_ARE_EQUAL(result, L"success\n");
             };
 
             restartBinfmt();
-            validateBinfmt();
 
             // Validate that the unit is regenerated after a daemon-reload.
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl daemon-reload"), 0u);
             restartBinfmt();
-            validateBinfmt();
 
             // Exercise both hooks independently of the distro's systemd-binfmt exit behavior.
             constexpr auto overridePath = L"/run/systemd/system/systemd-binfmt.service.d/wsl-test.conf";
@@ -441,17 +441,17 @@ class UnitTests
         }
     }
 
-    WSL2_TEST_METHOD(BinfmtStatusIsLocked)
+    WSL2_TEST_METHOD(BinfmtStatusIsProtected)
     {
         //
         // Validates the protection mechanism for the cross-distro binfmt wipe bug.
         //
-        // Fix: per-distro init bind-mounts a read-only file over
+        // Fix: per-distro init bind-mounts a writable regular file over
         // /proc/sys/fs/binfmt_misc/status before exec'ing the distro's init
-        // (see LockBinfmtStatusReadOnly in src/linux/init/init.cpp). systemd-shutdown's
+        // (see ProtectBinfmtStatus in src/linux/init/init.cpp). systemd-shutdown's
         // disable_binfmt() writes "-1" to that file to clear the kernel-global
         // binfmt_misc table at shutdown; with the bind-mount in place the write
-        // fails with EROFS so the entries shared with other running distros
+        // only changes the shadow file, so entries shared with other running distros
         // survive. Per-entry operations (registering new entries via /register,
         // unregistering individual entries via the entry file) are unaffected.
         //
@@ -467,26 +467,7 @@ class UnitTests
             // /status is its own mount point.
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mountpoint -q /proc/sys/fs/binfmt_misc/status"), 0u);
 
-            // Reading /status returns the lock-file content ("enabled\n") so
-            // callers that just check whether binfmt_misc is enabled still get a
-            // sensible answer.
-            {
-                auto [status, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/fs/binfmt_misc/status");
-                VERIFY_ARE_EQUAL(status, L"enabled\n");
-            }
-
-            // Direct write to /status — the wipe vector — must fail with EROFS.
-            // The shell's redirection error ("cannot create ...: Read-only file
-            // system") goes to the shell's stderr when the `>` open fails.
-            {
-                auto [_, err] = LxsstuLaunchWslAndCaptureOutput(L"sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/status; exit 0'");
-                VERIFY_IS_TRUE(err.find(L"Read-only file system") != std::wstring::npos);
-            }
-
-            // WSLInterop survives the failed wipe attempt.
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -e /proc/sys/fs/binfmt_misc/WSLInterop"), 0L);
-
-            // Runtime registration via /register still works (we only block /status).
+            // Runtime registration via /register still works (we only shadow /status).
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sh -c 'echo \":wsltestbinfmt:M::WSLTESTMAGIC::/bin/echo:\" > /proc/sys/fs/binfmt_misc/register'"), 0L);
 
             // binfmt_misc is VM-global, so a leftover wsltestbinfmt entry would
@@ -496,6 +477,18 @@ class UnitTests
             });
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -e /proc/sys/fs/binfmt_misc/wsltestbinfmt"), 0L);
+
+            // Clear/disable/enable writes succeed but affect only the shadow file.
+            for (const auto* value : {L"-1", L"0", L"1"})
+            {
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"echo {} > /proc/sys/fs/binfmt_misc/status", value)), 0L);
+                const auto status = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/fs/binfmt_misc/status").first;
+                VERIFY_ARE_EQUAL(status, std::format(L"{}\n", value));
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -e /proc/sys/fs/binfmt_misc/WSLInterop"), 0L);
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -e /proc/sys/fs/binfmt_misc/wsltestbinfmt"), 0L);
+                const auto cmd = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok").first;
+                VERIFY_ARE_EQUAL(cmd, L"ok\r\n");
+            }
 
             // Per-entry unregister (writing -1 to the entry file, not /status) still works.
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/wsltestbinfmt'"), 0L);
@@ -513,7 +506,7 @@ class UnitTests
         // EnableSystemd's cleanup re-launches the distro to revert wsl.conf and
         // then terminates it; that termination invokes systemd-shutdown's
         // disable_binfmt() which wipes the kernel-global table because
-        // protectBinfmt=false leaves /status writable. WslShutdown registered
+        // protectBinfmt=false exposes the real kernel /status. WslShutdown registered
         // FIRST (runs LAST in LIFO unwind) ensures the VM is fully torn down
         // after the wipe, so the next test starts a fresh VM where mini_init
         // re-registers WSLInterop.
