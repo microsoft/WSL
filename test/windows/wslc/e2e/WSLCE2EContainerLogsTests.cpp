@@ -273,11 +273,12 @@ class WSLCE2EContainerLogsTests
         VERIFY_IS_TRUE(logsSession.IsRunning(), L"`logs --follow` should wait for additional output");
 
         logsSession.SendCtrlBreak();
-        VERIFY_ARE_EQUAL(0, logsSession.Wait(30000));
+        constexpr auto controlCExitStatus = static_cast<int>(0xC000013A);
+        VERIFY_ARE_EQUAL(controlCExitStatus, logsSession.Wait(30000));
         logsSession.VerifyNoErrors();
 
         VERIFY_IS_TRUE(
-            InspectContainer(WslcContainerName).State.Running, L"Cancelling the log stream must not stop the container");
+            InspectContainer(WslcContainerName).State.Running, L"Terminating the log client must not stop the container");
     }
 
 private:

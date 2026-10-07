@@ -912,8 +912,7 @@ void ViewContainerLogs(CLIExecutionContext& context)
         until = context.Args.GetValue<ArgType::Until>();
     }
 
-    const auto cancelEvent = follow ? context.CreateCancelEvent() : nullptr;
-    ContainerService::Logs(session, WideToMultiByte(containerId), follow, timestamps, details, since, until, tail, cancelEvent);
+    ContainerService::Logs(session, WideToMultiByte(containerId), follow, timestamps, details, since, until, tail);
 }
 
 void PruneContainers(CLIExecutionContext& context)
