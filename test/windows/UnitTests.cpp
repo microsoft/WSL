@@ -5066,7 +5066,18 @@ VERSION_ID="Invalid|Format"
         const auto testDistroIdString = wsl::shared::string::GuidToString<wchar_t>(testDistroId.value());
 
         DistroFileChange distributionconf(L"/etc/wsl-distribution.conf", false);
-        distributionconf.SetContent(L"[oobe]\ncommand = /bin/bash -c 'echo OOBE'\n");
+        constexpr auto manifest =
+            L"[oobe]\n"
+            L"command = /bin/bash -c 'echo OOBE'\n"
+            L"defaultUid = 0\n"
+            L"defaultName = test-default-name\n"
+            L"[shortcut]\n"
+            L"icon = /icon.ico\n"
+            L"enabled = false\n"
+            L"[windowsterminal]\n"
+            L"ProfileTemplate = /terminal.json\n"
+            L"enabled = false\n";
+        distributionconf.SetContent(manifest);
 
         GUID runId;
         THROW_IF_FAILED(CoCreateGuid(&runId));
@@ -5112,11 +5123,21 @@ VERSION_ID="Invalid|Format"
             validateOutput(L"echo no oobe", L"no oobe\n");
             VERIFY_ARE_EQUAL(runOOBE.Get(), 1);
 
-            // Interactive shell should trigger OOBE
+            // Interactive shell should trigger OOBE without warnings for any supported manifest keys.
             validateOutput(nullptr, L"OOBE\n");
             VERIFY_ARE_EQUAL(runOOBE.Get(), 0);
 
             // OOBE should only trigger once
+            validateOutput(L"", L"");
+        }
+
+        {
+            runOOBE.Set(1);
+            distributionconf.SetContent((std::wstring(manifest) + L"[unknown]\nkey = value\n").c_str());
+            TerminateDistribution();
+
+            validateOutput(nullptr, L"OOBE\n", L"wsl: Unknown key 'unknown.key' in /etc/wsl-distribution.conf:12\n");
+            VERIFY_ARE_EQUAL(runOOBE.Get(), 0);
             validateOutput(L"", L"");
         }
 
