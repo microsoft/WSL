@@ -2142,9 +2142,11 @@ Usage:
         });
 
         // The request should complete quickly. Before the fix, a disabled-interop VM-mode launch could
-        // hang indefinitely instead of being rejected.
-        const auto status = launch.wait_for(30s);
-        VERIFY_ARE_EQUAL(status, std::future_status::ready);
+        // hang indefinitely instead of being rejected. Fail fast (rather than VERIFY_ARE_EQUAL) if the launch
+        // isn't ready in time, since unwinding past a still-running std::async task would block in the
+        // future's destructor / the unconditional get() below, turning the intended timeout into a hang.
+        FAIL_FAST_IF_MSG(
+            launch.wait_for(30s) != std::future_status::ready, "VM-mode launch did not complete with interop disabled");
 
         const auto exitCode = launch.get();
 
@@ -2152,19 +2154,7 @@ Usage:
         stdOutWrite.reset();
         stdErrWrite.reset();
 
-        const auto readAll = [](HANDLE handle) {
-            std::string content;
-            char buffer[4096];
-            DWORD bytesRead{};
-            while (ReadFile(handle, buffer, sizeof(buffer), &bytesRead, nullptr) && bytesRead > 0)
-            {
-                content.append(buffer, bytesRead);
-            }
-
-            return content;
-        };
-
-        const auto output = readAll(stdOutRead.get());
+        const auto output = ReadToString(stdOutRead.get());
 
         VERIFY_ARE_EQUAL(exitCode, 0u);
         VERIFY_IS_TRUE(output.find("exitcode:1:") != std::string::npos);
