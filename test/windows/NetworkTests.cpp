@@ -2488,8 +2488,10 @@ class NetworkTests
             std::chrono::minutes(2)));
     }
 
-    static void VerifyPortZeroBindFromThreadIsTracked()
+    static void VerifyPortZeroBindFromThreadIsTracked(bool verifyRelease = true)
     {
+        WslKeepAlive keepAlive;
+
         auto [stdOutRead, stdOutWrite] = CreateSubprocessPipe(false, true);
         // LXT uses one bit per variation; the threaded port-zero server is the sixth server variation.
         constexpr unsigned long long c_portZeroThreadVariationMask = 1ull << 5;
@@ -2545,6 +2547,15 @@ class NetworkTests
         };
 
         VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(connectToGuest, std::chrono::seconds(1), std::chrono::seconds(30)));
+
+        serverProcess.reset();
+
+        if (verifyRelease)
+        {
+            // Wait beyond the port tracker's grace period for the exact loopback mapping to be released.
+            // A wildcard bind can succeed while that mapping still prevents the next test from forwarding this port.
+            BindHostPort(assignedPort, SOCK_STREAM, IPPROTO_TCP, true, false, true, std::chrono::minutes(2));
+        }
     }
 
     static void VerifyPortZeroRebindSucceeds()
@@ -4703,7 +4714,7 @@ class MirroredTests
         // it — the range-level reservation remains, making release unverifiable.
         NetworkTests::VerifyPortZeroBindIsTracked(false);
 
-        NetworkTests::VerifyPortZeroBindFromThreadIsTracked();
+        NetworkTests::VerifyPortZeroBindFromThreadIsTracked(false);
     }
 
     WSL2_TEST_METHOD(ListenWithoutBindIsTracked)
@@ -5884,22 +5895,29 @@ class ConsommeTests
         auto tcpPort = NetworkTests::BindGuestPort(L"TCP4-LISTEN:2345", true);
     }
 
+    static auto SetTestEphemeralPortRange()
+    {
+        auto [originalRange, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range", 0);
+        originalRange = wsl::shared::string::Trim(originalRange);
+
+        auto revert = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [originalRange = std::move(originalRange)] {
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"echo '{}' > /proc/sys/net/ipv4/ip_local_port_range", originalRange)), 0);
+        });
+
+        // Keep anonymous guest binds out of the host's ephemeral port range, where an existing host bind
+        // would prevent consomme from forwarding the selected port.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"echo '1234 1239' > /proc/sys/net/ipv4/ip_local_port_range"), 0);
+
+        return revert;
+    }
+
     WSL2_TEST_METHOD(PortZeroBindIsTracked)
     {
         CONSOMME_TEST_ONLY();
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
 
-        auto [originalRange, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range", 0);
-        originalRange = wsl::shared::string::Trim(originalRange);
-
-        auto revert = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&originalRange] {
-            LxsstuLaunchWsl(std::format(L"echo '{}' > /proc/sys/net/ipv4/ip_local_port_range", originalRange));
-        });
-
-        // Keep anonymous guest binds out of the host's ephemeral port range, where an existing host bind
-        // would prevent consomme from forwarding the selected port.
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"echo '1234 1239' > /proc/sys/net/ipv4/ip_local_port_range"), 0);
+        auto revertEphemeralPortRange = SetTestEphemeralPortRange();
 
         NetworkTests::VerifyPortZeroBindIsTracked();
 
@@ -5912,6 +5930,8 @@ class ConsommeTests
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
 
+        auto revertEphemeralPortRange = SetTestEphemeralPortRange();
+
         NetworkTests::VerifyListenWithoutBindIsTracked();
     }
 
@@ -5920,6 +5940,8 @@ class ConsommeTests
         CONSOMME_TEST_ONLY();
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+
+        auto revertEphemeralPortRange = SetTestEphemeralPortRange();
 
         NetworkTests::VerifyPortZeroRebindSucceeds();
     }

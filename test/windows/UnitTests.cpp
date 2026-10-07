@@ -33,6 +33,7 @@ Abstract:
 #include "Distribution.h"
 #include "WslCoreConfigInterface.h"
 #include "WslCoreFilesystem.h"
+#include "WslSecurity.h"
 #include "CommandLine.h"
 #include "retryshared.h"
 
@@ -205,13 +206,6 @@ class UnitTests
 
     WSL2_TEST_METHOD(SystemdSystem)
     {
-        auto cleanup = wil::scope_exit([] {
-            // clean up wsl.conf file
-            const std::wstring disableSystemdCmd(LXSST_REMOVE_DISTRO_CONF_COMMAND_LINE);
-            LxsstuLaunchWsl(disableSystemdCmd);
-            TerminateDistribution();
-        });
-
         auto revert = EnableSystemd();
         VERIFY_IS_TRUE(IsSystemdRunning(L"--system"));
 
@@ -594,13 +588,7 @@ class UnitTests
         auto cleanupPeer =
             wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"--unregister {}", peerDistroName)); });
 
-        // Enable systemd in the peer distro (no helper exists for non-test distros).
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(std::format(L"-d {} -- sh -c \"mkdir -p /etc && printf '[boot]\\nsystemd=true\\n' > /etc/wsl.conf\"", peerDistroName)),
-            0L);
-
-        // Terminate so the config takes effect on next start.
-        TerminateDistribution(peerDistroName);
+        auto cleanupPeerSystemd = EnableSystemd("", peerDistroName);
 
         // Verify interop works in both distros (this also starts the peer with systemd).
         {
@@ -952,6 +940,7 @@ class UnitTests
 
         const auto wslSupport =
             wil::CoCreateInstance<LxssUserSession, IWslSupport>(CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA);
+        wsl::windows::common::security::ConfigureForCOMImpersonation(wslSupport.get());
 
         ULONG Version;
         ULONG DefaultUid;
@@ -1802,6 +1791,54 @@ class UnitTests
         VerifyOutput(L"--exec echo -n \\\"", L"\"");
     }
 
+    TEST_METHOD(CommandsRejectExtraArguments)
+    {
+        for (const auto* command :
+             {L"--debug-shell",
+              L"--help",
+              L"--status",
+              L"--version",
+              L"-v",
+              L"--set-default DoesNotExist",
+              L"--setdefault DoesNotExist",
+              L"-s DoesNotExist",
+              L"--terminate DoesNotExist",
+              L"-t DoesNotExist",
+              L"--unregister DoesNotExist",
+              L"--set-default-version 2",
+              L"--set-version DoesNotExist 2"})
+        {
+            for (const auto& [arguments, invalidArgument] :
+                 {std::pair{L"extra", L"extra"},
+                  std::pair{L"extra another", L"extra"},
+                  std::pair{L"--unexpected", L"--unexpected"},
+                  std::pair{L"\"extra argument\"", L"\"extra argument\""},
+                  std::pair{L"\"\"", L"\"\""}})
+            {
+                auto [output, error] = LxsstuLaunchWslAndCaptureOutput(std::format(L"{} {}", command, arguments), -1);
+
+                VERIFY_ARE_EQUAL(
+                    FormatErrorMessage(
+                        std::format(
+                            L"Invalid command line argument: {}\r\n"
+                            L"Please use 'wsl.exe --help' to get a list of supported arguments.",
+                            invalidArgument),
+                        L"Wsl/E_INVALIDARG"),
+                    output);
+
+                VERIFY_ARE_EQUAL(L"", error);
+            }
+        }
+
+        for (const auto* command : {L"--status", L"--version", L"-v"})
+        {
+            const auto [output, error] = LxsstuLaunchWslAndCaptureOutput(command);
+            VerifyOutput(std::format(L"{} \t ", command), output);
+        }
+
+        VerifyOutput(L"--help \t ", ExpectedUsageMessage(), -1);
+    }
+
     TEST_METHOD(ManageInvalidUsage)
     {
         VerifyInvalidUsage(L"--manage " LXSS_DISTRO_NAME_TEST_L L" --compact --resize 10GB");
@@ -2207,14 +2244,11 @@ Usage:
 
     TEST_METHOD(Hostname)
     {
-        auto cleanup = wil::scope_exit([] {
-            LxsstuLaunchWsl(LXSST_REMOVE_DISTRO_CONF_COMMAND_LINE);
+        auto cleanup = wil::scope_exit([] { TerminateDistribution(); });
+        DistroFileChange config(L"/etc/wsl.conf", false);
 
-            TerminateDistribution();
-        });
-
-        auto validate = [](const std::string& input, const std::wstring& expectedOutput) {
-            LxssWriteWslDistroConfig("[network]\nhostname=" + input);
+        auto validate = [&config](const std::string& input, const std::wstring& expectedOutput) {
+            config.SetContent(wsl::shared::string::MultiByteToWide("[network]\nhostname=" + input).c_str());
             TerminateDistribution();
 
             auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"hostname");
@@ -5051,6 +5085,15 @@ VERSION_ID="Invalid|Format"
             std::filesystem::remove_all(drvFsTestPath, ignored);
         });
 
+        auto cleanupUser = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+            TerminateDistribution();
+
+            const auto exitCode = LxsstuLaunchWsl(L"userdel -f -r user");
+
+            // The test may fail before OOBE creates the user (userdel exits with 6 if it does not exist).
+            VERIFY_IS_TRUE(exitCode == 0 || exitCode == 6);
+        });
+
         RegistryKeyChange<DWORD> runOOBE(lxssKey.get(), testDistroIdString.c_str(), L"RunOOBE", 1);
         const RegistryKeyChange<DWORD> defaultUid(lxssKey.get(), testDistroIdString.c_str(), L"DefaultUid", 0);
 
@@ -5121,7 +5164,7 @@ VERSION_ID="Invalid|Format"
 
             if (LxsstuVmMode())
             {
-                fstab.emplace(L"/etc/fstab");
+                fstab.emplace(L"/etc/fstab", false);
                 fstab->SetContent(
                     std::format(L"{} {} drvfs uid=2000,gid=2001,x-mount.mkdir 0 0\n", drvFsTestPath.root_path().generic_wstring(), userMountPoint)
                         .c_str());
@@ -5219,9 +5262,6 @@ VERSION_ID="Invalid|Format"
             VERIFY_ARE_EQUAL(wsl::windows::common::registry::ReadDword(distroKey.get(), nullptr, L"RunOOBE", 1), 0);
             validateOutput(nullptr, L"");
         }
-
-        // Make sure the defaultUid is reset for next test case.
-        TerminateDistribution();
     }
 
     static void ValidateDistributionStarts(LPCWSTR Name)
@@ -7569,6 +7609,18 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, L"State", LxssDistributionStateInstalled);
         wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, L"Flags", LXSS_DISTRO_FLAGS_VM_MODE);
 
+        auto [invalidOutput, invalidError] = LxsstuLaunchWslAndCaptureOutput(L"--unregister DummyBrokenDistro extra another", -1);
+
+        VERIFY_ARE_EQUAL(
+            FormatErrorMessage(
+                L"Invalid command line argument: extra\r\n"
+                L"Please use 'wsl.exe --help' to get a list of supported arguments.",
+                L"Wsl/E_INVALIDARG"),
+            invalidOutput);
+
+        VERIFY_ARE_EQUAL(L"", invalidError);
+        VERIFY_IS_TRUE(GetDistributionId(L"DummyBrokenDistro").has_value());
+
         auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"--unregister DummyBrokenDistro");
 
         VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
@@ -8406,6 +8458,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         std::optional<decltype(EnableSystemd())> systemdCleanup;
         std::optional<decltype(EnableSystemd())> systemdCleanup2;
         std::optional<DistroFileChange> cgroupConfig;
+        std::optional<DistroFileChange> cgroupConfig2;
         if (systemd)
         {
             systemdCleanup.emplace(EnableSystemd());
@@ -8416,7 +8469,8 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         {
             cgroupConfig.emplace(L"/etc/wsl.conf", false);
             cgroupConfig->SetContent(L"[automount]\ncgroups=v1\n");
-            LxssWriteWslDistroConfig("[automount]\ncgroups=v1\n", secondDistroName);
+            cgroupConfig2.emplace(L"/etc/wsl.conf", false, secondDistroName);
+            cgroupConfig2->SetContent(L"[automount]\ncgroups=v1\n");
             TerminateDistribution();
             TerminateDistribution(secondDistroName);
 
