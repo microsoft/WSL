@@ -38,6 +38,19 @@ constexpr auto c_ConfigGpuEnabledOption = "gpu.enabled";
 constexpr auto c_ConfigLinkOsLibsOption = "automount.ldconfig";
 constexpr auto c_ConfigAutoMountRoot = "automount.root";
 
+struct WslDistributionManifest
+{
+    std::string OobeCommand;
+    std::optional<int> DefaultUid;
+    std::string DefaultName;
+    std::string ShortcutIconPath;
+    bool GenerateShortcut = true;
+    std::string TerminalProfileTemplatePath;
+    bool GenerateTerminalProfile = true;
+};
+
+WslDistributionManifest ParseWslDistributionManifest();
+
 struct WslDistributionConfig
 {
     WslDistributionConfig(const char* configFilePath);
