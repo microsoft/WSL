@@ -2458,6 +2458,10 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
     <value>Impossible d’écrire la sortie de build dans la console pour la valeur --output « {} ».</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcBuildStdinContextAndDockerfile" xml:space="preserve">
+    <value>Can't use stdin for both the build context and the Dockerfile.</value>
+    <comment>{Locked="stdin"}{Locked="Dockerfile"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>Option obligatoire manquante : « {} »</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3464,7 +3468,8 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Chemin d'accès de l’image enregistrée</value>
   </data>
   <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
-    <value>Chemin d’accès au répertoire du contexte de build</value>
+    <value>Path to the build context directory (use "-" to read a tar archive or Dockerfile from stdin)</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
     <value>Publier un port d’un conteneur sur l’hôte</value>
@@ -3868,6 +3873,10 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>Impossible d’écrire l’image dans le terminal. Utilisez l’option -o ou redirigez stdout.</value>
+  </data>
+  <data name="WSLCCLI_BuildStdinIsTerminalError" xml:space="preserve">
+    <value>Cannot read build input from terminal. Pipe a Dockerfile or tar archive to stdin.</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
     <value>Impossible d’exporter le conteneur vers le terminal. Utilisez l’option -o ou redirigez stdout.</value>
