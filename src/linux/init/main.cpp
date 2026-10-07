@@ -14,6 +14,7 @@ Abstract:
 
 #include <sys/mount.h>
 #include <sys/signalfd.h>
+#include <sys/syscall.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/sysinfo.h>
@@ -27,6 +28,7 @@ Abstract:
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <linux/audit.h> /* Definition of AUDIT_* constants */
+#include <linux/fanotify.h>
 #include <linux/if_tun.h>
 #include <linux/loop.h>
 #include <linux/net.h>
@@ -53,6 +55,8 @@ Abstract:
 #include <unistd.h>
 #include <utmp.h>
 #include <assert.h>
+#include <array>
+#include <chrono>
 #include "configfile.h"
 #include "lxfsshares.h"
 #include "common.h"
@@ -124,6 +128,25 @@ struct VmConfiguration
     LX_MINI_INIT_NETWORKING_MODE NetworkingMode = LxMiniInitNetworkingModeNone;
 };
 
+class BinfmtPriorityMonitor
+{
+public:
+    void Start();
+    int Fd() const noexcept;
+    int PollTimeout() const;
+    void ProcessPollEvents(short Revents);
+    void Maintain();
+
+private:
+    int RestorePriority();
+    void ScheduleRetry();
+    void ProcessEvents();
+
+    wil::unique_fd m_notifyFd;
+    bool m_needsRestore = false;
+    std::optional<std::chrono::steady_clock::time_point> m_retryAt;
+};
+
 int g_LogFd = STDERR_FILENO;
 int g_TelemetryFd = -1;
 std::optional<bool> g_EnableSocketLogging;
@@ -156,7 +179,7 @@ std::string GetMountTarget(const char* Name);
 
 int ImportFromSocket(const char* Destination, int Socket, int ErrorSocket, unsigned int Flags);
 
-int Initialize(const char* Hostname);
+int Initialize(const char* Hostname, BinfmtPriorityMonitor& BinfmtMonitor);
 
 void InjectEntropy(gsl::span<gsl::byte> EntropyBuffer);
 
@@ -199,7 +222,12 @@ int MountInit(const char* Target);
 
 int MountPlan9(const char* Name, const char* Target, bool ReadOnly, unsigned int HostPort = LX_INIT_UTILITY_VM_PLAN9_PORT, std::optional<int> BufferSize = {});
 
-int ProcessMessage(wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config);
+int ProcessMessage(
+    wsl::shared::Transaction& Transaction,
+    LX_MESSAGE_TYPE Type,
+    gsl::span<gsl::byte> Buffer,
+    VmConfiguration& Config,
+    BinfmtPriorityMonitor& BinfmtMonitor);
 
 wil::unique_fd RegisterSeccompHook();
 
@@ -1181,7 +1209,7 @@ Return Value:
         });
 }
 
-int Initialize(const char* Hostname)
+int Initialize(const char* Hostname, BinfmtPriorityMonitor& BinfmtMonitor)
 
 /*++
 
@@ -1307,6 +1335,8 @@ Return Value:
         return -1;
     }
 
+    BinfmtMonitor.Start();
+
     //
     // Register the Windows interop interpreter using the 'F' flag which makes
     // it available in other mount namespaces and chroot environments.
@@ -1318,6 +1348,206 @@ Return Value:
     }
 
     return 0;
+}
+
+void BinfmtPriorityMonitor::Start()
+{
+    // An inode mark observes binfmt writes through other distros' mounts.
+    wil::unique_fd notifyFd{static_cast<int>(syscall(SYS_fanotify_init, FAN_CLOEXEC | FAN_NONBLOCK, O_RDONLY | O_CLOEXEC))};
+    if (!notifyFd)
+    {
+        LOG_ERROR("Failed to initialize binfmt notification: {}", errno);
+        ScheduleRetry();
+    }
+    else if (syscall(SYS_fanotify_mark, notifyFd.get(), FAN_MARK_ADD, FAN_MODIFY | FAN_EVENT_ON_CHILD, AT_FDCWD, BINFMT_PATH) < 0)
+    {
+        LOG_ERROR("Failed to monitor binfmt registrations: {}", errno);
+        ScheduleRetry();
+    }
+    else
+    {
+        m_notifyFd = std::move(notifyFd);
+    }
+}
+
+int BinfmtPriorityMonitor::Fd() const noexcept
+{
+    return m_notifyFd.get();
+}
+
+void BinfmtPriorityMonitor::ScheduleRetry()
+{
+    if (!m_retryAt)
+    {
+        m_retryAt = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+    }
+}
+
+int BinfmtPriorityMonitor::PollTimeout() const
+{
+    if (!m_retryAt)
+    {
+        return -1;
+    }
+
+    const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(*m_retryAt - std::chrono::steady_clock::now());
+    return static_cast<int>(std::max<int64_t>(0, remaining.count()));
+}
+
+void BinfmtPriorityMonitor::Maintain()
+{
+    if (!m_retryAt || std::chrono::steady_clock::now() < *m_retryAt)
+    {
+        return;
+    }
+
+    m_retryAt.reset();
+    if (!m_notifyFd)
+    {
+        Start();
+        if (m_notifyFd)
+        {
+            m_needsRestore = true;
+        }
+    }
+
+    if (m_notifyFd && m_needsRestore && RestorePriority() == 0)
+    {
+        m_needsRestore = false;
+    }
+
+    if (!m_notifyFd || m_needsRestore)
+    {
+        ScheduleRetry();
+    }
+}
+
+int BinfmtPriorityMonitor::RestorePriority()
+{
+    const wil::unique_fd status{open(BINFMT_PATH "/status", O_RDONLY | O_CLOEXEC)};
+    if (!status)
+    {
+        LOG_ERROR("Failed to open binfmt status: {}", errno);
+        return -1;
+    }
+
+    std::array<char, 16> statusBuffer{};
+    const auto statusLength = TEMP_FAILURE_RETRY(read(status.get(), statusBuffer.data(), statusBuffer.size()));
+    if (statusLength < 0)
+    {
+        LOG_ERROR("Failed to read binfmt status: {}", errno);
+        return -1;
+    }
+
+    const std::string_view currentStatus{statusBuffer.data(), static_cast<size_t>(statusLength)};
+    if (currentStatus == "disabled\n")
+    {
+        if (WriteToFile(BINFMT_PATH "/status", "1", O_WRONLY | O_CLOEXEC) < 0)
+        {
+            LOG_ERROR("Failed to enable binfmt: {}", errno);
+            return -1;
+        }
+    }
+    else if (currentStatus != "enabled\n")
+    {
+        LOG_ERROR("Unexpected binfmt status: {}", currentStatus);
+        return -1;
+    }
+
+    const wil::unique_fd entry{open(BINFMT_PATH "/" LX_INIT_BINFMT_NAME, O_WRONLY | O_CLOEXEC)};
+    if (entry)
+    {
+        const auto result = TEMP_FAILURE_RETRY(write(entry.get(), "-1", 2));
+        if (result != 2)
+        {
+            LOG_ERROR("Failed to unregister WSLInterop: {}", result < 0 ? errno : EIO);
+            return -1;
+        }
+    }
+    else if (errno != ENOENT)
+    {
+        LOG_ERROR("Failed to open WSLInterop: {}", errno);
+        return -1;
+    }
+
+    if (WriteToFile(BINFMT_PATH "/register", BINFMT_REGISTER_STRING) < 0)
+    {
+        LOG_ERROR("Failed to restore WSLInterop: {}", errno);
+        return -1;
+    }
+
+    return 0;
+}
+
+void BinfmtPriorityMonitor::ProcessEvents()
+{
+    alignas(fanotify_event_metadata) std::array<char, 4096> buffer{};
+    const auto bytesRead = TEMP_FAILURE_RETRY(read(m_notifyFd.get(), buffer.data(), buffer.size()));
+    if (bytesRead < 0 && errno == EAGAIN)
+    {
+        return;
+    }
+    if (bytesRead <= 0)
+    {
+        LOG_ERROR("Failed to read binfmt notifications: {}", errno);
+        m_notifyFd.reset();
+        m_needsRestore = true;
+        ScheduleRetry();
+        return;
+    }
+
+    auto remaining = bytesRead;
+    for (auto* event = reinterpret_cast<fanotify_event_metadata*>(buffer.data()); FAN_EVENT_OK(event, remaining);
+         event = FAN_EVENT_NEXT(event, remaining))
+    {
+        if (event->vers != FANOTIFY_METADATA_VERSION)
+        {
+            LOG_ERROR("Unexpected fanotify metadata version {}", event->vers);
+            m_notifyFd.reset();
+            m_needsRestore = true;
+            ScheduleRetry();
+            return;
+        }
+
+        const wil::unique_fd eventFd{event->fd};
+        m_needsRestore |= (event->mask & FAN_Q_OVERFLOW) != 0 || ((event->mask & FAN_MODIFY) != 0 && event->pid != getpid());
+    }
+
+    if (remaining != 0)
+    {
+        LOG_ERROR("Invalid binfmt notification length: {}", remaining);
+        m_notifyFd.reset();
+        m_needsRestore = true;
+        ScheduleRetry();
+        return;
+    }
+
+    if (m_needsRestore)
+    {
+        if (RestorePriority() == 0)
+        {
+            m_needsRestore = false;
+        }
+        else
+        {
+            ScheduleRetry();
+        }
+    }
+}
+
+void BinfmtPriorityMonitor::ProcessPollEvents(short Revents)
+{
+    if (Revents & (POLLHUP | POLLERR | POLLNVAL))
+    {
+        LOG_ERROR("binfmt notification fd failed: {}", Revents);
+        m_notifyFd.reset();
+        m_needsRestore = true;
+        ScheduleRetry();
+    }
+    else if (Revents & POLLIN)
+    {
+        ProcessEvents();
+    }
 }
 
 int InitializeLogging(bool SetStderr, wil::LogFunction* ExceptionCallback) noexcept
@@ -3047,7 +3277,12 @@ try
 }
 CATCH_RETURN_ERRNO();
 
-int ProcessMessage(wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config)
+int ProcessMessage(
+    wsl::shared::Transaction& Transaction,
+    LX_MESSAGE_TYPE Type,
+    gsl::span<gsl::byte> Buffer,
+    VmConfiguration& Config,
+    BinfmtPriorityMonitor& BinfmtMonitor)
 
 /*++
 
@@ -3339,7 +3574,7 @@ try
         // Initialization required by mini_init.
         //
 
-        if (Initialize(wsl::shared::string::FromSpan(Buffer, EarlyConfig->HostnameOffset)) < 0)
+        if (Initialize(wsl::shared::string::FromSpan(Buffer, EarlyConfig->HostnameOffset), BinfmtMonitor) < 0)
         {
             return -1;
         }
@@ -4035,7 +4270,8 @@ int main(int Argc, char* Argv[])
     wil::unique_fd ConsoleFd{};
     wsl::shared::SocketChannel channel;
     wil::unique_fd NotifyFd{};
-    struct pollfd PollDescriptors[2];
+    struct pollfd PollDescriptors[3]{};
+    BinfmtPriorityMonitor BinfmtMonitor;
     wil::unique_fd SignalFd{};
     struct signalfd_siginfo SignalInfo;
     sigset_t SignalMask;
@@ -4272,9 +4508,11 @@ int main(int Argc, char* Argv[])
     PollDescriptors[0].events = POLLIN;
     PollDescriptors[1].fd = SignalFd.get();
     PollDescriptors[1].events = POLLIN;
+    PollDescriptors[2].fd = -1;
+    PollDescriptors[2].events = POLLIN;
     for (;;)
     {
-        Result = poll(PollDescriptors, COUNT_OF(PollDescriptors), -1);
+        Result = poll(PollDescriptors, COUNT_OF(PollDescriptors), BinfmtMonitor.PollTimeout());
         if (Result < 0)
         {
             LOG_ERROR("poll failed {}", errno);
@@ -4299,11 +4537,13 @@ int main(int Argc, char* Argv[])
                 break; // Socket was closed, exit
             }
 
-            Result = ProcessMessage(transaction, Message->MessageType, Range, Config);
+            Result = ProcessMessage(transaction, Message->MessageType, Range, Config, BinfmtMonitor);
             if (Result < 0)
             {
                 goto ErrorExit;
             }
+
+            PollDescriptors[2].fd = BinfmtMonitor.Fd();
         }
 
         //
@@ -4414,6 +4654,10 @@ int main(int Argc, char* Argv[])
                 }
             }
         }
+
+        BinfmtMonitor.ProcessPollEvents(PollDescriptors[2].revents);
+        BinfmtMonitor.Maintain();
+        PollDescriptors[2].fd = BinfmtMonitor.Fd();
     }
 
 ErrorExit:

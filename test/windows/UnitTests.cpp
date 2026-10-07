@@ -357,15 +357,21 @@ class UnitTests
             WslShutdown(); // Required since this test registers a custom binfmt interpreter.
         });
 
+        auto validateBinfmt = []() {
+            std::wstring cmdOutput;
+            VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() {
+                    cmdOutput = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok").first;
+                    THROW_HR_IF(E_UNEXPECTED, cmdOutput != L"ok\r\n");
+                },
+                std::chrono::milliseconds(100),
+                std::chrono::seconds(10)));
+            VERIFY_ARE_EQUAL(cmdOutput, L"ok\r\n");
+        };
+
         {
             // Enable systemd (restarts distro).
             auto cleanupSystemd = EnableSystemd();
-
-            auto validateBinfmt = []() {
-                // Validate that WSL's binfmt interpreter is still in place.
-                auto [cmdOutput, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
-                VERIFY_ARE_EQUAL(cmdOutput, L"ok\r\n");
-            };
 
             validateBinfmt();
 
@@ -395,7 +401,7 @@ class UnitTests
             restartBinfmt();
             validateBinfmt();
 
-            // Exercise both hooks independently of the distro's systemd-binfmt exit behavior.
+            // Exercise successful and failed service starts without per-distro restoration hooks.
             constexpr auto overridePath = L"/run/systemd/system/systemd-binfmt.service.d/wsl-test.conf";
             auto cleanupOverride = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 LxsstuLaunchWsl(std::format(L"rm -f {} && systemctl daemon-reload", overridePath));
@@ -435,9 +441,8 @@ class UnitTests
             // Enable systemd (restarts distro).
             auto cleanupSystemd = EnableSystemd("protectBinfmt=false");
 
-            // Validate that WSL's binfmt interpreter is overridden
-            auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
-            VERIFY_IS_TRUE(wsl::shared::string::IsEqual(output, L"/mnt/c/Windows/system32/cmd.exe cmd.exe /c echo ok\n", true));
+            // The VM-wide priority monitor remains enabled even when this distro opts out of /status protection.
+            validateBinfmt();
         }
     }
 
@@ -464,12 +469,7 @@ class UnitTests
             auto cleanupVm = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
             auto cleanupSystemd = EnableSystemd();
 
-            VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-                [&]() {
-                    THROW_HR_IF(E_UNEXPECTED, LxsstuLaunchWsl(L"systemctl is-active --quiet wsl-binfmt-priority.service") != 0);
-                },
-                std::chrono::seconds(1),
-                std::chrono::minutes(1)));
+            VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(L"test -e /run/systemd/generator/wsl-binfmt-priority.service"), 0L);
 
             // /status is its own mount point.
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mountpoint -q /proc/sys/fs/binfmt_misc/status"), 0u);
@@ -516,7 +516,7 @@ class UnitTests
             }
 
             // A distro handler registered later for the same MZ magic must not
-            // keep precedence without manually restarting the priority unit.
+            // keep precedence without intervention from a per-distro service.
             VERIFY_ARE_EQUAL(
                 LxsstuLaunchWsl(L"sh -c 'echo \":wsltestmz:M::MZ::/bin/false:\" > /proc/sys/fs/binfmt_misc/register'"), 0L);
             auto cleanupMzEntry = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
@@ -540,29 +540,58 @@ class UnitTests
             auto cleanupVm = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
             auto cleanupSystemd = EnableSystemd("[interop]\nenabled=false\n");
 
-            VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-                [&]() {
-                    THROW_HR_IF(E_UNEXPECTED, LxsstuLaunchWsl(L"systemctl is-active --quiet wsl-binfmt-priority.service") != 0);
-                },
-                std::chrono::seconds(1),
-                std::chrono::minutes(1)));
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -e /proc/sys/fs/binfmt_misc/WSLInterop"), 0L);
         }
 
-        // protectBinfmt=false: bind-mount must NOT be installed (kill switch).
-        // EnableSystemd's cleanup re-launches the distro to revert wsl.conf and
-        // then terminates it; that termination invokes systemd-shutdown's
-        // disable_binfmt() which wipes the kernel-global table because
-        // protectBinfmt=false leaves /status writable. WslShutdown registered
-        // FIRST (runs LAST in LIFO unwind) ensures the VM is fully torn down
-        // after the wipe, so the next test starts a fresh VM where mini_init
-        // re-registers WSLInterop.
+        // protectBinfmt=false disables only this distro's /status bind-mount,
+        // not the VM-wide priority monitor.
+        // EnableSystemd's cleanup terminates the distro with /status writable;
+        // WslShutdown runs last to give the next test a fresh VM.
         {
             auto cleanupVm = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
             auto cleanupSystemd = EnableSystemd("protectBinfmt=false");
 
             VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(L"mountpoint -q /proc/sys/fs/binfmt_misc/status"), 0L);
             VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(L"test -e /run/systemd/generator/wsl-binfmt-priority.service"), 0L);
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(L"sh -c 'echo \":wsltestmz:M::MZ::/bin/false:\" > /proc/sys/fs/binfmt_misc/register'"), 0L);
+            auto cleanupMzEntry = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+                LxsstuLaunchWsl(L"sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/wsltestmz 2>/dev/null || true'");
+            });
+            VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { THROW_HR_IF(E_UNEXPECTED, LxsstuLaunchWsl(L"cmd.exe /c echo restored") != 0); },
+                std::chrono::milliseconds(100),
+                std::chrono::seconds(10)));
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/wsltestmz'"), 0L);
+            cleanupMzEntry.release();
+
+            // A writable /status can clear or disable the VM-global table, but
+            // mini_init must restore interop even without another registration.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/status'"), 0L);
+            VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { THROW_HR_IF(E_UNEXPECTED, LxsstuLaunchWsl(L"cmd.exe /c echo recovered") != 0); },
+                std::chrono::milliseconds(100),
+                std::chrono::seconds(10)));
+            {
+                auto [flags, _] = LxsstuLaunchWslAndCaptureOutput(L"grep ^flags /proc/sys/fs/binfmt_misc/WSLInterop");
+                VERIFY_IS_TRUE(flags.find(L"F") != std::wstring::npos);
+            }
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sh -c 'echo 0 > /proc/sys/fs/binfmt_misc/status'"), 0L);
+            VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { THROW_HR_IF(E_UNEXPECTED, LxsstuLaunchWsl(L"cmd.exe /c echo enabled") != 0); },
+                std::chrono::milliseconds(100),
+                std::chrono::seconds(10)));
+            {
+                auto [status, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/fs/binfmt_misc/status");
+                VERIFY_ARE_EQUAL(status, L"enabled\n");
+            }
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/WSLInterop'"), 0L);
+            VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { THROW_HR_IF(E_UNEXPECTED, LxsstuLaunchWsl(L"cmd.exe /c echo restored") != 0); },
+                std::chrono::milliseconds(100),
+                std::chrono::seconds(10)));
         }
     }
 
@@ -661,14 +690,53 @@ class UnitTests
             VERIFY_IS_TRUE(flags.find(L"F") != std::wstring::npos);
         }
 
-        // Restart the peer while the primary distro is still monitoring the
-        // VM-global registry, then terminate the primary to transfer leadership.
+        // Leave the primary distro protected, but allow the peer to modify the
+        // real VM-wide /status file through its separate binfmt mount.
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(std::format(
+                L"-d {} -- sh -c \"printf '[boot]\\nsystemd=true\\nprotectBinfmt=false\\n' > /etc/wsl.conf\"", peerDistroName)),
+            0L);
+        TerminateDistribution(peerDistroName);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mountpoint -q /proc/sys/fs/binfmt_misc/status"), 0L);
+        VERIFY_ARE_NOT_EQUAL(
+            LxsstuLaunchWsl(std::format(L"-d {} -- mountpoint -q /proc/sys/fs/binfmt_misc/status", peerDistroName)), 0L);
+
+        auto verifyPrimaryInterop = []() {
+            VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+                []() {
+                    auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo recovered");
+                    THROW_HR_IF(E_UNEXPECTED, output != L"recovered\r\n");
+                },
+                std::chrono::milliseconds(100),
+                std::chrono::seconds(10)));
+            auto [flags, _] = LxsstuLaunchWslAndCaptureOutput(L"grep ^flags /proc/sys/fs/binfmt_misc/WSLInterop");
+            VERIFY_IS_TRUE(flags.find(L"PF") != std::wstring::npos);
+        };
+
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(std::format(L"-d {} -- sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/status'", peerDistroName)), 0L);
+        verifyPrimaryInterop();
+
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(std::format(L"-d {} -- sh -c 'echo 0 > /proc/sys/fs/binfmt_misc/status'", peerDistroName)), 0L);
+        verifyPrimaryInterop();
+        {
+            auto [status, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -- cat /proc/sys/fs/binfmt_misc/status", peerDistroName));
+            VERIFY_ARE_EQUAL(status, L"enabled\n");
+        }
+
+        // Shutdown of an opted-out systemd distro can clear /status as well.
+        TerminateDistribution(peerDistroName);
+        verifyPrimaryInterop();
+
+        // Restart the peer, then terminate the primary. The VM-wide monitor
+        // must remain active regardless of which distro is running.
         {
             auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -- cmd.exe /c echo ready", peerDistroName));
             VERIFY_ARE_EQUAL(out, L"ready\r\n");
         }
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(std::format(L"-d {} -- systemctl is-active --quiet wsl-binfmt-priority.service", peerDistroName)), 0L);
+        VERIFY_ARE_NOT_EQUAL(
+            LxsstuLaunchWsl(std::format(L"-d {} -- test -e /run/systemd/generator/wsl-binfmt-priority.service", peerDistroName)), 0L);
         TerminateDistribution(LXSS_DISTRO_NAME_TEST_L);
 
         VERIFY_ARE_EQUAL(
@@ -693,6 +761,31 @@ class UnitTests
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(std::format(L"-d {} -- sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/wsltestmz'", peerDistroName)), 0L);
         cleanupTestEntry.release();
+
+        // Disabling interop in one distro must not disable VM-wide priority
+        // restoration for another distro.
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(std::format(
+                L"-d {} -- sh -c \"printf '[boot]\\nsystemd=true\\nprotectBinfmt=false\\n[interop]\\nenabled=false\\n' > /etc/wsl.conf\"",
+                peerDistroName)),
+            0L);
+        TerminateDistribution(peerDistroName);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mountpoint -q /proc/sys/fs/binfmt_misc/status"), 0L);
+        VERIFY_ARE_NOT_EQUAL(
+            LxsstuLaunchWsl(std::format(L"-d {} -- cmd.exe /c echo disabled", peerDistroName)), 0L);
+
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(
+                std::format(L"-d {} -- sh -c 'echo \":wsltestmz:M::MZ::/bin/false:\" > /proc/sys/fs/binfmt_misc/register'", peerDistroName)),
+            0L);
+        auto cleanupDisabledPeerEntry = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LxsstuLaunchWsl(std::format(
+                L"-d {} -- sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/wsltestmz 2>/dev/null || true'", peerDistroName));
+        });
+        verifyPrimaryInterop();
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(std::format(L"-d {} -- sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/wsltestmz'", peerDistroName)), 0L);
+        cleanupDisabledPeerEntry.release();
     }
 
     WSL2_TEST_METHOD(SharedMountSurvivesDistroTermination)
