@@ -2107,10 +2107,12 @@ Usage:
         VERIFY_IS_TRUE(distroGuid.has_value());
 
         // Run bash with interop disabled, and have it try to launch a Windows executable (cmd.exe) via
-        // the binfmt interop mechanism. The request should be rejected with EACCES, which bash surfaces
-        // as exit code 126 ("cannot execute").
+        // the binfmt interop mechanism. The request should be rejected with EACCES. The binfmt interpreter
+        // (/init) still execs successfully (so the kernel does not report exec failure via exit code 126);
+        // instead it surfaces the EACCES rejection by exiting with code 1, which bash reports as cmd.exe's
+        // exit code.
         const std::vector<std::wstring> arguments{
-            L"/bin/bash", L"-c", L"/mnt/c/Windows/System32/cmd.exe /c exit 0; echo exitcode:$?"};
+            L"/bin/bash", L"-c", L"/mnt/c/Windows/System32/cmd.exe /c exit 0; echo exitcode:$?:"};
 
         std::vector<LPCWSTR> argv;
         std::transform(arguments.begin(), arguments.end(), std::back_inserter(argv), [](const std::wstring& arg) { return arg.c_str(); });
@@ -2165,7 +2167,7 @@ Usage:
         const auto output = readAll(stdOutRead.get());
 
         VERIFY_ARE_EQUAL(exitCode, 0u);
-        VERIFY_IS_TRUE(output.find("exitcode:126") != std::string::npos);
+        VERIFY_IS_TRUE(output.find("exitcode:1:") != std::string::npos);
     }
 
     TEST_METHOD(InteropPid1)
