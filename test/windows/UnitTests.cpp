@@ -33,6 +33,7 @@ Abstract:
 #include "Distribution.h"
 #include "WslCoreConfigInterface.h"
 #include "WslCoreFilesystem.h"
+#include "WslSecurity.h"
 #include "CommandLine.h"
 #include "retryshared.h"
 
@@ -205,13 +206,6 @@ class UnitTests
 
     WSL2_TEST_METHOD(SystemdSystem)
     {
-        auto cleanup = wil::scope_exit([] {
-            // clean up wsl.conf file
-            const std::wstring disableSystemdCmd(LXSST_REMOVE_DISTRO_CONF_COMMAND_LINE);
-            LxsstuLaunchWsl(disableSystemdCmd);
-            TerminateDistribution();
-        });
-
         auto revert = EnableSystemd();
         VERIFY_IS_TRUE(IsSystemdRunning(L"--system"));
 
@@ -594,13 +588,7 @@ class UnitTests
         auto cleanupPeer =
             wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"--unregister {}", peerDistroName)); });
 
-        // Enable systemd in the peer distro (no helper exists for non-test distros).
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(std::format(L"-d {} -- sh -c \"mkdir -p /etc && printf '[boot]\\nsystemd=true\\n' > /etc/wsl.conf\"", peerDistroName)),
-            0L);
-
-        // Terminate so the config takes effect on next start.
-        TerminateDistribution(peerDistroName);
+        auto cleanupPeerSystemd = EnableSystemd("", peerDistroName);
 
         // Verify interop works in both distros (this also starts the peer with systemd).
         {
@@ -952,6 +940,7 @@ class UnitTests
 
         const auto wslSupport =
             wil::CoCreateInstance<LxssUserSession, IWslSupport>(CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA);
+        wsl::windows::common::security::ConfigureForCOMImpersonation(wslSupport.get());
 
         ULONG Version;
         ULONG DefaultUid;
@@ -2207,14 +2196,11 @@ Usage:
 
     TEST_METHOD(Hostname)
     {
-        auto cleanup = wil::scope_exit([] {
-            LxsstuLaunchWsl(LXSST_REMOVE_DISTRO_CONF_COMMAND_LINE);
+        auto cleanup = wil::scope_exit([] { TerminateDistribution(); });
+        DistroFileChange config(L"/etc/wsl.conf", false);
 
-            TerminateDistribution();
-        });
-
-        auto validate = [](const std::string& input, const std::wstring& expectedOutput) {
-            LxssWriteWslDistroConfig("[network]\nhostname=" + input);
+        auto validate = [&config](const std::string& input, const std::wstring& expectedOutput) {
+            config.SetContent(wsl::shared::string::MultiByteToWide("[network]\nhostname=" + input).c_str());
             TerminateDistribution();
 
             auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"hostname");
@@ -8412,6 +8398,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         std::optional<decltype(EnableSystemd())> systemdCleanup;
         std::optional<decltype(EnableSystemd())> systemdCleanup2;
         std::optional<DistroFileChange> cgroupConfig;
+        std::optional<DistroFileChange> cgroupConfig2;
         if (systemd)
         {
             systemdCleanup.emplace(EnableSystemd());
@@ -8422,7 +8409,8 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         {
             cgroupConfig.emplace(L"/etc/wsl.conf", false);
             cgroupConfig->SetContent(L"[automount]\ncgroups=v1\n");
-            LxssWriteWslDistroConfig("[automount]\ncgroups=v1\n", secondDistroName);
+            cgroupConfig2.emplace(L"/etc/wsl.conf", false, secondDistroName);
+            cgroupConfig2->SetContent(L"[automount]\ncgroups=v1\n");
             TerminateDistribution();
             TerminateDistribution(secondDistroName);
 
