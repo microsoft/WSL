@@ -270,7 +270,7 @@ struct ErrorInfoWrapper
 
     void GetErrorInfoFromCOM()
     {
-        if (m_errorMessage)
+        if (m_errorMessage && !*m_errorMessage)
         {
             auto errorInfo = wsl::windows::common::wslutil::GetCOMErrorInfo();
             if (errorInfo)
@@ -293,7 +293,7 @@ struct ErrorInfoWrapper
     HRESULT CaptureResult(HRESULT hr, const std::wstring& errorMessage)
     {
         m_hr = hr;
-        if (FAILED_LOG(m_hr.value()) && m_errorMessage)
+        if (FAILED_LOG(m_hr.value()) && m_errorMessage && !*m_errorMessage)
         {
             *m_errorMessage = wil::make_unique_string<wil::unique_cotaskmem_string>(errorMessage.c_str()).release();
         }
@@ -708,8 +708,7 @@ try
         RETURN_IF_FAILED(CheckWslRuntimeVersionSupport(runtimeVersion, c_sparseVhdMinimumVersion, errorInfoWrapper));
     }
 
-    auto result = std::make_unique<WslcSessionImpl>();
-    result->runtimeVersion = runtimeVersion;
+    auto result = std::make_unique<WslcSessionImpl>(runtimeVersion);
     WSLCCompatSessionSettings2 runtimeSettings2{};
     auto& runtimeSettings = runtimeSettings2.Base;
     runtimeSettings.DisplayName = internalType->displayName;
