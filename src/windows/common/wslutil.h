@@ -286,6 +286,10 @@ struct RepositoryReference
 
     // The fully-qualified "server/path" form (e.g. "docker.io/library/ubuntu").
     std::string GetCanonical() const;
+
+    // The shortest form Docker displays, without the default registry or official prefix (e.g. "docker.io/library/ubuntu"
+    // -> "ubuntu").
+    std::string GetFamiliar() const;
 };
 
 std::pair<wil::unique_hfile, wil::unique_hfile> OpenAnonymousPipe(DWORD Size, bool ReadPipeOverlapped, bool WritePipeOverlapped);

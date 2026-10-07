@@ -52,6 +52,8 @@ wsl::windows::common::io::HandleWrapper COMOutputHandle::Release()
 constexpr auto c_specificReleaseListUrl = L"https://api.github.com/repos/Microsoft/WSL/releases/tags/";
 constexpr auto c_userAgent = L"wsl-install"; // required to use the GitHub API
 constexpr auto c_pipePrefix = L"\\\\.\\pipe\\";
+constexpr auto c_dockerHubDomain = "docker.io";
+constexpr std::string_view c_officialRepositoryPrefix = "library/";
 
 namespace {
 
@@ -1270,15 +1272,13 @@ wsl::windows::common::wslutil::RepositoryReference wsl::windows::common::wslutil
 {
     // See: https://github.com/distribution/reference/blob/ff14fafe2236e51c2894ac07d4bdfc778e96d682/normalize.go#L126
 
-    constexpr auto defaultDomain = "docker.io";
-    constexpr auto officialPrefix = "library/";
     constexpr auto legacyDomain = "index.docker.io";
     constexpr auto localhost = "localhost";
 
     auto slash = input.find('/');
     if (slash == std::string::npos)
     {
-        return RepositoryReference{input, defaultDomain, officialPrefix + input};
+        return RepositoryReference{input, c_dockerHubDomain, std::format("{}{}", c_officialRepositoryPrefix, input)};
     }
 
     auto domain = input.substr(0, slash);
@@ -1286,19 +1286,19 @@ wsl::windows::common::wslutil::RepositoryReference wsl::windows::common::wslutil
 
     if (domain == legacyDomain)
     {
-        domain = defaultDomain;
+        domain = c_dockerHubDomain;
     }
     else if (domain != localhost && domain.find_first_of(".:") == std::string::npos && !std::ranges::any_of(domain, [](unsigned char e) {
                  return std::isupper(e);
              }))
     {
-        domain = defaultDomain;
+        domain = c_dockerHubDomain;
         path = input;
     }
 
-    if (domain == defaultDomain && path.find('/') == std::string::npos)
+    if (domain == c_dockerHubDomain && path.find('/') == std::string::npos)
     {
-        path = "library/" + path;
+        path = std::format("{}{}", c_officialRepositoryPrefix, path);
     }
 
     return RepositoryReference{input, std::move(domain), std::move(path)};
@@ -1307,6 +1307,25 @@ wsl::windows::common::wslutil::RepositoryReference wsl::windows::common::wslutil
 std::string wsl::windows::common::wslutil::RepositoryReference::GetCanonical() const
 {
     return std::format("{}/{}", Server, Path);
+}
+
+std::string wsl::windows::common::wslutil::RepositoryReference::GetFamiliar() const
+{
+    // See: https://github.com/distribution/reference/blob/ff14fafe2236e51c2894ac07d4bdfc778e96d682/normalize.go#L179
+
+    if (Server != c_dockerHubDomain)
+    {
+        return GetCanonical();
+    }
+
+    // Only a single-component official repository drops its prefix, so "library/a/b" stays as is.
+    const std::string_view path{Path};
+    if (path.starts_with(c_officialRepositoryPrefix) && path.find('/', c_officialRepositoryPrefix.size()) == std::string_view::npos)
+    {
+        return std::string{path.substr(c_officialRepositoryPrefix.size())};
+    }
+
+    return Path;
 }
 
 std::pair<wil::unique_hfile, wil::unique_hfile> wsl::windows::common::wslutil::OpenAnonymousPipe(DWORD Size, bool ReadPipeOverlapped, bool WritePipeOverlapped)
