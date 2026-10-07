@@ -343,6 +343,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         SlowOperationWatcher slowOperation{"HcsCreateSystem"};
         m_backend = HcsVirtualMachineBackend::Create(backendRequest);
     }
+    m_vmCrashEvent.reset(m_backend->GetCrashEvent().release());
     m_runtimeId = m_backend->GetDescription().Identity.VmId;
     WI_ASSERT(IsEqualGUID(VmId, m_runtimeId));
 
@@ -803,7 +804,14 @@ WslCoreVm::~WslCoreVm() noexcept
 
         m_vmExitEvent.wait(UTILITY_VM_TERMINATE_TIMEOUT);
 
-        const auto termination = m_backend->GetTerminationReason();
+        VmTerminationInformation termination;
+        {
+            auto exitLock = m_exitCallbackLock.lock_shared();
+            if (m_terminationInformation)
+            {
+                termination = m_terminationInformation.value();
+            }
+        }
         TraceLoggingWriteTagged(
             activity,
             "TerminateVm",

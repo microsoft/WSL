@@ -55,6 +55,7 @@ HRESULT OperationResult(Callback&& Operation)
 inline void VerifyBootsAndTerminates(std::unique_ptr<IVirtualMachineBackend> Backend)
 {
     auto terminationEvent = Backend->GetTerminationEvent();
+    auto crashEvent = Backend->GetCrashEvent();
     VERIFY_ARE_EQUAL(VmState::Created, Backend->GetState());
     VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), OperationResult([&] { Backend->GetTerminationReason(); }));
     auto guest = StartGuest(*Backend);
@@ -62,6 +63,7 @@ inline void VerifyBootsAndTerminates(std::unique_ptr<IVirtualMachineBackend> Bac
 
     const auto runningResult = WaitForSingleObject(terminationEvent.get(), 100);
     VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), runningResult);
+    VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(crashEvent.get(), 0));
     if (runningResult == WAIT_TIMEOUT)
     {
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), OperationResult([&] { Backend->GetTerminationReason(); }));
@@ -69,6 +71,7 @@ inline void VerifyBootsAndTerminates(std::unique_ptr<IVirtualMachineBackend> Bac
     }
 
     VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(terminationEvent.get(), 30 * 1000));
+    VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(crashEvent.get(), 0));
     VERIFY_ARE_EQUAL(VmState::Stopped, Backend->GetState());
     const auto terminationInformation = Backend->GetTerminationReason();
     VERIFY_ARE_EQUAL(VmTerminationReason::Shutdown, terminationInformation.Reason);

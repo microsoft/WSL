@@ -428,6 +428,10 @@ void OpenVmmVirtualMachineBackend::OnProcessExit(DWORD ExitCode) noexcept
         m_terminationInformation.Details = std::format(L"OpenVMM process exited with code {}", ExitCode);
         CloseGuestListenersLocked(m_description.Identity);
     }
+    if (ExitCode != ERROR_SUCCESS)
+    {
+        LOG_IF_WIN32_BOOL_FALSE(SetEvent(m_crashEvent.get()));
+    }
     LOG_IF_WIN32_BOOL_FALSE(SetEvent(m_exitEvent.get()));
     NotifyTerminated(m_description.Identity);
 }
@@ -477,6 +481,11 @@ VmTerminationInformation OpenVmmVirtualMachineBackend::GetTerminationReason() co
 wil::unique_handle OpenVmmVirtualMachineBackend::GetTerminationEvent() const
 {
     return wil::unique_handle{wsl::windows::common::wslutil::DuplicateHandle(m_exitEvent.get())};
+}
+
+wil::unique_handle OpenVmmVirtualMachineBackend::GetCrashEvent() const
+{
+    return wil::unique_handle{wsl::windows::common::wslutil::DuplicateHandle(m_crashEvent.get())};
 }
 
 void OpenVmmVirtualMachineBackend::Start()

@@ -596,6 +596,11 @@ wil::unique_handle HcsVirtualMachineBackend::GetTerminationEvent() const
     return event;
 }
 
+wil::unique_handle HcsVirtualMachineBackend::GetCrashEvent() const
+{
+    return wil::unique_handle{wsl::windows::common::wslutil::DuplicateHandle(m_vmCrashEvent.get())};
+}
+
 void HcsVirtualMachineBackend::Start()
 {
     std::vector<VmNetworkAdapterRequest> networkAdapters;
