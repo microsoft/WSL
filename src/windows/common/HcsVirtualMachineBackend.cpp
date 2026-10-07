@@ -294,7 +294,7 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
     // Attach the disks the VM boots from up front so that the guest can reach them without waiting
     // for a hot add. Their LUNs are reported so that the caller can name them in the guest.
     const auto vmIdString = wsl::shared::string::GuidToString<wchar_t>(Request.Identity.VmId, wsl::shared::string::GuidToStringFlags::None);
-    std::uint32_t nextLun = 0;
+    const auto lunInUse = [&scsi](std::uint32_t Lun) { return scsi.Attachments.contains(std::to_string(Lun)); };
     for (const auto& bootDisk : Request.BootDisks)
     {
         THROW_HR_IF(E_INVALIDARG, bootDisk.Key.empty());
@@ -305,16 +305,22 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
             "HCS boot disks must be virtual disks");
 
         const auto& path = validation::ValidateDiskSource(bootDisk.Disk);
-        std::uint32_t lun = nextLun;
+        std::uint32_t lun = 0;
         if (bootDisk.Disk.Placement)
         {
             THROW_HR_IF(c_notSupported, bootDisk.Disk.Placement->Address.Controller != 0);
             lun = bootDisk.Disk.Placement->Address.Lun;
+            THROW_HR_IF(E_BOUNDS, lun >= c_maximumDisks);
+            THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), lunInUse(lun));
         }
-
-        THROW_HR_IF(E_BOUNDS, lun >= c_maximumDisks);
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), scsi.Attachments.contains(std::to_string(lun)));
-        nextLun = lun + 1;
+        else
+        {
+            while (lun < c_maximumDisks && lunInUse(lun))
+            {
+                ++lun;
+            }
+            THROW_HR_IF(WSL_E_TOO_MANY_DISKS_ATTACHED, lun == c_maximumDisks);
+        }
 
         // Best effort: failures (for instance no WRITE_DAC on a SYSTEM-owned VHD) are swallowed
         // since the VM worker process may already have access via inherited ACLs; otherwise

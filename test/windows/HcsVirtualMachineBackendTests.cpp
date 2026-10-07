@@ -192,6 +192,32 @@ class HcsVirtualMachineBackendTests
         VerifyBootsAndTerminates(HcsVirtualMachineBackend::Create(CreateRunnableRequest()));
     }
 
+    TEST_METHOD(AllocatesFirstFreeBootDiskLun)
+    {
+        SKIP_TEST_ARM64();
+        const auto directory = CreateTestDirectory();
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { std::filesystem::remove_all(directory); });
+        const auto exactPath = directory / L"exact.vhdx";
+        const auto automaticPath = directory / L"automatic.vhdx";
+        CreateVhd(exactPath);
+        CreateVhd(automaticPath);
+
+        auto request = CreateRunnableRequest();
+        VmBootDiskRequest exact;
+        exact.Key = L"exact";
+        exact.Disk = CreateDiskRequest(exactPath, 253);
+        VmBootDiskRequest automatic;
+        automatic.Key = L"automatic";
+        automatic.Disk = CreateDiskRequest(automaticPath);
+        request.BootDisks = {std::move(exact), std::move(automatic)};
+
+        auto backend = HcsVirtualMachineBackend::Create(request);
+        const auto& bootDisks = backend->GetDescription().BootDisks;
+        VERIFY_ARE_EQUAL(UINT32{253}, bootDisks.at(L"exact").GuestAddress.Lun);
+        VERIFY_ARE_EQUAL(UINT32{0}, bootDisks.at(L"automatic").GuestAddress.Lun);
+        backend->Terminate();
+    }
+
     TEST_METHOD(ManagesDiskPlacementsAndLifetime)
     {
         SKIP_TEST_ARM64();

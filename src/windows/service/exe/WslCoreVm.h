@@ -196,7 +196,7 @@ private:
 
     void WaitForPmemDeviceInVm(_In_ ULONG PmemId);
 
-    void OnExit();
+    void OnExit(const VmTerminationInformation& Termination);
 
     void ReadGuestCapabilities();
 
@@ -226,6 +226,7 @@ private:
     wil::unique_event m_vmCrashEvent{wil::EventOptions::ManualReset};
 
     wil::srwlock m_exitCallbackLock;
+    _Guarded_by_(m_exitCallbackLock) std::optional<VmTerminationInformation> m_terminationInformation;
     std::wstring m_machineId;
     GUID m_runtimeId;
     wsl::core::Config m_vmConfig;
