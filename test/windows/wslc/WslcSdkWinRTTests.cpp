@@ -63,7 +63,7 @@ struct CapturedProcessOutput
     std::wstring StandardError;
 };
 
-bool FileSystemSupportsSparseFiles(const std::filesystem::path& path)
+bool WinRtFileSystemSupportsSparseFiles(const std::filesystem::path& path)
 {
     wchar_t volumePath[MAX_PATH];
     THROW_IF_WIN32_BOOL_FALSE(GetVolumePathNameW(path.c_str(), volumePath, ARRAYSIZE(volumePath)));
@@ -2205,7 +2205,7 @@ class WslcSdkWinRtTests
 
         const auto storageAttributes = GetFileAttributesW((vhdSessionStorage / L"storage.vhdx").c_str());
         VERIFY_ARE_NOT_EQUAL(INVALID_FILE_ATTRIBUTES, storageAttributes);
-        if (FileSystemSupportsSparseFiles(vhdSessionStorage / L"storage.vhdx"))
+        if (WinRtFileSystemSupportsSparseFiles(vhdSessionStorage / L"storage.vhdx"))
         {
             VERIFY_IS_TRUE(WI_IsFlagSet(storageAttributes, FILE_ATTRIBUTE_SPARSE_FILE));
         }
@@ -2218,7 +2218,7 @@ class WslcSdkWinRtTests
         VERIFY_IS_TRUE(std::filesystem::exists(expectedVhdPath));
         const auto volumeAttributes = GetFileAttributesW(expectedVhdPath.c_str());
         VERIFY_ARE_NOT_EQUAL(INVALID_FILE_ATTRIBUTES, volumeAttributes);
-        if (FileSystemSupportsSparseFiles(expectedVhdPath))
+        if (WinRtFileSystemSupportsSparseFiles(expectedVhdPath))
         {
             VERIFY_IS_TRUE(WI_IsFlagSet(volumeAttributes, FILE_ATTRIBUTE_SPARSE_FILE));
         }
