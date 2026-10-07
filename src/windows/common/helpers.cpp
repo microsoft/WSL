@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include "GuestConnector.h"
 #include "helpers.hpp"
 #include "Stringify.h"
 #include "svccomm.hpp"
@@ -146,7 +147,7 @@ private:
     _In_opt_ HANDLE InteropHandle,
     _In_opt_ HANDLE EventHandle,
     _In_opt_ HANDLE ParentHandle,
-    _In_opt_ LPCGUID VmId,
+    _In_opt_ const wsl::windows::common::GuestConnector* Connector,
     _In_opt_ HANDLE UserToken,
     _In_opt_ HANDLE JobObject = nullptr)
 {
@@ -158,7 +159,12 @@ private:
     // Format the command line.
     ProcessLauncher launcher((path / L"wslhost.exe").c_str());
     launcher.AddGuidOption(wslhost::distro_id_option, DistroId);
-    launcher.AddGuidOption(wslhost::vm_id_option, VmId);
+    if (Connector)
+    {
+        const auto serialized = Connector->Serialize();
+        launcher.AddOption(wslhost::guest_connection_option, std::format(L"\"{}\"", serialized).c_str());
+    }
+
     launcher.AddHandleOption(wslhost::handle_option, InteropHandle);
     launcher.AddHandleOption(wslhost::event_option, EventHandle);
     launcher.AddHandleOption(wslhost::parent_option, ParentHandle);
@@ -609,11 +615,11 @@ void wsl::windows::common::helpers::LaunchDebugConsole(
     _In_ HANDLE InteropHandle,
     _In_opt_ HANDLE EventHandle,
     _In_opt_ HANDLE ParentHandle,
-    _In_opt_ LPCGUID VmId,
+    _In_opt_ const GuestConnector* Connector,
     _In_opt_ HANDLE UserToken,
     _In_opt_ HANDLE JobObject)
 {
-    return LaunchWslHost(DistroId, InteropHandle, EventHandle, ParentHandle, VmId, UserToken, JobObject);
+    return LaunchWslHost(DistroId, InteropHandle, EventHandle, ParentHandle, Connector, UserToken, JobObject);
 }
 
 void wsl::windows::common::helpers::LaunchKdRelay(

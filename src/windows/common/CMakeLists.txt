@@ -13,6 +13,7 @@ set(SOURCES
     filesystem.cpp
     GnsChannel.cpp
     GnsPortTrackerChannel.cpp
+    GuestConnector.cpp
     GuestDeviceManager.cpp
     HandleConsoleProgressBar.cpp
     hcs.cpp
@@ -40,6 +41,7 @@ set(SOURCES
     svccomm.cpp
     timestamp.cpp
     VTSupport.cpp
+    vsock.cpp
     WindowsUpdateIntegration.cpp
     WSLCContainerLauncher.cpp
     ConsommeNetworking.cpp
@@ -104,6 +106,7 @@ set(HEADERS
     filesystem.hpp
     GnsChannel.h
     GnsPortTrackerChannel.h
+    GuestConnector.h
     GuestDeviceManager.h
     HandleConsoleProgressBar.h
     hcs.hpp
@@ -139,6 +142,7 @@ set(HEADERS
     ConsommeNetworking.h
     WSLCProcessLauncher.h
     WslClient.h
+    vsock.hpp
     WslCoreConfig.h
     WslCoreFilesystem.h
     WslCoreFirewallSupport.h

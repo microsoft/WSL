@@ -1278,6 +1278,7 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstanceInternal(
         ClientLifetimeId,
         m_initializeDrvFs,
         [this](ULONG Port, HANDLE ExitHandle) { return m_backend->ConnectGuest(GuestServicePort{Port}, ExitHandle); },
+        m_backend->GetGuestConnector(),
         featureFlags,
         m_vmConfig.DistributionStartTimeout,
         m_vmConfig.InstanceIdleTimeout,

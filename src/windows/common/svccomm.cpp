@@ -34,7 +34,7 @@ namespace {
 
 BOOL GetNextCharacter(_In_ INPUT_RECORD* InputRecord, _Out_ PWCHAR NextCharacter);
 BOOL IsActionableKey(_In_ PKEY_EVENT_RECORD KeyEvent);
-void SpawnWslHost(_In_ HANDLE ServerPort, _In_ const GUID& DistroId, _In_opt_ LPCGUID VmId);
+void SpawnWslHost(_In_ HANDLE ServerPort, _In_ const GUID& DistroId, _In_opt_ const wsl::windows::common::GuestConnector* Connector = nullptr);
 
 struct CreateProcessArguments
 {
@@ -124,10 +124,10 @@ void InitializeInterop(_In_ HANDLE ServerPort, _In_ const GUID& DistroId)
     // been backgrounded and their console window has been closed.
     //
 
-    SpawnWslHost(ServerPort, DistroId, nullptr);
+    SpawnWslHost(ServerPort, DistroId);
 }
 
-void SpawnWslHost(_In_ HANDLE ServerPort, _In_ const GUID& DistroId, _In_opt_ LPCGUID VmId)
+void SpawnWslHost(_In_ HANDLE ServerPort, _In_ const GUID& DistroId, _In_opt_ const wsl::windows::common::GuestConnector* Connector)
 {
     wsl::windows::common::helpers::SetHandleInheritable(ServerPort);
     const auto RegistrationComplete = wil::unique_event(wil::EventOptions::None);
@@ -135,7 +135,7 @@ void SpawnWslHost(_In_ HANDLE ServerPort, _In_ const GUID& DistroId, _In_opt_ LP
     THROW_LAST_ERROR_IF(!ParentProcess);
 
     const wil::unique_handle Process{wsl::windows::common::helpers::LaunchInteropServer(
-        &DistroId, ServerPort, RegistrationComplete.get(), ParentProcess.get(), VmId)};
+        &DistroId, ServerPort, RegistrationComplete.get(), ParentProcess.get(), Connector)};
 
     // Wait for either the child to exit, or the registration complete event to be set.
     const HANDLE WaitHandles[] = {Process.get(), RegistrationComplete.get()};
@@ -334,6 +334,7 @@ wsl::windows::common::SvcComm::LaunchProcess(
     wil::unique_handle StdErrSocket;
     wil::unique_handle ControlSocket;
     wil::unique_handle InteropSocket;
+    wil::unique_cotaskmem_string GuestConnectionHandle;
 
     if (GetFileType(GetStdHandle(STD_ERROR_HANDLE)) == FILE_TYPE_CHAR)
     {
@@ -364,6 +365,7 @@ wsl::windows::common::SvcComm::LaunchProcess(
         &StdErrSocket,
         &ControlSocket,
         &InteropSocket,
+        &GuestConnectionHandle,
         context.OutError()));
 
     context.FlushWarnings();
@@ -417,6 +419,9 @@ wsl::windows::common::SvcComm::LaunchProcess(
     }
     else
     {
+        THROW_HR_IF_NULL(E_UNEXPECTED, GuestConnectionHandle.get());
+        const auto connector = GuestConnector::Deserialize(GuestConnectionHandle.get());
+
         //
         // Create stdin, stdout and stderr worker threads.
         //
@@ -489,7 +494,7 @@ wsl::windows::common::SvcComm::LaunchProcess(
         {
             try
             {
-                SpawnWslHost(InteropSocket.get(), DistributionId, &InstanceId);
+                SpawnWslHost(InteropSocket.get(), DistributionId, &connector);
             }
             CATCH_LOG()
         }
@@ -500,7 +505,7 @@ wsl::windows::common::SvcComm::LaunchProcess(
 
         wsl::shared::SocketChannel InteropChannel{
             wil::unique_socket{reinterpret_cast<SOCKET>(InteropSocket.release())}, "Interop"};
-        ExitCode = interop::VmModeWorkerThread(InteropChannel, InstanceId);
+        ExitCode = interop::VmModeWorkerThread(InteropChannel, connector);
     }
 
     return ExitCode;

@@ -26,6 +26,7 @@ WslCoreInstance::WslCoreInstance(
     _In_ ULONG64 ClientLifetimeId,
     _In_ const std::function<LX_INIT_DRVFS_MOUNT(HANDLE)>& DrvFsCallback,
     _In_ GuestConnectionCallback ConnectGuest,
+    _In_ wsl::windows::common::GuestConnector Connector,
     _In_ ULONG FeatureFlags,
     _In_ DWORD SocketTimeout,
     _In_ int IdleTimeout,
@@ -39,6 +40,7 @@ WslCoreInstance::WslCoreInstance(
     m_defaultUid(DefaultUid),
     m_initializeDrvFs(DrvFsCallback),
     m_connectGuest(std::move(ConnectGuest)),
+    m_guestConnector(std::move(Connector)),
     m_ntClientLifetimeId(ClientLifetimeId),
     m_redirectorConnectionTargets{m_configuration.Name},
     m_socketTimeout(SocketTimeout),
@@ -134,6 +136,7 @@ WslCoreInstance::WslCoreInstance(
                 ClientLifetimeId,
                 DrvFsCallback,
                 m_connectGuest,
+                m_guestConnector,
                 systemDistroFeatureFlags,
                 m_socketTimeout,
                 IdleTimeout,
@@ -336,6 +339,11 @@ GUID WslCoreInstance::GetDistributionId() const
     return m_configuration.DistroId;
 }
 
+wsl::windows::common::GuestConnector WslCoreInstance::GetGuestConnector() const
+{
+    return m_guestConnector;
+}
+
 std::shared_ptr<LxssPort> WslCoreInstance::GetInitPort()
 {
     THROW_HR_IF(HCS_E_TERMINATED, !m_initChannel);
@@ -439,7 +447,7 @@ void WslCoreInstance::Initialize()
         {
             const wil::unique_socket socket{m_connectGuest(response.InteropPort, nullptr)};
             wil::unique_handle info{wsl::windows::common::helpers::LaunchInteropServer(
-                nullptr, reinterpret_cast<HANDLE>(socket.get()), nullptr, nullptr, &m_runtimeId, m_userToken.get(), m_jobObject)};
+                nullptr, reinterpret_cast<HANDLE>(socket.get()), nullptr, nullptr, &m_guestConnector, m_userToken.get(), m_jobObject)};
         }
         CATCH_LOG()
     }

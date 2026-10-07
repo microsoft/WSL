@@ -14,6 +14,7 @@ Abstract:
 
 #pragma once
 
+#include "GuestConnector.h"
 #include "SocketChannel.h"
 #include "WslPluginApi.h"
 
@@ -153,6 +154,10 @@ public:
         _Out_ HANDLE* InteropSocket) = 0;
 
     virtual GUID GetDistributionId() const = 0;
+    /// <summary>
+    /// Returns an opaque handle that client processes can use to connect to guest ports.
+    /// </summary>
+    virtual wsl::windows::common::GuestConnector GetGuestConnector() const = 0;
     virtual std::shared_ptr<LxssPort> GetInitPort() = 0;
     virtual ULONG64 GetLifetimeManagerId() const = 0;
     virtual ULONG GetClientId() const = 0;

@@ -26,6 +26,10 @@ Abstract:
 #include <winternl.h>
 #include "lxinitshared.h"
 
+namespace wsl::windows::common {
+class GuestConnector;
+}
+
 #define _1KB ((UINT64)(1024))
 #define _1MB (_1KB * _1KB)
 #define _1GB (_1KB * _1MB)
@@ -175,7 +179,7 @@ void LaunchDebugConsole(
     _In_ HANDLE InteropHandle,
     _In_opt_ HANDLE EventHandle,
     _In_opt_ HANDLE ParentHandle,
-    _In_opt_ LPCGUID VmId,
+    _In_opt_ const GuestConnector* Connector,
     _In_opt_ HANDLE UserToken = nullptr,
     _In_opt_ HANDLE JobObject = nullptr);
 

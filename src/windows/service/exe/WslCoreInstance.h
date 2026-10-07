@@ -65,6 +65,7 @@ public:
         _In_ ULONG64 ClientLifetimeId,
         _In_ const std::function<LX_INIT_DRVFS_MOUNT(HANDLE)>& DrvFsCallback,
         _In_ GuestConnectionCallback ConnectGuest,
+        _In_ wsl::windows::common::GuestConnector Connector,
         _In_ ULONG FeatureFlags,
         _In_ DWORD SocketTimeout,
         _In_ int IdleTimeout,
@@ -92,6 +93,8 @@ public:
     ULONG GetClientId() const override;
 
     GUID GetDistributionId() const override;
+
+    wsl::windows::common::GuestConnector GetGuestConnector() const override;
 
     std::shared_ptr<LxssPort> GetInitPort() override;
 
@@ -131,6 +134,7 @@ private:
     ULONG m_defaultUid{};
     std::function<LX_INIT_DRVFS_MOUNT(HANDLE)> m_initializeDrvFs;
     GuestConnectionCallback m_connectGuest;
+    wsl::windows::common::GuestConnector m_guestConnector;
     std::shared_ptr<WslCorePort> m_initChannel;
     std::shared_ptr<ConsoleManager> m_consoleManager;
     ULONG64 m_ntClientLifetimeId{};

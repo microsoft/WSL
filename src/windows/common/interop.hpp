@@ -15,11 +15,12 @@ Abstract:
 #pragma once
 
 #include <winsock2.h>
+#include "GuestConnector.h"
 
 namespace wsl::windows::common::interop {
 
 void WorkerThread(_In_ wil::unique_handle&& ServerPortHandle);
 
-DWORD VmModeWorkerThread(_In_ wsl::shared::SocketChannel& channel, _In_ const GUID& VmId, _In_ bool IgnoreExit = false);
+DWORD VmModeWorkerThread(_In_ wsl::shared::SocketChannel& channel, _In_ const GuestConnector& Connector, _In_ bool IgnoreExit = false);
 
 } // namespace wsl::windows::common::interop

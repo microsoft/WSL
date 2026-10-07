@@ -571,6 +571,11 @@ VmDescription HcsVirtualMachineBackend::GetDescription() const
     return m_configuration.Description;
 }
 
+GuestConnector HcsVirtualMachineBackend::GetGuestConnector() const
+{
+    return GuestConnector::CreateHcs(GetDescription().Identity.VmId);
+}
+
 VmState HcsVirtualMachineBackend::GetState() const
 {
     auto lock = m_lock.lock_shared();
@@ -661,7 +666,7 @@ wil::unique_socket HcsVirtualMachineBackend::ConnectGuest(GuestServicePort Port,
 {
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
-    return wsl::windows::common::hvsocket::Connect(m_configuration.Description.Identity.VmId, Port.Value, ExitHandle);
+    return GuestConnector::CreateHcs(m_configuration.Description.Identity.VmId).Connect(Port.Value, ExitHandle);
 }
 
 void HcsVirtualMachineBackend::CloseGuestListener(VmListenerId Listener)

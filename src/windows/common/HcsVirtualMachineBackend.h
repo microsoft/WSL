@@ -43,6 +43,7 @@ public:
 
     VmGuestListener CreateGuestListener(GuestServicePort Port) override;
     wil::unique_socket ConnectGuest(GuestServicePort Port, _In_opt_ HANDLE ExitHandle = nullptr) override;
+    GuestConnector GetGuestConnector() const override;
     void CloseGuestListener(VmListenerId Listener) override;
 
     VmDiskAttachment AttachDisk(const VmDiskRequest& Request) override;

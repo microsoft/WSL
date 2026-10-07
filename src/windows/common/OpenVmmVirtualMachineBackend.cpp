@@ -17,8 +17,10 @@ Abstract:
 #include <afunix.h>
 #include <bitset>
 #include <ctime>
+#include "GuestConnector.h"
 #include "HandleIO.h"
 #include "SubProcess.h"
+#include "vsock.hpp"
 #include "wslopenvmm.h"
 
 using wsl::windows::common::Context;
@@ -86,17 +88,6 @@ std::filesystem::path PrepareCrashDumpPath(const VmCrashCaptureRequest& Request,
 std::filesystem::path GetVsockListenerPath(const std::filesystem::path& VsockPath, GuestServicePort Port)
 {
     return std::format(L"{}_{:08x}{}", VsockPath.native(), Port.Value, c_vsockServiceIdSuffix);
-}
-
-SOCKADDR_UN GetUnixSocketAddress(const std::filesystem::path& Path)
-{
-    SOCKADDR_UN address{};
-    address.sun_family = AF_UNIX;
-    const auto narrowPath = Path.string();
-    THROW_HR_IF_MSG(E_INVALIDARG, narrowPath.size() >= sizeof(address.sun_path), "vsock bridge path too long: %hs", narrowPath.c_str());
-    std::copy(narrowPath.cbegin(), narrowPath.cend(), address.sun_path);
-    address.sun_path[narrowPath.size()] = '\0';
-    return address;
 }
 
 } // namespace
@@ -612,7 +603,7 @@ std::shared_ptr<VmGuestListenerState> OpenVmmVirtualMachineBackend::ConfigureGue
     listener->Socket.reset(::socket(AF_UNIX, SOCK_STREAM, 0));
     THROW_WIN32_IF(static_cast<DWORD>(WSAGetLastError()), !listener->Socket);
 
-    const auto address = GetUnixSocketAddress(path);
+    const auto address = wsl::windows::common::vsock::GetUnixSocketAddress(path);
 
     THROW_WIN32_IF(
         static_cast<DWORD>(WSAGetLastError()),
@@ -660,38 +651,9 @@ wil::unique_socket OpenVmmVirtualMachineBackend::ConnectGuest(GuestServicePort P
         THROW_HR_IF(E_ABORT, ExitHandle && WaitForSingleObject(ExitHandle, 0) == WAIT_OBJECT_0);
     }
 
-    wil::unique_socket socket{::socket(AF_UNIX, SOCK_STREAM, 0)};
-    THROW_WIN32_IF(static_cast<DWORD>(WSAGetLastError()), !socket);
-
-    const auto address = GetUnixSocketAddress(m_fileSystemResources.VsockPath);
-
-    THROW_WIN32_IF(
-        static_cast<DWORD>(WSAGetLastError()), connect(socket.get(), reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR);
-
-    const auto request = std::format("CONNECT {}\n", Port.Value);
     const auto cancellationEvent = ExitHandle ? ExitHandle : m_exitEvent.get();
-    wsl::windows::common::socket::Send(
-        socket.get(), gsl::make_span(reinterpret_cast<const gsl::byte*>(request.data()), request.size()), cancellationEvent);
+    auto socket = GetGuestConnector().Connect(Port.Value, cancellationEvent);
 
-    std::array<char, 64> response{};
-    size_t responseLength = 0;
-    for (; responseLength < response.size() - 1; ++responseLength)
-    {
-        const auto bytesRead = wsl::windows::common::socket::Receive(
-            socket.get(), gsl::make_span(reinterpret_cast<gsl::byte*>(&response[responseLength]), 1), cancellationEvent, MSG_WAITALL, c_rpcTimeoutMs);
-        THROW_HR_IF_MSG(
-            HRESULT_FROM_WIN32(ERROR_CONNECTION_ABORTED), bytesRead == 0, "vsock bridge closed during CONNECT handshake");
-        if (response[responseLength] == '\n')
-        {
-            ++responseLength;
-            break;
-        }
-    }
-
-    THROW_HR_IF_MSG(
-        E_FAIL, responseLength == response.size() - 1 && response[responseLength - 1] != '\n', "vsock bridge response too long");
-    const std::string_view responseView{response.data(), responseLength};
-    THROW_HR_IF_MSG(E_FAIL, !responseView.starts_with("OK "), "vsock bridge CONNECT failed: %hs", response.data());
     WSL_LOG(
         "OpenVmmConnectGuestEnd",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),

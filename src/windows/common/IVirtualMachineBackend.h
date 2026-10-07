@@ -32,6 +32,7 @@ Abstract:
 #include <string>
 #include <variant>
 #include <vector>
+#include "GuestConnector.h"
 #include "defs.h"
 #include "stringshared.h"
 
@@ -692,6 +693,7 @@ public:
 
     virtual VmGuestListener CreateGuestListener(GuestServicePort Port) = 0;
     virtual wil::unique_socket ConnectGuest(GuestServicePort Port, _In_opt_ HANDLE ExitHandle = nullptr) = 0;
+    virtual GuestConnector GetGuestConnector() const = 0;
     virtual void CloseGuestListener(VmListenerId Listener) = 0;
 
     virtual VmDiskAttachment AttachDisk(const VmDiskRequest& Request) = 0;
