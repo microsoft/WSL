@@ -52,14 +52,42 @@ constexpr auto c_vmIdleGracePeriod = std::chrono::seconds(30);
 
 namespace {
 
-// Strips carriage returns so Dockerfiles with CRLF line endings don't leak \r into heredoc content.
+// Converts CRLF line endings to LF so Dockerfiles with CRLF line endings don't leak \r into heredoc content.
+// Standalone carriage returns are preserved. A trailing \r is held until the next read (or EOF) shows whether
+// it starts a CRLF pair.
 class StripCarriageReturnReadHandle : public io::ReadHandle
 {
 public:
     StripCarriageReturnReadHandle(io::HandleWrapper&& Handle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead) :
-        io::ReadHandle(std::move(Handle), [OnRead = std::move(OnRead)](const gsl::span<char>& Buffer) {
-            const auto end = std::remove(Buffer.begin(), Buffer.end(), '\r');
-            OnRead(Buffer.first(static_cast<size_t>(end - Buffer.begin())));
+        io::ReadHandle(std::move(Handle), [OnRead = std::move(OnRead), pendingCr = false](const gsl::span<char>& Buffer) mutable {
+            if (pendingCr && (Buffer.empty() || Buffer[0] != '\n'))
+            {
+                char carriageReturn = '\r';
+                OnRead(gsl::make_span(&carriageReturn, 1));
+            }
+
+            pendingCr = false;
+            size_t length = 0;
+            for (size_t i = 0; i < Buffer.size(); i++)
+            {
+                if (Buffer[i] == '\r')
+                {
+                    if (i + 1 == Buffer.size())
+                    {
+                        pendingCr = true;
+                        continue;
+                    }
+
+                    if (Buffer[i + 1] == '\n')
+                    {
+                        continue;
+                    }
+                }
+
+                Buffer[length++] = Buffer[i];
+            }
+
+            OnRead(Buffer.first(length));
         })
     {
     }

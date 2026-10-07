@@ -1917,6 +1917,36 @@ class WSLCTests
         VERIFY_ARE_EQUAL(std::string("hello\n"), result.Output[1]);
     }
 
+    WSLC_TEST_METHOD(BuildImageHeredocPreservesCarriageReturn)
+    {
+        auto contextDir = std::filesystem::current_path() / "build-context-cr";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-cr:latest", WSLCDeleteImageFlagsForce).first);
+
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile", std::ios::binary);
+            dockerfile << "FROM debian:latest\n";
+            dockerfile << "RUN <<EOF\n";
+            dockerfile << "printf 'a\rb\r' > /cr-test\n";
+            dockerfile << "EOF\n";
+            dockerfile << "CMD [\"cat\", \"/cr-test\"]\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-cr:latest"));
+
+        WSLCContainerLauncher launcher("wslc-test-cr:latest", "wslc-build-cr-test-container");
+        auto container = launcher.Launch(*m_defaultSession);
+        auto result = container.GetInitProcess().WaitAndCaptureOutput();
+
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_ARE_EQUAL(std::string("a\rb\r"), result.Output[1]);
+    }
+
     // This test validates both that we can build an image with an empty CMD, and that we can run such an image.
     WSLC_TEST_METHOD(BuildImageEntrypoint)
     {
