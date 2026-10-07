@@ -5066,7 +5066,18 @@ VERSION_ID="Invalid|Format"
         const auto testDistroIdString = wsl::shared::string::GuidToString<wchar_t>(testDistroId.value());
 
         DistroFileChange distributionconf(L"/etc/wsl-distribution.conf", false);
-        distributionconf.SetContent(L"[oobe]\ncommand = /bin/bash -c 'echo OOBE'\n");
+        constexpr auto manifest =
+            L"[oobe]\n"
+            L"command = /bin/bash -c 'echo OOBE'\n"
+            L"defaultUid = 0\n"
+            L"defaultName = test-default-name\n"
+            L"[shortcut]\n"
+            L"icon = /icon.ico\n"
+            L"enabled = false\n"
+            L"[windowsterminal]\n"
+            L"ProfileTemplate = /terminal.json\n"
+            L"enabled = false\n";
+        distributionconf.SetContent(manifest);
 
         GUID runId;
         THROW_IF_FAILED(CoCreateGuid(&runId));
@@ -5112,11 +5123,21 @@ VERSION_ID="Invalid|Format"
             validateOutput(L"echo no oobe", L"no oobe\n");
             VERIFY_ARE_EQUAL(runOOBE.Get(), 1);
 
-            // Interactive shell should trigger OOBE
+            // Interactive shell should trigger OOBE without warnings for any supported manifest keys.
             validateOutput(nullptr, L"OOBE\n");
             VERIFY_ARE_EQUAL(runOOBE.Get(), 0);
 
             // OOBE should only trigger once
+            validateOutput(L"", L"");
+        }
+
+        {
+            runOOBE.Set(1);
+            distributionconf.SetContent((std::wstring(manifest) + L"[unknown]\nkey = value\n").c_str());
+            TerminateDistribution();
+
+            validateOutput(nullptr, L"OOBE\n", L"wsl: Unknown key 'unknown.key' in /etc/wsl-distribution.conf:12\n");
+            VERIFY_ARE_EQUAL(runOOBE.Get(), 0);
             validateOutput(L"", L"");
         }
 
@@ -7171,6 +7192,39 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_IS_TRUE(getCaseSensitivity(std::format(L"{}/l1/l2", testDir)));
         VERIFY_IS_TRUE(getCaseSensitivity(std::format(L"{}/l1", testDir)));
         VERIFY_IS_TRUE(getCaseSensitivity(testDir));
+    }
+
+    TEST_METHOD(CaseSensitivityDeepNesting)
+    {
+        // Regression test for stack overflow in EnsureCaseSensitiveDirectoryRecursive on deeply
+        // nested directory trees. The original recursive DFS implementation could blow the
+        // 1 MB Windows thread stack at a few hundred levels of nesting (each frame held a
+        // FILE_ID_BOTH_DIR_INFORMATION buffer plus locals); the iterative implementation must
+        // succeed at depths well beyond that without consuming caller stack space.
+
+        constexpr auto testDir = L"deep-case-test";
+        constexpr int depth = 1024;
+        constexpr auto flags = wsl::windows::common::filesystem::c_case_sensitive_folders_only | LXSS_CREATE_INSTANCE_FLAGS_ALLOW_FS_UPGRADE;
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+            // The deep tree exceeds MAX_PATH; remove it via the long-path prefix so the
+            // remove walk can see every component.
+            std::error_code ec;
+            std::filesystem::remove_all(std::format(L"\\\\?\\{}\\{}", std::filesystem::current_path().wstring(), testDir), ec);
+        });
+
+        // Build the deep chain via the \\?\ long-path prefix because the cumulative path
+        // length goes well past MAX_PATH.
+        auto deepPath = std::format(L"\\\\?\\{}\\{}", std::filesystem::current_path().wstring(), testDir);
+        for (int i = 0; i < depth; ++i)
+        {
+            deepPath += std::format(L"\\d{}", i);
+        }
+
+        std::filesystem::create_directories(deepPath);
+
+        // Should not crash with a stack overflow regardless of tree depth.
+        wsl::windows::common::filesystem::EnsureCaseSensitiveDirectory(testDir, flags);
     }
 
     TEST_METHOD(AutomountRespectedWithElevation)
