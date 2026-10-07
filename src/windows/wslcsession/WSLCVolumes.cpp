@@ -24,16 +24,20 @@ using wsl::shared::Localization;
 namespace wsl::windows::service::wslc {
 
 WSLCVolumes::WSLCVolumes(
-    DockerHTTPClient& dockerClient, WSLCVirtualMachine& virtualMachine, DockerEventTracker& eventTracker, const std::filesystem::path& storagePath) :
-    m_dockerClient(dockerClient), m_virtualMachine(virtualMachine), m_storagePath(storagePath)
+    DockerHTTPClient& dockerClient,
+    WSLCVirtualMachine& virtualMachine,
+    DockerEventTracker& eventTracker,
+    const std::filesystem::path& storagePath,
+    DockerEventTracker::VolumeEventCallback onVolumeEvent) :
+    m_dockerClient(dockerClient), m_virtualMachine(virtualMachine), m_storagePath(storagePath), m_onVolumeEvent(std::move(onVolumeEvent))
 {
     // Hold m_lock exclusively across both callback registration and the recovery loop.
     // This ensures any volume events that arrive while recovering are queued behind us in OnVolumeEvent,
     // and dedup naturally against entries inserted by recovery (insert is a no-op for existing keys).
     auto lock = m_lock.lock_exclusive();
 
-    m_volumeEventTracking = eventTracker.RegisterVolumeUpdates(
-        std::bind(&WSLCVolumes::OnVolumeEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+    m_volumeEventTracking = eventTracker.RegisterVolumeUpdates(std::bind(
+        &WSLCVolumes::OnVolumeEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 
     for (const auto& volume : dockerClient.ListVolumes())
     {
@@ -67,8 +71,28 @@ __requires_lock_held(m_lock) void WSLCVolumes::OpenVolumeExclusiveLockHeld(const
     m_volumes.insert({vol.Name, WSLCGuestVolumeImpl::Open(vol, m_dockerClient)});
 }
 
-void WSLCVolumes::OnVolumeEvent(const std::string& volumeName, VolumeEvent event, std::int64_t)
+void WSLCVolumes::OnVolumeEvent(const std::string& volumeName, const std::string& action, const std::map<std::string, std::string>& attributes, std::int64_t eventTimeNano)
 {
+    // Publish every event, including those skipped below, only once it has been applied and m_lock released,
+    // so that a consumer of the event observes the volume state it describes.
+    auto publish = wil::scope_exit([&]() {
+        if (m_onVolumeEvent)
+        {
+            m_onVolumeEvent(volumeName, action, attributes, eventTimeNano);
+        }
+    });
+
+    static std::map<std::string, VolumeEvent> events{{"create", VolumeEvent::Create}, {"destroy", VolumeEvent::Destroy}};
+
+    // Other volume events, such as mount and prune, don't change the set of volumes.
+    const auto it = events.find(action);
+    if (it == events.end())
+    {
+        return;
+    }
+
+    const auto event = it->second;
+
     auto lock = m_lock.lock_exclusive();
 
     // If this event matches the next self-initiated operation we are waiting to observe, the

@@ -491,6 +491,9 @@ try
     hooks.OnCrashDump = std::bind(
         &WSLCSession::OnCrashDumpWritten, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5);
 
+    hooks.OnVolumeEvent = std::bind(
+        &WSLCSession::OnVolumeEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4);
+
     WSLCSessionRuntime::SessionContext sessionContext;
     sessionContext.Id = m_id;
     sessionContext.DisplayName = m_displayName;
@@ -2597,6 +2600,14 @@ void WSLCSession::OnNetworkEvent(
 try
 {
     m_eventStore.Record("network", std::string{Action}, NetworkId, Attributes, TimeNano);
+}
+CATCH_LOG()
+
+void WSLCSession::OnVolumeEvent(
+    const std::string& VolumeName, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t TimeNano) noexcept
+try
+{
+    m_eventStore.Record("volume", std::string{Action}, VolumeName, Attributes, TimeNano);
 }
 CATCH_LOG()
 
