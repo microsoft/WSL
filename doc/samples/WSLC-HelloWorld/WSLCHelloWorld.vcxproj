@@ -19,7 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <VCProjectVersion>17.0</VCProjectVersion>
+    <VCProjectVersion>18.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{2B5C2E11-2C0A-4F1B-9F3D-7E8A1C2D3E4F}</ProjectGuid>
     <RootNamespace>WSLCHelloWorld</RootNamespace>

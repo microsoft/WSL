@@ -2,14 +2,14 @@
 .SYNOPSIS
     Sets up the development environment for building WSL.
 .DESCRIPTION
-    Detects any existing Visual Studio 2022 installation and runs the
+    Detects any existing Visual Studio 2026 installation and runs the
     matching WinGet Configuration to install all prerequisites:
-    Developer Mode, CMake, Visual Studio 2022, and required workloads
+    Developer Mode, CMake, Visual Studio 2026, and required workloads
     from .vsconfig.
 
-    If VS 2022 is already installed, the script picks the configuration
+    If VS 2026 is already installed, the script picks the configuration
     matching that edition (Community, Professional, or Enterprise).
-    If no VS 2022 is found, it defaults to Community edition.
+    If no VS 2026 is found, it defaults to Community edition.
 .EXAMPLE
     .\tools\setup-dev-env.ps1
 #>
@@ -20,13 +20,13 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path "$PSScriptRoot\..").Path
 $configDir = Join-Path $repoRoot ".config"
 
-# ── Detect existing VS 2022 edition ─────────────────────────────────
+# ── Detect existing VS 2026 edition ─────────────────────────────────
 $configFile = "configuration.winget" # default: Community
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 
 if (Test-Path $vswhere)
 {
-    $productId = (& $vswhere -version "[17.0,18.0)" -products * -latest -property productId 2>$null |
+    $productId = (& $vswhere -version "[18.0,19.0)" -products * -latest -property productId 2>$null |
         Select-Object -First 1)
 
     if ($productId) { $productId = $productId.Trim() }
@@ -35,23 +35,23 @@ if (Test-Path $vswhere)
     {
         "Microsoft.VisualStudio.Product.Professional" {
             $configFile = "configuration.vsProfessional.winget"
-            Write-Host "Detected VS 2022 Professional - using $configFile" -ForegroundColor Green
+            Write-Host "Detected VS 2026 Professional - using $configFile" -ForegroundColor Green
         }
         "Microsoft.VisualStudio.Product.Enterprise" {
             $configFile = "configuration.vsEnterprise.winget"
-            Write-Host "Detected VS 2022 Enterprise - using $configFile" -ForegroundColor Green
+            Write-Host "Detected VS 2026 Enterprise - using $configFile" -ForegroundColor Green
         }
         "Microsoft.VisualStudio.Product.Community" {
-            Write-Host "Detected VS 2022 Community - using $configFile" -ForegroundColor Green
+            Write-Host "Detected VS 2026 Community - using $configFile" -ForegroundColor Green
         }
         default {
-            Write-Host "No VS 2022 found - will install Community edition" -ForegroundColor Yellow
+            Write-Host "No VS 2026 found - will install Community edition" -ForegroundColor Yellow
         }
     }
 }
 else
 {
-    Write-Host "No VS 2022 found - will install Community edition" -ForegroundColor Yellow
+    Write-Host "No VS 2026 found - will install Community edition" -ForegroundColor Yellow
 }
 
 $configPath = Join-Path $configDir $configFile
@@ -65,7 +65,7 @@ if (-not (Test-Path -LiteralPath $configPath -PathType Leaf))
 # ── Run WinGet Configuration ────────────────────────────────────────
 Write-Host ""
 Write-Host "Running WinGet Configuration ($configFile)..." -ForegroundColor Cyan
-Write-Host "  This will install: Developer Mode, CMake, VS 2022 + required components"
+Write-Host "  This will install: Developer Mode, CMake, VS 2026 + required components"
 Write-Host ""
 
 winget configure --enable
