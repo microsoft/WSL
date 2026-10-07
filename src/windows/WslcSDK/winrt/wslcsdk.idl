@@ -384,6 +384,6 @@ namespace Microsoft.WSL.Containers
         RegistryBlockedByPolicy = 0x8004060D,
         VolumeNotAvailable = 0x8004060E,
         ContainerDeleted = 0x80040613,
-        WslUpdateNeeded = 0x80040614,
+        WslUpdateNeeded = 0x80040615,
     };
 }

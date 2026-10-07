@@ -61,6 +61,16 @@ struct CapturedProcessOutput
     std::wstring StandardError;
 };
 
+bool FileSystemSupportsSparseFiles(const std::filesystem::path& path)
+{
+    wchar_t volumePath[MAX_PATH];
+    THROW_IF_WIN32_BOOL_FALSE(GetVolumePathNameW(path.c_str(), volumePath, ARRAYSIZE(volumePath)));
+
+    DWORD fileSystemFlags{};
+    THROW_IF_WIN32_BOOL_FALSE(GetVolumeInformationW(volumePath, nullptr, 0, nullptr, nullptr, &fileSystemFlags, nullptr, 0));
+    return WI_IsFlagSet(fileSystemFlags, FILE_SUPPORTS_SPARSE_FILES);
+}
+
 std::wstring ReadStream(IInputStream const& stream)
 {
     std::wstring output;
@@ -1651,7 +1661,10 @@ class WslcSdkWinRtTests
 
         const auto storageAttributes = GetFileAttributesW((vhdSessionStorage / L"storage.vhdx").c_str());
         VERIFY_ARE_NOT_EQUAL(INVALID_FILE_ATTRIBUTES, storageAttributes);
-        VERIFY_IS_TRUE(WI_IsFlagSet(storageAttributes, FILE_ATTRIBUTE_SPARSE_FILE));
+        if (FileSystemSupportsSparseFiles(vhdSessionStorage / L"storage.vhdx"))
+        {
+            VERIFY_IS_TRUE(WI_IsFlagSet(storageAttributes, FILE_ATTRIBUTE_SPARSE_FILE));
+        }
 
         // Positive: create a named VHD volume.
         session.CreateVhdVolume(WSLCSDK::VhdOptions(c_volumeName, c_vhdSizeBytes, WSLCSDK::VhdType::Sparse));
@@ -1661,7 +1674,10 @@ class WslcSdkWinRtTests
         VERIFY_IS_TRUE(std::filesystem::exists(expectedVhdPath));
         const auto volumeAttributes = GetFileAttributesW(expectedVhdPath.c_str());
         VERIFY_ARE_NOT_EQUAL(INVALID_FILE_ATTRIBUTES, volumeAttributes);
-        VERIFY_IS_TRUE(WI_IsFlagSet(volumeAttributes, FILE_ATTRIBUTE_SPARSE_FILE));
+        if (FileSystemSupportsSparseFiles(expectedVhdPath))
+        {
+            VERIFY_IS_TRUE(WI_IsFlagSet(volumeAttributes, FILE_ATTRIBUTE_SPARSE_FILE));
+        }
 
         // Positive: write a marker via a container that mounts the named volume.
         {

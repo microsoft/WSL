@@ -17,4 +17,4 @@
 | `RegistryBlockedByPolicy` | `-2147219955` | `0x8004060D` | Registry access is blocked by policy. |
 | `VolumeNotAvailable` | `-2147219954` | `0x8004060E` | The requested volume is not available. |
 | `ContainerDeleted` | `-2147219949` | `0x80040613` | The container was deleted. |
-| `WslUpdateNeeded` | `-2147219948` | `0x80040614` | The installed WSL version does not support the requested operation and must be updated. |
+| `WslUpdateNeeded` | `-2147219947` | `0x80040615` | The installed WSL version does not support the requested operation and must be updated. |
