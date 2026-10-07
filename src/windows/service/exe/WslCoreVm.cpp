@@ -378,9 +378,23 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     }
     catch (...)
     {
-        // Reset the backend so the destructor does not attempt a graceful guest shutdown for a VM
-        // that never reached the running state.
-        m_backend.reset();
+        const auto hr = wil::ResultFromCaughtException();
+        auto resetBackend = wil::scope_exit([&] { m_backend.reset(); });
+        if ((hr == HRESULT_FROM_WIN32(WSAENOTCONN) || hr == HRESULT_FROM_WIN32(WSAECONNRESET) || hr == HRESULT_FROM_WIN32(WSAETIMEDOUT)) &&
+            m_vmCrashEvent.wait(1000))
+        {
+            const auto crashLogPath = m_backend->GetCrashLogPath();
+            if (crashLogPath)
+            {
+                THROW_HR_WITH_USER_ERROR(
+                    WSL_E_VM_CRASHED,
+                    wsl::shared::Localization::MessageWSL2Crashed() + L"\r\n" +
+                        Localization::MessageWSL2CrashedStackTrace(crashLogPath.value()));
+            }
+
+            THROW_HR_WITH_USER_ERROR(WSL_E_VM_CRASHED, wsl::shared::Localization::MessageWSL2Crashed());
+        }
+
         throw;
     }
 

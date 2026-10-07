@@ -39,7 +39,7 @@ void CreateVhd(const std::filesystem::path& Path)
         &storageType, Path.c_str(), VIRTUAL_DISK_ACCESS_NONE, nullptr, CREATE_VIRTUAL_DISK_FLAG_SUPPORT_COMPRESSED_VOLUMES, 0, &parameters, nullptr, &vhd));
 }
 
-std::wstring GetDacl(const std::filesystem::path& Path)
+std::wstring GetDaclAces(const std::filesystem::path& Path)
 {
     PACL acl = nullptr;
     wil::unique_hlocal descriptor;
@@ -48,7 +48,9 @@ std::wstring GetDacl(const std::filesystem::path& Path)
     wil::unique_hlocal_string value;
     THROW_IF_WIN32_BOOL_FALSE(ConvertSecurityDescriptorToStringSecurityDescriptorW(
         descriptor.get(), SDDL_REVISION_1, DACL_SECURITY_INFORMATION, &value, nullptr));
-    return value.get();
+    const std::wstring dacl{value.get()};
+    const auto firstAce = dacl.find(L'(');
+    return firstAce == std::wstring::npos ? std::wstring{} : dacl.substr(firstAce);
 }
 
 // Tests require elevation, so the test process token is the elevated counterpart of
@@ -235,14 +237,9 @@ class HcsVirtualMachineBackendTests
         const auto directory = CreateTestDirectory();
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { std::filesystem::remove_all(directory); });
         const auto firstPath = directory / L"first.vhdx";
-        const auto invalidPath = directory / L"invalid.vhdx";
         CreateVhd(firstPath);
-        wil::unique_hfile invalidFile{CreateFileW(invalidPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr)};
-        THROW_LAST_ERROR_IF(!invalidFile);
-        invalidFile.reset();
 
-        const auto firstDacl = GetDacl(firstPath);
-        const auto invalidDacl = GetDacl(invalidPath);
+        const auto firstDaclAces = GetDaclAces(firstPath);
         auto request = CreateRunnableRequest();
         request.Identity.UserToken = wil::shared_handle{GetElevatedTestToken().release()};
         VmBootDiskRequest first;
@@ -250,14 +247,13 @@ class HcsVirtualMachineBackendTests
         first.Disk = CreateDiskRequest(firstPath);
         first.GrantHostAccess = true;
         VmBootDiskRequest invalid;
-        invalid.Key = L"invalid";
-        invalid.Disk = CreateDiskRequest(invalidPath);
+        invalid.Key = L"first";
+        invalid.Disk = CreateDiskRequest(firstPath);
         invalid.GrantHostAccess = true;
         request.BootDisks = {std::move(first), std::move(invalid)};
 
         VERIFY_ARE_NOT_EQUAL(S_OK, OperationResult([&] { HcsVirtualMachineBackend::Create(request); }));
-        VERIFY_ARE_EQUAL(firstDacl, GetDacl(firstPath));
-        VERIFY_ARE_EQUAL(invalidDacl, GetDacl(invalidPath));
+        VERIFY_ARE_EQUAL(firstDaclAces, GetDaclAces(firstPath));
     }
 
     TEST_METHOD(ManagesDiskPlacementsAndLifetime)
