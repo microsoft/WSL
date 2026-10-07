@@ -2457,6 +2457,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>--output 値 '{}' のビルド出力をコンソールに書き込むことはできません。</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcBuildStdinContextAndDockerfile" xml:space="preserve">
+    <value>ビルド コンテキストと Dockerfile の両方に対し stdin を使用できません。</value>
+    <comment>{Locked="stdin"}{Locked="Dockerfile"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>必須のオプションがありません: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3463,7 +3467,8 @@ Windows バージョン: {}</value>
     <value>保存されたイメージのパス</value>
   </data>
   <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
-    <value>ビルド コンテキスト ディレクトリへのパス</value>
+    <value>ビルド コンテキスト ディレクトリへのパスです (stdin から tar アーカイブまたは Dockerfile を読み取るには "-" を使用します)</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
     <value>コンテナーからホストへのポートを公開します</value>
@@ -3867,6 +3872,10 @@ Windows バージョン: {}</value>
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>イメージをターミナルに書き込めません。-o オプションを使用するか、stdout をリダイレクトします。</value>
+  </data>
+  <data name="WSLCCLI_BuildStdinIsTerminalError" xml:space="preserve">
+    <value>ターミナルからビルド入力を読み取れません。Dockerfile または tar アーカイブを stdin にパイプしてください。</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
     <value>コンテナーをターミナルにエクスポートできません。-o オプションを使用するか、stdout をリダイレクトします。</value>
