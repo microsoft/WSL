@@ -1464,22 +1464,6 @@ std::wstring LxssWriteWslConfig(const std::wstring& Content)
     return previousContent;
 }
 
-// writes distro specific settings /etc/wsl.conf
-std::string LxssWriteWslDistroConfig(const std::string& Content, LPCWSTR DistributionName)
-{
-    std::string path = std::format("\\\\wsl.localhost\\{}\\etc\\wsl.conf", DistributionName);
-
-    std::ifstream distroConfigRead(path);
-    auto previousContent = std::string{std::istreambuf_iterator<char>(distroConfigRead), {}};
-    distroConfigRead.close();
-
-    std::ofstream distroConfig(path, std::ios_base::binary);
-    VERIFY_IS_TRUE(distroConfig.good());
-    distroConfig.write(Content.c_str(), Content.size());
-
-    return previousContent;
-}
-
 // generates a sample global WSL config for the tests
 std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
 {
@@ -2481,6 +2465,13 @@ bool IsHyperVFirewallSupported() noexcept
     return true;
 }
 
+bool IsMirroredNetworkingSupported()
+{
+    // Windows Server can expose the Hyper-V firewall APIs without supporting mirrored networking.
+    return !IsWindowsServer() && wsl::windows::common::helpers::IsWindows11OrAbove() &&
+           AreExperimentalNetworkingFeaturesSupported() && IsHyperVFirewallSupported();
+}
+
 std::optional<GUID> GetDistributionId(LPCWSTR Name)
 {
     // Get the GUID of the test distro
@@ -2695,11 +2686,12 @@ UniqueWebServer::~UniqueWebServer()
     }
 }
 
-DistroFileChange::DistroFileChange(LPCWSTR Path, bool exists) : m_path(Path)
+DistroFileChange::DistroFileChange(LPCWSTR Path, bool exists, LPCWSTR DistributionName) :
+    m_path(Path), m_distributionName(DistributionName)
 {
     if (exists)
     {
-        m_originalContent = LxsstuLaunchWslAndCaptureOutput(std::format(L"cat '{}'", m_path)).first;
+        m_originalContent = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -u root cat '{}'", m_distributionName, m_path)).first;
     }
 }
 
@@ -2717,7 +2709,7 @@ DistroFileChange::~DistroFileChange()
 
 void DistroFileChange::SetContent(LPCWSTR Content)
 {
-    const auto cmd = LxssGenerateWslCommandLine(std::format(L" -u root cat > '{}'", m_path).c_str());
+    const auto cmd = LxssGenerateWslCommandLine(std::format(L"-d {} -u root cat > '{}'", m_distributionName, m_path).c_str());
     wsl::windows::common::SubProcess process(nullptr, cmd.c_str());
 
     auto [read, write] = CreateSubprocessPipe(true, false);
@@ -2744,7 +2736,7 @@ void DistroFileChange::SetContent(LPCWSTR Content)
 
 void DistroFileChange::Delete()
 {
-    VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-u root rm -f '{}'", m_path).c_str()), 0L);
+    VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} -u root rm -f '{}'", m_distributionName, m_path)), 0L);
 }
 
 std::string ReadToString(SOCKET Handle)

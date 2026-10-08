@@ -555,7 +555,7 @@ std::string WSLCStateToEventAction(WSLCContainerState state)
     case WslcContainerStateRunning:
         return "start";
     case WslcContainerStateExited:
-        return "stop";
+        return "die";
     case WslcContainerStateDeleted:
         return "destroy";
     default:
@@ -937,6 +937,7 @@ WSLCContainerImpl::WSLCContainerImpl(
 
 WSLCContainerImpl::~WSLCContainerImpl()
 {
+    // Closing the timer waits for callbacks, which acquire m_lock.
     m_policyRestartTimer.reset();
 
     // Destructors are implicitly noexcept, so any escaping exception terminates the session host.
@@ -993,7 +994,7 @@ void WSLCContainerImpl::Initialize()
     // N.B. this must be done here because weak_from_this() is only valid after the constructor returns.
     m_comWrapper->Initialize(weak_from_this());
     m_containerEvents = m_runtime.Events().RegisterContainerStateUpdates(
-        m_id, std::bind(&WSLCContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+        m_id, std::bind(&WSLCContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 }
 
 void WSLCContainerImpl::SetExitCode(int ExitCode) noexcept
@@ -1346,13 +1347,25 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::CompleteTransitio
     transition->Completed.SetEvent();
 }
 
-void WSLCContainerImpl::RecordEvent(std::string&& Action, std::int64_t TimeNano, std::optional<int> ExitCode) noexcept
-try
+std::map<std::string, std::string> WSLCContainerImpl::BuildEventAttributes() const
 {
     auto attributes = StripInternalLabels(m_labels);
     attributes["name"] = m_name;
     attributes["image"] = m_image;
+    return attributes;
+}
 
+void WSLCContainerImpl::RecordEvent(std::string&& Action, std::int64_t TimeNano) noexcept
+try
+{
+    m_eventStore.Record("container", std::move(Action), m_id, BuildEventAttributes(), TimeNano);
+}
+CATCH_LOG()
+
+void WSLCContainerImpl::RecordEvent(std::string&& Action, std::int64_t TimeNano, std::optional<int> ExitCode) noexcept
+try
+{
+    auto attributes = BuildEventAttributes();
     if (ExitCode.has_value())
     {
         attributes["exitCode"] = std::to_string(ExitCode.value());
@@ -1362,7 +1375,40 @@ try
 }
 CATCH_LOG()
 
-void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode, std::int64_t eventTimeNano) noexcept
+void WSLCContainerImpl::RecordEvent(std::string&& Action, std::int64_t TimeNano, const std::map<std::string, std::string>& DockerAttributes) noexcept
+try
+{
+    auto attributes = GetEventAttributes(DockerAttributes);
+
+    // Containers are only tracked once created or opened with WSLC's metadata label, which Docker copies into every event.
+    WI_ASSERT(attributes.has_value());
+
+    m_eventStore.Record("container", std::move(Action), m_id, std::move(attributes.value()), TimeNano);
+}
+CATCH_LOG()
+
+std::optional<std::map<std::string, std::string>> WSLCContainerImpl::GetEventAttributes(std::map<std::string, std::string> DockerAttributes)
+{
+    // Containers WSLC didn't create, such as BuildKit's, carry no metadata and aren't reported.
+    const auto metadataIt = DockerAttributes.find(WSLCContainerMetadataLabel);
+    if (metadataIt == DockerAttributes.end())
+    {
+        return std::nullopt;
+    }
+
+    auto metadata = ParseContainerMetadata(metadataIt->second);
+    auto attributes = StripInternalLabels(std::move(DockerAttributes));
+
+    // Docker reports the image ID when the container was created from a resolved image (e.g. publish-all).
+    if (!metadata.Image.empty())
+    {
+        attributes["image"] = std::move(metadata.Image);
+    }
+
+    return attributes;
+}
+
+void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode, const std::map<std::string, std::string>& attributes, std::int64_t eventTimeNano) noexcept
 {
     // Either owner may disconnect the COM wrapper, so both must outlive m_lock.
     unique_com_disconnect comWrapper;
@@ -1370,10 +1416,22 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     bool notifyContainerStopping = false;
     std::shared_ptr<StateTransition> transition;
 
-    if (event == ContainerEvent::Kill)
+    switch (event)
     {
-        RecordEvent("kill", eventTimeNano);
+    case ContainerEvent::HealthHealthy:
+        RecordEvent("health_status: healthy", eventTimeNano, attributes);
         return;
+
+    case ContainerEvent::HealthUnhealthy:
+        RecordEvent("health_status: unhealthy", eventTimeNano, attributes);
+        return;
+
+    case ContainerEvent::Kill:
+        RecordEvent("kill", eventTimeNano, attributes);
+        return;
+
+    default:
+        break;
     }
 
     {
@@ -1389,12 +1447,26 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         auto lock = m_lock.lock_exclusive();
         transition = m_transition;
 
-        if (event == ContainerEvent::Start)
+        switch (event)
+        {
+        case ContainerEvent::Stop:
+            // Docker can report 'stop' before 'die', so it's published with the exit transition instead.
+            if (m_state == WslcContainerStateRunning)
+            {
+                m_pendingStopAttributes = attributes;
+            }
+            else
+            {
+                RecordEvent("stop", eventTimeNano, attributes);
+            }
+            break;
+
+        case ContainerEvent::Start:
         {
             if (transition && transition->ExpectedEvent == ContainerEvent::Start)
             {
                 WI_ASSERT(m_state == WslcContainerStateCreated || m_state == WslcContainerStateExited);
-                CommitState(WslcContainerStateRunning, eventTimeNano);
+                CommitState(WslcContainerStateRunning, eventTimeNano, std::nullopt, std::nullopt, std::cref(attributes));
 
                 // Restart() retains the explicit transaction object and signals it after StartPhase returns.
                 // Clear the container's reference once the replacement run is committed so later exits
@@ -1408,21 +1480,22 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
             }
             else
             {
-                notifyContainerStopping = PrepareForUnexpectedStartLockHeld(eventTimeNano);
+                notifyContainerStopping = PrepareForUnexpectedStartLockHeld(eventTimeNano, attributes);
                 reconcilePolicyRestart = true;
             }
+            break;
         }
-        else if (event == ContainerEvent::Stop)
-        {
+
+        case ContainerEvent::Exit:
             WI_ASSERT(exitCode.has_value());
-            notifyContainerStopping = OnStopped(exitCode.value(), eventTimeNano);
-        }
-        else if (event == ContainerEvent::Destroy)
-        {
+            notifyContainerStopping = OnStopped(exitCode.value(), attributes, eventTimeNano);
+            break;
+
+        case ContainerEvent::Destroy:
             if (m_state != WslcContainerStateDeleted)
             {
                 ResolvePolicyRestartLockHeld(false);
-                CommitState(WslcContainerStateDeleted, eventTimeNano);
+                CommitState(WslcContainerStateDeleted, eventTimeNano, std::nullopt, std::nullopt, std::cref(attributes));
                 comWrapper = ReleaseResources();
             }
 
@@ -1438,6 +1511,10 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
 
                 CompleteTransition(transition);
             }
+            break;
+
+        default:
+            break;
         }
 
         WSL_LOG(
@@ -1460,7 +1537,8 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     }
 }
 
-__requires_exclusive_lock_held(m_lock) bool WSLCContainerImpl::PrepareForUnexpectedStartLockHeld(std::int64_t eventTimeNano) noexcept
+__requires_exclusive_lock_held(m_lock) bool WSLCContainerImpl::PrepareForUnexpectedStartLockHeld(
+    std::int64_t eventTimeNano, const std::map<std::string, std::string>& attributes) noexcept
 try
 {
     if (m_state != WslcContainerStateRunning || m_restart)
@@ -1492,7 +1570,7 @@ try
     m_manualStopRequests = 0;
     SetExitCode(c_unknownExitCode);
     ReleaseProcesses();
-    CommitState(WslcContainerStateExited, eventTimeNano, c_unknownExitCode);
+    CommitState(WslcContainerStateExited, eventTimeNano, c_unknownExitCode, std::nullopt, std::cref(attributes));
     SignalInitProcessExit();
     m_initProcessStartedAt.clear();
     return true;
@@ -1658,7 +1736,7 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
                 {
                     if (!transition)
                     {
-                        transition = StartTransition(TransitionKind::Stop, ContainerEvent::Stop);
+                        transition = StartTransition(TransitionKind::Stop, ContainerEvent::Exit);
                     }
                 }
                 else if (!transition && m_state == WslcContainerStateRunning)
@@ -1779,11 +1857,11 @@ __requires_exclusive_lock_held(m_lock) std::shared_ptr<WSLCContainerImpl::StateT
     return StartTransition(TransitionKind::Delete, ContainerEvent::Destroy);
 }
 
-__requires_exclusive_lock_held(m_lock) bool WSLCContainerImpl::OnStopped(int exitCode, std::int64_t stopTimeNano)
+__requires_exclusive_lock_held(m_lock) bool WSLCContainerImpl::OnStopped(int exitCode, const std::map<std::string, std::string>& attributes, std::int64_t stopTimeNano)
 {
     auto transition = m_transition;
 
-    // A Stop while expecting Start should not occur normally: Docker emits start before die, and the event stream processes
+    // An exit while expecting Start should not occur normally: Docker emits start before die, and the event stream processes
     // them serially. It would indicate external manipulation. Ignoring it avoids applying an old exit code to the newly
     // staged init process.
     if (transition && (transition->ExpectedEvent == ContainerEvent::Start))
@@ -1863,7 +1941,7 @@ __requires_exclusive_lock_held(m_lock) bool WSLCContainerImpl::OnStopped(int exi
     // exit before the replacement run is reconciled.
     if (m_state == WslcContainerStateRunning)
     {
-        CommitState(WslcContainerStateExited, stopTimeNano, exitCode);
+        CommitState(WslcContainerStateExited, stopTimeNano, std::nullopt, std::nullopt, std::cref(attributes));
     }
 
     std::exception_ptr transitionException;
@@ -3095,6 +3173,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     WSLCContainerMetadataV1 metadata;
     metadata.Flags = containerOptions.Flags;
     metadata.InitProcessFlags = containerOptions.InitProcessOptions.Flags;
+    metadata.Image = containerOptions.Image;
     metadata.Volumes = volumes;
 
     for (const auto& e : mappedPorts)
@@ -3264,6 +3343,9 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         }
     }
 
+    // Containers created before the image was persisted fall back to what Docker reports.
+    std::string image = metadata.Image.empty() ? dockerContainer.Image : std::move(metadata.Image);
+
     // The list state is provisional. Event registration and a fresh inspect below establish the
     // authoritative state before the wrapper is exposed.
     const bool listedActive = dockerContainer.State == ContainerState::Running || dockerContainer.State == ContainerState::Restarting;
@@ -3275,7 +3357,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         pluginNotifier,
         std::string(dockerContainer.Id),
         std::move(name),
-        std::string(dockerContainer.Image),
+        std::move(image),
         std::move(networkMode),
         std::move(metadata.Volumes),
         std::move(namedVolumes),
@@ -3656,7 +3738,11 @@ __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::
 }
 
 __requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(
-    WSLCContainerState State, std::int64_t TimeNano, std::optional<int> ExitCode, std::optional<std::int64_t> EventTimeNano) noexcept
+    WSLCContainerState State,
+    std::int64_t TimeNano,
+    std::optional<int> ExitCode,
+    std::optional<std::int64_t> EventTimeNano,
+    std::optional<std::reference_wrapper<const std::map<std::string, std::string>>> DockerAttributes) noexcept
 {
     // N.B. A deleted container cannot transition back to any other state.
     WI_ASSERT(m_state != WslcContainerStateDeleted);
@@ -3671,7 +3757,21 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(
     m_stateGeneration++;
     m_stateChangedAt = std::chrono::floor<std::chrono::seconds>(std::chrono::nanoseconds{TimeNano}).count();
 
-    RecordEvent(WSLCStateToEventAction(State), EventTimeNano.value_or(TimeNano), ExitCode);
+    const auto eventTimeNano = EventTimeNano.value_or(TimeNano);
+    if (DockerAttributes.has_value())
+    {
+        RecordEvent(WSLCStateToEventAction(State), eventTimeNano, DockerAttributes->get());
+    }
+    else
+    {
+        RecordEvent(WSLCStateToEventAction(State), eventTimeNano, ExitCode);
+    }
+
+    // A held 'stop' takes the exit's time so it stays in timestamp order, and never outlives the run it belongs to.
+    if (auto pendingStop = std::exchange(m_pendingStopAttributes, std::nullopt); pendingStop.has_value() && State == WslcContainerStateExited)
+    {
+        RecordEvent("stop", TimeNano, pendingStop.value());
+    }
 
     // Explicit restart transactions are cleared by their expected start event. Policy resolution
     // includes monitor and waiter cleanup in addition to publishing the Running state.

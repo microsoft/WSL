@@ -2451,6 +2451,10 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <value>Nem lehet fordítási kimenetet írni a konzolra a(z) {} --output értékhez.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcBuildStdinContextAndDockerfile" xml:space="preserve">
+    <value>Can't use stdin for both the build context and the Dockerfile.</value>
+    <comment>{Locked="stdin"}{Locked="Dockerfile"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>Hiányzó kötelező opció: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2706,6 +2710,9 @@ Használat: wslc container cp [OPTIONS] SOURCE DEST
     <value>tar.exe nem található. A helyi fájlmásoláshoz Windows tar szükséges.</value>
     <comment>{Locked="tar.exe"}</comment>
   </data>
+  <data name="WSLCCLI_CpStdoutIsTerminalError" xml:space="preserve">
+    <value>A másolat kimenete nem írható a konzolra.</value>
+  </data>
   <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
     <value>Érvénytelen másolási irány. Forrásként vagy célként használja a CONTAINER:PATH elemet.</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
@@ -2729,7 +2736,11 @@ Példa: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_CpSourceNameNotRepresentableError" xml:space="preserve">
     <value>A(z) „{0}” nem másolható, mert a neve nem használható Windows-fájlnévként.</value>
-    <comment>{0} is the source path. Shown when the container source name holds a character that is not valid in a Windows file name.</comment>
+    <comment>{0} is the file name being copied. Shown when the name cannot be used as a Windows file name.</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceNameTrimmedWarning" xml:space="preserve">
+    <value>A Windows eltávolítja a fájlnevek végéről a szóközöket és pontokat, ezért a(z) „{}” „{}” néven lesz másolva.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Tároló vizsgálata.</value>
@@ -3450,7 +3461,8 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>A mentett kép elérési útja</value>
   </data>
   <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
-    <value>A buildkörnyezet könyvtárának elérési útja</value>
+    <value>Path to the build context directory (use "-" to read a tar archive or Dockerfile from stdin)</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
     <value>Port közzététele tárolóból gazdagépre</value>
@@ -3855,6 +3867,10 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>A rendszerkép nem írható a terminálba. Használja az -o opciót, vagy irányítsa át a stdout-ot.</value>
   </data>
+  <data name="WSLCCLI_BuildStdinIsTerminalError" xml:space="preserve">
+    <value>Cannot read build input from terminal. Pipe a Dockerfile or tar archive to stdin.</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
     <value>Nem lehet a tárolót a terminálba exportálni. Használja az -o opciót, vagy irányítsa át a stdout-ot.</value>
   </data>
@@ -3943,6 +3959,30 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderRepository" xml:space="preserve">
+    <value>ADATTÁR</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderTag" xml:space="preserve">
+    <value>CÍMKE</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderDigest" xml:space="preserve">
+    <value>KIVONAT</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderImageId" xml:space="preserve">
+    <value>LEMEZKÉP AZONOSÍTÓJA</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderNetworkId" xml:space="preserve">
+    <value>HÁLÓZATI AZONOSÍTÓ</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderDriver" xml:space="preserve">
+    <value>ILLESZTŐPROGRAM</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderScope" xml:space="preserve">
+    <value>HATÓKÖR</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderVolumeName" xml:space="preserve">
+    <value>KÖTET NEVE</value>
   </data>
   <data name="WSLCCLI_ContainerStateCreated" xml:space="preserve">
     <value>létrehozva</value>

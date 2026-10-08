@@ -508,6 +508,9 @@ try
     m_networkEventTracking = m_runtime.Events().RegisterNetworkUpdates(std::bind(
         &WSLCSession::OnNetworkEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 
+    m_containerActionTracking = m_runtime.Events().RegisterContainerActions(std::bind(
+        &WSLCSession::OnContainerAction, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
+
     return S_OK;
 }
 CATCH_RETURN()
@@ -1016,8 +1019,15 @@ try
     WSLCExecutionContext context(this);
 
     RETURN_HR_IF_NULL(E_POINTER, Options);
-    RETURN_HR_IF_NULL(E_POINTER, Options->ContextPath);
-    RETURN_HR_IF(E_INVALIDARG, *Options->ContextPath == L'\0');
+
+    // The build context is either a Windows directory or a stream relayed to docker's stdin, never both. The stream is
+    // a tar archive, or a bare Dockerfile that is built with an empty context. A streamed context occupies stdin, so it
+    // cannot also carry a Dockerfile handle.
+    const bool streamContext = Options->ContextHandle.Type != WSLCHandleTypeUnknown;
+    const bool hasContextPath = Options->ContextPath != nullptr && *Options->ContextPath != L'\0';
+    RETURN_HR_IF(E_INVALIDARG, streamContext == hasContextPath);
+    RETURN_HR_IF(E_INVALIDARG, streamContext && Options->DockerfileHandle.Type != WSLCHandleTypeUnknown);
+    RETURN_HR_IF(E_INVALIDARG, !streamContext && Options->DockerfilePath != nullptr);
     RETURN_HR_IF(E_INVALIDARG, Options->Tags.Count > 0 && Options->Tags.Values == nullptr);
     RETURN_HR_IF(E_INVALIDARG, Options->BuildArgs.Count > 0 && Options->BuildArgs.Values == nullptr);
     RETURN_HR_IF(E_INVALIDARG, Options->Labels.Count > 0 && Options->Labels.Values == nullptr);
@@ -1028,7 +1038,7 @@ try
         "Invalid flags: 0x%x",
         Options->Flags);
 
-    auto buildFileHandle = OpenUserHandle(Options->DockerfileHandle);
+    auto stdinHandle = OpenUserHandle(streamContext ? Options->ContextHandle : Options->DockerfileHandle);
 
     std::optional<UserCOMCallback> comCall;
     if (ProgressCallback != nullptr)
@@ -1077,7 +1087,11 @@ try
         buildEnv.emplace_back(std::string{"EXPERIMENTAL_BUILDKIT_SOURCE_POLICY="} + WSLCVirtualMachine::c_buildKitPolicyPath);
     }
 
-    auto mountPath = mountInVm(Options->ContextPath, TRUE);
+    std::string mountPath;
+    if (!streamContext)
+    {
+        mountPath = mountInVm(Options->ContextPath, TRUE);
+    }
 
     // Progress is requested as JSON so it can be parsed into the formatted progress messages sent to the
     // client. The raw JSON is a docker implementation detail and is never forwarded.
@@ -1270,9 +1284,21 @@ try
         }
     }
 
-    buildArgs.push_back("-f");
-    buildArgs.push_back("-");
-    buildArgs.push_back(mountPath);
+    if (streamContext)
+    {
+        if (Options->DockerfilePath != nullptr)
+        {
+            buildArgs.push_back(std::format("--file={}", Options->DockerfilePath));
+        }
+
+        buildArgs.push_back("-");
+    }
+    else
+    {
+        buildArgs.push_back("-f");
+        buildArgs.push_back("-");
+        buildArgs.push_back(mountPath);
+    }
 
     WSL_LOG("BuildImageStart", TraceLoggingValue(wsl::shared::string::Join(buildArgs, ' ').c_str(), "Command"));
 
@@ -1289,7 +1315,7 @@ try
     auto io = CreateIOContext();
 
     io.AddHandle(
-        std::make_unique<io::RelayHandle<io::ReadHandle>>(buildFileHandle.Get(), common::io::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}),
+        std::make_unique<io::RelayHandle<io::ReadHandle>>(stdinHandle.Get(), common::io::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}),
         MultiHandleWait::NeedNotComplete,
         [&buildProcess]() {
             // If we receive an error relaying stdin, it could be because the process exited.
@@ -2573,6 +2599,18 @@ void WSLCSession::OnNetworkEvent(
 try
 {
     m_eventStore.Record("network", std::string{Action}, NetworkId, Attributes, TimeNano);
+}
+CATCH_LOG()
+
+void WSLCSession::OnContainerAction(
+    const std::string& ContainerId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t TimeNano) noexcept
+try
+{
+    auto attributes = WSLCContainerImpl::GetEventAttributes(Attributes);
+    if (attributes.has_value())
+    {
+        m_eventStore.Record("container", std::string{Action}, ContainerId, std::move(attributes.value()), TimeNano);
+    }
 }
 CATCH_LOG()
 

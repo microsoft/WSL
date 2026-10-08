@@ -124,6 +124,9 @@ public:
     WSLCContainerState State() const noexcept;
     std::vector<WSLCPortMapping> GetPorts() const;
 
+    // Returns the attributes to record for a Docker container event, or nothing if WSLC didn't create the container.
+    static std::optional<std::map<std::string, std::string>> GetEventAttributes(std::map<std::string, std::string> DockerAttributes);
+
     // Re-registers a stopped container's VM-scoped port allocations against the restarted VM.
     void RecoverPorts(const common::docker_schema::ContainerInfo& dockerContainer);
     void CompleteRecovery() noexcept;
@@ -132,7 +135,8 @@ public:
         WSLCContainerState State,
         std::int64_t TimeNano,
         std::optional<int> ExitCode = std::nullopt,
-        std::optional<std::int64_t> EventTimeNano = std::nullopt) noexcept;
+        std::optional<std::int64_t> EventTimeNano = std::nullopt,
+        std::optional<std::reference_wrapper<const std::map<std::string, std::string>>> DockerAttributes = std::nullopt) noexcept;
 
     const std::string& ID() const noexcept;
 
@@ -163,7 +167,9 @@ public:
 
     // Appends an event for this container to the session's event stream. Direct Docker transitions use
     // the Docker event time; asynchronous reconciliation uses its publication time to preserve order.
-    void RecordEvent(std::string&& Action, std::int64_t TimeNano, std::optional<int> ExitCode = std::nullopt) noexcept;
+    void RecordEvent(std::string&& Action, std::int64_t TimeNano) noexcept;
+    void RecordEvent(std::string&& Action, std::int64_t TimeNano, std::optional<int> ExitCode) noexcept;
+    void RecordEvent(std::string&& Action, std::int64_t TimeNano, const std::map<std::string, std::string>& DockerAttributes) noexcept;
 
 private:
     enum class TransitionKind
@@ -213,8 +219,9 @@ private:
     __requires_exclusive_lock_held(m_lock) void RequestDeleteExclusiveLockHeld(WSLCDeleteFlags Flags);
 
     void AllocateBridgedModePorts();
-    void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::int64_t eventTimeNano) noexcept;
-    __requires_exclusive_lock_held(m_lock) [[nodiscard]] bool PrepareForUnexpectedStartLockHeld(std::int64_t eventTimeNano) noexcept;
+    void OnEvent(ContainerEvent event, std::optional<int> exitCode, const std::map<std::string, std::string>& attributes, std::int64_t eventTimeNano) noexcept;
+    __requires_exclusive_lock_held(m_lock)
+        [[nodiscard]] bool PrepareForUnexpectedStartLockHeld(std::int64_t eventTimeNano, const std::map<std::string, std::string>& attributes) noexcept;
 
     __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> StartTransition(TransitionKind kind, ContainerEvent expectedEvent);
 
@@ -249,7 +256,6 @@ private:
     __requires_exclusive_lock_held(m_lock) void ReleaseProcesses();
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect PrepareDisconnectComWrapper();
 
-    __requires_exclusive_lock_held(m_lock) [[nodiscard]] bool OnStopped(int exitCode, std::int64_t stopTimeNano);
     __requires_exclusive_lock_held(m_lock) void NotifyContainerStoppingLockHeld() noexcept;
     __requires_exclusive_lock_held(m_lock) void ArmPolicyRestartLockHeld();
 
@@ -263,6 +269,10 @@ private:
     // the timer callback must use nonblocking runtime-lock acquisition.
     static void CALLBACK PolicyRestartTimerCallback(PTP_CALLBACK_INSTANCE, PVOID context, PTP_TIMER) noexcept;
     __requires_lock_held(m_lock) bool PolicyRestartPendingLockHeld() const noexcept;
+    __requires_exclusive_lock_held(m_lock)
+        [[nodiscard]] bool OnStopped(int exitCode, const std::map<std::string, std::string>& attributes, std::int64_t stopTimeNano);
+
+    std::map<std::string, std::string> BuildEventAttributes() const;
 
     void SetExitCode(int ExitCode) noexcept;
     void SignalInitProcessExit() noexcept;
@@ -317,7 +327,7 @@ private:
     // held and must not be re-acquired.
     _Guarded_by_(m_lock) bool m_runtimeResourcesHeld = false;
 
-    wil::unique_threadpool_timer m_policyRestartTimer;
+    _Guarded_by_(m_lock) wil::unique_threadpool_timer m_policyRestartTimer;
 
     // The container outlives any single VM: it survives idle-termination and is reused when the VM
     // restarts. VM-scoped resources (Vm(), Docker(), Volumes(), Events(), Relay()) are therefore
@@ -327,6 +337,7 @@ private:
     std::int64_t m_stateChangedAt{static_cast<std::int64_t>(std::time(nullptr))};
     std::int64_t m_createdAt{};
     WSLCContainerState m_state = WslcContainerStateInvalid;
+    __guarded_by(m_lock) std::optional<std::map<std::string, std::string>> m_pendingStopAttributes;
 
     // Bumped on every state change so a thread that released m_lock can detect a state cycle, not just a difference.
     std::uint64_t m_stateGeneration{};

@@ -2457,6 +2457,10 @@ Windows 版本： {}</value>
     <value>無法將 --output 值 '{}' 的組建輸出寫入主控台。</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcBuildStdinContextAndDockerfile" xml:space="preserve">
+    <value>無法同時將 stdin 用於建置內容和 Dockerfile。</value>
+    <comment>{Locked="stdin"}{Locked="Dockerfile"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>缺少必要的選項: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2712,6 +2716,9 @@ Windows 版本： {}</value>
     <value>找不到 tar.exe。本機檔案複製需要 Windows tar。</value>
     <comment>{Locked="tar.exe"}</comment>
   </data>
+  <data name="WSLCCLI_CpStdoutIsTerminalError" xml:space="preserve">
+    <value>無法將複製輸出寫入主機。</value>
+  </data>
   <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
     <value>複製方向無效。使用 CONTAINER:PATH 作為來源或目的地。</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
@@ -2735,7 +2742,11 @@ Windows 版本： {}</value>
   </data>
   <data name="WSLCCLI_CpSourceNameNotRepresentableError" xml:space="preserve">
     <value>無法複製 '{0}'，因為其名稱不能用作 Windows 檔案名稱。</value>
-    <comment>{0} is the source path. Shown when the container source name holds a character that is not valid in a Windows file name.</comment>
+    <comment>{0} is the file name being copied. Shown when the name cannot be used as a Windows file name.</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceNameTrimmedWarning" xml:space="preserve">
+    <value>Windows 會從檔案名稱移除結尾空格和點，因此 '{}' 會複製為 '{}'。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>檢查容器。</value>
@@ -3456,7 +3467,8 @@ Windows 版本：{}</value>
     <value>已儲存映像的路徑</value>
   </data>
   <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
-    <value>建置內容目錄的路徑</value>
+    <value>建置內容目錄的路徑 (使用 "-" 從 stdin 讀取 tar 封存或 Dockerfile)</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
     <value>將來自容器的連接埠發佈至主機</value>
@@ -3861,6 +3873,10 @@ Windows 版本：{}</value>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>無法將影像寫入終端機。使用 -o 選項或重新導向 stdout。</value>
   </data>
+  <data name="WSLCCLI_BuildStdinIsTerminalError" xml:space="preserve">
+    <value>無法從終端機讀取建置輸入。請將 Dockerfile 或 tar 封存透過管線傳送至 stdin。</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
     <value>無法將容器匯出至終端機。使用 -o 選項或重新導向 stdout。</value>
   </data>
@@ -3949,6 +3965,30 @@ Windows 版本：{}</value>
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderRepository" xml:space="preserve">
+    <value>存放庫</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderTag" xml:space="preserve">
+    <value>標籤</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderDigest" xml:space="preserve">
+    <value>摘要</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderImageId" xml:space="preserve">
+    <value>影像識別碼</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderNetworkId" xml:space="preserve">
+    <value>網路識別碼</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderDriver" xml:space="preserve">
+    <value>驅動程式</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderScope" xml:space="preserve">
+    <value>範圍</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderVolumeName" xml:space="preserve">
+    <value>磁碟區名稱</value>
   </data>
   <data name="WSLCCLI_ContainerStateCreated" xml:space="preserve">
     <value>已建立</value>

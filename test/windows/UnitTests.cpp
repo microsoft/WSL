@@ -33,6 +33,7 @@ Abstract:
 #include "Distribution.h"
 #include "WslCoreConfigInterface.h"
 #include "WslCoreFilesystem.h"
+#include "WslSecurity.h"
 #include "CommandLine.h"
 #include "retryshared.h"
 
@@ -205,13 +206,6 @@ class UnitTests
 
     WSL2_TEST_METHOD(SystemdSystem)
     {
-        auto cleanup = wil::scope_exit([] {
-            // clean up wsl.conf file
-            const std::wstring disableSystemdCmd(LXSST_REMOVE_DISTRO_CONF_COMMAND_LINE);
-            LxsstuLaunchWsl(disableSystemdCmd);
-            TerminateDistribution();
-        });
-
         auto revert = EnableSystemd();
         VERIFY_IS_TRUE(IsSystemdRunning(L"--system"));
 
@@ -353,17 +347,111 @@ class UnitTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /tmp/.X11-unix"), 0L);
     }
 
-    WSL2_TEST_METHOD(BinfmtStatusIsLocked)
+    WSL2_TEST_METHOD(SystemdBinfmtIsRestored)
+    {
+        // Override WSL's binfmt interpreter
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkdir -p /usr/lib/binfmt.d && echo ':WSLInterop:M::MZ::/bin/echo:PF' > /usr/lib/binfmt.d/dummy.conf"), 0L);
+
+        auto cleanupBinfmt = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+            LxsstuLaunchWsl(L"rm /usr/lib/binfmt.d/dummy.conf");
+            WslShutdown(); // Required since this test registers a custom binfmt interpreter.
+        });
+
+        {
+            // Enable systemd (restarts distro).
+            auto cleanupSystemd = EnableSystemd();
+
+            auto validateBinfmt = []() {
+                const auto status = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/fs/binfmt_misc/status").first;
+                VERIFY_ARE_EQUAL(status, L"enabled\n");
+
+                // Validate that WSL's binfmt interpreter is still in place.
+                auto [cmdOutput, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
+                VERIFY_ARE_EQUAL(cmdOutput, L"ok\r\n");
+            };
+
+            validateBinfmt();
+
+            // Validate that this still works after restarting the distribution.
+            TerminateDistribution();
+            validateBinfmt();
+
+            // Validate that stopping or restarting systemd-binfmt doesn't break interop.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl stop systemd-binfmt.service"), 0u);
+            validateBinfmt();
+
+            auto restartBinfmt = [&]() {
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl restart systemd-binfmt.service"), 0u);
+                validateBinfmt();
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl is-active --quiet systemd-binfmt.service"), 0u);
+                const auto result =
+                    LxsstuLaunchWslAndCaptureOutput(L"systemctl show --property=Result --value systemd-binfmt.service").first;
+                VERIFY_ARE_EQUAL(result, L"success\n");
+            };
+
+            restartBinfmt();
+
+            // Validate that the unit is regenerated after a daemon-reload.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl daemon-reload"), 0u);
+            restartBinfmt();
+
+            // Exercise both hooks independently of the distro's systemd-binfmt exit behavior.
+            constexpr auto overridePath = L"/run/systemd/system/systemd-binfmt.service.d/wsl-test.conf";
+            auto cleanupOverride = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                LxsstuLaunchWsl(std::format(L"rm -f {} && systemctl daemon-reload", overridePath));
+            });
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkdir -p /run/systemd/system/systemd-binfmt.service.d"), 0u);
+            for (const bool failStartup : {false, true})
+            {
+                VERIFY_ARE_EQUAL(
+                    LxsstuLaunchWsl(std::format(
+                        L"printf '[Service]\\nExecStart=\\nExecStart=/bin/{}\\n' > {} && systemctl daemon-reload",
+                        failStartup ? L"false" : L"true",
+                        overridePath)),
+                    0u);
+                VERIFY_ARE_EQUAL(
+                    LxsstuLaunchWsl(L"echo -1 > /proc/sys/fs/binfmt_misc/WSLInterop && "
+                                    L"echo ':WSLInterop:M::MZ::/bin/echo:PF' > /proc/sys/fs/binfmt_misc/register"),
+                    0u);
+
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl restart systemd-binfmt.service"), failStartup ? 1u : 0u);
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl is-failed --quiet systemd-binfmt.service"), failStartup ? 0u : 1u);
+                validateBinfmt();
+
+                if (!failStartup)
+                {
+                    // A normal stop must not re-register the entry.
+                    const auto inodeBefore = LxsstuLaunchWslAndCaptureOutput(L"stat -c %i /proc/sys/fs/binfmt_misc/WSLInterop").first;
+                    VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl stop systemd-binfmt.service"), 0u);
+                    const auto inodeAfter = LxsstuLaunchWslAndCaptureOutput(L"stat -c %i /proc/sys/fs/binfmt_misc/WSLInterop").first;
+                    VERIFY_ARE_EQUAL(inodeBefore, inodeAfter);
+                    validateBinfmt();
+                }
+            }
+        }
+
+        {
+            // Enable systemd (restarts distro).
+            auto cleanupSystemd = EnableSystemd("protectBinfmt=false");
+
+            // Validate that WSL's binfmt interpreter is overridden
+            auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
+            VERIFY_IS_TRUE(wsl::shared::string::IsEqual(output, L"/mnt/c/Windows/system32/cmd.exe cmd.exe /c echo ok\n", true));
+        }
+    }
+
+    WSL2_TEST_METHOD(BinfmtStatusIsProtected)
     {
         //
         // Validates the protection mechanism for the cross-distro binfmt wipe bug.
         //
-        // Fix: per-distro init bind-mounts a read-only file over
+        // Fix: per-distro init bind-mounts a writable regular file over
         // /proc/sys/fs/binfmt_misc/status before exec'ing the distro's init
-        // (see LockBinfmtStatusReadOnly in src/linux/init/init.cpp). systemd-shutdown's
+        // (see ProtectBinfmtStatus in src/linux/init/init.cpp). systemd-shutdown's
         // disable_binfmt() writes "-1" to that file to clear the kernel-global
         // binfmt_misc table at shutdown; with the bind-mount in place the write
-        // fails with EROFS so the entries shared with other running distros
+        // only changes the shadow file, so entries shared with other running distros
         // survive. Per-entry operations (registering new entries via /register,
         // unregistering individual entries via the entry file) are unaffected.
         //
@@ -379,26 +467,7 @@ class UnitTests
             // /status is its own mount point.
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mountpoint -q /proc/sys/fs/binfmt_misc/status"), 0u);
 
-            // Reading /status returns the lock-file content ("enabled\n") so
-            // callers that just check whether binfmt_misc is enabled still get a
-            // sensible answer.
-            {
-                auto [status, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/fs/binfmt_misc/status");
-                VERIFY_ARE_EQUAL(status, L"enabled\n");
-            }
-
-            // Direct write to /status — the wipe vector — must fail with EROFS.
-            // The shell's redirection error ("cannot create ...: Read-only file
-            // system") goes to the shell's stderr when the `>` open fails.
-            {
-                auto [_, err] = LxsstuLaunchWslAndCaptureOutput(L"sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/status; exit 0'");
-                VERIFY_IS_TRUE(err.find(L"Read-only file system") != std::wstring::npos);
-            }
-
-            // WSLInterop survives the failed wipe attempt.
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -e /proc/sys/fs/binfmt_misc/WSLInterop"), 0L);
-
-            // Runtime registration via /register still works (we only block /status).
+            // Runtime registration via /register still works (we only shadow /status).
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sh -c 'echo \":wsltestbinfmt:M::WSLTESTMAGIC::/bin/echo:\" > /proc/sys/fs/binfmt_misc/register'"), 0L);
 
             // binfmt_misc is VM-global, so a leftover wsltestbinfmt entry would
@@ -408,6 +477,18 @@ class UnitTests
             });
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -e /proc/sys/fs/binfmt_misc/wsltestbinfmt"), 0L);
+
+            // Clear/disable/enable writes succeed but affect only the shadow file.
+            for (const auto* value : {L"-1", L"0", L"1"})
+            {
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"echo {} > /proc/sys/fs/binfmt_misc/status", value)), 0L);
+                const auto status = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/fs/binfmt_misc/status").first;
+                VERIFY_ARE_EQUAL(status, std::format(L"{}\n", value));
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -e /proc/sys/fs/binfmt_misc/WSLInterop"), 0L);
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -e /proc/sys/fs/binfmt_misc/wsltestbinfmt"), 0L);
+                const auto cmd = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok").first;
+                VERIFY_ARE_EQUAL(cmd, L"ok\r\n");
+            }
 
             // Per-entry unregister (writing -1 to the entry file, not /status) still works.
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/wsltestbinfmt'"), 0L);
@@ -425,7 +506,7 @@ class UnitTests
         // EnableSystemd's cleanup re-launches the distro to revert wsl.conf and
         // then terminates it; that termination invokes systemd-shutdown's
         // disable_binfmt() which wipes the kernel-global table because
-        // protectBinfmt=false leaves /status writable. WslShutdown registered
+        // protectBinfmt=false exposes the real kernel /status. WslShutdown registered
         // FIRST (runs LAST in LIFO unwind) ensures the VM is fully torn down
         // after the wipe, so the next test starts a fresh VM where mini_init
         // re-registers WSLInterop.
@@ -500,13 +581,7 @@ class UnitTests
         auto cleanupPeer =
             wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"--unregister {}", peerDistroName)); });
 
-        // Enable systemd in the peer distro (no helper exists for non-test distros).
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(std::format(L"-d {} -- sh -c \"mkdir -p /etc && printf '[boot]\\nsystemd=true\\n' > /etc/wsl.conf\"", peerDistroName)),
-            0L);
-
-        // Terminate so the config takes effect on next start.
-        TerminateDistribution(peerDistroName);
+        auto cleanupPeerSystemd = EnableSystemd("", peerDistroName);
 
         // Verify interop works in both distros (this also starts the peer with systemd).
         {
@@ -858,6 +933,7 @@ class UnitTests
 
         const auto wslSupport =
             wil::CoCreateInstance<LxssUserSession, IWslSupport>(CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA);
+        wsl::windows::common::security::ConfigureForCOMImpersonation(wslSupport.get());
 
         ULONG Version;
         ULONG DefaultUid;
@@ -999,7 +1075,7 @@ class UnitTests
             WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::None}));
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'none'"), 0u);
 
-            if (AreExperimentalNetworkingFeaturesSupported() && IsHyperVFirewallSupported())
+            if (IsMirroredNetworkingSupported())
             {
                 config.Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
                 VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'mirrored'"), 0u);
@@ -1708,6 +1784,54 @@ class UnitTests
         VerifyOutput(L"--exec echo -n \\\"", L"\"");
     }
 
+    TEST_METHOD(CommandsRejectExtraArguments)
+    {
+        for (const auto* command :
+             {L"--debug-shell",
+              L"--help",
+              L"--status",
+              L"--version",
+              L"-v",
+              L"--set-default DoesNotExist",
+              L"--setdefault DoesNotExist",
+              L"-s DoesNotExist",
+              L"--terminate DoesNotExist",
+              L"-t DoesNotExist",
+              L"--unregister DoesNotExist",
+              L"--set-default-version 2",
+              L"--set-version DoesNotExist 2"})
+        {
+            for (const auto& [arguments, invalidArgument] :
+                 {std::pair{L"extra", L"extra"},
+                  std::pair{L"extra another", L"extra"},
+                  std::pair{L"--unexpected", L"--unexpected"},
+                  std::pair{L"\"extra argument\"", L"\"extra argument\""},
+                  std::pair{L"\"\"", L"\"\""}})
+            {
+                auto [output, error] = LxsstuLaunchWslAndCaptureOutput(std::format(L"{} {}", command, arguments), -1);
+
+                VERIFY_ARE_EQUAL(
+                    FormatErrorMessage(
+                        std::format(
+                            L"Invalid command line argument: {}\r\n"
+                            L"Please use 'wsl.exe --help' to get a list of supported arguments.",
+                            invalidArgument),
+                        L"Wsl/E_INVALIDARG"),
+                    output);
+
+                VERIFY_ARE_EQUAL(L"", error);
+            }
+        }
+
+        for (const auto* command : {L"--status", L"--version", L"-v"})
+        {
+            const auto [output, error] = LxsstuLaunchWslAndCaptureOutput(command);
+            VerifyOutput(std::format(L"{} \t ", command), output);
+        }
+
+        VerifyOutput(L"--help \t ", ExpectedUsageMessage(), -1);
+    }
+
     TEST_METHOD(ManageInvalidUsage)
     {
         VerifyInvalidUsage(L"--manage " LXSS_DISTRO_NAME_TEST_L L" --compact --resize 10GB");
@@ -2113,14 +2237,11 @@ Usage:
 
     TEST_METHOD(Hostname)
     {
-        auto cleanup = wil::scope_exit([] {
-            LxsstuLaunchWsl(LXSST_REMOVE_DISTRO_CONF_COMMAND_LINE);
+        auto cleanup = wil::scope_exit([] { TerminateDistribution(); });
+        DistroFileChange config(L"/etc/wsl.conf", false);
 
-            TerminateDistribution();
-        });
-
-        auto validate = [](const std::string& input, const std::wstring& expectedOutput) {
-            LxssWriteWslDistroConfig("[network]\nhostname=" + input);
+        auto validate = [&config](const std::string& input, const std::wstring& expectedOutput) {
+            config.SetContent(wsl::shared::string::MultiByteToWide("[network]\nhostname=" + input).c_str());
             TerminateDistribution();
 
             auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"hostname");
@@ -4945,7 +5066,18 @@ VERSION_ID="Invalid|Format"
         const auto testDistroIdString = wsl::shared::string::GuidToString<wchar_t>(testDistroId.value());
 
         DistroFileChange distributionconf(L"/etc/wsl-distribution.conf", false);
-        distributionconf.SetContent(L"[oobe]\ncommand = /bin/bash -c 'echo OOBE'\n");
+        constexpr auto manifest =
+            L"[oobe]\n"
+            L"command = /bin/bash -c 'echo OOBE'\n"
+            L"defaultUid = 0\n"
+            L"defaultName = test-default-name\n"
+            L"[shortcut]\n"
+            L"icon = /icon.ico\n"
+            L"enabled = false\n"
+            L"[windowsterminal]\n"
+            L"ProfileTemplate = /terminal.json\n"
+            L"enabled = false\n";
+        distributionconf.SetContent(manifest);
 
         GUID runId;
         THROW_IF_FAILED(CoCreateGuid(&runId));
@@ -4955,6 +5087,15 @@ VERSION_ID="Invalid|Format"
         auto cleanupDrvFsTestPath = wil::scope_exit([&]() {
             std::error_code ignored;
             std::filesystem::remove_all(drvFsTestPath, ignored);
+        });
+
+        auto cleanupUser = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+            TerminateDistribution();
+
+            const auto exitCode = LxsstuLaunchWsl(L"userdel -f -r user");
+
+            // The test may fail before OOBE creates the user (userdel exits with 6 if it does not exist).
+            VERIFY_IS_TRUE(exitCode == 0 || exitCode == 6);
         });
 
         RegistryKeyChange<DWORD> runOOBE(lxssKey.get(), testDistroIdString.c_str(), L"RunOOBE", 1);
@@ -4982,11 +5123,21 @@ VERSION_ID="Invalid|Format"
             validateOutput(L"echo no oobe", L"no oobe\n");
             VERIFY_ARE_EQUAL(runOOBE.Get(), 1);
 
-            // Interactive shell should trigger OOBE
+            // Interactive shell should trigger OOBE without warnings for any supported manifest keys.
             validateOutput(nullptr, L"OOBE\n");
             VERIFY_ARE_EQUAL(runOOBE.Get(), 0);
 
             // OOBE should only trigger once
+            validateOutput(L"", L"");
+        }
+
+        {
+            runOOBE.Set(1);
+            distributionconf.SetContent((std::wstring(manifest) + L"[unknown]\nkey = value\n").c_str());
+            TerminateDistribution();
+
+            validateOutput(nullptr, L"OOBE\n", L"wsl: Unknown key 'unknown.key' in /etc/wsl-distribution.conf:12\n");
+            VERIFY_ARE_EQUAL(runOOBE.Get(), 0);
             validateOutput(L"", L"");
         }
 
@@ -5027,7 +5178,7 @@ VERSION_ID="Invalid|Format"
 
             if (LxsstuVmMode())
             {
-                fstab.emplace(L"/etc/fstab");
+                fstab.emplace(L"/etc/fstab", false);
                 fstab->SetContent(
                     std::format(L"{} {} drvfs uid=2000,gid=2001,x-mount.mkdir 0 0\n", drvFsTestPath.root_path().generic_wstring(), userMountPoint)
                         .c_str());
@@ -5125,9 +5276,6 @@ VERSION_ID="Invalid|Format"
             VERIFY_ARE_EQUAL(wsl::windows::common::registry::ReadDword(distroKey.get(), nullptr, L"RunOOBE", 1), 0);
             validateOutput(nullptr, L"");
         }
-
-        // Make sure the defaultUid is reset for next test case.
-        TerminateDistribution();
     }
 
     static void ValidateDistributionStarts(LPCWSTR Name)
@@ -7046,6 +7194,39 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_IS_TRUE(getCaseSensitivity(testDir));
     }
 
+    TEST_METHOD(CaseSensitivityDeepNesting)
+    {
+        // Regression test for stack overflow in EnsureCaseSensitiveDirectoryRecursive on deeply
+        // nested directory trees. The original recursive DFS implementation could blow the
+        // 1 MB Windows thread stack at a few hundred levels of nesting (each frame held a
+        // FILE_ID_BOTH_DIR_INFORMATION buffer plus locals); the iterative implementation must
+        // succeed at depths well beyond that without consuming caller stack space.
+
+        constexpr auto testDir = L"deep-case-test";
+        constexpr int depth = 1024;
+        constexpr auto flags = wsl::windows::common::filesystem::c_case_sensitive_folders_only | LXSS_CREATE_INSTANCE_FLAGS_ALLOW_FS_UPGRADE;
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+            // The deep tree exceeds MAX_PATH; remove it via the long-path prefix so the
+            // remove walk can see every component.
+            std::error_code ec;
+            std::filesystem::remove_all(std::format(L"\\\\?\\{}\\{}", std::filesystem::current_path().wstring(), testDir), ec);
+        });
+
+        // Build the deep chain via the \\?\ long-path prefix because the cumulative path
+        // length goes well past MAX_PATH.
+        auto deepPath = std::format(L"\\\\?\\{}\\{}", std::filesystem::current_path().wstring(), testDir);
+        for (int i = 0; i < depth; ++i)
+        {
+            deepPath += std::format(L"\\d{}", i);
+        }
+
+        std::filesystem::create_directories(deepPath);
+
+        // Should not crash with a stack overflow regardless of tree depth.
+        wsl::windows::common::filesystem::EnsureCaseSensitiveDirectory(testDir, flags);
+    }
+
     TEST_METHOD(AutomountRespectedWithElevation)
     {
         DistroFileChange distributionconf(L"/etc/wsl.conf", false);
@@ -7474,6 +7655,18 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, L"Version", LXSS_DISTRO_VERSION_2);
         wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, L"State", LxssDistributionStateInstalled);
         wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, L"Flags", LXSS_DISTRO_FLAGS_VM_MODE);
+
+        auto [invalidOutput, invalidError] = LxsstuLaunchWslAndCaptureOutput(L"--unregister DummyBrokenDistro extra another", -1);
+
+        VERIFY_ARE_EQUAL(
+            FormatErrorMessage(
+                L"Invalid command line argument: extra\r\n"
+                L"Please use 'wsl.exe --help' to get a list of supported arguments.",
+                L"Wsl/E_INVALIDARG"),
+            invalidOutput);
+
+        VERIFY_ARE_EQUAL(L"", invalidError);
+        VERIFY_IS_TRUE(GetDistributionId(L"DummyBrokenDistro").has_value());
 
         auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"--unregister DummyBrokenDistro");
 
@@ -8312,6 +8505,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         std::optional<decltype(EnableSystemd())> systemdCleanup;
         std::optional<decltype(EnableSystemd())> systemdCleanup2;
         std::optional<DistroFileChange> cgroupConfig;
+        std::optional<DistroFileChange> cgroupConfig2;
         if (systemd)
         {
             systemdCleanup.emplace(EnableSystemd());
@@ -8322,7 +8516,8 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         {
             cgroupConfig.emplace(L"/etc/wsl.conf", false);
             cgroupConfig->SetContent(L"[automount]\ncgroups=v1\n");
-            LxssWriteWslDistroConfig("[automount]\ncgroups=v1\n", secondDistroName);
+            cgroupConfig2.emplace(L"/etc/wsl.conf", false, secondDistroName);
+            cgroupConfig2->SetContent(L"[automount]\ncgroups=v1\n");
             TerminateDistribution();
             TerminateDistribution(secondDistroName);
 

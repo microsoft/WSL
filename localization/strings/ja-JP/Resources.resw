@@ -2457,6 +2457,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>--output 値 '{}' のビルド出力をコンソールに書き込むことはできません。</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcBuildStdinContextAndDockerfile" xml:space="preserve">
+    <value>ビルド コンテキストと Dockerfile の両方に対し stdin を使用できません。</value>
+    <comment>{Locked="stdin"}{Locked="Dockerfile"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>必須のオプションがありません: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2712,6 +2716,9 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>tar.exe 見つかりません。ローカル ファイルのコピーには Windows tar が必要です。</value>
     <comment>{Locked="tar.exe"}</comment>
   </data>
+  <data name="WSLCCLI_CpStdoutIsTerminalError" xml:space="preserve">
+    <value>コピー出力をコンソールに書き込めません。</value>
+  </data>
   <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
     <value>コピーの方向が無効です。ソースまたは宛先のいずれかに CONTAINER:PATH を使用してください。</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
@@ -2735,7 +2742,11 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   </data>
   <data name="WSLCCLI_CpSourceNameNotRepresentableError" xml:space="preserve">
     <value>名前を Windows ファイル名として使用できないため、'{0}' をコピーできません。</value>
-    <comment>{0} is the source path. Shown when the container source name holds a character that is not valid in a Windows file name.</comment>
+    <comment>{0} is the file name being copied. Shown when the name cannot be used as a Windows file name.</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceNameTrimmedWarning" xml:space="preserve">
+    <value>Windows ではファイル名の末尾のスペースとドットが削除されるため、'{}' は '{}' としてコピーされます。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>コンテナーを検査します。</value>
@@ -3456,7 +3467,8 @@ Windows バージョン: {}</value>
     <value>保存されたイメージのパス</value>
   </data>
   <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
-    <value>ビルド コンテキスト ディレクトリへのパス</value>
+    <value>ビルド コンテキスト ディレクトリへのパスです (stdin から tar アーカイブまたは Dockerfile を読み取るには "-" を使用します)</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
     <value>コンテナーからホストへのポートを公開します</value>
@@ -3861,6 +3873,10 @@ Windows バージョン: {}</value>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>イメージをターミナルに書き込めません。-o オプションを使用するか、stdout をリダイレクトします。</value>
   </data>
+  <data name="WSLCCLI_BuildStdinIsTerminalError" xml:space="preserve">
+    <value>ターミナルからビルド入力を読み取れません。Dockerfile または tar アーカイブを stdin にパイプしてください。</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
     <value>コンテナーをターミナルにエクスポートできません。-o オプションを使用するか、stdout をリダイレクトします。</value>
   </data>
@@ -3949,6 +3965,30 @@ Windows バージョン: {}</value>
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderRepository" xml:space="preserve">
+    <value>リポジトリ</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderTag" xml:space="preserve">
+    <value>タグ</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderDigest" xml:space="preserve">
+    <value>ダイジェスト</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderImageId" xml:space="preserve">
+    <value>画像 ID</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderNetworkId" xml:space="preserve">
+    <value>ネットワーク ID</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderDriver" xml:space="preserve">
+    <value>ドライバー</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderScope" xml:space="preserve">
+    <value>スコープ</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderVolumeName" xml:space="preserve">
+    <value>ボリューム名</value>
   </data>
   <data name="WSLCCLI_ContainerStateCreated" xml:space="preserve">
     <value>作成しました</value>

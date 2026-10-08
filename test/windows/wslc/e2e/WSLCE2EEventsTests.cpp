@@ -144,7 +144,7 @@ class WSLCE2EEventsTests
         const auto until = EpochSeconds() + 1;
         result = RunWslc(std::format(
             L"events --since {} --until {} --filter type=container --filter container={} --filter image={} "
-            L"--filter event=create --filter event=start --filter event=stop --filter event=destroy",
+            L"--filter event=create --filter event=start --filter event=die --filter event=destroy",
             since,
             until,
             containerId,
@@ -155,9 +155,22 @@ class WSLCE2EEventsTests
         VERIFY_ARE_EQUAL(4u, lines.size());
         VerifyEventLine(lines[0], std::format(L" container create {} (image={}, name={})", containerId, DebianImage.NameAndTag(), c_eventContainerName));
         VerifyEventLine(lines[1], std::format(L" container start {} (image={}, name={})", containerId, DebianImage.NameAndTag(), c_eventContainerName));
+
+        // execDuration is how long the container ran, so it's read from the line rather than predicted.
+        const auto execDurationStart = lines[2].find(L"execDuration=");
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, execDurationStart);
+        const auto execDurationValueStart = execDurationStart + wcslen(L"execDuration=");
+        const auto execDuration =
+            lines[2].substr(execDurationValueStart, lines[2].find(L',', execDurationValueStart) - execDurationValueStart);
         VerifyEventLine(
             lines[2],
-            std::format(L" container stop {} (exitCode={}, image={}, name={})", containerId, 128 + WSLCSignalSIGKILL, DebianImage.NameAndTag(), c_eventContainerName));
+            std::format(
+                L" container die {} (execDuration={}, exitCode={}, image={}, name={})",
+                containerId,
+                execDuration,
+                128 + WSLCSignalSIGKILL,
+                DebianImage.NameAndTag(),
+                c_eventContainerName));
         VerifyEventLine(lines[3], std::format(L" container destroy {} (image={}, name={})", containerId, DebianImage.NameAndTag(), c_eventContainerName));
     }
 
@@ -168,16 +181,29 @@ class WSLCE2EEventsTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto containerId = result.GetStdoutOneLine();
 
+        result = RunWslc(std::format(L"container start {}", containerId));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container kill {}", containerId));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
         result = RunWslc(std::format(L"container rm {}", containerId));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"events --since {} --until {} --filter container={} --format json", since, EpochSeconds() + 1, containerId));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
+        const std::vector<std::string> expectedActions{"create", "start", "kill", "die", "destroy"};
         const auto events = ParseNdjsonOutput(result);
-        VERIFY_ARE_EQUAL(2u, events.size());
-        VERIFY_ARE_EQUAL(std::string{"create"}, events[0].at("Action").get<std::string>());
-        VERIFY_ARE_EQUAL(std::string{"destroy"}, events[1].at("Action").get<std::string>());
+        VERIFY_ARE_EQUAL(expectedActions.size(), events.size());
+
+        for (size_t i = 0; i < events.size(); ++i)
+        {
+            VERIFY_ARE_EQUAL(expectedActions[i], events[i].at("Action").get<std::string>());
+        }
+
+        VERIFY_ARE_EQUAL(std::to_string(128 + WSLCSignalSIGKILL), events[3].at("Actor").at("Attributes").at("exitCode").get<std::string>());
+        VERIFY_IS_TRUE(events[3].at("Actor").at("Attributes").contains("execDuration"));
 
         for (const auto& event : events)
         {
@@ -194,6 +220,100 @@ class WSLCE2EEventsTests
 
             const auto timeNano = event.at("timeNano").get<std::int64_t>();
             VERIFY_IS_GREATER_THAN(timeNano, 0LL);
+            VERIFY_ARE_EQUAL(timeNano / 1'000'000'000, event.at("time").get<std::int64_t>());
+        }
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Events_ContainerHealth)
+    {
+        const auto since = EpochSeconds();
+        auto result = RunWslc(std::format(
+            LR"(container create --health-cmd "test -f /tmp/healthy" --health-interval 1s --health-timeout 3s --health-retries 1 --name {} {} sleep infinity)",
+            c_eventContainerName,
+            DebianImage.NameAndTag()));
+
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto containerId = result.GetStdoutOneLine();
+        const auto filters = std::format(
+            LR"(--filter type=container --filter container={} --filter event=create --filter event=start --filter event=stop --filter "event=health_status: healthy" --filter "event=health_status: unhealthy")",
+            containerId);
+
+        auto events = RunWslcInteractive(
+            std::format(L"events --since {} {}", since, filters), ElevationType::Elevated, std::nullopt, ProcessGroup::Create);
+
+        auto stopReader = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            if (events.IsRunning())
+            {
+                events.SendCtrlBreak();
+            }
+        });
+
+        const auto expectedEvent = [&](std::wstring_view action) {
+            return std::format(L" container {} {} (image={}, name={})", action, containerId, DebianImage.NameAndTag(), c_eventContainerName);
+        };
+
+        const auto createEvent = expectedEvent(L"create");
+        WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(createEvent));
+
+        RunWslc(std::format(L"container start {}", containerId)).Verify({.Stderr = L"", .ExitCode = 0});
+        const auto startEvent = expectedEvent(L"start");
+        WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(startEvent));
+
+        const auto unhealthyEvent = expectedEvent(L"health_status: unhealthy");
+        WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(unhealthyEvent));
+        VerifyContainerIsListed(containerId, L"running");
+
+        RunWslc(std::format(L"container exec {} touch /tmp/healthy", containerId)).Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto healthyEvent = expectedEvent(L"health_status: healthy");
+        WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(healthyEvent));
+        VerifyContainerIsListed(containerId, L"running");
+
+        RunWslc(std::format(L"container stop {} -t 0", containerId)).Verify({.Stderr = L"", .ExitCode = 0});
+        const auto stopEvent = expectedEvent(L"stop");
+        WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(stopEvent));
+        VerifyContainerIsListed(containerId, L"exited");
+
+        stopReader.reset();
+        VERIFY_ARE_EQUAL(0, events.Wait());
+
+        events.VerifyNoErrors();
+
+        const WSLCExecutionResult output{.Stdout = wsl::shared::string::MultiByteToWide(events.GetStdoutData())};
+        const auto lines = output.GetStdoutLines();
+        const std::vector<std::wstring> expected{createEvent, startEvent, unhealthyEvent, healthyEvent, stopEvent};
+        VERIFY_ARE_EQUAL(expected.size(), lines.size());
+        for (size_t index = 0; index < expected.size(); ++index)
+        {
+            VerifyEventLine(lines[index], expected[index]);
+        }
+
+        result = RunWslc(std::format(L"events --since {} --until {} {} --format json", since, EpochSeconds() + 1, filters));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto history = ParseNdjsonOutput(result);
+
+        const std::vector<std::string> expectedActions{
+            "create", "start", "health_status: unhealthy", "health_status: healthy", "stop"};
+        VERIFY_ARE_EQUAL(expectedActions.size(), history.size());
+
+        for (size_t index = 0; index < history.size(); ++index)
+        {
+            const auto& event = history[index];
+            VERIFY_ARE_EQUAL(expectedActions[index], event.at("Action").get<std::string>());
+            VERIFY_ARE_EQUAL(std::string{"container"}, event.at("Type").get<std::string>());
+            VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(containerId), event.at("Actor").at("ID").get<std::string>());
+
+            const auto& attributes = event.at("Actor").at("Attributes");
+            VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(c_eventContainerName), attributes.at("name").get<std::string>());
+            VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(DebianImage.NameAndTag()), attributes.at("image").get<std::string>());
+            VERIFY_IS_FALSE(attributes.contains("exitCode"));
+
+            VERIFY_ARE_EQUAL(event.at("Action").get<std::string>(), event.at("status").get<std::string>());
+
+            const auto timeNano = event.at("timeNano").get<std::int64_t>();
+            VERIFY_IS_GREATER_THAN_OR_EQUAL(timeNano, since * 1'000'000'000);
             VERIFY_ARE_EQUAL(timeNano / 1'000'000'000, event.at("time").get<std::int64_t>());
         }
     }
@@ -356,12 +476,69 @@ class WSLCE2EEventsTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Events_FilteredReplayAndLiveOutput)
+    {
+        // A per-run label value keeps events from an earlier run of this test out of the stream.
+        GUID runId{};
+        VERIFY_SUCCEEDED(CoCreateGuid(&runId));
+        const auto label =
+            L"wslc.events.filter=" + wsl::shared::string::GuidToString<wchar_t>(runId, wsl::shared::string::GuidToStringFlags::None);
+
+        const auto since = EpochSeconds();
+        auto result = RunWslc(
+            std::format(L"container create --name {} --label {} {} sleep 60", c_eventContainerName, label, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto containerId = result.GetStdoutOneLine();
+
+        // The container is selected by a prefix of its name, its image without the tag, and its label.
+        auto events = RunWslcInteractive(
+            std::format(
+                L"events --since {} --filter container=wslc-events-te --filter image={} --filter label={} "
+                L"--filter event=create --filter event=start",
+                since,
+                DebianImage.Name,
+                label),
+            ElevationType::Elevated,
+            std::nullopt,
+            ProcessGroup::Create);
+
+        auto stopReader = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            if (events.IsRunning())
+            {
+                events.SendCtrlBreak();
+            }
+        });
+
+        const auto expectedEvent = [&](std::wstring_view action) {
+            return std::format(L" container {} {} (image={}, name={}, {})", action, containerId, DebianImage.NameAndTag(), c_eventContainerName, label);
+        };
+
+        // The create event was recorded before the stream opened, so it's replayed.
+        const auto createEvent = expectedEvent(L"create");
+        WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(createEvent));
+
+        // The start event happens after the stream opened, so it's delivered live.
+        RunWslc(std::format(L"container start {}", containerId)).Verify({.Stderr = L"", .ExitCode = 0});
+        const auto startEvent = expectedEvent(L"start");
+        WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(startEvent));
+
+        stopReader.reset();
+        VERIFY_ARE_EQUAL(0, events.Wait());
+        events.VerifyNoErrors();
+
+        const WSLCExecutionResult output{.Stdout = wsl::shared::string::MultiByteToWide(events.GetStdoutData())};
+        const auto lines = output.GetStdoutLines();
+        VERIFY_ARE_EQUAL(2u, lines.size());
+        VerifyEventLine(lines[0], createEvent);
+        VerifyEventLine(lines[1], startEvent);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Events_RejectsUnsupportedFilter)
     {
         auto session = OpenDefaultElevatedSession();
         for (const auto* command : {L"events", L"system events"})
         {
-            for (const auto* key : {L"unsupported", L"label", L""})
+            for (const auto* key : {L"unsupported", L""})
             {
                 const auto result = RunWslc(std::format(L"{} --filter {}=test", command, key));
                 result.Verify({.Stdout = L"", .ExitCode = 1});

@@ -28,6 +28,7 @@ Abstract:
 
 using namespace wsl::windows::wslc;
 using namespace wsl::windows::wslc::cli;
+using namespace wsl::windows::cli::table;
 using namespace WSLCTestHelpers;
 using namespace WEX::Logging;
 using namespace WEX::Common;
@@ -912,6 +913,16 @@ class WSLCCLIExecutionUnitTests
             else if (dataType == Data::ConfirmMessage)
             {
                 dataMap.Add<Data::ConfirmMessage>(std::wstring{L"message"});
+                handled = true;
+            }
+            else if (dataType == Data::Table)
+            {
+                dataMap.Add<Data::Table>(wsl::windows::cli::table::TableData{L"HEADER"});
+                handled = true;
+            }
+            else if (dataType == Data::Json)
+            {
+                dataMap.Add<Data::Json>(std::vector<std::wstring>{});
                 handled = true;
             }
 
