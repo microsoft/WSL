@@ -2458,7 +2458,7 @@ Per informazioni sulla privacy di questo prodotto, visita https://aka.ms/privacy
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcBuildStdinContextAndDockerfile" xml:space="preserve">
-    <value>Can't use stdin for both the build context and the Dockerfile.</value>
+    <value>Non è possibile usare stdin sia per il contesto di compilazione sia per il Dockerfile.</value>
     <comment>{Locked="stdin"}{Locked="Dockerfile"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
@@ -3874,7 +3874,7 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Non è possibile scrivere l'immagine nel terminale. Utilizzare l'opzione -o o reindirizzare stdout.</value>
   </data>
   <data name="WSLCCLI_BuildStdinIsTerminalError" xml:space="preserve">
-    <value>Cannot read build input from terminal. Pipe a Dockerfile or tar archive to stdin.</value>
+    <value>Non è possibile leggere l'input della compilazione dal terminale. Reindirizza a stdin un Dockerfile o un archivio tar.</value>
     <comment>{Locked="Dockerfile"}{Locked="stdin"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
