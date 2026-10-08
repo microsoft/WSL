@@ -152,6 +152,12 @@ When adding settings to `src/shared/configfile/`:
 - Report invalid values with `EMIT_USER_WARNING(Localization::MessageConfigXxx(...))`
 - New settings require a corresponding localization string in Resources.resw
 
+## Architecture
+
+- `wsl.exe` is a thin entry point into `src/windows/common/WslClient.cpp`. Client commands reach the SYSTEM `wslservice.exe` through the internal COM interfaces in `src/windows/service/inc/wslservice.idl`; `LxssUserSession` owns per-user distribution operations.
+- For WSL2, the service creates/manages the VM through HCS in `WslCoreVm.cpp` and communicates over hvsockets with Linux `mini_init`. `mini_init` configures the VM, starts `gns` for networking, and launches a per-distribution `init`; the service's `WslCoreInstance` talks to that `init` to launch sessions. The session leader launches a relay and the requested Linux process; Windows client I/O is relayed over hvsockets. Shared wire messages live in `src/shared/inc/lxinitshared.h` and use `SocketChannel`.
+- `src/windows/wslc/` contains the container CLI, `src/windows/wslcsession/` the container session process, and the service hosts its session manager; their internal interface is `wslc.idl`. The SDK-facing compatibility contract is separate (`WSLCCompat.idl`). See `doc/docs/technical-documentation/index.md` and `boot-process.md` for the process and boot diagrams.
+
 ## Repository Navigation
 
 ### Key Directories
@@ -209,7 +215,7 @@ When adding settings to `src/shared/configfile/`:
 - Enable Developer Mode in Windows Settings OR run with Administrator privileges (required for symbolic link support)
 
 ### Building WSL (Windows Only)
-1. Clone the repository
+1. Install prerequisites with `tools\setup-dev-env.ps1` (or follow `doc/docs/dev-loop.md` and `.vsconfig`)
 2. Generate Visual Studio solution: `cmake .`
 3. Build: `cmake --build . -- -m` OR open `wsl.sln` in Visual Studio
 
@@ -251,7 +257,7 @@ bin\<platform>\<target>\test.bat
 Test execution:
 - Run all tests: `bin\<platform>\<target>\test.bat`
 - Run subset: `bin\<platform>\<target>\test.bat /name:*UnitTest*`
-- Run specific test: `bin\<platform>\<target>\test.bat /name:<class>::<test>`
+- Run specific test: `bin\<platform>\<target>\test.bat /name:<class>::<test>` (for example, `bin\x64\debug\test.bat /name:UnitTests::UnitTests::ModernInstall`)
 - WSL1 tests: Add `-Version 1` flag
 - Fast mode (after first run): Add `-f` flag (requires `wsl --set-default test_distro`)
 - **Requires Administrator privileges**
@@ -276,7 +282,8 @@ Test debugging:
 - **Note**: May show warnings about mermaid CDN access on restricted networks
 
 ### Code Formatting and Validation
-- Format all source (Windows, requires `cmake .` first): `.\FormatSource.ps1`
+- Format modified source (Windows, requires `cmake .` first): `.\FormatSource.ps1`
+- Format all source: `.\FormatSource.ps1 -ModifiedOnly $false`; format/check files touched by the branch: `.\FormatSource.ps1 -Branch` / `.\FormatSource.ps1 -Branch -Verify $true` (defaults to local `master`; use `-BaseBranch` if needed)
 - Format check (Linux/cross-platform): `clang-format --dry-run --style=file <files>`
 - Validate copyright headers: `python3 tools/devops/validate-copyright-headers.py`
   - **Note**: Will report missing headers in generated/dependency files (`_deps/`), which is expected
@@ -289,7 +296,7 @@ Test debugging:
 
 ### Pre-commit Checklist
 Always run before committing:
-1. `.\FormatSource.ps1` to verify formatting on changed C++ files
+1. `.\FormatSource.ps1 -Verify $true` to check formatting on changed C++ files
 2. `python3 tools/devops/validate-copyright-headers.py` (ignore `_deps/` warnings)
 3. `mkdocs build -f doc/mkdocs.yml` if documentation changed
 4. Full Windows build if core components changed
