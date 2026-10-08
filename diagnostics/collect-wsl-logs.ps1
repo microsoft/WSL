@@ -87,8 +87,7 @@ function Collect-WindowsNetworkState {
 
 function Collect-DistroSparseState {
     param (
-        $Folder,
-        $ReproStep
+        $Folder
     )
 
     $distributions = @()
@@ -148,7 +147,7 @@ function Collect-DistroSparseState {
         Collected = (Get-Date -Format "yyyy-MM-dd HH:mm:ss K")
         Distributions = $distributions
         Error = $collectionError
-    } | ConvertTo-Json -Depth 3 | Out-File -FilePath "$Folder/distro-sparse-$ReproStep.json" -Encoding utf8
+    } | ConvertTo-Json -Depth 3 | Out-File -FilePath "$Folder/distro-sparse.json" -Encoding utf8
 }
 
 $folder = "WslLogs-" + (Get-Date -Format "yyyy-MM-dd_HH-mm-ss")
@@ -247,7 +246,7 @@ if ($LogProfile -eq "networking")
 }
 
 reg.exe export HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Lxss $folder/HKCU.txt 2>&1 | Out-Null
-Collect-DistroSparseState -Folder $folder -ReproStep "before"
+Collect-DistroSparseState -Folder $folder
 reg.exe export HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Lxss $folder/HKLM.txt 2>&1 | Out-Null
 reg.exe export HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\P9NP $folder/P9NP.txt 2>&1 | Out-Null
 reg.exe export HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\WinSock2 $folder/Winsock2.txt 2>&1 | Out-Null
@@ -381,8 +380,6 @@ finally
 
     wpr.exe -stop $folder/logs.etl 2>&1 >> $wprOutputLog
 }
-
-Collect-DistroSparseState -Folder $folder -ReproStep "after"
 
 # Networking-specific post-repro collection
 if ($LogProfile -eq "networking")
