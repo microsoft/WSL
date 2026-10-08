@@ -36,24 +36,6 @@ Building the repository requires:
 - Visual Studio 2022 with the workloads specified by the repository's
   `.vsconfig`.
 
-The repository can install its required development environment:
-
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\tools\setup-dev-env.ps1
-```
-
-Open a new PowerShell terminal if the setup script installs or modifies Visual
-Studio, CMake, or environment settings.
-
-The prerequisites can alternatively be installed manually:
-
-```powershell
-winget install Kitware.CMake
-winget install Microsoft.VisualStudio.2022.Community `
-  --override "--wait --quiet --config .vsconfig"
-```
-
 Enable Developer Mode in Windows Settings if the build is not running as
 Administrator.
 
@@ -63,9 +45,35 @@ Administrator.
 git clone https://github.com/microsoft/WSL.git
 Set-Location .\WSL
 
-git fetch origin user/ptrivedi/wslc-fleet-prototype
-git switch --track origin/user/ptrivedi/wslc-fleet-prototype
+git fetch origin user/ptrivedi/wslc-aks-everywhere-prototype
+git switch --track origin/user/ptrivedi/wslc-aks-everywhere-prototype
+```
 
+After cloning, use the repository setup script to install the required
+development environment:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\tools\setup-dev-env.ps1
+```
+
+Open a new PowerShell terminal if the setup script installs or modifies Visual
+Studio, CMake, or environment settings.
+
+The prerequisites can alternatively be installed manually after cloning so
+Visual Studio can use the repository's `.vsconfig`:
+
+```powershell
+winget install Kitware.CMake
+$env:Path += ";C:\Program Files\CMake\bin"
+
+winget install Microsoft.VisualStudio.2022.Community `
+  --override "--wait --quiet --config .vsconfig"
+```
+
+Build the prototype:
+
+```powershell
 cmake .
 cmake --build . --config Debug --target wslc
 ```
@@ -164,8 +172,8 @@ All commands support:
 ```powershell
 & $wslc cluster create `
   --subscription <subscription-id> `
-  --resource-group <resource-group> `
   --tenant-id <tenant-id> `
+  [--resource-group <resource-group>] `
   [--location <location>] `
   [--distribution <k8s|k3s>] `
   [--distro <wsl-distro>] `
@@ -183,18 +191,40 @@ All commands support:
 Defaults:
 
 ```text
+--resource-group <hostname>-rg
 --location eastus
 --distribution k8s
 --distro aks-edge
 ```
+
+The default resource-group name uses the cluster host's short, lowercase
+hostname followed by `-rg`. Specify `--resource-group` to use an existing or
+custom resource group.
+
+The streamlined Windows client flow matches the AKS on bare metal Linux
+bootstrap flow:
+
+```powershell
+& $wslc cluster create -s <subscription-id> -t <tenant-id>
+```
+
+The corresponding Linux bootstrap command is:
+
+```bash
+curl -sSL https://aka.ms/aksbm | bash -s -- -s <subscription-id> -t <tenant-id>
+```
+
+See
+[Create an AKS on bare metal cluster on Ubuntu with Azure CLI](https://learn.microsoft.com/en-us/azure/aks/hybrid/create-aks-baremetal-ubuntu-cli)
+for the Linux workflow.
 
 Service-principal authentication requires:
 
 ```powershell
 & $wslc cluster create `
   --subscription <subscription-id> `
-  --resource-group <resource-group> `
   --tenant-id <tenant-id> `
+  [--resource-group <resource-group>] `
   --auth-mode sp `
   --client-id <client-id> `
   --client-secret <client-secret>
@@ -284,7 +314,35 @@ Write it to a file:
   --subscription <subscription-id> `
   --resource-group <resource-group> `
   --output .\kubeconfig
+
+$env:KUBECONFIG=".\kubeconfig"
 ```
+
+The kubeconfig is immediately usable with `kubectl` in the current PowerShell
+session:
+
+```powershell
+kubectl get nodes
+kubectl get pods --all-namespaces
+kubectl apply -f .\example.yml
+```
+
+For the intended Day 0 experience, cluster creation should perform kubeconfig
+retrieval and set `KUBECONFIG` as its final step. Until that behavior is
+integrated, run the commands above after creating the cluster.
+
+### Known issue: Arc OS information
+
+Arc4Server might not discover enough operating-system information to display
+the host OS in the Azure portal. Cluster onboarding can still continue when
+this warning appears:
+
+```text
+WARNING Failed to discover OS information for onboarding: missing some OS info
+```
+
+This is an Arc4Server OS-discovery issue rather than a `wslc` cluster creation
+failure.
 
 ## Fleet operations
 
