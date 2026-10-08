@@ -1464,22 +1464,6 @@ std::wstring LxssWriteWslConfig(const std::wstring& Content)
     return previousContent;
 }
 
-// writes distro specific settings /etc/wsl.conf
-std::string LxssWriteWslDistroConfig(const std::string& Content, LPCWSTR DistributionName)
-{
-    std::string path = std::format("\\\\wsl.localhost\\{}\\etc\\wsl.conf", DistributionName);
-
-    std::ifstream distroConfigRead(path);
-    auto previousContent = std::string{std::istreambuf_iterator<char>(distroConfigRead), {}};
-    distroConfigRead.close();
-
-    std::ofstream distroConfig(path, std::ios_base::binary);
-    VERIFY_IS_TRUE(distroConfig.good());
-    distroConfig.write(Content.c_str(), Content.size());
-
-    return previousContent;
-}
-
 // generates a sample global WSL config for the tests
 std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
 {
@@ -2481,6 +2465,13 @@ bool IsHyperVFirewallSupported() noexcept
     return true;
 }
 
+bool IsMirroredNetworkingSupported()
+{
+    // Windows Server can expose the Hyper-V firewall APIs without supporting mirrored networking.
+    return !IsWindowsServer() && wsl::windows::common::helpers::IsWindows11OrAbove() &&
+           AreExperimentalNetworkingFeaturesSupported() && IsHyperVFirewallSupported();
+}
+
 std::optional<GUID> GetDistributionId(LPCWSTR Name)
 {
     // Get the GUID of the test distro
@@ -2518,6 +2509,72 @@ bool WslShutdown()
 void TerminateDistribution(LPCWSTR DistributionName)
 {
     VERIFY_ARE_EQUAL(0u, LxsstuLaunchWsl(std::format(L"{} {}", WSL_TERMINATE_ARG, DistributionName)));
+}
+
+void VerifyNoVmAccessToVhd(LPCWSTR VhdPath)
+{
+    PACL dacl{};
+    wil::unique_hlocal descriptor;
+    THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(VhdPath, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, &dacl, nullptr, &descriptor));
+
+    VERIFY_IS_NOT_NULL(dacl);
+
+    // VM-specific ACEs must be removed when the VHD is detached.
+    constexpr auto c_virtualMachineSidPrefix = L"S-1-5-83-1-";
+    for (DWORD index = 0; index < dacl->AceCount; ++index)
+    {
+        void* ace{};
+        THROW_IF_WIN32_BOOL_FALSE(GetAce(dacl, index, &ace));
+        auto* allowed = static_cast<ACCESS_ALLOWED_ACE*>(ace);
+        VERIFY_ARE_EQUAL(ACCESS_ALLOWED_ACE_TYPE, allowed->Header.AceType);
+
+        wil::unique_hlocal_string sid;
+        THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSidW(&allowed->SidStart, &sid));
+        VERIFY_IS_FALSE(std::wstring_view(sid.get()).starts_with(c_virtualMachineSidPrefix));
+    }
+}
+
+std::wstring GetBlockDeviceInWsl(ULONGLONG SizeBytes)
+{
+    // Wait for the disk to be attached.
+    const auto timeout = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+    const auto expectedSize = std::to_wstring(SizeBytes);
+
+    bool done = false;
+    while (true)
+    {
+        for (wchar_t name = 'a'; name < 'z'; name++)
+        {
+            std::wstring cmd = L"-u root blockdev --getsize64 /dev/sd";
+            cmd += name;
+
+            std::wstring out;
+            try
+            {
+                out = LxsstuLaunchWslAndCaptureOutput(cmd.data()).first;
+            }
+            CATCH_LOG()
+
+            Trim(out);
+
+            if (out == expectedSize)
+            {
+                return std::wstring(L"/dev/sd") + name;
+            }
+        }
+
+        if (done)
+        {
+            break;
+        }
+
+        done = std::chrono::steady_clock::now() > timeout;
+    }
+
+    VERIFY_FAIL(L"Failed to find the block device in WSL");
+
+    // Unreachable.
+    return {};
 }
 
 void ValidateOutput(LPCWSTR CommandLine, const std::wstring& ExpectedOutput, const std::wstring& ExpectedWarnings, int ExitCode)
@@ -2629,11 +2686,12 @@ UniqueWebServer::~UniqueWebServer()
     }
 }
 
-DistroFileChange::DistroFileChange(LPCWSTR Path, bool exists) : m_path(Path)
+DistroFileChange::DistroFileChange(LPCWSTR Path, bool exists, LPCWSTR DistributionName) :
+    m_path(Path), m_distributionName(DistributionName)
 {
     if (exists)
     {
-        m_originalContent = LxsstuLaunchWslAndCaptureOutput(std::format(L"cat '{}'", m_path)).first;
+        m_originalContent = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -u root cat '{}'", m_distributionName, m_path)).first;
     }
 }
 
@@ -2651,7 +2709,7 @@ DistroFileChange::~DistroFileChange()
 
 void DistroFileChange::SetContent(LPCWSTR Content)
 {
-    const auto cmd = LxssGenerateWslCommandLine(std::format(L" -u root cat > '{}'", m_path).c_str());
+    const auto cmd = LxssGenerateWslCommandLine(std::format(L"-d {} -u root cat > '{}'", m_distributionName, m_path).c_str());
     wsl::windows::common::SubProcess process(nullptr, cmd.c_str());
 
     auto [read, write] = CreateSubprocessPipe(true, false);
@@ -2678,7 +2736,7 @@ void DistroFileChange::SetContent(LPCWSTR Content)
 
 void DistroFileChange::Delete()
 {
-    VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-u root rm -f '{}'", m_path).c_str()), 0L);
+    VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} -u root rm -f '{}'", m_distributionName, m_path)), 0L);
 }
 
 std::string ReadToString(SOCKET Handle)

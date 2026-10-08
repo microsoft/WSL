@@ -377,11 +377,11 @@ class Plan9Tests
 
     static auto EnablePlan9Logging()
     {
-        LxssWriteWslDistroConfig("[fileServer]\nlogFile=/plan9-logs.txt\nlogTruncate=false\nlogLevel=5");
+        auto config = std::make_unique<DistroFileChange>(L"/etc/wsl.conf", false);
+        config->SetContent(L"[fileServer]\nlogFile=/plan9-logs.txt\nlogTruncate=false\nlogLevel=5");
 
-        return wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [] {
-            // clean up wsl.conf file
-            LxsstuLaunchWsl(L"rm /etc/wsl.conf");
+        return wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [config = std::move(config)]() mutable {
+            config.reset();
             TerminateDistribution();
         });
     }
@@ -453,12 +453,13 @@ class Plan9Tests
             0u);
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            LxsstuLaunchWsl(L"-u root rm -rf /etc/wsl.conf /tmp/plan9-group-test");
+            LxsstuLaunchWsl(L"-u root rm -rf /tmp/plan9-group-test");
             TerminateDistribution();
         });
 
         // Make plan9testuser the default
-        LxssWriteWslDistroConfig("[user]\ndefault=plan9testuser\n");
+        DistroFileChange config(L"/etc/wsl.conf", false);
+        config.SetContent(L"[user]\ndefault=plan9testuser\n");
         TerminateDistribution();
 
         // Validate that folder isn't accessible

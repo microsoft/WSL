@@ -130,6 +130,27 @@ class WSLCCLIRelativeTimeUnitTests
         VERIFY_ARE_EQUAL(std::wstring{L"12 months ago"}, FormatInvariantElapsedSeconds(365 * 24 * 60 * 60));
         VERIFY_ARE_EQUAL(std::wstring{L"3 years ago"}, FormatInvariantElapsedSeconds(3 * 365 * 24 * 60 * 60LL));
     }
+
+    TEST_METHOD(EventTimestamp_Format)
+    {
+        constexpr std::int64_t c_seconds = 1700000000;
+        const auto utc = std::chrono::seconds::zero();
+
+        VERIFY_ARE_EQUAL(std::string{"2023-11-14T22:13:20.123456789Z"}, EpochToRfc3339Nano(c_seconds * 1'000'000'000 + 123456789, utc));
+        VERIFY_ARE_EQUAL(
+            std::string{"2023-11-14T15:13:20.123456789-07:00"},
+            EpochToRfc3339Nano(c_seconds * 1'000'000'000 + 123456789, -std::chrono::hours{7}));
+        VERIFY_ARE_EQUAL(std::string{"2023-11-14T22:13:20.100758600Z"}, EpochToRfc3339Nano(c_seconds * 1'000'000'000 + 100758600, utc));
+        VERIFY_ARE_EQUAL(std::string{"2023-11-14T22:13:20.000000000Z"}, EpochToRfc3339Nano(c_seconds * 1'000'000'000, utc));
+
+        // Applying an offset at either limit of a nanosecond timestamp must not overflow.
+        VERIFY_ARE_EQUAL(
+            std::string{"2262-04-12T13:47:16.854775807+14:00"},
+            EpochToRfc3339Nano(std::numeric_limits<std::int64_t>::max(), std::chrono::hours{14}));
+        VERIFY_ARE_EQUAL(
+            std::string{"1677-09-20T12:12:43.145224192-12:00"},
+            EpochToRfc3339Nano(std::numeric_limits<std::int64_t>::min(), -std::chrono::hours{12}));
+    }
 };
 
 } // namespace WSLCCLIRelativeTimeUnitTests

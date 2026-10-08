@@ -72,8 +72,7 @@ bool TryLoadWinhttpProxyMethods() noexcept
 
 #define MIRRORED_NETWORKING_TEST_ONLY() \
     { \
-        WINDOWS_11_TEST_ONLY(); \
-        if (!AreExperimentalNetworkingFeaturesSupported() || !IsHyperVFirewallSupported()) \
+        if (!IsMirroredNetworkingSupported()) \
         { \
             LogSkipped("Mirrored networking not supported on this OS. Skipping test.."); \
             return; \
@@ -122,6 +121,21 @@ static const std::wstring c_dnsTunnelingDefaultIp = L"10.255.255.254";
 static constexpr bool ManualConnectivityValidation = false;
 
 namespace {
+
+bool DefaultSwitchExists()
+{
+    for (const auto& id : wsl::core::networking::EnumerateNetworks())
+    {
+        const auto network = wsl::core::networking::OpenNetwork(id);
+        const auto [properties, propertiesString] = wsl::core::networking::QueryNetworkProperties(network.get());
+        if (properties.Name == L"Default Switch")
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
 
 std::wstring GetMacAddress(const std::wstring& adapter = L"eth0")
 {
@@ -1985,6 +1999,17 @@ class NetworkTests
             break;
         }
 
+        if (networkingMode == wsl::core::NetworkingMode::Bridged && !DefaultSwitchExists())
+        {
+            LogSkipped("Bridged networking requires the Default Switch. Skipping test...");
+            return;
+        }
+
+        if (networkingMode == wsl::core::NetworkingMode::Mirrored)
+        {
+            MIRRORED_NETWORKING_TEST_ONLY();
+        }
+
         LogInfo("HostToGuestLoopback (networkingMode=%hs)", ToString(networkingMode));
         WslConfigChange config(LxssGenerateTestConfig({.networkingMode = networkingMode, .vmSwitch = L"Default Switch"}));
         VerifyLoopbackHostToGuest(L"127.0.0.1", IPPROTO_TCP);
@@ -2080,7 +2105,14 @@ class NetworkTests
         VerifyLoopbackGuestToGuest(address, IPPROTO_TCP);
     }
 
-    static wil::unique_socket BindHostPort(uint16_t Port, int Type, int Protocol, bool ExpectSuccess, bool Ipv6 = false, bool Localhost = false)
+    static wil::unique_socket BindHostPort(
+        uint16_t Port,
+        int Type,
+        int Protocol,
+        bool ExpectSuccess,
+        bool Ipv6 = false,
+        bool Localhost = false,
+        std::chrono::seconds BindTimeout = std::chrono::seconds::zero())
     {
         int AddressFamily{};
         const SOCKADDR* Address{};
@@ -2115,7 +2147,28 @@ class NetworkTests
         wil::unique_socket listenSocket(socket(AddressFamily, Type, Protocol));
         VERIFY_IS_TRUE(!!listenSocket);
 
-        VERIFY_ARE_EQUAL(bind(listenSocket.get(), Address, AddressSize) != SOCKET_ERROR, ExpectSuccess);
+        bool bound = false;
+        int error = 0;
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                bound = bind(listenSocket.get(), Address, AddressSize) != SOCKET_ERROR;
+                error = bound ? 0 : WSAGetLastError();
+                THROW_HR_IF_MSG(
+                    HRESULT_FROM_WIN32(error),
+                    ExpectSuccess && !bound,
+                    "Host bind failed: port=%u protocol=%d family=%d WSAGetLastError=%d",
+                    Port,
+                    Protocol,
+                    AddressFamily,
+                    error);
+            },
+            std::chrono::milliseconds(100),
+            BindTimeout,
+            [&]() {
+                return ExpectSuccess && BindTimeout > std::chrono::seconds::zero() && (error == WSAEADDRINUSE || error == WSAEACCES);
+            }));
+
+        VERIFY_ARE_EQUAL(bound, ExpectSuccess);
 
         return listenSocket;
     }
@@ -2435,8 +2488,10 @@ class NetworkTests
             std::chrono::minutes(2)));
     }
 
-    static void VerifyPortZeroBindFromThreadIsTracked()
+    static void VerifyPortZeroBindFromThreadIsTracked(bool verifyRelease = true)
     {
+        WslKeepAlive keepAlive;
+
         auto [stdOutRead, stdOutWrite] = CreateSubprocessPipe(false, true);
         // LXT uses one bit per variation; the threaded port-zero server is the sixth server variation.
         constexpr unsigned long long c_portZeroThreadVariationMask = 1ull << 5;
@@ -2492,6 +2547,15 @@ class NetworkTests
         };
 
         VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(connectToGuest, std::chrono::seconds(1), std::chrono::seconds(30)));
+
+        serverProcess.reset();
+
+        if (verifyRelease)
+        {
+            // Wait beyond the port tracker's grace period for the exact loopback mapping to be released.
+            // A wildcard bind can succeed while that mapping still prevents the next test from forwarding this port.
+            BindHostPort(assignedPort, SOCK_STREAM, IPPROTO_TCP, true, false, true, std::chrono::minutes(2));
+        }
     }
 
     static void VerifyPortZeroRebindSucceeds()
@@ -2694,13 +2758,9 @@ class NetworkTests
         VerifyNotBoundLoopback(port, false);
     }
 
-    static void ValidateLocalhostRelayTraffic(ADDRESS_FAMILY addressFamily)
+    static void ValidateLocalhostRelayTraffic(ADDRESS_FAMILY addressFamily, HANDLE read)
     {
         THROW_HR_IF(E_INVALIDARG, addressFamily != AF_INET && addressFamily != AF_INET6);
-
-        // Bind a port in the guest.
-        auto [guestProcess, read] =
-            BindGuestPort(addressFamily == AF_INET6 ? L"TCP6-LISTEN:1234,bind=::1" : L"TCP4-LISTEN:1234,bind=127.0.0.1", true);
 
         // Connect to the port via the localhost relay
         wil::unique_socket hostSocket;
@@ -2737,7 +2797,7 @@ class NetworkTests
             while (totalRead < content.size())
             {
                 DWORD bytesRead{};
-                VERIFY_IS_TRUE(ReadFile(read.get(), content.data() + totalRead, static_cast<DWORD>(content.size()) - totalRead, &bytesRead, nullptr));
+                VERIFY_IS_TRUE(ReadFile(read, content.data() + totalRead, static_cast<DWORD>(content.size()) - totalRead, &bytesRead, nullptr));
                 LogInfo("Read %lu bytes", bytesRead);
 
                 totalRead += bytesRead;
@@ -2746,12 +2806,58 @@ class NetworkTests
         }
     }
 
+    static void ValidateLocalhostRelayTraffic(ADDRESS_FAMILY addressFamily)
+    {
+        auto [guestProcess, read] =
+            BindGuestPort(addressFamily == AF_INET6 ? L"TCP6-LISTEN:1234,bind=::1" : L"TCP4-LISTEN:1234,bind=127.0.0.1", true);
+
+        ValidateLocalhostRelayTraffic(addressFamily, read.get());
+    }
+
     WSL2_TEST_METHOD(NatLocalhostRelay)
     {
         WslKeepAlive keepAlive;
 
         ValidateLocalhostRelayTraffic(AF_INET);
         ValidateLocalhostRelayTraffic(AF_INET6);
+    }
+
+    WSL2_TEST_METHOD(NatLocalhostRelayDualStack)
+    {
+        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Nat}));
+        WslKeepAlive keepAlive;
+
+        for (int iteration = 0; iteration < 2; ++iteration)
+        {
+            {
+                auto [guestProcess, read] = BindGuestPort(L"TCP6-LISTEN:1234,bind=::,ipv6only=0,fork", true);
+
+                ValidateLocalhostRelayTraffic(AF_INET6, read.get());
+                ValidateLocalhostRelayTraffic(AF_INET, read.get());
+            }
+
+            VerifyNotBoundLoopback(1234, false);
+            VerifyNotBoundLoopback(1234, true);
+        }
+    }
+
+    WSL2_TEST_METHOD(NatLocalhostRelayIpv6Only)
+    {
+        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Nat}));
+        WslKeepAlive keepAlive;
+
+        for (const auto* bindSpec : {L"TCP6-LISTEN:1234,bind=::,ipv6only=1,fork", L"TCP6-LISTEN:1234,bind=::1,ipv6only=0,fork"})
+        {
+            {
+                auto [guestProcess, read] = BindGuestPort(bindSpec, true);
+
+                ValidateLocalhostRelayTraffic(AF_INET6, read.get());
+                VerifyNotBoundLoopback(1234, false);
+                ValidateLocalhostRelayTraffic(AF_INET6, read.get());
+            }
+
+            VerifyNotBoundLoopback(1234, true);
+        }
     }
 
     WSL2_TEST_METHOD(NatLocalhostRelayNoIpv6)
@@ -4151,6 +4257,12 @@ class MirroredTests
     {
         VERIFY_ARE_EQUAL(LxsstuInitialize(false), TRUE);
 
+        if (LxsstuVmMode() && !IsMirroredNetworkingSupported())
+        {
+            LogSkipped("Mirrored networking not supported on this OS. Skipping test class...");
+            return true;
+        }
+
         // Build the Linux unit tests used by the port tracking tests.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(LXSST_TESTS_INSTALL_COMMAND_LINE), (DWORD)0);
 
@@ -4511,13 +4623,16 @@ class MirroredTests
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
+        WslKeepAlive keepAlive;
+
+        // Short-lived guest binds can retain their host reservation until the port tracker's 60-second timeout.
         {
-            auto hostPort = NetworkTests::BindHostPort(1234, SOCK_STREAM, IPPROTO_TCP, true);
+            auto hostPort = NetworkTests::BindHostPort(1234, SOCK_STREAM, IPPROTO_TCP, true, false, false, std::chrono::minutes(2));
             NetworkTests::BindGuestPort(L"TCP4-LISTEN:1234", false);
         }
 
         {
-            auto hostPort = NetworkTests::BindHostPort(1234, SOCK_DGRAM, IPPROTO_UDP, true);
+            auto hostPort = NetworkTests::BindHostPort(1234, SOCK_DGRAM, IPPROTO_UDP, true, false, false, std::chrono::minutes(2));
             NetworkTests::BindGuestPort(L"UDP4-LISTEN:1234", false);
         }
     }
@@ -4599,7 +4714,7 @@ class MirroredTests
         // it — the range-level reservation remains, making release unverifiable.
         NetworkTests::VerifyPortZeroBindIsTracked(false);
 
-        NetworkTests::VerifyPortZeroBindFromThreadIsTracked();
+        NetworkTests::VerifyPortZeroBindFromThreadIsTracked(false);
     }
 
     WSL2_TEST_METHOD(ListenWithoutBindIsTracked)
@@ -5469,6 +5584,12 @@ class BridgedTests
 
         if (LxsstuVmMode())
         {
+            if (!DefaultSwitchExists())
+            {
+                LogSkipped("Bridged networking requires the Default Switch. Skipping test class...");
+                return true;
+            }
+
             m_config.emplace(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Bridged, .vmSwitch = L"Default Switch"}));
         }
 
@@ -5677,6 +5798,31 @@ class ConsommeTests
         }
     }
 
+    WSL2_TEST_METHOD(ConfigurationNoIpv6)
+    {
+        CONSOMME_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .kernelCommandLine = L"ipv6.disable=1"}));
+
+        auto [networkingMode, warnings] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --networking-mode", 0);
+        VERIFY_IS_TRUE(warnings.empty());
+        VERIFY_ARE_EQUAL(wsl::shared::string::Trim(networkingMode), L"consomme");
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /proc/sys/net/ipv6"), 1L);
+
+        const auto state = NetworkTests::GetInterfaceState(L"eth0");
+        VERIFY_IS_TRUE(state.Up);
+        VERIFY_IS_FALSE(state.V4Addresses.empty());
+        VERIFY_IS_TRUE(state.V6Addresses.empty());
+        VERIFY_IS_TRUE(state.Gateway.has_value());
+
+        const auto loopbackState = NetworkTests::GetInterfaceState(L"loopback0");
+        VERIFY_IS_TRUE(loopbackState.Up);
+        VERIFY_ARE_EQUAL(loopbackState.V4Addresses.size(), 1u);
+        VERIFY_ARE_EQUAL(loopbackState.V4Addresses[0].Address, L"169.254.73.250");
+        VERIFY_ARE_EQUAL(loopbackState.V4Addresses[0].PrefixLength, 28u);
+        VERIFY_IS_TRUE(loopbackState.V6Addresses.empty());
+    }
+
     WSL2_TEST_METHOD(ValidateMacAddress)
     {
         CONSOMME_TEST_ONLY();
@@ -5749,22 +5895,29 @@ class ConsommeTests
         auto tcpPort = NetworkTests::BindGuestPort(L"TCP4-LISTEN:2345", true);
     }
 
+    static auto SetTestEphemeralPortRange()
+    {
+        auto [originalRange, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range", 0);
+        originalRange = wsl::shared::string::Trim(originalRange);
+
+        auto revert = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [originalRange = std::move(originalRange)] {
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"echo '{}' > /proc/sys/net/ipv4/ip_local_port_range", originalRange)), 0);
+        });
+
+        // Keep anonymous guest binds out of the host's ephemeral port range, where an existing host bind
+        // would prevent consomme from forwarding the selected port.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"echo '1234 1239' > /proc/sys/net/ipv4/ip_local_port_range"), 0);
+
+        return revert;
+    }
+
     WSL2_TEST_METHOD(PortZeroBindIsTracked)
     {
         CONSOMME_TEST_ONLY();
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
 
-        auto [originalRange, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range", 0);
-        originalRange = wsl::shared::string::Trim(originalRange);
-
-        auto revert = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&originalRange] {
-            LxsstuLaunchWsl(std::format(L"echo '{}' > /proc/sys/net/ipv4/ip_local_port_range", originalRange));
-        });
-
-        // Keep anonymous guest binds out of the host's ephemeral port range, where an existing host bind
-        // would prevent consomme from forwarding the selected port.
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"echo '1234 1239' > /proc/sys/net/ipv4/ip_local_port_range"), 0);
+        auto revertEphemeralPortRange = SetTestEphemeralPortRange();
 
         NetworkTests::VerifyPortZeroBindIsTracked();
 
@@ -5777,6 +5930,8 @@ class ConsommeTests
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
 
+        auto revertEphemeralPortRange = SetTestEphemeralPortRange();
+
         NetworkTests::VerifyListenWithoutBindIsTracked();
     }
 
@@ -5785,6 +5940,8 @@ class ConsommeTests
         CONSOMME_TEST_ONLY();
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+
+        auto revertEphemeralPortRange = SetTestEphemeralPortRange();
 
         NetworkTests::VerifyPortZeroRebindSucceeds();
     }

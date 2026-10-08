@@ -25,7 +25,8 @@ set(SOURCES
     wslc/cli/InputChannel.cpp
     wslc/cli/OutputChannel.cpp
     wslc/cli/Terminal.cpp
-    wslc/cli/TableOutput.cpp
+    wslc/cli/TableData.cpp
+    wslc/cli/TableRenderer.cpp
     interop.cpp
     HandleIO.cpp
     Localization.cpp
@@ -121,7 +122,8 @@ set(HEADERS
     wslc/cli/InputChannel.h
     wslc/cli/OutputChannel.h
     wslc/cli/Terminal.h
-    wslc/cli/TableOutput.h
+    wslc/cli/TableData.h
+    wslc/cli/TableRenderer.h
     INetworkingEngine.h
     interop.hpp
     HandleIO.h

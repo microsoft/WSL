@@ -106,39 +106,16 @@ class SimpleTests
         ValidateOutput(
             std::format(L"{} {} {} {}", WSL_IMPORT_ARG, tempDistro, vhdDir.wstring(), tar.wstring()).c_str(),
             L"The operation completed successfully. \r\n",
-            L"wsl: Sparse VHD support is currently disabled due to potential data corruption.\r\n"
-            L"To force a distribution to use a sparse VHD, please run:\r\n"
-            L"wsl.exe --manage <DistributionName> --set-sparse true --allow-unsafe\r\n",
+            L"wsl: Sparse VHDs are currently experimental. If you encounter unexpected behavior, please file an issue at "
+            L"https://github.com/microsoft/WSL.\r\n",
             0);
 
         std::filesystem::path vhdPath = vhdDir / LXSS_VM_MODE_VHD_NAME;
-        VerifySparse(vhdPath.c_str(), false);
+        VerifySparse(vhdPath.c_str(), true);
 
         WslShutdown();
 
-        // Setting a distro VHD to sparse requires the allow unsafe flag.
-        ValidateOutput(
-            std::format(L"{} {} {} {}", WSL_MANAGE_ARG, tempDistro, WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG, L"true").c_str(),
-            FormatErrorMessage(
-                L"Sparse VHD support is currently disabled due to potential data corruption.\r\n"
-                L"To force a distribution to use a sparse VHD, please run:\r\n"
-                L"wsl.exe --manage <DistributionName> --set-sparse true --allow-unsafe",
-                L"Wsl/Service/E_INVALIDARG"),
-            L"",
-            -1);
-
-        VerifySparse(vhdPath.c_str(), false);
-
-        ValidateOutput(
-            std::format(L"{} {} {} {} {}", WSL_MANAGE_ARG, tempDistro, WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG, L"true", WSL_MANAGE_ARG_ALLOW_UNSAFE)
-                .c_str(),
-            L"The operation completed successfully. \r\n",
-            L"",
-            0);
-
-        VerifySparse(vhdPath.c_str(), true);
-
-        // Disabling sparse on a VHD does not require the allow unsafe flag.
+        // Sparse mode can be disabled without the allow unsafe flag.
         ValidateOutput(
             std::format(L"{} {} {} {}", WSL_MANAGE_ARG, tempDistro, WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG, L"false").c_str(),
             L"The operation completed successfully. \r\n",
@@ -146,6 +123,33 @@ class SimpleTests
             0);
 
         VerifySparse(vhdPath.c_str(), false);
+
+        // Enabling sparse mode no longer requires the allow unsafe flag.
+        ValidateOutput(
+            std::format(L"{} {} {} {}", WSL_MANAGE_ARG, tempDistro, WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG, L"true").c_str(),
+            L"The operation completed successfully. \r\n",
+            L"wsl: Sparse VHDs are currently experimental. If you encounter unexpected behavior, please file an issue at "
+            L"https://github.com/microsoft/WSL.\r\n",
+            0);
+
+        VerifySparse(vhdPath.c_str(), true);
+
+        // The legacy allow unsafe flag remains accepted for compatibility.
+        ValidateOutput(
+            std::format(L"{} {} {} {}", WSL_MANAGE_ARG, tempDistro, WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG, L"false").c_str(),
+            L"The operation completed successfully. \r\n",
+            L"",
+            0);
+
+        ValidateOutput(
+            std::format(L"{} {} {} {} {}", WSL_MANAGE_ARG, tempDistro, WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG, L"true", WSL_MANAGE_ARG_ALLOW_UNSAFE)
+                .c_str(),
+            L"The operation completed successfully. \r\n",
+            L"wsl: Sparse VHDs are currently experimental. If you encounter unexpected behavior, please file an issue at "
+            L"https://github.com/microsoft/WSL.\r\n",
+            0);
+
+        VerifySparse(vhdPath.c_str(), true);
     }
 
     TEST_METHOD(StringHelpers)

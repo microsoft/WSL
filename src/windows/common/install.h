@@ -32,4 +32,7 @@ UINT UninstallViaMsi(_In_opt_ LPCWSTR LogFile, _In_ const std::function<void(INS
 
 void WriteInstallLog(const std::string& Content);
 
+// Throws on failure; WriteInstallLog logs and suppresses failures.
+void WriteInstallLogImpl(const std::wstring& Path, const std::string& Content);
+
 } // namespace wsl::windows::common::install

@@ -25,7 +25,7 @@ namespace wsl::windows::wslc::models {
 
 namespace mount = wsl::windows::common::mount;
 
-// Valid formats for container list output.
+// Valid output formats for commands that support --format.
 enum class FormatType
 {
     Table,

@@ -940,7 +940,16 @@ class InstallerTests
             return flags;
         };
 
-        const std::vector<LPCWSTR> executables = {L"wsl.exe", L"wslhost.exe", L"wslrelay.exe", L"wslg.exe"};
+        const std::vector<LPCWSTR> executables = {
+            L"wsl.exe",
+            L"wslhost.exe",
+            L"wslrelay.exe",
+            L"wslg.exe",
+            L"wslservice.exe",
+            L"wslc.exe",
+            L"container.exe",
+            L"wslcsession.exe"};
+
         for (const auto& e : executables)
         {
             auto fullPath = installPath.value() + e;
