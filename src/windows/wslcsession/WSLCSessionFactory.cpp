@@ -61,10 +61,15 @@ try
 
     *Session = nullptr;
     *ServiceRef = nullptr;
+    RETURN_HR_IF_NULL(E_POINTER, Settings);
 
     // Create the session object.
     auto session = Microsoft::WRL::Make<wslc::WSLCSession>();
-    wsl::windows::wslc::diagnostics::DiagnosticReporter diagnostics{DiagnosticCallback};
+    wsl::windows::wslc::diagnostics::DiagnosticReporter diagnostics{
+        DiagnosticCallback, [session = session.Get()](const std::function<HRESULT()>& callback) {
+            auto comCallback = session->RegisterUserCOMCallback();
+            return callback();
+        }};
 
     // Initialize the session with the VM factory (VMs are created on demand).
     WSLC_EVENT(

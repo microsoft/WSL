@@ -8,8 +8,8 @@
 
 namespace wsl::windows::service::wslc {
 
-// Extends COMServiceExecutionContext with a cached diagnostic reporter and a WSLCSession
-// pointer for cancellable reverse COM calls when warnings are emitted.
+// Extends COMServiceExecutionContext with a cached diagnostic reporter and cancellable
+// reverse COM calls for diagnostics.
 class WSLCExecutionContext : public wsl::windows::common::COMServiceExecutionContext
 {
 public:
@@ -17,7 +17,15 @@ public:
     NON_MOVABLE(WSLCExecutionContext);
 
     WSLCExecutionContext(WSLCSession* session, IDiagnosticCallback* diagnosticCallback = nullptr) :
-        m_session(session), m_diagnostics(diagnosticCallback)
+        m_diagnostics(diagnosticCallback, [session](const std::function<HRESULT()>& callback) {
+            if (session == nullptr)
+            {
+                return callback();
+            }
+
+            auto comCallback = session->RegisterUserCOMCallback();
+            return callback();
+        })
     {
     }
 
@@ -38,12 +46,6 @@ protected:
                 return true;
             }
 
-            std::unique_ptr<UserCOMCallback> comCallback;
-            if (m_session != nullptr)
-            {
-                comCallback = std::make_unique<UserCOMCallback>(m_session->RegisterUserCOMCallback());
-            }
-
             const auto result = m_diagnostics.TryReport(WSLCDiagnosticLevelWarning, WSLC_DIAG_CODE_USER_WARNING, warning.c_str());
             if (SUCCEEDED(result) || result == RPC_E_CALL_CANCELED || result == HRESULT_FROM_WIN32(ERROR_CANCELLED))
             {
@@ -57,7 +59,6 @@ protected:
     }
 
 private:
-    WSLCSession* m_session = nullptr;
     wsl::windows::wslc::diagnostics::DiagnosticReporter m_diagnostics;
 };
 

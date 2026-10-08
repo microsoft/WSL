@@ -495,6 +495,30 @@ class WSLCCLITerminalUnitTests
         VERIFY_ARE_EQUAL(E_FAIL, deliveryFailure.TryReport(WSLCDiagnosticLevelWarning, WSLC_DIAG_CODE_USER_WARNING, L"warning\n"));
     }
 
+    TEST_METHOD(DiagnosticReporter_UsesCallbackScopeForQueriesAndEvents)
+    {
+        TestDiagnosticCallback callback;
+        callback.EnabledLevels = WSLCDiagnosticLevelDebug;
+        size_t callbackScopeCount = 0;
+        const wsl::windows::wslc::diagnostics::CallbackScope callbackScope = [&](const std::function<HRESULT()>& invoke) {
+            ++callbackScopeCount;
+            return invoke();
+        };
+
+        wsl::windows::wslc::diagnostics::DiagnosticReporter diagnostics{&callback, callbackScope};
+        VERIFY_ARE_EQUAL(size_t{1}, callbackScopeCount);
+        VERIFY_ARE_EQUAL(size_t{1}, callback.EnabledLevelsQueryCount);
+
+        VERIFY_SUCCEEDED(diagnostics.TryReport(WSLCDiagnosticLevelDebug, "debug", L"event"));
+        VERIFY_ARE_EQUAL(size_t{2}, callbackScopeCount);
+        VERIFY_ARE_EQUAL(size_t{1}, callback.DiagnosticCount);
+
+        diagnostics.Report(WSLCDiagnosticLevelDebug, "debug-event", L"value={}", 1);
+        VERIFY_ARE_EQUAL(size_t{3}, callbackScopeCount);
+        VERIFY_ARE_EQUAL(size_t{2}, callback.DiagnosticCount);
+        VERIFY_ARE_EQUAL(std::wstring{L"value=1"}, callback.LastMessage);
+    }
+
     TEST_METHOD(DiagnosticHelpers_SanitizeString)
     {
         using wsl::windows::wslc::diagnostics::SanitizeString;

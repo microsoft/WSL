@@ -242,8 +242,8 @@ interface IDiagnosticCallback : IUnknown
     // Enabled levels are immutable for the callback lifetime and may be queried and cached once.
     HRESULT GetEnabledLevels([out] WSLCDiagnosticLevel* Levels);
 
-    // Code and Arguments are invariant support data and must not contain secrets. Message is an
-    // optional localized rendering. Source and resource fields provide correlation when available.
+    // SchemaVersion, Timestamp, Level, and Code identify the diagnostic. Message is an optional
+    // localized rendering. Code and Message must not contain secrets.
     HRESULT OnDiagnostic([in] const WSLCDiagnosticEvent* Event);
 };
 

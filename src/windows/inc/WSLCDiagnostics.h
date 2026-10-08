@@ -4,6 +4,7 @@
 
 #include "WSLCEvent.h"
 #include "WslTelemetry.h"
+#include <functional>
 #include <initializer_list>
 #include <limits>
 #include <string>
@@ -68,7 +69,24 @@ inline bool IsEnabled(WSLCDiagnosticLevel enabledLevels, WSLCDiagnosticLevel lev
     return (static_cast<unsigned int>(enabledLevels) & static_cast<unsigned int>(level)) != 0;
 }
 
-inline WSLCDiagnosticLevel GetEnabledLevels(IDiagnosticCallback* callback, HRESULT* queryResult = nullptr) noexcept
+using CallbackScope = std::function<HRESULT(const std::function<HRESULT()>&)>;
+
+template <typename Callback>
+inline HRESULT InvokeCallback(const CallbackScope& callbackScope, Callback&& callback) noexcept
+{
+    if (!callbackScope)
+    {
+        return callback();
+    }
+
+    try
+    {
+        return callbackScope(std::function<HRESULT()>(std::forward<Callback>(callback)));
+    }
+    CATCH_RETURN();
+}
+
+inline WSLCDiagnosticLevel GetEnabledLevels(IDiagnosticCallback* callback, HRESULT* queryResult = nullptr, const CallbackScope& callbackScope = {}) noexcept
 {
     if (callback == nullptr)
     {
@@ -81,7 +99,7 @@ inline WSLCDiagnosticLevel GetEnabledLevels(IDiagnosticCallback* callback, HRESU
     }
 
     WSLCDiagnosticLevel enabledLevels = WSLCDiagnosticLevelNone;
-    const auto result = callback->GetEnabledLevels(&enabledLevels);
+    const auto result = InvokeCallback(callbackScope, [&]() { return callback->GetEnabledLevels(&enabledLevels); });
     if (FAILED(result))
     {
         LOG_HR(result);
@@ -168,9 +186,10 @@ inline void Report(
 class DiagnosticReporter
 {
 public:
-    explicit DiagnosticReporter(IDiagnosticCallback* callback) noexcept : m_callback(callback)
+    explicit DiagnosticReporter(IDiagnosticCallback* callback, CallbackScope callbackScope = {}) noexcept :
+        m_callback(callback), m_callbackScope(std::move(callbackScope))
     {
-        m_enabledLevels = GetEnabledLevels(callback, &m_enabledLevelsResult);
+        m_enabledLevels = GetEnabledLevels(callback, &m_enabledLevelsResult, m_callbackScope);
     }
 
     bool HasCallback() const noexcept
@@ -195,17 +214,39 @@ public:
 
     HRESULT TryReport(WSLCDiagnosticLevel level, LPCSTR code, LPCWSTR message = nullptr) const noexcept
     {
-        return wsl::windows::wslc::diagnostics::TryReport(m_callback.Get(), m_enabledLevels, events::GetCurrentTimestamp(), level, code, message);
+        if (!IsEnabled(level))
+        {
+            return S_FALSE;
+        }
+
+        WSLCDiagnosticEvent event{};
+        event.SchemaVersion = WSLC_DIAGNOSTIC_SCHEMA_VERSION;
+        event.Timestamp = events::GetCurrentTimestamp();
+        event.Level = level;
+        event.Code = code;
+        event.Message = message;
+        return InvokeCallback(m_callbackScope, [&]() { return m_callback->OnDiagnostic(&event); });
     }
 
     void Report(WSLCDiagnosticLevel level, LPCSTR code, LPCWSTR message = nullptr) const noexcept
     {
-        wsl::windows::wslc::diagnostics::Report(m_callback.Get(), m_enabledLevels, level, code, message);
+        LOG_IF_FAILED(TryReport(level, code, message));
     }
 
     void ReportAt(ULONGLONG timestamp, WSLCDiagnosticLevel level, LPCSTR code, LPCWSTR message = nullptr) const noexcept
     {
-        wsl::windows::wslc::diagnostics::Report(m_callback.Get(), m_enabledLevels, timestamp, level, code, message);
+        if (!IsEnabled(level))
+        {
+            return;
+        }
+
+        WSLCDiagnosticEvent event{};
+        event.SchemaVersion = WSLC_DIAGNOSTIC_SCHEMA_VERSION;
+        event.Timestamp = timestamp;
+        event.Level = level;
+        event.Code = code;
+        event.Message = message;
+        LOG_IF_FAILED(InvokeCallback(m_callbackScope, [&]() { return m_callback->OnDiagnostic(&event); }));
     }
 
     template <typename... Args>
@@ -216,7 +257,10 @@ public:
             return;
         }
 
-        wsl::windows::wslc::diagnostics::Report(m_callback.Get(), m_enabledLevels, level, code, std::move(format), std::forward<Args>(args)...);
+        LOG_IF_FAILED(wil::ResultFromException([&]() {
+            const auto message = std::format(std::move(format), std::forward<Args>(args)...);
+            Report(level, code, message.c_str());
+        }));
     }
 
     template <typename... Args>
@@ -230,12 +274,13 @@ public:
         LOG_IF_FAILED(wil::ResultFromException([&]() {
             const auto message = std::format(std::move(format), std::forward<Args>(args)...);
             const auto wideMessage = wsl::shared::string::MultiByteToWide(message);
-            wsl::windows::wslc::diagnostics::Report(m_callback.Get(), m_enabledLevels, level, code, wideMessage.c_str());
+            Report(level, code, wideMessage.c_str());
         }));
     }
 
 private:
     Microsoft::WRL::ComPtr<IDiagnosticCallback> m_callback;
+    CallbackScope m_callbackScope;
     WSLCDiagnosticLevel m_enabledLevels = WSLCDiagnosticLevelNone;
     HRESULT m_enabledLevelsResult = S_FALSE;
 };
