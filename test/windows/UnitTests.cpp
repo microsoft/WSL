@@ -2115,7 +2115,8 @@ Usage:
             L"/bin/bash", L"-c", L"/mnt/c/Windows/System32/cmd.exe /c exit 0; echo exitcode:$?:"};
 
         std::vector<LPCWSTR> argv;
-        std::transform(arguments.begin(), arguments.end(), std::back_inserter(argv), [](const std::wstring& arg) { return arg.c_str(); });
+        std::transform(
+            arguments.begin(), arguments.end(), std::back_inserter(argv), [](const std::wstring& arg) { return arg.c_str(); });
 
         // Redirect stdout/stderr to pipes so the output can be captured.
         SECURITY_ATTRIBUTES security{sizeof(security), nullptr, TRUE};
