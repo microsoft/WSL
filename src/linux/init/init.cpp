@@ -20,7 +20,9 @@ Abstract:
 #include <sys/wait.h>
 #include <sys/epoll.h>
 #include <sys/syscall.h>
+#include <sys/vfs.h>
 #include <linux/filter.h>
+#include <linux/magic.h>
 #include <pty.h>
 #include <utmp.h>
 #include <libgen.h>
@@ -2372,6 +2374,23 @@ Return Value:
     wsl::shared::MessageWriter<LX_MINI_INIT_CREATE_INSTANCE_RESULT> message;
     message->Pid = std::stoul(pid);
     message->Result = 0;
+
+    struct statfs fileSystem{};
+    if (statfs("/", &fileSystem) < 0)
+    {
+        const auto error = errno;
+        message->FileSystemSpaceError = error;
+        LOG_ERROR("statfs(/) failed: {}", error);
+    }
+    else if (fileSystem.f_type != EXT4_SUPER_MAGIC)
+    {
+        message->FileSystemSpaceError = ENODATA;
+    }
+    else
+    {
+        message->FileSystemTotalBytes = static_cast<uint64_t>(fileSystem.f_blocks) * fileSystem.f_frsize;
+        message->FileSystemUsedBytes = static_cast<uint64_t>(fileSystem.f_blocks - fileSystem.f_bfree) * fileSystem.f_frsize;
+    }
 
     auto Warnings = wil::ScopedWarningsCollector::ConsumeWarnings();
     if (!Warnings.empty())

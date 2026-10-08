@@ -41,6 +41,11 @@ Notable ETL providers:
 
 - `Microsoft.Windows.Plan9.Server`: Logs from the Windows plan9 server (used when accessing /mnt/ shares and running Windows)
 
+The [log collection script](https://github.com/microsoft/WSL/blob/master/diagnostics/collect-wsl-logs.ps1)
+also records each registered WSL2 distro's VHD sparse-file state in
+`distro-sparse-before.json` and `distro-sparse-after.json`. `Unknown` means the state
+could not be read; these snapshots do not start the distros.
+
 
 On the Linux side, the easiest way to access logs is to look at `dmesg` or use the debug console, which can be enabled by writing:
 
@@ -74,7 +79,6 @@ The [collect-wsl-logs.ps1](https://github.com/microsoft/WSL/blob/master/diagnost
 script gathers the logs above automatically into a `wslg/` folder (crash dumps are included when run
 with `-Dump`). Note that `weston.log` is truncated on every system-distro boot, so it only contains
 the most recent boot.
-
 
 ## Attaching debuggers
 
