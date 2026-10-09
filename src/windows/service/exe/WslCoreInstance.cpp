@@ -79,6 +79,11 @@ WslCoreInstance::WslCoreInstance(
         }
     }
 
+    if (result.FileSystemSpaceError == 0)
+    {
+        m_fileSystemSpace = FileSystemSpaceInfo{result.FileSystemTotalBytes, result.FileSystemUsedBytes};
+    }
+
     m_clientId = static_cast<ULONG>(result.Pid);
     if (ConnectPort != nullptr)
     {
@@ -464,6 +469,55 @@ void WslCoreInstance::Initialize()
         TraceLoggingValue(m_configuration.DistroId, "distroId"),
         TraceLoggingValue(response.DefaultUid, "defaultUid"),
         TraceLoggingValue(response.SystemdEnabled, "systemdEnabled"));
+
+    // The system distro has no backing VHD.
+    if (!m_configuration.BasePath.empty())
+    {
+        std::optional<bool> sparseVhd;
+        std::optional<FILE_STANDARD_INFO> hostSpace;
+        try
+        {
+            auto runAsUser = wil::impersonate_token(m_userToken.get());
+            const wil::unique_hfile vhd{CreateFileW(
+                m_configuration.VhdFilePath.c_str(),
+                FILE_READ_ATTRIBUTES,
+                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                nullptr,
+                OPEN_EXISTING,
+                FILE_ATTRIBUTE_NORMAL,
+                nullptr)};
+            THROW_LAST_ERROR_IF(!vhd);
+
+            FILE_BASIC_INFO basicInfo{};
+            if (GetFileInformationByHandleEx(vhd.get(), FileBasicInfo, &basicInfo, sizeof(basicInfo)))
+            {
+                sparseVhd = WI_IsFlagSet(basicInfo.FileAttributes, FILE_ATTRIBUTE_SPARSE_FILE);
+            }
+            else
+            {
+                LOG_LAST_ERROR();
+            }
+
+            FILE_STANDARD_INFO standardInfo{};
+            THROW_IF_WIN32_BOOL_FALSE(GetFileInformationByHandleEx(vhd.get(), FileStandardInfo, &standardInfo, sizeof(standardInfo)));
+            hostSpace = standardInfo;
+        }
+        CATCH_LOG()
+
+        WSL_LOG_TELEMETRY(
+            "DiskSpaceInfo",
+            PDT_ProductAndServicePerformance,
+            TraceLoggingValue(m_instanceId, "instanceId"),
+            TraceLoggingValue(m_configuration.DistroId, "distroId"),
+            TraceLoggingValue(sparseVhd.has_value(), "sparseVhdKnown"),
+            TraceLoggingValue(sparseVhd.value_or(false), "sparseVhd"),
+            TraceLoggingValue(hostSpace.has_value(), "hostSpaceKnown"),
+            TraceLoggingValue(hostSpace ? hostSpace->EndOfFile.QuadPart : 0, "vhdLogicalBytes"),
+            TraceLoggingValue(hostSpace ? hostSpace->AllocationSize.QuadPart : 0, "vhdAllocatedBytes"),
+            TraceLoggingValue(m_fileSystemSpace.has_value(), "fileSystemSpaceKnown"),
+            TraceLoggingValue(m_fileSystemSpace ? m_fileSystemSpace->TotalBytes : 0, "ext4TotalBytes"),
+            TraceLoggingValue(m_fileSystemSpace ? m_fileSystemSpace->UsedBytes : 0, "ext4UsedBytes"));
+    }
 }
 
 void WslCoreInstance::MountDrvfs(bool Admin) const

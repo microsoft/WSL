@@ -1628,9 +1628,21 @@ typedef struct _LX_MINI_INIT_CREATE_INSTANCE_RESULT
     uint64_t Pid;
     uint32_t ConnectPort;
     unsigned int WarningsOffset;
+    uint64_t FileSystemTotalBytes;
+    uint64_t FileSystemUsedBytes;
+    uint32_t FileSystemSpaceError;
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Result), FIELD(FailureStep), FIELD(Pid), FIELD(ConnectPort), STRING_FIELD(WarningsOffset));
+    PRETTY_PRINT(
+        FIELD(Header),
+        FIELD(Result),
+        FIELD(FailureStep),
+        FIELD(Pid),
+        FIELD(ConnectPort),
+        STRING_FIELD(WarningsOffset),
+        FIELD(FileSystemTotalBytes),
+        FIELD(FileSystemUsedBytes),
+        FIELD(FileSystemSpaceError));
 } LX_MINI_INIT_CREATE_INSTANCE_RESULT, *P_LX_MINI_INIT_CREATE_INSTANCE_RESULT;
 
 struct WSLC_ERROR
