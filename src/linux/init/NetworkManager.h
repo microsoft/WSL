@@ -77,6 +77,8 @@ public:
 
     void EnableIpv4ArpFilter();
 
+    void EnableTcpMtuProbing();
+
     wsl::shared::conncheck::ConnCheckResult SendConnectRequest(const char* remoteAddress);
 
 private:
@@ -91,4 +93,7 @@ private:
     IpNeighborManager neighborManager;
 
     void ModifyNetSetting(int addressFamily, const char* settingName, const char* scope, const char* settingValue, size_t settingValueLen);
+
+    // Overload for global (non per-interface) settings that live directly under /proc/sys/net/<family>/.
+    void ModifyNetSetting(int addressFamily, const char* settingName, const char* settingValue, size_t settingValueLen);
 };
