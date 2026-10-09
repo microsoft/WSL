@@ -260,6 +260,27 @@ class WSLCE2EContainerLogsTests
         logsSession.VerifyNoErrors();
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Logs_Follow_CtrlBreak)
+    {
+        auto result = RunWslc(std::format(
+            L"container run -d --name {} {} sh -c \"echo follow-ready; sleep infinity\"", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto logsSession = RunWslcInteractive(
+            std::format(L"container logs --follow {}", WslcContainerName), ElevationType::Elevated, std::nullopt, ProcessGroup::Create);
+
+        logsSession.ExpectStdout("follow-ready\n");
+        VERIFY_IS_TRUE(logsSession.IsRunning(), L"`logs --follow` should wait for additional output");
+
+        logsSession.SendCtrlBreak();
+        constexpr auto controlCExitStatus = static_cast<int>(0xC000013A);
+        VERIFY_ARE_EQUAL(controlCExitStatus, logsSession.Wait(30000));
+        logsSession.VerifyNoErrors();
+
+        VERIFY_IS_TRUE(
+            InspectContainer(WslcContainerName).State.Running, L"Terminating the log client must not stop the container");
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-logs";
     const TestImage& DebianImage = DebianTestImage();

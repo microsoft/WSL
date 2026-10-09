@@ -1082,7 +1082,6 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
             stderrHandle.Release(), GetStdHandle(STD_ERROR_HANDLE)));
     }
 
-    // TODO: Handle ctrl-c.
     io.Run({});
 }
 
