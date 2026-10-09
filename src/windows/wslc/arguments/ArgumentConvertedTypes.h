@@ -44,6 +44,7 @@ using InspectType = wsl::windows::wslc::models::InspectType;
 using JsonIndent = int;
 using ProgressMode = wsl::windows::wslc::models::ProgressMode;
 using PullPolicy = wsl::windows::wslc::models::PullPolicy;
+using RestartPolicy = wsl::windows::wslc::models::RestartPolicy;
 using ParsedNetworkArgument = wsl::windows::wslc::validation::ParsedNetworkArgument;
 using WSLCSignal = ::WSLCSignal;
 using UlimitValue = std::tuple<std::string, int64_t, int64_t>;

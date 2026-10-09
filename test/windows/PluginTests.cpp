@@ -868,6 +868,83 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
+    WSL2_TEST_METHOD(WslcContainerRestartLifecycleNotifications)
+    {
+        ConfigurePlugin(PluginTestType::WslcContainerRestartLifecycleNotifications);
+
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-container-restart-lifecycle");
+
+            LoadTestImage(*session, "debian:latest");
+
+            const auto command = std::format(
+                "count=$(cat /tmp/wslc-plugin-restart-count 2>/dev/null || echo 0); "
+                "count=$((count + 1)); "
+                "echo $count >/tmp/wslc-plugin-restart-count; "
+                "if [ \"$count\" -le {} ]; then "
+                "if [ \"$count\" -eq 1 ]; then echo ready; read value; else sleep 1; fi; "
+                "exit 1; "
+                "fi; "
+                "touch /tmp/wslc-plugin-restart-stable; "
+                "exec tail -f /dev/null",
+                c_restartLifecycleMaximumRetryCount);
+
+            wsl::windows::common::WSLCContainerLauncher launcher(
+                "debian:latest", "wslc-plugin-restart-lifecycle", {"/bin/sh", "-c", command}, {}, "host", WSLCProcessFlagsStdin);
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyOnFailure, c_restartLifecycleMaximumRetryCount);
+
+            auto container = launcher.Launch(*session);
+            auto firstProcess = container.GetInitProcess();
+            WaitForOutput(firstProcess.GetStdHandle(1), "ready");
+
+            auto stdinHandle = firstProcess.GetStdHandle(0);
+            DWORD bytesWritten{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(stdinHandle.Get(), "go\n", 3, &bytesWritten, nullptr));
+            VERIFY_ARE_EQUAL(3UL, bytesWritten);
+            VERIFY_ARE_EQUAL(1, firstProcess.Wait());
+
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() {
+                    THROW_HR_IF(E_FAIL, container.State() != WslcContainerStateRunning);
+
+                    wsl::windows::common::WSLCProcessLauncher markerLauncher(
+                        "/bin/test", {"/bin/test", "-e", "/tmp/wslc-plugin-restart-stable"});
+                    auto markerProcess = markerLauncher.Launch(container.Get());
+                    THROW_HR_IF(E_FAIL, markerProcess.Wait() != 0);
+                },
+                std::chrono::milliseconds(100),
+                std::chrono::seconds(30));
+        }
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=26
+            WSLC Session created, name=plugin-wslc-container-restart-lifecycle, id=*, pid=*, token=set, sid=set
+            WSLC Image created, session=*, id=sha256:*, name=debian:latest
+            WSLC Container started, session=*, id=*, name=/wslc-plugin-restart-lifecycle, image=debian:latest, state=running
+            WSLC Container restart policy notification: on-failure:3
+            WSLC Container stopping, session=*, id=*
+            WSLC Container stopping reentrant WSLCCreateProcess: ok
+            WSLC Container started, session=*, id=*, name=/wslc-plugin-restart-lifecycle, image=debian:latest, state=running
+            WSLC Container restart policy notification: on-failure:3
+            WSLC Container started reentrant WSLCCreateProcess: ok
+            OnWslcContainerStarted automatic restart notification: ERROR_ACCESS_DENIED
+            WSLC Container stopping, session=*, id=*
+            WSLC Container stopping reentrant WSLCCreateProcess: ok
+            WSLC Container started, session=*, id=*, name=/wslc-plugin-restart-lifecycle, image=debian:latest, state=running
+            WSLC Container restart policy notification: on-failure:3
+            WSLC Container started reentrant WSLCCreateProcess: ok
+            WSLC Container stopping, session=*, id=*
+            WSLC Container stopping reentrant WSLCCreateProcess: ok
+            WSLC Container started, session=*, id=*, name=/wslc-plugin-restart-lifecycle, image=debian:latest, state=running
+            WSLC Container restart policy notification: on-failure:3
+            WSLC Container started reentrant WSLCCreateProcess: ok
+            WSLC Container stopping, session=*, id=*
+            WSLC Container stopping reentrant WSLCCreateProcess: ok
+            WSLC Session stopping, name=plugin-wslc-container-restart-lifecycle, id=*)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
     // Validates the VM-lifecycle hooks: OnWslcVmStarted fires each time the VM is (re)created and
     // OnWslcVmStopping each time it is torn down, decoupled from the once-per-session hooks. Also
     // proves the started hook can call back into the session (WSLCCreateProcess) without deadlocking.
