@@ -19,6 +19,7 @@ Abstract:
 #include "WSLCContainerLauncher.h"
 #include "WSLCProcessLauncher.h"
 #include "wslc_schema.h"
+#include "wslpolicies.h"
 #include "wslc/e2e/WSLCE2EHelpers.h"
 #include <optional>
 
@@ -1197,6 +1198,10 @@ class WslcSdkTests
         UniqueContainer container;
         WslcContainerSettings containerSettings;
         VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+        const char* capabilities[] = {"NET_ADMIN", "SYS_TIME"};
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsCapabilityAdditions(&containerSettings, capabilities, ARRAYSIZE(capabilities)));
+        const char* drops[] = {"NET_RAW", "CHOWN"};
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsCapabilityDrops(&containerSettings, drops, ARRAYSIZE(drops)));
         VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
 
         wil::unique_cotaskmem_ansistring inspectData;
@@ -1210,6 +1215,16 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcGetContainerID(container.get(), containerId));
 
         VERIFY_ARE_EQUAL(containerId, inspectObject.Id);
+        VERIFY_ARE_EQUAL(2u, inspectObject.HostConfig.CapAdd.size());
+        VERIFY_IS_TRUE(std::ranges::any_of(
+            inspectObject.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("NET_ADMIN"); }));
+        VERIFY_IS_TRUE(std::ranges::any_of(
+            inspectObject.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("SYS_TIME"); }));
+        VERIFY_ARE_EQUAL(2u, inspectObject.HostConfig.CapDrop.size());
+        VERIFY_IS_TRUE(std::ranges::any_of(
+            inspectObject.HostConfig.CapDrop, [](const auto& capability) { return capability.ends_with("NET_RAW"); }));
+        VERIFY_IS_TRUE(std::ranges::any_of(
+            inspectObject.HostConfig.CapDrop, [](const auto& capability) { return capability.ends_with("CHOWN"); }));
     }
 
     WSLC_TEST_METHOD(ContainerExec)
@@ -1311,6 +1326,38 @@ class WslcSdkTests
             auto output = RunContainerAndCapture(m_defaultSession, containerSettings);
             VERIFY_ARE_EQUAL(output.stdoutOutput, "test.local\n");
         }
+    }
+
+    WSLC_TEST_METHOD(ContainerCapabilityAdditionsValidation)
+    {
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+
+        const char* capabilities[] = {"NET_ADMIN"};
+        VERIFY_ARE_EQUAL(WslcSetContainerSettingsCapabilityAdditions(&containerSettings, nullptr, 1), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(WslcSetContainerSettingsCapabilityAdditions(&containerSettings, capabilities, 0), E_INVALIDARG);
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsCapabilityAdditions(&containerSettings, nullptr, 0));
+
+        const char* capabilitiesWithNull[] = {nullptr};
+        VERIFY_ARE_EQUAL(WslcSetContainerSettingsCapabilityAdditions(&containerSettings, capabilitiesWithNull, 1), E_INVALIDARG);
+    }
+
+    WSLC_TEST_METHOD(ContainerCapabilityAdditionsBlockedByPolicy)
+    {
+        namespace policies = wsl::windows::policies;
+        RegistryKeyChange<DWORD> policy(HKEY_LOCAL_MACHINE, policies::c_registryKey, policies::c_allowWSLContainerPrivileged, 0);
+
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+        const char* capabilities[] = {"NET_ADMIN"};
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsCapabilityAdditions(&containerSettings, capabilities, ARRAYSIZE(capabilities)));
+
+        UniqueContainer container;
+        wil::unique_cotaskmem_string errorMessage;
+        VERIFY_ARE_EQUAL(WSLC_E_CAPABILITY_ADDITIONS_DISABLED, WslcCreateContainer(m_defaultSession, &containerSettings, &container, &errorMessage));
+        VERIFY_IS_NULL(container.get());
+        VERIFY_IS_NOT_NULL(errorMessage.get());
+        VERIFY_ARE_EQUAL(wsl::shared::Localization::MessageWslcCapabilityAdditionsDisabled(), std::wstring(errorMessage.get()));
     }
 
     WSLC_TEST_METHOD(ProcessEnvVariables)
