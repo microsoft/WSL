@@ -639,7 +639,8 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
         }
 
         std::filesystem::create_directories(storagePath);
-        wsl::core::filesystem::CreateVhd(m_storageVhdPath.c_str(), Settings.MaximumStorageSizeMb * _1MB, UserSid, false, false);
+        const bool sparse = WI_IsFlagSet(Settings.StorageFlags, WSLCSessionStorageFlagsSparse);
+        wsl::core::filesystem::CreateVhd(m_storageVhdPath.c_str(), Settings.MaximumStorageSizeMb * _1MB, UserSid, sparse, false);
         vhdCreated = true;
 
         // Then attach the new disk.

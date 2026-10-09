@@ -42,6 +42,7 @@ EXTERN_C_START
 #define WSLC_E_EVENTS_LOST MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 17)                /* 0x80040611 */
 #define WSLC_E_EVENT_STREAM_FINISHED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 18)      /* 0x80040612 */
 #define WSLC_E_CONTAINER_DELETED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 19)          /* 0x80040613 */
+#define WSLC_E_WSL_UPDATE_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 21)          /* 0x80040615 */
 
 // Session values
 #define WSLC_SESSION_OPTIONS_SIZE 72
@@ -84,7 +85,8 @@ typedef enum WslcContainerNetworkingMode
 typedef enum WslcVhdType
 {
     WSLC_VHD_TYPE_DYNAMIC = 0, // Expanding VHDX (default)
-    WSLC_VHD_TYPE_FIXED = 1    // Fixed-allocation VHDX (only honored by WslcCreateSessionVhdVolume)
+    WSLC_VHD_TYPE_FIXED = 1,   // Fixed-allocation VHDX (only honored by WslcCreateSessionVhdVolume)
+    WSLC_VHD_TYPE_SPARSE = 2   // Expanding sparse VHDX (experimental)
 } WslcVhdType;
 
 typedef enum WslcVhdRequirementsFlags
