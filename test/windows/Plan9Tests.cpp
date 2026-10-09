@@ -24,7 +24,7 @@ Abstract:
 namespace Plan9Tests {
 class Plan9Tests
 {
-    WSL_TEST_CLASS(Plan9Tests)
+    OPENVMM_UNSUPPORTED_TEST_CLASS(Plan9Tests)
 
     // Initialize the tests
     TEST_CLASS_SETUP(TestClassSetup)

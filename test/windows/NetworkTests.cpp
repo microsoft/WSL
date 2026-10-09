@@ -4035,7 +4035,7 @@ class GnsCallbackResultTests
 
 class MirroredTests
 {
-    WSL_TEST_CLASS(MirroredTests)
+    OPENVMM_UNSUPPORTED_TEST_CLASS(MirroredTests)
 
     std::optional<WslConfigChange> m_config;
     GUID AdapterId;
@@ -5219,7 +5219,7 @@ class MirroredTests
 
 class BridgedTests
 {
-    WSL_TEST_CLASS(BridgedTests)
+    OPENVMM_UNSUPPORTED_TEST_CLASS(BridgedTests)
 
     std::optional<WslConfigChange> m_config;
 
@@ -5342,7 +5342,7 @@ class BridgedTests
 
 class ConsommeTests
 {
-    WSL_TEST_CLASS(ConsommeTests)
+    OPENVMM_UNSUPPORTED_TEST_CLASS(ConsommeTests)
 
     std::optional<WslConfigChange> m_config;
 

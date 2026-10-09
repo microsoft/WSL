@@ -1342,11 +1342,10 @@ class WSL1 : public DrvFsTests
     }
 };
 
-#define WSL2_DRVFS_TEST_CLASS(_mode) \
+#define WSL2_DRVFS_TEST_CLASS(_mode, _testClassMacro) \
     class WSL2##_mode## : public DrvFsTests \
     { \
-        WSL_TEST_CLASS(WSL2##_mode##) \
-        std::unique_ptr<WslConfigChange> m_config; \
+        _testClassMacro(WSL2##_mode##) std::unique_ptr<WslConfigChange> m_config; \
         TEST_CLASS_SETUP(TestClassSetup) \
         { \
             if (!LxsstuVmMode()) \
@@ -1454,7 +1453,7 @@ class WSL1 : public DrvFsTests
             DrvFsTests::DrvFsMountUnicodePath(DrvFsMode::##_mode##); \
         } \
 \
-        WSL2_TEST_METHOD(DrvfsMountManyVirtioFsShares) \
+        OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(DrvfsMountManyVirtioFsShares) \
         { \
             DrvFsTests::DrvfsMountManyVirtioFsShares(DrvFsMode::##_mode##); \
         } \
@@ -1470,9 +1469,9 @@ class WSL1 : public DrvFsTests
         } \
     }
 
-WSL2_DRVFS_TEST_CLASS(Plan9);
+WSL2_DRVFS_TEST_CLASS(Plan9, OPENVMM_UNSUPPORTED_TEST_CLASS);
 
-WSL2_DRVFS_TEST_CLASS(VirtioFs);
+WSL2_DRVFS_TEST_CLASS(VirtioFs, WSL_TEST_CLASS);
 
 // Disabled while an issue with the 6.1 Linux kernel causing disk corruption is investigated.
 // TODO: Enable again once the issue is resolved

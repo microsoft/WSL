@@ -2034,7 +2034,7 @@ Usage:
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L" grep '^rootfs /init rootfs ro,' /proc/self/mounts", nullptr, nullptr, nullptr, nullptr), 0u);
     }
 
-    WSL2_TEST_METHOD(GpuMounts)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(GpuMounts)
     {
         auto ValidateGpuMounts = [](HANDLE Token) {
             VERIFY_ARE_EQUAL(
@@ -2426,7 +2426,7 @@ Usage:
         VERIFY_ARE_EQUAL(L"", warnings);
     }
 
-    WSL2_TEST_METHOD(DmesgCollection)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(DmesgCollection)
     {
         const auto dmesgLogFile = std::filesystem::current_path() / L"test-dmesg.txt";
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { DeleteFile(dmesgLogFile.c_str()); });
@@ -2490,7 +2490,7 @@ Usage:
         }
     }
 
-    WSL2_TEST_METHOD(GuiApplications)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(GuiApplications)
     {
         auto validateEnvironment = [&](bool systemdEnabled) {
             WslConfigChange configChange(LxssGenerateTestConfig({.guiApplications = true}));
@@ -2562,7 +2562,7 @@ Usage:
         validateEnvironment(true);
     }
 
-    WSL2_TEST_METHOD(GuiApplicationsSystemd)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(GuiApplicationsSystemd)
     {
         DistroFileChange wslConf(L"/etc/wsl.conf", false);
         wslConf.SetContent(L"[boot]\nsystemd=true\n");

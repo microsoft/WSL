@@ -55,6 +55,13 @@ using namespace std::chrono_literals;
     TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE() \
     TEST_METHOD(_name)
 
+#define OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(_name) \
+    TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(_name) \
+    TEST_METHOD_PROPERTY(L"Ignore[not(@Version=2)]", L"true") \
+    TEST_METHOD_PROPERTY(L"Ignore[@OpenVmm=1]", L"true") \
+    TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE() \
+    TEST_METHOD(_name)
+
 #define WSLC_TEST_METHOD(_name) \
     TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(_name) \
     TEST_METHOD_PROPERTY(L"Ignore[not(@Version=2)]", L"true") \
@@ -131,6 +138,12 @@ using namespace std::chrono_literals;
 #define WSL_TEST_CLASS(_name) \
     BEGIN_TEST_CLASS(_name) \
         WSL_TEST_CLASS_PROPERTIES \
+    END_TEST_CLASS()
+
+#define OPENVMM_UNSUPPORTED_TEST_CLASS(_name) \
+    BEGIN_TEST_CLASS(_name) \
+        WSL_TEST_CLASS_PROPERTIES \
+        TEST_CLASS_PROPERTY(L"Ignore[@OpenVmm=1]", L"true") \
     END_TEST_CLASS()
 
 #define WSLC_TEST_CLASS(_name) \
