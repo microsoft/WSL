@@ -3461,6 +3461,8 @@ void LxssUserSessionImpl::_ProcessImportResultMessage(
 
         // Validate that name is valid, and doesn't conflict with existing distributions.
         s_ValidateDistroName(distributionName.c_str());
+
+        std::lock_guard lock(m_instanceLock);
         _ValidateDistributionNameAndPathNotInUse(LxssKey, nullptr, distributionName.c_str(), Registration.Id());
 
         Configuration.Name = std::move(distributionName);
@@ -3903,6 +3905,7 @@ bool LxssUserSessionImpl::_ValidateDistro(_In_ HKEY LxssKey, _In_ LPCGUID Distro
     return isValid;
 }
 
+_Requires_lock_held_(m_instanceLock)
 void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
     _In_ HKEY LxssKey, _In_opt_ LPCWSTR Path, _In_opt_ LPCWSTR Name, const std::optional<GUID>& Exclude)
 {
