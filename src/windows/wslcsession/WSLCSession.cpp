@@ -52,6 +52,47 @@ constexpr auto c_vmIdleGracePeriod = std::chrono::seconds(30);
 
 namespace {
 
+// Converts CRLF line endings to LF so Dockerfiles with CRLF line endings don't leak \r into heredoc content.
+// Standalone carriage returns are preserved. A trailing \r is held until the next read (or EOF) shows whether
+// it starts a CRLF pair.
+class StripCarriageReturnReadHandle : public io::ReadHandle
+{
+public:
+    StripCarriageReturnReadHandle(io::HandleWrapper&& Handle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead) :
+        io::ReadHandle(std::move(Handle), [OnRead = std::move(OnRead), pendingCr = false](const gsl::span<char>& Buffer) mutable {
+            if (pendingCr && (Buffer.empty() || Buffer[0] != '\n'))
+            {
+                char carriageReturn = '\r';
+                OnRead(gsl::make_span(&carriageReturn, 1));
+            }
+
+            pendingCr = false;
+            size_t length = 0;
+            for (size_t i = 0; i < Buffer.size(); i++)
+            {
+                if (Buffer[i] == '\r')
+                {
+                    if (i + 1 == Buffer.size())
+                    {
+                        pendingCr = true;
+                        continue;
+                    }
+
+                    if (Buffer[i + 1] == '\n')
+                    {
+                        continue;
+                    }
+                }
+
+                Buffer[length++] = Buffer[i];
+            }
+
+            OnRead(Buffer.first(length));
+        })
+    {
+    }
+};
+
 // Validates the target path for a NEW session (one with no existing storage VHD): if the path
 // already exists it must be an empty directory, so session storage is never mixed with unrelated
 // user files. A non-existent path is fine (it will be created). Enforced eagerly at session
@@ -1312,18 +1353,27 @@ try
 
     auto io = CreateIOContext();
 
-    io.AddHandle(
-        std::make_unique<io::RelayHandle<io::ReadHandle>>(stdinHandle.Get(), common::io::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}),
-        MultiHandleWait::NeedNotComplete,
-        [&buildProcess]() {
-            // If we receive an error relaying stdin, it could be because the process exited.
-            // Wait up to one second for the process to exit so errors in this relay don't override the actual build result.
-            if (!buildProcess.GetExitEvent().wait(1000))
-            {
-                // Otherwise, throw the error and cancel the build.
-                throw;
-            }
-        });
+    // A streamed context may be a binary tar archive, so only a standalone Dockerfile is normalized.
+    std::unique_ptr<OverlappedIOHandle> stdinRelay;
+    common::io::HandleWrapper buildStdin{buildProcess.GetStdHandle(WSLCFDStdin)};
+    if (streamContext)
+    {
+        stdinRelay = std::make_unique<io::RelayHandle<io::ReadHandle>>(stdinHandle.Get(), std::move(buildStdin));
+    }
+    else
+    {
+        stdinRelay = std::make_unique<io::RelayHandle<StripCarriageReturnReadHandle>>(stdinHandle.Get(), std::move(buildStdin));
+    }
+
+    io.AddHandle(std::move(stdinRelay), MultiHandleWait::NeedNotComplete, [&buildProcess]() {
+        // If we receive an error relaying stdin, it could be because the process exited.
+        // Wait up to one second for the process to exit so errors in this relay don't override the actual build result.
+        if (!buildProcess.GetExitEvent().wait(1000))
+        {
+            // Otherwise, throw the error and cancel the build.
+            throw;
+        }
+    });
 
     bool verbose = WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsVerbose);
     std::string allOutput;

@@ -1545,6 +1545,29 @@ class WSLCE2EImageBuildTests
         BuildFromStdinArchive(BuiltImageStdinTarFile, L"-cf", L"sub\\custom.Dockerfile", L"sub\\custom.Dockerfile");
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_StdinTarContext_PreservesCarriageReturns)
+    {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageStdinTarCrlf);
+        auto testRoot = std::filesystem::current_path() / BuiltImageStdinTarCrlf.Name;
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::filesystem::create_directories(contextDir);
+        WriteTestFileContent(contextDir / L"Dockerfile", "FROM debian:latest\nCOPY crlf.txt /crlf.txt\n");
+        WriteTestFileContent(contextDir / L"crlf.txt", "a\r\nb\r\n");
+
+        auto tarPath = testRoot / L"context.tar";
+        auto tarCmd = std::format(L"tar.exe -cf \"{}\" -C \"{}\" .", tarPath.wstring(), contextDir.wstring());
+        wsl::windows::common::SubProcess tar(nullptr, tarCmd.c_str());
+        VERIFY_ARE_EQUAL(0u, tar.RunAndCaptureOutput().ExitCode, L"tar.exe failed to create the build context archive");
+
+        auto buildResult = RunWslcWithStdinFile(std::format(L"build - -t {}", BuiltImageStdinTarCrlf.NameAndTag()), tarPath);
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
+
+        auto runResult = RunWslc(std::format(L"container run --rm {} od -An -tx1 /crlf.txt", BuiltImageStdinTarCrlf.NameAndTag()));
+        runResult.Verify({.Stdout = L" 61 0d 0a 62 0d 0a\n", .ExitCode = 0});
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_StdinDockerfile_EmptyContext_Success)
     {
         auto imageCleanup = DeleteImageOnExit(BuiltImageStdinDockerfile);
@@ -1637,6 +1660,7 @@ private:
     const TestImage BuiltImageStdinTar{L"wslc-e2e-build-stdin-tar", L"latest", L""};
     const TestImage BuiltImageStdinGzip{L"wslc-e2e-build-stdin-gzip", L"latest", L""};
     const TestImage BuiltImageStdinTarFile{L"wslc-e2e-build-stdin-tar-file", L"latest", L""};
+    const TestImage BuiltImageStdinTarCrlf{L"wslc-e2e-build-stdin-tar-crlf", L"latest", L""};
     const TestImage BuiltImageStdinDockerfile{L"wslc-e2e-build-stdin-dockerfile", L"latest", L""};
 
     // Archives a context holding a Dockerfile (at dockerfileInContext) and a marker file, streams it to
