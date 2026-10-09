@@ -229,7 +229,7 @@ void FileCredStorage::Erase(const std::string& serverAddress)
         });
     }
 
-    THROW_HR_WITH_USER_ERROR_IF(E_NOT_SET, Localization::WSLCCLI_LogoutNotFound(wsl::shared::string::MultiByteToWide(serverAddress)), !erased);
+    THROW_HR_WITH_USER_ERROR_IF(E_NOT_SET, Localization::WSLCCLI_LogoutNotFound(serverAddress), !erased);
 }
 
 std::vector<std::wstring> FileCredStorage::List()

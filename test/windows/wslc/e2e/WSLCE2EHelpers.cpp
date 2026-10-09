@@ -27,10 +27,8 @@ extern std::wstring g_testDataPath;
 namespace WSLCE2ETests {
 
 using namespace WEX::Logging;
-
-namespace wslc_schema = wsl::windows::common::wslc_schema;
-using wsl::windows::common::RunningWSLCContainer;
-using wsl::windows::common::WSLCContainerLauncher;
+using namespace wsl::windows::common;
+using wsl::shared::string::MultiByteToWide;
 
 namespace {
     // Lazily compute the session storage base path.
@@ -101,7 +99,8 @@ namespace {
             std::filesystem::remove_all(storagePath, error);
             if (error)
             {
-                Log::Error(std::format(L"Failed to cleanup storage path {}: {}", storagePath.wstring(), error.message()).c_str());
+                Log::Error(
+                    std::format(L"Failed to cleanup storage path {}: {}", storagePath.wstring(), MultiByteToWide(error.message())).c_str());
             }
         }
     }
@@ -341,8 +340,8 @@ wslc_schema::Health WaitForContainerHealth(const std::wstring& containerName, co
         VERIFY_FAIL(std::format(
                         L"Container '{}' did not reach health status '{}' (last status: '{}')",
                         containerName,
-                        wsl::shared::string::MultiByteToWide(std::string(expectedStatus)),
-                        wsl::shared::string::MultiByteToWide(actual))
+                        MultiByteToWide(std::string(expectedStatus)),
+                        MultiByteToWide(actual))
                         .c_str());
         throw;
     }
@@ -420,7 +419,7 @@ void DeleteImagesWithRepositoryPrefix(const std::wstring& repositoryPrefix)
             // No container cleanup here: the images this prunes are only ever built and inspected, never used to
             // create containers, so image delete --force is sufficient. If a future test containerizes a built
             // image, remove its container in that test's cleanup rather than broadening this prefix-based safety net.
-            const auto nameAndTag = wsl::shared::string::MultiByteToWide(std::format("{}:{}", image.Repository, image.Tag));
+            const auto nameAndTag = MultiByteToWide(std::format("{}:{}", image.Repository, image.Tag));
             RunWslc(std::format(L"image delete --force {}", nameAndTag)).Verify({.Stderr = L"", .ExitCode = 0});
         }
     }
@@ -435,7 +434,7 @@ void EnsureNoUntaggedImages()
 
     for (const auto& image : images)
     {
-        const auto id = wsl::shared::string::MultiByteToWide(GetHashId(image.ID, true));
+        const auto id = MultiByteToWide(GetHashId(image.ID, true));
         auto deleteResult = RunWslc(std::format(L"image delete --force {}", id));
 
         // Tolerate WSLC_E_IMAGE_NOT_FOUND - an untagged image may already be gone if it was a
@@ -598,7 +597,7 @@ std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(
     else
     {
         auto address = std::format("127.0.0.1:{}", port);
-        auto url = std::format(L"http://{}/v2/", wsl::shared::string::MultiByteToWide(address));
+        auto url = std::format(L"http://{}/v2/", MultiByteToWide(address));
 
         int expectedCode = username.empty() ? 200 : 401;
         ExpectHttpResponse(url.c_str(), expectedCode, true);
@@ -707,8 +706,8 @@ void WaitForPseudoConsoleOutput(const WSLCInteractiveSession& session, const std
         const std::string data = session.GetStdoutData();
         VERIFY_FAIL(std::format(
                         L"Timed out waiting for \"{}\". Captured pseudoconsole output: \"{}\"",
-                        wsl::shared::string::MultiByteToWide(EscapeString(expected)),
-                        wsl::shared::string::MultiByteToWide(EscapeString(data)))
+                        MultiByteToWide(EscapeString(expected)),
+                        MultiByteToWide(EscapeString(data)))
                         .c_str());
     }
 }
