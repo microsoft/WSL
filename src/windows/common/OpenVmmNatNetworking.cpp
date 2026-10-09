@@ -14,13 +14,8 @@ VmNetworkAdapterRequest wsl::core::CreateOpenVmmNatNetworkAdapterRequest(bool En
     return {L"eth0", std::move(network)};
 }
 
-OpenVmmNatNetworking::OpenVmmNatNetworking(
-    IVirtualMachineBackend& Backend, VmDeviceId Device, GnsChannel&& GnsChannel, bool EnableLocalhostRelay, int DhcpTimeout) :
-    m_backend(Backend),
-    m_device(Device),
-    m_gnsChannel(std::move(GnsChannel)),
-    m_enableLocalhostRelay(EnableLocalhostRelay),
-    m_dhcpTimeout(DhcpTimeout)
+OpenVmmNatNetworking::OpenVmmNatNetworking(IVirtualMachineBackend& Backend, VmDeviceId Device, GnsChannel&& GnsChannel, bool EnableLocalhostRelay, int DhcpTimeout) :
+    m_backend(Backend), m_device(Device), m_gnsChannel(std::move(GnsChannel)), m_enableLocalhostRelay(EnableLocalhostRelay), m_dhcpTimeout(DhcpTimeout)
 {
 }
 
@@ -117,7 +112,8 @@ int OpenVmmNatNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int 
     if (ipv4)
     {
         request.ListenAddress.family = IpAddressFamily_V4;
-        std::copy_n(reinterpret_cast<const BYTE*>(&addr.Ipv4.sin_addr), sizeof(addr.Ipv4.sin_addr), std::begin(request.ListenAddress.bytes));
+        std::copy_n(
+            reinterpret_cast<const BYTE*>(&addr.Ipv4.sin_addr), sizeof(addr.Ipv4.sin_addr), std::begin(request.ListenAddress.bytes));
     }
     else
     {

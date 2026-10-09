@@ -311,8 +311,7 @@ class OpenVmmVirtualMachineBackendTests
         THROW_IF_FAILED(CoCreateGuid(&directoryId));
         const auto directory = wsl::windows::common::filesystem::GetTempFolderPath(GetCurrentProcessToken()) /
                                (L"OpenVmmPmemBackendTest-" +
-                                wsl::shared::string::GuidToString<wchar_t>(
-                                    directoryId, wsl::shared::string::GuidToStringFlags::None));
+                                wsl::shared::string::GuidToString<wchar_t>(directoryId, wsl::shared::string::GuidToStringFlags::None));
         THROW_IF_WIN32_BOOL_FALSE(CreateDirectoryW(directory.c_str(), nullptr));
         auto removeDirectory = wil::scope_exit([&] { LOG_IF_WIN32_BOOL_FALSE(RemoveDirectoryW(directory.c_str())); });
 
@@ -321,13 +320,7 @@ class OpenVmmVirtualMachineBackendTests
         for (const auto& path : {firstPath, secondPath})
         {
             wil::unique_hfile file{CreateFileW(
-                path.c_str(),
-                GENERIC_READ | GENERIC_WRITE,
-                FILE_SHARE_READ | FILE_SHARE_WRITE,
-                nullptr,
-                CREATE_ALWAYS,
-                FILE_ATTRIBUTE_NORMAL,
-                nullptr)};
+                path.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
             THROW_LAST_ERROR_IF(file.get() == INVALID_HANDLE_VALUE);
             LARGE_INTEGER size{};
             size.QuadPart = 2 * 1024 * 1024;
@@ -478,8 +471,9 @@ class OpenVmmVirtualMachineBackendTests
         loopback.family = IpAddressFamily_V4;
         std::memcpy(loopback.bytes, &loopbackAddress, sizeof(loopbackAddress));
         VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->CreateVirtualAddress(invalidNetwork, loopback); }));
-        VERIFY_ARE_EQUAL(
-            HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->CreateVirtualAddress(fileSystemDevice.Id, loopback); }));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] {
+                             backend->CreateVirtualAddress(fileSystemDevice.Id, loopback);
+                         }));
         const auto virtualAddress = backend->CreateVirtualAddress(network.Id, loopback);
         VERIFY_ARE_EQUAL(IpAddressFamily_V4, virtualAddress.family);
         VERIFY_ARE_NOT_EQUAL(0, std::memcmp(loopback.bytes, virtualAddress.bytes, sizeof(loopbackAddress)));
