@@ -334,6 +334,11 @@ GUID WslCoreInstance::GetDistributionId() const
     return m_configuration.DistroId;
 }
 
+GUID WslCoreInstance::GetInstanceId() const
+{
+    return m_instanceId;
+}
+
 std::shared_ptr<LxssPort> WslCoreInstance::GetInitPort()
 {
     std::lock_guard lock(m_lock);
