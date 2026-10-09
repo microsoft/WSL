@@ -129,13 +129,13 @@ std::unique_ptr<WslCoreVm> WslCoreVm::Create(
             // A kernel panic can cause an hvsocket error. If we hit this, wait one second for an HCS notification to give a better error for the user.
             if (newInstance->m_vmCrashEvent.wait(1000))
             {
-                const auto termination = newInstance->m_backend->GetTerminationReason();
-                if (!termination.Details.empty())
+                const auto crashLogPath = newInstance->m_backend ? newInstance->m_backend->GetCrashLogPath() : std::nullopt;
+                if (crashLogPath)
                 {
                     THROW_HR_WITH_USER_ERROR(
                         WSL_E_VM_CRASHED,
                         wsl::shared::Localization::MessageWSL2Crashed() + L"\r\n" +
-                            Localization::MessageWSL2CrashedStackTrace(termination.Details));
+                            Localization::MessageWSL2CrashedStackTrace(crashLogPath.value()));
                 }
                 else
                 {
@@ -338,6 +338,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         SlowOperationWatcher slowOperation{"CreateVirtualMachineBackend"};
         m_backend = CreateVirtualMachineBackend(backendKind, backendRequest);
     }
+    m_vmCrashEvent.reset(m_backend->GetCrashEvent().release());
     m_runtimeId = m_backend->GetDescription().Identity.VmId;
     WI_ASSERT(IsEqualGUID(VmId, m_runtimeId));
 
@@ -368,14 +369,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     }
 
     // Register before starting so an early exit cannot be missed.
-    m_backend->RegisterTerminationCallback([this](GUID) {
-        const auto termination = m_backend->GetTerminationReason();
-        if (termination.Reason == VmTerminationReason::Crashed)
-        {
-            m_vmCrashEvent.SetEvent();
-        }
-        OnExit();
-    });
+    auto* backend = m_backend.get();
+    m_backend->RegisterTerminationCallback([this, backend](GUID) { OnExit(backend->GetTerminationReason()); });
     signalEarlyTermination.release();
 
     // Start the utility VM.
@@ -386,9 +381,23 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     }
     catch (...)
     {
-        // Reset the backend so the destructor does not attempt a graceful guest shutdown for a VM
-        // that never reached the running state.
-        m_backend.reset();
+        const auto hr = wil::ResultFromCaughtException();
+        auto resetBackend = wil::scope_exit([&] { m_backend.reset(); });
+        if ((hr == HRESULT_FROM_WIN32(WSAENOTCONN) || hr == HRESULT_FROM_WIN32(WSAECONNRESET) || hr == HRESULT_FROM_WIN32(WSAETIMEDOUT)) &&
+            m_vmCrashEvent.wait(1000))
+        {
+            const auto crashLogPath = m_backend->GetCrashLogPath();
+            if (crashLogPath)
+            {
+                THROW_HR_WITH_USER_ERROR(
+                    WSL_E_VM_CRASHED,
+                    wsl::shared::Localization::MessageWSL2Crashed() + L"\r\n" +
+                        Localization::MessageWSL2CrashedStackTrace(crashLogPath.value()));
+            }
+
+            THROW_HR_WITH_USER_ERROR(WSL_E_VM_CRASHED, wsl::shared::Localization::MessageWSL2Crashed());
+        }
+
         throw;
     }
 
@@ -835,7 +844,14 @@ WslCoreVm::~WslCoreVm() noexcept
 
         m_vmExitEvent.wait(UTILITY_VM_TERMINATE_TIMEOUT);
 
-        const auto termination = m_backend->GetTerminationReason();
+        VmTerminationInformation termination;
+        {
+            auto exitLock = m_exitCallbackLock.lock_shared();
+            if (m_terminationInformation)
+            {
+                termination = m_terminationInformation.value();
+            }
+        }
         TraceLoggingWriteTagged(
             activity,
             "TerminateVm",
@@ -2070,21 +2086,25 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
     return {address.Tag, childName, share->EffectiveHostPath.native()};
 }
 
-void WslCoreVm::OnExit()
+void WslCoreVm::OnExit(const VmTerminationInformation& Termination)
 {
     // Indicate that the VM has exited and wake any waiting threads. The backend owns and drains the
     // underlying platform callbacks before it is destroyed.
     std::function<void(GUID)> terminationCallback{};
     {
         auto exitLock = m_exitCallbackLock.lock_exclusive();
+        m_terminationInformation = Termination;
         m_vmExitEvent.SetEvent();
+        if (Termination.Reason == VmTerminationReason::Crashed)
+        {
+            m_vmCrashEvent.SetEvent();
+        }
 
         // If we reach this block and 'm_terminatingEvent' is not signaled, then this is abnormal shutdown.
         // If that happens, set m_terminatingEvent so all pending socket operations can be properly cancelled.
         if (!m_terminatingEvent.is_signaled())
         {
-            const auto termination = m_backend->GetTerminationReason();
-            WSL_LOG("AbnormalVmExit", TraceLoggingValue(termination.Details.c_str(), "Details"));
+            WSL_LOG("AbnormalVmExit", TraceLoggingValue(Termination.Details.c_str(), "Details"));
             m_terminatingEvent.SetEvent();
         }
 

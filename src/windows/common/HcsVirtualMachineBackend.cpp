@@ -294,7 +294,17 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
     // Attach the disks the VM boots from up front so that the guest can reach them without waiting
     // for a hot add. Their LUNs are reported so that the caller can name them in the guest.
     const auto vmIdString = wsl::shared::string::GuidToString<wchar_t>(Request.Identity.VmId, wsl::shared::string::GuidToStringFlags::None);
-    std::uint32_t nextLun = 0;
+    auto cleanupBootDiskAccess = wil::scope_exit([&] {
+        for (const auto& entry : configuration.BootDisks)
+        {
+            const auto& disk = entry.second;
+            if (WI_IsFlagSet(disk.Backend.Flags, wsl::windows::common::disk::DiskStateFlags::AccessGranted))
+            {
+                LOG_IF_FAILED(wil::ResultFromException([&] { schema::RevokeVmAccess(vmIdString.c_str(), disk.Path.c_str()); }));
+            }
+        }
+    });
+    const auto lunInUse = [&scsi](std::uint32_t Lun) { return scsi.Attachments.contains(std::to_string(Lun)); };
     for (const auto& bootDisk : Request.BootDisks)
     {
         THROW_HR_IF(E_INVALIDARG, bootDisk.Key.empty());
@@ -305,16 +315,22 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
             "HCS boot disks must be virtual disks");
 
         const auto& path = validation::ValidateDiskSource(bootDisk.Disk);
-        std::uint32_t lun = nextLun;
+        std::uint32_t lun = 0;
         if (bootDisk.Disk.Placement)
         {
             THROW_HR_IF(c_notSupported, bootDisk.Disk.Placement->Address.Controller != 0);
             lun = bootDisk.Disk.Placement->Address.Lun;
+            THROW_HR_IF(E_BOUNDS, lun >= c_maximumDisks);
+            THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), lunInUse(lun));
         }
-
-        THROW_HR_IF(E_BOUNDS, lun >= c_maximumDisks);
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), scsi.Attachments.contains(std::to_string(lun)));
-        nextLun = lun + 1;
+        else
+        {
+            while (lun < c_maximumDisks && lunInUse(lun))
+            {
+                ++lun;
+            }
+            THROW_HR_IF(WSL_E_TOO_MANY_DISKS_ATTACHED, lun == c_maximumDisks);
+        }
 
         // Best effort: failures (for instance no WRITE_DAC on a SYSTEM-owned VHD) are swallowed
         // since the VM worker process may already have access via inherited ACLs; otherwise
@@ -331,6 +347,12 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
             CATCH_LOG()
         }
 
+        auto revokeDiskAccess = wil::scope_exit([&] {
+            if (WI_IsFlagSet(diskFlags, wsl::windows::common::disk::DiskStateFlags::AccessGranted))
+            {
+                LOG_IF_FAILED(wil::ResultFromException([&] { schema::RevokeVmAccess(vmIdString.c_str(), path.c_str()); }));
+            }
+        });
         auto backingFile = wsl::windows::common::disk::OpenVhdBackingFile(path.c_str());
 
         schema::Attachment attachment{};
@@ -347,6 +369,7 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
         description.BootDisks.emplace(bootDisk.Key, diskAttachment);
         configuration.BootDisks.emplace(
             diskAttachment.Id.Value, AttachedDisk{diskAttachment, {diskFlags, bootDisk.Disk.DeviceTimeout, std::move(backingFile)}});
+        revokeDiskAccess.release();
 
         ++configuration.NextDiskId;
     }
@@ -384,6 +407,7 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
     hvSocket.DefaultConnectSecurityDescriptor = securityDescriptor;
 
     signalEarlyTermination.release();
+    cleanupBootDiskAccess.release();
     return configuration;
 }
 
@@ -595,6 +619,17 @@ wil::unique_handle HcsVirtualMachineBackend::GetTerminationEvent() const
     THROW_IF_WIN32_BOOL_FALSE(DuplicateHandle(
         GetCurrentProcess(), m_terminatingEvent.get(), GetCurrentProcess(), event.put(), 0, FALSE, DUPLICATE_SAME_ACCESS));
     return event;
+}
+
+wil::unique_handle HcsVirtualMachineBackend::GetCrashEvent() const
+{
+    return wil::unique_handle{wsl::windows::common::wslutil::DuplicateHandle(m_vmCrashEvent.get())};
+}
+
+std::optional<std::filesystem::path> HcsVirtualMachineBackend::GetCrashLogPath() const
+{
+    auto lock = m_crashInformationLock.lock_shared();
+    return m_vmCrashLogFile;
 }
 
 void HcsVirtualMachineBackend::Start()
@@ -834,7 +869,7 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
         if (passThrough)
         {
             // Grant the VM access to the disk.
-            schema::GrantVmWorkerProcessAccessToDisk(m_vmIdString.c_str(), path.c_str(), userToken);
+            schema::GrantVmWorkerProcessAccessToDisk(m_vmIdString.c_str(), path.c_str(), Request.UserToken ? Request.UserToken->get() : nullptr);
             WI_SetFlag(diskFlags, wsl::windows::common::disk::DiskStateFlags::AccessGranted);
 
             // Set the disk offline if needed.
@@ -1125,7 +1160,11 @@ VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFile
                 {
                     const VirtioFsShareOptions options{.Kind = VirtiofsShareKind_Aggregate};
                     guestInstanceId = m_guestDeviceManager->AddVirtiofsDevice(
-                        transport.Tag.c_str(), mountOptions.c_str(), L"", ResolveUserToken({transport.Options.UserToken}).get(), options);
+                        transport.Tag.c_str(),
+                        mountOptions.c_str(),
+                        L"",
+                        ResolveUserToken({transport.Options.UserToken, userToken}).get(),
+                        options);
                     device.State = VmFileSystemDeviceState::Serving;
                 }
             },
@@ -1332,7 +1371,6 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
     validation::ValidateResourceId(Device, m_configuration.Description.Identity);
     THROW_HR_IF_MSG(E_INVALIDARG, Request.HostPath.empty(), "A host path is required");
     const auto requestUserToken = Request.UserToken.value_or(wil::shared_handle{});
-    const auto userToken = ResolveUserToken({requestUserToken});
 
     WSL_LOG(
         "HcsAddFileSystemShareBegin",
@@ -1346,6 +1384,7 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
     THROW_HR_IF(HCS_E_TERMINATED, !m_system || !m_guestDeviceManager);
     THROW_HR_IF(E_BOUNDS, m_nextShareId == std::numeric_limits<std::uint64_t>::max());
     const auto device = FindFileSystemDeviceLocked(Device);
+    const auto userToken = ResolveUserToken({requestUserToken, device->second.Backend.UserToken});
     if (!std::holds_alternative<VmVirtioFsDevice>(device->second.Transport))
     {
         if (auto existing = FindPlan9ShareByNameLocked(Device, Request, userToken.get()))
@@ -1430,7 +1469,7 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
                         transport.Tag.c_str(),
                         mountOptions.c_str(),
                         hostPath.c_str(),
-                        ResolveUserToken({options->UserToken, requestUserToken}).get());
+                        ResolveUserToken({options->UserToken, userToken}).get());
                 }
 
                 device->second.State = VmFileSystemDeviceState::Serving;
@@ -1452,7 +1491,7 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
                     hostPath.c_str(),
                     transport.Port.Value,
                     flags,
-                    userToken.get());
+                    WI_IsFlagSet(flags, schema::Plan9ShareFlags::UseShareRootIdentity) ? userToken.get() : nullptr);
                 guestAddress = VmPlan9SocketShareAddress{transport.Port, accessName};
             },
             [&](const VmPlan9VirtioDevice& transport) {

@@ -41,6 +41,8 @@ public:
     VmState GetState() const override;
     VmTerminationInformation GetTerminationReason() const override;
     wil::unique_handle GetTerminationEvent() const override;
+    wil::unique_handle GetCrashEvent() const override;
+    std::optional<std::filesystem::path> GetCrashLogPath() const override;
     void Start() override;
     void Terminate() override;
 
@@ -150,6 +152,7 @@ private:
     std::thread m_processLogThread;
     SessionFileSystemResources m_fileSystemResources;
     wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
+    wil::unique_event m_crashEvent{wil::EventOptions::ManualReset};
     _Guarded_by_(m_lock) VmState m_state = VmState::Unknown;
     _Guarded_by_(m_lock) VmTerminationInformation m_terminationInformation;
 };

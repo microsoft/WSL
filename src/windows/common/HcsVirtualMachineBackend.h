@@ -38,6 +38,8 @@ public:
     VmState GetState() const override;
     VmTerminationInformation GetTerminationReason() const override;
     wil::unique_handle GetTerminationEvent() const override;
+    wil::unique_handle GetCrashEvent() const override;
+    std::optional<std::filesystem::path> GetCrashLogPath() const override;
     void Start() override;
     void Terminate() override;
 
