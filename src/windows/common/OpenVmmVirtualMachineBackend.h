@@ -46,9 +46,9 @@ public:
 
     VmGuestListener CreateGuestListener(GuestServicePort Port) override;
     wil::unique_socket ConnectGuest(GuestServicePort Port, _In_opt_ HANDLE ExitHandle = nullptr) override;
-    GuestConnector GetGuestConnector() const override
+    wsl::windows::common::GuestConnector GetGuestConnector() const override
     {
-        return GuestConnector::CreateOpenVmm(m_fileSystemResources.VsockPath);
+        return wsl::windows::common::GuestConnector::CreateOpenVmm(m_fileSystemResources.VsockPath);
     }
     void CloseGuestListener(VmListenerId Listener) override;
 
@@ -131,6 +131,7 @@ private:
 
     VmDescription m_description{};
     _Guarded_by_(m_lock) std::map<std::uint64_t, VmDiskAttachment> m_attachedDisks;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, GUID> m_diskInstanceIds;
     _Guarded_by_(m_lock) std::uint64_t m_nextDiskId = 1;
     _Guarded_by_(m_lock) std::map<std::uint64_t, VmPersistentMemoryDevice> m_persistentMemoryDevices;
     _Guarded_by_(m_lock) std::map<std::uint64_t, FileSystemDevice> m_fileSystemDevices;

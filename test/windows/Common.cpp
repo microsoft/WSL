@@ -1530,6 +1530,18 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         return value;
     };
 
+    // Run with /p:OpenVmm=1 to exercise the OpenVMM backend instead of HCS. OpenVMM doesn't support GUI apps, GPU,
+    // virtio-9p/Plan9 or aggregate virtio-fs shares, so the defaults are adjusted unless a test overrides them.
+    WEX::Common::String openVmmArg;
+    WEX::TestExecution::RuntimeParameters::TryGetValue(L"OpenVmm", openVmmArg);
+    const bool openVmm = !openVmmArg.IsEmpty() && openVmmArg != L"0";
+    if (openVmm)
+    {
+        Default.guiApplications = Default.guiApplications.value_or(false);
+        Default.drvFsMode = Default.drvFsMode.value_or(DrvFsMode::VirtioFs);
+        Default.virtioFsAggregateShares = Default.virtioFsAggregateShares.value_or(false);
+    }
+
     std::wstring newConfig =
         L"[wsl2]\n"
         L"crashDumpFolder=" +
@@ -1651,6 +1663,11 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         newConfig += L"\n[experimental]\n";
         newConfig += boolOptionToString(L"virtioFsAggregateShares", Default.virtioFsAggregateShares, true);
         newConfig += L"[wsl2]\n";
+    }
+
+    if (openVmm)
+    {
+        newConfig += L"\ngpuSupport=false\n\n[experimental]\nopenVmm=true\n[wsl2]\n";
     }
 
     // TODO: Remove once SetVersion() truncated archive error is root caused.

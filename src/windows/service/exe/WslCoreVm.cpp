@@ -554,7 +554,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
                 }
             }
 
-            swapLun = AttachDiskLockHeld(m_vmConfig.SwapFilePath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get());
+            swapLun =
+                AttachDiskLockHeld(m_vmConfig.SwapFilePath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get(), true);
         }
         CATCH_LOG()
     }
@@ -580,7 +581,16 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     message->IsolateDistroCgroup = m_vmConfig.IsolateDistroCgroup;
     message->KernelModulesDeviceId = m_kernelModulesDeviceId;
     message.WriteString(message->HostnameOffset, wsl::windows::common::filesystem::GetLinuxHostName());
-    message.WriteString(message->KernelModulesListOffset, m_vmConfig.KernelModulesList);
+    auto kernelModulesList = m_vmConfig.KernelModulesList;
+    if (backendKind == BackendKind::OpenVmm)
+    {
+        if (!kernelModulesList.empty())
+        {
+            kernelModulesList += L',';
+        }
+        kernelModulesList += L"virtio_blk";
+    }
+    message.WriteString(message->KernelModulesListOffset, kernelModulesList);
     message->DnsTunnelingIpAddress = m_vmConfig.DnsTunnelingIpAddress.value_or(0);
 
     auto transaction = m_miniInitChannel.StartTransaction();
@@ -626,8 +636,9 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             {
                 if (m_vmConfig.NetworkingMode == NetworkingMode::Nat)
                 {
+                    const auto& adapter = m_backend->GetDescription().NetworkAdapters.at(L"eth0");
                     m_networkingEngine = std::make_unique<wsl::core::OpenVmmNatNetworking>(
-                        std::move(gnsChannel), m_vmConfig.EnableLocalhostRelay, m_vmConfig.DhcpTimeout);
+                        *m_backend, adapter.Id, std::move(gnsChannel), m_vmConfig.EnableLocalhostRelay, m_vmConfig.DhcpTimeout);
                     m_networkingEngine->Initialize();
                 }
                 else
@@ -1032,7 +1043,13 @@ ULONG WslCoreVm::AttachDisk(_In_ PCWSTR Disk, _In_ DiskType Type, _In_ std::opti
 }
 
 ULONG WslCoreVm::AttachDiskLockHeld(
-    _In_ PCWSTR Disk, _In_ DiskType Type, _In_ MountFlags Flags, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_opt_ HANDLE UserToken)
+    _In_ PCWSTR Disk,
+    _In_ DiskType Type,
+    _In_ MountFlags Flags,
+    _In_ std::optional<ULONG> Lun,
+    _In_ bool IsUserDisk,
+    _In_opt_ HANDLE UserToken,
+    _In_ bool BootCritical)
 {
     ExecutionContext context(Context::MountDisk);
 
@@ -1063,6 +1080,7 @@ ULONG WslCoreVm::AttachDiskLockHeld(
         }
         request.ReadOnly = WI_IsFlagSet(Flags, MountFlags::ReadOnly);
         request.UserDisk = IsUserDisk;
+        request.BootCritical = BootCritical;
         request.DeviceTimeout = std::chrono::milliseconds{m_vmConfig.MountDeviceTimeout};
         if (Lun)
         {
@@ -1538,7 +1556,7 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId, BackendKind 
         kernelCmdLine += L" pty.legacy_count=0";
     }
 
-    if (!m_comPipe0.empty() && (!m_dmesgCollector || !m_vmConfig.EnableEarlyBootLogging))
+    if (Backend != BackendKind::OpenVmm && !m_comPipe0.empty() && (!m_dmesgCollector || !m_vmConfig.EnableEarlyBootLogging))
     {
         request.Consoles.push_back({VmConsoleRole::KernelConsole, VmSerialConsole{0, m_comPipe0}});
     }
@@ -1583,7 +1601,7 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId, BackendKind 
     }
     if (Backend == BackendKind::OpenVmm && m_vmConfig.NetworkingMode == NetworkingMode::Nat)
     {
-        request.NetworkAdapters.emplace_back(wsl::core::CreateOpenVmmNatNetworkAdapterRequest());
+        request.NetworkAdapters.emplace_back(wsl::core::CreateOpenVmmNatNetworkAdapterRequest(m_vmConfig.EnableDnsTunneling));
     }
 
     return request;

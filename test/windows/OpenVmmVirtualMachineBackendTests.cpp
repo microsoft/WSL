@@ -101,7 +101,11 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(UINT32{0}, disk.GuestAddress.Lun);
         VERIFY_IS_FALSE(disk.ReadOnly);
 
-        request.Mmio.HighWindowSizeBytes = c_mib;
+        request.Processor.NestedVirtualization = VmFeatureRequest::Preferred;
+        VERIFY_IS_FALSE(ValidateCreateRequest(request).Processor.NestedVirtualization);
+        request.Processor.NestedVirtualization = VmFeatureRequest::Required;
+        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+        request.Processor.NestedVirtualization = VmFeatureRequest::Disabled;
         VERIFY_ARE_EQUAL(S_OK, DescribeResult(request));
         request.Mmio.MaximumGuestAddressBits = 36;
         VERIFY_ARE_EQUAL(S_OK, DescribeResult(request));
@@ -125,22 +129,29 @@ class OpenVmmVirtualMachineBackendTests
 
     TEST_METHOD(OpenVmmNatUsesCreationTimeAdapterAndGuestDhcp)
     {
-        const auto request = wsl::core::CreateOpenVmmNatNetworkAdapterRequest();
+        const auto enabledRequest = wsl::core::CreateOpenVmmNatNetworkAdapterRequest(true);
+        VERIFY_IS_TRUE(std::get<VmUserModeNatNetwork>(enabledRequest.Configuration).InternalDns);
+        const auto request = wsl::core::CreateOpenVmmNatNetworkAdapterRequest(false);
+        VERIFY_IS_FALSE(std::get<VmUserModeNatNetwork>(request.Configuration).InternalDns);
         VERIFY_ARE_EQUAL(L"eth0", request.Tag);
         const auto& network = std::get<VmUserModeNatNetwork>(request.Configuration);
         constexpr wsl::shared::string::MacAddress expectedMac{0x00, 0x00, 0x00, 0x00, 0x01, 0x00};
         VERIFY_IS_TRUE(network.ClientMacAddress() == expectedMac);
 
+        auto backendRequest = CreateRunnableRequest();
+        backendRequest.NetworkAdapters.push_back(request);
+        auto backend = OpenVmmVirtualMachineBackend::Create(backendRequest);
         auto [client, server] = MakeSocketPair();
-        wsl::core::OpenVmmNatNetworking networking(wsl::core::GnsChannel(std::move(server)), true, 5000);
+        wsl::core::OpenVmmNatNetworking networking(
+            *backend, backend->GetDescription().NetworkAdapters.at(L"eth0").Id, wsl::core::GnsChannel(std::move(server)), true, 5000);
         LX_MINI_INIT_NETWORKING_CONFIGURATION configuration{};
         networking.FillInitialConfiguration(configuration);
 
         VERIFY_ARE_EQUAL(LxMiniInitNetworkingModeNat, configuration.NetworkingMode);
-        VERIFY_IS_TRUE(configuration.DisableIpv6);
+        VERIFY_IS_FALSE(configuration.DisableIpv6);
         VERIFY_IS_TRUE(configuration.EnableDhcpClient);
         VERIFY_ARE_EQUAL(5, configuration.DhcpTimeout);
-        VERIFY_ARE_EQUAL(LxMiniInitPortTrackerTypeRelay, configuration.PortTrackerType);
+        VERIFY_ARE_EQUAL(LxMiniInitPortTrackerTypeMirrored, configuration.PortTrackerType);
     }
 
     TEST_METHOD(AllowsGuestAndSavedStateCrashCapture)
@@ -459,7 +470,38 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->UnbindPort(binding.Id); }));
 
         backend->BindPort(network.Id, bindingRequest);
-        VERIFY_ARE_EQUAL(E_FAIL, OperationResult([&] { backend->BindPort(network.Id, bindingRequest); }));
+        VERIFY_ARE_EQUAL(
+            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] { backend->BindPort(network.Id, bindingRequest); }));
+
+        // Virtual addresses and static DNS records are also applied to the running Consomme instance.
+        IpAddress loopback{};
+        loopback.family = IpAddressFamily_V4;
+        std::memcpy(loopback.bytes, &loopbackAddress, sizeof(loopbackAddress));
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->CreateVirtualAddress(invalidNetwork, loopback); }));
+        VERIFY_ARE_EQUAL(
+            HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->CreateVirtualAddress(fileSystemDevice.Id, loopback); }));
+        const auto virtualAddress = backend->CreateVirtualAddress(network.Id, loopback);
+        VERIFY_ARE_EQUAL(IpAddressFamily_V4, virtualAddress.family);
+        VERIFY_ARE_NOT_EQUAL(0, std::memcmp(loopback.bytes, virtualAddress.bytes, sizeof(loopbackAddress)));
+        const auto repeatedAddress = backend->CreateVirtualAddress(network.Id, loopback);
+        VERIFY_ARE_EQUAL(0, std::memcmp(virtualAddress.bytes, repeatedAddress.bytes, sizeof(loopbackAddress)));
+
+        VmDnsRecord dnsRecord;
+        dnsRecord.Name = "host.wsl.internal";
+        dnsRecord.Address = virtualAddress;
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->CreateDnsRecord(invalidNetwork, dnsRecord); }));
+        VERIFY_ARE_EQUAL(
+            HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->CreateDnsRecord(fileSystemDevice.Id, dnsRecord); }));
+        auto invalidRecord = dnsRecord;
+        invalidRecord.Name.clear();
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->CreateDnsRecord(network.Id, invalidRecord); }));
+        invalidRecord = dnsRecord;
+        invalidRecord.Address.family = IpAddressFamily_V6;
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->CreateDnsRecord(network.Id, invalidRecord); }));
+        invalidRecord = dnsRecord;
+        invalidRecord.Type = static_cast<DnsRecordType>(DnsRecordType_A + 1);
+        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->CreateDnsRecord(network.Id, invalidRecord); }));
+        backend->CreateDnsRecord(network.Id, dnsRecord);
 
         backend->Terminate();
     }

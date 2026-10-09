@@ -3,17 +3,18 @@
 #pragma once
 
 #include "GnsChannel.h"
+#include "GnsPortTrackerChannel.h"
 #include "INetworkingEngine.h"
 #include "IVirtualMachineBackend.h"
 
 namespace wsl::core {
 
-VmNetworkAdapterRequest CreateOpenVmmNatNetworkAdapterRequest();
+VmNetworkAdapterRequest CreateOpenVmmNatNetworkAdapterRequest(bool EnableDnsTunneling);
 
 class OpenVmmNatNetworking : public INetworkingEngine
 {
 public:
-    OpenVmmNatNetworking(GnsChannel&& GnsChannel, bool EnableLocalhostRelay, int DhcpTimeout);
+    OpenVmmNatNetworking(IVirtualMachineBackend& Backend, VmDeviceId Device, GnsChannel&& GnsChannel, bool EnableLocalhostRelay, int DhcpTimeout);
     ~OpenVmmNatNetworking() override;
 
     void Initialize() override;
@@ -22,9 +23,18 @@ public:
     void StartPortTracker(wil::unique_socket&& Socket) override;
 
 private:
+    using PortKey = std::tuple<int, int, uint16_t, bool>; // address family, protocol, guest port, loopback
+
+    int HandlePortNotification(const SOCKADDR_INET& addr, int protocol, bool allocate);
+
+    IVirtualMachineBackend& m_backend;
+    VmDeviceId m_device;
     GnsChannel m_gnsChannel;
     bool m_enableLocalhostRelay;
     int m_dhcpTimeout;
+    wil::srwlock m_lock;
+    _Guarded_by_(m_lock) std::map<PortKey, VmPortBindingId> m_portBindings;
+    std::optional<GnsPortTrackerChannel> m_gnsPortTrackerChannel;
 };
 
 } // namespace wsl::core

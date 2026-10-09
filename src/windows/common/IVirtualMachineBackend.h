@@ -283,6 +283,8 @@ struct VmDiskRequest
     // Set for disks that the user explicitly attached (for instance via 'wsl --mount'), as opposed
     // to disks that WSL attaches on the user's behalf.
     bool UserDisk = false;
+    // Set when the disk must be available before guest kernel modules can be loaded.
+    bool BootCritical = false;
     // Timeout applied to host disk state changes and to retries when attaching a physical disk.
     std::chrono::milliseconds DeviceTimeout{5000};
 };
@@ -354,7 +356,8 @@ struct VmUserModeNatNetwork
 {
     WslVirtioNetConfig Configuration{};
     std::vector<IpAddress> Nameservers;
-
+    // OpenVMM only: answer guest DNS queries with the NAT's built-in resolver instead of the host's DNS servers.
+    bool InternalDns = true;
     wsl::shared::string::MacAddress ClientMacAddress() const;
 };
 
@@ -693,7 +696,7 @@ public:
 
     virtual VmGuestListener CreateGuestListener(GuestServicePort Port) = 0;
     virtual wil::unique_socket ConnectGuest(GuestServicePort Port, _In_opt_ HANDLE ExitHandle = nullptr) = 0;
-    virtual GuestConnector GetGuestConnector() const = 0;
+    virtual wsl::windows::common::GuestConnector GetGuestConnector() const = 0;
     virtual void CloseGuestListener(VmListenerId Listener) = 0;
 
     virtual VmDiskAttachment AttachDisk(const VmDiskRequest& Request) = 0;

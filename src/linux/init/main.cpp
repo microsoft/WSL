@@ -53,6 +53,7 @@ Abstract:
 #include <unistd.h>
 #include <utmp.h>
 #include <assert.h>
+#include <fstream>
 #include "configfile.h"
 #include "lxfsshares.h"
 #include "common.h"
@@ -480,6 +481,11 @@ Return Value:
     // Close the device before trying to delete it.
     BlockDevice.reset();
 
+    if (deviceName.starts_with("vd"))
+    {
+        return 0;
+    }
+
     // Remove the block device.
     return WriteToFile(std::format("/sys/block/{}/device/delete", deviceName).c_str(), "1");
 }
@@ -560,6 +566,12 @@ try
     //
 
     sync();
+
+    const auto deviceName = GetLunDeviceName(Lun);
+    if (deviceName.starts_with("vd"))
+    {
+        return 0;
+    }
 
     //
     // Write "1" to /sys/bus/scsi/devices/0:0:<controller>:<lun>/delete to eject the SCSI device.
@@ -786,21 +798,35 @@ Return Value:
     //
 
     std::string Path = std::format("{}{}/block", SCSI_DEVICE_PREFIX, Lun);
+    const auto virtioSerial = std::format("wsl-{}", Lun);
     return wsl::shared::retry::RetryWithTimeout<std::string>(
         [&]() {
             wil::unique_dir Dir{opendir(Path.c_str())};
-            THROW_LAST_ERROR_IF(!Dir);
-
-            //
-            // Find the first directory entry that does not begin with a dot.
-            //
-
-            dirent64* Entry{};
-            while ((Entry = readdir64(Dir.get())) != nullptr)
+            if (Dir)
             {
-                if (Entry->d_name[0] != '.')
+                dirent64* Entry{};
+                while ((Entry = readdir64(Dir.get())) != nullptr)
                 {
-                    return std::string(Entry->d_name);
+                    if (Entry->d_name[0] != '.')
+                    {
+                        return std::string(Entry->d_name);
+                    }
+                }
+            }
+
+            for (const auto& entry : std::filesystem::directory_iterator("/sys/block"))
+            {
+                const auto deviceName = entry.path().filename().string();
+                if (!deviceName.starts_with("vd"))
+                {
+                    continue;
+                }
+
+                std::ifstream serialFile(entry.path() / "serial");
+                std::string serial;
+                if (std::getline(serialFile, serial) && serial == virtioSerial)
+                {
+                    return deviceName;
                 }
             }
 

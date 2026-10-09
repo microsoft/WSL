@@ -460,7 +460,22 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
 
     // Compute a default swiotlb config only when a virtio device that requires bounce buffers is present.
     // N.B. Must run after policy overrides so networking/fs modes reflect final values.
-    if (SwiotlbSizeBytes == 0 && (EnableVirtioFs || EnableVirtio9p || (NetworkingMode == NetworkingMode::Consomme)))
+    //
+    // N.B. The bounce buffer exists so out-of-process hv_pci device hosts can be restricted to a
+    //      single DMA window. OpenVMM emulates its virtio devices inside the VMM process, which
+    //      already maps all of guest memory, so forcing bounce buffers isolates nothing and instead
+    //      caps total in-flight DMA at the pool size. That cap is quickly exhausted by block I/O,
+    //      which surfaces as EIO from virtio-blk, so leave swiotlb disabled for this backend.
+    if (EnableOpenVmm)
+    {
+        VALIDATE_CONFIG_OPTION(EnableOpenVmm, SwiotlbSizeBytes, 0);
+
+        // Nested virtualization requires SynIC, which WHP does not expose to the guest, and SynIC
+        // is required for the VMBus devices OpenVMM relies on. Clear it here so the backend request
+        // never asks for an unavailable feature.
+        EnableNestedVirtualization = false;
+    }
+    else if (SwiotlbSizeBytes == 0 && (EnableVirtioFs || EnableVirtio9p || (NetworkingMode == NetworkingMode::Consomme)))
     {
         SwiotlbSizeBytes = wsl::windows::common::helpers::ComputeDefaultSwiotlbConfig(MemorySizeBytes);
     }

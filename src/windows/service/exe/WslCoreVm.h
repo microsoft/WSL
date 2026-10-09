@@ -158,7 +158,14 @@ private:
         _In_ bool Admin, _In_ PCWSTR Path, _In_ PCWSTR Options, _In_opt_ HANDLE UserToken = nullptr);
 
     _Requires_lock_held_(m_lock)
-    ULONG AttachDiskLockHeld(_In_ PCWSTR Disk, _In_ DiskType Type, _In_ MountFlags Flags, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_ HANDLE UserToken);
+    ULONG AttachDiskLockHeld(
+        _In_ PCWSTR Disk,
+        _In_ DiskType Type,
+        _In_ MountFlags Flags,
+        _In_ std::optional<ULONG> Lun,
+        _In_ bool IsUserDisk,
+        _In_ HANDLE UserToken,
+        _In_ bool BootCritical = false);
 
     void CollectCrashDumps(VmGuestListener Listener) const;
 
