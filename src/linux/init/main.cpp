@@ -200,7 +200,8 @@ int MountInit(const char* Target);
 
 int MountPlan9(const char* Name, const char* Target, bool ReadOnly, unsigned int HostPort = LX_INIT_UTILITY_VM_PLAN9_PORT, std::optional<int> BufferSize = {});
 
-int ProcessMessage(wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config);
+int ProcessMessage(
+    wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config, std::map<pid_t, GUID>& DistroInstances);
 
 wil::unique_fd RegisterSeccompHook();
 
@@ -3036,7 +3037,7 @@ try
 }
 CATCH_RETURN_ERRNO();
 
-int ProcessMessage(wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config)
+int ProcessMessage(wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config, std::map<pid_t, GUID>& DistroInstances)
 
 /*++
 
@@ -3051,6 +3052,8 @@ Arguments:
     Buffer - Supplies the message.
 
     Config - Supplies the VM configuration.
+
+    DistroInstances - Maps unreaped distribution processes to their launch identities.
 
 Return Value:
 
@@ -3112,6 +3115,11 @@ try
                     }
                 },
                 (CLONE_NEWIPC | CLONE_NEWNS | CLONE_NEWPID | CLONE_NEWUTS | SIGCHLD));
+
+            if (ChildPid > 0)
+            {
+                DistroInstances.emplace(ChildPid, Message->InstanceId);
+            }
 
             return (ChildPid < 0) ? -1 : 0;
         }
@@ -4021,6 +4029,7 @@ int main(int Argc, char* Argv[])
     std::vector<gsl::byte> Buffer;
     ssize_t BytesRead;
     VmConfiguration Config{};
+    std::map<pid_t, GUID> DistroInstances;
     wil::unique_fd ConsoleFd{};
     wsl::shared::SocketChannel channel;
     wil::unique_fd NotifyFd{};
@@ -4288,7 +4297,7 @@ int main(int Argc, char* Argv[])
                 break; // Socket was closed, exit
             }
 
-            Result = ProcessMessage(transaction, Message->MessageType, Range, Config);
+            Result = ProcessMessage(transaction, Message->MessageType, Range, Config, DistroInstances);
             if (Result < 0)
             {
                 goto ErrorExit;
@@ -4382,6 +4391,12 @@ int main(int Argc, char* Argv[])
                     Message.Header.MessageType = LxMiniInitMessageChildExit;
                     Message.Header.MessageSize = sizeof(Message);
                     Message.ChildPid = Result;
+                    // Preserve the launch identity even if this PID is reused before the host processes the notification.
+                    if (const auto instance = DistroInstances.extract(Result); !instance.empty())
+                    {
+                        Message.InstanceId = instance.mapped();
+                    }
+
                     Result = UtilWriteBuffer(NotifyFd.get(), gslhelpers::struct_as_bytes(Message));
                     if (Result < 0)
                     {
