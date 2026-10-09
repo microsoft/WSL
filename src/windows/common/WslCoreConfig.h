@@ -32,8 +32,8 @@ Abstract:
         T_SET(c, KernelModulesPath), T_SET(c, KernelPath), T_VALUE(c, LoadDefaultKernelModules), \
         T_PRESENT(c, LoadKernelModulesPresence), T_VALUE(c, MaximumMemorySizeBytes), T_VALUE(c, MaximumProcessorCount), \
         T_ENUM(c, MemoryReclaim), T_VALUE(c, MemorySizeBytes), T_VALUE(c, MountDeviceTimeout), T_ENUM(c, NetworkingMode), \
-        T_VALUE(c, ProcessorCount), T_SET(c, SwapFilePath), T_VALUE(c, SwapSizeBytes), T_VALUE(c, SwiotlbSizeBytes), \
-        T_SET(c, SystemDistroPath), T_VALUE(c, VhdSizeBytes), T_VALUE(c, VmIdleTimeout), T_SET(c, VmSwitch)
+        T_VALUE(c, EphemeralPortRangeSize), T_VALUE(c, ProcessorCount), T_SET(c, SwapFilePath), T_VALUE(c, SwapSizeBytes), \
+        T_VALUE(c, SwiotlbSizeBytes), T_SET(c, SystemDistroPath), T_VALUE(c, VhdSizeBytes), T_VALUE(c, VmIdleTimeout), T_SET(c, VmSwitch)
 
 namespace wsl::core {
 constexpr auto ToString(ConfigKeyPresence key)
@@ -291,6 +291,7 @@ namespace ConfigSetting {
         static constexpr auto AutoProxy = "experimental.autoProxy";
         static constexpr auto InitialAutoProxyTimeout = "experimental.initialAutoProxyTimeout";
         static constexpr auto IgnoredPorts = "experimental.ignoredPorts";
+        static constexpr auto EphemeralPortRangeSize = "experimental.ephemeralPortRangeSize";
         static constexpr auto HostAddressLoopback = "experimental.hostAddressLoopback";
         static constexpr auto SetVersionDebug = "experimental.setVersionDebug";
         static constexpr auto Swiotlb = "experimental.swiotlb";
@@ -379,6 +380,7 @@ struct Config
     FirewallConfiguration FirewallConfig;
     ConfigKeyPresence FirewallConfigPresence = ConfigKeyPresence::Absent;
     std::set<uint16_t> IgnoredPorts;
+    int EphemeralPortRangeSize = 4096;
     bool EnableHostAddressLoopback = false;
     std::filesystem::path CrashDumpFolder;
     int MaxCrashDumpCount = 10;
