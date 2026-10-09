@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
@@ -23,14 +24,24 @@ class WSLCE2ENetworkCreateTests
 {
     WSLC_TEST_CLASS(WSLCE2ENetworkCreateTests)
 
+    TEST_CLASS_SETUP(ClassSetup)
+    {
+        TestImageRegistry::Instance().EnsureLoaded(PythonImage);
+        return true;
+    }
+
     TEST_METHOD_SETUP(MethodSetup)
     {
+        EnsureContainerDoesNotExist(ClientContainerName);
+        EnsureContainerDoesNotExist(ServerContainerName);
         EnsureNetworkDoesNotExist(TestNetworkName);
         return true;
     }
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
+        EnsureContainerDoesNotExist(ClientContainerName);
+        EnsureContainerDoesNotExist(ServerContainerName);
         EnsureNetworkDoesNotExist(TestNetworkName);
         return true;
     }
@@ -58,6 +69,7 @@ class WSLCE2ENetworkCreateTests
         VerifyNetworkIsListed(TestNetworkName);
         auto inspect = InspectNetwork(TestNetworkName);
         VERIFY_ARE_EQUAL("bridge", inspect.Driver);
+        VERIFY_IS_FALSE(inspect.EnableIPv6);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Create_BridgeDriver_Success)
@@ -125,6 +137,78 @@ class WSLCE2ENetworkCreateTests
         auto inspect = InspectNetwork(TestNetworkName);
         VERIFY_ARE_EQUAL("bridge", inspect.Driver);
         VERIFY_IS_TRUE(inspect.Internal);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Network_Create_Ipv6_Success)
+    {
+        const std::wstring subnet = L"fd00:172:53::/64";
+        auto result = RunWslc(std::format(L"network create --ipv6 --subnet {} {}", subnet, TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_ARE_EQUAL(TestNetworkName, result.GetStdoutOneLine());
+
+        VerifyNetworkIsListed(TestNetworkName);
+        auto inspect = InspectNetwork(TestNetworkName);
+        VERIFY_ARE_EQUAL("bridge", inspect.Driver);
+        VERIFY_IS_TRUE(inspect.EnableIPv6);
+        VERIFY_IS_TRUE(inspect.IPAM.Config.has_value());
+        const auto ipv6Config = std::ranges::find_if(*inspect.IPAM.Config, [&](const auto& config) {
+            return config.Subnet == wsl::shared::string::WideToMultiByte(subnet);
+        });
+        VERIFY_IS_TRUE(ipv6Config != inspect.IPAM.Config->end());
+        if (ipv6Config == inspect.IPAM.Config->end())
+        {
+            return;
+        }
+
+        const auto serverScript = std::format(
+            L"import socket;"
+            L"s=socket.socket(socket.AF_INET6,socket.SOCK_STREAM);"
+            L"s.setsockopt(socket.IPPROTO_IPV6,socket.IPV6_V6ONLY,1);"
+            L"s.bind(('::',{}));"
+            L"s.listen(1);"
+            L"print('SERVER READY',flush=True);"
+            L"c,_=s.accept();"
+            L"c.sendall(b'ipv6-ok');"
+            L"c.close()",
+            Ipv6TestPort);
+
+        result = RunWslc(std::format(
+            L"container run -d --network {} --name {} {} python3 -u -c \"{}\"", TestNetworkName, ServerContainerName, PythonImage.NameAndTag(), serverScript));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        WaitForContainerOutput(ServerContainerName, "SERVER READY");
+
+        inspect = InspectNetwork(TestNetworkName);
+        const auto serverEndpoint = std::ranges::find_if(inspect.Containers, [&](const auto& entry) {
+            return entry.second.Name == string::WideToMultiByte(ServerContainerName);
+        });
+        VERIFY_IS_TRUE(serverEndpoint != inspect.Containers.end());
+        if (serverEndpoint == inspect.Containers.end())
+        {
+            return;
+        }
+
+        auto serverAddress = serverEndpoint->second.IPv6Address;
+        const auto prefixSeparator = serverAddress.find('/');
+        VERIFY_IS_TRUE(prefixSeparator != std::string::npos);
+        if (prefixSeparator == std::string::npos)
+        {
+            return;
+        }
+
+        serverAddress.resize(prefixSeparator);
+
+        const auto clientCommand = std::format(
+            L"python3 -c \"import socket;"
+            L"s=socket.socket(socket.AF_INET6,socket.SOCK_STREAM);"
+            L"s.settimeout(10);"
+            L"s.connect(('{}',{}));"
+            L"print(s.recv(16).decode())\"",
+            string::MultiByteToWide(serverAddress),
+            Ipv6TestPort);
+
+        result = RunWslc(std::format(
+            L"container run --rm --network {} --name {} {} {}", TestNetworkName, ClientContainerName, PythonImage.NameAndTag(), clientCommand));
+        result.Verify({.Stdout = L"ipv6-ok\n", .Stderr = L"", .ExitCode = 0});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Create_Subnet_Success)
@@ -213,6 +297,10 @@ class WSLCE2ENetworkCreateTests
     }
 
 private:
+    const std::wstring ClientContainerName = L"wslc-e2e-network-ipv6-client";
+    const std::wstring ServerContainerName = L"wslc-e2e-network-ipv6-server";
     const std::wstring TestNetworkName = L"wslc-e2e-network-create";
+    const uint16_t Ipv6TestPort = 18080;
+    const TestImage& PythonImage = PythonTestImage();
 };
 } // namespace WSLCE2ETests
