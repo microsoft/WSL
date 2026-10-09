@@ -3462,7 +3462,6 @@ void LxssUserSessionImpl::_ProcessImportResultMessage(
         // Validate that name is valid, and doesn't conflict with existing distributions.
         s_ValidateDistroName(distributionName.c_str());
 
-        // Validation can terminate orphaned instances. Keep the lock until the name is registered.
         std::lock_guard lock(m_instanceLock);
         _ValidateDistributionNameAndPathNotInUse(LxssKey, nullptr, distributionName.c_str(), Registration.Id());
 
