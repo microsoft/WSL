@@ -20,14 +20,10 @@ Abstract:
 #include "Dmesg.h"
 #include "GnsChannel.h"
 #include "INetworkingEngine.h"
-#include "WslCoreConfig.h"
 #include <filesystem>
 #include <functional>
-#include <map>
 #include <optional>
 #include <string>
-
-#define MAX_VHD_COUNT 254
 
 namespace wsl::windows::service::wslc {
 
@@ -86,35 +82,19 @@ private:
     std::recursive_mutex m_lock;
 
     std::unique_ptr<IVirtualMachineBackend> m_backend;
-    GUID m_vmId{};
     ULONG m_bootTimeoutMs{};
 
-    wil::shared_handle m_userToken;
     WSLCFeatureFlags m_featureFlags{};
     WSLCNetworkingMode m_networkingMode{};
     std::string m_hostLoopback;
 
     bool m_swiotlbConfigured = false;
 
-    wil::unique_socket m_listenSocket;
+    VmGuestListener m_guestListener;
     wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};
     std::shared_ptr<DmesgCollector> m_dmesgCollector;
-    std::optional<wsl::core::Config> m_natConfig;
     std::optional<WSLCNetworking> m_networking;
     WSLCNetworkingFactory m_networkingFactory;
-
-    std::map<ULONG, VmDiskId> m_backendDisks;
-
-    // Shares: key is the WSLC share identifier, value is the backend share identifier.
-    std::map<GUID, VmShareId, wsl::windows::common::helpers::GuidLess> m_shares;
-    std::optional<VmDeviceId> m_plan9Device;
-    std::optional<VmDeviceId> m_virtioFsDevice;
-
-    // Termination reason and details, cached in OnExit before m_vmExitEvent is signaled and never
-    // modified afterward. Publication relies on the event: readers (GetTerminationReason) only access
-    // these after observing m_vmExitEvent signaled, so no lock is needed.
-    WSLCVirtualMachineTerminationReason m_terminationReason{WSLCVirtualMachineTerminationReasonUnknown};
-    std::wstring m_terminationDetails;
 };
 
 //
