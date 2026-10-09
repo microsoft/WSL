@@ -286,6 +286,21 @@ std::pair<std::wstring, GUID> WslInstall::InstallModernDistribution(
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), SUCCEEDED(result));
     LOG_HR_IF(result, result != WSL_E_DISTRO_NOT_FOUND);
 
+    bool directoryCreated{};
+    if (location.has_value())
+    {
+        std::error_code error;
+        directoryCreated = std::filesystem::create_directories(*location, error);
+        THROW_IF_WIN32_ERROR_MSG(error.value(), "Failed to create install location: %ls", location->c_str());
+    }
+
+    auto directoryCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        if (directoryCreated)
+        {
+            LOG_IF_WIN32_BOOL_FALSE(RemoveDirectoryW(location->c_str()));
+        }
+    });
+
     const auto downloadInfo = wsl::shared::Arm64 ? distribution.Arm64Url : distribution.Amd64Url;
     THROW_HR_IF(E_UNEXPECTED, !downloadInfo.has_value());
 
@@ -326,5 +341,6 @@ std::pair<std::wstring, GUID> WslInstall::InstallModernDistribution(
         fixedVhd ? LXSS_IMPORT_DISTRO_FLAGS_FIXED_VHD : 0,
         vhdSize);
 
+    directoryCleanup.release();
     return {installedName.get(), id};
 }
