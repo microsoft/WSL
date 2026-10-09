@@ -2452,7 +2452,7 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcBuildStdinContextAndDockerfile" xml:space="preserve">
-    <value>Can't use stdin for both the build context and the Dockerfile.</value>
+    <value>stdin hem derleme bağlamı hem de Dockerfile için kullanılamaz.</value>
     <comment>{Locked="stdin"}{Locked="Dockerfile"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
@@ -3461,7 +3461,7 @@ Windows sürümü: {}</value>
     <value>Kaydedilen görüntünün yolu</value>
   </data>
   <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
-    <value>Path to the build context directory (use "-" to read a tar archive or Dockerfile from stdin)</value>
+    <value>Derleme bağlamı dizinine giden yol (stdin'den tar arşivini veya Dockerfile'ı okumak için "-" kullanın)</value>
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
@@ -3868,7 +3868,7 @@ Windows sürümü: {}</value>
     <value>Görüntü terminale yazılamıyor. -o seçeneğini kullanın veya stdout'u yeniden yönlendirin.</value>
   </data>
   <data name="WSLCCLI_BuildStdinIsTerminalError" xml:space="preserve">
-    <value>Cannot read build input from terminal. Pipe a Dockerfile or tar archive to stdin.</value>
+    <value>Terminalden derleme girişi okunamıyor. stdin'e bir Dockerfile veya tar arşivi yönlendirin.</value>
     <comment>{Locked="Dockerfile"}{Locked="stdin"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">

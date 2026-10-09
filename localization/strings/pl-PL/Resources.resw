@@ -2452,7 +2452,7 @@ Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stron�
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcBuildStdinContextAndDockerfile" xml:space="preserve">
-    <value>Can't use stdin for both the build context and the Dockerfile.</value>
+    <value>Nie można używać stdin jednocześnie dla kontekstu kompilacji i pliku Dockerfile.</value>
     <comment>{Locked="stdin"}{Locked="Dockerfile"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
@@ -3461,7 +3461,7 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <value>Ścieżka dla zapisanego obrazu</value>
   </data>
   <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
-    <value>Path to the build context directory (use "-" to read a tar archive or Dockerfile from stdin)</value>
+    <value>Ścieżka do katalogu kontekstu kompilacji (użyj „-”, aby odczytać archiwum tar lub plik Dockerfile z stdin)</value>
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">

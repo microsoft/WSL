@@ -10,7 +10,7 @@ parameters:
   default: false
 
 - name: testVersion
-  displayName: 'Test the release pipeline'
+  displayName: 'Override package version (required for testing / manual invocation)'
   type: string
   default: ''
   
@@ -41,6 +41,8 @@ resources:
 extends:
   template: v2/Microsoft.Official.yml@templates
   parameters:
+    release:
+      category: NonAzure
     platform:
       name: "windows_undocked"
     featureFlags:
@@ -85,12 +87,37 @@ extends:
       parameters:
         rs_prerelease_only: false
 
-    - template: flight-stage.yml@self
+    - template: github-release-stage.yml@self
       parameters:
         publishPackage: ${{ iif(eq(parameters.testVersion, ''), true, false) }}
         packageVersion: ${{ iif(eq(parameters.testVersion, ''), variables['Build.SourceBranchName'], parameters.testVersion) }}
         bypassTests: ${{ parameters.bypassTests }}
-        pushToStore: ${{ parameters.pushToStore }}
+
+    - ${{ if eq(parameters.testVersion, '') }}:
+        - template: dcat-publish-stages.yml@self
+          parameters:
+            releaseEnvironment: Production
+            initialDependsOn:
+              - dcat_prepare
+              - package
+              - ${{ if eq(parameters.bypassTests, false) }}:
+                  - test
+            dcat:
+              environment: PROD
+              serviceConnection: wsl-dcat-publish-prod
+              clientId: 9752ce08-bcf4-432b-ab86-d60856f646c0
+              tenantId: 33e01921-4d64-4f8c-a055-5bdaffd5e33d
+              publisher: WSL
+
+        - template: store-flight-stage.yml@self
+          parameters:
+            bypassTests: ${{ parameters.bypassTests }}
+            publishPackage: true
+            pushToStore: ${{ parameters.pushToStore }}
+
+        - template: nuget-publish-stage.yml@self
+          parameters:
+            bypassTests: ${{ parameters.bypassTests }}
 
     - ${{ if or(eq(parameters.testVersion, ''), not(eq(parameters.nugetSuffix, ''))) }}:
         - template: nuget-stage.yml@self
