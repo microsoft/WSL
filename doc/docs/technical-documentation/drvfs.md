@@ -33,3 +33,31 @@ mount -t drvfs C: /tmp/my-mount-point
 Internally, this is handled by `/usr/sbin/mount.drvfs`, which is a symlink to `/init`. When `/init` starts, it looks at `argv[0]` to determine which entrypoint to run. If `argv[0]` is `mount.drvfs`, then `/init` runs the `mount.drvfs` entrypoint (see `MountDrvfsEntry()` in `src/linux/init/drvfs.cpp`).
 
 Depending on the distribution configuration, `mount.drvfs` will either mount the drive as `drvfs` (WSL1), or `plan9`, `virtio-plan9` or `virtiofs` (WSL), depending on [.wslconfig](https://learn.microsoft.com/windows/wsl/wsl-config).
+
+## Mounting with an explicit transport
+
+`mount.drvfs` accepts a `transport=` mount option that overrides the default transport selected by `.wslconfig`:
+
+```bash
+sudo mount -t drvfs C: /mnt/c_plan9    -o transport=plan9
+sudo mount -t drvfs C: /mnt/c_virtio9p -o transport=virtio9p
+sudo mount -t drvfs C: /mnt/c_virtiofs -o transport=virtiofs
+```
+
+Accepted values are `plan9`, `virtio9p`, and `virtiofs`. Unknown or empty values cause the mount to fail with an error.
+
+The requested transport must be available in the VM. By default the host only stands up the transport selected by `wsl2.virtio9p` / `wsl2.virtiofs`, so mounting with a `transport=` value whose backend is not running fails at mount time. To make all three transports available simultaneously in a single VM (useful for development and benchmarking), enable the experimental setting below.
+
+## Testing all three transports in a single VM (experimental)
+
+To exercise the three DrvFs transports concurrently in a single VM, enable:
+
+```ini
+# .wslconfig
+[experimental]
+drvFsTransports = true
+```
+
+When this setting is enabled, the host stands up all three transport backends (plan9-over-hvsocket server, virtio9p server, and virtiofs worker) regardless of `wsl2.virtio9p` / `wsl2.virtiofs`. Combined with the `transport=` mount option above, this lets the same drive be mounted under each transport in the same VM without restarting.
+
+This setting is intended for diagnostics and is off by default; it has a small steady-state cost (extra plan9 server and virtiofs worker thread) when enabled.

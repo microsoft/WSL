@@ -557,6 +557,7 @@ struct TestConfigDefaults
     std::optional<std::wstring> debugConsoleLogFile;
     std::optional<DrvFsMode> drvFsMode;
     std::optional<bool> virtioFsAggregateShares;
+    std::optional<bool> drvFsTransports;
     std::optional<wsl::core::NetworkingMode> networkingMode;
     const std::optional<std::wstring> vmSwitch;
     const std::optional<std::wstring> macAddress;
