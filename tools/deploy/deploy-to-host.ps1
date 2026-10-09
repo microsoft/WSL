@@ -36,6 +36,42 @@ $MSIArguments = @(
     "/norestart"
 )
 
+$installer = New-Object -ComObject WindowsInstaller.Installer
+$database = $installer.OpenDatabase($PackagePath, 0)
+$view = $database.OpenView("SELECT ``Value`` FROM ``Property`` WHERE ``Property`` = 'ProductCode'")
+$view.Execute()
+$record = $view.Fetch()
+if ($null -eq $record)
+{
+    throw "ProductCode is missing from $PackagePath"
+}
+
+$packageProductCode = $record.StringData(1)
+[void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($record)
+[void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($view)
+[void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($database)
+[void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($installer)
+
+$registry = [Microsoft.Win32.RegistryKey]::OpenBaseKey(
+    [Microsoft.Win32.RegistryHive]::LocalMachine,
+    [Microsoft.Win32.RegistryView]::Registry64)
+$installedProductKey = $registry.OpenSubKey("SOFTWARE\Microsoft\Windows\CurrentVersion\Lxss\MSI")
+$installedProductCode = if ($null -ne $installedProductKey) { $installedProductKey.GetValue("ProductCode") } else { $null }
+if ($null -ne $installedProductKey)
+{
+    $installedProductKey.Dispose()
+}
+$registry.Dispose()
+
+if ($packageProductCode -eq $installedProductCode)
+{
+    # Refresh all installed files and machine registry entries for the current product.
+    $MSIArguments += @(
+        "REINSTALL=ALL"
+        "REINSTALLMODE=amus"
+    )
+}
+
 if ($MsiArgs)
 {
     $MSIArguments += $MsiArgs

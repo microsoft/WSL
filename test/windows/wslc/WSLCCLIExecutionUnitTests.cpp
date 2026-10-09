@@ -503,6 +503,99 @@ class WSLCCLIExecutionUnitTests
         VERIFY_IS_TRUE(arguments.GetValue<ArgType::NoColor>());
     }
 
+    TEST_METHOD(DebugGlobalOption_EnablesLifecycleMessagesOnStderr)
+    {
+        for (const auto debugOption : {L"-D", L"--debug"})
+        {
+            CapturePipe outPipe;
+            CapturePipe errPipe;
+            CLIExecutionContext context{outPipe.file(), false, errPipe.file(), false};
+            CommandInvocation invocation{std::make_unique<RootCommand>(), std::vector<std::wstring>{debugOption, L"version"}};
+
+            invocation.ParseCommandLine(context);
+            invocation.Execute(context);
+
+            VERIFY_IS_TRUE(context.Args.GetValue<ArgType::Debug>());
+            VERIFY_IS_TRUE(context.Terminal.IsDebugEnabled());
+            const auto diagnostics = errPipe.captured();
+            VERIFY_ARE_NOT_EQUAL(std::wstring::npos, diagnostics.find(L" [command-selected] Command: wslc version"));
+            VERIFY_ARE_NOT_EQUAL(std::wstring::npos, diagnostics.find(L" [command-parsing-completed] DurationMs: "));
+            VERIFY_ARE_NOT_EQUAL(std::wstring::npos, diagnostics.find(L" [command-execution-started] Command: wslc version"));
+            VERIFY_ARE_NOT_EQUAL(std::wstring::npos, diagnostics.find(L" [command-execution-completed] Command: wslc version; DurationMs: "));
+        }
+    }
+
+    TEST_METHOD(DebugGlobalOption_ReportsParsingFailure)
+    {
+        CapturePipe outPipe;
+        CapturePipe errPipe;
+        CLIExecutionContext context{outPipe.file(), false, errPipe.file(), false};
+        CommandInvocation invocation{std::make_unique<RootCommand>(), std::vector<std::wstring>{L"-D", L"--unknown"}};
+
+        VERIFY_THROWS(invocation.ParseCommandLine(context), ArgumentException);
+
+        const auto diagnostics = errPipe.captured();
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, diagnostics.find(L" [command-parsing-failed] DurationMs: "));
+    }
+
+    TEST_METHOD(DebugEvent_EvaluatesArgumentsOnlyForEnabledSinks)
+    {
+        {
+            CapturePipe outPipe;
+            CapturePipe errPipe;
+            CLIExecutionContext context{outPipe.file(), false, errPipe.file(), false};
+            int evaluationCount = 0;
+            int traceCount = 0;
+
+            wsl::windows::wslc::events::Dispatch(
+                false,
+                false,
+                [&]() {
+                    ++evaluationCount;
+                    return std::wstring{L"disabled"};
+                },
+                [&](const std::wstring&) { ++traceCount; },
+                [&](const std::wstring& message) { context.Terminal.Debug(L"{}", message); });
+            VERIFY_ARE_EQUAL(0, evaluationCount);
+            VERIFY_ARE_EQUAL(0, traceCount);
+            VERIFY_ARE_EQUAL(std::wstring{}, errPipe.captured());
+
+            wsl::windows::wslc::events::Dispatch(
+                true,
+                false,
+                [&]() {
+                    ++evaluationCount;
+                    return std::wstring{L"trace-only"};
+                },
+                [&](const std::wstring& message) {
+                    ++traceCount;
+                    VERIFY_ARE_EQUAL(std::wstring{L"trace-only"}, message);
+                },
+                [&](const std::wstring& message) { context.Terminal.Debug(L"{}", message); });
+            VERIFY_ARE_EQUAL(1, evaluationCount);
+            VERIFY_ARE_EQUAL(1, traceCount);
+            VERIFY_ARE_EQUAL(std::wstring{}, errPipe.captured());
+        }
+
+        {
+            CapturePipe outPipe;
+            CapturePipe errPipe;
+            CLIExecutionContext context{outPipe.file(), false, errPipe.file(), false};
+            int evaluationCount = 0;
+            const auto value = [&]() {
+                ++evaluationCount;
+                return 42;
+            };
+
+            context.Terminal.SetDebugEnabled(true);
+            WSLC_CLI_EVENT(context, "TestDebugEvent", "test-debug-event", L"Value: {}", value());
+            VERIFY_ARE_EQUAL(1, evaluationCount);
+            const auto diagnostics = errPipe.captured();
+            VERIFY_IS_TRUE(diagnostics.starts_with(L"[debug] "));
+            VERIFY_IS_TRUE(diagnostics.ends_with(L" [test-debug-event] Value: 42\n"));
+        }
+    }
+
     TEST_METHOD(EnvironmentArguments_LocalAppliedOnlyWhenCommandIsSelected)
     {
         ScopedEnvVariable noColor{L"NO_COLOR", L""};

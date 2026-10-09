@@ -361,7 +361,7 @@ HRESULT WSLCSession::Initialize(
     _In_ const WSLCSessionInitSettings* Settings,
     _In_ IWSLCVirtualMachineFactory* VmFactory,
     _In_ IWSLCPluginNotifier* PluginNotifier,
-    _In_opt_ IWarningCallback* WarningCallback)
+    _In_opt_ IDiagnosticCallback* DiagnosticCallback)
 try
 {
     RETURN_HR_IF(E_POINTER, Settings == nullptr || VmFactory == nullptr);
@@ -377,7 +377,7 @@ try
 
     // Set up a warning context for the duration of initialization so that non-fatal
     // failures are streamed to the CLI.
-    WSLCExecutionContext warningContext(this, WarningCallback);
+    WSLCExecutionContext diagnosticContext(this, DiagnosticCallback);
 
     // The VM (and storage VHD) is created lazily on the first operation. Validate the storage
     // configuration eagerly here so misconfiguration is reported at session creation rather than
@@ -964,10 +964,10 @@ try
 }
 CATCH_LOG()
 
-HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, BOOL AllTags, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback)
+HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, BOOL AllTags, IProgressCallback* ProgressCallback, IDiagnosticCallback* DiagnosticCallback)
 try
 {
-    WSLCExecutionContext context(this, WarningCallback);
+    WSLCExecutionContext context(this, DiagnosticCallback);
 
     RETURN_HR_IF_NULL(E_POINTER, Image);
 
@@ -983,6 +983,7 @@ try
     }
 
     EnforceRegistryAllowlist(repo);
+    WSLC_EVENT(context.Diagnostics(), "ImagePullStarted", WSLC_DIAG_CODE_IMAGE_PULL_STARTED, "Image: {}", Image);
 
     auto runtime = m_runtime.Acquire();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
@@ -1007,6 +1008,7 @@ try
         OnImageCreated(Image);
     }
 
+    WSLC_EVENT(context.Diagnostics(), "ImagePullCompleted", WSLC_DIAG_CODE_IMAGE_PULL_COMPLETED, "Image: {}", Image);
     return S_OK;
 }
 CATCH_RETURN();
@@ -1617,10 +1619,11 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::LoadImage(const WSLCHandle ImageHandle, ULONGLONG ContentSize, IWarningCallback* WarningCallback, IImageLoadCallback* LoadCallback)
+HRESULT WSLCSession::LoadImage(const WSLCHandle ImageHandle, ULONGLONG ContentSize, IDiagnosticCallback* DiagnosticCallback, IImageLoadCallback* LoadCallback)
 try
 {
-    WSLCExecutionContext context(this, WarningCallback);
+    WSLCExecutionContext context(this, DiagnosticCallback);
+    WSLC_EVENT(context.Diagnostics(), "ImageLoadStarted", WSLC_DIAG_CODE_IMAGE_LOAD_STARTED, "Size: {} bytes", ContentSize);
 
     auto lock = AcquireLease();
 
@@ -1630,14 +1633,15 @@ try
 
     std::ignore = ImportImageImpl(*requestContext, ImageHandle, LoadCallback);
 
+    WSLC_EVENT(context.Diagnostics(), "ImageLoadCompleted", WSLC_DIAG_CODE_IMAGE_LOAD_COMPLETED, "Size: {} bytes", ContentSize);
     return S_OK;
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ImportImage(const WSLCHandle ImageHandle, LPCSTR ImageName, ULONGLONG ContentSize, IWarningCallback* WarningCallback, LPSTR* ImageId)
+HRESULT WSLCSession::ImportImage(const WSLCHandle ImageHandle, LPCSTR ImageName, ULONGLONG ContentSize, IDiagnosticCallback* DiagnosticCallback, LPSTR* ImageId)
 try
 {
-    WSLCExecutionContext context(this, WarningCallback);
+    WSLCExecutionContext context(this, DiagnosticCallback);
 
     RETURN_HR_IF_NULL(E_POINTER, ImageId);
     *ImageId = nullptr;
@@ -1655,6 +1659,14 @@ try
         repo = reference.Repository.Name;
         tag = tagOrDigest.value();
     }
+
+    WSLC_EVENT(
+        context.Diagnostics(),
+        "ImageImportStarted",
+        WSLC_DIAG_CODE_IMAGE_IMPORT_STARTED,
+        "Name: {}; Size: {} bytes",
+        ImageName != nullptr && *ImageName != '\0' ? ImageName : "<unnamed>",
+        ContentSize);
 
     auto lock = AcquireLease();
 
@@ -1676,6 +1688,7 @@ try
 
     *ImageId = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(imageId->c_str()).release();
 
+    WSLC_EVENT(context.Diagnostics(), "ImageImportCompleted", WSLC_DIAG_CODE_IMAGE_IMPORT_COMPLETED, "ID: {}", imageId.value());
     return S_OK;
 }
 CATCH_RETURN();
@@ -2209,10 +2222,10 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, BOOL AllTags, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback)
+HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, BOOL AllTags, IProgressCallback* ProgressCallback, IDiagnosticCallback* DiagnosticCallback)
 try
 {
-    WSLCExecutionContext context(this, WarningCallback);
+    WSLCExecutionContext context(this, DiagnosticCallback);
 
     RETURN_HR_IF_NULL(E_POINTER, Image);
     RETURN_HR_IF_NULL(E_POINTER, RegistryAuthenticationInformation);
@@ -2229,6 +2242,7 @@ try
     }
 
     EnforceRegistryAllowlist(repo);
+    WSLC_EVENT(context.Diagnostics(), "ImagePushStarted", WSLC_DIAG_CODE_IMAGE_PUSH_STARTED, "Image: {}", Image);
 
     auto lock = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
@@ -2236,6 +2250,7 @@ try
     auto requestContext = m_runtime.Docker().PushImage(repo.Name, tagOrDigest, RegistryAuthenticationInformation);
     StreamImageOperation(*requestContext, Image, "Push", ProgressCallback);
 
+    WSLC_EVENT(context.Diagnostics(), "ImagePushCompleted", WSLC_DIAG_CODE_IMAGE_PUSH_COMPLETED, "Image: {}", Image);
     return S_OK;
 }
 CATCH_RETURN();
@@ -2374,10 +2389,10 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::CreateContainer(const WSLCContainerOptions* containerOptions, IWarningCallback* WarningCallback, IWSLCContainer** Container)
+HRESULT WSLCSession::CreateContainer(const WSLCContainerOptions* containerOptions, IDiagnosticCallback* DiagnosticCallback, IWSLCContainer** Container)
 try
 {
-    WSLCExecutionContext context(this, WarningCallback);
+    WSLCExecutionContext context(this, DiagnosticCallback);
     THROW_HR_IF_NULL(E_POINTER, containerOptions);
     THROW_HR_IF_NULL(E_POINTER, Container);
     THROW_HR_IF_NULL(E_POINTER, containerOptions->Image);
@@ -2391,6 +2406,14 @@ try
         WI_IsAnyFlagSet(containerOptions->InitProcessOptions.Flags, ~WSLCProcessFlagsValid),
         "Invalid process flags: 0x%x",
         containerOptions->InitProcessOptions.Flags);
+
+    WSLC_EVENT(
+        context.Diagnostics(),
+        "ContainerCreationStarted",
+        WSLC_DIAG_CODE_CONTAINER_CREATION_STARTED,
+        "Image: {}; Name: {}",
+        containerOptions->Image,
+        containerOptions->Name != nullptr && *containerOptions->Name != '\0' ? containerOptions->Name : "<generated>");
 
     auto lock = AcquireLease();
 
@@ -2406,6 +2429,17 @@ try
         TraceLoggingValue(containerOptions->Image, "Image"),
         TraceLoggingValue(m_displayName.c_str(), "SessionName"),
         TraceLoggingValue(m_creatorProcessName.c_str(), "CreatorProcess"));
+
+    if (SUCCEEDED(result))
+    {
+        WSLC_EVENT(
+            context.Diagnostics(),
+            "ContainerCreationCompleted",
+            WSLC_DIAG_CODE_CONTAINER_CREATION_COMPLETED,
+            "Image: {}; Name: {}",
+            containerOptions->Image,
+            containerOptions->Name != nullptr && *containerOptions->Name != '\0' ? containerOptions->Name : "<generated>");
+    }
 
     return result;
 }
@@ -3122,10 +3156,10 @@ try
 CATCH_RETURN();
 
 HRESULT WSLCSession::PruneVolumes(
-    const WSLCFilter* Filters, ULONG FiltersCount, IWarningCallback* WarningCallback, WSLCVolumeName** Volumes, ULONG* VolumesCount, ULONGLONG* SpaceReclaimed)
+    const WSLCFilter* Filters, ULONG FiltersCount, IDiagnosticCallback* DiagnosticCallback, WSLCVolumeName** Volumes, ULONG* VolumesCount, ULONGLONG* SpaceReclaimed)
 try
 {
-    WSLCExecutionContext context(this, WarningCallback);
+    WSLCExecutionContext context(this, DiagnosticCallback);
 
     RETURN_HR_IF_NULL(E_POINTER, Volumes);
     RETURN_HR_IF_NULL(E_POINTER, VolumesCount);
@@ -3135,6 +3169,7 @@ try
     *SpaceReclaimed = 0;
 
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
+    WSLC_EVENT(context.Diagnostics(), "VolumePruneStarted", WSLC_DIAG_CODE_VOLUME_PRUNE_STARTED, "Filters: {}", FiltersCount);
 
     auto lock = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVolumes());
@@ -3164,16 +3199,23 @@ try
         *VolumesCount = static_cast<ULONG>(pruneResult.Volumes.size());
     }
 
+    WSLC_EVENT(
+        context.Diagnostics(),
+        "VolumePruneCompleted",
+        WSLC_DIAG_CODE_VOLUME_PRUNE_COMPLETED,
+        "Volumes: {}; Reclaimed: {} bytes",
+        pruneResult.Volumes.size(),
+        pruneResult.SpaceReclaimed);
     return S_OK;
 }
 CATCH_RETURN();
 
 // Network management.
 
-HRESULT WSLCSession::CreateNetwork(const WSLCNetworkOptions* Options, IWarningCallback* WarningCallback)
+HRESULT WSLCSession::CreateNetwork(const WSLCNetworkOptions* Options, IDiagnosticCallback* DiagnosticCallback)
 try
 {
-    WSLCExecutionContext context(this, WarningCallback);
+    WSLCExecutionContext context(this, DiagnosticCallback);
 
     RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Options->Name);
@@ -3188,6 +3230,7 @@ try
 
     auto driverOpts = wslutil::ParseKeyValuePairs(Options->DriverOpts, Options->DriverOptsCount);
     auto labels = wslutil::ParseKeyValuePairs(Options->Labels, Options->LabelsCount, WSLCNetworkManagedLabel);
+    WSLC_EVENT(context.Diagnostics(), "NetworkCreationStarted", WSLC_DIAG_CODE_NETWORK_CREATION_STARTED, "Name: {}; Driver: {}", name, driver);
 
     auto lock = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
@@ -3290,10 +3333,9 @@ try
     auto [it, inserted] = m_networks.insert({name, std::move(entry)});
     WI_VERIFY(inserted);
 
-    WSL_LOG("NetworkCreated", TraceLoggingValue(name.c_str(), "NetworkName"), TraceLoggingValue(full.Id.c_str(), "NetworkId"));
+    WSLC_EVENT(context.Diagnostics(), "NetworkCreated", WSLC_DIAG_CODE_NETWORK_CREATION_COMPLETED, "Name: {}; Driver: {}; ID: {}", name, driver, full.Id);
 
     removeNetworkCleanup.release();
-
     return S_OK;
 }
 CATCH_RETURN();

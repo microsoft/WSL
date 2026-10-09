@@ -21,6 +21,8 @@ Abstract:
 #include "Invocation.h"
 #include "RootCommand.h"
 
+#include <chrono>
+
 using namespace wsl::shared;
 using namespace wsl::windows::common;
 using namespace wsl::windows::wslc::execution;
@@ -63,6 +65,17 @@ try
 
     // Must be declared after COM init; it holds COM references.
     CLIExecutionContext context;
+    const auto invocationStart = std::chrono::steady_clock::now();
+    const auto completeInvocation = [&](int exitCode) {
+        WSLC_CLI_EVENT(
+            context,
+            "CommandCompleted",
+            WSLC_DIAG_CODE_COMMAND_COMPLETED,
+            L"ExitCode: {}; DurationMs: {}",
+            exitCode,
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - invocationStart).count());
+        return exitCode;
+    };
 
     // SetConsoleCtrlHandler only accepts plain function pointers, so route Ctrl-C
     // through a static reference into the context.
@@ -108,22 +121,22 @@ try
     catch (const ArgumentException& ae)
     {
         invocation.OutputHelp(context.Terminal, HelpOutput::Argument, &ae, ae.Arguments());
-        return 1;
+        return completeInvocation(1);
     }
     catch (const CommandException& ce)
     {
         invocation.OutputHelp(context.Terminal, HelpOutput::Command, &ce);
-        return 1;
+        return completeInvocation(1);
     }
     catch (const ExecutionException& ee)
     {
         context.Terminal.Error(L"{}\n", ee.Message());
-        return 1;
+        return completeInvocation(1);
     }
     catch (const TerminateException&)
     {
         // The user declined a confirmation prompt, so the requested action is not performed.
-        return 0;
+        return completeInvocation(0);
     }
     catch (...)
     {
@@ -141,7 +154,7 @@ try
             // for cancellation is exit code 130, which is used by Docker compose and most shells.
             // TODO: Consider switching to 130 or differentiate the cancellation types when we have
             // more than image cancellation supported.
-            return 1;
+            return completeInvocation(1);
         }
 
         // Using WSL shared utility to get the HRESULT from the caught exception.
@@ -156,10 +169,10 @@ try
 
     if (context.ExitCode.has_value())
     {
-        return context.ExitCode.value();
+        return completeInvocation(context.ExitCode.value());
     }
 
-    return FAILED(result) ? 1 : 0;
+    return completeInvocation(FAILED(result) ? 1 : 0);
 }
 catch (...)
 {

@@ -28,6 +28,7 @@ Abstract:
 --*/
 
 #include "WSLCSessionManager.h"
+#include "WSLCDiagnostics.h"
 #include "HcsVirtualMachine.h"
 #include "WSLCUserSettings.h"
 #include "WSLCSessionDefaults.h"
@@ -184,19 +185,23 @@ try
 CATCH_LOG()
 
 void WSLCSessionManagerImpl::CreateSession(
-    _In_ const WSLCSessionSettings* Settings, _In_ WSLCSessionFlags Flags, _In_opt_ IWarningCallback* WarningCallback, _Out_ IWSLCSession** WslcSession)
+    _In_ const WSLCSessionSettings* Settings, _In_ WSLCSessionFlags Flags, _In_opt_ IDiagnosticCallback* DiagnosticCallback, _Out_ IWSLCSession** WslcSession)
 {
     THROW_HR_IF_NULL(E_POINTER, WslcSession);
+
+    wsl::windows::wslc::diagnostics::DiagnosticReporter diagnostics{DiagnosticCallback};
+    WSLC_EVENT(diagnostics, "SessionResolutionStarted", WSLC_DIAG_CODE_SESSION_RESOLUTION_STARTED, "{}", "");
 
     auto tokenInfo = GetCallingProcessTokenInfo();
     const auto callerToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
 
-    // Resolve display name upfront (for both default and custom sessions).
     std::wstring resolvedDisplayName;
+    std::optional<std::wstring> callerUserName;
     if (Settings == nullptr)
     {
         // Default session: name determined from token, qualified with username.
-        resolvedDisplayName = ResolveDefaultSessionName(tokenInfo);
+        callerUserName = ResolveUserName(tokenInfo);
+        resolvedDisplayName = ResolveDefaultSessionName(tokenInfo.Elevated, *callerUserName);
         Flags = WSLCSessionFlagsOpenExisting | WSLCSessionFlagsPersistent;
     }
     else
@@ -217,7 +222,16 @@ void WSLCSessionManagerImpl::CreateSession(
         THROW_HR_IF(WSLC_E_SESSION_RESERVED, IsReservedSessionName(Settings->DisplayName));
 
         resolvedDisplayName = Settings->DisplayName;
+        if (wsl::windows::wslc::events::IsTraceEnabled() || diagnostics.IsEnabled(WSLCDiagnosticLevelDebug))
+        {
+            LOG_IF_FAILED(wil::ResultFromException([&]() { callerUserName = ResolveUserName(tokenInfo); }));
+        }
     }
+
+    const auto sanitizeDisplayName = [&]() {
+        return callerUserName.has_value() ? wsl::windows::wslc::diagnostics::SanitizeUserName(resolvedDisplayName, *callerUserName)
+                                          : std::wstring{L"<session>"};
+    };
 
     std::lock_guard lock(m_wslcSessionsLock);
 
@@ -240,9 +254,11 @@ void WSLCSessionManagerImpl::CreateSession(
     if (result.has_value())
     {
         THROW_IF_FAILED(result.value());
+        WSLC_EVENT(diagnostics, "SessionOpened", WSLC_DIAG_CODE_SESSION_OPENED, L"Name: {}", sanitizeDisplayName());
         return; // Existing session was opened.
     }
 
+    WSLC_EVENT(diagnostics, "SessionCreationStarted", WSLC_DIAG_CODE_SESSION_CREATION_STARTED, L"Name: {}", sanitizeDisplayName());
     wslutil::StopWatch stopWatch;
 
     // Initialize settings for the default session.
@@ -293,13 +309,14 @@ void WSLCSessionManagerImpl::CreateSession(
 
         // Launch per-user COM server factory and add it to a fresh per-session job object for crash cleanup.
         auto factory = wslutil::CreateComServerAsUser<IWSLCSessionFactory>(__uuidof(WSLCSessionFactory), userToken.get());
+        WSLC_EVENT(diagnostics, "SessionProcessCreated", WSLC_DIAG_CODE_SESSION_PROCESS_CREATED, L"Name: {}; ID: {}", sanitizeDisplayName(), sessionId);
         wil::unique_handle sessionJob = CreateSessionProcessJob(factory.get());
 
         const auto sessionSettings = CreateSessionSettings(sessionId, callerFileName.c_str(), Settings, resolvedDisplayName.c_str());
         wil::com_ptr<IWSLCSession> session;
         wil::com_ptr<IWSLCSessionReference> serviceRef;
         const auto factoryHr =
-            factory->CreateSession(&sessionSettings, vmFactory.Get(), notifier.Get(), WarningCallback, &session, &serviceRef);
+            factory->CreateSession(&sessionSettings, vmFactory.Get(), notifier.Get(), DiagnosticCallback, &session, &serviceRef);
         if (FAILED(factoryHr))
         {
             if (auto comError = wslutil::GetCOMErrorInfo(); comError && comError->Message)
@@ -349,6 +366,7 @@ void WSLCSessionManagerImpl::CreateSession(
         }
 
         *WslcSession = session.detach();
+        WSLC_EVENT(diagnostics, "SessionCreationCompleted", WSLC_DIAG_CODE_SESSION_CREATION_COMPLETED, L"Name: {}; ID: {}", sanitizeDisplayName(), sessionId);
     });
 
     // This telemetry event is used to keep track of session creation performance (via CreationTimeMs) and failure reasons (via Result).
@@ -405,7 +423,7 @@ void WSLCSessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLCSession
     std::wstring resolvedName;
     if (DisplayName == nullptr)
     {
-        resolvedName = ResolveDefaultSessionName(tokenInfo);
+        resolvedName = ResolveDefaultSessionName(tokenInfo.Elevated, ResolveUserName(tokenInfo));
         DisplayName = resolvedName.c_str();
     }
 
@@ -456,14 +474,14 @@ void WSLCSessionManagerImpl::ListSessions(_Out_ WSLCSessionListEntry** Sessions,
 }
 
 void WSLCSessionManagerImpl::EnterSession(
-    _In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, _In_opt_ IWarningCallback* WarningCallback, _Out_ IWSLCSession** WslcSession)
+    _In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, _In_opt_ IDiagnosticCallback* DiagnosticCallback, _Out_ IWSLCSession** WslcSession)
 {
     THROW_HR_IF(E_POINTER, DisplayName == nullptr || StoragePath == nullptr);
     THROW_HR_IF(E_INVALIDARG, DisplayName[0] == L'\0' || StoragePath[0] == L'\0');
 
     const auto callerToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     auto sessionSettings = SessionSettings::Custom(callerToken.get(), DisplayName, StoragePath, WSLCSessionStorageFlagsNoCreate);
-    CreateSession(&sessionSettings.Settings, WSLCSessionFlagsNone, WarningCallback, WslcSession);
+    CreateSession(&sessionSettings.Settings, WSLCSessionFlagsNone, DiagnosticCallback, WslcSession);
 }
 
 WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
@@ -509,10 +527,8 @@ CallingProcessTokenInfo WSLCSessionManagerImpl::GetCallingProcessTokenInfo()
     return {std::move(tokenInfo), elevated};
 }
 
-std::wstring WSLCSessionManagerImpl::ResolveDefaultSessionName(const CallingProcessTokenInfo& TokenInfo)
+std::wstring WSLCSessionManagerImpl::ResolveUserName(const CallingProcessTokenInfo& TokenInfo)
 {
-    // Look up the username from the caller's SID so each user gets their own
-    // default session (e.g. "wslc-cli-alice", "wslc-cli-admin-bob").
     wchar_t username[256 + 1] = {};
     DWORD usernameLen = ARRAYSIZE(username);
     wchar_t domain[MAX_PATH] = {};
@@ -520,8 +536,13 @@ std::wstring WSLCSessionManagerImpl::ResolveDefaultSessionName(const CallingProc
     SID_NAME_USE sidType;
     THROW_IF_WIN32_BOOL_FALSE(LookupAccountSidW(nullptr, TokenInfo.TokenInfo->User.Sid, username, &usernameLen, domain, &domainLen, &sidType));
 
-    auto baseName = TokenInfo.Elevated ? wsl::windows::wslc::DefaultAdminSessionName : wsl::windows::wslc::DefaultSessionName;
-    return std::format(L"{}-{}", baseName, username);
+    return username;
+}
+
+std::wstring WSLCSessionManagerImpl::ResolveDefaultSessionName(bool Elevated, std::wstring_view UserName)
+{
+    const auto baseName = Elevated ? wsl::windows::wslc::DefaultAdminSessionName : wsl::windows::wslc::DefaultSessionName;
+    return std::format(L"{}-{}", baseName, UserName);
 }
 
 bool WSLCSessionManagerImpl::IsReservedSessionName(LPCWSTR Name)
@@ -603,20 +624,20 @@ try
 CATCH_RETURN();
 
 HRESULT WSLCSessionManager::CreateSession(
-    const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWarningCallback* WarningCallback, IWSLCSession** WslcSession)
+    const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IDiagnosticCallback* DiagnosticCallback, IWSLCSession** WslcSession)
 try
 {
     COMServiceExecutionContext context;
 
-    return CallImpl(&WSLCSessionManagerImpl::CreateSession, WslcSessionSettings, Flags, WarningCallback, WslcSession);
+    return CallImpl(&WSLCSessionManagerImpl::CreateSession, WslcSessionSettings, Flags, DiagnosticCallback, WslcSession);
 }
 CATCH_RETURN();
 
-HRESULT WSLCSessionManager::EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWarningCallback* WarningCallback, IWSLCSession** WslcSession)
+HRESULT WSLCSessionManager::EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IDiagnosticCallback* DiagnosticCallback, IWSLCSession** WslcSession)
 {
     COMServiceExecutionContext context;
 
-    return CallImpl(&WSLCSessionManagerImpl::EnterSession, DisplayName, StoragePath, WarningCallback, WslcSession);
+    return CallImpl(&WSLCSessionManagerImpl::EnterSession, DisplayName, StoragePath, DiagnosticCallback, WslcSession);
 }
 
 HRESULT WSLCSessionManager::ListSessions(_Out_ WSLCSessionListEntry** Sessions, _Out_ ULONG* SessionsCount)

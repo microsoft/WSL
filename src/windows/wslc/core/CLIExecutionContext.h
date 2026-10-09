@@ -15,6 +15,8 @@ Abstract:
 #include "ArgMap.h"
 #include "ExecutionContextData.h"
 #include "Terminal.h"
+#include "WSLCEvent.h"
+#include "WslTelemetry.h"
 #include <optional>
 
 namespace wsl::windows::wslc::execution {
@@ -24,6 +26,10 @@ using namespace wsl::windows::wslc::cli;
 struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 {
     CLIExecutionContext() : wsl::windows::common::ExecutionContext(wsl::windows::common::Context::WslC)
+    {
+    }
+    CLIExecutionContext(FILE* outFile, bool outVtEnabled, FILE* errFile, bool errVtEnabled) :
+        wsl::windows::common::ExecutionContext(wsl::windows::common::Context::WslC), Terminal(outFile, outVtEnabled, errFile, errVtEnabled)
     {
     }
     ~CLIExecutionContext() override = default;
@@ -63,3 +69,28 @@ protected:
 };
 
 } // namespace wsl::windows::wslc::execution
+
+// CLI events are always available through TraceLogging and are mirrored to stderr
+// as "[code] message" when debug output is enabled. Message arguments are evaluated
+// once when either sink is enabled.
+#define WSLC_CLI_EVENT(Context, Name, Code, Format, ...) \
+    do \
+    { \
+        auto&& _wslcDebugContext = (Context); \
+        const bool _wslcDebugTraceEnabled = ::wsl::windows::wslc::events::IsTraceEnabled(); \
+        const bool _wslcDebugOutputEnabled = _wslcDebugContext.Terminal.IsDebugEnabled(); \
+        ::wsl::windows::wslc::events::Dispatch( \
+            _wslcDebugTraceEnabled, \
+            _wslcDebugOutputEnabled, \
+            [&]() { return ::wsl::windows::wslc::events::FormatMessage((Format), __VA_ARGS__); }, \
+            [&](const std::wstring& _wslcDebugMessage) { \
+                WSL_LOG( \
+                    Name, \
+                    TraceLoggingLevel(WINEVENT_LEVEL_VERBOSE), \
+                    TraceLoggingString((Code), "DiagnosticCode"), \
+                    TraceLoggingWideString(_wslcDebugMessage.c_str(), "Message")); \
+            }, \
+            [&](const std::wstring& _wslcDebugMessage) { \
+                _wslcDebugContext.Terminal.Debug(L"{}", ::wsl::windows::wslc::events::FormatDebugEvent((Code), _wslcDebugMessage)); \
+            }); \
+    } while (false)

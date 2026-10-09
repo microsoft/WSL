@@ -328,9 +328,9 @@ void wsl::windows::common::WSLCContainerLauncher::SetPrimaryNetworkIpAddress(std
 }
 
 std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::LaunchNoThrow(
-    IWSLCSession& Session, WSLCContainerStartFlags Flags, IWarningCallback* WarningCallback)
+    IWSLCSession& Session, WSLCContainerStartFlags Flags, IDiagnosticCallback* DiagnosticCallback)
 {
-    auto [result, container] = CreateNoThrow(Session, WarningCallback);
+    auto [result, container] = CreateNoThrow(Session, DiagnosticCallback);
     if (FAILED(result))
     {
         return std::make_pair(result, std::optional<RunningWSLCContainer>{});
@@ -340,12 +340,12 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::L
     startOptions.TtyRows = m_rows;
     startOptions.TtyColumns = m_columns;
 
-    result = container.value().Get().Start(Flags, &startOptions, WarningCallback);
+    result = container.value().Get().Start(Flags, &startOptions, DiagnosticCallback);
 
     return std::make_pair(result, std::move(container));
 }
 
-std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::CreateNoThrow(IWSLCSession& Session, IWarningCallback* WarningCallback)
+std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::CreateNoThrow(IWSLCSession& Session, IDiagnosticCallback* DiagnosticCallback)
 {
     WSLCContainerOptions options{};
     options.Image = m_image.c_str();
@@ -499,7 +499,7 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
 
     // TODO: Support volumes, ports, flags, container networking mode, etc.
     wil::com_ptr<IWSLCContainer> container;
-    auto result = Session.CreateContainer(&options, WarningCallback, &container);
+    auto result = Session.CreateContainer(&options, DiagnosticCallback, &container);
     if (FAILED(result))
     {
         return std::pair<HRESULT, std::optional<RunningWSLCContainer>>(result, std::optional<RunningWSLCContainer>{});
@@ -508,17 +508,17 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     return std::make_pair(S_OK, std::move(RunningWSLCContainer{std::move(container), m_flags}));
 }
 
-RunningWSLCContainer WSLCContainerLauncher::Create(IWSLCSession& Session, IWarningCallback* WarningCallback)
+RunningWSLCContainer WSLCContainerLauncher::Create(IWSLCSession& Session, IDiagnosticCallback* DiagnosticCallback)
 {
-    auto [result, container] = CreateNoThrow(Session, WarningCallback);
+    auto [result, container] = CreateNoThrow(Session, DiagnosticCallback);
     THROW_IF_FAILED(result);
 
     return std::move(container.value());
 }
 
-RunningWSLCContainer WSLCContainerLauncher::Launch(IWSLCSession& Session, WSLCContainerStartFlags Flags, IWarningCallback* WarningCallback)
+RunningWSLCContainer WSLCContainerLauncher::Launch(IWSLCSession& Session, WSLCContainerStartFlags Flags, IDiagnosticCallback* DiagnosticCallback)
 {
-    auto [result, container] = LaunchNoThrow(Session, Flags, WarningCallback);
+    auto [result, container] = LaunchNoThrow(Session, Flags, DiagnosticCallback);
     THROW_IF_FAILED(result);
 
     return std::move(container.value());

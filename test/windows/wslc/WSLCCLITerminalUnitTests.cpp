@@ -16,9 +16,12 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCCLITestHelpers.h"
 
+#include "APICompat.h"
 #include "InputChannel.h"
 #include "OutputChannel.h"
+#include "DiagnosticCallback.h"
 #include "Terminal.h"
+#include "WSLCDiagnostics.h"
 
 using namespace wsl::windows::wslc;
 using namespace wsl::windows::wslc::cli;
@@ -56,6 +59,75 @@ struct InputCaptureTerminal
     {
     }
 };
+
+struct TestDiagnosticCallback : Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IDiagnosticCallback>
+{
+    HRESULT GetEnabledLevels(WSLCDiagnosticLevel* levels) override
+    {
+        RETURN_HR_IF_NULL(E_POINTER, levels);
+        ++EnabledLevelsQueryCount;
+        RETURN_IF_FAILED(GetEnabledLevelsResult);
+        *levels = EnabledLevels;
+        return S_OK;
+    }
+
+    HRESULT OnDiagnostic(const WSLCDiagnosticEvent* event) override
+    {
+        RETURN_HR_IF_NULL(E_POINTER, event);
+        ++DiagnosticCount;
+        LastLevel = event->Level;
+        LastCode = event->Code == nullptr ? "" : event->Code;
+        LastMessage = event->Message == nullptr ? L"" : event->Message;
+        return OnDiagnosticResult;
+    }
+
+    WSLCDiagnosticLevel EnabledLevels = WSLCDiagnosticLevelNone;
+    HRESULT GetEnabledLevelsResult = S_OK;
+    HRESULT OnDiagnosticResult = S_OK;
+    size_t EnabledLevelsQueryCount = 0;
+    size_t DiagnosticCount = 0;
+    WSLCDiagnosticLevel LastLevel = WSLCDiagnosticLevelNone;
+    std::string LastCode;
+    std::wstring LastMessage;
+};
+
+struct TestCompatWarningCallback
+    : Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCCompatWarningCallback>
+{
+    HRESULT OnWarning(LPCWSTR message) override
+    {
+        RETURN_HR_IF_NULL(E_INVALIDARG, message);
+        ++WarningCount;
+        LastMessage = message;
+        return S_OK;
+    }
+
+    size_t WarningCount = 0;
+    std::wstring LastMessage;
+};
+
+ULONGLONG DiagnosticTimestamp(const SYSTEMTIME& systemTime)
+{
+    FILETIME fileTime{};
+    THROW_LAST_ERROR_IF(!SystemTimeToFileTime(&systemTime, &fileTime));
+
+    ULARGE_INTEGER timestamp{};
+    timestamp.LowPart = fileTime.dwLowDateTime;
+    timestamp.HighPart = fileTime.dwHighDateTime;
+    return timestamp.QuadPart;
+}
+
+WSLCDiagnosticEvent DiagnosticEvent(
+    WSLCDiagnosticLevel level, LPCSTR code, LPCWSTR message = nullptr, ULONGLONG timestamp = wsl::windows::wslc::events::GetCurrentTimestamp())
+{
+    WSLCDiagnosticEvent event{};
+    event.SchemaVersion = WSLC_DIAGNOSTIC_SCHEMA_VERSION;
+    event.Timestamp = timestamp;
+    event.Level = level;
+    event.Code = code;
+    event.Message = message;
+    return event;
+}
 
 class WSLCCLITerminalUnitTests
 {
@@ -237,11 +309,318 @@ class WSLCCLITerminalUnitTests
 
         cap.terminal.Output(L"output text\n");
         cap.terminal.Info(L"info text\n");
+        cap.terminal.Debug(L"hidden debug text\n");
         cap.terminal.Warn(L"warn text\n");
         cap.terminal.Error(L"error text\n");
 
         VERIFY_ARE_EQUAL(std::wstring{L"output text\n"}, cap.outPipe.captured());
         VERIFY_ARE_EQUAL(std::wstring{L"info text\nwarn text\nerror text\n"}, cap.errPipe.captured());
+    }
+
+    TEST_METHOD(Terminal_DebugOutputIsFilteredAndRoutedToStderr)
+    {
+        {
+            SplitCaptureTerminal cap;
+
+            VERIFY_IS_FALSE(cap.terminal.IsDebugEnabled());
+            cap.terminal.Debug(L"hidden\n");
+            VERIFY_ARE_EQUAL(std::wstring{}, cap.errPipe.captured());
+        }
+
+        {
+            SplitCaptureTerminal cap;
+            cap.terminal.SetDebugEnabled(true);
+            VERIFY_IS_TRUE(cap.terminal.IsDebugEnabled());
+            cap.terminal.Debug(L"value={}\n", 42);
+
+            VERIFY_ARE_EQUAL(std::wstring{}, cap.outPipe.captured());
+            VERIFY_ARE_EQUAL(std::wstring{L"value=42\n"}, cap.errPipe.captured());
+        }
+
+        {
+            SplitCaptureTerminal cap{/*vt*/ true};
+            cap.terminal.SetDebugEnabled(true);
+            cap.terminal.Debug(L"value={}\n", 42);
+
+            const auto output = cap.errPipe.captured();
+            const auto prefix = Format::Dim.Get();
+            const auto suffix = Format::Default.Get();
+            const bool hasFormatting =
+                output.size() >= prefix.size() + suffix.size() && output.starts_with(prefix) && output.ends_with(suffix);
+            VERIFY_IS_TRUE(hasFormatting);
+            if (hasFormatting)
+            {
+                VERIFY_ARE_EQUAL(
+                    std::wstring{L"value=42\n"},
+                    std::wstring{std::wstring_view{output}.substr(prefix.size(), output.size() - prefix.size() - suffix.size())});
+            }
+        }
+
+        {
+            SplitCaptureTerminal cap{/*vt*/ true};
+            cap.terminal.SetNoColor(true);
+            cap.terminal.SetDebugEnabled(true);
+            cap.terminal.Debug(L"value={}\n", 42);
+
+            VERIFY_ARE_EQUAL(std::wstring{L"value=42\n"}, cap.errPipe.captured());
+        }
+    }
+
+    TEST_METHOD(DiagnosticCallback_AdvertisesAndRoutesEnabledLevels)
+    {
+        {
+            SplitCaptureTerminal cap;
+            services::DiagnosticCallback callback(cap.terminal);
+
+            WSLCDiagnosticLevel levels{};
+            VERIFY_ARE_EQUAL(E_POINTER, callback.GetEnabledLevels(nullptr));
+            VERIFY_SUCCEEDED(callback.GetEnabledLevels(&levels));
+            VERIFY_IS_FALSE(WI_IsFlagSet(levels, WSLCDiagnosticLevelDebug));
+            VERIFY_IS_TRUE(WI_IsFlagSet(levels, WSLCDiagnosticLevelWarning));
+
+            const auto debugEvent = DiagnosticEvent(WSLCDiagnosticLevelDebug, WSLC_DIAG_CODE_SESSION_RESOLUTION_STARTED);
+            const auto warningEvent = DiagnosticEvent(WSLCDiagnosticLevelWarning, WSLC_DIAG_CODE_USER_WARNING, L"warning\n");
+            const auto invalidLevelEvent = DiagnosticEvent(static_cast<WSLCDiagnosticLevel>(0x2), "invalid-level");
+            auto invalidVersionEvent = DiagnosticEvent(WSLCDiagnosticLevelWarning, "invalid-version", L"warning\n");
+            ++invalidVersionEvent.SchemaVersion;
+            const auto missingCodeEvent = DiagnosticEvent(WSLCDiagnosticLevelWarning, nullptr, L"warning\n");
+            const auto missingWarningMessage = DiagnosticEvent(WSLCDiagnosticLevelWarning, WSLC_DIAG_CODE_USER_WARNING);
+
+            VERIFY_ARE_EQUAL(E_POINTER, callback.OnDiagnostic(nullptr));
+            VERIFY_SUCCEEDED(callback.OnDiagnostic(&debugEvent));
+            VERIFY_SUCCEEDED(callback.OnDiagnostic(&warningEvent));
+            VERIFY_ARE_EQUAL(E_INVALIDARG, callback.OnDiagnostic(&invalidLevelEvent));
+            VERIFY_ARE_EQUAL(E_INVALIDARG, callback.OnDiagnostic(&invalidVersionEvent));
+            VERIFY_ARE_EQUAL(E_INVALIDARG, callback.OnDiagnostic(&missingCodeEvent));
+            VERIFY_ARE_EQUAL(E_INVALIDARG, callback.OnDiagnostic(&missingWarningMessage));
+            VERIFY_ARE_EQUAL(std::wstring{L"warning\n"}, cap.errPipe.captured());
+        }
+
+        {
+            SplitCaptureTerminal cap;
+            cap.terminal.SetDebugEnabled(true);
+            services::DiagnosticCallback callback(cap.terminal);
+
+            WSLCDiagnosticLevel levels{};
+            VERIFY_SUCCEEDED(callback.GetEnabledLevels(&levels));
+            VERIFY_IS_TRUE(WI_IsFlagSet(levels, WSLCDiagnosticLevelDebug));
+            const SYSTEMTIME eventTime{.wYear = 2026, .wMonth = 9, .wDay = 25, .wHour = 22, .wMinute = 27, .wSecond = 4, .wMilliseconds = 492};
+            const auto timestamp = DiagnosticTimestamp(eventTime);
+            const auto sessionEvent =
+                DiagnosticEvent(WSLCDiagnosticLevelDebug, WSLC_DIAG_CODE_SESSION_RESOLUTION_STARTED, L"Name: test\r\n\x1b[31m", timestamp);
+            const auto emptyEvent = DiagnosticEvent(WSLCDiagnosticLevelDebug, "empty-event", L"", timestamp);
+            const auto futureEvent = DiagnosticEvent(WSLCDiagnosticLevelDebug, "future-event", nullptr, timestamp);
+            VERIFY_SUCCEEDED(callback.OnDiagnostic(&sessionEvent));
+            VERIFY_SUCCEEDED(callback.OnDiagnostic(&emptyEvent));
+            VERIFY_SUCCEEDED(callback.OnDiagnostic(&futureEvent));
+
+            VERIFY_ARE_EQUAL(
+                std::wstring{L"[debug] 2026-09-25T22:27:04.492Z [session-resolution-started] Name: test\\r\\n\\u001B[31m\n"
+                             L"[debug] 2026-09-25T22:27:04.492Z [empty-event]\n"
+                             L"[debug] 2026-09-25T22:27:04.492Z [future-event]\n"},
+                cap.errPipe.captured());
+        }
+    }
+
+    TEST_METHOD(DiagnosticCallback_PreservesSdkWarningContract)
+    {
+        constexpr GUID expectedIid{0x290C58A1, 0x328C, 0x4E90, {0xB0, 0x9B, 0x0A, 0x9D, 0x32, 0xC4, 0x00, 0x74}};
+        VERIFY_IS_TRUE(IsEqualGUID(expectedIid, __uuidof(IWSLCCompatWarningCallback)));
+
+        auto warningCallback = Microsoft::WRL::Make<TestCompatWarningCallback>();
+        const auto diagnosticCallback = wsl::windows::common::apicompat::Convert(warningCallback.Get());
+        VERIFY_IS_NOT_NULL(diagnosticCallback.Get());
+
+        WSLCDiagnosticLevel levels{};
+        VERIFY_SUCCEEDED(diagnosticCallback->GetEnabledLevels(&levels));
+        VERIFY_ARE_EQUAL(WSLCDiagnosticLevelWarning, levels);
+
+        const auto warningEvent = DiagnosticEvent(WSLCDiagnosticLevelWarning, WSLC_DIAG_CODE_USER_WARNING, L"sdk warning\n");
+        VERIFY_SUCCEEDED(diagnosticCallback->OnDiagnostic(&warningEvent));
+        VERIFY_ARE_EQUAL(size_t{1}, warningCallback->WarningCount);
+        VERIFY_ARE_EQUAL(std::wstring{L"sdk warning\n"}, warningCallback->LastMessage);
+
+        const auto debugEvent = DiagnosticEvent(WSLCDiagnosticLevelDebug, "debug", L"not supported by the SDK callback");
+        const auto missingMessageEvent = DiagnosticEvent(WSLCDiagnosticLevelWarning, WSLC_DIAG_CODE_USER_WARNING);
+        VERIFY_ARE_EQUAL(E_INVALIDARG, diagnosticCallback->OnDiagnostic(&debugEvent));
+        VERIFY_ARE_EQUAL(E_INVALIDARG, diagnosticCallback->OnDiagnostic(&missingMessageEvent));
+        VERIFY_ARE_EQUAL(size_t{1}, warningCallback->WarningCount);
+    }
+
+    TEST_METHOD(DiagnosticHelpers_FilterAndIgnoreCallbackFailures)
+    {
+        TestDiagnosticCallback callback;
+        callback.EnabledLevels = WSLCDiagnosticLevelWarning;
+
+        HRESULT queryResult{};
+        const auto enabledLevels = wsl::windows::wslc::diagnostics::GetEnabledLevels(&callback, &queryResult);
+        VERIFY_SUCCEEDED(queryResult);
+        VERIFY_ARE_EQUAL(callback.EnabledLevels, enabledLevels);
+
+        wsl::windows::wslc::diagnostics::Report(&callback, enabledLevels, WSLCDiagnosticLevelDebug, "debug", L"filtered");
+        VERIFY_ARE_EQUAL(size_t{0}, callback.DiagnosticCount);
+
+        callback.OnDiagnosticResult = E_FAIL;
+        wsl::windows::wslc::diagnostics::Report(
+            &callback, enabledLevels, WSLCDiagnosticLevelWarning, WSLC_DIAG_CODE_USER_WARNING, L"warning");
+        VERIFY_ARE_EQUAL(size_t{1}, callback.DiagnosticCount);
+        VERIFY_ARE_EQUAL(WSLCDiagnosticLevelWarning, callback.LastLevel);
+        VERIFY_ARE_EQUAL(std::string{WSLC_DIAG_CODE_USER_WARNING}, callback.LastCode);
+        VERIFY_ARE_EQUAL(std::wstring{L"warning"}, callback.LastMessage);
+
+        callback.EnabledLevels = static_cast<WSLCDiagnosticLevel>(0x10);
+        VERIFY_ARE_EQUAL(WSLCDiagnosticLevelNone, wsl::windows::wslc::diagnostics::GetEnabledLevels(&callback, &queryResult));
+        VERIFY_ARE_EQUAL(E_INVALIDARG, queryResult);
+
+        callback.GetEnabledLevelsResult = E_FAIL;
+        VERIFY_ARE_EQUAL(WSLCDiagnosticLevelNone, wsl::windows::wslc::diagnostics::GetEnabledLevels(&callback, &queryResult));
+        VERIFY_ARE_EQUAL(E_FAIL, queryResult);
+    }
+
+    TEST_METHOD(DiagnosticReporter_PreservesCallbackFailures)
+    {
+        TestDiagnosticCallback callback;
+        callback.GetEnabledLevelsResult = E_FAIL;
+
+        wsl::windows::wslc::diagnostics::DiagnosticReporter negotiationFailure{&callback};
+        VERIFY_IS_FALSE(negotiationFailure.IsCallbackReady());
+        VERIFY_IS_FALSE(negotiationFailure.IsEnabled(WSLCDiagnosticLevelWarning));
+
+        callback.GetEnabledLevelsResult = S_OK;
+        callback.EnabledLevels = WSLCDiagnosticLevelWarning;
+        callback.OnDiagnosticResult = E_FAIL;
+
+        wsl::windows::wslc::diagnostics::DiagnosticReporter deliveryFailure{&callback};
+        VERIFY_IS_TRUE(deliveryFailure.IsCallbackReady());
+        VERIFY_ARE_EQUAL(E_FAIL, deliveryFailure.TryReport(WSLCDiagnosticLevelWarning, WSLC_DIAG_CODE_USER_WARNING, L"warning\n"));
+    }
+
+    TEST_METHOD(DiagnosticReporter_UsesCallbackScopeForQueriesAndEvents)
+    {
+        TestDiagnosticCallback callback;
+        callback.EnabledLevels = WSLCDiagnosticLevelDebug;
+        size_t callbackScopeCount = 0;
+        const wsl::windows::wslc::diagnostics::CallbackScope callbackScope = [&](const std::function<HRESULT()>& invoke) {
+            ++callbackScopeCount;
+            return invoke();
+        };
+
+        wsl::windows::wslc::diagnostics::DiagnosticReporter diagnostics{&callback, callbackScope};
+        VERIFY_ARE_EQUAL(size_t{1}, callbackScopeCount);
+        VERIFY_ARE_EQUAL(size_t{1}, callback.EnabledLevelsQueryCount);
+
+        VERIFY_SUCCEEDED(diagnostics.TryReport(WSLCDiagnosticLevelDebug, "debug", L"event"));
+        VERIFY_ARE_EQUAL(size_t{2}, callbackScopeCount);
+        VERIFY_ARE_EQUAL(size_t{1}, callback.DiagnosticCount);
+
+        diagnostics.Report(WSLCDiagnosticLevelDebug, "debug-event", L"value={}", 1);
+        VERIFY_ARE_EQUAL(size_t{3}, callbackScopeCount);
+        VERIFY_ARE_EQUAL(size_t{2}, callback.DiagnosticCount);
+        VERIFY_ARE_EQUAL(std::wstring{L"value=1"}, callback.LastMessage);
+    }
+
+    TEST_METHOD(DiagnosticHelpers_SanitizeString)
+    {
+        using wsl::windows::wslc::diagnostics::SanitizeString;
+        using wsl::windows::wslc::diagnostics::SanitizeUserName;
+
+        VERIFY_ARE_EQUAL(
+            std::wstring{L"<user> used <token>; <user>"},
+            SanitizeString(L"Alice used token-123; ALICE", {{L"alice", L"<user>"}, {L"token-123", L"<token>"}}));
+        VERIFY_ARE_EQUAL(std::wstring{L"wslc-cli-<user>"}, SanitizeUserName(L"wslc-cli-alice", L"alice"));
+        VERIFY_ARE_EQUAL(std::wstring{L"<user>-work-<user>"}, SanitizeUserName(L"Alice-work-ALICE", L"alice"));
+        VERIFY_ARE_EQUAL(std::wstring{L"custom-session"}, SanitizeUserName(L"custom-session", L"alice"));
+        VERIFY_ARE_EQUAL(std::wstring{L"wslc-cli-alice"}, SanitizeUserName(L"wslc-cli-alice", L""));
+        VERIFY_ARE_EQUAL(std::wstring{L"line1\\r\\nline2\\t\\u001B[31m"}, wsl::windows::wslc::events::EscapeControlCharacters(L"line1\r\nline2\t\x1b[31m"));
+    }
+
+    TEST_METHOD(DiagnosticMacro_EvaluatesMessageOnlyWhenEnabled)
+    {
+        TestDiagnosticCallback callback;
+        size_t evaluationCount = 0;
+
+        wsl::windows::wslc::diagnostics::DiagnosticReporter disabledDiagnostics{&callback};
+        WSLC_DIAG(disabledDiagnostics, WSLCDiagnosticLevelDebug, "disabled-debug", L"value={}", ++evaluationCount);
+        VERIFY_ARE_EQUAL(size_t{0}, evaluationCount);
+        VERIFY_ARE_EQUAL(size_t{0}, callback.DiagnosticCount);
+        VERIFY_ARE_EQUAL(size_t{1}, callback.EnabledLevelsQueryCount);
+
+        callback.EnabledLevels = WSLCDiagnosticLevelDebug;
+        WSLC_DIAG(disabledDiagnostics, WSLCDiagnosticLevelDebug, "still-disabled", L"value={}", ++evaluationCount);
+        VERIFY_ARE_EQUAL(size_t{0}, evaluationCount);
+        VERIFY_ARE_EQUAL(size_t{1}, callback.EnabledLevelsQueryCount);
+
+        wsl::windows::wslc::diagnostics::DiagnosticReporter enabledDiagnostics{&callback};
+        WSLC_DIAG(enabledDiagnostics, WSLCDiagnosticLevelDebug, "enabled-debug", "value={}", ++evaluationCount);
+        VERIFY_ARE_EQUAL(size_t{1}, evaluationCount);
+        VERIFY_ARE_EQUAL(size_t{1}, callback.DiagnosticCount);
+        VERIFY_ARE_EQUAL(size_t{2}, callback.EnabledLevelsQueryCount);
+        VERIFY_ARE_EQUAL(std::string{"enabled-debug"}, callback.LastCode);
+        VERIFY_ARE_EQUAL(std::wstring{L"value=1"}, callback.LastMessage);
+    }
+
+    TEST_METHOD(DiagnosticEvent_EvaluatesMessageOnceForEnabledSinks)
+    {
+        TestDiagnosticCallback callback;
+        size_t evaluationCount = 0;
+        size_t traceCount = 0;
+
+        wsl::windows::wslc::diagnostics::DiagnosticReporter disabledDiagnostics{&callback};
+        wsl::windows::wslc::events::Dispatch(
+            false,
+            false,
+            [&]() {
+                ++evaluationCount;
+                return std::wstring{L"disabled"};
+            },
+            [&](const std::wstring&) { ++traceCount; },
+            [&](const std::wstring& message) {
+                disabledDiagnostics.Report(WSLCDiagnosticLevelDebug, "disabled-event", message.c_str());
+            });
+        VERIFY_ARE_EQUAL(size_t{0}, evaluationCount);
+        VERIFY_ARE_EQUAL(size_t{0}, traceCount);
+        VERIFY_ARE_EQUAL(size_t{0}, callback.DiagnosticCount);
+
+        wsl::windows::wslc::events::Dispatch(
+            true,
+            false,
+            [&]() {
+                ++evaluationCount;
+                return std::wstring{L"trace-only"};
+            },
+            [&](const std::wstring& message) {
+                ++traceCount;
+                VERIFY_ARE_EQUAL(std::wstring{L"trace-only"}, message);
+            },
+            [&](const std::wstring& message) {
+                disabledDiagnostics.Report(WSLCDiagnosticLevelDebug, "trace-only-event", message.c_str());
+            });
+        VERIFY_ARE_EQUAL(size_t{1}, evaluationCount);
+        VERIFY_ARE_EQUAL(size_t{1}, traceCount);
+        VERIFY_ARE_EQUAL(size_t{0}, callback.DiagnosticCount);
+
+        callback.EnabledLevels = WSLCDiagnosticLevelDebug;
+        wsl::windows::wslc::diagnostics::DiagnosticReporter enabledDiagnostics{&callback};
+        wsl::windows::wslc::events::Dispatch(
+            true,
+            true,
+            [&]() {
+                ++evaluationCount;
+                return std::wstring{L"enabled"};
+            },
+            [&](const std::wstring& message) {
+                ++traceCount;
+                VERIFY_ARE_EQUAL(std::wstring{L"enabled"}, message);
+            },
+            [&](const std::wstring& message) {
+                enabledDiagnostics.Report(WSLCDiagnosticLevelDebug, "enabled-event", message.c_str());
+            });
+
+        VERIFY_ARE_EQUAL(size_t{2}, evaluationCount);
+        VERIFY_ARE_EQUAL(size_t{2}, traceCount);
+        VERIFY_ARE_EQUAL(size_t{1}, callback.DiagnosticCount);
+        VERIFY_ARE_EQUAL(std::string{"enabled-event"}, callback.LastCode);
+        VERIFY_ARE_EQUAL(std::wstring{L"enabled"}, callback.LastMessage);
     }
 
     TEST_METHOD(Terminal_SetNoColorTogglesIsNoColor)
@@ -265,6 +644,7 @@ class WSLCCLITerminalUnitTests
             SplitCaptureTerminal cap{/*vt*/ true};
             VERIFY_IS_TRUE(cap.terminal.IsVTEnabled(Terminal::Level::Output));
             VERIFY_IS_TRUE(cap.terminal.IsVTEnabled(Terminal::Level::Error));
+            VERIFY_IS_TRUE(cap.terminal.IsVTEnabled(Terminal::Level::Debug));
         }
         {
             CapturePipe outPipe;
@@ -272,6 +652,7 @@ class WSLCCLITerminalUnitTests
             Terminal terminal{outPipe.file(), /*outVt*/ true, errPipe.file(), /*errVt*/ false};
             VERIFY_IS_TRUE(terminal.IsVTEnabled(Terminal::Level::Output));
             VERIFY_IS_FALSE(terminal.IsVTEnabled(Terminal::Level::Info));
+            VERIFY_IS_FALSE(terminal.IsVTEnabled(Terminal::Level::Debug));
             VERIFY_IS_FALSE(terminal.IsVTEnabled(Terminal::Level::Warning));
             VERIFY_IS_FALSE(terminal.IsVTEnabled(Terminal::Level::Error));
         }
@@ -282,10 +663,12 @@ class WSLCCLITerminalUnitTests
         SplitCaptureTerminal cap{/*vt*/ true};
         VERIFY_IS_TRUE(cap.terminal.IsColorEnabled(Terminal::Level::Output));
         VERIFY_IS_TRUE(cap.terminal.IsColorEnabled(Terminal::Level::Error));
+        VERIFY_IS_TRUE(cap.terminal.IsColorEnabled(Terminal::Level::Debug));
 
         cap.terminal.SetNoColor(true);
         VERIFY_IS_FALSE(cap.terminal.IsColorEnabled(Terminal::Level::Output));
         VERIFY_IS_FALSE(cap.terminal.IsColorEnabled(Terminal::Level::Error));
+        VERIFY_IS_FALSE(cap.terminal.IsColorEnabled(Terminal::Level::Debug));
     }
 
     TEST_METHOD(Terminal_GetConsoleWidthReturnsNulloptForFileChannels)
@@ -293,6 +676,7 @@ class WSLCCLITerminalUnitTests
         SplitCaptureTerminal cap;
         VERIFY_IS_FALSE(cap.terminal.GetConsoleWidth(Terminal::Level::Output).has_value());
         VERIFY_IS_FALSE(cap.terminal.GetConsoleWidth(Terminal::Level::Info).has_value());
+        VERIFY_IS_FALSE(cap.terminal.GetConsoleWidth(Terminal::Level::Debug).has_value());
         VERIFY_IS_FALSE(cap.terminal.GetConsoleWidth(Terminal::Level::Warning).has_value());
         VERIFY_IS_FALSE(cap.terminal.GetConsoleWidth(Terminal::Level::Error).has_value());
     }

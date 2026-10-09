@@ -3,3 +3,6 @@
 # checked out as CRLF regardless of the committer's core.autocrlf setting.
 # tools/devops/validate-line-endings.py requires CRLF in the working tree.
 *.resw text eol=crlf
+
+# Keep this large test source stored with CRLF so focused edits remain surgical.
+test/windows/UnitTests.cpp -text whitespace=cr-at-eol

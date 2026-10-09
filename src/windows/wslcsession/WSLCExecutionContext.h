@@ -3,53 +3,63 @@
 #pragma once
 
 #include "ExecutionContext.h"
+#include "WSLCDiagnostics.h"
 #include "WSLCSession.h"
 
 namespace wsl::windows::service::wslc {
 
-// Extends COMServiceExecutionContext with a WSLCSession pointer for lazy COM callback
-// registration when warnings are emitted. This enables EMIT_USER_WARNING to stream
-// warnings back to the CLI via IWarningCallback, with proper cancellation support
-// during session termination via RegisterUserCOMCallback/CoCancelCall.
+// Extends COMServiceExecutionContext with a cached diagnostic reporter and cancellable
+// reverse COM calls for diagnostics.
 class WSLCExecutionContext : public wsl::windows::common::COMServiceExecutionContext
 {
 public:
     NON_COPYABLE(WSLCExecutionContext);
     NON_MOVABLE(WSLCExecutionContext);
 
-    WSLCExecutionContext(WSLCSession* session, IWarningCallback* warningCallback = nullptr) :
-        m_session(session), m_warningCallback(warningCallback)
+    WSLCExecutionContext(WSLCSession* session, IDiagnosticCallback* diagnosticCallback = nullptr) :
+        m_diagnostics(diagnosticCallback, [session](const std::function<HRESULT()>& callback) {
+            if (session == nullptr)
+            {
+                return callback();
+            }
+
+            auto comCallback = session->RegisterUserCOMCallback();
+            return callback();
+        })
     {
     }
 
     ~WSLCExecutionContext() override = default;
 
+    const wsl::windows::wslc::diagnostics::DiagnosticReporter& Diagnostics() const noexcept
+    {
+        return m_diagnostics;
+    }
+
 protected:
     bool CollectUserWarning(const std::wstring& warning) override
     {
-        if (m_warningCallback != nullptr)
+        if (m_diagnostics.IsCallbackReady())
         {
-            std::unique_ptr<UserCOMCallback> comCallback;
-            if (m_session != nullptr)
-            {
-                comCallback = std::make_unique<UserCOMCallback>(m_session->RegisterUserCOMCallback());
-            }
-
-            auto hr = m_warningCallback->OnWarning(warning.c_str());
-            if (SUCCEEDED(hr) || hr == RPC_E_CALL_CANCELED || hr == HRESULT_FROM_WIN32(ERROR_CANCELLED))
+            if (!m_diagnostics.IsEnabled(WSLCDiagnosticLevelWarning))
             {
                 return true;
             }
 
-            LOG_HR(hr);
+            const auto result = m_diagnostics.TryReport(WSLCDiagnosticLevelWarning, WSLC_DIAG_CODE_USER_WARNING, warning.c_str());
+            if (SUCCEEDED(result) || result == RPC_E_CALL_CANCELED || result == HRESULT_FROM_WIN32(ERROR_CANCELLED))
+            {
+                return true;
+            }
+
+            LOG_HR(result);
         }
 
         return COMServiceExecutionContext::CollectUserWarning(warning);
     }
 
 private:
-    WSLCSession* m_session = nullptr;
-    IWarningCallback* m_warningCallback = nullptr;
+    wsl::windows::wslc::diagnostics::DiagnosticReporter m_diagnostics;
 };
 
 } // namespace wsl::windows::service::wslc

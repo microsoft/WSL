@@ -51,7 +51,7 @@ public:
 
     // Records the exit code observed from Docker. Idempotent: first call wins.
     void SetExitCode(int ExitCode);
-    void SignalExit();
+    std::optional<int> SignalExit();
 
 private:
     std::mutex m_lock;
