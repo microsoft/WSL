@@ -16,7 +16,6 @@ Abstract:
 #include "ExecutionContext.h"
 #include "HcsVirtualMachineBackend.h"
 #include "WslCoreNetworkEndpointSettings.h"
-#include "hvsocket.hpp"
 
 using wsl::windows::common::Context;
 using wsl::windows::common::ExecutionContext;
