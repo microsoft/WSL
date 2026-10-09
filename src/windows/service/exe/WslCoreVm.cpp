@@ -76,6 +76,27 @@ RequiredExtraMmioSpaceForPmemFileInMb(_In_ PCWSTR FilePath)
     // Convert from bytes to megabytes. Ensure that we don't truncate a 512kb file to 0mb.
     return std::max(fileSizeBytes.QuadPart / static_cast<INT64>(_1MB), 1i64);
 }
+
+LX_MINI_INIT_MOUNT_DEVICE_TYPE ToMiniInitDeviceType(VmDiskTransport Transport)
+{
+    switch (Transport)
+    {
+    case VmDiskTransport::Scsi:
+        return LxMiniInitMountDeviceTypeScsi;
+    case VmDiskTransport::VirtioBlk:
+        return LxMiniInitMountDeviceTypeVirtioBlk;
+    default:
+        FAIL_FAST();
+    }
+}
+
+VmDiskAttachment FindAttachedDiskByLun(IVirtualMachineBackend& Backend, ULONG Lun)
+{
+    const auto disks = Backend.GetAttachedDisks();
+    const auto disk = std::ranges::find_if(disks, [&](const auto& candidate) { return candidate.GuestAddress.Lun == Lun; });
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), disk == disks.end());
+    return *disk;
+}
 } // namespace
 
 WslCoreVm::WslCoreVm(_In_ wsl::core::Config&& VmConfig, _In_ InitializeDrvFsCallback InitializeDrvFs) :
@@ -563,8 +584,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
                 }
             }
 
-            swapLun =
-                AttachDiskLockHeld(m_vmConfig.SwapFilePath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get(), true);
+            swapLun = AttachDiskLockHeld(m_vmConfig.SwapFilePath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get(), true)
+                          .GuestAddress.Lun;
         }
         CATCH_LOG()
     }
@@ -1055,17 +1076,11 @@ void WslCoreVm::AddPlan9Share(
 ULONG WslCoreVm::AttachDisk(_In_ PCWSTR Disk, _In_ DiskType Type, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_ HANDLE UserToken)
 {
     auto lock = m_lock.lock_exclusive();
-    return AttachDiskLockHeld(Disk, Type, MountFlags::None, Lun, IsUserDisk, UserToken);
+    return AttachDiskLockHeld(Disk, Type, MountFlags::None, Lun, IsUserDisk, UserToken).GuestAddress.Lun;
 }
 
-ULONG WslCoreVm::AttachDiskLockHeld(
-    _In_ PCWSTR Disk,
-    _In_ DiskType Type,
-    _In_ MountFlags Flags,
-    _In_ std::optional<ULONG> Lun,
-    _In_ bool IsUserDisk,
-    _In_opt_ HANDLE UserToken,
-    _In_ bool BootCritical)
+VmDiskAttachment WslCoreVm::AttachDiskLockHeld(
+    _In_ PCWSTR Disk, _In_ DiskType Type, _In_ MountFlags Flags, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_opt_ HANDLE UserToken, _In_ bool BootCritical)
 {
     ExecutionContext context(Context::MountDisk);
 
@@ -1113,7 +1128,7 @@ ULONG WslCoreVm::AttachDiskLockHeld(
             return std::ranges::none_of(attachedDisks, [&](const VmDiskAttachment& disk) { return disk.Id.Value == entry.first; });
         });
         m_diskMounts.try_emplace(attachment.Id.Value);
-        return attachment.GuestAddress.Lun;
+        return attachment;
     }
     catch (...)
     {
@@ -1217,7 +1232,8 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
     // Add the VHD to the machine.
     auto lock = m_lock.lock_exclusive();
     SlowOperationWatcher slowOperation{"AttachDistroVhd"};
-    const auto lun = AttachDiskLockHeld(Configuration.VhdFilePath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get());
+    const auto attachment =
+        AttachDiskLockHeld(Configuration.VhdFilePath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get());
     slowOperation.Reset();
 
     // Launch the init daemon and create the instance.
@@ -1248,8 +1264,8 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
     WI_SetFlagIf(flags, LxMiniInitMessageFlagVerbose, WI_IsFlagSet(ExportFlags, LXSS_EXPORT_DISTRO_FLAGS_VERBOSE));
 
     wsl::shared::MessageWriter<LX_MINI_INIT_MESSAGE> message(MessageType);
-    message->MountDeviceType = LxMiniInitMountDeviceTypeLun;
-    message->DeviceId = lun;
+    message->MountDeviceType = ToMiniInitDeviceType(attachment.Transport);
+    message->DeviceId = attachment.GuestAddress.Lun;
     message->Flags = flags;
     message.WriteString(message->FsTypeOffset, "ext4");
     message.WriteString(message->MountOptionsOffset, "discard,errors=remount-ro,data=ordered");
@@ -1389,7 +1405,8 @@ void WslCoreVm::EjectVhdLockHeld(_In_ PCWSTR VhdPath)
         EJECT_VHD_MESSAGE message;
         message.Header.MessageSize = sizeof(message);
         message.Header.MessageType = LxMiniInitMessageEjectVhd;
-        message.Lun = disk->GuestAddress.Lun;
+        message.DeviceType = ToMiniInitDeviceType(disk->Transport);
+        message.DeviceId = disk->GuestAddress.Lun;
         const auto& result = m_miniInitChannel.Transaction(message);
         LOG_HR_IF_MSG(E_UNEXPECTED, result.Result != 0, "VHD eject failed: %u", result.Result);
 
@@ -1479,7 +1496,7 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId, BackendKind 
         m_vmConfig.SystemDistroPath = TEXT(WSL_SYSTEM_DISTRO_PATH);
         privateSystemDistro = true;
 #else
-        m_systemDistroDeviceType = LxMiniInitMountDeviceTypeLun;
+        m_systemDistroDeviceType = LxMiniInitMountDeviceTypeScsi;
         m_vmConfig.SystemDistroPath = m_installPath / L"system.vhd";
         WI_ASSERT(wsl::windows::common::filesystem::FileExists(m_vmConfig.SystemDistroPath.c_str()));
 #endif
@@ -1493,7 +1510,7 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId, BackendKind 
         }
         else if (wsl::windows::common::string::IsPathComponentEqual(m_vmConfig.SystemDistroPath.extension().native(), L".vhd"))
         {
-            m_systemDistroDeviceType = LxMiniInitMountDeviceTypeLun;
+            m_systemDistroDeviceType = LxMiniInitMountDeviceTypeScsi;
         }
 
         THROW_HR_IF(
@@ -1607,7 +1624,7 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId, BackendKind 
         disk.GrantHostAccess = grantHostAccess;
         request.BootDisks.emplace_back(std::move(disk));
     };
-    if (m_systemDistroDeviceType == LxMiniInitMountDeviceTypeLun)
+    if (m_systemDistroDeviceType == LxMiniInitMountDeviceTypeScsi)
     {
         addBootDisk(L"system-distro", m_vmConfig.SystemDistroPath, privateSystemDistro);
     }
@@ -1845,7 +1862,8 @@ WslCoreVm::DiskMountResult WslCoreVm::MountDiskLockHeld(
 
     wsl::shared::MessageWriter<LX_MINI_INIT_MOUNT_MESSAGE> message(LxMiniInitMessageMount);
     message->PartitionIndex = PartitionIndex;
-    message->ScsiLun = disk->GuestAddress.Lun;
+    message->DeviceType = ToMiniInitDeviceType(disk->Transport);
+    message->DeviceId = disk->GuestAddress.Lun;
     message.WriteString(message->TypeOffset, Type);
     message.WriteString(message->TargetNameOffset, targetName);
     message.WriteString(message->OptionsOffset, Options);
@@ -2235,11 +2253,13 @@ void WslCoreVm::RegisterCallbacks(_In_ const std::function<void(ULONG)>& DistroE
 void WslCoreVm::ResizeDistribution(_In_ ULONG Lun, _In_ HANDLE OutputHandle, _In_ ULONG64 NewSize)
 {
     auto lock = m_lock.lock_exclusive();
+    const auto disk = FindAttachedDiskByLun(*m_backend, Lun);
 
     LX_MINI_INIT_RESIZE_DISTRIBUTION_MESSAGE message{};
     message.Header.MessageSize = sizeof(message);
     message.Header.MessageType = LxMiniInitMessageResizeDistribution;
-    message.ScsiLun = Lun;
+    message.DeviceType = ToMiniInitDeviceType(disk.Transport);
+    message.DeviceId = disk.GuestAddress.Lun;
     message.NewSize = NewSize;
 
     auto transaction = m_miniInitChannel.StartTransaction();
@@ -2260,11 +2280,13 @@ void WslCoreVm::ResizeDistribution(_In_ ULONG Lun, _In_ HANDLE OutputHandle, _In
 void WslCoreVm::TrimDistribution(_In_ ULONG Lun)
 {
     auto lock = m_lock.lock_exclusive();
+    const auto disk = FindAttachedDiskByLun(*m_backend, Lun);
 
     LX_MINI_INIT_TRIM_DISTRIBUTION_MESSAGE message{};
     message.Header.MessageSize = sizeof(message);
     message.Header.MessageType = LxMiniInitMessageTrimDistribution;
-    message.ScsiLun = Lun;
+    message.DeviceType = ToMiniInitDeviceType(disk.Transport);
+    message.DeviceId = disk.GuestAddress.Lun;
 
     auto transaction = m_miniInitChannel.StartTransaction();
     transaction.Send(message);
@@ -2340,7 +2362,8 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::UnmountDisk(_In_ const VmDiskAttac
     LX_MINI_INIT_DETACH_MESSAGE message{};
     message.Header.MessageType = LxMiniInitMessageDetach;
     message.Header.MessageSize = sizeof(message);
-    message.ScsiLun = Disk.GuestAddress.Lun;
+    message.DeviceType = ToMiniInitDeviceType(Disk.Transport);
+    message.DeviceId = Disk.GuestAddress.Lun;
 
     auto transaction = m_miniInitChannel.StartTransaction();
     transaction.Send(message);

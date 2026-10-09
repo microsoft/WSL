@@ -201,6 +201,7 @@ VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmC
         description.BootDisks.at(disk.Key) = {
             {description.Identity, nextId++},
             {0, lun},
+            VmDiskTransport::Scsi,
             disk.Disk.ReadOnly,
             disk.Disk.UserDisk,
             std::get<VmVirtualDiskSource>(disk.Disk.Source).Path.native(),
@@ -756,7 +757,13 @@ VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& R
 
     THROW_HR_IF(E_BOUNDS, m_nextDiskId == UINT64_MAX);
     const VmDiskAttachment attachment{
-        {m_description.Identity, m_nextDiskId}, {0, lun}, Request.ReadOnly, Request.UserDisk, source.Path.native(), false};
+        {m_description.Identity, m_nextDiskId},
+        {0, lun},
+        Request.BootCritical ? VmDiskTransport::Scsi : VmDiskTransport::VirtioBlk,
+        Request.ReadOnly,
+        Request.UserDisk,
+        source.Path.native(),
+        false};
     GUID instanceId{};
     HRESULT result;
     if (Request.BootCritical)

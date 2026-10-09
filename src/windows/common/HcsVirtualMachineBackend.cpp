@@ -365,7 +365,7 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
         scsi.Attachments[std::to_string(lun)] = std::move(attachment);
 
         const VmDiskAttachment diskAttachment{
-            {Request.Identity, configuration.NextDiskId}, {0, lun}, bootDisk.Disk.ReadOnly, bootDisk.Disk.UserDisk, path, false};
+            {Request.Identity, configuration.NextDiskId}, {0, lun}, VmDiskTransport::Scsi, bootDisk.Disk.ReadOnly, bootDisk.Disk.UserDisk, path, false};
         description.BootDisks.emplace(bootDisk.Key, diskAttachment);
         configuration.BootDisks.emplace(
             diskAttachment.Id.Value, AttachedDisk{diskAttachment, {diskFlags, bootDisk.Disk.DeviceTimeout, std::move(backingFile)}});
@@ -892,7 +892,7 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
     });
 
     const VmDiskAttachment attachment{
-        {m_configuration.Description.Identity, m_nextDiskId}, {0, lun}, Request.ReadOnly, Request.UserDisk, path, passThrough};
+        {m_configuration.Description.Identity, m_nextDiskId}, {0, lun}, VmDiskTransport::Scsi, Request.ReadOnly, Request.UserDisk, path, passThrough};
     m_attachedDisks.emplace(attachment.Id.Value, AttachedDisk{attachment, {diskFlags, Request.DeviceTimeout, std::move(backingFile)}});
     ++m_nextDiskId;
     cleanup.release();

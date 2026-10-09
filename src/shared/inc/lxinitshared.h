@@ -1224,8 +1224,9 @@ typedef enum _LX_MINI_INIT_MESSAGE_FLAGS
 typedef enum _LX_MINI_INIT_MOUNT_DEVICE_TYPE
 {
     LxMiniInitMountDeviceTypeInvalid = 0,
-    LxMiniInitMountDeviceTypeLun = 0x1,
+    LxMiniInitMountDeviceTypeScsi = 0x1,
     LxMiniInitMountDeviceTypePmem = 0x2,
+    LxMiniInitMountDeviceTypeVirtioBlk = 0x3,
 } LX_MINI_INIT_MOUNT_DEVICE_TYPE,
     *PLX_MINI_INIT_MOUNT_DEVICE_TYPE;
 
@@ -1392,13 +1393,14 @@ typedef struct _LX_MINI_INIT_MOUNT_MESSAGE
 
     MESSAGE_HEADER Header;
     unsigned int PartitionIndex; // 0 means the disk directly
-    unsigned int ScsiLun;
+    LX_MINI_INIT_MOUNT_DEVICE_TYPE DeviceType;
+    unsigned int DeviceId;
     unsigned int TypeOffset;
     unsigned int TargetNameOffset;
     unsigned int OptionsOffset;
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(PartitionIndex), FIELD(ScsiLun), STRING_FIELD(TypeOffset), STRING_FIELD(TargetNameOffset), STRING_FIELD(OptionsOffset));
+    PRETTY_PRINT(FIELD(Header), FIELD(PartitionIndex), FIELD(DeviceType), FIELD(DeviceId), STRING_FIELD(TypeOffset), STRING_FIELD(TargetNameOffset), STRING_FIELD(OptionsOffset));
 
 } LX_MINI_INIT_MOUNT_MESSAGE, *PLX_MINI_INIT_MOUNT_MESSAGE;
 
@@ -1419,9 +1421,10 @@ typedef struct _LX_MINI_INIT_DETACH_MESSAGE
     static inline auto Type = LxMiniInitMessageDetach;
 
     MESSAGE_HEADER Header;
-    unsigned int ScsiLun;
+    LX_MINI_INIT_MOUNT_DEVICE_TYPE DeviceType;
+    unsigned int DeviceId;
 
-    PRETTY_PRINT(FIELD(Header), FIELD(ScsiLun));
+    PRETTY_PRINT(FIELD(Header), FIELD(DeviceType), FIELD(DeviceId));
 } LX_MINI_INIT_DETACH_MESSAGE, *PLX_MINI_INIT_DETACH_MESSAGE;
 
 using PCLX_MINI_INIT_UNMOUNT_MESSAGE = const LX_MINI_INIT_UNMOUNT_MESSAGE*;
@@ -1515,10 +1518,11 @@ typedef struct _LX_MINI_INIT_RESIZE_DISTRIBUTION_MESSAGE
     static inline auto Type = LxMiniInitMessageResizeDistribution;
 
     MESSAGE_HEADER Header;
-    unsigned int ScsiLun;
+    LX_MINI_INIT_MOUNT_DEVICE_TYPE DeviceType;
+    unsigned int DeviceId;
     uint64_t NewSize;
 
-    PRETTY_PRINT(FIELD(Header), FIELD(ScsiLun), FIELD(NewSize));
+    PRETTY_PRINT(FIELD(Header), FIELD(DeviceType), FIELD(DeviceId), FIELD(NewSize));
 } LX_MINI_INIT_RESIZE_DISTRIBUTION_MESSAGE, *PLX_MINI_INIT_RESIZE_DISTRIBUTION_MESSAGE;
 
 typedef struct _LX_MINI_INIT_TRIM_DISTRIBUTION_RESPONSE
@@ -1536,9 +1540,10 @@ typedef struct _LX_MINI_INIT_TRIM_DISTRIBUTION_MESSAGE
     static inline auto Type = LxMiniInitMessageTrimDistribution;
 
     MESSAGE_HEADER Header;
-    unsigned int ScsiLun;
+    LX_MINI_INIT_MOUNT_DEVICE_TYPE DeviceType;
+    unsigned int DeviceId;
 
-    PRETTY_PRINT(FIELD(Header), FIELD(ScsiLun));
+    PRETTY_PRINT(FIELD(Header), FIELD(DeviceType), FIELD(DeviceId));
 } LX_MINI_INIT_TRIM_DISTRIBUTION_MESSAGE, *PLX_MINI_INIT_TRIM_DISTRIBUTION_MESSAGE;
 
 struct CREATE_PROCESS_MESSAGE
@@ -1559,9 +1564,10 @@ struct EJECT_VHD_MESSAGE
     using TResponse = RESULT_MESSAGE<int32_t>;
 
     MESSAGE_HEADER Header;
-    uint32_t Lun;
+    LX_MINI_INIT_MOUNT_DEVICE_TYPE DeviceType;
+    uint32_t DeviceId;
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Lun));
+    PRETTY_PRINT(FIELD(Header), FIELD(DeviceType), FIELD(DeviceId));
 };
 
 typedef enum _LX_MINI_CREATE_INSTANCE_STEP

@@ -158,7 +158,7 @@ private:
         _In_ bool Admin, _In_ PCWSTR Path, _In_ PCWSTR Options, _In_opt_ HANDLE UserToken = nullptr);
 
     _Requires_lock_held_(m_lock)
-    ULONG AttachDiskLockHeld(
+    VmDiskAttachment AttachDiskLockHeld(
         _In_ PCWSTR Disk,
         _In_ DiskType Type,
         _In_ MountFlags Flags,

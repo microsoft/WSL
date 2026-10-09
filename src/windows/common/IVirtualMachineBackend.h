@@ -250,6 +250,12 @@ struct VmScsiAddress
 
 using VmGuestDiskAddress = VmScsiAddress;
 
+enum class VmDiskTransport
+{
+    Scsi,
+    VirtioBlk
+};
+
 enum class VmDiskFormat
 {
     Vhd,
@@ -302,6 +308,7 @@ struct VmDiskAttachment
 {
     VmDiskId Id;
     VmGuestDiskAddress GuestAddress;
+    VmDiskTransport Transport = VmDiskTransport::Scsi;
     bool ReadOnly = true;
     bool UserDisk = false;
     // Host path backing the disk: a virtual disk image, or a physical disk for pass-through.
