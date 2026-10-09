@@ -2228,6 +2228,70 @@ Usage:
         validateInterop(L")");
     }
 
+    WSL2_TEST_METHOD(VmModeInteropDisabledRejectsWindowsProcessCreation)
+    {
+        // Validate that a VM-mode launch with interop disabled (LXSS_LAUNCH_FLAG_ENABLE_INTEROP not set)
+        // rejects Windows process creation requests coming from the relay channel with EACCES, instead of
+        // hanging or succeeding. See https://github.com/microsoft/WSL/pull/41627.
+
+        const auto distroGuid = GetDistributionId(LXSS_DISTRO_NAME_TEST_L);
+        VERIFY_IS_TRUE(distroGuid.has_value());
+
+        // Run bash with interop disabled, and have it try to launch a Windows executable (cmd.exe) via
+        // the binfmt interop mechanism. The request should be rejected with EACCES. The binfmt interpreter
+        // (/init) still execs successfully (so the kernel does not report exec failure via exit code 126);
+        // instead it surfaces the EACCES rejection by exiting with code 1, which bash reports as cmd.exe's
+        // exit code.
+        const std::vector<std::wstring> arguments{
+            L"/bin/bash", L"-c", L"/mnt/c/Windows/System32/cmd.exe /c exit 0; echo exitcode:$?:"};
+
+        std::vector<LPCWSTR> argv;
+        std::transform(
+            arguments.begin(), arguments.end(), std::back_inserter(argv), [](const std::wstring& arg) { return arg.c_str(); });
+
+        // Redirect stdout/stderr to pipes so the output can be captured.
+        SECURITY_ATTRIBUTES security{sizeof(security), nullptr, TRUE};
+        wil::unique_handle stdOutRead;
+        wil::unique_handle stdOutWrite;
+        VERIFY_IS_TRUE(CreatePipe(&stdOutRead, &stdOutWrite, &security, 64 * 1024));
+        wil::unique_handle stdErrRead;
+        wil::unique_handle stdErrWrite;
+        VERIFY_IS_TRUE(CreatePipe(&stdErrRead, &stdErrWrite, &security, 64 * 1024));
+
+        const HANDLE previousStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+        const HANDLE previousStdErr = GetStdHandle(STD_ERROR_HANDLE);
+        VERIFY_IS_TRUE(SetStdHandle(STD_OUTPUT_HANDLE, stdOutWrite.get()));
+        VERIFY_IS_TRUE(SetStdHandle(STD_ERROR_HANDLE, stdErrWrite.get()));
+        auto restoreStdHandles = wil::scope_exit([&] {
+            SetStdHandle(STD_OUTPUT_HANDLE, previousStdOut);
+            SetStdHandle(STD_ERROR_HANDLE, previousStdErr);
+        });
+
+        // Launch with LaunchFlags = 0, i.e. interop (and environment translation) disabled.
+        auto launch = std::async(std::launch::async, [&]() {
+            wsl::windows::common::SvcComm service;
+            return service.LaunchProcess(&distroGuid.value(), arguments[0].c_str(), gsl::narrow_cast<int>(argv.size()), argv.data(), 0);
+        });
+
+        // The request should complete quickly. Before the fix, a disabled-interop VM-mode launch could
+        // hang indefinitely instead of being rejected. Fail fast (rather than VERIFY_ARE_EQUAL) if the launch
+        // isn't ready in time, since unwinding past a still-running std::async task would block in the
+        // future's destructor / the unconditional get() below, turning the intended timeout into a hang.
+        FAIL_FAST_IF_MSG(
+            launch.wait_for(30s) != std::future_status::ready, "VM-mode launch did not complete with interop disabled");
+
+        const auto exitCode = launch.get();
+
+        restoreStdHandles.reset();
+        stdOutWrite.reset();
+        stdErrWrite.reset();
+
+        const auto output = ReadToString(stdOutRead.get());
+
+        VERIFY_ARE_EQUAL(exitCode, 0u);
+        VERIFY_IS_TRUE(output.find("exitcode:1:") != std::string::npos);
+    }
+
     TEST_METHOD(InteropPid1)
     {
         // Validate that interop works as pid 1.
