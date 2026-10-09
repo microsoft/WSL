@@ -7206,7 +7206,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         constexpr int depth = 1024;
         constexpr auto flags = wsl::windows::common::filesystem::c_case_sensitive_folders_only | LXSS_CREATE_INSTANCE_FLAGS_ALLOW_FS_UPGRADE;
 
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [testDir]() {
             // The deep tree exceeds MAX_PATH; remove it via the long-path prefix so the
             // remove walk can see every component.
             std::error_code ec;
