@@ -682,6 +682,7 @@ public:
     virtual VmState GetState() const = 0;
     // Returns the cached reason and backend-specific details after exit; fails before the VM has exited.
     virtual VmTerminationInformation GetTerminationReason() const = 0;
+    // Signals after the VM has exited and termination information is available.
     virtual wil::unique_handle GetTerminationEvent() const = 0;
     // Signals when the backend has identified a VM crash, which can precede termination.
     virtual wil::unique_handle GetCrashEvent() const = 0;

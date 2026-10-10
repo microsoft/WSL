@@ -20,6 +20,7 @@ Abstract:
 #include "Dmesg.h"
 #include "GnsChannel.h"
 #include "INetworkingEngine.h"
+#include "WslCoreConfig.h"
 #include <filesystem>
 #include <functional>
 #include <optional>
@@ -37,6 +38,7 @@ struct WSLCNetworkingRequest
 
 struct WSLCNetworking
 {
+    std::unique_ptr<wsl::core::Config> Config;
     std::unique_ptr<wsl::core::INetworkingEngine> Engine;
     std::function<HRESULT(const SOCKADDR_INET&, USHORT, int, _Out_ USHORT*)> MapPort;
     std::function<HRESULT(const SOCKADDR_INET&, USHORT, int)> UnmapPort;

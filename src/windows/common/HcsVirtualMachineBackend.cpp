@@ -414,27 +414,23 @@ HcsVirtualMachineBackend::HcsVirtualMachineBackend() = default;
 
 HcsVirtualMachineBackend::~HcsVirtualMachineBackend() noexcept
 {
-    std::shared_ptr<GuestDeviceManager> guestDeviceManager;
-    schema::unique_hcs_system system;
-    std::map<std::uint64_t, AttachedDisk> attachedDisks;
+    // Do not hold m_lock while waiting because exit and crash callbacks may need it. A created VM
+    // has not received a guest shutdown request, so only wait for a VM that was started.
+    bool waitForExit = false;
     {
-        auto lock = m_lock.lock_exclusive();
-        CloseNetworkAdaptersLocked();
-        guestDeviceManager = std::move(m_guestDeviceManager);
-        CloseGuestDevicesLocked();
-        system = std::move(m_system);
-        attachedDisks = std::move(m_attachedDisks);
-        CloseGuestListenersLocked(m_configuration.Description.Identity);
+        auto lock = m_lock.lock_shared();
+        waitForExit = m_system && m_state == VmState::Running;
     }
 
-    // Device hosts must be shut down while the compute system and callback context still exist.
-    guestDeviceManager.reset();
-    if (system && !m_exitEvent.is_signaled())
+    if (waitForExit)
     {
-        LOG_IF_FAILED(wil::ResultFromException([&] { schema::TerminateComputeSystem(system.get()); }));
+        m_exitEvent.wait(30000);
     }
-    system.reset();
-    CleanupAttachedDisks(std::move(attachedDisks));
+
+    auto resources = DetachResources(false);
+
+    const bool forceTerminate = resources.System && !m_exitEvent.is_signaled();
+    LOG_IF_FAILED(wil::ResultFromException([&] { ReleaseResources(std::move(resources), forceTerminate); }));
 
     try
     {
@@ -452,6 +448,7 @@ HcsVirtualMachineBackend::~HcsVirtualMachineBackend() noexcept
     WSL_LOG(
         "HcsVirtualMachineBackendDestroyed",
         TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
+        TraceLoggingValue(forceTerminate, "forced"),
         TraceLoggingValue(m_exitEvent.is_signaled(), "exitEventSignaled"),
         TraceLoggingValue(m_terminationInformation.Details.c_str(), "exitDetails"));
 }
@@ -607,10 +604,7 @@ VmTerminationInformation HcsVirtualMachineBackend::GetTerminationReason() const
 
 wil::unique_handle HcsVirtualMachineBackend::GetTerminationEvent() const
 {
-    wil::unique_handle event;
-    THROW_IF_WIN32_BOOL_FALSE(DuplicateHandle(
-        GetCurrentProcess(), m_terminatingEvent.get(), GetCurrentProcess(), event.put(), 0, FALSE, DUPLICATE_SAME_ACCESS));
-    return event;
+    return wil::unique_handle{wsl::windows::common::wslutil::DuplicateHandle(m_exitEvent.get())};
 }
 
 wil::unique_handle HcsVirtualMachineBackend::GetCrashEvent() const
@@ -647,31 +641,45 @@ void HcsVirtualMachineBackend::Terminate()
     // AddPersistentMemory releases m_lock while the device host attaches the device and the caller
     // waits for it. Serialize termination with that entire lifecycle.
     auto persistentMemoryLock = m_persistentMemoryLock.lock_exclusive();
-    std::shared_ptr<GuestDeviceManager> guestDeviceManager;
-    schema::unique_hcs_system system;
-    std::map<std::uint64_t, AttachedDisk> attachedDisks;
-    {
-        auto lock = m_lock.lock_exclusive();
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
-        CloseNetworkAdaptersLocked();
-        guestDeviceManager = std::move(m_guestDeviceManager);
-        CloseGuestDevicesLocked();
-        system = std::move(m_system);
-        m_state = VmState::Stopped;
-        attachedDisks = std::move(m_attachedDisks);
-        CloseGuestListenersLocked(m_configuration.Description.Identity);
-    }
+    auto resources = DetachResources(true);
 
-    guestDeviceManager.reset();
-
-    auto cleanup = wil::scope_exit([&] {
-        system.reset();
-        CleanupAttachedDisks(std::move(attachedDisks));
+    auto notify = wil::scope_exit([&] {
         m_terminatingEvent.SetEvent();
         NotifyTerminated(m_configuration.Description.Identity);
     });
 
-    schema::TerminateComputeSystem(system.get());
+    ReleaseResources(std::move(resources), true);
+}
+
+HcsVirtualMachineBackend::DetachedResources HcsVirtualMachineBackend::DetachResources(bool RequireSystem)
+{
+    DetachedResources resources;
+    auto lock = m_lock.lock_exclusive();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), RequireSystem && !m_system);
+    CloseNetworkAdaptersLocked();
+    resources.Devices = std::move(m_guestDeviceManager);
+    CloseGuestDevicesLocked();
+    resources.System = std::move(m_system);
+    m_state = VmState::Stopped;
+    resources.Disks = std::move(m_attachedDisks);
+    CloseGuestListenersLocked(m_configuration.Description.Identity);
+    return resources;
+}
+
+void HcsVirtualMachineBackend::ReleaseResources(DetachedResources&& Resources, bool TerminateSystem)
+{
+    // Device hosts must be shut down while the compute system and callback context still exist.
+    Resources.Devices.reset();
+
+    auto cleanup = wil::scope_exit([&] {
+        Resources.System.reset();
+        CleanupAttachedDisks(std::move(Resources.Disks));
+    });
+
+    if (TerminateSystem)
+    {
+        schema::TerminateComputeSystem(Resources.System.get());
+    }
 }
 
 std::shared_ptr<VmGuestListenerState> HcsVirtualMachineBackend::ConfigureGuestListener(const VmGuestListener& Listener)

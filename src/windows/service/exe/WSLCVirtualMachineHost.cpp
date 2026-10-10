@@ -174,6 +174,7 @@ WSLCVirtualMachineHost::WSLCVirtualMachineHost(_In_ const WSLCSessionSettings* S
 
 WSLCVirtualMachineHost::~WSLCVirtualMachineHost()
 {
+    m_networking.reset();
     m_backend.reset();
 }
 
@@ -483,8 +484,6 @@ try
 
     *Reason = WSLCVirtualMachineTerminationReasonUnknown;
     *Details = nullptr;
-
-    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vmExitEvent.is_signaled());
 
     const auto information = m_backend->GetTerminationReason();
     *Reason = information.Reason == VmTerminationReason::Shutdown  ? WSLCVirtualMachineTerminationReasonShutdown

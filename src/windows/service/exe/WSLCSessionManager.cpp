@@ -79,25 +79,25 @@ wsl::windows::service::wslc::WSLCVirtualMachineBackendFactory CreateHcsVirtualMa
             WSLCNetworking networking{};
             if (networkingRequest.Mode == WSLCNetworkingModeNAT)
             {
-                auto config = std::make_unique<wsl::core::Config>(nullptr);
-                if (!wsl::core::NatNetworking::IsHyperVFirewallSupported(*config))
+                networking.Config = std::make_unique<wsl::core::Config>(nullptr);
+                if (!wsl::core::NatNetworking::IsHyperVFirewallSupported(*networking.Config))
                 {
-                    config->FirewallConfig.reset();
+                    networking.Config->FirewallConfig.reset();
                 }
 
                 if (networkingRequest.EnableDnsTunneling)
                 {
-                    config->EnableDnsTunneling = true;
+                    networking.Config->EnableDnsTunneling = true;
                     in_addr address{};
                     WI_VERIFY(inet_pton(AF_INET, LX_INIT_DNS_TUNNELING_IP_ADDRESS, &address) == 1);
-                    config->DnsTunnelingIpAddress = address.S_un.S_addr;
+                    networking.Config->DnsTunnelingIpAddress = address.S_un.S_addr;
                 }
 
                 networking.Engine = std::make_unique<wsl::core::NatNetworking>(
                     hcsBackend->GetComputeSystemHandle(),
-                    wsl::core::NatNetworking::CreateNetwork(*config),
+                    wsl::core::NatNetworking::CreateNetwork(*networking.Config),
                     std::move(gnsChannel),
-                    *config,
+                    *networking.Config,
                     std::move(dnsSocket),
                     nullptr);
             }

@@ -126,6 +126,16 @@ private:
 
     using NetworkAdapter = VmResource<VmNetworkAttachment, HcsNetworkAdapter>;
 
+    /// <summary>
+    /// Host state detached from the backend so that it can be released without holding m_lock.
+    /// </summary>
+    struct DetachedResources
+    {
+        std::shared_ptr<GuestDeviceManager> Devices;
+        wsl::windows::common::hcs::unique_hcs_system System;
+        std::map<std::uint64_t, AttachedDisk> Disks;
+    };
+
     HcsVirtualMachineBackend();
     void Initialize(const VmCreateRequest& Request);
     VmConfiguration BuildConfiguration(const VmCreateRequest& Request);
@@ -134,6 +144,19 @@ private:
     void OnExit(const HCS_EVENT* Event);
     void CleanupAttachedDisks(std::map<std::uint64_t, AttachedDisk>&& Disks) noexcept;
     std::shared_ptr<VmGuestListenerState> ConfigureGuestListener(const VmGuestListener& Listener) override;
+
+    /// <summary>
+    /// Detaches the tracked host state under m_lock and marks the VM stopped, so that the resources
+    /// can be released without holding the lock. Fails when RequireSystem is set and the compute
+    /// system is already gone, which keeps a repeated termination from notifying callers twice.
+    /// </summary>
+    DetachedResources DetachResources(bool RequireSystem);
+
+    /// <summary>
+    /// Releases detached resources, terminating the compute system first when TerminateSystem is
+    /// set. The resources are released even when termination fails.
+    /// </summary>
+    void ReleaseResources(DetachedResources&& Resources, bool TerminateSystem);
 
     _Requires_lock_held_(m_lock)
     void CloseGuestDevicesLocked() noexcept;
