@@ -158,7 +158,7 @@ When adding settings to `src/shared/configfile/`:
 - `src/windows/` — Main Windows WSL service components
 - `src/linux/` — Linux-side WSL components
 - `src/shared/` — Shared code between Windows and Linux
-- `test/windows/` — Windows-based tests (TAEF framework)
+- `test/windows/` — Windows-based tests (TAEF framework): `common/`, `wsl/`, `wslc/`, `testplugin/`
 - `test/linux/unit_tests/` — Linux unit test suite
 - `doc/` — Documentation source (MkDocs)
 - `tools/` — Build and deployment scripts
@@ -233,7 +233,12 @@ Key points:
 - Use `WSL_TEST_CLASS(Name)` — not raw `BEGIN_TEST_CLASS`
 - Use `VERIFY_*` macros for assertions (`VERIFY_ARE_EQUAL`, `VERIFY_IS_TRUE`, etc.)
 - Skip macros: `WSL1_TEST_ONLY()`, `WSL2_TEST_ONLY()`, `SKIP_TEST_ARM64()`
-- Test infrastructure is in `test/windows/Common.h`
+- Test infrastructure is in `test/windows/common/Common.h` (include it as `"Common.h"`)
+- Test layout under `test/windows/`:
+  - `common/` — shared fixtures and helpers, plus unit tests for `src/windows/common`
+  - `wsl/` — WSL tests
+  - `wslc/` — WSLC tests
+  - `testplugin/` — test plugin used by the plugin tests
 
 ### Running Tests (Windows Only)
 
