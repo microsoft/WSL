@@ -1,4 +1,4 @@
-# Publishes the release NuGet packages to nuget.org.
+# Publishes the release NuGet packages to the WSL feed.
 parameters:
   - name: bypassTests
     type: boolean
@@ -22,7 +22,7 @@ stages:
     jobs:
       - ${{ each package in parameters.packages }}:
           - job: nuget_${{ replace(package, '.', '_') }}
-            displayName: Push ${{ package }} to NuGet.org
+            displayName: Push ${{ package }}
             pool:
               type: release
               os: windows
