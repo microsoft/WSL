@@ -126,10 +126,11 @@ enum class VmFeature
     UdpPortBinding,
     Ipv6PortBinding,
     ScopedIpv6PortBinding,
+    SavedStateOnCrash,
     Count
 };
 
-static_assert(static_cast<size_t>(VmFeature::Count) == 19);
+static_assert(static_cast<size_t>(VmFeature::Count) == 20);
 
 struct VmPlatformCapabilities
 {
