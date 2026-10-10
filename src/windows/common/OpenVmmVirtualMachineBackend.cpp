@@ -17,6 +17,7 @@ Abstract:
 #include <afunix.h>
 #include <bitset>
 #include <ctime>
+#include "GuestDeviceManager.h"
 #include "GuestConnector.h"
 #include "HandleIO.h"
 #include "SubProcess.h"
@@ -1008,7 +1009,9 @@ VmFileSystemShare OpenVmmVirtualMachineBackend::AddFileSystemShare(VmDeviceId De
         device->second.State = VmFileSystemDeviceState::Prepared;
         m_fileSystemShares.erase(entry);
     });
-    const auto result = WslOpenVmmVmAddShare(m_vm.get(), guestAddress.Tag.c_str(), hostPath.c_str(), Request.ReadOnly);
+    const auto mountOptions = FormatVirtioFsMountOptions(options->MountOptions);
+    const auto result =
+        WslOpenVmmVmAddShare(m_vm.get(), guestAddress.Tag.c_str(), hostPath.c_str(), Request.ReadOnly, mountOptions.c_str());
     WSL_LOG(
         "OpenVmmAddFileSystemShareEnd",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),

@@ -2717,7 +2717,17 @@ Return Value:
         return -1;
     }
 
-    int Result = MountPlan9(Name, Target, Message->ReadOnly, LX_INIT_UTILITY_VM_PLAN9_PLUGIN_PORT);
+    int Result;
+    if (Message->VirtioFs)
+    {
+        const unsigned long flags = Message->ReadOnly ? MS_RDONLY : 0;
+        Result = UtilMount(Name, Target, VIRTIO_FS_TYPE, flags, "", c_defaultRetryTimeout);
+    }
+    else
+    {
+        Result = MountPlan9(Name, Target, Message->ReadOnly, LX_INIT_UTILITY_VM_PLAN9_PLUGIN_PORT);
+    }
+
     Transaction.SendResultMessage<int32_t>(Result);
     return 0;
 }

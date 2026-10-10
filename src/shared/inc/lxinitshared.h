@@ -1496,11 +1496,12 @@ typedef struct _LX_MINI_INIT_MOUNT_FOLDER_MESSAGE
 
     MESSAGE_HEADER Header;
     bool ReadOnly;
+    bool VirtioFs;
     unsigned int PathIndex;
     unsigned int NameIndex;
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(ReadOnly), STRING_FIELD(PathIndex), STRING_FIELD(NameIndex));
+    PRETTY_PRINT(FIELD(Header), FIELD(ReadOnly), FIELD(VirtioFs), STRING_FIELD(PathIndex), STRING_FIELD(NameIndex));
 } LX_MINI_INIT_MOUNT_FOLDER_MESSAGE, *PLX_MINI_INIT_MOUNT_FOLDER_MESSAGE;
 
 typedef struct _LX_MINI_INIT_RESIZE_DISTRIBUTION_RESPONSE

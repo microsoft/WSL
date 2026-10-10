@@ -7063,7 +7063,12 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             LxsstuLaunchPowershellAndCaptureOutput(std::format(L"New-Vhd {}  -SizeBytes 20MB", testVhd));
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--mount {} --vhd --bare", testVhd)), 0L);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkfs.ext4 /dev/sde"), 0L);
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(
+                    L"bash -c 'for device in /dev/sd? /dev/vd?; do "
+                    L"[ \"$(blockdev --getsize64 \"$device\" 2>/dev/null)\" = 20971520 ] && exec mkfs.ext4 \"$device\"; "
+                    L"done; exit 1'"),
+                0L);
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount"), 0L);
 
             auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--import-in-place broken-test-distro {}", testVhd), -1);

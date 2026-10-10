@@ -666,9 +666,11 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             {
                 if (m_vmConfig.NetworkingMode == NetworkingMode::Nat)
                 {
-                    const auto& adapter = m_backend->GetDescription().NetworkAdapters.at(L"eth0");
+                    // N.B. GetDescription() returns by value, so the adapter id must be copied out of the
+                    // temporary rather than bound to a reference that would dangle past this statement.
+                    const auto adapterId = m_backend->GetDescription().NetworkAdapters.at(L"eth0").Id;
                     m_networkingEngine = std::make_unique<wsl::core::OpenVmmNatNetworking>(
-                        *m_backend, adapter.Id, std::move(gnsChannel), m_vmConfig.EnableLocalhostRelay, m_vmConfig.DhcpTimeout);
+                        *m_backend, adapterId, std::move(gnsChannel), m_vmConfig.EnableLocalhostRelay, m_vmConfig.DhcpTimeout);
                     m_networkingEngine->Initialize();
                 }
                 else
@@ -1916,11 +1918,27 @@ wil::unique_socket WslCoreVm::CreateRootNamespaceProcess(_In_ LPCSTR Path, _In_ 
 void WslCoreVm::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR GuestPath, _In_ bool ReadOnly, _In_ LPCWSTR Name)
 {
     auto lock = m_lock.lock_exclusive();
+    const bool useVirtioFs = m_backend->GetDescription().Backend == BackendKind::OpenVmm;
+    std::wstring mountSource = Name;
 
-    const auto flags = (ReadOnly ? hcs::Plan9ShareFlags::ReadOnly : hcs::Plan9ShareFlags::None) | hcs::Plan9ShareFlags::AllowOptions;
     wsl::windows::common::security::EnableTokenPrivilege(m_userToken.get(), SE_CREATE_SYMBOLIC_LINK_NAME);
-
+    if (useVirtioFs)
     {
+        auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
+        auto options = std::wstring{TEXT(LX_INIT_DEFAULT_PLAN9_MOUNT_OPTIONS)};
+        if (ReadOnly)
+        {
+            options += L";ro";
+        }
+
+        std::wstring childName;
+        std::tie(mountSource, childName, std::ignore) = AddVirtioFsShare(
+            wsl::windows::common::security::IsTokenElevated(m_userToken.get()), HostPath, options.c_str(), m_userToken.get());
+        THROW_HR_IF_MSG(E_UNEXPECTED, !childName.empty(), "OpenVMM plugin shares must use a single-share virtio-fs device");
+    }
+    else
+    {
+        const auto flags = (ReadOnly ? hcs::Plan9ShareFlags::ReadOnly : hcs::Plan9ShareFlags::None) | hcs::Plan9ShareFlags::AllowOptions;
         auto runAsUser = wil::impersonate_token(m_userToken.get());
         if (!m_pluginPlan9Server || m_pluginPlan9Server->IsRunning() != S_OK)
         {
@@ -1943,8 +1961,9 @@ void WslCoreVm::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR Gue
 
     wsl::shared::MessageWriter<LX_MINI_INIT_MOUNT_FOLDER_MESSAGE> message(LxMiniInitMountFolder);
     message.WriteString(message->PathIndex, GuestPath);
-    message.WriteString(message->NameIndex, Name);
+    message.WriteString(message->NameIndex, mountSource);
     message->ReadOnly = ReadOnly;
+    message->VirtioFs = useVirtioFs;
 
     const auto& ResultMessage = m_miniInitChannel.Transaction<LX_MINI_INIT_MOUNT_FOLDER_MESSAGE>(message.Span());
 

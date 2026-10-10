@@ -248,7 +248,8 @@ class MountTests
         TestMountStateIsDeletedOnShutdownImpl(true);
     }
 
-    WSL2_TEST_METHOD(TestFilesystemDetectionWholeDisk)
+    // OpenVMM only supports VHD/VHDX disk sources; physical-disk pass-through is not implemented.
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(TestFilesystemDetectionWholeDisk)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
@@ -262,7 +263,8 @@ class MountTests
         TestFilesystemDetectionWholeDiskImpl(true);
     }
 
-    WSL2_TEST_METHOD(TestMountTwoPartitionsWithDetection)
+    // OpenVMM only supports VHD/VHDX disk sources; physical-disk pass-through is not implemented.
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(TestMountTwoPartitionsWithDetection)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
@@ -276,7 +278,8 @@ class MountTests
         TestMountTwoPartitionsWithDetectionImpl(true);
     }
 
-    WSL2_TEST_METHOD(TestFilesystemDetectionFail)
+    // OpenVMM only supports VHD/VHDX disk sources; physical-disk pass-through is not implemented.
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(TestFilesystemDetectionFail)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
@@ -1034,24 +1037,31 @@ class MountTests
         bool done = false;
         while (true)
         {
-            for (wchar_t name = 'a'; name < 'z'; name++)
+            for (const std::wstring_view prefix : {L"sd", L"vd"})
             {
-                std::wstring cmd = L"-u root blockdev --getsize64 /dev/sd";
-                cmd += name;
-
-                std::wstring out;
-                try
+                for (wchar_t name = 'a'; name < 'z'; name++)
                 {
-                    out = LxsstuLaunchWslAndCaptureOutput(cmd.data()).first;
-                }
-                CATCH_LOG()
+                    std::wstring device = L"/dev/";
+                    device += prefix;
+                    device += name;
 
-                Trim(out);
+                    std::wstring cmd = L"-u root blockdev --getsize64 ";
+                    cmd += device;
 
-                // Disk size is 20MB, so 20 * 1024 * 1024 bytes
-                if (out == L"20971520")
-                {
-                    return std::wstring(L"/dev/sd") + name;
+                    std::wstring out;
+                    try
+                    {
+                        out = LxsstuLaunchWslAndCaptureOutput(cmd.data()).first;
+                    }
+                    CATCH_LOG()
+
+                    Trim(out);
+
+                    // Disk size is 20MB, so 20 * 1024 * 1024 bytes
+                    if (out == L"20971520")
+                    {
+                        return device;
+                    }
                 }
             }
 
