@@ -4,11 +4,6 @@ parameters:
   type: boolean
   default: false
 
-- name: pushToStore
-  displayName: 'Push the release to the Microsoft Store'
-  type: boolean
-  default: false
-
 - name: testVersion
   displayName: 'Override package version (required for testing / manual invocation)'
   type: string
@@ -112,8 +107,6 @@ extends:
         - template: store-flight-stage.yml@self
           parameters:
             bypassTests: ${{ parameters.bypassTests }}
-            publishPackage: true
-            pushToStore: ${{ parameters.pushToStore }}
 
         - template: nuget-publish-stage.yml@self
           parameters:
