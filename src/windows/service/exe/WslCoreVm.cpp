@@ -1599,7 +1599,14 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId, BackendKind 
     {
         kernelCmdLine += L" " WSL_ENABLE_CRASH_DUMP_ENV L"=1";
         VmCrashCaptureRequest crashCapture{m_vmConfig.CrashDumpFolder, gsl::narrow_cast<std::uint32_t>(m_vmConfig.MaxCrashDumpCount)};
-        crashCapture.SavedStateFolder = m_vmConfig.CrashDumpFolder;
+
+        // HCS pre-creates an empty saved-state file that lives in the folder for the VM's lifetime, so only OpenVMM,
+        // which writes its dump when the guest crashes, captures saved state into the user's crash dump folder.
+        if (Backend == BackendKind::OpenVmm)
+        {
+            crashCapture.SavedStateFolder = m_vmConfig.CrashDumpFolder;
+        }
+
         crashCapture.Policy = VmSelectionPolicy::Preferred;
         request.CrashCapture = std::move(crashCapture);
     }
