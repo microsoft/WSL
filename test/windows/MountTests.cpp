@@ -1176,7 +1176,15 @@ class MountTests
             }
 
             imageName.resize(length);
-            if (imageName == L"vmmemWSL" || (!wsl::windows::common::helpers::IsWindows11OrAbove() && imageName == L"vmmem"))
+            if (LxsstuOpenVmmMode())
+            {
+                // The OpenVMM backend runs the VM in an openvmm.exe worker process instead of vmmem.
+                if (wsl::shared::string::IsEqual(std::filesystem::path(imageName).filename().wstring(), L"openvmm.exe", true))
+                {
+                    return pid;
+                }
+            }
+            else if (imageName == L"vmmemWSL" || (!wsl::windows::common::helpers::IsWindows11OrAbove() && imageName == L"vmmem"))
             {
                 return pid;
             }

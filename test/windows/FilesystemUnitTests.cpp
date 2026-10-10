@@ -58,7 +58,7 @@ std::filesystem::path ExistingFile()
 namespace FilesystemUnitTests {
 class FilesystemUnitTests
 {
-    WSL_TEST_CLASS(FilesystemUnitTests)
+    BACKEND_AGNOSTIC_TEST_CLASS(FilesystemUnitTests)
 
     // A relative path naming a file that does not exist must still resolve to an absolute path.
     // std::filesystem::weakly_canonical cannot do this on its own: it builds its result from the

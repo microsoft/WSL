@@ -302,6 +302,7 @@ public:
         ValidateDrvfsMounts(CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT | CREATE_NEW_CONSOLE, Mode);
     }
 
+    // The SystemDistroEnabled tests boot the system distro by enabling GUI applications, which OpenVMM doesn't support yet.
     void DrvfsMountElevatedSystemDistroEnabled(DrvFsMode Mode)
     {
         WINDOWS_11_TEST_ONLY(); // TODO: Enable on Windows 10 when virtio support is added
@@ -1423,12 +1424,12 @@ class WSL1 : public DrvFsTests
             DrvFsTests::DrvfsMountNonElevatedDifferentConsole(DrvFsMode::##_mode##); \
         } \
 \
-        WSL2_TEST_METHOD(DrvfsMountElevatedSystemDistroEnabled) \
+        OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(DrvfsMountElevatedSystemDistroEnabled) \
         { \
             DrvFsTests::DrvfsMountElevatedSystemDistroEnabled(DrvFsMode::##_mode##); \
         } \
 \
-        WSL2_TEST_METHOD(DrvfsMountNonElevatedSystemDistroEnabled) \
+        OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(DrvfsMountNonElevatedSystemDistroEnabled) \
         { \
             DrvFsTests::DrvfsMountNonElevatedSystemDistroEnabled(DrvFsMode::##_mode##); \
         } \

@@ -153,6 +153,26 @@ using namespace std::chrono_literals;
     END_TEST_CLASS()
 
 //
+// Tests that drive the OpenVMM backend directly. These only run in the dedicated OpenVMM test pass,
+// which uses an image with the Windows Hypervisor Platform enabled.
+//
+#define OPENVMM_TEST_CLASS(_name) \
+    BEGIN_TEST_CLASS(_name) \
+        WSL_TEST_CLASS_PROPERTIES \
+        TEST_CLASS_PROPERTY(L"TestCategory", L"OpenVMM") \
+    END_TEST_CLASS()
+
+//
+// Tests whose outcome cannot depend on which virtual machine backend is in use. These are excluded
+// from the OpenVMM test pass, where re-running them would only duplicate the main WSL2 pass.
+//
+#define BACKEND_AGNOSTIC_TEST_CLASS(_name) \
+    BEGIN_TEST_CLASS(_name) \
+        WSL_TEST_CLASS_PROPERTIES \
+        TEST_CLASS_PROPERTY(L"TestCategory", L"BackendAgnostic") \
+    END_TEST_CLASS()
+
+//
 // RAII Wrapper that prevents the UVM from timing out
 //
 class WslKeepAlive
@@ -529,6 +549,8 @@ wil::unique_file FileFromHandle(_Inout_ wil::unique_handle& Handle, _In_ const c
 BOOL LxsstuInitialize(__in BOOLEAN RunInstanceTests);
 
 BOOL LxsstuVmMode(VOID);
+
+bool LxsstuOpenVmmMode();
 
 std::pair<std::wstring, std::wstring> LxsstuLaunchPowershellAndCaptureOutput(_In_ const std::wstring& Cmd, _In_ int ExpectedExitCode = 0);
 

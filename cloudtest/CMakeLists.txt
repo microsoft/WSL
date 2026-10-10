@@ -53,13 +53,19 @@ function(add_test_group image version suffix filter backend_argument)
 endfunction()
 
 foreach(image ${CLOUDTEST_IMAGES})
-    add_test_group("${image}" "1" "wsl1" "not (@TestCategory='WSLC')" "")
-    add_test_group("${image}" "2" "wsl2" "not (@TestCategory='WSLC')" "")
+    # OpenVMM backend tests construct OpenVMM VMs directly, so they belong only in the dedicated
+    # OpenVMM pass below, which runs on an image that has the Windows Hypervisor Platform enabled.
+    set(TEST_FILTER "not (@TestCategory='WSLC' or @TestCategory='OpenVMM')")
+
+    add_test_group("${image}" "1" "wsl1" "${TEST_FILTER}" "")
+    add_test_group("${image}" "2" "wsl2" "${TEST_FILTER}" "")
     if (NOT "${image}" IN_LIST CLOUDTEST_SERVER_IMAGES)
         add_test_group("${image}" "2" "wslc" "@TestCategory='WSLC'" "")
     endif()
 
     if ("${image}" STREQUAL "wsl-test-image-rs_prerelease-2026-10-05")
-        add_test_group("${image}" "2" "wsl2-openvmm" "not (@TestCategory='WSLC')" "/p:OpenVmm=1")
+        # Re-run the WSL2 suite against the OpenVMM backend, minus the tests whose outcome cannot
+        # depend on the backend in use, which would otherwise duplicate the wsl2 pass above.
+        add_test_group("${image}" "2" "wsl2-openvmm" "not (@TestCategory='WSLC' or @TestCategory='BackendAgnostic')" "/p:OpenVmm=1")
     endif()
 endforeach()

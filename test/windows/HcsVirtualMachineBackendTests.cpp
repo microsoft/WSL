@@ -110,7 +110,7 @@ namespace HcsVirtualMachineBackendTests {
 
 class HcsVirtualMachineBackendTests
 {
-    WSL_TEST_CLASS(HcsVirtualMachineBackendTests)
+    BACKEND_AGNOSTIC_TEST_CLASS(HcsVirtualMachineBackendTests)
 
     TEST_CLASS_SETUP(TestClassSetup)
     {

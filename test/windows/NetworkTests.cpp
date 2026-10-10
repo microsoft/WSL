@@ -1726,7 +1726,9 @@ class NetworkTests
         VERIFY_SUCCEEDED(hr, error.get());
     }
 
-    WSL2_TEST_METHOD(NatInvalidRange)
+    // TODO: OpenVMM NAT doesn't use an HNS network, so these tests are skipped there. OpenVMM needs equivalent behavior
+    // for the persisted NAT network range, gateway and address (including the fallback when they're invalid).
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatInvalidRange)
     {
         WslConfigChange config(LxssGenerateTestConfig());
         WriteNatConfiguration(L"InvalidRange", {}, {L"delete"});
@@ -1747,7 +1749,7 @@ class NetworkTests
         VERIFY_ARE_EQUAL(state.Gateway.value_or(L""), networkConfiguration.gatewayIpAddress);
     }
 
-    WSL2_TEST_METHOD(NatInvalidGateway)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatInvalidGateway)
     {
         WslConfigChange config(LxssGenerateTestConfig());
         WriteNatConfiguration({}, L"InvalidGateway", {});
@@ -1768,7 +1770,7 @@ class NetworkTests
         VERIFY_ARE_EQUAL(state.Gateway.value_or(L""), networkConfiguration.gatewayIpAddress);
     }
 
-    WSL2_TEST_METHOD(NatInvalidAddress)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatInvalidAddress)
     {
         WslConfigChange config(LxssGenerateTestConfig());
 
@@ -1904,6 +1906,12 @@ class NetworkTests
         int networkingModeVal = 0;
         WEX::TestExecution::TestData::TryGetValue(L"NetConfig", networkingModeVal);
         auto networkingMode = static_cast<wsl::core::NetworkingMode>(networkingModeVal);
+        if (LxsstuOpenVmmMode() && networkingMode != wsl::core::NetworkingMode::Nat)
+        {
+            LogSkipped("OpenVMM only supports NAT networking");
+            return;
+        }
+
         switch (networkingMode)
         {
         case wsl::core::NetworkingMode::Bridged:
@@ -2753,7 +2761,8 @@ class NetworkTests
         VERIFY_ARE_NOT_EQUAL(warnings.find(L"starting data transfer loop"), std::string::npos);
     }
 
-    WSL2_TEST_METHOD(NatNonRootNamespaceEphemeralBind)
+    // Requires GUI applications, which OpenVMM doesn't support yet.
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatNonRootNamespaceEphemeralBind)
     {
         // Because the test creates a new network namespace, the resolv.conf from the root network namespace
         // is copied in the resolv.conf of the new network namespace. The DNS tunneling listener running in the root namespace
@@ -2961,7 +2970,7 @@ class NetworkTests
         AddFirewallRuleAndValidateTraffic(hyperVBlockRule, expectedConnectivity);
     }
 
-    WSL2_TEST_METHOD(NatFirewallRulesExpectedBlock)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatFirewallRulesExpectedBlock)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig({.firewall = true}));
@@ -2970,7 +2979,7 @@ class NetworkTests
         FirewallRuleBlockedTests(FirewallTestConnectivity::Blocked);
     }
 
-    WSL2_TEST_METHOD(NatFirewallRulesExpectedBlockFirewallDisabled)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatFirewallRulesExpectedBlockFirewallDisabled)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         SKIP_TEST_UNSTABLE();
@@ -2981,7 +2990,7 @@ class NetworkTests
         FirewallRuleBlockedTests(FirewallTestConnectivity::Allowed);
     }
 
-    WSL2_TEST_METHOD(NatFirewallRulesExpectedBlockFirewallDisabledByPolicy)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatFirewallRulesExpectedBlockFirewallDisabledByPolicy)
     {
         HYPERV_FIREWALL_TEST_ONLY();
 
@@ -3021,7 +3030,7 @@ class NetworkTests
         AddFirewallRuleAndValidateTraffic(allowHyperVRule, expectedConnectivity);
     }
 
-    WSL2_TEST_METHOD(NatFirewallRulesExpectedAllow)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatFirewallRulesExpectedAllow)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig({.firewall = true}));
@@ -3030,7 +3039,7 @@ class NetworkTests
         FirewallRuleAllowedTests(FirewallTestConnectivity::Allowed);
     }
 
-    WSL2_TEST_METHOD(NatFirewallRulesExpectedAllowFirewallDisabled)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatFirewallRulesExpectedAllowFirewallDisabled)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         SKIP_TEST_UNSTABLE();
@@ -3108,7 +3117,7 @@ class NetworkTests
             blockRule, isHyperVFirewallEnabled ? FirewallTestConnectivity::Blocked : FirewallTestConnectivity::Allowed);
     }
 
-    WSL2_TEST_METHOD(NatFirewallRulesEnabledSetting)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatFirewallRulesEnabledSetting)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig({.firewall = true}));
@@ -3117,7 +3126,7 @@ class NetworkTests
         FirewallSettingEnabledTests(true);
     }
 
-    WSL2_TEST_METHOD(NatFirewallRulesEnabledSettingFirewallDisabled)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatFirewallRulesEnabledSettingFirewallDisabled)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         SKIP_TEST_UNSTABLE();

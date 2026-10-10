@@ -21,6 +21,7 @@ class WslInstall
 public:
     static inline LPCWSTR c_optionalFeatureNameVmp = L"VirtualMachinePlatform";
     static inline LPCWSTR c_optionalFeatureNameWsl = L"Microsoft-Windows-Subsystem-Linux";
+    static inline LPCWSTR c_optionalFeatureNameWhp = L"HypervisorPlatform";
 
     struct InstallResult
     {

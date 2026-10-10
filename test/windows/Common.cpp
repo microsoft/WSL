@@ -478,6 +478,14 @@ Return Value:
     return g_VmMode;
 }
 
+// Returns true when the tests run with /p:OpenVmm=1, i.e. against the OpenVMM backend instead of HCS.
+bool LxsstuOpenVmmMode()
+{
+    WEX::Common::String openVmmArg;
+    WEX::TestExecution::RuntimeParameters::TryGetValue(L"OpenVmm", openVmmArg);
+    return !openVmmArg.IsEmpty() && openVmmArg != L"0";
+}
+
 // LxsstuLaunchPowershellAndCaptureOutput
 
 std::pair<std::wstring, std::wstring> LxsstuLaunchPowershellAndCaptureOutput(_In_ const std::wstring& Cmd, _In_ int ExpectedExitCode)
@@ -1532,9 +1540,7 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
 
     // Run with /p:OpenVmm=1 to exercise the OpenVMM backend instead of HCS. OpenVMM doesn't support GUI apps, GPU,
     // virtio-9p/Plan9 or aggregate virtio-fs shares, so the defaults are adjusted unless a test overrides them.
-    WEX::Common::String openVmmArg;
-    WEX::TestExecution::RuntimeParameters::TryGetValue(L"OpenVmm", openVmmArg);
-    const bool openVmm = !openVmmArg.IsEmpty() && openVmmArg != L"0";
+    const bool openVmm = LxsstuOpenVmmMode();
     if (openVmm)
     {
         Default.guiApplications = Default.guiApplications.value_or(false);

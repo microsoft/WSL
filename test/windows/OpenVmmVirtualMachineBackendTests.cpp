@@ -65,7 +65,7 @@ namespace OpenVmmVirtualMachineBackendTests {
 
 class OpenVmmVirtualMachineBackendTests
 {
-    WSL_TEST_CLASS(OpenVmmVirtualMachineBackendTests)
+    OPENVMM_TEST_CLASS(OpenVmmVirtualMachineBackendTests)
 
     TEST_CLASS_SETUP(TestClassSetup)
     {

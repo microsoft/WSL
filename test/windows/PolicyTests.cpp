@@ -23,7 +23,7 @@ using namespace wsl::windows::common::registry;
 
 class PolicyTest
 {
-    WSL_TEST_CLASS(PolicyTest)
+    BACKEND_AGNOSTIC_TEST_CLASS(PolicyTest)
 
     bool m_initialized = false;
 
