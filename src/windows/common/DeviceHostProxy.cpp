@@ -401,9 +401,24 @@ void DeviceHostProxy::Shutdown()
         TeardownDevice(device);
     }
 
+    std::vector<std::shared_ptr<DeviceHostProcess>> processJobs;
     {
         auto lock = m_devicesLock.lock_exclusive();
         m_devices.clear();
+        processJobs = std::move(m_processJobs);
+    }
+    devices.clear();
+
+    // Remote hosts can retain our callback after device teardown. Disconnect the exported
+    // interfaces before releasing the last local owner instead of waiting for COM rundown.
+    LOG_IF_FAILED(CoDisconnectObject(CastToUnknown(), 0));
+
+    wil::com_ptr<IWslVm> vm;
+    wil::com_ptr<IWslVm> adminVm;
+    {
+        auto lock = m_lock.lock_exclusive();
+        vm = std::move(m_wslVm);
+        adminVm = std::move(m_adminWslVm);
     }
 }
 
@@ -483,26 +498,49 @@ try
     const wil::com_ptr<IUnknown> unknown = remoteHost.query<IUnknown>();
     THROW_IF_FAILED(proxyDeviceHost(m_system.get(), unknown.get(), ProcessId, IpcSectionHandle));
 
-    // Assign the device host process to a fresh kill-on-close job so it is terminated when the VM
-    // shuts down. Each process needs its own job: a process the system has already placed in a job
-    // cannot be assigned to a job that already owns a different process (ERROR_ACCESS_DENIED).
+    // Keep one kill-on-close job per process, shared by every VM using that COM server.
+    // Each process needs its own job because nested jobs cannot contain unrelated processes.
     {
         auto lock = m_devicesLock.lock_exclusive();
         if (!m_devicesShutdown)
         {
-            wil::unique_handle process(OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, FALSE, ProcessId));
-            LOG_LAST_ERROR_IF_MSG(!process, "Failed to open device host process %u for job assignment", ProcessId);
-            if (process)
+            static wil::srwlock processLock;
+            static std::map<DWORD, std::weak_ptr<DeviceHostProcess>> processes;
+            auto processGuard = processLock.lock_exclusive();
+            std::erase_if(processes, [](const auto& entry) { return entry.second.expired(); });
+            auto& existing = processes[ProcessId];
+            auto lifetime = existing.lock();
+            if (lifetime)
             {
-                wil::unique_handle job = wsl::windows::common::helpers::CreateKillOnCloseJob();
-                if (AssignProcessToJobObject(job.get(), process.get()))
+                const auto waitResult = WaitForSingleObject(lifetime->Process.get(), 0);
+                THROW_LAST_ERROR_IF(waitResult == WAIT_FAILED);
+                if (waitResult == WAIT_OBJECT_0)
                 {
-                    m_processJobs.emplace_back(std::move(job));
+                    lifetime.reset();
                 }
-                else
+            }
+            if (!lifetime)
+            {
+                auto candidate = std::make_shared<DeviceHostProcess>();
+                candidate->Process.reset(OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE | SYNCHRONIZE, FALSE, ProcessId));
+                LOG_LAST_ERROR_IF_MSG(!candidate->Process, "Failed to open device host process %u for job assignment", ProcessId);
+                if (candidate->Process)
                 {
-                    LOG_LAST_ERROR_MSG("Failed to assign device host process %u to job object", ProcessId);
+                    candidate->Job = wsl::windows::common::helpers::CreateKillOnCloseJob();
+                    if (AssignProcessToJobObject(candidate->Job.get(), candidate->Process.get()))
+                    {
+                        lifetime = std::move(candidate);
+                        existing = lifetime;
+                    }
+                    else
+                    {
+                        LOG_LAST_ERROR_MSG("Failed to assign device host process %u to job object", ProcessId);
+                    }
                 }
+            }
+            if (lifetime)
+            {
+                m_processJobs.emplace_back(std::move(lifetime));
             }
         }
     }

@@ -39,6 +39,20 @@ void CreateVhd(const std::filesystem::path& Path)
         &storageType, Path.c_str(), VIRTUAL_DISK_ACCESS_NONE, nullptr, CREATE_VIRTUAL_DISK_FLAG_SUPPORT_COMPRESSED_VOLUMES, 0, &parameters, nullptr, &vhd));
 }
 
+std::wstring GetDaclAces(const std::filesystem::path& Path)
+{
+    PACL acl = nullptr;
+    wil::unique_hlocal descriptor;
+    THROW_IF_WIN32_ERROR(
+        GetNamedSecurityInfoW(Path.c_str(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, &acl, nullptr, &descriptor));
+    wil::unique_hlocal_string value;
+    THROW_IF_WIN32_BOOL_FALSE(ConvertSecurityDescriptorToStringSecurityDescriptorW(
+        descriptor.get(), SDDL_REVISION_1, DACL_SECURITY_INFORMATION, &value, nullptr));
+    const std::wstring dacl{value.get()};
+    const auto firstAce = dacl.find(L'(');
+    return firstAce == std::wstring::npos ? std::wstring{} : dacl.substr(firstAce);
+}
+
 // Tests require elevation, so the test process token is the elevated counterpart of
 // GetNonElevatedToken() and stands in for an administrator's DrvFs share.
 wil::unique_handle GetElevatedTestToken()
@@ -98,6 +112,28 @@ class HcsVirtualMachineBackendTests
 {
     WSL_TEST_CLASS(HcsVirtualMachineBackendTests)
 
+    TEST_CLASS_SETUP(TestClassSetup)
+    {
+        WSADATA data{};
+        THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &data));
+        return true;
+    }
+
+    TEST_CLASS_CLEANUP(TestClassCleanup)
+    {
+        const auto module = GetModuleHandleW(L"wsldevicehostproxystub.dll");
+        if (module)
+        {
+            const auto canUnload = reinterpret_cast<HRESULT(STDAPICALLTYPE*)()>(GetProcAddress(module, "DllCanUnloadNow"));
+            VERIFY_IS_NOT_NULL(canUnload);
+            LogInfo("Device-host proxy unload status before COM cleanup: 0x%08x", canUnload());
+        }
+        CoFreeUnusedLibrariesEx(0, 0);
+        VERIFY_IS_NULL(GetModuleHandleW(L"wsldevicehostproxystub.dll"));
+        VERIFY_ARE_EQUAL(0, WSACleanup());
+        return true;
+    }
+
     TEST_METHOD(FileSystemRequestsDefaultToVirtioFs)
     {
         const VmFileSystemDeviceRequest device;
@@ -130,6 +166,8 @@ class HcsVirtualMachineBackendTests
         auto backend = HcsVirtualMachineBackend::Create(request);
         const auto description = backend->GetDescription();
 
+        VERIFY_IS_NOT_NULL(backend->GetComputeSystemHandle());
+        VERIFY_IS_NOT_NULL(backend->GetGuestDeviceManager().get());
         VERIFY_IS_TRUE(IsEqualGUID(request.Identity.VmId, description.Identity.VmId));
         VERIFY_ARE_EQUAL(BackendKind::Hcs, description.Backend);
         VERIFY_ARE_EQUAL(request.Processor.Count, description.Processor.Count);
@@ -138,7 +176,11 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(UINT32{4}, description.Memory.FaultClusterSizeShift.value());
         VERIFY_ARE_EQUAL(UINT32{4}, description.Memory.DirectMapFaultClusterSizeShift.value());
         VERIFY_ARE_EQUAL(UINT32{5}, description.Memory.PageReportingOrder.value());
-        VERIFY_ARE_EQUAL(std::wstring{L"WSL"}, description.Memory.HostingProcessNameSuffix.value());
+        VERIFY_ARE_EQUAL(wsl::windows::common::helpers::IsVmemmSuffixSupported(), description.Memory.HostingProcessNameSuffix.has_value());
+        if (description.Memory.HostingProcessNameSuffix)
+        {
+            VERIFY_ARE_EQUAL(std::wstring{L"WSL"}, description.Memory.HostingProcessNameSuffix.value());
+        }
         VERIFY_ARE_EQUAL(UINT64{24 * c_mib}, description.Memory.HighMmioSizeBytes.value());
         VERIFY_ARE_EQUAL((UINT64{1} << 36) - (24 * c_mib), description.Memory.HighMmioBaseBytes.value());
         VERIFY_ARE_EQUAL(VmBootMethod::LinuxDirect, description.Boot.Method);
@@ -164,6 +206,56 @@ class HcsVirtualMachineBackendTests
         VerifyBootsAndTerminates(HcsVirtualMachineBackend::Create(CreateRunnableRequest()));
     }
 
+    TEST_METHOD(AllocatesFirstFreeBootDiskLun)
+    {
+        SKIP_TEST_ARM64();
+        const auto directory = CreateTestDirectory();
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { std::filesystem::remove_all(directory); });
+        const auto exactPath = directory / L"exact.vhdx";
+        const auto automaticPath = directory / L"automatic.vhdx";
+        CreateVhd(exactPath);
+        CreateVhd(automaticPath);
+
+        auto request = CreateRunnableRequest();
+        VmBootDiskRequest exact;
+        exact.Key = L"exact";
+        exact.Disk = CreateDiskRequest(exactPath, 253);
+        VmBootDiskRequest automatic;
+        automatic.Key = L"automatic";
+        automatic.Disk = CreateDiskRequest(automaticPath);
+        request.BootDisks = {std::move(exact), std::move(automatic)};
+
+        auto backend = HcsVirtualMachineBackend::Create(request);
+        const auto& bootDisks = backend->GetDescription().BootDisks;
+        VERIFY_ARE_EQUAL(UINT32{253}, bootDisks.at(L"exact").GuestAddress.Lun);
+        VERIFY_ARE_EQUAL(UINT32{0}, bootDisks.at(L"automatic").GuestAddress.Lun);
+        backend->Terminate();
+    }
+
+    TEST_METHOD(RollsBackBootDiskAccessOnConfigurationFailure)
+    {
+        const auto directory = CreateTestDirectory();
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { std::filesystem::remove_all(directory); });
+        const auto firstPath = directory / L"first.vhdx";
+        CreateVhd(firstPath);
+
+        const auto firstDaclAces = GetDaclAces(firstPath);
+        auto request = CreateRunnableRequest();
+        request.Identity.UserToken = wil::shared_handle{GetElevatedTestToken().release()};
+        VmBootDiskRequest first;
+        first.Key = L"first";
+        first.Disk = CreateDiskRequest(firstPath);
+        first.GrantHostAccess = true;
+        VmBootDiskRequest invalid;
+        invalid.Key = L"first";
+        invalid.Disk = CreateDiskRequest(firstPath);
+        invalid.GrantHostAccess = true;
+        request.BootDisks = {std::move(first), std::move(invalid)};
+
+        VERIFY_ARE_NOT_EQUAL(S_OK, OperationResult([&] { HcsVirtualMachineBackend::Create(request); }));
+        VERIFY_ARE_EQUAL(firstDaclAces, GetDaclAces(firstPath));
+    }
+
     TEST_METHOD(ManagesDiskPlacementsAndLifetime)
     {
         SKIP_TEST_ARM64();
@@ -179,7 +271,7 @@ class HcsVirtualMachineBackendTests
         CreateVhd(invalidPath);
 
         auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
-        backend->Start();
+        auto guest = StartGuest(*backend);
         const auto automatic = backend->AttachDisk(CreateDiskRequest(automaticPath));
         const auto exact = backend->AttachDisk(CreateDiskRequest(exactPath, 2));
         const auto replacement = backend->AttachDisk(CreateDiskRequest(replacementPath));
@@ -230,7 +322,7 @@ class HcsVirtualMachineBackendTests
         CreateVhd(secondPath);
 
         auto firstBackend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
-        firstBackend->Start();
+        auto firstGuest = StartGuest(*firstBackend);
         const auto first = firstBackend->AttachDisk(CreateDiskRequest(firstPath, 253));
 
         VERIFY_ARE_EQUAL(UINT32{253}, first.GuestAddress.Lun);
@@ -241,7 +333,7 @@ class HcsVirtualMachineBackendTests
 
         // Disk IDs are local to a VM and can be reused after another VM has terminated.
         auto secondBackend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
-        secondBackend->Start();
+        auto secondGuest = StartGuest(*secondBackend);
         const auto second = secondBackend->AttachDisk(CreateDiskRequest(secondPath));
 
         VERIFY_ARE_EQUAL(first.Id.Value, second.Id.Value);
@@ -273,7 +365,7 @@ class HcsVirtualMachineBackendTests
     {
         SKIP_TEST_ARM64();
         auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
-        backend->Start();
+        auto guest = StartGuest(*backend);
 
         const auto request = CreateNetworkRequest();
         const auto first = backend->AddNetworkAdapter(request);
@@ -289,6 +381,31 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->RemoveNetworkAdapter(duplicate.Id); }));
         VERIFY_IS_TRUE(backend->GetDescription().NetworkAdapters.empty());
         backend->Terminate();
+    }
+
+    TEST_METHOD(KeepsOtherVmDeviceHostsAlive)
+    {
+        SKIP_TEST_ARM64();
+        const auto directory = CreateTestDirectory();
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { std::filesystem::remove_all(directory); });
+
+        auto first = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        auto firstGuest = StartGuest(*first);
+        first->CreateFileSystemDevice({VmVirtioFsDevice{L"first", VmVirtioFsLayout::Aggregate}});
+
+        auto second = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        auto secondGuest = StartGuest(*second);
+        const auto device = second->CreateFileSystemDevice({VmVirtioFsDevice{L"second", VmVirtioFsLayout::Aggregate}});
+
+        first.reset();
+
+        VmFileSystemShareRequest request;
+        request.HostPath = directory;
+        request.Options = VmVirtioFsShareOptions{};
+        const auto share = second->AddFileSystemShare(device.Id, request);
+        VERIFY_ARE_EQUAL(device.Id.Value, share.Device.Value);
+        second->RemoveFileSystemShare(share.Id);
+        second->Terminate();
     }
 
     TEST_METHOD(NotifiesTerminationCallbacksWithoutHoldingBackendLock)
@@ -355,6 +472,8 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->GetFileSystemDeviceStatus(device); }));
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->RemoveDevice(device); }));
         backend->Terminate();
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), OperationResult([&] { backend->GetComputeSystemHandle(); }));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), OperationResult([&] { backend->GetGuestDeviceManager(); }));
     }
 
     TEST_METHOD(SharesHostDirectoriesPerElevationLevel)
@@ -364,7 +483,7 @@ class HcsVirtualMachineBackendTests
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { std::filesystem::remove_all(directory); });
 
         auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
-        backend->Start();
+        auto guest = StartGuest(*backend);
 
         // Elevated and unelevated callers share one VM, so each elevation level gets its own device
         // just as WslCoreVm::AddDrvFsShare uses a separate Plan 9 port and virtio-fs tag for each.
@@ -557,13 +676,7 @@ class HcsVirtualMachineBackendTests
                 backend->AddFileSystemShare(device, original).Id.Value, backend->AddFileSystemShare(device, conflicting).Id.Value);
             wil::unique_handle duplicatedToken;
             THROW_IF_WIN32_BOOL_FALSE(DuplicateHandle(
-                GetCurrentProcess(),
-                conflicting.UserToken.get(),
-                GetCurrentProcess(),
-                duplicatedToken.put(),
-                0,
-                FALSE,
-                DUPLICATE_SAME_ACCESS));
+                GetCurrentProcess(), conflicting.UserToken->get(), GetCurrentProcess(), duplicatedToken.put(), 0, FALSE, DUPLICATE_SAME_ACCESS));
             conflicting.UserToken = wil::shared_handle{duplicatedToken.release()};
             VERIFY_ARE_EQUAL(
                 backend->AddFileSystemShare(device, original).Id.Value, backend->AddFileSystemShare(device, conflicting).Id.Value);

@@ -171,6 +171,13 @@ target_include_directories(common PUBLIC
 # PUBLIC propagates them instead of making each consumer restate them.
 target_link_libraries(common PUBLIC ${HCS_LINK_LIBRARIES} ${MSI_LINK_LIBRARIES} VirtDisk.lib configfile wslopenvmm_client)
 
+# Keep backend imports out of clients that only use common utilities, such as the MSIX launchers.
+set_source_files_properties(
+    VirtualMachineBackend.cpp
+    HcsVirtualMachineBackend.cpp
+    OpenVmmVirtualMachineBackend.cpp
+    PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+
 # WSLCUserSettings.cpp uses yaml-cpp headers.
 # The per-source include path and definition below only apply when the file is
 # compiled on its own, so keep it out of the unity sources.

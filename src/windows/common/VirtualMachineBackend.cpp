@@ -117,12 +117,12 @@ VmGuestListener IVirtualMachineBackend::RegisterGuestListenerLocked(const VmInst
     return listener;
 }
 
-wil::unique_socket VmGuestListener::Accept() const
+wil::unique_socket VmGuestListener::Accept(DWORD Timeout, const std::source_location& Location) const
 {
     THROW_HR_IF(E_INVALIDARG, Id.Value == 0 || !State);
     WSL_LOG("VmAcceptGuestConnectionBegin", TraceLoggingValue(Id.Owner.VmId, "vmId"), TraceLoggingValue(Id.Value, "listenerId"));
 
-    auto socket = wsl::windows::common::socket::CancellableAccept(State->Socket.get(), INFINITE, State->CancellationEvent.get());
+    auto socket = wsl::windows::common::socket::CancellableAccept(State->Socket.get(), Timeout, State->CancellationEvent.get(), Location);
     WSL_LOG(
         "VmAcceptGuestConnectionEnd",
         TraceLoggingValue(Id.Owner.VmId, "vmId"),
@@ -131,6 +131,12 @@ wil::unique_socket VmGuestListener::Accept() const
         TraceLoggingHResult(socket ? S_OK : E_ABORT, "result"));
     THROW_HR_IF(E_ABORT, !socket);
     return std::move(*socket);
+}
+
+SOCKET VmGuestListener::Socket() const
+{
+    THROW_HR_IF(E_INVALIDARG, Id.Value == 0 || !State);
+    return State->Socket.get();
 }
 
 std::shared_ptr<VmGuestListenerState> IVirtualMachineBackend::RemoveGuestListenerLocked(VmListenerId Listener, const VmInstanceId& Identity)
@@ -143,6 +149,15 @@ std::shared_ptr<VmGuestListenerState> IVirtualMachineBackend::RemoveGuestListene
     auto result = std::move(entry->second);
     m_guestListeners.erase(entry);
     return result;
+}
+
+void IVirtualMachineBackend::CancelGuestListeners() noexcept
+{
+    auto lock = m_lock.lock_shared();
+    for (const auto& entry : m_guestListeners)
+    {
+        LOG_IF_WIN32_BOOL_FALSE(SetEvent(entry.second->CancellationEvent.get()));
+    }
 }
 
 void IVirtualMachineBackend::CloseGuestListenersLocked(const VmInstanceId& Identity) noexcept

@@ -41,6 +41,8 @@ public:
     VmState GetState() const override;
     VmTerminationInformation GetTerminationReason() const override;
     wil::unique_handle GetTerminationEvent() const override;
+    wil::unique_handle GetCrashEvent() const override;
+    std::optional<std::filesystem::path> GetCrashLogPath() const override;
     void Start() override;
     void Terminate() override;
 
@@ -49,14 +51,17 @@ public:
     void CloseGuestListener(VmListenerId Listener) override;
 
     VmDiskAttachment AttachDisk(const VmDiskRequest& Request) override;
+    std::vector<VmDiskAttachment> GetAttachedDisks() const override;
     void DetachDisk(VmDiskId Disk) override;
 
     VmPersistentMemoryDevice AddPersistentMemory(const VmPersistentMemoryRequest& Request) override;
     VmGpuAttachment AddGpu(const VmGpuRequest& Request) override;
 
     VmFileSystemDevice CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request) override;
+    std::optional<VmFileSystemDevice> GetFileSystemDevice(const VmFileSystemDevicePredicate& Predicate) const override;
     VmFileSystemDevice GetFileSystemDeviceStatus(VmDeviceId Device) override;
     VmFileSystemShare AddFileSystemShare(VmDeviceId Device, const VmFileSystemShareRequest& Request) override;
+    std::optional<VmFileSystemShare> GetFileSystemShare(const VmFileSystemSharePredicate& Predicate) const override;
     void RemoveFileSystemShare(VmShareId Share) override;
     VmSharedMemoryDevice AddSharedMemory(const VmSharedMemoryRequest& Request) override;
     void ConfigureGuestDma(const VmGuestDmaRequest& Request) override;
@@ -92,30 +97,27 @@ private:
         wil::unique_hfile SocketFile;
     };
 
-    struct FileSystemDevice
+    struct OpenVmmFileSystemDevice
     {
-        VmFileSystemDevice Device;
-        VmVirtioFsDevice Transport;
         std::optional<std::uint64_t> Share;
     };
 
-    struct FileSystemShare
-    {
-        VmFileSystemShare Share;
-    };
+    using FileSystemDevice = VmResource<VmFileSystemDevice, OpenVmmFileSystemDevice>;
 
-    struct NetworkAdapter
+    struct OpenVmmNetworkAdapter
     {
-        VmNetworkAttachment Attachment;
         std::wstring NicId;
     };
 
-    struct PortBinding
+    using NetworkAdapter = VmResource<VmNetworkAttachment, OpenVmmNetworkAdapter>;
+
+    struct OpenVmmPortBinding
     {
-        VmPortBinding Binding;
         std::wstring NicId;
         std::wstring HostAddress;
     };
+
+    using PortBinding = VmResource<VmPortBinding, OpenVmmPortBinding>;
 
     struct SessionFileSystemResources
     {
@@ -129,7 +131,7 @@ private:
     _Guarded_by_(m_lock) std::map<std::uint64_t, VmDiskAttachment> m_attachedDisks;
     _Guarded_by_(m_lock) std::uint64_t m_nextDiskId = 1;
     _Guarded_by_(m_lock) std::map<std::uint64_t, FileSystemDevice> m_fileSystemDevices;
-    _Guarded_by_(m_lock) std::map<std::uint64_t, FileSystemShare> m_fileSystemShares;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, VmFileSystemShare> m_fileSystemShares;
     _Guarded_by_(m_lock) std::map<std::uint64_t, NetworkAdapter> m_networkAdapters;
     _Guarded_by_(m_lock) std::map<std::uint64_t, PortBinding> m_portBindings;
     _Guarded_by_(m_lock) std::uint64_t m_nextDeviceId = 1;
@@ -141,6 +143,7 @@ private:
     std::thread m_processLogThread;
     SessionFileSystemResources m_fileSystemResources;
     wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
+    wil::unique_event m_crashEvent{wil::EventOptions::ManualReset};
     _Guarded_by_(m_lock) VmState m_state = VmState::Unknown;
     _Guarded_by_(m_lock) VmTerminationInformation m_terminationInformation;
 };

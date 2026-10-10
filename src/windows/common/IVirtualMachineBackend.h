@@ -52,6 +52,7 @@ enum class BackendKind
 struct VmInstanceId
 {
     GUID VmId{};
+    // Required VM identity; unlike request overrides, this token cannot be omitted.
     wil::shared_handle UserToken{};
 };
 
@@ -75,6 +76,13 @@ using VmDeviceId = VmResourceId<VmDeviceTag>;
 using VmShareId = VmResourceId<VmShareTag>;
 using VmListenerId = VmResourceId<VmListenerTag>;
 using VmPortBindingId = VmResourceId<VmPortBindingTag>;
+
+// Backends own the extended resource; API methods return only its description by value.
+template <typename Description, typename BackendState>
+struct VmResource : Description
+{
+    BackendState Backend;
+};
 
 enum class VmFeatureRequest
 {
@@ -103,6 +111,7 @@ enum class VmFeature
     PerfmonLbr,
     DeferredMemoryCommit,
     ColdDiscard,
+    SmallPageMemory,
     PhysicalDisk,
     SerialConsole,
     VirtioConsole,
@@ -116,7 +125,7 @@ enum class VmFeature
     Count
 };
 
-static_assert(static_cast<size_t>(VmFeature::Count) == 15);
+static_assert(static_cast<size_t>(VmFeature::Count) == 16);
 
 struct VmPlatformCapabilities
 {
@@ -143,7 +152,8 @@ struct VmGuestListener
     GuestServicePort Port;
     std::shared_ptr<VmGuestListenerState> State;
 
-    wil::unique_socket Accept() const;
+    wil::unique_socket Accept(DWORD Timeout = INFINITE, const std::source_location& Location = std::source_location::current()) const;
+    SOCKET Socket() const;
 };
 
 struct VmGuestListenerState
@@ -263,18 +273,23 @@ struct VmDiskRequest
     std::variant<VmVirtualDiskSource, VmPhysicalDiskSource> Source;
     bool ReadOnly = true;
     std::optional<VmScsiPlacement> Placement;
+    // VHD access uses this token, falling back to the VM identity when unset. Physical disk
+    // requests require an elevated token; an unset token is reserved for service-authorized restore.
+    std::optional<wil::shared_handle> UserToken;
     // Set for disks that the user explicitly attached (for instance via 'wsl --mount'), as opposed
     // to disks that WSL attaches on the user's behalf.
     bool UserDisk = false;
     // Timeout applied to host disk state changes and to retries when attaching a physical disk.
     std::chrono::milliseconds DeviceTimeout{5000};
-    wil::shared_handle UserToken{};
 };
 
 struct VmBootDiskRequest
 {
     VmBootResourceKey Key;
     VmDiskRequest Disk;
+    // Set for disks whose path the user supplied, which the VM identity may not be able to reach yet.
+    // Inbox disks are left alone so that their ACL does not grow on every boot.
+    bool GrantHostAccess = false;
 };
 
 struct VmDiskAttachment
@@ -283,6 +298,10 @@ struct VmDiskAttachment
     VmGuestDiskAddress GuestAddress;
     bool ReadOnly = true;
     bool UserDisk = false;
+    // Host path backing the disk: a virtual disk image, or a physical disk for pass-through.
+    std::wstring Path;
+    // Set for pass-through disks, cleared for virtual disks.
+    bool PassThrough = false;
 };
 
 struct VmCrashCaptureRequest
@@ -368,6 +387,7 @@ struct VmCreateRequest
 {
     VmInstanceId Identity;
     std::wstring Owner;
+    bool EnableTelemetry = true;
     VmProcessorRequest Processor;
     VmMemoryRequest Memory;
     VmMmioRequest Mmio;
@@ -473,12 +493,14 @@ struct VmPlan9VirtioDevice
     VmPlan9ServerFactory ServerFactory;
 };
 
-using VmFileSystemDeviceTransport =
-    std::variant<VmVirtioFsDevice, VmPlan9SocketDevice, VmPlan9HostedDevice, VmPlan9VirtioDevice>;
+using VmFileSystemDeviceTransport = std::variant<VmVirtioFsDevice, VmPlan9SocketDevice, VmPlan9HostedDevice, VmPlan9VirtioDevice>;
 
 struct VmFileSystemDeviceRequest
 {
     VmFileSystemDeviceTransport Transport;
+    // Host identity for the device, defaulting to the VM identity. Aggregate virtio-fs children
+    // inherit this identity because the device host does not accept a token when adding a child.
+    std::optional<wil::shared_handle> UserToken;
 };
 
 enum class VmFileSystemDeviceState
@@ -495,6 +517,8 @@ struct VmFileSystemDevice
     // Set once the device exists in the VM. Backends that create the device when its first share is
     // added report a prepared device without a guest instance id.
     std::optional<GUID> GuestInstanceId;
+    VmFileSystemDeviceTransport Transport;
+    bool Elevated = false;
 };
 
 struct VmPlan9ShareOptions
@@ -516,10 +540,9 @@ struct VmFileSystemShareRequest
     std::wstring Name;
     bool ReadOnly = true;
     VmFileSystemShareOptions Options;
-    // Token whose identity is used to reach the host path. Elevated and unelevated callers share the
-    // same VM, so a share carries its own token instead of reusing the one that created the VM. The
-    // VM identity token is used when this is unset.
-    wil::shared_handle UserToken{};
+    // Token whose identity is used to reach the host path, defaulting to the device identity.
+    // Aggregate virtio-fs shares always use the device identity; set its token at device creation.
+    std::optional<wil::shared_handle> UserToken;
 };
 
 struct VmVirtioFsShareAddress
@@ -549,7 +572,12 @@ struct VmFileSystemShare
     VmFileSystemShareAddress GuestAddress;
     std::filesystem::path EffectiveHostPath;
     bool ReadOnly = true;
+    std::map<std::wstring, std::wstring> MountOptions;
+    bool Elevated = false;
 };
+
+using VmFileSystemDevicePredicate = std::function<bool(const VmFileSystemDevice&)>;
+using VmFileSystemSharePredicate = std::function<bool(const VmFileSystemShare&)>;
 
 // Invoked with the index of a newly added persistent memory device while the backend still
 // serializes persistent memory additions. Callers that name devices after the order in which the
@@ -564,7 +592,7 @@ struct VmPersistentMemoryRequest
     bool ReadOnly = true;
     // Token whose identity is used to reach the backing file. The VM identity token is used when
     // this is unset.
-    wil::shared_handle UserToken{};
+    std::optional<wil::shared_handle> UserToken;
     VmPersistentMemoryReadyCallback WaitForGuestDevice;
 };
 
@@ -609,7 +637,8 @@ struct VmSharedMemoryRequest
     std::wstring Tag;
     std::wstring Path;
     std::uint64_t SizeBytes = 0;
-    wil::shared_handle UserToken{};
+    // Host identity for the section, defaulting to the VM identity when omitted.
+    std::optional<wil::shared_handle> UserToken;
 };
 
 struct VmSharedMemoryDevice
@@ -654,6 +683,9 @@ public:
     // Returns the cached reason and backend-specific details after exit; fails before the VM has exited.
     virtual VmTerminationInformation GetTerminationReason() const = 0;
     virtual wil::unique_handle GetTerminationEvent() const = 0;
+    // Signals when the backend has identified a VM crash, which can precede termination.
+    virtual wil::unique_handle GetCrashEvent() const = 0;
+    virtual std::optional<std::filesystem::path> GetCrashLogPath() const = 0;
     virtual void Start() = 0;
     virtual void Terminate() = 0;
     void RegisterTerminationCallback(TerminationCallback Callback);
@@ -663,6 +695,7 @@ public:
     virtual void CloseGuestListener(VmListenerId Listener) = 0;
 
     virtual VmDiskAttachment AttachDisk(const VmDiskRequest& Request) = 0;
+    virtual std::vector<VmDiskAttachment> GetAttachedDisks() const = 0;
     virtual void DetachDisk(VmDiskId Disk) = 0;
 
     /// <summary>
@@ -677,8 +710,10 @@ public:
     virtual VmGpuAttachment AddGpu(const VmGpuRequest& Request) = 0;
 
     virtual VmFileSystemDevice CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request) = 0;
+    virtual std::optional<VmFileSystemDevice> GetFileSystemDevice(const VmFileSystemDevicePredicate& Predicate) const = 0;
     virtual VmFileSystemDevice GetFileSystemDeviceStatus(VmDeviceId Device) = 0;
     virtual VmFileSystemShare AddFileSystemShare(VmDeviceId Device, const VmFileSystemShareRequest& Request) = 0;
+    virtual std::optional<VmFileSystemShare> GetFileSystemShare(const VmFileSystemSharePredicate& Predicate) const = 0;
     virtual void RemoveFileSystemShare(VmShareId Share) = 0;
     virtual VmSharedMemoryDevice AddSharedMemory(const VmSharedMemoryRequest& Request) = 0;
     virtual void ConfigureGuestDma(const VmGuestDmaRequest& Request) = 0;
@@ -703,6 +738,13 @@ protected:
     std::shared_ptr<VmGuestListenerState> RemoveGuestListenerLocked(VmListenerId Listener, const VmInstanceId& Identity);
     void CloseGuestListenersLocked(const VmInstanceId& Identity) noexcept;
     void NotifyTerminated(const VmInstanceId& Identity) noexcept;
+
+    /// <summary>
+    /// Cancels pending accepts without dropping the listeners. Backends call this when the VM exits
+    /// without a termination request, so that callers blocked on the guest do not wait forever.
+    /// </summary>
+    /// <remarks>Acquires m_lock, so it must not be called while the lock is held.</remarks>
+    void CancelGuestListeners() noexcept;
 
 private:
     virtual std::shared_ptr<VmGuestListenerState> ConfigureGuestListener(const VmGuestListener& Listener) = 0;
