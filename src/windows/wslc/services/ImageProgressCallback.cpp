@@ -18,6 +18,8 @@ Abstract:
 #include <format>
 
 namespace wsl::windows::wslc::services {
+
+using namespace wsl::windows::wslc::cli;
 using namespace wsl::shared;
 using namespace wsl::windows::common::vt;
 using wsl::windows::common::string::FormatHumanReadableSize;

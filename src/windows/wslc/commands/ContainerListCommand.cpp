@@ -14,6 +14,7 @@ Abstract:
 
 #include "ContainerCommand.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "ContainerTasks.h"
 #include "SessionTasks.h"
 #include "Task.h"
@@ -35,6 +36,7 @@ std::vector<Argument> ContainerListCommand::GetArguments() const
         Argument::Create(ArgType::Latest),
         Argument::Create(ArgType::NoTrunc),
         Argument::Create(ArgType::Quiet),
+        Argument::Create(ArgType::Size),
     };
 }
 
@@ -54,7 +56,8 @@ void ContainerListCommand::ExecuteInternal(CLIExecutionContext& context) const
     context
         << ResolveSession
         << GetContainers
-        << ListContainers;
+        << FormatContainerOutput //
+        << PrintFormattedOutput;
 }
 // clang-format on
 

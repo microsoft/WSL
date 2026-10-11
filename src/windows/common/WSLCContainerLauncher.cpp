@@ -527,7 +527,7 @@ RunningWSLCContainer WSLCContainerLauncher::Launch(IWSLCSession& Session, WSLCCo
 wsl::windows::common::wslc_schema::InspectContainer RunningWSLCContainer::Inspect()
 {
     wil::unique_cotaskmem_ansistring output;
-    THROW_IF_FAILED(m_container->Inspect(&output));
+    THROW_IF_FAILED(m_container->Inspect(FALSE, &output));
 
     return wsl::shared::FromJson<wslc_schema::InspectContainer>(output.get());
 }

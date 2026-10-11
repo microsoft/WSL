@@ -265,11 +265,12 @@ docker_schema::PruneImageResult DockerHTTPClient::PruneImages(const std::map<std
 }
 
 std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListContainers(
-    bool all, int limit, const std::map<std::string, std::vector<std::string>>& filters)
+    bool all, int limit, const std::map<std::string, std::vector<std::string>>& filters, bool size)
 {
     auto url = URL::Create("/containers/json");
     url.SetParameter("all", all);
     url.SetParameter("limit", std::to_string(limit));
+    url.SetParameter("size", size);
 
     if (!filters.empty())
     {
@@ -355,9 +356,12 @@ void DockerHTTPClient::DeleteContainer(const std::string& Id, bool Force, bool D
     Transaction(verb::delete_, url);
 }
 
-docker_schema::InspectContainer DockerHTTPClient::InspectContainer(const std::string& Id)
+docker_schema::InspectContainer DockerHTTPClient::InspectContainer(const std::string& Id, bool Size)
 {
-    return Transaction<EmptyRequest, docker_schema::InspectContainer>(verb::get, URL::Create("/containers/{}/json", Id));
+    auto url = URL::Create("/containers/{}/json", Id);
+    url.SetParameter("size", Size);
+
+    return Transaction<EmptyRequest, docker_schema::InspectContainer>(verb::get, url);
 }
 
 docker_schema::ContainerStats DockerHTTPClient::ContainerStats(const std::string& Id)
@@ -431,6 +435,35 @@ std::tuple<uint32_t, wil::unique_socket, bool> DockerHTTPClient::GetArchive(cons
     auto [response, socket] = SendRequest(verb::get, url, {}, {});
 
     return {response.result_int(), std::move(socket), response.chunked()};
+}
+
+std::optional<docker_schema::ContainerPathStat> DockerHTTPClient::StatArchivePath(const std::string& ContainerID, const std::string& Path)
+{
+    auto url = URL::Create("/containers/{}/archive", ContainerID);
+    url.SetParameter("path", Path);
+
+    // The engine reports the stat in a response header, so a HEAD request is enough.
+    auto [response, socket] = SendRequest(verb::head, url, {}, {});
+    socket.reset();
+
+    if (response.result_int() == 404)
+    {
+        return std::nullopt;
+    }
+
+    if (response.result_int() != 200)
+    {
+        throw DockerHTTPException(std::move(response), verb::head, url.Get(), "", "");
+    }
+
+    const auto header = response["X-Docker-Container-Path-Stat"];
+    if (header.empty())
+    {
+        return std::nullopt;
+    }
+
+    const auto decoded = wslutil::Base64Decode(std::string(header));
+    return wsl::shared::FromJson<docker_schema::ContainerPathStat>(decoded.c_str());
 }
 
 docker_schema::Volume DockerHTTPClient::CreateVolume(const docker_schema::CreateVolume& Request)
@@ -529,6 +562,7 @@ wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLCLo
     url.SetParameter("stdout", true);
     url.SetParameter("stderr", true);
     url.SetParameter("timestamps", WI_IsFlagSet(Flags, WSLCLogsFlagsTimestamps));
+    url.SetParameter("details", WI_IsFlagSet(Flags, WSLCLogsFlagsDetails));
 
     if (Tail != 0)
     {

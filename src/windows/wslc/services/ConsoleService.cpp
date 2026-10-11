@@ -17,6 +17,8 @@ Abstract:
 
 namespace wsl::windows::wslc::services {
 
+using namespace wsl::windows::wslc::cli;
+
 using wsl::windows::common::ClientRunningWSLCProcess;
 using wsl::windows::common::io::HandleWrapper;
 using wsl::windows::common::io::MultiHandleWait;

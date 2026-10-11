@@ -43,7 +43,8 @@ Argument Argument::Create(ArgType type, ArgumentOverrides overrides)
             overrides.Desc.has_value() ? std::move(overrides.Desc.value()) : std::wstring(DefaultDesc), \
             ArgumentKind, \
             overrides.Required.value_or(Argument::DefaultRequired), \
-            overrides.Limit.value_or(Argument::DefaultLimit)};
+            overrides.Limit.value_or(Argument::DefaultLimit), \
+            overrides.Flags.value_or(Flags::None)};
 
         WSLC_ARGUMENTS(WSLC_ARG_CREATE_CASE)
 #undef WSLC_ARG_CREATE_CASE
@@ -51,6 +52,13 @@ Argument Argument::Create(ArgType type, ArgumentOverrides overrides)
     default:
         THROW_HR(E_UNEXPECTED);
     }
+}
+
+Argument Argument::CreateGlobal(ArgType type, const Command& owner, ArgumentOverrides overrides)
+{
+    auto argument = Create(type, std::move(overrides));
+    argument.m_globalOwner = std::cref(owner);
+    return argument;
 }
 
 // Retrieves the usage string of the Argument, based on its Alias and Name.
@@ -65,5 +73,29 @@ std::wstring Argument::GetUsageString() const
 
     strstr << WSLC_CLI_ARG_ID_CHAR << WSLC_CLI_ARG_ID_CHAR << m_name;
     return strstr.str();
+}
+
+bool Argument::MatchesOption(std::wstring_view token) const
+{
+    if (!IsOption() || token.length() < 2 || token.front() != WSLC_CLI_ARG_ID_CHAR)
+    {
+        return false;
+    }
+
+    const bool longName = token[1] == WSLC_CLI_ARG_ID_CHAR;
+    const size_t optionStart = longName ? 2 : 1;
+    if (token.length() == optionStart || token[optionStart] == WSLC_CLI_ARG_ID_CHAR)
+    {
+        return false;
+    }
+
+    auto optionName = token.substr(optionStart);
+    if (const auto separator = optionName.find_first_of(WSLC_CLI_ARG_SPLIT_CHAR); separator != std::wstring_view::npos)
+    {
+        optionName = optionName.substr(0, separator);
+    }
+
+    const auto& configuredName = longName ? Name() : Alias();
+    return !configuredName.empty() && string::IsEqual(optionName, configuredName);
 }
 } // namespace wsl::windows::wslc

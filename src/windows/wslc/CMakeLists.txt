@@ -14,10 +14,7 @@ target_include_directories(wslclib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${WSLC_SUB
 
 target_link_libraries(wslclib
                       ${COMMON_LINK_LIBRARIES}
-                      yaml-cpp
-                      common
-                      advapi32
-                      crypt32)
+                      common)
 
 
 target_precompile_headers(wslclib REUSE_FROM common)
@@ -28,9 +25,8 @@ set_target_properties(wslclib PROPERTIES FOLDER windows)
 # transitive dependencies. Do not also use $<TARGET_OBJECTS:wslclib>.
 add_executable(wslc main.rc resource.h)
 
-target_link_libraries(wslc wslclib delayimp.lib)
+target_link_libraries(wslc wslclib)
 
-set_target_properties(wslc PROPERTIES LINK_FLAGS "/DELAYLOAD:msi.dll /DELAYLOAD:WINTRUST.dll")
 set_target_properties(wslc PROPERTIES FOLDER windows)
 
 # For prettier source tree browsing

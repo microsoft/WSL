@@ -10,11 +10,6 @@ Abstract:
 
     This file contains the public WSL Container SDK api definitions.
 
-    PREVIEW NOTICE: This API is currently in preview and is subject to breaking
-    changes in future releases without prior notice. Do not rely on API stability
-    for production workloads. Features, function signatures, and behaviors may
-    change between releases during the preview period.
-
 --*/
 #pragma once
 #include <winsock2.h>
@@ -46,6 +41,7 @@ EXTERN_C_START
 #define WSLC_E_VM_NOT_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 16)             /* 0x80040610 */
 #define WSLC_E_EVENTS_LOST MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 17)                /* 0x80040611 */
 #define WSLC_E_EVENT_STREAM_FINISHED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 18)      /* 0x80040612 */
+#define WSLC_E_CONTAINER_DELETED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 19)          /* 0x80040613 */
 
 // Session values
 #define WSLC_SESSION_OPTIONS_SIZE 72
@@ -343,6 +339,26 @@ STDAPI WslcSetProcessSettingsWorkingDirectory(_In_ WslcProcessSettings* processS
 STDAPI WslcSetProcessSettingsCmdLine(_In_ WslcProcessSettings* processSettings, _In_reads_(argc) PCSTR const* argv, size_t argc);
 
 STDAPI WslcSetProcessSettingsEnvVariables(_In_ WslcProcessSettings* processSettings, _In_reads_(argc) PCSTR const* key_value, size_t argc);
+
+// Flags that control optional behavior of a process.
+typedef enum WslcProcessFlags
+{
+    WSLC_PROCESS_FLAG_NONE = 0x00000000,
+    // Enables standard input for the process. Standard input is disabled by
+    // default: without this flag the process observes an immediately closed
+    // stdin and WSLC_PROCESS_IO_HANDLE_STDIN cannot be used.
+    WSLC_PROCESS_FLAG_STDIN = 0x00000001,
+} WslcProcessFlags;
+
+DEFINE_ENUM_FLAG_OPERATORS(WslcProcessFlags);
+
+// Sets the flags for the process, replacing any previously set flags.
+//
+// Unknown flag bits are rejected with E_INVALIDARG.
+//
+// Must be called before the settings are used to create a process
+// (WslcCreateContainerProcess) or container (WslcCreateContainer).
+STDAPI WslcSetProcessSettingsFlags(_In_ WslcProcessSettings* processSettings, _In_ WslcProcessFlags flags);
 
 typedef enum WslcProcessIOHandle
 {

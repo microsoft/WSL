@@ -17,7 +17,7 @@ Abstract:
 #include "JsonUtils.h"
 #include "SessionService.h"
 #include "SessionTasks.h"
-#include "TableOutput.h"
+#include "TableRenderer.h"
 #include "Task.h"
 #include "WSLCUserSettings.h"
 
@@ -30,22 +30,28 @@ using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
 
+using namespace wsl::windows::wslc::cli;
+using namespace wsl::windows::cli::table;
+
 static void WriteSessionTable(Terminal& terminal, const std::vector<SessionInformation>& sessions)
 {
-    TableOutput<3> table(
-        terminal,
-        {Localization::MessageWslcHeaderId(), Localization::MessageWslcHeaderCreatorPid(), Localization::MessageWslcHeaderDisplayName()});
+    TableData table{std::vector<ColumnDefinition>{
+        {Localization::MessageWslcHeaderId(), {}},
+        {Localization::MessageWslcHeaderCreatorPid(), {}},
+        {Localization::MessageWslcHeaderDisplayName(), {}}}};
+
+    table.Reserve(sessions.size());
 
     for (const auto& session : sessions)
     {
-        table.WriteRow({
+        table.AddRow({
             std::to_wstring(session.SessionId),
             std::to_wstring(session.CreatorPid),
             session.DisplayName,
         });
     }
 
-    table.Complete();
+    RenderTable(terminal, table);
 }
 
 void AttachToSession(CLIExecutionContext& context)
@@ -56,9 +62,9 @@ void AttachToSession(CLIExecutionContext& context)
 
 void OpenSessionIfSpecified(CLIExecutionContext& context)
 {
-    if (context.GlobalArgs.Contains(ArgType::Session))
+    if (context.Args.Contains(ArgType::Session))
     {
-        const auto& sessionName = context.GlobalArgs.GetValue<ArgType::Session>();
+        const auto& sessionName = context.Args.GetValue<ArgType::Session>();
         context.Data.Add<Data::Session>(SessionService::OpenSession(sessionName));
     }
 }
@@ -95,6 +101,23 @@ void ListSessions(CLIExecutionContext& context)
     }
 
     WriteSessionTable(context.Terminal, sessions);
+}
+
+void StreamEvents(CLIExecutionContext& context)
+{
+    using namespace std::chrono;
+
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+
+    const auto now = floor<seconds>(system_clock::now()).time_since_epoch().count();
+    const EventStreamOptions options{
+        .Since = context.Args.GetValue<ArgType::Since>(now),
+        .Until = context.Args.GetValue<ArgType::Until>(0),
+        .Filters = context.Args.GetAllValues<ArgType::Filter>(),
+        .Format = context.Args.GetValue<ArgType::Format>(FormatType::Table),
+    };
+    SessionService::StreamEvents(context.Terminal, session, options, context.CreateCancelEvent());
 }
 
 static std::wstring FormatManagerVersion(const WSLCVersion& version)
