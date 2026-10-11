@@ -63,6 +63,7 @@ Abstract:
 #include "binfmt.h"
 #include "address.h"
 #include "SocketChannel.h"
+#include "WslDistributionConfig.h"
 
 #define BSDTAR_PATH "/usr/bin/bsdtar"
 #define BINFMT_REGISTER_STRING BINFMT_INTEROP_REGISTRATION_STRING_VM(LX_INIT_BINFMT_NAME) "\n"
@@ -2472,29 +2473,16 @@ void PostProcessImportedDistribution(wsl::shared::MessageWriter<LX_MINI_INIT_IMP
         Message.WriteString(Message->VersionIndex, version.value());
     }
 
-    std::string defaultName{};
-    std::string shortcutIconPath;
-    std::string terminalProfileTemplatePath;
-    Message->GenerateTerminalProfile = true;
-    Message->GenerateShortcut = true;
+    const auto manifest = wsl::linux::ParseWslDistributionManifest();
+    Message->GenerateTerminalProfile = manifest.GenerateTerminalProfile;
+    Message->GenerateShortcut = manifest.GenerateShortcut;
 
-    std::vector<ConfigKey> keys = {
-        ConfigKey("shortcut.icon", shortcutIconPath),
-        ConfigKey("shortcut.enabled", Message->GenerateShortcut),
-        ConfigKey("oobe.defaultName", defaultName),
-        ConfigKey("windowsterminal.profileTemplate", terminalProfileTemplatePath),
-        ConfigKey("windowsterminal.enabled", Message->GenerateTerminalProfile)};
-
+    if (!manifest.DefaultName.empty())
     {
-        wil::unique_file File{fopen(WSL_DISTRIBUTION_CONF, "r")};
-        ParseConfigFile(keys, File.get(), (CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES), STRING_TO_WSTRING(WSL_DISTRIBUTION_CONF));
+        Message.WriteString(Message->DefaultNameIndex, manifest.DefaultName);
     }
 
-    if (!defaultName.empty())
-    {
-        Message.WriteString(Message->DefaultNameIndex, defaultName);
-    }
-
+    const auto& shortcutIconPath = manifest.ShortcutIconPath;
     try
     {
         if (!shortcutIconPath.empty())
@@ -2514,6 +2502,7 @@ void PostProcessImportedDistribution(wsl::shared::MessageWriter<LX_MINI_INIT_IMP
     }
     CATCH_LOG();
 
+    const auto& terminalProfileTemplatePath = manifest.TerminalProfileTemplatePath;
     try
     {
         if (Message->GenerateTerminalProfile && !terminalProfileTemplatePath.empty())
