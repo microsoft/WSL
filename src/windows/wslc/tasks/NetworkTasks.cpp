@@ -14,21 +14,56 @@ Abstract:
 #include "Argument.h"
 #include "ArgumentConvertedTypes.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "NetworkModel.h"
 #include "NetworkService.h"
 #include "NetworkTasks.h"
-#include "TableOutput.h"
+#include "TableData.h"
 #include <wslc_schema.h>
 
 using namespace wsl::shared;
 using namespace wsl::windows::common;
 using namespace wsl::windows::common::string;
+using namespace wsl::windows::common::timestamp;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
+
+using namespace wsl::windows::wslc::cli;
+using namespace wsl::windows::cli::table;
+
+namespace {
+
+    // Shared by the table and json output so the two cannot drift. The id is truncated unless --no-trunc is passed.
+    NetworkOutputInformation ToNetworkOutput(const wslc_schema::NetworkListEntry& network, bool truncate)
+    {
+        NetworkOutputInformation entry;
+        entry.CreatedAt = Rfc3339ToUtcDisplayTime(network.Created);
+        entry.Driver = network.Driver;
+        entry.ID = TruncateId(network.Id, truncate);
+        entry.IPv4 = network.EnableIPv4 ? "true" : "false";
+        entry.IPv6 = network.EnableIPv6 ? "true" : "false";
+        entry.Internal = network.Internal ? "true" : "false";
+        entry.Name = network.Name;
+        entry.Scope = network.Scope;
+
+        for (const auto& [key, value] : network.Labels)
+        {
+            if (!entry.Labels.empty())
+            {
+                entry.Labels += ",";
+            }
+
+            entry.Labels += std::format("{}={}", key, value);
+        }
+
+        return entry;
+    }
+
+} // namespace
 
 static bool TryInspectNetwork(Terminal& terminal, Session& session, const std::string& networkName, std::optional<wslc_schema::Network>& inspectData)
 {
@@ -167,21 +202,30 @@ void InspectNetworks(CLIExecutionContext& context)
     context.Terminal.Output(L"{}\n", MultiByteToWide(json));
 }
 
-void ListNetworks(CLIExecutionContext& context)
+void FormatNetworkOutput(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Networks));
     auto& networks = context.Data.Get<Data::Networks>();
 
+    // Networks are reported in name order regardless of how the daemon returns them.
+    std::ranges::sort(networks, {}, &wslc_schema::NetworkListEntry::Name);
+
     const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
     const bool quiet = context.Args.GetValue<ArgType::Quiet>();
     const bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
+
     if (format == FormatType::Table && quiet)
     {
+        wsl::windows::cli::table::TableData table{Localization::WSLCCLI_TableHeaderNetworkId()};
+        table.ShowHeader = false;
+        table.Reserve(networks.size());
+
         for (const auto& network : networks)
         {
-            context.Terminal.Output(L"{}\n", MultiByteToWide(TruncateId(network.Id, trunc)));
+            table.AddRow({MultiByteToWide(TruncateId(network.Id, trunc))});
         }
 
+        context.Data.Add<Data::Table>(std::move(table));
         return;
     }
 
@@ -189,28 +233,38 @@ void ListNetworks(CLIExecutionContext& context)
     {
     case FormatType::Json:
     {
+        std::vector<std::wstring> json;
+        json.reserve(networks.size());
+
         for (const auto& network : networks)
         {
-            auto json = nlohmann::json(network);
-            json["ID"] = TruncateId(network.Id, trunc);
-            context.Terminal.Output(L"{}\n", ToJsonW(json, c_jsonCompactIndent));
+            json.push_back(ToJsonW(ToNetworkOutput(network, trunc), c_jsonCompactIndent));
         }
 
+        context.Data.Add<Data::Json>(std::move(json));
         break;
     }
     case FormatType::Table:
     {
-        auto table = wsl::windows::wslc::TableOutput<3>(context.Terminal, {L"NETWORK ID", L"NAME", L"DRIVER"});
+        wsl::windows::cli::table::TableData table{
+            Localization::WSLCCLI_TableHeaderNetworkId(),
+            Localization::WSLCCLI_TableHeaderName(),
+            Localization::WSLCCLI_TableHeaderDriver(),
+            Localization::WSLCCLI_TableHeaderScope()};
+        table.Reserve(networks.size());
+
         for (const auto& network : networks)
         {
-            table.WriteRow({
-                MultiByteToWide(TruncateId(network.Id, trunc)),
-                MultiByteToWide(network.Name),
-                MultiByteToWide(network.Driver),
+            const auto entry = ToNetworkOutput(network, trunc);
+            table.AddRow({
+                MultiByteToWide(entry.ID),
+                MultiByteToWide(entry.Name),
+                MultiByteToWide(entry.Driver),
+                MultiByteToWide(entry.Scope),
             });
         }
 
-        table.Complete();
+        context.Data.Add<Data::Table>(std::move(table));
         break;
     }
     default:
@@ -220,6 +274,10 @@ void ListNetworks(CLIExecutionContext& context)
 
 void PruneNetworks(CLIExecutionContext& context)
 {
+    context.Data.Add<Data::ConfirmWarning>(Localization::WSLCCLI_NetworkPruneConfirm());
+    context.Data.Add<Data::ConfirmMessage>(Localization::WSLCCLI_PruneConfirmPrompt());
+    ConfirmAction(context);
+
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
 
@@ -228,10 +286,18 @@ void PruneNetworks(CLIExecutionContext& context)
 
     auto result = NetworkService::Prune(session, filters);
 
+    if (result.PrunedNetworks.empty())
+    {
+        return;
+    }
+
+    context.Terminal.Output(L"{}\n", Localization::WSLCCLI_NetworkPruneDeletedHeader());
     for (const auto& networkName : result.PrunedNetworks)
     {
-        context.Terminal.Output(L"{}\n", Localization::WSLCCLI_NetworkPruneDeleted(MultiByteToWide(networkName)));
+        context.Terminal.Output(L"{}\n", MultiByteToWide(networkName));
     }
+
+    context.Terminal.Output(L"\n");
 }
 
 void ConnectNetwork(CLIExecutionContext& context)

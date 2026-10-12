@@ -180,9 +180,10 @@ typedef enum _WSLCLogsFlags
     WSLCLogsFlagsNone = 0,
     WSLCLogsFlagsFollow = 1,
     WSLCLogsFlagsTimestamps = 2,
+    WSLCLogsFlagsDetails = 4,
 } WSLCLogsFlags;
 
-cpp_quote("#define WSLCLogsFlagsValid (WSLCLogsFlagsFollow | WSLCLogsFlagsTimestamps)")
+cpp_quote("#define WSLCLogsFlagsValid (WSLCLogsFlagsFollow | WSLCLogsFlagsTimestamps | WSLCLogsFlagsDetails)")
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCLogsFlags);")
 
@@ -231,9 +232,10 @@ typedef enum _WSLCListContainersFlags
 {
     WSLCListContainersFlagsNone = 0,
     WSLCListContainersFlagsAll = 1,
+    WSLCListContainersFlagsSize = 2,
 } WSLCListContainersFlags;
 
-cpp_quote("#define WSLCListContainersFlagsValid (WSLCListContainersFlagsAll)")
+cpp_quote("#define WSLCListContainersFlagsValid (WSLCListContainersFlagsAll | WSLCListContainersFlagsSize)")
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCListContainersFlags);")
 

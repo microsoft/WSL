@@ -699,7 +699,7 @@ int SocketGetSockName(PLXT_ARGS Args)
         }
 
         //
-        // Create the underlaying socket and query again, port should be the same.
+        // Create the underlying socket and query again, port should be the same.
         //
 
         if (listen(Socket, 32) < 0)

@@ -25,8 +25,8 @@ namespace wsl::windows::wslc {
 std::vector<Argument> SessionRunCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::Command, true),
-        Argument::Create(ArgType::ForwardArgs, std::nullopt, std::nullopt, Localization::WSLCCLI_SessionRunForwardArgsDescription()),
+        Argument::Create(ArgType::Command, {.Required = true}),
+        Argument::Create(ArgType::ForwardArgs, {.Desc = Localization::WSLCCLI_SessionRunForwardArgsDescription()}),
     };
 }
 

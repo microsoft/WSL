@@ -27,10 +27,10 @@ namespace wsl::windows::wslc {
 std::vector<Argument> NetworkCreateCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::NetworkName, true),
-        Argument::Create(ArgType::Driver, std::nullopt, std::nullopt, Localization::WSLCCLI_NetworkDriverOptionDescription()),
-        Argument::Create(ArgType::Options, false, Limit::Unlimited),
-        Argument::Create(ArgType::Label, false, Limit::Unlimited, Localization::WSLCCLI_NetworkLabelArgDescription()),
+        Argument::Create(ArgType::NetworkName, {.Required = true}),
+        Argument::Create(ArgType::Driver, {.Desc = Localization::WSLCCLI_NetworkDriverOptionDescription()}),
+        Argument::Create(ArgType::Options, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::Label, {.Limit = Limit::Unlimited, .Desc = Localization::WSLCCLI_NetworkLabelArgDescription()}),
         Argument::Create(ArgType::Gateway),
         Argument::Create(ArgType::Internal),
         Argument::Create(ArgType::IpRange),

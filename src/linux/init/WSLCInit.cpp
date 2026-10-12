@@ -69,6 +69,8 @@ struct WSLCState
 
 static WSLCState g_state;
 
+constexpr auto c_kernelModulesVhdMountPoint = "/kernel_modules_vhd";
+
 void WriteWslcCdiSpec()
 try
 {
@@ -696,24 +698,7 @@ void HandleMountMessage(
         }
 
         const char* source = readField(Message.SourceIndex);
-
-        const char* target{};
-        if (WI_IsFlagSet(Message.Flags, WSLC_MOUNT::KernelModules))
-        {
-            assert(!g_state.ModulesMountPoint.has_value());
-
-            // Modules need to be mounted to a specific path that depends on the kernel version.
-
-            utsname UnameBuffer{};
-            THROW_LAST_ERROR_IF(uname(&UnameBuffer) < 0);
-
-            g_state.ModulesMountPoint = std::format("/lib/modules/{}", UnameBuffer.release);
-            target = g_state.ModulesMountPoint->c_str();
-        }
-        else
-        {
-            target = readField(Message.DestinationIndex);
-        }
+        const char* target = readField(Message.DestinationIndex);
 
         // Chroot without OverlayFs is not supported — the chroot logic depends on the overlay target path.
         THROW_ERRNO_IF(EINVAL, WI_IsFlagSet(Message.Flags, WSLC_MOUNT::Chroot) && !WI_IsFlagSet(Message.Flags, WSLC_MOUNT::OverlayFs));
@@ -840,6 +825,46 @@ void HandleMessageImpl(
     wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_MOUNT_VIRTIOFS& Message, const gsl::span<gsl::byte>& Buffer)
 {
     HandleMountMessage(Channel, Transaction, Message, Buffer);
+}
+
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_MOUNT_MODULES& Message, const gsl::span<gsl::byte>& Buffer)
+{
+    WSLC_MOUNT_RESULT response{};
+    response.Header.MessageType = WSLC_MOUNT_RESULT::Type;
+    response.Header.MessageSize = sizeof(response);
+
+    try
+    {
+        assert(!g_state.ModulesMountPoint.has_value());
+
+        utsname unameBuffer{};
+        THROW_LAST_ERROR_IF(uname(&unameBuffer) < 0);
+
+        const char* source = wsl::shared::string::FromSpan(Buffer, Message.SourceIndex);
+        THROW_LAST_ERROR_IF(UtilMount(source, c_kernelModulesVhdMountPoint, "ext4", MS_RDONLY, nullptr, c_defaultRetryTimeout) < 0);
+
+        auto unmountVhd = wil::scope_exit([&]() {
+            if (umount(c_kernelModulesVhdMountPoint) < 0)
+            {
+                LOG_ERROR("umount({}) failed {}", c_kernelModulesVhdMountPoint, errno);
+            }
+        });
+
+        g_state.ModulesMountPoint = std::format("/lib/modules/{}", unameBuffer.release);
+        const std::string modulesSource = std::format("{}/{}/modules", c_kernelModulesVhdMountPoint, unameBuffer.release);
+        THROW_LAST_ERROR_IF(
+            UtilMount(modulesSource.c_str(), g_state.ModulesMountPoint->c_str(), nullptr, (MS_BIND | MS_REC), nullptr, c_defaultRetryTimeout) < 0);
+
+        response.Result = 0;
+    }
+    catch (...)
+    {
+        LOG_CAUGHT_EXCEPTION();
+        response.Result = wil::ResultFromCaughtException();
+    }
+
+    Transaction.Send<WSLC_MOUNT_RESULT>(response);
 }
 
 void HandleMessageImpl(
@@ -1079,7 +1104,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, wsl::shared::Transactio
 {
     try
     {
-        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_MOUNT_VIRTIOFS, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_GET_GUEST_CAPABILITIES, WSLC_LISTDIR, WSLC_WRITE_FILE>(
+        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_MOUNT_VIRTIOFS, WSLC_MOUNT_MODULES, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_GET_GUEST_CAPABILITIES, WSLC_LISTDIR, WSLC_WRITE_FILE>(
             Channel, Transaction, Type, Buffer);
     }
     catch (...)

@@ -73,19 +73,44 @@ RequiredExtraMmioSpaceForPmemFileInMb(_In_ PCWSTR FilePath)
     // Convert from bytes to megabytes. Ensure that we don't truncate a 512kb file to 0mb.
     return std::max(fileSizeBytes.QuadPart / static_cast<INT64>(_1MB), 1i64);
 }
+
+wil::unique_hfile OpenVhdBackingFile(_In_ PCWSTR Path, _In_opt_ HANDLE UserToken)
+{
+    // User-owned VHDs may not grant the service identity access.
+    wil::unique_token_reverter runAsUser;
+    if (UserToken != nullptr)
+    {
+        runAsUser = wil::impersonate_token(UserToken);
+    }
+
+    wil::unique_hfile file{CreateFileW(
+        Path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+    THROW_LAST_ERROR_IF(!file);
+
+    return file;
+}
+
+bool IsBackingVolumeMounted(_In_ HANDLE File)
+{
+    DWORD bytesReturned{};
+    return DeviceIoControl(File, FSCTL_IS_VOLUME_MOUNTED, nullptr, 0, nullptr, 0, &bytesReturned, nullptr);
+}
 } // namespace
 
-WslCoreVm::WslCoreVm(_In_ wsl::core::Config&& VmConfig) :
-    m_vmConfig(std::move(VmConfig)), m_traceClient(m_vmConfig.EnableTelemetry)
+WslCoreVm::WslCoreVm(_In_ wsl::core::Config&& VmConfig, _In_ InitializeDrvFsCallback InitializeDrvFs) :
+    m_vmConfig(std::move(VmConfig)), m_initializeDrvFs(std::move(InitializeDrvFs)), m_traceClient(m_vmConfig.EnableTelemetry)
 {
     // Create a job object that will terminate child processes (wslhost.exe, wslrelay.exe)
     // when the VM is destroyed.
     m_processJobObject = wsl::windows::common::helpers::CreateKillOnCloseJob();
 }
 
-std::unique_ptr<WslCoreVm> WslCoreVm::Create(_In_ const wil::shared_handle& UserToken, _In_ wsl::core::Config&& VmConfig, _In_ const GUID& VmId)
+std::unique_ptr<WslCoreVm> WslCoreVm::Create(
+    _In_ const wil::shared_handle& UserToken, _In_ wsl::core::Config&& VmConfig, _In_ const GUID& VmId, _In_ InitializeDrvFsCallback InitializeDrvFs)
 {
-    auto newInstance = std::unique_ptr<WslCoreVm>{new WslCoreVm{std::move(VmConfig)}};
+    THROW_HR_IF(E_INVALIDARG, !InitializeDrvFs);
+
+    auto newInstance = std::unique_ptr<WslCoreVm>{new WslCoreVm{std::move(VmConfig), std::move(InitializeDrvFs)}};
     try
     {
         const auto startTimeMs = GetTickCount64();
@@ -236,7 +261,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
 #else
 
-            m_vmConfig.KernelModulesPath = m_rootFsPath / L"modules.vhd";
+            m_vmConfig.KernelModulesPath = m_rootFsPath / L"artifacts.vhd";
 
 #endif
         }
@@ -791,6 +816,12 @@ WslCoreVm::~WslCoreVm() noexcept
     // Close the handle to the VM. This will wait for any outstanding callbacks.
     m_system.reset();
 
+    if (m_pluginPlan9Server)
+    {
+        LOG_IF_FAILED(m_pluginPlan9Server->Teardown());
+        m_pluginPlan9Server.reset();
+    }
+
     // This loops helps against a potential crash in build <= Windows 11 22H2.
     for (const auto& e : m_plan9Servers)
     {
@@ -812,7 +843,8 @@ WslCoreVm::~WslCoreVm() noexcept
         {
             try
             {
-                wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), Entry.first.Path.c_str());
+                wsl::windows::common::hcs::RevokeVmAccess(
+                    m_machineId.c_str(), Entry.first.Path.c_str(), Entry.first.Type == DiskType::VHD ? m_userToken.get() : nullptr);
             }
             CATCH_LOG()
         }
@@ -858,7 +890,8 @@ WslCoreVm::~WslCoreVm() noexcept
 
 wil::unique_socket WslCoreVm::AcceptConnection(_In_ DWORD ReceiveTimeout, _In_ const std::source_location& Location) const
 {
-    auto socket = socket::CancellableAccept(m_listenSocket.get(), m_vmConfig.KernelBootTimeout, m_terminatingEvent.get(), Location);
+    auto socket = wsl::windows::common::socket::CancellableAccept(
+        m_listenSocket.get(), m_vmConfig.KernelBootTimeout, m_terminatingEvent.get(), Location);
     THROW_HR_IF(E_ABORT, !socket.has_value());
 
     if (ReceiveTimeout != 0)
@@ -990,11 +1023,12 @@ ULONG WslCoreVm::AttachDiskLockHeld(
 
     // Set a scope exit variable to perform cleanup if attaching the disk fails.
     DiskStateFlags diskFlags{};
+    wil::unique_hfile backingFile;
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
         FreeLun(Lun.value());
         if (WI_IsFlagSet(diskFlags, DiskStateFlags::AccessGranted))
         {
-            wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), Disk);
+            wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), Disk, Type == DiskType::VHD ? UserToken : nullptr);
         }
 
         if (WI_IsFlagSet(diskFlags, DiskStateFlags::Online))
@@ -1047,8 +1081,24 @@ ULONG WslCoreVm::AttachDiskLockHeld(
                 // Prevent user from launching a distro vhd after manually mounting it; otherwise, return the LUN of the mounted disk.
                 THROW_HR_IF(WSL_E_USER_VHD_ALREADY_ATTACHED, found->first.User);
 
-                return found->second.Lun;
+                // Check if the lun is still valid. It could be stale if the backing volume is reattached.
+                if (IsBackingVolumeMounted(found->second.BackingFile.get()))
+                {
+                    return found->second.Lun;
+                }
+
+                const auto staleLun = found->second.Lun;
+                wsl::windows::common::hcs::RemoveScsiDisk(m_system.get(), staleLun);
+                if (WI_IsFlagSet(found->second.Flags, DiskStateFlags::AccessGranted))
+                {
+                    wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), found->first.Path.c_str(), UserToken);
+                }
+
+                m_attachedDisks.erase(found);
+                FreeLun(staleLun);
             }
+
+            backingFile = OpenVhdBackingFile(Disk, UserToken);
 
             auto grantDiskAccess = [&]() {
                 auto runAsUser = wil::impersonate_token(UserToken);
@@ -1084,7 +1134,7 @@ ULONG WslCoreVm::AttachDiskLockHeld(
             result, Localization::MessageFailedToAttachDisk(Disk, wsl::windows::common::wslutil::GetSystemErrorString(result)));
     }
 
-    m_attachedDisks.emplace(AttachedDisk{Type, Disk, IsUserDisk}, DiskState{Lun.value(), {}, diskFlags});
+    m_attachedDisks.emplace(AttachedDisk{Type, Disk, IsUserDisk}, DiskState{Lun.value(), {}, diskFlags, std::move(backingFile)});
     cleanup.release();
 
     return Lun.value();
@@ -1098,7 +1148,7 @@ void WslCoreVm::CollectCrashDumps(wil::unique_socket&& listenSocket) const
     {
         try
         {
-            auto socket = socket::CancellableAccept(listenSocket.get(), INFINITE, m_terminatingEvent.get());
+            auto socket = wsl::windows::common::socket::CancellableAccept(listenSocket.get(), INFINITE, m_terminatingEvent.get());
             if (!socket.has_value())
             {
                 break; // VM is exiting.
@@ -1281,7 +1331,7 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstanceInternal(
         localConfig,
         DefaultUid,
         ClientLifetimeId,
-        std::bind(s_InitializeDrvFs, this, std::placeholders::_1),
+        m_initializeDrvFs,
         featureFlags,
         m_vmConfig.DistributionStartTimeout,
         m_vmConfig.InstanceIdleTimeout,
@@ -1340,7 +1390,8 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::DetachDisk(_In_opt_ PCWSTR Disk)
             wsl::windows::common::hcs::RemoveScsiDisk(m_system.get(), it->second.Lun);
             if (WI_VERIFY(WI_IsFlagSet(it->second.Flags, DiskStateFlags::AccessGranted)))
             {
-                wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), it->first.Path.c_str());
+                wsl::windows::common::hcs::RevokeVmAccess(
+                    m_machineId.c_str(), it->first.Path.c_str(), it->first.Type == DiskType::VHD ? m_userToken.get() : nullptr);
             }
 
             FreeLun(it->second.Lun);
@@ -1390,7 +1441,7 @@ void WslCoreVm::EjectVhdLockHeld(_In_ PCWSTR VhdPath)
             wsl::windows::common::hcs::RemoveScsiDisk(m_system.get(), search->second.Lun);
             if (WI_IsFlagSet(search->second.Flags, DiskStateFlags::AccessGranted))
             {
-                wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), VhdPath);
+                wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), VhdPath, m_userToken.get());
             }
         }
 
@@ -1525,6 +1576,12 @@ std::wstring WslCoreVm::GenerateConfigJson()
 
     // Configure the number of processors.
     vmSettings.ComputeTopology.Processor.Count = m_vmConfig.ProcessorCount;
+
+    if (m_windowsVersion.BuildNumber >= WindowsBuildNumbers::Germanium)
+    {
+        // Let HCS derive a virtual NUMA topology from the requested resources and the host topology.
+        vmSettings.ComputeTopology.Numa.emplace();
+    }
 
     // Set the vmmem suffix which will change the process name in task manager.
     if (helpers::IsVmemmSuffixSupported())
@@ -1744,6 +1801,24 @@ std::wstring WslCoreVm::GenerateConfigJson()
     // inherited ACLs; otherwise StartComputeSystem will surface E_ACCESSDENIED.
     auto attachDisk = [&](PCWSTR path, bool grantVmAccess) {
         auto lun = ReserveLun();
+        wil::unique_hfile backingFile;
+        try
+        {
+            backingFile = OpenVhdBackingFile(path, grantVmAccess ? m_userToken.get() : nullptr);
+        }
+        catch (...)
+        {
+            if (!grantVmAccess || wil::ResultFromCaughtException() != E_ACCESSDENIED)
+            {
+                throw;
+            }
+
+            LOG_CAUGHT_EXCEPTION();
+
+            // Custom VHDs may be accessible only to the service and VMWP.
+            backingFile = OpenVhdBackingFile(path, nullptr);
+        }
+
         hcs::Attachment disk{};
         disk.Type = hcs::AttachmentType::VirtualDisk;
         disk.Path = path;
@@ -1765,7 +1840,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
             CATCH_LOG()
         }
 
-        m_attachedDisks.emplace(AttachedDisk{DiskType::VHD, path, false}, DiskState{lun, {}, diskFlags});
+        m_attachedDisks.emplace(AttachedDisk{DiskType::VHD, path, false}, DiskState{lun, {}, diskFlags, std::move(backingFile)});
         return lun;
     };
 
@@ -2064,8 +2139,28 @@ void WslCoreVm::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR Gue
     auto lock = m_lock.lock_exclusive();
 
     const auto flags = (ReadOnly ? hcs::Plan9ShareFlags::ReadOnly : hcs::Plan9ShareFlags::None) | hcs::Plan9ShareFlags::AllowOptions;
-    wsl::windows::common::hcs::AddPlan9Share(
-        m_system.get(), Name, Name, HostPath, LX_INIT_UTILITY_VM_PLAN9_PORT, flags, m_userToken.get());
+    wsl::windows::common::security::EnableTokenPrivilege(m_userToken.get(), SE_CREATE_SYMBOLIC_LINK_NAME);
+
+    {
+        auto runAsUser = wil::impersonate_token(m_userToken.get());
+        if (!m_pluginPlan9Server || m_pluginPlan9Server->IsRunning() != S_OK)
+        {
+            // Tear down the previous server so it releases the port before the replacement binds it.
+            if (m_pluginPlan9Server)
+            {
+                LOG_IF_FAILED(m_pluginPlan9Server->Teardown());
+                m_pluginPlan9Server.reset();
+            }
+
+            auto server =
+                wsl::windows::common::wslutil::CreateComServerAsUser<p9fs::Plan9FileSystem, IPlan9FileSystem>(m_userToken.get());
+            THROW_IF_FAILED(server->Init(&m_runtimeId, LX_INIT_UTILITY_VM_PLAN9_PLUGIN_PORT));
+            THROW_IF_FAILED(server->Resume());
+            m_pluginPlan9Server = std::move(server);
+        }
+
+        THROW_IF_FAILED(m_pluginPlan9Server->AddSharePath(Name, HostPath, static_cast<UINT32>(flags)));
+    }
 
     wsl::shared::MessageWriter<LX_MINI_INIT_MOUNT_FOLDER_MESSAGE> message(LxMiniInitMountFolder);
     message.WriteString(message->PathIndex, GuestPath);
@@ -2324,14 +2419,15 @@ void WslCoreVm::OnExit(_In_opt_ PCWSTR ExitDetails)
 
 void WslCoreVm::ReadGuestCapabilities()
 {
-    const auto& info = m_miniInitChannel.ReceiveMessage<LX_INIT_GUEST_CAPABILITIES>();
+    gsl::span<gsl::byte> span;
+    const auto& info = m_miniInitChannel.ReceiveMessage<LX_INIT_GUEST_CAPABILITIES>(&span);
+    const std::string input{wsl::shared::string::FromMessageBuffer<LX_INIT_GUEST_CAPABILITIES>(span)};
 
-    m_kernelVersionString = wsl::shared::string::MultiByteToWide(info.Buffer);
+    m_kernelVersionString = wsl::shared::string::MultiByteToWide(input);
 
     // Parse the version string.
     const std::regex pattern("(\\d+)\\.(\\d+)\\.(\\d+).*");
     std::smatch match;
-    const std::string input = info.Buffer;
     if (!std::regex_match(input, match, pattern) || match.size() != 4)
     {
         THROW_HR_MSG(E_UNEXPECTED, "Failed to parse kernel version: '%hs'", input.c_str());
@@ -2345,7 +2441,7 @@ void WslCoreVm::ReadGuestCapabilities()
     }
     catch (const std::exception& e)
     {
-        THROW_HR_MSG(E_UNEXPECTED, "Failed to parse kernel version: '%hs', %hs", info.Buffer, e.what());
+        THROW_HR_MSG(E_UNEXPECTED, "Failed to parse kernel version: '%hs', %hs", input.c_str(), e.what());
     }
 
     m_seccompAvailable = info.SeccompAvailable;
@@ -2776,20 +2872,6 @@ std::string WslCoreVm::s_GetMountTargetName(_In_ PCWSTR Disk, _In_opt_ PCWSTR Na
     }
 
     return target;
-}
-
-LX_INIT_DRVFS_MOUNT WslCoreVm::s_InitializeDrvFs(_Inout_ WslCoreVm* VmContext, _In_ HANDLE UserToken)
-{
-    try
-    {
-        return VmContext->InitializeDrvFs(UserToken) ? LxInitDrvfsMountElevated : LxInitDrvfsMountNonElevated;
-    }
-    catch (...)
-    {
-        LOG_CAUGHT_EXCEPTION();
-
-        return LxInitDrvfsMountNone;
-    }
 }
 
 void CALLBACK WslCoreVm::s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context)

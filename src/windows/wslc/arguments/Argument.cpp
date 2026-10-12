@@ -28,28 +28,23 @@ using namespace std::literals;
 namespace wsl::windows::wslc {
 using namespace wsl::windows::wslc::execution;
 
-// This is the main Argument creation method, allowing overrides of the default properties of arguments.
-// The ArgType has some core characteristic, such as the Kind, Name, and Alias. If these
-// need to be changed, it is recommended to create a new ArgType in ArgumentDefinitions.h. If the argument
-// just needs a different description, it can be overridden in the desc, or if you need it to be required,
-// or to allow multiple uses within a command, then those properties can be set using the Create
-// function below inside the command. In this way all arguments default to "1" use and not required, and
-// this can only be changed in the command's GetArguments function, so the defaults are always clear and
-// consistent. Visibility can also be overridden and is defaulted to "Help".
-Argument Argument::Create(ArgType type, std::optional<bool> required, std::optional<argument::Limit> limit, std::optional<std::wstring> desc)
+Argument Argument::Create(ArgType type, ArgumentOverrides overrides)
 {
+    WI_ASSERT(!overrides.Name.has_value() || overrides.Name->size() >= 2);
+
     switch (type)
     {
-#define WSLC_ARG_CREATE_CASE(EnumName, Name, Alias, ArgumentKind, ConvertedType, Desc) \
+#define WSLC_ARG_CREATE_CASE(EnumName, DefaultName, DefaultAlias, ArgumentKind, ConvertedType, DefaultDesc) \
     case ArgType::EnumName: \
         return Argument{ \
             type, \
-            L##Name, \
-            Alias, \
-            desc.has_value() ? std::move(desc.value()) : std::wstring(Desc), \
+            overrides.Name.has_value() ? std::move(overrides.Name.value()) : std::wstring{L##DefaultName}, \
+            overrides.Alias.has_value() ? std::move(overrides.Alias.value()) : std::wstring{DefaultAlias}, \
+            overrides.Desc.has_value() ? std::move(overrides.Desc.value()) : std::wstring(DefaultDesc), \
             ArgumentKind, \
-            required.value_or(DefaultRequired), \
-            limit.value_or(DefaultLimit)};
+            overrides.Required.value_or(Argument::DefaultRequired), \
+            overrides.Limit.value_or(Argument::DefaultLimit), \
+            overrides.Flags.value_or(Flags::None)};
 
         WSLC_ARGUMENTS(WSLC_ARG_CREATE_CASE)
 #undef WSLC_ARG_CREATE_CASE
@@ -57,6 +52,13 @@ Argument Argument::Create(ArgType type, std::optional<bool> required, std::optio
     default:
         THROW_HR(E_UNEXPECTED);
     }
+}
+
+Argument Argument::CreateGlobal(ArgType type, const Command& owner, ArgumentOverrides overrides)
+{
+    auto argument = Create(type, std::move(overrides));
+    argument.m_globalOwner = std::cref(owner);
+    return argument;
 }
 
 // Retrieves the usage string of the Argument, based on its Alias and Name.
@@ -71,5 +73,29 @@ std::wstring Argument::GetUsageString() const
 
     strstr << WSLC_CLI_ARG_ID_CHAR << WSLC_CLI_ARG_ID_CHAR << m_name;
     return strstr.str();
+}
+
+bool Argument::MatchesOption(std::wstring_view token) const
+{
+    if (!IsOption() || token.length() < 2 || token.front() != WSLC_CLI_ARG_ID_CHAR)
+    {
+        return false;
+    }
+
+    const bool longName = token[1] == WSLC_CLI_ARG_ID_CHAR;
+    const size_t optionStart = longName ? 2 : 1;
+    if (token.length() == optionStart || token[optionStart] == WSLC_CLI_ARG_ID_CHAR)
+    {
+        return false;
+    }
+
+    auto optionName = token.substr(optionStart);
+    if (const auto separator = optionName.find_first_of(WSLC_CLI_ARG_SPLIT_CHAR); separator != std::wstring_view::npos)
+    {
+        optionName = optionName.substr(0, separator);
+    }
+
+    const auto& configuredName = longName ? Name() : Alias();
+    return !configuredName.empty() && string::IsEqual(optionName, configuredName);
 }
 } // namespace wsl::windows::wslc

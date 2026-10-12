@@ -34,15 +34,18 @@ void CreateContainer(CLIExecutionContext& context);
 void ContainerCp(CLIExecutionContext& context);
 void ExecContainer(CLIExecutionContext& context);
 void ExportContainer(CLIExecutionContext& context);
+void FormatContainerOutput(CLIExecutionContext& context);
+
+// Collects the stats before building the output.
+void FormatContainerStatsOutput(CLIExecutionContext& context);
 void GetContainers(CLIExecutionContext& context);
 void InspectContainers(CLIExecutionContext& context);
 void KillContainers(CLIExecutionContext& context);
-void ListContainers(CLIExecutionContext& context);
 void PruneContainers(CLIExecutionContext& context);
 void RemoveContainers(CLIExecutionContext& context);
+void RestartContainers(CLIExecutionContext& context);
 void RunContainer(CLIExecutionContext& context);
 void SetContainerOptionsFromArgs(CLIExecutionContext& context);
-void ShowContainerStats(CLIExecutionContext& context);
 void StartContainer(CLIExecutionContext& context);
 void StopContainers(CLIExecutionContext& context);
 void ViewContainerLogs(CLIExecutionContext& context);
