@@ -53,24 +53,11 @@ void wsl::windows::common::hcs::RemovePlan9Share(_In_ HCS_SYSTEM ComputeSystem, 
     ModifyComputeSystem(ComputeSystem, wsl::shared::ToJsonW(request).c_str());
 }
 
-void wsl::windows::common::hcs::AddVhd(
-    _In_ HCS_SYSTEM ComputeSystem,
-    _In_ PCWSTR VhdPath,
-    _In_ ULONG Lun,
-    _In_ bool ReadOnly,
-    _In_opt_ HANDLE UserToken,
-    _In_opt_ const GUID* InstanceId,
-    _In_opt_ const GUID* DistroId)
+void wsl::windows::common::hcs::AddVhd(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR VhdPath, _In_ ULONG Lun, _In_ bool ReadOnly)
 {
     std::optional<int> sparseVhd;
     try
     {
-        wil::unique_token_reverter runAsUser;
-        if (UserToken != nullptr)
-        {
-            runAsUser = wil::impersonate_token(UserToken);
-        }
-
         const wil::unique_hfile vhd{CreateFileW(
             VhdPath,
             FILE_READ_ATTRIBUTES,
@@ -90,8 +77,6 @@ void wsl::windows::common::hcs::AddVhd(
     WSL_LOG_TELEMETRY(
         "AttachVhdBegin",
         PDT_ProductAndServicePerformance,
-        TraceLoggingValue(InstanceId != nullptr ? *InstanceId : GUID{}, "instanceId"),
-        TraceLoggingValue(DistroId != nullptr ? *DistroId : GUID{}, "distroId"),
         TraceLoggingValue(Lun, "lun"),
         TraceLoggingValue(ReadOnly, "readOnly"),
         TraceLoggingValue(sparseVhd.value_or(-1), "sparseVhd"));

@@ -32,7 +32,7 @@ Notable ETL providers:
     - `GuestLog`: Logs from the vm's dmesg
     - `Error`: Unexpected errors
     - `CreateVmBegin`, `CreateVmEnd`: Virtual machine lifetime
-    - `AttachVhdBegin`: VHD sparse state before each attach call (`1` sparse, `0` non-sparse, `-1` unreadable). Distro attachments include `instanceId` and `distroId`; other attachments use zero GUIDs. Retries can emit more than one event.
+    - `AttachVhdBegin`: VHD sparse state before each attach call (`1` sparse, `0` non-sparse, `-1` unreadable). Retries can emit more than one event; this event does not identify a distro.
     - `DiskSpaceInfo`: Sparse state and host/guest disk usage after a distro initializes successfully.
     - `CreateNetworkBegin`, `CreateNetworkEnd`: Networking configuration
     - `SentMessage`, `ReceivedMessage`: Communication on the hvsocket channels with Linux.

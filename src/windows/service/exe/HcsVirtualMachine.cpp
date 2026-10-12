@@ -560,12 +560,12 @@ try
         grantDiskAccess();
     }
 
-    auto result = wil::ResultFromException([&]() { hcs::AddVhd(m_computeSystem.get(), Path, allocatedLun, ReadOnly, m_userToken.get()); });
+    auto result = wil::ResultFromException([&]() { hcs::AddVhd(m_computeSystem.get(), Path, allocatedLun, ReadOnly); });
 
     if (result == HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED) && !disk.AccessGranted)
     {
         grantDiskAccess();
-        hcs::AddVhd(m_computeSystem.get(), Path, allocatedLun, ReadOnly, m_userToken.get());
+        hcs::AddVhd(m_computeSystem.get(), Path, allocatedLun, ReadOnly);
     }
     else
     {
