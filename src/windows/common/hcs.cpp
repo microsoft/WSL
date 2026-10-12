@@ -53,8 +53,49 @@ void wsl::windows::common::hcs::RemovePlan9Share(_In_ HCS_SYSTEM ComputeSystem, 
     ModifyComputeSystem(ComputeSystem, wsl::shared::ToJsonW(request).c_str());
 }
 
-void wsl::windows::common::hcs::AddVhd(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR VhdPath, _In_ ULONG Lun, _In_ bool ReadOnly)
+void wsl::windows::common::hcs::AddVhd(
+    _In_ HCS_SYSTEM ComputeSystem,
+    _In_ PCWSTR VhdPath,
+    _In_ ULONG Lun,
+    _In_ bool ReadOnly,
+    _In_opt_ HANDLE UserToken,
+    _In_opt_ const GUID* InstanceId,
+    _In_opt_ const GUID* DistroId)
 {
+    std::optional<int> sparseVhd;
+    try
+    {
+        wil::unique_token_reverter runAsUser;
+        if (UserToken != nullptr)
+        {
+            runAsUser = wil::impersonate_token(UserToken);
+        }
+
+        const wil::unique_hfile vhd{CreateFileW(
+            VhdPath,
+            FILE_READ_ATTRIBUTES,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            nullptr,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL,
+            nullptr)};
+        THROW_LAST_ERROR_IF(!vhd);
+
+        FILE_BASIC_INFO basicInfo{};
+        THROW_IF_WIN32_BOOL_FALSE(GetFileInformationByHandleEx(vhd.get(), FileBasicInfo, &basicInfo, sizeof(basicInfo)));
+        sparseVhd = WI_IsFlagSet(basicInfo.FileAttributes, FILE_ATTRIBUTE_SPARSE_FILE) ? 1 : 0;
+    }
+    CATCH_LOG()
+
+    WSL_LOG_TELEMETRY(
+        "AttachVhdBegin",
+        PDT_ProductAndServicePerformance,
+        TraceLoggingValue(InstanceId != nullptr ? *InstanceId : GUID{}, "instanceId"),
+        TraceLoggingValue(DistroId != nullptr ? *DistroId : GUID{}, "distroId"),
+        TraceLoggingValue(Lun, "lun"),
+        TraceLoggingValue(ReadOnly, "readOnly"),
+        TraceLoggingValue(sparseVhd.value_or(-1), "sparseVhd"));
+
     ModifySettingRequest<Attachment> request{};
     request.RequestType = ModifyRequestType::Add;
     request.ResourcePath = c_scsiResourcePath + std::to_wstring(Lun);

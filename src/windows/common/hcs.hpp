@@ -47,7 +47,14 @@ void AddPlan9Share(
 
 void RemovePlan9Share(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR AccessName, _In_ UINT32 Port);
 
-void AddVhd(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR VhdPath, _In_ ULONG Lun, _In_ bool ReadOnly = false);
+void AddVhd(
+    _In_ HCS_SYSTEM ComputeSystem,
+    _In_ PCWSTR VhdPath,
+    _In_ ULONG Lun,
+    _In_ bool ReadOnly,
+    _In_opt_ HANDLE UserToken,
+    _In_opt_ const GUID* InstanceId = nullptr,
+    _In_opt_ const GUID* DistroId = nullptr);
 
 void AddPassThroughDisk(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun);
 

@@ -1015,7 +1015,14 @@ ULONG WslCoreVm::AttachDisk(_In_ PCWSTR Disk, _In_ DiskType Type, _In_ std::opti
 }
 
 ULONG WslCoreVm::AttachDiskLockHeld(
-    _In_ PCWSTR Disk, _In_ DiskType Type, _In_ MountFlags Flags, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_opt_ HANDLE UserToken)
+    _In_ PCWSTR Disk,
+    _In_ DiskType Type,
+    _In_ MountFlags Flags,
+    _In_ std::optional<ULONG> Lun,
+    _In_ bool IsUserDisk,
+    _In_opt_ HANDLE UserToken,
+    _In_opt_ const GUID* InstanceId,
+    _In_opt_ const GUID* DistroId)
 {
     ExecutionContext context(Context::MountDisk);
 
@@ -1113,13 +1120,15 @@ ULONG WslCoreVm::AttachDiskLockHeld(
             }
 
             auto result = wil::ResultFromException([&]() {
-                wsl::windows::common::hcs::AddVhd(m_system.get(), Disk, Lun.value(), WI_IsFlagSet(Flags, MountFlags::ReadOnly));
+                wsl::windows::common::hcs::AddVhd(
+                    m_system.get(), Disk, Lun.value(), WI_IsFlagSet(Flags, MountFlags::ReadOnly), UserToken, InstanceId, DistroId);
             });
 
             if (result == HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED) && WI_IsFlagClear(diskFlags, DiskStateFlags::AccessGranted))
             {
                 grantDiskAccess();
-                wsl::windows::common::hcs::AddVhd(m_system.get(), Disk, Lun.value(), WI_IsFlagSet(Flags, MountFlags::ReadOnly));
+                wsl::windows::common::hcs::AddVhd(
+                    m_system.get(), Disk, Lun.value(), WI_IsFlagSet(Flags, MountFlags::ReadOnly), UserToken, InstanceId, DistroId);
             }
             else
             {
@@ -1238,7 +1247,8 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
     // Add the VHD to the machine.
     auto lock = m_lock.lock_exclusive();
     SlowOperationWatcher slowOperation{"AttachDistroVhd"};
-    const auto lun = AttachDiskLockHeld(Configuration.VhdFilePath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get());
+    const auto lun = AttachDiskLockHeld(
+        Configuration.VhdFilePath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get(), &InstanceId, &Configuration.DistroId);
     slowOperation.Reset();
 
     // Launch the init daemon and create the instance.
