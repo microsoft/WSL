@@ -13,7 +13,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
-#include "windows/Common.h"
+#include "Common.h"
 #include "WSLCCLITestHelpers.h"
 
 #include "Argument.h"
@@ -86,6 +86,21 @@ class WSLCCLIArgumentUnitTests
         VERIFY_IS_TRUE(overrides.Required());
         VERIFY_ARE_EQUAL(Limit::Unlimited, overrides.Limit());
         VERIFY_ARE_EQUAL(std::wstring{L"Custom description"}, overrides.Description());
+    }
+
+    TEST_METHOD(ArgumentMatchesOption_RequiresNameOrAliasSpecifier)
+    {
+        const auto argument = Argument::Create(ArgType::Quiet);
+
+        VERIFY_IS_TRUE(argument.MatchesOption(L"--quiet"));
+        VERIFY_IS_TRUE(argument.MatchesOption(L"--quiet=true"));
+        VERIFY_IS_TRUE(argument.MatchesOption(L"-q"));
+        VERIFY_IS_TRUE(argument.MatchesOption(L"-q=true"));
+
+        VERIFY_IS_FALSE(argument.MatchesOption(L"quiet"));
+        VERIFY_IS_FALSE(argument.MatchesOption(L"-"));
+        VERIFY_IS_FALSE(argument.MatchesOption(L"--"));
+        VERIFY_IS_FALSE(argument.MatchesOption(L"---quiet"));
     }
 
     // Test: Verify Argument::Create() successfully creates arguments for all ArgType enum values
@@ -387,6 +402,16 @@ class WSLCCLIArgumentUnitTests
         return values;
     }
 
+    TEST_METHOD(Filter_RejectsMalformedValues)
+    {
+        ArgMap args;
+        args.Add(ArgType::Filter, std::wstring(L"type"));
+        VERIFY_THROWS_SPECIFIC(Argument::Create(ArgType::Filter).Validate(args), ArgumentException, [](const auto& exception) {
+            return exception.Message() == wsl::shared::Localization::WSLCCLI_InvalidFilterError(L"type");
+        });
+        VERIFY_IS_FALSE(args.ContainsValidated(ArgType::Filter));
+    }
+
     // Test: Every ArgType whose validation converts its raw string into a typed value must cache
     // that value on the ArgMap during Argument::Validate, so execution reads it back without
     // re-converting. This drives the real validation + caching path for each converted ArgType.
@@ -412,8 +437,9 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::HealthRetries>(L"3"), 3);
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Last>(L"5"), 5);
 
-        // string -> LONG
+        // string -> LONG (Time and Timeout share the converter)
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Time>(L"5"), 5L);
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Timeout>(L"5"), 5L);
 
         // string -> ULONGLONG (Tail is a raw integer; Since/Until go through the timestamp parser)
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Tail>(L"10"), 10ULL);

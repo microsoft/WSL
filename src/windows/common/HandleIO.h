@@ -6,9 +6,21 @@
 #include <deque>
 #include <list>
 
-#define LX_RELAY_BUFFER_SIZE 0x1000
+#define LX_RELAY_BUFFER_SIZE (65536)
 
 namespace wsl::windows::common::io {
+
+// Returns the current file pointer for disk handles, and a zero offset for every other handle type.
+inline LARGE_INTEGER InitializeFileOffset(HANDLE File)
+{
+    LARGE_INTEGER Offset{};
+    if (GetFileType(File) == FILE_TYPE_DISK)
+    {
+        LOG_IF_WIN32_BOOL_FALSE(SetFilePointerEx(File, {}, &Offset, FILE_CURRENT));
+    }
+
+    return Offset;
+}
 
 enum class IOHandleStatus
 {

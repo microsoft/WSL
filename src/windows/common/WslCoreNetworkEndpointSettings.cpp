@@ -7,6 +7,27 @@
 
 using namespace wsl::shared;
 
+SOCKADDR_INET wsl::core::networking::GetFallbackIpv4Gateway(const EndpointIpAddress& address)
+{
+    SOCKADDR_INET gateway{};
+    if (address.Address.si_family != AF_INET || address.PrefixLength > 32)
+    {
+        return gateway;
+    }
+
+    const uint32_t hostAddress = ntohl(address.Address.Ipv4.sin_addr.s_addr);
+    const uint32_t mask = (address.PrefixLength == 0) ? 0u : ~((1u << (32u - address.PrefixLength)) - 1u);
+    uint32_t gatewayAddress = (hostAddress & mask) | 1u;
+    if (gatewayAddress == hostAddress)
+    {
+        gatewayAddress = address.PrefixLength <= 30 ? (hostAddress & mask) | 2u : hostAddress ^ 1u;
+    }
+
+    gateway.si_family = AF_INET;
+    gateway.Ipv4.sin_addr.s_addr = htonl(gatewayAddress);
+    return gateway;
+}
+
 std::shared_ptr<wsl::core::networking::NetworkSettings> wsl::core::networking::GetEndpointSettings(const hns::HNSEndpoint& properties)
 {
     EndpointIpAddress address{};
@@ -107,13 +128,7 @@ std::shared_ptr<wsl::core::networking::NetworkSettings> wsl::core::networking::G
     }
     else if (address.Address.si_family == AF_INET)
     {
-        // Synthesize a gateway from the first host address in the subnet.
-        SOCKADDR_INET gatewayAddr{};
-        gatewayAddr.si_family = AF_INET;
-        const uint32_t hostAddr = ntohl(address.Address.Ipv4.sin_addr.s_addr);
-        const uint32_t mask = (address.PrefixLength == 0) ? 0u : ~((1u << (32u - address.PrefixLength)) - 1u);
-        gatewayAddr.Ipv4.sin_addr.s_addr = htonl((hostAddr & mask) | 1u);
-        route = EndpointRoute::DefaultRoute(AF_INET, gatewayAddr);
+        route = EndpointRoute::DefaultRoute(AF_INET, GetFallbackIpv4Gateway(address));
     }
 
     // Build IPv6 default route.

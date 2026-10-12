@@ -24,6 +24,7 @@ std::vector<Argument> InspectCommand::GetArguments() const
     return {
         Argument::Create(ArgType::ObjectId, {.Required = true, .Limit = Limit::Unlimited}),
         Argument::Create(ArgType::Type),
+        Argument::Create(ArgType::Size, {.Desc = Localization::WSLCCLI_InspectSizeArgDescription()}),
         Argument::Create(ArgType::InspectFormat),
     };
 }

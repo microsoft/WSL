@@ -27,7 +27,8 @@ namespace wsl::windows::wslc {
 std::vector<Argument> NetworkPruneCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::Filter, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::Filter, {.Alias = NO_ALIAS, .Limit = Limit::Unlimited, .Desc = Localization::WSLCCLI_PruneFilterArgDescription()}),
+        Argument::Create(ArgType::Force, {.Desc = Localization::WSLCCLI_PruneForceArgDescription()}),
     };
 }
 

@@ -130,13 +130,13 @@ public:
 
     // Container management.
     std::vector<common::docker_schema::ContainerInfo> ListContainers(
-        bool all = false, int limit = -1, const std::map<std::string, std::vector<std::string>>& filters = {});
+        bool all = false, int limit = -1, const std::map<std::string, std::vector<std::string>>& filters = {}, bool size = false);
     common::docker_schema::CreatedContainer CreateContainer(const common::docker_schema::CreateContainer& Request, const std::optional<std::string>& Name);
     void StartContainer(const std::string& Id, const std::optional<std::string>& DetachKeys);
     void StopContainer(const std::string& Id, std::optional<WSLCSignal> Signal, std::optional<LONG> TimeoutSeconds);
     void DeleteContainer(const std::string& Id, bool Force, bool DeleteVolumes = false);
     void SignalContainer(const std::string& Id, std::optional<WSLCSignal> Signal);
-    common::docker_schema::InspectContainer InspectContainer(const std::string& Id);
+    common::docker_schema::InspectContainer InspectContainer(const std::string& Id, bool Size = false);
     common::docker_schema::ContainerStats ContainerStats(const std::string& Id);
     common::docker_schema::InspectExec InspectExec(const std::string& Id);
     wil::unique_socket AttachContainer(const std::string& Id, const std::optional<std::string>& DetachKeys);
@@ -145,6 +145,7 @@ public:
     std::pair<uint32_t, wil::unique_socket> ExportContainer(const std::string& ContainerID);
     std::unique_ptr<HTTPRequestContext> PutArchive(const std::string& ContainerID, const std::string& Path, std::optional<uint64_t> ContentLength);
     std::tuple<uint32_t, wil::unique_socket, bool> GetArchive(const std::string& ContainerID, const std::string& Path);
+    std::optional<common::docker_schema::ContainerPathStat> StatArchivePath(const std::string& ContainerID, const std::string& Path);
     common::docker_schema::PruneContainerResult PruneContainers(const std::map<std::string, std::vector<std::string>>& filters = {});
 
     // Volume management.

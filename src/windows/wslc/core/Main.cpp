@@ -18,7 +18,6 @@ Abstract:
 #include "wslutil.h"
 #include "Errors.h"
 #include "CLIExecutionContext.h"
-#include "EnvironmentOptions.h"
 #include "Invocation.h"
 #include "RootCommand.h"
 
@@ -27,6 +26,8 @@ using namespace wsl::windows::common;
 using namespace wsl::windows::wslc::execution;
 
 namespace wsl::windows::wslc {
+
+using namespace wsl::windows::wslc::cli;
 int CoreMain(int argc, wchar_t const** argv)
 try
 {
@@ -84,70 +85,45 @@ try
     THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &data));
     auto wsaCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WSACleanup(); });
 
-    std::unique_ptr<Command> command = std::make_unique<RootCommand>();
+    std::vector<std::wstring> args;
+    for (int i = 1; i < argc; ++i)
+    {
+        args.emplace_back(argv[i]);
+    }
 
-    // Environment variable scanning.
-    // The env-bound argument set is the only state needed before NO_COLOR is
-    // applied; keep just this and the noexcept env apply outside the try so a
-    // throw can't reroute through the colored-help error path.
-    auto envDefs = command->GetGlobalsAndEnvArguments();
-    ApplyEnvironmentOptions(context.GlobalArgs, envDefs);
-    context.ApplyGlobalEnvironmentOptions();
+    CommandInvocation invocation{std::make_unique<RootCommand>(), std::move(args)};
+
+    // Apply root environment options before any user-visible output. Keep this outside the try so
+    // a failure cannot reroute through the colored-help error path.
+    invocation.ApplyRootEnvironmentOptions(context.Args);
+    context.ApplyTerminalOptions();
 
     // Past this point, environment variable options are in effect.
 
     try
     {
-        std::vector<std::wstring> args;
-        for (int i = 1; i < argc; ++i)
-        {
-            args.emplace_back(argv[i]);
-        }
-
-        Invocation invocation{std::move(args)};
-
-        // Pass 1 — CLI globals. Consume only the global options we recognize at
-        // the front of the invocation; anything else (subcommands, unknown
-        // options, --help, --version, malformed tokens) is left in place for
-        // the regular pipeline to parse and report against the right command.
-        auto cliGlobals = command->GetGlobalArguments();
-        command->ParseArguments(
-            invocation,
-            context.GlobalArgs,
-            cliGlobals,
-            /*optionsOnly*/ true,
-            /*stopOnUnknown*/ true,
-            /*overridableDefaults*/ envDefs);
-        command->ValidateArguments(context.GlobalArgs, envDefs, /*runInternalHook*/ false);
-
-        // Past this point, global option parsing and validation are complete.
-
-        // Pass 2 - Subcommand and leaf command resolution.
-        std::unique_ptr<Command> subCommand = command->FindSubCommand(invocation);
-        while (subCommand)
-        {
-            command = std::move(subCommand);
-            subCommand = command->FindSubCommand(invocation);
-        }
-
-        command->ParseArguments(invocation, context.Args);
-        command->ValidateArguments(context.Args);
-        command->Execute(context);
+        invocation.ParseCommandLine(context);
+        invocation.Execute(context);
     }
     catch (const ArgumentException& ae)
     {
-        command->OutputHelp(context.Terminal, HelpOutput::Argument, &ae, ae.Arguments());
+        invocation.OutputHelp(context.Terminal, HelpOutput::Argument, &ae, ae.Arguments());
         return 1;
     }
     catch (const CommandException& ce)
     {
-        command->OutputHelp(context.Terminal, HelpOutput::Command, &ce);
+        invocation.OutputHelp(context.Terminal, HelpOutput::Command, &ce);
         return 1;
     }
     catch (const ExecutionException& ee)
     {
         context.Terminal.Error(L"{}\n", ee.Message());
         return 1;
+    }
+    catch (const TerminateException&)
+    {
+        // The user declined a confirmation prompt, so the requested action is not performed.
+        return 0;
     }
     catch (...)
     {
@@ -174,17 +150,7 @@ try
 
         if (FAILED(result))
         {
-            if (const auto& reported = context.ReportedError())
-            {
-                auto strings = wslutil::ErrorToString(*reported);
-                auto errorMessage = strings.Message.empty() ? strings.Code : strings.Message;
-                context.Terminal.Error(L"{}\n", Localization::MessageErrorCode(errorMessage, wslutil::ErrorCodeToString(result)));
-            }
-            else
-            {
-                // Fallback for errors without context
-                context.Terminal.Error(L"{}\n", Localization::MessageErrorCode(L"", wslutil::ErrorCodeToString(result)));
-            }
+            context.ReportError(result);
         }
     }
 

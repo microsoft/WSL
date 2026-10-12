@@ -50,6 +50,7 @@ inline std::vector<wsl::windows::wslc::Argument> GetArgumentsForSet(ArgumentSet 
 {
     using namespace wsl::windows::wslc;
     using namespace wsl::windows::wslc::argument;
+    using Argument = wsl::windows::wslc::Argument;
 
     switch (argumentSet)
     {
