@@ -473,7 +473,7 @@ void WslCoreInstance::Initialize()
     // The system distro has no backing VHD.
     if (!m_configuration.BasePath.empty())
     {
-        std::optional<bool> sparseVhd;
+        std::optional<int> sparseVhd;
         std::optional<FILE_STANDARD_INFO> hostSpace;
         try
         {
@@ -491,7 +491,7 @@ void WslCoreInstance::Initialize()
             FILE_BASIC_INFO basicInfo{};
             if (GetFileInformationByHandleEx(vhd.get(), FileBasicInfo, &basicInfo, sizeof(basicInfo)))
             {
-                sparseVhd = WI_IsFlagSet(basicInfo.FileAttributes, FILE_ATTRIBUTE_SPARSE_FILE);
+                sparseVhd = WI_IsFlagSet(basicInfo.FileAttributes, FILE_ATTRIBUTE_SPARSE_FILE) ? 1 : 0;
             }
             else
             {
@@ -504,13 +504,13 @@ void WslCoreInstance::Initialize()
         }
         CATCH_LOG()
 
+        // -1 indicates that the sparse attribute could not be read.
         WSL_LOG_TELEMETRY(
             "DiskSpaceInfo",
             PDT_ProductAndServicePerformance,
             TraceLoggingValue(m_instanceId, "instanceId"),
             TraceLoggingValue(m_configuration.DistroId, "distroId"),
-            TraceLoggingValue(sparseVhd.has_value(), "sparseVhdKnown"),
-            TraceLoggingValue(sparseVhd.value_or(false), "sparseVhd"),
+            TraceLoggingValue(sparseVhd.value_or(-1), "sparseVhd"),
             TraceLoggingValue(hostSpace.has_value(), "hostSpaceKnown"),
             TraceLoggingValue(hostSpace ? hostSpace->EndOfFile.QuadPart : 0, "vhdLogicalBytes"),
             TraceLoggingValue(hostSpace ? hostSpace->AllocationSize.QuadPart : 0, "vhdAllocatedBytes"),
