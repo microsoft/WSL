@@ -75,7 +75,7 @@ void wsl::windows::common::hcs::AddVhd(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWST
     CATCH_LOG()
 
     WSL_LOG_TELEMETRY(
-        "AttachVhdBegin",
+        "AttachVhd",
         PDT_ProductAndServicePerformance,
         TraceLoggingValue(Lun, "lun"),
         TraceLoggingValue(ReadOnly, "readOnly"),
