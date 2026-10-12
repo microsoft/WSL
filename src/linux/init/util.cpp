@@ -749,7 +749,7 @@ CreateProcessAndWaitEnd:
     return Result;
 }
 
-int UtilExecCommandLine(const char* CommandLine, std::string* Output, int ExpectedStatus, bool PrintError)
+int UtilExecCommandLine(const char* CommandLine, std::string* Output, const std::vector<int>& ExpectedStatuses, bool PrintError)
 
 /*++
 
@@ -764,9 +764,9 @@ Arguments:
     Output - Supplies an optional pointer to a std::string to receive the output of the command.
         If no buffer is provided the output will appear in stdout.
 
-    ExpectedStatus - Supplies the expected return status of the command.
+    ExpectedStatuses - Supplies the accepted return statuses of the command.
 
-    PrintError - Supplies a boolean that specifies if an error should be printed if the process does not return the expected status.
+    PrintError - Supplies a boolean that specifies if an error should be printed if the process does not return an accepted status.
 
 Return Value:
 
@@ -819,7 +819,7 @@ ErrorExit:
         }
         else
         {
-            Result = UtilProcessChildExitCode(Result, CommandLine, ExpectedStatus, PrintError);
+            Result = UtilProcessChildExitCode(Result, CommandLine, ExpectedStatuses, PrintError);
         }
     }
 
@@ -2290,7 +2290,7 @@ Return Value:
     return Output;
 }
 
-int UtilProcessChildExitCode(int Status, const char* Name, int ExpectedStatus, bool PrintError)
+int UtilProcessChildExitCode(int Status, const char* Name, const std::vector<int>& ExpectedStatuses, bool PrintError)
 
 /*++
 
@@ -2304,9 +2304,9 @@ Arguments:
 
     Name - Supplies the process image name, for logging.
 
-    ExpectedStatus - Supplies the expected exit status.
+    ExpectedStatuses - Supplies the accepted exit statuses.
 
-    PrintError - Supplies a boolean that specifies if an error should be printed if the process does not return the expected status.
+    PrintError - Supplies a boolean that specifies if an error should be printed if the process does not return an accepted status.
 
 Return Value:
 
@@ -2318,7 +2318,7 @@ Return Value:
     if (WIFEXITED(Status))
     {
         Status = WEXITSTATUS(Status);
-        if (Status == ExpectedStatus)
+        if (std::find(ExpectedStatuses.begin(), ExpectedStatuses.end(), Status) != ExpectedStatuses.end())
         {
             return 0;
         }
