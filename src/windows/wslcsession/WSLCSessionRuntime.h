@@ -80,8 +80,7 @@ public:
         // (e.g. to create a process) fails cleanly instead of restarting the VM.
         std::function<void()> OnVmStopping;
 
-        // Fired for every Docker volume event, after WSLCVolumes applied it, so a consumer of the event never
-        // observes volume state that lags behind it.
+        // Fired for every Docker volume event, after WSLCVolumes has updated the volumes it tracks.
         DockerEventTracker::VolumeEventCallback OnVolumeEvent;
     };
 
