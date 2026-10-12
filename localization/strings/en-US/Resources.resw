@@ -921,11 +921,11 @@ Falling back to NAT networking.</value>
   </data>
   <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
     <value>Mirrored networking is using a smaller ephemeral port range ({} ports instead of {}). This may limit the number of simultaneous connections.</value>
-    <comment>{FixedPlaceholder="{}"}The first placeholder is the allocated port count; the second is the preferred port count.</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
     <value>Mirrored networking could not reserve the minimum contiguous range of {} TCP and UDP ports. Check Windows port usage and exclusions.</value>
-    <comment>{FixedPlaceholder="{}"}{Locked="TCP"}{Locked="UDP"}The placeholder is the minimum port count.</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Hyper-V firewall is not supported</value>
