@@ -122,6 +122,10 @@ void CreateConsole(_In_ LPCWSTR ConsoleTitle = nullptr);
 
 [[nodiscard]] wil::unique_handle CreateKillOnCloseJob();
 
+// Creates a single-instance, duplex, overlapped byte-mode pipe server. If ClientSid is set, the pipe grants read/write
+// access to that SID (in addition to SYSTEM and administrators) instead of using the default pipe security.
+[[nodiscard]] wil::unique_hfile CreatePipeServer(_In_ LPCWSTR PipeName, _In_opt_ PSID ClientSid = nullptr);
+
 unique_proc_attribute_list CreateProcThreadAttributeList(_In_ DWORD AttributeCount);
 
 std::vector<gsl::byte> GenerateConfigurationMessage(
@@ -183,7 +187,14 @@ void LaunchDebugConsole(
     _In_opt_ HANDLE UserToken = nullptr,
     _In_opt_ HANDLE JobObject = nullptr);
 
-void LaunchKdRelay(_In_ LPCWSTR PipeName, _In_ HANDLE UserToken, _In_ int Port, _In_ HANDLE ExitEvent, _In_ bool DisableTelemetry, _In_opt_ HANDLE JobObject = nullptr);
+void LaunchKdRelay(
+    _In_ LPCWSTR PipeName,
+    _In_ HANDLE UserToken,
+    _In_ int Port,
+    _In_ HANDLE ExitEvent,
+    _In_ bool DisableTelemetry,
+    _In_opt_ HANDLE JobObject = nullptr,
+    _In_opt_ PSID PipeClientSid = nullptr);
 
 void LaunchPortRelay(_In_ SOCKET Socket, _In_ const GUID& VmId, _In_ HANDLE UserToken, _In_ bool DisableTelemetry, _In_opt_ HANDLE JobObject = nullptr);
 

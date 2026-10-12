@@ -186,6 +186,8 @@ private:
 
     VmCreateRequest GenerateBackendRequest(const GUID& VmId, BackendKind Backend);
 
+    PSID GetConsolePipeClientSid(BackendKind Backend);
+
     static std::pair<int, LX_MINI_MOUNT_STEP> GetMountResult(_In_ wsl::shared::SocketChannel& Channel);
 
     void Initialize(const GUID& VmId, const wil::shared_handle& UserToken);

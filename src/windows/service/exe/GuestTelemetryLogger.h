@@ -23,14 +23,14 @@ public:
     GuestTelemetryLogger() = delete;
     ~GuestTelemetryLogger();
 
-    static std::shared_ptr<GuestTelemetryLogger> Create(GUID VmId, const wil::unique_event& ExitEvent);
+    static std::shared_ptr<GuestTelemetryLogger> Create(GUID VmId, const wil::unique_event& ExitEvent, PSID PipeClientSid = nullptr);
 
     LPCWSTR GetPipeName() const;
 
 private:
     GuestTelemetryLogger(GUID VmId);
 
-    void Start(const wil::unique_event& ExitEvent);
+    void Start(const wil::unique_event& ExitEvent, PSID PipeClientSid);
     void ProcessInput(const std::string_view Input);
 
     std::wstring m_pipeName;

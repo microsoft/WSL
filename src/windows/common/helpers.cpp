@@ -304,6 +304,34 @@ wil::unique_handle wsl::windows::common::helpers::CreateKillOnCloseJob()
     return job;
 }
 
+wil::unique_hfile wsl::windows::common::helpers::CreatePipeServer(_In_ LPCWSTR PipeName, _In_opt_ PSID ClientSid)
+{
+    wil::unique_hlocal_security_descriptor securityDescriptor;
+    SECURITY_ATTRIBUTES attributes{sizeof(attributes), nullptr, FALSE};
+    if (ClientSid != nullptr)
+    {
+        const auto sid = wslutil::SidToString(ClientSid);
+        const auto sddl = std::format(L"D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;{})", sid.get());
+        THROW_IF_WIN32_BOOL_FALSE(
+            ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.c_str(), SDDL_REVISION_1, &securityDescriptor, nullptr));
+
+        attributes.lpSecurityDescriptor = securityDescriptor.get();
+    }
+
+    wil::unique_hfile pipe{CreateNamedPipeW(
+        PipeName,
+        (PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED),
+        (PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT),
+        1,
+        LX_RELAY_BUFFER_SIZE,
+        LX_RELAY_BUFFER_SIZE,
+        0,
+        ClientSid != nullptr ? &attributes : nullptr)};
+
+    THROW_LAST_ERROR_IF(!pipe);
+    return pipe;
+}
+
 std::vector<gsl::byte> wsl::windows::common::helpers::GenerateConfigurationMessage(
     _In_ const std::wstring& DistributionName,
     _In_ ULONG FixedDrivesBitmap,
@@ -623,17 +651,9 @@ void wsl::windows::common::helpers::LaunchDebugConsole(
 }
 
 void wsl::windows::common::helpers::LaunchKdRelay(
-    _In_ LPCWSTR PipeName, _In_ HANDLE UserToken, _In_ int Port, _In_ HANDLE ExitEvent, _In_ bool DisableTelemetry, _In_opt_ HANDLE JobObject)
+    _In_ LPCWSTR PipeName, _In_ HANDLE UserToken, _In_ int Port, _In_ HANDLE ExitEvent, _In_ bool DisableTelemetry, _In_opt_ HANDLE JobObject, _In_opt_ PSID PipeClientSid)
 {
-    // Create a new pipe server. The pipe should be:
-    //     Bi-directional: PIPE_ACCESS_DUPLEX
-    //     Asynchronous: FILE_FLAG_OVERLAPPED
-    //     Raw: PIPE_TYPE_BYTE | PIPE_READMODE_BYTE
-    //     Blocking: PIPE_WAIT
-    const wil::unique_hfile pipe{CreateNamedPipeW(
-        PipeName, (PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED), (PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT), 1, LX_RELAY_BUFFER_SIZE, LX_RELAY_BUFFER_SIZE, 0, nullptr)};
-
-    THROW_LAST_ERROR_IF(!pipe);
+    const auto pipe = CreatePipeServer(PipeName, PipeClientSid);
 
     LaunchWslRelayFlags flags = LaunchWslRelayFlags::ConnectPipe;
     WI_SetFlagIf(flags, LaunchWslRelayFlags::DisableTelemetry, DisableTelemetry);

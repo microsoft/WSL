@@ -311,8 +311,9 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         try
         {
             bool enableTelemetry = TraceLoggingProviderEnabled(g_hTraceLoggingProvider, WINEVENT_LEVEL_INFO, 0);
+            const auto consolePipeClientSid = GetConsolePipeClientSid(backendKind);
             m_dmesgCollector = DmesgCollector::Create(
-                VmId, m_vmExitEvent.get(), enableTelemetry, m_vmConfig.EnableDebugConsole, m_comPipe0, m_vmConfig.EnableEarlyBootLogging, {});
+                VmId, m_vmExitEvent.get(), enableTelemetry, m_vmConfig.EnableDebugConsole, m_comPipe0, m_vmConfig.EnableEarlyBootLogging, {}, consolePipeClientSid);
 
             WSL_LOG("DMESG collector created");
 
@@ -321,7 +322,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
                 m_debugShellPipe = wsl::windows::common::wslutil::GetDebugShellPipeName(&m_userSid.Sid);
             }
 
-            m_gnsTelemetryLogger = GuestTelemetryLogger::Create(VmId, m_vmExitEvent);
+            m_gnsTelemetryLogger = GuestTelemetryLogger::Create(VmId, m_vmExitEvent, consolePipeClientSid);
         }
         CATCH_LOG()
     }
@@ -1331,6 +1332,24 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstanceInternal(
         m_initializeDrvFs,
         [this](ULONG Port, HANDLE ExitHandle) { return m_backend->ConnectGuest(GuestServicePort{Port}, ExitHandle); },
         m_backend->GetGuestConnector(),
+        [this](ULONG Port) -> std::shared_ptr<const std::filesystem::path> {
+            auto socket = m_backend->CreateHostSocket(GuestServicePort{Port});
+            if (!socket)
+            {
+                return nullptr;
+            }
+
+            // N.B. Instances are stopped, releasing the socket, before the VM is terminated.
+            return {new std::filesystem::path{socket->Path}, [this, id = socket->Id](const std::filesystem::path* Path) {
+                        try
+                        {
+                            m_backend->CloseHostSocket(id);
+                        }
+                        CATCH_LOG()
+
+                        delete Path;
+                    }};
+        },
         featureFlags,
         m_vmConfig.DistributionStartTimeout,
         m_vmConfig.InstanceIdleTimeout,
@@ -1452,6 +1471,13 @@ void WslCoreVm::ValidateBackendConfiguration(BackendKind Backend) const
         notSupported,
         m_vmConfig.NetworkingMode != NetworkingMode::None && m_vmConfig.NetworkingMode != NetworkingMode::Nat,
         "OpenVMM only supports NAT or disabled networking");
+}
+
+PSID WslCoreVm::GetConsolePipeClientSid(BackendKind Backend)
+{
+    // The OpenVMM process runs as the user and connects to the console pipes the service creates. The default pipe
+    // security only grants non-elevated users read access, so those pipes must explicitly grant the user access.
+    return Backend == BackendKind::OpenVmm ? &m_userSid.Sid : nullptr;
 }
 
 VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId, BackendKind Backend)
@@ -1584,7 +1610,8 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId, BackendKind 
             m_vmConfig.KernelDebugPort,
             m_terminatingEvent.get(),
             !m_vmConfig.EnableTelemetry,
-            m_processJobObject.get());
+            m_processJobObject.get(),
+            GetConsolePipeClientSid(Backend));
     }
     else
     {
@@ -1787,12 +1814,14 @@ bool WslCoreVm::InitializeDrvFsLockHeld(_In_ HANDLE UserToken)
     const auto elevated = wsl::windows::common::security::IsTokenElevated(UserToken);
     if (m_backend->GetDescription().Backend == BackendKind::OpenVmm)
     {
+        // OpenVMM serves DrvFs by impersonating the session's token from a process running under the
+        // VM owner's token, which Windows allows only for a token of no higher integrity level.
         const auto tokenUser = wil::get_token_information<TOKEN_USER>(UserToken);
         THROW_HR_IF(E_ACCESSDENIED, !EqualSid(&m_userSid.Sid, tokenUser->User.Sid));
         THROW_HR_IF_MSG(
             E_ACCESSDENIED,
-            elevated != wsl::windows::common::security::IsTokenElevated(m_userToken.get()),
-            "OpenVMM DrvFs cannot switch elevation context after VM creation");
+            elevated && !wsl::windows::common::security::IsTokenElevated(m_userToken.get()),
+            "An unelevated OpenVMM VM cannot serve elevated DrvFs");
     }
 
     if (elevated)
@@ -2098,10 +2127,7 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
         {
             VmFileSystemDeviceRequest deviceRequest{};
             deviceRequest.Transport = VmVirtioFsDevice{shareName, VmVirtioFsLayout::SingleShare};
-            if (!openVmm)
-            {
-                deviceRequest.UserToken = wil::shared_handle{wsl::windows::common::wslutil::DuplicateHandle(UserToken)};
-            }
+            deviceRequest.UserToken = wil::shared_handle{wsl::windows::common::wslutil::DuplicateHandle(UserToken)};
             device = m_backend->CreateFileSystemDevice(deviceRequest);
 
             VmFileSystemShareRequest request{};
