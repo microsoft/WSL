@@ -19,6 +19,30 @@ Abstract:
 using wsl::linux::WslDistributionConfig;
 using namespace wsl::linux;
 
+WslDistributionManifest wsl::linux::ParseWslDistributionManifest()
+{
+    WslDistributionManifest manifest;
+    int defaultUid = 0;
+    ConfigKeyPresence defaultUidPresent{};
+    std::vector<ConfigKey> keys = {
+        ConfigKey("oobe.command", manifest.OobeCommand),
+        ConfigKey("oobe.defaultUid", defaultUid, &defaultUidPresent),
+        ConfigKey("oobe.defaultName", manifest.DefaultName),
+        ConfigKey("shortcut.icon", manifest.ShortcutIconPath),
+        ConfigKey("shortcut.enabled", manifest.GenerateShortcut),
+        ConfigKey("windowsterminal.profileTemplate", manifest.TerminalProfileTemplatePath),
+        ConfigKey("windowsterminal.enabled", manifest.GenerateTerminalProfile)};
+
+    wil::unique_file file{fopen(WSL_DISTRIBUTION_CONF, "r")};
+    ParseConfigFile(keys, file.get(), (CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES), STRING_TO_WSTRING(WSL_DISTRIBUTION_CONF));
+    if (defaultUidPresent == ConfigKeyPresence::Present)
+    {
+        manifest.DefaultUid = defaultUid;
+    }
+
+    return manifest;
+}
+
 WslDistributionConfig::WslDistributionConfig(const char* configFilePath)
 {
 

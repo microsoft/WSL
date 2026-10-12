@@ -349,11 +349,12 @@ private:
     // because the container ID isn't known until Docker assigns it.
     void WaitForConflictingCreateToComplete(std::unique_lock<std::mutex>& ContainersLock);
 
-    void OnContainerCreated(const std::string& ContainerId, std::int64_t Time) noexcept;
+    void OnContainerCreated(const std::string& ContainerId, std::int64_t TimeNano) noexcept;
 
     // Docker network notifications are forwarded to the event store as they arrive; the session's
     // network state is committed independently by the mutators under m_networksLock.
-    void OnNetworkEvent(const std::string& NetworkId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t Time) noexcept;
+    void OnNetworkEvent(const std::string& NetworkId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t TimeNano) noexcept;
+    void OnContainerAction(const std::string& ContainerId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t TimeNano) noexcept;
 
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
 
@@ -443,6 +444,9 @@ private:
 
     // N.B. Declared after everything OnNetworkEvent() touches so the callback is unregistered first.
     DockerEventTracker::EventTrackingReference m_networkEventTracking;
+
+    // N.B. Declared after everything OnContainerAction() touches so the callback is unregistered first.
+    DockerEventTracker::EventTrackingReference m_containerActionTracking;
 
     // User-provided handles that the session is currently doing IO on.
     std::mutex m_userHandlesLock;

@@ -337,6 +337,35 @@ void ConsommeNetworking::RefreshGuestConnection()
 
     std::wstring default_route = networkSettings->GetBestGatewayAddressString();
 
+    // Generate a fallback gateway address if the host doesn't have a usable one.
+    // See: https://github.com/microsoft/WSL/issues/41740
+    if (default_route.empty() || default_route == LX_INIT_UNSPECIFIED_ADDRESS)
+    {
+        const auto gateway = GetFallbackIpv4Gateway(networkSettings->PreferredIpAddress);
+        if (gateway.si_family == AF_INET)
+        {
+            std::erase_if(
+                networkSettings->Routes, [](const auto& existing) { return existing.Family == AF_INET && existing.IsDefault(); });
+
+            const auto route = EndpointRoute::DefaultRoute(AF_INET, gateway);
+            networkSettings->Routes.emplace(route);
+            default_route = route.NextHopString;
+
+            WSL_LOG(
+                "ConsommeGeneratedIpv4Gateway",
+                TraceLoggingValue(networkSettings->PreferredIpAddress.AddressString.c_str(), "ClientIp"),
+                TraceLoggingValue(networkSettings->PreferredIpAddress.PrefixLength, "PrefixLength"),
+                TraceLoggingValue(default_route.c_str(), "GatewayIp"));
+        }
+        else
+        {
+            WSL_LOG(
+                "ConsommeIpv4GatewayUnavailable",
+                TraceLoggingValue(networkSettings->PreferredIpAddress.AddressString.c_str(), "ClientIp"),
+                TraceLoggingValue(networkSettings->PreferredIpAddress.PrefixLength, "PrefixLength"));
+        }
+    }
+
     networking::DnsInfo currentDns{};
     if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::DnsTunneling))
     {
