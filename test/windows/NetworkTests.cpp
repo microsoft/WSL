@@ -2673,13 +2673,30 @@ class NetworkTests
 
         {
             // Validate that the guest received the correct data.
+            // N.B. Poll the pipe so lost traffic fails the test instead of blocking forever.
             std::string content(strlen(buffer), '\0');
 
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::minutes(1);
             DWORD totalRead{};
             while (totalRead < content.size())
             {
+                DWORD available{};
+                VERIFY_IS_TRUE(PeekNamedPipe(read.get(), nullptr, 0, nullptr, &available, nullptr));
+                if (available == 0)
+                {
+                    if (std::chrono::steady_clock::now() > deadline)
+                    {
+                        LogError("Timed out waiting for the guest to receive relayed data");
+                        VERIFY_FAIL();
+                    }
+
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    continue;
+                }
+
                 DWORD bytesRead{};
-                VERIFY_IS_TRUE(ReadFile(read.get(), content.data() + totalRead, static_cast<DWORD>(content.size()) - totalRead, &bytesRead, nullptr));
+                const DWORD toRead = std::min(available, static_cast<DWORD>(content.size()) - totalRead);
+                VERIFY_IS_TRUE(ReadFile(read.get(), content.data() + totalRead, toRead, &bytesRead, nullptr));
                 LogInfo("Read %lu bytes", bytesRead);
 
                 totalRead += bytesRead;
@@ -2693,7 +2710,14 @@ class NetworkTests
         WslKeepAlive keepAlive;
 
         ValidateLocalhostRelayTraffic(AF_INET);
-        ValidateLocalhostRelayTraffic(AF_INET6);
+        if (LxsstuOpenVmmMode())
+        {
+            LogInfo("Skipping IPv6 loopback forwarding on OpenVMM NAT");
+        }
+        else
+        {
+            ValidateLocalhostRelayTraffic(AF_INET6);
+        }
     }
 
     WSL2_TEST_METHOD(NatLocalhostRelayNoIpv6)

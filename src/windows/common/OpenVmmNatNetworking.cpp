@@ -43,6 +43,7 @@ void OpenVmmNatNetworking::FillInitialConfiguration(LX_MINI_INIT_NETWORKING_CONF
     Message.EnableDhcpClient = true;
     Message.DhcpTimeout = static_cast<int>(std::round(m_dhcpTimeout / 1000.0));
     Message.PortTrackerType = LxMiniInitPortTrackerTypeMirrored;
+    Message.EnableLoopbackRouting = m_enableLocalhostRelay;
 }
 
 void OpenVmmNatNetworking::StartPortTracker(wil::unique_socket&& Socket)
@@ -81,8 +82,8 @@ int OpenVmmNatNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int 
 
     if (loopback)
     {
-        // Only 127.0.0.1 and ::1 are intercepted; any other IPv4 loopback address stays on 'lo'.
-        if (!m_enableLocalhostRelay || (ipv4 && addr.Ipv4.sin_addr.s_addr != htonl(INADDR_LOOPBACK)))
+        // IPv6 loopback cannot be routed through eth0; any other IPv4 loopback address stays on 'lo'.
+        if (!m_enableLocalhostRelay || !ipv4 || addr.Ipv4.sin_addr.s_addr != htonl(INADDR_LOOPBACK))
         {
             return 0;
         }
@@ -124,6 +125,13 @@ int OpenVmmNatNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int 
 
     request.HostPort = port;
     request.GuestPort = port;
+    if (loopback)
+    {
+        request.GuestAddress.emplace();
+        request.GuestAddress->family = IpAddressFamily_V4;
+        std::copy_n(
+            reinterpret_cast<const BYTE*>(&addr.Ipv4.sin_addr), sizeof(addr.Ipv4.sin_addr), std::begin(request.GuestAddress->bytes));
+    }
 
     m_portBindings.emplace(key, m_backend.BindPort(m_device, request).Id);
     return 0;

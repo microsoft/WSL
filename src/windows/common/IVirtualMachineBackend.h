@@ -432,6 +432,8 @@ struct VmPortBindingRequest
     std::uint32_t ListenScopeId = 0;
     std::uint16_t HostPort = 0;
     std::uint16_t GuestPort = 0;
+    // Optional destination address inside the guest; only supported by OpenVMM.
+    std::optional<IpAddress> GuestAddress;
 };
 
 struct VmPortBinding
