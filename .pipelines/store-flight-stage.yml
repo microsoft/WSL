@@ -1,25 +1,23 @@
-# Flights the release to the WSL SelfHost flight group in Partner Center.
+# Flights the release to the WSL SelfHost flight group in Partner Center after a manual gate.
 #
-# This is transitional: Store distribution goes away once DCAT takes over, so this is a verbatim port of
-# what the release build used to do inline rather than an attempt to improve it.
+# This is transitional: Store distribution goes away once DCAT takes over.
 
 parameters:
   - name: bypassTests
     type: boolean
     default: false
 
-  - name: publishPackage
-    type: boolean
-    default: false
-
-  - name: pushToStore
-    type: boolean
-    default: true
-
 stages:
+  - template: publish-gate-stage.yml
+    parameters:
+      name: gate_store_flight
+      displayName: Gate - Microsoft Store
+      releaseEnvironment: Production
+
   - stage: store_flight
     displayName: Microsoft Store - SelfHost flight
     dependsOn:
+      - gate_store_flight
       - package
       - ${{ if eq(parameters.bypassTests, false) }}:
           - test
@@ -48,7 +46,6 @@ stages:
         steps:
           - task: MS-RDX-MRO.windows-store-publish.flight-task.store-flight@3
             displayName: 'Flight StoreBroker Package to Partner Center - WSL SelfHost Flight Group'
-            condition: and(succeeded(), eq('${{ parameters.publishPackage }}', true), eq('${{ parameters.pushToStore }}', true))
             inputs:
               serviceEndpoint: 'AzureConnection-StoreBroker-WIF'
               appId: $(AppId)
