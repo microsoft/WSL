@@ -4446,6 +4446,192 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerGpuLinkerCache)
+    {
+        auto contextDir = std::filesystem::current_path() / "build-context-gpu-linker-cache";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-gpu-wrapped-ldconfig:latest", WSLCDeleteImageFlagsForce).first);
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-gpu-no-ldconfig:latest", WSLCDeleteImageFlagsForce).first);
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-gpu-musl-default-path:latest", WSLCDeleteImageFlagsForce).first);
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-gpu-musl-custom-path:latest", WSLCDeleteImageFlagsForce).first);
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-gpu-musl-configured-path:latest", WSLCDeleteImageFlagsForce).first);
+
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        // An image whose ldconfig records the capabilities it runs with, then runs the real ldconfig.
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM debian:latest\n";
+            dockerfile << "RUN mv /sbin/ldconfig /sbin/ldconfig.image\n";
+            dockerfile << "COPY ldconfig /sbin/ldconfig\n";
+            dockerfile << "RUN chmod 755 /sbin/ldconfig\n";
+        }
+
+        {
+            std::ofstream ldconfig(contextDir / "ldconfig", std::ios::binary);
+            ldconfig << "#!/bin/sh\n";
+            ldconfig << "grep CapEff /proc/self/status > /image-ldconfig-ran\n";
+            ldconfig << "exec /sbin/ldconfig.image \"$@\"\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-gpu-wrapped-ldconfig:latest"));
+
+        // A glibc image without ldconfig, a linker cache, or an ld.so.conf, like some minimal images.
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM debian:latest\n";
+            dockerfile << "RUN rm -f /sbin/ldconfig /sbin/ldconfig.real /etc/ld.so.cache /etc/ld.so.conf\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-gpu-no-ldconfig:latest"));
+
+        constexpr auto c_muslArchitecture = wsl::shared::Arm64 ? "aarch64" : "x86_64";
+        const auto muslPathFile = std::format("/etc/ld-musl-{}.path", c_muslArchitecture);
+        const auto muslLoader = std::format("/lib/ld-musl-{}.so.1", c_muslArchitecture);
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM alpine:latest\n";
+            dockerfile << std::format("RUN rm -f {}\n", muslPathFile);
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-gpu-musl-default-path:latest"));
+
+        // /custom/lib represents an image-specific search directory; it needn't exist for the file-preservation check.
+        // Omit the final newline to verify that GPU setup adds a separator before appending its directory.
+        {
+            std::ofstream libraryPaths(contextDir / "musl-library-path", std::ios::binary);
+            libraryPaths << "/custom/lib:/lib:/usr/local/lib:/usr/lib";
+        }
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM alpine:latest\n";
+            dockerfile << std::format("COPY musl-library-path {}\n", muslPathFile);
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-gpu-musl-custom-path:latest"));
+
+        // An already-configured image whose path file is readable only by its owner.
+        {
+            std::ofstream libraryPaths(contextDir / "musl-library-path", std::ios::binary);
+            libraryPaths << "/custom/lib:/usr/lib/wsl/lib:/lib:/usr/local/lib:/usr/lib\n";
+        }
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM alpine:latest\n";
+            dockerfile << std::format("COPY musl-library-path {}\n", muslPathFile);
+            dockerfile << std::format("RUN chmod u=rw,go= {}\n", muslPathFile);
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-gpu-musl-configured-path:latest"));
+
+        auto restore = ResetTestSession();
+
+        auto settings = GetDefaultSessionSettings(L"container-gpu-linker-cache-test", true);
+        WI_SetFlag(settings.FeatureFlags, WslcFeatureFlagsGPU);
+
+        auto session = CreateSession(settings);
+
+        auto launch = [&](LPCSTR Image, LPCSTR Name, LPCSTR User = nullptr) {
+            WSLCContainerLauncher launcher(Image, Name, {"sleep", "99999"});
+            launcher.SetContainerFlags(WSLCContainerFlagsGpu);
+            if (User != nullptr)
+            {
+                launcher.SetUser(User);
+            }
+
+            return launcher.Launch(*session);
+        };
+
+        auto expect = [&](RunningWSLCContainer& Container,
+                          const std::vector<std::string>& Command,
+                          int ExitCode,
+                          const std::map<int, std::string>& ExpectedOutput = {}) {
+            auto process = WSLCProcessLauncher({}, Command).Launch(Container.Get());
+            ValidateProcessOutput(process, ExpectedOutput, ExitCode);
+        };
+
+        auto expectGpuLibrariesCached = [&](RunningWSLCContainer& Container) {
+            expect(Container, {"grep", "-a", "-q", "/usr/lib/wsl/lib/", "/etc/ld.so.cache"}, 0);
+        };
+
+        auto expectInitDeleted = [&](RunningWSLCContainer& Container) {
+            expect(Container, {"test", "-e", LX_INIT_WSLC_GPU_START_HOOK_PATH}, 1);
+        };
+
+        auto expectMuslLibraryPath = [&](RunningWSLCContainer& Container, const std::string& ExpectedPaths) {
+            expect(Container, {"cat", muslPathFile}, 0, {{1, ExpectedPaths}});
+            expect(Container, {"stat", "-c", "%a", muslPathFile}, 0, {{1, "644\n"}});
+            expect(Container, {muslLoader, "--list", "/usr/lib/wsl/lib/libd3d12core.so"}, 0);
+            expectInitDeleted(Container);
+        };
+
+        // Validate that the image's own ldconfig only runs from the sandboxed startContainer hook, with no more
+        // capabilities than the container itself. The image's ldconfig records its capabilities for this check.
+        {
+            auto container = launch("wslc-test-gpu-wrapped-ldconfig:latest", "test-container-gpu-image-ldconfig");
+
+            const auto capabilities =
+                WSLCProcessLauncher({}, {"grep", "CapEff", "/proc/self/status"}).Launch(container.Get()).WaitAndCaptureOutput();
+            expect(container, {"cat", "/image-ldconfig-ran"}, 0, {{1, capabilities.Output.at(1)}});
+
+            expectGpuLibrariesCached(container);
+            expectInitDeleted(container);
+        }
+
+        // Validate that non-root containers, whose own ldconfig can't write the cache, get it from the VM's ldconfig
+        // instead, and that the image's ldconfig doesn't run.
+        {
+            auto container = launch("wslc-test-gpu-wrapped-ldconfig:latest", "test-container-gpu-image-ldconfig-nobody", "nobody");
+
+            expect(container, {"test", "-e", "/image-ldconfig-ran"}, 1);
+            expectGpuLibrariesCached(container);
+            expectInitDeleted(container);
+        }
+
+        // Validate that images without ldconfig get the cache from the VM's ldconfig, and that it includes the GPU
+        // libraries even without an ld.so.conf to include ld.wsl.conf.
+        {
+            auto container = launch("wslc-test-gpu-no-ldconfig:latest", "test-container-gpu-no-ldconfig");
+
+            expectGpuLibrariesCached(container);
+            expectInitDeleted(container);
+        }
+
+        // Preserve musl's default search directories when adding GPU discovery to an image without a .path file.
+        {
+            auto container = launch("wslc-test-gpu-musl-default-path:latest", "test-container-gpu-musl");
+            expectMuslLibraryPath(container, "/lib\n/usr/local/lib\n/usr/lib\n/usr/lib/wsl/lib\n");
+        }
+
+        // Keep the existing paths in order, adding a separator before the GPU directory.
+        {
+            auto container = launch("wslc-test-gpu-musl-custom-path:latest", "test-container-gpu-musl-custom-path");
+            expectMuslLibraryPath(container, "/custom/lib:/lib:/usr/local/lib:/usr/lib\n/usr/lib/wsl/lib\n");
+        }
+
+        // Keep an already-configured list unchanged. The image made the file owner-readable only;
+        // setup must still make it readable by non-root users.
+        {
+            auto container = launch("wslc-test-gpu-musl-configured-path:latest", "test-container-gpu-musl-configured-path");
+            expectMuslLibraryPath(container, "/custom/lib:/usr/lib/wsl/lib:/lib:/usr/local/lib:/usr/lib\n");
+        }
+
+        // Validate that images with no shell, ldconfig, or /etc start. hello-world only contains a static program.
+        {
+            WSLCContainerLauncher launcher("hello-world:latest", "test-container-gpu-scratch");
+            launcher.SetContainerFlags(WSLCContainerFlagsGpu);
+
+            auto container = launcher.Launch(*session);
+            ValidateContainerOutput(container, {}, 0);
+        }
+    }
+
     WSLC_TEST_METHOD(Modules)
     {
         // Sanity check.

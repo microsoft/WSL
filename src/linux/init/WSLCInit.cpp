@@ -28,6 +28,8 @@ Abstract:
 #include <sys/socket.h>
 #include <sys/utsname.h>
 #include <sys/signalfd.h>
+#include <sys/sendfile.h>
+#include <sys/statvfs.h>
 #include <arpa/inet.h>
 
 #include <pty.h>
@@ -93,12 +95,19 @@ try
     hook.path = "/" LX_INIT_WSLC_GPU_HOOK;
     hook.args = {LX_INIT_WSLC_GPU_HOOK};
 
+    // startContainer hooks run inside the container, after its user, capabilities and seccomp filter are applied.
+    wsl::shared::cdi::Hook startHook{};
+    startHook.hookName = "startContainer";
+    startHook.path = LX_INIT_WSLC_GPU_START_HOOK_PATH;
+    startHook.args = {LX_INIT_WSLC_GPU_START_HOOK};
+
     wsl::shared::cdi::Device gpu{};
     gpu.name = "gpu";
     gpu.containerEdits.deviceNodes.push_back(std::move(dxg));
     gpu.containerEdits.mounts.push_back(std::move(libs));
     gpu.containerEdits.mounts.push_back(std::move(drivers));
     gpu.containerEdits.hooks.push_back(std::move(hook));
+    gpu.containerEdits.hooks.push_back(std::move(startHook));
 
     wsl::shared::cdi::Spec spec{};
     spec.cdiVersion = "0.6.0";
@@ -126,6 +135,132 @@ try
 }
 CATCH_LOG()
 
+// The image's ldconfig is preferred, but it runs sandboxed, where it can't write the cache as non-root or on a
+// read-only root. Must be called from within the container's root.
+bool ShouldImageLdconfigRebuildCache(uid_t ContainerUid, bool ReadOnlyRoot)
+{
+    return std::filesystem::exists(LDCONFIG_COMMAND) && ContainerUid == 0 && !ReadOnlyRoot;
+}
+
+bool IsRootReadOnly()
+{
+    struct statvfs rootInfo{};
+    THROW_LAST_ERROR_IF(statvfs("/", &rootInfo) < 0);
+    return (rootInfo.f_flag & ST_RDONLY) != 0;
+}
+
+bool HasGpuLibraryDirectory(std::string_view Paths)
+{
+    // musl separates entries with ':' or '\n'. Compare whole entries, not similarly named directories.
+    while (!Paths.empty())
+    {
+        const auto separator = Paths.find_first_of(":\n");
+        const auto directory = Paths.substr(0, separator);
+        if (directory == LXSS_LIB_PATH)
+        {
+            return true;
+        }
+        if (separator == std::string_view::npos)
+        {
+            return false;
+        }
+
+        Paths.remove_prefix(separator + 1);
+    }
+
+    return false;
+}
+
+// musl ignores the glibc cache; its loader reads library directories from an architecture-specific .path file.
+void ConfigureMuslLibraryPath()
+{
+    constexpr auto c_defaultMuslLibraryPaths = "/lib\n/usr/local/lib\n/usr/lib\n";
+    constexpr auto c_architecture = wsl::shared::Arm64 ? "aarch64" : "x86_64";
+
+    const auto muslLoader = std::format("/lib/ld-musl-{}.so.1", c_architecture);
+    if (!std::filesystem::exists(muslLoader))
+    {
+        return;
+    }
+
+    const auto pathFile = std::format("/etc/ld-musl-{}.path", c_architecture);
+    const bool pathFileExists = std::filesystem::exists(pathFile);
+    wil::unique_fd file{open(pathFile.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)};
+    THROW_LAST_ERROR_IF(!file);
+    THROW_LAST_ERROR_IF(fchmod(file.get(), S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) < 0);
+
+    std::string pathsToAppend;
+    if (pathFileExists)
+    {
+        const auto existingPaths = UtilReadFileContent(pathFile);
+
+        // Docker can recreate the runtime task on restart; don't append the same directory each time.
+        if (HasGpuLibraryDirectory(existingPaths))
+        {
+            return;
+        }
+
+        // O_APPEND doesn't insert a separator; without one, the GPU directory would join the last existing path.
+        if (!existingPaths.empty() && existingPaths.back() != '\n' && existingPaths.back() != ':')
+        {
+            pathsToAppend = "\n";
+        }
+    }
+    else
+    {
+        // Without a .path file, musl searches its built-in defaults. With one, it uses the file's contents instead.
+        // Include the defaults so creating the file for GPU discovery doesn't hide normal system libraries.
+        pathsToAppend = c_defaultMuslLibraryPaths;
+    }
+
+    pathsToAppend += LXSS_LIB_PATH "\n";
+    THROW_LAST_ERROR_IF(UtilWriteStringView(file.get(), pathsToAppend) < 0);
+}
+
+[[noreturn]] void ExecVmLdconfig(int VmLdconfig)
+{
+    // Passing the folder caches the GPU libraries even in images without an ld.so.conf to include ld.wsl.conf.
+    char command[] = "ldconfig";
+    char libraryPath[] = LXSS_LIB_PATH;
+    char* arguments[] = {command, libraryPath, nullptr};
+    char* environment[] = {nullptr};
+    syscall(SYS_execveat, VmLdconfig, "", arguments, environment, AT_EMPTY_PATH);
+    THROW_LAST_ERROR();
+}
+
+[[noreturn]] void ExecImageLdconfig()
+{
+    // Alpine's ldconfig exits with 1 when no folders are given.
+    const char* const arguments[] = {LDCONFIG_COMMAND, LXSS_LIB_PATH, nullptr};
+    execv(LDCONFIG_COMMAND, const_cast<char* const*>(arguments));
+    THROW_LAST_ERROR();
+}
+
+// init is copied rather than mounted because the startContainer hook can't unmount it, but it can delete a file
+// in a folder its user owns. The folder is in memory so this works on read-only roots too.
+void CopyInitForStartHook(int Init, uid_t ContainerUid, gid_t ContainerGid)
+{
+    constexpr mode_t c_directoryMode = S_IRWXU;
+    constexpr mode_t c_executableMode = S_IRUSR | S_IXUSR;
+    THROW_LAST_ERROR_IF(mkdir(LX_INIT_WSLC_GPU_START_HOOK_DIRECTORY, c_directoryMode) < 0 && errno != EEXIST);
+
+    const auto options = std::format("mode={:#o},uid={},gid={}", c_directoryMode, ContainerUid, ContainerGid);
+    THROW_LAST_ERROR_IF(mount("tmpfs", LX_INIT_WSLC_GPU_START_HOOK_DIRECTORY, "tmpfs", MS_NOSUID | MS_NODEV, options.c_str()) < 0);
+
+    wil::unique_fd copy{open(LX_INIT_WSLC_GPU_START_HOOK_PATH, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, c_executableMode)};
+    THROW_LAST_ERROR_IF(!copy);
+
+    ssize_t bytesCopied{};
+    do
+    {
+        bytesCopied = sendfile(copy.get(), Init, nullptr, 1024 * 1024);
+        THROW_LAST_ERROR_IF(bytesCopied < 0);
+    } while (bytesCopied > 0);
+
+    THROW_LAST_ERROR_IF(fchown(copy.get(), ContainerUid, ContainerGid) < 0);
+}
+
+// createContainer hook. Runs as root before the container's restrictions apply, so it must not run image code.
 int WslcGpuHookEntry()
 try
 {
@@ -146,14 +281,27 @@ try
     rootfsPath = std::filesystem::canonical(rootfsPath);
     THROW_ERRNO_IF(EINVAL, rootfsPath == "/");
 
-    THROW_LAST_ERROR_IF(chroot(rootfsPath.c_str()) < 0);
+    // runc applies the container's user and read-only root after this hook, so read them from the spec.
+    const uid_t containerUid = spec.at("process").at("user").at("uid").get<uid_t>();
+    const gid_t containerGid = spec.at("process").at("user").at("gid").get<gid_t>();
+    const bool readOnlyRoot = spec.at("root").value("readonly", false);
+
+    // After chroot, these paths would be the image's.
+    wil::unique_fd vmInit{open(LX_INIT_PATH, O_RDONLY | O_CLOEXEC)};
+    THROW_LAST_ERROR_IF(!vmInit);
+
+    wil::unique_fd vmLdconfig{open(LDCONFIG_COMMAND, O_RDONLY | O_CLOEXEC)};
+    THROW_LAST_ERROR_IF(!vmLdconfig);
+
+    // chroot alone would leave the working directory outside the new root.
+    THROW_LAST_ERROR_IF(chdir(rootfsPath.c_str()) < 0);
+    THROW_LAST_ERROR_IF(chroot(".") < 0);
+
+    CopyInitForStartHook(vmInit.get(), containerUid, containerGid);
 
     THROW_LAST_ERROR_IF(UtilMkdirPath("/etc/ld.so.conf.d", 0755) < 0);
     THROW_LAST_ERROR_IF(WriteToFile("/etc/ld.so.conf.d/ld.wsl.conf", LXSS_LIB_PATH "\n", O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC) < 0);
-
-    // Run the container's own ldconfig so it updates /etc/ld.so.cache.
-    const char* const ldArgv[] = {LDCONFIG_COMMAND, nullptr};
-    THROW_LAST_ERROR_IF(UtilCreateProcessAndWait(ldArgv[0], ldArgv) < 0);
+    ConfigureMuslLibraryPath();
 
     constexpr auto c_binPath = "/usr/bin";
     if (std::filesystem::is_directory(LXSS_LIB_PATH))
@@ -172,6 +320,30 @@ try
                 LOG_ERROR("UtilMountFile({}, {}) failed {}", entry.path().c_str(), target, errno);
             }
         }
+    }
+
+    if (!ShouldImageLdconfigRebuildCache(containerUid, readOnlyRoot))
+    {
+        ExecVmLdconfig(vmLdconfig.get());
+    }
+
+    return 0;
+}
+CATCH_RETURN_ERRNO()
+
+// startContainer hook. Runs inside the container, as its user, with its restrictions applied.
+int WslcGpuStartHookEntry()
+try
+{
+    // This process keeps running after its file is deleted.
+    if (unlink(LX_INIT_WSLC_GPU_START_HOOK_PATH) < 0)
+    {
+        LOG_ERROR("unlink({}) failed {}", LX_INIT_WSLC_GPU_START_HOOK_PATH, errno);
+    }
+
+    if (ShouldImageLdconfigRebuildCache(geteuid(), IsRootReadOnly()))
+    {
+        ExecImageLdconfig();
     }
 
     return 0;
