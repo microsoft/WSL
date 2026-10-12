@@ -3461,7 +3461,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Tallennetun kuvan polku</value>
   </data>
   <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
-    <value>Path to the build context directory (use "-" to read a tar archive or Dockerfile from stdin)</value>
+    <value>Polku koontikontekstihakemistoon (käytä komentoa -, kun haluat lukea tar-arkiston tai Dockerfile-tiedoston stdinistä)</value>
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
@@ -3868,7 +3868,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Kuvaa ei voi kirjoittaa päätteeseen. Käytä -o-asetusta tai ohjaa stdout uudelleen.</value>
   </data>
   <data name="WSLCCLI_BuildStdinIsTerminalError" xml:space="preserve">
-    <value>Cannot read build input from terminal. Pipe a Dockerfile or tar archive to stdin.</value>
+    <value>Koontisyötettä ei voi lukea päätelaitteesta. Ohjaa Dockerfile tai tar-arkisto stdin:iin.</value>
     <comment>{Locked="Dockerfile"}{Locked="stdin"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">

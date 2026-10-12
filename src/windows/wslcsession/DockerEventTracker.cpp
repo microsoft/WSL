@@ -233,21 +233,7 @@ void DockerEventTracker::OnContainerAction(
 
 void DockerEventTracker::OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano)
 {
-    static std::map<std::string, VolumeEvent> events{{"create", VolumeEvent::Create}, {"destroy", VolumeEvent::Destroy}};
-
-    auto it = events.find(action);
-    if (it == events.end())
-    {
-        return; // Event is not tracked, dropped.
-    }
-
-    auto actor = parsed.find("Actor");
-    THROW_HR_IF_MSG(E_INVALIDARG, actor == parsed.end(), "Missing Actor in volume event");
-
-    auto id = actor->find("ID");
-    THROW_HR_IF_MSG(E_INVALIDARG, id == actor->end(), "Missing Actor.ID in volume event");
-
-    auto volumeName = id->get<std::string>();
+    const auto [volumeName, attributes] = ParseResourceActor(parsed, action, "volume");
 
     std::vector<std::shared_ptr<VolumeCallback>> callbacks;
     {
@@ -255,32 +241,12 @@ void DockerEventTracker::OnVolumeEvent(const nlohmann::json& parsed, const std::
         callbacks = m_volumeCallbacks;
     }
 
-    InvokeCallbacks(callbacks, [&](const VolumeCallback& e) { e.Callback(volumeName, it->second, eventTimeNano); });
+    InvokeCallbacks(callbacks, [&](const VolumeCallback& e) { e.Callback(volumeName, action, attributes, eventTimeNano); });
 }
 
 void DockerEventTracker::OnNetworkEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano)
 {
-    auto actor = parsed.find("Actor");
-    THROW_HR_IF_MSG(E_INVALIDARG, actor == parsed.end(), "Missing Actor in network event");
-
-    std::string networkId;
-    auto id = actor->find("ID");
-    if (id != actor->end())
-    {
-        networkId = id->get<std::string>();
-    }
-    else
-    {
-        // Docker's aggregate prune event reports no network.
-        THROW_HR_IF_MSG(E_INVALIDARG, action != "prune", "Missing Actor.ID in network event");
-    }
-
-    std::map<std::string, std::string> attributes;
-    auto attributesEntry = actor->find("Attributes");
-    if (attributesEntry != actor->end())
-    {
-        attributes = attributesEntry->get<std::map<std::string, std::string>>();
-    }
+    const auto [networkId, attributes] = ParseResourceActor(parsed, action, "network");
 
     std::vector<std::shared_ptr<NetworkCallback>> callbacks;
     {
@@ -290,6 +256,31 @@ void DockerEventTracker::OnNetworkEvent(const nlohmann::json& parsed, const std:
 
     InvokeCallbacks(
         callbacks, [&](const NetworkCallback& callback) { callback.Callback(networkId, action, attributes, eventTimeNano); });
+}
+
+std::pair<std::string, std::map<std::string, std::string>> DockerEventTracker::ParseResourceActor(
+    const nlohmann::json& parsed, const std::string& action, const char* type)
+{
+    auto actor = parsed.find("Actor");
+    THROW_HR_IF_MSG(E_INVALIDARG, actor == parsed.end(), "Missing Actor in %hs event", type);
+
+    std::string id;
+    if (const auto idEntry = actor->find("ID"); idEntry != actor->end())
+    {
+        id = idEntry->get<std::string>();
+    }
+    else
+    {
+        THROW_HR_IF_MSG(E_INVALIDARG, action != "prune", "Missing Actor.ID in %hs event", type);
+    }
+
+    std::map<std::string, std::string> attributes;
+    if (const auto attributesEntry = actor->find("Attributes"); attributesEntry != actor->end())
+    {
+        attributes = attributesEntry->get<std::map<std::string, std::string>>();
+    }
+
+    return {std::move(id), std::move(attributes)};
 }
 
 void DockerEventTracker::OnContainerCreated(const nlohmann::json& parsed, std::int64_t eventTimeNano)

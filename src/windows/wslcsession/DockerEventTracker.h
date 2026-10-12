@@ -67,7 +67,8 @@ public:
 
     using ContainerStateChangeCallback =
         std::function<void(ContainerEvent, std::optional<int>, const std::map<std::string, std::string>&, std::int64_t)>;
-    using VolumeEventCallback = std::function<void(const std::string&, VolumeEvent, std::int64_t)>;
+    using VolumeEventCallback =
+        std::function<void(const std::string&, const std::string&, const std::map<std::string, std::string>&, std::int64_t)>;
     using NetworkEventCallback =
         std::function<void(const std::string&, const std::string&, const std::map<std::string, std::string>&, std::int64_t)>;
     using ContainerCreateCallback = std::function<void(const std::string& ContainerId, std::int64_t TimeNano)>;
@@ -101,6 +102,10 @@ private:
     void OnContainerCreated(const nlohmann::json& parsed, std::int64_t eventTimeNano);
     void OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano);
     void OnNetworkEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano);
+
+    // Volume and network events identify their resource by Actor.ID, except Docker's aggregate prune event, which reports none.
+    static std::pair<std::string, std::map<std::string, std::string>> ParseResourceActor(
+        const nlohmann::json& parsed, const std::string& action, const char* type);
 
     // Callbacks are invoked without holding m_lock so that a callback can register or unregister callbacks, and so
     // that a callback taking its own lock can't invert with a thread that registers a callback under that same lock.

@@ -13,7 +13,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
-#include "windows/Common.h"
+#include "Common.h"
 #include "ContainerModel.h"
 
 using namespace wsl::windows::wslc::models;

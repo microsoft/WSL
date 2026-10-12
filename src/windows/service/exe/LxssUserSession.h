@@ -718,6 +718,7 @@ private:
 
     /// <summary>
     /// Validates that the given path or name is not already in use by a registered distribution.
+    /// N.B. Enumeration may unregister orphaned distributions and terminate their instances.
     /// </summary>
     _Requires_lock_held_(m_instanceLock)
     void _ValidateDistributionNameAndPathNotInUse(

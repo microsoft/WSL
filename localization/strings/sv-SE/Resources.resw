@@ -2452,7 +2452,7 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcBuildStdinContextAndDockerfile" xml:space="preserve">
-    <value>Can't use stdin for both the build context and the Dockerfile.</value>
+    <value>Det går inte att använda stdin för både byggkontexten och Dockerfile.</value>
     <comment>{Locked="stdin"}{Locked="Dockerfile"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
@@ -3462,7 +3462,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Sökväg till den sparade bilden</value>
   </data>
   <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
-    <value>Path to the build context directory (use "-" to read a tar archive or Dockerfile from stdin)</value>
+    <value>Sökväg till byggkontextkatalogen (använd "-" för att läsa ett tar-arkiv eller Dockerfile från stdin)</value>
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
@@ -3869,7 +3869,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Det går inte att skriva bilden till terminalen. Använd alternativet -o eller omdirigera stdout.</value>
   </data>
   <data name="WSLCCLI_BuildStdinIsTerminalError" xml:space="preserve">
-    <value>Cannot read build input from terminal. Pipe a Dockerfile or tar archive to stdin.</value>
+    <value>Det går inte att läsa kompileringsindata från terminalen. Skicka en Dockerfile- eller tar-arkivfil till stdin.</value>
     <comment>{Locked="Dockerfile"}{Locked="stdin"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
