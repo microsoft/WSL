@@ -919,6 +919,14 @@ Falling back to NAT networking.</value>
     <value>IPv6 is disabled on the host in an unsupported way (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>Mirrored networking is using a smaller ephemeral port range ({} ports instead of {}). This may limit the number of simultaneous connections.</value>
+    <comment>{FixedPlaceholder="{}"}The first placeholder is the allocated port count; the second is the preferred port count.</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>Mirrored networking could not reserve the minimum contiguous range of {} TCP and UDP ports. Check Windows port usage and exclusions.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="TCP"}{Locked="UDP"}The placeholder is the minimum port count.</comment>
+  </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Hyper-V firewall is not supported</value>
   </data>
