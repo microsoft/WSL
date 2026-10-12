@@ -131,7 +131,11 @@ public:
         _In_ BOOL AllTags,
         _In_opt_ IProgressCallback* ProgressCallback,
         _In_opt_ IWarningCallback* WarningCallback) override;
-    IFACEMETHOD(BuildImage)(_In_ const WSLCBuildImageOptions* Options, _In_opt_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
+    IFACEMETHOD(BuildImage)(
+        _In_ const WSLCBuildImageOptions* Options,
+        _In_opt_ IProgressCallback* ProgressCallback,
+        _In_opt_ IWarningCallback* WarningCallback,
+        _In_opt_ HANDLE CancelEvent) override;
     IFACEMETHOD(LoadImage)(
         _In_ const WSLCHandle ImageHandle,
         _In_ ULONGLONG ContentLength,

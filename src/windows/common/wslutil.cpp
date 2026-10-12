@@ -1712,7 +1712,7 @@ std::string wsl::windows::common::wslutil::Base64Decode(const std::string& encod
 
 bool wsl::windows::common::wslutil::DockerfileHeredocContainsCarriageReturn(std::string_view Dockerfile)
 {
-    // Find the first heredoc opener, a word of the form [fd]<<[-]NAME.
+    // Find each heredoc opener, a word of the form [fd]<<[-]NAME.
     for (auto position = Dockerfile.find("<<"); position != std::string_view::npos; position = Dockerfile.find("<<", position + 1))
     {
         auto wordStart = position;
@@ -1737,9 +1737,29 @@ bool wsl::windows::common::wslutil::DockerfileHeredocContainsCarriageReturn(std:
             continue;
         }
 
-        // The heredoc body starts on the line after the opener.
-        const auto bodyStart = Dockerfile.find('\n', nameStart);
-        return bodyStart != std::string_view::npos && Dockerfile.find('\r', bodyStart) != std::string_view::npos;
+        auto name = Dockerfile.substr(nameStart, Dockerfile.find_first_of(" \t\r\n", nameStart) - nameStart);
+        if (name.size() >= 2 && (name.front() == '\'' || name.front() == '"') && name.back() == name.front())
+        {
+            name = name.substr(1, name.size() - 2);
+        }
+
+        // The heredoc body starts on the line after the opener and ends at a line containing only the name.
+        for (auto lineEnd = Dockerfile.find('\n', nameStart); lineEnd != std::string_view::npos;)
+        {
+            const auto lineStart = lineEnd + 1;
+            lineEnd = Dockerfile.find('\n', lineStart);
+            auto line = Dockerfile.substr(lineStart, lineEnd == std::string_view::npos ? std::string_view::npos : lineEnd - lineStart);
+            if (line.find('\r') != std::string_view::npos)
+            {
+                return true;
+            }
+
+            line.remove_prefix(std::min(line.find_first_not_of('\t'), line.size()));
+            if (line == name)
+            {
+                break;
+            }
+        }
     }
 
     return false;

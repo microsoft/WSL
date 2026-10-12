@@ -390,15 +390,18 @@ class StringUnitTests
             {"", false},
             {"FROM a\r\nRUN echo hi\r\n", false},
             {"RUN <<EOF\r\necho hi\nEOF\n", false},
+            {"RUN <<EOF\ntrue\nEOF\nRUN false\r\n", false},
+            {"RUN <<'EOF'\ntrue\nEOF\nRUN false\r\n", false},
+            {"RUN <<-EOF\n\ttrue\n\tEOF\nRUN false\r\n", false},
             {"RUN cat << EOF\r\nRUN echo hi\r\n", false},
             {"RUN echo a<<EOF\r\nRUN echo hi\r\n", false},
             {"RUN cat <<<EOF\r\nRUN echo hi\r\n", false},
         };
 
-        for (const auto& [Dockerfile, Expected] : TestCases)
+        for (const auto& [dockerfile, expected] : TestCases)
         {
-            LogInfo("Dockerfile: %hs", Dockerfile.c_str());
-            VERIFY_ARE_EQUAL(Expected, wsl::windows::common::wslutil::DockerfileHeredocContainsCarriageReturn(Dockerfile));
+            LogInfo("Dockerfile: %hs", dockerfile.c_str());
+            VERIFY_ARE_EQUAL(expected, wsl::windows::common::wslutil::DockerfileHeredocContainsCarriageReturn(dockerfile));
         }
     }
 };

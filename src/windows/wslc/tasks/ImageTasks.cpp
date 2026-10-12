@@ -175,7 +175,7 @@ void BuildImage(CLIExecutionContext& context)
     auto cancelEvent = context.CreateCancelEvent();
     BuildImageCallback callback(context.Terminal, cancelEvent, context.Args.GetValue<ArgType::Verbose>(), progressMode);
     services::ImageService::Build(
-        session, contextPath, tags, buildArgs, labels, secrets, dockerfilePath, target, output, iidFilePath, flags, &callback, cancelEvent);
+        context.Terminal, session, contextPath, tags, buildArgs, labels, secrets, dockerfilePath, target, output, iidFilePath, flags, &callback, cancelEvent);
 }
 
 void GetImages(CLIExecutionContext& context)

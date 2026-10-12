@@ -1030,10 +1030,10 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::BuildImage(const WSLCBuildImageOptions* Options, IProgressCallback* ProgressCallback, HANDLE CancelEvent)
+HRESULT WSLCSession::BuildImage(const WSLCBuildImageOptions* Options, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback, HANDLE CancelEvent)
 try
 {
-    WSLCExecutionContext context(this);
+    WSLCExecutionContext context(this, WarningCallback);
 
     RETURN_HR_IF_NULL(E_POINTER, Options);
 
@@ -1632,10 +1632,10 @@ try
     // Stripping \r normalizes to plain \n which becomes \r\n once via text-mode
     // translation.
     std::erase(allOutput, '\r');
-    // Only hint when the failing step's output references a heredoc.
+    // Only warn when the failing step's output references a heredoc.
     if (exitCode != 0 && allOutput.find("<<") != std::string::npos && wslutil::DockerfileHeredocContainsCarriageReturn(dockerfileContent))
     {
-        allOutput += "\n" + wsl::shared::string::WideToMultiByte(Localization::MessageWslcBuildHeredocCarriageReturn());
+        EMIT_USER_WARNING(Localization::MessageWslcBuildHeredocCarriageReturn());
     }
 
     THROW_HR_WITH_USER_ERROR_IF(E_FAIL, allOutput, exitCode != 0);

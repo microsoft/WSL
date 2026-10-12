@@ -1830,7 +1830,11 @@ class WSLCTests
         std::string& m_output;
     };
 
-    HRESULT BuildImageFromContext(const std::filesystem::path& contextDir, const WSLCBuildImageOptions* options, IProgressCallback* callback = nullptr)
+    HRESULT BuildImageFromContext(
+        const std::filesystem::path& contextDir,
+        const WSLCBuildImageOptions* options,
+        IProgressCallback* callback = nullptr,
+        IWarningCallback* warningCallback = nullptr)
     {
         auto dockerfileHandle = wil::open_file((contextDir / "Dockerfile").c_str());
 
@@ -1839,7 +1843,7 @@ class WSLCTests
         optionsCopy.ContextPath = contextPathStr.c_str();
         optionsCopy.DockerfileHandle = ToCOMInputHandle(dockerfileHandle.get());
 
-        auto buildResult = m_defaultSession->BuildImage(&optionsCopy, callback, nullptr);
+        auto buildResult = m_defaultSession->BuildImage(&optionsCopy, callback, warningCallback, nullptr);
 
         if (FAILED(buildResult))
         {
@@ -1849,13 +1853,13 @@ class WSLCTests
         return buildResult;
     }
 
-    HRESULT BuildImageFromContext(const std::filesystem::path& contextDir, const char* imageTag)
+    HRESULT BuildImageFromContext(const std::filesystem::path& contextDir, const char* imageTag, IWarningCallback* warningCallback = nullptr)
     {
         LPCSTR tag = imageTag;
         WSLCBuildImageOptions options{
             .Tags = {&tag, 1},
         };
-        return BuildImageFromContext(contextDir, &options);
+        return BuildImageFromContext(contextDir, &options, nullptr, warningCallback);
     }
 
     WSLC_TEST_METHOD(BuildImage)
@@ -2329,24 +2333,26 @@ class WSLCTests
         });
 
         const auto hint = wsl::shared::Localization::MessageWslcBuildHeredocCarriageReturn();
-        auto buildAndGetError = [&](const std::string& content) {
+        auto buildAndCheckWarning = [&](const std::string& content) {
             {
                 std::ofstream dockerfile(contextDir / "Dockerfile", std::ios::binary | std::ios::trunc);
                 dockerfile << content;
             }
 
-            VERIFY_FAILED(BuildImageFromContext(contextDir, "wslc-test-build-heredoc-cr:latest"));
+            auto warningCallback = Microsoft::WRL::Make<CapturingWarningCallback>();
+            VERIFY_FAILED(BuildImageFromContext(contextDir, "wslc-test-build-heredoc-cr:latest", warningCallback.Get()));
+
             auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
             VERIFY_IS_TRUE(comError.has_value());
-            LogInfo("Build error: %ls", comError->Message.get());
-            return std::wstring(comError->Message.get());
+            VERIFY_ARE_EQUAL(std::wstring::npos, std::wstring(comError->Message.get()).find(hint));
+
+            return std::ranges::any_of(warningCallback->GetWarnings(), [&](const std::wstring& warning) {
+                return warning.find(hint) != std::wstring::npos;
+            });
         };
 
-        auto error = buildAndGetError("FROM debian:latest\r\nRUN <<EOF\r\nset -e\r\nEOF\r\n");
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, error.find(hint));
-
-        error = buildAndGetError("FROM debian:latest\nRUN <<EOF\nexit 1\nEOF\n");
-        VERIFY_ARE_EQUAL(std::wstring::npos, error.find(hint));
+        VERIFY_IS_TRUE(buildAndCheckWarning("FROM debian:latest\r\nRUN <<EOF\r\nset -e\r\nEOF\r\n"));
+        VERIFY_IS_FALSE(buildAndCheckWarning("FROM debian:latest\nRUN <<EOF\nexit 1\nEOF\n"));
     }
 
     WSLC_TEST_METHOD(BuildImageFailureShowsBuildOutput)
@@ -2398,7 +2404,7 @@ class WSLCTests
             .Tags = {&tag, 1},
         };
 
-        VERIFY_FAILED(m_defaultSession->BuildImage(&options, callback.Get(), nullptr));
+        VERIFY_FAILED(m_defaultSession->BuildImage(&options, callback.Get(), nullptr, nullptr));
         VERIFY_IS_TRUE(progressOutput.find("build-log-marker") != std::string::npos);
     }
 
@@ -2431,7 +2437,7 @@ class WSLCTests
             .DockerfileHandle = ToCOMInputHandle(readHandle.get()),
             .Tags = {&tag, 1},
         };
-        VERIFY_SUCCEEDED(m_defaultSession->BuildImage(&options, nullptr, nullptr));
+        VERIFY_SUCCEEDED(m_defaultSession->BuildImage(&options, nullptr, nullptr, nullptr));
         ExpectImagePresent(*m_defaultSession, "wslc-test-build-stdin:latest");
 
         WSLCContainerLauncher launcher("wslc-test-build-stdin:latest", "wslc-build-stdin-container");
@@ -2503,7 +2509,7 @@ class WSLCTests
     {
         WSLCBuildImageOptions options{.ContextPath = L"C:\\", .DockerfileHandle = {}, .Tags = {nullptr, 0}};
 
-        VERIFY_ARE_EQUAL(m_defaultSession->BuildImage(&options, nullptr, nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE));
+        VERIFY_ARE_EQUAL(m_defaultSession->BuildImage(&options, nullptr, nullptr, nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE));
     }
 
     WSLC_TEST_METHOD(BuildImageCancel)
@@ -2556,7 +2562,7 @@ class WSLCTests
 
         std::promise<HRESULT> result;
         std::thread buildThread(
-            [&]() { result.set_value(m_defaultSession->BuildImage(&options, callback.Get(), cancelEvent.get())); });
+            [&]() { result.set_value(m_defaultSession->BuildImage(&options, callback.Get(), nullptr, cancelEvent.get())); });
 
         auto joinThread = wil::scope_exit([&]() { buildThread.join(); });
 
@@ -2619,7 +2625,7 @@ class WSLCTests
             .DockerfileHandle = ToCOMInputHandle(dummyDockerfile.get()),
             .Flags = static_cast<WSLCBuildImageFlags>(0x10)};
 
-        VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->BuildImage(&options, nullptr, nullptr));
+        VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->BuildImage(&options, nullptr, nullptr, nullptr));
     }
 
     WSLC_TEST_METHOD(AnonymousVolumes)
@@ -3665,7 +3671,7 @@ class WSLCTests
 
         std::promise<HRESULT> buildResult;
         std::thread buildThread(
-            [&]() { buildResult.set_value(m_defaultSession->BuildImage(&options, callback.Get(), exitEvent.get())); });
+            [&]() { buildResult.set_value(m_defaultSession->BuildImage(&options, callback.Get(), nullptr, exitEvent.get())); });
 
         auto joinThread = wil::scope_exit([&]() {
             exitEvent.SetEvent();

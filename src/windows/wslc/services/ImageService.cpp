@@ -223,6 +223,7 @@ using namespace wsl::windows::wslc::models;
 using wsl::windows::common::wslc_schema::InspectImage;
 
 void ImageService::Build(
+    Terminal& terminal,
     wsl::windows::wslc::models::Session& session,
     const std::wstring& contextPath,
     const std::vector<std::wstring>& tags,
@@ -373,7 +374,8 @@ void ImageService::Build(
         .DockerfilePath = buildContext.DockerfilePath.empty() ? nullptr : buildContext.DockerfilePath.c_str(),
     };
 
-    THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, cancelEvent));
+    WarningCallback warningCallback(terminal);
+    THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, &warningCallback, cancelEvent));
 }
 
 std::vector<ImageInformation> ImageService::List(

@@ -50,6 +50,7 @@ class ImageService
 {
 public:
     static void Build(
+        Terminal& terminal,
         wsl::windows::wslc::models::Session& session,
         const std::wstring& contextPath,
         const std::vector<std::wstring>& tags,
