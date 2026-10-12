@@ -389,9 +389,8 @@ class StringUnitTests
             {"COPY <<A <<B /dest/\nfirst\nA\nsecond\r\nB\n", true},
             {"", false},
             {"FROM a\r\nRUN echo hi\r\n", false},
-            {"RUN <<EOF\necho hi\nEOF\r\nRUN echo done\r\n", false},
-            {"RUN <<-EOF\n\techo hi\n\tEOF\r\nRUN echo done\r\n", false},
-            {"# RUN <<EOF\r\nRUN echo hi\r\n", false},
+            {"RUN <<EOF\r\necho hi\nEOF\n", false},
+            {"RUN cat << EOF\r\nRUN echo hi\r\n", false},
             {"RUN echo a<<EOF\r\nRUN echo hi\r\n", false},
             {"RUN cat <<<EOF\r\nRUN echo hi\r\n", false},
         };

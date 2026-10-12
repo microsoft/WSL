@@ -136,29 +136,6 @@ public:
     }
 };
 
-bool IsArchive(std::string_view Content)
-{
-    constexpr std::string_view c_compressionSignatures[] = {
-        {"\x1f\x8b", 2}, // gzip
-        {"BZh", 3},      // bzip2
-        {"\xfd"
-         "7zXZ\x00",
-         6},                     // xz
-        {"\x28\xb5\x2f\xfd", 4}, // zstd
-    };
-
-    for (const auto& signature : c_compressionSignatures)
-    {
-        if (Content.starts_with(signature))
-        {
-            return true;
-        }
-    }
-
-    constexpr size_t c_tarMagicOffset = 257;
-    return Content.size() > c_tarMagicOffset && Content.substr(c_tarMagicOffset).starts_with("ustar");
-}
-
 void ValidateName(LPCSTR Name, size_t maxLength)
 {
     const auto& locale = std::locale::classic();
@@ -1655,14 +1632,10 @@ try
     // Stripping \r normalizes to plain \n which becomes \r\n once via text-mode
     // translation.
     std::erase(allOutput, '\r');
-    if (exitCode != 0 && !IsArchive(dockerfileContent) && wslutil::DockerfileHeredocContainsCarriageReturn(dockerfileContent))
+    // Only hint when the failing step's output references a heredoc.
+    if (exitCode != 0 && allOutput.find("<<") != std::string::npos && wslutil::DockerfileHeredocContainsCarriageReturn(dockerfileContent))
     {
-        if (!allOutput.empty() && allOutput.back() != '\n')
-        {
-            allOutput.push_back('\n');
-        }
-
-        allOutput.append(wsl::shared::string::WideToMultiByte(Localization::MessageWslcBuildHeredocCarriageReturn()));
+        allOutput += "\n" + wsl::shared::string::WideToMultiByte(Localization::MessageWslcBuildHeredocCarriageReturn());
     }
 
     THROW_HR_WITH_USER_ERROR_IF(E_FAIL, allOutput, exitCode != 0);
