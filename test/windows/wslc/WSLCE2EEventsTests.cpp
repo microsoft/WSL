@@ -47,6 +47,15 @@ namespace {
         VERIFY_ARE_EQUAL(std::wstring{expectedEvent}, std::wstring{line.substr(separator)});
     }
 
+    void VerifyEventLines(const std::vector<std::wstring>& lines, const std::vector<std::wstring>& expectedEvents)
+    {
+        VERIFY_ARE_EQUAL(expectedEvents.size(), lines.size());
+        for (size_t index = 0; index < expectedEvents.size(); ++index)
+        {
+            VerifyEventLine(lines[index], expectedEvents[index]);
+        }
+    }
+
 } // namespace
 
 class WSLCE2EEventsTests
@@ -384,13 +393,7 @@ class WSLCE2EEventsTests
         events.VerifyNoErrors();
 
         const WSLCExecutionResult output{.Stdout = wsl::shared::string::MultiByteToWide(events.GetStdoutData())};
-        const auto lines = output.GetStdoutLines();
-        const std::vector<std::wstring> expected{createEvent, connectEvent, disconnectEvent, destroyEvent};
-        VERIFY_ARE_EQUAL(expected.size(), lines.size());
-        for (size_t index = 0; index < expected.size(); ++index)
-        {
-            VerifyEventLine(lines[index], expected[index]);
-        }
+        VerifyEventLines(output.GetStdoutLines(), {createEvent, connectEvent, disconnectEvent, destroyEvent});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Events_NetworkJsonFormat)
@@ -474,6 +477,90 @@ class WSLCE2EEventsTests
             VERIFY_IS_FALSE(event.contains("id"));
             VERIFY_IS_FALSE(event.contains("from"));
         }
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Events_VolumeLifecycle)
+    {
+        GUID runId{};
+        VERIFY_SUCCEEDED(CoCreateGuid(&runId));
+        const auto suffix = wsl::shared::string::GuidToString<wchar_t>(runId, wsl::shared::string::GuidToStringFlags::None);
+        const auto volumeName = L"wslc-events-volume-" + suffix;
+        const auto containerName = L"wslc-events-volume-container-" + suffix;
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            EnsureContainerDoesNotExist(containerName);
+            EnsureVolumeDoesNotExist(volumeName);
+        });
+
+        const auto since = EpochSeconds();
+        auto events = RunWslcInteractive(
+            std::format(L"events --since {} --filter type=volume --filter volume={}", since, volumeName),
+            ElevationType::Elevated,
+            std::nullopt,
+            ProcessGroup::Create);
+        auto stopReader = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            if (events.IsRunning())
+            {
+                events.SendCtrlBreak();
+            }
+        });
+
+        auto result = RunWslc(std::format(L"volume create {}", volumeName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto createEvent = std::format(L" volume create {} (driver=local)", volumeName);
+        WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(createEvent));
+
+        result = RunWslc(std::format(
+            L"container run -d --name {} --volume {}:/data {} sleep infinity", containerName, volumeName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto containerId = result.GetStdoutOneLine();
+        const auto mountEvent = std::format(
+            L" volume mount {} (container={}, destination=/data, driver=local, propagation=, read/write=true)", volumeName, containerId);
+        WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(mountEvent));
+
+        result = RunWslc(std::format(L"container rm -f {}", containerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto unmountEvent = std::format(L" volume unmount {} (container={}, driver=local)", volumeName, containerId);
+        WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(unmountEvent));
+
+        result = RunWslc(std::format(L"volume rm {}", volumeName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto destroyEvent = std::format(L" volume destroy {} (driver=local)", volumeName);
+        WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(destroyEvent));
+
+        stopReader.reset();
+        VERIFY_ARE_EQUAL(0, events.Wait());
+        events.VerifyNoErrors();
+
+        const WSLCExecutionResult output{.Stdout = wsl::shared::string::MultiByteToWide(events.GetStdoutData())};
+        VerifyEventLines(output.GetStdoutLines(), {createEvent, mountEvent, unmountEvent, destroyEvent});
+
+        // The events are replayed after the volume is gone.
+        result = RunWslc(std::format(
+            L"events --since {} --until {} --filter type=volume --filter volume={} --format json", since, EpochSeconds() + 1, volumeName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto jsonEvents = ParseNdjsonOutput(result);
+
+        std::vector<std::string> actions;
+        std::ranges::transform(jsonEvents, std::back_inserter(actions), [](const nlohmann::json& event) {
+            return event.at("Action").get<std::string>();
+        });
+        VERIFY_ARE_EQUAL((std::vector<std::string>{"create", "mount", "unmount", "destroy"}), actions);
+
+        std::ranges::for_each(jsonEvents, [&](const nlohmann::json& event) {
+            VERIFY_ARE_EQUAL(std::string{"volume"}, event.at("Type").get<std::string>());
+            VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(volumeName), event.at("Actor").at("ID").get<std::string>());
+            VERIFY_ARE_EQUAL(std::string{"local"}, event.at("Actor").at("Attributes").at("driver").get<std::string>());
+            VERIFY_ARE_EQUAL(std::string{"local"}, event.at("scope").get<std::string>());
+
+            const auto timeNano = event.at("timeNano").get<std::int64_t>();
+            VERIFY_IS_GREATER_THAN(timeNano, 0LL);
+            VERIFY_ARE_EQUAL(timeNano / 1'000'000'000, event.at("time").get<std::int64_t>());
+
+            // Docker only reports its legacy fields for container events.
+            VERIFY_IS_FALSE(event.contains("status"));
+            VERIFY_IS_FALSE(event.contains("id"));
+            VERIFY_IS_FALSE(event.contains("from"));
+        });
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Events_FilteredReplayAndLiveOutput)

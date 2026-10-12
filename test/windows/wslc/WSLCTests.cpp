@@ -7232,6 +7232,13 @@ class WSLCTests
         return stream;
     }
 
+    static std::vector<std::string> EventActions(const std::vector<wsl::windows::common::wslc_schema::Event>& Events)
+    {
+        std::vector<std::string> actions;
+        std::ranges::transform(Events, std::back_inserter(actions), &wsl::windows::common::wslc_schema::Event::Action);
+        return actions;
+    }
+
     WSLC_TEST_METHOD(EventStream)
     {
         constexpr auto c_containerName = "wslc-test-events";
@@ -7630,6 +7637,9 @@ class WSLCTests
         // A network filter matches a container by its id or name too.
         VERIFY_ARE_EQUAL(id, matchingIds({{"network", "wslc-test-event-fil"}}));
 
+        // So does a volume filter.
+        VERIFY_ARE_EQUAL(id, matchingIds({{"volume", "wslc-test-event-fil"}}));
+
         // The recorded image matches exactly or by its familiar name, while the filter value is compared as written.
         // Repeated values are OR'd.
         VERIFY_ARE_EQUAL(id, matchingThisContainer({{"image", "docker.io/library/debian:latest"}}));
@@ -7955,6 +7965,210 @@ class WSLCTests
         VERIFY_ARE_EQUAL(static_cast<size_t>(2), events.size());
         VERIFY_ARE_EQUAL("create", events[0].Action);
         VERIFY_ARE_EQUAL("destroy", events[1].Action);
+    }
+
+    void ValidateVolumeEventLifecycle(const std::string& Driver, const std::vector<WSLCDriverOption>& DriverOpts = {})
+    {
+        const auto volumeName = GenerateNetworkEventTestName(std::format("wslc-test-volume-events-{}", Driver));
+        auto stream = OpenEventStream({{"volume", volumeName.c_str()}});
+
+        // Docker doesn't report a volume's labels in its events.
+        CreateNamedVolume(volumeName, Driver, {{"wslc-test-volume-label", "yes"}}, DriverOpts);
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
+
+        // Running a container makes Docker mount and unmount the volume.
+        std::string containerId;
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest", std::format("wslc-test-volume-events-{}-container", Driver), {"sleep", "99999"});
+            launcher.AddNamedVolume(volumeName, "/data", false);
+            auto container = launcher.Launch(*m_defaultSession);
+            containerId = container.Id();
+
+            // Deleting a volume in use fails without an event.
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), m_defaultSession->DeleteVolume(volumeName.c_str()));
+        }
+
+        // WSLC skips its own destroy when updating its volumes, but the event is still recorded.
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+        cleanup.release();
+
+        const std::vector<std::string> lifecycleActions{"create", "mount", "unmount", "destroy"};
+        const auto events = ReadEvents(stream.get(), lifecycleActions.size());
+        VERIFY_ARE_EQUAL(lifecycleActions, EventActions(events));
+
+        // Docker reports its own volume driver rather than the WSLC one.
+        VERIFY_IS_TRUE(std::ranges::all_of(events, [&](const auto& event) {
+            return event.Type == "volume" && event.Actor.ID == volumeName && event.Actor.Attributes.at("driver") == "local" &&
+                   event.timeNano > 0;
+        }));
+
+        const std::map<std::string, std::string> driverAttributes{{"driver", "local"}};
+        VERIFY_IS_TRUE(events[0].Actor.Attributes == driverAttributes);
+        VERIFY_IS_TRUE(events[3].Actor.Attributes == driverAttributes);
+
+        const std::map<std::string, std::string> mountAttributes{
+            {"container", containerId},
+            {"destination", "/data"},
+            {"driver", "local"},
+            {"propagation", ""},
+            {"read/write", "true"}};
+        VERIFY_IS_TRUE(events[1].Actor.Attributes == mountAttributes);
+
+        const std::map<std::string, std::string> unmountAttributes{{"container", containerId}, {"driver", "local"}};
+        VERIFY_IS_TRUE(events[2].Actor.Attributes == unmountAttributes);
+
+        const LONGLONG until = events.back().timeNano / 1'000'000'000 + 1;
+        auto actionsMatching = [&](const std::vector<WSLCFilter>& Filters) {
+            wil::com_ptr<IWSLCEventStream> replayStream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, until, Filters.data(), static_cast<ULONG>(Filters.size()), &replayStream));
+
+            return EventActions(DrainEventStream(replayStream.get()));
+        };
+
+        // The events outlive the volume, and a volume filter matches its name or a prefix of it.
+        const auto volumeNamePrefix = volumeName.substr(0, volumeName.size() - 1);
+        VERIFY_ARE_EQUAL(lifecycleActions, actionsMatching({{"type", "volume"}, {"volume", volumeName.c_str()}}));
+        VERIFY_ARE_EQUAL(lifecycleActions, actionsMatching({{"volume", volumeNamePrefix.c_str()}}));
+
+        // A container filter matches the volume by name, but not by the container recorded on its mount events.
+        VERIFY_ARE_EQUAL(lifecycleActions, actionsMatching({{"type", "volume"}, {"container", volumeName.c_str()}}));
+        VERIFY_IS_TRUE(actionsMatching({{"type", "volume"}, {"container", containerId.c_str()}}).empty());
+
+        // Distinct filter keys are AND'd.
+        VERIFY_ARE_EQUAL(std::vector<std::string>{"mount"}, actionsMatching({{"volume", volumeName.c_str()}, {"event", "mount"}}));
+
+        // A label filter only sees the event's attributes, so the volume's own label doesn't select its events.
+        VERIFY_IS_TRUE(actionsMatching({{"volume", volumeName.c_str()}, {"label", "wslc-test-volume-label"}}).empty());
+    }
+
+    WSLC_TEST_METHOD(VolumeEventStream)
+    {
+        ValidateVolumeEventLifecycle("guest");
+        ValidateVolumeEventLifecycle("vhd", {{"SizeBytes", "1073741824"}});
+
+        // Volumes created and removed directly through Docker are applied to the session before their events are published.
+        {
+            const auto volumeName = GenerateNetworkEventTestName("wslc-test-volume-external");
+
+            auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
+
+            auto stream = OpenEventStream({{"volume", volumeName.c_str()}});
+            wil::unique_cotaskmem_ansistring output;
+
+            ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "volume", "create", volumeName}, 0);
+            VERIFY_ARE_EQUAL("create", ReadEvents(stream.get(), 1)[0].Action);
+            VERIFY_SUCCEEDED(m_defaultSession->InspectVolume(volumeName.c_str(), &output));
+
+            ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "volume", "rm", volumeName}, 0);
+            cleanup.release();
+
+            VERIFY_ARE_EQUAL("destroy", ReadEvents(stream.get(), 1)[0].Action);
+            VERIFY_ARE_EQUAL(WSLC_E_VOLUME_NOT_FOUND, m_defaultSession->InspectVolume(volumeName.c_str(), &output));
+        }
+
+        // Prune events, including those of a prune that matches nothing.
+        {
+            const auto firstVolume = GenerateNetworkEventTestName("wslc-test-volume-prune-a");
+            const auto secondVolume = GenerateNetworkEventTestName("wslc-test-volume-prune-b");
+            const std::string pruneLabelFilter = firstVolume + "=yes";
+
+            auto cleanup = wil::scope_exit([&]() {
+                LOG_IF_FAILED(m_defaultSession->DeleteVolume(firstVolume.c_str()));
+                LOG_IF_FAILED(m_defaultSession->DeleteVolume(secondVolume.c_str()));
+            });
+
+            // The aggregate prune event names no volume, so the network marker bounds this test's volume events instead.
+            auto stream = OpenEventStream({{"type", "network"}, {"type", "volume"}});
+            ReadNetworkEventsThroughMarker(stream.get());
+
+            const auto readVolumeEvents = [&]() {
+                std::vector<wsl::windows::common::wslc_schema::Event> events;
+                std::ranges::copy_if(ReadNetworkEventsThroughMarker(stream.get()), std::back_inserter(events), [](const auto& event) {
+                    return event.Type == "volume";
+                });
+                return events;
+            };
+
+            // The label scopes the prune to the test volumes.
+            CreateNamedVolume(firstVolume, "guest", {{firstVolume.c_str(), "yes"}});
+            CreateNamedVolume(secondVolume, "guest", {{firstVolume.c_str(), "yes"}});
+
+            // Write to a volume so the prune reclaims space.
+            {
+                WSLCContainerLauncher launcher(
+                    "debian:latest", "wslc-test-volume-prune-writer", {"/bin/sh", "-c", "head -c 4096 /dev/zero >/data/file"});
+                launcher.AddNamedVolume(firstVolume, "/data", false);
+                auto container = launcher.Launch(*m_defaultSession);
+                auto process = container.GetInitProcess();
+                ValidateProcessOutput(process, {});
+            }
+
+            WSLCFilter pruneFilters[]{{"all", "true"}, {"label", pruneLabelFilter.c_str()}};
+            wil::unique_cotaskmem_array_ptr<WSLCVolumeName> deleted;
+            ULONGLONG spaceReclaimed{};
+            VERIFY_SUCCEEDED(m_defaultSession->PruneVolumes(
+                pruneFilters, ARRAYSIZE(pruneFilters), nullptr, deleted.addressof(), deleted.size_address<ULONG>(), &spaceReclaimed));
+            VERIFY_ARE_EQUAL(static_cast<size_t>(2), deleted.size());
+            VERIFY_IS_GREATER_THAN(spaceReclaimed, 0ULL);
+
+            cleanup.release();
+
+            // Docker emits per-volume destroys before one aggregate prune.
+            const auto events = readVolumeEvents();
+            const std::vector<std::string> expectedActions{"create", "create", "mount", "unmount", "destroy", "destroy", "prune"};
+            VERIFY_ARE_EQUAL(expectedActions, EventActions(events));
+            VerifyAreEqualUnordered(
+                std::vector<std::string>{firstVolume, secondVolume}, std::vector<std::string>{events[4].Actor.ID, events[5].Actor.ID});
+
+            VERIFY_IS_TRUE(events[6].Actor.ID.empty());
+            VERIFY_ARE_EQUAL(std::to_string(spaceReclaimed), events[6].Actor.Attributes.at("reclaimed"));
+
+            // A prune that matches nothing still reports an aggregate prune.
+            VERIFY_SUCCEEDED(m_defaultSession->PruneVolumes(
+                pruneFilters, ARRAYSIZE(pruneFilters), nullptr, deleted.addressof(), deleted.size_address<ULONG>(), &spaceReclaimed));
+            VERIFY_ARE_EQUAL(static_cast<size_t>(0), deleted.size());
+
+            const auto emptyPruneEvents = readVolumeEvents();
+            VERIFY_ARE_EQUAL(std::vector<std::string>{"prune"}, EventActions(emptyPruneEvents));
+            VERIFY_ARE_EQUAL("0", emptyPruneEvents[0].Actor.Attributes.at("reclaimed"));
+        }
+    }
+
+    // Verify volume events are recorded after the VM restarts, and that recovering a volume records no create.
+    WSLC_TEST_METHOD(VolumeEventsSurviveVmRestart)
+    {
+        const auto volumeName = GenerateNetworkEventTestName("wslc-test-volume-reconnect");
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
+
+        auto stream = OpenEventStream({{"volume", volumeName.c_str()}});
+
+        CreateNamedVolume(volumeName, "vhd", {}, {{"SizeBytes", "1073741824"}});
+
+        // Teardown stops the relay that delivers events, so the create must land before the restart.
+        const auto createEvents = ReadEvents(stream.get(), 1);
+        VERIFY_ARE_EQUAL("create", createEvents[0].Action);
+
+        BOOL wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(m_defaultSession->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_testSessionName));
+
+        // Listing restarts the VM and recovers the volume.
+        VERIFY_IS_TRUE(ListVolumes().contains(volumeName));
+        VERIFY_IS_TRUE(IsVmRunning(c_testSessionName));
+
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+        cleanup.release();
+
+        const auto destroyEvents = ReadEvents(stream.get(), 1);
+        VERIFY_ARE_EQUAL("destroy", destroyEvents[0].Action);
+
+        WSLCFilter filter{"volume", volumeName.c_str()};
+        wil::com_ptr<IWSLCEventStream> replayStream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, destroyEvents[0].timeNano / 1'000'000'000 + 1, &filter, 1, &replayStream));
+        VERIFY_ARE_EQUAL((std::vector<std::string>{"create", "destroy"}), EventActions(DrainEventStream(replayStream.get())));
     }
 
     WSLC_TEST_METHOD(EventStreamReportsLostEvents)

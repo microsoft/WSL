@@ -125,7 +125,7 @@ namespace {
                     return false;
                 }
             }
-            else if (key == "container" || key == "network")
+            else if (key == "container" || key == "network" || key == "volume")
             {
                 if (!MatchesIdOrName(event, values))
                 {
@@ -161,7 +161,7 @@ Microsoft::WRL::ComPtr<IWSLCEventStream> EventStore::CreateStream(
         Localization::MessageWslcEventsInvalidTimeWindow(SinceTime, UntilTime),
         SinceTime < 0 || UntilTime < 0 || (SinceTime != 0 && UntilTime != 0 && SinceTime > UntilTime));
 
-    static constexpr std::array c_supportedFilters{"type", "event", "container", "image", "network", "label"};
+    static constexpr std::array c_supportedFilters{"type", "event", "container", "image", "network", "volume", "label"};
     for (const auto& [key, values] : Filters)
     {
         THROW_HR_WITH_USER_ERROR_IF(
