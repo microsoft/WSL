@@ -240,7 +240,7 @@ void ContainerSettings::CapabilityAdditions(winrt::Windows::Foundation::Collecti
 {
     if (m_containerSettings)
     {
-        winrt::throw_hresult(E_ILLEGAL_STATE_CHANGE);
+        throw winrt::hresult_illegal_state_change(L"Cannot change capabilities after container has been initialized");
     }
 
     if (!value)
