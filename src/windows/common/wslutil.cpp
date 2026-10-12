@@ -23,8 +23,8 @@ Abstract:
 #include "ExecutionContext.h"
 #include "HandleIO.h"
 #include "MsiQuery.h"
-#include <Dbghelp.h>
 #include "WslInstall.h"
+#include <Dbghelp.h>
 
 using winrt::Windows::Foundation::Uri;
 using winrt::Windows::Management::Deployment::DeploymentOptions;
@@ -410,10 +410,14 @@ static LONG WINAPI OnException(_EXCEPTION_POINTERS* exception)
             dumpPath = std::filesystem::path(crashFolder.value()) / std::format(L"{}.{}.dmp", image.native(), GetCurrentProcessId());
         }
 
-        WSL_LOG(
-            "ProcessCrash",
-            TraceLoggingValue(image.c_str(), "Process"),
-            TraceLoggingValue(dumpPath.has_value() ? dumpPath->native().c_str() : L"<none>", "DumpPath"));
+        // The crash handler can run before telemetry initialization.
+        if (g_hTraceLoggingProvider != nullptr)
+        {
+            WSL_LOG(
+                "ProcessCrash",
+                TraceLoggingValue(image.c_str(), "Process"),
+                TraceLoggingValue(dumpPath.has_value() ? dumpPath->native().c_str() : L"<none>", "DumpPath"));
+        }
 
         if (!dumpPath.has_value())
         {
@@ -438,7 +442,17 @@ static LONG WINAPI OnException(_EXCEPTION_POINTERS* exception)
             nullptr,
             nullptr));
     }
-    CATCH_LOG();
+    catch (...)
+    {
+        if (g_hTraceLoggingProvider != nullptr)
+        {
+            LOG_CAUGHT_EXCEPTION();
+        }
+        else
+        {
+            OutputDebugStringW(L"WSL crash dump collection failed before telemetry initialization.\n");
+        }
+    }
 
     return EXCEPTION_CONTINUE_SEARCH;
 }
