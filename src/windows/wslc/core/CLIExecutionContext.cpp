@@ -45,4 +45,11 @@ void CLIExecutionContext::ClearError()
     m_error.reset();
 }
 
+bool CLIExecutionContext::CollectUserWarning(const std::wstring& warning)
+{
+    // The message already carries the "wsl: " prefix and trailing newline, so it is written verbatim.
+    Terminal.Warn(L"{}", warning);
+    return true;
+}
+
 } // namespace wsl::windows::wslc::execution

@@ -56,10 +56,11 @@ struct WSLCContainerMetadataV1
 {
     WSLCContainerFlags Flags{WSLCContainerFlagsNone};
     WSLCProcessFlags InitProcessFlags{WSLCProcessFlagsNone};
+    std::string Image;
     std::vector<WSLCPortMapping> Ports;
     std::vector<WSLCVolumeMount> Volumes;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCContainerMetadataV1, Flags, InitProcessFlags, Ports, Volumes);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCContainerMetadataV1, Flags, InitProcessFlags, Image, Ports, Volumes);
 };
 
 struct WSLCContainerMetadata

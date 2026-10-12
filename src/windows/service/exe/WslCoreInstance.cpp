@@ -321,9 +321,9 @@ ULONG WslCoreInstance::GetClientId() const
 {
     // Return the system distro ClientId if any so that this distribution is correctly
     // identified if the system distro init process terminates.
-    if (m_systemDistro)
+    if (const auto systemDistro = m_systemDistro.load())
     {
-        return m_systemDistro->GetClientId();
+        return systemDistro->GetClientId();
     }
 
     return m_clientId;
@@ -336,6 +336,7 @@ GUID WslCoreInstance::GetDistributionId() const
 
 std::shared_ptr<LxssPort> WslCoreInstance::GetInitPort()
 {
+    std::lock_guard lock(m_lock);
     THROW_HR_IF(HCS_E_TERMINATED, !m_initChannel);
 
     return m_initChannel;
@@ -343,14 +344,14 @@ std::shared_ptr<LxssPort> WslCoreInstance::GetInitPort()
 
 std::shared_ptr<LxssRunningInstance> WslCoreInstance::GetSystemDistro()
 {
-    return m_systemDistro;
+    return m_systemDistro.load();
 }
 
 void WslCoreInstance::UpdateTimezone()
 {
-    if (m_systemDistro)
+    if (const auto systemDistro = m_systemDistro.load())
     {
-        m_systemDistro->UpdateTimezone();
+        systemDistro->UpdateTimezone();
     }
 
     auto message =
@@ -376,9 +377,9 @@ void WslCoreInstance::Initialize()
     }
 
     // If a system distro was created, initialize it first.
-    if (m_systemDistro)
+    if (const auto systemDistro = m_systemDistro.load())
     {
-        m_systemDistro->Initialize();
+        systemDistro->Initialize();
     }
 
     LX_INIT_DRVFS_MOUNT drvfsMount = LxInitDrvfsMountNone;
@@ -528,7 +529,7 @@ void WslCoreInstance::Stop()
     m_redirectorConnectionTargets.RemoveAll();
 
     // If the instance was terminated, terminate the associated system distro.
-    m_systemDistro.reset();
+    m_systemDistro.store(nullptr);
 
     return;
 }

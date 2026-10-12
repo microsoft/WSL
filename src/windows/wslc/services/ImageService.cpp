@@ -107,6 +107,112 @@ InputSource OpenImageInput(const std::wstring& input)
     return InputSource{std::move(handle), static_cast<ULONGLONG>(fileSize.QuadPart)};
 }
 
+// Where the build context and Dockerfile come from. Either ContextPath names a Windows directory and
+// DockerfileHandle supplies the Dockerfile, or ContextHandle streams the whole context over stdin and
+// DockerfilePath optionally names the Dockerfile inside it.
+struct BuildContextInput
+{
+    std::wstring ContextPath;
+    HANDLE ContextHandle = nullptr;
+    HANDLE DockerfileHandle = nullptr;
+    wil::unique_hfile Dockerfile;
+    std::optional<wsl::windows::common::filesystem::TempFile> SpooledStdin;
+    std::string DockerfilePath;
+};
+
+// Returns a relayable stdin handle. Character devices need a file because COM cannot relay their handles.
+HANDLE OpenStdin(BuildContextInput& input)
+{
+    auto handle = GetStdHandle(STD_INPUT_HANDLE);
+
+    // Intentional divergence from docker, which accepts a Dockerfile typed into an interactive terminal.
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_BuildStdinIsTerminalError(), IsConsoleHandle(handle));
+
+    if (GetFileType(handle) != FILE_TYPE_CHAR)
+    {
+        return handle;
+    }
+
+    input.SpooledStdin.emplace(
+        GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, wsl::windows::common::filesystem::TempFileFlags::DeleteOnClose);
+    std::array<char, 4096> buffer{};
+    for (;;)
+    {
+        DWORD read{};
+        if (!ReadFile(handle, buffer.data(), static_cast<DWORD>(buffer.size()), &read, nullptr))
+        {
+            const auto error = GetLastError();
+            // NUL reports ERROR_INVALID_FUNCTION instead of EOF when read as a character device.
+            if (error == ERROR_INVALID_FUNCTION)
+            {
+                break;
+            }
+
+            THROW_WIN32(error);
+        }
+
+        if (read == 0)
+        {
+            break;
+        }
+
+        DWORD written{};
+        THROW_IF_WIN32_BOOL_FALSE(WriteFile(input.SpooledStdin->Handle.get(), buffer.data(), read, &written, nullptr));
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_WRITE_FAULT), written != read);
+    }
+
+    THROW_LAST_ERROR_IF(SetFilePointer(input.SpooledStdin->Handle.get(), 0, nullptr, FILE_BEGIN) == INVALID_SET_FILE_POINTER);
+    return input.SpooledStdin->Handle.get();
+}
+
+BuildContextInput OpenBuildContext(const std::wstring& contextPath, const std::wstring& dockerfilePath)
+{
+    BuildContextInput input;
+
+    if (contextPath == L"-")
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, Localization::MessageWslcBuildStdinContextAndDockerfile(), dockerfilePath == L"-");
+
+        // The Dockerfile path is resolved inside the streamed context by the Linux builder.
+        auto pathInContext = dockerfilePath;
+        std::ranges::replace(pathInContext, L'\\', L'/');
+
+        input.ContextHandle = OpenStdin(input);
+        input.DockerfilePath = wsl::windows::common::string::WideToMultiByte(pathInContext);
+        return input;
+    }
+
+    auto absolutePath = std::filesystem::absolute(contextPath);
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_DIRECTORY),
+        !std::filesystem::is_directory(absolutePath),
+        "Path must be a directory: %ls",
+        absolutePath.c_str());
+
+    input.ContextPath = absolutePath.wstring();
+
+    if (dockerfilePath == L"-")
+    {
+        input.DockerfileHandle = OpenStdin(input);
+        return input;
+    }
+
+    if (dockerfilePath.empty())
+    {
+        input.Dockerfile = ResolveBuildFile(absolutePath);
+    }
+    else
+    {
+        input.Dockerfile.reset(
+            CreateFileW(dockerfilePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+        THROW_LAST_ERROR_IF_MSG(!input.Dockerfile, "Failed to open Dockerfile: %ls", dockerfilePath.c_str());
+    }
+
+    input.DockerfileHandle = input.Dockerfile.get();
+    return input;
+}
+
 } // namespace
 
 namespace wsl::windows::wslc::services {
@@ -131,30 +237,7 @@ void ImageService::Build(
     IProgressCallback* callback,
     HANDLE cancelEvent)
 {
-    auto absolutePath = std::filesystem::absolute(contextPath);
-    THROW_HR_IF_MSG(
-        HRESULT_FROM_WIN32(ERROR_DIRECTORY),
-        !std::filesystem::is_directory(absolutePath),
-        "Path must be a directory: %ls",
-        absolutePath.c_str());
-
-    HANDLE dockerfileHandle = nullptr;
-    wil::unique_hfile dockerfile;
-    if (dockerfilePath == L"-")
-    {
-        dockerfileHandle = GetStdHandle(STD_INPUT_HANDLE);
-    }
-    else if (!dockerfilePath.empty())
-    {
-        dockerfile.reset(CreateFileW(dockerfilePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
-        THROW_LAST_ERROR_IF_MSG(!dockerfile, "Failed to open Dockerfile: %ls", dockerfilePath.c_str());
-        dockerfileHandle = dockerfile.get();
-    }
-    else
-    {
-        dockerfile = ResolveBuildFile(absolutePath);
-        dockerfileHandle = dockerfile.get();
-    }
+    auto buildContext = OpenBuildContext(contextPath, dockerfilePath);
 
     auto toMultiByte = [](const std::vector<std::wstring>& input, std::vector<std::string>& strings, std::vector<LPCSTR>& pointers) {
         strings.reserve(input.size());
@@ -262,8 +345,6 @@ void ImageService::Build(
         }
     }
 
-    auto contextPathStr = absolutePath.wstring();
-
     // Resolve the --iidfile destination against the client's working directory; the server mounts its
     // parent directory read-write into the VM so buildx writes the image ID straight to it.
     std::wstring iidPathStr;
@@ -273,8 +354,9 @@ void ImageService::Build(
     }
 
     WSLCBuildImageOptions options{
-        .ContextPath = contextPathStr.c_str(),
-        .DockerfileHandle = ToCOMInputHandle(dockerfileHandle),
+        .ContextPath = buildContext.ContextPath.empty() ? nullptr : buildContext.ContextPath.c_str(),
+        .DockerfileHandle = buildContext.DockerfileHandle != nullptr ? ToCOMInputHandle(buildContext.DockerfileHandle)
+                                                                     : WSLCHandle{.Type = WSLCHandleTypeUnknown},
         .Tags = {tagPointers.data(), static_cast<ULONG>(tagPointers.size())},
         .BuildArgs = {buildArgPointers.data(), static_cast<ULONG>(buildArgPointers.size())},
         .Target = targetStr.empty() ? nullptr : targetStr.c_str(),
@@ -286,6 +368,9 @@ void ImageService::Build(
         .OutputMountPath = outputMountPath.empty() ? nullptr : outputMountPath.c_str(),
         .OutputMountFile = outputMountFile.empty() ? nullptr : outputMountFile.c_str(),
         .IidFilePath = iidPathStr.empty() ? nullptr : iidPathStr.c_str(),
+        .ContextHandle = buildContext.ContextHandle != nullptr ? ToCOMInputHandle(buildContext.ContextHandle)
+                                                               : WSLCHandle{.Type = WSLCHandleTypeUnknown},
+        .DockerfilePath = buildContext.DockerfilePath.empty() ? nullptr : buildContext.DockerfilePath.c_str(),
     };
 
     THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, cancelEvent));
