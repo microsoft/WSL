@@ -5843,6 +5843,19 @@ class ConsommeTests
         WslKeepAlive keepAlive;
 
         {
+            auto hostPort = NetworkTests::BindHostPort(1234, SOCK_STREAM, IPPROTO_TCP, true, false, false, std::chrono::minutes(2));
+            VERIFY_ARE_EQUAL(listen(hostPort.get(), SOMAXCONN), 0);
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(L"perl -MSocket -MErrno=EADDRINUSE -e '"
+                                L"socket(my $s,AF_INET,SOCK_STREAM,0) or die \"socket: $!\\n\";"
+                                L"bind($s,sockaddr_in(1234,INADDR_ANY)) and die \"bind unexpectedly succeeded\\n\";"
+                                L"$!{EADDRINUSE} or die \"expected EADDRINUSE: $!\\n\";"
+                                L"my ($port)=sockaddr_in(getsockname($s));"
+                                L"$port==0 or die \"failed bind assigned port $port\\n\";'"),
+                0L);
+        }
+
+        {
             auto guestProcess = NetworkTests::BindGuestPort(L"TCP4-LISTEN:1234", true);
             NetworkTests::BindHostPort(1234, SOCK_STREAM, IPPROTO_TCP, false);
         }
