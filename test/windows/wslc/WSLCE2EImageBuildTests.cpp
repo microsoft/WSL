@@ -1562,6 +1562,19 @@ class WSLCE2EImageBuildTests
         VERIFY_ARE_EQUAL(BuiltImageStdinDockerfile.NameAndTag(), wsl::shared::string::MultiByteToWide(inspectData.RepoTags.value()[0]));
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_StdinDockerfile_HeredocCarriageReturn_ShowsHint)
+    {
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-stdin-heredoc-cr";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\r\nRUN <<EOF\r\nset -e\r\nEOF\r\n");
+
+        auto buildResult = RunWslcWithStdinFile(L"build - --progress=quiet", dockerfilePath);
+        VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
+        VERIFY_IS_TRUE(buildResult.StderrContainsSubstring(Localization::MessageWslcBuildHeredocCarriageReturn()));
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_StdinContext_Terminal_Fails)
     {
         // A pseudo console gives wslc a console stdin, which build must reject.

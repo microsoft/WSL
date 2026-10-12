@@ -382,6 +382,9 @@ winrt::Windows::Management::Deployment::PackageVolume GetSystemVolume();
 std::string Base64Encode(const std::string& input);
 std::string Base64Decode(const std::string& encoded);
 
+// Returns true if the body of any heredoc in the Dockerfile contains a carriage return.
+bool DockerfileHeredocContainsCarriageReturn(std::string_view Dockerfile);
+
 // Builds the base64-encoded X-Registry-Auth header value used by Docker APIs
 // (PullImage, PushImage, etc.) from the given credentials.
 std::string BuildRegistryAuthHeader(const std::string& username, const std::string& password);

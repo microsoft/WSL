@@ -1710,6 +1710,114 @@ std::string wsl::windows::common::wslutil::Base64Decode(const std::string& encod
     return result;
 }
 
+bool wsl::windows::common::wslutil::DockerfileHeredocContainsCarriageReturn(std::string_view Dockerfile)
+{
+    struct Heredoc
+    {
+        std::string_view Name;
+        bool StripTabs;
+    };
+
+    constexpr auto trimTrailingCarriageReturns = [](std::string_view Line) {
+        while (!Line.empty() && Line.back() == '\r')
+        {
+            Line.remove_suffix(1);
+        }
+
+        return Line;
+    };
+
+    // Matches the heredoc opener form '[fd]<<[-]NAME' where NAME may be quoted.
+    constexpr auto parseHeredocOpener = [](std::string_view Word) -> std::optional<Heredoc> {
+        const auto start = Word.find_first_not_of("0123456789");
+        if (start == std::string_view::npos || !Word.substr(start).starts_with("<<"))
+        {
+            return {};
+        }
+
+        Word.remove_prefix(start + 2);
+        const bool stripTabs = Word.starts_with('-');
+        if (stripTabs)
+        {
+            Word.remove_prefix(1);
+        }
+
+        if (Word.size() >= 2 && (Word.front() == '"' || Word.front() == '\'') && Word.back() == Word.front())
+        {
+            Word = Word.substr(1, Word.size() - 2);
+        }
+
+        if (Word.empty() || Word.find_first_of("<\"'") != std::string_view::npos)
+        {
+            return {};
+        }
+
+        return Heredoc{Word, stripTabs};
+    };
+
+    std::deque<Heredoc> pending;
+    size_t position = 0;
+    while (position < Dockerfile.size())
+    {
+        auto end = Dockerfile.find('\n', position);
+        if (end == std::string_view::npos)
+        {
+            end = Dockerfile.size();
+        }
+
+        const auto line = Dockerfile.substr(position, end - position);
+        position = end + 1;
+
+        if (!pending.empty())
+        {
+            auto terminator = trimTrailingCarriageReturns(line);
+            if (pending.front().StripTabs)
+            {
+                terminator.remove_prefix(std::min(terminator.find_first_not_of('\t'), terminator.size()));
+            }
+
+            if (terminator == pending.front().Name)
+            {
+                pending.pop_front();
+                continue;
+            }
+
+            if (line.find('\r') != std::string_view::npos)
+            {
+                return true;
+            }
+
+            continue;
+        }
+
+        const auto content = trimTrailingCarriageReturns(line);
+        const auto firstNonBlank = content.find_first_not_of(" \t");
+        if (firstNonBlank == std::string_view::npos || content[firstNonBlank] == '#')
+        {
+            continue;
+        }
+
+        size_t wordStart = firstNonBlank;
+        while (wordStart != std::string_view::npos)
+        {
+            auto wordEnd = content.find_first_of(" \t", wordStart);
+            if (wordEnd == std::string_view::npos)
+            {
+                wordEnd = content.size();
+            }
+
+            if (auto heredoc = parseHeredocOpener(content.substr(wordStart, wordEnd - wordStart)))
+            {
+                pending.push_back(*heredoc);
+            }
+
+            wordStart = content.find_first_not_of(" \t", wordEnd);
+        }
+    }
+
+    return false;
+}
+
 std::string wsl::windows::common::wslutil::BuildRegistryAuthHeader(const std::string& username, const std::string& password)
 {
     nlohmann::json authJson = {{"username", username}, {"password", password}};

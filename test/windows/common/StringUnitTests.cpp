@@ -376,5 +376,31 @@ class StringUnitTests
             VERIFY_ARE_EQUAL(bytes, ParseStorageSize(text, TestCase.Unit));
         }
     }
+
+    TEST_METHOD(DockerfileHeredocContainsCarriageReturn)
+    {
+        const std::vector<std::pair<std::string, bool>> TestCases{
+            {"FROM a\r\nRUN <<EOF\r\necho hi\r\nEOF\r\n", true},
+            {"FROM a\nRUN <<EOF\necho hi\r\nEOF\n", true},
+            {"RUN <<'EOF'\necho hi\r\nEOF\n", true},
+            {"RUN <<\"EOF\"\necho hi\r\nEOF\n", true},
+            {"RUN 3<<EOF\necho hi\r\nEOF\n", true},
+            {"RUN <<-EOF\n\techo hi\r\n\tEOF\n", true},
+            {"COPY <<A <<B /dest/\nfirst\nA\nsecond\r\nB\n", true},
+            {"", false},
+            {"FROM a\r\nRUN echo hi\r\n", false},
+            {"RUN <<EOF\necho hi\nEOF\r\nRUN echo done\r\n", false},
+            {"RUN <<-EOF\n\techo hi\n\tEOF\r\nRUN echo done\r\n", false},
+            {"# RUN <<EOF\r\nRUN echo hi\r\n", false},
+            {"RUN echo a<<EOF\r\nRUN echo hi\r\n", false},
+            {"RUN cat <<<EOF\r\nRUN echo hi\r\n", false},
+        };
+
+        for (const auto& [Dockerfile, Expected] : TestCases)
+        {
+            LogInfo("Dockerfile: %hs", Dockerfile.c_str());
+            VERIFY_ARE_EQUAL(Expected, wsl::windows::common::wslutil::DockerfileHeredocContainsCarriageReturn(Dockerfile));
+        }
+    }
 };
 } // namespace StringUnitTests

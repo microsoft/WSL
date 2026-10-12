@@ -120,6 +120,45 @@ std::string IndentLines(const std::string& input, const std::string& prefix, boo
     return result;
 }
 
+constexpr size_t c_maxCapturedDockerfileSize = 1024 * 1024;
+
+// Read handle that retains the first c_maxCapturedDockerfileSize bytes it reads.
+class CapturingReadHandle : public io::ReadHandle
+{
+public:
+    CapturingReadHandle(io::HandleWrapper&& Handle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead, std::string& Capture) :
+        io::ReadHandle(std::move(Handle), [OnRead = std::move(OnRead), &Capture](const gsl::span<char>& Buffer) {
+            const auto remaining = c_maxCapturedDockerfileSize - std::min(Capture.size(), c_maxCapturedDockerfileSize);
+            Capture.append(Buffer.data(), std::min(Buffer.size(), remaining));
+            OnRead(Buffer);
+        })
+    {
+    }
+};
+
+bool IsArchive(std::string_view Content)
+{
+    constexpr std::string_view c_compressionSignatures[] = {
+        {"\x1f\x8b", 2}, // gzip
+        {"BZh", 3},      // bzip2
+        {"\xfd"
+         "7zXZ\x00",
+         6},                     // xz
+        {"\x28\xb5\x2f\xfd", 4}, // zstd
+    };
+
+    for (const auto& signature : c_compressionSignatures)
+    {
+        if (Content.starts_with(signature))
+        {
+            return true;
+        }
+    }
+
+    constexpr size_t c_tarMagicOffset = 257;
+    return Content.size() > c_tarMagicOffset && Content.substr(c_tarMagicOffset).starts_with("ustar");
+}
+
 void ValidateName(LPCSTR Name, size_t maxLength)
 {
     const auto& locale = std::locale::classic();
@@ -1315,8 +1354,10 @@ try
 
     auto io = CreateIOContext();
 
+    std::string dockerfileContent;
     io.AddHandle(
-        std::make_unique<io::RelayHandle<io::ReadHandle>>(stdinHandle.Get(), common::io::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}),
+        std::make_unique<io::RelayHandle<CapturingReadHandle>>(
+            stdinHandle.Get(), common::io::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}, dockerfileContent),
         MultiHandleWait::NeedNotComplete,
         [&buildProcess]() {
             // If we receive an error relaying stdin, it could be because the process exited.
@@ -1614,6 +1655,16 @@ try
     // Stripping \r normalizes to plain \n which becomes \r\n once via text-mode
     // translation.
     std::erase(allOutput, '\r');
+    if (exitCode != 0 && !IsArchive(dockerfileContent) && wslutil::DockerfileHeredocContainsCarriageReturn(dockerfileContent))
+    {
+        if (!allOutput.empty() && allOutput.back() != '\n')
+        {
+            allOutput.push_back('\n');
+        }
+
+        allOutput.append(wsl::shared::string::WideToMultiByte(Localization::MessageWslcBuildHeredocCarriageReturn()));
+    }
+
     THROW_HR_WITH_USER_ERROR_IF(E_FAIL, allOutput, exitCode != 0);
 
     return S_OK;

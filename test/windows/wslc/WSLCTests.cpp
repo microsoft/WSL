@@ -2319,6 +2319,36 @@ class WSLCTests
         ExpectImagePresent(*m_defaultSession, "wslc-test-build-failure:latest", false);
     }
 
+    WSLC_TEST_METHOD(BuildImageFailureHeredocCarriageReturnHint)
+    {
+        auto contextDir = std::filesystem::current_path() / "build-context-heredoc-cr";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        const auto hint = wsl::shared::Localization::MessageWslcBuildHeredocCarriageReturn();
+        auto buildAndGetError = [&](const std::string& content) {
+            {
+                std::ofstream dockerfile(contextDir / "Dockerfile", std::ios::binary | std::ios::trunc);
+                dockerfile << content;
+            }
+
+            VERIFY_FAILED(BuildImageFromContext(contextDir, "wslc-test-build-heredoc-cr:latest"));
+            auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
+            VERIFY_IS_TRUE(comError.has_value());
+            LogInfo("Build error: %ls", comError->Message.get());
+            return std::wstring(comError->Message.get());
+        };
+
+        auto error = buildAndGetError("FROM debian:latest\r\nRUN <<EOF\r\nset -e\r\nEOF\r\n");
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, error.find(hint));
+
+        error = buildAndGetError("FROM debian:latest\nRUN <<EOF\nexit 1\nEOF\n");
+        VERIFY_ARE_EQUAL(std::wstring::npos, error.find(hint));
+    }
+
     WSLC_TEST_METHOD(BuildImageFailureShowsBuildOutput)
     {
         auto contextDir = std::filesystem::current_path() / "build-context-failure-output";
