@@ -382,15 +382,22 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->CreateFileSystemDevice(fileSystemRequest); }));
         auto& fileSystemTransport = std::get<VmVirtioFsDevice>(fileSystemRequest.Transport);
         fileSystemTransport.Layout = VmVirtioFsLayout::SingleShare;
-        fileSystemRequest.UserToken = request.Identity.UserToken;
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->CreateFileSystemDevice(fileSystemRequest); }));
+        // A single-share device takes its options, including its identity, from the share that it serves.
+        fileSystemTransport.Options.UserToken = request.Identity.UserToken;
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->CreateFileSystemDevice(fileSystemRequest); }));
+        fileSystemTransport.Options.UserToken.reset();
+        // OpenVMM runs under the VM identity, which cannot impersonate a token of higher integrity.
+        const wil::shared_handle elevatedToken{GetElevatedTestToken().release()};
+        fileSystemRequest.UserToken = elevatedToken;
+        VERIFY_ARE_EQUAL(E_ACCESSDENIED, OperationResult([&] { backend->CreateFileSystemDevice(fileSystemRequest); }));
         fileSystemRequest.UserToken.emplace();
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->CreateFileSystemDevice(fileSystemRequest); }));
-        fileSystemRequest.UserToken.reset();
+        VERIFY_ARE_EQUAL(E_UNEXPECTED, OperationResult([&] { backend->CreateFileSystemDevice(fileSystemRequest); }));
+        fileSystemRequest.UserToken = request.Identity.UserToken;
         const auto fileSystemDevice = backend->CreateFileSystemDevice(fileSystemRequest);
         VERIFY_ARE_EQUAL(UINT64{2}, fileSystemDevice.Id.Value);
         VERIFY_IS_TRUE(IsEqualGUID(request.Identity.VmId, fileSystemDevice.Id.Owner.VmId));
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Prepared, fileSystemDevice.State);
+        VERIFY_IS_FALSE(fileSystemDevice.Elevated);
         VERIFY_ARE_EQUAL(fileSystemTransport.Tag, std::get<VmVirtioFsDevice>(fileSystemDevice.Transport).Tag);
         VERIFY_ARE_EQUAL(VmVirtioFsLayout::SingleShare, std::get<VmVirtioFsDevice>(fileSystemDevice.Transport).Layout);
         VERIFY_ARE_EQUAL(
@@ -405,7 +412,15 @@ class OpenVmmVirtualMachineBackendTests
         shareOptions.MountOptions.emplace(L"uid", L"1000");
         shareOptions.MountOptions.emplace(L"gid", L"1000");
         shareOptions.MountOptions.emplace(L"symlinkroot", L"/mnt/");
+        shareRequest.UserToken = elevatedToken;
+        VERIFY_ARE_EQUAL(E_ACCESSDENIED, OperationResult([&] { backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest); }));
+        shareRequest.UserToken.reset();
+        shareOptions.UserToken = elevatedToken;
+        VERIFY_ARE_EQUAL(E_ACCESSDENIED, OperationResult([&] { backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest); }));
+        shareOptions.UserToken.reset();
+        VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Prepared, backend->GetFileSystemDeviceStatus(fileSystemDevice.Id).State);
         const auto share = backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest);
+        VERIFY_IS_FALSE(share.Elevated);
         const auto servingDevice = backend->GetFileSystemDeviceStatus(fileSystemDevice.Id);
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Prepared, fileSystemDevice.State);
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Serving, servingDevice.State);
@@ -424,8 +439,11 @@ class OpenVmmVirtualMachineBackendTests
         backend->RemoveFileSystemShare(share.Id);
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Prepared, backend->GetFileSystemDeviceStatus(fileSystemDevice.Id).State);
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Serving, servingDevice.State);
+        // A share may name its own identity, which OpenVMM impersonates instead of the device's.
+        shareOptions.UserToken = request.Identity.UserToken;
         const auto replacementShare = backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest);
         VERIFY_ARE_NOT_EQUAL(share.Id.Value, replacementShare.Id.Value);
+        VERIFY_IS_FALSE(replacementShare.Elevated);
         backend->RemoveFileSystemShare(replacementShare.Id);
 
         const auto network = backend->GetDescription().NetworkAdapters.at(networkRequest.Tag);
@@ -503,6 +521,35 @@ class OpenVmmVirtualMachineBackendTests
         backend->Terminate();
     }
 
+    TEST_METHOD(ServesFileSystemShareUnderUnelevatedToken)
+    {
+        SKIP_TEST_ARM64();
+        // A VM created by an elevated session serves an unelevated session's share under that session's token.
+        auto request = CreateRunnableRequest();
+        request.Identity.UserToken = wil::shared_handle{GetElevatedTestToken().release()};
+        GUID directoryId{};
+        THROW_IF_FAILED(CoCreateGuid(&directoryId));
+        const auto sharePath =
+            wsl::windows::common::filesystem::GetTempFolderPath(GetCurrentProcessToken()) /
+            (L"OpenVmmBackendTest-" + wsl::shared::string::GuidToString<wchar_t>(directoryId, wsl::shared::string::GuidToStringFlags::None));
+        THROW_IF_WIN32_BOOL_FALSE(CreateDirectoryW(sharePath.c_str(), nullptr));
+        auto removeShareDirectory = wil::scope_exit([&] { LOG_IF_WIN32_BOOL_FALSE(RemoveDirectoryW(sharePath.c_str())); });
+
+        auto backend = OpenVmmVirtualMachineBackend::Create(request);
+        VmFileSystemDeviceRequest deviceRequest{VmVirtioFsDevice{L"unelevated-share", VmVirtioFsLayout::SingleShare}};
+        deviceRequest.UserToken = wil::shared_handle{GetNonElevatedToken(TokenImpersonation).release()};
+        const auto device = backend->CreateFileSystemDevice(deviceRequest);
+        VERIFY_IS_FALSE(device.Elevated);
+
+        VmFileSystemShareRequest shareRequest;
+        shareRequest.HostPath = sharePath;
+        shareRequest.Options = VmVirtioFsShareOptions{};
+        const auto share = backend->AddFileSystemShare(device.Id, shareRequest);
+        VERIFY_IS_FALSE(share.Elevated);
+        VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Serving, backend->GetFileSystemDeviceStatus(device.Id).State);
+        backend->RemoveFileSystemShare(share.Id);
+    }
+
     TEST_METHOD(ManagesGuestListenerLifetime)
     {
         SKIP_TEST_ARM64();
@@ -517,6 +564,34 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_ARE_NOT_EQUAL(listener.Id.Value, replacement.Id.Value);
         backend->CloseGuestListener(replacement.Id);
         backend->Terminate();
+    }
+
+    TEST_METHOD(ManagesHostSocketLifetime)
+    {
+        SKIP_TEST_ARM64();
+        const auto exists = [](const std::filesystem::path& Path) {
+            return GetFileAttributesW(Path.c_str()) != INVALID_FILE_ATTRIBUTES;
+        };
+
+        auto backend = OpenVmmVirtualMachineBackend::Create(CreateRunnableRequest());
+        const auto socket = backend->CreateHostSocket({50000});
+        VERIFY_IS_TRUE(socket.has_value());
+        VERIFY_IS_TRUE(exists(socket->Path));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] { backend->CreateHostSocket(socket->Port); }));
+        VERIFY_IS_TRUE(exists(socket->Path));
+
+        auto invalidSocket = socket->Id;
+        THROW_IF_FAILED(CoCreateGuid(&invalidSocket.Owner.VmId));
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->CloseHostSocket(invalidSocket); }));
+        backend->CloseHostSocket(socket->Id);
+        VERIFY_IS_FALSE(exists(socket->Path));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->CloseHostSocket(socket->Id); }));
+
+        const auto replacement = backend->CreateHostSocket(socket->Port);
+        VERIFY_IS_TRUE(replacement.has_value());
+        VERIFY_ARE_NOT_EQUAL(socket->Id.Value, replacement->Id.Value);
+        backend->Terminate();
+        VERIFY_IS_FALSE(exists(replacement->Path));
     }
 
     TEST_METHOD(CapabilitiesReflectVmServiceProtocol)

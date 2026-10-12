@@ -53,18 +53,6 @@ std::wstring GetDaclAces(const std::filesystem::path& Path)
     return firstAce == std::wstring::npos ? std::wstring{} : dacl.substr(firstAce);
 }
 
-// Tests require elevation, so the test process token is the elevated counterpart of
-// GetNonElevatedToken() and stands in for an administrator's DrvFs share.
-wil::unique_handle GetElevatedTestToken()
-{
-    wil::unique_handle token;
-    THROW_IF_WIN32_BOOL_FALSE(OpenProcessToken(GetCurrentProcess(), TOKEN_ALL_ACCESS, &token));
-    wil::unique_handle impersonationToken;
-    THROW_IF_WIN32_BOOL_FALSE(
-        DuplicateTokenEx(token.get(), TOKEN_ALL_ACCESS, nullptr, SecurityImpersonation, TokenImpersonation, &impersonationToken));
-    return impersonationToken;
-}
-
 VmDiskRequest CreateDiskRequest(const std::filesystem::path& Path, std::optional<UINT32> Lun = std::nullopt)
 {
     VmDiskRequest request;

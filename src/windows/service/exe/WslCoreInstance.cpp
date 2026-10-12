@@ -27,6 +27,7 @@ WslCoreInstance::WslCoreInstance(
     _In_ const std::function<LX_INIT_DRVFS_MOUNT(HANDLE)>& DrvFsCallback,
     _In_ GuestConnectionCallback ConnectGuest,
     _In_ wsl::windows::common::GuestConnector Connector,
+    _In_ HostSocketCallback CreateHostSocket,
     _In_ ULONG FeatureFlags,
     _In_ DWORD SocketTimeout,
     _In_ int IdleTimeout,
@@ -41,6 +42,7 @@ WslCoreInstance::WslCoreInstance(
     m_initializeDrvFs(DrvFsCallback),
     m_connectGuest(std::move(ConnectGuest)),
     m_guestConnector(std::move(Connector)),
+    m_createHostSocket(std::move(CreateHostSocket)),
     m_ntClientLifetimeId(ClientLifetimeId),
     m_redirectorConnectionTargets{m_configuration.Name},
     m_socketTimeout(SocketTimeout),
@@ -137,6 +139,7 @@ WslCoreInstance::WslCoreInstance(
                 DrvFsCallback,
                 m_connectGuest,
                 m_guestConnector,
+                m_createHostSocket,
                 systemDistroFeatureFlags,
                 m_socketTimeout,
                 IdleTimeout,
@@ -428,6 +431,16 @@ void WslCoreInstance::Initialize()
     m_plan9Port = response.Plan9Port;
     m_distributionInfo.PidNamespace = response.PidNamespace;
 
+    // Without a host socket, the Plan 9 Redirector falls back to connecting over AF_HYPERV.
+    if (m_plan9Port != LX_INIT_UTILITY_VM_INVALID_PORT)
+    {
+        try
+        {
+            m_plan9Socket = m_createHostSocket(m_plan9Port);
+        }
+        CATCH_LOG()
+    }
+
     if (response.VersionIndex > 0)
     {
         m_configuration.OsVersion = wsl::shared::string::MultiByteToWide(wsl::shared::string::FromSpan(span, response.VersionIndex));
@@ -536,6 +549,7 @@ void WslCoreInstance::Stop()
 
     // Remove the instance's Plan 9 Redirector connection targets.
     m_redirectorConnectionTargets.RemoveAll();
+    m_plan9Socket.reset();
 
     // If the instance was terminated, terminate the associated system distro.
     m_systemDistro.reset();
@@ -545,8 +559,24 @@ void WslCoreInstance::Stop()
 
 void WslCoreInstance::RegisterPlan9ConnectionTarget(_In_ HANDLE userToken)
 {
+    std::lock_guard lock(m_lock);
+
     // If Plan 9 is running, add a connection target to the P9Rdr driver.
-    if (m_plan9Port != LX_INIT_UTILITY_VM_INVALID_PORT)
+    if (m_plan9Port == LX_INIT_UTILITY_VM_INVALID_PORT)
+    {
+        return;
+    }
+
+    if (m_plan9Socket)
+    {
+        using unique_unicode_string = wil::unique_struct<UNICODE_STRING, decltype(RtlFreeUnicodeString), RtlFreeUnicodeString>;
+        unique_unicode_string socketPath;
+        THROW_IF_NTSTATUS_FAILED(RtlDosPathNameToNtPathName_U_WithStatus(m_plan9Socket->c_str(), &socketPath, nullptr, nullptr));
+
+        m_redirectorConnectionTargets.AddConnectionTarget(
+            userToken, {}, m_defaultUid, std::wstring_view{socketPath.Buffer, socketPath.Length / sizeof(WCHAR)});
+    }
+    else
     {
         m_redirectorConnectionTargets.AddConnectionTarget(userToken, {}, m_defaultUid, {}, m_runtimeId, m_plan9Port);
     }

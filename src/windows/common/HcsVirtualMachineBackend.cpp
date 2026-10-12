@@ -712,6 +712,18 @@ void HcsVirtualMachineBackend::CloseGuestListener(VmListenerId Listener)
     RemoveGuestListenerLocked(Listener, m_configuration.Description.Identity);
 }
 
+std::optional<VmHostSocket> HcsVirtualMachineBackend::CreateHostSocket(GuestServicePort)
+{
+    // Host components connect to HCS guests directly over AF_HYPERV.
+    return std::nullopt;
+}
+
+void HcsVirtualMachineBackend::CloseHostSocket(VmHostSocketId Socket)
+{
+    validation::ValidateResourceId(Socket, m_configuration.Description.Identity);
+    THROW_HR(HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+}
+
 std::uint32_t HcsVirtualMachineBackend::ReserveLunLocked(const std::optional<VmScsiPlacement>& Placement) const
 {
     const auto lunInUse = [this](std::uint32_t Lun) {

@@ -71,12 +71,14 @@ struct VmDeviceTag;
 struct VmShareTag;
 struct VmListenerTag;
 struct VmPortBindingTag;
+struct VmHostSocketTag;
 
 using VmDiskId = VmResourceId<VmDiskTag>;
 using VmDeviceId = VmResourceId<VmDeviceTag>;
 using VmShareId = VmResourceId<VmShareTag>;
 using VmListenerId = VmResourceId<VmListenerTag>;
 using VmPortBindingId = VmResourceId<VmPortBindingTag>;
+using VmHostSocketId = VmResourceId<VmHostSocketTag>;
 
 // Backends own the extended resource; API methods return only its description by value.
 template <typename Description, typename BackendState>
@@ -166,6 +168,14 @@ struct VmGuestListenerState
     VmGuestListener Listener;
     wil::unique_socket Socket;
     wil::unique_event CancellationEvent{wil::EventOptions::ManualReset};
+};
+
+// An AF_UNIX socket file that relays each accepted connection to a guest service port.
+struct VmHostSocket
+{
+    VmHostSocketId Id;
+    GuestServicePort Port;
+    std::filesystem::path Path;
 };
 
 struct VmProcessorRequest
@@ -711,6 +721,12 @@ public:
     virtual wil::unique_socket ConnectGuest(GuestServicePort Port, _In_opt_ HANDLE ExitHandle = nullptr) = 0;
     virtual wsl::windows::common::GuestConnector GetGuestConnector() const = 0;
     virtual void CloseGuestListener(VmListenerId Listener) = 0;
+
+    // Creates a host socket for host components that can connect only over AF_UNIX, such as P9Rdr.
+    // Returns std::nullopt when such components can reach guest service ports directly over AF_HYPERV.
+    virtual std::optional<VmHostSocket> CreateHostSocket(GuestServicePort Port) = 0;
+    // Stops accepting connections on the host socket and deletes its file. Established connections are not affected.
+    virtual void CloseHostSocket(VmHostSocketId Socket) = 0;
 
     virtual VmDiskAttachment AttachDisk(const VmDiskRequest& Request) = 0;
     virtual std::vector<VmDiskAttachment> GetAttachedDisks() const = 0;

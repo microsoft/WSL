@@ -54,6 +54,10 @@ public:
     WslCoreInstance& operator=(const WslCoreInstance&) = delete;
     WslCoreInstance& operator=(WslCoreInstance&&) = delete;
 
+    // Creates a host AF_UNIX socket that relays to a guest port, closed when the returned path is released.
+    // Returns nullptr when host components can connect to guest ports over AF_HYPERV.
+    using HostSocketCallback = std::function<std::shared_ptr<const std::filesystem::path>(ULONG Port)>;
+
     WslCoreInstance(
         _In_ HANDLE UserToken,
         _In_ wil::unique_socket& InitSocket,
@@ -66,6 +70,7 @@ public:
         _In_ const std::function<LX_INIT_DRVFS_MOUNT(HANDLE)>& DrvFsCallback,
         _In_ GuestConnectionCallback ConnectGuest,
         _In_ wsl::windows::common::GuestConnector Connector,
+        _In_ HostSocketCallback CreateHostSocket,
         _In_ ULONG FeatureFlags,
         _In_ DWORD SocketTimeout,
         _In_ int IdleTimeout,
@@ -135,11 +140,13 @@ private:
     std::function<LX_INIT_DRVFS_MOUNT(HANDLE)> m_initializeDrvFs;
     GuestConnectionCallback m_connectGuest;
     wsl::windows::common::GuestConnector m_guestConnector;
+    HostSocketCallback m_createHostSocket;
     std::shared_ptr<WslCorePort> m_initChannel;
     std::shared_ptr<ConsoleManager> m_consoleManager;
     ULONG64 m_ntClientLifetimeId{};
     wsl::windows::common::redirector::ConnectionTargetManager m_redirectorConnectionTargets;
     ULONG m_plan9Port{LX_INIT_UTILITY_VM_INVALID_PORT};
+    std::shared_ptr<const std::filesystem::path> m_plan9Socket;
     std::shared_ptr<WslCoreInstance> m_systemDistro;
     WSLDistributionInformation m_distributionInfo{};
     DWORD m_socketTimeout{};

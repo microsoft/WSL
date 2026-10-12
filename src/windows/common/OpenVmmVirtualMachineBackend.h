@@ -53,6 +53,8 @@ public:
         return wsl::windows::common::GuestConnector::CreateOpenVmm(m_fileSystemResources.VsockPath);
     }
     void CloseGuestListener(VmListenerId Listener) override;
+    std::optional<VmHostSocket> CreateHostSocket(GuestServicePort Port) override;
+    void CloseHostSocket(VmHostSocketId Socket) override;
 
     VmDiskAttachment AttachDisk(const VmDiskRequest& Request) override;
     std::vector<VmDiskAttachment> GetAttachedDisks() const override;
@@ -104,6 +106,7 @@ private:
     struct OpenVmmFileSystemDevice
     {
         std::optional<std::uint64_t> Share;
+        wil::shared_handle UserToken;
     };
 
     using FileSystemDevice = VmResource<VmFileSystemDevice, OpenVmmFileSystemDevice>;
@@ -143,6 +146,8 @@ private:
     _Guarded_by_(m_lock) std::uint64_t m_nextDeviceId = 1;
     _Guarded_by_(m_lock) std::uint64_t m_nextShareId = 1;
     _Guarded_by_(m_lock) std::uint64_t m_nextPortBindingId = 1;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, VmHostSocket> m_hostSockets;
+    _Guarded_by_(m_lock) std::uint64_t m_nextHostSocketId = 1;
     // Serialize additions, including waiting for guest enumeration, so /dev/pmemN follows add order.
     wil::srwlock m_persistentMemoryLock;
     _Guarded_by_(m_persistentMemoryLock) std::uint32_t m_nextPersistentMemoryIndex = 0;
