@@ -1,4 +1,4 @@
-# Publishes the release NuGet packages to nuget.org.
+# Publishes the release NuGet packages to the WSL feed.
 parameters:
   - name: bypassTests
     type: boolean
@@ -11,16 +11,9 @@ parameters:
       - Microsoft.WSL.Containers
 
 stages:
-  - template: publish-gate-stage.yml
-    parameters:
-      name: gate_nuget_org
-      displayName: Gate - NuGet.org
-      releaseEnvironment: Production
-
-  - stage: nuget_org
-    displayName: NuGet.org
+  - stage: nuget_publish
+    displayName: Publish nuget packages
     dependsOn:
-      - gate_nuget_org
       - package
       - ${{ if eq(parameters.bypassTests, false) }}:
           - test
@@ -29,7 +22,7 @@ stages:
     jobs:
       - ${{ each package in parameters.packages }}:
           - job: nuget_${{ replace(package, '.', '_') }}
-            displayName: Push ${{ package }} to NuGet.org
+            displayName: Push ${{ package }}
             pool:
               type: release
               os: windows
