@@ -238,7 +238,9 @@ static void CreatePerfWrapper(const std::string& target)
 
     const auto content = std::format(
         "#!/bin/sh\n"
-        "PERF_EXEC_PATH={}\n"
+        "if [ -z \"${{PERF_EXEC_PATH:-}}\" ]; then\n"
+        "    PERF_EXEC_PATH={}\n"
+        "fi\n"
         "export PERF_EXEC_PATH\n"
         "exec {} \"$@\"\n",
         ShellQuote(target + "/libexec/perf-core"),

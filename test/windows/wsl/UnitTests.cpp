@@ -3223,6 +3223,8 @@ EOF
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(command -v perf)\" = /usr/local/bin/perf"), 0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"perf --version", nullptr, nullptr, nullptr, nullptr), 0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(env -u PERF_EXEC_PATH perf --exec-path)\" = /usr/lib/wsl/perf/$(uname -r)/libexec/perf-core"), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(env PERF_EXEC_PATH= perf --exec-path)\" = /usr/lib/wsl/perf/$(uname -r)/libexec/perf-core"), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(env 'PERF_EXEC_PATH=/tmp/user perf helpers' perf --exec-path)\" = '/tmp/user perf helpers'"), 0u);
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(
                 L"test \"$(env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin perf --exec-path)\" = "
