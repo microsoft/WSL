@@ -96,6 +96,7 @@ enum Context : ULONGLONG
     QueryLatestGitHubRelease = 0x20000000000,
     VerifyChecksum = 0x40000000000,
     WslC = 0x80000000000,
+    OpenVMM = 0x100000000000,
 };
 
 DEFINE_ENUM_FLAG_OPERATORS(Context)

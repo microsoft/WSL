@@ -248,8 +248,7 @@ class MountTests
         TestMountStateIsDeletedOnShutdownImpl(true);
     }
 
-    // OpenVMM only supports VHD/VHDX disk sources; physical-disk pass-through is not implemented.
-    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(TestFilesystemDetectionWholeDisk)
+    WSL2_TEST_METHOD(TestFilesystemDetectionWholeDisk)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
@@ -263,8 +262,7 @@ class MountTests
         TestFilesystemDetectionWholeDiskImpl(true);
     }
 
-    // OpenVMM only supports VHD/VHDX disk sources; physical-disk pass-through is not implemented.
-    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(TestMountTwoPartitionsWithDetection)
+    WSL2_TEST_METHOD(TestMountTwoPartitionsWithDetection)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
@@ -278,8 +276,7 @@ class MountTests
         TestMountTwoPartitionsWithDetectionImpl(true);
     }
 
-    // OpenVMM only supports VHD/VHDX disk sources; physical-disk pass-through is not implemented.
-    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(TestFilesystemDetectionFail)
+    WSL2_TEST_METHOD(TestFilesystemDetectionFail)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
@@ -547,7 +544,7 @@ class MountTests
     }
 
     // Attach a disk, but don't mount it
-    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(TestBareMount)
+    WSL2_TEST_METHOD(TestBareMount)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
@@ -556,7 +553,7 @@ class MountTests
 
     // Validate that attached disks that were offline when attached
     // are still offline when detached
-    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(TestOfflineDiskStaysOffline)
+    WSL2_TEST_METHOD(TestOfflineDiskStaysOffline)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
         WslKeepAlive keepAlive;
@@ -587,7 +584,7 @@ class MountTests
     }
 
     // Mount one partition and validate that options are correctly applied
-    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(TestMountOnePartition)
+    WSL2_TEST_METHOD(TestMountOnePartition)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
@@ -595,7 +592,7 @@ class MountTests
     }
 
     // Mount two partitions on the same disk
-    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(TestMountTwoPartitions)
+    WSL2_TEST_METHOD(TestMountTwoPartitions)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
@@ -603,7 +600,7 @@ class MountTests
     }
 
     // Mount a fat partition
-    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(TestMountFatPartition)
+    WSL2_TEST_METHOD(TestMountFatPartition)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
         WslKeepAlive keepAlive;
@@ -631,14 +628,14 @@ class MountTests
     }
 
     // Mount the disk directly
-    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(TestMountWholeDisk)
+    WSL2_TEST_METHOD(TestMountWholeDisk)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
         TestMountWholeDiskImpl(false);
     }
 
-    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(TestMountStateIsDeletedOnShutdown)
+    WSL2_TEST_METHOD(TestMountStateIsDeletedOnShutdown)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
@@ -646,7 +643,7 @@ class MountTests
     }
 
     // Validate that a failure to mount a disk isn't fatal
-    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(TestMountFailuresArentFatal)
+    WSL2_TEST_METHOD(TestMountFailuresArentFatal)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
         WslKeepAlive keepAlive;
@@ -712,7 +709,7 @@ class MountTests
     }
 
     // Mount two partitions on the same disk and validate that the mount is restored
-    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(TestMountTwoPartitionsAfterTimeout)
+    WSL2_TEST_METHOD(TestMountTwoPartitionsAfterTimeout)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
         WslKeepAlive keepAlive;
@@ -742,7 +739,7 @@ class MountTests
     }
 
     // Validate that non-admin can remount saved disks
-    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(TestMount1PartitionAndRemountAsNonAdmin)
+    WSL2_TEST_METHOD(TestMount1PartitionAndRemountAsNonAdmin)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
         WslKeepAlive keepAlive;
@@ -779,7 +776,7 @@ class MountTests
     }
 
     // Run a bare mount and then mount a partition
-    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(TestAttachThenMount)
+    WSL2_TEST_METHOD(TestAttachThenMount)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
@@ -787,7 +784,7 @@ class MountTests
     }
 
     // Validate that unmounting works when the UVM is not running
-    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(TestMountOnePartitionAfterTimeout)
+    WSL2_TEST_METHOD(TestMountOnePartitionAfterTimeout)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
         WslKeepAlive keepAlive;
@@ -817,7 +814,7 @@ class MountTests
     }
 
     // Validate that the proper mount error is returned if the filesystem type is wrong
-    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(TestMountPartitionWithWrongFs)
+    WSL2_TEST_METHOD(TestMountPartitionWithWrongFs)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
         WslKeepAlive keepAlive;
@@ -839,7 +836,7 @@ class MountTests
     }
 
     // Validate that the proper mount error is returned if the partition can't be found
-    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(TestMountPartitionWithBadPartitionIndex)
+    WSL2_TEST_METHOD(TestMountPartitionWithBadPartitionIndex)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
         WslKeepAlive keepAlive;
@@ -861,7 +858,7 @@ class MountTests
     }
 
     // Validate that disk aren't detached if in use by other processes
-    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(TestDeviceCantBeMountedIfInUse)
+    WSL2_TEST_METHOD(TestDeviceCantBeMountedIfInUse)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
         {
@@ -912,7 +909,7 @@ class MountTests
         VERIFY_ARE_EQUAL(output, wsl::shared::string::MultiByteToWide(fileContent));
     }
 
-    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(TestMountWithFlagOption)
+    WSL2_TEST_METHOD(TestMountWithFlagOption)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
         WslKeepAlive keepAlive;

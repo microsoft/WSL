@@ -112,7 +112,8 @@ class PolicyTest
             L"--mount DoesNotExist",
             FormatErrorMessage(
                 L"Failed to attach disk 'DoesNotExist' to WSL2: The system cannot find the file specified. ",
-                L"Wsl/Service/AttachDisk/MountDisk/HCS/ERROR_FILE_NOT_FOUND"));
+                LxsstuOpenVmmMode() ? L"Wsl/Service/AttachDisk/MountDisk/OpenVMM/ERROR_FILE_NOT_FOUND"
+                                    : L"Wsl/Service/AttachDisk/MountDisk/HCS/ERROR_FILE_NOT_FOUND"));
     }
 
     WSL2_TEST_METHOD(MountPolicyDisabled)

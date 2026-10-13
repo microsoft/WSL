@@ -1,6 +1,7 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
 #include "precomp.h"
+#include "ExecutionContext.h"
 #include "vsock.hpp"
 #include "socket.hpp"
 
@@ -23,6 +24,13 @@ SOCKADDR_UN wsl::windows::common::vsock::GetUnixSocketAddress(_In_ const std::fi
 
 wil::unique_socket wsl::windows::common::vsock::Connect(_In_ const std::filesystem::path& VsockPath, _In_ unsigned long Port, _In_opt_ HANDLE ExitHandle)
 {
+    std::optional<ExecutionContext> context;
+    const auto* current = ExecutionContext::Current();
+    if (current == nullptr || WI_IsFlagClear(current->CurrentContext(), Context::OpenVMM))
+    {
+        context.emplace(Context::OpenVMM);
+    }
+
     wil::unique_socket socket{::socket(AF_UNIX, SOCK_STREAM, 0)};
     THROW_WIN32_IF(static_cast<DWORD>(WSAGetLastError()), !socket);
 

@@ -2,6 +2,7 @@
 
 #include "precomp.h"
 #include "Common.h"
+#include "ExecutionContext.h"
 #include "OpenVmmNatNetworking.h"
 #include "OpenVmmVirtualMachineBackend.h"
 #include "VirtualMachineBackendTestHelpers.h"
@@ -78,6 +79,122 @@ class OpenVmmVirtualMachineBackendTests
     {
         VERIFY_ARE_EQUAL(0, WSACleanup());
         return true;
+    }
+
+    TEST_METHOD(CreationAndGuestConnectionErrorsIncludeBackend)
+    {
+        using namespace wsl::windows::common;
+        const wsl::windows::common::Error hcsError{
+            HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND),
+            Context::Wsl | Context::Service | Context::AttachDisk | Context::MountDisk | Context::HCS};
+        VERIFY_ARE_EQUAL(L"Wsl/Service/AttachDisk/MountDisk/HCS/ERROR_FILE_NOT_FOUND", wslutil::ErrorToString(hcsError).Code);
+        {
+            ExecutionContext context(Context::Wsl);
+            ExecutionContext serviceContext(Context::Service);
+            VmCreateRequest request;
+            VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { OpenVmmVirtualMachineBackend::Create(request); }));
+            VERIFY_IS_TRUE(context.ReportedError().has_value());
+            VERIFY_ARE_EQUAL(L"Wsl/Service/CreateVm/OpenVMM/E_INVALIDARG", wslutil::ErrorToString(context.ReportedError().value()).Code);
+            VERIFY_ARE_EQUAL(static_cast<ULONGLONG>(Context::Wsl | Context::Service), serviceContext.CurrentContext());
+        }
+        {
+            ExecutionContext context(Context::Wsl);
+            const auto connector = GuestConnector::CreateOpenVmm(std::wstring(256, L'a'));
+            VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { connector.Connect(1234); }));
+            VERIFY_IS_TRUE(context.ReportedError().has_value());
+            VERIFY_ARE_EQUAL(L"Wsl/OpenVMM/E_INVALIDARG", wslutil::ErrorToString(context.ReportedError().value()).Code);
+        }
+    }
+
+    TEST_METHOD(OperationErrorsIncludeBackend)
+    {
+        SKIP_TEST_ARM64();
+        using namespace wsl::windows::common;
+        const auto request = CreateRunnableRequest();
+        auto backend = OpenVmmVirtualMachineBackend::Create(request);
+        const auto verifyError = [&](auto&& operation, HRESULT expectedResult, PCWSTR expectedCode) {
+            ExecutionContext context(Context::Wsl);
+            ExecutionContext serviceContext(Context::Service);
+            VERIFY_ARE_EQUAL(expectedResult, OperationResult([&] { operation(); }));
+            VERIFY_IS_TRUE(context.ReportedError().has_value());
+            VERIFY_ARE_EQUAL(expectedCode, wslutil::ErrorToString(context.ReportedError().value()).Code);
+            VERIFY_ARE_EQUAL(static_cast<ULONGLONG>(Context::Wsl | Context::Service), serviceContext.CurrentContext());
+        };
+
+        VmDiskRequest disk;
+        disk.Source = VmVirtualDiskSource{
+            filesystem::GetTempFolderPath(GetCurrentProcessToken()) /
+                (wsl::shared::string::GuidToString<wchar_t>(request.Identity.VmId) + L"-missing.vhdx"),
+            VmDiskFormat::Vhdx};
+        verifyError(
+            [&] {
+                ExecutionContext attachContext(Context::AttachDisk);
+                ExecutionContext mountContext(Context::MountDisk);
+                try
+                {
+                    backend->AttachDisk(disk);
+                }
+                catch (...)
+                {
+                    THROW_HR(wil::ResultFromCaughtException());
+                }
+            },
+            HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND),
+            L"Wsl/Service/AttachDisk/MountDisk/OpenVMM/ERROR_FILE_NOT_FOUND");
+        verifyError([&] { backend->DetachDisk({}); }, E_INVALIDARG, L"Wsl/Service/OpenVMM/E_INVALIDARG");
+        verifyError(
+            [&] { backend->GetTerminationReason(); },
+            HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+            L"Wsl/Service/OpenVMM/ERROR_INVALID_STATE");
+        verifyError([&] { backend->AddGpu({}); }, c_notSupported, L"Wsl/Service/OpenVMM/ERROR_NOT_SUPPORTED");
+        verifyError([&] { backend->AddSharedMemory({}); }, c_notSupported, L"Wsl/Service/OpenVMM/ERROR_NOT_SUPPORTED");
+        verifyError([&] { backend->ConfigureGuestDma({}); }, c_notSupported, L"Wsl/Service/OpenVMM/ERROR_NOT_SUPPORTED");
+        VmPersistentMemoryRequest persistentMemory;
+        persistentMemory.UserToken = request.Identity.UserToken;
+        verifyError(
+            [&] { backend->AddPersistentMemory(persistentMemory); }, c_notSupported, L"Wsl/Service/OpenVMM/ERROR_NOT_SUPPORTED");
+        verifyError([&] { backend->CreateFileSystemDevice({}); }, c_notSupported, L"Wsl/Service/OpenVMM/ERROR_NOT_SUPPORTED");
+        verifyError([&] { backend->GetFileSystemDeviceStatus({}); }, E_INVALIDARG, L"Wsl/Service/OpenVMM/E_INVALIDARG");
+        verifyError([&] { backend->AddFileSystemShare({}, {}); }, E_INVALIDARG, L"Wsl/Service/OpenVMM/E_INVALIDARG");
+        verifyError([&] { backend->RemoveFileSystemShare({}); }, E_INVALIDARG, L"Wsl/Service/OpenVMM/E_INVALIDARG");
+        verifyError([&] { backend->RemoveDevice({}); }, E_INVALIDARG, L"Wsl/Service/OpenVMM/E_INVALIDARG");
+        verifyError([&] { backend->CloseGuestListener({}); }, E_INVALIDARG, L"Wsl/Service/OpenVMM/E_INVALIDARG");
+        verifyError([&] { backend->CloseHostSocket({}); }, E_INVALIDARG, L"Wsl/Service/OpenVMM/E_INVALIDARG");
+        verifyError(
+            [&] {
+                ExecutionContext networkContext(Context::ConfigureNetworking);
+                backend->AddNetworkAdapter({});
+            },
+            c_notSupported,
+            L"Wsl/Service/ConfigureNetworking/OpenVMM/ERROR_NOT_SUPPORTED");
+        verifyError(
+            [&] { backend->UpdateNetworkAdapter({}, {}); }, E_INVALIDARG, L"Wsl/Service/ConfigureNetworking/OpenVMM/E_INVALIDARG");
+        verifyError(
+            [&] { backend->RemoveNetworkAdapter({}); }, E_INVALIDARG, L"Wsl/Service/ConfigureNetworking/OpenVMM/E_INVALIDARG");
+        verifyError([&] { backend->BindPort({}, {}); }, E_INVALIDARG, L"Wsl/Service/ConfigureNetworking/OpenVMM/E_INVALIDARG");
+        verifyError([&] { backend->UnbindPort({}); }, E_INVALIDARG, L"Wsl/Service/ConfigureNetworking/OpenVMM/E_INVALIDARG");
+        verifyError(
+            [&] { backend->CreateVirtualAddress({}, {}); }, E_INVALIDARG, L"Wsl/Service/ConfigureNetworking/OpenVMM/E_INVALIDARG");
+        verifyError(
+            [&] { backend->CreateDnsRecord({}, {}); }, E_INVALIDARG, L"Wsl/Service/ConfigureNetworking/OpenVMM/E_INVALIDARG");
+
+        backend->Terminate();
+        verifyError(
+            [&] { backend->Start(); }, HRESULT_FROM_WIN32(ERROR_INVALID_STATE), L"Wsl/Service/OpenVMM/ERROR_INVALID_STATE");
+        verifyError(
+            [&] { backend->Terminate(); }, HRESULT_FROM_WIN32(ERROR_INVALID_STATE), L"Wsl/Service/OpenVMM/ERROR_INVALID_STATE");
+        verifyError(
+            [&] { backend->CreateGuestListener({1234}); },
+            HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+            L"Wsl/Service/OpenVMM/ERROR_INVALID_STATE");
+        verifyError(
+            [&] { backend->ConnectGuest({1234}); },
+            HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+            L"Wsl/Service/OpenVMM/ERROR_INVALID_STATE");
+        verifyError(
+            [&] { backend->CreateHostSocket({1234}); },
+            HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+            L"Wsl/Service/OpenVMM/ERROR_INVALID_STATE");
     }
 
     TEST_METHOD(PreservesCallerIdentityAndBootInputs)
@@ -603,6 +720,7 @@ class OpenVmmVirtualMachineBackendTests
         for (const auto feature :
              {VmFeature::SerialConsole,
               VmFeature::HighMmio,
+              VmFeature::PhysicalDisk,
               VmFeature::PersistentMemory,
               VmFeature::VirtioFsFileBacked,
               VmFeature::UserModeNatNetwork,

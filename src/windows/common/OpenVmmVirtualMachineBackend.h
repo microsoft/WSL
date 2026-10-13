@@ -32,6 +32,7 @@ public:
 
     // Networking supports one creation-time Consomme NIC: 10.0.0.2/24, gateway 10.0.0.1,
     // default gateway MACs, automatic guest IPv6 and host DNS. Custom settings and hot-add are unsupported.
+    // Backend failures include OpenVMM in the contextualized error code.
     static std::unique_ptr<OpenVmmVirtualMachineBackend> Create(const VmCreateRequest& Request);
 
     static VmPlatformCapabilities QueryCapabilities();
@@ -89,6 +90,10 @@ private:
     void OnProcessExit(DWORD ExitCode) noexcept;
     void ReadProcessLog(wil::unique_hfile Pipe) noexcept;
     void Initialize(const VmCreateRequest& Request);
+    // Brings pass-through disks that were taken offline back online. Must only be called once OpenVMM
+    // no longer uses the disks.
+    _Requires_lock_held_(m_lock)
+    void RestorePassThroughDisksLocked() noexcept;
 
     static void DestroyVm(WslOpenVmmVm* Vm) noexcept;
     using UniqueVm = wil::unique_any<WslOpenVmmVm*, decltype(&DestroyVm), DestroyVm>;
@@ -134,9 +139,17 @@ private:
         bool DirectoryCreated = false;
     };
 
+    struct PassThroughDisk
+    {
+        // The host disk was taken offline for the attachment and must be brought back online.
+        bool RestoreOnline = false;
+        std::chrono::milliseconds DeviceTimeout{wsl::windows::common::disk::c_defaultDiskTimeoutMs};
+    };
+
     VmDescription m_description{};
     _Guarded_by_(m_lock) std::map<std::uint64_t, VmDiskAttachment> m_attachedDisks;
     _Guarded_by_(m_lock) std::map<std::uint64_t, GUID> m_diskInstanceIds;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, PassThroughDisk> m_passThroughDisks;
     _Guarded_by_(m_lock) std::uint64_t m_nextDiskId = 1;
     _Guarded_by_(m_lock) std::map<std::uint64_t, VmPersistentMemoryDevice> m_persistentMemoryDevices;
     _Guarded_by_(m_lock) std::map<std::uint64_t, FileSystemDevice> m_fileSystemDevices;
