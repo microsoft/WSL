@@ -885,7 +885,7 @@ private:
     /// Listens to host http proxy setting changes, tracks ongoing proxy queries, and stores current settings.
     /// Information used to configure Linux proxy environment variables.
     /// </summary>
-    _Guarded_by_(m_instanceLock) std::shared_ptr<HttpProxyStateTracker> m_httpProxyStateTracker{};
+    _Guarded_by_(m_instanceLock) std::shared_ptr<HttpProxyStateTracker> m_httpProxyStateTracker {};
 
     std::thread m_timezoneThread;
 };
