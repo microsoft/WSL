@@ -2544,7 +2544,6 @@ void WslCoreVm::RegisterCallbacks(_In_ const std::function<void(ULONG)>& DistroE
         }
         else
         {
-            // The callback only queues cleanup. Invoke it inline so it cannot outlive this VM.
             TerminationCallback(m_runtimeId);
         }
     }

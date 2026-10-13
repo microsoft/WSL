@@ -4348,8 +4348,8 @@ VOID CALLBACK LxssUserSessionImpl::s_VmIdleTerminate(_Inout_ PTP_CALLBACK_INSTAN
 
 void LxssUserSessionImpl::s_VmTerminated(_Inout_ LxssUserSessionImpl* UserSession, _In_ const GUID& VmId)
 {
-    // HCS drains its callbacks during VM destruction, which holds m_instanceLock.
-    // Only publish the notification here; the session owns and drains the cleanup work.
+    // s_ProcessVmExit needs m_instanceLock, which cannot be held while in an HCS callback, since that could deadlock
+    // with WslCoreVm's destructor, which wait for the HCS callback to complete while releasing the VM handle.
     UserSession->m_exitedVmId.store(VmId);
     SubmitThreadpoolWork(UserSession->m_vmExitWork.get());
 }

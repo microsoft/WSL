@@ -857,8 +857,14 @@ private:
     /// </summary>
     wil::unique_threadpool_timer m_vmTerminationTimer;
 
-    // VM destruction drains notifications before a replacement VM can publish its exit.
+    /// <summary>
+    /// ID of the last VM that exited.
+    /// </summary>
     std::atomic<GUID> m_exitedVmId{GUID_NULL};
+
+    /// <summary>
+    /// Work item to handle VM exit.
+    /// </summary>
     wil::unique_threadpool_work m_vmExitWork;
 
     /// <summary>
