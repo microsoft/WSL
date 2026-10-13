@@ -2743,14 +2743,14 @@ Usage:
         };
 
         // Attempt to import a vhd with an open handle.
+        // TODO: OpenVMM needs proper gRPC error marshalling to preserve ERROR_SHARING_VIOLATION instead of E_FAIL.
+        const bool openVmm = LxsstuOpenVmmMode();
         validateOutput(
             std::format(L"--import-in-place test-distro-corrupted \"{}\"", vhdPath.wstring()),
             FormatErrorMessage(
-                std::format(
-                    L"Failed to attach disk '\\\\?\\{}' to WSL2: The process cannot access the file because it is being used by "
-                    L"another process. ",
-                    vhdPath.wstring()),
-                L"Wsl/Service/RegisterDistro/MountDisk/HCS/ERROR_SHARING_VIOLATION"));
+                std::format(L"Failed to attach disk '\\\\?\\{}' to WSL2: {} ", vhdPath.wstring(), openVmm ? L"Unspecified error" : L"The process cannot access the file because it is being used by another process."),
+                openVmm ? L"Wsl/Service/RegisterDistro/MountDisk/OpenVMM/E_FAIL"
+                        : L"Wsl/Service/RegisterDistro/MountDisk/HCS/ERROR_SHARING_VIOLATION"));
 
         vhd.reset();
 
