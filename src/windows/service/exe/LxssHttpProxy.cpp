@@ -37,9 +37,9 @@ try
     static HRESULT loadResult = E_UNEXPECTED;
 
     std::call_once(winHttpLoadFlag, [&]() {
-        loadResult = wil::ResultFromException([&]() {
+        loadResult = [&]() {
             winHttpModule.reset(LoadLibraryEx(c_winhttpModuleName, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32));
-            THROW_LAST_ERROR_IF(!winHttpModule);
+            RETURN_LAST_ERROR_IF(!winHttpModule);
 
             // Initialize dynamic functions for the WinHttp Proxy OS APIs
             // Not using the throwing constructor
@@ -74,7 +74,7 @@ try
             s_WinHttpGetProxySettingsResultEx.emplace(std::move(local_WinHttpGetProxySettingsResultEx));
             s_WinHttpFreeProxySettingsEx.emplace(std::move(local_WinHttpFreeProxySettingsEx));
             return S_OK;
-        });
+        }();
     });
 
     return loadResult;
