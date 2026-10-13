@@ -2675,15 +2675,6 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
     <value>Copy files between a container and the local filesystem.</value>
   </data>
-  <data name="WSLCCLI_ContainerCpExampleLocalToContainer" xml:space="preserve">
-    <value>Local to container</value>
-  </data>
-  <data name="WSLCCLI_ContainerCpExampleContainerToLocal" xml:space="preserve">
-    <value>Container to local</value>
-  </data>
-  <data name="WSLCCLI_ContainerCpExampleStdinToContainer" xml:space="preserve">
-    <value>Stdin to container</value>
-  </data>
   <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
     <value>Source: local path, CONTAINER:PATH, or '-' for stdin</value>
     <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>

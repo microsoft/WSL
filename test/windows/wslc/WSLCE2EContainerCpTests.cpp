@@ -53,25 +53,6 @@ class WSLCE2EContainerCpTests
         VERIFY_ARE_EQUAL(L"", result.Stderr.value());
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_HelpExamplesUseInvokedCommand)
-    {
-        const std::vector<std::pair<std::wstring, std::wstring>> testCases{
-            {L"cp --help", L"wslc cp"},
-            {L"container cp --help", L"wslc container cp"},
-        };
-
-        for (const auto& [commandLine, invocation] : testCases)
-        {
-            const auto result = RunWslc(commandLine);
-            VERIFY_IS_TRUE(result.ExitCode.has_value());
-            VERIFY_ARE_EQUAL(0u, result.ExitCode.value());
-            VERIFY_IS_TRUE(result.Stdout.has_value());
-            VERIFY_IS_TRUE(result.Stdout->find(invocation + L" LOCAL_PATH CONTAINER:PATH") != std::wstring::npos);
-            VERIFY_IS_TRUE(result.Stdout->find(invocation + L" CONTAINER:PATH LOCAL_PATH") != std::wstring::npos);
-            VERIFY_IS_TRUE(result.Stdout->find(invocation + L" - CONTAINER:PATH") != std::wstring::npos);
-        }
-    }
-
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_HelpListsFollowLink)
     {
         auto result = RunWslc(L"container cp --help");

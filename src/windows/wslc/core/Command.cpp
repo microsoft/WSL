@@ -455,37 +455,7 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
                 Format::Default);
         }
 
-        terminal.Write(helpLevel, L"\n");
-
-        if (fullHelp)
-        {
-            const auto examples = Examples();
-            size_t labelWidth = 0;
-            for (const auto& example : examples)
-            {
-                labelWidth = std::max(labelWidth, example.Label.size());
-            }
-
-            for (const auto& example : examples)
-            {
-                terminal.Write(
-                    helpLevel,
-                    L"{:{}}{}:{:{}} {}{}{} {}{}{}\n",
-                    L"",
-                    c_helpRowIndent,
-                    example.Label,
-                    L"",
-                    labelWidth - example.Label.size(),
-                    HelpCommandEmphasis,
-                    commandInvocation,
-                    Format::Default,
-                    HelpPlaceholderEmphasis,
-                    example.Arguments,
-                    Format::Default);
-            }
-        }
-
-        terminal.Write(helpLevel, L"\n");
+        terminal.Write(helpLevel, L"\n\n");
     }
 
     if (fullHelp && !commandAliases.empty())
