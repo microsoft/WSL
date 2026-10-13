@@ -24,8 +24,35 @@ using wsl::windows::service::wslc::WSLCSessionManagerImpl;
 CoCreatableClassWithFactory(WSLCSessionManager, WSLCSessionManagerFactory);
 
 static std::mutex g_mutex;
+
+static std::mutex g_pluginLookupLock;
+static std::condition_variable g_pluginLookupCv;
+_Guarded_by_(g_pluginLookupLock) static bool g_allowPluginLookups = true;
+_Guarded_by_(g_pluginLookupLock) static size_t g_activePluginLookups = 0;
+
 static std::optional<WSLCSessionManagerImpl> g_sessionManagerImpl = std::make_optional<WSLCSessionManagerImpl>();
 static Microsoft::WRL::ComPtr<WSLCSessionManager> g_sessionManager;
+
+
+
+wil::com_ptr<IWSLCSession> wsl::windows::service::wslc::FindWslcSession(ULONG SessionId)
+{
+    {
+        std::lock_guard lock(g_pluginLookupLock);
+        THROW_HR_IF(RPC_E_DISCONNECTED, !g_allowPluginLookups);
+
+        ++g_activePluginLookups;
+    }
+
+    auto release = wil::scope_exit([]() {
+        std::lock_guard lock(g_pluginLookupLock);
+        --g_activePluginLookups;
+        g_pluginLookupCv.notify_all();
+    });
+
+    // Shutdown cannot reset the session manager until all lookups have returned.
+    return g_sessionManagerImpl->FindSession(SessionId);
+}
 
 HRESULT WSLCSessionManagerFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_ REFIID riid, _Out_ void** ppCreated)
 {
@@ -73,6 +100,13 @@ void wsl::windows::service::wslc::ClearWslcSessionsAndBlockNewInstances()
         g_sessionManager.Reset();
 
         // N.B. Callers might still have references to the COM instance. If that's the case, calls will all fail with RPC_E_DISCONNECTED.
+    }
+
+    // Wait for all plugin looks to complete before resetting the session manager.
+    {
+        std::unique_lock lock(g_pluginLookupLock);
+        g_allowPluginLookups = false;
+        g_pluginLookupCv.wait(lock, []() { return g_activePluginLookups == 0; });
     }
 
     g_sessionManagerImpl.reset();

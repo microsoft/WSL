@@ -54,8 +54,6 @@ namespace settings = wsl::windows::wslc::settings;
 
 namespace {
 
-std::atomic<wsl::windows::service::wslc::WSLCSessionManagerImpl*> g_managerInstance{nullptr};
-
 // Session settings built server-side from the caller's settings.yaml.
 struct SessionSettings
 {
@@ -143,15 +141,8 @@ private:
 
 } // namespace
 
-WSLCSessionManagerImpl::WSLCSessionManagerImpl()
-{
-    g_managerInstance.store(this);
-}
-
 WSLCSessionManagerImpl::~WSLCSessionManagerImpl()
 {
-    g_managerInstance.store(nullptr);
-
     // Terminate all sessions on shutdown.
     // Call Terminate() directly rather than going through ForEachSession(),
     // which would needlessly resolve weak references and call GetState().
@@ -685,11 +676,6 @@ try
 CATCH_RETURN();
 
 namespace wsl::windows::service::wslc {
-
-WSLCSessionManagerImpl* WSLCSessionManagerImpl::Instance() noexcept
-{
-    return g_managerInstance.load();
-}
 
 wil::com_ptr<IWSLCSession> WSLCSessionManagerImpl::FindSession(ULONG Id)
 {
