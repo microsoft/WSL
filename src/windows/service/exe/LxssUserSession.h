@@ -639,7 +639,6 @@ private:
     _Requires_exclusive_lock_held_(m_instanceLock)
     void _LoadDiskMounts();
 
-    _Requires_exclusive_lock_held_(m_instanceLock)
     void _LoadNetworkingSettings(_Inout_ wsl::core::Config& config, _In_ HANDLE userToken);
 
     void _ProcessImportResultMessage(
@@ -884,7 +883,7 @@ private:
     /// Listens to host http proxy setting changes, tracks ongoing proxy queries, and stores current settings.
     /// Information used to configure Linux proxy environment variables.
     /// </summary>
-    std::shared_ptr<HttpProxyStateTracker> m_httpProxyStateTracker{};
+    std::atomic<std::shared_ptr<HttpProxyStateTracker>> m_httpProxyStateTracker{};
 
     std::thread m_timezoneThread;
 };
