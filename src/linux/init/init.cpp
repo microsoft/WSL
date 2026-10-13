@@ -3666,7 +3666,7 @@ void WaitForBootProcess(wsl::linux::WslDistributionConfig& Config)
                 [&]() {
                     std::string Output;
                     THROW_LAST_ERROR_IF(
-                        UtilExecCommandLine("systemctl is-system-running | grep -E \"running|degraded\"", &Output, {0}, false) < 0);
+                        UtilExecCommandLine("systemctl is-system-running 2>/dev/null | grep -E \"running|degraded\"", &Output, {0}, false) < 0);
                 },
                 std::chrono::milliseconds{250},
                 std::chrono::milliseconds{Config.BootInitTimeout});
