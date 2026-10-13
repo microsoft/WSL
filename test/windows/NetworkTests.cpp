@@ -826,7 +826,7 @@ class NetworkTests
               L"fc00::1"}});
     }
 
-    WSL2_TEST_METHOD(MacAddressChangeAndBack)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(MacAddressChangeAndBack)
     {
         const auto originalMac = GetMacAddress();
 
