@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include <limits>
 #include "WslCoreInstance.h"
 
 WslCoreInstance::WslCoreInstance(
@@ -504,19 +505,27 @@ void WslCoreInstance::Initialize()
         }
         CATCH_LOG()
 
-        // -1 indicates that the sparse attribute could not be read.
+        const auto ext4Bytes = [](uint64_t bytes) -> int64_t {
+            if (bytes > static_cast<uint64_t>((std::numeric_limits<int64_t>::max)()))
+            {
+                LOG_HR_MSG(E_INVALIDARG, "Guest ext4 space exceeds the telemetry range");
+                return -1;
+            }
+
+            return static_cast<int64_t>(bytes);
+        };
+
+        // -1 indicates that a measurement is unavailable.
         WSL_LOG_TELEMETRY(
             "DiskSpaceInfo",
             PDT_ProductAndServicePerformance,
             TraceLoggingValue(m_instanceId, "instanceId"),
             TraceLoggingValue(m_configuration.DistroId, "distroId"),
             TraceLoggingValue(sparseVhd.value_or(-1), "sparseVhd"),
-            TraceLoggingValue(hostSpace.has_value(), "hostSpaceKnown"),
-            TraceLoggingValue(hostSpace ? hostSpace->EndOfFile.QuadPart : 0, "vhdLogicalBytes"),
-            TraceLoggingValue(hostSpace ? hostSpace->AllocationSize.QuadPart : 0, "vhdAllocatedBytes"),
-            TraceLoggingValue(m_fileSystemSpace.has_value(), "fileSystemSpaceKnown"),
-            TraceLoggingValue(m_fileSystemSpace ? m_fileSystemSpace->TotalBytes : 0, "ext4TotalBytes"),
-            TraceLoggingValue(m_fileSystemSpace ? m_fileSystemSpace->UsedBytes : 0, "ext4UsedBytes"));
+            TraceLoggingValue(hostSpace ? hostSpace->EndOfFile.QuadPart : -1, "vhdLogicalBytes"),
+            TraceLoggingValue(hostSpace ? hostSpace->AllocationSize.QuadPart : -1, "vhdAllocatedBytes"),
+            TraceLoggingValue(m_fileSystemSpace ? ext4Bytes(m_fileSystemSpace->TotalBytes) : -1, "ext4TotalBytes"),
+            TraceLoggingValue(m_fileSystemSpace ? ext4Bytes(m_fileSystemSpace->UsedBytes) : -1, "ext4UsedBytes"));
     }
 }
 
