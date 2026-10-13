@@ -30,7 +30,12 @@ public:
     NON_COPYABLE(WSLCVolumes);
     NON_MOVABLE(WSLCVolumes);
 
-    WSLCVolumes(DockerHTTPClient& dockerClient, WSLCVirtualMachine& virtualMachine, DockerEventTracker& eventTracker, const std::filesystem::path& storagePath);
+    WSLCVolumes(
+        DockerHTTPClient& dockerClient,
+        WSLCVirtualMachine& virtualMachine,
+        DockerEventTracker& eventTracker,
+        const std::filesystem::path& storagePath,
+        DockerEventTracker::VolumeEventCallback onVolumeEvent);
     ~WSLCVolumes() = default;
 
     WSLCVolumeInformation CreateVolume(
@@ -60,7 +65,7 @@ private:
     __requires_lock_held(m_lock) void OpenVolumeExclusiveLockHeld(const std::string& volumeName);
     __requires_lock_held(m_lock) void OnVolumeDeletedExclusiveLockHeld(const std::string& volumeName);
 
-    void OnVolumeEvent(const std::string& volumeName, VolumeEvent event, std::int64_t eventTimeNano);
+    void OnVolumeEvent(const std::string& volumeName, const std::string& action, const std::map<std::string, std::string>& attributes, std::int64_t eventTimeNano);
 
     mutable wil::srwlock m_lock;
     _Guarded_by_(m_lock) std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>> m_volumes;
@@ -69,6 +74,7 @@ private:
     DockerHTTPClient& m_dockerClient;
     WSLCVirtualMachine& m_virtualMachine;
     std::filesystem::path m_storagePath;
+    const DockerEventTracker::VolumeEventCallback m_onVolumeEvent;
     DockerEventTracker::EventTrackingReference m_volumeEventTracking;
 };
 

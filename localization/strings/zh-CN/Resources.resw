@@ -2451,6 +2451,10 @@ Windows 版本: {}</value>
     <value>对于 --output 值 '{}'，无法将构建输出写入控制台。</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcBuildStdinContextAndDockerfile" xml:space="preserve">
+    <value>不能将 stdin 同时用于构建上下文和 Dockerfile。</value>
+    <comment>{Locked="stdin"}{Locked="Dockerfile"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>缺少必需选项: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3456,7 +3460,8 @@ Windows 版本: {}</value>
     <value>已保存映像的路径</value>
   </data>
   <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
-    <value>生成上下文目录的路径</value>
+    <value>构建上下文目录的路径(使用 "-" 从 stdin 读取 tar 存档或 Dockerfile)</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
     <value>将端口从容器发布到主机</value>
@@ -3860,6 +3865,10 @@ Windows 版本: {}</value>
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>无法将图像写入终端。请使用 -o 选项或重定向 stdout。</value>
+  </data>
+  <data name="WSLCCLI_BuildStdinIsTerminalError" xml:space="preserve">
+    <value>无法从终端读取构建输入。将 Dockerfile 或 tar 存档发送到 stdin。</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
     <value>无法将容器导出到终端。请使用 -o 选项或重定向标准输出。</value>

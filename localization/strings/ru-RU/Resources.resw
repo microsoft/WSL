@@ -2458,6 +2458,10 @@
     <value>Невозможно записать выходные данные сборки в консоль для значения --output '{}'.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcBuildStdinContextAndDockerfile" xml:space="preserve">
+    <value>Не удается использовать stdin одновременно для контекста сборки и Dockerfile.</value>
+    <comment>{Locked="stdin"}{Locked="Dockerfile"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>Отсутствует обязательный параметр: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3464,7 +3468,8 @@
     <value>Путь к сохранённому образу.</value>
   </data>
   <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
-    <value>Путь к каталогу контекста сборки</value>
+    <value>Путь к каталогу контекста сборки (используйте "-", чтобы считать архив tar или Dockerfile из stdin)</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
     <value>Опубликовать порт из контейнера на узел</value>
@@ -3868,6 +3873,10 @@
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>Невозможно записать образ в терминал. Используйте параметр -o или перенаправьте StdOut.</value>
+  </data>
+  <data name="WSLCCLI_BuildStdinIsTerminalError" xml:space="preserve">
+    <value>Не удается считать входные данные сборки из терминала. Передайте Dockerfile или архив tar через канал в stdin.</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
     <value>Не удалось экспортировать контейнер в терминал. Используйте параметр -o или перенаправьте StdOut.</value>

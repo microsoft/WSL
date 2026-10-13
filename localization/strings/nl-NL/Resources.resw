@@ -2451,6 +2451,10 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
     <value>Kan de build-uitvoer niet naar de console schrijven voor --output value '{}'.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcBuildStdinContextAndDockerfile" xml:space="preserve">
+    <value>Kan stdin niet gebruiken voor zowel de buildcontext als de Dockerfile.</value>
+    <comment>{Locked="stdin"}{Locked="Dockerfile"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>Ontbrekende vereiste optie: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3457,7 +3461,8 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Pad voor de opgeslagen afbeelding</value>
   </data>
   <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
-    <value>Pad naar de buildcontextmap</value>
+    <value>Pad naar de map met de buildcontext (gebruik "-" om een tar-archief of Dockerfile uit stdin te lezen)</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
     <value>Een poort van een container naar de host publiceren</value>
@@ -3861,6 +3866,10 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>Kan de afbeelding niet naar de terminal schrijven. Gebruik de -o-optie of leid stdout om.</value>
+  </data>
+  <data name="WSLCCLI_BuildStdinIsTerminalError" xml:space="preserve">
+    <value>Kan buildinvoer niet uit de terminal lezen. Stuur een Dockerfile of tar-archief via een pipe naar stdin.</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
     <value>Kan container niet naar de terminal exporteren. Gebruik de -o-optie of leid stdout om.</value>

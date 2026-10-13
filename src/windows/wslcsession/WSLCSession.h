@@ -355,6 +355,9 @@ private:
     // Docker network notifications are forwarded to the event store as they arrive; the session's
     // network state is committed independently by the mutators under m_networksLock.
     void OnNetworkEvent(const std::string& NetworkId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t TimeNano) noexcept;
+
+    // WSLCVolumes forwards every Docker volume notification to the event store after updating the volumes it tracks.
+    void OnVolumeEvent(const std::string& VolumeName, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t TimeNano) noexcept;
     void OnContainerAction(const std::string& ContainerId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t TimeNano) noexcept;
 
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);

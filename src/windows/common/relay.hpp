@@ -67,7 +67,7 @@ public:
 
     ~ScopedMultiRelay();
 
-    ScopedMultiRelay(ScopedMultiRelay&& other) = default;
+    ScopedMultiRelay(ScopedMultiRelay&& other) = delete;
     ScopedMultiRelay(const ScopedMultiRelay&) = delete;
 
     ScopedMultiRelay& operator=(const ScopedMultiRelay&) = delete;
@@ -108,7 +108,7 @@ public:
 
     ~ScopedRelay();
 
-    ScopedRelay(ScopedRelay&& other) = default;
+    ScopedRelay(ScopedRelay&& other) = delete;
     ScopedRelay(const ScopedRelay&) = delete;
 
     ScopedRelay& operator=(const ScopedRelay&) = delete;

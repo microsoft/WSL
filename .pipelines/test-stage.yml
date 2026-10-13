@@ -23,6 +23,8 @@ parameters:
     default:
       - name: rs_prerelease
         image: rs_prerelease-2025-01-30
+      - name: rs_base2
+        image: rs_base2-2026-10-05
       - name: ge_current
         image: ge_current-2026-09-28
       - name: ge_release
