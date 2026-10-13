@@ -45,7 +45,7 @@ Notable ETL providers:
 
 The [log collection script](https://github.com/microsoft/WSL/blob/master/diagnostics/collect-wsl-logs.ps1)
 also records each registered WSL2 distro's VHD sparse-file state in
-`distro-sparse.json`. `Unknown` means the state could not be read; collecting
+`distro-info.json`. `Unknown` means the state could not be read; collecting
 this snapshot does not start the distros.
 
 

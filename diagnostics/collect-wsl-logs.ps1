@@ -147,7 +147,7 @@ function Collect-DistroSparseState {
         Collected = (Get-Date -Format "yyyy-MM-dd HH:mm:ss K")
         Distributions = $distributions
         Error = $collectionError
-    } | ConvertTo-Json -Depth 3 | Out-File -FilePath "$Folder/distro-sparse.json" -Encoding utf8
+    } | ConvertTo-Json -Depth 3 | Out-File -FilePath "$Folder/distro-info.json" -Encoding utf8
 }
 
 $folder = "WslLogs-" + (Get-Date -Format "yyyy-MM-dd_HH-mm-ss")
