@@ -631,6 +631,7 @@ private:
     /// <summary>
     /// Return a new config after policies have been applied.
     /// </summary>
+    _Requires_exclusive_lock_held_(m_instanceLock)
     wsl::core::Config _GetResultantConfig(_In_ const HANDLE userToken);
 
     _Requires_exclusive_lock_held_(m_instanceLock)
@@ -639,6 +640,7 @@ private:
     _Requires_exclusive_lock_held_(m_instanceLock)
     void _LoadDiskMounts();
 
+    _Requires_exclusive_lock_held_(m_instanceLock)
     void _LoadNetworkingSettings(_Inout_ wsl::core::Config& config, _In_ HANDLE userToken);
 
     void _ProcessImportResultMessage(
@@ -750,7 +752,7 @@ private:
     /// <summary>
     /// Configures HttpProxy info for the process
     /// </summary>
-    void _SetHttpProxyInfo(_Inout_ std::vector<std::string>& environment) const noexcept;
+    void _SetHttpProxyInfo(_Inout_ std::vector<std::string>& environment) noexcept;
 
     /// <summary>
     /// Launch OOBE for the first time or skip.
@@ -883,7 +885,7 @@ private:
     /// Listens to host http proxy setting changes, tracks ongoing proxy queries, and stores current settings.
     /// Information used to configure Linux proxy environment variables.
     /// </summary>
-    std::atomic<std::shared_ptr<HttpProxyStateTracker>> m_httpProxyStateTracker{};
+    _Guarded_by_(m_instanceLock) std::shared_ptr<HttpProxyStateTracker> m_httpProxyStateTracker{};
 
     std::thread m_timezoneThread;
 };

@@ -1473,11 +1473,11 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
         DistributionRegistration registration;
         LXSS_DISTRO_CONFIGURATION configuration;
         std::filesystem::path distributionPath;
+
+        std::unique_lock instanceLock(m_instanceLock);
         auto config = _GetResultantConfig(userToken.get());
 
         {
-            std::lock_guard lock(m_instanceLock);
-
             // Create a registration for the distribution and determine which version should be used.
             ULONG flags = LXSS_DISTRO_FLAGS_DEFAULT;
             WI_SetFlagIf(flags, LXSS_DISTRO_FLAGS_VM_MODE, (Version == LXSS_WSL_VERSION_2));
@@ -1541,6 +1541,8 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
             // Add the distribution to the list of converting distributions.
             _ConversionBegin(configuration.DistroId, LxssDistributionStateInstalling);
         }
+
+        instanceLock.unlock();
 
         // Set up a scope exit member to remove the distribution from the converting list.
         auto installComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { _ConversionComplete(configuration.DistroId); });
@@ -2268,7 +2270,7 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, ShutdownBeh
 
             // Reset the proxy state.
             // We don't clear it in _VMTerminate because we want to cache results if possible.
-            m_httpProxyStateTracker.store(nullptr);
+            m_httpProxyStateTracker.reset();
 
             // Clear any attached disk state.
             // This is needed because wsl --shutdown might be called after the vm
@@ -2990,7 +2992,7 @@ void LxssUserSessionImpl::_CreateVm()
         // Create the utility VM and register for callbacks.
         m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId, std::move(initializeDrvFs));
 
-        if (const auto tracker = m_httpProxyStateTracker.load())
+        if (const auto tracker = m_httpProxyStateTracker)
         {
             // this needs to be done after the VM has finished in case we fell back to NAT mode
             tracker->ConfigureNetworkingMode(m_utilityVm->GetConfig().NetworkingMode);
@@ -3310,6 +3312,7 @@ LONG LxssUserSessionImpl::_GetElfExitStatus(_In_ const LXSS_RUN_ELF_CONTEXT& Con
     return exitStatus;
 }
 
+_Requires_exclusive_lock_held_(m_instanceLock)
 wsl::core::Config LxssUserSessionImpl::_GetResultantConfig(_In_ const HANDLE userToken)
 {
     const auto configFilePath = wsl::windows::common::helpers::GetWslConfigPath(userToken);
@@ -3394,6 +3397,7 @@ try
 }
 CATCH_LOG()
 
+_Requires_exclusive_lock_held_(m_instanceLock)
 void LxssUserSessionImpl::_LoadNetworkingSettings(_Inout_ wsl::core::Config& config, _In_ HANDLE userToken)
 try
 {
@@ -3402,13 +3406,12 @@ try
     {
         if (SUCCEEDED(HttpProxyStateTracker::s_LoadWinHttpProxyMethods()))
         {
-            if (auto tracker = m_httpProxyStateTracker.load(); !tracker)
+            if (!m_httpProxyStateTracker)
             {
                 try
                 {
-                    // Preserve a tracker installed by another caller while this one is being created.
-                    m_httpProxyStateTracker.compare_exchange_strong(
-                        tracker, std::make_shared<HttpProxyStateTracker>(config.InitialAutoProxyTimeout, userToken, config.NetworkingMode));
+                    m_httpProxyStateTracker =
+                        std::make_shared<HttpProxyStateTracker>(config.InitialAutoProxyTimeout, userToken, config.NetworkingMode);
                 }
                 catch (...)
                 {
@@ -4061,11 +4064,15 @@ void LxssUserSessionImpl::_VmTerminate()
     m_vmTerminating.ResetEvent();
 }
 
-void LxssUserSessionImpl::_SetHttpProxyInfo(std::vector<std::string>& environment) const noexcept
+void LxssUserSessionImpl::_SetHttpProxyInfo(std::vector<std::string>& environment) noexcept
 try
 {
-    // Copy guarantees a ref is held on the original instance, or it's null.
-    const auto localTracker = m_httpProxyStateTracker.load();
+    std::shared_ptr<HttpProxyStateTracker> localTracker;
+    {
+        std::lock_guard lock(m_instanceLock);
+        localTracker = m_httpProxyStateTracker;
+    }
+
     if (localTracker)
     {
         WSL_LOG("_SetHttpProxyInfo: Attempting to set proxy info");
