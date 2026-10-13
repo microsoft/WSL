@@ -574,36 +574,36 @@ LxssUserSessionImpl::LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId
 {
     THROW_IF_WIN32_BOOL_FALSE(::CopySid(sizeof(m_userSid), &m_userSid.Sid, userSid));
 
+    wil::unique_hkey lxssKey;
+    wil::unique_handle userToken;
+    {
+        userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+        lxssKey = s_OpenLxssUserKey(userToken.get());
+    }
+
+    static std::atomic<DWORD> sessionCookie;
+
+    m_session = {sessionCookie++, nullptr, &m_userSid.Sid};
+
+    // Detect existing legacy installs and convert them to the new format.
+    const DWORD state =
+        wsl::windows::common::registry::ReadDword(lxssKey.get(), nullptr, LXSS_LEGACY_INSTALL_VALUE, LxssDistributionStateInvalid);
+
+    if (state == LxssDistributionStateInstalled)
+    {
+        // Create a registration for legacy installs and delete legacy
+        // installed state.
+        std::lock_guard lock(m_instanceLock);
+        _CreateLegacyRegistration(lxssKey.get(), userToken.get());
+        wsl::windows::common::registry::DeleteKeyValue(lxssKey.get(), LXSS_LEGACY_INSTALL_VALUE);
+    }
+
+    // Create a threadpool timer to terminate a Linux utility VM that is idle.
+    m_vmTerminationTimer.reset(CreateThreadpoolTimer(s_VmIdleTerminate, this, nullptr));
+    THROW_IF_NULL_ALLOC(m_vmTerminationTimer);
+
     try
     {
-        wil::unique_hkey lxssKey;
-        wil::unique_handle userToken;
-        {
-            userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
-            lxssKey = s_OpenLxssUserKey(userToken.get());
-        }
-
-        static std::atomic<DWORD> sessionCookie;
-
-        m_session = {sessionCookie++, nullptr, &m_userSid.Sid};
-
-        // Detect existing legacy installs and convert them to the new format.
-        const DWORD state =
-            wsl::windows::common::registry::ReadDword(lxssKey.get(), nullptr, LXSS_LEGACY_INSTALL_VALUE, LxssDistributionStateInvalid);
-
-        if (state == LxssDistributionStateInstalled)
-        {
-            // Create a registration for legacy installs and delete legacy
-            // installed state.
-            std::lock_guard lock(m_instanceLock);
-            _CreateLegacyRegistration(lxssKey.get(), userToken.get());
-            wsl::windows::common::registry::DeleteKeyValue(lxssKey.get(), LXSS_LEGACY_INSTALL_VALUE);
-        }
-
-        // Create a threadpool timer to terminate a Linux utility VM that is idle.
-        m_vmTerminationTimer.reset(CreateThreadpoolTimer(s_VmIdleTerminate, this, nullptr));
-        THROW_IF_NULL_ALLOC(m_vmTerminationTimer);
-
         // Register for timezone update notifications.
 
         auto listenForTimeZoneChanges = [this] {
@@ -3461,6 +3461,8 @@ void LxssUserSessionImpl::_ProcessImportResultMessage(
 
         // Validate that name is valid, and doesn't conflict with existing distributions.
         s_ValidateDistroName(distributionName.c_str());
+
+        std::lock_guard lock(m_instanceLock);
         _ValidateDistributionNameAndPathNotInUse(LxssKey, nullptr, distributionName.c_str(), Registration.Id());
 
         Configuration.Name = std::move(distributionName);
@@ -3903,6 +3905,7 @@ bool LxssUserSessionImpl::_ValidateDistro(_In_ HKEY LxssKey, _In_ LPCGUID Distro
     return isValid;
 }
 
+_Requires_lock_held_(m_instanceLock)
 void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
     _In_ HKEY LxssKey, _In_opt_ LPCWSTR Path, _In_opt_ LPCWSTR Name, const std::optional<GUID>& Exclude)
 {

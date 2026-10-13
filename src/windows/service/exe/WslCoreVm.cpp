@@ -478,21 +478,24 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         std::promise<bool> initialResult;
         m_drvfsInitialResult = initialResult.get_future();
         auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
-        std::thread([this, guestDeviceLock = std::move(guestDeviceLock), initialResult = std::move(initialResult)]() mutable {
-            try
-            {
-                wsl::windows::common::wslutil::SetThreadDescription(L"InitializeDrvfs");
-                initialResult.set_value(InitializeDrvFsLockHeld(m_userToken.get()));
-            }
-            catch (...)
-            {
+        m_drvfsInitialThread =
+            std::thread([this, guestDeviceLock = std::move(guestDeviceLock), initialResult = std::move(initialResult)]() mutable {
                 try
                 {
-                    initialResult.set_exception(std::current_exception());
+                    wsl::windows::common::wslutil::SetThreadDescription(L"InitializeDrvfs");
+                    initialResult.set_value(InitializeDrvFsLockHeld(m_userToken.get()));
                 }
-                CATCH_LOG()
-            }
-        }).detach();
+                catch (...)
+                {
+                    LOG_CAUGHT_EXCEPTION();
+
+                    try
+                    {
+                        initialResult.set_exception(std::current_exception());
+                    }
+                    CATCH_LOG()
+                }
+            });
     }
 
     // Mount the system distro.
@@ -732,18 +735,14 @@ WslCoreVm::~WslCoreVm() noexcept
         TelemetryPrivacyDataTag(PDT_ProductAndServicePerformance),
         TraceLoggingValue(m_runtimeId, "vmId"));
 
+    if (m_drvfsInitialThread.joinable())
+    {
+        m_drvfsInitialThread.join();
+    }
+
     m_networkingEngine.reset();
 
     auto lock = m_lock.lock_exclusive();
-
-    if (m_drvfsInitialResult.valid())
-    {
-        try
-        {
-            m_drvfsInitialResult.get();
-        }
-        CATCH_LOG()
-    }
 
     // Clear out the exit callback.
     {
