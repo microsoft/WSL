@@ -105,6 +105,17 @@ struct Command
     virtual std::wstring ShortDescription() const = 0;
     virtual std::wstring LongDescription() const = 0;
 
+    struct HelpExample
+    {
+        std::wstring Label;
+        std::wstring Arguments;
+    };
+
+    virtual std::vector<HelpExample> Examples() const
+    {
+        return {};
+    }
+
     void OutputHelp(
         Terminal& terminal,
         HelpOutput output = HelpOutput::Full,

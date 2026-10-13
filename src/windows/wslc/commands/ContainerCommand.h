@@ -71,6 +71,7 @@ struct ContainerCpCommand final : public Command
     std::vector<Argument> GetArguments() const override;
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
+    std::vector<HelpExample> Examples() const override;
 
 protected:
     void ExecuteInternal(CLIExecutionContext& context) const override;

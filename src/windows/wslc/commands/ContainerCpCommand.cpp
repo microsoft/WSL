@@ -33,6 +33,15 @@ std::wstring ContainerCpCommand::LongDescription() const
     return Localization::WSLCCLI_ContainerCpLongDesc();
 }
 
+std::vector<Command::HelpExample> ContainerCpCommand::Examples() const
+{
+    return {
+        {Localization::WSLCCLI_ContainerCpExampleLocalToContainer(), L"LOCAL_PATH CONTAINER:PATH"},
+        {Localization::WSLCCLI_ContainerCpExampleContainerToLocal(), L"CONTAINER:PATH LOCAL_PATH"},
+        {Localization::WSLCCLI_ContainerCpExampleStdinToContainer(), L"- CONTAINER:PATH"},
+    };
+}
+
 void ContainerCpCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context               //
