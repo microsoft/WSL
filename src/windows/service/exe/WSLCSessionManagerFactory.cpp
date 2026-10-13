@@ -51,7 +51,7 @@ wil::com_ptr<IWSLCSession> wsl::windows::service::wslc::FindWslcSession(ULONG Se
         g_pluginLookupCv.notify_all();
     });
 
-    // Shutdown may move the owner, but cannot destroy the manager until all lookups have returned.
+    // Shutdown cannot destroy the session manager until all lookups have returned.
     return sessionManagerImpl->FindSession(SessionId);
 }
 
@@ -103,7 +103,6 @@ void wsl::windows::service::wslc::ClearWslcSessionsAndBlockNewInstances()
         // N.B. Callers might still have references to the COM instance. If that's the case, calls will all fail with RPC_E_DISCONNECTED.
     }
 
-    // Reject new lookups by unpublishing the manager, then drain admitted lookups before destroying it.
     std::unique_ptr<WSLCSessionManagerImpl> sessionManagerImpl;
     {
         std::unique_lock lock(g_pluginLookupLock);
