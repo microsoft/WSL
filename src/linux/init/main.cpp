@@ -89,7 +89,7 @@ Abstract:
 #define KERNEL_HEADERS_TEMP_PATH "/kernel_headers"
 #define KERNEL_HEADERS_PATH_PREFIX "/usr/src/linux-headers-"
 #define KERNEL_PERF_TEMP_PATH "/kernel_perf"
-#define KERNEL_PERF_PATH_PREFIX "/usr/lib/linux-tools/"
+#define KERNEL_PERF_PATH_PREFIX "/usr/lib/wsl/perf/"
 #define MODPROBE_PATH "/sbin/modprobe"
 #define PROCFS_PATH "/proc"
 #define RESOLV_CONF_FILE "resolv.conf"
@@ -1651,7 +1651,7 @@ Return Value:
     //
     // If the perf tooling was mounted, move it to a temporary location and pass the desired target
     // path to the distro init via an environment variable. Distro init will move the mount to
-    // /usr/lib/linux-tools/<uname -r> and add it to the default $PATH.
+    // /usr/lib/wsl/perf/<uname -r> and expose it through a wrapper in /usr/local/bin.
     //
 
     if (!Config.KernelPerfTarget.empty())
@@ -3307,7 +3307,7 @@ try
             //
             // When the nested artifacts layout is present, bind mount the kernel headers and perf
             // tooling to temporary locations. Each distro init moves them into the distro namespace
-            // at /usr/src/linux-headers-<release> and /usr/lib/linux-tools/<release> (see config.cpp).
+            // at /usr/src/linux-headers-<release> and /usr/lib/wsl/perf/<release> (see config.cpp).
             //
 
             if (NestedLayout)
@@ -3319,7 +3319,14 @@ try
                 }
 
                 const std::string PerfSource = ArtifactsBase + "/perf";
-                if (UtilMount(PerfSource.c_str(), KERNEL_PERF_TEMP_PATH, nullptr, (MS_BIND | MS_REC), nullptr) == 0)
+                const std::string perfBinary = PerfSource + "/bin/perf";
+                struct stat perfBinaryInfo{};
+                if ((stat(perfBinary.c_str(), &perfBinaryInfo) < 0) || !S_ISREG(perfBinaryInfo.st_mode) ||
+                    (access(perfBinary.c_str(), X_OK) < 0))
+                {
+                    LOG_WARNING("kernel perf artifacts do not contain an executable {}", perfBinary);
+                }
+                else if (UtilMount(PerfSource.c_str(), KERNEL_PERF_TEMP_PATH, nullptr, (MS_BIND | MS_REC), nullptr) == 0)
                 {
                     Config.KernelPerfTarget = std::format("{}{}", KERNEL_PERF_PATH_PREFIX, Release);
                 }

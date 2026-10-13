@@ -56,8 +56,10 @@ Abstract:
 #define LOCALE_FILE_PATH ETC_DEFAULT_FOLDER "locale"
 #define LOCALE_CONF_FILE_PATH ETC_FOLDER "locale.conf"
 #define PATH_ENV "PATH"
-#define PERF_BINARY_PATH "/usr/bin/perf"
-#define PERF_EXEC_PATH_ENV "PERF_EXEC_PATH"
+#define PERF_LOCAL_BINARY_DIRECTORY "/usr/local/bin"
+#define PERF_LOCAL_BINARY_PATH PERF_LOCAL_BINARY_DIRECTORY "/perf"
+#define PERF_RUNTIME_BINARY_DIRECTORY RUN_FOLDER "/wsl"
+#define PERF_RUNTIME_BINARY_PATH PERF_RUNTIME_BINARY_DIRECTORY "/perf"
 #define RESOLV_CONF_DIRECTORY_MODE 0755
 #define RESOLV_CONF_FILE_MODE 0644
 #define RESOLV_CONF_FILE_NAME "resolv.conf"
@@ -198,6 +200,83 @@ try
     if (tempMount.MoveMount(targetPath.c_str()))
     {
         Callback(targetPath);
+    }
+}
+CATCH_LOG()
+
+static std::string ShellQuote(std::string_view value)
+{
+    std::string result{"'"};
+    for (const auto character : value)
+    {
+        if (character == '\'')
+        {
+            result += "'\\''";
+        }
+        else
+        {
+            result += character;
+        }
+    }
+
+    result += '\'';
+    return result;
+}
+
+static void CreatePerfWrapper(const std::string& target)
+{
+    THROW_LAST_ERROR_IF(UtilMkdirPath(PERF_RUNTIME_BINARY_DIRECTORY, 0755) < 0);
+    wil::unique_fd wrapper{TEMP_FAILURE_RETRY(open(PERF_RUNTIME_BINARY_PATH, (O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC), 0600))};
+    THROW_LAST_ERROR_IF(!wrapper);
+
+    auto cleanup = wil::scope_exit([]() {
+        if (unlink(PERF_RUNTIME_BINARY_PATH) < 0)
+        {
+            LOG_ERROR("unlink({}) failed {}", PERF_RUNTIME_BINARY_PATH, errno);
+        }
+    });
+
+    const auto content = std::format(
+        "#!/bin/sh\n"
+        "PERF_EXEC_PATH={}\n"
+        "export PERF_EXEC_PATH\n"
+        "exec {} \"$@\"\n",
+        ShellQuote(target + "/libexec/perf-core"),
+        ShellQuote(target + "/bin/perf"));
+    THROW_LAST_ERROR_IF(UtilWriteStringView(wrapper.get(), content) < 0);
+    THROW_LAST_ERROR_IF(fchmod(wrapper.get(), 0755) < 0);
+    cleanup.release();
+}
+
+static void UpdatePerfSymlink(bool available)
+try
+{
+    struct stat existing{};
+    if (lstat(PERF_LOCAL_BINARY_PATH, &existing) == 0)
+    {
+        if (!available && S_ISLNK(existing.st_mode))
+        {
+            const auto target = std::filesystem::read_symlink(PERF_LOCAL_BINARY_PATH);
+            if ((target == PERF_RUNTIME_BINARY_PATH) && (unlink(PERF_LOCAL_BINARY_PATH) < 0))
+            {
+                LOG_ERROR("unlink({}) failed {}", PERF_LOCAL_BINARY_PATH, errno);
+            }
+        }
+
+        // Existing entries belong to the user unless they point exactly to our runtime wrapper.
+        return;
+    }
+
+    if (errno != ENOENT)
+    {
+        LOG_ERROR("lstat({}) failed {}", PERF_LOCAL_BINARY_PATH, errno);
+        return;
+    }
+
+    if (available)
+    {
+        THROW_LAST_ERROR_IF(UtilMkdirPath(PERF_LOCAL_BINARY_DIRECTORY, 0755) < 0);
+        THROW_LAST_ERROR_IF(symlink(PERF_RUNTIME_BINARY_PATH, PERF_LOCAL_BINARY_PATH) < 0);
     }
 }
 CATCH_LOG()
@@ -1199,32 +1278,13 @@ Return Value:
         }
     });
 
+    bool perfAvailable = false;
     MoveTemporaryMount(LX_WSL2_KERNEL_PERF_MOUNT_ENV, LX_WSL2_KERNEL_PERF_PATH_ENV, [&](const std::string& target) {
-        //
-        // Expose the kernel-matched perf via the environment block (see ConfigCreateEnvironmentBlock).
-        //
-
-        Config.KernelPerfPath = target;
-
-        //
-        // If the distro ships its own perf, shadow it with a bind mount so that the binary matching the
-        // running kernel is used.
-        //
-        // N.B. The distro's file system is only modified if perf is already present as a regular file.
-        //      Distros without perf pick it up via $PATH instead.
-        //
-
-        struct stat existing{};
-        if ((stat(PERF_BINARY_PATH, &existing) == 0) && S_ISREG(existing.st_mode))
-        {
-            const std::string perfBinary = target + "/bin/perf";
-            const auto perfMountPoint = std::filesystem::canonical(PERF_BINARY_PATH);
-            if (UtilMountFile(perfBinary.c_str(), perfMountPoint.c_str()) < 0)
-            {
-                LOG_ERROR("UtilMountFile({}, {}) failed {}", perfBinary, perfMountPoint.string(), errno);
-            }
-        }
+        THROW_LAST_ERROR_IF(UtilMount(nullptr, target.c_str(), nullptr, (MS_BIND | MS_REMOUNT | MS_RDONLY | MS_NOSUID | MS_NODEV), nullptr) < 0);
+        CreatePerfWrapper(target);
+        perfAvailable = true;
     });
+    UpdatePerfSymlink(perfAvailable);
 
     //
     // Change the permission of some devtmpfs devices to be more permissive.
@@ -1787,25 +1847,6 @@ Return Value:
         if (Config.AppendGpuLibPath && Config.GpuEnabled)
         {
             ConfigAppendToPath(Environment, LXSS_LIB_PATH);
-        }
-
-        //
-        // Add the kernel-matched perf tools to the $PATH variable and point perf at its helper
-        // scripts since it is built with a prefix that does not match where it is mounted.
-        //
-
-        if (Config.KernelPerfPath.has_value())
-        {
-            ConfigAppendToPath(Environment, std::format("{}/bin", *Config.KernelPerfPath));
-
-            //
-            // N.B. This is only set if the user has not provided a value via WSLENV.
-            //
-
-            if (Environment.GetVariable(PERF_EXEC_PATH_ENV).empty())
-            {
-                Environment.AddVariable(PERF_EXEC_PATH_ENV, std::format("{}/libexec/perf-core", *Config.KernelPerfPath));
-            }
         }
     }
 
