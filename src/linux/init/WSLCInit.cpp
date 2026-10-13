@@ -135,11 +135,11 @@ try
 }
 CATCH_LOG()
 
-// The image's ldconfig is preferred, but it runs sandboxed, where it can't write the cache as non-root or on a
+// The image's ldconfig runs sandboxed, where it can't write the cache as non-root or on a
 // read-only root. Must be called from within the container's root.
 bool ShouldImageLdconfigRebuildCache(uid_t ContainerUid, bool ReadOnlyRoot)
 {
-    return std::filesystem::exists(LDCONFIG_COMMAND) && ContainerUid == 0 && !ReadOnlyRoot;
+    return ContainerUid == 0 && !ReadOnlyRoot && std::filesystem::is_regular_file(LDCONFIG_COMMAND) && access(LDCONFIG_COMMAND, X_OK) == 0;
 }
 
 bool IsRootReadOnly()
@@ -187,7 +187,6 @@ void ConfigureMuslLibraryPath()
     const bool pathFileExists = std::filesystem::exists(pathFile);
     wil::unique_fd file{open(pathFile.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)};
     THROW_LAST_ERROR_IF(!file);
-    THROW_LAST_ERROR_IF(fchmod(file.get(), S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) < 0);
 
     std::string pathsToAppend;
     if (pathFileExists)
@@ -215,17 +214,6 @@ void ConfigureMuslLibraryPath()
 
     pathsToAppend += LXSS_LIB_PATH "\n";
     THROW_LAST_ERROR_IF(UtilWriteStringView(file.get(), pathsToAppend) < 0);
-}
-
-[[noreturn]] void ExecVmLdconfig(int VmLdconfig)
-{
-    // Passing the folder caches the GPU libraries even in images without an ld.so.conf to include ld.wsl.conf.
-    char command[] = "ldconfig";
-    char libraryPath[] = LXSS_LIB_PATH;
-    char* arguments[] = {command, libraryPath, nullptr};
-    char* environment[] = {nullptr};
-    syscall(SYS_execveat, VmLdconfig, "", arguments, environment, AT_EMPTY_PATH);
-    THROW_LAST_ERROR();
 }
 
 [[noreturn]] void ExecImageLdconfig()
@@ -281,17 +269,13 @@ try
     rootfsPath = std::filesystem::canonical(rootfsPath);
     THROW_ERRNO_IF(EINVAL, rootfsPath == "/");
 
-    // runc applies the container's user and read-only root after this hook, so read them from the spec.
+    // runc applies the container's user after this hook, so read it from the spec.
     const uid_t containerUid = spec.at("process").at("user").at("uid").get<uid_t>();
     const gid_t containerGid = spec.at("process").at("user").at("gid").get<gid_t>();
-    const bool readOnlyRoot = spec.at("root").value("readonly", false);
 
-    // After chroot, these paths would be the image's.
+    // After chroot, this path would be the image's.
     wil::unique_fd vmInit{open(LX_INIT_PATH, O_RDONLY | O_CLOEXEC)};
     THROW_LAST_ERROR_IF(!vmInit);
-
-    wil::unique_fd vmLdconfig{open(LDCONFIG_COMMAND, O_RDONLY | O_CLOEXEC)};
-    THROW_LAST_ERROR_IF(!vmLdconfig);
 
     // chroot alone would leave the working directory outside the new root.
     THROW_LAST_ERROR_IF(chdir(rootfsPath.c_str()) < 0);
@@ -320,11 +304,6 @@ try
                 LOG_ERROR("UtilMountFile({}, {}) failed {}", entry.path().c_str(), target, errno);
             }
         }
-    }
-
-    if (!ShouldImageLdconfigRebuildCache(containerUid, readOnlyRoot))
-    {
-        ExecVmLdconfig(vmLdconfig.get());
     }
 
     return 0;

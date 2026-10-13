@@ -4467,7 +4467,7 @@ class WSLCTests
             dockerfile << "FROM debian:latest\n";
             dockerfile << "RUN mv /sbin/ldconfig /sbin/ldconfig.image\n";
             dockerfile << "COPY ldconfig /sbin/ldconfig\n";
-            dockerfile << "RUN chmod 755 /sbin/ldconfig\n";
+            dockerfile << "RUN chmod 755 /sbin/ldconfig && rm -f /etc/ld.so.cache\n";
         }
 
         {
@@ -4511,6 +4511,7 @@ class WSLCTests
             std::ofstream dockerfile(contextDir / "Dockerfile");
             dockerfile << "FROM alpine:latest\n";
             dockerfile << std::format("COPY musl-library-path {}\n", muslPathFile);
+            dockerfile << std::format("RUN chmod 644 {}\n", muslPathFile);
         }
 
         VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-gpu-musl-custom-path:latest"));
@@ -4564,9 +4565,9 @@ class WSLCTests
             expect(Container, {"test", "-e", LX_INIT_WSLC_GPU_START_HOOK_PATH}, 1);
         };
 
-        auto expectMuslLibraryPath = [&](RunningWSLCContainer& Container, const std::string& ExpectedPaths) {
+        auto expectMuslLibraryPath = [&](RunningWSLCContainer& Container, const std::string& ExpectedPaths, const std::string& ExpectedMode) {
             expect(Container, {"cat", muslPathFile}, 0, {{1, ExpectedPaths}});
-            expect(Container, {"stat", "-c", "%a", muslPathFile}, 0, {{1, "644\n"}});
+            expect(Container, {"stat", "-c", "%a", muslPathFile}, 0, {{1, ExpectedMode}});
             expect(Container, {muslLoader, "--list", "/usr/lib/wsl/lib/libd3d12core.so"}, 0);
             expectInitDeleted(Container);
         };
@@ -4584,42 +4585,39 @@ class WSLCTests
             expectInitDeleted(container);
         }
 
-        // Validate that non-root containers, whose own ldconfig can't write the cache, get it from the VM's ldconfig
-        // instead, and that the image's ldconfig doesn't run.
+        // Non-root containers must start without running image ldconfig or generating a fallback cache.
         {
             auto container = launch("wslc-test-gpu-wrapped-ldconfig:latest", "test-container-gpu-image-ldconfig-nobody", "nobody");
 
             expect(container, {"test", "-e", "/image-ldconfig-ran"}, 1);
-            expectGpuLibrariesCached(container);
+            expect(container, {"test", "-e", "/etc/ld.so.cache"}, 1);
             expectInitDeleted(container);
         }
 
-        // Validate that images without ldconfig get the cache from the VM's ldconfig, and that it includes the GPU
-        // libraries even without an ld.so.conf to include ld.wsl.conf.
+        // Images without ldconfig must start without generating a VM fallback cache.
         {
             auto container = launch("wslc-test-gpu-no-ldconfig:latest", "test-container-gpu-no-ldconfig");
 
-            expectGpuLibrariesCached(container);
+            expect(container, {"test", "-e", "/etc/ld.so.cache"}, 1);
             expectInitDeleted(container);
         }
 
         // Preserve musl's default search directories when adding GPU discovery to an image without a .path file.
         {
             auto container = launch("wslc-test-gpu-musl-default-path:latest", "test-container-gpu-musl");
-            expectMuslLibraryPath(container, "/lib\n/usr/local/lib\n/usr/lib\n/usr/lib/wsl/lib\n");
+            expectMuslLibraryPath(container, "/lib\n/usr/local/lib\n/usr/lib\n/usr/lib/wsl/lib\n", "644\n");
         }
 
         // Keep the existing paths in order, adding a separator before the GPU directory.
         {
             auto container = launch("wslc-test-gpu-musl-custom-path:latest", "test-container-gpu-musl-custom-path");
-            expectMuslLibraryPath(container, "/custom/lib:/lib:/usr/local/lib:/usr/lib\n/usr/lib/wsl/lib\n");
+            expectMuslLibraryPath(container, "/custom/lib:/lib:/usr/local/lib:/usr/lib\n/usr/lib/wsl/lib\n", "644\n");
         }
 
-        // Keep an already-configured list unchanged. The image made the file owner-readable only;
-        // setup must still make it readable by non-root users.
+        // Keep an already-configured list and its owner-only permissions unchanged.
         {
             auto container = launch("wslc-test-gpu-musl-configured-path:latest", "test-container-gpu-musl-configured-path");
-            expectMuslLibraryPath(container, "/custom/lib:/usr/lib/wsl/lib:/lib:/usr/local/lib:/usr/lib\n");
+            expectMuslLibraryPath(container, "/custom/lib:/usr/lib/wsl/lib:/lib:/usr/local/lib:/usr/lib\n", "600\n");
         }
 
         // Validate that images with no shell, ldconfig, or /etc start. hello-world only contains a static program.
