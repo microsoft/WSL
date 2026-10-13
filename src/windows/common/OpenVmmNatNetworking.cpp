@@ -2,8 +2,18 @@
 
 #include "precomp.h"
 #include "OpenVmmNatNetworking.h"
+#include "WslCoreHostDnsInfo.h"
 
 using wsl::core::OpenVmmNatNetworking;
+using namespace wsl::shared;
+
+namespace {
+
+constexpr auto c_guestIpv4Address = L"10.0.0.2";
+constexpr auto c_guestIpv4PrefixLength = 24;
+constexpr auto c_gatewayIpv4Address = L"10.0.0.1";
+
+} // namespace
 
 VmNetworkAdapterRequest wsl::core::CreateOpenVmmNatNetworkAdapterRequest(bool EnableDnsTunneling)
 {
@@ -14,8 +24,19 @@ VmNetworkAdapterRequest wsl::core::CreateOpenVmmNatNetworkAdapterRequest(bool En
     return {L"eth0", std::move(network)};
 }
 
-OpenVmmNatNetworking::OpenVmmNatNetworking(IVirtualMachineBackend& Backend, VmDeviceId Device, GnsChannel&& GnsChannel, bool EnableLocalhostRelay, int DhcpTimeout) :
-    m_backend(Backend), m_device(Device), m_gnsChannel(std::move(GnsChannel)), m_enableLocalhostRelay(EnableLocalhostRelay), m_dhcpTimeout(DhcpTimeout)
+OpenVmmNatNetworking::OpenVmmNatNetworking(
+    IVirtualMachineBackend& Backend,
+    VmDeviceId Device,
+    GUID AdapterId,
+    GnsChannel&& GnsChannel,
+    bool EnableLocalhostRelay,
+    bool EnableDnsTunneling) :
+    m_backend(Backend),
+    m_device(Device),
+    m_adapterId(AdapterId),
+    m_gnsChannel(std::move(GnsChannel)),
+    m_enableLocalhostRelay(EnableLocalhostRelay),
+    m_enableDnsTunneling(EnableDnsTunneling)
 {
 }
 
@@ -26,6 +47,38 @@ OpenVmmNatNetworking::~OpenVmmNatNetworking()
 
 void OpenVmmNatNetworking::Initialize()
 {
+    hns::HNSEndpoint endpointProperties{};
+    endpointProperties.ID = m_adapterId;
+    endpointProperties.IPAddress = c_guestIpv4Address;
+    endpointProperties.PrefixLength = c_guestIpv4PrefixLength;
+    m_gnsChannel.SendEndpointState(endpointProperties);
+
+    hns::Route route{};
+    route.NextHop = c_gatewayIpv4Address;
+    route.DestinationPrefix = LX_INIT_DEFAULT_ROUTE_PREFIX;
+    route.Family = AF_INET;
+
+    hns::ModifyGuestEndpointSettingRequest<hns::Route> routeNotification{};
+    routeNotification.RequestType = hns::ModifyRequestType::Add;
+    routeNotification.ResourceType = hns::GuestEndpointResourceType::Route;
+    routeNotification.Settings = route;
+    m_gnsChannel.SendHnsNotification(ToJsonW(routeNotification).c_str(), m_adapterId);
+
+    wsl::core::networking::DnsInfo dns;
+    if (m_enableDnsTunneling)
+    {
+        dns = wsl::core::networking::HostDnsInfo::GetDnsTunnelingSettings(c_gatewayIpv4Address);
+    }
+    else
+    {
+        dns = wsl::core::networking::HostDnsInfo::GetDnsSettings(wsl::core::networking::DnsSettingsFlags::IncludeVpn);
+    }
+
+    hns::ModifyGuestEndpointSettingRequest<hns::DNS> dnsNotification{};
+    dnsNotification.RequestType = hns::ModifyRequestType::Update;
+    dnsNotification.ResourceType = hns::GuestEndpointResourceType::DNS;
+    dnsNotification.Settings = wsl::core::networking::BuildDnsNotification(dns);
+    m_gnsChannel.SendHnsNotification(ToJsonW(dnsNotification).c_str(), m_adapterId);
 }
 
 void OpenVmmNatNetworking::TraceLoggingRundown() noexcept
@@ -33,15 +86,14 @@ void OpenVmmNatNetworking::TraceLoggingRundown() noexcept
     WSL_LOG(
         "OpenVmmNatNetworking::TraceLoggingRundown",
         TraceLoggingValue(m_enableLocalhostRelay, "localhostRelay"),
-        TraceLoggingValue(m_dhcpTimeout, "dhcpTimeout"));
+        TraceLoggingValue(m_enableDnsTunneling, "dnsTunneling"));
 }
 
 void OpenVmmNatNetworking::FillInitialConfiguration(LX_MINI_INIT_NETWORKING_CONFIGURATION& Message)
 {
     Message.NetworkingMode = LxMiniInitNetworkingModeNat;
     Message.DisableIpv6 = false;
-    Message.EnableDhcpClient = true;
-    Message.DhcpTimeout = static_cast<int>(std::round(m_dhcpTimeout / 1000.0));
+    Message.EnableDhcpClient = false;
     Message.PortTrackerType = LxMiniInitPortTrackerTypeMirrored;
     Message.EnableLoopbackRouting = m_enableLocalhostRelay;
 }
@@ -76,7 +128,7 @@ int OpenVmmNatNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int 
     const bool unspecified = ipv4 ? IN4_IS_ADDR_UNSPECIFIED(&addr.Ipv4.sin_addr) : IN6_IS_ADDR_UNSPECIFIED(&addr.Ipv6.sin6_addr);
     if (!loopback && !unspecified)
     {
-        // A bind to a specific guest address (e.g. the DHCP client on the guest's own IP) isn't a valid host address.
+        // A bind to a specific guest address isn't a valid host address.
         return 0;
     }
 

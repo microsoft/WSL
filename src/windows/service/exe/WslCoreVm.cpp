@@ -667,11 +667,16 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             {
                 if (m_vmConfig.NetworkingMode == NetworkingMode::Nat)
                 {
-                    // N.B. GetDescription() returns by value, so the adapter id must be copied out of the
-                    // temporary rather than bound to a reference that would dangle past this statement.
-                    const auto adapterId = m_backend->GetDescription().NetworkAdapters.at(L"eth0").Id;
+                    // Keep the description alive while using the adapter fields below.
+                    const auto description = m_backend->GetDescription();
+                    const auto& adapter = description.NetworkAdapters.at(L"eth0");
                     m_networkingEngine = std::make_unique<wsl::core::OpenVmmNatNetworking>(
-                        *m_backend, adapterId, std::move(gnsChannel), m_vmConfig.EnableLocalhostRelay, m_vmConfig.DhcpTimeout);
+                        *m_backend,
+                        adapter.Id,
+                        adapter.GuestInstanceId.value(),
+                        std::move(gnsChannel),
+                        m_vmConfig.EnableLocalhostRelay,
+                        m_vmConfig.EnableDnsTunneling);
                     m_networkingEngine->Initialize();
                 }
                 else

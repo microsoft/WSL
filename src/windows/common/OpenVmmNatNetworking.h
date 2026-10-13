@@ -14,7 +14,13 @@ VmNetworkAdapterRequest CreateOpenVmmNatNetworkAdapterRequest(bool EnableDnsTunn
 class OpenVmmNatNetworking : public INetworkingEngine
 {
 public:
-    OpenVmmNatNetworking(IVirtualMachineBackend& Backend, VmDeviceId Device, GnsChannel&& GnsChannel, bool EnableLocalhostRelay, int DhcpTimeout);
+    OpenVmmNatNetworking(
+        IVirtualMachineBackend& Backend,
+        VmDeviceId Device,
+        GUID AdapterId,
+        GnsChannel&& GnsChannel,
+        bool EnableLocalhostRelay,
+        bool EnableDnsTunneling);
     ~OpenVmmNatNetworking() override;
 
     void Initialize() override;
@@ -29,9 +35,10 @@ private:
 
     IVirtualMachineBackend& m_backend;
     VmDeviceId m_device;
+    GUID m_adapterId;
     GnsChannel m_gnsChannel;
     bool m_enableLocalhostRelay;
-    int m_dhcpTimeout;
+    bool m_enableDnsTunneling;
     wil::srwlock m_lock;
     _Guarded_by_(m_lock) std::map<PortKey, VmPortBindingId> m_portBindings;
     std::optional<GnsPortTrackerChannel> m_gnsPortTrackerChannel;
