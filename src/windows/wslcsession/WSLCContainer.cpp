@@ -3758,7 +3758,14 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(
     m_stateChangedAt = std::chrono::floor<std::chrono::seconds>(std::chrono::nanoseconds{TimeNano}).count();
 
     const auto eventTimeNano = EventTimeNano.value_or(TimeNano);
-    if (DockerAttributes.has_value())
+    if (DockerAttributes.has_value() && ExitCode.has_value())
+    {
+        // A synthesized exit borrows another event's attributes, which carry no exit code.
+        auto attributes = DockerAttributes->get();
+        attributes["exitCode"] = std::to_string(ExitCode.value());
+        RecordEvent(WSLCStateToEventAction(State), eventTimeNano, attributes);
+    }
+    else if (DockerAttributes.has_value())
     {
         RecordEvent(WSLCStateToEventAction(State), eventTimeNano, DockerAttributes->get());
     }
