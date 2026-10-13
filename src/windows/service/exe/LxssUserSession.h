@@ -781,9 +781,11 @@ private:
     static void s_ValidateDistroName(_In_ LPCWSTR Name);
 
     /// <summary>
-    /// Callback for when a VM unexpectedly exits (crashes).
+    /// Queues cleanup when a VM unexpectedly exits (crashes).
     /// </summary>
     static void s_VmTerminated(_Inout_ LxssUserSessionImpl* UserSession, _In_ const GUID& VmId);
+
+    static VOID CALLBACK s_ProcessVmExit(_Inout_ PTP_CALLBACK_INSTANCE, _Inout_opt_ PVOID Context, _Inout_ PTP_WORK);
 
     /// <summary>
     /// Callback to terminate a utility VM.
@@ -854,6 +856,10 @@ private:
     /// Timer to control terminating the Linux utility VM.
     /// </summary>
     wil::unique_threadpool_timer m_vmTerminationTimer;
+
+    // VM destruction drains notifications before a replacement VM can publish its exit.
+    std::atomic<GUID> m_exitedVmId{GUID_NULL};
+    wil::unique_threadpool_work m_vmExitWork;
 
     /// <summary>
     /// Signaled when the utility vm is terminating.
