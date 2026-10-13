@@ -184,6 +184,26 @@ class PolicyTest
         SKIP_TEST_ARM64();
         WINDOWS_11_TEST_ONLY();
 
+        if (LxsstuOpenVmmMode())
+        {
+            WslConfigChange config(LxssGenerateTestConfig({.nestedVirtualization = true}));
+            for (const auto value : {1u, 12u})
+            {
+                auto revert = SetPolicy(c_allowNestedVirtualizationUserSetting, value);
+                WslShutdown();
+                ValidateOutput(
+                    L"echo ok",
+                    FormatErrorMessage(
+                        wsl::shared::Localization::MessageOpenVmmNestedVirtualizationConflict(),
+                        L"Wsl/Service/CreateInstance/CreateVm/OpenVMM/ERROR_NOT_SUPPORTED"));
+            }
+
+            auto revert = SetPolicy(c_allowNestedVirtualizationUserSetting, 0);
+            WslShutdown();
+            ValidateWarnings(L"wsl: The .wslconfig setting 'wsl2.nestedVirtualization' is disabled by the computer policy.\r\n");
+            return;
+        }
+
         ValidatePolicy(
             c_allowNestedVirtualizationUserSetting,
             L"nestedVirtualization=true",

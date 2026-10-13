@@ -20,6 +20,7 @@ Abstract:
 #include "GuestDeviceManager.h"
 #include "GuestConnector.h"
 #include "HandleIO.h"
+#include "Localization.h"
 #include "SubProcess.h"
 #include "vsock.hpp"
 #include "wslopenvmm.h"
@@ -133,10 +134,10 @@ VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmC
     description.Backend = BackendKind::OpenVmm;
     description.Processor.Count = Request.Processor.Count;
     // Nested virtualization isn't available: WHP provides no SynIC, which the VMBus devices require.
-    THROW_HR_IF_MSG(
+    THROW_HR_WITH_USER_ERROR_IF(
         c_notSupported,
-        Request.Processor.NestedVirtualization == VmFeatureRequest::Required,
-        "OpenVMM does not support nested virtualization");
+        wsl::shared::Localization::MessageOpenVmmNestedVirtualizationConflict(),
+        Request.Processor.NestedVirtualization != VmFeatureRequest::Disabled);
     description.Processor.NestedVirtualization = false;
     description.Memory.SizeBytes = (Request.Memory.SizeBytes / c_mib) * c_mib;
     validation::ValidateFeature(Request.Processor.PerfmonPmu, L"PMU");

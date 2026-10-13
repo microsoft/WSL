@@ -469,11 +469,6 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
     if (EnableOpenVmm)
     {
         VALIDATE_CONFIG_OPTION(EnableOpenVmm, SwiotlbSizeBytes, 0);
-
-        // Nested virtualization requires SynIC, which WHP does not expose to the guest, and SynIC
-        // is required for the VMBus devices OpenVMM relies on. Clear it here so the backend request
-        // never asks for an unavailable feature.
-        EnableNestedVirtualization = false;
     }
     else if (SwiotlbSizeBytes == 0 && (EnableVirtioFs || EnableVirtio9p || (NetworkingMode == NetworkingMode::Consomme)))
     {

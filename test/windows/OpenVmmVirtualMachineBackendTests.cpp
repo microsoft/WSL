@@ -219,7 +219,7 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_IS_FALSE(disk.ReadOnly);
 
         request.Processor.NestedVirtualization = VmFeatureRequest::Preferred;
-        VERIFY_IS_FALSE(ValidateCreateRequest(request).Processor.NestedVirtualization);
+        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
         request.Processor.NestedVirtualization = VmFeatureRequest::Required;
         VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
         request.Processor.NestedVirtualization = VmFeatureRequest::Disabled;
@@ -242,6 +242,26 @@ class OpenVmmVirtualMachineBackendTests
 
         request.Memory.HostingProcessNameSuffix = L"WSL";
         VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+    }
+
+    TEST_METHOD(NestedVirtualizationConflictIncludesUserError)
+    {
+        SKIP_TEST_ARM64();
+        using namespace wsl::windows::common;
+        for (const auto feature : {VmFeatureRequest::Preferred, VmFeatureRequest::Required})
+        {
+            ExecutionContext context(Context::Wsl);
+            auto request = CreateRequest();
+            request.Processor.NestedVirtualization = feature;
+            VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+            VERIFY_IS_TRUE(context.ReportedError().has_value());
+            const auto& error = context.ReportedError().value();
+            VERIFY_IS_TRUE(error.Message.has_value());
+            VERIFY_IS_TRUE(error.Message->find(L"experimental.openVmm=true") != std::wstring::npos);
+            VERIFY_IS_TRUE(error.Message->find(L"wsl2.nestedVirtualization=true") != std::wstring::npos);
+            VERIFY_IS_TRUE(error.Message->find(L"wsl2.nestedVirtualization=false") != std::wstring::npos);
+            VERIFY_ARE_EQUAL(L"Wsl/OpenVMM/ERROR_NOT_SUPPORTED", wslutil::ErrorToString(error).Code);
+        }
     }
 
     TEST_METHOD(OpenVmmNatUsesCreationTimeAdapterAndGuestDhcp)

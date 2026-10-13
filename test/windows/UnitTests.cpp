@@ -2222,10 +2222,10 @@ Usage:
 
         // Some cases need a config without the test defaults. When running against OpenVMM, that config still has to
         // select the OpenVMM backend with the same overrides that LxssGenerateTestConfig() applies.
-        const std::wstring minimalConfig = LxsstuOpenVmmMode()
-                                               ? L"[experimental]\nopenVmm=true\nvirtioFsAggregateShares=false\n[wsl2]"
-                                                 L"\ngpuSupport=false\nguiApplications=false\nvirtiofs=true\n"
-                                               : L"[wsl2]\n";
+        const std::wstring minimalConfig =
+            LxsstuOpenVmmMode() ? L"[experimental]\nopenVmm=true\nvirtioFsAggregateShares=false\n[wsl2]"
+                                  L"\ngpuSupport=false\nguiApplications=false\nnestedVirtualization=false\nvirtiofs=true\n"
+                                : L"[wsl2]\n";
 
         // .wslconfig line numbers of the first line appended to each prefix.
         const auto firstLine = [](const std::wstring& prefix) { return std::ranges::count(prefix, L'\n') + 1; };
@@ -3580,6 +3580,28 @@ Usage:
 
         TerminateDistribution();
         VERIFY_IS_TRUE(isDriveMountingEnabled());
+    }
+
+    WSL2_TEST_METHOD(OpenVmmNestedVirtualizationConflict)
+    {
+        WSL_SETTINGS_TEST();
+        if (!LxsstuOpenVmmMode())
+        {
+            LogSkipped("Requires the OpenVMM backend");
+            return;
+        }
+
+        {
+            WslConfigChange config(LxssGenerateTestConfig({.nestedVirtualization = true}));
+            const auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"--exec true", -1);
+            VERIFY_IS_TRUE(output.find(L"experimental.openVmm=true") != std::wstring::npos);
+            VERIFY_IS_TRUE(output.find(L"wsl2.nestedVirtualization=true") != std::wstring::npos);
+            VERIFY_IS_TRUE(output.find(L"wsl2.nestedVirtualization=false") != std::wstring::npos);
+            VERIFY_IS_TRUE(output.find(L"OpenVMM/ERROR_NOT_SUPPORTED") != std::wstring::npos);
+        }
+
+        WslConfigChange config(LxssGenerateTestConfig());
+        VERIFY_ARE_EQUAL(0u, LxsstuLaunchWsl(L"--exec true"));
     }
 
     WSL2_TEST_METHOD(WriteWslConfig)

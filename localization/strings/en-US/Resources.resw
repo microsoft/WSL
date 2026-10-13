@@ -890,6 +890,10 @@ For more information on Admin Protection, please visit https://aka.ms/apdevguide
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>Nested virtualization is not supported on this machine.</value>
   </data>
+  <data name="MessageOpenVmmNestedVirtualizationConflict" xml:space="preserve">
+    <value>The .wslconfig settings 'experimental.openVmm=true' and 'wsl2.nestedVirtualization=true' conflict because OpenVMM does not support nested virtualization. Set 'wsl2.nestedVirtualization=false' to use OpenVMM.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated{Locked="experimental.openVmm=true"}{Locked="wsl2.nestedVirtualization=true"}{Locked="wsl2.nestedVirtualization=false"}{Locked="OpenVMM"}</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Failed to create network endpoint with address: '{}', assigned new address: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

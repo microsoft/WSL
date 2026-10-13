@@ -1539,13 +1539,14 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
     };
 
     // Run with /p:OpenVmm=1 to exercise the OpenVMM backend instead of HCS. OpenVMM doesn't support GUI apps, GPU,
-    // virtio-9p/Plan9 or aggregate virtio-fs shares, so the defaults are adjusted unless a test overrides them.
+    // nested virtualization, virtio-9p/Plan9 or aggregate virtio-fs shares, so defaults are adjusted unless a test overrides them.
     const bool openVmm = LxsstuOpenVmmMode();
     if (openVmm)
     {
         Default.guiApplications = Default.guiApplications.value_or(false);
         Default.drvFsMode = Default.drvFsMode.value_or(DrvFsMode::VirtioFs);
         Default.virtioFsAggregateShares = Default.virtioFsAggregateShares.value_or(false);
+        Default.nestedVirtualization = Default.nestedVirtualization.value_or(false);
     }
 
     std::wstring newConfig =
@@ -1674,6 +1675,11 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
     if (openVmm)
     {
         newConfig += L"\ngpuSupport=false\n\n[experimental]\nopenVmm=true\n[wsl2]\n";
+    }
+
+    if (Default.nestedVirtualization.has_value())
+    {
+        newConfig += boolOptionToString(L"nestedVirtualization", Default.nestedVirtualization, false);
     }
 
     // TODO: Remove once SetVersion() truncated archive error is root caused.

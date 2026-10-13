@@ -613,6 +613,7 @@ struct TestConfigDefaults
     int crashDumpCount = 100;
     std::optional<std::wstring> CrashDumpFolder;
     std::optional<bool> isolateDistroCgroup;
+    std::optional<bool> nestedVirtualization;
 };
 
 std::wstring LxssGenerateTestConfig(TestConfigDefaults Default = {});
