@@ -612,7 +612,7 @@ Spec ParseDockerVolumeString(const std::wstring& value)
             {
                 target = std::move(buffer);
             }
-            else if (!endOfSpec)
+            else if (!endOfSpec || buffer.find(L':') != std::wstring::npos)
             {
                 ThrowParse(Localization::WSLCCLI_VolumeTooManyColonsError());
             }
