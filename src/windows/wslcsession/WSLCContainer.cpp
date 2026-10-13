@@ -1136,7 +1136,12 @@ void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProc
 
     if (!m_runtimeResourcesHeld)
     {
-        MountVolumes(m_mountedVolumes, m_runtime.Vm()).release();
+        // An in-flight archive operation may already hold the mounts; adopt them in that case.
+        if (m_archiveMountUsers == 0)
+        {
+            MountVolumes(m_mountedVolumes, m_runtime.Vm()).release();
+        }
+
         MapPorts();
         m_runtimeResourcesHeld = true;
     }
@@ -1833,8 +1838,38 @@ void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
     }
 }
 
-void WSLCContainerImpl::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize) const
+void WSLCContainerImpl::AcquireArchiveVolumeMounts()
 {
+    auto lock = m_lock.lock_exclusive();
+
+    if (!m_runtimeResourcesHeld && m_archiveMountUsers == 0 && m_state != WslcContainerStateDeleted)
+    {
+        MountVolumes(m_mountedVolumes, m_runtime.Vm()).release();
+    }
+
+    m_archiveMountUsers++;
+}
+
+void WSLCContainerImpl::ReleaseArchiveVolumeMounts() noexcept
+try
+{
+    auto lock = m_lock.lock_exclusive();
+
+    WI_ASSERT(m_archiveMountUsers > 0);
+    m_archiveMountUsers--;
+
+    if (m_archiveMountUsers == 0 && !m_runtimeResourcesHeld)
+    {
+        UnmountVolumesLockHeld();
+    }
+}
+CATCH_LOG();
+
+void WSLCContainerImpl::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize)
+{
+    AcquireArchiveVolumeMounts();
+    auto releaseMounts = wil::scope_exit([this]() { ReleaseArchiveVolumeMounts(); });
+
     auto lock = m_lock.lock_shared();
 
     std::optional<uint64_t> contentLength;
@@ -1895,8 +1930,11 @@ void WSLCContainerImpl::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULO
     }
 }
 
-void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, BOOL FollowLink, WSLCHandle OutHandle) const
+void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, BOOL FollowLink, WSLCHandle OutHandle)
 {
+    AcquireArchiveVolumeMounts();
+    auto releaseMounts = wil::scope_exit([this]() { ReleaseArchiveVolumeMounts(); });
+
     auto lock = m_lock.lock_shared();
 
     std::string effectivePath(SrcPath);
@@ -3139,6 +3177,15 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ReleaseRuntimeRes
     // Release runtime resources (port relays, volume mounts) that were set up at Start().
     UnmapPorts();
 
+    // An in-flight archive operation still needs the mounts and unmounts them once it completes.
+    if (m_archiveMountUsers == 0)
+    {
+        UnmountVolumesLockHeld();
+    }
+}
+
+__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::UnmountVolumesLockHeld()
+{
     // A VM that already exited (crash / external kill) has dropped every guest mount, so calling
     // UnmountWindowsFolder would only block on the RPC timeout and emit spurious unmount-failed
     // warnings. Mark the mounts inactive without touching the dead VM.

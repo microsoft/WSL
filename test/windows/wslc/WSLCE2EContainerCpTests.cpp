@@ -5,6 +5,7 @@
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
 #include "TestImageRegistry.h"
+#include <fstream>
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
@@ -760,6 +761,57 @@ class WSLCE2EContainerCpTests
 
         auto extractedFile = downloadDir / L"stopped.txt";
         VERIFY_IS_TRUE(std::filesystem::exists(extractedFile));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ToCreatedContainerWithBindMount)
+    {
+        auto hostDir = std::filesystem::current_path() / L"wslc-cp-bind-created";
+        std::filesystem::create_directories(hostDir);
+        auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(hostDir); });
+
+        auto createResult = RunWslc(std::format(
+            L"container create --name {} --volume \"{}:/data\" {}", WslcContainerName, hostDir.wstring(), DebianImage.NameAndTag()));
+        createResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto localFile = std::filesystem::current_path() / L"wslc-cp-bind-local.txt";
+        auto cleanupLocal = wil::scope_exit([&] { DeleteFileW(localFile.c_str()); });
+        std::ofstream(localFile, std::ios::binary) << "bind-mount-content\n";
+
+        // Copy into a path outside the bind mount.
+        auto cpResult = RunWslc(std::format(L"container cp {} {}:/tmp/", localFile.wstring(), WslcContainerName));
+        cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        // Copy into the bind mount and verify the file lands in the host folder.
+        cpResult = RunWslc(std::format(L"container cp {} {}:/data/", localFile.wstring(), WslcContainerName));
+        cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        std::ifstream copiedFile(hostDir / L"wslc-cp-bind-local.txt", std::ios::binary);
+        VERIFY_IS_TRUE(copiedFile.good());
+        const std::string content{std::istreambuf_iterator<char>(copiedFile), std::istreambuf_iterator<char>()};
+        VERIFY_ARE_EQUAL(std::string("bind-mount-content\n"), content);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_FromStoppedContainerWithBindMount)
+    {
+        auto hostDir = std::filesystem::current_path() / L"wslc-cp-bind-stopped";
+        std::filesystem::create_directories(hostDir);
+        auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(hostDir); });
+
+        auto runResult = RunWslc(std::format(
+            L"container run --name {} --volume \"{}:/data\" {} sh -c \"echo stopped-content > /tmp/stopped.txt\"",
+            WslcContainerName,
+            hostDir.wstring(),
+            DebianImage.NameAndTag()));
+        runResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto downloadDir = std::filesystem::current_path() / L"wslc-cp-bind-stopped-download";
+        std::filesystem::create_directories(downloadDir);
+        auto cleanupDownload = wil::scope_exit([&] { std::filesystem::remove_all(downloadDir); });
+
+        const auto cpResult = RunWslc(std::format(L"container cp {}:/tmp/stopped.txt {}", WslcContainerName, downloadDir.wstring()));
+        cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        VERIFY_IS_TRUE(std::filesystem::exists(downloadDir / L"stopped.txt"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_InvalidDirection_LocalToLocal)
