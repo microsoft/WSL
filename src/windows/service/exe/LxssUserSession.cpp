@@ -2268,7 +2268,7 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, ShutdownBeh
 
             // Reset the proxy state.
             // We don't clear it in _VMTerminate because we want to cache results if possible.
-            m_httpProxyStateTracker.reset();
+            m_httpProxyStateTracker.store(nullptr);
 
             // Clear any attached disk state.
             // This is needed because wsl --shutdown might be called after the vm
@@ -2990,10 +2990,10 @@ void LxssUserSessionImpl::_CreateVm()
         // Create the utility VM and register for callbacks.
         m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId, std::move(initializeDrvFs));
 
-        if (m_httpProxyStateTracker)
+        if (const auto tracker = m_httpProxyStateTracker.load())
         {
             // this needs to be done after the VM has finished in case we fell back to NAT mode
-            m_httpProxyStateTracker->ConfigureNetworkingMode(m_utilityVm->GetConfig().NetworkingMode);
+            tracker->ConfigureNetworkingMode(m_utilityVm->GetConfig().NetworkingMode);
         }
 
         try
@@ -3402,12 +3402,13 @@ try
     {
         if (SUCCEEDED(HttpProxyStateTracker::s_LoadWinHttpProxyMethods()))
         {
-            if (!m_httpProxyStateTracker)
+            if (auto tracker = m_httpProxyStateTracker.load(); !tracker)
             {
                 try
                 {
-                    m_httpProxyStateTracker =
-                        std::make_shared<HttpProxyStateTracker>(config.InitialAutoProxyTimeout, userToken, config.NetworkingMode);
+                    // Preserve a tracker installed by another caller while this one is being created.
+                    m_httpProxyStateTracker.compare_exchange_strong(
+                        tracker, std::make_shared<HttpProxyStateTracker>(config.InitialAutoProxyTimeout, userToken, config.NetworkingMode));
                 }
                 catch (...)
                 {
@@ -4064,7 +4065,7 @@ void LxssUserSessionImpl::_SetHttpProxyInfo(std::vector<std::string>& environmen
 try
 {
     // Copy guarantees a ref is held on the original instance, or it's null.
-    const auto localTracker = m_httpProxyStateTracker;
+    const auto localTracker = m_httpProxyStateTracker.load();
     if (localTracker)
     {
         WSL_LOG("_SetHttpProxyInfo: Attempting to set proxy info");
