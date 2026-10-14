@@ -2677,7 +2677,7 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
                         configuration,
                         defaultUid,
                         clientKey,
-                        std::bind(s_TerminateInstance, this, registration.Id(), false),
+                        std::bind(s_TerminateInstance, this, registration.Id(), clientKey, false),
                         std::bind(s_UpdateInit, this, configuration),
                         Flags,
                         _GetResultantConfig(userToken.get()).InstanceIdleTimeout);
@@ -2791,11 +2791,9 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
             currentProcess = wsl::windows::common::wslutil::OpenCallingProcess(GENERIC_READ | SYNCHRONIZE);
         }
 
+        const auto clientKey = instance->GetLifetimeManagerId();
         m_lifetimeManager.RegisterCallback(
-            instance->GetLifetimeManagerId(),
-            std::bind(s_TerminateInstance, this, registration.Id(), true),
-            currentProcess.get(),
-            instance->GetIdleTimeout());
+            clientKey, std::bind(s_TerminateInstance, this, registration.Id(), clientKey, true), currentProcess.get(), instance->GetIdleTimeout());
     }
 
     // If the system distro flag was specified, return the system distro for the instance.
@@ -3713,9 +3711,17 @@ void LxssUserSessionImpl::_SetDistributionInstalled(_In_ HKEY LxssKey, _In_ cons
 }
 
 _Requires_lock_not_held_(m_instanceLock)
-bool LxssUserSessionImpl::_TerminateInstance(_In_ LPCGUID DistroGuid, _In_ bool CheckForClients)
+bool LxssUserSessionImpl::_TerminateInstance(_In_ LPCGUID DistroGuid, _In_ ULONG64 ClientLifetimeId, _In_ bool CheckForClients)
 {
     std::lock_guard lock(m_instanceLock);
+
+    // A retired instance's callback can finish after another instance of the same distribution starts.
+    const auto instance = m_runningInstances.find(*DistroGuid);
+    if (instance == m_runningInstances.end() || instance->second->GetLifetimeManagerId() != ClientLifetimeId)
+    {
+        return true;
+    }
+
     return _TerminateInstanceInternal(DistroGuid, CheckForClients);
 }
 
@@ -4282,12 +4288,12 @@ LX_INIT_DRVFS_MOUNT LxssUserSessionImpl::s_InitializeDrvFs(_In_ const std::weak_
     }
 }
 
-bool LxssUserSessionImpl::s_TerminateInstance(_Inout_ LxssUserSessionImpl* UserSession, _In_ GUID DistroGuid, _In_ bool CheckForClients)
+bool LxssUserSessionImpl::s_TerminateInstance(_Inout_ LxssUserSessionImpl* UserSession, _In_ GUID DistroGuid, _In_ ULONG64 ClientLifetimeId, _In_ bool CheckForClients)
 {
     bool success = true;
     try
     {
-        success = UserSession->_TerminateInstance(&DistroGuid, CheckForClients);
+        success = UserSession->_TerminateInstance(&DistroGuid, ClientLifetimeId, CheckForClients);
     }
     CATCH_LOG()
 
