@@ -4,6 +4,7 @@ set(SOURCES
     ConsoleProgressIndicator.cpp
     ConsoleState.cpp
     CrashReporting.cpp
+    ElfCore.cpp
     wslc/models/ContainerModel.cpp
     DeviceHostProxy.cpp
     disk.cpp
@@ -100,6 +101,7 @@ set(HEADERS
     ConsoleProgressIndicator.h
     ConsoleState.h
     CrashReporting.h
+    ElfCore.h
     wslc/models/ContainerModel.h
     DeviceHostProxy.h
     disk.hpp

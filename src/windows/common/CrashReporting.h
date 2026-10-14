@@ -4,8 +4,10 @@
 
 #include <array>
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <utility>
+#include "ElfCore.h"
 
 namespace wsl::windows::common::crashreporting {
 
@@ -37,7 +39,10 @@ std::wstring GetExecutableName(_In_ const std::string& Executable);
 
 // Builds the WSLAppCrash parameter set. Separated from submission so the mapping can be tested
 // without talking to Windows Error Reporting.
-ReportParameters BuildReportParameters(_In_ const LinuxCrashInfo& Info);
+//
+// Fault is the location read from the core. Without it the report names the crashing executable
+// with a zero offset.
+ReportParameters BuildReportParameters(_In_ const LinuxCrashInfo& Info, _In_ const std::optional<elfcore::FaultLocation>& Fault = std::nullopt);
 
 // Submits a WSLAppCrash report with the guest's ELF core attached as report data.
 HRESULT ReportLinuxCrash(_In_ const LinuxCrashInfo& Info) noexcept;

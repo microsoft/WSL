@@ -61,25 +61,33 @@ std::wstring wsl::windows::common::crashreporting::GetExecutableName(_In_ const 
     return name.empty() ? L"unknown" : wsl::shared::string::MultiByteToWide(name);
 }
 
-ReportParameters wsl::windows::common::crashreporting::BuildReportParameters(_In_ const LinuxCrashInfo& Info)
+ReportParameters wsl::windows::common::crashreporting::BuildReportParameters(
+    _In_ const LinuxCrashInfo& Info, _In_ const std::optional<elfcore::FaultLocation>& Fault)
 {
-    const auto module = GetExecutableName(Info.Executable);
+    const auto executable = GetExecutableName(Info.Executable);
     const auto& version = WslVersion();
 
     // AppName identifies who the crash belongs to and ModuleName what actually faulted. For a
     // container crash those differ: the report buckets against the Windows application that
-    // created the container, while the module names the Linux binary that died.
-    const auto app = Info.AppName.empty() ? module : Info.AppName;
+    // created the container, while the module names the Linux binary or library that faulted.
+    const auto app = Info.AppName.empty() ? executable : Info.AppName;
 
-    // The module offset is not resolved yet: doing so means parsing the core's NT_FILE mappings
-    // and NT_PRSTATUS registers to map the faulting address back to a shared object. Until then
-    // reports bucket per executable and signal rather than per faulting frame.
+    std::wstring module = executable;
+    ULONGLONG offset = 0;
+    if (Fault.has_value())
+    {
+        // A program counter outside any file mapping has no module to be relative to, so the
+        // absolute address is reported against an unknown module.
+        module = Fault->ModulePath.empty() ? L"unknown" : GetExecutableName(Fault->ModulePath);
+        offset = Fault->ModulePath.empty() ? Fault->ProgramCounter : Fault->ModuleOffset;
+    }
+
     return ReportParameters{
         {{L"AppName", app},
          {L"AppVersion", version},
          {L"ModuleName", module},
          {L"ModuleVersion", version},
-         {L"ModuleOffset", L"0000000000000000"},
+         {L"ModuleOffset", std::format(L"{:016x}", offset)},
          {L"ExceptionCode", std::format(L"{:08x}", Info.Signal)},
          {L"Flags", L"0"}}};
 }
@@ -100,7 +108,16 @@ catch (...)
 HRESULT wsl::windows::common::crashreporting::ReportLinuxCrash(_In_ const LinuxCrashInfo& Info) noexcept
 try
 {
-    const auto parameters = BuildReportParameters(Info);
+    // A core that cannot be parsed still gets reported, bucketed per executable instead of per
+    // faulting frame.
+    std::optional<elfcore::FaultLocation> fault;
+    try
+    {
+        fault = elfcore::ReadFaultLocation(Info.CorePath);
+    }
+    CATCH_LOG()
+
+    const auto parameters = BuildReportParameters(Info, fault);
     const auto module = GetExecutableName(Info.Executable);
     const auto& app = parameters[0].second;
 
@@ -138,6 +155,8 @@ try
         TraceLoggingValue(module.c_str(), "Executable"),
         TraceLoggingValue(Info.Pid, "Pid"),
         TraceLoggingValue(Info.Signal, "Signal"),
+        TraceLoggingValue(parameters[2].second.c_str(), "ModuleName"),
+        TraceLoggingValue(parameters[4].second.c_str(), "ModuleOffset"),
         TraceLoggingValue(static_cast<int>(submitResult), "SubmitResult"));
 
     return S_OK;
