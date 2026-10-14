@@ -26,15 +26,21 @@ Abstract:
 #include <CommandLine.h>
 #include <WSLCUserSettings.h>
 #include <filesystem>
+#include <filesystem.hpp>
 #include <unordered_map>
 #include <wslc.h>
 
 namespace wsl::windows::wslc::services {
+
+using namespace wsl::windows::wslc::cli;
 namespace mount = wsl::windows::common::mount;
 
 using wsl::windows::common::ClientRunningWSLCProcess;
 using wsl::windows::common::wslc_schema::InspectContainer;
+using namespace wsl::windows::common;
 using namespace wsl::windows::common::wslutil;
+using namespace wsl::windows::common::string;
+using namespace wsl::windows::common::filesystem;
 using namespace wsl::shared;
 using namespace wsl::windows::wslc::models;
 using namespace std::chrono_literals;
@@ -821,6 +827,212 @@ void ContainerService::Export(Session& session, const std::string& id, HANDLE ou
     THROW_IF_FAILED(container->Export(ToCOMInputHandle(outputHandle)));
 }
 
+bool ContainerService::IsCopyingToContainer(const std::wstring& source, const std::wstring& target)
+{
+    // Determine copy direction by looking for CONTAINER:PATH patterns.
+    auto isContainerPath = [](const std::wstring& path) -> bool {
+        auto colonPos = path.find(L':');
+        if (colonPos == std::wstring::npos || colonPos == 0)
+        {
+            return false;
+        }
+
+        // Single letter before colon is a Windows drive path
+        if (colonPos == 1 && std::isalpha(static_cast<unsigned char>(path[0])))
+        {
+            return false;
+        }
+
+        return true;
+    };
+
+    bool sourceIsStdin = (source == L"-");
+    bool sourceIsContainer = !sourceIsStdin && isContainerPath(source);
+    bool targetIsContainer = isContainerPath(target);
+
+    if (!sourceIsContainer && targetIsContainer)
+    {
+        return true;
+    }
+    else if (sourceIsContainer && !targetIsContainer)
+    {
+        return false;
+    }
+
+    // Both sides name the container, or both name the host.
+    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_CpInvalidDirectionError());
+}
+
+std::pair<std::string, std::string> ContainerService::ParseContainerPath(const std::wstring& path)
+{
+    auto colonPos = path.find(L':');
+
+    THROW_HR_IF(
+        E_UNEXPECTED,
+        colonPos == std::wstring::npos || colonPos == 0 || (colonPos == 1 && std::isalpha(static_cast<unsigned char>(path[0]))));
+
+    auto container = WideToMultiByte(path.substr(0, colonPos));
+    auto containerPath = WideToMultiByte(path.substr(colonPos + 1));
+    return {container, containerPath};
+}
+
+void ContainerService::CopyStdinToContainer(models::Session& session, const std::string& containerId, const std::string& destPath)
+{
+    auto inputHandle = GetStdHandle(STD_INPUT_HANDLE);
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::WSLCCLI_CpStdinIsTerminalError(), wsl::windows::common::wslutil::IsConsoleHandle(inputHandle));
+
+    LARGE_INTEGER fileSize{};
+    ULONGLONG contentSize = 0;
+    if (GetFileSizeEx(inputHandle, &fileSize))
+    {
+        contentSize = static_cast<ULONGLONG>(fileSize.QuadPart);
+    }
+
+    // --archive is a no-op: tar headers already carry uid/gid.
+    ContainerService::CopyToContainer(session, containerId, destPath, inputHandle, contentSize);
+}
+
+void ContainerService::CopyContainerPathToStdout(models::Session& session, const std::string& containerId, const std::string& srcPath, bool followLink)
+{
+    auto outputHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::WSLCCLI_CpStdoutIsTerminalError(), wsl::windows::common::wslutil::IsConsoleHandle(outputHandle));
+
+    ContainerService::CopyFromContainer(session, containerId, srcPath, followLink, outputHandle);
+}
+
+void ContainerService::CopyLocalPathToContainer(
+    models::Session& session, const std::wstring& source, const std::string& containerId, const std::string& destPath, bool followLink)
+{
+    // Local path → container: create tar from local path using tar.exe
+    std::error_code fsError;
+    bool pathExists = std::filesystem::exists(source, fsError);
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpSourceNotFoundError(source), fsError || !pathExists);
+
+    auto absPath = std::filesystem::absolute(source);
+
+    // A trailing separator leaves filename() empty, which would name an empty tar entry.
+    if (!absPath.has_filename())
+    {
+        absPath = absPath.parent_path();
+    }
+
+    // tar -h dereferences every link it walks, so only use it for a link to a single file.
+    std::optional<StagingDirectory> staging;
+
+    bool dereference = false;
+    if (followLink && std::filesystem::is_symlink(absPath, fsError))
+    {
+        std::error_code resolveError;
+        const auto resolved = std::filesystem::canonical(absPath, resolveError);
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpSourceNotFoundError(source), !!resolveError);
+
+        if (std::filesystem::is_directory(resolved))
+        {
+            // The archive must carry the link's name while holding the target's tree.
+            staging.emplace(std::filesystem::temp_directory_path());
+            absPath = wsl::windows::common::filesystem::StageDereferencedTree(staging->Path(), absPath.filename(), resolved);
+        }
+        else
+        {
+            dereference = true;
+        }
+    }
+
+    std::wstring parentDir = wsl::windows::common::filesystem::StripTrailingSeparators(absPath.parent_path());
+    std::wstring fileName = absPath.filename().wstring();
+
+    // Create a temp file with DELETE_ON_CLOSE and InheritHandle so tar can write to it via stdout
+    TempFile tarFile(GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, TempFileFlags::DeleteOnClose | TempFileFlags::InheritHandle);
+
+    // Run tar.exe writing to stdout, redirected to our temp file handle.
+    auto tarCmd = std::format(L"tar.exe -c{}f - -C \"{}\" \"{}\"", dereference ? L"h" : L"", parentDir, fileName);
+    SubProcess process(nullptr, tarCmd.c_str());
+    process.SetStdHandles(nullptr, tarFile.Handle.get(), nullptr);
+    auto exitCode = process.Run();
+    THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
+
+    // Rewind and get size for upload
+    LARGE_INTEGER zero{};
+    THROW_LAST_ERROR_IF(!SetFilePointerEx(tarFile.Handle.get(), zero, nullptr, FILE_BEGIN));
+
+    LARGE_INTEGER fileSize{};
+    THROW_LAST_ERROR_IF(!GetFileSizeEx(tarFile.Handle.get(), &fileSize));
+
+    ContainerService::CopyToContainer(session, containerId, destPath, tarFile.Handle.get(), static_cast<ULONGLONG>(fileSize.QuadPart));
+}
+
+void ContainerService::CopyFromContainerIntoLocalDir(
+    models::Session& session, const std::string& containerId, const std::string& srcPath, const std::filesystem::path& canonicalTarget, bool followLink)
+{
+    // A followed link's archive is named after its target; keep the requested name.
+    std::optional<std::wstring> rebaseName;
+    if (followLink)
+    {
+        rebaseName = MultiByteToWide(PosixBaseName(srcPath));
+    }
+
+    ExtractArchiveInto(canonicalTarget, rebaseName, [&](HANDLE archive) {
+        ContainerService::CopyFromContainer(session, containerId, srcPath, followLink, archive);
+    });
+}
+
+void ContainerService::CopyFromContainerIntoLocalFile(
+    models::Session& session, const std::string& containerId, const std::string& srcPath, const std::filesystem::path& canonicalTarget, bool followLink)
+{
+    ExtractSingleFileAs(canonicalTarget, [&](HANDLE archive) {
+        ContainerService::CopyFromContainer(session, containerId, srcPath, followLink, archive);
+    });
+}
+
+void ContainerService::Copy(models::Session& session, const std::wstring& source, const std::wstring& target, bool followLink)
+{
+
+    if (IsCopyingToContainer(source, target))
+    {
+        auto [containerId, destPath] = ParseContainerPath(target);
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpInvalidTargetError(), containerId.empty() || destPath.empty());
+
+        bool isSourceStdin = source == L"-";
+        if (isSourceStdin)
+        {
+            CopyStdinToContainer(session, containerId, destPath);
+            return;
+        }
+
+        CopyLocalPathToContainer(session, source, containerId, destPath, followLink);
+    }
+    else
+    {
+        auto [containerId, srcPath] = ParseContainerPath(source);
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpInvalidSourceError(), containerId.empty() || srcPath.empty());
+
+        bool isTargetStdout = target == L"-";
+        if (isTargetStdout)
+        {
+            CopyContainerPathToStdout(session, containerId, srcPath, followLink);
+            return;
+        }
+
+        // Resolve any symlinks in the target path since tar.exe refuses to extract through a symlink.
+        std::error_code canonicalError;
+        auto canonicalTarget = GetCanonicalPath(target, canonicalError);
+        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(canonicalError.value()), Localization::WSLCCLI_CpInvalidTargetError(), !!canonicalError);
+
+        bool targetIsDir = (!target.empty() && (target.back() == L'\\' || target.back() == L'/')) ||
+                           std::filesystem::is_directory(canonicalTarget);
+
+        if (targetIsDir)
+        {
+            CopyFromContainerIntoLocalDir(session, containerId, srcPath, canonicalTarget, followLink);
+            return;
+        }
+
+        CopyFromContainerIntoLocalFile(session, containerId, srcPath, canonicalTarget, followLink);
+    }
+}
+
 void ContainerService::CopyToContainer(Session& session, const std::string& id, const std::string& destPath, HANDLE inputHandle, ULONGLONG contentSize)
 {
     [[maybe_unused]] auto operation = session.BeginContainerOperation();
@@ -831,14 +1043,14 @@ void ContainerService::CopyToContainer(Session& session, const std::string& id, 
     THROW_IF_FAILED(container->UploadArchive(ToCOMInputHandle(inputHandle), destPath.c_str(), contentSize));
 }
 
-void ContainerService::CopyFromContainer(Session& session, const std::string& id, const std::string& srcPath, HANDLE outputHandle)
+void ContainerService::CopyFromContainer(Session& session, const std::string& id, const std::string& srcPath, bool followLink, HANDLE outputHandle)
 {
     [[maybe_unused]] auto operation = session.BeginContainerOperation();
 
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
 
-    THROW_IF_FAILED(container->DownloadArchive(srcPath.c_str(), ToCOMInputHandle(outputHandle)));
+    THROW_IF_FAILED(container->DownloadArchive(srcPath.c_str(), followLink, ToCOMInputHandle(outputHandle)));
 }
 
 void ContainerService::Logs(Session& session, const std::string& id, bool follow, bool timestamps, bool details, LONGLONG since, LONGLONG until, ULONGLONG tail)

@@ -47,8 +47,15 @@ bool wsl::windows::common::disk::IsDiskOnline(_In_ HANDLE Disk)
     return !WI_IsFlagSet(attributes.Attributes, DISK_ATTRIBUTE_OFFLINE);
 }
 
-wil::unique_hfile wsl::windows::common::disk::OpenVhdBackingFile(_In_ LPCWSTR Path)
+wil::unique_hfile wsl::windows::common::disk::OpenVhdBackingFile(_In_ LPCWSTR Path, _In_opt_ HANDLE UserToken)
 {
+    // User-owned VHDs may not grant the service identity access.
+    wil::unique_token_reverter runAsUser;
+    if (UserToken != nullptr)
+    {
+        runAsUser = wil::impersonate_token(UserToken);
+    }
+
     wil::unique_hfile file{CreateFileW(
         Path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
     THROW_LAST_ERROR_IF(!file);

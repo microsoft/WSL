@@ -25,7 +25,15 @@ class Program
     {
         // 0. Check prerequisites
         var missing = WslcService.GetMissingComponents();
-        if (missing.Count > 0)
+        foreach (Component component in missing)
+        {
+            if (component == Component.SdkNeedsUpdate)
+            {
+                Console.WriteLine("This application is incompatible with the installed WSL runtime.");
+                return 1;
+            }
+        }
+        if (missing.Count != 0)
         {
             Console.WriteLine("WSL components are missing. Run: wsl --install");
             return 1;

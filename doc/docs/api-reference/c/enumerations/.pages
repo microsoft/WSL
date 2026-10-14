@@ -13,6 +13,9 @@ nav:
   - wslcsignal.md
   - wslcdeletecontainerflags.md
   - wslcprocessiohandle.md
+  - wslcprocessflags.md
   - wslcprocessstate.md
   - wslcimageprogressstatus.md
   - wslccomponentflags.md
+  - wslcidentitytokentype.md
+  - wslcinstalloptions.md

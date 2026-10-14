@@ -26,6 +26,8 @@ using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
 
+using namespace wsl::windows::wslc::cli;
+
 void Login(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));

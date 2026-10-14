@@ -1,10 +1,13 @@
 title: Data Classes
 nav:
   - index.md
+  - authenticateresult.md
   - imageinfo.md
   - imageprogress.md
   - installprogress.md
+  - processcrashinformation.md
+  - serviceversion.md
+  - vhdowner.md
   - containerportmapping.md
   - containervolume.md
   - containernamedvolume.md
-  - referenced.md

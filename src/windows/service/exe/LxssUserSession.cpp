@@ -574,36 +574,36 @@ LxssUserSessionImpl::LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId
 {
     THROW_IF_WIN32_BOOL_FALSE(::CopySid(sizeof(m_userSid), &m_userSid.Sid, userSid));
 
+    wil::unique_hkey lxssKey;
+    wil::unique_handle userToken;
+    {
+        userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+        lxssKey = s_OpenLxssUserKey(userToken.get());
+    }
+
+    static std::atomic<DWORD> sessionCookie;
+
+    m_session = {sessionCookie++, nullptr, &m_userSid.Sid};
+
+    // Detect existing legacy installs and convert them to the new format.
+    const DWORD state =
+        wsl::windows::common::registry::ReadDword(lxssKey.get(), nullptr, LXSS_LEGACY_INSTALL_VALUE, LxssDistributionStateInvalid);
+
+    if (state == LxssDistributionStateInstalled)
+    {
+        // Create a registration for legacy installs and delete legacy
+        // installed state.
+        std::lock_guard lock(m_instanceLock);
+        _CreateLegacyRegistration(lxssKey.get(), userToken.get());
+        wsl::windows::common::registry::DeleteKeyValue(lxssKey.get(), LXSS_LEGACY_INSTALL_VALUE);
+    }
+
+    // Create a threadpool timer to terminate a Linux utility VM that is idle.
+    m_vmTerminationTimer.reset(CreateThreadpoolTimer(s_VmIdleTerminate, this, nullptr));
+    THROW_IF_NULL_ALLOC(m_vmTerminationTimer);
+
     try
     {
-        wil::unique_hkey lxssKey;
-        wil::unique_handle userToken;
-        {
-            userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
-            lxssKey = s_OpenLxssUserKey(userToken.get());
-        }
-
-        static std::atomic<DWORD> sessionCookie;
-
-        m_session = {sessionCookie++, nullptr, &m_userSid.Sid};
-
-        // Detect existing legacy installs and convert them to the new format.
-        const DWORD state =
-            wsl::windows::common::registry::ReadDword(lxssKey.get(), nullptr, LXSS_LEGACY_INSTALL_VALUE, LxssDistributionStateInvalid);
-
-        if (state == LxssDistributionStateInstalled)
-        {
-            // Create a registration for legacy installs and delete legacy
-            // installed state.
-            std::lock_guard lock(m_instanceLock);
-            _CreateLegacyRegistration(lxssKey.get(), userToken.get());
-            wsl::windows::common::registry::DeleteKeyValue(lxssKey.get(), LXSS_LEGACY_INSTALL_VALUE);
-        }
-
-        // Create a threadpool timer to terminate a Linux utility VM that is idle.
-        m_vmTerminationTimer.reset(CreateThreadpoolTimer(s_VmIdleTerminate, this, nullptr));
-        THROW_IF_NULL_ALLOC(m_vmTerminationTimer);
-
         // Register for timezone update notifications.
 
         auto listenForTimeZoneChanges = [this] {
@@ -1498,10 +1498,12 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
 
             _ValidateDistributionNameAndPathNotInUse(lxssKey.get(), distributionPath.c_str(), DistributionName);
 
-            if (!std::filesystem::exists(distributionPath))
             {
                 auto impersonate = wil::CoImpersonateClient();
-                wil::CreateDirectoryDeep(distributionPath.c_str());
+                if (!std::filesystem::exists(distributionPath))
+                {
+                    wil::CreateDirectoryDeep(distributionPath.c_str());
+                }
             }
 
             // If importing a vhd, determine if it is a .vhd or .vhdx.
@@ -1582,8 +1584,9 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
                         VhdSize = config.VhdSizeBytes;
                     }
 
+                    const bool fixed = WI_IsFlagSet(Flags, LXSS_IMPORT_DISTRO_FLAGS_FIXED_VHD);
                     wsl::core::filesystem::CreateVhd(
-                        configuration.VhdFilePath.c_str(), VhdSize, GetUserSid(), config.EnableSparseVhd, WI_IsFlagSet(Flags, LXSS_IMPORT_DISTRO_FLAGS_FIXED_VHD));
+                        configuration.VhdFilePath.c_str(), VhdSize, GetUserSid(), config.EnableSparseVhd && !fixed, fixed);
 
                     deleteFlags = LXSS_DELETE_DISTRO_FLAGS_VHD;
                 }
@@ -1759,6 +1762,8 @@ CATCH_RETURN()
 HRESULT LxssUserSessionImpl::SetSparse(_In_ LPCGUID DistroGuid, _In_ BOOLEAN Sparse, _In_ BOOLEAN AllowUnsafe)
 try
 {
+    UNREFERENCED_PARAMETER(AllowUnsafe);
+
     const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     const wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
     auto runAsUser = wil::impersonate_token(userToken.get());
@@ -1771,12 +1776,6 @@ try
     if (WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE))
     {
         THROW_HR_WITH_USER_ERROR(WSL_E_VM_MODE_INVALID_STATE, wsl::shared::Localization::MessageSparseVhdWsl2Only());
-    }
-
-    // Allow disabling sparse mode but not enabling until the data corruption issue has been resolved.
-    if (Sparse && !AllowUnsafe)
-    {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageSparseVhdDisabled());
     }
 
     // Don't attempt if running
@@ -1801,6 +1800,11 @@ try
         .SetSparse = Sparse,
     };
     THROW_IF_WIN32_BOOL_FALSE(::DeviceIoControl(vhd.get(), FSCTL_SET_SPARSE, &buffer, sizeof(buffer), nullptr, 0, nullptr, nullptr));
+
+    if (Sparse)
+    {
+        EMIT_USER_WARNING(wsl::shared::Localization::MessageSparseVhdUnsafe());
+    }
 
     return S_OK;
 }
@@ -1869,7 +1873,6 @@ CATCH_RETURN()
 HRESULT LxssUserSessionImpl::CompactDistribution(_In_ LPCGUID DistroGuid)
 try
 {
-    auto runAsUser = wil::CoImpersonateClient();
     std::filesystem::path vhdPath;
     LXSS_DISTRO_CONFIGURATION configuration{};
 
@@ -1910,6 +1913,7 @@ try
 
     auto compactionComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { _ConversionComplete(configuration.DistroId); });
 
+    auto runAsUser = wil::CoImpersonateClient();
     THROW_IF_FAILED_MSG(
         wil::ResultFromException([&] { wsl::core::filesystem::CompactVhd(vhdPath.c_str()); }),
         "Failed to compact VHD: %ls",
@@ -3457,6 +3461,8 @@ void LxssUserSessionImpl::_ProcessImportResultMessage(
 
         // Validate that name is valid, and doesn't conflict with existing distributions.
         s_ValidateDistroName(distributionName.c_str());
+
+        std::lock_guard lock(m_instanceLock);
         _ValidateDistributionNameAndPathNotInUse(LxssKey, nullptr, distributionName.c_str(), Registration.Id());
 
         Configuration.Name = std::move(distributionName);
@@ -3899,6 +3905,7 @@ bool LxssUserSessionImpl::_ValidateDistro(_In_ HKEY LxssKey, _In_ LPCGUID Distro
     return isValid;
 }
 
+_Requires_lock_held_(m_instanceLock)
 void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
     _In_ HKEY LxssKey, _In_opt_ LPCWSTR Path, _In_opt_ LPCWSTR Name, const std::optional<GUID>& Exclude)
 {
@@ -3915,6 +3922,7 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
 
     if (Path != nullptr)
     {
+        auto impersonate = wil::CoImpersonateClient();
         canonicalPath = wsl::windows::common::filesystem::GetCanonicalPath(Path, error);
         if (error)
         {
@@ -3959,6 +3967,7 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
 
         if (Path != nullptr)
         {
+            auto impersonate = wil::CoImpersonateClient();
             auto canonicalDistroPath = wsl::windows::common::filesystem::GetCanonicalPath(configuration.BasePath, error);
             if (error)
             {
