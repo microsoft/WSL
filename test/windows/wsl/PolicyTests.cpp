@@ -189,6 +189,28 @@ class PolicyTest
             L"wsl: The .wslconfig setting 'wsl2.nestedVirtualization' is disabled by the computer policy.\r\n");
     }
 
+    WSL2_TEST_METHOD(NestedVirtualizationWindows10)
+    {
+        SKIP_TEST_ARM64();
+        if (wsl::windows::common::helpers::IsWindows11OrAbove())
+        {
+            LogSkipped("This test validates Windows 10 nested virtualization behavior");
+            return;
+        }
+
+        auto validate = [](DWORD policyValue) {
+            const auto expectedResult = policyValue == 0 ? 1u : 0u;
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(L"-- sh -c \"test -c /dev/kvm && grep -Eq 'vmx|svm' /proc/cpuinfo\""), expectedResult);
+        };
+
+        ValidatePolicy(
+            c_allowNestedVirtualizationUserSetting,
+            L"nestedVirtualization=true",
+            L"wsl: The .wslconfig setting 'wsl2.nestedVirtualization' is disabled by the computer policy.\r\n",
+            validate);
+    }
+
     WSL2_TEST_METHOD(KernelDebugging)
     {
         WINDOWS_11_TEST_ONLY();
