@@ -4461,11 +4461,11 @@ class WSLCTests
     WSLC_TEST_METHOD(RootNamespaceProcessReleaseAndExitStress)
     {
         constexpr unsigned int c_threadCount = 4;
-        constexpr unsigned int c_iterationsPerThread = 50;
+        constexpr unsigned int c_iterations = 50;
 
         std::atomic<unsigned int> failures = 0;
         std::vector<std::thread> threads;
-        threads.reserve(c_threadCount);
+
         {
             auto joinThreads = wil::scope_exit([&]() {
                 for (auto& thread : threads)
@@ -4474,15 +4474,14 @@ class WSLCTests
                 }
             });
 
-            for (unsigned int t = 0; t < c_threadCount; ++t)
+            for (auto t = 0; t < c_threadCount; ++t)
             {
                 threads.emplace_back([&]() {
                     try
                     {
                         const auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
-                        for (unsigned int i = 0; i < c_iterationsPerThread; ++i)
+                        for (auto i = 0; i < c_iterations; ++i)
                         {
-                            // Release without waiting, racing process rundown with exit notifications and other releases.
                             auto [result, process, error] = WSLCProcessLauncher("/bin/true", {"/bin/true"}).LaunchNoThrow(*m_defaultSession);
                             if (FAILED(result))
                             {
@@ -4503,9 +4502,8 @@ class WSLCTests
 
         VERIFY_ARE_EQUAL(failures.load(), 0u);
 
-        // Process creation can still succeed with a wedged exit watcher; require a fresh exit notification.
-        auto process = WSLCProcessLauncher("/bin/true", {"/bin/true"}).Launch(*m_defaultSession);
-        VERIFY_ARE_EQUAL(process.Wait(30000), 0);
+        // Validate that exit notifications are still functional.
+        ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "echo OK"}, 0);
     }
 
     WSLC_TEST_METHOD(CreateRootNamespaceProcess)

@@ -573,8 +573,8 @@ try
             TraceLoggingValue(message->Code, "Code"),
             TraceLoggingValue(message->Signaled, "Signaled"));
 
-        // A temporary strong reference can become the last owner and reenter OnProcessReleased.
-        // Snapshot weak references so both process calls and strong-reference releases happen outside the lock.
+        // N.B. Processes must be released outside of m_trackedProcessesLock since releasing the last reference
+        // can call back into the VM and acquire m_trackedProcessesLock.
         std::vector<std::weak_ptr<VMProcessControl>> processes;
         {
             std::lock_guard lock{m_trackedProcessesLock};
