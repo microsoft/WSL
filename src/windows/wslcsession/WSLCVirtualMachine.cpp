@@ -573,21 +573,22 @@ try
             TraceLoggingValue(message->Code, "Code"),
             TraceLoggingValue(message->Signaled, "Signaled"));
 
-        // Signal the exited process, if it's been monitored.
-        // N.B. Lock weak_ptr under lock, then call OnExited outside it to avoid
-        // deadlock with the destructor's m_lock -> m_trackedProcessesLock ordering.
-        std::shared_ptr<VMProcessControl> exited;
+        // A temporary strong reference can become the last owner and reenter OnProcessReleased.
+        // Snapshot weak references so both process calls and strong-reference releases happen outside the lock.
+        std::vector<std::weak_ptr<VMProcessControl>> processes;
         {
             std::lock_guard lock{m_trackedProcessesLock};
+            processes = m_trackedProcesses;
+        }
 
-            for (auto& e : m_trackedProcesses)
+        std::shared_ptr<VMProcessControl> exited;
+        for (const auto& process : processes)
+        {
+            auto locked = process.lock();
+            if (locked && locked->GetPid() == message->Pid)
             {
-                auto locked = e.lock();
-                if (locked && locked->GetPid() == message->Pid)
-                {
-                    exited = std::move(locked);
-                    break;
-                }
+                exited = std::move(locked);
+                break;
             }
         }
 
@@ -1344,14 +1345,12 @@ void WSLCVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_
         THROW_IF_FAILED(MountWindowsFolderImpl(packagedLibPath.c_str(), LibrariesMountPoint, WSLCMountFlagsReadOnly));
     }
 }
-void WSLCVirtualMachine::OnProcessReleased(int Pid)
+void WSLCVirtualMachine::OnProcessReleased()
 {
     std::lock_guard lock{m_trackedProcessesLock};
 
-    std::erase_if(m_trackedProcesses, [Pid](const auto& e) {
-        auto locked = e.lock();
-        return !locked || locked->GetPid() == Pid;
-    });
+    // The releasing process's weak reference is already expired when its destructor calls us.
+    std::erase_if(m_trackedProcesses, [](const auto& process) { return process.expired(); });
 }
 
 void WSLCVirtualMachine::OnSessionTerminated()

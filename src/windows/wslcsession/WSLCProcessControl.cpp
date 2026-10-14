@@ -218,7 +218,7 @@ VMProcessControl::~VMProcessControl()
 
     if (m_vm != nullptr)
     {
-        m_vm->OnProcessReleased(m_pid);
+        m_vm->OnProcessReleased();
     }
 }
 

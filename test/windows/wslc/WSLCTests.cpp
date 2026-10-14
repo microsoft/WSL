@@ -4458,6 +4458,56 @@ class WSLCTests
         ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "lsmod | grep ^xsk_diag"}, 0);
     }
 
+    WSLC_TEST_METHOD(RootNamespaceProcessReleaseAndExitStress)
+    {
+        constexpr unsigned int c_threadCount = 4;
+        constexpr unsigned int c_iterationsPerThread = 50;
+
+        std::atomic<unsigned int> failures = 0;
+        std::vector<std::thread> threads;
+        threads.reserve(c_threadCount);
+        {
+            auto joinThreads = wil::scope_exit([&]() {
+                for (auto& thread : threads)
+                {
+                    thread.join();
+                }
+            });
+
+            for (unsigned int t = 0; t < c_threadCount; ++t)
+            {
+                threads.emplace_back([&]() {
+                    try
+                    {
+                        const auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
+                        for (unsigned int i = 0; i < c_iterationsPerThread; ++i)
+                        {
+                            // Release without waiting, racing process rundown with exit notifications and other releases.
+                            auto [result, process, error] = WSLCProcessLauncher("/bin/true", {"/bin/true"}).LaunchNoThrow(*m_defaultSession);
+                            if (FAILED(result))
+                            {
+                                LogError("Root process launch failed: 0x%08x, errno: %i", result, error);
+                                ++failures;
+                                return;
+                            }
+                        }
+                    }
+                    catch (...)
+                    {
+                        LOG_CAUGHT_EXCEPTION();
+                        ++failures;
+                    }
+                });
+            }
+        }
+
+        VERIFY_ARE_EQUAL(failures.load(), 0u);
+
+        // Process creation can still succeed with a wedged exit watcher; require a fresh exit notification.
+        auto process = WSLCProcessLauncher("/bin/true", {"/bin/true"}).Launch(*m_defaultSession);
+        VERIFY_ARE_EQUAL(process.Wait(30000), 0);
+    }
+
     WSLC_TEST_METHOD(CreateRootNamespaceProcess)
     {
         // Reject invalid process flags.

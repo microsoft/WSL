@@ -170,7 +170,7 @@ public:
 
     void Signal(_In_ LONG Pid, _In_ int Signal);
 
-    void OnProcessReleased(int Pid);
+    void OnProcessReleased();
     void OnSessionTerminated();
 
     std::shared_ptr<VmPortAllocation> TryAllocatePort(uint16_t Port, int Family, int Protocol);
