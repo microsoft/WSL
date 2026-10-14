@@ -1588,7 +1588,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
         vmSettings.ComputeTopology.Memory.HostingProcessNameSuffix = wsl::windows::common::wslutil::c_vmOwner;
     }
 
-    // Configure nested virtualization if it was explicitly requested.
+    // Configure nested virtualization when enabled.
     if (m_vmConfig.EnableNestedVirtualization)
     {
         try
