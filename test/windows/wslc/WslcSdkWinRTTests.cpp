@@ -30,13 +30,6 @@ Abstract:
 #include <winrt/Windows.Networking.h>
 #include <winrt/Windows.Storage.Streams.h>
 
-using namespace winrt::Windows::Foundation;
-using namespace winrt::Windows::Foundation::Collections;
-using namespace winrt::Windows::Storage::Streams;
-using namespace std::chrono_literals;
-
-namespace WSLCSDK = winrt::Microsoft::WSL::Containers;
-
 extern std::wstring g_testDataPath;
 extern bool g_fastTestRun;
 
@@ -53,6 +46,14 @@ extern bool g_fastTestRun;
 #define SCOPE_CLEANUP(operation) wil::scope_exit([&]() { IGNORE_ERRORS(operation) })
 #define DELETE_CONTAINER_ON_SCOPE_EXIT(container) SCOPE_CLEANUP(container.Delete(WSLCSDK::DeleteContainerOption::Force))
 #define DELETE_IMAGE_ON_SCOPE_EXIT(imageName) SCOPE_CLEANUP(m_defaultSession.DeleteImage(imageName))
+
+namespace {
+using namespace winrt::Windows::Foundation;
+using namespace winrt::Windows::Foundation::Collections;
+using namespace winrt::Windows::Storage::Streams;
+using namespace std::chrono_literals;
+
+namespace WSLCSDK = winrt::Microsoft::WSL::Containers;
 
 struct CapturedProcessOutput
 {
@@ -2127,3 +2128,4 @@ class WslcSdkWinRtTests
         VERIFY_ARE_EQUAL(stderrAccum, "EVENT_ERR\n");
     }
 };
+} // namespace
