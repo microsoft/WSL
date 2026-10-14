@@ -22,6 +22,7 @@ Abstract:
 #include "DiagnosticCallback.h"
 #include "Terminal.h"
 #include "WSLCDiagnostics.h"
+#include <thread>
 
 using namespace wsl::windows::wslc;
 using namespace wsl::windows::wslc::cli;
@@ -62,6 +63,14 @@ struct InputCaptureTerminal
 
 struct TestDiagnosticCallback : Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IDiagnosticCallback>
 {
+    ~TestDiagnosticCallback()
+    {
+        if (OnDestruction)
+        {
+            OnDestruction();
+        }
+    }
+
     HRESULT GetEnabledLevels(WSLCDiagnosticLevel* levels) override
     {
         RETURN_HR_IF_NULL(E_POINTER, levels);
@@ -78,6 +87,9 @@ struct TestDiagnosticCallback : Microsoft::WRL::RuntimeClass<Microsoft::WRL::Run
         LastLevel = event->Level;
         LastCode = event->Code == nullptr ? "" : event->Code;
         LastMessage = event->Message == nullptr ? L"" : event->Message;
+        LastTimestamp = event->Timestamp;
+        LastMessagePresent = event->Message != nullptr;
+        LastThreadId = GetCurrentThreadId();
         return OnDiagnosticResult;
     }
 
@@ -89,6 +101,10 @@ struct TestDiagnosticCallback : Microsoft::WRL::RuntimeClass<Microsoft::WRL::Run
     WSLCDiagnosticLevel LastLevel = WSLCDiagnosticLevelNone;
     std::string LastCode;
     std::wstring LastMessage;
+    ULONGLONG LastTimestamp = 0;
+    bool LastMessagePresent = false;
+    DWORD LastThreadId = 0;
+    std::function<void()> OnDestruction;
 };
 
 struct TestCompatWarningCallback
@@ -385,6 +401,9 @@ class WSLCCLITerminalUnitTests
             ++invalidVersionEvent.SchemaVersion;
             const auto missingCodeEvent = DiagnosticEvent(WSLCDiagnosticLevelWarning, nullptr, L"warning\n");
             const auto missingWarningMessage = DiagnosticEvent(WSLCDiagnosticLevelWarning, WSLC_DIAG_CODE_USER_WARNING);
+            const auto combinedLevelEvent =
+                DiagnosticEvent(WSLCDiagnosticLevelDebug | WSLCDiagnosticLevelWarning, "combined-level");
+            const auto noLevelEvent = DiagnosticEvent(WSLCDiagnosticLevelNone, "no-level");
 
             VERIFY_ARE_EQUAL(E_POINTER, callback.OnDiagnostic(nullptr));
             VERIFY_SUCCEEDED(callback.OnDiagnostic(&debugEvent));
@@ -392,7 +411,9 @@ class WSLCCLITerminalUnitTests
             VERIFY_ARE_EQUAL(E_INVALIDARG, callback.OnDiagnostic(&invalidLevelEvent));
             VERIFY_ARE_EQUAL(E_INVALIDARG, callback.OnDiagnostic(&invalidVersionEvent));
             VERIFY_ARE_EQUAL(E_INVALIDARG, callback.OnDiagnostic(&missingCodeEvent));
-            VERIFY_ARE_EQUAL(E_INVALIDARG, callback.OnDiagnostic(&missingWarningMessage));
+            VERIFY_SUCCEEDED(callback.OnDiagnostic(&missingWarningMessage));
+            VERIFY_ARE_EQUAL(E_INVALIDARG, callback.OnDiagnostic(&combinedLevelEvent));
+            VERIFY_ARE_EQUAL(E_INVALIDARG, callback.OnDiagnostic(&noLevelEvent));
             VERIFY_ARE_EQUAL(std::wstring{L"warning\n"}, cap.errPipe.captured());
         }
 
@@ -443,7 +464,10 @@ class WSLCCLITerminalUnitTests
         const auto debugEvent = DiagnosticEvent(WSLCDiagnosticLevelDebug, "debug", L"not supported by the SDK callback");
         const auto missingMessageEvent = DiagnosticEvent(WSLCDiagnosticLevelWarning, WSLC_DIAG_CODE_USER_WARNING);
         VERIFY_ARE_EQUAL(E_INVALIDARG, diagnosticCallback->OnDiagnostic(&debugEvent));
-        VERIFY_ARE_EQUAL(E_INVALIDARG, diagnosticCallback->OnDiagnostic(&missingMessageEvent));
+        VERIFY_SUCCEEDED(diagnosticCallback->OnDiagnostic(&missingMessageEvent));
+        const auto combinedEvent =
+            DiagnosticEvent(WSLCDiagnosticLevelDebug | WSLCDiagnosticLevelWarning, "combined-level", L"warning");
+        VERIFY_ARE_EQUAL(E_INVALIDARG, diagnosticCallback->OnDiagnostic(&combinedEvent));
         VERIFY_ARE_EQUAL(size_t{1}, warningCallback->WarningCount);
     }
 
@@ -457,12 +481,12 @@ class WSLCCLITerminalUnitTests
         VERIFY_SUCCEEDED(queryResult);
         VERIFY_ARE_EQUAL(callback.EnabledLevels, enabledLevels);
 
-        wsl::windows::wslc::diagnostics::Report(&callback, enabledLevels, WSLCDiagnosticLevelDebug, "debug", L"filtered");
+        wsl::windows::wslc::diagnostics::DiagnosticReporter reporter{&callback};
+        reporter.Report(WSLCDiagnosticLevelDebug, "debug", L"filtered");
         VERIFY_ARE_EQUAL(size_t{0}, callback.DiagnosticCount);
 
         callback.OnDiagnosticResult = E_FAIL;
-        wsl::windows::wslc::diagnostics::Report(
-            &callback, enabledLevels, WSLCDiagnosticLevelWarning, WSLC_DIAG_CODE_USER_WARNING, L"warning");
+        reporter.Report(WSLCDiagnosticLevelWarning, WSLC_DIAG_CODE_USER_WARNING, L"warning");
         VERIFY_ARE_EQUAL(size_t{1}, callback.DiagnosticCount);
         VERIFY_ARE_EQUAL(WSLCDiagnosticLevelWarning, callback.LastLevel);
         VERIFY_ARE_EQUAL(std::string{WSLC_DIAG_CODE_USER_WARNING}, callback.LastCode);
@@ -517,6 +541,95 @@ class WSLCCLITerminalUnitTests
         VERIFY_ARE_EQUAL(size_t{3}, callbackScopeCount);
         VERIFY_ARE_EQUAL(size_t{2}, callback.DiagnosticCount);
         VERIFY_ARE_EQUAL(std::wstring{L"value=1"}, callback.LastMessage);
+    }
+
+    TEST_METHOD(DiagnosticReporter_RejectsInvalidEvents)
+    {
+        TestDiagnosticCallback callback;
+        callback.EnabledLevels = WSLCDiagnosticLevelDebug | WSLCDiagnosticLevelWarning;
+        diagnostics::DiagnosticReporter reporter{&callback};
+
+        for (const auto level :
+             {WSLCDiagnosticLevelNone, WSLCDiagnosticLevelDebug | WSLCDiagnosticLevelWarning, static_cast<WSLCDiagnosticLevel>(2)})
+        {
+            VERIFY_ARE_EQUAL(E_INVALIDARG, reporter.TryReport(level, "invalid-level"));
+        }
+
+        VERIFY_ARE_EQUAL(E_INVALIDARG, reporter.TryReport(WSLCDiagnosticLevelDebug, nullptr));
+        VERIFY_ARE_EQUAL(E_INVALIDARG, reporter.TryReport(WSLCDiagnosticLevelDebug, ""));
+        VERIFY_ARE_EQUAL(size_t{0}, callback.DiagnosticCount);
+    }
+
+    TEST_METHOD(DiagnosticQueue_DeliversOnlyOnOriginatingThreadAndClosesSharedCopies)
+    {
+        TestDiagnosticCallback callback;
+        callback.EnabledLevels = WSLCDiagnosticLevelDebug;
+        diagnostics::DiagnosticReporter reporter{&callback};
+        diagnostics::DiagnosticQueue queue{reporter.EnabledLevels()};
+        auto transitionQueue = queue;
+        std::thread producer([&]() { transitionQueue.ReportAt(123, WSLCDiagnosticLevelDebug, "queued-event", L"queued"); });
+        producer.join();
+
+        VERIFY_ARE_EQUAL(size_t{0}, callback.DiagnosticCount);
+        queue.Complete(reporter);
+        VERIFY_ARE_EQUAL(size_t{1}, callback.DiagnosticCount);
+        VERIFY_ARE_EQUAL(GetCurrentThreadId(), callback.LastThreadId);
+        VERIFY_ARE_EQUAL(ULONGLONG{123}, callback.LastTimestamp);
+        VERIFY_ARE_EQUAL(std::wstring{L"queued"}, callback.LastMessage);
+        VERIFY_ARE_EQUAL(WSLCDiagnosticLevelNone, transitionQueue.EnabledLevels());
+
+        transitionQueue.Report(WSLCDiagnosticLevelDebug, "late-event", L"late");
+        transitionQueue.Complete(reporter);
+        VERIFY_ARE_EQUAL(size_t{1}, callback.DiagnosticCount);
+    }
+
+    TEST_METHOD(DiagnosticQueue_DoesNotRetainCallbackAfterOperationUnwinds)
+    {
+        bool destroyed = false;
+        diagnostics::DiagnosticQueue transitionQueue;
+        VERIFY_THROWS(
+            [&]() {
+                auto callback = Microsoft::WRL::Make<TestDiagnosticCallback>();
+                callback->EnabledLevels = WSLCDiagnosticLevelDebug;
+                callback->OnDestruction = [&]() { destroyed = true; };
+                diagnostics::DiagnosticReporter reporter{callback.Get()};
+                diagnostics::DiagnosticQueue queue{reporter.EnabledLevels()};
+                transitionQueue = queue;
+                auto complete = wil::scope_exit([&]() { queue.Complete(reporter); });
+                queue.Report(WSLCDiagnosticLevelDebug, "before-cancel", L"queued");
+                THROW_HR(E_ABORT);
+            }(),
+            wil::ResultException);
+
+        VERIFY_IS_TRUE(destroyed);
+        VERIFY_ARE_EQUAL(WSLCDiagnosticLevelNone, transitionQueue.EnabledLevels());
+        transitionQueue.Report(WSLCDiagnosticLevelDebug, "after-cancel", L"late");
+    }
+
+    TEST_METHOD(QueuedDiagnosticCallback_PreservesContractAndDoesNotDeliverInline)
+    {
+        TestDiagnosticCallback callback;
+        callback.EnabledLevels = WSLCDiagnosticLevelWarning;
+        diagnostics::DiagnosticReporter reporter{&callback};
+        diagnostics::DiagnosticQueue queue{reporter.EnabledLevels()};
+        auto queued = Microsoft::WRL::Make<diagnostics::QueuedDiagnosticCallback>(queue);
+        WSLCDiagnosticLevel enabled{};
+        VERIFY_SUCCEEDED(queued->GetEnabledLevels(&enabled));
+        VERIFY_ARE_EQUAL(callback.EnabledLevels, enabled);
+
+        const auto event = DiagnosticEvent(WSLCDiagnosticLevelWarning, "queued-warning", nullptr, 123);
+        VERIFY_SUCCEEDED(queued->OnDiagnostic(&event));
+        VERIFY_ARE_EQUAL(size_t{0}, callback.DiagnosticCount);
+        queue.Complete(reporter);
+        VERIFY_ARE_EQUAL(size_t{1}, callback.DiagnosticCount);
+        VERIFY_ARE_EQUAL(ULONGLONG{123}, callback.LastTimestamp);
+        VERIFY_IS_FALSE(callback.LastMessagePresent);
+
+        const auto combined = DiagnosticEvent(WSLCDiagnosticLevelDebug | WSLCDiagnosticLevelWarning, "invalid");
+        VERIFY_ARE_EQUAL(E_INVALIDARG, queued->OnDiagnostic(&combined));
+        VERIFY_SUCCEEDED(queued->OnDiagnostic(&event));
+        queue.Complete(reporter);
+        VERIFY_ARE_EQUAL(size_t{1}, callback.DiagnosticCount);
     }
 
     TEST_METHOD(DiagnosticHelpers_SanitizeString)

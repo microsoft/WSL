@@ -1094,10 +1094,12 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
 
 void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, DiagnosticReporter Diagnostics)
 {
-    StartPhase(Flags, StartOptions, false, Diagnostics);
+    OperationDiagnostics pending{Diagnostics.EnabledLevels()};
+    auto completeDiagnostics = wil::scope_exit([&]() { pending.Complete(Diagnostics); });
+    StartPhase(Flags, StartOptions, false, pending);
 }
 
-void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, bool RestartPhase, const DiagnosticReporter& Diagnostics)
+void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, bool RestartPhase, const OperationDiagnostics& Diagnostics)
 {
     std::shared_ptr<StateTransition> transition;
     auto lifecycleLock = m_lifecycleLock.lock_shared();
@@ -1282,7 +1284,7 @@ void WSLCContainerImpl::WaitForConflictingTransitionToComplete(
 }
 
 __requires_exclusive_lock_held(m_lock) std::shared_ptr<WSLCContainerImpl::StateTransition> WSLCContainerImpl::StartTransition(
-    TransitionKind kind, ContainerEvent expectedEvent, const DiagnosticReporter& Diagnostics)
+    TransitionKind kind, ContainerEvent expectedEvent, const OperationDiagnostics& Diagnostics)
 {
     auto transition = std::make_shared<StateTransition>(kind, expectedEvent, Diagnostics);
     WI_ASSERT(!m_transition);
@@ -1307,7 +1309,6 @@ void WSLCContainerImpl::WaitForTransitionCompletion(const std::shared_ptr<StateT
 void WSLCContainerImpl::AttachToTransition(const std::shared_ptr<StateTransition>& transition) const
 {
     WaitForTransitionCompletion(transition);
-    transition->Diagnostics.Flush();
 
     unique_com_disconnect wrapper;
 
@@ -1407,7 +1408,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         auto lifecycleLock = m_lifecycleLock.lock_exclusive();
         auto lock = m_lock.lock_exclusive();
         transition = m_transition;
-        OperationDiagnostics traceOnly{DiagnosticReporter{nullptr}};
+        OperationDiagnostics traceOnly;
         OperationDiagnostics* diagnostics = &traceOnly;
         if (m_restart && (!transition || transition->Kind != TransitionKind::Delete))
         {
@@ -1500,10 +1501,12 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
 
 void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill, DiagnosticReporter Diagnostics)
 {
-    StopPhase(Signal, TimeoutSeconds, Kill, false, Diagnostics);
+    OperationDiagnostics pending{Diagnostics.EnabledLevels()};
+    auto completeDiagnostics = wil::scope_exit([&]() { pending.Complete(Diagnostics); });
+    StopPhase(Signal, TimeoutSeconds, Kill, false, pending);
 }
 
-void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill, bool RestartPhase, const DiagnosticReporter& Diagnostics)
+void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill, bool RestartPhase, const OperationDiagnostics& Diagnostics)
 {
     std::shared_ptr<StateTransition> transition;
 
@@ -1631,11 +1634,13 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
 
 void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds, DiagnosticReporter Diagnostics)
 {
+    OperationDiagnostics pending{Diagnostics.EnabledLevels()};
+    auto completeDiagnostics = wil::scope_exit([&]() { pending.Complete(Diagnostics); });
     // The stop phase is skipped when the container is not running, so it cannot be the only validation.
     ValidateStopTimeout(TimeoutSeconds, true);
 
     bool wasRunning{};
-    auto restart = std::make_shared<RestartTransaction>(Diagnostics);
+    auto restart = std::make_shared<RestartTransaction>(pending);
 
     {
         auto lifecycleLock = m_lifecycleLock.lock_shared();
@@ -1670,7 +1675,7 @@ void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds, Diagnost
 
             if (!succeeded)
             {
-                transition = OnFailedRestartExclusiveLockHeld(restart->Diagnostics.Reporter);
+                transition = OnFailedRestartExclusiveLockHeld(restart->Diagnostics);
             }
         }
 
@@ -1678,22 +1683,20 @@ void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds, Diagnost
         {
             AttachToTransition(transition);
         }
-
-        restart->Diagnostics.Flush();
     });
 
     if (wasRunning)
     {
-        StopPhase(Signal, TimeoutSeconds, false, true, Diagnostics);
+        StopPhase(Signal, TimeoutSeconds, false, true, pending);
     }
 
-    StartPhase(WSLCContainerStartFlagsNone, nullptr, true, Diagnostics);
+    StartPhase(WSLCContainerStartFlagsNone, nullptr, true, pending);
     succeeded = true;
 }
 
 // N.B. Runs with m_restart already cleared, so the delete below is no longer suppressed by OnStopped().
 __requires_exclusive_lock_held(m_lock) std::shared_ptr<WSLCContainerImpl::StateTransition> WSLCContainerImpl::OnFailedRestartExclusiveLockHeld(
-    const DiagnosticReporter& Diagnostics)
+    const OperationDiagnostics& Diagnostics)
 {
     // The start phase waits for the start event after Docker has accepted the start, so it can throw
     // on a container that is coming up. Leave that container alone; it still owns its resources.
@@ -1780,7 +1783,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(
             }
             else
             {
-                transition = StartTransition(TransitionKind::Delete, ContainerEvent::Destroy, Diagnostics.Reporter);
+                transition = StartTransition(TransitionKind::Delete, ContainerEvent::Destroy, Diagnostics);
             }
 
             return;
@@ -1839,6 +1842,8 @@ void WSLCContainerImpl::RecoverPorts(const common::docker_schema::ContainerInfo&
 
 void WSLCContainerImpl::Delete(WSLCDeleteFlags Flags, const DiagnosticReporter& Diagnostics)
 {
+    OperationDiagnostics pending{Diagnostics.EnabledLevels()};
+    auto completeDiagnostics = wil::scope_exit([&]() { pending.Complete(Diagnostics); });
     std::shared_ptr<StateTransition> transition;
     auto lifecycleLock = m_lifecycleLock.lock_shared();
     auto lock = m_lock.lock_exclusive();
@@ -1848,7 +1853,7 @@ void WSLCContainerImpl::Delete(WSLCDeleteFlags Flags, const DiagnosticReporter& 
     WaitForConflictingTransitionToComplete(lock, lifecycleLock, std::nullopt, false);
 
     RequestDeleteExclusiveLockHeld(Flags);
-    transition = StartTransition(TransitionKind::Delete, ContainerEvent::Destroy, Diagnostics);
+    transition = StartTransition(TransitionKind::Delete, ContainerEvent::Destroy, pending);
 
     lock.reset();
     lifecycleLock.reset();

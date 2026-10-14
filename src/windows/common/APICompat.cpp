@@ -86,8 +86,7 @@ namespace {
             RETURN_HR_IF_NULL(E_POINTER, Event);
             RETURN_HR_IF(E_INVALIDARG, Event->SchemaVersion != WSLC_DIAGNOSTIC_SCHEMA_VERSION);
             RETURN_HR_IF(E_INVALIDARG, Event->Level != WSLCDiagnosticLevelWarning);
-            RETURN_HR_IF_NULL(E_INVALIDARG, Event->Message);
-            return m_inner->OnWarning(Event->Message);
+            return Event->Message != nullptr ? m_inner->OnWarning(Event->Message) : S_OK;
         }
 
     private:

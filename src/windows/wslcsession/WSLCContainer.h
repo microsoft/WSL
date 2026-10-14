@@ -171,51 +171,7 @@ private:
         Delete
     };
 
-    struct PendingDiagnosticEvent
-    {
-        ULONGLONG Timestamp;
-        WSLCDiagnosticLevel Level;
-        std::string Code;
-        std::wstring Message;
-    };
-
-    // Docker lifecycle events arrive on the relay thread. Queue callback delivery so
-    // the diagnostic callback is invoked from the originating COM operation thread.
-    struct OperationDiagnostics
-    {
-        explicit OperationDiagnostics(const wsl::windows::wslc::diagnostics::DiagnosticReporter& reporter) : Reporter(reporter)
-        {
-        }
-
-        bool IsEnabled(WSLCDiagnosticLevel level) const noexcept
-        {
-            return Reporter.IsEnabled(level);
-        }
-
-        void Report(WSLCDiagnosticLevel level, LPCSTR code, LPCWSTR message)
-        {
-            std::lock_guard lock(PendingLock);
-            Pending.push_back({wsl::windows::wslc::events::GetCurrentTimestamp(), level, code, message != nullptr ? message : L""});
-        }
-
-        void Flush() noexcept
-        {
-            std::vector<PendingDiagnosticEvent> pending;
-            {
-                std::lock_guard lock(PendingLock);
-                pending.swap(Pending);
-            }
-
-            for (const auto& event : pending)
-            {
-                Reporter.ReportAt(event.Timestamp, event.Level, event.Code.c_str(), event.Message.c_str());
-            }
-        }
-
-        wsl::windows::wslc::diagnostics::DiagnosticReporter Reporter;
-        std::mutex PendingLock;
-        std::vector<PendingDiagnosticEvent> Pending;
-    };
+    using OperationDiagnostics = wsl::windows::wslc::diagnostics::DiagnosticQueue;
 
     __requires_lock_held(m_lock) void CommitState(
         WSLCContainerState State,
@@ -226,7 +182,7 @@ private:
 
     struct StateTransition
     {
-        StateTransition(TransitionKind kind, ContainerEvent expectedEvent, const wsl::windows::wslc::diagnostics::DiagnosticReporter& diagnostics) :
+        StateTransition(TransitionKind kind, ContainerEvent expectedEvent, const OperationDiagnostics& diagnostics) :
             Kind(kind), Diagnostics(diagnostics), ExpectedEvent(expectedEvent)
         {
         }
@@ -245,8 +201,7 @@ private:
     // that Start() and Stop() cannot land in between.
     struct RestartTransaction
     {
-        explicit RestartTransaction(const wsl::windows::wslc::diagnostics::DiagnosticReporter& diagnostics) :
-            Diagnostics(diagnostics)
+        explicit RestartTransaction(const OperationDiagnostics& diagnostics) : Diagnostics(diagnostics)
         {
         }
 
@@ -260,7 +215,7 @@ private:
     void OnEvent(ContainerEvent event, std::optional<int> exitCode, const std::map<std::string, std::string>& attributes, std::int64_t eventTimeNano) noexcept;
 
     __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> StartTransition(
-        TransitionKind kind, ContainerEvent expectedEvent, const wsl::windows::wslc::diagnostics::DiagnosticReporter& Diagnostics);
+        TransitionKind kind, ContainerEvent expectedEvent, const OperationDiagnostics& Diagnostics);
 
     // Returns with both locks held when no transition is active (or it matches kind) and, if waitForRestart,
     // no restart is in flight either. Both conditions are re-checked every time the locks come back.
@@ -272,17 +227,12 @@ private:
 
     // Phases of Restart(). Identical to Start() and Stop() except that they do not stand down for the
     // restart they are part of.
-    void StartPhase(
-        WSLCContainerStartFlags Flags,
-        const WSLCProcessStartOptions* StartOptions,
-        bool RestartPhase,
-        const wsl::windows::wslc::diagnostics::DiagnosticReporter& Diagnostics);
-    void StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill, bool RestartPhase, const wsl::windows::wslc::diagnostics::DiagnosticReporter& Diagnostics);
+    void StartPhase(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, bool RestartPhase, const OperationDiagnostics& Diagnostics);
+    void StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill, bool RestartPhase, const OperationDiagnostics& Diagnostics);
 
     // Undoes what the phases left half-done: releases the resources the stop phase held back and
     // requests the auto-delete OnStopped() deferred, returning that delete's transition.
-    __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> OnFailedRestartExclusiveLockHeld(
-        const wsl::windows::wslc::diagnostics::DiagnosticReporter& Diagnostics);
+    __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> OnFailedRestartExclusiveLockHeld(const OperationDiagnostics& Diagnostics);
 
     void WaitForCompletionEvent(HANDLE Event) const;
     void WaitForTransitionCompletion(const std::shared_ptr<StateTransition>& transition) const;

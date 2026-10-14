@@ -21,8 +21,6 @@ Abstract:
 #include "Invocation.h"
 #include "RootCommand.h"
 
-#include <chrono>
-
 using namespace wsl::shared;
 using namespace wsl::windows::common;
 using namespace wsl::windows::wslc::execution;
@@ -65,15 +63,10 @@ try
 
     // Must be declared after COM init; it holds COM references.
     CLIExecutionContext context;
-    const auto invocationStart = std::chrono::steady_clock::now();
+    const wslutil::StopWatch stopWatch;
     const auto completeInvocation = [&](int exitCode) {
         WSLC_CLI_EVENT(
-            context,
-            "CommandCompleted",
-            WSLC_DIAG_CODE_COMMAND_COMPLETED,
-            L"ExitCode: {}; DurationMs: {}",
-            exitCode,
-            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - invocationStart).count());
+            context, "CommandCompleted", WSLC_DIAG_CODE_COMMAND_COMPLETED, L"ExitCode: {}; DurationMs: {}", exitCode, stopWatch.ElapsedMilliseconds());
         return exitCode;
     };
 

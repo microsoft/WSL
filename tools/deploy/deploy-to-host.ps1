@@ -65,10 +65,10 @@ $registry.Dispose()
 
 if ($packageProductCode -eq $installedProductCode)
 {
-    # Refresh all installed files and machine registry entries for the current product.
+    # Recache the supplied package and refresh installed files and registry entries.
     $MSIArguments += @(
         "REINSTALL=ALL"
-        "REINSTALLMODE=amus"
+        "REINSTALLMODE=vamus"
     )
 }
 

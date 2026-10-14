@@ -88,6 +88,7 @@ typedef enum _WSLCDiagnosticLevel
     WSLCDiagnosticLevelWarning = 4,
 } WSLCDiagnosticLevel;
 
+// Enabled levels form a bitmask. An event carries exactly one nonzero level.
 cpp_quote("#define WSLCDiagnosticLevelValid (WSLCDiagnosticLevelDebug | WSLCDiagnosticLevelWarning)")
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCDiagnosticLevel);")
 
@@ -237,8 +238,8 @@ typedef struct _WSLCDiagnosticEvent
 ]
 interface IDiagnosticCallback : IUnknown
 {
-    // Supplemental diagnostics do not determine operation success. Error reports a non-fatal
-    // problem; fatal operation failure is returned through HRESULT or the final operation result.
+    // Supplemental diagnostics do not determine operation success. Warnings report non-fatal
+    // problems; fatal operation failure is returned through HRESULT or the final operation result.
     // Enabled levels are immutable for the callback lifetime and may be queried and cached once.
     HRESULT GetEnabledLevels([out] WSLCDiagnosticLevel* Levels);
 

@@ -52,10 +52,13 @@ public:
             break;
 
         case WSLCDiagnosticLevelWarning:
-            RETURN_HR_IF_NULL(E_INVALIDARG, Event->Message);
-            m_terminal.Warn(L"{}", Event->Message);
+            if (Event->Message != nullptr)
+            {
+                m_terminal.Warn(L"{}", Event->Message);
+            }
             break;
 
+        case WSLCDiagnosticLevelNone:
         default:
             return E_INVALIDARG;
         }

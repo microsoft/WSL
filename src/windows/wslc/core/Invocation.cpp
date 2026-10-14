@@ -17,9 +17,9 @@ Abstract:
 #include "CLIExecutionContext.h"
 #include "Command.h"
 #include "EnvironmentOptions.h"
+#include "wslutil.h"
 
 #include <algorithm>
-#include <chrono>
 #include <functional>
 #include <optional>
 #include <span>
@@ -176,14 +176,9 @@ void CommandInvocation::ApplyRootEnvironmentOptions(argument::ArgMap& arguments)
 
 void CommandInvocation::ParseCommandLine(CLIExecutionContext& context)
 {
-    const auto start = std::chrono::steady_clock::now();
+    const wsl::windows::common::wslutil::StopWatch stopWatch;
     const auto reportFailure = [&]() {
-        WSLC_CLI_EVENT(
-            context,
-            "CommandLineParsingFailed",
-            WSLC_DIAG_CODE_COMMAND_PARSING_FAILED,
-            L"DurationMs: {}",
-            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+        WSLC_CLI_EVENT(context, "CommandLineParsingFailed", WSLC_DIAG_CODE_COMMAND_PARSING_FAILED, L"DurationMs: {}", stopWatch.ElapsedMilliseconds());
     };
     const auto enableDebugOutput = [&]() {
         if (context.Args.Contains(ArgType::Debug))
@@ -247,18 +242,13 @@ void CommandInvocation::ParseCommandLine(CLIExecutionContext& context)
     }
 
     WSLC_CLI_EVENT(context, "CommandSelected", WSLC_DIAG_CODE_COMMAND_SELECTED, L"Command: {}", Selected().FormatInvocation());
-    WSLC_CLI_EVENT(
-        context,
-        "CommandLineParsingCompleted",
-        WSLC_DIAG_CODE_COMMAND_PARSING_COMPLETED,
-        L"DurationMs: {}",
-        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+    WSLC_CLI_EVENT(context, "CommandLineParsingCompleted", WSLC_DIAG_CODE_COMMAND_PARSING_COMPLETED, L"DurationMs: {}", stopWatch.ElapsedMilliseconds());
 }
 
 void CommandInvocation::Execute(CLIExecutionContext& context) const
 {
     WSLC_CLI_EVENT(context, "CommandExecutionStarted", WSLC_DIAG_CODE_COMMAND_EXECUTION_STARTED, L"Command: {}", Selected().FormatInvocation());
-    const auto start = std::chrono::steady_clock::now();
+    const wsl::windows::common::wslutil::StopWatch stopWatch;
 
     try
     {
@@ -272,7 +262,7 @@ void CommandInvocation::Execute(CLIExecutionContext& context) const
             WSLC_DIAG_CODE_COMMAND_EXECUTION_FAILED,
             L"Command: {}; DurationMs: {}",
             Selected().FormatInvocation(),
-            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+            stopWatch.ElapsedMilliseconds());
         throw;
     }
 
@@ -282,7 +272,7 @@ void CommandInvocation::Execute(CLIExecutionContext& context) const
         WSLC_DIAG_CODE_COMMAND_EXECUTION_COMPLETED,
         L"Command: {}; DurationMs: {}",
         Selected().FormatInvocation(),
-        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+        stopWatch.ElapsedMilliseconds());
 }
 
 void CommandInvocation::OutputHelp(Terminal& terminal, HelpOutput output, const CommandException* exception, std::span<const Argument> relevantArguments) const

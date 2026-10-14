@@ -189,7 +189,14 @@ void WSLCSessionManagerImpl::CreateSession(
 {
     THROW_HR_IF_NULL(E_POINTER, WslcSession);
 
-    wsl::windows::wslc::diagnostics::DiagnosticReporter diagnostics{DiagnosticCallback};
+    wsl::windows::wslc::diagnostics::DiagnosticReporter reporter{DiagnosticCallback};
+    wsl::windows::wslc::diagnostics::DiagnosticQueue diagnostics{reporter.EnabledLevels()};
+    auto completeDiagnostics = wil::scope_exit([&]() { diagnostics.Complete(reporter); });
+    Microsoft::WRL::ComPtr<wsl::windows::wslc::diagnostics::QueuedDiagnosticCallback> queuedCallback;
+    if (reporter.IsCallbackReady())
+    {
+        queuedCallback = wil::MakeOrThrow<wsl::windows::wslc::diagnostics::QueuedDiagnosticCallback>(diagnostics);
+    }
     WSLC_EVENT(diagnostics, "SessionResolutionStarted", WSLC_DIAG_CODE_SESSION_RESOLUTION_STARTED, "{}", "");
 
     auto tokenInfo = GetCallingProcessTokenInfo();
@@ -316,7 +323,7 @@ void WSLCSessionManagerImpl::CreateSession(
         wil::com_ptr<IWSLCSession> session;
         wil::com_ptr<IWSLCSessionReference> serviceRef;
         const auto factoryHr =
-            factory->CreateSession(&sessionSettings, vmFactory.Get(), notifier.Get(), DiagnosticCallback, &session, &serviceRef);
+            factory->CreateSession(&sessionSettings, vmFactory.Get(), notifier.Get(), queuedCallback.Get(), &session, &serviceRef);
         if (FAILED(factoryHr))
         {
             if (auto comError = wslutil::GetCOMErrorInfo(); comError && comError->Message)

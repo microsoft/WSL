@@ -538,6 +538,23 @@ class WSLCCLIExecutionUnitTests
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, diagnostics.find(L" [command-parsing-failed] DurationMs: "));
     }
 
+    TEST_METHOD(DebugGlobalOption_ExcludesArgumentValuesFromLifecycleMessages)
+    {
+        CapturePipe outPipe;
+        CapturePipe errPipe;
+        CLIExecutionContext context{outPipe.file(), false, errPipe.file(), false};
+        CommandInvocation invocation{
+            std::make_unique<RootCommand>(), {L"--debug", L"--session", L"private-session-value", L"version"}};
+
+        invocation.ParseCommandLine(context);
+        invocation.Execute(context);
+
+        const auto diagnostics = errPipe.captured();
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, diagnostics.find(L" [command-selected] Command: wslc version"));
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, diagnostics.find(L" [command-execution-started] Command: wslc version"));
+        VERIFY_ARE_EQUAL(std::wstring::npos, diagnostics.find(L"private-session-value"));
+    }
+
     TEST_METHOD(DebugEvent_EvaluatesArgumentsOnlyForEnabledSinks)
     {
         {
