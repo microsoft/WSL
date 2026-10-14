@@ -187,17 +187,29 @@ void EpollWatcher::Run()
     std::thread(WatchThread, this).detach();
 }
 
-void EpollWatcher::Add(int fd, int events, EpollDispatcher& dispatcher)
+uint64_t EpollWatcher::Add(int fd, int events, EpollDispatcher& dispatcher)
 {
+    std::scoped_lock<std::mutex> lock{m_Lock};
+
+    FAIL_FAST_IF(m_NextRegistrationId == 0);
+    const auto registrationId = m_NextRegistrationId++;
+    m_Dispatchers.emplace(registrationId, &dispatcher);
+    auto cleanup = wil::scope_exit([&]() { m_Dispatchers.erase(registrationId); });
+
     epoll_event event{};
     event.events = events;
-    event.data.ptr = &dispatcher;
+    event.data.u64 = registrationId;
     THROW_LAST_ERROR_IF(epoll_ctl(m_EpollFileDescriptor, EPOLL_CTL_ADD, fd, &event) < 0);
+
+    cleanup.release();
+    return registrationId;
 }
 
-void EpollWatcher::Remove(int fd)
+void EpollWatcher::Remove(int fd, uint64_t registrationId)
 {
+    std::scoped_lock<std::mutex> lock{m_Lock};
     THROW_LAST_ERROR_IF(epoll_ctl(m_EpollFileDescriptor, EPOLL_CTL_DEL, fd, nullptr) < 0);
+    m_Dispatchers.erase(registrationId);
 }
 
 void EpollWatcher::WatchThread(EpollWatcher* watcher)
@@ -210,10 +222,12 @@ void EpollWatcher::WatchThread(EpollWatcher* watcher)
 
         for (int i = 0; i < result; ++i)
         {
-            if (events[i].data.ptr != nullptr)
+            std::scoped_lock<std::mutex> lock{watcher->m_Lock};
+            const auto dispatcher = watcher->m_Dispatchers.find(events[i].data.u64);
+
+            if (dispatcher != watcher->m_Dispatchers.end())
             {
-                const auto dispatcher = static_cast<EpollDispatcher*>(events[i].data.ptr);
-                dispatcher->Notify(events[i].events);
+                dispatcher->second->Notify(events[i].events);
             }
         }
     }
