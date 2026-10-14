@@ -23,6 +23,7 @@ class EventStore
 public:
     static constexpr size_t c_eventRingCapacity = 256;
 
+    // Published timeNano is clamped to the last session event's timestamp; lifecycle state retains its source timestamp.
     void Record(std::string&& Type, std::string&& Action, const std::string& ActorId, std::map<std::string, std::string> ActorAttributes, std::int64_t TimeNano) noexcept;
 
     Microsoft::WRL::ComPtr<IWSLCEventStream> CreateStream(

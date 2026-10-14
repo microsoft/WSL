@@ -35,10 +35,12 @@ void EventStore::Append(wsl::windows::common::wslc_schema::Event Event)
 {
     std::lock_guard lock(m_lock);
 
-    // Events are recorded in Docker's delivery order, which is also timestamp order to the second. Subscribers rely on
-    // this: they resume from a sequence number, so an out-of-order event could never be inserted where it
-    // belongs without hiding it from readers that already moved past that point.
-    WI_ASSERT(m_events.empty() || EventTime(m_events.back()) <= EventTime(Event));
+    // timeNano is publication time. Delayed Docker events share this sequence with synthesized lifecycle events.
+    // Readers resume by sequence and finish at Until, so publication timestamps must be non-decreasing across all actors.
+    if (!m_events.empty())
+    {
+        Event.timeNano = std::max(Event.timeNano, m_events.back().timeNano);
+    }
 
     m_events.push_back(std::move(Event));
 
