@@ -227,8 +227,6 @@ VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmC
             false};
     }
 
-    // OpenVMM's port RPC channel targets only the first Consomme NIC.
-    THROW_HR_IF_MSG(c_notSupported, Request.NetworkAdapters.size() > 1, "OpenVMM supports one creation-time network adapter");
     for (const auto& adapter : Request.NetworkAdapters)
     {
         // OpenVMM serves its NIC with a built-in user-mode NAT and has no host network stack to
@@ -241,7 +239,7 @@ VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmC
         GUID nicId{};
         THROW_IF_FAILED(CoCreateGuid(&nicId));
         description.NetworkAdapters.emplace(
-            adapter.Tag, VmNetworkAttachment{{description.Identity, 1}, adapter.Tag, nicId, adapter.Configuration});
+            adapter.Tag, VmNetworkAttachment{{description.Identity, nextId++}, adapter.Tag, nicId, adapter.Configuration});
     }
 
     return description;
@@ -398,11 +396,20 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
             wsl::shared::string::GuidToString<wchar_t>(attachment.GuestInstanceId.value(), wsl::shared::string::GuidToStringFlags::None);
         const auto& configuration = std::get<VmUserModeNatNetwork>(attachment.EffectiveConfiguration);
         const auto macAddress = wsl::shared::string::FormatMacAddress(configuration.ClientMacAddress(), L'-');
-        THROW_IF_FAILED(WslOpenVmmConfigSetConsommeNic(config.get(), nicId.c_str(), macAddress.c_str(), L""));
-        THROW_IF_FAILED(WslOpenVmmConfigSetConsommeInternalDns(config.get(), nicId.c_str(), configuration.InternalDns));
+        THROW_IF_FAILED(WslOpenVmmConfigSetConsommeNic(
+            config.get(),
+            nicId.c_str(),
+            macAddress.c_str(),
+            L"",
+            configuration.InternalDns,
+            configuration.ClientIp.c_str(),
+            configuration.GatewayIp.c_str(),
+            configuration.NetMask.c_str(),
+            configuration.ClientIpv6.c_str(),
+            configuration.AllowHostLocalAccess));
         m_networkAdapters.emplace(attachment.Id.Value, NetworkAdapter{attachment, {nicId}});
-        m_nextDeviceId = attachment.Id.Value + 1;
     }
+    m_nextDeviceId = Request.BootDisks.size() + Request.NetworkAdapters.size() + 1;
     for (const auto& disk : Request.BootDisks)
     {
         const auto& attachment = m_description.BootDisks.at(disk.Key);

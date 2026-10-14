@@ -670,10 +670,12 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
                     // Keep the description alive while using the adapter fields below.
                     const auto description = m_backend->GetDescription();
                     const auto& adapter = description.NetworkAdapters.at(L"eth0");
+                    const auto loopbackAdapter = description.NetworkAdapters.find(L"loopback0");
                     m_networkingEngine = std::make_unique<wsl::core::OpenVmmNatNetworking>(
                         *m_backend,
-                        adapter.Id,
-                        adapter.GuestInstanceId.value(),
+                        adapter,
+                        loopbackAdapter == description.NetworkAdapters.end() ? std::optional<VmNetworkAttachment>{}
+                                                                             : loopbackAdapter->second,
                         std::move(gnsChannel),
                         m_vmConfig.EnableLocalhostRelay,
                         m_vmConfig.EnableDnsTunneling);
@@ -1676,6 +1678,10 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId, BackendKind 
     if (Backend == BackendKind::OpenVmm && m_vmConfig.NetworkingMode == NetworkingMode::Nat)
     {
         request.NetworkAdapters.emplace_back(wsl::core::CreateOpenVmmNatNetworkAdapterRequest(m_vmConfig.EnableDnsTunneling));
+        if (m_vmConfig.EnableLocalhostRelay)
+        {
+            request.NetworkAdapters.emplace_back(wsl::core::CreateOpenVmmLoopbackNetworkAdapterRequest());
+        }
     }
 
     return request;

@@ -376,6 +376,11 @@ struct VmUserModeNatNetwork
     std::vector<IpAddress> Nameservers;
     // OpenVMM only: answer guest DNS queries with the NAT's built-in resolver instead of the host's DNS servers.
     bool InternalDns = true;
+    std::wstring ClientIp;
+    std::wstring GatewayIp;
+    std::wstring NetMask;
+    std::wstring ClientIpv6;
+    bool AllowHostLocalAccess = false;
     wsl::shared::string::MacAddress ClientMacAddress() const;
 };
 

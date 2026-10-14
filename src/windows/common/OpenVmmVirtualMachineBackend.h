@@ -30,8 +30,7 @@ class OpenVmmVirtualMachineBackend : public IVirtualMachineBackend
 public:
     ~OpenVmmVirtualMachineBackend() noexcept override;
 
-    // Networking supports one creation-time Consomme NIC: 10.0.0.2/24, gateway 10.0.0.1,
-    // default gateway MACs, automatic guest IPv6 and host DNS. Custom settings and hot-add are unsupported.
+    // Networking supports creation-time Consomme NICs, automatic guest IPv6 and host DNS. Hot-add is unsupported.
     // Backend failures include OpenVMM in the contextualized error code.
     static std::unique_ptr<OpenVmmVirtualMachineBackend> Create(const VmCreateRequest& Request);
 
