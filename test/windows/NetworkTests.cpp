@@ -1623,6 +1623,10 @@ class NetworkTests
     */
     WSL2_TEST_METHOD(LoopbackGetRoute)
     {
+        // OpenVMM configures loopback routing at boot when localhost forwarding is enabled.
+        WslConfigChange config(LxssGenerateTestConfig({.localhostForwarding = false}));
+        AdapterId = NetworkTests::QueryAdapterId();
+
         // Verify that before configurations are applied, the route chosen for 127.0.0.1 tcp/udp uses the local routing table
         const bool loopbackTcpUsesLocalTable =
             LxsstuLaunchWsl(L"ip route get from 127.0.0.1 127.0.0.1 ipproto tcp | grep local") == (DWORD)0;

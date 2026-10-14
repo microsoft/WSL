@@ -112,6 +112,7 @@ private:
     {
         std::optional<std::uint64_t> Share;
         wil::shared_handle UserToken;
+        wil::shared_handle ShareToken{};
     };
 
     using FileSystemDevice = VmResource<VmFileSystemDevice, OpenVmmFileSystemDevice>;
@@ -139,12 +140,28 @@ private:
         bool DirectoryCreated = false;
     };
 
+    struct SuspendedFileSystemShare
+    {
+        VmFileSystemShare Share;
+        wil::shared_handle Token;
+    };
+
     struct PassThroughDisk
     {
         // The host disk was taken offline for the attachment and must be brought back online.
         bool RestoreOnline = false;
         std::chrono::milliseconds DeviceTimeout{wsl::windows::common::disk::c_defaultDiskTimeoutMs};
+        std::vector<SuspendedFileSystemShare> Shares;
     };
+
+    _Requires_lock_held_(m_lock)
+    void AddFileSystemShareLocked(const VmFileSystemShare& Share, const wil::shared_handle& Token);
+    _Requires_lock_held_(m_lock)
+    void RemoveFileSystemShareLocked(VmShareId Share);
+    _Requires_lock_held_(m_lock)
+    void SuspendFileSystemSharesForDiskLocked(HANDLE Disk, std::vector<SuspendedFileSystemShare>& Shares);
+    _Requires_lock_held_(m_lock)
+    void RestoreFileSystemSharesLocked(std::vector<SuspendedFileSystemShare>& Shares) noexcept;
 
     struct SharedMemoryDevice
     {

@@ -200,7 +200,8 @@ std::pair<bool, std::vector<std::wstring>> WslInstall::CheckForMissingOptionalCo
 {
     // Include the WSL optional component if it was requested, or if the OS is not Windows 11 or later.
     std::vector<std::wstring> missingComponents;
-    requireWslOptionalComponent |= !wsl::windows::common::helpers::IsWindows11OrAbove();
+    const bool windows11OrAbove = wsl::windows::common::helpers::IsWindows11OrAbove();
+    requireWslOptionalComponent |= !windows11OrAbove;
     if (requireWslOptionalComponent && !wsl::windows::common::helpers::IsServicePresent(L"lxssmanager"))
     {
         missingComponents.emplace_back(c_optionalFeatureNameWsl);
@@ -211,8 +212,8 @@ std::pair<bool, std::vector<std::wstring>> WslInstall::CheckForMissingOptionalCo
         missingComponents.emplace_back(c_optionalFeatureNameVmp);
     }
 
-    // The OpenVMM backend runs on top of the Windows Hypervisor Platform.
-    if (!IsOptionalComponentInstalledOrUnavailable(c_optionalFeatureNameWhp))
+    // The OpenVMM backend runs on top of the Windows Hypervisor Platform. For now, only require it on Windows 11 and later.
+    if (windows11OrAbove && !IsOptionalComponentInstalledOrUnavailable(c_optionalFeatureNameWhp))
     {
         missingComponents.emplace_back(c_optionalFeatureNameWhp);
     }

@@ -1389,13 +1389,19 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::DetachDisk(_In_opt_ PCWSTR Disk)
             return false;
         }
 
+        // Canonical paths can match without reopening a VHD that is in use by the backend.
+        if (TargetPath == nullptr || wsl::windows::common::string::IsPathComponentEqual(disk.Path, TargetPath))
+        {
+            return true;
+        }
+
         if (!disk.PassThrough)
         {
             std::error_code error{};
-            return TargetPath == nullptr || std::filesystem::equivalent(disk.Path, TargetPath, error);
+            return std::filesystem::equivalent(disk.Path, TargetPath, error);
         }
 
-        return TargetPath == nullptr || wsl::windows::common::string::IsPathComponentEqual(disk.Path, TargetPath);
+        return false;
     };
 
     auto lock = m_lock.lock_exclusive();

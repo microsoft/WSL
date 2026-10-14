@@ -596,6 +596,7 @@ struct TestConfigDefaults
     std::optional<wsl::core::NetworkingMode> networkingMode;
     const std::optional<std::wstring> vmSwitch;
     const std::optional<std::wstring> macAddress;
+    std::optional<bool> localhostForwarding;
     bool ipv6 = false;
     std::optional<bool> dnsTunneling;
     std::optional<std::wstring> dnsTunnelingIpAddress;

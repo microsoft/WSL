@@ -928,7 +928,8 @@ VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& R
         Request.UserDisk,
         path,
         passThrough};
-    PassThroughDisk passThroughState{false, Request.DeviceTimeout};
+    PassThroughDisk passThroughState{false, Request.DeviceTimeout, {}};
+    auto restoreShares = wil::scope_exit([&] { RestoreFileSystemSharesLocked(passThroughState.Shares); });
     auto restoreOnline = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
         if (passThroughState.RestoreOnline)
         {
@@ -949,6 +950,14 @@ VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& R
         const auto instanceIdString = wsl::shared::string::GuidToString<wchar_t>(instanceId, wsl::shared::string::GuidToStringFlags::None);
         if (passThrough)
         {
+            {
+                const auto disk = wsl::windows::common::disk::OpenDevice(path.c_str(), 0, timeoutMs);
+                if (wsl::windows::common::disk::IsDiskOnline(disk.get()))
+                {
+                    SuspendFileSystemSharesForDiskLocked(disk.get(), passThroughState.Shares);
+                }
+            }
+
             // Take the disk offline so that the host no longer uses its volumes, then pass OpenVMM a handle
             // opened by the service, since the OpenVMM process runs as the user and can't open the disk itself.
             if (wsl::windows::common::disk::TakeOffline(path.c_str(), timeoutMs))
@@ -1006,6 +1015,7 @@ VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& R
         WI_ASSERT(stateInserted);
     }
     restoreOnline.release();
+    restoreShares.release();
     ++m_nextDiskId;
     return attachment;
 }
@@ -1063,6 +1073,7 @@ void OpenVmmVirtualMachineBackend::DetachDisk(VmDiskId Disk)
             CATCH_LOG()
         }
 
+        RestoreFileSystemSharesLocked(passThroughDisk->second.Shares);
         m_passThroughDisks.erase(passThroughDisk);
     }
     m_attachedDisks.erase(disk);
@@ -1271,33 +1282,44 @@ VmFileSystemShare OpenVmmVirtualMachineBackend::AddFileSystemShare(VmDeviceId De
         Request.ReadOnly,
         options->MountOptions,
         wsl::windows::common::security::IsTokenElevated(userToken.get())};
-    const auto& guestAddress = std::get<VmVirtioFsShareAddress>(share.GuestAddress);
-    const auto [entry, inserted] = m_fileSystemShares.emplace(share.Id.Value, share);
+    AddFileSystemShareLocked(share, wil::shared_handle{shareToken.release()});
+    ++m_nextShareId;
+    return share;
+}
+
+_Requires_lock_held_(m_lock)
+void OpenVmmVirtualMachineBackend::AddFileSystemShareLocked(const VmFileSystemShare& Share, const wil::shared_handle& Token)
+{
+    const auto device = m_fileSystemDevices.find(Share.Device.Value);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), device == m_fileSystemDevices.end());
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), device->second.Backend.Share.has_value());
+    const auto& guestAddress = std::get<VmVirtioFsShareAddress>(Share.GuestAddress);
+    const auto [entry, inserted] = m_fileSystemShares.emplace(Share.Id.Value, Share);
     WI_ASSERT(inserted);
-    device->second.Backend.Share = share.Id.Value;
+    device->second.Backend.Share = Share.Id.Value;
     device->second.State = VmFileSystemDeviceState::Serving;
     auto rollback = wil::scope_exit([this, &device, &entry] {
         device->second.Backend.Share.reset();
         device->second.State = VmFileSystemDeviceState::Prepared;
         m_fileSystemShares.erase(entry);
     });
-    const auto mountOptions = FormatVirtioFsMountOptions(options->MountOptions);
+    const auto mountOptions = FormatVirtioFsMountOptions(Share.MountOptions);
     HANDLE remoteToken = nullptr;
     THROW_IF_WIN32_BOOL_FALSE(
-        DuplicateHandle(GetCurrentProcess(), shareToken.get(), m_process.get(), &remoteToken, TOKEN_DUPLICATE | TOKEN_QUERY, FALSE, 0));
+        DuplicateHandle(GetCurrentProcess(), Token.get(), m_process.get(), &remoteToken, TOKEN_DUPLICATE | TOKEN_QUERY, FALSE, 0));
     const auto result = WslOpenVmmVmAddShare(
         m_vm.get(),
         guestAddress.Tag.c_str(),
-        hostPath.c_str(),
-        Request.ReadOnly,
+        Share.EffectiveHostPath.c_str(),
+        Share.ReadOnly,
         mountOptions.c_str(),
         static_cast<UINT64>(reinterpret_cast<ULONG_PTR>(remoteToken)),
         FALSE);
     WSL_LOG(
         "OpenVmmAddFileSystemShareEnd",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
-        TraceLoggingValue(Device.Value, "deviceId"),
-        TraceLoggingValue(share.Id.Value, "shareId"),
+        TraceLoggingValue(Share.Device.Value, "deviceId"),
+        TraceLoggingValue(Share.Id.Value, "shareId"),
         TraceLoggingValue(guestAddress.Tag.c_str(), "tag"),
         TraceLoggingHResult(result, "result"));
 
@@ -1307,9 +1329,8 @@ VmFileSystemShare OpenVmmVirtualMachineBackend::AddFileSystemShare(VmDeviceId De
     // OpenVMM exits.
     THROW_IF_FAILED(result);
     LOG_IF_WIN32_BOOL_FALSE(DuplicateHandle(m_process.get(), remoteToken, nullptr, nullptr, 0, FALSE, DUPLICATE_CLOSE_SOURCE));
-    ++m_nextShareId;
+    device->second.Backend.ShareToken = Token;
     rollback.release();
-    return share;
 }
 
 std::optional<VmFileSystemShare> OpenVmmVirtualMachineBackend::GetFileSystemShare(const VmFileSystemSharePredicate& Predicate) const
@@ -1335,6 +1356,12 @@ void OpenVmmVirtualMachineBackend::RemoveFileSystemShare(VmShareId Share)
     ValidateResourceId(Share, m_description.Identity);
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
+    RemoveFileSystemShareLocked(Share);
+}
+
+_Requires_lock_held_(m_lock)
+void OpenVmmVirtualMachineBackend::RemoveFileSystemShareLocked(VmShareId Share)
+{
     const auto share = m_fileSystemShares.find(Share.Value);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), share == m_fileSystemShares.end());
     const auto device = m_fileSystemDevices.find(share->second.Device.Value);
@@ -1351,8 +1378,77 @@ void OpenVmmVirtualMachineBackend::RemoveFileSystemShare(VmShareId Share)
         TraceLoggingHResult(result, "result"));
     THROW_IF_FAILED(result);
     device->second.Backend.Share.reset();
+    device->second.Backend.ShareToken.reset();
     device->second.State = VmFileSystemDeviceState::Prepared;
     m_fileSystemShares.erase(share);
+}
+
+_Requires_lock_held_(m_lock)
+void OpenVmmVirtualMachineBackend::SuspendFileSystemSharesForDiskLocked(HANDLE Disk, std::vector<SuspendedFileSystemShare>& Shares)
+{
+    const auto diskNumber = wsl::windows::common::disk::GetDiskNumber(Disk);
+    for (const auto& [id, share] : m_fileSystemShares)
+    {
+        const auto& token = m_fileSystemDevices.at(share.Device.Value).Backend.ShareToken;
+
+        // An unavailable unrelated share must not prevent attaching the disk.
+        const auto onDisk = [&]() {
+            std::wstring volumeDevice;
+            {
+                const auto runAsUser = wil::impersonate_token(token.get());
+                std::wstring volumePath(32768, L'\0');
+                THROW_IF_WIN32_BOOL_FALSE(GetVolumePathNameW(
+                    share.EffectiveHostPath.c_str(), volumePath.data(), gsl::narrow_cast<DWORD>(volumePath.size())));
+                const auto driveType = GetDriveTypeW(volumePath.c_str());
+                if (driveType != DRIVE_FIXED && driveType != DRIVE_REMOVABLE)
+                {
+                    return false;
+                }
+
+                wchar_t volumeName[MAX_PATH]{};
+                THROW_IF_WIN32_BOOL_FALSE(GetVolumeNameForVolumeMountPointW(volumePath.c_str(), volumeName, ARRAYSIZE(volumeName)));
+                volumeDevice = volumeName;
+                volumeDevice.pop_back();
+            }
+
+            const auto volume = wsl::windows::common::disk::OpenDevice(volumeDevice.c_str(), 0);
+            return wsl::windows::common::disk::GetDiskNumber(volume.get()) == diskNumber;
+        };
+
+        try
+        {
+            if (onDisk())
+            {
+                Shares.push_back({share, token});
+            }
+        }
+        CATCH_LOG()
+    }
+
+    // Close every share on the disk, including subdirectory shares and both elevation contexts,
+    // before FSCTL_LOCK_VOLUME. The volume handles used for discovery have already been closed.
+    for (const auto& share : Shares)
+    {
+        RemoveFileSystemShareLocked(share.Share.Id);
+    }
+}
+
+_Requires_lock_held_(m_lock)
+void OpenVmmVirtualMachineBackend::RestoreFileSystemSharesLocked(std::vector<SuspendedFileSystemShare>& Shares) noexcept
+{
+    for (const auto& share : Shares)
+    {
+        if (!m_fileSystemShares.contains(share.Share.Id.Value))
+        {
+            try
+            {
+                AddFileSystemShareLocked(share.Share, share.Token);
+            }
+            CATCH_LOG()
+        }
+    }
+
+    Shares.clear();
 }
 
 VmSharedMemoryDevice OpenVmmVirtualMachineBackend::AddSharedMemory(const VmSharedMemoryRequest& Request)

@@ -107,6 +107,17 @@ class FilesystemUnitTests
         VERIFY_ARE_EQUAL(expected.wstring(), GetCanonicalPath(expected).wstring());
     }
 
+    TEST_METHOD(GetFullPath_ExclusiveFileDoesNotRequireReadAccess)
+    {
+        using namespace wsl::windows::common::filesystem;
+        TempFile file(GENERIC_READ | GENERIC_WRITE, 0, OPEN_EXISTING, TempFileFlags::None);
+        const auto result = GetFullPath(file.Path.c_str());
+
+        VERIFY_IS_TRUE(result.is_absolute());
+        VERIFY_ARE_EQUAL(file.Path.filename().wstring(), result.filename().wstring());
+        VERIFY_ARE_EQUAL(result.wstring(), GetFullPath(result.c_str()).wstring());
+    }
+
     // A failure from std::filesystem::absolute must be reported. absolute returns an empty path when
     // it fails, and weakly_canonical succeeds on an empty path and clears the error_code, so calling
     // the two in sequence without checking in between silently turns the failure into success.

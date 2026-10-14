@@ -3037,6 +3037,7 @@ Usage:
 #endif
 
         // Verify that no modules are mounted for a custom kernel with no modules specified.
+        // TODO: This fails with OpenVMM until the WSL kernel has the virtio-blk driver built in.
         kernelPath = std::regex_replace(kernelPath, std::wregex(L"\\\\"), L"\\\\");
         configChange.Update(LxssGenerateTestConfig({.kernel = kernelPath.c_str()}));
         ValidateOutput(command.c_str(), L"", L"", 1);

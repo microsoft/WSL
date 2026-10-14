@@ -1563,6 +1563,7 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         L"telemetry=false\n" +
         boolOptionToString(L"safeMode", Default.safeMode, false) + boolOptionToString(L"guiApplications", Default.guiApplications, true) +
         boolOptionToString(L"earlyBootLogging", Default.earlyBootLogging, false) +
+        boolOptionToString(L"localhostForwarding", Default.localhostForwarding, true) +
         networkingModeToString(Default.networkingMode) + drvFsModeToString(Default.drvFsMode);
 
     if (Default.kernel.has_value())

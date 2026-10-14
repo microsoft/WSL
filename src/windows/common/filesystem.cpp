@@ -810,7 +810,7 @@ std::filesystem::path wsl::windows::common::filesystem::GetFullPath(_In_ LPCWSTR
 
     const wil::unique_hfile Handle(CreateFileW(
         Path,
-        GENERIC_READ,
+        0,
         (FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE),
         nullptr,
         OPEN_EXISTING,
