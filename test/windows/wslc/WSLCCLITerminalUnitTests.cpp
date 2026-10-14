@@ -645,6 +645,13 @@ class WSLCCLITerminalUnitTests
         VERIFY_ARE_EQUAL(std::wstring{L"custom-session"}, SanitizeUserName(L"custom-session", L"alice"));
         VERIFY_ARE_EQUAL(std::wstring{L"wslc-cli-alice"}, SanitizeUserName(L"wslc-cli-alice", L""));
         VERIFY_ARE_EQUAL(std::wstring{L"line1\\r\\nline2\\t\\u001B[31m"}, wsl::windows::wslc::events::EscapeControlCharacters(L"line1\r\nline2\t\x1b[31m"));
+        for (wchar_t control = L'\x7f'; control <= L'\x9f'; ++control)
+        {
+            VERIFY_ARE_EQUAL(
+                std::format(L"before\\u{:04X}after", static_cast<unsigned int>(control)),
+                wsl::windows::wslc::events::EscapeControlCharacters(std::wstring{L"before"} + control + L"after"));
+        }
+        VERIFY_ARE_EQUAL(std::wstring{L"\x00a0"}, wsl::windows::wslc::events::EscapeControlCharacters(L"\x00a0"));
     }
 
     TEST_METHOD(DiagnosticMacro_EvaluatesMessageOnlyWhenEnabled)

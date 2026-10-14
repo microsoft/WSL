@@ -50,7 +50,7 @@ inline std::wstring EscapeControlCharacters(std::wstring_view message)
             break;
 
         default:
-            if (character < L' ' || character == L'\x7f')
+            if (character < L' ' || (character >= L'\x7f' && character <= L'\x9f'))
             {
                 const auto value = static_cast<unsigned int>(character);
                 escaped.append(L"\\u00");

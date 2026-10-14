@@ -15284,7 +15284,7 @@ class WSLCTests
         }
 
         wil::unique_event Reached{wil::EventOptions::ManualReset};
-        wil::unique_event Release{wil::EventOptions::ManualReset};
+        wil::unique_event Unblock{wil::EventOptions::ManualReset};
         wil::unique_event Returned{wil::EventOptions::ManualReset};
 
     private:
@@ -15293,7 +15293,7 @@ class WSLCTests
             if (!m_blocked.exchange(true))
             {
                 Reached.SetEvent();
-                Release.wait();
+                Unblock.wait();
                 Returned.SetEvent();
             }
         }
@@ -15322,7 +15322,7 @@ class WSLCTests
             creationResult.set_value(manager->CreateSession(&settings, WSLCSessionFlagsNone, callback.Get(), &session));
         });
         auto joinCreation = wil::scope_exit([&]() {
-            callback->Release.SetEvent();
+            callback->Unblock.SetEvent();
             creationThread.join();
         });
 
@@ -15333,14 +15333,14 @@ class WSLCTests
             listResult.set_value(manager->ListSessions(&sessions, sessions.size_address<ULONG>()));
         });
         auto joinList = wil::scope_exit([&]() {
-            callback->Release.SetEvent();
+            callback->Unblock.SetEvent();
             listThread.join();
         });
 
         auto listFuture = listResult.get_future();
         VERIFY_ARE_EQUAL(std::future_status::ready, listFuture.wait_for(std::chrono::seconds(60)));
         VERIFY_SUCCEEDED(listFuture.get());
-        callback->Release.SetEvent();
+        callback->Unblock.SetEvent();
         auto creationFuture = creationResult.get_future();
         VERIFY_ARE_EQUAL(std::future_status::ready, creationFuture.wait_for(std::chrono::seconds(60)));
         VERIFY_SUCCEEDED(creationFuture.get());
@@ -15360,7 +15360,7 @@ class WSLCTests
             std::thread operationThread(
                 [&]() { operationResult.set_value(m_defaultSession->CreateNetwork(&options, callback.Get())); });
             auto joinOperation = wil::scope_exit([&]() {
-                callback->Release.SetEvent();
+                callback->Unblock.SetEvent();
                 operationThread.join();
             });
 
@@ -15369,7 +15369,7 @@ class WSLCTests
             auto operationFuture = operationResult.get_future();
             VERIFY_ARE_EQUAL(std::future_status::ready, operationFuture.wait_for(std::chrono::seconds(60)));
             VERIFY_FAILED(operationFuture.get());
-            callback->Release.SetEvent();
+            callback->Unblock.SetEvent();
             VERIFY_IS_TRUE(callback->Returned.wait(60000));
             operationThread.join();
             joinOperation.release();
