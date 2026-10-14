@@ -1044,10 +1044,21 @@ class NetworkTests
 
         WslConfigChange config(LxssGenerateTestConfig({.dnsTunneling = true}));
 
-        VerifyDnsTunneling(c_dnsTunnelingDefaultIp);
+        // OpenVMM NAT resolves DNS through Consomme, which serves DNS on the gateway address.
+        if (LxsstuOpenVmmMode())
+        {
+            const auto state = GetInterfaceState(L"eth0");
+            VERIFY_IS_TRUE(state.Gateway.has_value());
+            VerifyDnsTunneling(state.Gateway.value());
+        }
+        else
+        {
+            VerifyDnsTunneling(c_dnsTunnelingDefaultIp);
+        }
     }
 
-    WSL2_TEST_METHOD(NatDnsTunnelingWithSpecificIp)
+    // OpenVMM NAT always serves DNS on the Consomme gateway address.
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatDnsTunnelingWithSpecificIp)
     {
         DNS_TUNNELING_TEST_ONLY();
 
@@ -5375,7 +5386,13 @@ class BridgedTests
 
 class ConsommeTests
 {
-    OPENVMM_UNSUPPORTED_TEST_CLASS(ConsommeTests)
+    WSL_TEST_CLASS(ConsommeTests)
+
+    // OpenVMM doesn't support the Consomme networking mode, but its NAT mode is backed by Consomme.
+    static wsl::core::NetworkingMode ConsommeMode()
+    {
+        return LxsstuOpenVmmMode() ? wsl::core::NetworkingMode::Nat : wsl::core::NetworkingMode::Consomme;
+    }
 
     std::optional<WslConfigChange> m_config;
 
@@ -5388,7 +5405,7 @@ class ConsommeTests
 
         if (LxsstuVmMode())
         {
-            m_config.emplace(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+            m_config.emplace(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
         }
 
         return true;
@@ -5407,7 +5424,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         // Verify that we have a working connection
         NetworkTests::GuestClient(L"tcp-connect:bing.com:80");
@@ -5417,7 +5434,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         if (!NetworkTests::HostHasInternetConnectivity(AF_INET))
         {
@@ -5432,7 +5449,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         if (!NetworkTests::HostHasInternetConnectivity(AF_INET6))
         {
@@ -5449,7 +5466,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         const auto state = NetworkTests::GetInterfaceState(L"eth0");
         VERIFY_IS_FALSE(state.V4Addresses.empty());
@@ -5474,7 +5491,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         // eth0 should have wsldevicehost's default client MAC. Update if that default changes.
         VERIFY_ARE_EQUAL(GetMacAddress(L"eth0"), std::wstring(L"00:00:00:00:01:00"));
@@ -5484,7 +5501,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         // Make sure the VM doesn't time out
         WslKeepAlive keepAlive;
@@ -5512,7 +5529,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         // Verify guest can connect to host on loopback (TCP only, UDP not supported)
         NetworkTests::VerifyLoopbackGuestToHost(L"127.0.0.1", IPPROTO_TCP);
@@ -5526,7 +5543,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         auto tcpPort = NetworkTests::BindGuestPort(L"TCP4-LISTEN:1234", true);
         auto udpPort = NetworkTests::BindGuestPort(L"UDP4-LISTEN:1234", true);
@@ -5536,7 +5553,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         auto udpPort = NetworkTests::BindHostPort(2345, SOCK_DGRAM, IPPROTO_UDP, true);
         auto tcpPort = NetworkTests::BindGuestPort(L"TCP4-LISTEN:2345", true);
@@ -5546,7 +5563,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         auto [originalRange, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range", 0);
         originalRange = wsl::shared::string::Trim(originalRange);
@@ -5568,7 +5585,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         NetworkTests::VerifyListenWithoutBindIsTracked();
     }
@@ -5577,7 +5594,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         NetworkTests::VerifyPortZeroRebindSucceeds();
     }
@@ -5587,7 +5604,7 @@ class ConsommeTests
         CONSOMME_TEST_ONLY();
         WINHTTP_PROXY_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .autoProxy = true}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode(), .autoProxy = true}));
         NetworkTests::VerifyHttpProxySimple();
     }
 
@@ -5595,7 +5612,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         if (!NetworkTests::HostHasInternetConnectivity(AF_INET6))
         {
@@ -5671,7 +5688,7 @@ class ConsommeTests
         CONSOMME_TEST_ONLY();
         WINDOWS_11_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         // Make sure the VM doesn't time out
         WslKeepAlive keepAlive;
@@ -5699,7 +5716,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         if (!NetworkTests::HostHasInternetConnectivity(AF_INET6))
         {
@@ -5724,7 +5741,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .dnsTunneling = false}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode(), .dnsTunneling = false}));
         NetworkTests::VerifyDnsResolutionBasic();
     }
 
@@ -5732,7 +5749,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .dnsTunneling = false}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode(), .dnsTunneling = false}));
         NetworkTests::VerifyDnsResolutionDig();
     }
 
@@ -5740,7 +5757,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .dnsTunneling = false}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode(), .dnsTunneling = false}));
         NetworkTests::VerifyDnsResolutionRecordTypes();
     }
 
@@ -5749,7 +5766,7 @@ class ConsommeTests
         CONSOMME_TEST_ONLY();
         DNS_TUNNELING_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .dnsTunneling = true}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode(), .dnsTunneling = true}));
         NetworkTests::VerifyDnsResolutionBasic();
     }
 
@@ -5758,7 +5775,7 @@ class ConsommeTests
         CONSOMME_TEST_ONLY();
         DNS_TUNNELING_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .dnsTunneling = true}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode(), .dnsTunneling = true}));
         NetworkTests::VerifyDnsResolutionDig();
     }
 
@@ -5767,7 +5784,7 @@ class ConsommeTests
         CONSOMME_TEST_ONLY();
         DNS_TUNNELING_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .dnsTunneling = true}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode(), .dnsTunneling = true}));
         NetworkTests::VerifyDnsResolutionRecordTypes();
     }
 
@@ -5777,7 +5794,7 @@ class ConsommeTests
         CONSOMME_TEST_ONLY();
         DNS_TUNNELING_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .dnsTunneling = true}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode(), .dnsTunneling = true}));
 
         const auto state = NetworkTests::GetInterfaceState(L"eth0");
         VERIFY_IS_TRUE(state.Gateway.has_value());
