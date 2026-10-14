@@ -275,7 +275,15 @@ OpenVmmVirtualMachineBackend::~OpenVmmVirtualMachineBackend() noexcept
     }
     if (m_processLogThread.joinable())
     {
-        m_processLogThread.join();
+        if (m_processLogThread.get_id() == std::this_thread::get_id())
+        {
+            // The final termination callback may destroy us; the log thread no longer accesses the backend.
+            m_processLogThread.detach();
+        }
+        else
+        {
+            m_processLogThread.join();
+        }
     }
     {
         auto lock = m_lock.lock_exclusive();
@@ -503,21 +511,31 @@ void OpenVmmVirtualMachineBackend::ReadProcessLog(wil::unique_hfile Pipe) noexce
 try
 {
     const auto context = CreateExecutionContext(Context::OpenVMM);
-    wsl::windows::common::io::MultiHandleWait io;
-    io.AddHandle(std::make_unique<wsl::windows::common::io::LineBasedReadHandle>(
-        std::move(Pipe),
-        [this](const gsl::span<char>& Line) {
-            const std::string entry{Line.begin(), Line.end()};
-            WSL_LOG(
-                "OpenVmmLog", TraceLoggingGuid(m_description.Identity.VmId, "VmId"), TraceLoggingValue(entry.c_str(), "Content"));
-        },
-        false));
-    io.AddHandle(std::make_unique<wsl::windows::common::io::EventHandle>(m_process.get(), [this]() {
-        DWORD exitCode = 0;
-        LOG_LAST_ERROR_IF(!GetExitCodeProcess(m_process.get(), &exitCode));
-        OnProcessExit(exitCode);
-    }));
-    io.Run(std::nullopt);
+    try
+    {
+        wsl::windows::common::io::MultiHandleWait io;
+        io.AddHandle(std::make_unique<wsl::windows::common::io::LineBasedReadHandle>(
+            std::move(Pipe),
+            [this](const gsl::span<char>& Line) {
+                const std::string entry{Line.begin(), Line.end()};
+                WSL_LOG(
+                    "OpenVmmLog",
+                    TraceLoggingGuid(m_description.Identity.VmId, "VmId"),
+                    TraceLoggingValue(entry.c_str(), "Content"));
+            },
+            false));
+        io.AddHandle(
+            std::make_unique<wsl::windows::common::io::EventHandle>(m_process.get(), []() {}),
+            wsl::windows::common::io::MultiHandleWait::Flags::CancelOnCompleted);
+        io.Run(std::nullopt);
+    }
+    CATCH_LOG()
+
+    THROW_LAST_ERROR_IF(WaitForSingleObject(m_process.get(), INFINITE) == WAIT_FAILED);
+    DWORD exitCode = 0;
+    THROW_IF_WIN32_BOOL_FALSE(GetExitCodeProcess(m_process.get(), &exitCode));
+    // All I/O callbacks are gone. OnProcessExit may destroy this backend, so it must be the last access.
+    OnProcessExit(exitCode);
 }
 CATCH_LOG()
 

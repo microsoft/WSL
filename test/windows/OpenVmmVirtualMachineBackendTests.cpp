@@ -264,7 +264,7 @@ class OpenVmmVirtualMachineBackendTests
         }
     }
 
-    TEST_METHOD(OpenVmmNatUsesCreationTimeAdapterAndGuestDhcp)
+    TEST_METHOD(OpenVmmNatUsesCreationTimeAdaptersAndStaticConfiguration)
     {
         const auto enabledRequest = wsl::core::CreateOpenVmmNatNetworkAdapterRequest(true);
         VERIFY_IS_TRUE(std::get<VmUserModeNatNetwork>(enabledRequest.Configuration).InternalDns);
@@ -277,17 +277,24 @@ class OpenVmmVirtualMachineBackendTests
 
         auto backendRequest = CreateRunnableRequest();
         backendRequest.NetworkAdapters.push_back(request);
+        backendRequest.NetworkAdapters.push_back(wsl::core::CreateOpenVmmLoopbackNetworkAdapterRequest());
         auto backend = OpenVmmVirtualMachineBackend::Create(backendRequest);
+        const auto description = backend->GetDescription();
         auto [client, server] = MakeSocketPair();
         wsl::core::OpenVmmNatNetworking networking(
-            *backend, backend->GetDescription().NetworkAdapters.at(L"eth0").Id, wsl::core::GnsChannel(std::move(server)), true, 5000);
+            *backend,
+            description.NetworkAdapters.at(L"eth0"),
+            description.NetworkAdapters.at(L"loopback0"),
+            wsl::core::GnsChannel(std::move(server)),
+            true,
+            false);
         LX_MINI_INIT_NETWORKING_CONFIGURATION configuration{};
         networking.FillInitialConfiguration(configuration);
 
         VERIFY_ARE_EQUAL(LxMiniInitNetworkingModeNat, configuration.NetworkingMode);
         VERIFY_IS_FALSE(configuration.DisableIpv6);
-        VERIFY_IS_TRUE(configuration.EnableDhcpClient);
-        VERIFY_ARE_EQUAL(5, configuration.DhcpTimeout);
+        VERIFY_IS_FALSE(configuration.EnableDhcpClient);
+        VERIFY_IS_FALSE(configuration.EnableLoopbackRouting);
         VERIFY_ARE_EQUAL(LxMiniInitPortTrackerTypeMirrored, configuration.PortTrackerType);
     }
 
@@ -438,6 +445,60 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_IS_TRUE(IsEqualGUID(backend->GetDescription().Identity.VmId, callbackVmId));
         VERIFY_ARE_EQUAL(VmState::Stopped, backend->GetState());
         VERIFY_ARE_EQUAL(VmTerminationReason::Shutdown, backend->GetTerminationReason().Reason);
+    }
+
+    TEST_METHOD(GuestShutdownCallbackCanDestroyBackend)
+    {
+        SKIP_TEST_ARM64();
+        wil::unique_event callbackEvent{wil::EventOptions::ManualReset};
+        auto backend = OpenVmmVirtualMachineBackend::Create(CreateRunnableRequest());
+        auto terminationEvent = backend->GetTerminationEvent();
+        auto [channel, notifications] = StartGuest(*backend);
+        backend->RegisterTerminationCallback([&](GUID) {
+            backend.reset();
+            callbackEvent.SetEvent();
+        });
+
+        channel.Close();
+        notifications.reset();
+
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(terminationEvent.get(), 30 * 1000));
+        VERIFY_IS_TRUE(callbackEvent.wait(30 * 1000));
+        VERIFY_IS_NULL(backend.get());
+    }
+
+    TEST_METHOD(DestructionDrainsTerminationCallback)
+    {
+        SKIP_TEST_ARM64();
+        wil::unique_event callbackStarted{wil::EventOptions::ManualReset};
+        wil::unique_event releaseCallback{wil::EventOptions::ManualReset};
+        wil::unique_event destroyed{wil::EventOptions::ManualReset};
+        auto backend = OpenVmmVirtualMachineBackend::Create(CreateRunnableRequest());
+        std::thread destructionThread;
+        auto cleanup = wil::scope_exit([&] {
+            releaseCallback.SetEvent();
+            if (destructionThread.joinable())
+            {
+                destructionThread.join();
+            }
+        });
+        auto [channel, notifications] = StartGuest(*backend);
+        backend->RegisterTerminationCallback([&](GUID) {
+            callbackStarted.SetEvent();
+            releaseCallback.wait();
+        });
+
+        channel.Close();
+        notifications.reset();
+        VERIFY_IS_TRUE(callbackStarted.wait(30 * 1000));
+        destructionThread = std::thread([backend = std::move(backend), &destroyed]() mutable {
+            backend.reset();
+            destroyed.SetEvent();
+        });
+
+        VERIFY_IS_FALSE(destroyed.wait(100));
+        releaseCallback.SetEvent();
+        VERIFY_IS_TRUE(destroyed.wait(30 * 1000));
     }
 
     TEST_METHOD(AddsPersistentMemoryInGuestOrder)

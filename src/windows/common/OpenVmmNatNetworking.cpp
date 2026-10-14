@@ -3,6 +3,7 @@
 #include "precomp.h"
 #include "OpenVmmNatNetworking.h"
 #include "WslCoreHostDnsInfo.h"
+#include "WslCoreNetworkingSupport.h"
 
 using wsl::core::OpenVmmNatNetworking;
 using namespace wsl::shared;
@@ -66,12 +67,6 @@ OpenVmmNatNetworking::~OpenVmmNatNetworking()
 
 void OpenVmmNatNetworking::Initialize()
 {
-    hns::HNSEndpoint endpointProperties{};
-    endpointProperties.ID = m_adapterId;
-    endpointProperties.IPAddress = c_guestIpv4Address;
-    endpointProperties.PrefixLength = c_guestIpv4PrefixLength;
-    m_gnsChannel.SendEndpointState(endpointProperties);
-
     if (m_enableLocalhostRelay)
     {
         hns::HNSEndpoint loopbackEndpointProperties{};
@@ -86,9 +81,17 @@ void OpenVmmNatNetworking::Initialize()
         createLoopbackDevice.type = hns::DeviceType::Loopback;
         createLoopbackDevice.lowerEdgeAdapterId = m_loopbackAdapterId.value();
         createLoopbackDevice.flags = hns::CreateDeviceFlags::DisableDAD;
-        constexpr auto loopbackType = GnsMessageType(createLoopbackDevice);
+        constexpr auto loopbackType = wsl::core::networking::GnsMessageType(createLoopbackDevice);
         m_gnsChannel.SendNetworkDeviceMessage(loopbackType, ToJsonW(createLoopbackDevice).c_str());
     }
+
+    // Rename the loopback NIC first in case Linux initially assigned it eth0.
+    hns::HNSEndpoint endpointProperties{};
+    endpointProperties.ID = m_adapterId;
+    endpointProperties.IPAddress = c_guestIpv4Address;
+    endpointProperties.PrefixLength = c_guestIpv4PrefixLength;
+    endpointProperties.PortFriendlyName = L"eth0";
+    m_gnsChannel.SendEndpointState(endpointProperties);
 
     hns::Route route{};
     route.NextHop = c_gatewayIpv4Address;
@@ -133,7 +136,7 @@ void OpenVmmNatNetworking::FillInitialConfiguration(LX_MINI_INIT_NETWORKING_CONF
     Message.DisableIpv6 = false;
     Message.EnableDhcpClient = false;
     Message.PortTrackerType = LxMiniInitPortTrackerTypeMirrored;
-    Message.EnableLoopbackRouting = m_enableLocalhostRelay;
+    Message.EnableLoopbackRouting = false;
 }
 
 void OpenVmmNatNetworking::StartPortTracker(wil::unique_socket&& Socket)

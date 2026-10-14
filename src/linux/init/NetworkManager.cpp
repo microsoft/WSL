@@ -283,7 +283,8 @@ void NetworkManager::EnableLoopbackRouting(Interface& interface)
 */
 void NetworkManager::InitializeLoopbackConfiguration(Interface& gelnic, wsl::shared::hns::CreateDeviceFlags flags)
 {
-    if (WI_IsFlagSet(flags, wsl::shared::hns::CreateDeviceFlags::DisableDAD))
+    // IPv6 sysctls don't exist if the kernel was booted with ipv6.disable=1.
+    if (WI_IsFlagSet(flags, wsl::shared::hns::CreateDeviceFlags::DisableDAD) && std::filesystem::exists("/proc/sys/net/ipv6"))
     {
         gelnic.DisableNetworkSetting("accept_dad", AF_INET6);
         gelnic.DisableNetworkSetting("dad_transmits", AF_INET6);
