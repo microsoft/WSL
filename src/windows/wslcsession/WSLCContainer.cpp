@@ -588,6 +588,11 @@ std::vector<wsl::windows::common::mount::Spec> ConvertAndValidateMounts(const WS
             i);
         THROW_HR_IF_MSG(
             E_INVALIDARG,
+            type != WSLCMountTypeVolume && WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsConfigVolume),
+            "Mount at index %lu specifies config-volume for a non-volume mount",
+            i);
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
             type != WSLCMountTypeTmpfs && value.TmpfsOptions != nullptr,
             "Mount at index %lu specifies tmpfs options for a non-tmpfs mount",
             i);
@@ -607,6 +612,7 @@ std::vector<wsl::windows::common::mount::Spec> ConvertAndValidateMounts(const WS
             .TmpfsSizeBytes = WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsTmpfsSize) ? std::optional<int64_t>{value.TmpfsSizeBytes} : std::nullopt,
             .TmpfsMode = WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsTmpfsMode) ? std::optional<uint32_t>{value.TmpfsMode} : std::nullopt,
             .TmpfsOptions = value.TmpfsOptions != nullptr ? std::optional<std::string>{value.TmpfsOptions} : std::nullopt,
+            .ConfigVolume = WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsConfigVolume),
         });
     }
 
@@ -660,7 +666,10 @@ std::vector<wsl::windows::common::mount::Spec> ConvertAndValidateMounts(const WS
 
     for (const auto& mount : mounts)
     {
-        addDestination(mount.Target.c_str());
+        if (!mount.ConfigVolume)
+        {
+            addDestination(mount.Target.c_str());
+        }
     }
 
     THROW_HR_IF(E_INVALIDARG, containerOptions.VolumesCount > 0 && containerOptions.Volumes == nullptr);
@@ -2517,6 +2526,12 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     for (const auto& mount : mounts)
     {
+        if (mount.ConfigVolume)
+        {
+            request.Volumes[mount.Target] = {};
+            continue;
+        }
+
         common::docker_schema::Mount dockerMount{
             .Target = mount.Target,
             .ReadOnly = mount.ReadOnly,
