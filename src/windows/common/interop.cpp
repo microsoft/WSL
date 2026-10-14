@@ -17,7 +17,6 @@ Abstract:
 #include "HandleIO.h"
 #include "helpers.hpp"
 #include "socket.hpp"
-#include "hvsocket.hpp"
 #include "relay.hpp"
 #include "LxssServerPort.h"
 #include "LxssMessagePort.h"
@@ -106,7 +105,7 @@ struct CreateProcessResult
 
 struct CreateProcessVmModeContext
 {
-    GUID VmId{};
+    wsl::windows::common::GuestConnector Connector{};
     std::vector<gsl::byte> Buffer{};
 };
 
@@ -257,13 +256,13 @@ CreateProcessResult CreateProcess(_In_ CreateProcessParsed* Parsed, _In_ HANDLE 
     return Result;
 }
 
-void CreateProcessVmMode(_In_ const GUID& VmId, _In_ const gsl::span<gsl::byte>& Buffer)
+void CreateProcessVmMode(_In_ const wsl::windows::common::GuestConnector& Connector, _In_ const gsl::span<gsl::byte>& Buffer)
 {
     // Create a worker thread to service the interop request.
     //
     // N.B. The worker thread takes ownership of the arguments.
     auto Arguments = std::make_unique<CreateProcessVmModeContext>();
-    Arguments->VmId = VmId;
+    Arguments->Connector = Connector;
     Arguments->Buffer.resize(Buffer.size());
     gsl::copy(Buffer, gsl::make_span(Arguments->Buffer));
     std::thread([Arguments = std::move(Arguments)]() {
@@ -283,7 +282,7 @@ void CreateProcessVmMode(_In_ const GUID& VmId, _In_ const gsl::span<gsl::byte>&
             wil::unique_socket Sockets[LX_INIT_CREATE_NT_PROCESS_SOCKETS];
             for (ULONG Index = 0; Index < RTL_NUMBER_OF(Sockets); Index += 1)
             {
-                Sockets[Index] = wsl::windows::common::hvsocket::Connect(Arguments->VmId, Params->Port);
+                Sockets[Index] = Arguments->Connector.Connect(Params->Port);
             }
 
             // Clean up relay threads.
@@ -572,7 +571,7 @@ void wsl::windows::common::interop::WorkerThread(_In_ wil::unique_handle&& Serve
 }
 
 DWORD
-wsl::windows::common::interop::VmModeWorkerThread(_In_ wsl::shared::SocketChannel& Channel, _In_ const GUID& VmId, _In_ bool IgnoreExit)
+wsl::windows::common::interop::VmModeWorkerThread(_In_ wsl::shared::SocketChannel& Channel, _In_ const GuestConnector& Connector, _In_ bool IgnoreExit)
 {
     std::vector<gsl::byte> Buffer;
 
@@ -604,7 +603,7 @@ wsl::windows::common::interop::VmModeWorkerThread(_In_ wsl::shared::SocketChanne
         case LxInitMessageCreateProcessUtilityVm:
             THROW_HR_IF(E_INVALIDARG, (Span.size() < sizeof(LX_INIT_CREATE_PROCESS_UTILITY_VM)));
 
-            CreateProcessVmMode(VmId, Span);
+            CreateProcessVmMode(Connector, Span);
             break;
 
         default:

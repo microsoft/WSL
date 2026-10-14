@@ -32,6 +32,7 @@ Abstract:
 #include <string>
 #include <variant>
 #include <vector>
+#include "GuestConnector.h"
 #include "defs.h"
 #include "stringshared.h"
 
@@ -70,12 +71,14 @@ struct VmDeviceTag;
 struct VmShareTag;
 struct VmListenerTag;
 struct VmPortBindingTag;
+struct VmHostSocketTag;
 
 using VmDiskId = VmResourceId<VmDiskTag>;
 using VmDeviceId = VmResourceId<VmDeviceTag>;
 using VmShareId = VmResourceId<VmShareTag>;
 using VmListenerId = VmResourceId<VmListenerTag>;
 using VmPortBindingId = VmResourceId<VmPortBindingTag>;
+using VmHostSocketId = VmResourceId<VmHostSocketTag>;
 
 // Backends own the extended resource; API methods return only its description by value.
 template <typename Description, typename BackendState>
@@ -109,23 +112,27 @@ enum class VmFeature
     NestedVirtualization,
     PerfmonPmu,
     PerfmonLbr,
+    MemoryOvercommit,
     DeferredMemoryCommit,
     ColdDiscard,
     SmallPageMemory,
+    HighMmio,
+    HostingProcessNameSuffix,
     PhysicalDisk,
+    PersistentMemory,
+    GuestDmaWindow,
     SerialConsole,
-    VirtioConsole,
     VirtioFsFileBacked,
-    SavedStateOnCrash,
     UserModeNatNetwork,
     TcpPortBinding,
     UdpPortBinding,
     Ipv6PortBinding,
     ScopedIpv6PortBinding,
+    SavedStateOnCrash,
     Count
 };
 
-static_assert(static_cast<size_t>(VmFeature::Count) == 16);
+static_assert(static_cast<size_t>(VmFeature::Count) == 20);
 
 struct VmPlatformCapabilities
 {
@@ -161,6 +168,14 @@ struct VmGuestListenerState
     VmGuestListener Listener;
     wil::unique_socket Socket;
     wil::unique_event CancellationEvent{wil::EventOptions::ManualReset};
+};
+
+// An AF_UNIX socket file that relays each accepted connection to a guest service port.
+struct VmHostSocket
+{
+    VmHostSocketId Id;
+    GuestServicePort Port;
+    std::filesystem::path Path;
 };
 
 struct VmProcessorRequest
@@ -246,6 +261,12 @@ struct VmScsiAddress
 
 using VmGuestDiskAddress = VmScsiAddress;
 
+enum class VmDiskTransport
+{
+    Scsi,
+    VirtioBlk
+};
+
 enum class VmDiskFormat
 {
     Vhd,
@@ -279,6 +300,8 @@ struct VmDiskRequest
     // Set for disks that the user explicitly attached (for instance via 'wsl --mount'), as opposed
     // to disks that WSL attaches on the user's behalf.
     bool UserDisk = false;
+    // Set when the disk must be available before guest kernel modules can be loaded.
+    bool BootCritical = false;
     // Timeout applied to host disk state changes and to retries when attaching a physical disk.
     std::chrono::milliseconds DeviceTimeout{5000};
 };
@@ -296,6 +319,7 @@ struct VmDiskAttachment
 {
     VmDiskId Id;
     VmGuestDiskAddress GuestAddress;
+    VmDiskTransport Transport = VmDiskTransport::Scsi;
     bool ReadOnly = true;
     bool UserDisk = false;
     // Host path backing the disk: a virtual disk image, or a physical disk for pass-through.
@@ -350,7 +374,13 @@ struct VmUserModeNatNetwork
 {
     WslVirtioNetConfig Configuration{};
     std::vector<IpAddress> Nameservers;
-
+    // OpenVMM only: answer guest DNS queries with the NAT's built-in resolver instead of the host's DNS servers.
+    bool InternalDns = true;
+    std::wstring ClientIp;
+    std::wstring GatewayIp;
+    std::wstring NetMask;
+    std::wstring ClientIpv6;
+    bool AllowHostLocalAccess = false;
     wsl::shared::string::MacAddress ClientMacAddress() const;
 };
 
@@ -691,8 +721,15 @@ public:
     void RegisterTerminationCallback(TerminationCallback Callback);
 
     virtual VmGuestListener CreateGuestListener(GuestServicePort Port) = 0;
-    virtual wil::unique_socket ConnectGuest(GuestServicePort Port) = 0;
+    virtual wil::unique_socket ConnectGuest(GuestServicePort Port, _In_opt_ HANDLE ExitHandle = nullptr) = 0;
+    virtual wsl::windows::common::GuestConnector GetGuestConnector() const = 0;
     virtual void CloseGuestListener(VmListenerId Listener) = 0;
+
+    // Creates a host socket for host components that can connect only over AF_UNIX, such as P9Rdr.
+    // Returns std::nullopt when such components can reach guest service ports directly over AF_HYPERV.
+    virtual std::optional<VmHostSocket> CreateHostSocket(GuestServicePort Port) = 0;
+    // Stops accepting connections on the host socket and deletes its file. Established connections are not affected.
+    virtual void CloseHostSocket(VmHostSocketId Socket) = 0;
 
     virtual VmDiskAttachment AttachDisk(const VmDiskRequest& Request) = 0;
     virtual std::vector<VmDiskAttachment> GetAttachedDisks() const = 0;
@@ -756,6 +793,8 @@ private:
     _Guarded_by_(m_terminationCallbackLock) GUID m_terminatedVmId {};
     _Guarded_by_(m_terminationCallbackLock) TerminationCallback m_terminationCallback;
 };
+
+BackendKind SelectVirtualMachineBackendKind(bool EnableOpenVmm) noexcept;
 
 VmPlatformCapabilities QueryVirtualMachineBackendCapabilities(BackendKind Kind);
 

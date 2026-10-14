@@ -302,6 +302,7 @@ public:
         ValidateDrvfsMounts(CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT | CREATE_NEW_CONSOLE, Mode);
     }
 
+    // The SystemDistroEnabled tests boot the system distro by enabling GUI applications, which OpenVMM doesn't support yet.
     void DrvfsMountElevatedSystemDistroEnabled(DrvFsMode Mode)
     {
         WINDOWS_11_TEST_ONLY(); // TODO: Enable on Windows 10 when virtio support is added
@@ -1342,11 +1343,10 @@ class WSL1 : public DrvFsTests
     }
 };
 
-#define WSL2_DRVFS_TEST_CLASS(_mode) \
+#define WSL2_DRVFS_TEST_CLASS(_mode, _testClassMacro) \
     class WSL2##_mode## : public DrvFsTests \
     { \
-        WSL_TEST_CLASS(WSL2##_mode##) \
-        std::unique_ptr<WslConfigChange> m_config; \
+        _testClassMacro(WSL2##_mode##) std::unique_ptr<WslConfigChange> m_config; \
         TEST_CLASS_SETUP(TestClassSetup) \
         { \
             if (!LxsstuVmMode()) \
@@ -1424,12 +1424,12 @@ class WSL1 : public DrvFsTests
             DrvFsTests::DrvfsMountNonElevatedDifferentConsole(DrvFsMode::##_mode##); \
         } \
 \
-        WSL2_TEST_METHOD(DrvfsMountElevatedSystemDistroEnabled) \
+        OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(DrvfsMountElevatedSystemDistroEnabled) \
         { \
             DrvFsTests::DrvfsMountElevatedSystemDistroEnabled(DrvFsMode::##_mode##); \
         } \
 \
-        WSL2_TEST_METHOD(DrvfsMountNonElevatedSystemDistroEnabled) \
+        OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(DrvfsMountNonElevatedSystemDistroEnabled) \
         { \
             DrvFsTests::DrvfsMountNonElevatedSystemDistroEnabled(DrvFsMode::##_mode##); \
         } \
@@ -1454,7 +1454,7 @@ class WSL1 : public DrvFsTests
             DrvFsTests::DrvFsMountUnicodePath(DrvFsMode::##_mode##); \
         } \
 \
-        WSL2_TEST_METHOD(DrvfsMountManyVirtioFsShares) \
+        OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(DrvfsMountManyVirtioFsShares) \
         { \
             DrvFsTests::DrvfsMountManyVirtioFsShares(DrvFsMode::##_mode##); \
         } \
@@ -1470,9 +1470,9 @@ class WSL1 : public DrvFsTests
         } \
     }
 
-WSL2_DRVFS_TEST_CLASS(Plan9);
+WSL2_DRVFS_TEST_CLASS(Plan9, OPENVMM_UNSUPPORTED_TEST_CLASS);
 
-WSL2_DRVFS_TEST_CLASS(VirtioFs);
+WSL2_DRVFS_TEST_CLASS(VirtioFs, WSL_TEST_CLASS);
 
 // Disabled while an issue with the 6.1 Linux kernel causing disk corruption is investigated.
 // TODO: Enable again once the issue is resolved

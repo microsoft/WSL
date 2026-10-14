@@ -1034,24 +1034,31 @@ class MountTests
         bool done = false;
         while (true)
         {
-            for (wchar_t name = 'a'; name < 'z'; name++)
+            for (const std::wstring_view prefix : {L"sd", L"vd"})
             {
-                std::wstring cmd = L"-u root blockdev --getsize64 /dev/sd";
-                cmd += name;
-
-                std::wstring out;
-                try
+                for (wchar_t name = 'a'; name < 'z'; name++)
                 {
-                    out = LxsstuLaunchWslAndCaptureOutput(cmd.data()).first;
-                }
-                CATCH_LOG()
+                    std::wstring device = L"/dev/";
+                    device += prefix;
+                    device += name;
 
-                Trim(out);
+                    std::wstring cmd = L"-u root blockdev --getsize64 ";
+                    cmd += device;
 
-                // Disk size is 20MB, so 20 * 1024 * 1024 bytes
-                if (out == L"20971520")
-                {
-                    return std::wstring(L"/dev/sd") + name;
+                    std::wstring out;
+                    try
+                    {
+                        out = LxsstuLaunchWslAndCaptureOutput(cmd.data()).first;
+                    }
+                    CATCH_LOG()
+
+                    Trim(out);
+
+                    // Disk size is 20MB, so 20 * 1024 * 1024 bytes
+                    if (out == L"20971520")
+                    {
+                        return device;
+                    }
                 }
             }
 
@@ -1166,7 +1173,15 @@ class MountTests
             }
 
             imageName.resize(length);
-            if (imageName == L"vmmemWSL" || (!wsl::windows::common::helpers::IsWindows11OrAbove() && imageName == L"vmmem"))
+            if (LxsstuOpenVmmMode())
+            {
+                // The OpenVMM backend runs the VM in an openvmm.exe worker process instead of vmmem.
+                if (wsl::shared::string::IsEqual(std::filesystem::path(imageName).filename().wstring(), L"openvmm.exe", true))
+                {
+                    return pid;
+                }
+            }
+            else if (imageName == L"vmmemWSL" || (!wsl::windows::common::helpers::IsWindows11OrAbove() && imageName == L"vmmem"))
             {
                 return pid;
             }

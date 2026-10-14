@@ -148,6 +148,7 @@ HRESULT STDMETHODCALLTYPE LxssUserSession::CreateLxProcess(
     _Out_ HANDLE* StandardErr,
     _Out_ HANDLE* CommunicationChannel,
     _Out_ HANDLE* InteropSocket,
+    _Out_ LPWSTR* GuestConnectionHandle,
     _Out_ LXSS_ERROR_INFO* Error)
 try
 {
@@ -179,7 +180,8 @@ try
         StandardOut,
         StandardErr,
         CommunicationChannel,
-        InteropSocket);
+        InteropSocket,
+        GuestConnectionHandle);
 }
 CATCH_RETURN()
 
@@ -803,7 +805,8 @@ HRESULT LxssUserSessionImpl::CreateLxProcess(
     _Out_ HANDLE* StandardOut,
     _Out_ HANDLE* StandardErr,
     _Out_ HANDLE* CommunicationChannel,
-    _Out_ HANDLE* InteropSocket)
+    _Out_ HANDLE* InteropSocket,
+    _Out_ LPWSTR* GuestConnectionHandle)
 try
 {
     // This API handles launching processes three ways:
@@ -855,6 +858,9 @@ try
         parsed, context, consoleData, Columns, Rows, StdHandles, InstanceId, ProcessHandle, ServerHandle, StandardIn, StandardOut, StandardErr, CommunicationChannel, InteropSocket);
 
     *DistributionId = distributionId;
+
+    const auto serializedGuestConnection = instance->GetGuestConnector().Serialize();
+    *GuestConnectionHandle = wil::make_unique_string<wil::unique_cotaskmem_string>(serializedGuestConnection.c_str()).release();
     return S_OK;
 }
 CATCH_RETURN()
@@ -3665,8 +3671,9 @@ LxssUserSessionImpl::_RunUtilityVmSetup(_In_ const LXSS_DISTRO_CONFIGURATION& Co
     context.instance = m_utilityVm->CreateInstance(instanceId, Configuration, MessageType, 0, 0, 0, ExportFlags, &connectPort);
 
     // Establish the socket that will be used to transfer the tar file contents.
-    context.tarSocket = wsl::windows::common::hvsocket::Connect(m_utilityVm->GetRuntimeId(), connectPort);
-    context.errorSocket = wsl::windows::common::hvsocket::Connect(m_utilityVm->GetRuntimeId(), connectPort);
+    const auto guestConnector = context.instance->GetGuestConnector();
+    context.tarSocket = guestConnector.Connect(connectPort);
+    context.errorSocket = guestConnector.Connect(connectPort);
     WI_ASSERT(context.tarSocket.is_valid());
 
     return context;

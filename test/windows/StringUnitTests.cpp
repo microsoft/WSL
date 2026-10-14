@@ -73,7 +73,7 @@ void VerifyDockerStorageUnits(StorageSizeUnit Unit, uint64_t Base)
 namespace StringUnitTests {
 class StringUnitTests
 {
-    WSL_TEST_CLASS(StringUnitTests)
+    BACKEND_AGNOSTIC_TEST_CLASS(StringUnitTests)
 
     TEST_METHOD(FormatUtf8StringAsWideString)
     {

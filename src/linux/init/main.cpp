@@ -53,6 +53,7 @@ Abstract:
 #include <unistd.h>
 #include <utmp.h>
 #include <assert.h>
+#include <fstream>
 #include "configfile.h"
 #include "lxfsshares.h"
 #include "common.h"
@@ -128,19 +129,27 @@ void CreateSwap(unsigned int Lun);
 
 int CreateTempDirectory(const char* ParentPath, std::string& Path);
 
+int DetachDisk(LX_MINI_INIT_MOUNT_DEVICE_TYPE DeviceType, unsigned int DeviceId);
+
 int DetachScsiDisk(unsigned int Lun);
 
-int EjectScsi(unsigned int Lun);
+int EjectDisk(LX_MINI_INIT_MOUNT_DEVICE_TYPE DeviceType, unsigned int DeviceId);
 
 int EnableInterface(int Socket, const char* Name);
 
 int ExportToSocket(const char* Source, int Socket, int ErrorSocket, unsigned int flags);
 
-int FormatDevice(unsigned int Lun);
+int FormatDevice(LX_MINI_INIT_MOUNT_DEVICE_TYPE DeviceType, unsigned int DeviceId);
 
-std::string GetLunDeviceName(unsigned int Lun);
+std::string GetDiskDeviceName(LX_MINI_INIT_MOUNT_DEVICE_TYPE DeviceType, unsigned int DeviceId);
 
-std::string GetLunDevicePath(unsigned int Lun);
+std::string GetDiskDevicePath(LX_MINI_INIT_MOUNT_DEVICE_TYPE DeviceType, unsigned int DeviceId);
+
+std::string GetScsiDeviceName(unsigned int Lun);
+
+std::string GetScsiDevicePath(unsigned int Lun);
+
+std::string GetVirtioBlkDeviceName(unsigned int DeviceId);
 
 int GetDiskPartitionIndex(const char* DiskPath, const char* PartitionName);
 
@@ -329,7 +338,7 @@ Return Value:
     //
 
     UtilCreateChildProcess("CreateSwap", [Lun]() {
-        std::string DevicePath = GetLunDevicePath(Lun);
+        std::string DevicePath = GetScsiDevicePath(Lun);
 
         WaitForBlockDevice(DevicePath.c_str());
 
@@ -424,17 +433,19 @@ Return Value:
     }
 }
 
-int DetachScsiDisk(unsigned int Lun)
+int DetachDisk(LX_MINI_INIT_MOUNT_DEVICE_TYPE DeviceType, unsigned int DeviceId)
 
 /*++
 
 Routine Description:
 
-    This routine detaches a SCSI disk.
+    This routine prepares a disk for host-side detachment.
 
 Arguments:
 
-    Lun - Supplies the LUN of the disk to detach.
+    DeviceType - Supplies the disk transport.
+
+    DeviceId - Supplies the transport-specific disk identifier.
 
 Return Value:
 
@@ -443,7 +454,7 @@ Return Value:
 --*/
 
 {
-    auto deviceName = GetLunDeviceName(Lun);
+    auto deviceName = GetDiskDeviceName(DeviceType, DeviceId);
 
     try
     {
@@ -480,8 +491,20 @@ Return Value:
     // Close the device before trying to delete it.
     BlockDevice.reset();
 
+    if (DeviceType == LxMiniInitMountDeviceTypeVirtioBlk)
+    {
+        return 0;
+    }
+
+    THROW_ERRNO_IF(EINVAL, DeviceType != LxMiniInitMountDeviceTypeScsi);
+
     // Remove the block device.
     return WriteToFile(std::format("/sys/block/{}/device/delete", deviceName).c_str(), "1");
+}
+
+int DetachScsiDisk(unsigned int Lun)
+{
+    return DetachDisk(LxMiniInitMountDeviceTypeScsi, Lun);
 }
 
 int DetectFilesystem(const char* BlockDevice, std::string& Output)
@@ -535,17 +558,19 @@ try
 }
 CATCH_RETURN_ERRNO()
 
-int EjectScsi(unsigned int Lun)
+int EjectDisk(LX_MINI_INIT_MOUNT_DEVICE_TYPE DeviceType, unsigned int DeviceId)
 
 /*++
 
 Routine Description:
 
-    This routine ejects the specified SCSI device.
+    This routine ejects the specified disk.
 
 Arguments:
 
-    Lun - Supplies the LUN of the SCSI device to eject.
+    DeviceType - Supplies the disk transport.
+
+    DeviceId - Supplies the transport-specific disk identifier.
 
 Return Value:
 
@@ -561,11 +586,18 @@ try
 
     sync();
 
+    if (DeviceType == LxMiniInitMountDeviceTypeVirtioBlk)
+    {
+        return 0;
+    }
+
+    THROW_ERRNO_IF(EINVAL, DeviceType != LxMiniInitMountDeviceTypeScsi);
+
     //
     // Write "1" to /sys/bus/scsi/devices/0:0:<controller>:<lun>/delete to eject the SCSI device.
     //
 
-    std::string Path = std::format("{}{}/delete", SCSI_DEVICE_PREFIX, Lun);
+    std::string Path = std::format("{}{}/delete", SCSI_DEVICE_PREFIX, DeviceId);
     if (WriteToFile(Path.c_str(), c_trueString) < 0)
     {
         return -1;
@@ -721,19 +753,21 @@ Return Value:
     return Result;
 }
 
-int FormatDevice(unsigned int Lun)
+int FormatDevice(LX_MINI_INIT_MOUNT_DEVICE_TYPE DeviceType, unsigned int DeviceId)
 
 /*++
 
 Routine Description:
 
-    This routine formats the specified SCSI device with the ext4 file system.
+    This routine formats the specified disk with the ext4 file system.
     N.B. The group size was chosen based on the best practices for Linux VHDs:
          https://docs.microsoft.com/en-us/windows-server/virtualization/hyper-v/best-practices-for-running-linux-on-hyper-v
 
 Arguments:
 
-    Lun - Supplies the LUN number of the SCSI device.
+    DeviceType - Supplies the disk transport.
+
+    DeviceId - Supplies the transport-specific disk identifier.
 
 Return Value:
 
@@ -743,7 +777,7 @@ Return Value:
 
 try
 {
-    std::string DevicePath = GetLunDevicePath(Lun);
+    std::string DevicePath = GetDiskDevicePath(DeviceType, DeviceId);
 
     WaitForBlockDevice(DevicePath.c_str());
 
@@ -757,13 +791,26 @@ try
 }
 CATCH_RETURN_ERRNO()
 
-std::string GetLunDeviceName(unsigned int Lun)
+std::string GetDiskDeviceName(LX_MINI_INIT_MOUNT_DEVICE_TYPE DeviceType, unsigned int DeviceId)
+{
+    switch (DeviceType)
+    {
+    case LxMiniInitMountDeviceTypeScsi:
+        return GetScsiDeviceName(DeviceId);
+    case LxMiniInitMountDeviceTypeVirtioBlk:
+        return GetVirtioBlkDeviceName(DeviceId);
+    default:
+        THROW_ERRNO(EINVAL);
+    }
+}
+
+std::string GetScsiDeviceName(unsigned int Lun)
 
 /*++
 
 Routine Description:
 
-    This routine returns the device name(sdX) for the specified SCSI device.
+    This routine returns the device name (sdX) for the specified SCSI device.
 
 Arguments:
 
@@ -789,18 +836,15 @@ Return Value:
     return wsl::shared::retry::RetryWithTimeout<std::string>(
         [&]() {
             wil::unique_dir Dir{opendir(Path.c_str())};
-            THROW_LAST_ERROR_IF(!Dir);
-
-            //
-            // Find the first directory entry that does not begin with a dot.
-            //
-
-            dirent64* Entry{};
-            while ((Entry = readdir64(Dir.get())) != nullptr)
+            if (Dir)
             {
-                if (Entry->d_name[0] != '.')
+                dirent64* Entry{};
+                while ((Entry = readdir64(Dir.get())) != nullptr)
                 {
-                    return std::string(Entry->d_name);
+                    if (Entry->d_name[0] != '.')
+                    {
+                        return std::string(Entry->d_name);
+                    }
                 }
             }
 
@@ -810,17 +854,46 @@ Return Value:
         c_defaultRetryTimeout);
 }
 
-std::string GetLunDevicePath(unsigned int Lun)
+std::string GetVirtioBlkDeviceName(unsigned int DeviceId)
+{
+    const auto expectedSerial = std::format("wsl-{}", DeviceId);
+    return wsl::shared::retry::RetryWithTimeout<std::string>(
+        [&]() {
+            for (const auto& entry : std::filesystem::directory_iterator("/sys/block"))
+            {
+                const auto deviceName = entry.path().filename().string();
+                if (!deviceName.starts_with("vd"))
+                {
+                    continue;
+                }
+
+                std::ifstream serialFile(entry.path() / "serial");
+                std::string serial;
+                if (std::getline(serialFile, serial) && serial == expectedSerial)
+                {
+                    return deviceName;
+                }
+            }
+
+            THROW_ERRNO(ENXIO);
+        },
+        c_defaultRetryPeriod,
+        c_defaultRetryTimeout);
+}
+
+std::string GetDiskDevicePath(LX_MINI_INIT_MOUNT_DEVICE_TYPE DeviceType, unsigned int DeviceId)
 
 /*++
 
 Routine Description:
 
-    This routine returns the device path for the specified SCSI device.
+    This routine returns the device path for the specified disk.
 
 Arguments:
 
-    Lun - Supplies a SCSI LUN.
+    DeviceType - Supplies the disk transport.
+
+    DeviceId - Supplies the transport-specific disk identifier.
 
 Return Value:
 
@@ -829,9 +902,14 @@ Return Value:
 --*/
 
 {
-    auto DeviceName = GetLunDeviceName(Lun);
+    auto DeviceName = GetDiskDeviceName(DeviceType, DeviceId);
 
     return std::format("{}/{}", DEVFS_PATH, DeviceName.c_str());
+}
+
+std::string GetScsiDevicePath(unsigned int Lun)
+{
+    return GetDiskDevicePath(LxMiniInitMountDeviceTypeScsi, Lun);
 }
 
 int GetDiskPartitionIndex(const char* DiskPath, const char* PartitionName)
@@ -1840,8 +1918,9 @@ try
     std::string DevicePath;
     switch (DeviceType)
     {
-    case LxMiniInitMountDeviceTypeLun:
-        DevicePath = GetLunDevicePath(DeviceId);
+    case LxMiniInitMountDeviceTypeScsi:
+    case LxMiniInitMountDeviceTypeVirtioBlk:
+        DevicePath = GetDiskDevicePath(DeviceType, DeviceId);
         break;
 
     case LxMiniInitMountDeviceTypePmem:
@@ -2526,7 +2605,7 @@ void ProcessImportExportMessage(gsl::span<gsl::byte> Buffer, wsl::shared::Socket
 
             if (Message->Header.MessageType == LxMiniInitMessageImport)
             {
-                THROW_LAST_ERROR_IF(FormatDevice(Message->DeviceId) < 0);
+                THROW_LAST_ERROR_IF(FormatDevice(Message->MountDeviceType, Message->DeviceId) < 0);
             }
 
             auto* FsType = wsl::shared::string::FromSpan(Buffer, Message->FsTypeOffset);
@@ -2638,7 +2717,17 @@ Return Value:
         return -1;
     }
 
-    int Result = MountPlan9(Name, Target, Message->ReadOnly, LX_INIT_UTILITY_VM_PLAN9_PLUGIN_PORT);
+    int Result;
+    if (Message->VirtioFs)
+    {
+        const unsigned long flags = Message->ReadOnly ? MS_RDONLY : 0;
+        Result = UtilMount(Name, Target, VIRTIO_FS_TYPE, flags, "", c_defaultRetryTimeout);
+    }
+    else
+    {
+        Result = MountPlan9(Name, Target, Message->ReadOnly, LX_INIT_UTILITY_VM_PLAN9_PLUGIN_PORT);
+    }
+
     Transaction.SendResultMessage<int32_t>(Result);
     return 0;
 }
@@ -2694,7 +2783,7 @@ Return Value:
                     return;
                 }
 
-                Device = GetLunDevicePath(Message->ScsiLun);
+                Device = GetDiskDevicePath(Message->DeviceType, Message->DeviceId);
 
                 //
                 // Construct the target of the mount.
@@ -2791,7 +2880,7 @@ Return Value:
                     return;
                 }
 
-                Result = DetachScsiDisk(Message->ScsiLun);
+                Result = DetachDisk(Message->DeviceType, Message->DeviceId);
             }
         });
 
@@ -2935,7 +3024,7 @@ try
             THROW_LAST_ERROR_IF(TEMP_FAILURE_RETRY(dup2(OutputSocket.get(), STDOUT_FILENO)) < 0);
             THROW_LAST_ERROR_IF(TEMP_FAILURE_RETRY(dup2(OutputSocket.get(), STDERR_FILENO)) < 0);
 
-            auto DevicePath = GetLunDevicePath(Message->ScsiLun);
+            auto DevicePath = GetDiskDevicePath(Message->DeviceType, Message->DeviceId);
 
             auto CommandLine = std::format("/usr/sbin/e2fsck -f -y '{}'", DevicePath);
             THROW_LAST_ERROR_IF(UtilExecCommandLine(CommandLine.c_str()) < 0);
@@ -2987,7 +3076,7 @@ try
                 Channel.SendMessage(ResponseMessage);
             });
 
-            const auto DevicePath = GetLunDevicePath(Message->ScsiLun);
+            const auto DevicePath = GetDiskDevicePath(Message->DeviceType, Message->DeviceId);
 
             //
             // Run a full offline filesystem check and discard the free blocks so the host can reclaim
@@ -3105,7 +3194,7 @@ try
             return -1;
         }
 
-        Transaction.SendResultMessage(EjectScsi(EjectMessage->Lun));
+        Transaction.SendResultMessage(EjectDisk(EjectMessage->DeviceType, EjectMessage->DeviceId));
         return 0;
     }
 
@@ -3230,7 +3319,7 @@ try
         if (EarlyConfig->KernelModulesDeviceId != UINT_MAX)
         {
             THROW_LAST_ERROR_IF(
-                MountDevice(LxMiniInitMountDeviceTypeLun, EarlyConfig->KernelModulesDeviceId, KERNEL_MODULES_VHD_PATH, "ext4", LxMiniInitMessageFlagMountReadOnly, nullptr) <
+                MountDevice(LxMiniInitMountDeviceTypeScsi, EarlyConfig->KernelModulesDeviceId, KERNEL_MODULES_VHD_PATH, "ext4", LxMiniInitMessageFlagMountReadOnly, nullptr) <
                 0);
 
             utsname UnameBuffer{};

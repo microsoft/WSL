@@ -111,6 +111,7 @@ public:
         _Out_ HANDLE* StandardErr,
         _Out_ HANDLE* CommunicationChannel,
         _Out_ HANDLE* InteropSocket,
+        _Out_ LPWSTR* GuestConnectionHandle,
         _Out_ LXSS_ERROR_INFO* Error) override;
 
     /// <summary>
@@ -361,7 +362,8 @@ public:
         _Out_ HANDLE* StandardOut,
         _Out_ HANDLE* StandardErr,
         _Out_ HANDLE* CommunicationChannel,
-        _Out_ HANDLE* InteropSocket);
+        _Out_ HANDLE* InteropSocket,
+        _Out_ LPWSTR* GuestConnectionHandle);
 
     /// <summary>
     /// Clears the state of an attached disk in the registry

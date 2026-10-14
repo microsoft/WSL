@@ -1,0 +1,51 @@
+// Copyright (C) Microsoft Corporation. All rights reserved.
+
+#pragma once
+
+#include "GnsChannel.h"
+#include "GnsPortTrackerChannel.h"
+#include "INetworkingEngine.h"
+#include "IVirtualMachineBackend.h"
+
+namespace wsl::core {
+
+VmNetworkAdapterRequest CreateOpenVmmNatNetworkAdapterRequest(bool EnableDnsTunneling);
+VmNetworkAdapterRequest CreateOpenVmmLoopbackNetworkAdapterRequest();
+
+class OpenVmmNatNetworking : public INetworkingEngine
+{
+public:
+    OpenVmmNatNetworking(
+        IVirtualMachineBackend& Backend,
+        const VmNetworkAttachment& Adapter,
+        std::optional<VmNetworkAttachment> LoopbackAdapter,
+        GnsChannel&& GnsChannel,
+        bool EnableLocalhostRelay,
+        bool EnableDnsTunneling);
+    ~OpenVmmNatNetworking() override;
+
+    void Initialize() override;
+    void TraceLoggingRundown() noexcept override;
+    void FillInitialConfiguration(LX_MINI_INIT_NETWORKING_CONFIGURATION& Message) override;
+    void StartPortTracker(wil::unique_socket&& Socket) override;
+
+private:
+    using PortKey = std::tuple<bool, int, int, uint16_t>; // loopback0, address family, protocol, port
+
+    void HandlePortNotification(const SOCKADDR_INET& addr, int protocol, bool allocate);
+    void ModifyPort(bool loopbackDevice, const SOCKADDR_INET& hostAddress, int protocol, bool allocate);
+
+    IVirtualMachineBackend& m_backend;
+    VmDeviceId m_device;
+    GUID m_adapterId;
+    std::optional<VmDeviceId> m_loopbackDevice;
+    std::optional<GUID> m_loopbackAdapterId;
+    GnsChannel m_gnsChannel;
+    bool m_enableLocalhostRelay;
+    bool m_enableDnsTunneling;
+    wil::srwlock m_lock;
+    _Guarded_by_(m_lock) std::map<PortKey, VmPortBindingId> m_portBindings;
+    std::optional<GnsPortTrackerChannel> m_gnsPortTrackerChannel;
+};
+
+} // namespace wsl::core

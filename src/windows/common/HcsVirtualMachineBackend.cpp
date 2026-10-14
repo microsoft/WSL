@@ -365,7 +365,7 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
         scsi.Attachments[std::to_string(lun)] = std::move(attachment);
 
         const VmDiskAttachment diskAttachment{
-            {Request.Identity, configuration.NextDiskId}, {0, lun}, bootDisk.Disk.ReadOnly, bootDisk.Disk.UserDisk, path, false};
+            {Request.Identity, configuration.NextDiskId}, {0, lun}, VmDiskTransport::Scsi, bootDisk.Disk.ReadOnly, bootDisk.Disk.UserDisk, path, false};
         description.BootDisks.emplace(bootDisk.Key, diskAttachment);
         configuration.BootDisks.emplace(
             diskAttachment.Id.Value, AttachedDisk{diskAttachment, {diskFlags, bootDisk.Disk.DeviceTimeout, std::move(backingFile)}});
@@ -562,12 +562,15 @@ VmPlatformCapabilities HcsVirtualMachineBackend::QueryCapabilities()
     capabilities.Backend = BackendKind::Hcs;
     for (const auto feature :
          {VmFeature::NestedVirtualization,
+          VmFeature::MemoryOvercommit,
           VmFeature::DeferredMemoryCommit,
           VmFeature::ColdDiscard,
           VmFeature::SmallPageMemory,
+          VmFeature::HighMmio,
           VmFeature::SerialConsole,
-          VmFeature::VirtioConsole,
           VmFeature::PhysicalDisk,
+          VmFeature::PersistentMemory,
+          VmFeature::GuestDmaWindow,
           VmFeature::VirtioFsFileBacked,
           VmFeature::UserModeNatNetwork,
           VmFeature::TcpPortBinding,
@@ -579,7 +582,7 @@ VmPlatformCapabilities HcsVirtualMachineBackend::QueryCapabilities()
 
     capabilities.Features.set(static_cast<size_t>(VmFeature::NestedVirtualization), schema::IsNestedVirtualizationSupported());
     capabilities.Features.set(static_cast<size_t>(VmFeature::SmallPageMemory), schema::IsSmallPageMemorySupported());
-    // Saved-state crash capture needs the DebugOptions of schema 2.7, which Windows 10 does not have.
+    capabilities.Features.set(static_cast<size_t>(VmFeature::HostingProcessNameSuffix), wsl::windows::common::helpers::IsVmemmSuffixSupported());
     capabilities.Features.set(static_cast<size_t>(VmFeature::SavedStateOnCrash), wsl::windows::common::helpers::IsWindows11OrAbove());
     const auto [perfmonPmuSupported, perfmonLbrSupported] = schema::GetPerfmonCapabilities();
     capabilities.Features.set(static_cast<size_t>(VmFeature::PerfmonPmu), perfmonPmuSupported);
@@ -591,6 +594,11 @@ VmDescription HcsVirtualMachineBackend::GetDescription() const
 {
     auto lock = m_lock.lock_shared();
     return m_configuration.Description;
+}
+
+wsl::windows::common::GuestConnector HcsVirtualMachineBackend::GetGuestConnector() const
+{
+    return wsl::windows::common::GuestConnector::CreateHcs(GetDescription().Identity.VmId);
 }
 
 VmState HcsVirtualMachineBackend::GetState() const
@@ -690,11 +698,11 @@ VmGuestListener HcsVirtualMachineBackend::CreateGuestListener(GuestServicePort P
     return RegisterGuestListenerLocked(m_configuration.Description.Identity, Port);
 }
 
-wil::unique_socket HcsVirtualMachineBackend::ConnectGuest(GuestServicePort Port)
+wil::unique_socket HcsVirtualMachineBackend::ConnectGuest(GuestServicePort Port, _In_opt_ HANDLE ExitHandle)
 {
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
-    return wsl::windows::common::hvsocket::Connect(m_configuration.Description.Identity.VmId, Port.Value);
+    return wsl::windows::common::GuestConnector::CreateHcs(m_configuration.Description.Identity.VmId).Connect(Port.Value, ExitHandle);
 }
 
 void HcsVirtualMachineBackend::CloseGuestListener(VmListenerId Listener)
@@ -702,6 +710,18 @@ void HcsVirtualMachineBackend::CloseGuestListener(VmListenerId Listener)
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
     RemoveGuestListenerLocked(Listener, m_configuration.Description.Identity);
+}
+
+std::optional<VmHostSocket> HcsVirtualMachineBackend::CreateHostSocket(GuestServicePort)
+{
+    // Host components connect to HCS guests directly over AF_HYPERV.
+    return std::nullopt;
+}
+
+void HcsVirtualMachineBackend::CloseHostSocket(VmHostSocketId Socket)
+{
+    validation::ValidateResourceId(Socket, m_configuration.Description.Identity);
+    THROW_HR(HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 }
 
 std::uint32_t HcsVirtualMachineBackend::ReserveLunLocked(const std::optional<VmScsiPlacement>& Placement) const
@@ -885,7 +905,7 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
     });
 
     const VmDiskAttachment attachment{
-        {m_configuration.Description.Identity, m_nextDiskId}, {0, lun}, Request.ReadOnly, Request.UserDisk, path, passThrough};
+        {m_configuration.Description.Identity, m_nextDiskId}, {0, lun}, VmDiskTransport::Scsi, Request.ReadOnly, Request.UserDisk, path, passThrough};
     m_attachedDisks.emplace(attachment.Id.Value, AttachedDisk{attachment, {diskFlags, Request.DeviceTimeout, std::move(backingFile)}});
     ++m_nextDiskId;
     cleanup.release();

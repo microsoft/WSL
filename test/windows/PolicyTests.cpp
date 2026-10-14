@@ -23,7 +23,7 @@ using namespace wsl::windows::common::registry;
 
 class PolicyTest
 {
-    WSL_TEST_CLASS(PolicyTest)
+    BACKEND_AGNOSTIC_TEST_CLASS(PolicyTest)
 
     bool m_initialized = false;
 
@@ -112,7 +112,8 @@ class PolicyTest
             L"--mount DoesNotExist",
             FormatErrorMessage(
                 L"Failed to attach disk 'DoesNotExist' to WSL2: The system cannot find the file specified. ",
-                L"Wsl/Service/AttachDisk/MountDisk/HCS/ERROR_FILE_NOT_FOUND"));
+                LxsstuOpenVmmMode() ? L"Wsl/Service/AttachDisk/MountDisk/OpenVMM/ERROR_FILE_NOT_FOUND"
+                                    : L"Wsl/Service/AttachDisk/MountDisk/HCS/ERROR_FILE_NOT_FOUND"));
     }
 
     WSL2_TEST_METHOD(MountPolicyDisabled)
@@ -182,6 +183,26 @@ class PolicyTest
     {
         SKIP_TEST_ARM64();
         WINDOWS_11_TEST_ONLY();
+
+        if (LxsstuOpenVmmMode())
+        {
+            WslConfigChange config(LxssGenerateTestConfig({.nestedVirtualization = true}));
+            for (const auto value : {1u, 12u})
+            {
+                auto revert = SetPolicy(c_allowNestedVirtualizationUserSetting, value);
+                WslShutdown();
+                ValidateOutput(
+                    L"echo ok",
+                    FormatErrorMessage(
+                        wsl::shared::Localization::MessageOpenVmmNestedVirtualizationConflict(),
+                        L"Wsl/Service/CreateInstance/CreateVm/OpenVMM/ERROR_NOT_SUPPORTED"));
+            }
+
+            auto revert = SetPolicy(c_allowNestedVirtualizationUserSetting, 0);
+            WslShutdown();
+            ValidateWarnings(L"wsl: The .wslconfig setting 'wsl2.nestedVirtualization' is disabled by the computer policy.\r\n");
+            return;
+        }
 
         ValidatePolicy(
             c_allowNestedVirtualizationUserSetting,

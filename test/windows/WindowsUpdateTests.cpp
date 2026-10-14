@@ -822,7 +822,7 @@ static wil::com_ptr<MockUpdate> AddMockUpdate(MockUpdateCollection* col, VARIANT
 
 class WindowsUpdateTests
 {
-    WSL_TEST_CLASS(WindowsUpdateTests)
+    BACKEND_AGNOSTIC_TEST_CLASS(WindowsUpdateTests)
 
     // -----------------------------------------------------------------------
     // SearchForUpdates tests

@@ -13,6 +13,7 @@ set(SOURCES
     filesystem.cpp
     GnsChannel.cpp
     GnsPortTrackerChannel.cpp
+    GuestConnector.cpp
     GuestDeviceManager.cpp
     HandleConsoleProgressBar.cpp
     hcs.cpp
@@ -28,6 +29,7 @@ set(SOURCES
     LxssServerPort.cpp
     MountSpecParsing.cpp
     NatNetworking.cpp
+    OpenVmmNatNetworking.cpp
     notifications.cpp
     Redirector.cpp
     registry.cpp
@@ -39,6 +41,7 @@ set(SOURCES
     svccomm.cpp
     timestamp.cpp
     VTSupport.cpp
+    vsock.cpp
     WindowsUpdateIntegration.cpp
     WSLCContainerLauncher.cpp
     ConsommeNetworking.cpp
@@ -103,6 +106,7 @@ set(HEADERS
     filesystem.hpp
     GnsChannel.h
     GnsPortTrackerChannel.h
+    GuestConnector.h
     GuestDeviceManager.h
     HandleConsoleProgressBar.h
     hcs.hpp
@@ -118,6 +122,7 @@ set(HEADERS
     LxssServerPort.h
     MountSpecParsing.h
     NatNetworking.h
+    OpenVmmNatNetworking.h
     notifications.h
     precomp.h
     Redirector.h
@@ -137,6 +142,7 @@ set(HEADERS
     ConsommeNetworking.h
     WSLCProcessLauncher.h
     WslClient.h
+    vsock.hpp
     WslCoreConfig.h
     WslCoreFilesystem.h
     WslCoreFirewallSupport.h

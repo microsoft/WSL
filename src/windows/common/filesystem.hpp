@@ -152,6 +152,9 @@ std::filesystem::path GetCanonicalPath(const std::filesystem::path& Path);
 /// </summary>
 std::filesystem::path GetCanonicalPath(const std::filesystem::path& Path, std::error_code& Error);
 
+/// <summary>
+/// Resolves an existing path using a metadata-only handle, without requesting read access to its contents.
+/// </summary>
 std::filesystem::path GetFullPath(_In_ LPCWSTR Path);
 
 std::pair<std::string, std::string> GetHostAndDomainNames();

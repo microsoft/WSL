@@ -126,6 +126,7 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         ConfigKey(ConfigSetting::Experimental::InitialAutoProxyTimeout, InitialAutoProxyTimeout),
         ConfigKey(ConfigSetting::Experimental::IgnoredPorts, std::move(parseIgnoredPorts)),
         ConfigKey(ConfigSetting::Experimental::HostAddressLoopback, EnableHostAddressLoopback),
+        ConfigKey(ConfigSetting::Experimental::OpenVmm, EnableOpenVmm),
         ConfigKey(ConfigSetting::Experimental::SetVersionDebug, SetVersionDebug),
         ConfigKey(ConfigSetting::Experimental::Swiotlb, MemoryString(SwiotlbSizeBytes)),
         ConfigKey(ConfigSetting::Experimental::VirtioFsAggregateShares, EnableVirtioFsAggregateShares)};
@@ -459,7 +460,17 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
 
     // Compute a default swiotlb config only when a virtio device that requires bounce buffers is present.
     // N.B. Must run after policy overrides so networking/fs modes reflect final values.
-    if (SwiotlbSizeBytes == 0 && (EnableVirtioFs || EnableVirtio9p || (NetworkingMode == NetworkingMode::Consomme)))
+    //
+    // N.B. The bounce buffer exists so out-of-process hv_pci device hosts can be restricted to a
+    //      single DMA window. OpenVMM emulates its virtio devices inside the VMM process, which
+    //      already maps all of guest memory, so forcing bounce buffers isolates nothing and instead
+    //      caps total in-flight DMA at the pool size. That cap is quickly exhausted by block I/O,
+    //      which surfaces as EIO from virtio-blk, so leave swiotlb disabled for this backend.
+    if (EnableOpenVmm)
+    {
+        VALIDATE_CONFIG_OPTION(EnableOpenVmm, SwiotlbSizeBytes, 0);
+    }
+    else if (SwiotlbSizeBytes == 0 && (EnableVirtioFs || EnableVirtio9p || (NetworkingMode == NetworkingMode::Consomme)))
     {
         SwiotlbSizeBytes = wsl::windows::common::helpers::ComputeDefaultSwiotlbConfig(MemorySizeBytes);
     }

@@ -55,6 +55,13 @@ using namespace std::chrono_literals;
     TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE() \
     TEST_METHOD(_name)
 
+#define OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(_name) \
+    TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(_name) \
+    TEST_METHOD_PROPERTY(L"Ignore[not(@Version=2)]", L"true") \
+    TEST_METHOD_PROPERTY(L"Ignore[@OpenVmm=1]", L"true") \
+    TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE() \
+    TEST_METHOD(_name)
+
 #define WSLC_TEST_METHOD(_name) \
     TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(_name) \
     TEST_METHOD_PROPERTY(L"Ignore[not(@Version=2)]", L"true") \
@@ -133,10 +140,36 @@ using namespace std::chrono_literals;
         WSL_TEST_CLASS_PROPERTIES \
     END_TEST_CLASS()
 
+#define OPENVMM_UNSUPPORTED_TEST_CLASS(_name) \
+    BEGIN_TEST_CLASS(_name) \
+        WSL_TEST_CLASS_PROPERTIES \
+        TEST_CLASS_PROPERTY(L"Ignore[@OpenVmm=1]", L"true") \
+    END_TEST_CLASS()
+
 #define WSLC_TEST_CLASS(_name) \
     BEGIN_TEST_CLASS(_name) \
         WSL_TEST_CLASS_PROPERTIES \
         TEST_CLASS_PROPERTY(L"TestCategory", L"WSLC") \
+    END_TEST_CLASS()
+
+//
+// Tests that drive the OpenVMM backend directly. These only run in the dedicated OpenVMM test pass,
+// which uses an image with the Windows Hypervisor Platform enabled.
+//
+#define OPENVMM_TEST_CLASS(_name) \
+    BEGIN_TEST_CLASS(_name) \
+        WSL_TEST_CLASS_PROPERTIES \
+        TEST_CLASS_PROPERTY(L"TestCategory", L"OpenVMM") \
+    END_TEST_CLASS()
+
+//
+// Tests whose outcome cannot depend on which virtual machine backend is in use. These are excluded
+// from the OpenVMM test pass, where re-running them would only duplicate the main WSL2 pass.
+//
+#define BACKEND_AGNOSTIC_TEST_CLASS(_name) \
+    BEGIN_TEST_CLASS(_name) \
+        WSL_TEST_CLASS_PROPERTIES \
+        TEST_CLASS_PROPERTY(L"TestCategory", L"BackendAgnostic") \
     END_TEST_CLASS()
 
 //
@@ -517,6 +550,8 @@ BOOL LxsstuInitialize(__in BOOLEAN RunInstanceTests);
 
 BOOL LxsstuVmMode(VOID);
 
+bool LxsstuOpenVmmMode();
+
 std::pair<std::wstring, std::wstring> LxsstuLaunchPowershellAndCaptureOutput(_In_ const std::wstring& Cmd, _In_ int ExpectedExitCode = 0);
 
 VOID LxsstuUninitialize(__in BOOLEAN RunInstanceTests);
@@ -561,6 +596,7 @@ struct TestConfigDefaults
     std::optional<wsl::core::NetworkingMode> networkingMode;
     const std::optional<std::wstring> vmSwitch;
     const std::optional<std::wstring> macAddress;
+    std::optional<bool> localhostForwarding;
     bool ipv6 = false;
     std::optional<bool> dnsTunneling;
     std::optional<std::wstring> dnsTunnelingIpAddress;
@@ -578,6 +614,7 @@ struct TestConfigDefaults
     int crashDumpCount = 100;
     std::optional<std::wstring> CrashDumpFolder;
     std::optional<bool> isolateDistroCgroup;
+    std::optional<bool> nestedVirtualization;
 };
 
 std::wstring LxssGenerateTestConfig(TestConfigDefaults Default = {});

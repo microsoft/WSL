@@ -15,6 +15,7 @@ Abstract:
 #pragma once
 
 #include <thread>
+#include "GuestDeviceManager.h"
 #include "IVirtualMachineBackend.h"
 
 struct WslOpenVmmVm;
@@ -30,8 +31,8 @@ class OpenVmmVirtualMachineBackend : public IVirtualMachineBackend
 public:
     ~OpenVmmVirtualMachineBackend() noexcept override;
 
-    // Networking supports one creation-time Consomme NIC: 10.0.0.2/24, gateway 10.0.0.1,
-    // default gateway MACs, automatic guest IPv6 and host DNS. Custom settings and hot-add are unsupported.
+    // Networking supports creation-time Consomme NICs, automatic guest IPv6 and host DNS. Hot-add is unsupported.
+    // Backend failures include OpenVMM in the contextualized error code.
     static std::unique_ptr<OpenVmmVirtualMachineBackend> Create(const VmCreateRequest& Request);
 
     static VmPlatformCapabilities QueryCapabilities();
@@ -47,8 +48,14 @@ public:
     void Terminate() override;
 
     VmGuestListener CreateGuestListener(GuestServicePort Port) override;
-    wil::unique_socket ConnectGuest(GuestServicePort Port) override;
+    wil::unique_socket ConnectGuest(GuestServicePort Port, _In_opt_ HANDLE ExitHandle = nullptr) override;
+    wsl::windows::common::GuestConnector GetGuestConnector() const override
+    {
+        return wsl::windows::common::GuestConnector::CreateOpenVmm(m_fileSystemResources.VsockPath);
+    }
     void CloseGuestListener(VmListenerId Listener) override;
+    std::optional<VmHostSocket> CreateHostSocket(GuestServicePort Port) override;
+    void CloseHostSocket(VmHostSocketId Socket) override;
 
     VmDiskAttachment AttachDisk(const VmDiskRequest& Request) override;
     std::vector<VmDiskAttachment> GetAttachedDisks() const override;
@@ -83,6 +90,10 @@ private:
     void OnProcessExit(DWORD ExitCode) noexcept;
     void ReadProcessLog(wil::unique_hfile Pipe) noexcept;
     void Initialize(const VmCreateRequest& Request);
+    // Brings pass-through disks that were taken offline back online. Must only be called once OpenVMM
+    // no longer uses the disks.
+    _Requires_lock_held_(m_lock)
+    void RestorePassThroughDisksLocked() noexcept;
 
     static void DestroyVm(WslOpenVmmVm* Vm) noexcept;
     using UniqueVm = wil::unique_any<WslOpenVmmVm*, decltype(&DestroyVm), DestroyVm>;
@@ -100,6 +111,8 @@ private:
     struct OpenVmmFileSystemDevice
     {
         std::optional<std::uint64_t> Share;
+        wil::shared_handle UserToken;
+        wil::shared_handle ShareToken{};
     };
 
     using FileSystemDevice = VmResource<VmFileSystemDevice, OpenVmmFileSystemDevice>;
@@ -127,16 +140,54 @@ private:
         bool DirectoryCreated = false;
     };
 
+    struct SuspendedFileSystemShare
+    {
+        VmFileSystemShare Share;
+        wil::shared_handle Token;
+    };
+
+    struct PassThroughDisk
+    {
+        // The host disk was taken offline for the attachment and must be brought back online.
+        bool RestoreOnline = false;
+        std::chrono::milliseconds DeviceTimeout{wsl::windows::common::disk::c_defaultDiskTimeoutMs};
+        std::vector<SuspendedFileSystemShare> Shares;
+    };
+
+    _Requires_lock_held_(m_lock)
+    void AddFileSystemShareLocked(const VmFileSystemShare& Share, const wil::shared_handle& Token);
+    _Requires_lock_held_(m_lock)
+    void RemoveFileSystemShareLocked(VmShareId Share);
+    _Requires_lock_held_(m_lock)
+    void SuspendFileSystemSharesForDiskLocked(HANDLE Disk, std::vector<SuspendedFileSystemShare>& Shares);
+    _Requires_lock_held_(m_lock)
+    void RestoreFileSystemSharesLocked(std::vector<SuspendedFileSystemShare>& Shares) noexcept;
+
+    struct SharedMemoryDevice
+    {
+        VmSharedMemoryDevice Device;
+        DirectoryObjectLifetime Directory;
+    };
+
     VmDescription m_description{};
     _Guarded_by_(m_lock) std::map<std::uint64_t, VmDiskAttachment> m_attachedDisks;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, GUID> m_diskInstanceIds;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, PassThroughDisk> m_passThroughDisks;
     _Guarded_by_(m_lock) std::uint64_t m_nextDiskId = 1;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, VmPersistentMemoryDevice> m_persistentMemoryDevices;
     _Guarded_by_(m_lock) std::map<std::uint64_t, FileSystemDevice> m_fileSystemDevices;
     _Guarded_by_(m_lock) std::map<std::uint64_t, VmFileSystemShare> m_fileSystemShares;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, SharedMemoryDevice> m_sharedMemoryDevices;
     _Guarded_by_(m_lock) std::map<std::uint64_t, NetworkAdapter> m_networkAdapters;
     _Guarded_by_(m_lock) std::map<std::uint64_t, PortBinding> m_portBindings;
     _Guarded_by_(m_lock) std::uint64_t m_nextDeviceId = 1;
     _Guarded_by_(m_lock) std::uint64_t m_nextShareId = 1;
     _Guarded_by_(m_lock) std::uint64_t m_nextPortBindingId = 1;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, VmHostSocket> m_hostSockets;
+    _Guarded_by_(m_lock) std::uint64_t m_nextHostSocketId = 1;
+    // Serialize additions, including waiting for guest enumeration, so /dev/pmemN follows add order.
+    wil::srwlock m_persistentMemoryLock;
+    _Guarded_by_(m_persistentMemoryLock) std::uint32_t m_nextPersistentMemoryIndex = 0;
     UniqueVm m_vm;
     wil::unique_handle m_process;
     wil::unique_handle m_job;

@@ -289,6 +289,7 @@ interface ILxssUserSession : IUnknown
         [out, system_handle(sh_socket)] HANDLE* StandardErr,
         [out, system_handle(sh_socket)] HANDLE* CommunicationChannel,
         [out, system_handle(sh_socket)] HANDLE* InteropSocket,
+        [out] LPWSTR* GuestConnectionHandle,
         [in, out] LXSS_ERROR_INFO* Error);
 
     HRESULT SetVersion(

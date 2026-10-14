@@ -158,7 +158,14 @@ private:
         _In_ bool Admin, _In_ PCWSTR Path, _In_ PCWSTR Options, _In_opt_ HANDLE UserToken = nullptr);
 
     _Requires_lock_held_(m_lock)
-    ULONG AttachDiskLockHeld(_In_ PCWSTR Disk, _In_ DiskType Type, _In_ MountFlags Flags, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_ HANDLE UserToken);
+    VmDiskAttachment AttachDiskLockHeld(
+        _In_ PCWSTR Disk,
+        _In_ DiskType Type,
+        _In_ MountFlags Flags,
+        _In_ std::optional<ULONG> Lun,
+        _In_ bool IsUserDisk,
+        _In_ HANDLE UserToken,
+        _In_ bool BootCritical = false);
 
     void CollectCrashDumps(VmGuestListener Listener) const;
 
@@ -177,13 +184,17 @@ private:
     _Requires_lock_held_(m_guestDeviceLock)
     std::optional<VmFileSystemShare> FindVirtioFsShare(_In_ PCWSTR Tag, _In_ std::optional<bool> Admin = {}) const;
 
-    VmCreateRequest GenerateBackendRequest(const GUID& VmId);
+    VmCreateRequest GenerateBackendRequest(const GUID& VmId, BackendKind Backend);
+
+    PSID GetConsolePipeClientSid(BackendKind Backend);
 
     static std::pair<int, LX_MINI_MOUNT_STEP> GetMountResult(_In_ wsl::shared::SocketChannel& Channel);
 
     void Initialize(const GUID& VmId, const wil::shared_handle& UserToken);
 
     void InitializeGuest();
+
+    void ValidateBackendConfiguration(BackendKind Backend) const;
 
     _Requires_lock_held_(m_guestDeviceLock)
     bool InitializeDrvFsLockHeld(_In_ HANDLE UserToken);
@@ -211,6 +222,8 @@ private:
 
     void VirtioFsWorker(VmGuestListener Listener);
 
+    void WslgRelayWorker(wil::unique_socket Listener);
+
     std::vector<char> ProcessVirtioFsRequest(_In_ gsl::span<gsl::byte> Request);
 
     static std::string s_GetMountTargetName(_In_ PCWSTR Disk, _In_opt_ PCWSTR Name, _In_ int PartitionIndex);
@@ -228,6 +241,8 @@ private:
     wil::srwlock m_exitCallbackLock;
     _Guarded_by_(m_exitCallbackLock) std::optional<VmTerminationInformation> m_terminationInformation;
     std::wstring m_machineId;
+    // VM ID reported to the guest; WSLGd passes it to MSRDC as the AF_HYPERV address of the VM.
+    std::wstring m_guestVmId;
     GUID m_runtimeId;
     wsl::core::Config m_vmConfig;
     InitializeDrvFsCallback m_initializeDrvFs;
@@ -273,6 +288,7 @@ private:
     std::thread m_distroExitThread;
     std::thread m_virtioFsThread;
     std::thread m_crashDumpCollectionThread;
+    std::thread m_wslgRelayThread;
 
     std::unique_ptr<wsl::core::INetworkingEngine> m_networkingEngine;
 
