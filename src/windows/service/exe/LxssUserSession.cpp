@@ -602,6 +602,9 @@ LxssUserSessionImpl::LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId
     m_vmTerminationTimer.reset(CreateThreadpoolTimer(s_VmIdleTerminate, this, nullptr));
     THROW_IF_NULL_ALLOC(m_vmTerminationTimer);
 
+    m_vmExitWork.reset(CreateThreadpoolWork(s_ProcessVmExit, this, nullptr));
+    THROW_LAST_ERROR_IF(!m_vmExitWork);
+
     try
     {
         // Register for timezone update notifications.
@@ -679,6 +682,17 @@ LxssUserSessionImpl::LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId
 
 LxssUserSessionImpl::~LxssUserSessionImpl()
 {
+    // Stop any remaining notification source before continuing.
+    {
+        std::lock_guard lock(m_instanceLock);
+        if (m_utilityVm)
+        {
+            _VmTerminate();
+        }
+    }
+
+    m_vmExitWork.reset();
+
     if (m_timezoneThread.joinable())
     {
         LOG_IF_WIN32_BOOL_FALSE(PostThreadMessage(GetThreadId(m_timezoneThread.native_handle()), WM_QUIT, 0, 0));
@@ -2258,6 +2272,11 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, ShutdownBeh
                 locked = true;
             }
 
+            WI_ASSERT(!PreventNewInstances || !m_disableNewInstanceCreation);
+
+            // Once permanent shutdown starts, no caller may recreate the VM or its notification sources.
+            m_disableNewInstanceCreation |= PreventNewInstances;
+
             // Stop each instance with the lock held.
             while (!m_runningInstances.empty())
             {
@@ -2277,15 +2296,12 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, ShutdownBeh
             // has timed out (and so the disks states would have been written in the registry)
             const auto key = wsl::windows::common::registry::OpenOrCreateLxssDiskMountsKey(&m_userSid.Sid);
             wsl::windows::common::registry::ClearSubkeys(key.get());
+        }
 
-            WI_ASSERT(!PreventNewInstances || !m_disableNewInstanceCreation);
-
-            // This is used when the session is being deleted.
-            // This is in place to prevent a CreateInstance() call from succeeding
-            // after the session is shut down since this would mean that the destructor,
-            // which could run on that thread (if the session already dropped its LxssUserSessionImpl reference)
-            // would have to do all the cleanup work.
-            m_disableNewInstanceCreation = PreventNewInstances;
+        if (PreventNewInstances)
+        {
+            // Wait for all pending callbacks to complete.
+            WaitForThreadpoolWorkCallbacks(m_vmExitWork.get(), TRUE);
         }
 
         auto lock = m_terminatedInstanceLock.lock_exclusive();
@@ -2956,6 +2972,7 @@ _Requires_exclusive_lock_held_(m_instanceLock)
 void LxssUserSessionImpl::_CreateVm()
 {
     ExecutionContext context(Context::CreateVm);
+    THROW_HR_IF(RPC_E_DISCONNECTED, m_disableNewInstanceCreation);
 
     if (!m_utilityVm)
     {
@@ -3045,10 +3062,6 @@ void LxssUserSessionImpl::_CreateVm()
             auto unlock = wil::scope_exit([&]() { m_instanceLock.unlock(); });
             TerminateByClientIdLockHeld(Pid);
         };
-
-        // N.B. The callbacks must be registered outside of the above try/catch.
-        // Otherwise if an exception is thrown, calling _VmTerminate() will trigger the 's_VmTerminated' termination callback
-        // Which can deadlock since this thread holds the instance lock and HCS can block until the VM termination callback returns before deleting the VM.
 
         m_utilityVm->RegisterCallbacks(std::bind(callback, _1), std::bind(s_VmTerminated, this, _1));
     }
@@ -4342,16 +4355,26 @@ VOID CALLBACK LxssUserSessionImpl::s_VmIdleTerminate(_Inout_ PTP_CALLBACK_INSTAN
 }
 
 void LxssUserSessionImpl::s_VmTerminated(_Inout_ LxssUserSessionImpl* UserSession, _In_ const GUID& VmId)
+{
+    // s_ProcessVmExit needs m_instanceLock, which cannot be held while in an HCS callback, since that could deadlock
+    // with WslCoreVm's destructor, which wait for the HCS callback to complete while releasing the VM handle.
+    UserSession->m_exitedVmId.store(VmId);
+    SubmitThreadpoolWork(UserSession->m_vmExitWork.get());
+}
+
+VOID CALLBACK LxssUserSessionImpl::s_ProcessVmExit(_Inout_ PTP_CALLBACK_INSTANCE, _Inout_opt_ PVOID Context, _Inout_ PTP_WORK)
 try
 {
-    UNREFERENCED_PARAMETER(VmId);
+    const auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
+    const auto session = static_cast<LxssUserSessionImpl*>(Context);
 
-    if (UserSession->m_suppressVmTerminationCallback.load())
+    std::lock_guard lock(session->m_instanceLock);
+    const auto vmId = session->m_exitedVmId.exchange(GUID_NULL);
+    if (session->m_suppressVmTerminationCallback.load() || !session->m_utilityVm || !IsEqualGUID(session->m_utilityVm->GetRuntimeId(), vmId))
     {
         return;
     }
 
-    UserSession->TerminateByClientId(LXSS_CLIENT_ID_WILDCARD);
-    return;
+    session->TerminateByClientIdLockHeld(LXSS_CLIENT_ID_WILDCARD);
 }
 CATCH_LOG()
