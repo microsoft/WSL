@@ -22,7 +22,9 @@
 .PARAMETER Fast
     Handy flag to skip package and distro installation to make tests run faster during development. 
 .PARAMETER TeArgs
-    Additional arguments for TE.exe.
+    Additional arguments for TE.exe. For the Windows 10 nested-virtualization regression test,
+    pass /p:NestedVirtualizationSupported=true only on a Win10 x64 host whose nightly configuration
+    has independently established the required hardware/Hyper-V prerequisite.
 #>
 
 [cmdletbinding(PositionalBinding = $false)]

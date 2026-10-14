@@ -189,6 +189,19 @@ class PolicyTest
             L"wsl: The .wslconfig setting 'wsl2.nestedVirtualization' is disabled by the computer policy.\r\n");
     }
 
+    static bool IsNestedVirtualizationSupportedTestHost()
+    {
+        WEX::Common::String supported;
+        WEX::TestExecution::RuntimeParameters::TryGetValue(L"NestedVirtualizationSupported", supported);
+        if (supported.IsEmpty())
+        {
+            return false;
+        }
+
+        const auto value = static_cast<LPCWSTR>(supported);
+        return ::_wcsicmp(value, L"1") == 0 || ::_wcsicmp(value, L"true") == 0;
+    }
+
     WSL2_TEST_METHOD(NestedVirtualizationWindows10)
     {
         SKIP_TEST_ARM64();
@@ -198,10 +211,18 @@ class PolicyTest
             return;
         }
 
+        // The Win10 nightly job must set this parameter only on hosts with the
+        // independently established hardware/Hyper-V prerequisite. Do not use
+        // /dev/kvm here: that is the behavior this regression test validates.
+        if (!IsNestedVirtualizationSupportedTestHost())
+        {
+            LogSkipped("Nested virtualization host prerequisite was not declared");
+            return;
+        }
+
         auto validate = [](DWORD policyValue) {
             const auto expectedResult = policyValue == 0 ? 1u : 0u;
-            VERIFY_ARE_EQUAL(
-                LxsstuLaunchWsl(L"-- sh -c \"test -c /dev/kvm && grep -Eq 'vmx|svm' /proc/cpuinfo\""), expectedResult);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"-- sh -c \"test -c /dev/kvm && grep -Eq 'vmx|svm' /proc/cpuinfo\""), expectedResult);
         };
 
         ValidatePolicy(
