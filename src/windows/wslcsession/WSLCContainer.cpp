@@ -1842,7 +1842,9 @@ void WSLCContainerImpl::AcquireArchiveVolumeMounts()
 {
     auto lock = m_lock.lock_exclusive();
 
-    if (!m_runtimeResourcesHeld && m_archiveMountUsers == 0 && m_state != WslcContainerStateDeleted)
+    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_DELETED, Localization::MessageWslcContainerDeleted(m_id), m_state == WslcContainerStateDeleted);
+
+    if (!m_runtimeResourcesHeld && m_archiveMountUsers == 0)
     {
         MountVolumes(m_mountedVolumes, m_runtime.Vm()).release();
     }

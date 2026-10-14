@@ -770,7 +770,13 @@ class WSLCE2EContainerCpTests
         std::filesystem::create_directories(hostDir);
         auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(hostDir); });
 
-        WriteSingleFileTar(TarPath, "/usr/lib/ssl/aspire/cert.pem", "WSLC absolute path test");
+        RunWslcAndRedirectToFile(
+            std::format(
+                L"container run --rm {} sh -c \"mkdir -p /usr/lib/ssl/aspire && printf '%s' 'WSLC absolute path test' > "
+                L"/usr/lib/ssl/aspire/cert.pem && tar --format=ustar -cPf - /usr/lib/ssl/aspire/cert.pem\"",
+                DebianImage.NameAndTag()),
+            TarPath)
+            .Verify({.Stderr = L"", .ExitCode = 0});
 
         RunWslc(std::format(
                     L"container create --name {} --mount \"type=bind,source={},target=/data\" {} sleep infinity",
@@ -910,48 +916,6 @@ private:
         wsl::windows::common::SubProcess process(nullptr, CommandLine.c_str());
         const auto exitCode = process.Run();
         THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
-    }
-
-    // Writes a ustar archive holding one regular file. Used for entry names tar.exe cannot produce, such as absolute paths.
-    static void WriteSingleFileTar(const std::filesystem::path& Path, std::string_view Name, std::string_view Content)
-    {
-        constexpr size_t blockSize = 512;
-        VERIFY_IS_TRUE(Name.size() < 100);
-
-        std::string header(blockSize, '\0');
-        auto writeField = [&](size_t Offset, std::string_view Value) { header.replace(Offset, Value.size(), Value); };
-        auto writeOctal = [&](size_t Offset, size_t Size, size_t Value) {
-            writeField(Offset, std::format("{:0{}o}", Value, Size - 1));
-        };
-
-        writeField(0, Name);
-        writeOctal(100, 8, 0644);
-        writeOctal(108, 8, 0);
-        writeOctal(116, 8, 0);
-        writeOctal(124, 12, Content.size());
-        writeOctal(136, 12, 0);
-        header[156] = '0';
-        writeField(257, "ustar");
-        writeField(263, "00");
-
-        // The checksum covers the whole header with its own field read as spaces.
-        writeField(148, "        ");
-        unsigned int sum = 0;
-        for (const auto c : header)
-        {
-            sum += static_cast<unsigned char>(c);
-        }
-
-        writeField(148, std::format("{:06o}", sum));
-        header[154] = '\0';
-
-        const auto paddedSize = ((Content.size() + blockSize - 1) / blockSize) * blockSize;
-        std::string body(Content);
-        body.resize(paddedSize + (2 * blockSize), '\0');
-
-        std::ofstream file(Path, std::ios::binary);
-        VERIFY_IS_TRUE(file.is_open());
-        file << header << body;
     }
 
     // Creates a tar file containing a single text file using tar.exe.
