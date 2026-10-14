@@ -396,10 +396,7 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
             diskAttachment.Id.Value,
             AttachedDisk{
                 diskAttachment,
-                {diskFlags,
-                 bootDisk.Disk.DeviceTimeout,
-                 bootDisk.GrantHostAccess ? Request.Identity.UserToken : wil::shared_handle{},
-                 std::move(backingFile)}});
+                {diskFlags, bootDisk.Disk.DeviceTimeout, bootDisk.GrantHostAccess ? Request.Identity.UserToken : wil::shared_handle{}, std::move(backingFile)}});
         revokeDiskAccess.release();
 
         ++configuration.NextDiskId;
@@ -787,9 +784,7 @@ void HcsVirtualMachineBackend::CleanupAttachedDisks(std::map<std::uint64_t, Atta
             try
             {
                 schema::RevokeVmAccess(
-                    m_vmIdString.c_str(),
-                    disk.Path.c_str(),
-                    disk.PassThrough ? nullptr : disk.Backend.UserToken.get());
+                    m_vmIdString.c_str(), disk.Path.c_str(), disk.PassThrough ? nullptr : disk.Backend.UserToken.get());
             }
             CATCH_LOG()
         }
@@ -923,9 +918,7 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
         {m_configuration.Description.Identity, m_nextDiskId}, {0, lun}, Request.ReadOnly, Request.UserDisk, path, passThrough};
     m_attachedDisks.emplace(
         attachment.Id.Value,
-        AttachedDisk{
-            attachment,
-            {diskFlags, Request.DeviceTimeout, passThrough ? wil::shared_handle{} : userToken, std::move(backingFile)}});
+        AttachedDisk{attachment, {diskFlags, Request.DeviceTimeout, passThrough ? wil::shared_handle{} : userToken, std::move(backingFile)}});
     ++m_nextDiskId;
     cleanup.release();
 
