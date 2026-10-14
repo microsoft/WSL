@@ -164,8 +164,7 @@ public:
         _Out_ ULONGLONG* SpaceReclaimed) override;
 
     // Container management.
-    IFACEMETHOD(CreateContainer)(
-        _In_ const WSLCContainerOptions* Options, _In_opt_ IDiagnosticCallback* DiagnosticCallback, _Out_ IWSLCContainer** Container) override;
+    IFACEMETHOD(CreateContainer)(_In_ const WSLCContainerOptions* Options, _In_opt_ IDiagnosticCallback* DiagnosticCallback, _Out_ IWSLCContainer** Container) override;
     IFACEMETHOD(OpenContainer)(_In_ LPCSTR Id, _In_ IWSLCContainer** Container) override;
     IFACEMETHOD(BeginContainerOperation)(_Outptr_ IUnknown** Operation) override;
     IFACEMETHOD(ListContainers)(
@@ -198,7 +197,7 @@ public:
     IFACEMETHOD(PruneVolumes)
     (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters,
      _In_ ULONG FiltersCount,
-    _In_opt_ IDiagnosticCallback* DiagnosticCallback,
+     _In_opt_ IDiagnosticCallback* DiagnosticCallback,
      _Out_ WSLCVolumeName** Volumes,
      _Out_ ULONG* VolumesCount,
      _Out_ ULONGLONG* SpaceReclaimed) override;
