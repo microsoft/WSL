@@ -283,8 +283,7 @@ class UnitTests
             VERIFY_ARE_EQUAL(out, std::format(L"/run/user/{}\n", TestUid));
         }
 
-        // Validate user sessions state with gui apps enabled. OpenVMM doesn't support gui apps yet.
-        if (!LxsstuOpenVmmMode())
+        // Validate user sessions state with gui apps enabled.
         {
             config.Update(LxssGenerateTestConfig({.guiApplications = true}));
 
@@ -995,12 +994,6 @@ class UnitTests
 
             for (const auto enabled : {true, false})
             {
-                // OpenVMM doesn't support gui apps yet.
-                if (enabled && LxsstuOpenVmmMode())
-                {
-                    continue;
-                }
-
                 config.Update(LxssGenerateTestConfig({.guiApplications = enabled}));
 
 #ifdef WSL_DEV_INSTALL_PATH
@@ -2524,7 +2517,7 @@ Usage:
         }
     }
 
-    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(GuiApplications)
+    WSL2_TEST_METHOD(GuiApplications)
     {
         auto validateEnvironment = [&](bool systemdEnabled) {
             WslConfigChange configChange(LxssGenerateTestConfig({.guiApplications = true}));
@@ -2596,7 +2589,7 @@ Usage:
         validateEnvironment(true);
     }
 
-    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(GuiApplicationsSystemd)
+    WSL2_TEST_METHOD(GuiApplicationsSystemd)
     {
         DistroFileChange wslConf(L"/etc/wsl.conf", false);
         wslConf.SetContent(L"[boot]\nsystemd=true\n");

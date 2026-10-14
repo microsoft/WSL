@@ -222,6 +222,8 @@ private:
 
     void VirtioFsWorker(VmGuestListener Listener);
 
+    void WslgRelayWorker(wil::unique_socket Listener);
+
     std::vector<char> ProcessVirtioFsRequest(_In_ gsl::span<gsl::byte> Request);
 
     static std::string s_GetMountTargetName(_In_ PCWSTR Disk, _In_opt_ PCWSTR Name, _In_ int PartitionIndex);
@@ -239,6 +241,8 @@ private:
     wil::srwlock m_exitCallbackLock;
     _Guarded_by_(m_exitCallbackLock) std::optional<VmTerminationInformation> m_terminationInformation;
     std::wstring m_machineId;
+    // VM ID reported to the guest; WSLGd passes it to MSRDC as the AF_HYPERV address of the VM.
+    std::wstring m_guestVmId;
     GUID m_runtimeId;
     wsl::core::Config m_vmConfig;
     InitializeDrvFsCallback m_initializeDrvFs;
@@ -284,6 +288,7 @@ private:
     std::thread m_distroExitThread;
     std::thread m_virtioFsThread;
     std::thread m_crashDumpCollectionThread;
+    std::thread m_wslgRelayThread;
 
     std::unique_ptr<wsl::core::INetworkingEngine> m_networkingEngine;
 

@@ -48,6 +48,9 @@ using namespace std::string_literals;
 static constexpr size_t c_bootEntropy = 0x1000;
 static constexpr auto c_localDevicesKey = L"SOFTWARE\\Microsoft\\Terminal Server Client\\LocalDevices";
 
+// WSLGd listens for RDP on the first free reserved vsock port, which is port 1.
+static constexpr unsigned long c_wslgRdpPort = 1;
+
 #define LXSS_ENABLE_GUI_APPS() (m_vmConfig.EnableGuiApps && (m_systemDistroDeviceId != ULONG_MAX))
 
 using namespace wsl::windows::common;
@@ -187,6 +190,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
     // Generate a machine ID string based on the VM ID. This is used for some HCS APIs.
     m_machineId = wsl::shared::string::GuidToString<wchar_t>(VmId, wsl::shared::string::GuidToStringFlags::Uppercase);
+    m_guestVmId = m_machineId;
 
     // Set the install path of the package.
     m_installPath = wsl::windows::common::wslutil::GetBasePath();
@@ -913,6 +917,12 @@ WslCoreVm::~WslCoreVm() noexcept
         m_crashDumpCollectionThread.join();
     }
 
+    // N.B. The relay exits once the VM has exited, because that closes its guest connection.
+    if (m_wslgRelayThread.joinable())
+    {
+        m_wslgRelayThread.join();
+    }
+
     if (m_pluginPlan9Server)
     {
         LOG_IF_FAILED(m_pluginPlan9Server->Teardown());
@@ -953,7 +963,7 @@ WslCoreVm::~WslCoreVm() noexcept
             const auto runAsUser = wil::impersonate_token(m_userToken.get());
             const auto userKey = wsl::windows::common::registry::OpenCurrentUser();
             const auto key = wsl::windows::common::registry::CreateKey(userKey.get(), c_localDevicesKey, KEY_SET_VALUE);
-            THROW_IF_WIN32_ERROR(::RegDeleteKeyValueW(key.get(), nullptr, m_machineId.c_str()));
+            THROW_IF_WIN32_ERROR(::RegDeleteKeyValueW(key.get(), nullptr, m_guestVmId.c_str()));
         }
         CATCH_LOG()
     }
@@ -1279,7 +1289,7 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
     message->Flags = flags;
     message.WriteString(message->FsTypeOffset, "ext4");
     message.WriteString(message->MountOptionsOffset, "discard,errors=remount-ro,data=ordered");
-    message.WriteString(message->VmIdOffset, m_machineId);
+    message.WriteString(message->VmIdOffset, m_guestVmId);
     message.WriteString(message->DistributionNameOffset, Configuration.Name);
     message.WriteString(message->SharedMemoryRootOffset, sharedMemoryRoot);
     message.WriteString(message->InstallPathOffset, installPath);
@@ -1468,7 +1478,6 @@ void WslCoreVm::ValidateBackendConfiguration(BackendKind Backend) const
     constexpr auto notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
     THROW_HR_IF_MSG(notSupported, wsl::shared::Arm64, "OpenVMM is supported only on x64");
     THROW_HR_IF_MSG(notSupported, m_vmConfig.EnableGpuSupport, "OpenVMM does not support GPU assignment");
-    THROW_HR_IF_MSG(notSupported, m_vmConfig.EnableGuiApps, "OpenVMM does not support GUI applications");
     THROW_HR_IF_MSG(notSupported, m_vmConfig.EnableVirtio9p, "OpenVMM does not support virtio-9p file sharing");
     THROW_HR_IF_MSG(
         notSupported,
@@ -1724,13 +1733,27 @@ void WslCoreVm::InitializeGuest()
             CATCH_LOG()
         }
 
+        // MSRDC reaches WSLg only over AF_HYPERV, which can't address an OpenVMM guest. Relay MSRDC's loopback
+        // connection to the guest instead, and report the loopback VM ID to the guest so that WSLGd targets it.
+        // N.B. The loopback listener has no access check, so any local process can connect to it.
+        if (m_backend->GetDescription().Backend == BackendKind::OpenVmm)
+        {
+            try
+            {
+                auto listener = wsl::windows::common::hvsocket::Listen(HV_GUID_LOOPBACK, c_wslgRdpPort);
+                m_wslgRelayThread = std::thread(&WslCoreVm::WslgRelayWorker, this, std::move(listener));
+                m_guestVmId = wsl::shared::string::GuidToString<wchar_t>(HV_GUID_LOOPBACK, wsl::shared::string::GuidToStringFlags::Uppercase);
+            }
+            CATCH_LOG()
+        }
+
         try
         {
             auto runAsUser = wil::impersonate_token(m_userToken.get());
             const auto userKey = wsl::windows::common::registry::OpenCurrentUser();
             const auto devicesKey = wsl::windows::common::registry::CreateKey(userKey.get(), c_localDevicesKey, KEY_SET_VALUE);
             constexpr DWORD flags = 0xC4; // Allow clipboard, microphone, and printer access.
-            wsl::windows::common::registry::WriteDword(devicesKey.get(), nullptr, m_machineId.c_str(), flags);
+            wsl::windows::common::registry::WriteDword(devicesKey.get(), nullptr, m_guestVmId.c_str(), flags);
             m_localDevicesKeyCreated = true;
         }
         CATCH_LOG()
@@ -2484,6 +2507,30 @@ void WslCoreVm::VerifyPlan9Servers()
         }
     }
 }
+
+void WslCoreVm::WslgRelayWorker(wil::unique_socket Listener)
+try
+{
+    wsl::windows::common::wslutil::SetThreadDescription(L"WslgRelay");
+
+    // N.B. One connection is relayed at a time. If MSRDC exits, WSLGd relaunches it and it reconnects.
+    for (;;)
+    {
+        auto client = wsl::windows::common::socket::CancellableAccept(Listener.get(), INFINITE, m_terminatingEvent.get());
+        if (!client)
+        {
+            break;
+        }
+
+        try
+        {
+            auto guest = m_backend->ConnectGuest(GuestServicePort{c_wslgRdpPort}, m_terminatingEvent.get());
+            wsl::windows::common::relay::SocketRelay(client->get(), guest.get());
+        }
+        CATCH_LOG()
+    }
+}
+CATCH_LOG()
 
 void WslCoreVm::VirtioFsWorker(VmGuestListener Listener)
 try

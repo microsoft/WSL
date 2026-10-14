@@ -15,6 +15,7 @@ Abstract:
 #pragma once
 
 #include <thread>
+#include "GuestDeviceManager.h"
 #include "IVirtualMachineBackend.h"
 
 struct WslOpenVmmVm;
@@ -145,6 +146,12 @@ private:
         std::chrono::milliseconds DeviceTimeout{wsl::windows::common::disk::c_defaultDiskTimeoutMs};
     };
 
+    struct SharedMemoryDevice
+    {
+        VmSharedMemoryDevice Device;
+        DirectoryObjectLifetime Directory;
+    };
+
     VmDescription m_description{};
     _Guarded_by_(m_lock) std::map<std::uint64_t, VmDiskAttachment> m_attachedDisks;
     _Guarded_by_(m_lock) std::map<std::uint64_t, GUID> m_diskInstanceIds;
@@ -153,6 +160,7 @@ private:
     _Guarded_by_(m_lock) std::map<std::uint64_t, VmPersistentMemoryDevice> m_persistentMemoryDevices;
     _Guarded_by_(m_lock) std::map<std::uint64_t, FileSystemDevice> m_fileSystemDevices;
     _Guarded_by_(m_lock) std::map<std::uint64_t, VmFileSystemShare> m_fileSystemShares;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, SharedMemoryDevice> m_sharedMemoryDevices;
     _Guarded_by_(m_lock) std::map<std::uint64_t, NetworkAdapter> m_networkAdapters;
     _Guarded_by_(m_lock) std::map<std::uint64_t, PortBinding> m_portBindings;
     _Guarded_by_(m_lock) std::uint64_t m_nextDeviceId = 1;

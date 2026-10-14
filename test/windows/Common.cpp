@@ -1538,12 +1538,11 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         return value;
     };
 
-    // Run with /p:OpenVmm=1 to exercise the OpenVMM backend instead of HCS. OpenVMM doesn't support GUI apps, GPU,
+    // Run with /p:OpenVmm=1 to exercise the OpenVMM backend instead of HCS. OpenVMM doesn't support GPU,
     // nested virtualization, virtio-9p/Plan9 or aggregate virtio-fs shares, so defaults are adjusted unless a test overrides them.
     const bool openVmm = LxsstuOpenVmmMode();
     if (openVmm)
     {
-        Default.guiApplications = Default.guiApplications.value_or(false);
         Default.drvFsMode = Default.drvFsMode.value_or(DrvFsMode::VirtioFs);
         Default.virtioFsAggregateShares = Default.virtioFsAggregateShares.value_or(false);
         Default.nestedVirtualization = Default.nestedVirtualization.value_or(false);

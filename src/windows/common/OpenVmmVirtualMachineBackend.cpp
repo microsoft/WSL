@@ -1291,7 +1291,8 @@ VmFileSystemShare OpenVmmVirtualMachineBackend::AddFileSystemShare(VmDeviceId De
         hostPath.c_str(),
         Request.ReadOnly,
         mountOptions.c_str(),
-        static_cast<UINT64>(reinterpret_cast<ULONG_PTR>(remoteToken)));
+        static_cast<UINT64>(reinterpret_cast<ULONG_PTR>(remoteToken)),
+        FALSE);
     WSL_LOG(
         "OpenVmmAddFileSystemShareEnd",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
@@ -1354,10 +1355,48 @@ void OpenVmmVirtualMachineBackend::RemoveFileSystemShare(VmShareId Share)
     m_fileSystemShares.erase(share);
 }
 
-VmSharedMemoryDevice OpenVmmVirtualMachineBackend::AddSharedMemory(const VmSharedMemoryRequest&)
+VmSharedMemoryDevice OpenVmmVirtualMachineBackend::AddSharedMemory(const VmSharedMemoryRequest& Request)
 {
     const auto context = CreateExecutionContext(Context::OpenVMM);
-    THROW_HR_MSG(c_notSupported, "OpenVMM does not support section-backed shared memory devices");
+    THROW_HR_IF(E_INVALIDARG, Request.Tag.empty() || Request.Path.empty() || Request.SizeBytes == 0);
+    // OpenVMM sizes the shared memory window of a section-backed virtio-fs device itself.
+    THROW_HR_IF_MSG(
+        c_notSupported,
+        Request.SizeBytes != 8ull * 1024 * c_mib,
+        "OpenVMM supports only an 8GB shared memory window, requested %llu bytes",
+        Request.SizeBytes);
+    const auto userToken = Request.UserToken.value_or(m_description.Identity.UserToken);
+    THROW_HR_IF_MSG(E_UNEXPECTED, !userToken, "UserToken not set for the shared memory request");
+
+    // OpenVMM runs as the user, so it can open a directory that is created as the user.
+    const auto vmId = wsl::shared::string::GuidToString<wchar_t>(m_description.Identity.VmId, wsl::shared::string::GuidToStringFlags::None);
+    auto directory = CreateSectionObjectRoot(vmId, Request.Path, userToken.get());
+
+    auto lock = m_lock.lock_exclusive();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
+    THROW_HR_IF(E_BOUNDS, m_nextDeviceId == UINT64_MAX);
+    for (const auto& entry : m_sharedMemoryDevices)
+    {
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), wsl::shared::string::IsEqual(entry.second.Device.Tag, Request.Tag, false));
+    }
+
+    VmSharedMemoryDevice device{};
+    device.Id = {m_description.Identity, m_nextDeviceId};
+    device.Tag = Request.Tag;
+    device.ObjectPath = std::format(L"WSL\\{}\\{}", vmId, Request.Path);
+    device.SizeBytes = Request.SizeBytes;
+    const auto result = WslOpenVmmVmAddShare(m_vm.get(), Request.Tag.c_str(), directory.Path.c_str(), FALSE, L"", 0, TRUE);
+    WSL_LOG(
+        "OpenVmmAddSharedMemory",
+        TraceLoggingValue(m_description.Identity.VmId, "vmId"),
+        TraceLoggingValue(device.Id.Value, "deviceId"),
+        TraceLoggingValue(Request.Tag.c_str(), "tag"),
+        TraceLoggingValue(directory.Path.c_str(), "path"),
+        TraceLoggingHResult(result, "result"));
+    THROW_IF_FAILED(result);
+    m_sharedMemoryDevices.emplace(device.Id.Value, SharedMemoryDevice{device, std::move(directory)});
+    ++m_nextDeviceId;
+    return device;
 }
 
 void OpenVmmVirtualMachineBackend::ConfigureGuestDma(const VmGuestDmaRequest&)
@@ -1372,6 +1411,13 @@ void OpenVmmVirtualMachineBackend::RemoveDevice(VmDeviceId Device)
     validation::ValidateResourceId(Device, m_description.Identity);
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
+    if (const auto sharedMemory = m_sharedMemoryDevices.find(Device.Value); sharedMemory != m_sharedMemoryDevices.end())
+    {
+        THROW_IF_FAILED(WslOpenVmmVmRemoveShare(m_vm.get(), sharedMemory->second.Device.Tag.c_str()));
+        m_sharedMemoryDevices.erase(sharedMemory);
+        return;
+    }
+
     const auto device = m_fileSystemDevices.find(Device.Value);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), device == m_fileSystemDevices.end());
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_BUSY), device->second.Backend.Share.has_value());
