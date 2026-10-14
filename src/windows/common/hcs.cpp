@@ -55,24 +55,7 @@ void wsl::windows::common::hcs::RemovePlan9Share(_In_ HCS_SYSTEM ComputeSystem, 
 
 void wsl::windows::common::hcs::AddVhd(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR VhdPath, _In_ ULONG Lun, _In_ bool ReadOnly)
 {
-    std::optional<int> sparseVhd;
-    try
-    {
-        const wil::unique_hfile vhd{CreateFileW(
-            VhdPath,
-            FILE_READ_ATTRIBUTES,
-            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-            nullptr,
-            OPEN_EXISTING,
-            FILE_ATTRIBUTE_NORMAL,
-            nullptr)};
-        THROW_LAST_ERROR_IF(!vhd);
-
-        FILE_BASIC_INFO basicInfo{};
-        THROW_IF_WIN32_BOOL_FALSE(GetFileInformationByHandleEx(vhd.get(), FileBasicInfo, &basicInfo, sizeof(basicInfo)));
-        sparseVhd = WI_IsFlagSet(basicInfo.FileAttributes, FILE_ATTRIBUTE_SPARSE_FILE) ? 1 : 0;
-    }
-    CATCH_LOG()
+    const auto sparseVhd = filesystem::GetSparseFileState(VhdPath);
 
     WSL_LOG_TELEMETRY(
         "AttachVhd",

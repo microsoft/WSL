@@ -489,15 +489,7 @@ void WslCoreInstance::Initialize()
                 nullptr)};
             THROW_LAST_ERROR_IF(!vhd);
 
-            FILE_BASIC_INFO basicInfo{};
-            if (GetFileInformationByHandleEx(vhd.get(), FileBasicInfo, &basicInfo, sizeof(basicInfo)))
-            {
-                sparseVhd = WI_IsFlagSet(basicInfo.FileAttributes, FILE_ATTRIBUTE_SPARSE_FILE) ? 1 : 0;
-            }
-            else
-            {
-                LOG_LAST_ERROR();
-            }
+            sparseVhd = wsl::windows::common::filesystem::GetSparseFileState(vhd.get());
 
             FILE_STANDARD_INFO standardInfo{};
             THROW_IF_WIN32_BOOL_FALSE(GetFileInformationByHandleEx(vhd.get(), FileStandardInfo, &standardInfo, sizeof(standardInfo)));

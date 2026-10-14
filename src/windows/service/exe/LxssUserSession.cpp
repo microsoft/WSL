@@ -2627,13 +2627,26 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
             GUID instanceId;
             THROW_IF_FAILED(CoCreateGuid(&instanceId));
 
+            std::optional<int> sparseVhd;
+            if (version == LXSS_WSL_VERSION_2)
+            {
+                try
+                {
+                    auto runAsUser = wil::impersonate_token(userToken.get());
+                    sparseVhd = wsl::windows::common::filesystem::GetSparseFileState(configuration.VhdFilePath.c_str());
+                }
+                CATCH_LOG()
+            }
+
             // Log telemetry to determine how long instance creation takes.
             WSL_LOG_TELEMETRY(
                 "CreateInstanceBegin",
                 PDT_ProductAndServicePerformance,
                 TraceLoggingValue(configuration.Name.c_str(), "distroName"),
                 TraceLoggingValue(version, "version"),
-                TraceLoggingValue(instanceId, "instanceId"));
+                TraceLoggingValue(instanceId, "instanceId"),
+                TraceLoggingValue(configuration.DistroId, "distroId"),
+                TraceLoggingValue(sparseVhd.value_or(-1), "sparseVhd"));
 
             HRESULT result = E_UNEXPECTED;
             wsl::windows::common::wslutil::StopWatch stopWatch;
@@ -2645,6 +2658,8 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
                     TraceLoggingValue(configuration.Name.c_str(), "distroName"),
                     TraceLoggingValue(version, "version"),
                     TraceLoggingValue(instanceId, "instanceId"),
+                    TraceLoggingValue(configuration.DistroId, "distroId"),
+                    TraceLoggingValue(sparseVhd.value_or(-1), "sparseVhd"),
                     TraceLoggingValue(SUCCEEDED(result), "success"),
                     TraceLoggingValue(result, "error"),
                     TraceLoggingValue(reportedError ? reportedError->Context : 0ULL, "errorContext"),
