@@ -303,6 +303,8 @@ COMMAND_LINE_TEST_CASE(L"container export cont1 --output foo", L"export", true)
 COMMAND_LINE_TEST_CASE(L"container export cont1 -o foo", L"export", true)
 
 // Cp command tests
+COMMAND_LINE_TEST_CASE(L"cp - cont1:/path", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"cp -L cont1:/path somefile", L"cp", true)
 COMMAND_LINE_TEST_CASE(L"container cp - cont1:/path", L"cp", true)
 COMMAND_LINE_TEST_CASE(L"container cp - mycontainer:/usr/local/etc", L"cp", true)
 COMMAND_LINE_TEST_CASE(L"container cp - cont1:/", L"cp", true)
