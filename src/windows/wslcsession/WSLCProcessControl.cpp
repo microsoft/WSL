@@ -207,18 +207,20 @@ void DockerExecProcessControl::OnContainerReleased() noexcept
     }
 }
 
-VMProcessControl::VMProcessControl(WSLCVirtualMachine& VirtualMachine, int Pid, wil::unique_socket&& TtyControl) :
-    m_pid(Pid), m_ttyControlChannel(std::move(TtyControl), "TtyControl", {VirtualMachine.TerminatingEvent()}), m_vm(&VirtualMachine)
+VMProcessControl::VMProcessControl(WSLCVirtualMachine& VirtualMachine, int Pid, wil::unique_socket&& TtyControl, std::weak_ptr<VMProcessRegistry> Registry) :
+    m_pid(Pid),
+    m_ttyControlChannel(std::move(TtyControl), "TtyControl", {VirtualMachine.TerminatingEvent()}),
+    m_vm(&VirtualMachine),
+    m_registry(std::move(Registry))
 {
 }
 
 VMProcessControl::~VMProcessControl()
 {
-    std::lock_guard lock{m_lock};
-
-    if (m_vm != nullptr)
+    if (auto registry = m_registry.lock())
     {
-        m_vm->OnProcessReleased();
+        std::lock_guard lock{registry->Mutex};
+        std::erase_if(registry->Processes, [](const auto& process) { return process.expired(); });
     }
 }
 
