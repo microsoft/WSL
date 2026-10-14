@@ -51,7 +51,7 @@ struct WSLCProcessFd
 class WSLCVirtualMachine;
 
 // This structure is used to keep track of tracked processes.
-// It cannot be stored inside WSLCVirtualMachine because process references can outlive the VM. 
+// It cannot be stored inside WSLCVirtualMachine because process references can outlive the VM.
 struct VMProcessRegistry
 {
     std::mutex Mutex;
