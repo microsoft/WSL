@@ -2524,8 +2524,6 @@ void LxssUserSessionImpl::_ClearTerminatedInstances()
         auto lock = m_terminatedInstanceLock.lock_exclusive();
         terminatedInstances.splice(terminatedInstances.end(), m_terminatedInstances);
     }
-
-    // Instance destruction drains termination callbacks, which may need either session lock.
 }
 
 _Requires_lock_held_(m_instanceLock)
@@ -3715,7 +3713,7 @@ bool LxssUserSessionImpl::_TerminateInstance(_In_ LPCGUID DistroGuid, _In_ ULONG
 {
     std::lock_guard lock(m_instanceLock);
 
-    // A retired instance's callback can finish after another instance of the same distribution starts.
+    // A terminated instance's callback can finish after another instance of the same distribution starts.
     const auto instance = m_runningInstances.find(*DistroGuid);
     if (instance == m_runningInstances.end() || instance->second->GetLifetimeManagerId() != ClientLifetimeId)
     {

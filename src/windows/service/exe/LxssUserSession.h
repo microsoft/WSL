@@ -545,7 +545,7 @@ public:
 
 private:
     /// <summary>
-    /// Detaches retired instances under their list lock and destroys them with neither session lock held.
+    /// Clear the list of terminated instances.
     /// </summary>
     _Requires_lock_not_held_(m_instanceLock)
     _Requires_lock_not_held_(m_terminatedInstanceLock)
