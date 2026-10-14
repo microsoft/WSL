@@ -95,10 +95,10 @@
                 }
             }
         ],
-        "RLCPlus": [
+        "CIQ_RLCPlus": [
             {
-                "Name": "RLCPlus-9",
-                "FriendlyName": "Rocky Linux Plus 9 (CIQ)",
+                "Name": "CIQ_RLCPlus-9",
+                "FriendlyName": "CIQ Rocky Linux Plus 9",
                 "Default": false,
                 "Amd64Url": {
                     "Url": "https://github.com/ctrliq/rlcplus-wsl-images/releases/download/v20260812/RLCPlus-9-WSL-9-20260812.0.x86_64.wsl",
@@ -110,8 +110,8 @@
                 }
             },
             {
-                "Name": "RLCPlus-10",
-                "FriendlyName": "Rocky Linux Plus 10 (CIQ)",
+                "Name": "CIQ_RLCPlus-10",
+                "FriendlyName": "CIQ Rocky Linux Plus 10",
                 "Default": true,
                 "Amd64Url": {
                     "Url": "https://github.com/ctrliq/rlcplus-wsl-images/releases/download/v20260812/RLCPlus-10-WSL-10-20260812.0.x86_64.wsl",
