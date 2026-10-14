@@ -2286,8 +2286,7 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, ShutdownBeh
             m_disableNewInstanceCreation = PreventNewInstances;
         }
 
-        auto lock = m_terminatedInstanceLock.lock_exclusive();
-        m_terminatedInstances.clear();
+        _ClearTerminatedInstances();
     }
     CATCH_LOG()
 
@@ -2516,6 +2515,19 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid)
     return result;
 }
 
+_Requires_lock_not_held_(m_instanceLock)
+_Requires_lock_not_held_(m_terminatedInstanceLock)
+void LxssUserSessionImpl::_ClearTerminatedInstances()
+{
+    std::list<std::shared_ptr<LxssRunningInstance>> terminatedInstances;
+    {
+        auto lock = m_terminatedInstanceLock.lock_exclusive();
+        terminatedInstances.splice(terminatedInstances.end(), m_terminatedInstances);
+    }
+
+    // Instance destruction drains termination callbacks, which may need either session lock.
+}
+
 _Requires_lock_held_(m_instanceLock)
 void LxssUserSessionImpl::_ConversionBegin(_In_ GUID DistroGuid, _In_ LxssDistributionState State)
 {
@@ -2586,12 +2598,7 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
     // Validate flags.
     THROW_HR_IF(E_INVALIDARG, (WI_IsAnyFlagSet(Flags, ~LXSS_CREATE_INSTANCE_FLAGS_ALL)));
 
-    // Clear the list of terminated instances before acquiring the instance
-    // list lock.
-    {
-        auto lock = m_terminatedInstanceLock.lock_exclusive();
-        m_terminatedInstances.clear();
-    }
+    _ClearTerminatedInstances();
 
     wil::unique_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());

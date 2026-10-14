@@ -545,6 +545,13 @@ public:
 
 private:
     /// <summary>
+    /// Detaches retired instances under their list lock and destroys them with neither session lock held.
+    /// </summary>
+    _Requires_lock_not_held_(m_instanceLock)
+    _Requires_lock_not_held_(m_terminatedInstanceLock)
+    void _ClearTerminatedInstances();
+
+    /// <summary>
     /// Adds a distro to the list of converting distros.
     /// </summary>
     _Requires_lock_held_(m_instanceLock)
