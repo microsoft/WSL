@@ -136,7 +136,6 @@ void OpenVmmNatNetworking::FillInitialConfiguration(LX_MINI_INIT_NETWORKING_CONF
     Message.DisableIpv6 = false;
     Message.EnableDhcpClient = false;
     Message.PortTrackerType = LxMiniInitPortTrackerTypeMirrored;
-    Message.EnableLoopbackRouting = false;
 }
 
 void OpenVmmNatNetworking::StartPortTracker(wil::unique_socket&& Socket)
@@ -173,9 +172,10 @@ void OpenVmmNatNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int
         return;
     }
 
-    if (loopback && (!m_enableLocalhostRelay || (ipv4 && addr.Ipv4.sin_addr.s_addr != htonl(INADDR_LOOPBACK))))
+    // Only 127.0.0.1 is relayed. Linux drops inbound packets addressed to ::1 on non-loopback interfaces,
+    // so IPv6 loopback can't be relayed through loopback0.
+    if (loopback && (!m_enableLocalhostRelay || !ipv4 || addr.Ipv4.sin_addr.s_addr != htonl(INADDR_LOOPBACK)))
     {
-        // Only 127.0.0.1 and ::1 are relayed; any other loopback address stays on 'lo'.
         return;
     }
 
@@ -183,19 +183,10 @@ void OpenVmmNatNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int
 
     // Relay host loopback connections through loopback0, which delivers them to the guest's loopback address.
     std::optional<SOCKADDR_INET> hostLoopback;
-    if (m_enableLocalhostRelay)
+    if (m_enableLocalhostRelay && ipv4)
     {
         hostLoopback = addr;
-        if (ipv4)
-        {
-            hostLoopback->Ipv4.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-        }
-        else
-        {
-            hostLoopback->Ipv6.sin6_addr = in6addr_loopback;
-            hostLoopback->Ipv6.sin6_scope_id = 0;
-        }
-
+        hostLoopback->Ipv4.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
         ModifyPort(true, hostLoopback.value(), protocol, allocate);
     }
 

@@ -1418,8 +1418,6 @@ VmPortBinding OpenVmmVirtualMachineBackend::BindPort(VmDeviceId Device, const Vm
         c_notSupported, Request.HostPort == 0, "OpenVMM cannot report the allocated port for a dynamic host port binding");
     THROW_HR_IF(E_INVALIDARG, Request.GuestPort == 0);
     const auto hostAddress = wsl::windows::common::string::IpAddressToWstring(Request.ListenAddress, Request.ListenScopeId);
-    const auto guestAddress =
-        Request.GuestAddress.has_value() ? wsl::windows::common::string::IpAddressToWstring(*Request.GuestAddress) : std::wstring{};
     bool tcp = false;
     switch (Request.Protocol)
     {
@@ -1451,13 +1449,7 @@ VmPortBinding OpenVmmVirtualMachineBackend::BindPort(VmDeviceId Device, const Vm
     WI_ASSERT(inserted);
     auto rollback = wil::scope_exit([this, &entry] { m_portBindings.erase(entry); });
     const auto result = WslOpenVmmVmBindPort(
-        m_vm.get(),
-        adapter->second.Backend.NicId.c_str(),
-        Request.HostPort,
-        Request.GuestPort,
-        tcp,
-        hostAddress.c_str(),
-        guestAddress.c_str());
+        m_vm.get(), adapter->second.Backend.NicId.c_str(), Request.HostPort, Request.GuestPort, tcp, hostAddress.c_str());
     WSL_LOG(
         "OpenVmmBindPortEnd",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),

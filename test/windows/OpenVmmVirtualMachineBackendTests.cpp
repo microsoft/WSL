@@ -294,7 +294,6 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(LxMiniInitNetworkingModeNat, configuration.NetworkingMode);
         VERIFY_IS_FALSE(configuration.DisableIpv6);
         VERIFY_IS_FALSE(configuration.EnableDhcpClient);
-        VERIFY_IS_FALSE(configuration.EnableLoopbackRouting);
         VERIFY_ARE_EQUAL(LxMiniInitPortTrackerTypeMirrored, configuration.PortTrackerType);
     }
 
@@ -662,9 +661,6 @@ class OpenVmmVirtualMachineBackendTests
         std::memcpy(bindingRequest.ListenAddress.bytes, &loopbackAddress, sizeof(loopbackAddress));
         bindingRequest.HostPort = ReserveTcpPort();
         bindingRequest.GuestPort = 80;
-        bindingRequest.GuestAddress.emplace();
-        bindingRequest.GuestAddress->family = IpAddressFamily_V4;
-        std::memcpy(bindingRequest.GuestAddress->bytes, &loopbackAddress, sizeof(loopbackAddress));
         VERIFY_ARE_EQUAL(
             HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->BindPort(fileSystemDevice.Id, bindingRequest); }));
         auto invalidNetwork = network.Id;

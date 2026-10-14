@@ -1340,7 +1340,6 @@ typedef struct _LX_MINI_INIT_NETWORKING_CONFIGURATION
     bool EnableDhcpClient;
     bool DisableIpv6;
     int DhcpTimeout;
-    bool EnableLoopbackRouting;
 } LX_MINI_INIT_NETWORKING_CONFIGURATION, *PLX_MINI_INIT_NETWORKING_CONFIGURATION;
 
 typedef struct _LX_MINI_INIT_CONFIG_MESSAGE

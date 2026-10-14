@@ -2723,6 +2723,7 @@ class NetworkTests
         ValidateLocalhostRelayTraffic(AF_INET);
         if (LxsstuOpenVmmMode())
         {
+            // Linux drops inbound packets addressed to ::1 on non-loopback interfaces, so OpenVMM NAT can't relay IPv6 loopback.
             LogInfo("Skipping IPv6 loopback forwarding on OpenVMM NAT");
         }
         else

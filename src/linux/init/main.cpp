@@ -3414,11 +3414,6 @@ try
             StartDhcpClient(NetworkingConfiguration->DhcpTimeout);
         }
 
-        if (NetworkingConfiguration->EnableLoopbackRouting && WriteToFile("/proc/sys/net/ipv4/conf/eth0/route_localnet", "1\n") < 0)
-        {
-            return -1;
-        }
-
         if (SetEphemeralPortRange(NetworkingConfiguration->EphemeralPortRangeStart, NetworkingConfiguration->EphemeralPortRangeEnd) < 0)
         {
             return -1;
