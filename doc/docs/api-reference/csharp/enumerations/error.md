@@ -18,3 +18,4 @@
 | `VolumeNotAvailable` | `-2147219954` | `0x8004060E` | The requested volume is not available. |
 | `ContainerDeleted` | `-2147219949` | `0x80040613` | The container was deleted. |
 | `CapabilityAdditionsDisabled` | `-2147219948` | `0x80040614` | Capability additions are disabled by policy |
+| `RuntimeUpdateNeeded` | `-2147219947` | `0x80040615` | The requested feature requires a newer WSL runtime. |

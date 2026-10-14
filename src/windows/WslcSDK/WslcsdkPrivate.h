@@ -17,6 +17,7 @@ Abstract:
 #include "WSLCCompat.h"
 #include "IOCallback.h"
 #include <stdint.h>
+#include <variant>
 #include <wil/com.h> // COM helpers
 // #include <wil/resource.h> // handle wrappers
 // #include <wil/result.h>   // error handling
@@ -109,7 +110,18 @@ const WslcContainerOptionsInternal* GetInternalType(const WslcContainerSettings*
 // Use to allocate the actual objects on the heap to keep it alive.
 struct WslcSessionImpl
 {
-    wil::com_ptr<IWSLCCompatSession2> session;
+    std::variant<wil::com_ptr<IWSLCCompatSession2>, wil::com_ptr<IWSLCCompatSession>> session;
+
+    IWSLCCompatSession* GetSession() const
+    {
+        return std::visit([](const auto& activeSession) -> IWSLCCompatSession* { return activeSession.get(); }, session);
+    }
+
+    IWSLCCompatSession2* GetSession2() const
+    {
+        const auto* session2 = std::get_if<wil::com_ptr<IWSLCCompatSession2>>(&session);
+        return session2 != nullptr ? session2->get() : nullptr;
+    }
 };
 
 WslcSessionImpl* GetInternalType(WslcSession handle);

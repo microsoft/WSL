@@ -411,7 +411,8 @@ class WslcSdkTests
         UniqueCrashDumpSubscription subscription;
         VERIFY_SUCCEEDED(WslcRegisterSessionCrashDumpCallback(session.get(), callback, &promise, &subscription, nullptr));
 
-        auto comSession = reinterpret_cast<WslcSessionImpl*>(session.get())->session.query<IWSLCSession>();
+        wil::com_ptr<IWSLCSession> comSession;
+        VERIFY_SUCCEEDED(reinterpret_cast<WslcSessionImpl*>(session.get())->GetSession()->QueryInterface(IID_PPV_ARGS(comSession.put())));
 
         wsl::windows::common::WSLCProcessLauncher launcher{"/bin/sh", {"/bin/sh", "-c", "kill -SEGV $$"}};
         auto process = launcher.Launch(*comSession);
@@ -2477,7 +2478,8 @@ class WslcSdkTests
         const std::string& username = {}, const std::string& password = {}, uint16_t port = 5000)
     {
         // Get the IWSLCSession COM object from the SDK session handle and delegate to the shared helper.
-        auto session = reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session.query<IWSLCSession>();
+        wil::com_ptr<IWSLCSession> session;
+        VERIFY_SUCCEEDED(reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->GetSession()->QueryInterface(IID_PPV_ARGS(session.put())));
         return WSLCE2ETests::StartLocalRegistry(*session, username, password, port);
     }
 

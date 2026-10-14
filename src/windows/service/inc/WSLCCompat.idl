@@ -202,38 +202,7 @@ typedef struct _WSLCCompatContainerOptions
 
 typedef struct _WSLCCompatContainerOptions2
 {
-    LPCSTR Image;
-    [unique] LPCSTR Name;
-    WSLCCompatStringArray Entrypoint;
-    WSLCCompatProcessOptions InitProcessOptions;
-    [unique, size_is(VolumesCount)] WSLCCompatVolume* Volumes;
-    ULONG VolumesCount;
-    [unique, size_is(PortsCount)] WSLCCompatPortMapping* Ports;
-    ULONG PortsCount;
-    [unique, size_is(LabelsCount)] const WSLCCompatLabel* Labels;
-    ULONG LabelsCount;
-    WSLCContainerFlags Flags;
-    WSLCSignal StopSignal;
-    [unique] LPCSTR HostName;
-    [unique] LPCSTR DomainName;
-
-    WSLCCompatStringArray DnsServers;
-    WSLCCompatStringArray DnsSearchDomains;
-    WSLCCompatStringArray DnsOptions;
-
-    LONGLONG ShmSize;
-    WSLCCompatContainerNetwork ContainerNetwork;
-    [unique, size_is(TmpfsCount)] const WSLCCompatTmpfsMount* Tmpfs;
-    ULONG TmpfsCount;
-
-    [unique, size_is(NamedVolumesCount)] WSLCCompatNamedVolume* NamedVolumes;
-    ULONG NamedVolumesCount;
-
-    LONGLONG MemoryBytes;
-    LONGLONG NanoCpus;
-    [unique, size_is(UlimitsCount)] const WSLCCompatUlimit* Ulimits;
-    ULONG UlimitsCount;
-
+    WSLCCompatContainerOptions Base;
     WSLCCompatStringArray CapAdd;
     WSLCCompatStringArray CapDrop;
 } WSLCCompatContainerOptions2;
