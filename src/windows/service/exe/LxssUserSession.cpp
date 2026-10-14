@@ -1473,11 +1473,11 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
         DistributionRegistration registration;
         LXSS_DISTRO_CONFIGURATION configuration;
         std::filesystem::path distributionPath;
+
+        std::unique_lock instanceLock(m_instanceLock);
         auto config = _GetResultantConfig(userToken.get());
 
         {
-            std::lock_guard lock(m_instanceLock);
-
             // Create a registration for the distribution and determine which version should be used.
             ULONG flags = LXSS_DISTRO_FLAGS_DEFAULT;
             WI_SetFlagIf(flags, LXSS_DISTRO_FLAGS_VM_MODE, (Version == LXSS_WSL_VERSION_2));
@@ -1541,6 +1541,8 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
             // Add the distribution to the list of converting distributions.
             _ConversionBegin(configuration.DistroId, LxssDistributionStateInstalling);
         }
+
+        instanceLock.unlock();
 
         // Set up a scope exit member to remove the distribution from the converting list.
         auto installComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { _ConversionComplete(configuration.DistroId); });
@@ -2990,10 +2992,10 @@ void LxssUserSessionImpl::_CreateVm()
         // Create the utility VM and register for callbacks.
         m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId, std::move(initializeDrvFs));
 
-        if (m_httpProxyStateTracker)
+        if (const auto tracker = m_httpProxyStateTracker)
         {
             // this needs to be done after the VM has finished in case we fell back to NAT mode
-            m_httpProxyStateTracker->ConfigureNetworkingMode(m_utilityVm->GetConfig().NetworkingMode);
+            tracker->ConfigureNetworkingMode(m_utilityVm->GetConfig().NetworkingMode);
         }
 
         try
@@ -3310,6 +3312,7 @@ LONG LxssUserSessionImpl::_GetElfExitStatus(_In_ const LXSS_RUN_ELF_CONTEXT& Con
     return exitStatus;
 }
 
+_Requires_exclusive_lock_held_(m_instanceLock)
 wsl::core::Config LxssUserSessionImpl::_GetResultantConfig(_In_ const HANDLE userToken)
 {
     const auto configFilePath = wsl::windows::common::helpers::GetWslConfigPath(userToken);
@@ -3394,6 +3397,7 @@ try
 }
 CATCH_LOG()
 
+_Requires_exclusive_lock_held_(m_instanceLock)
 void LxssUserSessionImpl::_LoadNetworkingSettings(_Inout_ wsl::core::Config& config, _In_ HANDLE userToken)
 try
 {
@@ -4060,11 +4064,15 @@ void LxssUserSessionImpl::_VmTerminate()
     m_vmTerminating.ResetEvent();
 }
 
-void LxssUserSessionImpl::_SetHttpProxyInfo(std::vector<std::string>& environment) const noexcept
+void LxssUserSessionImpl::_SetHttpProxyInfo(std::vector<std::string>& environment) noexcept
 try
 {
-    // Copy guarantees a ref is held on the original instance, or it's null.
-    const auto localTracker = m_httpProxyStateTracker;
+    std::shared_ptr<HttpProxyStateTracker> localTracker;
+    {
+        std::lock_guard lock(m_instanceLock);
+        localTracker = m_httpProxyStateTracker;
+    }
+
     if (localTracker)
     {
         WSL_LOG("_SetHttpProxyInfo: Attempting to set proxy info");
