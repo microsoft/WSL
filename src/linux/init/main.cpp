@@ -63,6 +63,7 @@ Abstract:
 #include "binfmt.h"
 #include "address.h"
 #include "SocketChannel.h"
+#include "WslDistributionConfig.h"
 
 #define BSDTAR_PATH "/usr/bin/bsdtar"
 #define BINFMT_REGISTER_STRING BINFMT_INTEROP_REGISTRATION_STRING_VM(LX_INIT_BINFMT_NAME) "\n"
@@ -85,6 +86,10 @@ Abstract:
 #define KERNEL_MODULES_PATH "/lib/modules"
 #define KERNEL_MODULES_VHD_PATH "/modules"
 #define KERNEL_MODULES_OVERLAY "/modules_overlay"
+#define KERNEL_HEADERS_TEMP_PATH "/kernel_headers"
+#define KERNEL_HEADERS_PATH_PREFIX "/usr/src/linux-headers-"
+#define KERNEL_PERF_TEMP_PATH "/kernel_perf"
+#define KERNEL_PERF_PATH_PREFIX "/usr/lib/linux-tools/"
 #define MODPROBE_PATH "/sbin/modprobe"
 #define PROCFS_PATH "/proc"
 #define RESOLV_CONF_FILE "resolv.conf"
@@ -115,6 +120,8 @@ struct VmConfiguration
     bool EnableSystemDistro = false;
     bool EnableCrashDumpCollection = false;
     std::string KernelModulesPath;
+    std::string KernelHeadersTarget;
+    std::string KernelPerfTarget;
     LX_MINI_INIT_NETWORKING_MODE NetworkingMode = LxMiniInitNetworkingModeNone;
 };
 
@@ -1629,6 +1636,31 @@ Return Value:
     }
 
     //
+    // If kernel headers were mounted, move them to a temporary location and pass the desired
+    // target path to the distro init via an environment variable. Distro init will move the
+    // mount to /usr/src/linux-headers-<uname -r> and create the
+    // /lib/modules/<release>/build symlink.
+    //
+
+    if (!Config.KernelHeadersTarget.empty())
+    {
+        AddTemporaryMount(LX_WSL2_KERNEL_HEADERS_MOUNT_ENV, KERNEL_HEADERS_TEMP_PATH, (MS_MOVE | MS_REC));
+        AddEnvironmentVariable(LX_WSL2_KERNEL_HEADERS_PATH_ENV, Config.KernelHeadersTarget.c_str());
+    }
+
+    //
+    // If the perf tooling was mounted, move it to a temporary location and pass the desired target
+    // path to the distro init via an environment variable. Distro init will move the mount to
+    // /usr/lib/linux-tools/<uname -r> and add it to the default $PATH.
+    //
+
+    if (!Config.KernelPerfTarget.empty())
+    {
+        AddTemporaryMount(LX_WSL2_KERNEL_PERF_MOUNT_ENV, KERNEL_PERF_TEMP_PATH, (MS_MOVE | MS_REC));
+        AddEnvironmentVariable(LX_WSL2_KERNEL_PERF_PATH_ENV, Config.KernelPerfTarget.c_str());
+    }
+
+    //
     // Bind mount the init daemon into the distro namespace.
     //
 
@@ -2441,29 +2473,16 @@ void PostProcessImportedDistribution(wsl::shared::MessageWriter<LX_MINI_INIT_IMP
         Message.WriteString(Message->VersionIndex, version.value());
     }
 
-    std::string defaultName{};
-    std::string shortcutIconPath;
-    std::string terminalProfileTemplatePath;
-    Message->GenerateTerminalProfile = true;
-    Message->GenerateShortcut = true;
+    const auto manifest = wsl::linux::ParseWslDistributionManifest();
+    Message->GenerateTerminalProfile = manifest.GenerateTerminalProfile;
+    Message->GenerateShortcut = manifest.GenerateShortcut;
 
-    std::vector<ConfigKey> keys = {
-        ConfigKey("shortcut.icon", shortcutIconPath),
-        ConfigKey("shortcut.enabled", Message->GenerateShortcut),
-        ConfigKey("oobe.defaultName", defaultName),
-        ConfigKey("windowsterminal.profileTemplate", terminalProfileTemplatePath),
-        ConfigKey("windowsterminal.enabled", Message->GenerateTerminalProfile)};
-
+    if (!manifest.DefaultName.empty())
     {
-        wil::unique_file File{fopen(WSL_DISTRIBUTION_CONF, "r")};
-        ParseConfigFile(keys, File.get(), (CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES), STRING_TO_WSTRING(WSL_DISTRIBUTION_CONF));
+        Message.WriteString(Message->DefaultNameIndex, manifest.DefaultName);
     }
 
-    if (!defaultName.empty())
-    {
-        Message.WriteString(Message->DefaultNameIndex, defaultName);
-    }
-
+    const auto& shortcutIconPath = manifest.ShortcutIconPath;
     try
     {
         if (!shortcutIconPath.empty())
@@ -2483,6 +2502,7 @@ void PostProcessImportedDistribution(wsl::shared::MessageWriter<LX_MINI_INIT_IMP
     }
     CATCH_LOG();
 
+    const auto& terminalProfileTemplatePath = manifest.TerminalProfileTemplatePath;
     try
     {
         if (Message->GenerateTerminalProfile && !terminalProfileTemplatePath.empty())
@@ -2943,7 +2963,9 @@ try
             auto DevicePath = GetLunDevicePath(Message->ScsiLun);
 
             auto CommandLine = std::format("/usr/sbin/e2fsck -f -y '{}'", DevicePath);
-            THROW_LAST_ERROR_IF(UtilExecCommandLine(CommandLine.c_str()) < 0);
+            // 1: filesystem errors were corrected.
+            // 2: filesystem errors were corrected and system needs reboot.
+            THROW_LAST_ERROR_IF(UtilExecCommandLine(CommandLine.c_str(), nullptr, {0, 1, 2}) < 0);
 
             if (Message->NewSize == 0)
             {
@@ -3228,7 +3250,7 @@ try
         // N.B. The VHD is mounted as read-only but with a writable overlayfs layer. The modules
         //      directory must be writable for tools like depmod to work.
         //
-        // N.B. The artifacts VHD nests the modules under <release>/modules.
+        // N.B. The artifacts VHD nests its payloads under <release>/{modules,linux-headers,perf}.
         //      Older module-only VHDs place the modules tree at the filesystem root; fall back to that
         //      layout when the nested modules directory is not present.
         //
@@ -3258,7 +3280,7 @@ try
             {
                 LOG_WARNING(
                     "kernel modules VHD uses the legacy flat layout; support for the legacy modules VHD format will be "
-                    "removed in a future version");
+                    "removed in a future version; kernel headers and perf tooling are unavailable");
             }
             else if (!NestedLayout)
             {
@@ -3281,6 +3303,27 @@ try
             }
 
             Config.KernelModulesPath = std::move(Target);
+
+            //
+            // When the nested artifacts layout is present, bind mount the kernel headers and perf
+            // tooling to temporary locations. Each distro init moves them into the distro namespace
+            // at /usr/src/linux-headers-<release> and /usr/lib/linux-tools/<release> (see config.cpp).
+            //
+
+            if (NestedLayout)
+            {
+                const std::string HeadersSource = ArtifactsBase + "/linux-headers";
+                if (UtilMount(HeadersSource.c_str(), KERNEL_HEADERS_TEMP_PATH, nullptr, (MS_BIND | MS_REC), nullptr) == 0)
+                {
+                    Config.KernelHeadersTarget = std::format("{}{}", KERNEL_HEADERS_PATH_PREFIX, Release);
+                }
+
+                const std::string PerfSource = ArtifactsBase + "/perf";
+                if (UtilMount(PerfSource.c_str(), KERNEL_PERF_TEMP_PATH, nullptr, (MS_BIND | MS_REC), nullptr) == 0)
+                {
+                    Config.KernelPerfTarget = std::format("{}{}", KERNEL_PERF_PATH_PREFIX, Release);
+                }
+            }
         }
 
         //

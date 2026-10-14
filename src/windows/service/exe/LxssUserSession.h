@@ -631,6 +631,7 @@ private:
     /// <summary>
     /// Return a new config after policies have been applied.
     /// </summary>
+    _Requires_exclusive_lock_held_(m_instanceLock)
     wsl::core::Config _GetResultantConfig(_In_ const HANDLE userToken);
 
     _Requires_exclusive_lock_held_(m_instanceLock)
@@ -718,6 +719,7 @@ private:
 
     /// <summary>
     /// Validates that the given path or name is not already in use by a registered distribution.
+    /// N.B. Enumeration may unregister orphaned distributions and terminate their instances.
     /// </summary>
     _Requires_lock_held_(m_instanceLock)
     void _ValidateDistributionNameAndPathNotInUse(
@@ -750,7 +752,7 @@ private:
     /// <summary>
     /// Configures HttpProxy info for the process
     /// </summary>
-    void _SetHttpProxyInfo(_Inout_ std::vector<std::string>& environment) const noexcept;
+    void _SetHttpProxyInfo(_Inout_ std::vector<std::string>& environment) noexcept;
 
     /// <summary>
     /// Launch OOBE for the first time or skip.
@@ -780,9 +782,11 @@ private:
     static void s_ValidateDistroName(_In_ LPCWSTR Name);
 
     /// <summary>
-    /// Callback for when a VM unexpectedly exits (crashes).
+    /// Queues cleanup when a VM unexpectedly exits (crashes).
     /// </summary>
     static void s_VmTerminated(_Inout_ LxssUserSessionImpl* UserSession, _In_ const GUID& VmId);
+
+    static VOID CALLBACK s_ProcessVmExit(_Inout_ PTP_CALLBACK_INSTANCE, _Inout_opt_ PVOID Context, _Inout_ PTP_WORK);
 
     /// <summary>
     /// Callback to terminate a utility VM.
@@ -855,6 +859,16 @@ private:
     wil::unique_threadpool_timer m_vmTerminationTimer;
 
     /// <summary>
+    /// ID of the last VM that exited.
+    /// </summary>
+    std::atomic<GUID> m_exitedVmId{GUID_NULL};
+
+    /// <summary>
+    /// Work item to handle VM exit.
+    /// </summary>
+    wil::unique_threadpool_work m_vmExitWork;
+
+    /// <summary>
     /// Signaled when the utility vm is terminating.
     /// </summary>
     wil::unique_event m_vmTerminating{wil::EventOptions::ManualReset};
@@ -883,7 +897,7 @@ private:
     /// Listens to host http proxy setting changes, tracks ongoing proxy queries, and stores current settings.
     /// Information used to configure Linux proxy environment variables.
     /// </summary>
-    std::shared_ptr<HttpProxyStateTracker> m_httpProxyStateTracker{};
+    _Guarded_by_(m_instanceLock) std::shared_ptr<HttpProxyStateTracker> m_httpProxyStateTracker {};
 
     std::thread m_timezoneThread;
 };

@@ -11,7 +11,7 @@ STDAPI WslcInspectContainer(_In_ WslcContainer container, _Outptr_result_z_ PSTR
 
 Return value: `HRESULT`.
 
-Header note: `inspectData` is allocated using `CoTaskMemAlloc`; free it with `CoTaskMemFree`.
+`inspectData` is allocated using `CoTaskMemAlloc`; free it with `CoTaskMemFree`.
 
 Example:
 

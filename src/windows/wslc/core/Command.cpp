@@ -16,7 +16,7 @@ Abstract:
 #include "Command.h"
 #include "Invocation.h"
 #include "ArgumentParser.h"
-#include "TableOutput.h"
+#include "TableRenderer.h"
 
 #include <algorithm>
 #include <typeinfo>
@@ -29,6 +29,7 @@ using namespace wsl::windows::wslc::execution;
 namespace wsl::windows::wslc {
 
 using namespace wsl::windows::wslc::cli;
+using namespace wsl::windows::cli::table;
 
 std::wstring s_ExecutableName = L"wslc";
 
@@ -476,56 +477,48 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
 
     // Col0: name/command
     // Col1: description (word-wraps at computed column width)
-    const auto MakeHelpTable = [&terminal, helpLevel]() -> TableOutput<2> {
-        TableOutput<2> table{terminal, {L"", L""}, 50, c_helpColumnPadding, helpLevel};
-        table.SetShowHeader(false);
-        table.SetRowIndent(c_helpRowIndent);
-        table.SetColumnConfig(
-            1,
-            ColumnWidthConfig{
-                .MinWidth = ColumnWidthConfig::NoLimit,
-                .MaxWidth = ColumnWidthConfig::NoLimit,
-                .Overflow = ColumnOverflow::Wrap,
-            });
+    const auto MakeHelpTable = []() -> TableData {
+        TableData table{L"", L""};
+        table.ShowHeader = false;
+        table.RowIndent = c_helpRowIndent;
+        table.ColumnPadding = c_helpColumnPadding;
+        table.MinCellWidth = 0;
+        table.ColumnConfig(1).Overflow = ColumnOverflow::Wrap;
         return table;
     };
 
     // Col0: short alias (e.g. "-f")
     // Col1: long name  (e.g. "--force")
     // Col2: description (word-wraps at computed column width)
-    const auto MakeOptionsTable = [&terminal, helpLevel]() -> TableOutput<3> {
-        TableOutput<3> table{terminal, {L"", L"", L""}, {}, 50, c_helpColumnPadding, helpLevel};
-        table.SetShowHeader(false);
-        table.SetRowIndent(c_helpRowIndent);
-        table.SetColumnConfig(
-            2,
-            ColumnWidthConfig{
-                .MinWidth = ColumnWidthConfig::NoLimit,
-                .MaxWidth = ColumnWidthConfig::NoLimit,
-                .Overflow = ColumnOverflow::Wrap,
-            });
+    const auto MakeOptionsTable = []() -> TableData {
+        TableData table{L"", L"", L""};
+        table.ShowHeader = false;
+        table.RowIndent = c_helpRowIndent;
+        table.ColumnPadding = c_helpColumnPadding;
+        table.MinCellWidth = 0;
+        table.ColumnConfig(2).Overflow = ColumnOverflow::Wrap;
         return table;
     };
 
     const auto AddArgumentRows = [](auto& table, std::span<const Argument> args) {
         for (const auto& arg : args)
         {
-            FormattedCell aliasCell{L""};
+            Cell aliasCell{L""};
             std::wstring name = arg.Name();
             if (arg.Kind() == Kind::Flag || arg.Kind() == Kind::Value)
             {
                 if (!arg.Alias().empty())
                 {
-                    aliasCell = FormattedCell(std::wstring{WSLC_CLI_ARG_ID_CHAR} + arg.Alias(), HelpArgumentEmphasis);
+                    aliasCell = Cell(std::wstring{WSLC_CLI_ARG_ID_CHAR} + arg.Alias(), HelpArgumentEmphasis);
                 }
 
                 name = std::wstring{WSLC_CLI_ARG_ID_CHAR} + std::wstring{WSLC_CLI_ARG_ID_CHAR} + name;
             }
 
-            table.WriteRow({
+            table.AddRow({
                 std::move(aliasCell),
-                FormattedCell(std::move(name), HelpArgumentEmphasis),
-                FormattedCell(arg.Description()),
+                Cell(std::move(name), HelpArgumentEmphasis),
+                Cell(arg.Description()),
             });
         }
     };
@@ -537,12 +530,12 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
         auto table = MakeHelpTable();
         for (const auto& command : commands)
         {
-            table.WriteRow({
-                FormattedCell(command->Name(), HelpCommandEmphasis),
-                FormattedCell(command->ShortDescription()),
+            table.AddRow({
+                Cell(command->Name(), HelpCommandEmphasis),
+                Cell(command->ShortDescription()),
             });
         }
-        table.Complete();
+        RenderTable(terminal, table, helpLevel);
 
         if (fullHelp)
         {
@@ -563,7 +556,7 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
 
         auto table = MakeOptionsTable();
         AddArgumentRows(table, helpArguments);
-        table.Complete();
+        RenderTable(terminal, table, helpLevel);
     }
     else if (fullHelp && !helpArguments.empty())
     {
@@ -581,21 +574,21 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
 
             for (const auto& arg : helpPositionalArgs)
             {
-                table.WriteRow({
-                    FormattedCell(arg.Name(), HelpArgumentEmphasis),
-                    FormattedCell(arg.Description()),
+                table.AddRow({
+                    Cell(arg.Name(), HelpArgumentEmphasis),
+                    Cell(arg.Description()),
                 });
             }
 
             for (const auto& arg : helpForwardArgs)
             {
-                table.WriteRow({
-                    FormattedCell(arg.Name(), HelpArgumentEmphasis),
-                    FormattedCell(arg.Description()),
+                table.AddRow({
+                    Cell(arg.Name(), HelpArgumentEmphasis),
+                    Cell(arg.Description()),
                 });
             }
 
-            table.Complete();
+            RenderTable(terminal, table, helpLevel);
         }
     }
 
@@ -616,7 +609,7 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
 
         if (hasHelpOptions)
         {
-            table.WriteLine(FormattedCell(Localization::WSLCCLI_HeadingOptions(), HelpHeadingEmphasis));
+            table.AddSpanningRow(Cell(Localization::WSLCCLI_HeadingOptions(), HelpHeadingEmphasis));
             AddArgumentRows(table, std::span<const Argument>{helpStandardArgs});
         }
 
@@ -642,19 +635,19 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
 
             if (hasPreviousOptionSection)
             {
-                table.WriteLine();
+                table.AddSpanningRow();
             }
 
             const auto globalOwnerInvocation = globalOwner->get().FormatInvocation();
             const auto globalScopeName =
                 globalOwnerInvocation == s_ExecutableName ? globalOwnerInvocation : std::wstring{globalOwner->get().Name()};
-            table.WriteLine(FormattedCell(Localization::WSLCCLI_HeadingScopedGlobalOptions(globalScopeName), HelpHeadingEmphasis));
+            table.AddSpanningRow(Cell(Localization::WSLCCLI_HeadingScopedGlobalOptions(globalScopeName), HelpHeadingEmphasis));
             AddArgumentRows(table, std::span<const Argument>{globalArguments}.subspan(scopeStart, scopeEnd - scopeStart));
             hasPreviousOptionSection = true;
             scopeStart = scopeEnd;
         }
 
-        table.Complete();
+        RenderTable(terminal, table, helpLevel);
     }
 
     if (!fullHelp)
