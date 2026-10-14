@@ -13,6 +13,7 @@ file(GLOB_RECURSE WSLC_TEST_HEADERS CONFIGURE_DEPENDS
 # Add the sources to the parent wsltests target.
 # This ensures they're compiled into the main test binary.
 target_sources(wsltests PRIVATE ${WSLC_TEST_SOURCES} ${WSLC_TEST_HEADERS})
+target_sources(wsltests PRIVATE ${CMAKE_SOURCE_DIR}/src/windows/wslcsession/EventStore.cpp)
 
 # N.B. These sources are compiled into wsltests, which is defined in the parent
 # directory. Source file properties are scoped to the directory that sets them,
@@ -30,4 +31,5 @@ target_include_directories(wsltests PRIVATE
     ${CMAKE_SOURCE_DIR}/src/windows/wslc/arguments
     ${CMAKE_SOURCE_DIR}/src/windows/wslc/services
     ${CMAKE_SOURCE_DIR}/src/windows/wslc/tasks
+    ${CMAKE_SOURCE_DIR}/src/windows/wslcsession
 )

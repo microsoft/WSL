@@ -44,8 +44,9 @@ public:
     void OnDistributionRegistered(const WSLSessionInformation* Session, const WslOfflineDistributionInformation* distro) const;
     void OnDistributionUnregistered(const WSLSessionInformation* Session, const WslOfflineDistributionInformation* distro) const;
 
-    // WSLC notifications. Returning failure from OnSessionCreated/OnContainerStarted causes the
-    // corresponding operation to be aborted. Other notifications log errors and continue.
+    // WSLC notifications. Returning failure from OnSessionCreated or an explicit OnContainerStarted
+    // causes the corresponding operation to be aborted. Docker-owned restart notifications and all
+    // other notifications log errors and continue.
     void OnWslcSessionCreated(const WSLCSessionInformation* Session);
     void OnWslcSessionStopping(const WSLCSessionInformation* Session) const;
     HRESULT OnWslcContainerStarted(const WSLCSessionInformation* Session, LPCSTR InspectJson) const;

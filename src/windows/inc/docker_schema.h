@@ -389,6 +389,14 @@ struct DeviceRequest
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(DeviceRequest, Driver, DeviceIDs);
 };
 
+struct RestartPolicyConfig
+{
+    std::string Name{"no"};
+    std::int64_t MaximumRetryCount{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(RestartPolicyConfig, Name, MaximumRetryCount);
+};
+
 struct HostConfig
 {
     std::vector<Mount> Mounts;
@@ -410,9 +418,10 @@ struct HostConfig
     std::int64_t Memory{};
     std::int64_t NanoCpus{};
     std::optional<std::vector<Ulimit>> Ulimits;
+    RestartPolicyConfig RestartPolicy;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
-        HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, DeviceRequests, ShmSize, Memory, NanoCpus, Ulimits);
+        HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, DeviceRequests, ShmSize, Memory, NanoCpus, Ulimits, RestartPolicy);
 };
 
 struct InspectEndpointIPAMConfig
@@ -515,12 +524,13 @@ struct ContainerInspectState
 {
     std::string Status;
     bool Running{};
+    bool Restarting{};
     int ExitCode{};
     std::string StartedAt;
     std::string FinishedAt;
     std::optional<Health> Health;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInspectState, Status, Running, ExitCode, StartedAt, FinishedAt, Health);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInspectState, Status, Running, Restarting, ExitCode, StartedAt, FinishedAt, Health);
 };
 
 struct ContainerConfig

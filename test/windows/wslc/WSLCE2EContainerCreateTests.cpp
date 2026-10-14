@@ -135,6 +135,26 @@ class WSLCE2EContainerCreateTests
         EnsureContainerDoesNotExist(WslcContainerName);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_RestartPolicy)
+    {
+        auto result =
+            RunWslc(std::format(L"container create --restart on-failure:3 --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_ARE_EQUAL(std::string("on-failure"), inspect.HostConfig.RestartPolicy.Name);
+        VERIFY_ARE_EQUAL(3LL, inspect.HostConfig.RestartPolicy.MaximumRetryCount);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_RestartPolicyConflictsWithRemove)
+    {
+        auto result =
+            RunWslc(std::format(L"container create --restart always --rm --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Conflicting options: cannot specify both --restart and --rm"));
+        VerifyContainerIsNotListed(WslcContainerName);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Valid)
     {
         VerifyContainerIsNotListed(WslcContainerName);

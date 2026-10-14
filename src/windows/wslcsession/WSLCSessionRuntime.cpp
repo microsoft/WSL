@@ -115,6 +115,11 @@ bool WSLCSessionRuntime::HasVolumes() const noexcept
     return m_volumes.has_value();
 }
 
+wil::rwlock_release_shared_scope_exit WSLCSessionRuntime::TryLockShared() noexcept
+{
+    return m_lock.try_lock_shared();
+}
+
 wil::rwlock_release_exclusive_scope_exit WSLCSessionRuntime::TryLockExclusive() noexcept
 {
     return m_lock.try_lock_exclusive();
@@ -267,6 +272,20 @@ void WSLCSessionRuntime::EnsureVmRunning()
         generation = m_vmGeneration.load();
     }
 
+    auto finishStart = wil::scope_exit([this, started]() {
+        if (started)
+        {
+            EndVmStartCompletion();
+        }
+    });
+
+    // Recovery completion may invoke external plugins. Run it after releasing the runtime lock;
+    // VmLease holds an activity reference across this call.
+    if (started && m_hooks.CompleteRecovery && !m_terminating->load() && m_vmState.load() == VmState::Running && m_vmGeneration.load() == generation)
+    {
+        m_hooks.CompleteRecovery();
+    }
+
     // Notify plugins that a VM has started, outside the exclusive lock: the handler forwards to the
     // plugin, which may call back into the session (e.g. WSLCCreateProcess acquires a VM lease and
     // the exclusive lock), so firing under the lock would deadlock. EnsureVmRunning's only caller
@@ -276,6 +295,18 @@ void WSLCSessionRuntime::EnsureVmRunning()
     {
         NotifyVmStarted(generation);
     }
+}
+
+__requires_exclusive_lock_held(m_lock) void WSLCSessionRuntime::BeginVmStartCompletionLockHeld()
+{
+    m_vmStartCompleteEvent.ResetEvent();
+    m_vmStartCompletionPending.store(true);
+}
+
+void WSLCSessionRuntime::EndVmStartCompletion() noexcept
+{
+    m_vmStartCompletionPending.store(false);
+    m_vmStartCompleteEvent.SetEvent();
 }
 
 void WSLCSessionRuntime::NotifyVmStarted(uint64_t Generation)
@@ -424,9 +455,9 @@ void WSLCSessionRuntime::StartVmLockHeld()
         m_hooks.RecoverState();
     }
 
+    BeginVmStartCompletionLockHeld();
     m_vmState.store(VmState::Running);
     startCleanup.release();
-
     WSL_LOG("WslcVmStarted", TraceLoggingValue(m_id, "SessionId"));
 }
 
@@ -806,6 +837,21 @@ WSLCSessionRuntime::VmLease::VmLease(WSLCSessionRuntime& Runtime, VmLeasePolicy 
 
         if (m_runtime->m_vmState.load() == VmState::Running)
         {
+            if (Policy == VmLeasePolicy::Acquire && m_runtime->m_vmStartCompletionPending.load())
+            {
+                m_lock.reset();
+
+                while (!m_runtime->m_vmStartCompleteEvent.wait(c_vmStopWaitLogIntervalMs))
+                {
+                    WSL_LOG(
+                        "WslcVmLeaseWaitingForStartCompletion",
+                        TraceLoggingLevel(WINEVENT_LEVEL_WARNING),
+                        TraceLoggingValue(m_runtime->m_id, "SessionId"));
+                }
+
+                continue;
+            }
+
             // An announced stop always happens, so a VM with one pending is unusable even though it is
             // still Running: wait for the teardown, then retry, which brings up a fresh VM. ExistingOnly
             // callers are exempt and are served by the stopping VM -- see VmLeasePolicy.
