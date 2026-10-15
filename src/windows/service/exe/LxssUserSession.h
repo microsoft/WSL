@@ -545,6 +545,13 @@ public:
 
 private:
     /// <summary>
+    /// Clear the list of terminated instances.
+    /// </summary>
+    _Requires_lock_not_held_(m_instanceLock)
+    _Requires_lock_not_held_(m_terminatedInstanceLock)
+    void _ClearTerminatedInstances();
+
+    /// <summary>
     /// Adds a distro to the list of converting distros.
     /// </summary>
     _Requires_lock_held_(m_instanceLock)
@@ -685,10 +692,10 @@ private:
     static void _SetDistributionInstalled(_In_ HKEY LxssKey, _In_ const GUID& DistroGuid);
 
     /// <summary>
-    /// Removes a utility vm from the list.
+    /// Terminates the distribution only if its current instance matches the callback's lifetime registration.
     /// </summary>
     _Requires_lock_not_held_(m_instanceLock)
-    bool _TerminateInstance(_In_ LPCGUID DistroGuid, _In_ bool CheckForClients);
+    bool _TerminateInstance(_In_ LPCGUID DistroGuid, _In_ ULONG64 ClientLifetimeId, _In_ bool CheckForClients);
 
     _Requires_exclusive_lock_held_(m_instanceLock)
     bool _TerminateInstanceInternal(_In_ LPCGUID DistroGuid, _In_ bool CheckForClients = false);
@@ -789,9 +796,9 @@ private:
     static VOID CALLBACK s_ProcessVmExit(_Inout_ PTP_CALLBACK_INSTANCE, _Inout_opt_ PVOID Context, _Inout_ PTP_WORK);
 
     /// <summary>
-    /// Callback to terminate a utility VM.
+    /// Callback to terminate a specific instance of a distribution.
     /// </summary>
-    static bool s_TerminateInstance(_Inout_ LxssUserSessionImpl* UserSession, _In_ GUID DistroGuid, _In_ bool CheckForClients);
+    static bool s_TerminateInstance(_Inout_ LxssUserSessionImpl* UserSession, _In_ GUID DistroGuid, _In_ ULONG64 ClientLifetimeId, _In_ bool CheckForClients);
 
     /// <summary>
     /// Ensures that the init binary for the specified distribution is up-to-date.

@@ -572,6 +572,13 @@ WSLCSession::~WSLCSession()
 
     LOG_IF_FAILED(Terminate());
 
+    // Wait for any relay-driven termination to complete before returning from the destructor.
+    m_terminationCompleteEvent.wait();
+    if (auto* relay = m_runtime.Relay())
+    {
+        relay->Stop();
+    }
+
     if (m_destructionCallback)
     {
         m_destructionCallback();
@@ -3578,6 +3585,7 @@ try
         return S_OK;
     }
 
+    auto terminationComplete = m_terminationCompleteEvent.SetEvent_scope_exit();
     wil::rwlock_release_exclusive_scope_exit sessionLock;
 
     // Because it's not possible to synchronize CancelIoEx() with ReadFile() calls, keep attempting to acquire the session lock while cancelling IO & callbacks.

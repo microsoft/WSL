@@ -5,6 +5,7 @@
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
 #include "TestImageRegistry.h"
+#include <fstream>
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
@@ -760,6 +761,67 @@ class WSLCE2EContainerCpTests
 
         auto extractedFile = downloadDir / L"stopped.txt";
         VERIFY_IS_TRUE(std::filesystem::exists(extractedFile));
+    }
+
+    // Repro from https://github.com/microsoft/WSL/issues/41872.
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ToBindMountedContainerAcrossStates)
+    {
+        auto hostDir = std::filesystem::current_path() / L"wslc-cp-bind-source";
+        std::filesystem::create_directories(hostDir);
+        auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(hostDir); });
+
+        RunWslcAndRedirectToFile(
+            std::format(
+                L"container run --rm {} sh -c \"mkdir -p /usr/lib/ssl/aspire && printf '%s' 'WSLC absolute path test' > "
+                L"/usr/lib/ssl/aspire/cert.pem && tar --format=ustar -cPf - /usr/lib/ssl/aspire/cert.pem\"",
+                DebianImage.NameAndTag()),
+            TarPath)
+            .Verify({.Stderr = L"", .ExitCode = 0});
+
+        RunWslc(std::format(
+                    L"container create --name {} --mount \"type=bind,source={},target=/data\" {} sleep infinity",
+                    WslcContainerName,
+                    hostDir.wstring(),
+                    DebianImage.NameAndTag()))
+            .Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto copyCommand = std::format(L"container cp -a=false - {}:/", WslcContainerName);
+
+        // Created.
+        RunWslcWithStdinFile(copyCommand, TarPath).Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        // Running. Verify the copy made while the container was created landed.
+        RunWslc(std::format(L"container start {}", WslcContainerName)).Verify({.Stderr = L"", .ExitCode = 0});
+        RunWslc(std::format(L"container exec {} cat /usr/lib/ssl/aspire/cert.pem", WslcContainerName))
+            .Verify({.Stdout = L"WSLC absolute path test", .Stderr = L"", .ExitCode = 0});
+        RunWslcWithStdinFile(copyCommand, TarPath).Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        // Stopped.
+        RunWslc(std::format(L"container stop {} -t 0", WslcContainerName)).Verify({.Stderr = L"", .ExitCode = 0});
+        RunWslcWithStdinFile(copyCommand, TarPath).Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_FromStoppedContainerWithBindMount)
+    {
+        auto hostDir = std::filesystem::current_path() / L"wslc-cp-bind-stopped";
+        std::filesystem::create_directories(hostDir);
+        auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(hostDir); });
+
+        auto runResult = RunWslc(std::format(
+            L"container run --name {} --volume \"{}:/data\" {} sh -c \"echo stopped-content > /tmp/stopped.txt\"",
+            WslcContainerName,
+            hostDir.wstring(),
+            DebianImage.NameAndTag()));
+        runResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto downloadDir = std::filesystem::current_path() / L"wslc-cp-bind-stopped-download";
+        std::filesystem::create_directories(downloadDir);
+        auto cleanupDownload = wil::scope_exit([&] { std::filesystem::remove_all(downloadDir); });
+
+        const auto cpResult = RunWslc(std::format(L"container cp {}:/tmp/stopped.txt {}", WslcContainerName, downloadDir.wstring()));
+        cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        VERIFY_IS_TRUE(std::filesystem::exists(downloadDir / L"stopped.txt"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_InvalidDirection_LocalToLocal)

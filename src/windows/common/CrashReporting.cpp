@@ -5,14 +5,14 @@
 #include "CrashReporting.h"
 #include "registry.hpp"
 #include "WslTelemetry.h"
-#include "wslutil.h"
 
+using wsl::windows::common::crashreporting::c_unknownValue;
 using wsl::windows::common::crashreporting::LinuxCrashInfo;
 using wsl::windows::common::crashreporting::ReportParameters;
 
 namespace {
 
-constexpr auto c_eventName = L"WSLAppCrash";
+constexpr auto c_eventName = L"WSLCProcessCrash";
 
 // Opt-in switch. wslcsession does not parse .wslconfig, so the container path is gated on the
 // machine-wide WSL registry key instead.
@@ -24,26 +24,24 @@ constexpr auto c_reportingValueName = L"CrashDumpReporting";
 constexpr DWORD c_submitFlags = WER_SUBMIT_ADD_REGISTERED_DATA | WER_SUBMIT_NO_CLOSE_UI | WER_SUBMIT_BYPASS_DATA_THROTTLING |
                                 WER_SUBMIT_REPORT_MACHINE_ID | WER_SUBMIT_QUEUE;
 
-// The guest kernel has no notion of a Windows module version, so the installed WSL version is
-// reported instead. It identifies the build whose guest components produced the core.
-const std::wstring& WslVersion()
+// Maximum lengths registered for the event's parameters.
+constexpr size_t c_maxParameterLength = 128;
+constexpr size_t c_maxOffsetLength = 32;
+constexpr size_t c_maxCallingProcessLength = 255;
+
+std::wstring Limit(std::wstring Value, size_t MaxLength)
 {
-    static const std::wstring version = []() {
-        try
-        {
-            const auto installed = wsl::windows::common::wslutil::GetInstalledPackageVersion();
-            if (installed.has_value())
-            {
-                const auto& [major, minor, revision] = installed.value();
-                return std::format(L"{}.{}.{}", major, minor, revision);
-            }
-        }
-        CATCH_LOG()
+    if (Value.size() > MaxLength)
+    {
+        Value.resize(MaxLength);
+    }
 
-        return std::wstring{L"0.0.0"};
-    }();
+    return Value;
+}
 
-    return version;
+std::wstring ValueOrUnknown(const std::string& Value)
+{
+    return Value.empty() ? std::wstring{c_unknownValue} : wsl::shared::string::MultiByteToWide(Value);
 }
 
 void SetField(_Out_writes_(Size) PWSTR Field, size_t Size, _In_ const std::wstring& Value)
@@ -58,38 +56,64 @@ std::wstring wsl::windows::common::crashreporting::GetExecutableName(_In_ const 
     const auto separator = Executable.find_last_of("!/");
     const auto name = (separator == std::string::npos) ? Executable : Executable.substr(separator + 1);
 
-    return name.empty() ? L"unknown" : wsl::shared::string::MultiByteToWide(name);
+    return name.empty() ? std::wstring{c_unknownValue} : wsl::shared::string::MultiByteToWide(name);
 }
 
 ReportParameters wsl::windows::common::crashreporting::BuildReportParameters(
-    _In_ const LinuxCrashInfo& Info, _In_ const std::optional<elfcore::FaultLocation>& Fault)
+    _In_ const LinuxCrashInfo& Info, _In_ const std::optional<elfcore::CoreDetails>& Core)
 {
-    const auto executable = GetExecutableName(Info.Executable);
-    const auto& version = WslVersion();
+    std::wstring process = GetExecutableName(Info.Executable);
+    std::wstring processBuildId = c_unknownValue;
+    std::wstring module = c_unknownValue;
+    std::wstring moduleBuildId = c_unknownValue;
+    std::wstring offset = c_unknownValue;
+    std::wstring signal = std::to_wstring(Info.Signal);
+    std::wstring signalCode = c_unknownValue;
+    std::wstring architecture = c_unknownValue;
 
-    // AppName identifies who the crash belongs to and ModuleName what actually faulted. For a
-    // container crash those differ: the report buckets against the Windows application that
-    // created the container, while the module names the Linux binary or library that faulted.
-    const auto app = Info.AppName.empty() ? executable : Info.AppName;
-
-    std::wstring module = executable;
-    ULONGLONG offset = 0;
-    if (Fault.has_value())
+    if (Core.has_value())
     {
+        if (!Core->ExecutablePath.empty())
+        {
+            process = GetExecutableName(Core->ExecutablePath);
+        }
+
+        processBuildId = ValueOrUnknown(Core->ExecutableBuildId);
+        architecture = ValueOrUnknown(Core->Architecture);
+
         // A program counter outside any file mapping has no module to be relative to, so the
         // absolute address is reported against an unknown module.
-        module = Fault->ModulePath.empty() ? L"unknown" : GetExecutableName(Fault->ModulePath);
-        offset = Fault->ModulePath.empty() ? Fault->ProgramCounter : Fault->ModuleOffset;
+        if (!Core->ModulePath.empty())
+        {
+            module = GetExecutableName(Core->ModulePath);
+            moduleBuildId = ValueOrUnknown(Core->ModuleBuildId);
+        }
+
+        offset = std::format(L"0x{:x}", Core->ModulePath.empty() ? Core->ProgramCounter : Core->ModuleOffset);
+
+        if (Core->Signal != 0)
+        {
+            signal = std::to_wstring(Core->Signal);
+        }
+
+        if (Core->SignalCode.has_value())
+        {
+            signalCode = std::to_wstring(Core->SignalCode.value());
+        }
     }
 
+    const auto callingProcess = Info.CallingProcess.empty() ? std::wstring{c_unknownValue} : Info.CallingProcess;
+
     return ReportParameters{
-        {{L"AppName", app},
-         {L"AppVersion", version},
-         {L"ModuleName", module},
-         {L"ModuleVersion", version},
-         {L"ModuleOffset", std::format(L"{:016x}", offset)},
-         {L"ExceptionCode", std::format(L"{:08x}", Info.Signal)},
-         {L"Flags", L"0"}}};
+        {{L"ProcessName", Limit(std::move(process), c_maxParameterLength)},
+         {L"ProcessBuildId", Limit(std::move(processBuildId), c_maxParameterLength)},
+         {L"ModuleName", Limit(std::move(module), c_maxParameterLength)},
+         {L"ModuleBuildId", Limit(std::move(moduleBuildId), c_maxParameterLength)},
+         {L"ModuleOffset", Limit(std::move(offset), c_maxOffsetLength)},
+         {L"SignalNumber", std::move(signal)},
+         {L"SICode", std::move(signalCode)},
+         {L"Architecture", std::move(architecture)},
+         {L"CallingProcess", Limit(callingProcess, c_maxCallingProcessLength)}}};
 }
 
 bool wsl::windows::common::crashreporting::IsReportingEnabled() noexcept
@@ -110,28 +134,32 @@ try
 {
     // A core that cannot be parsed still gets reported, bucketed per executable instead of per
     // faulting frame.
-    std::optional<elfcore::FaultLocation> fault;
+    std::optional<elfcore::CoreDetails> core;
     try
     {
-        fault = elfcore::ReadFaultLocation(Info.CorePath);
+        core = elfcore::ReadCoreDetails(Info.CorePath);
     }
     CATCH_LOG()
 
-    const auto parameters = BuildReportParameters(Info, fault);
-    const auto module = GetExecutableName(Info.Executable);
-    const auto& app = parameters[0].second;
+    const auto parameters = BuildReportParameters(Info, core);
+    const auto& process = parameters[0].second;
+    const auto& signal = parameters[5].second;
+
+    // The report is shown under the Windows application the crash is attributed to when there is
+    // one, otherwise under the crashing Linux process.
+    const auto& app = Info.CallingProcess.empty() ? process : parameters[8].second;
 
     WER_REPORT_INFORMATION information{};
     information.dwSize = sizeof(information);
 
-    // The report is filed against this process rather than the application named in AppName.
+    // The report is filed against this process rather than the calling application.
     // Windows Error Reporting suspends hProcess while it collects data, and the crashing process
     // lives in the utility VM, so pointing it at the calling application would stall a process
     // that did not crash without adding anything to the report.
     information.hProcess = GetCurrentProcess();
     SetField(information.wzFriendlyEventName, ARRAYSIZE(information.wzFriendlyEventName), L"Linux application crash");
     SetField(information.wzApplicationName, ARRAYSIZE(information.wzApplicationName), app);
-    SetField(information.wzDescription, ARRAYSIZE(information.wzDescription), std::format(L"{} terminated by signal {}", module, Info.Signal));
+    SetField(information.wzDescription, ARRAYSIZE(information.wzDescription), std::format(L"{} terminated by signal {}", process, signal));
 
     wil::unique_any<HREPORT, decltype(&WerReportCloseHandle), WerReportCloseHandle> report;
     RETURN_IF_FAILED(WerReportCreate(c_eventName, WerReportApplicationCrash, &information, &report));
@@ -151,10 +179,11 @@ try
 
     WSL_LOG(
         "LinuxCrashReported",
-        TraceLoggingValue(app.c_str(), "AppName"),
-        TraceLoggingValue(module.c_str(), "Executable"),
+        TraceLoggingValue(process.c_str(), "ProcessName"),
+        TraceLoggingValue(parameters[8].second.c_str(), "CallingProcess"),
         TraceLoggingValue(Info.Pid, "Pid"),
-        TraceLoggingValue(Info.Signal, "Signal"),
+        TraceLoggingValue(signal.c_str(), "Signal"),
+        TraceLoggingValue(parameters[6].second.c_str(), "SICode"),
         TraceLoggingValue(parameters[2].second.c_str(), "ModuleName"),
         TraceLoggingValue(parameters[4].second.c_str(), "ModuleOffset"),
         TraceLoggingValue(static_cast<int>(submitResult), "SubmitResult"));
