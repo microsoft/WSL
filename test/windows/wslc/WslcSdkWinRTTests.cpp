@@ -47,7 +47,7 @@ extern bool g_fastTestRun;
 #define DELETE_CONTAINER_ON_SCOPE_EXIT(container) SCOPE_CLEANUP(container.Delete(WSLCSDK::DeleteContainerOption::Force))
 #define DELETE_IMAGE_ON_SCOPE_EXIT(imageName) SCOPE_CLEANUP(m_defaultSession.DeleteImage(imageName))
 
-namespace {
+namespace WslcSdkWinRtTests {
 using namespace winrt::Windows::Foundation;
 using namespace winrt::Windows::Foundation::Collections;
 using namespace winrt::Windows::Storage::Streams;
@@ -2128,4 +2128,4 @@ class WslcSdkWinRtTests
         VERIFY_ARE_EQUAL(stderrAccum, "EVENT_ERR\n");
     }
 };
-} // namespace
+} // namespace WslcSdkWinRtTests
