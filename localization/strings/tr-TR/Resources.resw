@@ -2675,14 +2675,6 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
     <value>Dosyaları bir kapsayıcı ile yerel dosya sistemi arasında kopyalar.</value>
   </data>
-  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
-    <value>Bir kapsayıcı ile yerel dosya sistemi arasında dosya kopyalayın.
-Kullanım: wslc container cp [OPTIONS] SOURCE DEST
-  Yerelden kapsayıcıya: wslc container cp LOCAL_PATH CONTAINER:PATH
-  Kapsayıcıdan yerele: wslc container cp CONTAINER:PATH LOCAL_PATH
-  Stdin’dan kapsayıcıya: wslc container cp - CONTAINER:PATH</value>
-    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
-  </data>
   <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
     <value>Kaynak: yerel yol, CONTAINER:PATH veya stdin için '-'</value>
     <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
@@ -3289,6 +3281,10 @@ Windows sürümü: {}</value>
     <value>'{}' seçeneği desteklenmiyor.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
+    <value>Invalid mode '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
     <value>Bağlama hedefi gereklidir.</value>
   </data>
@@ -3875,28 +3871,25 @@ Windows sürümü: {}</value>
     <value>Kapsayıcı terminale aktarılamıyor. -o seçeneğini kullanın veya stdout'u yeniden yönlendirin.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>Beklenen biçim: &lt;ana bilgisayar yolu | adlandırılmış birim&gt;:&lt;kapsayıcı yolu&gt;[:mode]</value>
+    <value>Expected format: [&lt;host path | named volume&gt;:]&lt;container path&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
-  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>Geçersiz birim belirtimleri: '{}'. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
+    <value>Invalid volume specification: '{}'. {} {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>Geçersiz birim belirtimleri: '{}'. Konak yolu boş olamaz. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
+    <value>The volume specification is empty.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
-    <value>Geçersiz birim belirtimleri: '{}'. Kapsayıcı yolu boş olamaz. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
+    <value>The volume specification contains an empty section between colons.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
-    <value>Geçersiz birim belirtimleri: '{}'. Kapsayıcı yolu mutlak bir yol olmalıdır ('/' ile başlayan). {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
+    <value>The volume specification contains too many colons.</value>
   </data>
-  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
-    <value>Geçersiz birim belirtimleri: '{}'. '{}' konak yolu geçerli bir Windows yolu değil.</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
+    <value>'{}' konak yolu geçerli bir Windows yolu değil.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
     <value>Herhangi bir nesne türünün adı veya kimliği</value>
