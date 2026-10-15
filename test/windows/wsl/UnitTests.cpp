@@ -2572,9 +2572,31 @@ Usage:
         VERIFY_ARE_EQUAL(L"", warnings);
     }
 
+    static bool IsNestedVirtualizationSupportedTestHost()
+    {
+        WEX::Common::String supported;
+        WEX::TestExecution::RuntimeParameters::TryGetValue(L"NestedVirtualizationSupported", supported);
+        if (supported.IsEmpty())
+        {
+            return false;
+        }
+
+        const auto value = static_cast<LPCWSTR>(supported);
+        return ::_wcsicmp(value, L"1") == 0 || ::_wcsicmp(value, L"true") == 0;
+    }
+
     WSL2_TEST_METHOD(NestedVirtualization)
     {
         SKIP_TEST_ARM64();
+
+        // The test job must set this parameter only on hosts with the independently
+        // established hardware and Hyper-V prerequisite. Do not use /dev/kvm here:
+        // that is the behavior this regression test validates.
+        if (!IsNestedVirtualizationSupportedTestHost())
+        {
+            LogSkipped("Nested virtualization host prerequisite was not declared");
+            return;
+        }
 
         // The service should honor this explicit setting on every supported x64 Windows version.
         WslConfigChange configChange(LxssGenerateTestConfig() + L"\nnestedVirtualization=true");
