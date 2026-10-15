@@ -5611,7 +5611,7 @@ class MirroredTests
 
         auto [networkingMode, warnings] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --networking-mode", 0);
         VERIFY_ARE_EQUAL(wsl::shared::string::Trim(networkingMode), L"mirrored");
-        VERIFY_IS_TRUE(warnings.find(wsl::shared::Localization::MessageMirroredNetworkingReducedPortRange(512, 4096)) != std::wstring::npos);
+        VERIFY_ARE_EQUAL(std::format(L"wsl: {}\r\n", wsl::shared::Localization::MessageMirroredNetworkingReducedPortRange(512, 4096)), warnings);
 
         auto [range, rangeWarnings] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range", 0);
         std::wistringstream rangeStream(range);
@@ -5633,7 +5633,13 @@ class MirroredTests
 
         auto [networkingMode, warnings] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --networking-mode", 0);
         VERIFY_ARE_EQUAL(wsl::shared::string::Trim(networkingMode), L"none");
-        VERIFY_IS_TRUE(warnings.find(wsl::shared::Localization::MessageMirroredNetworkingPortRangeAllocationFailed(512)) != std::wstring::npos);
+        const auto expectedWarnings = std::format(
+            L"wsl: {}\r\nwsl: {}wsl: {}\r\n",
+            wsl::shared::Localization::MessageMirroredNetworkingPortRangeAllocationFailed(512),
+            FormatErrorMessage(L"An internal error occurred. ", L"CreateInstance/CreateVm/ConfigureNetworking/0x8007054f"),
+            wsl::shared::Localization::MessageNetworkInitializationFailedFallback2(
+                ToString(wsl::core::NetworkingMode::Mirrored), ToString(wsl::core::NetworkingMode::None)));
+        VERIFY_ARE_EQUAL(expectedWarnings, warnings);
     }
 };
 

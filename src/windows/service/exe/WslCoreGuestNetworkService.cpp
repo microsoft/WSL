@@ -144,11 +144,14 @@ std::pair<uint16_t, uint16_t> wsl::core::networking::GuestNetworkService::Alloca
         }
     }
 
-    if (portRangeSize < c_minEphemeralPortRangeSize)
+    if (FAILED(result))
     {
-        EMIT_USER_WARNING(Localization::MessageMirroredNetworkingPortRangeAllocationFailed(c_minEphemeralPortRangeSize + 1));
+        if (portRangeSize < c_minEphemeralPortRangeSize)
+        {
+            EMIT_USER_WARNING(Localization::MessageMirroredNetworkingPortRangeAllocationFailed(c_minEphemeralPortRangeSize + 1));
+        }
+        THROW_HR(result);
     }
-    THROW_IF_FAILED(result);
 
     WI_ASSERT(m_reservedPortRange.endingPort - m_reservedPortRange.startingPort == portRangeSize);
 
