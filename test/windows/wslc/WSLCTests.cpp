@@ -15418,6 +15418,82 @@ class WSLCTests
         }));
     }
 
+    WSLC_TEST_METHOD(DiagnosticCallbackNetworkCompletionReleasesNetworkLock)
+    {
+        constexpr auto c_networkName = "diagnostic-network-reentrant";
+        WSLCNetworkOptions options{};
+        options.Name = c_networkName;
+        options.Driver = "bridge";
+        auto cleanupNetwork = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(c_networkName)); });
+
+        auto callback = Microsoft::WRL::Make<BlockingDiagnosticCallback>(false, WSLC_DIAG_CODE_NETWORK_CREATION_COMPLETED);
+        std::promise<HRESULT> creationResult;
+        std::thread creationThread([&]() { creationResult.set_value(m_defaultSession->CreateNetwork(&options, callback.Get())); });
+        auto joinCreation = wil::scope_exit([&]() {
+            callback->Unblock.SetEvent();
+            creationThread.join();
+        });
+
+        VERIFY_IS_TRUE(callback->Reached.wait(60000));
+        std::promise<HRESULT> deletionResult;
+        std::thread deletionThread([&]() { deletionResult.set_value(m_defaultSession->DeleteNetwork(c_networkName)); });
+        auto joinDeletion = wil::scope_exit([&]() {
+            callback->Unblock.SetEvent();
+            deletionThread.join();
+        });
+
+        auto deletionFuture = deletionResult.get_future();
+        VERIFY_ARE_EQUAL(std::future_status::ready, deletionFuture.wait_for(std::chrono::seconds(60)));
+        VERIFY_SUCCEEDED(deletionFuture.get());
+        cleanupNetwork.release();
+        callback->Unblock.SetEvent();
+        auto creationFuture = creationResult.get_future();
+        VERIFY_ARE_EQUAL(std::future_status::ready, creationFuture.wait_for(std::chrono::seconds(60)));
+        VERIFY_SUCCEEDED(creationFuture.get());
+    }
+
+    WSLC_TEST_METHOD(DiagnosticCallbackContainerEventsReleaseCallerRegistration)
+    {
+        for (const bool restart : {false, true})
+        {
+            WSLCContainerLauncher launcher("debian:latest", "diagnostic-container-reentrant", {"sleep", "99999"});
+            auto container = launcher.Create(*m_defaultSession);
+            if (restart)
+            {
+                VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+            }
+
+            auto callback = Microsoft::WRL::Make<BlockingDiagnosticCallback>(false, WSLC_DIAG_CODE_CONTAINER_STATE_CHANGE);
+            std::promise<HRESULT> operationResult;
+            std::thread operationThread([&]() {
+                operationResult.set_value(
+                    restart ? container.Get().Restart(WSLCSignalSIGKILL, 0, callback.Get())
+                            : container.Get().Start(WSLCContainerStartFlagsNone, nullptr, callback.Get()));
+            });
+            auto joinOperation = wil::scope_exit([&]() {
+                callback->Unblock.SetEvent();
+                operationThread.join();
+            });
+
+            VERIFY_IS_TRUE(callback->Reached.wait(60000));
+            std::promise<HRESULT> deletionResult;
+            std::thread deletionThread([&]() { deletionResult.set_value(container.Get().Delete(WSLCDeleteFlagsForce)); });
+            auto joinDeletion = wil::scope_exit([&]() {
+                callback->Unblock.SetEvent();
+                deletionThread.join();
+            });
+
+            auto deletionFuture = deletionResult.get_future();
+            VERIFY_ARE_EQUAL(std::future_status::ready, deletionFuture.wait_for(std::chrono::seconds(60)));
+            VERIFY_SUCCEEDED(deletionFuture.get());
+            container.SetDeleteOnClose(false);
+            callback->Unblock.SetEvent();
+            auto operationFuture = operationResult.get_future();
+            VERIFY_ARE_EQUAL(std::future_status::ready, operationFuture.wait_for(std::chrono::seconds(60)));
+            VERIFY_SUCCEEDED(operationFuture.get());
+        }
+    }
+
     WSLC_TEST_METHOD(WarningCallbackContainerRecovery)
     {
         SKIP_TEST_SERVER();

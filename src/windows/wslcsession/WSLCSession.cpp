@@ -3243,6 +3243,9 @@ try
     auto labels = wslutil::ParseKeyValuePairs(Options->Labels, Options->LabelsCount, WSLCNetworkManagedLabel);
     WSLC_EVENT(context.Diagnostics(), "NetworkCreationStarted", WSLC_DIAG_CODE_NETWORK_CREATION_STARTED, "Name: {}; Driver: {}", name, driver);
 
+    wsl::windows::wslc::diagnostics::DiagnosticQueue pending{context.Diagnostics().EnabledLevels()};
+    auto completeDiagnostics = wil::scope_exit([&]() { pending.Complete(context.Diagnostics()); });
+
     auto lock = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
@@ -3344,7 +3347,7 @@ try
     auto [it, inserted] = m_networks.insert({name, std::move(entry)});
     WI_VERIFY(inserted);
 
-    WSLC_EVENT(context.Diagnostics(), "NetworkCreated", WSLC_DIAG_CODE_NETWORK_CREATION_COMPLETED, "Name: {}; Driver: {}; ID: {}", name, driver, full.Id);
+    WSLC_EVENT(pending, "NetworkCreated", WSLC_DIAG_CODE_NETWORK_CREATION_COMPLETED, "Name: {}; Driver: {}; ID: {}", name, driver, full.Id);
 
     removeNetworkCleanup.release();
     return S_OK;

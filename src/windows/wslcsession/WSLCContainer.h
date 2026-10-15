@@ -98,10 +98,10 @@ public:
 
     void Initialize();
 
-    void Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, wsl::windows::wslc::diagnostics::DiagnosticReporter Diagnostics);
+    void Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, wsl::windows::wslc::diagnostics::DiagnosticQueue Diagnostics);
     void Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr) const;
     void Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, bool Kill, wsl::windows::wslc::diagnostics::DiagnosticReporter Diagnostics);
-    void Restart(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, wsl::windows::wslc::diagnostics::DiagnosticReporter Diagnostics);
+    void Restart(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, wsl::windows::wslc::diagnostics::DiagnosticQueue Diagnostics);
     void Delete(WSLCDeleteFlags Flags, const wsl::windows::wslc::diagnostics::DiagnosticReporter& Diagnostics);
     void Export(WSLCHandle TarHandle) const;
     void UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize) const;

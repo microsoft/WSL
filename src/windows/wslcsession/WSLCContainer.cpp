@@ -1092,11 +1092,9 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
     *Stderr = common::wslutil::ToCOMOutputHandle(reinterpret_cast<HANDLE>(stderrRead.get()), GENERIC_READ | SYNCHRONIZE, WSLCHandleTypePipe);
 }
 
-void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, DiagnosticReporter Diagnostics)
+void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, OperationDiagnostics Diagnostics)
 {
-    OperationDiagnostics pending{Diagnostics.EnabledLevels()};
-    auto completeDiagnostics = wil::scope_exit([&]() { pending.Complete(Diagnostics); });
-    StartPhase(Flags, StartOptions, false, pending);
+    StartPhase(Flags, StartOptions, false, Diagnostics);
 }
 
 void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, bool RestartPhase, const OperationDiagnostics& Diagnostics)
@@ -1632,15 +1630,13 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
     }
 }
 
-void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds, DiagnosticReporter Diagnostics)
+void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds, OperationDiagnostics Diagnostics)
 {
-    OperationDiagnostics pending{Diagnostics.EnabledLevels()};
-    auto completeDiagnostics = wil::scope_exit([&]() { pending.Complete(Diagnostics); });
     // The stop phase is skipped when the container is not running, so it cannot be the only validation.
     ValidateStopTimeout(TimeoutSeconds, true);
 
     bool wasRunning{};
-    auto restart = std::make_shared<RestartTransaction>(pending);
+    auto restart = std::make_shared<RestartTransaction>(Diagnostics);
 
     {
         auto lifecycleLock = m_lifecycleLock.lock_shared();
@@ -1687,10 +1683,10 @@ void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds, Diagnost
 
     if (wasRunning)
     {
-        StopPhase(Signal, TimeoutSeconds, false, true, pending);
+        StopPhase(Signal, TimeoutSeconds, false, true, Diagnostics);
     }
 
-    StartPhase(WSLCContainerStartFlagsNone, nullptr, true, pending);
+    StartPhase(WSLCContainerStartFlagsNone, nullptr, true, Diagnostics);
     succeeded = true;
 }
 
@@ -3479,20 +3475,26 @@ HRESULT WSLCContainer::Restart(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds,
 try
 {
     WSLCExecutionContext context(&m_session, DiagnosticCallback);
-    const auto getContainerName = [this]() {
+    const auto containerName = [this]() {
         auto [lock, impl] = LockImpl();
         return impl->Name();
-    };
+    }();
 
     // Hold a VM lease across both phases: the container is not Running in between, so nothing else
     // keeps the VM alive.
     auto vmLease = m_session.Runtime().AcquireVmLease();
-    WSLC_EVENT(context.Diagnostics(), "ContainerRestarting", WSLC_DIAG_CODE_CONTAINER_RESTARTING, "Name: {}", getContainerName());
+    WSLC_EVENT(context.Diagnostics(), "ContainerRestarting", WSLC_DIAG_CODE_CONTAINER_RESTARTING, "Name: {}", containerName);
 
-    const auto result = CallImpl(&WSLCContainerImpl::Restart, Signal, TimeoutSeconds, context.Diagnostics());
+    HRESULT result;
+    {
+        wsl::windows::wslc::diagnostics::DiagnosticQueue pending{context.Diagnostics().EnabledLevels()};
+        auto completeDiagnostics = wil::scope_exit([&]() { pending.Complete(context.Diagnostics()); });
+        result = CallImpl(&WSLCContainerImpl::Restart, Signal, TimeoutSeconds, pending);
+    }
+
     if (SUCCEEDED(result))
     {
-        WSLC_EVENT(context.Diagnostics(), "ContainerRestarted", WSLC_DIAG_CODE_CONTAINER_RESTARTED, "Name: {}", getContainerName());
+        WSLC_EVENT(context.Diagnostics(), "ContainerRestarted", WSLC_DIAG_CODE_CONTAINER_RESTARTED, "Name: {}", containerName);
     }
 
     return result;
@@ -3503,20 +3505,26 @@ HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags, const WSLCProcessSta
 try
 {
     WSLCExecutionContext context(&m_session, DiagnosticCallback);
-    const auto getContainerName = [this]() {
+    const auto containerName = [this]() {
         auto [lock, impl] = LockImpl();
         return impl->Name();
-    };
+    }();
 
     THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCContainerStartFlagsValid), "Invalid flags: 0x%x", Flags);
 
     auto vmLease = m_session.Runtime().AcquireVmLease();
-    WSLC_EVENT(context.Diagnostics(), "ContainerStarting", WSLC_DIAG_CODE_CONTAINER_STARTING, "Name: {}", getContainerName());
+    WSLC_EVENT(context.Diagnostics(), "ContainerStarting", WSLC_DIAG_CODE_CONTAINER_STARTING, "Name: {}", containerName);
 
-    const auto result = CallImpl(&WSLCContainerImpl::Start, Flags, StartOptions, context.Diagnostics());
+    HRESULT result;
+    {
+        wsl::windows::wslc::diagnostics::DiagnosticQueue pending{context.Diagnostics().EnabledLevels()};
+        auto completeDiagnostics = wil::scope_exit([&]() { pending.Complete(context.Diagnostics()); });
+        result = CallImpl(&WSLCContainerImpl::Start, Flags, StartOptions, pending);
+    }
+
     if (SUCCEEDED(result))
     {
-        WSLC_EVENT(context.Diagnostics(), "ContainerStarted", WSLC_DIAG_CODE_CONTAINER_STARTED, "Name: {}", getContainerName());
+        WSLC_EVENT(context.Diagnostics(), "ContainerStarted", WSLC_DIAG_CODE_CONTAINER_STARTED, "Name: {}", containerName);
     }
 
     return result;
