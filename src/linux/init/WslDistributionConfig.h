@@ -98,7 +98,7 @@ struct WslDistributionConfig
 
     bool GuiAppsEnabled = false;
     std::optional<int> FeatureFlags;
-    std::optional<std::string> KernelPerfPath;
+    bool KernelPerfAvailable = false;
     std::optional<LX_MINI_INIT_NETWORKING_MODE> NetworkingMode;
     std::optional<std::string> VmId;
 

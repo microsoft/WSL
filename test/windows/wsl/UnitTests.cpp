@@ -3194,8 +3194,8 @@ Usage:
     {
         // The unified kernel artifacts VHD provides the kernel headers and the perf tooling
         // alongside the kernel modules. Headers are mounted at /usr/src/linux-headers-$(uname -r)
-        // with /lib/modules/$(uname -r)/build symlinked to that directory; perf is mounted at
-        // /usr/lib/linux-tools/$(uname -r) and exposed via $PATH.
+        // with /lib/modules/$(uname -r)/build symlinked to that directory; perf is mounted read-only
+        // at /usr/lib/wsl/perf/$(uname -r) and exposed via a fallback launcher in $PATH.
 
         // Headers: the build symlink and a representative uapi header are present.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -L /lib/modules/$(uname -r)/build", nullptr, nullptr, nullptr, nullptr), 0u);
@@ -3234,28 +3234,33 @@ EOF
                 nullptr),
             0u);
 
-        // perf: leave no trace in the distro's file system and make the versioned binary reachable
-        // via $PATH, with PERF_EXEC_PATH pointing at its helper scripts.
+        // perf: leave distro package paths untouched and scope helper settings to the launcher.
         //
         // N.B. The test distro does not ship perf, so nothing should be created at /usr/bin/perf.
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -x /usr/lib/linux-tools/$(uname -r)/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -x /usr/lib/wsl/perf/$(uname -r)/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -w /usr/lib/wsl/perf/$(uname -r)/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /usr/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(L"test \"$(command -v perf)\" = \"/usr/lib/linux-tools/$(uname -r)/bin/perf\"", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /usr/lib/linux-tools/$(uname -r)", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -z \"${PERF_EXEC_PATH+x}\"", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(command -v perf)\" = \"/run/wsl/perf/bin/perf\"", nullptr, nullptr, nullptr, nullptr), 0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"perf --version", nullptr, nullptr, nullptr, nullptr), 0u);
         VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(L"test \"$(perf --exec-path)\" = \"/usr/lib/linux-tools/$(uname -r)/libexec/perf-core\"", nullptr, nullptr, nullptr, nullptr),
+            LxsstuLaunchWsl(L"test \"$(perf --exec-path)\" = \"/usr/lib/wsl/perf/$(uname -r)/libexec/perf-core\"", nullptr, nullptr, nullptr, nullptr),
+            0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(PERF_EXEC_PATH=/tmp perf --exec-path)\" = /tmp", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(
+                L"test \"$(PERF_EXEC_PATH= perf --exec-path)\" = \"/usr/lib/wsl/perf/$(uname -r)/libexec/perf-core\"", nullptr, nullptr, nullptr, nullptr),
             0u);
 
-        // Stale distro-provided artifacts are replaced or hidden after the VM restarts. A distro
-        // provided perf is shadowed by the binary matching the running kernel.
+        // Headers are refreshed after restart, but distro perf takes precedence and remains replaceable.
         //
         // N.B. The cleanup is registered before the distro's file system is modified so that a
         //      failure can't leave a perf binary or a broken build symlink behind, which would
         //      break subsequent runs.
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
             LxsstuLaunchWsl(
-                L"umount /usr/bin/distro-perf 2>/dev/null; rm -f /usr/bin/perf /usr/bin/distro-perf; ln -snf"
+                L"rm -f /usr/bin/perf /usr/bin/perf.new /usr/bin/distro-perf /usr/bin/distro-perf.backup; ln -snf"
                 L" /usr/src/linux-headers-$(uname -r) /lib/modules/$(uname -r)/build",
                 nullptr,
                 nullptr,
@@ -3265,8 +3270,9 @@ EOF
 
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(
-                L"rm /lib/modules/$(uname -r)/build && ln -s /tmp /lib/modules/$(uname -r)/build && printf old-perf >"
-                L" /usr/bin/distro-perf && ln -s distro-perf /usr/bin/perf",
+                L"rm /lib/modules/$(uname -r)/build && ln -s /tmp /lib/modules/$(uname -r)/build &&"
+                L" printf '#!/bin/sh\\nprintf distro-perf\\n' > /usr/bin/distro-perf && chmod +x /usr/bin/distro-perf &&"
+                L" ln -s distro-perf /usr/bin/perf",
                 nullptr,
                 nullptr,
                 nullptr,
@@ -3278,10 +3284,28 @@ EOF
             0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(readlink /usr/bin/perf)\" = \"distro-perf\"", nullptr, nullptr, nullptr, nullptr), 0u);
         VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(
-                L"test \"$(stat -Lc %d:%i /usr/bin/perf)\" = \"$(stat -Lc %d:%i /usr/lib/linux-tools/$(uname -r)/bin/perf)\"", nullptr, nullptr, nullptr, nullptr),
+            LxsstuLaunchWsl(L"test \"$(command -v perf)\" = /usr/bin/perf && test \"$(perf --version)\" = distro-perf", nullptr, nullptr, nullptr, nullptr),
             0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"/usr/bin/perf --version", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(
+                L"ln /usr/bin/distro-perf /usr/bin/distro-perf.backup && cp /usr/bin/distro-perf /usr/bin/perf.new &&"
+                L" mv -f /usr/bin/perf.new /usr/bin/perf",
+                nullptr,
+                nullptr,
+                nullptr,
+                nullptr),
+            0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(
+                L"test ! -L /usr/bin/perf && test \"$(perf --version)\" = distro-perf &&"
+                L" ln /usr/bin/perf /usr/bin/perf.new && rm /usr/bin/perf && mv /usr/bin/perf.new /usr/bin/perf",
+                nullptr,
+                nullptr,
+                nullptr,
+                nullptr),
+            0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"/run/wsl/perf/bin/perf --version", nullptr, nullptr, nullptr, nullptr), 0u);
     }
 
     WSL2_TEST_METHOD(CrashCollection)

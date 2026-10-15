@@ -83,7 +83,9 @@ When started, the virtual machine will boot into the provided kernel, and then e
 - An entropy buffer, to seed the virtual machine's entropy
 - Information about the GPU drivers shares to mount, if any
 - Whether [wslg](https://github.com/microsoft/wslg) is enabled
-- Whether to mount the bundled Linux kernel headers and perf tooling (shipped in the kernel artifacts VHD; headers are mounted at `/usr/src/linux-headers-$(uname -r)` with `/lib/modules/$(uname -r)/build` linked to them or bind mounted when it is an existing directory, and perf is mounted at `/usr/lib/linux-tools/$(uname -r)`, added to the default `$PATH` and, when the distribution ships its own `/usr/bin/perf`, bind mounted over it)
+- Whether to mount the bundled Linux kernel headers and perf tooling (shipped in the kernel artifacts VHD; headers are mounted at `/usr/src/linux-headers-$(uname -r)` with `/lib/modules/$(uname -r)/build` linked to them or bind mounted when it is an existing directory, and perf is mounted read-only at `/usr/lib/wsl/perf/$(uname -r)`)
+
+Bundled perf is exposed through a launcher at `/run/wsl/perf/bin/perf`, with its directory appended to the default `$PATH` so distribution-provided tools take precedence. The launcher supplies the bundled helper path only when `PERF_EXEC_PATH` is unset or empty, without setting it globally. WSL does not modify `/usr/bin/perf` or `/usr/lib/linux-tools`, leaving distribution packages and their ELF/DWARF support intact. The bundled tool can be selected explicitly through the launcher.
 
 After applying all the configuration requested by [wslservice.exe](wslservice.exe.md), the virtual machine is ready to start Linux distributions.
 
