@@ -2,8 +2,10 @@
 
 #pragma once
 
+#include <algorithm>
 #include <array>
-#include <charconv>
+#include <cassert>
+#include <cctype>
 #include <format>
 #include <ranges>
 #include <string>
@@ -11,55 +13,54 @@
 
 namespace wsl::windows::common::proxy {
 
-// Convert IPv4 prefix wildcards to CIDR for consumers that accept CIDR ranges but do not recognize IP wildcard syntax
-// (e.g., adapting Windows proxy bypass entries for NO_PROXY).
-// Preserve other entries, including domain patterns and Windows-specific macros.
+// Convert a valid IPv4 prefix wildcard to CIDR for consumers that do not recognize wildcard syntax,
+// e.g., when adapting Windows proxy bypass entries for NO_PROXY.
 inline std::string Ipv4WildcardToCidr(std::string_view value)
 {
-    const auto first = value.find_first_not_of(" \t\r\n");
-    if (first == std::string_view::npos)
-    {
-        return std::string{value};
-    }
+    assert(
+        value.empty() ||
+        (!std::isspace(static_cast<unsigned char>(value.front())) && !std::isspace(static_cast<unsigned char>(value.back()))));
 
-    const auto pattern = value.substr(first, value.find_last_not_of(" \t\r\n") - first + 1);
-    const auto wildcard = pattern.find(".*");
-    if (wildcard == std::string_view::npos || wildcard == 0)
+    std::array<std::string_view, 4> parts;
+    parts.fill("*");
+    size_t count = 0;
+    size_t wildcardPos = parts.size();
+    for (const auto range : std::views::split(value, '.'))
     {
-        return std::string{value};
-    }
+        if (count == parts.size())
+        {
+            return std::string{value};
+        }
 
-    const auto suffix = pattern.substr(wildcard);
-    if (suffix != ".*" && suffix != ".*.*" && suffix != ".*.*.*")
-    {
-        return std::string{value};
-    }
-
-    std::array<unsigned int, 4> octets{};
-    size_t fixedOctets = 0;
-    for (const auto range : std::views::split(pattern.substr(0, wildcard), '.'))
-    {
         const std::string_view part{range.begin(), range.end()};
-        if (fixedOctets == 3 || part.empty() || part.size() > 3 || (part.size() > 1 && part.front() == '0'))
+        if (part == "*")
+        {
+            if (wildcardPos == parts.size())
+            {
+                wildcardPos = count;
+            }
+        }
+        else if (wildcardPos != parts.size() || part.empty() || !std::ranges::all_of(part, [](const char character) {
+                     return std::isdigit(static_cast<unsigned char>(character));
+                 }))
         {
             return std::string{value};
         }
 
-        const auto [end, error] = std::from_chars(part.data(), part.data() + part.size(), octets[fixedOctets]);
-        if (error != std::errc{} || end != part.data() + part.size() || octets[fixedOctets] > 255)
-        {
-            return std::string{value};
-        }
-
-        ++fixedOctets;
+        parts[count++] = part;
     }
 
-    if (fixedOctets + suffix.size() / 2 > octets.size())
+    if (wildcardPos == 0 || wildcardPos == parts.size())
     {
         return std::string{value};
     }
 
-    return std::format("{}.{}.{}.{}/{}", octets[0], octets[1], octets[2], octets[3], fixedOctets * 8);
+    for (size_t index = wildcardPos; index < parts.size(); ++index)
+    {
+        parts[index] = "0";
+    }
+
+    return std::format("{}.{}.{}.{}/{}", parts[0], parts[1], parts[2], parts[3], wildcardPos * 8);
 }
 
 } // namespace wsl::windows::common::proxy
