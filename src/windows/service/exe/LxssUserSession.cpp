@@ -20,6 +20,7 @@ Abstract:
 #include "notifications.h"
 #include "WslInstall.h"
 #include "WslCoreInstance.h"
+#include "UsbManager.h"
 #include "resource.h"
 #include <winrt\Windows.ApplicationModel.Background.h>
 #include <nlohmann\json.hpp>
@@ -569,8 +570,65 @@ try
 }
 CATCH_RETURN()
 
-LxssUserSessionImpl::LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId, _Inout_ wsl::windows::service::PluginManager& pluginManager) :
-    m_sessionId(sessionId), m_pluginManager(pluginManager)
+HRESULT STDMETHODCALLTYPE LxssUserSession::EnumerateUsbDevices(_Out_ ULONG* DeviceCount, _Out_ WSL_USB_DEVICE** Devices, _Out_ LXSS_ERROR_INFO* Error)
+try
+{
+    ServiceExecutionContext context(Error);
+    RETURN_HR_IF_NULL(E_POINTER, DeviceCount);
+    RETURN_HR_IF_NULL(E_POINTER, Devices);
+    *DeviceCount = 0;
+    *Devices = nullptr;
+    const auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+    const auto token = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    const auto user = wil::get_token_information<TOKEN_USER>(token.get());
+    RETURN_HR_IF(E_ACCESSDENIED, !EqualSid(user->User.Sid, session->GetUserSid()));
+    return session->EnumerateUsbDevices(DeviceCount, Devices);
+}
+CATCH_RETURN()
+
+HRESULT STDMETHODCALLTYPE LxssUserSession::AttachUsbDevice(_In_ LPCWSTR Port, _Out_ LXSS_ERROR_INFO* Error)
+try
+{
+    ServiceExecutionContext context(Error);
+    RETURN_HR_IF_NULL(E_INVALIDARG, Port);
+    const auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+    const auto token = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    const auto user = wil::get_token_information<TOKEN_USER>(token.get());
+    RETURN_HR_IF(E_ACCESSDENIED, !EqualSid(user->User.Sid, session->GetUserSid()));
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED),
+        wsl::shared::Localization::MessageUsbElevationRequired(),
+        !wsl::windows::common::security::IsTokenElevated(token.get()));
+    return session->AttachUsbDevice(Port);
+}
+CATCH_RETURN()
+
+HRESULT STDMETHODCALLTYPE LxssUserSession::DetachUsbDevice(_In_ LPCWSTR Port, _Out_ LXSS_ERROR_INFO* Error)
+try
+{
+    ServiceExecutionContext context(Error);
+    RETURN_HR_IF_NULL(E_INVALIDARG, Port);
+    const auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+    const auto token = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    const auto user = wil::get_token_information<TOKEN_USER>(token.get());
+    RETURN_HR_IF(E_ACCESSDENIED, !EqualSid(user->User.Sid, session->GetUserSid()));
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED),
+        wsl::shared::Localization::MessageUsbElevationRequired(),
+        !wsl::windows::common::security::IsTokenElevated(token.get()));
+    return session->DetachUsbDevice(Port);
+}
+CATCH_RETURN()
+
+LxssUserSessionImpl::LxssUserSessionImpl(
+    _In_ PSID userSid,
+    _In_ DWORD sessionId,
+    _Inout_ wsl::windows::service::PluginManager& pluginManager,
+    std::shared_ptr<wsl::windows::common::usb::Manager> usbManager) :
+    m_sessionId(sessionId), m_pluginManager(pluginManager), m_usbManager(std::move(usbManager))
 {
     THROW_IF_WIN32_BOOL_FALSE(::CopySid(sizeof(m_userSid), &m_userSid.Sid, userSid));
 
@@ -2263,6 +2321,10 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, ShutdownBeh
             }
 
             // Terminate the utility VM.
+            if (m_usbManager)
+            {
+                m_usbManager->ShutdownByUser(&m_userSid.Sid);
+            }
             _VmTerminate();
             resetVmTerminationCallback.reset();
 
@@ -2514,6 +2576,58 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid)
     }
 
     return result;
+}
+
+HRESULT LxssUserSessionImpl::EnumerateUsbDevices(_Out_ ULONG* DeviceCount, _Out_ WSL_USB_DEVICE** Devices)
+{
+    std::lock_guard lock(m_instanceLock);
+    THROW_HR_IF(CO_E_SERVER_STOPPING, m_disableNewInstanceCreation);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_READY), !m_usbManager);
+    const auto devices = m_usbManager->List(&m_userSid.Sid);
+    auto result = wil::make_unique_cotaskmem<WSL_USB_DEVICE[]>(devices.size());
+    auto cleanup = wil::scope_exit([&]() {
+        for (size_t index = 0; index < devices.size(); ++index)
+        {
+            CoTaskMemFree(result[index].Port);
+            CoTaskMemFree(result[index].Name);
+            CoTaskMemFree(result[index].HardwareId);
+        }
+    });
+    for (size_t index = 0; index < devices.size(); ++index)
+    {
+        result[index].Port = wil::make_cotaskmem_string(devices[index].Port.c_str()).release();
+        result[index].Name = wil::make_cotaskmem_string(devices[index].Name.c_str()).release();
+        result[index].HardwareId = wil::make_cotaskmem_string(devices[index].HardwareId.c_str()).release();
+        result[index].State = static_cast<WslUsbDeviceState>(devices[index].State);
+    }
+    cleanup.release();
+    *DeviceCount = gsl::narrow_cast<ULONG>(devices.size());
+    *Devices = result.release();
+    return S_OK;
+}
+
+HRESULT LxssUserSessionImpl::AttachUsbDevice(_In_ LPCWSTR Port)
+{
+    const auto port = wsl::windows::common::usb::ParsePortSelector(Port);
+    std::lock_guard lock(m_instanceLock);
+    THROW_HR_IF(CO_E_SERVER_STOPPING, m_disableNewInstanceCreation);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_READY), !m_usbManager);
+    if (m_utilityVm)
+    {
+        m_usbManager->VmStarted(&m_userSid.Sid, m_vmId.load());
+    }
+    m_usbManager->Attach(&m_userSid.Sid, port);
+    return S_OK;
+}
+
+HRESULT LxssUserSessionImpl::DetachUsbDevice(_In_ LPCWSTR Port)
+{
+    const auto port = wsl::windows::common::usb::ParsePortSelector(Port);
+    std::lock_guard lock(m_instanceLock);
+    THROW_HR_IF(CO_E_SERVER_STOPPING, m_disableNewInstanceCreation);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_READY), !m_usbManager);
+    m_usbManager->Detach(&m_userSid.Sid, port);
+    return S_OK;
 }
 
 _Requires_lock_held_(m_instanceLock)
@@ -3013,6 +3127,14 @@ void LxssUserSessionImpl::_CreateVm()
             }
 
             m_pluginManager.OnVmStarted(&m_session, &userSettings);
+            try
+            {
+                if (m_usbManager)
+                {
+                    m_usbManager->VmStarted(&m_userSid.Sid, vmId);
+                }
+            }
+            CATCH_LOG()
         }
         catch (...)
         {
@@ -4039,6 +4161,10 @@ void LxssUserSessionImpl::_VmTerminate()
     }
 
     m_vmTerminating.SetEvent();
+    if (m_usbManager)
+    {
+        m_usbManager->VmStopped(&m_userSid.Sid);
+    }
     if (m_telemetryThread.joinable())
     {
         m_telemetryThread.join();

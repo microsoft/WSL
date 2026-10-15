@@ -59,6 +59,13 @@ enum _LxssExecutionContextFlags {
     LxssExecutionContextFlagsEnableUserWarnings = 2
 } LxssExecutionContextFlags;
 
+typedef enum _WslUsbDeviceState
+{
+    WslUsbDeviceStateUnattached = 0,
+    WslUsbDeviceStateAttached,
+    WslUsbDeviceStateUnavailable
+} WslUsbDeviceState;
+
 cpp_quote("#define LXSS_HANDLE_USE_CONSOLE 0")
 
 typedef
@@ -91,6 +98,14 @@ struct _LXSS_ERROR_INFO {
     [string] LPWSTR Warnings;
     ULONG WarningsPipe;
 } LXSS_ERROR_INFO, *PLXSS_ERROR_INFO;
+
+typedef struct _WSL_USB_DEVICE
+{
+    [string] LPWSTR Port;
+    [string] LPWSTR Name;
+    [string] LPWSTR HardwareId;
+    WslUsbDeviceState State;
+} WSL_USB_DEVICE;
 
 cpp_quote("#define LXSS_DISTRO_VERSION_LEGACY 0")
 cpp_quote("#define LXSS_DISTRO_VERSION_1 1")
@@ -350,6 +365,19 @@ interface ILxssUserSession : IUnknown
 
     HRESULT CompactDistribution(
         [in] LPCGUID DistroGuid,
+        [in, out] LXSS_ERROR_INFO* Error);
+
+    HRESULT EnumerateUsbDevices(
+        [out] ULONG* DeviceCount,
+        [out, size_is(,*DeviceCount)] WSL_USB_DEVICE** Devices,
+        [in, out] LXSS_ERROR_INFO* Error);
+
+    HRESULT AttachUsbDevice(
+        [in, string] LPCWSTR Port,
+        [in, out] LXSS_ERROR_INFO* Error);
+
+    HRESULT DetachUsbDevice(
+        [in, string] LPCWSTR Port,
         [in, out] LXSS_ERROR_INFO* Error);
 };
 

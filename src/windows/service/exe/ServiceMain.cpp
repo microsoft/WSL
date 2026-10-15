@@ -19,6 +19,7 @@ Abstract:
 #include "LxssIpTables.h"
 #include "LxssUserSessionFactory.h"
 #include "WSLCSessionManagerFactory.h"
+#include "UsbManager.h"
 #include <ctime>
 
 using namespace wsl::windows::common::registry;
@@ -31,6 +32,7 @@ bool g_lxcoreInitialized{false};
 wil::unique_event g_networkingReady{wil::EventOptions::ManualReset};
 
 wsl::windows::service::PluginManager g_pluginManager;
+std::shared_ptr<wsl::windows::common::usb::Manager> g_usbManager;
 
 // Declare the LxssUserSession COM class.
 CoCreatableClassWrlCreatorMapInclude(LxssUserSession);
@@ -199,6 +201,12 @@ try
 
     wsl::windows::common::helpers::RegisterWithDcat();
 
+    try
+    {
+        g_usbManager = std::make_shared<wsl::windows::common::usb::Manager>();
+    }
+    CATCH_LOG()
+
     return S_OK;
 }
 CATCH_RETURN()
@@ -247,11 +255,19 @@ void WslService::ServiceStopped()
     // Stop watching the WSL policy registry keys.
     m_watcher.reset();
 
+    // Cancel USB attach waits before session teardown acquires the instance locks.
+    if (g_usbManager)
+    {
+        g_usbManager->Stop();
+    }
+
     // Terminate all user sessions.
     ClearSessionsAndBlockNewInstances();
 
     // Also tear down WSLC sessions.
     wsl::windows::service::wslc::ClearWslcSessionsAndBlockNewInstances();
+
+    g_usbManager.reset();
 
     // Disconnect from the LxCore driver.
     if (g_lxcoreInitialized)

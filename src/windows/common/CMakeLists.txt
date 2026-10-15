@@ -47,6 +47,9 @@ set(SOURCES
     SubProcess.cpp
     svccomm.cpp
     timestamp.cpp
+    UsbDevice.cpp
+    UsbManager.cpp
+    UsbUxdRegistry.cpp
     VTSupport.cpp
     WindowsUpdateIntegration.cpp
     WSLCContainerLauncher.cpp
@@ -145,6 +148,10 @@ set(HEADERS
     SubProcess.h
     svccomm.hpp
     timestamp.hpp
+    UsbDevice.h
+    UsbManager.h
+    UsbTypes.h
+    UsbUxdRegistry.h
     VTSupport.h
     WindowsUpdateIntegration.h
     WSLCContainerLauncher.h
@@ -181,7 +188,7 @@ target_include_directories(common PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/../service/
 # PUBLIC propagates them instead of making each consumer restate them.
 # yaml-cpp backs WSLCUserSettings, advapi32 the credential manager APIs used by
 # WinCredStorage, and Crypt32 the data protection APIs used by FileCredStorage.
-target_link_libraries(common PUBLIC ${HCS_LINK_LIBRARIES} ${MSI_LINK_LIBRARIES} VirtDisk.lib configfile yaml-cpp advapi32 Crypt32.lib)
+target_link_libraries(common PUBLIC ${HCS_LINK_LIBRARIES} ${MSI_LINK_LIBRARIES} VirtDisk.lib configfile yaml-cpp advapi32 Crypt32.lib cfgmgr32.lib setupapi.lib winusb.lib KtmW32.lib)
 
 # WSLCUserSettings.cpp uses yaml-cpp headers.
 # The per-source include path and definition below only apply when the file is

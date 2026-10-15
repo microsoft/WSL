@@ -540,6 +540,17 @@ Arguments for managing Windows Subsystem for Linux:
         Unmounts and detaches a disk from all WSL2 distributions.
         Unmounts and detaches all disks if called without argument.
 
+    --usb --list [--verbose]
+      Lists physical USB devices. Include --verbose to display hardware IDs.
+
+    --usb --attach &lt;Port&gt;
+      Attaches a USB device to this user's WSL 2 virtual machine.
+      Requires administrator privileges.
+
+    --usb --detach &lt;Port&gt;
+      Returns this user's attached USB device to Windows.
+      Requires administrator privileges.
+
     --uninstall
         Uninstalls the Windows Subsystem for Linux package from this machine.
 
@@ -624,13 +635,13 @@ Arguments for managing distributions in Windows Subsystem for Linux:
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
 "}{Locked="--status
-"}{Locked="--unmount "}{Locked="--uninstall
+"}{Locked="--unmount "}{Locked="--usb "}{Locked="--list "}{Locked="--verbose]"}{Locked="--verbose "}{Locked="--usb "}{Locked="--attach "}{Locked="--usb "}{Locked="--detach "}{Locked="--uninstall
 "}{Locked="--update
 "}{Locked="--pre-release
 "}{Locked="--version,"}{Locked="--export "}{Locked="--format "}{Locked="--import "}{Locked="--version "}{Locked="--vhd
 "}{Locked="--import-in-place "}{Locked="--list,"}{Locked="--all
 "}{Locked="--running
-"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
+"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated. {Locked="&lt;Port&gt;"}The USB port placeholder should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessagePackageVersions" xml:space="preserve">
     <value>WSL version: {}
@@ -1216,6 +1227,26 @@ See recovery instructions on: https://aka.ms/wsldiskmountrecovery</value>
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
     <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. Using cgroup v2 instead. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
+  <data name="MessageUsbInvalidPort" xml:space="preserve">
+    <value>Invalid USB port '{}'. Use the hub-port value shown by wsl --usb --list.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--usb "}{Locked="--list."}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUsbElevationRequired" xml:space="preserve">
+    <value>The --usb --attach and --usb --detach commands require administrator privileges.</value>
+    <comment>{Locked="--usb "}{Locked="--attach "}{Locked="--usb "}{Locked="--detach "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUsbUnavailable" xml:space="preserve">
+    <value>This USB device is unavailable to your WSL session.</value>
+  </data>
+  <data name="MessageUsbAlreadyAttached" xml:space="preserve">
+    <value>This USB device is already attached to your WSL session.</value>
+  </data>
+  <data name="MessageUsbNotAttached" xml:space="preserve">
+    <value>This USB device is not attached to your WSL session.</value>
+  </data>
+  <data name="MessageUsbNotFound" xml:space="preserve">
+    <value>No physical USB device was found at this port. Refresh the list and try again.</value>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Something went wrong. Try again later.</value>

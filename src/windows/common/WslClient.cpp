@@ -18,6 +18,7 @@ Abstract:
 #include "HandleConsoleProgressBar.h"
 #include "Distribution.h"
 #include "CommandLine.h"
+#include "UsbTypes.h"
 #include <conio.h>
 #include "WslCoreFilesystem.h"
 
@@ -715,6 +716,96 @@ int ListDistributions(_In_ std::wstring_view commandLine)
     parser.Parse();
 
     return ListDistributionsHelper(options);
+}
+
+std::wstring FormatUsbDevices(const std::vector<usb::ListedDevice>& devices, bool verbose)
+{
+    std::vector<std::array<std::wstring, 4>> rows;
+    rows.push_back({WSL_USB_LIST_HEADER_PORT, WSL_USB_LIST_HEADER_NAME, WSL_USB_LIST_HEADER_STATE, WSL_USB_LIST_HEADER_HARDWARE_ID});
+    for (const auto& device : devices)
+    {
+        std::wstring state;
+        switch (device.State)
+        {
+        case usb::DeviceState::Unattached:
+            state = L"Unattached";
+            break;
+        case usb::DeviceState::Attached:
+            state = L"Attached";
+            break;
+        default:
+            state = L"Unavailable";
+            break;
+        }
+        rows.push_back({device.Port, device.Name, std::move(state), device.HardwareId});
+    }
+    std::array<size_t, 4> widths{};
+    for (auto& row : rows)
+    {
+        for (size_t column = 0; column < row.size(); ++column)
+        {
+            for (auto& character : row[column])
+            {
+                if (character < L' ' || (character >= 0x7f && character <= 0x9f))
+                {
+                    character = L' ';
+                }
+            }
+            widths[column] = std::max(widths[column], row[column].size());
+        }
+    }
+    std::wstring output;
+    const size_t columns = verbose ? 4 : 3;
+    for (const auto& row : rows)
+    {
+        for (size_t column = 0; column < columns; ++column)
+        {
+            output += row[column];
+            if (column + 1 < columns)
+            {
+                output.append(widths[column] - row[column].size() + 4, L' ');
+            }
+        }
+        output += L'\n';
+    }
+    return output;
+}
+
+int Usb(_In_ std::wstring_view commandLine)
+{
+    bool list = false;
+    bool verbose = false;
+    std::optional<std::wstring> attachPort;
+    std::optional<std::wstring> detachPort;
+    ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
+    parser.AddArgument(list, WSL_USB_ARG_LIST_OPTION);
+    parser.AddArgument(verbose, WSL_USB_ARG_VERBOSE_OPTION);
+    parser.AddArgument(attachPort, WSL_USB_ARG_ATTACH_OPTION);
+    parser.AddArgument(detachPort, WSL_USB_ARG_DETACH_OPTION);
+    parser.Parse();
+
+    THROW_HR_IF(WSL_E_INVALID_USAGE, list + attachPort.has_value() + detachPort.has_value() != 1 || (verbose && !list));
+    if (!list)
+    {
+        const auto& port = attachPort ? *attachPort : *detachPort;
+        const auto result = wil::ResultFromException([&]() { usb::ParsePortSelector(port); });
+        THROW_HR_WITH_USER_ERROR_IF(result, Localization::MessageUsbInvalidPort(port), FAILED(result));
+    }
+
+    SvcComm service;
+    if (list)
+    {
+        wprintf(L"%ls", FormatUsbDevices(service.EnumerateUsbDevices(), verbose).c_str());
+    }
+    else if (attachPort)
+    {
+        service.AttachUsbDevice(attachPort->c_str());
+    }
+    else
+    {
+        service.DetachUsbDevice(detachPort->c_str());
+    }
+    return 0;
 }
 
 int ListDistributionsHelper(_In_ ListOptions options)
@@ -1803,6 +1894,10 @@ int WslMain(_In_ std::wstring_view commandLine)
             }
 
             return Uninstall();
+        }
+        else if (argument == WSL_USB_ARG)
+        {
+            return Usb(commandLine);
         }
         else
         {

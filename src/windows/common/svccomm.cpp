@@ -729,3 +729,40 @@ void wsl::windows::common::SvcComm::UnregisterDistribution(_In_ LPCGUID DistroGu
     ClientExecutionContext context;
     THROW_IF_FAILED(m_userSession->UnregisterDistribution(DistroGuid, context.OutError()));
 }
+
+std::vector<wsl::windows::common::usb::ListedDevice> wsl::windows::common::SvcComm::EnumerateUsbDevices() const
+{
+    static_assert(static_cast<WslUsbDeviceState>(usb::DeviceState::Unattached) == WslUsbDeviceStateUnattached);
+    static_assert(static_cast<WslUsbDeviceState>(usb::DeviceState::Attached) == WslUsbDeviceStateAttached);
+    static_assert(static_cast<WslUsbDeviceState>(usb::DeviceState::Unavailable) == WslUsbDeviceStateUnavailable);
+
+    ClientExecutionContext context;
+    wil::unique_cotaskmem_array_ptr<WSL_USB_DEVICE> devices;
+    auto cleanup = wil::scope_exit([&]() {
+        for (auto& device : devices)
+        {
+            CoTaskMemFree(device.Port);
+            CoTaskMemFree(device.Name);
+            CoTaskMemFree(device.HardwareId);
+        }
+    });
+    THROW_IF_FAILED(m_userSession->EnumerateUsbDevices(devices.size_address<ULONG>(), &devices, context.OutError()));
+    std::vector<usb::ListedDevice> result;
+    for (const auto& device : devices)
+    {
+        result.push_back({device.Port, device.Name, device.HardwareId, static_cast<usb::DeviceState>(device.State)});
+    }
+    return result;
+}
+
+void wsl::windows::common::SvcComm::AttachUsbDevice(PCWSTR Port) const
+{
+    ClientExecutionContext context;
+    THROW_IF_FAILED(m_userSession->AttachUsbDevice(Port, context.OutError()));
+}
+
+void wsl::windows::common::SvcComm::DetachUsbDevice(PCWSTR Port) const
+{
+    ClientExecutionContext context;
+    THROW_IF_FAILED(m_userSession->DetachUsbDevice(Port, context.OutError()));
+}

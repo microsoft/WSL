@@ -31,6 +31,7 @@ std::optional<std::vector<std::shared_ptr<LxssUserSessionImpl>>> g_sessions =
     std::make_optional<std::vector<std::shared_ptr<LxssUserSessionImpl>>>();
 
 extern wsl::windows::service::PluginManager g_pluginManager;
+extern std::shared_ptr<wsl::windows::common::usb::Manager> g_usbManager;
 
 extern unique_event g_networkingReady;
 extern bool g_lxcoreInitialized;
@@ -221,7 +222,7 @@ std::weak_ptr<LxssUserSessionImpl> CreateInstanceForCurrentUser()
 
         if (!userSession)
         {
-            userSession.reset(new LxssUserSessionImpl(tokenInfo->User.Sid, sessionId, g_pluginManager));
+            userSession.reset(new LxssUserSessionImpl(tokenInfo->User.Sid, sessionId, g_pluginManager, g_usbManager));
             g_sessions->emplace_back(userSession);
         }
     }

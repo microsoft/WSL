@@ -41,6 +41,10 @@ class LxssRunningInstance;
 class WslCoreVm;
 class LxssUserSessionImpl;
 
+namespace wsl::windows::common::usb {
+class Manager;
+}
+
 typedef struct _LXSS_RUN_ELF_CONTEXT
 {
     wil::unique_event instanceTerminatedEvent;
@@ -266,6 +270,21 @@ public:
     /// </summary>
     IFACEMETHOD(UnregisterDistribution)(_In_ LPCGUID DistroGuid, _Out_ LXSS_ERROR_INFO* Error) override;
 
+    /// <summary>
+    /// Enumerates physical USB devices and their availability to the caller.
+    /// </summary>
+    IFACEMETHOD(EnumerateUsbDevices)(_Out_ ULONG* DeviceCount, _Out_ WSL_USB_DEVICE** Devices, _Out_ LXSS_ERROR_INFO* Error) override;
+
+    /// <summary>
+    /// Attaches a USB device to the caller's utility VM.
+    /// </summary>
+    IFACEMETHOD(AttachUsbDevice)(_In_ LPCWSTR Port, _Out_ LXSS_ERROR_INFO* Error) override;
+
+    /// <summary>
+    /// Detaches the caller's USB device and returns it to Windows.
+    /// </summary>
+    IFACEMETHOD(DetachUsbDevice)(_In_ LPCWSTR Port, _Out_ LXSS_ERROR_INFO* Error) override;
+
     // IWslSupport methods.
 
     /// <summary>
@@ -316,7 +335,11 @@ private:
 class LxssUserSessionImpl : public std::enable_shared_from_this<LxssUserSessionImpl>
 {
 public:
-    LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId, _Inout_ wsl::windows::service::PluginManager& pluginManager);
+    LxssUserSessionImpl(
+        _In_ PSID userSid,
+        _In_ DWORD sessionId,
+        _Inout_ wsl::windows::service::PluginManager& pluginManager,
+        std::shared_ptr<wsl::windows::common::usb::Manager> usbManager);
     virtual ~LxssUserSessionImpl();
     LxssUserSessionImpl(const LxssUserSessionImpl&) = delete;
     LxssUserSessionImpl& operator=(const LxssUserSessionImpl&) = delete;
@@ -542,6 +565,21 @@ public:
     /// Queries a distribution's default UID, default environment, and flags.
     /// </summary>
     static CreateLxProcessContext s_GetCreateProcessContext(_In_ const GUID& DistroGuid, _In_ bool SystemDistro);
+
+    /// <summary>
+    /// Enumerates physical USB devices and their availability to this user.
+    /// </summary>
+    HRESULT EnumerateUsbDevices(_Out_ ULONG* DeviceCount, _Out_ WSL_USB_DEVICE** Devices);
+
+    /// <summary>
+    /// Attaches a USB device for this user while serializing with session shutdown.
+    /// </summary>
+    HRESULT AttachUsbDevice(_In_ LPCWSTR Port);
+
+    /// <summary>
+    /// Detaches this user's USB device and returns it to Windows.
+    /// </summary>
+    HRESULT DetachUsbDevice(_In_ LPCWSTR Port);
 
 private:
     /// <summary>
@@ -879,6 +917,8 @@ private:
     WSLSessionInformation m_session{};
 
     wsl::windows::service::PluginManager& m_pluginManager;
+
+    const std::shared_ptr<wsl::windows::common::usb::Manager> m_usbManager;
 
     /// <summary>
     /// Listens to host http proxy setting changes, tracks ongoing proxy queries, and stores current settings.
