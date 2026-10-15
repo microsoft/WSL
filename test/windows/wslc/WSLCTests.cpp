@@ -14948,7 +14948,8 @@ class WSLCTests
         options.CommandLine = {commandLine, RTL_NUMBER_OF(commandLine)};
         options.Flags = WSLCProcessFlagsTty | WSLCProcessFlagsStdin;
         wil::com_ptr<IWSLCProcess> pluginProcess;
-        VERIFY_SUCCEEDED(session->CreateRootNamespaceProcess("/bin/sleep", &options, 24, 80, FALSE, &pluginProcess, nullptr));
+        int errnoValue = -1;
+        VERIFY_SUCCEEDED(session->CreateRootNamespaceProcess("/bin/sleep", &options, 24, 80, FALSE, &pluginProcess, &errnoValue));
         VERIFY_SUCCEEDED(pluginProcess->ResizeTty(25, 81));
 
         // Releasing the ordinary process wrapper removes its activity hold, allowing idle termination.
