@@ -2554,6 +2554,15 @@ Usage:
         VERIFY_ARE_EQUAL(L"", warnings);
     }
 
+    WSL2_TEST_METHOD(NestedVirtualization)
+    {
+        SKIP_TEST_ARM64();
+
+        // The service should honor this explicit setting on every supported x64 Windows version.
+        WslConfigChange configChange(LxssGenerateTestConfig() + L"\nnestedVirtualization=true");
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -c /dev/kvm && grep -Eq 'vmx|svm' /proc/cpuinfo"), 0u);
+    }
+
     WSL2_TEST_METHOD(DmesgCollection)
     {
         const auto dmesgLogFile = std::filesystem::current_path() / L"test-dmesg.txt";
