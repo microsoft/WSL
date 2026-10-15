@@ -46,12 +46,15 @@ IAsyncOperationWithProgress<IBuffer, uint32_t> IOHandleInputStream::ReadAsync(IB
         throw winrt::hresult_error(E_BOUNDS, L"Count cannot be greater than the buffer capacity");
     }
 
+    // Stash parameter for coroutine suspension
+    IBuffer localBuffer = buffer;
+
     // Move to a background thread, ensuring that this object stays alive until the async operation completes.
     auto self = get_strong();
     co_await winrt::resume_background();
 
     DWORD bytesRead = 0;
-    if (!ReadFile(self->m_handle.get(), buffer.data(), count, &bytesRead, nullptr))
+    if (!ReadFile(self->m_handle.get(), localBuffer.data(), count, &bytesRead, nullptr))
     {
         const auto error = GetLastError();
         if (error == ERROR_BROKEN_PIPE)
@@ -64,8 +67,8 @@ IAsyncOperationWithProgress<IBuffer, uint32_t> IOHandleInputStream::ReadAsync(IB
         }
     }
 
-    buffer.Length(bytesRead);
-    co_return buffer;
+    localBuffer.Length(bytesRead);
+    co_return localBuffer;
 }
 
 void IOHandleInputStream::Close()
@@ -84,12 +87,15 @@ IAsyncOperationWithProgress<uint32_t, uint32_t> IOHandleOutputStream::WriteAsync
         throw winrt::hresult_illegal_method_call(L"Stream is closed");
     }
 
+    // Stash parameter for coroutine suspension
+    IBuffer localBuffer = buffer;
+
     // Move to a background thread, ensuring that this object stays alive until the async operation completes.
     auto self = get_strong();
     co_await winrt::resume_background();
 
     DWORD bytesWritten = 0;
-    THROW_IF_WIN32_BOOL_FALSE(WriteFile(self->m_handle.get(), buffer.data(), buffer.Length(), &bytesWritten, nullptr));
+    THROW_IF_WIN32_BOOL_FALSE(WriteFile(self->m_handle.get(), localBuffer.data(), localBuffer.Length(), &bytesWritten, nullptr));
 
     co_return bytesWritten;
 }

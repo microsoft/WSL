@@ -25,9 +25,8 @@ set_target_properties(wslclib PROPERTIES FOLDER windows)
 # transitive dependencies. Do not also use $<TARGET_OBJECTS:wslclib>.
 add_executable(wslc main.rc resource.h)
 
-target_link_libraries(wslc wslclib delayimp.lib)
+target_link_libraries(wslc wslclib)
 
-set_target_properties(wslc PROPERTIES LINK_FLAGS "/DELAYLOAD:msi.dll /DELAYLOAD:WINTRUST.dll")
 set_target_properties(wslc PROPERTIES FOLDER windows)
 
 # For prettier source tree browsing

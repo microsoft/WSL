@@ -3,6 +3,7 @@ nav:
   - index.md
   - wslcinitcontainersettings.md
   - wslccreatecontainer.md
+  - wslcopencontainer.md
   - wslcstartcontainer.md
   - wslcsetcontainersettingsname.md
   - wslcsetcontainersettingsinitprocess.md
@@ -13,6 +14,7 @@ nav:
   - wslcsetcontainersettingsportmappings.md
   - wslcsetcontainersettingsvolumes.md
   - wslcsetcontainersettingsnamedvolumes.md
+  - wslcsetcontainerinitprocessiocallbacks.md
   - wslccreatecontainerprocess.md
   - wslcgetcontainerid.md
   - wslcgetcontainerinitprocess.md
