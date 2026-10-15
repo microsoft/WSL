@@ -1606,18 +1606,21 @@ std::wstring WslCoreVm::GenerateConfigJson()
             {
                 m_vmConfig.EnableNestedVirtualization = false;
             }
+
+            if (!m_vmConfig.EnableNestedVirtualization)
+            {
+                EMIT_USER_WARNING(wsl::shared::Localization::MessageNestedVirtualizationNotSupported());
+            }
         }
         catch (...)
         {
             LOG_CAUGHT_EXCEPTION();
             m_vmConfig.EnableNestedVirtualization = false;
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageNestedVirtualizationDetectionFailed(
+                wsl::windows::common::wslutil::ErrorCodeToString(wil::ResultFromCaughtException())));
         }
 
         vmSettings.ComputeTopology.Processor.ExposeVirtualizationExtensions = m_vmConfig.EnableNestedVirtualization;
-        if (!m_vmConfig.EnableNestedVirtualization)
-        {
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageNestedVirtualizationNotSupported());
-        }
     }
 
 #ifdef _AMD64_
