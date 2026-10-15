@@ -432,6 +432,9 @@ private:
     std::function<void()> m_destructionCallback;
     std::atomic<bool> m_terminating{false};
 
+    // Signals that the winning Terminate() call has finished, including cleanup or failure.
+    wil::unique_event m_terminationCompleteEvent{wil::EventOptions::ManualReset};
+
     wil::com_ptr<IWSLCPluginNotifier> m_pluginNotifier;
 
     // Bounded in-memory ring of recent lifecycle events, shared by all event-stream subscribers.
