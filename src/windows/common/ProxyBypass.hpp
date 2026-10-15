@@ -11,7 +11,8 @@
 
 namespace wsl::windows::common::proxy {
 
-// Convert Windows IPv4 prefix wildcards to CIDR for NO_PROXY consumers that support IP ranges.
+// Convert IPv4 prefix wildcards to CIDR for consumers that accept CIDR ranges but do not recognize IP wildcard syntax
+// (e.g., adapting Windows proxy bypass entries for NO_PROXY).
 // Preserve other entries, including domain patterns and Windows-specific macros.
 inline std::string Ipv4WildcardToCidr(std::string_view value)
 {
