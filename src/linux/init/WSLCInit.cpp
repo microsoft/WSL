@@ -90,12 +90,13 @@ try
     drivers.containerPath = LXSS_GPU_DRIVERS_PATH;
     drivers.options = {"ro", "rbind"};
 
+    // Mount setup needs createContainer privileges. Image-provided ldconfig must instead run from
+    // startContainer, after the container's restrictions are installed.
     wsl::shared::cdi::Hook hook{};
     hook.hookName = "createContainer";
     hook.path = "/" LX_INIT_WSLC_GPU_HOOK;
     hook.args = {LX_INIT_WSLC_GPU_HOOK};
 
-    // startContainer hooks run inside the container, after its user, capabilities and seccomp filter are applied.
     wsl::shared::cdi::Hook startHook{};
     startHook.hookName = "startContainer";
     startHook.path = LX_INIT_WSLC_GPU_START_HOOK_PATH;
@@ -135,8 +136,8 @@ try
 }
 CATCH_LOG()
 
-// The image's ldconfig runs sandboxed, where it can't write the cache as non-root or on a
-// read-only root. Must be called from within the container's root.
+// Container policy may suppress setuid; skip cache generation rather than bypassing that policy.
+// Resolve the image's ldconfig only after entering the container's root.
 bool ShouldImageLdconfigRebuildCache(uid_t ContainerUid, bool ReadOnlyRoot)
 {
     return ContainerUid == 0 && !ReadOnlyRoot && std::filesystem::is_regular_file(LDCONFIG_COMMAND) && access(LDCONFIG_COMMAND, X_OK) == 0;
@@ -218,22 +219,27 @@ void ConfigureMuslLibraryPath()
 
 [[noreturn]] void ExecImageLdconfig()
 {
+    // Shell-based ldconfig wrappers otherwise drop the setuid helper's effective root identity.
+    THROW_LAST_ERROR_IF(setresuid(0, 0, 0) < 0);
+
     // Alpine's ldconfig exits with 1 when no folders are given.
     const char* const arguments[] = {LDCONFIG_COMMAND, LXSS_LIB_PATH, nullptr};
     execv(LDCONFIG_COMMAND, const_cast<char* const*>(arguments));
     THROW_LAST_ERROR();
 }
 
-// init is copied rather than mounted because the startContainer hook can't unmount it, but it can delete a file
-// in a folder its user owns. The folder is in memory so this works on read-only roots too.
-void CopyInitForStartHook(int Init, uid_t ContainerUid, gid_t ContainerGid)
+// Start hooks cannot unmount a bind-mounted helper. A copy in tmpfs can unlink itself before running image code,
+// without leaving a reusable setuid executable in the container's filesystem.
+void CopyInitForStartHook(int Init, gid_t ContainerGid)
 {
-    constexpr mode_t c_directoryMode = S_IRWXU;
+    // Root ownership permits cleanup even without CAP_DAC_OVERRIDE. Group write/search lets the container user
+    // remove the helper when no_new_privs prevents elevation.
+    constexpr mode_t c_directoryMode = S_IRWXU | S_IWGRP | S_IXGRP;
     constexpr mode_t c_executableMode = S_IRUSR | S_IXUSR;
     THROW_LAST_ERROR_IF(mkdir(LX_INIT_WSLC_GPU_START_HOOK_DIRECTORY, c_directoryMode) < 0 && errno != EEXIST);
 
-    const auto options = std::format("mode={:#o},uid={},gid={}", c_directoryMode, ContainerUid, ContainerGid);
-    THROW_LAST_ERROR_IF(mount("tmpfs", LX_INIT_WSLC_GPU_START_HOOK_DIRECTORY, "tmpfs", MS_NOSUID | MS_NODEV, options.c_str()) < 0);
+    const auto options = std::format("mode={:#o},uid=0,gid={}", c_directoryMode, ContainerGid);
+    THROW_LAST_ERROR_IF(mount("tmpfs", LX_INIT_WSLC_GPU_START_HOOK_DIRECTORY, "tmpfs", MS_NODEV, options.c_str()) < 0);
 
     wil::unique_fd copy{open(LX_INIT_WSLC_GPU_START_HOOK_PATH, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, c_executableMode)};
     THROW_LAST_ERROR_IF(!copy);
@@ -245,7 +251,10 @@ void CopyInitForStartHook(int Init, uid_t ContainerUid, gid_t ContainerGid)
         THROW_LAST_ERROR_IF(bytesCopied < 0);
     } while (bytesCopied > 0);
 
-    THROW_LAST_ERROR_IF(fchown(copy.get(), ContainerUid, ContainerGid) < 0);
+    // Elevate only this VM-supplied copy so non-root workloads can rebuild the image's cache.
+    // Apply the mode after chown, which can clear the setuid bit.
+    THROW_LAST_ERROR_IF(fchown(copy.get(), 0, 0) < 0);
+    THROW_LAST_ERROR_IF(fchmod(copy.get(), S_ISUID | c_executableMode | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) < 0);
 }
 
 // createContainer hook. Runs as root before the container's restrictions apply, so it must not run image code.
@@ -270,10 +279,9 @@ try
     THROW_ERRNO_IF(EINVAL, rootfsPath == "/");
 
     // runc applies the container's user after this hook, so read it from the spec.
-    const uid_t containerUid = spec.at("process").at("user").at("uid").get<uid_t>();
     const gid_t containerGid = spec.at("process").at("user").at("gid").get<gid_t>();
 
-    // After chroot, this path would be the image's.
+    // Capture the trusted VM binary before chroot makes /init refer to image-controlled content.
     wil::unique_fd vmInit{open(LX_INIT_PATH, O_RDONLY | O_CLOEXEC)};
     THROW_LAST_ERROR_IF(!vmInit);
 
@@ -281,7 +289,7 @@ try
     THROW_LAST_ERROR_IF(chdir(rootfsPath.c_str()) < 0);
     THROW_LAST_ERROR_IF(chroot(".") < 0);
 
-    CopyInitForStartHook(vmInit.get(), containerUid, containerGid);
+    CopyInitForStartHook(vmInit.get(), containerGid);
 
     THROW_LAST_ERROR_IF(UtilMkdirPath("/etc/ld.so.conf.d", 0755) < 0);
     THROW_LAST_ERROR_IF(WriteToFile("/etc/ld.so.conf.d/ld.wsl.conf", LXSS_LIB_PATH "\n", O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC) < 0);
@@ -310,15 +318,12 @@ try
 }
 CATCH_RETURN_ERRNO()
 
-// startContainer hook. Runs inside the container, as its user, with its restrictions applied.
+// startContainer hook. Setuid elevates to container root unless prohibited by the container's restrictions.
 int WslcGpuStartHookEntry()
 try
 {
-    // This process keeps running after its file is deleted.
-    if (unlink(LX_INIT_WSLC_GPU_START_HOOK_PATH) < 0)
-    {
-        LOG_ERROR("unlink({}) failed {}", LX_INIT_WSLC_GPU_START_HOOK_PATH, errno);
-    }
+    // Image code must not inherit access to a reusable root helper, so failed cleanup must prevent ldconfig execution.
+    THROW_LAST_ERROR_IF(unlink(LX_INIT_WSLC_GPU_START_HOOK_PATH) < 0);
 
     if (ShouldImageLdconfigRebuildCache(geteuid(), IsRootReadOnly()))
     {
