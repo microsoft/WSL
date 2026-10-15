@@ -3219,6 +3219,7 @@ EOF
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -f /run/wsl/perf && test ! -L /run/wsl/perf && test -x /run/wsl/perf"), 0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /usr/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"! mountpoint -q /usr/lib/linux-tools/$(uname -r)"), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -z \"${PERF_EXEC_PATH+x}\""), 0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(readlink /usr/local/bin/perf)\" = /run/wsl/perf"), 0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(command -v perf)\" = /usr/local/bin/perf"), 0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"perf --version", nullptr, nullptr, nullptr, nullptr), 0u);
@@ -3269,6 +3270,21 @@ EOF
                 L"printf '#!/bin/sh\\necho upgraded-perf\\n' > /usr/bin/perf.dpkg-new && chmod +x /usr/bin/perf.dpkg-new && "
                 L"mv /usr/bin/perf.dpkg-new /usr/bin/distro-perf && test \"$(/usr/bin/perf)\" = upgraded-perf && "
                 L"test \"$(/usr/bin/perf.dpkg-tmp)\" = distro-perf"),
+            0u);
+
+        // Replacing the package's symlink with a regular executable also survives restart.
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"cp /usr/bin/distro-perf /usr/bin/perf.dpkg-new && "
+                            L"mv -f /usr/bin/perf.dpkg-new /usr/bin/perf"),
+            0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"test -f /usr/bin/perf && test ! -L /usr/bin/perf && "
+                            L"test \"$(/usr/bin/perf)\" = upgraded-perf && "
+                            L"rm /usr/bin/perf.dpkg-tmp && ln /usr/bin/perf /usr/bin/perf.dpkg-tmp && "
+                            L"test \"$(stat -c %d:%i /usr/bin/perf)\" = \"$(stat -c %d:%i /usr/bin/perf.dpkg-tmp)\" && "
+                            L"rm /usr/bin/perf && mv /usr/bin/perf.dpkg-tmp /usr/bin/perf && "
+                            L"test \"$(/usr/bin/perf)\" = upgraded-perf"),
             0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(command -v perf)\" = /usr/local/bin/perf && perf --version"), 0u);
 
