@@ -926,6 +926,20 @@ WSLCSessionRuntime::VmLease::~VmLease()
     }
 }
 
+uint64_t WSLCSessionRuntime::VmLease::Suspend() noexcept
+{
+    const auto generation = m_runtime->m_vmGeneration.load();
+    m_lock.reset();
+    return generation;
+}
+
+bool WSLCSessionRuntime::VmLease::Resume(uint64_t Generation) noexcept
+{
+    m_lock = m_runtime->m_lock.lock_shared();
+    return m_runtime->m_vmGeneration.load() == Generation && m_runtime->m_vmState.load() == VmState::Running &&
+           !m_runtime->m_vmExited.load() && !m_runtime->m_vmStopPending.load();
+}
+
 WSLCSessionRuntime::LockedRuntime::LockedRuntime(WSLCSessionRuntime& Runtime, VmLeasePolicy Policy) :
     m_runtime(&Runtime), m_lease(Runtime.AcquireVmLease(Policy))
 {

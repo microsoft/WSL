@@ -862,10 +862,57 @@ class PluginTests
             WSLC Session created, name=plugin-wslc-container-rejected, id=*, pid=*, token=set, sid=set
             WSLC Image created, session=*, id=sha256:*, name=debian:latest
             WSLC Container started, session=*, id=*, name=*, image=debian:latest, state=*
+            WSLC Container started reentrant WSLCCreateProcess: ok
             OnWslcContainerStarted: ERROR_ACCESS_DENIED
             WSLC Session stopping, name=plugin-wslc-container-rejected, id=*)";
 
         ValidateLogFile(ExpectedOutput);
+    }
+
+    WSL2_TEST_METHOD(WslcContainerRestartPolicyRejected)
+    {
+        const std::array policies{WSLCContainerRestartPolicyAlways, WSLCContainerRestartPolicyUnlessStopped, WSLCContainerRestartPolicyOnFailure};
+
+        for (const auto policy : policies)
+        {
+            ConfigurePlugin(PluginTestType::WslcContainerRejected);
+            {
+                auto session = CreateWslcSession(L"plugin-wslc-restart-policy-rejected");
+                LoadTestImage(*session, "debian:latest");
+
+                wsl::windows::common::WSLCContainerLauncher launcher(
+                    "debian:latest", "wslc-plugin-policy-rejected", {"/bin/sh", "-c", "exec tail -f /dev/null"});
+                launcher.SetRestartPolicy(policy, 0);
+                auto container = launcher.Create(*session);
+
+                for (size_t attempt = 0; attempt < 2; ++attempt)
+                {
+                    const auto hr = container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr);
+                    ValidateCOMErrorMessageContains(L"A fatal error was returned by plugin 'TestPlugin'");
+                    VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED), hr);
+                    VERIFY_ARE_EQUAL(WslcContainerStateExited, container.State());
+                    const auto inspect = container.Inspect();
+                    VERIFY_IS_FALSE(inspect.State.Running);
+                    VERIFY_IS_FALSE(inspect.State.Restarting);
+                }
+
+                VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
+                container.SetDeleteOnClose(false);
+            }
+
+            constexpr auto ExpectedOutput =
+                LR"(Plugin loaded. TestMode=20
+                WSLC Session created, name=plugin-wslc-restart-policy-rejected, id=*, pid=*, token=set, sid=set
+                WSLC Image created, session=*, id=sha256:*, name=debian:latest
+                WSLC Container started, session=*, id=*, name=/wslc-plugin-policy-rejected, image=debian:latest, state=running
+                WSLC Container started reentrant WSLCCreateProcess: ok
+                OnWslcContainerStarted: ERROR_ACCESS_DENIED
+                WSLC Container started, session=*, id=*, name=/wslc-plugin-policy-rejected, image=debian:latest, state=running
+                WSLC Container started reentrant WSLCCreateProcess: ok
+                OnWslcContainerStarted: ERROR_ACCESS_DENIED
+                WSLC Session stopping, name=plugin-wslc-restart-policy-rejected, id=*)";
+            ValidateLogFile(ExpectedOutput);
+        }
     }
 
     WSL2_TEST_METHOD(WslcContainerRestartLifecycleNotifications)
@@ -914,6 +961,9 @@ class PluginTests
                 },
                 std::chrono::milliseconds(100),
                 std::chrono::seconds(30));
+
+            VERIFY_SUCCEEDED(container.Get().Restart(WSLCSignalNone, WSLC_STOP_TIMEOUT_DEFAULT, nullptr));
+            VERIFY_ARE_EQUAL(WslcContainerStateRunning, container.State());
         }
 
         constexpr auto ExpectedOutput =
@@ -922,12 +972,18 @@ class PluginTests
             WSLC Image created, session=*, id=sha256:*, name=debian:latest
             WSLC Container started, session=*, id=*, name=/wslc-plugin-restart-lifecycle, image=debian:latest, state=running
             WSLC Container restart policy notification: on-failure:3
+            WSLC Container started reentrant WSLCCreateProcess: ok
             WSLC Container stopping, session=*, id=*
             WSLC Container stopping reentrant WSLCCreateProcess: ok
             WSLC Container started, session=*, id=*, name=/wslc-plugin-restart-lifecycle, image=debian:latest, state=running
             WSLC Container restart policy notification: on-failure:3
             WSLC Container started reentrant WSLCCreateProcess: ok
             OnWslcContainerStarted automatic restart notification: ERROR_ACCESS_DENIED
+            WSLC Container stopping, session=*, id=*
+            WSLC Container stopping reentrant WSLCCreateProcess: ok
+            WSLC Container started, session=*, id=*, name=/wslc-plugin-restart-lifecycle, image=debian:latest, state=running
+            WSLC Container restart policy notification: on-failure:3
+            WSLC Container started reentrant WSLCCreateProcess: ok
             WSLC Container stopping, session=*, id=*
             WSLC Container stopping reentrant WSLCCreateProcess: ok
             WSLC Container started, session=*, id=*, name=/wslc-plugin-restart-lifecycle, image=debian:latest, state=running

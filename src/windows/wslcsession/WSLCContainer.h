@@ -16,6 +16,7 @@ Abstract:
 
 #include "ServiceProcessLauncher.h"
 #include "WSLCSession.h"
+#include "WSLCSessionRuntime.h"
 #include "WSLCIdleState.h"
 #include "DockerEventTracker.h"
 #include "DockerHTTPClient.h"
@@ -28,6 +29,7 @@ Abstract:
 #include "WSLCNetworkMetadata.h"
 #include "WSLCVhdVolume.h"
 #include <chrono>
+#include <deque>
 #include <unordered_map>
 
 namespace wsl::windows::service::wslc {
@@ -97,10 +99,10 @@ public:
 
     void Initialize();
 
-    void Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions);
+    void Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, WSLCSessionRuntime::VmLease& VmLease);
     void Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr) const;
     void Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, bool Kill);
-    void Restart(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds);
+    void Restart(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, WSLCSessionRuntime::VmLease& VmLease);
     void Delete(WSLCDeleteFlags Flags);
     void Export(WSLCHandle TarHandle) const;
     void UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize) const;
@@ -179,6 +181,21 @@ private:
         Delete
     };
 
+    enum class StartDecision
+    {
+        Accepted,
+        Pending,
+        Rejected
+    };
+
+    struct DeferredContainerEvent
+    {
+        ContainerEvent Event;
+        std::optional<int> ExitCode;
+        std::map<std::string, std::string> Attributes;
+        std::int64_t TimeNano;
+    };
+
     struct StateTransition
     {
         StateTransition(TransitionKind kind, ContainerEvent expectedEvent) : Kind(kind), ExpectedEvent(expectedEvent)
@@ -219,7 +236,9 @@ private:
     __requires_exclusive_lock_held(m_lock) void RequestDeleteExclusiveLockHeld(WSLCDeleteFlags Flags);
 
     void AllocateBridgedModePorts();
-    void OnEvent(ContainerEvent event, std::optional<int> exitCode, const std::map<std::string, std::string>& attributes, std::int64_t eventTimeNano) noexcept;
+    bool OnEvent(ContainerEvent event, std::optional<int> exitCode, const std::map<std::string, std::string>& attributes, std::int64_t eventTimeNano, bool Replay = false) noexcept;
+    void DrainDeferredStartEvents(WSLCSessionRuntime::VmLease& VmLease);
+    __requires_exclusive_lock_held(m_lock) void StopRejectedStartLockHeld();
     __requires_exclusive_lock_held(m_lock)
         [[nodiscard]] bool PrepareForUnexpectedStartLockHeld(std::int64_t eventTimeNano, const std::map<std::string, std::string>& attributes) noexcept;
 
@@ -235,7 +254,7 @@ private:
 
     // Phases of Restart(). Identical to Start() and Stop() except that they do not stand down for the
     // restart they are part of.
-    void StartPhase(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, bool RestartPhase);
+    void StartPhase(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, bool RestartPhase, WSLCSessionRuntime::VmLease& VmLease);
     void StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill, bool RestartPhase);
     __requires_exclusive_lock_held(m_lock) void AcquireRuntimeResourcesLockHeld();
     __requires_exclusive_lock_held(m_lock) void ReplaceInitProcessLockHeld(std::unique_ptr<WSLCProcessIO>&& io);
@@ -305,6 +324,12 @@ private:
     __guarded_by(m_processesLock) DockerContainerProcessControl* m_initProcessControl = nullptr;
 
     _Guarded_by_(m_lock) std::shared_ptr<StateTransition> m_transition;
+    // Lifecycle events stay queued through plugin acceptance and ordered replay.
+    _Guarded_by_(m_lock) StartDecision m_startDecision = StartDecision::Accepted;
+    _Guarded_by_(m_lock) bool m_rejectedStartCleanupPending = false;
+    _Guarded_by_(m_lock) std::shared_ptr<StateTransition> m_deferredStartTransition;
+    _Guarded_by_(m_lock) std::deque<DeferredContainerEvent> m_deferredStartEvents;
+    wil::unique_event m_startEventsDrained{wil::EventOptions::ManualReset | wil::EventOptions::Signaled};
 
     // Exact Docker run represented by m_initProcess. A delayed die event is ignored only when this
     // matches Docker's current StartedAt; otherwise the old wrapper must enter policy reconciliation.

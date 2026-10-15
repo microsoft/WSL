@@ -668,6 +668,7 @@ try
 
     if (g_testType == PluginTestType::WslcContainerRejected)
     {
+        RETURN_IF_FAILED(VerifyWslcContainerLifecycleReentry(Session, "started"));
         g_logfile << "OnWslcContainerStarted: ERROR_ACCESS_DENIED" << std::endl;
         return HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED);
     }
@@ -697,10 +698,7 @@ try
 
         g_logfile << "WSLC Container restart policy notification: on-failure:" << c_restartLifecycleMaximumRetryCount << std::endl;
         const auto startCount = ++g_wslcContainerStartedCount;
-        if (startCount > 1)
-        {
-            RETURN_IF_FAILED(VerifyWslcContainerLifecycleReentry(Session, "started"));
-        }
+        RETURN_IF_FAILED(VerifyWslcContainerLifecycleReentry(Session, "started"));
 
         if (startCount == 2)
         {

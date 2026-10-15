@@ -123,6 +123,10 @@ public:
         VmLease& operator=(VmLease&& Other) noexcept;
         ~VmLease();
 
+        // Suspension releases the runtime lock but retains VM activity. Resume validates the VM generation.
+        [[nodiscard]] uint64_t Suspend() noexcept;
+        [[nodiscard]] bool Resume(uint64_t Generation) noexcept;
+
         VmLease(const VmLease&) = delete;
         VmLease& operator=(const VmLease&) = delete;
 
