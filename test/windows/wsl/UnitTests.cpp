@@ -553,6 +553,24 @@ class UnitTests
         VERIFY_ARE_EQUAL(out, L"hello\n");
     }
 
+    WSL2_TEST_METHOD(SystemdShutdownReapsLoginProcesses)
+    {
+        constexpr DWORD c_shutdownTimeoutMs = 120000;
+        constexpr DWORD c_initTimeoutMs = 180000;
+
+        auto cleanupVm = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
+        auto cleanupSystemd = EnableSystemd(std::format("initTimeout={}", c_initTimeoutMs));
+
+        VERIFY_IS_TRUE(IsSystemdRunning(L"--system"));
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"-u root /bin/true"), 0L);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-u root pgrep -P {} -x login", GetWslInitPid())), 0L);
+
+        wsl::windows::common::SubProcess terminate(nullptr, LxssGenerateWslCommandLine(L"--terminate " LXSS_DISTRO_NAME_TEST_L).c_str());
+        const auto result = terminate.RunAndCaptureOutput(c_shutdownTimeoutMs);
+        VERIFY_ARE_EQUAL(result.ExitCode, 0L);
+        VERIFY_ARE_NOT_EQUAL(GetDistroState(), LxssDistributionStateRunning);
+    }
+
     WSL2_TEST_METHOD(BinfmtSurvivesDistroTermination)
     {
         //
