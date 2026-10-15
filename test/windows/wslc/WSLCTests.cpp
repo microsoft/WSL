@@ -38,6 +38,8 @@ using wsl::windows::common::WSLCProcessLauncher;
 using wsl::windows::common::io::OverlappedIOHandle;
 using wsl::windows::common::io::WriteHandle;
 using namespace wsl::windows::common::wslutil;
+using WSLCE2ETests::KillVmByOwner;
+using WSLCE2ETests::ListVms;
 using WSLCE2ETests::StartLocalRegistry;
 
 extern std::wstring g_testDataPath;
@@ -572,46 +574,6 @@ class WSLCTests
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->GetId(nullptr));
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->GetDisplayName(nullptr));
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->GetState(nullptr));
-    }
-
-    struct VmInfo
-    {
-        std::wstring Id;
-        std::wstring Owner;
-    };
-
-    // Returns VM info (Id + Owner) for all compute systems via the HCS API.
-    static std::vector<VmInfo> ListVms()
-    {
-        const wsl::windows::common::ExecutionContext context(wsl::windows::common::Context::HCS);
-
-        auto operation = wsl::windows::common::hcs::CreateOperation();
-        THROW_IF_FAILED(::HcsEnumerateComputeSystems(L"{}", operation.get()));
-
-        wil::unique_cotaskmem_string resultDocument;
-        const auto result = ::HcsWaitForOperationResult(operation.get(), 10000, &resultDocument);
-        THROW_IF_FAILED_MSG(result, "HcsEnumerateComputeSystems failed (error: %ls)", resultDocument.get());
-
-        LogInfo("HcsEnumerateComputeSystems result='%ws'", resultDocument.get());
-
-        std::vector<VmInfo> vms;
-        const auto json = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(resultDocument.get()));
-        if (!json.is_array())
-        {
-            return vms;
-        }
-
-        for (const auto& entry : json)
-        {
-            if (entry.contains("Owner") && entry["Owner"].is_string() && entry.contains("Id") && entry["Id"].is_string())
-            {
-                vms.push_back(
-                    {wsl::shared::string::MultiByteToWide(entry["Id"].get<std::string>()),
-                     wsl::shared::string::MultiByteToWide(entry["Owner"].get<std::string>())});
-            }
-        }
-
-        return vms;
     }
 
     WSLC_TEST_METHOD(VmOwnerMatchesSessionDisplayName)
@@ -14837,22 +14799,6 @@ class WSLCTests
         auto initProcess = container.GetInitProcess();
 
         ValidateProcessOutput(initProcess, {{1, "OK\n"}});
-    }
-
-    // Kills all VMs matching the given owner name via hcsdiag.
-    static void KillVmByOwner(const std::wstring& owner)
-    {
-        bool found = false;
-        for (const auto& vm : ListVms())
-        {
-            if (vm.Owner == owner)
-            {
-                found = true;
-                VERIFY_ARE_EQUAL(wsl::windows::common::SubProcess(nullptr, std::format(L"hcsdiag.exe kill {}", vm.Id).c_str()).Run(10000), 0u);
-            }
-        }
-
-        VERIFY_IS_TRUE(found, std::format(L"VM with owner '{}' not found", owner).c_str());
     }
 
     // Waits for a session to report the terminated state.
