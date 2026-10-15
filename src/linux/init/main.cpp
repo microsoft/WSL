@@ -3383,29 +3383,34 @@ try
             InjectEntropy(Buffer.subspan(ConfigMessage->EntropyOffset, ConfigMessage->EntropySize));
         }
 
-        if (ConfigMessage->MountGpuShares)
+        //
+        // GPU support is best-effort; if the shares cannot be mounted, continue booting
+        // without GPU support instead of terminating the VM.
+        //
+
+        bool EnableGpuSupport = ConfigMessage->MountGpuShares;
+        bool EnableInboxGpuLibs = ConfigMessage->EnableInboxGpuLibs;
+        if (EnableGpuSupport)
         {
             if (MountPlan9(LXSS_GPU_DRIVERS_SHARE, GPU_SHARE_DRIVERS, true) < 0)
             {
-                return -1;
+                LOG_ERROR("Failed to mount GPU driver share, continuing without GPU support");
+                EnableGpuSupport = false;
             }
-
-            if (MountPlan9(LXSS_GPU_PACKAGED_LIB_SHARE, GPU_SHARE_LIB_PACKAGED, true) < 0)
+            else if (MountPlan9(LXSS_GPU_PACKAGED_LIB_SHARE, GPU_SHARE_LIB_PACKAGED, true) < 0)
             {
-                return -1;
+                LOG_ERROR("Failed to mount packaged GPU library share, continuing without GPU support");
+                EnableGpuSupport = false;
             }
-
-            if (ConfigMessage->EnableInboxGpuLibs)
+            else if (EnableInboxGpuLibs && (MountPlan9(LXSS_GPU_INBOX_LIB_SHARE, GPU_SHARE_LIB_INBOX, true) < 0))
             {
-                if (MountPlan9(LXSS_GPU_INBOX_LIB_SHARE, GPU_SHARE_LIB_INBOX, true) < 0)
-                {
-                    return -1;
-                }
+                LOG_ERROR("Failed to mount inbox GPU library share, continuing without inbox GPU libraries");
+                EnableInboxGpuLibs = false;
             }
         }
 
-        Config.EnableInboxGpuLibs = ConfigMessage->EnableInboxGpuLibs;
-        Config.EnableGpuSupport = ConfigMessage->MountGpuShares;
+        Config.EnableInboxGpuLibs = EnableInboxGpuLibs;
+        Config.EnableGpuSupport = EnableGpuSupport;
         Config.EnableGuiApps = ConfigMessage->EnableGuiApps;
         return 0;
     }
