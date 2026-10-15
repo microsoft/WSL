@@ -158,6 +158,6 @@ inline SessionSettingsConversion Convert(const WSLCCompatSessionSettings& Settin
 
 Microsoft::WRL::ComPtr<ICrashDumpCallback> Convert(IWSLCCompatCrashDumpCallback* Callback);
 Microsoft::WRL::ComPtr<IProgressCallback> Convert(IWSLCCompatProgressCallback* Callback);
-Microsoft::WRL::ComPtr<IWarningCallback> Convert(IWSLCCompatWarningCallback* Callback);
+Microsoft::WRL::ComPtr<IDiagnosticCallback> Convert(IWSLCCompatWarningCallback* Callback);
 
 } // namespace wsl::windows::common::apicompat

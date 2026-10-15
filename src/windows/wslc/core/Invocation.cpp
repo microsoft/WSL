@@ -17,6 +17,7 @@ Abstract:
 #include "CLIExecutionContext.h"
 #include "Command.h"
 #include "EnvironmentOptions.h"
+#include "wslutil.h"
 
 #include <algorithm>
 #include <functional>
@@ -175,44 +176,103 @@ void CommandInvocation::ApplyRootEnvironmentOptions(argument::ArgMap& arguments)
 
 void CommandInvocation::ParseCommandLine(CLIExecutionContext& context)
 {
-    auto subcommand = ParseGlobalArgumentsAndFindSubcommand(m_cursor, context, Selected());
-    while (subcommand)
-    {
-        Select(subcommand->get());
-        subcommand = ParseGlobalArgumentsAndFindSubcommand(m_cursor, context, Selected());
-    }
+    const wsl::windows::common::wslutil::StopWatch stopWatch;
+    const auto reportFailure = [&]() {
+        WSLC_CLI_EVENT(context, "CommandLineParsingFailed", WSLC_DIAG_CODE_COMMAND_PARSING_FAILED, L"DurationMs: {}", stopWatch.ElapsedMilliseconds());
+    };
+    const auto enableDebugOutput = [&]() {
+        if (context.Args.Contains(ArgType::Debug))
+        {
+            context.Terminal.SetDebugEnabled(context.Args.GetValue<ArgType::Debug>());
+        }
+    };
 
+    std::optional<std::reference_wrapper<const Command>> subcommand;
     try
     {
-        ApplyEnvironmentOptions(context.Args, Selected().GetScopedArguments(Scope::Command));
-        Selected().ParseArguments(
-            m_cursor,
-            context.Args,
-            Selected().GetScopedArguments(Scope::Command, Flags::None),
-            /*optionsOnly*/ false,
-            /*stopOnUnknown*/ false,
-            GetInheritedGlobalArguments(Selected()));
+        subcommand = ParseGlobalArgumentsAndFindSubcommand(m_cursor, context, Selected());
     }
-    catch (const ArgumentException& exception)
+    catch (...)
     {
-        if (exception.UnknownOptionToken().has_value())
-        {
-            ThrowIfMisplacedGlobalOption(*exception.UnknownOptionToken(), Selected());
-        }
-
+        enableDebugOutput();
+        reportFailure();
         throw;
     }
 
-    Selected().ValidateArguments(context.Args, Selected().GetScopedArguments(Scope::Command));
-    if (!context.Args.GetValue<ArgType::Help>())
+    enableDebugOutput();
+    try
     {
-        ValidateArgumentRelationships(Selected(), context.Args);
+        while (subcommand)
+        {
+            Select(subcommand->get());
+            subcommand = ParseGlobalArgumentsAndFindSubcommand(m_cursor, context, Selected());
+        }
+
+        ApplyEnvironmentOptions(context.Args, Selected().GetScopedArguments(Scope::Command));
+        try
+        {
+            Selected().ParseArguments(
+                m_cursor,
+                context.Args,
+                Selected().GetScopedArguments(Scope::Command, Flags::None),
+                /*optionsOnly*/ false,
+                /*stopOnUnknown*/ false,
+                GetInheritedGlobalArguments(Selected()));
+        }
+        catch (const ArgumentException& exception)
+        {
+            if (exception.UnknownOptionToken().has_value())
+            {
+                ThrowIfMisplacedGlobalOption(*exception.UnknownOptionToken(), Selected());
+            }
+
+            throw;
+        }
+
+        Selected().ValidateArguments(context.Args, Selected().GetScopedArguments(Scope::Command));
+        if (!context.Args.GetValue<ArgType::Help>())
+        {
+            ValidateArgumentRelationships(Selected(), context.Args);
+        }
     }
+    catch (...)
+    {
+        reportFailure();
+        throw;
+    }
+
+    WSLC_CLI_EVENT(context, "CommandSelected", WSLC_DIAG_CODE_COMMAND_SELECTED, L"Command: {}", Selected().FormatInvocation());
+    WSLC_CLI_EVENT(context, "CommandLineParsingCompleted", WSLC_DIAG_CODE_COMMAND_PARSING_COMPLETED, L"DurationMs: {}", stopWatch.ElapsedMilliseconds());
 }
 
 void CommandInvocation::Execute(CLIExecutionContext& context) const
 {
-    Selected().Execute(context);
+    WSLC_CLI_EVENT(context, "CommandExecutionStarted", WSLC_DIAG_CODE_COMMAND_EXECUTION_STARTED, L"Command: {}", Selected().FormatInvocation());
+    const wsl::windows::common::wslutil::StopWatch stopWatch;
+
+    try
+    {
+        Selected().Execute(context);
+    }
+    catch (...)
+    {
+        WSLC_CLI_EVENT(
+            context,
+            "CommandExecutionFailed",
+            WSLC_DIAG_CODE_COMMAND_EXECUTION_FAILED,
+            L"Command: {}; DurationMs: {}",
+            Selected().FormatInvocation(),
+            stopWatch.ElapsedMilliseconds());
+        throw;
+    }
+
+    WSLC_CLI_EVENT(
+        context,
+        "CommandExecutionCompleted",
+        WSLC_DIAG_CODE_COMMAND_EXECUTION_COMPLETED,
+        L"Command: {}; DurationMs: {}",
+        Selected().FormatInvocation(),
+        stopWatch.ElapsedMilliseconds());
 }
 
 void CommandInvocation::OutputHelp(Terminal& terminal, HelpOutput output, const CommandException* exception, std::span<const Argument> relevantArguments) const

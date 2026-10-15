@@ -37,6 +37,8 @@ std::wstring_view Terminal::LevelPrefix(Level level) const noexcept
 
     switch (level)
     {
+    case Level::Debug:
+        return Format::Dim.Get();
     case Level::Warning:
         return Format::Fg::BrightYellow.Get();
     case Level::Error:

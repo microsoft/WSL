@@ -15132,15 +15132,42 @@ class WSLCTests
         VERIFY_IS_TRUE(process.GetExitEvent().wait(30000));
     }
 
-    // Helper: COM callback that captures all warnings received.
-    class CapturingWarningCallback
-        : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWarningCallback, IFastRundown>
+    class CapturingDiagnosticCallback
+        : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IDiagnosticCallback, IFastRundown>
     {
     public:
-        HRESULT OnWarning(LPCWSTR Message) override
+        explicit CapturingDiagnosticCallback(WSLCDiagnosticLevel enabledLevels = WSLCDiagnosticLevelWarning) :
+            m_enabledLevels(enabledLevels)
         {
+        }
+
+        HRESULT GetEnabledLevels(WSLCDiagnosticLevel* Levels) override
+        {
+            RETURN_HR_IF_NULL(E_POINTER, Levels);
+            *Levels = m_enabledLevels;
+            return S_OK;
+        }
+
+        HRESULT OnDiagnostic(const WSLCDiagnosticEvent* Event) override
+        {
+            RETURN_HR_IF_NULL(E_POINTER, Event);
+
             std::lock_guard lock(m_lock);
-            m_warnings.emplace_back(Message);
+            if (Event->Code != nullptr)
+            {
+                m_codes.emplace_back(Event->Code);
+            }
+
+            if (Event->Message != nullptr)
+            {
+                m_messages.emplace_back(Event->Message);
+            }
+
+            if (Event->Level == WSLCDiagnosticLevelWarning && Event->Message != nullptr)
+            {
+                m_warnings.emplace_back(Event->Message);
+            }
+
             return S_OK;
         }
 
@@ -15150,10 +15177,268 @@ class WSLCTests
             return m_warnings;
         }
 
+        std::vector<std::string> GetCodes()
+        {
+            std::lock_guard lock(m_lock);
+            return m_codes;
+        }
+
+        std::vector<std::wstring> GetMessages()
+        {
+            std::lock_guard lock(m_lock);
+            return m_messages;
+        }
+
     private:
+        WSLCDiagnosticLevel m_enabledLevels;
         std::mutex m_lock;
+        std::vector<std::string> m_codes;
+        std::vector<std::wstring> m_messages;
         std::vector<std::wstring> m_warnings;
     };
+
+    class BlockingDiagnosticCallback
+        : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IDiagnosticCallback, IFastRundown>
+    {
+    public:
+        BlockingDiagnosticCallback(bool blockQuery, std::string blockedCode) :
+            m_blockQuery(blockQuery), m_blockedCode(std::move(blockedCode))
+        {
+        }
+
+        HRESULT GetEnabledLevels(WSLCDiagnosticLevel* Levels) override
+        {
+            RETURN_HR_IF_NULL(E_POINTER, Levels);
+            if (m_blockQuery)
+            {
+                Block();
+            }
+
+            *Levels = WSLCDiagnosticLevelDebug;
+            return S_OK;
+        }
+
+        HRESULT OnDiagnostic(const WSLCDiagnosticEvent* Event) override
+        {
+            RETURN_HR_IF_NULL(E_POINTER, Event);
+            if (!m_blockQuery && Event->Code != nullptr && m_blockedCode == Event->Code)
+            {
+                Block();
+            }
+
+            return S_OK;
+        }
+
+        wil::unique_event Reached{wil::EventOptions::ManualReset};
+        wil::unique_event Unblock{wil::EventOptions::ManualReset};
+        wil::unique_event Returned{wil::EventOptions::ManualReset};
+
+    private:
+        void Block()
+        {
+            if (!m_blocked.exchange(true))
+            {
+                Reached.SetEvent();
+                Unblock.wait();
+                Returned.SetEvent();
+            }
+        }
+
+        const bool m_blockQuery;
+        const std::string m_blockedCode;
+        std::atomic<bool> m_blocked{false};
+    };
+
+    WSLC_TEST_METHOD(DiagnosticCallbackSessionCreationReleasesManagerLock)
+    {
+        SKIP_TEST_SERVER();
+
+        auto manager = OpenSessionManager();
+        auto settings = GetDefaultSessionSettings(L"diagnostic-session-lock");
+        auto callback = Microsoft::WRL::Make<BlockingDiagnosticCallback>(false, WSLC_DIAG_CODE_SESSION_CREATION_STARTED);
+        wil::com_ptr<IWSLCSession> session;
+        auto cleanupSession = wil::scope_exit([&]() {
+            if (session)
+            {
+                LOG_IF_FAILED(session->Terminate());
+            }
+        });
+        std::promise<HRESULT> creationResult;
+        std::thread creationThread([&]() {
+            creationResult.set_value(manager->CreateSession(&settings, WSLCSessionFlagsNone, callback.Get(), &session));
+        });
+        auto joinCreation = wil::scope_exit([&]() {
+            callback->Unblock.SetEvent();
+            creationThread.join();
+        });
+
+        VERIFY_IS_TRUE(callback->Reached.wait(60000));
+        std::promise<HRESULT> listResult;
+        std::thread listThread([&]() {
+            wil::unique_cotaskmem_array_ptr<WSLCSessionListEntry> sessions;
+            listResult.set_value(manager->ListSessions(&sessions, sessions.size_address<ULONG>()));
+        });
+        auto joinList = wil::scope_exit([&]() {
+            callback->Unblock.SetEvent();
+            listThread.join();
+        });
+
+        auto listFuture = listResult.get_future();
+        VERIFY_ARE_EQUAL(std::future_status::ready, listFuture.wait_for(std::chrono::seconds(60)));
+        VERIFY_SUCCEEDED(listFuture.get());
+        callback->Unblock.SetEvent();
+        auto creationFuture = creationResult.get_future();
+        VERIFY_ARE_EQUAL(std::future_status::ready, creationFuture.wait_for(std::chrono::seconds(60)));
+        VERIFY_SUCCEEDED(creationFuture.get());
+    }
+
+    WSLC_TEST_METHOD(DiagnosticCallbackStuckCallbackCancellation)
+    {
+        SKIP_TEST_SERVER();
+
+        for (const bool blockQuery : {true, false})
+        {
+            auto callback = Microsoft::WRL::Make<BlockingDiagnosticCallback>(blockQuery, WSLC_DIAG_CODE_NETWORK_CREATION_STARTED);
+            WSLCNetworkOptions options{};
+            options.Name = "diagnostic-callback-cancellation";
+            options.Driver = "bridge";
+            std::promise<HRESULT> operationResult;
+            std::thread operationThread(
+                [&]() { operationResult.set_value(m_defaultSession->CreateNetwork(&options, callback.Get())); });
+            auto joinOperation = wil::scope_exit([&]() {
+                callback->Unblock.SetEvent();
+                operationThread.join();
+            });
+
+            VERIFY_IS_TRUE(callback->Reached.wait(60000));
+            VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+            auto operationFuture = operationResult.get_future();
+            VERIFY_ARE_EQUAL(std::future_status::ready, operationFuture.wait_for(std::chrono::seconds(60)));
+            VERIFY_FAILED(operationFuture.get());
+            callback->Unblock.SetEvent();
+            VERIFY_IS_TRUE(callback->Returned.wait(60000));
+            operationThread.join();
+            joinOperation.release();
+            ResetTestSession();
+        }
+    }
+
+    WSLC_TEST_METHOD(DiagnosticCallbackNetworkLifecycle)
+    {
+        const std::string networkName = "diagnostic-network-lifecycle";
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = "bridge";
+
+        auto callback = Microsoft::WRL::Make<CapturingDiagnosticCallback>(WSLCDiagnosticLevelDebug);
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, callback.Get()));
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        const auto codes = callback->GetCodes();
+        VERIFY_ARE_EQUAL(size_t{2}, codes.size());
+        VERIFY_ARE_EQUAL(std::string{WSLC_DIAG_CODE_NETWORK_CREATION_STARTED}, codes[0]);
+        VERIFY_ARE_EQUAL(std::string{WSLC_DIAG_CODE_NETWORK_CREATION_COMPLETED}, codes[1]);
+    }
+
+    WSLC_TEST_METHOD(DiagnosticCallbackContainerEvents)
+    {
+        WSLCContainerLauncher launcher("debian:latest", "diagnostic-container-events", {"sleep", "99999"});
+        auto container = launcher.Launch(*m_defaultSession);
+
+        auto callback = Microsoft::WRL::Make<CapturingDiagnosticCallback>(WSLCDiagnosticLevelDebug);
+        VERIFY_SUCCEEDED(container.Get().Restart(WSLCSignalSIGKILL, 0, callback.Get()));
+
+        const auto codes = callback->GetCodes();
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(static_cast<size_t>(std::count(codes.begin(), codes.end(), WSLC_DIAG_CODE_CONTAINER_EVENT)), size_t{2});
+        VERIFY_ARE_EQUAL(size_t{2}, static_cast<size_t>(std::count(codes.begin(), codes.end(), WSLC_DIAG_CODE_CONTAINER_STATE_CHANGE)));
+        VERIFY_ARE_EQUAL(size_t{1}, static_cast<size_t>(std::count(codes.begin(), codes.end(), WSLC_DIAG_CODE_CONTAINER_PROCESS_STOP)));
+
+        const auto messages = callback->GetMessages();
+        VERIFY_IS_TRUE(std::any_of(messages.begin(), messages.end(), [](const auto& message) {
+            return message.find(L"Event: exit; Exit code: 137") != std::wstring::npos;
+        }));
+        VERIFY_IS_TRUE(std::any_of(messages.begin(), messages.end(), [](const auto& message) {
+            return message.find(L"State: running -> exited; Exit code: 137") != std::wstring::npos;
+        }));
+    }
+
+    WSLC_TEST_METHOD(DiagnosticCallbackNetworkCompletionReleasesNetworkLock)
+    {
+        constexpr auto c_networkName = "diagnostic-network-reentrant";
+        WSLCNetworkOptions options{};
+        options.Name = c_networkName;
+        options.Driver = "bridge";
+        auto cleanupNetwork = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(c_networkName)); });
+
+        auto callback = Microsoft::WRL::Make<BlockingDiagnosticCallback>(false, WSLC_DIAG_CODE_NETWORK_CREATION_COMPLETED);
+        std::promise<HRESULT> creationResult;
+        std::thread creationThread([&]() { creationResult.set_value(m_defaultSession->CreateNetwork(&options, callback.Get())); });
+        auto joinCreation = wil::scope_exit([&]() {
+            callback->Unblock.SetEvent();
+            creationThread.join();
+        });
+
+        VERIFY_IS_TRUE(callback->Reached.wait(60000));
+        std::promise<HRESULT> deletionResult;
+        std::thread deletionThread([&]() { deletionResult.set_value(m_defaultSession->DeleteNetwork(c_networkName)); });
+        auto joinDeletion = wil::scope_exit([&]() {
+            callback->Unblock.SetEvent();
+            deletionThread.join();
+        });
+
+        auto deletionFuture = deletionResult.get_future();
+        VERIFY_ARE_EQUAL(std::future_status::ready, deletionFuture.wait_for(std::chrono::seconds(60)));
+        VERIFY_SUCCEEDED(deletionFuture.get());
+        cleanupNetwork.release();
+        callback->Unblock.SetEvent();
+        auto creationFuture = creationResult.get_future();
+        VERIFY_ARE_EQUAL(std::future_status::ready, creationFuture.wait_for(std::chrono::seconds(60)));
+        VERIFY_SUCCEEDED(creationFuture.get());
+    }
+
+    WSLC_TEST_METHOD(DiagnosticCallbackContainerEventsReleaseCallerRegistration)
+    {
+        for (const bool restart : {false, true})
+        {
+            WSLCContainerLauncher launcher("debian:latest", "diagnostic-container-reentrant", {"sleep", "99999"});
+            auto container = launcher.Create(*m_defaultSession);
+            if (restart)
+            {
+                VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+            }
+
+            auto callback = Microsoft::WRL::Make<BlockingDiagnosticCallback>(false, WSLC_DIAG_CODE_CONTAINER_STATE_CHANGE);
+            std::promise<HRESULT> operationResult;
+            std::thread operationThread([&]() {
+                operationResult.set_value(
+                    restart ? container.Get().Restart(WSLCSignalSIGKILL, 0, callback.Get())
+                            : container.Get().Start(WSLCContainerStartFlagsNone, nullptr, callback.Get()));
+            });
+            auto joinOperation = wil::scope_exit([&]() {
+                callback->Unblock.SetEvent();
+                operationThread.join();
+            });
+
+            VERIFY_IS_TRUE(callback->Reached.wait(60000));
+            std::promise<HRESULT> deletionResult;
+            std::thread deletionThread([&]() { deletionResult.set_value(container.Get().Delete(WSLCDeleteFlagsForce)); });
+            auto joinDeletion = wil::scope_exit([&]() {
+                callback->Unblock.SetEvent();
+                deletionThread.join();
+            });
+
+            auto deletionFuture = deletionResult.get_future();
+            VERIFY_ARE_EQUAL(std::future_status::ready, deletionFuture.wait_for(std::chrono::seconds(60)));
+            VERIFY_SUCCEEDED(deletionFuture.get());
+            container.SetDeleteOnClose(false);
+            callback->Unblock.SetEvent();
+            auto operationFuture = operationResult.get_future();
+            VERIFY_ARE_EQUAL(std::future_status::ready, operationFuture.wait_for(std::chrono::seconds(60)));
+            VERIFY_SUCCEEDED(operationFuture.get());
+        }
+    }
 
     WSLC_TEST_METHOD(WarningCallbackContainerRecovery)
     {
@@ -15189,7 +15474,7 @@ class WSLCTests
             VERIFY_SUCCEEDED(session->Terminate());
 
             // Phase 2: Create a new session pointing to the same storage with a warning callback.
-            auto warningCallback = Microsoft::WRL::Make<CapturingWarningCallback>();
+            auto warningCallback = Microsoft::WRL::Make<CapturingDiagnosticCallback>();
 
             auto settings2 = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeConsomme);
             settings2.StoragePath = storagePath.c_str();
@@ -15265,7 +15550,7 @@ class WSLCTests
         VERIFY_IS_TRUE(DeleteFileA(vhdHostPath.c_str()));
 
         {
-            auto warningCallback = Microsoft::WRL::Make<CapturingWarningCallback>();
+            auto warningCallback = Microsoft::WRL::Make<CapturingDiagnosticCallback>();
 
             auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeConsomme);
             settings.StoragePath = storagePath.c_str();
@@ -15338,7 +15623,7 @@ class WSLCTests
 
         // Restart with a warning callback and verify the unsupported volume triggers a recovery warning when the session loads.
         {
-            auto warningCallback = Microsoft::WRL::Make<CapturingWarningCallback>();
+            auto warningCallback = Microsoft::WRL::Make<CapturingDiagnosticCallback>();
 
             auto settings = GetDefaultSessionSettings(c_sessionName, false, WSLCNetworkingModeConsomme);
             settings.StoragePath = storagePath.c_str();
