@@ -5,6 +5,7 @@
 #include <array>
 #include <charconv>
 #include <format>
+#include <ranges>
 #include <string>
 #include <string_view>
 
@@ -12,65 +13,49 @@ namespace wsl::windows::common::proxy {
 
 // Convert Windows IPv4 prefix wildcards to CIDR for NO_PROXY consumers that support IP ranges.
 // Preserve other entries, including domain patterns and Windows-specific macros.
-inline std::string NormalizeBypass(std::string_view bypass)
+inline std::string Ipv4WildcardToCidr(std::string_view value)
 {
-    const auto original = bypass;
-    const auto first = bypass.find_first_not_of(" \t\r\n");
+    const auto first = value.find_first_not_of(" \t\r\n");
     if (first == std::string_view::npos)
     {
-        return std::string{original};
+        return std::string{value};
     }
 
-    bypass = bypass.substr(first, bypass.find_last_not_of(" \t\r\n") - first + 1);
+    const auto pattern = value.substr(first, value.find_last_not_of(" \t\r\n") - first + 1);
+    const auto wildcard = pattern.find(".*");
+    if (wildcard == std::string_view::npos || wildcard == 0)
+    {
+        return std::string{value};
+    }
+
+    const auto suffix = pattern.substr(wildcard);
+    if (suffix != ".*" && suffix != ".*.*" && suffix != ".*.*.*")
+    {
+        return std::string{value};
+    }
+
     std::array<unsigned int, 4> octets{};
     size_t fixedOctets = 0;
-    size_t totalOctets = 0;
-    bool hasWildcard = false;
-    while (!bypass.empty())
+    for (const auto range : std::views::split(pattern.substr(0, wildcard), '.'))
     {
-        if (totalOctets++ == octets.size())
+        const std::string_view part{range.begin(), range.end()};
+        if (fixedOctets == 3 || part.empty() || part.size() > 3 || (part.size() > 1 && part.front() == '0'))
         {
-            return std::string{original};
+            return std::string{value};
         }
 
-        const auto separator = bypass.find('.');
-        const auto part = bypass.substr(0, separator);
-        if (part == "*")
+        const auto [end, error] = std::from_chars(part.data(), part.data() + part.size(), octets[fixedOctets]);
+        if (error != std::errc{} || end != part.data() + part.size() || octets[fixedOctets] > 255)
         {
-            hasWildcard = true;
-        }
-        else
-        {
-            if (hasWildcard || part.empty() || part.size() > 3 || (part.size() > 1 && part.front() == '0'))
-            {
-                return std::string{original};
-            }
-
-            unsigned int octet = 0;
-            const auto [end, error] = std::from_chars(part.data(), part.data() + part.size(), octet);
-            if (error != std::errc{} || end != part.data() + part.size() || octet > 255)
-            {
-                return std::string{original};
-            }
-
-            octets[fixedOctets++] = octet;
+            return std::string{value};
         }
 
-        if (separator == std::string_view::npos)
-        {
-            break;
-        }
-
-        bypass.remove_prefix(separator + 1);
-        if (bypass.empty())
-        {
-            return std::string{original};
-        }
+        ++fixedOctets;
     }
 
-    if (!hasWildcard || fixedOctets == 0)
+    if (fixedOctets + suffix.size() / 2 > octets.size())
     {
-        return std::string{original};
+        return std::string{value};
     }
 
     return std::format("{}.{}.{}.{}/{}", octets[0], octets[1], octets[2], octets[3], fixedOctets * 8);

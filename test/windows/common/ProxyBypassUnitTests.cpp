@@ -4,7 +4,7 @@
 #include "Common.h"
 #include "ProxyBypass.hpp"
 
-using wsl::windows::common::proxy::NormalizeBypass;
+using wsl::windows::common::proxy::Ipv4WildcardToCidr;
 
 namespace ProxyBypassUnitTests {
 
@@ -16,6 +16,7 @@ class ProxyBypassUnitTests
     {
         const std::vector<std::pair<std::string, std::string>> cases{
             {"127.*", "127.0.0.0/8"},
+            {"127.*.*", "127.0.0.0/8"},
             {"10.*", "10.0.0.0/8"},
             {"10.*.*.*", "10.0.0.0/8"},
             {"192.168.*", "192.168.0.0/16"},
@@ -27,12 +28,12 @@ class ProxyBypassUnitTests
 
         for (const auto& [input, expected] : cases)
         {
-            VERIFY_ARE_EQUAL(expected, NormalizeBypass(input));
+            VERIFY_ARE_EQUAL(expected, Ipv4WildcardToCidr(input));
         }
 
         for (unsigned int subnet = 16; subnet <= 31; ++subnet)
         {
-            VERIFY_ARE_EQUAL(std::format("172.{}.0.0/16", subnet), NormalizeBypass(std::format("172.{}.*", subnet)));
+            VERIFY_ARE_EQUAL(std::format("172.{}.0.0/16", subnet), Ipv4WildcardToCidr(std::format("172.{}.*", subnet)));
         }
     }
 
@@ -56,33 +57,18 @@ class ProxyBypassUnitTests
               "<-loopback>",
               "  *.example.com  "})
         {
-            VERIFY_ARE_EQUAL(input, NormalizeBypass(input));
+            VERIFY_ARE_EQUAL(input, Ipv4WildcardToCidr(input));
         }
     }
 
     TEST_METHOD(InvalidIPv4PatternsArePreserved)
     {
         for (const std::string input :
-             {"256.*",
-              "192.256.*",
-              "-1.*",
-              "+1.*",
-              "01.*",
-              "192.168.01.*",
-              "999999999999.*",
-              "127.*.1",
-              "127.*.1.*",
-              "127.0.0.1.*",
-              "127.*.*.*.*",
-              "127..*",
-              ".127.*",
-              "127.*.",
-              "127.0*",
-              "127.?.*",
-              "127.*:80",
-              "127 . *"})
+             {"256.*",   "192.256.*", "-1.*",        "+1.*",        "01.*",          "192.168.01.*", "999999999999.*",
+              "127.*.1", "127.*.1.*", "127.0.0.1.*", "127.*.*.*.*", "192.168.*.*.*", ".*",           "127..*",
+              ".127.*",  "127.*.",    "127.0*",      "127.?.*",     "127.*:80",      "127 . *"})
         {
-            VERIFY_ARE_EQUAL(input, NormalizeBypass(input));
+            VERIFY_ARE_EQUAL(input, Ipv4WildcardToCidr(input));
         }
     }
 };

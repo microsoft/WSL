@@ -130,9 +130,9 @@ HttpProxySettings::HttpProxySettings(const WINHTTP_PROXY_SETTINGS_EX& proxySetti
             ProxyBypassesComma = std::accumulate(
                 std::next(std::cbegin(ProxyBypasses)),
                 std::cend(ProxyBypasses),
-                proxy::NormalizeBypass(ProxyBypasses.front()),
+                proxy::Ipv4WildcardToCidr(ProxyBypasses.front()),
                 [](std::string previous, const std::string& proxyBypass) {
-                    return std::move(previous) + "," + proxy::NormalizeBypass(proxyBypass);
+                    return std::move(previous) + "," + proxy::Ipv4WildcardToCidr(proxyBypass);
                 });
         }
     }
