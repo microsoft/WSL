@@ -662,6 +662,9 @@ void OpenVmmVirtualMachineBackend::CloseGuestListener(VmListenerId Listener)
 
 VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& Request)
 {
+    THROW_HR_IF_MSG(
+        c_notSupported, Request.UserToken.has_value(), "OpenVMM does not support a per-device user token for disk attachments");
+
     const auto& source = validation::ValidateDiskRequest(Request);
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);

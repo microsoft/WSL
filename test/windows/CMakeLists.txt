@@ -4,17 +4,9 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/common/*.cpp
 )
 
-<<<<<<< 4a10c0a1^1
-set(HEADERS
-    Common.h
-    PluginTests.h
-    VirtualMachineBackendTestHelpers.h
-    lxsstest.h)
-=======
 file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/common/*.h
 )
->>>>>>> 4a10c0a1^2
 
 add_compile_definitions(INLINE_TEST_METHOD_MARKUP)
 

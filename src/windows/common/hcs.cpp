@@ -449,12 +449,18 @@ void wsl::windows::common::hcs::RegisterCallback(_In_ HCS_SYSTEM ComputeSystem, 
 }
 
 void wsl::windows::common::hcs::RemoveDiskWithAccess(
-    _In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR VmId, _In_ PCWSTR Disk, _In_ ULONG Lun, _In_ wsl::windows::common::disk::DiskStateFlags Flags, _In_ size_t TimeoutMs)
+    _In_ HCS_SYSTEM ComputeSystem,
+    _In_ PCWSTR VmId,
+    _In_ PCWSTR Disk,
+    _In_ ULONG Lun,
+    _In_opt_ HANDLE UserToken,
+    _In_ wsl::windows::common::disk::DiskStateFlags Flags,
+    _In_ size_t TimeoutMs)
 {
     RemoveScsiDisk(ComputeSystem, Lun);
     if (WI_IsFlagSet(Flags, wsl::windows::common::disk::DiskStateFlags::AccessGranted))
     {
-        RevokeVmAccess(VmId, Disk);
+        RevokeVmAccess(VmId, Disk, UserToken);
     }
 
     // If the disk was online before being attached, revert to that state.
