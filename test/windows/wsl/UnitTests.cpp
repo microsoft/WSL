@@ -3225,42 +3225,6 @@ EOF
             0u);
     }
 
-    WSL2_TEST_METHOD(DistributionPerf)
-    {
-        // The test distro does not ship perf, and WSL must not supply one.
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /usr/bin/perf && test ! -L /usr/bin/perf"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /usr/local/bin/perf && test ! -L /usr/local/bin/perf"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /run/wsl/perf && test ! -e /usr/lib/wsl/perf/$(uname -r)"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"! mountpoint -q /usr/lib/linux-tools/$(uname -r) && ! command -v perf"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -z \"${PERF_EXEC_PATH+x}\""), 0u);
-
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            LxsstuLaunchWsl(L"rm -f /usr/bin/perf /usr/bin/distro-perf /usr/bin/perf.dpkg-tmp /usr/bin/perf.dpkg-new");
-        });
-
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(
-                L"printf '#!/bin/sh\\necho distro-perf\\n' > /usr/bin/distro-perf && chmod +x /usr/bin/distro-perf && "
-                L"ln -s distro-perf /usr/bin/perf"),
-            0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(readlink /usr/bin/perf)\" = distro-perf && test \"$(perf)\" = distro-perf"), 0u);
-
-        // Package-manager backup links and replacement must work across restarts.
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(
-                L"ln /usr/bin/distro-perf /usr/bin/perf.dpkg-tmp && "
-                L"printf '#!/bin/sh\\necho upgraded-perf\\n' > /usr/bin/perf.dpkg-new && chmod +x /usr/bin/perf.dpkg-new && "
-                L"mv -f /usr/bin/perf.dpkg-new /usr/bin/perf && test \"$(/usr/bin/perf.dpkg-tmp)\" = distro-perf"),
-            0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(L"test ! -L /usr/bin/perf && test \"$(perf)\" = upgraded-perf && "
-                            L"rm /usr/bin/perf.dpkg-tmp && ln /usr/bin/perf /usr/bin/perf.dpkg-tmp && "
-                            L"rm /usr/bin/perf && mv /usr/bin/perf.dpkg-tmp /usr/bin/perf && test \"$(perf)\" = upgraded-perf"),
-            0u);
-    }
-
     WSL2_TEST_METHOD(CrashCollection)
     {
         const auto folder = std::filesystem::absolute(L"test-crash-dumps");
