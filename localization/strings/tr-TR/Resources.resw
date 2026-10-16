@@ -919,6 +919,14 @@ NAT ağ bağlantısına geri dönülüyor.</value>
     <value>IPv6, ana bilgisayarda desteklenmeyen bir şekilde devre dışı bırakıldı (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>Yansıtılmış ağ, daha küçük bir geçici bağlantı noktası aralığı kullanıyor ({} yerine {} bağlantı noktası). Bu, eşzamanlı bağlantı sayısını sınırlayabilir.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>Mirrored networking could not reserve the minimum contiguous range of {} TCP and UDP ports. Check Windows port usage and exclusions.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Hyper-V güvenlik duvarı desteklenmiyor</value>
   </data>
@@ -3282,7 +3290,7 @@ Windows sürümü: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
-    <value>Invalid mode '{}'.</value>
+    <value>Geçersiz mod '{}'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
@@ -3871,21 +3879,21 @@ Windows sürümü: {}</value>
     <value>Kapsayıcı terminale aktarılamıyor. -o seçeneğini kullanın veya stdout'u yeniden yönlendirin.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>Expected format: [&lt;host path | named volume&gt;:]&lt;container path&gt;[:mode]</value>
+    <value>Beklenen biçim: [&lt;ana bilgisayar yolu | adlandırılmış birim&gt;:]&lt;kapsayıcı yolu&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
   <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
-    <value>Invalid volume specification: '{}'. {} {}</value>
+    <value>Geçersiz birim belirtimi: '{}'. {} {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
-    <value>The volume specification is empty.</value>
+    <value>Birim belirtimi boş.</value>
   </data>
   <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
-    <value>The volume specification contains an empty section between colons.</value>
+    <value>Birim belirtimi, iki nokta üst üste işaretleri arasında boş bir bölüm içeriyor.</value>
   </data>
   <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
-    <value>The volume specification contains too many colons.</value>
+    <value>Birim belirtiminde çok fazla iki nokta üst üste var.</value>
   </data>
   <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
     <value>'{}' konak yolu geçerli bir Windows yolu değil.</value>

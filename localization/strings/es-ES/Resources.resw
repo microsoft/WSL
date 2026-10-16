@@ -925,6 +925,14 @@ Revirtiendo a las redes NAT.</value>
     <value>IPv6 está deshabilitado en el host de forma no compatible (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>Las redes reflejadas usan un intervalo de puertos efímeros más pequeño (puertos {} en lugar de {}). Esto puede limitar el número de conexiones simultáneas.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>Las redes reflejadas no pudieron reservar el intervalo contiguo mínimo de {} puertos TCP y UDP. Compruebe el uso y las exclusiones del puerto de Windows.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>No se admite el firewall de Hyper-V</value>
   </data>
@@ -3288,7 +3296,7 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
-    <value>Invalid mode '{}'.</value>
+    <value>Modo "{}" no válido.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
@@ -3877,15 +3885,15 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>No se puede exportar el contenedor al terminal. Use la opción -o o redirija stdout.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>Expected format: [&lt;host path | named volume&gt;:]&lt;container path&gt;[:mode]</value>
+    <value>Formato esperado: [&lt;host path | named volume&gt;:]&lt;container path&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
   <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
-    <value>Invalid volume specification: '{}'. {} {}</value>
+    <value>Especificación de volumen no válida: "{}". {} {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
-    <value>The volume specification is empty.</value>
+    <value>La especificación de volumen está vacía.</value>
   </data>
   <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
     <value>La especificación de volumen contiene una sección vacía entre dos puntos.</value>

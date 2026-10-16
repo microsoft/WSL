@@ -919,6 +919,14 @@ Návrat k sítím NAT.</value>
     <value>Protokol IPv6 je na hostiteli zakázán nepodporovaným způsobem (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>Mirrored networking is using a smaller ephemeral port range ({} ports instead of {}). This may limit the number of simultaneous connections.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>Mirrored networking could not reserve the minimum contiguous range of {} TCP and UDP ports. Check Windows port usage and exclusions.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Brána firewall technologie Hyper-V není podporována.</value>
   </data>
@@ -3282,7 +3290,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
-    <value>Invalid mode '{}'.</value>
+    <value>Neplatný režim '{}'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
@@ -3871,24 +3879,24 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Kontejner nelze exportovat do terminálu. Použijte možnost -o nebo přesměrujte stdout.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>Expected format: [&lt;host path | named volume&gt;:]&lt;container path&gt;[:mode]</value>
+    <value>Očekávaný formát: [&lt;host path | named volume&gt;:]&lt;container path&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
   <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
-    <value>Invalid volume specification: '{}'. {} {}</value>
+    <value>Neplatná specifikace svazku: '{}'. {} {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
-    <value>The volume specification is empty.</value>
+    <value>Specifikace svazku je prázdná.</value>
   </data>
   <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
     <value>Specifikace svazku obsahuje prázdný oddíl mezi dvojtečkami.</value>
   </data>
   <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
-    <value>The volume specification contains too many colons.</value>
+    <value>Specifikace svazku obsahuje příliš mnoho dvojteček.</value>
   </data>
   <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
-    <value>Host path '{}' is not a valid Windows path.</value>
+    <value>Cesta k hostiteli {} není platná cesta systému Windows.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">

@@ -919,6 +919,14 @@ Visszaállás NAT-hálózatkezelésre.</value>
     <value>Az IPv6 nem támogatott módon van letiltva a gazdagépen (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>A tükrözött hálózatkezelés kisebb rövid élettartamú porttartományt használ ({} port helyett {}). Ez korlátozhatja az egyidejű kapcsolatok számát.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>A tükrözött hálózatkezelés nem tudta lefoglalni a legalább {} egymást követő TCP- és UDP-portból álló tartományt. Ellenőrizze a Windows porthasználatát és a kizárásokat.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>A Hyper-V tűzfal nem támogatott</value>
   </data>
@@ -3282,7 +3290,7 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
-    <value>Invalid mode '{}'.</value>
+    <value>Érvénytelen mód: '{}'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
@@ -3871,24 +3879,24 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Nem lehet a tárolót a terminálba exportálni. Használja az -o opciót, vagy irányítsa át a stdout-ot.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>Expected format: [&lt;host path | named volume&gt;:]&lt;container path&gt;[:mode]</value>
+    <value>Várt formátum: [&lt;gazdaelérési út | elnevezett kötet&gt;:]&lt;tároló elérési útja&gt;[:mód]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
   <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
-    <value>Invalid volume specification: '{}'. {} {}</value>
+    <value>Érvénytelen kötetspecifikációk: „{}”. {} {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
-    <value>The volume specification is empty.</value>
+    <value>A kötetspecifikáció üres.</value>
   </data>
   <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
-    <value>The volume specification contains an empty section between colons.</value>
+    <value>A kötetspecifikáció kettőspontok közötti szakasza üres.</value>
   </data>
   <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
-    <value>The volume specification contains too many colons.</value>
+    <value>A kötetspecifikáció túl sok kettőspontot tartalmaz.</value>
   </data>
   <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
-    <value>Host path '{}' is not a valid Windows path.</value>
+    <value>A gazdagép {} elérési útja nem érvényes Windows-elérési út.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
