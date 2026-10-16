@@ -926,6 +926,14 @@ Voltando à rede NAT.</value>
     <value>O IPv6 está desabilitado no host de uma forma sem suporte (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>A rede espelhada está usando um intervalo de portas efêmero menor ({} portas em vez de {}). Isso pode limitar o número de conexões simultâneas.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>A rede espelhada não pôde reservar o intervalo contíguo mínimo de {} portas TCP e UDP. Verifique o uso e as exclusões de portas do Windows.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Não há suporte para o firewall do Hyper-V</value>
   </data>
@@ -2682,14 +2690,6 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
   <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
     <value>Copie arquivos entre um contêiner e o sistema de arquivos local.</value>
   </data>
-  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
-    <value>Copiar arquivos entre um contêiner e o sistema de arquivos local.
-Uso: wslc container cp [OPÇÕES] ORIGEM DESTINO
-  Local para contêiner: wslc container cp LOCAL_PATH CONTAINER:PATH
-  Contêiner para local: wslc container cp CONTAINER:PATH LOCAL_PATH
-  Stdin para contêiner: wslc container cp - CONTAINER:PATH</value>
-    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
-  </data>
   <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
     <value>Fonte: caminho local, CONTAINER:PATH, ou '-' para stdin</value>
     <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
@@ -3296,6 +3296,10 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>A opção '{}' não tem suporte.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
+    <value>Modo inválido '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
     <value>O destino de montagem é obrigatório.</value>
   </data>
@@ -3882,28 +3886,25 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Não é possível exportar o contêiner para o terminal. Use a opção -o ou redirecione stdout.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>Formato esperado: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
+    <value>Formato esperado: [&lt;host path | named volume&gt;:]&lt;container path&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
-  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>Especificações de volume inválidas: '{}'. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
+    <value>Especificação de volume inválida: '{}'. {} {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>Especificações de volume inválidas: '{}'. O caminho do host não pode ficar vazio. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
+    <value>A especificação do volume está vazia.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
-    <value>Especificações de volume inválidas: '{}'. O caminho do contêiner não pode ficar vazio. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
+    <value>A especificação do volume contém uma seção vazia entre dois-pontos.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
-    <value>Especificações de volume inválidas: '{}'. O caminho do contêiner deve ser um caminho absoluto (começando com '/'). {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
+    <value>A especificação de volume contém muitos dois-pontos.</value>
   </data>
-  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
-    <value>Especificações de volume inválidas: '{}'. O caminho do host '{}' não é um caminho válido do Windows.</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
+    <value>O caminho do host '{}' não é um caminho válido do Windows.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
     <value>Nome ou ID de qualquer tipo de objeto</value>

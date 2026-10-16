@@ -925,6 +925,14 @@ NAT 네트워킹으로 대체합니다.</value>
     <value>호스트에서 지원하지 않는 방식으로 IPv6가 비활성화되어 있습니다(HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff).</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>Mirrored networking is using a smaller ephemeral port range ({} ports instead of {}). This may limit the number of simultaneous connections.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>미러된 네트워킹이 {}개의 TCP 및 UDP 포트에 있는 최소 연속 범위를 예약할 수 없습니다. Windows 포트 사용 및 제외를 확인합니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Hyper-V 방화벽은 지원되지 않습니다.</value>
   </data>
@@ -2681,14 +2689,6 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
     <value>컨테이너와 로컬 파일 시스템 간에 파일을 복사합니다.</value>
   </data>
-  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
-    <value>컨테이너와 로컬 파일 시스템 간에 파일을 복사합니다.
-사용법: wslc container cp [OPTIONS] SOURCE DEST
-  로컬에서 컨테이너로: wslc container cp LOCAL_PATH CONTAINER:PATH
-  컨테이너에서 로컬로: wslc container cp CONTAINER:PATH LOCAL_PATH
-  Stdin에서 컨테이너로: wslc container cp - CONTAINER:PATH</value>
-    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
-  </data>
   <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
     <value>원본: 로컬 경로, CONTAINER:PATH 또는 stdin의 경우 '-'</value>
     <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
@@ -3295,6 +3295,10 @@ Windows 버전: {}</value>
     <value>'{}' 옵션은 지원되지 않습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
+    <value>'{}' 모드가 잘못되었습니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
     <value>탑재 대상이 필요합니다.</value>
   </data>
@@ -3881,28 +3885,25 @@ Windows 버전: {}</value>
     <value>터미널로 컨테이너를 내보낼 수 없습니다. -o 옵션을 사용하거나 stdout을 리디렉션합니다.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>필요한 형식: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
+    <value>예상 형식: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
-  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>잘못된 볼륨 사양: '{}'. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
+    <value>잘못된 볼륨 사양: '{}'. {} {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>잘못된 볼륨 사양: '{}'. 호스트 경로는 비워 둘 수 없습니다. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
+    <value>볼륨 사양이 비어 있습니다.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
-    <value>잘못된 볼륨 사양: '{}'. 컨테이너 경로는 비워 둘 수 없습니다. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
+    <value>볼륨 사양에 콜론 사이의 빈 섹션이 있습니다.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
-    <value>잘못된 볼륨 사양: '{}'. 컨테이너 경로는 절대 경로여야 하며 '/'로 시작해야 합니다. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
+    <value>볼륨 사양에 콜론이 너무 많습니다.</value>
   </data>
-  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
-    <value>잘못된 볼륨 사양: '{}'. 호스트 경로 '{}'은(는) 유효한 Windows 경로가 아닙니다.</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
+    <value>호스트 경로 '{}'는 유효한 Windows 경로가 아닙니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
     <value>모든 개체 유형의 이름 또는 ID</value>

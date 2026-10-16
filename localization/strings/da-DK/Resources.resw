@@ -919,6 +919,14 @@ Går tilbage til NAT-netværk.</value>
     <value>IPv6 er deaktiveret på værten på en ikke-understøttet måde (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>Spejlet netværk bruger et mindre kortvarigt portområde ({} porte i stedet for {}). Dette kan begrænse antallet af samtidige forbindelser.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>Spejlede netværk kunne ikke reservere det mindste sammenhængende område på {} TCP- og UDP-porte. Kontrollér brugen af Windows-porte og udeladelser.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Hyper-V-firewall understøttes ikke</value>
   </data>
@@ -2675,14 +2683,6 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
   <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
     <value>Kopiér filer mellem en objektbeholder og det lokale filsystem.</value>
   </data>
-  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
-    <value>Kopiér filer mellem en objektbeholder og det lokale filsystem.
-Format: wslc container cp [INDSTILLINGER] KILDEDESTINATION 
-  Lokalt til objektbeholder: wslc container cp LOCAL_PATH CONTAINER:PATH
-  Objektbeholder til lokalt: wslc container cp CONTAINER:PATH LOCAL_PATH
-  Stdin til objektbeholder: wslc container cp - CONTAINER:PATH</value>
-    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
-  </data>
   <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
     <value>Kilde: lokal sti, CONTAINER:PATH eller '-' til stdin</value>
     <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
@@ -3289,6 +3289,10 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Indstillingen "{}" understøttes ikke.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
+    <value>Ugyldig tilstand "{}".</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
     <value>Monteringsmålet er påkrævet.</value>
   </data>
@@ -3878,25 +3882,22 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Forventet format: &lt;værtssti | navngivet diskenhed&gt;:&lt;objektbeholdersti&gt;[:tilstand]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
-  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>Ugyldige diskenhedsspecifikationer: '{}'. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
+    <value>Ugyldige diskenhedsspecifikationer: "{}". {} {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>Ugyldige enhedsspecifikationer: '{}'. Værtsstien må ikke være tom. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
+    <value>Diskenhedsspecifikationen er tom.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
-    <value>Ugyldige enhedsspecifikationer: '{}'. Beholderstien må ikke være tom. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
+    <value>Diskenhedsspecifikationen indeholder en tom sektion mellem kolon.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
-    <value>Ugyldige enhedsspecifikationer: '{}'. Beholderstien skal være en absolut sti (starter med '/'). {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
+    <value>Volumespecifikationen indeholder for mange koloner.</value>
   </data>
-  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
-    <value>Ugyldige enhedsspecifikationer: '{}'. Værtsstien '{}' er ikke en gyldig Windows-sti.</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
+    <value>Værtsstien '{}' er ikke en gyldig Windows-sti.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
     <value>Navn eller id for en objekttype</value>

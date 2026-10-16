@@ -925,6 +925,14 @@ Fallback alla rete NAT.</value>
     <value>IPv6 è disabilitato sull'host in modo non supportato (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>La rete con mirroring usa un intervallo di porte temporanee più piccolo ({} porte invece di {}). Ciò potrebbe limitare il numero di connessioni simultanee.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>La rete con mirroring non è riuscita a riservare l'intervallo contiguo minimo di {} porte TCP e UDP. Controlla l'utilizzo e le esclusioni delle porte di Windows.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Il firewall Hyper-V non è supportato</value>
   </data>
@@ -2681,14 +2689,6 @@ Per informazioni sulla privacy di questo prodotto, visita https://aka.ms/privacy
   <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
     <value>Copia i file tra un contenitore e il file system locale.</value>
   </data>
-  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
-    <value>Copia i file tra un contenitore e il filesystem locale.
-Uso: wslc container cp [OPZIONI] SORGENTE DEST
-  Da locale a contenitore: wslc container cp LOCAL_PATH CONTAINER:PATH
-  Da contenitore a locale: wslc container cp CONTAINER:PATH LOCAL_PATH
-  Stdin a contenitore: wslc container cp - CONTAINER:PATH</value>
-    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
-  </data>
   <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
     <value>Origine: percorso locale, CONTAINER:PATH oppure '-' per STDIN</value>
     <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
@@ -3295,6 +3295,10 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>L'opzione '{}' non è supportata.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
+    <value>Modalità non valida '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
     <value>La destinazione di montaggio è obbligatoria.</value>
   </data>
@@ -3884,25 +3888,22 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Formato previsto: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
-  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>Specifiche del volume non valide: "{}". {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
+    <value>Specifica del volume non valida: '{}'. {} {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>Specifiche del volume non valide: "{}". Il percorso host non può essere vuoto. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
+    <value>La specifica del volume è vuota.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
-    <value>Specifiche del volume non valide: "{}". Il percorso del contenitore non può essere vuoto. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
+    <value>La specifica del volume contiene una sezione vuota tra i due punti.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
-    <value>Specifiche del volume non valide: '{}'. Il percorso del contenitore deve essere un percorso assoluto (che inizia con '/'). {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
+    <value>La specifica del volume contiene troppi due punti.</value>
   </data>
-  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
-    <value>Specifiche del volume non valide: '{}'. Il percorso host '{}' non è un percorso di Windows valido.</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
+    <value>Il percorso host '{}' non è un percorso di Windows valido.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
     <value>Nome o ID di qualsiasi tipo di oggetto</value>

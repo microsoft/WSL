@@ -54,8 +54,6 @@ namespace settings = wsl::windows::wslc::settings;
 
 namespace {
 
-std::atomic<wsl::windows::service::wslc::WSLCSessionManagerImpl*> g_managerInstance{nullptr};
-
 // Session settings built server-side from the caller's settings.yaml.
 struct SessionSettings
 {
@@ -143,15 +141,8 @@ private:
 
 } // namespace
 
-WSLCSessionManagerImpl::WSLCSessionManagerImpl()
-{
-    g_managerInstance.store(this);
-}
-
 WSLCSessionManagerImpl::~WSLCSessionManagerImpl()
 {
-    g_managerInstance.store(nullptr);
-
     // Terminate all sessions on shutdown.
     // Call Terminate() directly rather than going through ForEachSession(),
     // which would needlessly resolve weak references and call GetState().
@@ -293,7 +284,9 @@ void WSLCSessionManagerImpl::CreateSession(
 
         // Launch per-user COM server factory and add it to a fresh per-session job object for crash cleanup.
         auto factory = wslutil::CreateComServerAsUser<IWSLCSessionFactory>(__uuidof(WSLCSessionFactory), userToken.get());
-        wil::unique_handle sessionJob = CreateSessionProcessJob(factory.get());
+        wil::unique_handle hostProcess;
+        THROW_IF_FAILED(factory->GetProcessHandle(hostProcess.put()));
+        wil::unique_handle sessionJob = CreateSessionProcessJob(hostProcess.get());
 
         const auto sessionSettings = CreateSessionSettings(sessionId, callerFileName.c_str(), Settings, resolvedDisplayName.c_str());
         wil::com_ptr<IWSLCSession> session;
@@ -312,7 +305,17 @@ void WSLCSessionManagerImpl::CreateSession(
 
         // Track the session via its service ref, along with metadata and security info.
         m_sessions.push_back(SessionEntry{
-            std::move(serviceRef), sessionId, creatorPid, resolvedDisplayName, std::move(tokenInfo), notifier, false, sharedToken, std::move(storedSid), std::move(sessionJob)});
+            std::move(serviceRef),
+            sessionId,
+            creatorPid,
+            resolvedDisplayName,
+            std::move(tokenInfo),
+            notifier,
+            false,
+            sharedToken,
+            std::move(storedSid),
+            std::move(sessionJob),
+            std::move(hostProcess)});
 
         // For persistent sessions, also hold a strong reference to keep them alive.
         const bool persistent = WI_IsFlagSet(Flags, WSLCSessionFlagsPersistent);
@@ -485,16 +488,13 @@ WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
     return sessionSettings;
 }
 
-wil::unique_handle WSLCSessionManagerImpl::CreateSessionProcessJob(_In_ IWSLCSessionFactory* Factory)
+wil::unique_handle WSLCSessionManagerImpl::CreateSessionProcessJob(_In_ HANDLE Process)
 {
     // Use a fresh job per session; reusing one fails intermittently with
     // ERROR_ACCESS_DENIED once it's assigned to a process the system put in another job.
     wil::unique_handle jobObject = wsl::windows::common::helpers::CreateKillOnCloseJob();
 
-    wil::unique_handle process;
-    THROW_IF_FAILED(Factory->GetProcessHandle(process.put()));
-
-    THROW_IF_WIN32_BOOL_FALSE(AssignProcessToJobObject(jobObject.get(), process.get()));
+    THROW_IF_WIN32_BOOL_FALSE(AssignProcessToJobObject(jobObject.get(), Process));
 
     return jobObject;
 }
@@ -685,11 +685,6 @@ try
 CATCH_RETURN();
 
 namespace wsl::windows::service::wslc {
-
-WSLCSessionManagerImpl* WSLCSessionManagerImpl::Instance() noexcept
-{
-    return g_managerInstance.load();
-}
 
 wil::com_ptr<IWSLCSession> WSLCSessionManagerImpl::FindSession(ULONG Id)
 {

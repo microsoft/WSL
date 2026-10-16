@@ -919,6 +919,14 @@ Terugvallen op NAT-netwerken.</value>
     <value>IPv6 is op de host uitgeschakeld op een niet-ondersteunde manier (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>Mirrored networking is using a smaller ephemeral port range ({} ports instead of {}). This may limit the number of simultaneous connections.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>Gespiegeld netwerken kan het minimale aaneengesloten bereik van {} TCP- en UDP-poorten niet reserveren. Controleer het gebruik en de uitsluitingen van Windows-poorten.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Hyper-V-firewall wordt niet ondersteund</value>
   </data>
@@ -2675,14 +2683,6 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
   <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
     <value>Bestanden kopiëren tussen een container en het lokale bestandssysteem.</value>
   </data>
-  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
-    <value>Kopieer bestanden tussen een container en het lokale bestandssysteem.
-Gebruik: wslc container cp [OPTIES] BRON BESTEMMING
-  Lokaal naar container: wslc container cp LOCAL_PATH CONTAINER:PATH
-  Container naar lokaal: wslc container cp CONTAINER:PATH LOCAL_PATH
-  stdin naar container: wslc container cp - CONTAINER:PATH</value>
-    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
-  </data>
   <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
     <value>Bron: lokaal pad, CONTAINER:PATH, of '-' voor stdin</value>
     <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
@@ -3289,6 +3289,10 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Optie '{}' wordt niet ondersteund.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
+    <value>Ongeldige modus '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
     <value>Het koppelingsdoel is vereist.</value>
   </data>
@@ -3875,28 +3879,25 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Kan container niet naar de terminal exporteren. Gebruik de -o-optie of leid stdout om.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>Verwachte indeling: &lt;hostpad | benoemd volume&gt;:&lt;containerpad&gt;[:modus]</value>
+    <value>Verwachte indeling: [&lt;hostpad | benoemd volume&gt;:]&lt;containerpad&gt;[:modus]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
-  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>Ongeldige volumespecificaties: {}. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
+    <value>Ongeldige volumespecificatie: '{}': {} {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>Ongeldige volumespecificaties: {}. Het hostpad mag niet leeg zijn. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
+    <value>De volumespecificatie is leeg.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
-    <value>Ongeldige volumespecificaties: {}. Het containerpad mag niet leeg zijn. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
+    <value>De volumespecificatie bevat een leeg gedeelte tussen dubbele punten.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
-    <value>Ongeldige volumespecificaties: {}. Het containerpad moet een absoluut pad zijn (beginnend met /). {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
+    <value>De volumespecificatie bevat te veel dubbele punten.</value>
   </data>
-  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
-    <value>Ongeldige volumespecificaties: {}. Hostpad {} is geen geldig Windows-pad.</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
+    <value>Hostpad '{}' is geen geldig Windows-pad.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
     <value>Naam of id van een objecttype</value>

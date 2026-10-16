@@ -355,8 +355,7 @@ private:
     // network state is committed independently by the mutators under m_networksLock.
     void OnNetworkEvent(const std::string& NetworkId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t TimeNano) noexcept;
 
-    // Docker volume notifications are forwarded to the event store by WSLCVolumes once it has applied them,
-    // so the volume state is current by the time a consumer observes the event.
+    // WSLCVolumes forwards every Docker volume notification to the event store after updating the volumes it tracks.
     void OnVolumeEvent(const std::string& VolumeName, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t TimeNano) noexcept;
     void OnContainerAction(const std::string& ContainerId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t TimeNano) noexcept;
 
@@ -432,6 +431,9 @@ private:
     WSLCFeatureFlags m_featureFlags{};
     std::function<void()> m_destructionCallback;
     std::atomic<bool> m_terminating{false};
+
+    // Signals that the winning Terminate() call has finished, including cleanup or failure.
+    wil::unique_event m_terminationCompleteEvent{wil::EventOptions::ManualReset};
 
     wil::com_ptr<IWSLCPluginNotifier> m_pluginNotifier;
 

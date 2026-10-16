@@ -483,13 +483,33 @@ struct CreateContainer
     std::optional<std::vector<std::string>> Entrypoint;
     std::vector<std::string> Env;
     std::map<std::string, EmptyObject> ExposedPorts;
+    std::map<std::string, EmptyObject> Volumes;
     std::map<std::string, std::string> Labels;
     std::optional<HealthConfig> Healthcheck;
     HostConfig HostConfig;
     NetworkingConfig NetworkingConfig;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(
-        CreateContainer, Image, Cmd, Tty, OpenStdin, StdinOnce, Entrypoint, Env, ExposedPorts, HostConfig, StopSignal, StopTimeout, WorkingDir, User, Hostname, Domainname, Labels, Healthcheck, NetworkingConfig);
+        CreateContainer,
+        Image,
+        Cmd,
+        Tty,
+        OpenStdin,
+        StdinOnce,
+        Entrypoint,
+        Env,
+        ExposedPorts,
+        Volumes,
+        HostConfig,
+        StopSignal,
+        StopTimeout,
+        WorkingDir,
+        User,
+        Hostname,
+        Domainname,
+        Labels,
+        Healthcheck,
+        NetworkingConfig);
 };
 
 struct HealthcheckResult

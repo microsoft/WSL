@@ -143,8 +143,8 @@ class EpollWatcher
 {
 public:
     void Run();
-    void Add(int fd, int events, EpollDispatcher& dispatcher);
-    void Remove(int fd);
+    uint64_t Add(int fd, int events, EpollDispatcher& dispatcher);
+    void Remove(int fd, uint64_t registrationId);
 
     explicit operator bool() const noexcept
     {
@@ -155,6 +155,9 @@ private:
     static void WatchThread(EpollWatcher* watcher);
 
     int m_EpollFileDescriptor{-1};
+    std::mutex m_Lock;
+    uint64_t m_NextRegistrationId{1};
+    std::map<uint64_t, EpollDispatcher*> m_Dispatchers;
 };
 
 extern EpollWatcher g_Watcher;
@@ -261,15 +264,16 @@ public:
         // If there is an existing file descriptor, remove it from the epoll.
         if (m_FileDescriptor >= 0)
         {
-            m_Watcher.Remove(m_FileDescriptor);
+            m_Watcher.Remove(m_FileDescriptor, m_RegistrationId);
+            m_FileDescriptor = -1;
+            m_RegistrationId = 0;
         }
 
-        m_FileDescriptor = fd;
-
         // Add the new file descriptor to epoll.
-        if (m_FileDescriptor >= 0)
+        if (fd >= 0)
         {
-            m_Watcher.Add(m_FileDescriptor, EPOLLIN | EPOLLOUT | EPOLLET, m_Dispatcher);
+            m_RegistrationId = m_Watcher.Add(fd, EPOLLIN | EPOLLOUT | EPOLLET, m_Dispatcher);
+            m_FileDescriptor = fd;
         }
     }
 
@@ -277,6 +281,7 @@ private:
     EpollWatcher& m_Watcher;
     EpollDispatcher m_Dispatcher;
     int m_FileDescriptor{-1};
+    uint64_t m_RegistrationId{};
 };
 
 Task<int> AcceptAsync(CoroutineEpollIssuer& listen, CancelToken& token);

@@ -43,8 +43,12 @@ class WSLCVolumeMountUnitTests
             {L"./foo:/data:ro", (cwd / L"foo").wstring(), R"(/data)", true},
             {L"../bar:/data:rw", (cwd.parent_path() / L"bar").wstring(), R"(/data)", false},
             {L"..\\bar:/data:rw", (cwd.parent_path() / L"bar").wstring(), R"(/data)", false},
-            {L"sub/dir:/data", (cwd / L"sub" / L"dir").wstring(), R"(/data)", false},
-            {L"sub\\dir:/data", (cwd / L"sub" / L"dir").wstring(), R"(/data)", false},
+
+            // Anonymous volumes
+            {L"/data", L"", R"(/data)", false},
+            {L":", L"", R"(:)", false},
+            {L"::", L"", R"(::)", false},
+            {LR"(C:\hostPath)", L"", R"(C:\hostPath)", false},
         };
 
         for (const auto& arg : validVolumeArgs)
@@ -60,14 +64,15 @@ class WSLCVolumeMountUnitTests
     TEST_METHOD(VolumeMount_Parse_InvalidArgs)
     {
         std::vector<std::wstring> invalidCases = {
-            LR"(:/containerPath)",             // Empty host path
-            LR"(:/containerPath:ro)",          // Empty host path
-            LR"(:)",                           // Empty container path
-            LR"(::)",                          // Empty container path
-            LR"(C:\hostPath::ro)",             // Empty container path
-            LR"(C:\hostPath:)",                // Empty container path
-            LR"(C:\hostPath::rw)",             // Empty container path
-            LR"(C:\hostPath:/containerPath:)", // Empty container path
+            LR"()",                            // Empty specification
+            LR"(:/containerPath)",             // Empty section
+            LR"(:/containerPath:ro)",          // Empty section
+            LR"(C:\hostPath::ro)",             // Empty section
+            LR"(C:\hostPath:)",                // Empty section
+            LR"(C:\hostPath::rw)",             // Empty section
+            LR"(C:\hostPath:/containerPath:)", // Empty section
+            LR"(sub/dir:/data)",               // Not a file path, so an invalid volume name
+            LR"(sub\dir:/data)",               // Not a file path, so an invalid volume name
         };
 
         for (const auto& value : invalidCases)
@@ -79,13 +84,11 @@ class WSLCVolumeMountUnitTests
 
     TEST_METHOD(VolumeMount_Parse_InvalidContainerPath)
     {
-        // Drive colon gets misinterpreted as the host:container separator,
-        // producing a non-absolute container path. Caught by container path validation.
         std::vector<std::wstring> invalidPathCases = {
-            LR"(C:\hostPath:ro)",                          // host='C', container=\hostPath (not absolute)
-            LR"(C:\hostPath)",                             // host='C', container=\hostPath (not absolute)
-            LR"(C:\hostPath:/containerPath:invalid_mode)", // container=invalid_mode (not absolute)
-            LR"(C:\hostPath:/containerPath:ro:extra)",     // container=extra (not absolute)
+            LR"(C:\hostPath:ro)",                          // container=ro (not absolute)
+            LR"(C:\hostPath:/containerPath:invalid_mode)", // invalid mode
+            LR"(C:\hostPath:/containerPath:ro:extra)",     // too many colons
+            LR"(C:\hostPath:/containerPath:rw,ro)",        // duplicate rw-category mode
         };
 
         for (const auto& value : invalidPathCases)

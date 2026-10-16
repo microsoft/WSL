@@ -795,10 +795,11 @@ void wsl::windows::common::helpers::AppendCommonKernelCommandLine(
     // Configure page reporting order - minimum order of pages reported as free to the hypervisor.
     kernelCmdLine += std::format(L" page_reporting.page_reporting_order={}", pageReportingOrder);
 
-    // Reserve a swiotlb bounce buffer for virtio devices.
+    // Reserve a swiotlb bounce buffer for virtio devices. The hv_pci pool bounces on its own; a global
+    // swiotlb=force would also push all other DMA (storvsc) through the small default pool.
     if (swiotlbSizeBytes != 0)
     {
-        kernelCmdLine += std::format(L" swiotlb=force hv_pci_swiotlb={}", swiotlbSizeBytes);
+        kernelCmdLine += std::format(L" hv_pci_swiotlb={}", swiotlbSizeBytes);
     }
 
     // Cap the storage hw queue count. Default is CPU count.
