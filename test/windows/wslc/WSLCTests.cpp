@@ -13229,6 +13229,93 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerCachedProperties)
+    {
+        auto verifyDeletedProperties = [](RunningWSLCContainer& container, IWSLCProcess* expectedProcess = nullptr) {
+            const auto id = container.Id();
+            const auto name = container.Name();
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
+            container.SetDeleteOnClose(false);
+
+            VERIFY_ARE_EQUAL(id, container.Id());
+            VERIFY_ARE_EQUAL(name, container.Name());
+            VERIFY_ARE_EQUAL(WslcContainerStateDeleted, container.State());
+
+            wil::com_ptr<IWSLCProcess> cachedProcess;
+            if (expectedProcess != nullptr)
+            {
+                VERIFY_SUCCEEDED(container.Get().GetInitProcess(&cachedProcess));
+                wil::com_ptr<IUnknown> expectedIdentity;
+                wil::com_ptr<IUnknown> cachedIdentity;
+                VERIFY_SUCCEEDED(expectedProcess->QueryInterface(IID_PPV_ARGS(&expectedIdentity)));
+                VERIFY_SUCCEEDED(cachedProcess->QueryInterface(IID_PPV_ARGS(&cachedIdentity)));
+                VERIFY_ARE_EQUAL(expectedIdentity.get(), cachedIdentity.get());
+            }
+            else
+            {
+                VERIFY_ARE_EQUAL(RPC_E_DISCONNECTED, container.Get().GetInitProcess(&cachedProcess));
+                VERIFY_IS_NULL(cachedProcess.get());
+            }
+        };
+
+        {
+            WSLCContainerLauncher launcher("alpine:latest", "cached-created", {"/bin/true"});
+            auto container = launcher.Create(*m_defaultSession);
+            VERIFY_ARE_EQUAL(WslcContainerStateCreated, container.State());
+            verifyDeletedProperties(container);
+        }
+
+        {
+            WSLCContainerLauncher launcher("alpine:latest", "cached-restarted", {"/bin/sh", "-c", "exit 42"});
+            auto container = launcher.Launch(*m_defaultSession);
+            VERIFY_ARE_EQUAL(42, container.GetInitProcess().Wait());
+
+            wil::com_ptr<IWSLCProcess> firstProcess;
+            VERIFY_SUCCEEDED(container.Get().GetInitProcess(&firstProcess));
+            VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+            VERIFY_ARE_EQUAL(42, container.GetInitProcess().Wait());
+
+            wil::com_ptr<IWSLCProcess> lastProcess;
+            VERIFY_SUCCEEDED(container.Get().GetInitProcess(&lastProcess));
+            VERIFY_ARE_NOT_EQUAL(firstProcess.get(), lastProcess.get());
+            verifyDeletedProperties(container, lastProcess.get());
+        }
+
+        {
+            WSLCContainerLauncher launcher("alpine:latest", "cached-failed-start", {"/wslc-nonexistent-executable"});
+            auto container = launcher.Create(*m_defaultSession);
+            VERIFY_FAILED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+
+            // Failed start rolls back the provisional init process, including its cached reference.
+            verifyDeletedProperties(container);
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerCallRetainsSession)
+    {
+        auto session = CreateSession(GetDefaultSessionSettings(L"container-call-lifetime"));
+        LoadTestImage(*session, "alpine:latest");
+
+        ULONG sessionId{};
+        wil::unique_handle terminationEvent;
+        VERIFY_SUCCEEDED(session->GetId(&sessionId));
+        VERIFY_SUCCEEDED(session->GetTerminationEvent(&terminationEvent));
+
+        WSLCContainerLauncher launcher("alpine:latest", "export-retains-session", {"/bin/true"});
+        auto container = launcher.Create(*session);
+        container.SetDeleteOnClose(false);
+
+        // Block a container operation to verify that this keeps the session alive.
+        BlockingOperation operation([&](HANDLE handle) { return container.Get().Export(ToCOMInputHandle(handle)); });
+        auto unblock = wil::scope_exit([&]() { operation.m_testCompleteEvent.SetEvent(); });
+
+        session.reset();
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(terminationEvent.get(), 1000));
+
+        operation.Complete();
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(terminationEvent.get(), 120 * 1000));
+    }
+
     WSLC_TEST_METHOD(SessionCleanupWaitsForHostExit)
     {
         const auto manager = OpenSessionManager();
