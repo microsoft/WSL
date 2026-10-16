@@ -238,6 +238,9 @@ static void CreatePerfWrapper(const std::string& target)
 
     const auto content = std::format(
         "#!/bin/sh\n"
+        "if [ -f /usr/bin/perf ] && [ -x /usr/bin/perf ] && [ ! /usr/bin/perf -ef /run/wsl/perf ]; then\n"
+        "    exec /usr/bin/perf \"$@\"\n"
+        "fi\n"
         "if [ -z \"${{PERF_EXEC_PATH:-}}\" ]; then\n"
         "    PERF_EXEC_PATH={}\n"
         "fi\n"

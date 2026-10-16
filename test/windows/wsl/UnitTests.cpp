@@ -3256,6 +3256,13 @@ EOF
                 L"ln -s distro-perf /usr/bin/perf && mkdir -p /usr/lib/linux-tools/$(uname -r) && "
                 L"printf persistent > /usr/lib/linux-tools/$(uname -r)/wsl-test-persistent"),
             0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(perf)\" = distro-perf"), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin perf)\" = distro-perf"), 0u);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(
+                L"test \"$(PERF_EXEC_PATH=/usr/lib/wsl/perf/$(uname -r)/libexec/perf-core "
+                L"/usr/lib/wsl/perf/$(uname -r)/bin/perf --exec-path)\" = /usr/lib/wsl/perf/$(uname -r)/libexec/perf-core"),
+            0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(L"test \"$(readlink /lib/modules/$(uname -r)/build)\" = \"/usr/src/linux-headers-$(uname -r)\"", nullptr, nullptr, nullptr, nullptr),
@@ -3286,7 +3293,24 @@ EOF
                             L"rm /usr/bin/perf && mv /usr/bin/perf.dpkg-tmp /usr/bin/perf && "
                             L"test \"$(/usr/bin/perf)\" = upgraded-perf"),
             0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(command -v perf)\" = /usr/local/bin/perf && perf --version"), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(command -v perf)\" = /usr/local/bin/perf && test \"$(perf)\" = upgraded-perf"), 0u);
+
+        // Distro perf receives the original environment, arguments, and exit status without retry.
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"printf '%s\\n' '#!/bin/sh' 'printf \"%s\\n\" \"${PERF_EXEC_PATH-unset}\" \"$@\"' "
+                            L"'exit 23' > /usr/bin/perf"),
+            0u);
+        ValidateOutput(L"env -u PERF_EXEC_PATH perf 'argument with spaces' ''", L"unset\nargument with spaces\n\n", L"", 23);
+        ValidateOutput(L"env PERF_EXEC_PATH= perf", L"\n", L"", 23);
+        ValidateOutput(L"env 'PERF_EXEC_PATH=/tmp/user perf helpers' perf", L"/tmp/user perf helpers\n", L"", 23);
+
+        // Removal and non-executable entries fall back immediately; links to our wrapper cannot recurse.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"chmod -x /usr/bin/perf && perf --version"), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"rm /usr/bin/perf && perf --version"), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ln -s /nonexistent-distro-perf /usr/bin/perf && perf --version"), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"rm /usr/bin/perf && ln -s /usr/local/bin/perf /usr/bin/perf && perf --version"), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"rm /usr/bin/perf"), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(env -u PERF_EXEC_PATH perf --exec-path)\" = /usr/lib/wsl/perf/$(uname -r)/libexec/perf-core"), 0u);
 
         // A local override controls both ordinary and sudo-style lookup and is never replaced.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"rm /usr/local/bin/perf && printf '#!/bin/sh\\necho user-perf\\n' > /usr/local/bin/perf && chmod +x /usr/local/bin/perf"), 0u);
