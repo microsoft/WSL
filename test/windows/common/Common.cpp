@@ -2865,7 +2865,7 @@ std::string EscapeString(const std::string& Input)
     return Output;
 }
 
-PartialHandleRead::PartialHandleRead(HANDLE Handle) : m_handle(Handle)
+PartialHandleRead::PartialHandleRead(wsl::windows::common::io::HandleWrapper Handle) : m_handle(std::move(Handle))
 {
     m_thread = std::thread(std::bind(&PartialHandleRead::Run, this));
 }
@@ -2956,7 +2956,7 @@ try
 
     while (!m_exitEvent.is_signaled())
     {
-        auto bytesRead = wsl::windows::common::relay::InterruptableRead(m_handle, gsl::make_span(buffer), {m_exitEvent.get()});
+        auto bytesRead = wsl::windows::common::relay::InterruptableRead(m_handle.Get(), gsl::make_span(buffer), {m_exitEvent.get()});
         if (bytesRead == 0)
         {
             break;

@@ -395,7 +395,7 @@ public:
     NON_COPYABLE(PartialHandleRead);
     NON_MOVABLE(PartialHandleRead);
 
-    PartialHandleRead(HANDLE Handle);
+    PartialHandleRead(wsl::windows::common::io::HandleWrapper Handle);
     ~PartialHandleRead();
 
     void Expect(const std::string& Expected);
@@ -411,7 +411,7 @@ public:
 private:
     void Run();
 
-    HANDLE m_handle{};
+    wsl::windows::common::io::HandleWrapper m_handle;
     mutable std::mutex m_mutex;
     wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
     std::thread m_thread;
