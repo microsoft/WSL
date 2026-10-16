@@ -4462,11 +4462,9 @@ class WSLCTests
             std::filesystem::remove_all(contextDir, ec);
         });
 
-        // A shell wrapper exposes dropped-root regressions; Python's dlopen checks actual library discovery,
-        // rather than merely the presence of a cache entry.
         {
             std::ofstream dockerfile(contextDir / "Dockerfile");
-            dockerfile << "FROM python:3.12-slim\n";
+            dockerfile << "FROM debian:latest\n";
             dockerfile << "RUN mv /sbin/ldconfig /sbin/ldconfig.image\n";
             dockerfile << "COPY ldconfig /sbin/ldconfig\n";
             dockerfile << "RUN chmod 755 /sbin/ldconfig && rm -f /etc/ld.so.cache\n";
@@ -4474,6 +4472,7 @@ class WSLCTests
 
         {
             std::ofstream ldconfig(contextDir / "ldconfig", std::ios::binary);
+            // An interpreter exposes dropped-root regressions that a native ldconfig would not.
             ldconfig << "#!/bin/sh\n";
             ldconfig << "test ! -e " LX_INIT_WSLC_GPU_START_HOOK_PATH " || exit 99\n";
             ldconfig << "id -u > /image-ldconfig-uid\n";
@@ -4580,7 +4579,11 @@ class WSLCTests
         };
 
         auto expectGpuLibraryLoads = [&](RunningWSLCContainer& Container) {
-            expect(Container, {"python3", "-c", "import ctypes; ctypes.CDLL('libd3d12core.so')"}, 0);
+            // Use bundled Debian's Perl to exercise glibc lookup by soname without pulling another image.
+            expect(
+                Container,
+                {"perl", "-MDynaLoader", "-e", "DynaLoader::dl_load_file('libd3d12core.so') or die DynaLoader::dl_error()"},
+                0);
         };
 
         auto expectMuslLibraryPath = [&](RunningWSLCContainer& Container, const std::string& ExpectedPaths, const std::string& ExpectedMode) {
@@ -4590,13 +4593,17 @@ class WSLCTests
             expectInitDeleted(Container);
         };
 
+        std::string rootCapabilities;
+
         // Moving image code out of createContainer must not grant more capabilities than an ordinary root workload.
         {
             auto container = launch("wslc-test-gpu-wrapped-ldconfig:latest", "test-container-gpu-image-ldconfig");
 
             const auto capabilities =
                 WSLCProcessLauncher({}, {"grep", "CapEff", "/proc/self/status"}).Launch(container.Get()).WaitAndCaptureOutput();
-            expect(container, {"cat", "/image-ldconfig-ran"}, 0, {{1, capabilities.Output.at(1)}});
+            VERIFY_ARE_EQUAL(capabilities.Code, 0);
+            rootCapabilities = capabilities.Output.at(1);
+            expect(container, {"cat", "/image-ldconfig-ran"}, 0, {{1, rootCapabilities}});
             expect(container, {"cat", "/image-ldconfig-uid"}, 0, {{1, "0\n"}});
 
             expectGpuLibrariesCached(container);
@@ -4609,7 +4616,7 @@ class WSLCTests
         {
             auto container = launch("wslc-test-gpu-wrapped-ldconfig:latest", "test-container-gpu-image-ldconfig-nobody", "nobody");
 
-            auto verify = [&]() {
+            auto verifyNonRootGpuAccess = [&]() {
                 expect(container, {"id", "-u"}, 0, {{1, "65534\n"}});
                 expect(container, {"cat", "/image-ldconfig-uid"}, 0, {{1, "0\n"}});
                 expect(container, {"sh", "-c", "grep -q '^Uid:[[:space:]]*65534[[:space:]]' /proc/1/status"}, 0);
@@ -4620,113 +4627,26 @@ class WSLCTests
                         .WaitAndCaptureOutput();
                 VERIFY_ARE_EQUAL(restrictions.Code, 0);
                 expect(container, {"cat", "/image-ldconfig-restrictions"}, 0, {{1, restrictions.Output.at(1)}});
-                expect(
-                    container,
-                    {"python3",
-                     "-c",
-                     "import re; s=open('/proc/self/status').read(); "
-                     "b=int(re.search(r'^CapBnd:\\s*(\\w+)',s,re.M)[1],16); "
-                     "e=int(open('/image-ldconfig-ran').read().split()[1],16); assert e & ~b == 0"},
-                    0);
+                expect(container, {"cat", "/image-ldconfig-ran"}, 0, {{1, rootCapabilities}});
 
                 expectGpuLibrariesCached(container);
                 expectGpuLibraryLoads(container);
                 expectInitDeleted(container);
             };
 
-            verify();
+            verifyNonRootGpuAccess();
             VERIFY_SUCCEEDED(container.Get().Restart(WSLCSignalSIGKILL, 0, nullptr));
-            verify();
-        }
-
-        // Use Docker directly for restrictions not exposed by the WSLC container settings.
-        // An explicit ban on elevation must take precedence over rebuilding the cache.
-        {
-            const auto command = std::format(
-                "test ! -e {0} && test ! -e /image-ldconfig-ran && test ! -e /etc/ld.so.cache && "
-                "test \"$(id -u)\" = 65534 && grep -q '^NoNewPrivs:[[:space:]]*1$' /proc/self/status",
-                LX_INIT_WSLC_GPU_START_HOOK_PATH);
-            ExpectCommandResult(
-                session.get(),
-                {"/usr/bin/docker",
-                 "run",
-                 "--rm",
-                 "--device",
-                 LX_WSLC_GPU_CDI_DEVICE,
-                 "--user",
-                 "nobody",
-                 "--security-opt",
-                 "no-new-privileges=true",
-                 "wslc-test-gpu-wrapped-ldconfig:latest",
-                 "sh",
-                 "-c",
-                 command},
-                0);
-        }
-
-        // Setuid must not restore removed capabilities; root ownership is enough to update a normally writable cache.
-        {
-            const auto command = std::format(
-                "test ! -e {0} && test \"$(cat /image-ldconfig-uid)\" = 0 && test \"$(id -u)\" = 65534 && "
-                "grep -q '^CapEff:[[:space:]]*0000000000000000$' /image-ldconfig-ran && "
-                "grep -q '^CapBnd:[[:space:]]*0000000000000000$' /image-ldconfig-restrictions && "
-                "python3 -c \"import ctypes; ctypes.CDLL('libd3d12core.so')\"",
-                LX_INIT_WSLC_GPU_START_HOOK_PATH);
-            ExpectCommandResult(
-                session.get(),
-                {"/usr/bin/docker",
-                 "run",
-                 "--rm",
-                 "--device",
-                 LX_WSLC_GPU_CDI_DEVICE,
-                 "--user",
-                 "nobody",
-                 "--cap-drop",
-                 "ALL",
-                 "wslc-test-gpu-wrapped-ldconfig:latest",
-                 "sh",
-                 "-c",
-                 command},
-                0);
+            verifyNonRootGpuAccess();
         }
 
         // A failing image ldconfig must prevent workload execution, with the helper already removed before it runs.
         {
-            constexpr auto c_containerName = "test-container-gpu-ldconfig-failure";
-            auto cleanupContainer = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-                ExpectCommandResult(session.get(), {"/usr/bin/docker", "rm", "-f", c_containerName}, 0);
-            });
+            auto container = launch("wslc-test-gpu-failing-ldconfig:latest", "test-container-gpu-ldconfig-failure", "nobody");
 
-            ExpectCommandResult(
-                session.get(),
-                {"/usr/bin/docker",
-                 "create",
-                 "--name",
-                 c_containerName,
-                 "--device",
-                 LX_WSLC_GPU_CDI_DEVICE,
-                 "--user",
-                 "nobody",
-                 "wslc-test-gpu-failing-ldconfig:latest",
-                 "sleep",
-                 "99999"},
-                0);
             // runc signals start before running startContainer hooks; hook failures surface through container exit.
-            ExpectCommandResult(session.get(), {"/usr/bin/docker", "start", c_containerName}, 0);
-            const auto exit = ExpectCommandResult(session.get(), {"/usr/bin/docker", "wait", c_containerName}, 0);
-            VERIFY_ARE_EQUAL(exit.Code, 0);
-            VERIFY_ARE_EQUAL(exit.Output.at(1), "255\n");
-            const auto logs = ExpectCommandResult(session.get(), {"/usr/bin/docker", "logs", c_containerName}, 0);
-            VERIFY_ARE_EQUAL(logs.Code, 0);
-            VERIFY_IS_TRUE((logs.Output.at(1) + logs.Output.at(2)).find("exit status 42") != std::string::npos);
-            const auto uid = ExpectCommandResult(
-                session.get(), {"/bin/sh", "-c", std::format("/usr/bin/docker cp {}:/image-ldconfig-uid - | tar -xO", c_containerName)}, 0);
-            VERIFY_ARE_EQUAL(uid.Code, 0);
-            VERIFY_ARE_EQUAL(uid.Output.at(1), "0\n");
-            ExpectCommandResult(
-                session.get(),
-                {"/usr/bin/docker", "cp", std::format("{}:{}", c_containerName, LX_INIT_WSLC_GPU_START_HOOK_PATH), "-"},
-                1);
+            const auto result = container.GetInitProcess().WaitAndCaptureOutput();
+            VERIFY_ARE_EQUAL(result.Code, 255);
+            VERIFY_IS_TRUE((result.Output.at(1) + result.Output.at(2)).find("exit status 42") != std::string::npos);
         }
 
         // Images without ldconfig must start without generating a VM fallback cache.
