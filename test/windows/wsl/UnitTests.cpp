@@ -8249,6 +8249,66 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         }
     }
 
+    TEST_METHOD(ConsoleDetachSequenceIgnoresUnicodeLowBytes)
+    {
+        // Validate that characters whose low byte matches the detach sequence (U+3010 and U+3011 vs ctrl-p, ctrl-q)
+        // don't trigger a detach, and that the real sequence still does.
+        wil::unique_hfile conin{CreateFileW(
+            L"CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
+        if (!conin)
+        {
+            LogSkipped("Skipping console detach test: CONIN$ is not available (no attached console)");
+            return;
+        }
+
+        VERIFY_WIN32_BOOL_SUCCEEDED(FlushConsoleInputBuffer(conin.get()));
+        auto flushInput = wil::scope_exit([&]() { FlushConsoleInputBuffer(conin.get()); });
+
+        std::string output;
+        bool detached = false;
+        wsl::windows::common::io::ReadConsoleHandle console(
+            wsl::windows::common::io::HandleWrapper{conin.get()},
+            [&](const gsl::span<char>& buffer) { output.append(buffer.data(), buffer.size()); },
+            []() {},
+            {0x10, 0x11},
+            [&]() { detached = true; });
+
+        auto typeAndCollect = [&](std::initializer_list<wchar_t> characters) {
+            std::vector<INPUT_RECORD> records;
+            for (const auto character : characters)
+            {
+                INPUT_RECORD record{};
+                record.EventType = KEY_EVENT;
+                record.Event.KeyEvent.bKeyDown = TRUE;
+                record.Event.KeyEvent.wRepeatCount = 1;
+                record.Event.KeyEvent.uChar.UnicodeChar = character;
+                records.push_back(record);
+            }
+
+            DWORD written{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteConsoleInputW(conin.get(), records.data(), static_cast<DWORD>(records.size()), &written));
+            VERIFY_ARE_EQUAL(records.size(), static_cast<size_t>(written));
+
+            console.Schedule();
+            console.Collect();
+        };
+
+        typeAndCollect({0x3010, 0x3011});
+
+        const std::string expectedUnicode = "\xE3\x80\x90\xE3\x80\x91";
+        VERIFY_IS_FALSE(detached);
+        VERIFY_IS_TRUE(console.GetState() == wsl::windows::common::io::IOHandleStatus::Standby);
+        VERIFY_ARE_EQUAL(expectedUnicode, output);
+
+        output.clear();
+        typeAndCollect({0x10, 0x11});
+
+        const std::string expectedDetach = "\x10\x11";
+        VERIFY_IS_TRUE(detached);
+        VERIFY_IS_TRUE(console.GetState() == wsl::windows::common::io::IOHandleStatus::Completed);
+        VERIFY_ARE_EQUAL(expectedDetach, output);
+    }
+
     TEST_METHOD(SocketChannel)
     {
         // Read exactly `size` bytes from a raw socket into the destination buffer.
