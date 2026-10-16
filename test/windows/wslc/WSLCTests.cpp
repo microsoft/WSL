@@ -12955,6 +12955,56 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(SessionCleanupWaitsForHostExit)
+    {
+        const auto manager = OpenSessionManager();
+        const auto settings = GetDefaultSessionSettings(L"session-cleanup-host-exit");
+
+        for (const auto flags : {WSLCSessionFlagsNone, WSLCSessionFlagsPersistent})
+        {
+            auto session = CreateSession(settings, flags);
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                if (session)
+                {
+                    LOG_IF_FAILED(session->Terminate());
+                }
+
+                wil::unique_cotaskmem_array_ptr<WSLCSessionListEntry> sessions;
+                LOG_IF_FAILED(manager->ListSessions(&sessions, sessions.size_address<ULONG>()));
+            });
+
+            wil::unique_handle hostProcess;
+            VERIFY_SUCCEEDED(session->GetProcessHandle(&hostProcess));
+            ULONG id{};
+            VERIFY_SUCCEEDED(session->GetId(&id));
+
+            // Keep the terminated session's client reference so its host cannot exit.
+            VERIFY_SUCCEEDED(session->Terminate());
+
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(hostProcess.get(), 1000));
+            VERIFY_IS_FALSE(ListTestSessionNames(manager.get()).contains(settings.DisplayName));
+
+            WSLCSessionState state{};
+            VERIFY_SUCCEEDED(session->GetState(&state));
+            VERIFY_ARE_EQUAL(WSLCSessionStateTerminated, state);
+
+            wil::com_ptr<IWSLCSession> opened;
+            VERIFY_ARE_EQUAL(WSLC_E_SESSION_NOT_FOUND, manager->OpenSession(id, &opened));
+            VERIFY_ARE_EQUAL(WSLC_E_SESSION_NOT_FOUND, manager->OpenSessionByName(settings.DisplayName, &opened));
+
+            // Validate that the session can be recreated under the same name.
+            auto replacement = CreateSession(settings);
+            ULONG replacementId{};
+            VERIFY_SUCCEEDED(replacement->GetId(&replacementId));
+            VERIFY_ARE_NOT_EQUAL(id, replacementId);
+
+            // Validate that releasing the final client reference lets the host exit.
+            session.reset();
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(hostProcess.get(), 60 * 1000));
+            VERIFY_IS_TRUE(ListTestSessionNames(manager.get()).contains(settings.DisplayName));
+        }
+    }
+
     static void ValidateHandleOutput(HANDLE handle, const std::string& expectedOutput)
     {
         VERIFY_ARE_EQUAL(EscapeString(expectedOutput), EscapeString(ReadToString(handle)));

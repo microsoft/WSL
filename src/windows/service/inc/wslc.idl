@@ -794,7 +794,7 @@ interface IWSLCSession : IUnknown
     HRESULT UnmapVmPort([in] int Family, [in] unsigned short WindowsPort, [in] unsigned short LinuxPort);
 
     // Session initialization - called by SYSTEM service after launching per-user process.
-    // Returns a handle to this COM server process (used to add to job object).
+    // Returns a handle to this COM server process for job assignment and waiting for process exit.
     HRESULT GetProcessHandle([out, system_handle(sh_process)] HANDLE* ProcessHandle);
 
     // Initializes the session with a VM factory. VMs are created through the factory.
@@ -883,7 +883,7 @@ interface IWSLCSessionFactory : IUnknown
         [out] IWSLCSession** Session,
         [out] IWSLCSessionReference** ServiceRef);
 
-    // Gets the process handle for adding to job object.
+    // Gets the process handle for job assignment and waiting for process exit.
     HRESULT GetProcessHandle([out, system_handle(sh_process)] HANDLE* ProcessHandle);
 }
 
