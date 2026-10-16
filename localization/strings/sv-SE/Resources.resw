@@ -919,6 +919,14 @@ Mer information om Admin Protection finns på https://aka.ms/apdevguide</value>
     <value>IPv6 är inaktiverat på värden på ett sätt som inte stöds (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>Mirrored networking is using a smaller ephemeral port range ({} ports instead of {}). This may limit the number of simultaneous connections.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>Mirrored networking could not reserve the minimum contiguous range of {} TCP and UDP ports. Check Windows port usage and exclusions.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Hyper-V-brandväggen stöds inte</value>
   </data>
@@ -3283,7 +3291,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
-    <value>Invalid mode '{}'.</value>
+    <value>Ogiltigt läge. ''{}''.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
@@ -3872,24 +3880,24 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Det går inte att exportera containern till terminalen. Använd alternativet -o eller omdirigera stdout.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>Expected format: [&lt;host path | named volume&gt;:]&lt;container path&gt;[:mode]</value>
+    <value>Förväntat format: [&lt;host path | named volume&gt;:]&lt;container path&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
   <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
-    <value>Invalid volume specification: '{}'. {} {}</value>
+    <value>Ogiltiga volymspecifikationer: ''{}''. {} {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
-    <value>The volume specification is empty.</value>
+    <value>Volymspecifikationen är tom.</value>
   </data>
   <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
-    <value>The volume specification contains an empty section between colons.</value>
+    <value>Volymspecifikationen innehåller ett tomt avsnitt mellan kolon.</value>
   </data>
   <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
-    <value>The volume specification contains too many colons.</value>
+    <value>Volymspecifikationen innehåller för många kolon.</value>
   </data>
   <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
-    <value>Host path '{}' is not a valid Windows path.</value>
+    <value>Värdsökvägen '{}' är inte en giltig Windows-sökväg.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
