@@ -356,12 +356,12 @@ void ConsommeNetworking::RefreshGuestConnection()
     // Query current networking information before acquiring the lock.
     auto networkSettings = GetHostEndpointSettings();
 
-    const auto defaultRouteIpv4 = networkSettings->GetBestGatewayAddressString(AF_INET);
+    auto defaultRouteIpv4 = networkSettings->GetBestGatewayAddressString(AF_INET);
     const auto defaultRouteIpv6 = networkSettings->GetBestGatewayAddressString(AF_INET6);
 
     // Generate a fallback gateway address if the host doesn't have a usable one.
     // See: https://github.com/microsoft/WSL/issues/41740
-    if (default_route.empty() || default_route == LX_INIT_UNSPECIFIED_ADDRESS)
+    if (defaultRouteIpv4.empty() || defaultRouteIpv4 == LX_INIT_UNSPECIFIED_ADDRESS)
     {
         const auto gateway = GetFallbackIpv4Gateway(networkSettings->PreferredIpAddress);
         if (gateway.si_family == AF_INET)
@@ -371,13 +371,13 @@ void ConsommeNetworking::RefreshGuestConnection()
 
             const auto route = EndpointRoute::DefaultRoute(AF_INET, gateway);
             networkSettings->Routes.emplace(route);
-            default_route = route.NextHopString;
+            defaultRouteIpv4 = route.NextHopString;
 
             WSL_LOG(
                 "ConsommeGeneratedIpv4Gateway",
                 TraceLoggingValue(networkSettings->PreferredIpAddress.AddressString.c_str(), "ClientIp"),
                 TraceLoggingValue(networkSettings->PreferredIpAddress.PrefixLength, "PrefixLength"),
-                TraceLoggingValue(default_route.c_str(), "GatewayIp"));
+                TraceLoggingValue(defaultRouteIpv4.c_str(), "GatewayIp"));
         }
         else
         {
