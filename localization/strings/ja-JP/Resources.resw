@@ -2681,14 +2681,6 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
     <value>コンテナーとローカル ファイル システムの間でファイルをコピーします。</value>
   </data>
-  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
-    <value>コンテナーとローカル ファイルシステムの間でファイルをコピーします。
-使用法: wslc container cp [OPTIONS] SOURCE DEST
-  ローカルからコンテナーへ: wslc container cp LOCAL_PATH CONTAINER:PATH
-  コンテナーからローカルへ: wslc container cp CONTAINER:PATH LOCAL_PATH
-  Stdin からコンテナーへ: wslc container cp - CONTAINER:PATH</value>
-    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
-  </data>
   <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
     <value>ソース: ローカル パス、CONTAINER:PATH、または '-' で stdin</value>
     <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
@@ -3295,6 +3287,10 @@ Windows バージョン: {}</value>
     <value>オプション '{}' はサポートされていません。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
+    <value>Invalid mode '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
     <value>マウント ターゲットが必要です。</value>
   </data>
@@ -3881,28 +3877,25 @@ Windows バージョン: {}</value>
     <value>コンテナーをターミナルにエクスポートできません。-o オプションを使用するか、stdout をリダイレクトします。</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>必要な形式: &lt;ホスト パス | 名前付きボリューム&gt;:&lt;コンテナー パス&gt;[:モード]</value>
+    <value>Expected format: [&lt;host path | named volume&gt;:]&lt;container path&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
-  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>ボリュームの指定が無効です: '{}'。{}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
+    <value>Invalid volume specification: '{}'. {} {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>ボリュームの指定が無効です: '{}'。ホスト パスを空にすることはできません。{}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
+    <value>The volume specification is empty.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
-    <value>ボリュームの指定が無効です: '{}'。コンテナパスは空にできません。{}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
+    <value>The volume specification contains an empty section between colons.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
-    <value>ボリュームの指定が無効です: '{}'。コンテナー パスは絶対パス ('/' で始まる) である必要があります。{}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
+    <value>The volume specification contains too many colons.</value>
   </data>
-  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
-    <value>ボリュームの指定が無効です: '{}'。ホスト パス '{}' は有効な Windows パスではありません。</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
+    <value>ホスト パス '{}' は有効な Windows パスではありません。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
     <value>任意のオブジェクトの種類の名前または ID</value>

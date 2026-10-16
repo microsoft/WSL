@@ -2682,14 +2682,6 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
   <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
     <value>Copier des fichiers entre un conteneur et le système de fichiers local.</value>
   </data>
-  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
-    <value>Copiez des fichiers entre un conteneur et le système de fichiers local.
-Utilisation : wslc container cp [OPTIONS] SOURCE DEST
-  Du système local vers le conteneur : wslc container cp LOCAL_PATH CONTAINER:PATH
-  Du conteneur vers le système local : wslc container cp CONTAINER:PATH LOCAL_PATH
-  De l’entrée standard vers le conteneur : wslc container cp – CONTAINER:PATH</value>
-    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
-  </data>
   <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
     <value>Source : chemin local, CONTAINER:PATH ou '-' pour stdin</value>
     <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
@@ -3296,6 +3288,10 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>L’option '{}' n’est pas prise en charge.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
+    <value>Invalid mode '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
     <value>La cible de montage est obligatoire.</value>
   </data>
@@ -3882,28 +3878,25 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Impossible d’exporter le conteneur vers le terminal. Utilisez l’option -o ou redirigez stdout.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>Format attendu : &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
+    <value>Expected format: [&lt;host path | named volume&gt;:]&lt;container path&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
-  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>Spécifications de volume non valides : '{}'. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
+    <value>Invalid volume specification: '{}'. {} {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>Spécifications de volume non valides : « {} ». Le chemin d’accès de l’hôte ne peut pas être vide. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
+    <value>The volume specification is empty.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
-    <value>Spécifications de volume non valides : « {} ». Le chemin du conteneur ne peut pas être vide. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
+    <value>La spécification de volume contient une section vide entre les deux-points.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
-    <value>Spécifications de volume non valides : « {} ». Le chemin du conteneur doit être un chemin absolu (commençant par « / »). {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
+    <value>La spécification du volume contient trop de deux-points.</value>
   </data>
-  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
-    <value>Spécifications de volume non valides : « {} ». Le chemin d’accès de l’hôte « {} » n’est pas un chemin d’accès Windows valide.</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
+    <value>Le chemin d’hôte '{}' n’est pas un chemin d’accès Windows valide.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
     <value>Nom ou ID de tout type d’objet</value>

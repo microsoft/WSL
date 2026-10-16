@@ -102,8 +102,8 @@ public:
     void Restart(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds);
     void Delete(WSLCDeleteFlags Flags);
     void Export(WSLCHandle TarHandle) const;
-    void UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize) const;
-    void DownloadArchive(LPCSTR SrcPath, BOOL FollowLink, WSLCHandle OutHandle) const;
+    void UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize);
+    void DownloadArchive(LPCSTR SrcPath, BOOL FollowLink, WSLCHandle OutHandle);
     void GetStateChangedAt(_Out_ LONGLONG* StateChangedAt);
     void GetCreatedAt(_Out_ LONGLONG* CreatedAt);
     void GetState(_Out_ WSLCContainerState* State);
@@ -227,7 +227,13 @@ private:
 
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect ReleaseResources();
     __requires_exclusive_lock_held(m_lock) void ReleaseRuntimeResources();
+    __requires_exclusive_lock_held(m_lock) void UnmountVolumesLockHeld();
     __requires_exclusive_lock_held(m_lock) void ReleaseProcesses();
+
+    // Archive operations stat every bind source, so a container that is not running needs its volumes
+    // mounted for the duration of the copy. Each acquire must be paired with a release.
+    void AcquireArchiveVolumeMounts();
+    void ReleaseArchiveVolumeMounts() noexcept;
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect PrepareDisconnectComWrapper();
 
     __requires_exclusive_lock_held(m_lock) void OnStopped(int exitCode, const std::map<std::string, std::string>& attributes, std::int64_t stopTimeNano);
@@ -276,6 +282,10 @@ private:
     // restart leaves this set across the two phases, which is what tells the start phase they are still
     // held and must not be re-acquired.
     _Guarded_by_(m_lock) bool m_runtimeResourcesHeld = false;
+
+    // Number of in-flight archive operations holding the volume mounts. Volumes are mounted exactly
+    // while m_runtimeResourcesHeld is set or this is non-zero.
+    _Guarded_by_(m_lock) ULONG m_archiveMountUsers = 0;
 
     // The container outlives any single VM: it survives idle-termination and is reused when the VM
     // restarts. VM-scoped resources (Vm(), Docker(), Volumes(), Events(), Relay()) are therefore

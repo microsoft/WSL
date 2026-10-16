@@ -483,25 +483,30 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     {
         std::promise<bool> initialResult;
         m_drvfsInitialResult = initialResult.get_future();
-        auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
-        m_drvfsInitialThread =
-            std::thread([this, guestDeviceLock = std::move(guestDeviceLock), initialResult = std::move(initialResult)]() mutable {
+
+        std::promise<void> lockAcquired;
+        auto lockAcquiredFuture = lockAcquired.get_future();
+        m_drvfsInitialThread = std::thread([this, lockAcquired = std::move(lockAcquired), initialResult = std::move(initialResult)]() mutable {
+            auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
+            try
+            {
+                lockAcquired.set_value();
+                wsl::windows::common::wslutil::SetThreadDescription(L"InitializeDrvfs");
+                initialResult.set_value(InitializeDrvFsLockHeld(m_userToken.get()));
+            }
+            catch (...)
+            {
+                LOG_CAUGHT_EXCEPTION();
+
                 try
                 {
-                    wsl::windows::common::wslutil::SetThreadDescription(L"InitializeDrvfs");
-                    initialResult.set_value(InitializeDrvFsLockHeld(m_userToken.get()));
+                    initialResult.set_exception(std::current_exception());
                 }
-                catch (...)
-                {
-                    LOG_CAUGHT_EXCEPTION();
+                CATCH_LOG()
+            }
+        });
 
-                    try
-                    {
-                        initialResult.set_exception(std::current_exception());
-                    }
-                    CATCH_LOG()
-                }
-            });
+        lockAcquiredFuture.get();
     }
 
     // Mount the system distro.
@@ -2107,11 +2112,7 @@ void WslCoreVm::RegisterCallbacks(_In_ const std::function<void(ULONG)>& DistroE
         }
         else
         {
-            // The VM has already been terminated, invoke the callback on a separate thread.
-            std::thread([terminationCallback = std::move(TerminationCallback), runtimeId = m_runtimeId]() {
-                wsl::windows::common::wslutil::SetThreadDescription(L"TerminationCallback");
-                terminationCallback(runtimeId);
-            }).detach();
+            TerminationCallback(m_runtimeId);
         }
     }
 
