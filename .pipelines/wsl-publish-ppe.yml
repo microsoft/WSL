@@ -1,0 +1,42 @@
+# Development pipeline for testing publishing changes against DCAT PPE. It uses artifacts from an
+# existing wsl-github-release run selected when the pipeline is manually queued.
+
+trigger: none
+pr: none
+
+resources:
+  pipelines:
+    - pipeline: releaseBuild
+      source: '\OneBranch\wsl-github-release'
+
+  repositories:
+    - repository: templates
+      type: git
+      name: OneBranch.Pipelines/GovernedTemplates
+      ref: refs/heads/main
+
+extends:
+  template: v2/Microsoft.NonOfficial.yml@templates
+  parameters:
+    release:
+      category: NonAzure
+    platform:
+      name: windows_undocked
+    featureFlags:
+      WindowsHostVersion: 1ESWindows2022
+    globalSdl:
+      tsa:
+        enabled: false
+
+    stages:
+      - template: dcat-publish-stages.yml@self
+        parameters:
+          artifactPipeline: releaseBuild
+          releaseEnvironment: PPE
+          updateRunName: true
+          dcat:
+            environment: PPE
+            serviceConnection: wsl-dcat-publish-ppe
+            clientId: 793bdf5b-a802-4c14-9857-2c3047139431
+            tenantId: 33e01921-4d64-4f8c-a055-5bdaffd5e33d
+            publisher: WSL

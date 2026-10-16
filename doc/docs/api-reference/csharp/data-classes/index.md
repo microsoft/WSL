@@ -3,6 +3,7 @@
 
 ## Members
 
+- [AuthenticateResult](authenticateresult.md)
 - [ContainerPortMapping](containerportmapping.md)
 - [ContainerVolume](containervolume.md)
 - [ContainerNamedVolume](containernamedvolume.md)

@@ -102,8 +102,8 @@ public:
     void Restart(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds);
     void Delete(WSLCDeleteFlags Flags);
     void Export(WSLCHandle TarHandle) const;
-    void UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize) const;
-    void DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) const;
+    void UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize);
+    void DownloadArchive(LPCSTR SrcPath, BOOL FollowLink, WSLCHandle OutHandle);
     void GetStateChangedAt(_Out_ LONGLONG* StateChangedAt);
     void GetCreatedAt(_Out_ LONGLONG* CreatedAt);
     void GetState(_Out_ WSLCContainerState* State);
@@ -123,10 +123,14 @@ public:
     WSLCContainerState State() const noexcept;
     std::vector<WSLCPortMapping> GetPorts() const;
 
+    // Returns the attributes to record for a Docker container event, or nothing if WSLC didn't create the container.
+    static std::optional<std::map<std::string, std::string>> GetEventAttributes(std::map<std::string, std::string> DockerAttributes);
+
     // Re-registers a stopped container's VM-scoped port allocations against the restarted VM.
     void RecoverPorts(const common::docker_schema::ContainerInfo& dockerContainer);
 
-    __requires_lock_held(m_lock) void CommitState(WSLCContainerState State, std::int64_t Time, std::optional<int> ExitCode = std::nullopt) noexcept;
+    __requires_lock_held(m_lock) void CommitState(
+        WSLCContainerState State, std::int64_t TimeNano, const std::map<std::string, std::string>& DockerAttributes) noexcept;
 
     const std::string& ID() const noexcept;
 
@@ -157,7 +161,8 @@ public:
 
     // Appends an event for this container to the session's event stream. Must be called from the Docker
     // event stream thread so that recorded events keep Docker's delivery order.
-    void RecordEvent(std::string&& Action, std::int64_t Time, std::optional<int> ExitCode = std::nullopt) noexcept;
+    void RecordEvent(std::string&& Action, std::int64_t TimeNano) noexcept;
+    void RecordEvent(std::string&& Action, std::int64_t TimeNano, const std::map<std::string, std::string>& DockerAttributes) noexcept;
 
 private:
     enum class TransitionKind
@@ -192,7 +197,7 @@ private:
     __requires_exclusive_lock_held(m_lock) void RequestDeleteExclusiveLockHeld(WSLCDeleteFlags Flags);
 
     void AllocateBridgedModePorts();
-    void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::int64_t eventTime) noexcept;
+    void OnEvent(ContainerEvent event, std::optional<int> exitCode, const std::map<std::string, std::string>& attributes, std::int64_t eventTimeNano) noexcept;
 
     __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> StartTransition(TransitionKind kind, ContainerEvent expectedEvent);
 
@@ -222,10 +227,18 @@ private:
 
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect ReleaseResources();
     __requires_exclusive_lock_held(m_lock) void ReleaseRuntimeResources();
+    __requires_exclusive_lock_held(m_lock) void UnmountVolumesLockHeld();
     __requires_exclusive_lock_held(m_lock) void ReleaseProcesses();
+
+    // Archive operations stat every bind source, so a container that is not running needs its volumes
+    // mounted for the duration of the copy. Each acquire must be paired with a release.
+    void AcquireArchiveVolumeMounts();
+    void ReleaseArchiveVolumeMounts() noexcept;
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect PrepareDisconnectComWrapper();
 
-    __requires_exclusive_lock_held(m_lock) void OnStopped(int exitCode, std::int64_t stopTime);
+    __requires_exclusive_lock_held(m_lock) void OnStopped(int exitCode, const std::map<std::string, std::string>& attributes, std::int64_t stopTimeNano);
+
+    std::map<std::string, std::string> BuildEventAttributes() const;
 
     void SetExitCode(int ExitCode) noexcept;
     void SignalInitProcessExit() noexcept;
@@ -270,6 +283,10 @@ private:
     // held and must not be re-acquired.
     _Guarded_by_(m_lock) bool m_runtimeResourcesHeld = false;
 
+    // Number of in-flight archive operations holding the volume mounts. Volumes are mounted exactly
+    // while m_runtimeResourcesHeld is set or this is non-zero.
+    _Guarded_by_(m_lock) ULONG m_archiveMountUsers = 0;
+
     // The container outlives any single VM: it survives idle-termination and is reused when the VM
     // restarts. VM-scoped resources (Vm(), Docker(), Volumes(), Events(), Relay()) are therefore
     // fetched from the (stable) runtime at each use rather than cached, since a cached reference
@@ -278,6 +295,7 @@ private:
     std::int64_t m_stateChangedAt{static_cast<std::int64_t>(std::time(nullptr))};
     std::int64_t m_createdAt{};
     WSLCContainerState m_state = WslcContainerStateInvalid;
+    __guarded_by(m_lock) std::optional<std::map<std::string, std::string>> m_pendingStopAttributes;
 
     // Bumped on every state change so a thread that released m_lock can detect a state cycle, not just a difference.
     std::uint64_t m_stateGeneration{};
@@ -315,7 +333,7 @@ public:
     IFACEMETHOD(Delete)(WSLCDeleteFlags Flags) override;
     IFACEMETHOD(Export)(_In_ WSLCHandle TarHandle) override;
     IFACEMETHOD(UploadArchive)(_In_ WSLCHandle TarHandle, _In_ LPCSTR DestPath, _In_ ULONGLONG ContentSize) override;
-    IFACEMETHOD(DownloadArchive)(_In_ LPCSTR SrcPath, _In_ WSLCHandle OutHandle) override;
+    IFACEMETHOD(DownloadArchive)(_In_ LPCSTR SrcPath, _In_ BOOL FollowLink, _In_ WSLCHandle OutHandle) override;
     IFACEMETHOD(GetState)(_Out_ WSLCContainerState* State) override;
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLCProcess** process) override;
     IFACEMETHOD(Exec)(_In_ const WSLCProcessOptions* Options, _In_opt_ const WSLCProcessStartOptions* StartOptions, _Out_ IWSLCProcess** Process) override;

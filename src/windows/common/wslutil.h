@@ -286,6 +286,10 @@ struct RepositoryReference
 
     // The fully-qualified "server/path" form (e.g. "docker.io/library/ubuntu").
     std::string GetCanonical() const;
+
+    // The shortest form Docker displays, without the default registry or official prefix (e.g. "docker.io/library/ubuntu"
+    // -> "ubuntu").
+    std::string GetFamiliar() const;
 };
 
 std::pair<wil::unique_hfile, wil::unique_hfile> OpenAnonymousPipe(DWORD Size, bool ReadPipeOverlapped, bool WritePipeOverlapped);
@@ -309,6 +313,10 @@ struct ImageReference
     // Parse an image reference string into its components. Throws E_INVALIDARG (with a user-facing error) when the
     // reference is malformed.
     static ImageReference Parse(const std::string& input);
+
+    // Parse an image reference string, returning nullopt when it is malformed. Use this where a bad reference should be
+    // skipped rather than reported, such as when listing references supplied by the daemon.
+    static std::optional<ImageReference> TryParse(const std::string& input);
 
     // Collapse the reference to a single tag-or-digest field, where a digest takes precedence over a tag. This matches
     // how callers that resolve, pull or push a single reference treat the two.

@@ -23,7 +23,7 @@ function (restore_nuget_packages)
 
     # Restore nuget packages
     execute_process(COMMAND
-        ${CMAKE_BINARY_DIR}/_deps/nuget.exe restore packages.config -SolutionDirectory ${CMAKE_BINARY_DIR}
+        ${CMAKE_BINARY_DIR}/_deps/nuget.exe restore packages.config -SolutionDirectory ${CMAKE_BINARY_DIR} -ConfigFile ${CMAKE_CURRENT_LIST_DIR}/nuget.config
         WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
         COMMAND_ERROR_IS_FATAL ANY)
 endfunction()

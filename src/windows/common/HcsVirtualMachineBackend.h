@@ -78,6 +78,8 @@ private:
         wsl::windows::common::disk::DiskStateFlags Flags{};
         // Timeout applied when the host disk state changes performed to attach the disk are undone.
         std::chrono::milliseconds DeviceTimeout{wsl::windows::common::disk::c_defaultDiskTimeoutMs};
+        // Identity used to grant access to a user-owned VHD, retained for cleanup.
+        wil::shared_handle UserToken;
         wil::unique_hfile BackingFile;
     };
 

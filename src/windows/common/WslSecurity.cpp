@@ -56,9 +56,9 @@ void wsl::windows::common::security::ApplyProcessMitigationPolicies()
     loadPolicy.PreferSystem32Images = true;
     LOG_IF_WIN32_BOOL_FALSE(SetProcessMitigationPolicy(ProcessImageLoadPolicy, &loadPolicy, sizeof(loadPolicy)));
 
-    PROCESS_MITIGATION_REDIRECTION_TRUST_POLICY redirectionTrustPolicy{};
-    redirectionTrustPolicy.EnforceRedirectionTrust = true;
-    LOG_IF_WIN32_BOOL_FALSE(SetProcessMitigationPolicy(ProcessRedirectionTrustPolicy, &redirectionTrustPolicy, sizeof(redirectionTrustPolicy)));
+    // Note: Enabling PROCESS_MITIGATION_REDIRECTION_TRUST_POLICY::EnforceRedirectionTrust can break MSIX based distributions
+    // and should not be enabled.
+    // See: https://github.com/microsoft/WSL/issues/41737 .
 }
 
 SECURITY_DESCRIPTOR wsl::windows::common::security::CreateSecurityDescriptor(_In_ PSID userSid)

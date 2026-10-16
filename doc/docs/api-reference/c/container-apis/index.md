@@ -5,6 +5,7 @@
 
 - [WslcInitContainerSettings](wslcinitcontainersettings.md)
 - [WslcCreateContainer](wslccreatecontainer.md)
+- [WslcOpenContainer](wslcopencontainer.md)
 - [WslcStartContainer](wslcstartcontainer.md)
 - [WslcSetContainerSettingsName](wslcsetcontainersettingsname.md)
 - [WslcSetContainerSettingsInitProcess](wslcsetcontainersettingsinitprocess.md)
@@ -15,6 +16,7 @@
 - [WslcSetContainerSettingsPortMappings](wslcsetcontainersettingsportmappings.md)
 - [WslcSetContainerSettingsVolumes](wslcsetcontainersettingsvolumes.md)
 - [WslcSetContainerSettingsNamedVolumes](wslcsetcontainersettingsnamedvolumes.md)
+- [WslcSetContainerInitProcessIOCallbacks](wslcsetcontainerinitprocessiocallbacks.md)
 - [WslcCreateContainerProcess](wslccreatecontainerprocess.md)
 - [WslcGetContainerID](wslcgetcontainerid.md)
 - [WslcGetContainerInitProcess](wslcgetcontainerinitprocess.md)

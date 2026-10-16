@@ -246,7 +246,7 @@ int ParseConfigFile(std::vector<ConfigKey>& keys, FILE* file, int flags, const w
     int result;
     size_t sectionLength = 0;
     std::string key = {0};
-    std::string value = {0};
+    std::wstring value = {0};
 
     // Function default is parse mode (updateConfigFile = false).
     // Otherwise, update mode (though parsing logic is still used).
@@ -693,20 +693,20 @@ ParseKeyValue:
             {
             case '\\':
             case '"':
-                value += static_cast<char>(ch2);
+                value += static_cast<wchar_t>(ch2);
 
                 break;
 
             case 'b':
-                value += '\b';
+                value += L'\b';
                 break;
 
             case 'n':
-                value += '\n';
+                value += L'\n';
                 break;
 
             case 't':
-                value += '\t';
+                value += L'\t';
                 break;
 
             case '\n':
@@ -743,7 +743,7 @@ ParseKeyValue:
                 goto ValueDone;
             }
         default:
-            value += static_cast<char>(ch);
+            value += static_cast<wchar_t>(ch);
 
             break;
         }
@@ -796,7 +796,8 @@ ValueDone:
     {
         // Trim any trailing space.
         value.resize(trimmedLength);
-        SetConfig(keys, key.c_str(), value.c_str(), flags & CFG_DEBUG, filePath, line);
+        const auto valueUtf8 = wsl::shared::string::WideToMultiByte(value);
+        SetConfig(keys, key.c_str(), valueUtf8.c_str(), flags & CFG_DEBUG, filePath, line);
     }
 
     goto NewLine;

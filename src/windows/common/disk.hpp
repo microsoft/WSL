@@ -45,9 +45,10 @@ wil::unique_hfile OpenDevice(_In_ LPCWSTR Name, _In_ DWORD Access = GENERIC_READ
 
 /// <summary>
 /// Opens a VHD file so its backing volume can be tracked. The file is opened without requesting
-/// any access so the VM can keep using it.
+/// any access so the VM can keep using it. If UserToken is specified, the file is opened while
+/// impersonating it since user-owned VHDs may not grant the service identity access.
 /// </summary>
-wil::unique_hfile OpenVhdBackingFile(_In_ LPCWSTR Path);
+wil::unique_hfile OpenVhdBackingFile(_In_ LPCWSTR Path, _In_opt_ HANDLE UserToken = nullptr);
 
 /// <summary>
 /// Returns whether the volume backing an open file is still mounted. This is used to detect

@@ -122,18 +122,20 @@ void RegisterCallback(_In_ HCS_SYSTEM ComputeSystem, _In_ HCS_EVENT_CALLBACK Cal
 /// <summary>
 /// Removes a disk from a compute system, undoing the host state changes that were performed to attach it.
 /// Access is revoked if it was granted, and the disk is brought back online if it was taken offline.
+/// UserToken must match the identity that was used to grant access, or be null if access was granted as the service.
 /// </summary>
 void RemoveDiskWithAccess(
     _In_ HCS_SYSTEM ComputeSystem,
     _In_ PCWSTR VmId,
     _In_ PCWSTR Disk,
     _In_ ULONG Lun,
+    _In_opt_ HANDLE UserToken,
     _In_ wsl::windows::common::disk::DiskStateFlags Flags,
     _In_ size_t TimeoutMs = wsl::windows::common::disk::c_defaultDiskTimeoutMs);
 
 void RemoveScsiDisk(_In_ HCS_SYSTEM ComputeSystem, _In_ ULONG Lun);
 
-void RevokeVmAccess(_In_ PCWSTR VmId, _In_ PCWSTR FilePath);
+void RevokeVmAccess(_In_ PCWSTR VmId, _In_ PCWSTR FilePath, _In_opt_ HANDLE UserToken = nullptr);
 
 void StartComputeSystem(_In_ HCS_SYSTEM ComputeSystem, _In_ LPCWSTR Configuration);
 

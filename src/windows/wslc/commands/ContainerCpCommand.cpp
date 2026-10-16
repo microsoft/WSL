@@ -16,6 +16,7 @@ std::vector<Argument> ContainerCpCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::Archive),
+        Argument::Create(ArgType::FollowLink),
         Argument::Create(ArgType::Quiet, {.Desc = Localization::WSLCCLI_CpQuietArgDescription()}),
         Argument::Create(ArgType::Source, {.Required = true, .Desc = Localization::WSLCCLI_CpSourceArgDescription()}),
         Argument::Create(ArgType::Target, {.Required = true, .Desc = Localization::WSLCCLI_CpTargetArgDescription()}),
@@ -29,7 +30,7 @@ std::wstring ContainerCpCommand::ShortDescription() const
 
 std::wstring ContainerCpCommand::LongDescription() const
 {
-    return Localization::WSLCCLI_ContainerCpLongDesc();
+    return Localization::WSLCCLI_ContainerCpDesc();
 }
 
 void ContainerCpCommand::ExecuteInternal(CLIExecutionContext& context) const

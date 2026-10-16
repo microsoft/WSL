@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include "filesystem.hpp"
+#include <set>
 
 #define FULL_PATH_PREFIX L"\\\\?\\"
 #define LXSS_DOMAIN_NAME_DEFAULT "localdomain"
@@ -244,43 +245,82 @@ bool HasReadAccessToDrive(wchar_t drive)
 
 void EnsureCaseSensitiveDirectoryRecursive(_In_ HANDLE Directory)
 {
+    // Use iterative depth-first traversal with explicit frames to avoid stack overflow on deeply nested
+    // directory trees. Only O(depth) handles are open at any time — each directory handle is closed once
+    // all its children have been processed and marked case-sensitive.
+
+    struct Frame
+    {
+        wil::unique_hfile OwnedHandle;
+        HANDLE DirectoryHandle;
+        std::vector<std::byte> Buffer;
+        bool Restart;
+    };
+
+    std::vector<Frame> stack;
+    stack.push_back(
+        {.OwnedHandle = {}, .DirectoryHandle = Directory, .Buffer = std::vector<std::byte>(sizeof(FILE_ID_BOTH_DIR_INFORMATION) + MAX_PATH), .Restart = true});
+
     FILE_CASE_SENSITIVE_INFORMATION CaseInfo{};
     IO_STATUS_BLOCK IoStatus{};
-    std::vector<std::byte> buffer{sizeof(FILE_ID_BOTH_DIR_INFORMATION) + MAX_PATH};
-    bool restart = true;
 
-    while (true)
+    while (!stack.empty())
     {
+        auto& frame = stack.back();
+
+        //
+        // Enumerate the next entry in this directory.
+        //
+
         const auto result = NtQueryDirectoryFile(
-            Directory,
+            frame.DirectoryHandle,
             nullptr,
             nullptr,
             nullptr,
             &IoStatus,
-            buffer.data(),
-            static_cast<DWORD>(buffer.size()),
+            frame.Buffer.data(),
+            static_cast<DWORD>(frame.Buffer.size()),
             static_cast<FILE_INFORMATION_CLASS>(FileIdBothDirectoryInformation),
             true,
             nullptr,
-            restart);
+            frame.Restart);
 
         WI_ASSERT(result != STATUS_PENDING);
 
         if (result == STATUS_NO_MORE_FILES || result == STATUS_NO_SUCH_FILE)
         {
-            break;
+            //
+            // Enumeration complete — mark this directory case-sensitive, then pop the frame.
+            //
+            // N.B. This is done with a retry because if the NtfsEnableDirCaseSensitivity
+            //      flag was just changed from 3 to 1, NTFS may not have updated its
+            //      behavior yet in which case it will fail with STATUS_DIRECTORY_NOT_EMPTY.
+            //
+
+            CaseInfo.Flags = FILE_CS_FLAG_CASE_SENSITIVE_DIR;
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() {
+                    THROW_IF_NTSTATUS_FAILED(NtSetInformationFile(
+                        frame.DirectoryHandle, &IoStatus, &CaseInfo, sizeof(CaseInfo), FileCaseSensitiveInformation));
+                },
+                std::chrono::milliseconds{100},
+                std::chrono::seconds{1},
+                []() { return wil::ResultFromCaughtException() == HRESULT_FROM_NT(STATUS_DIRECTORY_NOT_EMPTY); });
+
+            stack.pop_back();
+            continue;
         }
         else if (result == STATUS_BUFFER_OVERFLOW)
         {
-            buffer.resize(buffer.size() * 2);
+            frame.Buffer.resize(frame.Buffer.size() * 2);
             continue;
         }
 
         THROW_IF_NTSTATUS_FAILED(result);
 
-        restart = false;
+        frame.Restart = false;
 
-        const auto* information = reinterpret_cast<const FILE_ID_BOTH_DIR_INFORMATION*>(buffer.data());
+        const auto* information = reinterpret_cast<const FILE_ID_BOTH_DIR_INFORMATION*>(frame.Buffer.data());
 
         //
         // Only process non-reparse point directories.
@@ -303,10 +343,12 @@ void EnsureCaseSensitiveDirectoryRecursive(_In_ HANDLE Directory)
             }
 
             UNICODE_STRING Name{};
-            RtlInitUnicodeString(&Name, information->FileName);
+            Name.Buffer = const_cast<PWCH>(information->FileName);
+            Name.Length = static_cast<USHORT>(information->FileNameLength);
+            Name.MaximumLength = Name.Length;
 
             auto Child = wsl::windows::common::filesystem::OpenRelativeFile(
-                Directory,
+                frame.DirectoryHandle,
                 &Name,
                 (FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES | SYNCHRONIZE),
                 FILE_OPEN,
@@ -315,32 +357,20 @@ void EnsureCaseSensitiveDirectoryRecursive(_In_ HANDLE Directory)
             THROW_IF_NTSTATUS_FAILED(NtQueryInformationFile(Child.get(), &IoStatus, &CaseInfo, sizeof(CaseInfo), FileCaseSensitiveInformation));
 
             //
-            // Skip if the directory already has the flag.
+            // If the child directory is not yet case-sensitive, push a new frame to process it.
             //
 
             if (WI_IsFlagClear(CaseInfo.Flags, FILE_CS_FLAG_CASE_SENSITIVE_DIR))
             {
-                EnsureCaseSensitiveDirectoryRecursive(Child.get());
+                HANDLE childHandle = Child.get();
+                stack.push_back(
+                    {.OwnedHandle = std::move(Child),
+                     .DirectoryHandle = childHandle,
+                     .Buffer = std::vector<std::byte>(sizeof(FILE_ID_BOTH_DIR_INFORMATION) + MAX_PATH),
+                     .Restart = true});
             }
         }
     }
-
-    //
-    // After all children are processed, mark the directory case-sensitive.
-    //
-    // N.B. This is done with a retry because if the NtfsEnableDirCaseSensitivity
-    //      flag was just changed from 3 to 1, NTFS may not have updated its
-    //      behavior yet in which case it will fail with STATUS_DIRECTORY_NOT_EMPTY.
-    //
-
-    CaseInfo.Flags = FILE_CS_FLAG_CASE_SENSITIVE_DIR;
-    wsl::shared::retry::RetryWithTimeout<void>(
-        [&]() {
-            THROW_IF_NTSTATUS_FAILED(NtSetInformationFile(Directory, &IoStatus, &CaseInfo, sizeof(CaseInfo), FileCaseSensitiveInformation));
-        },
-        std::chrono::milliseconds{100},
-        std::chrono::seconds{1},
-        []() { return wil::ResultFromCaughtException() == HRESULT_FROM_NT(STATUS_DIRECTORY_NOT_EMPTY); });
 }
 
 void SetDirectoryCaseSensitive(_In_ PCWSTR Path)
@@ -972,6 +1002,640 @@ std::string wsl::windows::common::filesystem::GetWindowsHosts(const std::filesys
     return WindowsHosts;
 }
 
+std::filesystem::path wsl::windows::common::filesystem::MakeStagingDirectory(const std::filesystem::path& Parent)
+{
+    GUID stagingId{};
+    THROW_IF_FAILED(CoCreateGuid(&stagingId));
+
+    auto staging =
+        Parent /
+        std::format(L".wslc-cp-{}", wsl::shared::string::GuidToString<wchar_t>(stagingId, wsl::shared::string::GuidToStringFlags::None));
+
+    std::error_code error;
+    std::filesystem::create_directories(staging, error);
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error.value()), !!error, "Failed to create directory: %ls", staging.c_str());
+
+    return staging;
+}
+
+bool wsl::windows::common::filesystem::IsRepresentableFileName(std::wstring_view Name)
+{
+    // An empty name means the path has no name; the caller handles it.
+    if (Name.empty())
+    {
+        return true;
+    }
+
+    constexpr std::wstring_view reserved = L"<>:\"/\\|?*";
+
+    for (const auto character : Name)
+    {
+        if (character < L' ' || reserved.find(character) != std::wstring_view::npos)
+        {
+            return false;
+        }
+    }
+
+    // Win32 strips trailing spaces and dots, which would change the name. Also covers "." and "..".
+    if (Name.back() == L' ' || Name.back() == L'.')
+    {
+        return false;
+    }
+
+    const auto lowerName = wsl::shared::string::AsciiToLower(Name);
+
+    // Reserved device names. Names with an extension, such as "nul.txt", are left to Win32.
+    // https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#naming-conventions
+    if (lowerName == L"con" || lowerName == L"prn" || lowerName == L"aux" || lowerName == L"nul")
+    {
+        return false;
+    }
+
+    // COM1-COM9 and LPT1-LPT9, along with the superscript forms Windows resolves to ports 1 through 3.
+    if (lowerName.size() == 4 && (lowerName.starts_with(L"com") || lowerName.starts_with(L"lpt")) &&
+        ((lowerName[3] >= L'1' && lowerName[3] <= L'9') || lowerName[3] == L'\u00b9' || lowerName[3] == L'\u00b2' || lowerName[3] == L'\u00b3'))
+    {
+        return false;
+    }
+
+    return true;
+}
+
+wsl::windows::common::filesystem::StagingDirectory::StagingDirectory(const std::filesystem::path& Parent) :
+    m_path(MakeStagingDirectory(Parent))
+{
+}
+
+wsl::windows::common::filesystem::StagingDirectory::~StagingDirectory()
+{
+    std::error_code error;
+    std::filesystem::remove_all(m_path, error);
+    LOG_HR_IF_MSG(HRESULT_FROM_WIN32(error.value()), !!error, "Failed to remove directory: %ls", m_path.c_str());
+}
+
+const std::filesystem::path& wsl::windows::common::filesystem::StagingDirectory::Path() const noexcept
+{
+    return m_path;
+}
+
+static void MoveOver(const std::filesystem::path& From, const std::filesystem::path& To)
+{
+    std::error_code statusError;
+    const auto toLinkStatus = std::filesystem::symlink_status(To, statusError);
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(statusError.value()),
+        statusError && statusError != std::errc::no_such_file_or_directory,
+        "Failed to inspect destination: %ls",
+        To.c_str());
+    const auto attributes = GetFileAttributesW(To.c_str());
+    if (std::filesystem::is_symlink(toLinkStatus) ||
+        (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0))
+    {
+        // Do not let the fallback copy follow an existing reparse point when rename cannot replace it.
+        std::filesystem::remove(To, statusError);
+        THROW_HR_IF_MSG(HRESULT_FROM_WIN32(statusError.value()), !!statusError, "Failed to remove link: %ls", To.c_str());
+    }
+
+    std::error_code error;
+    std::filesystem::rename(From, To, error);
+    if (!error)
+    {
+        return;
+    }
+
+    // std::filesystem::copy would place a file underneath a directory carrying the same name.
+    const auto fromStatus = std::filesystem::status(From, statusError);
+    const auto toStatus = std::filesystem::status(To, statusError);
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_FILE_EXISTS),
+        wsl::shared::Localization::WSLCCLI_CpDestinationTypeMismatchError(To.wstring()),
+        std::filesystem::exists(toStatus) && std::filesystem::is_directory(fromStatus) != std::filesystem::is_directory(toStatus));
+
+    std::error_code copyError;
+    std::filesystem::copy(
+        From,
+        To,
+        std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing | std::filesystem::copy_options::copy_symlinks,
+        copyError);
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(copyError.value()), !!copyError, "Failed to copy to: %ls", To.c_str());
+}
+
+static void MergeStagedEntry(const std::filesystem::path& From, const std::filesystem::path& To)
+{
+    std::error_code error;
+    const auto fromStatus = std::filesystem::symlink_status(From, error);
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error.value()), !!error, "Failed to inspect source: %ls", From.c_str());
+    const auto toStatus = std::filesystem::symlink_status(To, error);
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(error.value()),
+        error && error != std::errc::no_such_file_or_directory,
+        "Failed to inspect destination: %ls",
+        To.c_str());
+
+    const auto attributes = GetFileAttributesW(To.c_str());
+    THROW_HR_IF_MSG(
+        E_FAIL,
+        std::filesystem::is_directory(fromStatus) &&
+            (std::filesystem::is_symlink(toStatus) ||
+             (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0)),
+        "Cannot extract a directory through a destination reparse point: %ls",
+        To.c_str());
+
+    if (std::filesystem::is_directory(fromStatus) && std::filesystem::is_directory(toStatus))
+    {
+        for (const auto& entry : std::filesystem::directory_iterator(From))
+        {
+            MergeStagedEntry(entry.path(), To / entry.path().filename());
+        }
+    }
+    else
+    {
+        MoveOver(From, To);
+    }
+}
+
+std::wstring wsl::windows::common::filesystem::StripTrailingSeparators(const std::filesystem::path& Path)
+{
+    if (Path.has_root_directory() && !Path.has_relative_path())
+    {
+        return Path.root_name().wstring() + L"\\\\";
+    }
+
+    auto text = Path.wstring();
+    while (text.size() > 1 && (text.back() == L'\\' || text.back() == L'/'))
+    {
+        text.pop_back();
+    }
+
+    return text;
+}
+
+namespace {
+
+// ustar entries are a 512 byte header followed by content padded to the block size.
+constexpr size_t c_tarBlockSize = 512;
+
+// Upper bound on a long name or pax header.
+constexpr uint64_t c_tarMaxMetadataSize = 1 * _1MB;
+
+#pragma pack(push, 1)
+struct TarHeader
+{
+    char Name[100];
+    char Mode[8];
+    char Uid[8];
+    char Gid[8];
+    char Size[12];
+    char ModifiedTime[12];
+    char Checksum[8];
+    char TypeFlag;
+    char LinkName[100];
+    char Magic[6];
+    char Version[2];
+    char UserName[32];
+    char GroupName[32];
+    char DeviceMajor[8];
+    char DeviceMinor[8];
+    char Prefix[155];
+    char Padding[12];
+};
+#pragma pack(pop)
+
+static_assert(sizeof(TarHeader) == c_tarBlockSize);
+
+constexpr char c_tarTypeSymlink = '2';
+constexpr char c_tarTypeLongName = 'L';
+constexpr char c_tarTypeLongLinkName = 'K';
+constexpr char c_tarTypePaxExtended = 'x';
+constexpr char c_tarTypePaxExtendedAlternate = 'X';
+constexpr char c_tarTypePaxGlobal = 'g';
+
+bool ReadArchiveBytes(HANDLE Archive, void* Buffer, size_t Size)
+{
+    auto* const out = static_cast<char*>(Buffer);
+    size_t total = 0;
+    while (total < Size)
+    {
+        DWORD read = 0;
+        THROW_IF_WIN32_BOOL_FALSE(ReadFile(Archive, out + total, static_cast<DWORD>(Size - total), &read, nullptr));
+        if (read == 0)
+        {
+            THROW_HR_IF_MSG(E_FAIL, total > 0, "Archive ended inside an entry");
+            return false;
+        }
+
+        total += read;
+    }
+
+    return true;
+}
+
+std::string TarFieldToString(const char* Field, size_t Size)
+{
+    return std::string(Field, std::find(Field, Field + Size, '\0'));
+}
+
+uint64_t TarHeaderSize(const TarHeader& Header)
+{
+    // Sizes too large for the octal field are stored big endian with the high bit of the first byte set.
+    if ((static_cast<unsigned char>(Header.Size[0]) & 0x80) != 0)
+    {
+        uint64_t value = 0;
+        for (size_t index = 1; index < sizeof(Header.Size); index++)
+        {
+            value = (value << 8) | static_cast<unsigned char>(Header.Size[index]);
+        }
+
+        return value;
+    }
+
+    uint64_t value = 0;
+    for (const char digit : Header.Size)
+    {
+        if (digit == ' ')
+        {
+            continue;
+        }
+
+        if (digit < '0' || digit > '7')
+        {
+            break;
+        }
+
+        value = (value * 8) + (digit - '0');
+    }
+
+    return value;
+}
+
+uint64_t TarDataBlocks(uint64_t Size)
+{
+    return (Size + c_tarBlockSize - 1) / c_tarBlockSize;
+}
+
+std::vector<char> ReadTarData(HANDLE Archive, uint64_t Size)
+{
+    THROW_HR_IF_MSG(E_FAIL, Size > c_tarMaxMetadataSize, "Archive metadata entry is %llu bytes", Size);
+
+    std::vector<char> data(static_cast<size_t>(TarDataBlocks(Size) * c_tarBlockSize));
+    THROW_HR_IF_MSG(
+        E_FAIL, !data.empty() && !ReadArchiveBytes(Archive, data.data(), data.size()), "Archive ended inside an entry");
+
+    data.resize(static_cast<size_t>(Size));
+    return data;
+}
+
+void SkipTarData(HANDLE Archive, uint64_t Size)
+{
+    LARGE_INTEGER distance{};
+    distance.QuadPart = static_cast<LONGLONG>(TarDataBlocks(Size) * c_tarBlockSize);
+    THROW_LAST_ERROR_IF(!SetFilePointerEx(Archive, distance, nullptr, FILE_CURRENT));
+}
+
+std::optional<std::string> FindPaxPath(const std::vector<char>& Data)
+{
+    constexpr std::string_view c_pathKey = "path=";
+
+    std::string_view remaining(Data.data(), Data.size());
+    size_t position = 0;
+    while (position < remaining.size())
+    {
+        const auto space = remaining.find(' ', position);
+        if (space == std::string_view::npos)
+        {
+            break;
+        }
+
+        size_t length = 0;
+        for (size_t index = position; index < space; index++)
+        {
+            if (remaining[index] < '0' || remaining[index] > '9')
+            {
+                return {};
+            }
+
+            length = (length * 10) + (remaining[index] - '0');
+        }
+
+        // The record has to hold at least its own length field, the space, and the trailing newline.
+        if (length <= (space - position) + 2 || (position + length) > remaining.size())
+        {
+            break;
+        }
+
+        const auto record = remaining.substr(space + 1, (position + length) - space - 2);
+        if (record.starts_with(c_pathKey))
+        {
+            return std::string(record.substr(c_pathKey.size()));
+        }
+
+        position += length;
+    }
+
+    return {};
+}
+
+std::vector<std::string> SplitArchivePath(std::string_view Path)
+{
+    std::vector<std::string> components;
+    std::string current;
+    const auto append = [&]() {
+        if (!current.empty() && current != ".")
+        {
+            components.push_back(current);
+        }
+
+        current.clear();
+    };
+
+    for (const char character : Path)
+    {
+        if (character == '/' || character == '\\')
+        {
+            append();
+        }
+        else
+        {
+            current += character;
+        }
+    }
+
+    append();
+
+    // tar.exe drops a leading drive letter from an entry name.
+    if (!components.empty() && components.front().size() == 2 && components.front()[1] == ':' &&
+        ((components.front()[0] >= 'a' && components.front()[0] <= 'z') || (components.front()[0] >= 'A' && components.front()[0] <= 'Z')))
+    {
+        components.erase(components.begin());
+    }
+
+    return components;
+}
+
+struct ArchiveEntries
+{
+    size_t MemberCount = 0;
+    std::unordered_set<std::string> TopLevelNames;
+};
+
+struct WindowsPathLess
+{
+    bool operator()(std::wstring_view Left, std::wstring_view Right) const
+    {
+        const auto result =
+            CompareStringOrdinal(Left.data(), static_cast<int>(Left.size()), Right.data(), static_cast<int>(Right.size()), TRUE);
+        THROW_LAST_ERROR_IF(result == 0);
+        return result == CSTR_LESS_THAN;
+    }
+};
+
+ArchiveEntries ValidateArchiveEntries(HANDLE Archive)
+{
+    std::set<std::wstring, WindowsPathLess> symlinks;
+    std::optional<std::string> overrideName;
+    ArchiveEntries entries;
+
+    for (;;)
+    {
+        TarHeader header{};
+        if (!ReadArchiveBytes(Archive, &header, sizeof(header)))
+        {
+            break;
+        }
+
+        // The archive ends with zeroed blocks, which carry no name.
+        const auto* const bytes = reinterpret_cast<const char*>(&header);
+        if (std::all_of(bytes, bytes + sizeof(header), [](char value) { return value == '\0'; }))
+        {
+            break;
+        }
+
+        const auto size = TarHeaderSize(header);
+
+        // These headers carry the next entry's metadata rather than an entry of their own.
+        if (header.TypeFlag == c_tarTypeLongName)
+        {
+            const auto data = ReadTarData(Archive, size);
+            overrideName = TarFieldToString(data.data(), data.size());
+            continue;
+        }
+
+        if (header.TypeFlag == c_tarTypePaxExtended || header.TypeFlag == c_tarTypePaxExtendedAlternate)
+        {
+            const auto data = ReadTarData(Archive, size);
+            if (auto path = FindPaxPath(data); path.has_value())
+            {
+                overrideName = std::move(path);
+            }
+
+            continue;
+        }
+
+        // A long link target or a global header belongs to the next entry but says nothing about its name.
+        if (header.TypeFlag == c_tarTypeLongLinkName || header.TypeFlag == c_tarTypePaxGlobal)
+        {
+            SkipTarData(Archive, size);
+            continue;
+        }
+
+        std::string name;
+        if (overrideName.has_value())
+        {
+            name = std::move(*overrideName);
+            overrideName.reset();
+        }
+        else
+        {
+            name = TarFieldToString(header.Name, sizeof(header.Name));
+            const auto prefix = TarFieldToString(header.Prefix, sizeof(header.Prefix));
+            if (!prefix.empty() && std::string_view(header.Magic, 5) == "ustar")
+            {
+                name = prefix + "/" + name;
+            }
+        }
+
+        SkipTarData(Archive, size);
+
+        const auto components = SplitArchivePath(name);
+        if (components.empty())
+        {
+            continue;
+        }
+
+        ++entries.MemberCount;
+        entries.TopLevelNames.insert(components.front());
+
+        std::wstring path;
+        for (size_t index = 0; index < components.size(); index++)
+        {
+            if (!path.empty())
+            {
+                path += L'/';
+            }
+
+            path += wsl::windows::common::string::MultiByteToWide(components[index]);
+
+            // Only a parent of this entry resolves while the entry is written.
+            THROW_HR_IF_MSG(
+                E_FAIL,
+                index < (components.size() - 1) && symlinks.contains(path),
+                "Archive entry '%hs' is under the link '%hs'",
+                name.c_str(),
+                components[index].c_str());
+        }
+
+        if (header.TypeFlag == c_tarTypeSymlink)
+        {
+            symlinks.insert(path);
+        }
+    }
+
+    return entries;
+}
+
+} // namespace
+
+ArchiveEntries ExtractTarStream(const std::filesystem::path& Root, const std::function<void(HANDLE)>& WriteArchive)
+{
+    const auto targetDir = wsl::windows::common::filesystem::StripTrailingSeparators(Root);
+
+    // Buffer the archive so its entries are validated before tar.exe sees them.
+    wsl::windows::common::filesystem::TempFile archive(
+        GENERIC_READ | GENERIC_WRITE,
+        FILE_SHARE_READ,
+        CREATE_ALWAYS,
+        wsl::windows::common::filesystem::TempFileFlags::DeleteOnClose | wsl::windows::common::filesystem::TempFileFlags::InheritHandle);
+
+    WriteArchive(archive.Handle.get());
+
+    const auto rewind = [&]() {
+        LARGE_INTEGER zero{};
+        THROW_LAST_ERROR_IF(!SetFilePointerEx(archive.Handle.get(), zero, nullptr, FILE_BEGIN));
+    };
+
+    rewind();
+    auto entries = ValidateArchiveEntries(archive.Handle.get());
+    rewind();
+
+    auto tarCmd = std::format(L"tar.exe -xf - -C \"{}\"", targetDir);
+    wsl::windows::common::SubProcess process(nullptr, tarCmd.c_str());
+    process.SetStdHandles(archive.Handle.get(), nullptr, nullptr);
+    const auto exitCode = process.Run();
+    THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
+    return entries;
+}
+
+void wsl::windows::common::filesystem::ExtractArchiveInto(
+    const std::filesystem::path& Destination, const std::optional<std::wstring>& RebaseName, const std::function<void(HANDLE)>& WriteArchive)
+{
+    // Validate the rebase name before touching the destination. Trailing spaces and dots, which Win32
+    // strips, are trimmed and reported.
+    auto rebaseName = RebaseName;
+    if (rebaseName.has_value() && !rebaseName->empty())
+    {
+        auto trimmed = rebaseName->substr(0, rebaseName->find_last_not_of(L" .") + 1);
+
+        // An empty name means merge, so a name of only spaces and dots is rejected.
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, wsl::shared::Localization::WSLCCLI_CpSourceNameNotRepresentableError(*rebaseName), trimmed.empty());
+
+        if (trimmed != *rebaseName)
+        {
+            EMIT_USER_WARNING(wsl::shared::Localization::WSLCCLI_CpSourceNameTrimmedWarning(*rebaseName, trimmed));
+            rebaseName = std::move(trimmed);
+        }
+
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, wsl::shared::Localization::WSLCCLI_CpSourceNameNotRepresentableError(*rebaseName), !IsRepresentableFileName(*rebaseName));
+    }
+
+    std::error_code dirError;
+    std::filesystem::create_directories(Destination, dirError);
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", Destination.c_str());
+
+    // Stage on the destination volume so the moves are renames.
+    const StagingDirectory staging(Destination);
+    const auto entries = ExtractTarStream(staging.Path(), WriteArchive);
+
+    // Moving entries invalidates an open directory iterator, so the listing is taken first.
+    std::vector<std::filesystem::path> staged;
+    for (const auto& entry : std::filesystem::directory_iterator(staging.Path()))
+    {
+        staged.push_back(entry.path());
+    }
+
+    // A lone entry is the source itself and takes the name; several mean the source has no name of its own.
+    auto destinationRoot = Destination;
+    if (rebaseName.has_value() && !rebaseName->empty() && entries.TopLevelNames.size() > 1)
+    {
+        destinationRoot = Destination / *rebaseName;
+        const auto destinationStatus = std::filesystem::symlink_status(destinationRoot, dirError);
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(dirError.value()),
+            dirError && dirError != std::errc::no_such_file_or_directory,
+            "Failed to inspect destination: %ls",
+            destinationRoot.c_str());
+        const auto attributes = GetFileAttributesW(destinationRoot.c_str());
+        THROW_HR_IF_MSG(
+            E_FAIL,
+            std::filesystem::is_symlink(destinationStatus) ||
+                (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0),
+            "Destination is a reparse point: %ls",
+            destinationRoot.c_str());
+        std::filesystem::create_directories(destinationRoot, dirError);
+        THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", destinationRoot.c_str());
+    }
+
+    const bool rebase = rebaseName.has_value() && !rebaseName->empty() && entries.TopLevelNames.size() == 1;
+    for (const auto& entry : staged)
+    {
+        MergeStagedEntry(entry, destinationRoot / (rebase ? *rebaseName : entry.filename().wstring()));
+    }
+}
+
+void wsl::windows::common::filesystem::ExtractSingleFileAs(const std::filesystem::path& DestinationFile, const std::function<void(HANDLE)>& WriteArchive)
+{
+    const auto destinationDirectory = DestinationFile.parent_path();
+
+    std::error_code dirError;
+    std::filesystem::create_directories(destinationDirectory, dirError);
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", destinationDirectory.c_str());
+
+    // Stage on the destination volume so the move is a rename.
+    const StagingDirectory staging(destinationDirectory);
+    const auto entries = ExtractTarStream(staging.Path(), WriteArchive);
+
+    std::vector<std::filesystem::path> staged;
+    for (const auto& entry : std::filesystem::directory_iterator(staging.Path()))
+    {
+        staged.push_back(entry.path());
+    }
+
+    THROW_HR_WITH_USER_ERROR_IF(E_FAIL, wsl::shared::Localization::WSLCCLI_CpNoFileExtractedError(), staged.empty());
+
+    // symlink_status so a link to a directory counts as a single entry.
+    std::error_code statusError;
+    const auto stagedStatus = std::filesystem::symlink_status(staged.front(), statusError);
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_FAIL,
+        wsl::shared::Localization::WSLCCLI_CpSourceIsDirectoryError(),
+        entries.MemberCount != 1 || staged.size() != 1 || (!statusError && std::filesystem::is_directory(stagedStatus)));
+
+    MoveOver(staged.front(), DestinationFile);
+}
+
+std::filesystem::path wsl::windows::common::filesystem::StageDereferencedTree(
+    const std::filesystem::path& StagingRoot, const std::filesystem::path& LinkName, const std::filesystem::path& Resolved)
+{
+    auto staged = StagingRoot / LinkName;
+
+    std::error_code copyError;
+    std::filesystem::copy(Resolved, staged, std::filesystem::copy_options::recursive | std::filesystem::copy_options::copy_symlinks, copyError);
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(copyError.value()), !!copyError, "Failed to copy from: %ls", Resolved.c_str());
+
+    return staged;
+}
+
 wil::unique_hfile wsl::windows::common::filesystem::OpenDirectoryHandle(_In_ LPCWSTR pPath, _In_ bool forWrite)
 {
     wil::unique_hfile handle(OpenDirectoryHandleNoThrow(pPath, forWrite));
@@ -1038,6 +1702,24 @@ std::pair<NTSTATUS, wil::unique_hfile> wsl::windows::common::filesystem::OpenRel
         &File, DesiredAccess, &Attributes, &IoStatus, nullptr, 0, (FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE), Disposition, CreateOptions, EaBuffer, EaSize);
 
     return std::make_pair(Status, std::move(File));
+}
+
+std::string wsl::windows::common::filesystem::PosixBaseName(std::string_view Path)
+{
+    while (Path.size() > 1 && Path.back() == '/')
+    {
+        Path.remove_suffix(1);
+    }
+
+    const auto separator = Path.find_last_of('/');
+    auto name = std::string(separator == std::string_view::npos ? Path : Path.substr(separator + 1));
+
+    if (name == "." || name == "..")
+    {
+        return {};
+    }
+
+    return name;
 }
 
 wil::unique_hfile wsl::windows::common::filesystem::ReopenFile(_In_ HANDLE Handle, _In_ ACCESS_MASK DesiredAccess, _In_ ULONG CreateOptions)

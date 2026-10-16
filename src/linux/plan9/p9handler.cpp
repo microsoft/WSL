@@ -743,10 +743,14 @@ private:
         const auto start = reader.U64();
         const auto length = reader.U64();
         const auto procId = reader.U32();
-        auto clientId = reader.String();
+        const auto clientId = reader.TryString();
+        if (!clientId.Success)
+        {
+            return LX_EINVAL;
+        }
 
         const auto file = LookupFid(fid);
-        auto status = file->Lock(LockType{type}, flags, start, length, procId, clientId);
+        auto status = file->Lock(LockType{type}, flags, start, length, procId, clientId.Result);
         if (!status)
         {
             return status.Error();
@@ -764,10 +768,14 @@ private:
         const auto start = reader.U64();
         const auto length = reader.U64();
         const auto procId = reader.U32();
-        auto clientId = reader.String();
+        const auto clientId = reader.TryString();
+        if (!clientId.Success)
+        {
+            return LX_EINVAL;
+        }
 
         const auto file = LookupFid(fid);
-        auto result = file->GetLock(LockType{type}, start, length, procId, clientId);
+        auto result = file->GetLock(LockType{type}, start, length, procId, clientId.Result);
         if (!result)
         {
             return result.Error();
@@ -1237,21 +1245,31 @@ private:
     // Process a Plan 9 message, and write the response to the specified buffer.
     Task<void> ProcessMessage(SpanReader& reader, MessageResponse& response)
     {
-        LogMessage(reader.Span());
-        reader.U32(); // message size, already validated
+        const auto messageSize = reader.U32(); // message size, already validated
         auto messageType = reader.U8();
         const auto messageTag = reader.U16();
         const SpanWriter errorWriter{response.Writer};
 
-        LX_INT error;
-        try
+        LX_INT error{};
+
+        if (const auto minimumMessageSize = GetMessageSize(static_cast<MessageType>(messageType));
+            minimumMessageSize != 0 && messageSize < minimumMessageSize)
         {
-            error = co_await HandleMessage(static_cast<MessageType>(messageType), reader, response);
+            error = LX_EINVAL;
         }
-        catch (...)
+        else
         {
-            LOG_CAUGHT_EXCEPTION();
-            error = util::LinuxErrorFromCaughtException();
+            try
+            {
+                LogMessage(reader.Span());
+
+                error = co_await HandleMessage(static_cast<MessageType>(messageType), reader, response);
+            }
+            catch (...)
+            {
+                LOG_CAUGHT_EXCEPTION();
+                error = util::LinuxErrorFromCaughtException();
+            }
         }
 
         if (error != 0)

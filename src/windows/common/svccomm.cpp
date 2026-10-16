@@ -423,7 +423,7 @@ wsl::windows::common::SvcComm::LaunchProcess(
 
         std::thread StdOutWorker;
         std::thread StdErrWorker;
-        auto ExitEvent = wil::unique_event(wil::EventOptions::ManualReset);
+        auto ExitEvent = wil::shared_event(wil::EventOptions::ManualReset);
         auto outWorkerExit = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&StdOutWorker, &StdErrWorker, &ExitEvent] {
             ExitEvent.SetEvent();
             if (StdOutWorker.joinable())
@@ -447,7 +447,8 @@ wsl::windows::common::SvcComm::LaunchProcess(
         auto StdIn = GetStdHandle(STD_INPUT_HANDLE);
         if (IS_VALID_HANDLE(StdIn))
         {
-            std::thread([StdIn, StdInSocket = std::move(StdInSocket), ControlChannel = ControlChannel, ExitHandle = ExitEvent.get(), Io = &Io]() mutable {
+            std::thread([StdIn, StdInSocket = std::move(StdInSocket), ControlChannel = ControlChannel, ExitEvent]() mutable {
+                ConsoleState consoleState;
                 auto updateTerminal = [&]() {
                     //
                     // Query the window size and send an update message via the
@@ -455,7 +456,7 @@ wsl::windows::common::SvcComm::LaunchProcess(
                     //
                     if (ControlChannel)
                     {
-                        auto WindowSize = Io->GetWindowSize();
+                        auto WindowSize = consoleState.GetWindowSize();
 
                         LX_INIT_WINDOW_SIZE_CHANGED WindowSizeMessage{};
                         WindowSizeMessage.Header.MessageType = LxInitMessageWindowSizeChanged;
@@ -471,7 +472,7 @@ wsl::windows::common::SvcComm::LaunchProcess(
                     }
                 };
 
-                wsl::windows::common::relay::StandardInputRelay(StdIn, StdInSocket.get(), updateTerminal, ExitHandle);
+                wsl::windows::common::relay::StandardInputRelay(StdIn, StdInSocket.get(), updateTerminal, ExitEvent.get());
             }).detach();
         }
 

@@ -56,8 +56,6 @@ namespace settings = wsl::windows::wslc::settings;
 
 namespace {
 
-std::atomic<wsl::windows::service::wslc::WSLCSessionManagerImpl*> g_managerInstance{nullptr};
-
 wsl::windows::service::wslc::WSLCVirtualMachineBackendFactory CreateHcsVirtualMachineFactory()
 {
     return [](const VmCreateRequest& request) {
@@ -224,15 +222,8 @@ private:
 
 } // namespace
 
-WSLCSessionManagerImpl::WSLCSessionManagerImpl()
-{
-    g_managerInstance.store(this);
-}
-
 WSLCSessionManagerImpl::~WSLCSessionManagerImpl()
 {
-    g_managerInstance.store(nullptr);
-
     // Terminate all sessions on shutdown.
     // Call Terminate() directly rather than going through ForEachSession(),
     // which would needlessly resolve weak references and call GetState().
@@ -672,8 +663,6 @@ try
         TraceLoggingValue(ClientVersion->Revision, "Revision"));
 
     // Moved to 2.9.5 in https://github.com/microsoft/WSL/pull/41199 to add OpenContainer to a compat interface.
-    // While we could have prevented moving this forward, as we are still in preview it should be acceptable to break.
-    // This also forces callers to experience the SDK support error early, hopefully leading to better support if a post-release support floor needs to be raised.
     constexpr std::tuple<uint32_t, uint32_t, uint32_t> c_minClientVersion{2, 9, 5};
 
     const std::tuple<uint32_t, uint32_t, uint32_t> clientVersion{ClientVersion->Major, ClientVersion->Minor, ClientVersion->Revision};
@@ -768,11 +757,6 @@ try
 CATCH_RETURN();
 
 namespace wsl::windows::service::wslc {
-
-WSLCSessionManagerImpl* WSLCSessionManagerImpl::Instance() noexcept
-{
-    return g_managerInstance.load();
-}
 
 wil::com_ptr<IWSLCSession> WSLCSessionManagerImpl::FindSession(ULONG Id)
 {

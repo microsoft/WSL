@@ -59,6 +59,27 @@ std::vector<sockaddr_storage> QueryListeningSockets(NetlinkChannel& channel)
                     static_assert(sizeof(ipv6->sin6_addr.s6_addr32) == sizeof(payload->id.idiag_src));
                     memcpy(ipv6->sin6_addr.s6_addr32, payload->id.idiag_src, sizeof(ipv6->sin6_addr.s6_addr32));
                     ipv6->sin6_port = payload->id.idiag_sport;
+
+                    if (IN6_IS_ADDR_UNSPECIFIED(&ipv6->sin6_addr))
+                    {
+                        try
+                        {
+                            const auto ipv6Only = e.Attributes<uint8_t>(INET_DIAG_SKV6ONLY);
+                            if (ipv6Only.size() == 1 && *ipv6Only.front() == 0)
+                            {
+                                sockaddr_storage ipv4Socket{};
+                                auto* ipv4 = reinterpret_cast<sockaddr_in*>(&ipv4Socket);
+                                ipv4->sin_family = AF_INET;
+                                ipv4->sin_addr.s_addr = htonl(INADDR_ANY);
+                                ipv4->sin_port = ipv6->sin6_port;
+                                sockets.emplace_back(ipv4Socket);
+                            }
+                        }
+                        catch (const NetlinkParseException& exception)
+                        {
+                            LOG_ERROR("Failed to read listening socket IPv6-only attribute: {}", exception.what());
+                        }
+                    }
                 }
 
                 sockets.emplace_back(sock);

@@ -55,6 +55,25 @@ struct ErrorResponse
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ErrorResponse, message);
 };
 
+// Payload of the X-Docker-Container-Path-Stat response header on /containers/{id}/archive.
+struct ContainerPathStat
+{
+    std::string name;
+    int64_t size{};
+    uint32_t mode{};
+    std::string mtime;
+    std::string linkTarget;
+
+    static constexpr uint32_t c_modeSymlink = 1u << 27;
+
+    bool IsSymlink() const
+    {
+        return (mode & c_modeSymlink) != 0;
+    }
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerPathStat, name, size, mode, mtime, linkTarget);
+};
+
 struct ImageLoadResult
 {
     std::optional<std::string> stream;
@@ -464,13 +483,33 @@ struct CreateContainer
     std::optional<std::vector<std::string>> Entrypoint;
     std::vector<std::string> Env;
     std::map<std::string, EmptyObject> ExposedPorts;
+    std::map<std::string, EmptyObject> Volumes;
     std::map<std::string, std::string> Labels;
     std::optional<HealthConfig> Healthcheck;
     HostConfig HostConfig;
     NetworkingConfig NetworkingConfig;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(
-        CreateContainer, Image, Cmd, Tty, OpenStdin, StdinOnce, Entrypoint, Env, ExposedPorts, HostConfig, StopSignal, StopTimeout, WorkingDir, User, Hostname, Domainname, Labels, Healthcheck, NetworkingConfig);
+        CreateContainer,
+        Image,
+        Cmd,
+        Tty,
+        OpenStdin,
+        StdinOnce,
+        Entrypoint,
+        Env,
+        ExposedPorts,
+        Volumes,
+        HostConfig,
+        StopSignal,
+        StopTimeout,
+        WorkingDir,
+        User,
+        Hostname,
+        Domainname,
+        Labels,
+        Healthcheck,
+        NetworkingConfig);
 };
 
 struct HealthcheckResult

@@ -449,12 +449,18 @@ void wsl::windows::common::hcs::RegisterCallback(_In_ HCS_SYSTEM ComputeSystem, 
 }
 
 void wsl::windows::common::hcs::RemoveDiskWithAccess(
-    _In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR VmId, _In_ PCWSTR Disk, _In_ ULONG Lun, _In_ wsl::windows::common::disk::DiskStateFlags Flags, _In_ size_t TimeoutMs)
+    _In_ HCS_SYSTEM ComputeSystem,
+    _In_ PCWSTR VmId,
+    _In_ PCWSTR Disk,
+    _In_ ULONG Lun,
+    _In_opt_ HANDLE UserToken,
+    _In_ wsl::windows::common::disk::DiskStateFlags Flags,
+    _In_ size_t TimeoutMs)
 {
     RemoveScsiDisk(ComputeSystem, Lun);
     if (WI_IsFlagSet(Flags, wsl::windows::common::disk::DiskStateFlags::AccessGranted))
     {
-        RevokeVmAccess(VmId, Disk);
+        RevokeVmAccess(VmId, Disk, UserToken);
     }
 
     // If the disk was online before being attached, revert to that state.
@@ -496,11 +502,18 @@ void wsl::windows::common::hcs::RemoveScsiDisk(_In_ HCS_SYSTEM ComputeSystem, _I
     ModifyComputeSystem(ComputeSystem, wsl::shared::ToJsonW(request).c_str());
 }
 
-void wsl::windows::common::hcs::RevokeVmAccess(_In_ PCWSTR VmId, _In_ PCWSTR FilePath)
+void wsl::windows::common::hcs::RevokeVmAccess(_In_ PCWSTR VmId, _In_ PCWSTR FilePath, _In_opt_ HANDLE UserToken)
 {
     WSL_LOG_DEBUG("HcsRevokeVmAccess", TraceLoggingValue(VmId, "vmId"), TraceLoggingValue(FilePath, "filePath"));
 
     ExecutionContext context(Context::HCS);
+
+    // Match the identity used to grant access to user-owned VHDs.
+    wil::unique_token_reverter runAsUser;
+    if (UserToken != nullptr)
+    {
+        runAsUser = wil::impersonate_token(UserToken);
+    }
 
     THROW_IF_FAILED_MSG(::HcsRevokeVmAccess(VmId, FilePath), "HcsRevokeVmAccess(%ls, %ls)", VmId, FilePath);
 }

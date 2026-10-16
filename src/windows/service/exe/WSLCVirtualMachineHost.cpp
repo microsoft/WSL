@@ -159,6 +159,7 @@ WSLCVirtualMachineHost::WSLCVirtualMachineHost(_In_ const WSLCSessionSettings* S
 
     auto resources = BackendFactory(request);
     m_backend = std::move(resources.Backend);
+    auto cleanupBackendOnFailure = wil::scope_exit([&] { m_backend.reset(); });
     m_networkingFactory = std::move(resources.NetworkingFactory);
     THROW_IF_NULL_ALLOC(m_backend);
     THROW_HR_IF(E_INVALIDARG, !m_networkingFactory);
@@ -170,6 +171,8 @@ WSLCVirtualMachineHost::WSLCVirtualMachineHost(_In_ const WSLCSessionSettings* S
     {
         m_backend->AddGpu({});
     }
+
+    cleanupBackendOnFailure.release();
 }
 
 WSLCVirtualMachineHost::~WSLCVirtualMachineHost()
@@ -298,7 +301,6 @@ try
     request.Source = VmVirtualDiskSource{path, format};
     request.ReadOnly = ReadOnly;
     request.UserDisk = true;
-    request.BootCritical = true;
     const auto attachment = m_backend->AttachDisk(request);
     *Lun = attachment.GuestAddress.Lun;
     return S_OK;

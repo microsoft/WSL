@@ -1,0 +1,63 @@
+parameters:
+  - name: name
+    type: string
+
+  - name: displayName
+    type: string
+
+  - name: audience
+    type: string
+    values:
+      - Internal
+      - Insider
+      - Public
+
+  - name: dependsOn
+    type: object
+    default: []
+
+  - name: platforms
+    type: object
+    default: [x64, arm64]
+
+  # Build pipeline from which to retrieve the JSON inputs for DCAT.
+  # Defaults to the current pipeline if empty.
+  - name: artifactPipeline
+    type: string
+    default: ''
+
+  - name: dcat
+    type: object
+
+jobs:
+  - job: ${{ parameters.name }}
+    displayName: ${{ parameters.displayName }}
+    dependsOn: ${{ parameters.dependsOn }}
+    pool:
+      type: release
+      os: windows
+
+    variables:
+      dcatSubmissionPath: $(Pipeline.Workspace)\dcat
+
+    templateContext:
+      inputs:
+        - input: pipelineArtifact
+          ${{ if ne(parameters.artifactPipeline, '') }}:
+            pipeline: ${{ parameters.artifactPipeline }}
+          artifactName: drop_wsl_dcat
+          targetPath: $(Pipeline.Workspace)\dcat
+
+    steps:
+      - ${{ each platform in parameters.platforms }}:
+          - task: dcat-publishing@1
+            displayName: Add ${{ parameters.audience }} audience (${{ platform }})
+            inputs:
+              serviceConnectionId: ${{ parameters.dcat.serviceConnection }}
+              tenantId: ${{ parameters.dcat.tenantId }}
+              clientId: ${{ parameters.dcat.clientId }}
+              environment: ${{ parameters.dcat.environment }}
+              action: add
+              publisher: ${{ parameters.dcat.publisher }}
+              metadataFile: $(dcatSubmissionPath)\add-audience-${{ parameters.audience }}-${{ platform }}.json
+              pollingEnabled: false

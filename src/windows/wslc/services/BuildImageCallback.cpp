@@ -17,6 +17,8 @@ Abstract:
 
 namespace wsl::windows::wslc::services {
 
+using namespace wsl::windows::wslc::cli;
+
 using wsl::windows::common::string::MultiByteToWide;
 using namespace wsl::windows::common::vt;
 

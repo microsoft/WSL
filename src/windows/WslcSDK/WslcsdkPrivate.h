@@ -56,6 +56,7 @@ typedef struct WslcContainerProcessOptionsInternal
     uint32_t commandLineCount;
     PCSTR const* environment;
     uint32_t environmentCount;
+    WslcProcessFlags flags;
     PCSTR workingDirectory;
     WslcContainerProcessIOCallbackOptions ioCallbacks;
 } WslcContainerProcessOptionsInternal;

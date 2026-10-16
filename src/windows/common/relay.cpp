@@ -126,11 +126,6 @@ wsl::windows::common::relay::InterruptableRead(
 
 void wsl::windows::common::relay::InterruptableRelay(_In_ HANDLE InputHandle, _In_opt_ HANDLE OutputHandle, _In_opt_ HANDLE ExitHandle, _In_ size_t BufferSize)
 {
-    // If the handle file is seekable, make sure to respect the offset.
-    // This is useful in cases when WSL is invoked on an existing file, like: wsl.exe echo foo >> file
-    // See: https://github.com/microsoft/WSL/issues/11799
-
-    LARGE_INTEGER writeOffset = InitializeFileOffset(OutputHandle);
     LARGE_INTEGER readOffset = InitializeFileOffset(InputHandle);
 
     std::vector<gsl::byte> buffer(BufferSize);
@@ -159,8 +154,9 @@ void wsl::windows::common::relay::InterruptableRelay(_In_ HANDLE InputHandle, _I
 
         if (OutputHandle)
         {
-            overlapped.Offset = writeOffset.LowPart;
-            overlapped.OffsetHigh = writeOffset.HighPart;
+            // An offset of -1 appends to files and is ignored for other handle types.
+            overlapped.Offset = MAXDWORD;
+            overlapped.OffsetHigh = MAXDWORD;
             auto writeSpan = readSpan.first(bytesRead);
             const auto bytesWritten = InterruptableWrite(OutputHandle, writeSpan, exitHandles, &overlapped);
             if (bytesWritten == 0)
@@ -170,8 +166,6 @@ void wsl::windows::common::relay::InterruptableRelay(_In_ HANDLE InputHandle, _I
 
             WI_ASSERT(bytesWritten == bytesRead);
         }
-
-        writeOffset.QuadPart += bytesRead;
     }
 }
 

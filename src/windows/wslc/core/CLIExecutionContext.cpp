@@ -12,6 +12,8 @@ using namespace wsl::windows::common;
 
 namespace wsl::windows::wslc::execution {
 
+using namespace wsl::windows::wslc::cli;
+
 HANDLE CLIExecutionContext::CreateCancelEvent()
 {
     WI_ASSERT(!CancelEvent);
@@ -19,11 +21,11 @@ HANDLE CLIExecutionContext::CreateCancelEvent()
     return CancelEvent.get();
 }
 
-void CLIExecutionContext::ApplyGlobalEnvironmentOptions()
+void CLIExecutionContext::ApplyTerminalOptions()
 {
     // NoColor is environment-only and resolved before any output. Freezing it keeps the terminal
     // color state consistent for the entire invocation.
-    Terminal.SetNoColor(GlobalArgs.GetValue<ArgType::NoColor>());
+    Terminal.SetNoColor(Args.GetValue<ArgType::NoColor>());
 }
 
 void CLIExecutionContext::ReportError(HRESULT result)
@@ -41,6 +43,13 @@ void CLIExecutionContext::ReportError(HRESULT result)
 void CLIExecutionContext::ClearError()
 {
     m_error.reset();
+}
+
+bool CLIExecutionContext::CollectUserWarning(const std::wstring& warning)
+{
+    // The message already carries the "wsl: " prefix and trailing newline, so it is written verbatim.
+    Terminal.Warn(L"{}", warning);
+    return true;
 }
 
 } // namespace wsl::windows::wslc::execution

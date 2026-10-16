@@ -31,6 +31,8 @@ static bool IsSameProcess(_In_ HANDLE process1, _In_ HANDLE process2)
 
 LifetimeManager::LifetimeManager() : m_nextClientKey(0)
 {
+    m_cleanupWork.reset(CreateThreadpoolWork(s_DrainRetiredCallbacks, this, nullptr));
+    THROW_LAST_ERROR_IF(!m_cleanupWork);
 }
 
 LifetimeManager::~LifetimeManager()
@@ -45,37 +47,26 @@ LifetimeManager::~LifetimeManager()
 
 void LifetimeManager::ClearCallbacks()
 {
-    // Synchronization with the termination callbacks is tricky and must avoid:
-    //  (1) deadlocks
-    //  (2) concurrent modification of the callback list
-    //  (3) closing the process handle while the wait is still pending
-    //
-    // The strategy is to:
-    //  1. Take the lock
-    //  2. Move all clients to a local list
-    //  3. Release the lock
-    //  4. Wait for any pending callbacks (when the local vectors go out of
-    //     scope).
-    std::vector<ClientCallback> callbacks;
-    std::vector<wil::unique_threadpool_wait> waits;
+    wil::unique_threadpool_wait lastCallbackWait;
+    wil::unique_threadpool_timer lastTimerWait;
     {
         std::lock_guard<std::mutex> lock(m_lock);
 
         // Set m_exiting to make sure no new callbacks can be scheduled.
         m_exiting = true;
 
-        for (auto& callback : m_callbackList)
+        while (!m_callbackList.empty())
         {
-            for (auto& child : callback.clientProcesses)
-            {
-                waits.emplace_back(child.terminationWait.release());
-            }
-
-            callbacks.emplace_back(std::move(callback));
+            _RetireCallback(m_callbackList.begin());
         }
 
-        m_callbackList.clear();
+        lastCallbackWait = std::move(m_lastCallbackWait);
+        lastTimerWait = std::move(m_lastTimerWait);
     }
+
+    // Also drain registrations removed before ClearCallbacks(), including callbacks
+    // that have not acquired m_lock yet. Do not cancel the cleanup work itself.
+    WaitForThreadpoolWorkCallbacks(m_cleanupWork.get(), FALSE);
 }
 
 ULONG64 LifetimeManager::GetRegistrationId()
@@ -96,6 +87,7 @@ bool LifetimeManager::IsAnyProcessRegistered(_In_ ULONG64 ClientKey)
 void LifetimeManager::RegisterCallback(_In_ ULONG64 ClientKey, _In_ const std::function<bool(void)>& Callback, _In_opt_ HANDLE ClientProcess, _In_ DWORD TimeoutMs)
 {
     std::lock_guard<std::mutex> lock(m_lock);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_SHUTDOWN_IN_PROGRESS), m_exiting);
     auto client = _FindClient(ClientKey);
     if (client == m_callbackList.end())
     {
@@ -104,13 +96,12 @@ void LifetimeManager::RegisterCallback(_In_ ULONG64 ClientKey, _In_ const std::f
         newClient.clientKey = ClientKey;
         newClient.timeout = TimeoutMs;
         newClient.CreateTimer(s_OnTimeout, this);
-        if (!ARGUMENT_PRESENT(ClientProcess))
-        {
-            newClient.SetTimer(TimeoutMs);
-        }
-
         m_callbackList.emplace_back(std::move(newClient));
         client = _FindClient(ClientKey);
+        if (!ARGUMENT_PRESENT(ClientProcess))
+        {
+            client->SetTimer(TimeoutMs);
+        }
     }
     else
     {
@@ -143,17 +134,51 @@ void LifetimeManager::RegisterCallback(_In_ ULONG64 ClientKey, _In_ const std::f
 bool LifetimeManager::RemoveCallback(_In_ ULONG64 ClientKey)
 {
     bool callbackFound = false;
-    ClientCallback oldClient{};
     std::lock_guard<std::mutex> lock(m_lock);
     const auto client = _FindClient(ClientKey);
     if (client != m_callbackList.end())
     {
-        oldClient = std::move(*client);
-        m_callbackList.erase(client);
+        _RetireCallback(client);
         callbackFound = true;
     }
 
     return callbackFound;
+}
+
+_Requires_lock_held_(m_lock)
+void LifetimeManager::_RetireCallback(std::list<ClientCallback>::iterator Client)
+{
+    Client->CancelTimer();
+    for (const auto& process : Client->clientProcesses)
+    {
+        SetThreadpoolWait(process.terminationWait.get(), nullptr, nullptr);
+    }
+
+    m_retiredCallbacks.splice(m_retiredCallbacks.end(), m_callbackList, Client);
+    SubmitThreadpoolWork(m_cleanupWork.get());
+}
+
+VOID CALLBACK LifetimeManager::s_DrainRetiredCallbacks(_Inout_ PTP_CALLBACK_INSTANCE, _Inout_opt_ PVOID Context, _Inout_ PTP_WORK)
+{
+    try
+    {
+        const auto manager = static_cast<LifetimeManager*>(Context);
+        std::list<ClientCallback> callbacks;
+        {
+            std::lock_guard<std::mutex> lock(manager->m_lock);
+            callbacks.splice(callbacks.end(), manager->m_retiredCallbacks);
+        }
+
+        for (auto& callback : callbacks)
+        {
+            wil::unique_threadpool_timer timer{callback.timer.release()};
+            for (auto& process : callback.clientProcesses)
+            {
+                wil::unique_threadpool_wait wait{process.terminationWait.release()};
+            }
+        }
+    }
+    CATCH_FAIL_FAST()
 }
 
 VOID CALLBACK LifetimeManager::s_OnClientProcessTerminated(_Inout_ PTP_CALLBACK_INSTANCE, _Inout_opt_ PVOID Context, _Inout_ PTP_WAIT Wait, _In_ TP_WAIT_RESULT WaitResult)
@@ -164,7 +189,7 @@ VOID CALLBACK LifetimeManager::s_OnClientProcessTerminated(_Inout_ PTP_CALLBACK_
     try
     {
         const auto manager = static_cast<LifetimeManager*>(Context);
-        ClientCallback clientLocal{};
+        std::function<bool(void)> callback;
         wil::unique_threadpool_wait previousCallbackWait{};
 
         // Search for a callback with a matching threadpool wait.
@@ -193,8 +218,8 @@ VOID CALLBACK LifetimeManager::s_OnClientProcessTerminated(_Inout_ PTP_CALLBACK_
                 {
                     if (client->timeout == 0)
                     {
-                        clientLocal = std::move(*client);
-                        manager->m_callbackList.erase(client);
+                        callback = std::move(client->callback);
+                        manager->_RetireCallback(client);
                     }
                     else
                     {
@@ -206,9 +231,9 @@ VOID CALLBACK LifetimeManager::s_OnClientProcessTerminated(_Inout_ PTP_CALLBACK_
 
         // Callbacks that have a zero timeout must return success because they
         // are not retried.
-        if (clientLocal.callback)
+        if (callback)
         {
-            WI_VERIFY(clientLocal.callback());
+            WI_VERIFY(callback());
         }
     }
     CATCH_LOG()
@@ -262,8 +287,9 @@ VOID CALLBACK LifetimeManager::s_OnTimeout(_Inout_ PTP_CALLBACK_INSTANCE, _Inout
                 if (!manager->m_exiting)
                 {
                     clientLocal.CreateTimer(s_OnTimeout, manager);
-                    clientLocal.SetTimer(clientLocal.timeout);
                     manager->m_callbackList.emplace_back(std::move(clientLocal));
+                    const auto& client = manager->m_callbackList.back();
+                    client.SetTimer(client.timeout);
                 }
             }
         }

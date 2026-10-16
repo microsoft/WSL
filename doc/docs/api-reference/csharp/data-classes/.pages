@@ -1,6 +1,7 @@
 title: Data Classes
 nav:
   - index.md
+  - authenticateresult.md
   - containerportmapping.md
   - containervolume.md
   - containernamedvolume.md

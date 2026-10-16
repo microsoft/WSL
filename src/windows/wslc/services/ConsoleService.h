@@ -19,6 +19,8 @@ Abstract:
 #include "Terminal.h"
 
 namespace wsl::windows::wslc::services {
+
+using namespace wsl::windows::wslc::cli;
 class ConsoleService
 {
 public:

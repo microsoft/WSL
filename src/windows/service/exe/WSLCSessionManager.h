@@ -79,7 +79,7 @@ public:
     NON_COPYABLE(WSLCSessionManagerImpl);
     NON_MOVABLE(WSLCSessionManagerImpl);
 
-    WSLCSessionManagerImpl();
+    WSLCSessionManagerImpl() = default;
     ~WSLCSessionManagerImpl();
 
     void CreateSession(
@@ -94,8 +94,6 @@ public:
 
     // Resolves a session by ID for plugin->API calls. Throws ERROR_NOT_FOUND if no session matches.
     wil::com_ptr<IWSLCSession> FindSession(ULONG Id);
-
-    static WSLCSessionManagerImpl* Instance() noexcept;
 
 private:
     // Resolves the default session name for a caller: appends the username

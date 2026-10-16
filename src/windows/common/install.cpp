@@ -450,16 +450,33 @@ try
 {
     static std::wstring path = wil::GetWindowsDirectoryW<std::wstring>() + L"\\temp\\wsl-install-log.txt";
 
+    WriteInstallLogImpl(path, Content);
+}
+CATCH_LOG();
+
+void wsl::windows::common::install::WriteInstallLogImpl(const std::wstring& Path, const std::string& Content)
+{
     // Wait up to 10 seconds for the log file mutex
     wil::unique_handle mutex{CreateMutex(nullptr, true, L"Global\\WslInstallLog")};
     THROW_LAST_ERROR_IF(!mutex);
 
     THROW_LAST_ERROR_IF(WaitForSingleObject(mutex.get(), 10 * 1000) != WAIT_OBJECT_0);
 
-    wil::unique_handle file{CreateFile(
-        path.c_str(), GENERIC_ALL, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_ALWAYS, 0, nullptr)};
+    wil::unique_hfile file{CreateFileW(
+        Path.c_str(), GENERIC_WRITE | FILE_READ_ATTRIBUTES, FILE_SHARE_READ, nullptr, OPEN_ALWAYS, FILE_FLAG_OPEN_REPARSE_POINT, nullptr)};
 
     THROW_LAST_ERROR_IF(!file);
+
+    BY_HANDLE_FILE_INFORMATION info{};
+    THROW_IF_WIN32_BOOL_FALSE(GetFileInformationByHandle(file.get(), &info));
+
+    THROW_HR_IF_MSG(
+        E_ACCESSDENIED,
+        WI_IsAnyFlagSet(info.dwFileAttributes, FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_DIRECTORY) || info.nNumberOfLinks != 1,
+        "Refusing to write to %ls. Attributes: %u, links: %u",
+        Path.c_str(),
+        info.dwFileAttributes,
+        info.nNumberOfLinks);
 
     LARGE_INTEGER size{};
     THROW_IF_WIN32_BOOL_FALSE(GetFileSizeEx(file.get(), &size));
@@ -480,4 +497,3 @@ try
     DWORD bytesWritten{};
     THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.get(), logLine.c_str(), static_cast<DWORD>(logLine.size()), &bytesWritten, nullptr));
 }
-CATCH_LOG();

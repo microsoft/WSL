@@ -195,9 +195,30 @@ void ConsommeNetworking::StartPortTracker(wil::unique_socket&& socket)
     m_gnsPortTrackerChannel.emplace(
         std::move(socket),
         [&](const SOCKADDR_INET& addr, int protocol, bool allocate) {
-            return wil::ResultFromException([&]() {
+            const auto result = wil::ResultFromException([&]() {
                 HandlePortNotification(addr, protocol, INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&addr)), allocate);
             });
+
+            LOG_IF_FAILED_MSG(
+                result,
+                "Port mapping failed: address=%hs port=%u protocol=%d allocate=%d",
+                wsl::windows::common::string::SockAddrInetToString(addr).c_str(),
+                INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&addr)),
+                protocol,
+                allocate);
+
+            switch (result)
+            {
+            case S_OK:
+                return 0;
+
+            case HRESULT_FROM_WIN32(WSAEADDRINUSE):
+            case HRESULT_FROM_WIN32(WSAEACCES):
+                return -LX_EADDRINUSE;
+
+            default:
+                return -LX_EINVAL;
+            }
         },
         [](const std::string&, bool) {}); // TODO: reconsider if InterfaceStateCallback is needed.
 }
@@ -336,6 +357,35 @@ void ConsommeNetworking::RefreshGuestConnection()
     auto networkSettings = GetHostEndpointSettings();
 
     std::wstring default_route = networkSettings->GetBestGatewayAddressString();
+
+    // Generate a fallback gateway address if the host doesn't have a usable one.
+    // See: https://github.com/microsoft/WSL/issues/41740
+    if (default_route.empty() || default_route == LX_INIT_UNSPECIFIED_ADDRESS)
+    {
+        const auto gateway = GetFallbackIpv4Gateway(networkSettings->PreferredIpAddress);
+        if (gateway.si_family == AF_INET)
+        {
+            std::erase_if(
+                networkSettings->Routes, [](const auto& existing) { return existing.Family == AF_INET && existing.IsDefault(); });
+
+            const auto route = EndpointRoute::DefaultRoute(AF_INET, gateway);
+            networkSettings->Routes.emplace(route);
+            default_route = route.NextHopString;
+
+            WSL_LOG(
+                "ConsommeGeneratedIpv4Gateway",
+                TraceLoggingValue(networkSettings->PreferredIpAddress.AddressString.c_str(), "ClientIp"),
+                TraceLoggingValue(networkSettings->PreferredIpAddress.PrefixLength, "PrefixLength"),
+                TraceLoggingValue(default_route.c_str(), "GatewayIp"));
+        }
+        else
+        {
+            WSL_LOG(
+                "ConsommeIpv4GatewayUnavailable",
+                TraceLoggingValue(networkSettings->PreferredIpAddress.AddressString.c_str(), "ClientIp"),
+                TraceLoggingValue(networkSettings->PreferredIpAddress.PrefixLength, "PrefixLength"));
+        }
+    }
 
     networking::DnsInfo currentDns{};
     if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::DnsTunneling))
