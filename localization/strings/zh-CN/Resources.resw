@@ -919,6 +919,14 @@ Windows 版本: {}</value>
     <value>主机上以不受支持的方式禁用了 IPv6 (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>镜像网络使用的是较小的临时端口范围 ({} 个端口，而不是 {})。这可能会限制同时连接的数目。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>镜像网络无法保留 {} TCP 和 UDP 端口的最小连续范围。检查 Windows 端口使用情况和排除项。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Hyper-V 防火墙不受支持</value>
   </data>
@@ -2675,14 +2683,6 @@ Windows 版本: {}</value>
   <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
     <value>在容器和本地文件系统之间复制文件。</value>
   </data>
-  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
-    <value>在容器和本地文件系统之间复制文件。
-用法: wslc container cp [OPTIONS] SOURCE DEST
-  本地到容器: wslc container cp LOCAL_PATH CONTAINER:PATH
-  容器到本地: wslc container cp CONTAINER:PATH LOCAL_PATH
-  标准输入到容器: wslc container cp - CONTAINER:PATH</value>
-    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
-  </data>
   <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
     <value>源：本地路径、CONTAINER:PATH 或 '-' 表示标准输入</value>
     <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
@@ -3288,6 +3288,10 @@ Windows 版本: {}</value>
     <value>不支持“{}”选项。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
+    <value>模式“{}”无效。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
     <value>需要指定装入目标。</value>
   </data>
@@ -3874,28 +3878,25 @@ Windows 版本: {}</value>
     <value>无法将容器导出到终端。请使用 -o 选项或重定向标准输出。</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>预期格式: &lt;主机路径|命名卷&gt;:&lt;容器路径&gt;[:模式]</value>
+    <value>预期格式: [&lt;主机路径|命名卷&gt;:]&lt;容器路径&gt;[:模式]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
-  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>卷规范无效: '{}'。{}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
+    <value>卷规范无效:“{}”。{} {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>卷规范无效: '{}'。主机路径不能为空。{}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
+    <value>卷规范为空。</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
-    <value>无效的卷规格：'{}'. 容器路径不能为空。{}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
+    <value>卷规范在冒号之间包含一个空节。</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
-    <value>无效的卷规格：'{}'。容器路径必须是绝对路径（以 '/' 开头）。{}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
+    <value>卷规范包含的冒号过多。</value>
   </data>
-  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
-    <value>卷规格无效：'{}'。主机路径 '{}' 不是有效的 Windows 路径。</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
+    <value>主机路径“{}”不是有效的 Windows 路径。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
     <value>任何对象类型的名称或 ID</value>

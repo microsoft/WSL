@@ -371,6 +371,82 @@ namespace {
          Localization::WSLCCLI_MountInvalidValueError(L"tmpfs-mode", L"40000000000")},
     };
 
+    mount::Spec ParseAndValidateVolume(const std::wstring& value)
+    {
+        auto mountSpec = mount::ParseDockerVolumeString(value);
+        mount::ValidateMountSpec(mountSpec);
+        return mountSpec;
+    }
+
+    void VerifyExceptionType(const mount::MountException& ex, ExpectedException expected)
+    {
+        switch (expected)
+        {
+        case ExpectedException::Parse:
+            VERIFY_IS_TRUE(dynamic_cast<const mount::MountParseException*>(&ex) != nullptr);
+            break;
+
+        case ExpectedException::Unsupported:
+            VERIFY_IS_TRUE(dynamic_cast<const mount::MountUnsupportedException*>(&ex) != nullptr);
+            break;
+
+        case ExpectedException::Validation:
+            VERIFY_IS_TRUE(dynamic_cast<const mount::MountValidationException*>(&ex) != nullptr);
+            break;
+        }
+    }
+
+    struct ValidVolumeCase
+    {
+        const wchar_t* Input;
+        mount::Type Type;
+        const wchar_t* Source;
+        const char* Target;
+        bool ReadOnly;
+    };
+
+    constexpr ValidVolumeCase c_validVolumeCases[] = {
+        {L"C:\\hostPath:/data", WSLCMountTypeBind, L"C:\\hostPath", "/data", false},
+        {L"C:\\hostPath:/data:ro", WSLCMountTypeBind, L"C:\\hostPath", "/data", true},
+        {L"C:\\hostPath:/data:rw", WSLCMountTypeBind, L"C:\\hostPath", "/data", false},
+        {L"C:/hostPath:/data", WSLCMountTypeBind, L"C:\\hostPath", "/data", false},
+        {L"C:\\host Path:/container Path:ro", WSLCMountTypeBind, L"C:\\host Path", "/container Path", true},
+        {L"named-volume:/data", WSLCMountTypeVolume, L"named-volume", "/data", false},
+        {L"named-volume:/data:ro", WSLCMountTypeVolume, L"named-volume", "/data", true},
+        {L"/data", WSLCMountTypeVolume, L"", "/data", false},
+        {L":", WSLCMountTypeVolume, L"", ":", false},
+        {L"::", WSLCMountTypeVolume, L"", "::", false},
+        {L"ab", WSLCMountTypeVolume, L"", "ab", false},
+        {L"C:", WSLCMountTypeVolume, L"", "C:", false},
+        {L"C:\\test", WSLCMountTypeVolume, L"", "C:\\test", false},
+        {L"\u00e9:\\test", WSLCMountTypeVolume, L"", "\xc3\xa9:\\test", false},
+        {L"\u00e9:", WSLCMountTypeVolume, L"", "\xc3\xa9:", false},
+    };
+
+    const InvalidMountCase c_invalidVolumeCases[] = {
+        {L"", Localization::WSLCCLI_VolumeEmptySpecError()},
+        {L":/data", Localization::WSLCCLI_VolumeEmptySectionError()},
+        {L":\u00e9", Localization::WSLCCLI_VolumeEmptySectionError()},
+        {L"::/data:ro", Localization::WSLCCLI_VolumeEmptySectionError()},
+        {L"C:\\hostPath::ro", Localization::WSLCCLI_VolumeEmptySectionError()},
+        {L"C:\\hostPath:/data:", Localization::WSLCCLI_VolumeEmptySectionError()},
+        {L"C:\\hostPath:/data:ro:extra", Localization::WSLCCLI_VolumeTooManyColonsError()},
+        {L"named-volume:/data:z:ro", Localization::WSLCCLI_VolumeTooManyColonsError()},
+        {L"C:\\bad|name:/data", Localization::WSLCCLI_VolumeHostPathInvalidError(L"C:\\bad|name")},
+        {L"C:\\hostPath:ro", Localization::WSLCCLI_MountTargetAbsoluteError(), ExpectedException::Validation},
+        {L"C:\\hostPath:C:\\data", Localization::WSLCCLI_MountTargetAbsoluteError(), ExpectedException::Validation},
+        {L"/data:ro", Localization::WSLCCLI_MountTargetAbsoluteError(), ExpectedException::Validation},
+        {L"sub/dir:/data", Localization::WSLCCLI_MountVolumeSourceInvalidError(), ExpectedException::Validation},
+        {L"sub\\dir:/data", Localization::WSLCCLI_MountVolumeSourceInvalidError(), ExpectedException::Validation},
+        {L"C:\\hostPath:/data:bogus", Localization::WSLCCLI_MountInvalidModeError(L"bogus"), ExpectedException::Validation},
+        {L"C:\\hostPath:/data:ro,", Localization::WSLCCLI_MountInvalidModeError(L""), ExpectedException::Validation},
+        {L"C:\\hostPath:/data:ro,rw", Localization::WSLCCLI_MountInvalidModeError(L"rw"), ExpectedException::Validation},
+        {L"C:\\hostPath:/data:z,Z", Localization::WSLCCLI_MountInvalidModeError(L"Z"), ExpectedException::Validation},
+        {L"C:\\hostPath:/data:z", Localization::WSLCCLI_MountOptionUnsupportedError(L"z"), ExpectedException::Unsupported},
+        {L"named-volume:/data:nocopy", Localization::WSLCCLI_MountOptionUnsupportedError(L"nocopy"), ExpectedException::Unsupported},
+        {L"C:\\hostPath:/data:ro,rshared", Localization::WSLCCLI_MountOptionUnsupportedError(L"rshared"), ExpectedException::Unsupported},
+    };
+
 } // namespace
 
 class WSLCCLIMountParserUnitTests
@@ -419,55 +495,78 @@ class WSLCCLIMountParserUnitTests
             catch (const mount::MountException& ex)
             {
                 VERIFY_ARE_EQUAL(testCase.ExpectedReason, ex.Reason());
-                switch (testCase.Exception)
-                {
-                case ExpectedException::Parse:
-                    VERIFY_IS_TRUE(dynamic_cast<const mount::MountParseException*>(&ex) != nullptr);
-                    break;
-
-                case ExpectedException::Unsupported:
-                    VERIFY_IS_TRUE(dynamic_cast<const mount::MountUnsupportedException*>(&ex) != nullptr);
-                    break;
-
-                case ExpectedException::Validation:
-                    VERIFY_IS_TRUE(dynamic_cast<const mount::MountValidationException*>(&ex) != nullptr);
-                    break;
-                }
+                VerifyExceptionType(ex, testCase.Exception);
             }
         }
     }
 
     TEST_METHOD(Volume_ValidCases)
     {
-        const auto bind = mount::ParseDockerVolumeString(LR"(C:\hostPath:/data:ro)");
-        VERIFY_ARE_EQUAL(static_cast<int>(WSLCMountTypeBind), static_cast<int>(bind.MountType));
-        VERIFY_ARE_EQUAL(std::wstring(LR"(C:\hostPath)"), bind.Source);
-        VERIFY_ARE_EQUAL(std::string("/data"), bind.Target);
-        VERIFY_IS_TRUE(bind.ReadOnly);
-        VERIFY_ARE_EQUAL(static_cast<int>(mount::BindSourcePolicy::CreateIfMissing), static_cast<int>(bind.BindSource));
+        for (const auto& testCase : c_validVolumeCases)
+        {
+            Log::Comment(String().Format(L"Accepting: %ls", testCase.Input));
 
-        const auto relativeBind = mount::ParseDockerVolumeString(L".\\mount:/data");
-        VERIFY_ARE_EQUAL(std::filesystem::weakly_canonical(std::filesystem::current_path() / L"mount").wstring(), relativeBind.Source);
+            const auto actual = ParseAndValidateVolume(testCase.Input);
+            VERIFY_ARE_EQUAL(static_cast<int>(testCase.Type), static_cast<int>(actual.MountType));
+            VERIFY_ARE_EQUAL(std::wstring(testCase.Source), actual.Source);
+            VERIFY_ARE_EQUAL(std::string(testCase.Target), actual.Target);
+            VERIFY_ARE_EQUAL(testCase.ReadOnly, actual.ReadOnly);
 
-        const auto volume = mount::ParseDockerVolumeString(L"named-volume:/data");
-        VERIFY_ARE_EQUAL(static_cast<int>(WSLCMountTypeVolume), static_cast<int>(volume.MountType));
-        VERIFY_ARE_EQUAL(std::wstring(L"named-volume"), volume.Source);
-        VERIFY_ARE_EQUAL(std::string("/data"), volume.Target);
-        VERIFY_IS_FALSE(volume.ReadOnly);
-        VERIFY_ARE_EQUAL(static_cast<int>(mount::BindSourcePolicy::RequireExisting), static_cast<int>(volume.BindSource));
+            const auto expectedPolicy = testCase.Type == WSLCMountTypeBind ? mount::BindSourcePolicy::CreateIfMissing
+                                                                           : mount::BindSourcePolicy::RequireExisting;
+            VERIFY_ARE_EQUAL(static_cast<int>(expectedPolicy), static_cast<int>(actual.BindSource));
+            VERIFY_ARE_EQUAL(testCase.Type == WSLCMountTypeVolume && testCase.Source[0] == L'\0', actual.ConfigVolume);
+        }
     }
 
-    TEST_METHOD(Volume_InvalidHostPath)
+    TEST_METHOD(Volume_InvalidCases)
     {
-        try
+        for (const auto& testCase : c_invalidVolumeCases)
         {
-            (void)mount::ParseDockerVolumeString(L"::/container:ro");
-            VERIFY_FAIL(L"Expected MountParseException for an invalid host path");
+            Log::Comment(String().Format(L"Rejecting: %ls", testCase.Input));
+
+            try
+            {
+                (void)ParseAndValidateVolume(testCase.Input);
+                VERIFY_FAIL(L"Expected MountException for invalid volume spec");
+            }
+            catch (const mount::MountException& ex)
+            {
+                VERIFY_ARE_EQUAL(testCase.ExpectedReason, ex.Reason());
+                VerifyExceptionType(ex, testCase.Exception);
+            }
         }
-        catch (const mount::MountParseException& ex)
+    }
+
+    TEST_METHOD(Volume_AnonymousVolumesSkipDuplicateDestinationCheck)
+    {
+        const std::vector<mount::Spec> mounts{
+            ParseAndValidateVolume(L"/data"),
+            ParseAndValidateVolume(L"/data"),
+            ParseAndValidateVolume(L"named-volume:/data"),
+        };
+
+        mount::ValidateMountCollection(mounts);
+    }
+
+    TEST_METHOD(Volume_RelativeBindSourceUsesCurrentDirectory)
+    {
+        const auto actual = ParseAndValidateVolume(L".\\mount:/data");
+        VERIFY_ARE_EQUAL(static_cast<int>(WSLCMountTypeBind), static_cast<int>(actual.MountType));
+        VERIFY_ARE_EQUAL(std::filesystem::weakly_canonical(std::filesystem::current_path() / L"mount").wstring(), actual.Source);
+    }
+
+    TEST_METHOD(Volume_ModesArePreserved)
+    {
+        const auto actual = mount::ParseDockerVolumeString(L"named-volume:/data:ro,z,nocopy");
+        const std::vector<std::wstring> expected{L"ro", L"z", L"nocopy"};
+        VERIFY_ARE_EQUAL(expected.size(), actual.Modes.size());
+        for (size_t index = 0; index < expected.size(); ++index)
         {
-            VERIFY_ARE_EQUAL(Localization::WSLCCLI_VolumeHostPathInvalid(L"::/container:ro", L":"), ex.Reason());
+            VERIFY_ARE_EQUAL(expected[index], actual.Modes[index]);
         }
+
+        VERIFY_IS_TRUE(actual.ReadOnly);
     }
 
     TEST_METHOD(Mount_DotRelativeBindSourceUsesCurrentDirectory)

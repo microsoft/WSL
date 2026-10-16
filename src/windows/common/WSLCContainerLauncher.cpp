@@ -265,6 +265,11 @@ void wsl::windows::common::WSLCContainerLauncher::AddMount(const mount::Spec& Mo
         WI_SetFlag(mount.Flags, WSLCMountSpecFlagsCreateSourceIfMissing);
     }
 
+    if (Mount.ConfigVolume)
+    {
+        WI_SetFlag(mount.Flags, WSLCMountSpecFlagsConfigVolume);
+    }
+
     if (Mount.TmpfsSizeBytes.has_value())
     {
         WI_SetFlag(mount.Flags, WSLCMountSpecFlagsTmpfsSize);

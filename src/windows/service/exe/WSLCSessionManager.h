@@ -34,6 +34,7 @@ Abstract:
 #include "wslc.h"
 #include "WSLCCompat.h"
 #include "COMImplClass.h"
+#include "COMCallbackTracker.h"
 #include "wslutil.h"
 #include <atomic>
 #include <algorithm>
@@ -71,6 +72,7 @@ struct SessionEntry
     std::vector<BYTE> UserSid;
 
     wil::unique_handle JobObject;
+    wil::unique_handle HostProcess;
 };
 
 class WSLCSessionManagerImpl
@@ -79,8 +81,10 @@ public:
     NON_COPYABLE(WSLCSessionManagerImpl);
     NON_MOVABLE(WSLCSessionManagerImpl);
 
-    WSLCSessionManagerImpl();
+    WSLCSessionManagerImpl() = default;
     ~WSLCSessionManagerImpl();
+
+    void CancelDiagnosticCallbacks() noexcept;
 
     void CreateSession(
         _In_ const WSLCSessionSettings* WslcSessionSettings,
@@ -94,8 +98,6 @@ public:
 
     // Resolves a session by ID for plugin->API calls. Throws ERROR_NOT_FOUND if no session matches.
     wil::com_ptr<IWSLCSession> FindSession(ULONG Id);
-
-    static WSLCSessionManagerImpl* Instance() noexcept;
 
 private:
     static std::wstring ResolveUserName(const CallingProcessTokenInfo& TokenInfo);
@@ -141,7 +143,14 @@ private:
                 auto remove =
                     std::ranges::remove_if(m_persistentSessions, [&](const auto& e) { return e.first == entry.SessionId; });
                 m_persistentSessions.erase(remove.begin(), remove.end());
-                return true; // Remove from tracking
+
+                // Do not remove the entry if the process is still running.
+                // Clients can still hold COM references to the other objects even after the session is destroyed.
+                // Releasing the job object would cause the host process to be terminated and break access to those objects + potential ongoing WSLCSession cleanup.
+
+                const auto waitResult = WaitForSingleObject(entry.HostProcess.get(), 0);
+                LOG_LAST_ERROR_IF(waitResult == WAIT_FAILED);
+                return waitResult == WAIT_OBJECT_0;
             }
 
             if constexpr (std::is_same_v<T, void>)
@@ -172,7 +181,7 @@ private:
         }
     }
 
-    [[nodiscard]] wil::unique_handle CreateSessionProcessJob(_In_ IWSLCSessionFactory* Factory);
+    [[nodiscard]] wil::unique_handle CreateSessionProcessJob(_In_ HANDLE Process);
     WSLCSessionInitSettings CreateSessionSettings(
         _In_ ULONG SessionId, _In_ LPCWSTR CreatorProcessName, _In_ const WSLCSessionSettings* Settings, _In_ LPCWSTR ResolvedDisplayName);
     static CallingProcessTokenInfo GetCallingProcessTokenInfo();
@@ -182,9 +191,10 @@ private:
 
     std::atomic<ULONG> m_nextSessionId{1};
     std::recursive_mutex m_wslcSessionsLock;
+    wsl::windows::common::COMCallbackTracker m_diagnosticCallbacks;
 
     // All sessions tracked via SessionEntry (which holds weak refs and service-side security info).
-    // Sessions are automatically cleaned up when the underlying session is released.
+    // Expired sessions are hidden immediately; entries are erased when a cleanup pass observes host exit.
     std::vector<SessionEntry> m_sessions;
 
     // Strong references to persistent sessions to keep them alive.

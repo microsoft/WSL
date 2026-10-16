@@ -17,11 +17,13 @@ Abstract:
 #include "WSLCCLITestHelpers.h"
 
 #include "APICompat.h"
+#include "COMCallbackTracker.h"
 #include "InputChannel.h"
 #include "OutputChannel.h"
 #include "DiagnosticCallback.h"
 #include "Terminal.h"
 #include "WSLCDiagnostics.h"
+#include <future>
 #include <thread>
 
 using namespace wsl::windows::wslc;
@@ -541,6 +543,85 @@ class WSLCCLITerminalUnitTests
         VERIFY_ARE_EQUAL(size_t{3}, callbackScopeCount);
         VERIFY_ARE_EQUAL(size_t{2}, callback.DiagnosticCount);
         VERIFY_ARE_EQUAL(std::wstring{L"value=1"}, callback.LastMessage);
+    }
+
+    TEST_METHOD(COMCallbackTracker_TracksRegistrationBeforeInvocation)
+    {
+        wsl::windows::common::COMCallbackTracker callbacks;
+        callbacks.Register();
+        auto unregister = wil::scope_exit([&]() { callbacks.Unregister(GetCurrentThreadId()); });
+
+        callbacks.BeginShutdown();
+        VERIFY_IS_FALSE(callbacks.CancelPending());
+        VERIFY_ARE_EQUAL(E_ABORT, wil::ResultFromException([&]() { callbacks.Register(); }));
+
+        callbacks.Unregister(GetCurrentThreadId());
+        unregister.release();
+        VERIFY_IS_TRUE(callbacks.CancelPending());
+    }
+
+    TEST_METHOD(COMCallbackTracker_DrainsNestedRegistrations)
+    {
+        wsl::windows::common::COMCallbackTracker callbacks;
+        callbacks.Register();
+        auto unregisterOuter = wil::scope_exit([&]() { callbacks.Unregister(GetCurrentThreadId()); });
+        {
+            callbacks.Register();
+            auto unregisterInner = wil::scope_exit([&]() { callbacks.Unregister(GetCurrentThreadId()); });
+            callbacks.BeginShutdown();
+            VERIFY_IS_FALSE(callbacks.CancelPending());
+        }
+
+        VERIFY_IS_FALSE(callbacks.CancelPending());
+        callbacks.Unregister(GetCurrentThreadId());
+        unregisterOuter.release();
+        VERIFY_IS_TRUE(callbacks.CancelPending());
+    }
+
+    TEST_METHOD(COMCallbackTracker_ShutdownWaitsForRegistrationGap)
+    {
+        wsl::windows::common::COMCallbackTracker callbacks;
+        wil::unique_event invoke{wil::EventOptions::ManualReset};
+        std::promise<HRESULT> registrationResult;
+        std::thread callbackThread([&]() {
+            wil::unique_couninitialize_call comInitialize;
+            const auto result = wil::ResultFromException([&]() {
+                comInitialize = wil::CoInitializeEx(COINIT_MULTITHREADED);
+                callbacks.Register();
+            });
+            registrationResult.set_value(result);
+            if (SUCCEEDED(result))
+            {
+                invoke.wait();
+                callbacks.Unregister(GetCurrentThreadId());
+            }
+        });
+        auto joinCallback = wil::scope_exit([&]() {
+            invoke.SetEvent();
+            callbackThread.join();
+        });
+
+        auto registrationFuture = registrationResult.get_future();
+        VERIFY_ARE_EQUAL(std::future_status::ready, registrationFuture.wait_for(std::chrono::seconds(60)));
+        VERIFY_SUCCEEDED(registrationFuture.get());
+        callbacks.BeginShutdown();
+        VERIFY_IS_FALSE(callbacks.CancelPending());
+
+        std::promise<void> shutdownResult;
+        std::thread shutdownThread([&]() {
+            callbacks.CancelAndWait();
+            shutdownResult.set_value();
+        });
+        auto joinShutdown = wil::scope_exit([&]() {
+            invoke.SetEvent();
+            shutdownThread.join();
+        });
+
+        auto shutdownFuture = shutdownResult.get_future();
+        VERIFY_ARE_EQUAL(std::future_status::timeout, shutdownFuture.wait_for(std::chrono::milliseconds(100)));
+        invoke.SetEvent();
+        VERIFY_ARE_EQUAL(std::future_status::ready, shutdownFuture.wait_for(std::chrono::seconds(60)));
+        VERIFY_IS_TRUE(callbacks.CancelPending());
     }
 
     TEST_METHOD(DiagnosticReporter_RejectsInvalidEvents)

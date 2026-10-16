@@ -38,6 +38,8 @@ using wsl::windows::common::WSLCProcessLauncher;
 using wsl::windows::common::io::OverlappedIOHandle;
 using wsl::windows::common::io::WriteHandle;
 using namespace wsl::windows::common::wslutil;
+using WSLCE2ETests::KillVmByOwner;
+using WSLCE2ETests::ListVms;
 using WSLCE2ETests::StartLocalRegistry;
 
 extern std::wstring g_testDataPath;
@@ -572,46 +574,6 @@ class WSLCTests
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->GetId(nullptr));
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->GetDisplayName(nullptr));
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->GetState(nullptr));
-    }
-
-    struct VmInfo
-    {
-        std::wstring Id;
-        std::wstring Owner;
-    };
-
-    // Returns VM info (Id + Owner) for all compute systems via the HCS API.
-    static std::vector<VmInfo> ListVms()
-    {
-        const wsl::windows::common::ExecutionContext context(wsl::windows::common::Context::HCS);
-
-        auto operation = wsl::windows::common::hcs::CreateOperation();
-        THROW_IF_FAILED(::HcsEnumerateComputeSystems(L"{}", operation.get()));
-
-        wil::unique_cotaskmem_string resultDocument;
-        const auto result = ::HcsWaitForOperationResult(operation.get(), 10000, &resultDocument);
-        THROW_IF_FAILED_MSG(result, "HcsEnumerateComputeSystems failed (error: %ls)", resultDocument.get());
-
-        LogInfo("HcsEnumerateComputeSystems result='%ws'", resultDocument.get());
-
-        std::vector<VmInfo> vms;
-        const auto json = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(resultDocument.get()));
-        if (!json.is_array())
-        {
-            return vms;
-        }
-
-        for (const auto& entry : json)
-        {
-            if (entry.contains("Owner") && entry["Owner"].is_string() && entry.contains("Id") && entry["Id"].is_string())
-            {
-                vms.push_back(
-                    {wsl::shared::string::MultiByteToWide(entry["Id"].get<std::string>()),
-                     wsl::shared::string::MultiByteToWide(entry["Owner"].get<std::string>())});
-            }
-        }
-
-        return vms;
     }
 
     WSLC_TEST_METHOD(VmOwnerMatchesSessionDisplayName)
@@ -6761,6 +6723,13 @@ class WSLCTests
 
         // Validate error paths
         {
+            WSLCContainerLauncher launcher("debian:latest", "/invalid-name", {"/bin/cat"});
+            auto [hresult, container] = launcher.CreateNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(hresult, E_INVALIDARG);
+            ValidateCOMErrorMessage(L"Invalid name: '/invalid-name'");
+        }
+
+        {
             WSLCContainerLauncher launcher("debian:latest", std::string(WSLC_MAX_CONTAINER_NAME_LENGTH + 1, 'a'), {"/bin/cat"});
             auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(hresult, E_INVALIDARG);
@@ -8507,12 +8476,26 @@ class WSLCTests
             // Validate that the container can be opened by name.
             expectOpen("named-container");
 
+            // Validate that the "/name" form returned by inspect can be opened.
+            auto openedByName = expectOpen(container->Inspect().Name.c_str());
+            WSLCContainerId openedId{};
+            VERIFY_SUCCEEDED(openedByName->GetId(openedId));
+            VERIFY_ARE_EQUAL(container->Id(), std::string{openedId});
+
             // Validate that the container can be opened by ID.
             expectOpen(container->Id().c_str());
 
             // Validate that the container can be opened by a prefix of the ID.
             expectOpen(container->Id().substr(0, 8).c_str());
             expectOpen(container->Id().substr(0, 1).c_str());
+
+            // A single leading slash is ignored, so slash-prefixed IDs and ID prefixes also resolve.
+            for (const auto& reference : {"/" + container->Id(), "/" + container->Id().substr(0, 8)})
+            {
+                auto opened = expectOpen(reference.c_str());
+                VERIFY_SUCCEEDED(opened->GetId(openedId));
+                VERIFY_ARE_EQUAL(container->Id(), std::string{openedId});
+            }
 
             // Validate that prefix conflicts are correctly handled.
             std::vector<RunningWSLCContainer> createdContainers;
@@ -8552,6 +8535,17 @@ class WSLCTests
             }
         }
 
+        // Validate that a maximum-length name can be opened with and without a leading slash.
+        {
+            const std::string name(WSLC_MAX_CONTAINER_NAME_LENGTH, 'a');
+            WSLCContainerLauncher launcher("debian:latest", name, {"echo", "OK"});
+            auto [result, container] = launcher.CreateNoThrow(*m_defaultSession);
+            VERIFY_SUCCEEDED(result);
+
+            expectOpen(name.c_str());
+            expectOpen(("/" + name).c_str());
+        }
+
         // Test error paths
         {
             // A null id and a null output pointer are rejected by the marshaller.
@@ -8566,6 +8560,9 @@ class WSLCTests
 
             expectOpen("non-existing-container", WSLC_E_CONTAINER_NOT_FOUND);
             ValidateCOMErrorMessage(L"Container 'non-existing-container' not found.");
+
+            expectOpen("/non-existing-container", WSLC_E_CONTAINER_NOT_FOUND);
+            ValidateCOMErrorMessage(L"Container '/non-existing-container' not found.");
 
             expectOpen("/", E_INVALIDARG);
             ValidateCOMErrorMessage(L"Invalid name: '/'");
@@ -12993,6 +12990,56 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(SessionCleanupWaitsForHostExit)
+    {
+        const auto manager = OpenSessionManager();
+        const auto settings = GetDefaultSessionSettings(L"session-cleanup-host-exit");
+
+        for (const auto flags : {WSLCSessionFlagsNone, WSLCSessionFlagsPersistent})
+        {
+            auto session = CreateSession(settings, flags);
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                if (session)
+                {
+                    LOG_IF_FAILED(session->Terminate());
+                }
+
+                wil::unique_cotaskmem_array_ptr<WSLCSessionListEntry> sessions;
+                LOG_IF_FAILED(manager->ListSessions(&sessions, sessions.size_address<ULONG>()));
+            });
+
+            wil::unique_handle hostProcess;
+            VERIFY_SUCCEEDED(session->GetProcessHandle(&hostProcess));
+            ULONG id{};
+            VERIFY_SUCCEEDED(session->GetId(&id));
+
+            // Keep the terminated session's client reference so its host cannot exit.
+            VERIFY_SUCCEEDED(session->Terminate());
+
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(hostProcess.get(), 1000));
+            VERIFY_IS_FALSE(ListTestSessionNames(manager.get()).contains(settings.DisplayName));
+
+            WSLCSessionState state{};
+            VERIFY_SUCCEEDED(session->GetState(&state));
+            VERIFY_ARE_EQUAL(WSLCSessionStateTerminated, state);
+
+            wil::com_ptr<IWSLCSession> opened;
+            VERIFY_ARE_EQUAL(WSLC_E_SESSION_NOT_FOUND, manager->OpenSession(id, &opened));
+            VERIFY_ARE_EQUAL(WSLC_E_SESSION_NOT_FOUND, manager->OpenSessionByName(settings.DisplayName, &opened));
+
+            // Validate that the session can be recreated under the same name.
+            auto replacement = CreateSession(settings);
+            ULONG replacementId{};
+            VERIFY_SUCCEEDED(replacement->GetId(&replacementId));
+            VERIFY_ARE_NOT_EQUAL(id, replacementId);
+
+            // Validate that releasing the final client reference lets the host exit.
+            session.reset();
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(hostProcess.get(), 60 * 1000));
+            VERIFY_IS_TRUE(ListTestSessionNames(manager.get()).contains(settings.DisplayName));
+        }
+    }
+
     static void ValidateHandleOutput(HANDLE handle, const std::string& expectedOutput)
     {
         VERIFY_ARE_EQUAL(EscapeString(expectedOutput), EscapeString(ReadToString(handle)));
@@ -13834,11 +13881,15 @@ class WSLCTests
         expectInvalidArg("?foo");
         expectInvalidArg("?foo&bar");
         expectInvalidArg("/url/path");
+        expectInvalidArg("//container");
+        expectInvalidArg("/container/");
+        expectInvalidArg("/?foo");
         expectInvalidArg("");
         expectInvalidArg("\\escaped\n\\chars");
 
         std::string longName(WSLC_MAX_CONTAINER_NAME_LENGTH + 1, 'a');
         expectInvalidArg(longName);
+        expectInvalidArg("/" + longName);
 
         auto expectInvalidPull = [&](const char* name) {
             VERIFY_ARE_EQUAL(m_defaultSession->PullImage(name, nullptr, FALSE, nullptr, nullptr), E_INVALIDARG);
@@ -14839,22 +14890,6 @@ class WSLCTests
         ValidateProcessOutput(initProcess, {{1, "OK\n"}});
     }
 
-    // Kills all VMs matching the given owner name via hcsdiag.
-    static void KillVmByOwner(const std::wstring& owner)
-    {
-        bool found = false;
-        for (const auto& vm : ListVms())
-        {
-            if (vm.Owner == owner)
-            {
-                found = true;
-                VERIFY_ARE_EQUAL(wsl::windows::common::SubProcess(nullptr, std::format(L"hcsdiag.exe kill {}", vm.Id).c_str()).Run(10000), 0u);
-            }
-        }
-
-        VERIFY_IS_TRUE(found, std::format(L"VM with owner '{}' not found", owner).c_str());
-    }
-
     // Waits for a session to report the terminated state.
     static void WaitForSessionTermination(IWSLCSession* session)
     {
@@ -15344,6 +15379,39 @@ class WSLCTests
         auto creationFuture = creationResult.get_future();
         VERIFY_ARE_EQUAL(std::future_status::ready, creationFuture.wait_for(std::chrono::seconds(60)));
         VERIFY_SUCCEEDED(creationFuture.get());
+    }
+
+    WSLC_TEST_METHOD(DiagnosticCallbackSessionManagerShutdownCancellation)
+    {
+        SKIP_TEST_SERVER();
+
+        for (const bool blockQuery : {true, false})
+        {
+            auto manager = OpenSessionManager();
+            auto settings = GetDefaultSessionSettings(L"diagnostic-manager-shutdown");
+            auto callback = Microsoft::WRL::Make<BlockingDiagnosticCallback>(blockQuery, WSLC_DIAG_CODE_SESSION_CREATION_STARTED);
+            wil::com_ptr<IWSLCSession> session;
+            std::promise<HRESULT> creationResult;
+            std::thread creationThread([&]() {
+                creationResult.set_value(manager->CreateSession(&settings, WSLCSessionFlagsNone, callback.Get(), &session));
+            });
+            auto joinCreation = wil::scope_exit([&]() {
+                callback->Unblock.SetEvent();
+                creationThread.join();
+            });
+
+            VERIFY_IS_TRUE(callback->Reached.wait(60000));
+            StopWslService();
+            auto creationFuture = creationResult.get_future();
+            VERIFY_ARE_EQUAL(std::future_status::ready, creationFuture.wait_for(std::chrono::seconds(60)));
+            LogInfo("CreateSession returned 0x%08x during service shutdown", creationFuture.get());
+            callback->Unblock.SetEvent();
+            VERIFY_IS_TRUE(callback->Returned.wait(60000));
+            creationThread.join();
+            joinCreation.release();
+            session.reset();
+            ResetTestSession();
+        }
     }
 
     WSLC_TEST_METHOD(DiagnosticCallbackStuckCallbackCancellation)

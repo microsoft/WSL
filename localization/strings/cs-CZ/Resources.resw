@@ -919,6 +919,14 @@ Návrat k sítím NAT.</value>
     <value>Protokol IPv6 je na hostiteli zakázán nepodporovaným způsobem (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>Mirrored networking is using a smaller ephemeral port range ({} ports instead of {}). This may limit the number of simultaneous connections.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>Mirrored networking could not reserve the minimum contiguous range of {} TCP and UDP ports. Check Windows port usage and exclusions.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Brána firewall technologie Hyper-V není podporována.</value>
   </data>
@@ -2675,14 +2683,6 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
   <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
     <value>Kopíruje soubory mezi kontejnerem a místním systémem souborů.</value>
   </data>
-  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
-    <value>Kopírujte soubory mezi kontejnerem a místním systémem souborů.
-Použití: wslc container cp [OPTIONS] SOURCE DEST
-  Z místního prostředí do kontejneru: wslc container cp LOCAL_PATH CONTAINER:PATH
-  Z kontejneru do místního prostředí: wslc container cp CONTAINER:PATH LOCAL_PATH
-  Ze stdin do kontejneru: wslc container cp - CONTAINER:PATH</value>
-    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
-  </data>
   <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
     <value>Zdroj: místní cesta, CONTAINER:PATH nebo '-' pro stdin</value>
     <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
@@ -3289,6 +3289,10 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Možnost {} není podporovaná.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
+    <value>Neplatný režim '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
     <value>Je nutné zadat cíl připojení.</value>
   </data>
@@ -3875,28 +3879,25 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Kontejner nelze exportovat do terminálu. Použijte možnost -o nebo přesměrujte stdout.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>Očekávaný formát: &lt;cesta k hostiteli | pojmenovaný svazek&gt;:&lt;cesta ke kontejneru&gt;[:mode]</value>
+    <value>Očekávaný formát: [&lt;host path | named volume&gt;:]&lt;container path&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
-  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>Neplatné specifikace svazku: {}. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
+    <value>Neplatná specifikace svazku: '{}'. {} {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>Neplatné specifikace svazku: {}. Cesta k hostiteli nemůže být prázdná. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
+    <value>Specifikace svazku je prázdná.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
-    <value>Neplatné specifikace svazku: {}. Cesta ke kontejneru nemůže být prázdná. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
+    <value>Specifikace svazku obsahuje prázdný oddíl mezi dvojtečkami.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
-    <value>Neplatné specifikace svazku: {}. Cesta ke kontejneru musí být absolutní cesta (začínající na /). {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
+    <value>Specifikace svazku obsahuje příliš mnoho dvojteček.</value>
   </data>
-  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
-    <value>Neplatné specifikace svazku: {}. Cesta k hostiteli {} není platná cesta systému Windows.</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
+    <value>Cesta k hostiteli {} není platná cesta systému Windows.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
     <value>Název nebo ID libovolného typu objektu</value>

@@ -26,6 +26,7 @@ Abstract:
 #include "DockerHTTPClient.h"
 #include "EventStore.h"
 #include "IORelay.h"
+#include "COMCallbackTracker.h"
 #include <atomic>
 #include <list>
 #include <optional>
@@ -323,7 +324,6 @@ private:
     }
 
     __requires_lock_held(m_userHandlesLock) void CancelUserHandleIO();
-    __requires_lock_held(m_userCOMCallbacksLock) void CancelUserCOMCallbacks();
 
     void CreateContainerImpl(const WSLCContainerOptions* Options, IWSLCContainer** Container);
 
@@ -432,6 +432,9 @@ private:
     std::function<void()> m_destructionCallback;
     std::atomic<bool> m_terminating{false};
 
+    // Signals that the winning Terminate() call has finished, including cleanup or failure.
+    wil::unique_event m_terminationCompleteEvent{wil::EventOptions::ManualReset};
+
     wil::com_ptr<IWSLCPluginNotifier> m_pluginNotifier;
 
     // Bounded in-memory ring of recent lifecycle events, shared by all event-stream subscribers.
@@ -456,8 +459,7 @@ private:
     __guarded_by(m_userHandlesLock) std::vector<HANDLE> m_userHandles;
 
     // Threads currently inside an outgoing COM callback (e.g. IProgressCallback::OnProgress).
-    std::recursive_mutex m_userCOMCallbacksLock;
-    __guarded_by(m_userCOMCallbacksLock) std::map<DWORD, int> m_userCOMCallbackThreads;
+    wsl::windows::common::COMCallbackTracker m_userCOMCallbacks;
 
     // Callbacks registered via RegisterCrashDumpCallback. std::list gives stable iterators that
     // survive insertions and unrelated erasures, so each CrashDumpSubscription stashes its own

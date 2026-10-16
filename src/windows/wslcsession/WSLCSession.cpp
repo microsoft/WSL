@@ -120,10 +120,11 @@ std::string IndentLines(const std::string& input, const std::string& prefix, boo
     return result;
 }
 
-void ValidateName(LPCSTR Name, size_t maxLength)
+void ValidateName(LPCSTR Name, size_t maxLength, bool allowLeadingSlash = false)
 {
     const auto& locale = std::locale::classic();
-    size_t i = 0;
+    const size_t start = allowLeadingSlash && Name[0] == '/' ? 1 : 0;
+    size_t i = start;
 
     for (; Name[i] != '\0'; i++)
     {
@@ -133,7 +134,7 @@ void ValidateName(LPCSTR Name, size_t maxLength)
         }
     }
 
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidName(Name), i == 0 || i > maxLength);
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidName(Name), i == start || i - start > maxLength);
 }
 
 wslc_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage& dockerInspect)
@@ -337,8 +338,6 @@ void UserCOMCallback::Reset() noexcept
 
         m_session->UnregisterUserCOMCallback(m_threadId);
         m_threadId = 0;
-
-        LOG_IF_FAILED(CoDisableCallCancellation(nullptr));
     }
 }
 
@@ -352,7 +351,7 @@ try
 {
     RETURN_HR_IF_NULL(E_POINTER, ProcessHandle);
 
-    *ProcessHandle = wslutil::DuplicateHandle(GetCurrentProcess(), PROCESS_SET_QUOTA | PROCESS_TERMINATE);
+    *ProcessHandle = wslutil::DuplicateHandle(GetCurrentProcess(), PROCESS_SET_QUOTA | PROCESS_TERMINATE | SYNCHRONIZE);
     return S_OK;
 }
 CATCH_RETURN();
@@ -570,6 +569,13 @@ WSLCSession::~WSLCSession()
     WSL_LOG("SessionTerminated", TraceLoggingValue(m_id, "SessionId"), TraceLoggingValue(m_displayName.c_str(), "DisplayName"));
 
     LOG_IF_FAILED(Terminate());
+
+    // Wait for any relay-driven termination to complete before returning from the destructor.
+    m_terminationCompleteEvent.wait();
+    if (auto* relay = m_runtime.Relay())
+    {
+        relay->Stop();
+    }
 
     if (m_destructionCallback)
     {
@@ -2665,7 +2671,9 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Id);
     RETURN_HR_IF_NULL(E_POINTER, Container);
 
-    ValidateName(Id, WSLC_MAX_CONTAINER_NAME_LENGTH);
+    // Accept the "/name" form returned by inspect, but strip the slash since it can't be passed in the Docker URL path.
+    ValidateName(Id, WSLC_MAX_CONTAINER_NAME_LENGTH, true);
+    const auto lookupId = CleanContainerName(Id);
 
     // Look for an exact ID match first.
     auto lock = AcquireLease();
@@ -2673,7 +2681,7 @@ try
 
     // Purge containers that were auto-deleted via OnEvent (--rm).
     std::erase_if(m_containers, [](const auto& entry) { return entry.second->State() == WslcContainerStateDeleted; });
-    auto it = m_containers.find(Id);
+    auto it = m_containers.find(lookupId);
 
     // If no match is found, call Inspect() so that partial IDs and names are matched.
     if (it == m_containers.end())
@@ -2683,7 +2691,7 @@ try
 
         try
         {
-            inspectResult = m_runtime.Docker().InspectContainer(Id);
+            inspectResult = m_runtime.Docker().InspectContainer(lookupId);
         }
         catch (DockerHTTPException& e)
         {
@@ -3622,12 +3630,15 @@ try
         return S_OK;
     }
 
+    auto terminationComplete = m_terminationCompleteEvent.SetEvent_scope_exit();
     wil::rwlock_release_exclusive_scope_exit sessionLock;
+    m_userCOMCallbacks.BeginShutdown();
 
     // Because it's not possible to synchronize CancelIoEx() with ReadFile() calls, keep attempting to acquire the session lock while cancelling IO & callbacks.
     // This is required because calling CancelIoEx() between two ReadFile() calls does nothing, and therefore could still allow another thread to get stuck doing synchronous IO.
     bool retrying = false;
-    while (!sessionLock)
+    bool callbacksDrained = false;
+    while (!sessionLock || !callbacksDrained)
     {
         // If this isn't the first iteration, sleep to prevent this loop from burning too much CPU.
         if (retrying)
@@ -3654,15 +3665,12 @@ try
             CancelUserHandleIO();
         }
 
+        // A registered callback can enter COM after an earlier cancellation attempt.
+        callbacksDrained = m_userCOMCallbacks.CancelPending();
+        if (callbacksDrained)
         {
-            std::lock_guard comLock(m_userCOMCallbacksLock);
-
-            // Cancel any pending outgoing COM callback calls (e.g. IProgressCallback::OnProgress)
-            // to unblock operations waiting for cross-process COM responses.
-            CancelUserCOMCallbacks();
+            sessionLock = m_runtime.TryLockExclusive();
         }
-
-        sessionLock = m_runtime.TryLockExclusive();
         retrying = true;
     }
 
@@ -4118,54 +4126,13 @@ void WSLCSession::CancelUserHandleIO()
 
 UserCOMCallback WSLCSession::RegisterUserCOMCallback()
 {
-    std::lock_guard lock(m_userCOMCallbacksLock);
-
-    // Don't allow new COM calls if the session is terminating.
-    // N.B. This check must happen under m_userCOMCallbacksLock to synchronize with Terminate().
-    THROW_HR_IF_MSG(
-        E_ABORT, m_sessionTerminatingEvent.is_signaled(), "Refusing to make a COM callback while the session is terminating.");
-
-    THROW_IF_FAILED(CoEnableCallCancellation(nullptr));
-
-    auto threadId = GetCurrentThreadId();
-    auto it = m_userCOMCallbackThreads.find(threadId);
-    WI_VERIFY(it == m_userCOMCallbackThreads.end() || it->second > 0);
-
-    if (it == m_userCOMCallbackThreads.end())
-    {
-        m_userCOMCallbackThreads.insert({threadId, 1});
-    }
-    else
-    {
-        it->second++;
-    }
-
+    m_userCOMCallbacks.Register();
     return UserCOMCallback{*this};
 }
 
 void WSLCSession::UnregisterUserCOMCallback(DWORD ThreadId)
 {
-    std::lock_guard lock(m_userCOMCallbacksLock);
-
-    auto it = m_userCOMCallbackThreads.find(ThreadId);
-    WI_VERIFY(it != m_userCOMCallbackThreads.end() && it->second > 0);
-
-    if (it->second > 1)
-    {
-        it->second--;
-    }
-    else
-    {
-        m_userCOMCallbackThreads.erase(it);
-    }
-}
-
-void WSLCSession::CancelUserCOMCallbacks()
-{
-    for (auto threadId : std::views::keys(m_userCOMCallbackThreads))
-    {
-        LOG_IF_FAILED(CoCancelCall(threadId, 0));
-    }
+    m_userCOMCallbacks.Unregister(ThreadId);
 }
 
 void WSLCSession::OnContainerDeleted(const WSLCContainerImpl* Container)

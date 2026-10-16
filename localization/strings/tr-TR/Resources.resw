@@ -919,6 +919,14 @@ NAT ağ bağlantısına geri dönülüyor.</value>
     <value>IPv6, ana bilgisayarda desteklenmeyen bir şekilde devre dışı bırakıldı (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>Yansıtılmış ağ, daha küçük bir geçici bağlantı noktası aralığı kullanıyor ({} yerine {} bağlantı noktası). Bu, eşzamanlı bağlantı sayısını sınırlayabilir.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>Mirrored networking could not reserve the minimum contiguous range of {} TCP and UDP ports. Check Windows port usage and exclusions.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Hyper-V güvenlik duvarı desteklenmiyor</value>
   </data>
@@ -2675,14 +2683,6 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
     <value>Dosyaları bir kapsayıcı ile yerel dosya sistemi arasında kopyalar.</value>
   </data>
-  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
-    <value>Bir kapsayıcı ile yerel dosya sistemi arasında dosya kopyalayın.
-Kullanım: wslc container cp [OPTIONS] SOURCE DEST
-  Yerelden kapsayıcıya: wslc container cp LOCAL_PATH CONTAINER:PATH
-  Kapsayıcıdan yerele: wslc container cp CONTAINER:PATH LOCAL_PATH
-  Stdin’dan kapsayıcıya: wslc container cp - CONTAINER:PATH</value>
-    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
-  </data>
   <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
     <value>Kaynak: yerel yol, CONTAINER:PATH veya stdin için '-'</value>
     <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
@@ -3289,6 +3289,10 @@ Windows sürümü: {}</value>
     <value>'{}' seçeneği desteklenmiyor.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
+    <value>Geçersiz mod '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
     <value>Bağlama hedefi gereklidir.</value>
   </data>
@@ -3875,28 +3879,25 @@ Windows sürümü: {}</value>
     <value>Kapsayıcı terminale aktarılamıyor. -o seçeneğini kullanın veya stdout'u yeniden yönlendirin.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>Beklenen biçim: &lt;ana bilgisayar yolu | adlandırılmış birim&gt;:&lt;kapsayıcı yolu&gt;[:mode]</value>
+    <value>Beklenen biçim: [&lt;ana bilgisayar yolu | adlandırılmış birim&gt;:]&lt;kapsayıcı yolu&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
-  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>Geçersiz birim belirtimleri: '{}'. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
+    <value>Geçersiz birim belirtimi: '{}'. {} {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>Geçersiz birim belirtimleri: '{}'. Konak yolu boş olamaz. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
+    <value>Birim belirtimi boş.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
-    <value>Geçersiz birim belirtimleri: '{}'. Kapsayıcı yolu boş olamaz. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
+    <value>Birim belirtimi, iki nokta üst üste işaretleri arasında boş bir bölüm içeriyor.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
-    <value>Geçersiz birim belirtimleri: '{}'. Kapsayıcı yolu mutlak bir yol olmalıdır ('/' ile başlayan). {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
+    <value>Birim belirtiminde çok fazla iki nokta üst üste var.</value>
   </data>
-  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
-    <value>Geçersiz birim belirtimleri: '{}'. '{}' konak yolu geçerli bir Windows yolu değil.</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
+    <value>'{}' konak yolu geçerli bir Windows yolu değil.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
     <value>Herhangi bir nesne türünün adı veya kimliği</value>

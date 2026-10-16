@@ -38,6 +38,7 @@ using wsl::windows::common::io::HTTPChunkBasedReadHandle;
 using wsl::windows::common::io::OverlappedIOHandle;
 using wsl::windows::common::io::ReadHandle;
 using wsl::windows::common::io::RelayHandle;
+using wsl::windows::service::wslc::CleanContainerName;
 using wsl::windows::service::wslc::ContainerEvent;
 using wsl::windows::service::wslc::ContainerPortMapping;
 using wsl::windows::service::wslc::DockerEventTracker;
@@ -535,17 +536,6 @@ std::string_view ContainerEventToString(ContainerEvent event)
     }
 }
 
-std::string CleanContainerName(const std::string& name)
-{
-    // Docker container names have a leading '/', strip it.
-    if (!name.empty() && name[0] == '/')
-    {
-        return name.substr(1);
-    }
-
-    return name;
-}
-
 std::string ExtractContainerName(const std::vector<std::string>& names, const std::string& id)
 {
     if (names.empty())
@@ -634,6 +624,11 @@ std::vector<wsl::windows::common::mount::Spec> ConvertAndValidateMounts(const WS
             i);
         THROW_HR_IF_MSG(
             E_INVALIDARG,
+            type != WSLCMountTypeVolume && WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsConfigVolume),
+            "Mount at index %lu specifies config-volume for a non-volume mount",
+            i);
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
             type != WSLCMountTypeTmpfs && value.TmpfsOptions != nullptr,
             "Mount at index %lu specifies tmpfs options for a non-tmpfs mount",
             i);
@@ -653,6 +648,7 @@ std::vector<wsl::windows::common::mount::Spec> ConvertAndValidateMounts(const WS
             .TmpfsSizeBytes = WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsTmpfsSize) ? std::optional<int64_t>{value.TmpfsSizeBytes} : std::nullopt,
             .TmpfsMode = WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsTmpfsMode) ? std::optional<uint32_t>{value.TmpfsMode} : std::nullopt,
             .TmpfsOptions = value.TmpfsOptions != nullptr ? std::optional<std::string>{value.TmpfsOptions} : std::nullopt,
+            .ConfigVolume = WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsConfigVolume),
         });
     }
 
@@ -706,7 +702,10 @@ std::vector<wsl::windows::common::mount::Spec> ConvertAndValidateMounts(const WS
 
     for (const auto& mount : mounts)
     {
-        addDestination(mount.Target.c_str());
+        if (!mount.ConfigVolume)
+        {
+            addDestination(mount.Target.c_str());
+        }
     }
 
     THROW_HR_IF(E_INVALIDARG, containerOptions.VolumesCount > 0 && containerOptions.Volumes == nullptr);
@@ -804,6 +803,17 @@ void ProcessNamedVolumes(const WSLCContainerOptions& containerOptions, wsl::wind
 }
 
 } // namespace
+
+std::string wsl::windows::service::wslc::CleanContainerName(const std::string& name)
+{
+    // Docker container names have a leading '/', strip it.
+    if (!name.empty() && name[0] == '/')
+    {
+        return name.substr(1);
+    }
+
+    return name;
+}
 
 ContainerPortMapping::ContainerPortMapping(VMPortMapping&& VmMapping, uint16_t ContainerPort) :
     VmMapping(std::move(VmMapping)), ContainerPort(ContainerPort)
@@ -1192,7 +1202,12 @@ void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProc
 
     if (!m_runtimeResourcesHeld)
     {
-        MountVolumes(m_mountedVolumes, m_runtime.Vm()).release();
+        // An in-flight archive operation may already hold the mounts; adopt them in that case.
+        if (m_archiveMountUsers == 0)
+        {
+            MountVolumes(m_mountedVolumes, m_runtime.Vm()).release();
+        }
+
         MapPorts();
         m_runtimeResourcesHeld = true;
     }
@@ -1923,8 +1938,40 @@ void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
     }
 }
 
-void WSLCContainerImpl::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize) const
+void WSLCContainerImpl::AcquireArchiveVolumeMounts()
 {
+    auto lock = m_lock.lock_exclusive();
+
+    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_DELETED, Localization::MessageWslcContainerDeleted(m_id), m_state == WslcContainerStateDeleted);
+
+    if (!m_runtimeResourcesHeld && m_archiveMountUsers == 0)
+    {
+        MountVolumes(m_mountedVolumes, m_runtime.Vm()).release();
+    }
+
+    m_archiveMountUsers++;
+}
+
+void WSLCContainerImpl::ReleaseArchiveVolumeMounts() noexcept
+try
+{
+    auto lock = m_lock.lock_exclusive();
+
+    WI_ASSERT(m_archiveMountUsers > 0);
+    m_archiveMountUsers--;
+
+    if (m_archiveMountUsers == 0 && !m_runtimeResourcesHeld)
+    {
+        UnmountVolumesLockHeld();
+    }
+}
+CATCH_LOG();
+
+void WSLCContainerImpl::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize)
+{
+    AcquireArchiveVolumeMounts();
+    auto releaseMounts = wil::scope_exit([this]() { ReleaseArchiveVolumeMounts(); });
+
     auto lock = m_lock.lock_shared();
 
     std::optional<uint64_t> contentLength;
@@ -1985,8 +2032,11 @@ void WSLCContainerImpl::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULO
     }
 }
 
-void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, BOOL FollowLink, WSLCHandle OutHandle) const
+void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, BOOL FollowLink, WSLCHandle OutHandle)
 {
+    AcquireArchiveVolumeMounts();
+    auto releaseMounts = wil::scope_exit([this]() { ReleaseArchiveVolumeMounts(); });
+
     auto lock = m_lock.lock_shared();
 
     std::string effectivePath(SrcPath);
@@ -2607,6 +2657,12 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     for (const auto& mount : mounts)
     {
+        if (mount.ConfigVolume)
+        {
+            request.Volumes[mount.Target] = {};
+            continue;
+        }
+
         common::docker_schema::Mount dockerMount{
             .Target = mount.Target,
             .ReadOnly = mount.ReadOnly,
@@ -3229,6 +3285,15 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ReleaseRuntimeRes
     // Release runtime resources (port relays, volume mounts) that were set up at Start().
     UnmapPorts();
 
+    // An in-flight archive operation still needs the mounts and unmounts them once it completes.
+    if (m_archiveMountUsers == 0)
+    {
+        UnmountVolumesLockHeld();
+    }
+}
+
+__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::UnmountVolumesLockHeld()
+{
     // A VM that already exited (crash / external kill) has dropped every guest mount, so calling
     // UnmountWindowsFolder would only block on the RPC timeout and emit spurious unmount-failed
     // warnings. Mark the mounts inactive without touching the dead VM.
