@@ -14,15 +14,17 @@ Abstract:
 #include "ArgumentParser.h"
 #include "Localization.h"
 
+#include <algorithm>
+
 using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
-
 ParseArgumentsStateMachine::ParseArgumentsStateMachine(
-    Invocation& inv, ArgMap& execArgs, std::vector<Argument> arguments, bool optionsOnly, bool stopOnUnknown, const std::vector<Argument>& overridableDefaults) :
-    m_invocation(inv),
+    InvocationCursor& invocation, ArgMap& execArgs, std::vector<Argument> arguments, bool optionsOnly, bool stopOnUnknown, std::vector<Argument> inheritedGlobalArguments) :
+    m_invocation(invocation),
     m_executionArgs(execArgs),
     m_arguments(std::move(arguments)),
+    m_inheritedGlobalArguments(std::move(inheritedGlobalArguments)),
     m_invocationItr(m_invocation.begin()),
     m_optionsOnly(optionsOnly),
     m_stopOnUnknown(stopOnUnknown)
@@ -47,12 +49,6 @@ ParseArgumentsStateMachine::ParseArgumentsStateMachine(
     }
 
     m_positionalSearchItr = m_positionalArgs.begin();
-
-    m_overridableDefaults.reserve(overridableDefaults.size());
-    for (const auto& arg : overridableDefaults)
-    {
-        m_overridableDefaults.push_back(arg.Type());
-    }
 }
 
 bool ParseArgumentsStateMachine::Step()
@@ -111,25 +107,8 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::BackUpAndStop()
     return {};
 }
 
-bool ParseArgumentsStateMachine::ConsumeOverrideIfPresent(ArgType type)
-{
-    auto it = std::find(m_overridableDefaults.begin(), m_overridableDefaults.end(), type);
-    if (it == m_overridableDefaults.end())
-    {
-        return false;
-    }
-
-    m_executionArgs.Remove(type);
-    m_overridableDefaults.erase(it);
-    return true;
-}
-
 void ParseArgumentsStateMachine::ClearArgument(ArgType type)
 {
-    // Drop any preloaded overridable default and remove previously parsed entries so the
-    // argument is left absent. This is the single-value/last-wins primitive shared by
-    // SetFlag (which then stores the flag's explicit value) and AddValue (single-value args).
-    ConsumeOverrideIfPresent(type);
     m_executionArgs.Remove(type);
 }
 
@@ -142,6 +121,11 @@ void ParseArgumentsStateMachine::SetFlag(ArgType type, bool value)
     // folds the presence check and the stored value into one test, rather than a bare Contains().
     ClearArgument(type);
     m_executionArgs.Add(type, value);
+
+    if (type == ArgType::Help && value)
+    {
+        m_stopped = true;
+    }
 }
 
 std::wstring_view ParseArgumentsStateMachine::StripSurroundingQuotes(std::wstring_view value)
@@ -187,14 +171,8 @@ void ParseArgumentsStateMachine::AddValue(ArgType type, std::wstring value)
     const Argument* arg = FindArgument(type);
     WI_ASSERT(arg != nullptr);
 
-    // Unlimited value args accumulate; single-value args are last-wins. In both cases the
-    // first CLI value must displace a preloaded overridable default, which ClearArgument
-    // (single) and ConsumeOverrideIfPresent (unlimited) each handle.
-    if (arg != nullptr && arg->IsUnlimited())
-    {
-        ConsumeOverrideIfPresent(type);
-    }
-    else
+    // Unlimited value args accumulate; single-value args are last-wins.
+    if (arg == nullptr || arg->IsSingle())
     {
         ClearArgument(type);
     }
@@ -207,9 +185,9 @@ void ParseArgumentsStateMachine::AddValue(ArgType type, std::wstring value)
 //     a. Value: '-a=VALUE' / '-ab=VALUE' / '-a VALUE' / '-ab VALUE'
 //     b. Flag:  trailing chars are additional flags; fails if any is non-flag.
 //  2. Token starting with '--' is the full name: '--arg=VALUE' or '--arg VALUE'.
-//  3. Anything else is the next positional.
-//  4. Once a positional is seen, everything after stays positional.
-//  5. If only one positional is defined, everything after it is forwarded.
+//  3. A bare '-' or '--' is positional when a positional is available.
+//  4. Anything else is the next positional.
+//  5. Commands with forward arguments treat everything after the first positional as positional or forwarded.
 ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
 {
     auto currArg = std::wstring_view{*m_invocationItr};
@@ -222,10 +200,20 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
         return {};
     }
 
-    // Anchored: remaining tokens are positional or forwarded.
-    if (!m_forwardArgs.empty() && m_anchorPositional.has_value())
+    const bool matchesCommandOption =
+        std::ranges::any_of(m_arguments, [currArg](const auto& argument) { return argument.MatchesOption(currArg); });
+    const auto inheritedGlobalOption = matchesCommandOption ? nullptr : FindInheritedGlobalOption(currArg);
+
+    if (m_anchorPositional.has_value() && !m_forwardArgs.empty())
     {
         return ProcessAnchoredPositionals(currArg);
+    }
+
+    if (inheritedGlobalOption != nullptr)
+    {
+        const auto message = currArg.starts_with(L"--") ? Localization::WSLCCLI_InvalidNameError(currArg)
+                                                        : Localization::WSLCCLI_InvalidAliasError(currArg);
+        return ArgumentException::CreateUnknownOption(message, currArg);
     }
 
     // Arg does not begin with '-' so it is neither an alias nor a named value, must be positional.
@@ -233,21 +221,24 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
     {
         if (m_optionsOnly)
         {
-            // Options-only mode: stop cleanly at the first positional token without
-            // consuming it so the caller can resume parsing (e.g. subcommand resolution).
+            // Options-only mode leaves the cursor at the first positional token so the
+            // caller can resume parsing, such as for subcommand resolution.
             return BackUpAndStop();
         }
 
         return ProcessPositionalArgument(currArg);
     }
 
-    // The currentArg is non-empty, and starts with a -.
-    if (currArg.length() == 1)
+    // Bare option specifiers may be positional values such as stdin.
+    if (currArg == L"-" || currArg == L"--")
     {
         if (HasNextPositional())
         {
-            // The '-' character may be a valid positional argument value (ex: stdin), so treat this
-            // as a positional argument if there are any positionals left to fill.
+            if (m_optionsOnly)
+            {
+                return BackUpAndStop();
+            }
+
             return ProcessPositionalArgument(currArg);
         }
 
@@ -258,7 +249,8 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
             return BackUpAndStop();
         }
 
-        return ArgumentException(Localization::WSLCCLI_InvalidArgumentSpecifierError(currArg));
+        return currArg.length() == 1 ? ArgumentException(Localization::WSLCCLI_InvalidArgumentSpecifierError(currArg))
+                                     : ArgumentException(Localization::WSLCCLI_MissingArgumentNameError(currArg));
     }
 
     // Single '-' that is 2 characters or more means this must be an alias or collection of alias flags.
@@ -341,6 +333,13 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPos
     return {};
 }
 
+const Argument* ParseArgumentsStateMachine::FindInheritedGlobalOption(std::wstring_view token) const
+{
+    const auto argument =
+        std::ranges::find_if(m_inheritedGlobalArguments, [token](const auto& candidate) { return candidate.MatchesOption(token); });
+    return argument != m_inheritedGlobalArguments.end() ? &*argument : nullptr;
+}
+
 // Assumes argument begins with '-' and is at least 2 characters.
 ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgument(const std::wstring_view& currArg)
 {
@@ -379,7 +378,8 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
             return BackUpAndStop();
         }
 
-        return ArgumentException(Localization::WSLCCLI_InvalidAliasError(currArg));
+        const auto message = Localization::WSLCCLI_InvalidAliasError(currArg);
+        return m_anchorPositional.has_value() ? ArgumentException(message) : ArgumentException::CreateUnknownOption(message, currArg);
     }
 
     // Position after the first alias
@@ -530,7 +530,8 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessNamedArgume
         return BackUpAndStop();
     }
 
-    return ArgumentException(Localization::WSLCCLI_InvalidNameError(currArg));
+    const auto message = Localization::WSLCCLI_InvalidNameError(currArg);
+    return m_anchorPositional.has_value() ? ArgumentException(message) : ArgumentException::CreateUnknownOption(message, currArg);
 }
 
 void ParseArgumentsStateMachine::ProcessAdjoinedValue(ArgType type, std::wstring_view value)

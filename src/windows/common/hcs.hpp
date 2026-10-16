@@ -133,7 +133,7 @@ void RemoveDiskWithAccess(
 
 void RemoveScsiDisk(_In_ HCS_SYSTEM ComputeSystem, _In_ ULONG Lun);
 
-void RevokeVmAccess(_In_ PCWSTR VmId, _In_ PCWSTR FilePath);
+void RevokeVmAccess(_In_ PCWSTR VmId, _In_ PCWSTR FilePath, _In_opt_ HANDLE UserToken = nullptr);
 
 void StartComputeSystem(_In_ HCS_SYSTEM ComputeSystem, _In_ LPCWSTR Configuration);
 

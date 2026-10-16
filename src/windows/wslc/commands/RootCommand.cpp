@@ -28,7 +28,9 @@ using namespace wsl::windows::wslc::execution;
 using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
-std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
+
+using namespace wsl::windows::wslc::cli;
+std::vector<std::unique_ptr<Command>> RootCommand::CreateCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<ContainerCommand>(FullName()));
@@ -42,6 +44,7 @@ std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
     commands.push_back(std::make_unique<ImageBuildCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerCreateCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerExecCommand>(FullName()));
+    commands.push_back(std::make_unique<SystemEventsCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerExportCommand>(FullName()));
     commands.push_back(std::make_unique<ImageListCommand>(FullName(), true));
     commands.push_back(std::make_unique<ImageImportCommand>(FullName()));
@@ -75,21 +78,11 @@ std::vector<Argument> RootCommand::GetArguments() const
     };
 }
 
-// Global options apply to the overall invocation and may appear before any
-// subcommand (e.g. `wslc --session foo image list`). Define them here using
-// the Argument::Create factory backed by ArgumentDefinitions.h so help text,
-// aliases, validation, and parsing match subcommand arguments.
 std::vector<Argument> RootCommand::GetGlobalArguments() const
 {
     return {
-        Argument::Create(ArgType::Session),
-    };
-}
-
-std::vector<Argument> RootCommand::GetEnvArguments() const
-{
-    return {
-        Argument::Create(ArgType::NoColor),
+        CreateGlobalArgument(ArgType::Session),
+        CreateGlobalArgument(ArgType::NoColor, {.Flags = Flags::EnvironmentOnly}),
     };
 }
 
