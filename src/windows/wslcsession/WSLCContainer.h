@@ -37,6 +37,8 @@ class WSLCSessionRuntime;
 class WSLCVolumes;
 class EventStore;
 
+std::string CleanContainerName(const std::string& name);
+
 class unique_com_disconnect
 {
 public:

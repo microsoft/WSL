@@ -6723,6 +6723,13 @@ class WSLCTests
 
         // Validate error paths
         {
+            WSLCContainerLauncher launcher("debian:latest", "/invalid-name", {"/bin/cat"});
+            auto [hresult, container] = launcher.CreateNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(hresult, E_INVALIDARG);
+            ValidateCOMErrorMessage(L"Invalid name: '/invalid-name'");
+        }
+
+        {
             WSLCContainerLauncher launcher("debian:latest", std::string(WSLC_MAX_CONTAINER_NAME_LENGTH + 1, 'a'), {"/bin/cat"});
             auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(hresult, E_INVALIDARG);
@@ -8469,12 +8476,26 @@ class WSLCTests
             // Validate that the container can be opened by name.
             expectOpen("named-container");
 
+            // Validate that the "/name" form returned by inspect can be opened.
+            auto openedByName = expectOpen(container->Inspect().Name.c_str());
+            WSLCContainerId openedId{};
+            VERIFY_SUCCEEDED(openedByName->GetId(openedId));
+            VERIFY_ARE_EQUAL(container->Id(), std::string{openedId});
+
             // Validate that the container can be opened by ID.
             expectOpen(container->Id().c_str());
 
             // Validate that the container can be opened by a prefix of the ID.
             expectOpen(container->Id().substr(0, 8).c_str());
             expectOpen(container->Id().substr(0, 1).c_str());
+
+            // A single leading slash is ignored, so slash-prefixed IDs and ID prefixes also resolve.
+            for (const auto& reference : {"/" + container->Id(), "/" + container->Id().substr(0, 8)})
+            {
+                auto opened = expectOpen(reference.c_str());
+                VERIFY_SUCCEEDED(opened->GetId(openedId));
+                VERIFY_ARE_EQUAL(container->Id(), std::string{openedId});
+            }
 
             // Validate that prefix conflicts are correctly handled.
             std::vector<RunningWSLCContainer> createdContainers;
@@ -8514,6 +8535,17 @@ class WSLCTests
             }
         }
 
+        // Validate that a maximum-length name can be opened with and without a leading slash.
+        {
+            const std::string name(WSLC_MAX_CONTAINER_NAME_LENGTH, 'a');
+            WSLCContainerLauncher launcher("debian:latest", name, {"echo", "OK"});
+            auto [result, container] = launcher.CreateNoThrow(*m_defaultSession);
+            VERIFY_SUCCEEDED(result);
+
+            expectOpen(name.c_str());
+            expectOpen(("/" + name).c_str());
+        }
+
         // Test error paths
         {
             // A null id and a null output pointer are rejected by the marshaller.
@@ -8528,6 +8560,9 @@ class WSLCTests
 
             expectOpen("non-existing-container", WSLC_E_CONTAINER_NOT_FOUND);
             ValidateCOMErrorMessage(L"Container 'non-existing-container' not found.");
+
+            expectOpen("/non-existing-container", WSLC_E_CONTAINER_NOT_FOUND);
+            ValidateCOMErrorMessage(L"Container '/non-existing-container' not found.");
 
             expectOpen("/", E_INVALIDARG);
             ValidateCOMErrorMessage(L"Invalid name: '/'");
@@ -13846,11 +13881,15 @@ class WSLCTests
         expectInvalidArg("?foo");
         expectInvalidArg("?foo&bar");
         expectInvalidArg("/url/path");
+        expectInvalidArg("//container");
+        expectInvalidArg("/container/");
+        expectInvalidArg("/?foo");
         expectInvalidArg("");
         expectInvalidArg("\\escaped\n\\chars");
 
         std::string longName(WSLC_MAX_CONTAINER_NAME_LENGTH + 1, 'a');
         expectInvalidArg(longName);
+        expectInvalidArg("/" + longName);
 
         auto expectInvalidPull = [&](const char* name) {
             VERIFY_ARE_EQUAL(m_defaultSession->PullImage(name, nullptr, FALSE, nullptr, nullptr), E_INVALIDARG);

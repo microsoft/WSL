@@ -37,6 +37,7 @@ using wsl::windows::common::io::HTTPChunkBasedReadHandle;
 using wsl::windows::common::io::OverlappedIOHandle;
 using wsl::windows::common::io::ReadHandle;
 using wsl::windows::common::io::RelayHandle;
+using wsl::windows::service::wslc::CleanContainerName;
 using wsl::windows::service::wslc::ContainerPortMapping;
 using wsl::windows::service::wslc::DockerEventTracker;
 using wsl::windows::service::wslc::DockerHTTPClient;
@@ -489,16 +490,6 @@ std::string WSLCStateToEventAction(WSLCContainerState state)
         return "unknown";
     }
 }
-std::string CleanContainerName(const std::string& name)
-{
-    // Docker container names have a leading '/', strip it.
-    if (!name.empty() && name[0] == '/')
-    {
-        return name.substr(1);
-    }
-
-    return name;
-}
 
 std::string ExtractContainerName(const std::vector<std::string>& names, const std::string& id)
 {
@@ -767,6 +758,17 @@ void ProcessNamedVolumes(const WSLCContainerOptions& containerOptions, wsl::wind
 }
 
 } // namespace
+
+std::string wsl::windows::service::wslc::CleanContainerName(const std::string& name)
+{
+    // Docker container names have a leading '/', strip it.
+    if (!name.empty() && name[0] == '/')
+    {
+        return name.substr(1);
+    }
+
+    return name;
+}
 
 ContainerPortMapping::ContainerPortMapping(VMPortMapping&& VmMapping, uint16_t ContainerPort) :
     VmMapping(std::move(VmMapping)), ContainerPort(ContainerPort)
