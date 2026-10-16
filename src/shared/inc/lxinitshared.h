@@ -251,6 +251,12 @@ Abstract:
 
 #define LX_INIT_WSLC_GPU_HOOK "wsl-gpu-hook"
 
+#define LX_INIT_WSLC_GPU_START_HOOK "wsl-gpu-start-hook"
+
+// Where init is copied inside GPU containers, so that the startContainer hook can run it.
+#define LX_INIT_WSLC_GPU_START_HOOK_DIRECTORY "/.wslc-gpu-hook"
+#define LX_INIT_WSLC_GPU_START_HOOK_PATH LX_INIT_WSLC_GPU_START_HOOK_DIRECTORY "/init"
+
 #define LX_WSLC_CDI_KIND "microsoft.com/wslc"
 #define LX_WSLC_GPU_CDI_DEVICE LX_WSLC_CDI_KIND "=gpu"
 
