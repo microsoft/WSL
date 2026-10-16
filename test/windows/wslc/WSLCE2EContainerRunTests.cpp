@@ -829,6 +829,33 @@ class WSLCE2EContainerRunTests
         VerifyPseudoConsoleTtySize(session, columns, rows);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PseudoConsole_DetachSequenceIgnoresUnicodeLowBytes)
+    {
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto session = RunWslcInteractive(
+            std::format(L"container run -it --name {} {} cat", WslcContainerName, DebianImage.NameAndTag()),
+            ElevationType::Elevated,
+            PseudoConsole{120, 30});
+
+        // U+3010 and U+3011 have the same low bytes as the ctrl-p, ctrl-q detach sequence. They are written on
+        // their own so no other input follows them in the same read batch. The marker is written separately and
+        // is only relayed to the container if those characters did not trigger a detach.
+        const std::string unicodePair = "\xE3\x80\x90\xE3\x80\x91";
+        session.Write(unicodePair);
+        WaitForPseudoConsoleOutput(session, unicodePair);
+
+        const std::string marker = "wslc-detach-marker";
+        session.WriteLine(marker);
+        WaitForPseudoConsoleOutput(session, marker);
+        VERIFY_IS_TRUE(session.IsRunning(), L"wslc should not detach on characters whose low bytes match the detach sequence");
+        VERIFY_ARE_EQUAL(std::string::npos, session.GetStdoutData().find("[detached]"));
+
+        session.Write("\x10\x11");
+        WaitForPseudoConsoleOutput(session, "[detached]");
+        session.WaitForExit();
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Tmpfs)
     {
         auto result = RunWslc(std::format(
