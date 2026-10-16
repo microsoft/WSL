@@ -34,12 +34,6 @@ inline std::string Ipv4WildcardToCidr(std::string_view value)
         }
 
         const std::string_view part{range.begin(), range.end()};
-        // Only wildcards may follow the first wildcard, so 127.*.1.3 cannot be converted.
-        if (wildcardPos != parts.size() && part != "*")
-        {
-            return std::string{value};
-        }
-
         if (part == "*")
         {
             // Record the first wildcard, e.g., position 1 in 127.*.*.
@@ -48,11 +42,16 @@ inline std::string Ipv4WildcardToCidr(std::string_view value)
                 wildcardPos = count;
             }
         }
+        else if (wildcardPos != parts.size())
+        {
+            // Only wildcards may follow the first wildcard, so 127.*.1.3 cannot be converted.
+            return std::string{value};
+        }
         else if (part.empty() || !std::ranges::all_of(part, [](const char character) {
                      return std::isdigit(static_cast<unsigned char>(character));
                  }))
         {
-            // Preserve non-IP prefixes such as 127.example.*.
+            // IPv4 wildcard parts must contain only digits or '*'; preserve other entries.
             return std::string{value};
         }
 
