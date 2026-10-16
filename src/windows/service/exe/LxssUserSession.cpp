@@ -637,11 +637,30 @@ LxssUserSessionImpl::LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId
                 THROW_LAST_ERROR_IF(!windowHandle);
                 SetWindowLongPtr(windowHandle.get(), GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 
-                MSG windowMessage{};
-                while (GetMessageW(&windowMessage, nullptr, 0, 0))
+                const HANDLE stopEvent = m_timezoneStopEvent.get();
+                for (;;)
                 {
-                    TranslateMessage(&windowMessage);
-                    DispatchMessage(&windowMessage);
+                    const auto result = MsgWaitForMultipleObjectsEx(1, &stopEvent, INFINITE, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+                    THROW_LAST_ERROR_IF(result == WAIT_FAILED);
+
+                    if (result == WAIT_OBJECT_0)
+                    {
+                        break;
+                    }
+
+                    THROW_HR_IF_MSG(E_UNEXPECTED, result != WAIT_OBJECT_0 + 1, "Unexpected timezone wait result: %lu", result);
+
+                    MSG windowMessage{};
+                    if (PeekMessageW(&windowMessage, nullptr, 0, 0, PM_REMOVE))
+                    {
+                        if (windowMessage.message == WM_QUIT)
+                        {
+                            break;
+                        }
+
+                        TranslateMessage(&windowMessage);
+                        DispatchMessage(&windowMessage);
+                    }
                 }
             }
             CATCH_LOG();
@@ -695,7 +714,7 @@ LxssUserSessionImpl::~LxssUserSessionImpl()
 
     if (m_timezoneThread.joinable())
     {
-        LOG_IF_WIN32_BOOL_FALSE(PostThreadMessage(GetThreadId(m_timezoneThread.native_handle()), WM_QUIT, 0, 0));
+        m_timezoneStopEvent.SetEvent();
         m_timezoneThread.join();
     }
 

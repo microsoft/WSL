@@ -906,6 +906,7 @@ private:
     /// </summary>
     _Guarded_by_(m_instanceLock) std::shared_ptr<HttpProxyStateTracker> m_httpProxyStateTracker {};
 
+    wil::unique_event m_timezoneStopEvent{wil::EventOptions::ManualReset};
     std::thread m_timezoneThread;
 };
 
