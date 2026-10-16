@@ -83,9 +83,9 @@ When started, the virtual machine will boot into the provided kernel, and then e
 - An entropy buffer, to seed the virtual machine's entropy
 - Information about the GPU drivers shares to mount, if any
 - Whether [wslg](https://github.com/microsoft/wslg) is enabled
-- Whether to mount the bundled Linux kernel headers and perf tooling (shipped in the kernel artifacts VHD; headers are mounted at `/usr/src/linux-headers-$(uname -r)` with `/lib/modules/$(uname -r)/build` linked to them or bind mounted when it is an existing directory, and perf is mounted read-only at `/usr/lib/wsl/perf/$(uname -r)`)
+- Whether to mount the bundled Linux kernel headers (shipped in the kernel artifacts VHD; headers are mounted at `/usr/src/linux-headers-$(uname -r)` with `/lib/modules/$(uname -r)/build` linked to them or bind mounted when it is an existing directory)
 
-Perf is exposed through a per-distribution wrapper at `/run/wsl/perf` that prefers an executable `/usr/bin/perf` unless it points back to the wrapper. Otherwise, it supplies the bundled helper path only when `PERF_EXEC_PATH` is unset or empty before executing the bundled binary. Selection happens on every invocation, so installing or removing distro perf takes effect without restarting WSL. Distro perf receives the original arguments and helper environment, and its failures are not retried with bundled perf. WSL creates `/usr/local/bin/perf` as a symlink to that wrapper only when no entry already exists, making it available through the default shell and standard `sudo` search paths without changing either search path. User-owned entries are preserved, and the managed symlink is removed at startup when the bundled tooling is unavailable. WSL does not modify `/usr/bin/perf` or `/usr/lib/linux-tools`. To explicitly select bundled perf, run `PERF_EXEC_PATH=/usr/lib/wsl/perf/$(uname -r)/libexec/perf-core /usr/lib/wsl/perf/$(uname -r)/bin/perf`.
+WSL does not expose bundled perf tooling or modify the distribution's perf installation. Install perf through the distribution's package manager.
 
 After applying all the configuration requested by [wslservice.exe](wslservice.exe.md), the virtual machine is ready to start Linux distributions.
 

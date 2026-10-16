@@ -56,10 +56,6 @@ Abstract:
 #define LOCALE_FILE_PATH ETC_DEFAULT_FOLDER "locale"
 #define LOCALE_CONF_FILE_PATH ETC_FOLDER "locale.conf"
 #define PATH_ENV "PATH"
-#define PERF_LOCAL_BINARY_DIRECTORY "/usr/local/bin"
-#define PERF_LOCAL_BINARY_PATH PERF_LOCAL_BINARY_DIRECTORY "/perf"
-#define PERF_RUNTIME_BINARY_DIRECTORY RUN_FOLDER "/wsl"
-#define PERF_RUNTIME_BINARY_PATH PERF_RUNTIME_BINARY_DIRECTORY "/perf"
 #define RESOLV_CONF_DIRECTORY_MODE 0755
 #define RESOLV_CONF_FILE_MODE 0644
 #define RESOLV_CONF_FILE_NAME "resolv.conf"
@@ -200,88 +196,6 @@ try
     if (tempMount.MoveMount(targetPath.c_str()))
     {
         Callback(targetPath);
-    }
-}
-CATCH_LOG()
-
-static std::string ShellQuote(std::string_view value)
-{
-    std::string result{"'"};
-    for (const auto character : value)
-    {
-        if (character == '\'')
-        {
-            result += "'\\''";
-        }
-        else
-        {
-            result += character;
-        }
-    }
-
-    result += '\'';
-    return result;
-}
-
-static void CreatePerfWrapper(const std::string& target)
-{
-    THROW_LAST_ERROR_IF(UtilMkdirPath(PERF_RUNTIME_BINARY_DIRECTORY, 0755) < 0);
-    wil::unique_fd wrapper{TEMP_FAILURE_RETRY(open(PERF_RUNTIME_BINARY_PATH, (O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC), 0600))};
-    THROW_LAST_ERROR_IF(!wrapper);
-
-    auto cleanup = wil::scope_exit([]() {
-        if (unlink(PERF_RUNTIME_BINARY_PATH) < 0)
-        {
-            LOG_ERROR("unlink({}) failed {}", PERF_RUNTIME_BINARY_PATH, errno);
-        }
-    });
-
-    const auto content = std::format(
-        "#!/bin/sh\n"
-        "if [ -f /usr/bin/perf ] && [ -x /usr/bin/perf ] && [ ! /usr/bin/perf -ef /run/wsl/perf ]; then\n"
-        "    exec /usr/bin/perf \"$@\"\n"
-        "fi\n"
-        "if [ -z \"${{PERF_EXEC_PATH:-}}\" ]; then\n"
-        "    PERF_EXEC_PATH={}\n"
-        "fi\n"
-        "export PERF_EXEC_PATH\n"
-        "exec {} \"$@\"\n",
-        ShellQuote(target + "/libexec/perf-core"),
-        ShellQuote(target + "/bin/perf"));
-    THROW_LAST_ERROR_IF(UtilWriteStringView(wrapper.get(), content) < 0);
-    THROW_LAST_ERROR_IF(fchmod(wrapper.get(), 0755) < 0);
-    cleanup.release();
-}
-
-static void UpdatePerfSymlink(bool available)
-try
-{
-    struct stat existing{};
-    if (lstat(PERF_LOCAL_BINARY_PATH, &existing) == 0)
-    {
-        if (!available && S_ISLNK(existing.st_mode))
-        {
-            const auto target = std::filesystem::read_symlink(PERF_LOCAL_BINARY_PATH);
-            if ((target == PERF_RUNTIME_BINARY_PATH) && (unlink(PERF_LOCAL_BINARY_PATH) < 0))
-            {
-                LOG_ERROR("unlink({}) failed {}", PERF_LOCAL_BINARY_PATH, errno);
-            }
-        }
-
-        // Existing entries belong to the user unless they point exactly to our runtime wrapper.
-        return;
-    }
-
-    if (errno != ENOENT)
-    {
-        LOG_ERROR("lstat({}) failed {}", PERF_LOCAL_BINARY_PATH, errno);
-        return;
-    }
-
-    if (available)
-    {
-        THROW_LAST_ERROR_IF(UtilMkdirPath(PERF_LOCAL_BINARY_DIRECTORY, 0755) < 0);
-        THROW_LAST_ERROR_IF(symlink(PERF_RUNTIME_BINARY_PATH, PERF_LOCAL_BINARY_PATH) < 0);
     }
 }
 CATCH_LOG()
@@ -1282,14 +1196,6 @@ Return Value:
             LOG_ERROR("symlink({}, {}) failed {}", target, linkPath, errno);
         }
     });
-
-    bool perfAvailable = false;
-    MoveTemporaryMount(LX_WSL2_KERNEL_PERF_MOUNT_ENV, LX_WSL2_KERNEL_PERF_PATH_ENV, [&](const std::string& target) {
-        THROW_LAST_ERROR_IF(UtilMount(nullptr, target.c_str(), nullptr, (MS_BIND | MS_REMOUNT | MS_RDONLY | MS_NOSUID | MS_NODEV), nullptr) < 0);
-        CreatePerfWrapper(target);
-        perfAvailable = true;
-    });
-    UpdatePerfSymlink(perfAvailable);
 
     //
     // Change the permission of some devtmpfs devices to be more permissive.

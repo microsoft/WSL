@@ -3174,8 +3174,7 @@ Usage:
 
     WSL2_TEST_METHOD(KernelArtifacts)
     {
-        // Kernel artifacts provide headers at /usr/src/linux-headers-$(uname -r) and read-only
-        // perf tooling at /usr/lib/wsl/perf/$(uname -r), exposed through /usr/local/bin/perf.
+        // Kernel artifacts provide headers at /usr/src/linux-headers-$(uname -r).
 
         // Headers: the build symlink and a representative uapi header are present.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -L /lib/modules/$(uname -r)/build", nullptr, nullptr, nullptr, nullptr), 0u);
@@ -3214,138 +3213,52 @@ EOF
                 nullptr),
             0u);
 
-        // All automatic perf entry points use the wrapper, even with a sanitized environment.
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -x /usr/lib/wsl/perf/$(uname -r)/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -f /run/wsl/perf && test ! -L /run/wsl/perf && test -x /run/wsl/perf"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /usr/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"! mountpoint -q /usr/lib/linux-tools/$(uname -r)"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -z \"${PERF_EXEC_PATH+x}\""), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(readlink /usr/local/bin/perf)\" = /run/wsl/perf"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(command -v perf)\" = /usr/local/bin/perf"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"perf --version", nullptr, nullptr, nullptr, nullptr), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(env -u PERF_EXEC_PATH perf --exec-path)\" = /usr/lib/wsl/perf/$(uname -r)/libexec/perf-core"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(env PERF_EXEC_PATH= perf --exec-path)\" = /usr/lib/wsl/perf/$(uname -r)/libexec/perf-core"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(env 'PERF_EXEC_PATH=/tmp/user perf helpers' perf --exec-path)\" = '/tmp/user perf helpers'"), 0u);
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(
-                L"test \"$(env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin perf --exec-path)\" = "
-                L"/usr/lib/wsl/perf/$(uname -r)/libexec/perf-core"),
-            0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(env -i PATH=/nonexistent /run/wsl/perf --exec-path)\" = /usr/lib/wsl/perf/$(uname -r)/libexec/perf-core"), 0u);
-
-        // Artifact writes fail instead of disappearing after shutdown.
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"findmnt -n -o VFS-OPTIONS --mountpoint /usr/lib/wsl/perf/$(uname -r) | grep -w ro"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(stat -c %u /run/wsl/perf)\" = 0 && test \"$(stat -c %a /run/wsl/perf)\" = 755"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"! touch /usr/lib/wsl/perf/$(uname -r)/.wsl-test-write"), 0u);
-
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            LxsstuLaunchWsl(
-                L"rm -f /usr/bin/perf /usr/bin/distro-perf /usr/bin/perf.dpkg-tmp /usr/bin/perf.dpkg-new "
-                L"/usr/lib/linux-tools/$(uname -r)/wsl-test-persistent; "
-                L"if test -d /usr/local/bin/perf && test ! -L /usr/local/bin/perf; then rmdir /usr/local/bin/perf; "
-                L"else rm -f /usr/local/bin/perf; fi; "
-                L"ln -snf /usr/src/linux-headers-$(uname -r) /lib/modules/$(uname -r)/build");
-            LxsstuLaunchWsl(L"--shutdown");
+            LxsstuLaunchWsl(L"ln -snf /usr/src/linux-headers-$(uname -r) /lib/modules/$(uname -r)/build");
         });
 
-        // Package-owned executables and linux-tools files remain unchanged and writable across boots.
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(
-                L"rm /lib/modules/$(uname -r)/build && ln -s /tmp /lib/modules/$(uname -r)/build && "
-                L"printf '#!/bin/sh\\necho distro-perf\\n' > /usr/bin/distro-perf && chmod +x /usr/bin/distro-perf && "
-                L"ln -s distro-perf /usr/bin/perf && mkdir -p /usr/lib/linux-tools/$(uname -r) && "
-                L"printf persistent > /usr/lib/linux-tools/$(uname -r)/wsl-test-persistent"),
-            0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(perf)\" = distro-perf"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin perf)\" = distro-perf"), 0u);
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(
-                L"test \"$(PERF_EXEC_PATH=/usr/lib/wsl/perf/$(uname -r)/libexec/perf-core "
-                L"/usr/lib/wsl/perf/$(uname -r)/bin/perf --exec-path)\" = /usr/lib/wsl/perf/$(uname -r)/libexec/perf-core"),
-            0u);
+        // Stale header links are refreshed after restart.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"rm /lib/modules/$(uname -r)/build && ln -s /tmp /lib/modules/$(uname -r)/build"), 0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(L"test \"$(readlink /lib/modules/$(uname -r)/build)\" = \"/usr/src/linux-headers-$(uname -r)\"", nullptr, nullptr, nullptr, nullptr),
             0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(readlink /usr/bin/perf)\" = \"distro-perf\"", nullptr, nullptr, nullptr, nullptr), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(/usr/bin/perf)\" = distro-perf"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(cat /usr/lib/linux-tools/$(uname -r)/wsl-test-persistent)\" = persistent"), 0u);
+    }
+
+    WSL2_TEST_METHOD(DistributionPerf)
+    {
+        // The test distro does not ship perf, and WSL must not supply one.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /usr/bin/perf && test ! -L /usr/bin/perf"), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /usr/local/bin/perf && test ! -L /usr/local/bin/perf"), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /run/wsl/perf && test ! -e /usr/lib/wsl/perf/$(uname -r)"), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"! mountpoint -q /usr/lib/linux-tools/$(uname -r) && ! command -v perf"), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -z \"${PERF_EXEC_PATH+x}\""), 0u);
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LxsstuLaunchWsl(L"rm -f /usr/bin/perf /usr/bin/distro-perf /usr/bin/perf.dpkg-tmp /usr/bin/perf.dpkg-new");
+        });
+
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(
+                L"printf '#!/bin/sh\\necho distro-perf\\n' > /usr/bin/distro-perf && chmod +x /usr/bin/distro-perf && "
+                L"ln -s distro-perf /usr/bin/perf"),
+            0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(readlink /usr/bin/perf)\" = distro-perf && test \"$(perf)\" = distro-perf"), 0u);
+
+        // Package-manager backup links and replacement must work across restarts.
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(
                 L"ln /usr/bin/distro-perf /usr/bin/perf.dpkg-tmp && "
-                L"test \"$(stat -c %d:%i /usr/bin/distro-perf)\" = \"$(stat -c %d:%i /usr/bin/perf.dpkg-tmp)\" && "
                 L"printf '#!/bin/sh\\necho upgraded-perf\\n' > /usr/bin/perf.dpkg-new && chmod +x /usr/bin/perf.dpkg-new && "
-                L"mv /usr/bin/perf.dpkg-new /usr/bin/distro-perf && test \"$(/usr/bin/perf)\" = upgraded-perf && "
-                L"test \"$(/usr/bin/perf.dpkg-tmp)\" = distro-perf"),
-            0u);
-
-        // Replacing the package's symlink with a regular executable also survives restart.
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(L"cp /usr/bin/distro-perf /usr/bin/perf.dpkg-new && "
-                            L"mv -f /usr/bin/perf.dpkg-new /usr/bin/perf"),
+                L"mv -f /usr/bin/perf.dpkg-new /usr/bin/perf && test \"$(/usr/bin/perf.dpkg-tmp)\" = distro-perf"),
             0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
         VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(L"test -f /usr/bin/perf && test ! -L /usr/bin/perf && "
-                            L"test \"$(/usr/bin/perf)\" = upgraded-perf && "
+            LxsstuLaunchWsl(L"test ! -L /usr/bin/perf && test \"$(perf)\" = upgraded-perf && "
                             L"rm /usr/bin/perf.dpkg-tmp && ln /usr/bin/perf /usr/bin/perf.dpkg-tmp && "
-                            L"test \"$(stat -c %d:%i /usr/bin/perf)\" = \"$(stat -c %d:%i /usr/bin/perf.dpkg-tmp)\" && "
-                            L"rm /usr/bin/perf && mv /usr/bin/perf.dpkg-tmp /usr/bin/perf && "
-                            L"test \"$(/usr/bin/perf)\" = upgraded-perf"),
+                            L"rm /usr/bin/perf && mv /usr/bin/perf.dpkg-tmp /usr/bin/perf && test \"$(perf)\" = upgraded-perf"),
             0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(command -v perf)\" = /usr/local/bin/perf && test \"$(perf)\" = upgraded-perf"), 0u);
-
-        // Distro perf receives the original environment, arguments, and exit status without retry.
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(L"printf '%s\\n' '#!/bin/sh' 'printf \"%s\\n\" \"${PERF_EXEC_PATH-unset}\" \"$@\"' "
-                            L"'exit 23' > /usr/bin/perf"),
-            0u);
-        ValidateOutput(L"env -u PERF_EXEC_PATH perf 'argument with spaces' ''", L"unset\nargument with spaces\n\n", L"", 23);
-        ValidateOutput(L"env PERF_EXEC_PATH= perf", L"\n", L"", 23);
-        ValidateOutput(L"env 'PERF_EXEC_PATH=/tmp/user perf helpers' perf", L"/tmp/user perf helpers\n", L"", 23);
-
-        // Removal and non-executable entries fall back immediately; links to our wrapper cannot recurse.
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"chmod -x /usr/bin/perf && perf --version"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"rm /usr/bin/perf && perf --version"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ln -s /nonexistent-distro-perf /usr/bin/perf && perf --version"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"rm /usr/bin/perf && ln -s /usr/local/bin/perf /usr/bin/perf && perf --version"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"rm /usr/bin/perf"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(env -u PERF_EXEC_PATH perf --exec-path)\" = /usr/lib/wsl/perf/$(uname -r)/libexec/perf-core"), 0u);
-
-        // A local override controls both ordinary and sudo-style lookup and is never replaced.
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"rm /usr/local/bin/perf && printf '#!/bin/sh\\necho user-perf\\n' > /usr/local/bin/perf && chmod +x /usr/local/bin/perf"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(perf)\" = user-perf"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin perf)\" = user-perf"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"rm /usr/local/bin/perf && ln -s /usr/bin/distro-perf /usr/local/bin/perf"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(readlink /usr/local/bin/perf)\" = /usr/bin/distro-perf && test \"$(perf)\" = upgraded-perf"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"rm /usr/local/bin/perf && ln -s /nonexistent-user-perf /usr/local/bin/perf"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(readlink /usr/local/bin/perf)\" = /nonexistent-user-perf"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"rm /usr/local/bin/perf && mkdir /usr/local/bin/perf"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /usr/local/bin/perf && rmdir /usr/local/bin/perf"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(readlink /usr/local/bin/perf)\" = /run/wsl/perf && perf --version"), 0u);
-
-        // A custom kernel without artifacts removes only the managed link.
-#ifdef WSL_DEV_INSTALL_PATH
-        const auto kernelPath = std::filesystem::path{WSL_DEV_INSTALL_PATH} / "kernel";
-#else
-        const auto installPath = wsl::windows::common::wslutil::GetMsiPackagePath();
-        VERIFY_IS_TRUE(installPath.has_value());
-        const auto kernelPath = std::filesystem::path{installPath.value()} / "tools" / "kernel";
-#endif
-        WslConfigChange configChange(LxssGenerateTestConfig({.kernel = kernelPath.wstring()}));
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /run/wsl/perf && test ! -L /usr/local/bin/perf"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"printf '#!/bin/sh\\necho user-perf\\n' > /usr/local/bin/perf && chmod +x /usr/local/bin/perf"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(perf)\" = user-perf"), 0u);
-        configChange.Update(LxssGenerateTestConfig());
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(perf)\" = user-perf && rm /usr/local/bin/perf"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(readlink /usr/local/bin/perf)\" = /run/wsl/perf && perf --version"), 0u);
     }
 
     WSL2_TEST_METHOD(CrashCollection)
