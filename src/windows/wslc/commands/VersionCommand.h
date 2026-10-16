@@ -14,8 +14,14 @@ Abstract:
 #pragma once
 #include "Command.h"
 
-namespace wsl::windows::wslc {
+namespace wsl::windows::wslc::cli {
 struct Terminal;
+}
+
+namespace wsl::windows::wslc {
+
+using namespace wsl::windows::wslc::cli;
+
 struct VersionCommand final : public Command
 {
     constexpr static std::wstring_view CommandName = L"version";

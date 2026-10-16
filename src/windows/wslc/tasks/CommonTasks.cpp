@@ -15,11 +15,15 @@ Abstract:
 #include "CLIExecutionContext.h"
 #include "CommonTasks.h"
 #include "Exceptions.h"
+#include "TableRenderer.h"
 
 using namespace wsl::shared;
 using namespace wsl::windows::wslc::execution;
 
 namespace wsl::windows::wslc::task {
+
+using namespace wsl::windows::wslc::cli;
+using namespace wsl::windows::cli::table;
 
 // Prompts the user to confirm the action described by Data::ConfirmMessage, preceded by the
 // Data::ConfirmWarning explaining what the action affects. The prompt is skipped when --force is
@@ -41,6 +45,21 @@ void ConfirmAction(CLIExecutionContext& context)
     if (!context.Terminal.Confirm(context.Data.Get<Data::ConfirmMessage>()))
     {
         throw TerminateException{};
+    }
+}
+
+void PrintFormattedOutput(CLIExecutionContext& context)
+{
+    if (context.Data.Contains(Data::Json))
+    {
+        for (const auto& line : context.Data.Get<Data::Json>())
+        {
+            context.Terminal.Output(L"{}\n", line);
+        }
+    }
+    else if (context.Data.Contains(Data::Table))
+    {
+        RenderTable(context.Terminal, context.Data.Get<Data::Table>());
     }
 }
 

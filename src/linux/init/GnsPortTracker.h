@@ -5,8 +5,8 @@
 #include <set>
 #include <utility>
 #include <optional>
+#include <variant>
 #include <NetlinkChannel.h>
-#include <future>
 #include <functional>
 #include <memory>
 #include <time.h>
@@ -130,33 +130,34 @@ private:
         ActivePortSet PortProtocolPairs; // Always populated, but only used in mirrored mode
     };
 
-    struct PortRefreshResult
+    struct ListPortsResult
     {
         ActivePorts Ports;
         time_t Timestamp;
-        std::function<void()> Resume;
     };
+
+    using TrackerEvent = std::variant<seccomp_notif, ListPortsResult>;
 
     bool IsMirroredMode() const
     {
         return m_networkingMode == LxMiniInitNetworkingModeMirrored;
     }
 
-    void OnRefreshAllocatedPorts(const ActivePorts& Ports, time_t Timestamp);
+    void ReconcileAllocatedPorts(const ActivePorts& Ports, time_t Timestamp);
 
-    void RunPortRefresh();
+    void RunPortListing();
 
-    ActivePorts ListAllocatedPorts();
+    ActivePorts ListBoundPorts();
 
-    std::optional<BindCall> ReadNextRequest();
+    BindCall ReadRequest(const seccomp_notif& Notification);
 
-    std::optional<BindCall> GetCallInfo(uint64_t CallId, pid_t Pid, int Arch, int SysCallNumber, const gsl::span<unsigned long long>& Arguments);
+    BindCall GetCallInfo(uint64_t CallId, pid_t Pid, int Arch, int SysCallNumber, const gsl::span<const unsigned long long>& Arguments);
 
     int RequestPort(const PortAllocation& Port, bool Allocate);
 
     int HandleRequest(const PortAllocation& Request);
 
-    void CompleteRequest(uint64_t Id, int Result);
+    void CompleteRequest(int Result);
 
     static int GetSocketProtocol(int Pid, int Fd);
 
@@ -169,10 +170,10 @@ private:
     std::map<PortAllocation, std::optional<time_t>> m_allocatedPorts;
     std::shared_ptr<wsl::shared::SocketChannel> m_hvSocketChannel;
     NetlinkChannel m_channel;
-    std::promise<PortRefreshResult> m_allocatedPortsRefresh;
 
-    WaitableValue<seccomp_notif> m_request;
+    WaitableValue<TrackerEvent> m_eventQueue;
     WaitableValue<int> m_reply;
+    WaitableValue<bool> m_portListingResume;
 
     std::shared_ptr<SecCompDispatcher> m_seccompDispatcher;
 

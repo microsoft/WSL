@@ -21,7 +21,7 @@ Abstract:
 #include "ImageService.h"
 #include "ImageTasks.h"
 #include "ImageProgressCallback.h"
-#include "TableOutput.h"
+#include "TableData.h"
 #include "Task.h"
 #include <format>
 #include <unordered_map>
@@ -37,6 +37,9 @@ using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
+
+using namespace wsl::windows::wslc::cli;
+using namespace wsl::windows::cli::table;
 
 namespace {
 
@@ -72,7 +75,7 @@ namespace {
         Terminal& m_terminal;
     };
 
-    // Placeholder for values that are unavailable. wslc does not track image digests or layer sharing.
+    // Placeholder for values that are unavailable. wslc does not track layer sharing.
     constexpr std::string_view c_imageNotAvailable = "N/A";
 
     // Builds the representation of an image, shared by the table and json output so the two cannot
@@ -88,7 +91,7 @@ namespace {
         entry.CreatedAt = EpochToLocalDisplayTime(image.Created);
         entry.CreatedSince =
             WideToMultiByte(format == FormatType::Json ? FormatInvariantRelativeTime(image.Created) : FormatRelativeTime(image.Created));
-        entry.Digest = c_none;
+        entry.Digest = image.Digest.empty() ? std::string{c_none} : image.Digest;
         entry.ID = truncate ? TruncateId(image.Id, true) : image.Id;
         entry.Repository = image.Repository.value_or(std::string{c_none});
         entry.SharedSize = c_imageNotAvailable;
@@ -188,71 +191,88 @@ void GetImages(CLIExecutionContext& context)
     const bool containerCounts =
         context.Args.GetValue<ArgType::Format>(FormatType::Table) == FormatType::Json && !context.Args.GetValue<ArgType::Quiet>();
 
-    auto images = ImageService::List(session, filters, containerCounts, context.Args.GetValue<ArgType::All>());
+    auto images = ImageService::List(
+        session, filters, containerCounts, context.Args.GetValue<ArgType::All>(), context.Args.GetValue<ArgType::Digests>());
     context.Data.Add<Data::Images>(std::move(images));
 }
 
-void ListImages(CLIExecutionContext& context)
+void FormatImageOutput(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Images));
     auto& images = context.Data.Get<Data::Images>();
 
+    const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
+    const bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
+
     if (context.Args.GetValue<ArgType::Quiet>())
     {
-        bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
+        wsl::windows::cli::table::TableData table{Localization::WSLCCLI_TableHeaderImageId()};
+        table.ShowHeader = false;
+        table.Reserve(images.size());
+
         for (const auto& image : images)
         {
-            context.Terminal.Output(L"{}\n", trunc ? TruncateId(image.Id, true) : image.Id);
+            table.AddRow({MultiByteToWide(trunc ? TruncateId(image.Id, true) : image.Id)});
         }
 
+        context.Data.Add<Data::Table>(std::move(table));
         return;
     }
-
-    const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
-    bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
 
     switch (format)
     {
     case FormatType::Json:
     {
+        std::vector<std::wstring> json;
+        json.reserve(images.size());
+
         for (const auto& image : images)
         {
-            context.Terminal.Output(L"{}\n", ToJsonW(ToImageOutput(image, trunc, format), c_jsonCompactIndent));
+            json.push_back(ToJsonW(ToImageOutput(image, trunc, format), c_jsonCompactIndent));
         }
 
+        context.Data.Add<Data::Json>(std::move(json));
         break;
     }
     case FormatType::Table:
     {
         using enum ColumnOverflow;
 
-        // Create table — only IMAGE ID uses fixed width; other columns shrink to fit the console.
+        constexpr ColumnWidthConfig c_shrink{.Overflow = Shrink};
+
+        // Only IMAGE ID uses fixed width; other columns shrink to fit the console.
         // When --no-trunc is passed, IMAGE ID also shows full length via TruncateId().
-        auto table =
-            trunc
-                ? wsl::windows::wslc::TableOutput<5>(
-                      context.Terminal,
-                      {{{L"REPOSITORY", {.Overflow = Shrink}},
-                        {L"TAG", {.Overflow = Shrink}},
-                        {L"IMAGE ID", {.MinWidth = 12, .MaxWidth = 12, .Overflow = Shrink}},
-                        {L"CREATED", {.Overflow = Shrink}},
-                        {L"SIZE", {.Overflow = Shrink}}}},
-                      images.size())
-                : wsl::windows::wslc::TableOutput<5>(context.Terminal, {L"REPOSITORY", L"TAG", L"IMAGE ID", L"CREATED", L"SIZE"});
+        constexpr ColumnWidthConfig c_imageId{.MinWidth = 12, .MaxWidth = 12, .Overflow = Shrink};
+
+        const bool digests = context.Args.GetValue<ArgType::Digests>();
+
+        wsl::windows::cli::table::TableData table;
+        table.Truncate(trunc)
+            .AddColumn(Localization::WSLCCLI_TableHeaderRepository(), c_shrink)
+            .AddColumn(Localization::WSLCCLI_TableHeaderTag(), c_shrink)
+            .AddColumnIf(digests, Localization::WSLCCLI_TableHeaderDigest(), c_shrink)
+            .AddColumn(Localization::WSLCCLI_TableHeaderImageId(), c_imageId)
+            .AddColumn(Localization::WSLCCLI_TableHeaderCreated(), c_shrink)
+            .AddColumn(Localization::WSLCCLI_TableHeaderSize(), c_shrink);
+
+        table.Reserve(images.size());
 
         for (const auto& image : images)
         {
             const auto entry = ToImageOutput(image, trunc, format);
-            table.WriteRow({
-                MultiByteToWide(entry.Repository),
-                MultiByteToWide(entry.Tag),
-                MultiByteToWide(entry.ID),
-                MultiByteToWide(entry.CreatedSince),
-                MultiByteToWide(entry.Size),
-            });
+
+            Row row;
+            row.AddCell(MultiByteToWide(entry.Repository))
+                .AddCell(MultiByteToWide(entry.Tag))
+                .AddCellIf(digests, MultiByteToWide(entry.Digest))
+                .AddCell(MultiByteToWide(entry.ID))
+                .AddCell(MultiByteToWide(entry.CreatedSince))
+                .AddCell(MultiByteToWide(entry.Size));
+
+            table.AddRow(std::move(row));
         }
 
-        table.Complete();
+        context.Data.Add<Data::Table>(std::move(table));
         break;
     }
     default:

@@ -284,6 +284,12 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
     description.Identity = Request.Identity;
     description.Backend = BackendKind::Hcs;
     description.Processor = ConfigureProcessor(Request.Processor, configuration.Settings.VirtualMachine.ComputeTopology.Processor);
+    if (wsl::windows::common::helpers::GetWindowsVersion().BuildNumber >= wsl::windows::common::helpers::WindowsBuildNumbers::Germanium)
+    {
+        // Let HCS derive a virtual NUMA topology from the requested resources and the host topology.
+        configuration.Settings.VirtualMachine.ComputeTopology.Numa.emplace();
+    }
+
     description.Memory = ConfigureMemory(Request.Memory, Request.Mmio, configuration.Settings.VirtualMachine.ComputeTopology.Memory);
     description.Boot = ConfigureBoot(Request.Boot, configuration.Settings.VirtualMachine.Chipset);
     description.Boot.Consoles = Request.Consoles;
@@ -294,13 +300,15 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
     // Attach the disks the VM boots from up front so that the guest can reach them without waiting
     // for a hot add. Their LUNs are reported so that the caller can name them in the guest.
     const auto vmIdString = wsl::shared::string::GuidToString<wchar_t>(Request.Identity.VmId, wsl::shared::string::GuidToStringFlags::None);
+    const auto userToken = Request.Identity.UserToken.get();
     auto cleanupBootDiskAccess = wil::scope_exit([&] {
         for (const auto& entry : configuration.BootDisks)
         {
             const auto& disk = entry.second;
             if (WI_IsFlagSet(disk.Backend.Flags, wsl::windows::common::disk::DiskStateFlags::AccessGranted))
             {
-                LOG_IF_FAILED(wil::ResultFromException([&] { schema::RevokeVmAccess(vmIdString.c_str(), disk.Path.c_str()); }));
+                LOG_IF_FAILED(
+                    wil::ResultFromException([&] { schema::RevokeVmAccess(vmIdString.c_str(), disk.Path.c_str(), userToken); }));
             }
         }
     });
@@ -340,7 +348,7 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
         {
             try
             {
-                auto runAsUser = wil::impersonate_token(Request.Identity.UserToken.get());
+                auto runAsUser = wil::impersonate_token(userToken);
                 schema::GrantVmAccess(vmIdString.c_str(), path.c_str());
                 WI_SetFlag(diskFlags, wsl::windows::common::disk::DiskStateFlags::AccessGranted);
             }
@@ -350,10 +358,27 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
         auto revokeDiskAccess = wil::scope_exit([&] {
             if (WI_IsFlagSet(diskFlags, wsl::windows::common::disk::DiskStateFlags::AccessGranted))
             {
-                LOG_IF_FAILED(wil::ResultFromException([&] { schema::RevokeVmAccess(vmIdString.c_str(), path.c_str()); }));
+                LOG_IF_FAILED(wil::ResultFromException([&] { schema::RevokeVmAccess(vmIdString.c_str(), path.c_str(), userToken); }));
             }
         });
-        auto backingFile = wsl::windows::common::disk::OpenVhdBackingFile(path.c_str());
+
+        wil::unique_hfile backingFile;
+        try
+        {
+            backingFile = wsl::windows::common::disk::OpenVhdBackingFile(path.c_str(), bootDisk.GrantHostAccess ? userToken : nullptr);
+        }
+        catch (...)
+        {
+            if (!bootDisk.GrantHostAccess || wil::ResultFromCaughtException() != E_ACCESSDENIED)
+            {
+                throw;
+            }
+
+            LOG_CAUGHT_EXCEPTION();
+
+            // Custom VHDs may be accessible only to the service and the VM worker process.
+            backingFile = wsl::windows::common::disk::OpenVhdBackingFile(path.c_str());
+        }
 
         schema::Attachment attachment{};
         attachment.Type = schema::AttachmentType::VirtualDisk;
@@ -368,7 +393,10 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
             {Request.Identity, configuration.NextDiskId}, {0, lun}, bootDisk.Disk.ReadOnly, bootDisk.Disk.UserDisk, path, false};
         description.BootDisks.emplace(bootDisk.Key, diskAttachment);
         configuration.BootDisks.emplace(
-            diskAttachment.Id.Value, AttachedDisk{diskAttachment, {diskFlags, bootDisk.Disk.DeviceTimeout, std::move(backingFile)}});
+            diskAttachment.Id.Value,
+            AttachedDisk{
+                diskAttachment,
+                {diskFlags, bootDisk.Disk.DeviceTimeout, bootDisk.GrantHostAccess ? Request.Identity.UserToken : wil::shared_handle{}, std::move(backingFile)}});
         revokeDiskAccess.release();
 
         ++configuration.NextDiskId;
@@ -755,7 +783,8 @@ void HcsVirtualMachineBackend::CleanupAttachedDisks(std::map<std::uint64_t, Atta
         {
             try
             {
-                schema::RevokeVmAccess(m_vmIdString.c_str(), disk.Path.c_str());
+                schema::RevokeVmAccess(
+                    m_vmIdString.c_str(), disk.Path.c_str(), disk.PassThrough ? nullptr : disk.Backend.UserToken.get());
             }
             CATCH_LOG()
         }
@@ -776,7 +805,7 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
     const auto& path = validation::ValidateDiskSource(Request);
     const bool passThrough = std::holds_alternative<VmPhysicalDiskSource>(Request.Source);
     const auto timeoutMs = static_cast<size_t>(Request.DeviceTimeout.count());
-    HANDLE userToken = Request.UserToken ? Request.UserToken->get() : m_configuration.Description.Identity.UserToken.get();
+    const auto userToken = Request.UserToken.value_or(m_configuration.Description.Identity.UserToken);
     THROW_HR_IF_MSG(E_UNEXPECTED, !userToken, "UserToken not set for the disk request");
 
     auto lock = m_lock.lock_exclusive();
@@ -790,7 +819,7 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
         if (WI_IsFlagSet(diskFlags, wsl::windows::common::disk::DiskStateFlags::AccessGranted))
         {
-            schema::RevokeVmAccess(m_vmIdString.c_str(), path.c_str());
+            schema::RevokeVmAccess(m_vmIdString.c_str(), path.c_str(), passThrough ? nullptr : userToken.get());
         }
 
         if (WI_IsFlagSet(diskFlags, wsl::windows::common::disk::DiskStateFlags::Online))
@@ -844,6 +873,7 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
             m_vmIdString.c_str(),
             found->second.Path.c_str(),
             found->second.GuestAddress.Lun,
+            found->second.PassThrough ? nullptr : found->second.Backend.UserToken.get(),
             found->second.Backend.Flags,
             static_cast<size_t>(found->second.Backend.DeviceTimeout.count()));
 
@@ -878,15 +908,17 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
         }
         else
         {
-            backingFile = wsl::windows::common::disk::OpenVhdBackingFile(path.c_str());
+            backingFile = wsl::windows::common::disk::OpenVhdBackingFile(path.c_str(), userToken.get());
 
-            schema::AddVhdWithAccess(m_system.get(), m_vmIdString.c_str(), path.c_str(), lun, Request.ReadOnly, userToken, diskFlags);
+            schema::AddVhdWithAccess(m_system.get(), m_vmIdString.c_str(), path.c_str(), lun, Request.ReadOnly, userToken.get(), diskFlags);
         }
     });
 
     const VmDiskAttachment attachment{
         {m_configuration.Description.Identity, m_nextDiskId}, {0, lun}, Request.ReadOnly, Request.UserDisk, path, passThrough};
-    m_attachedDisks.emplace(attachment.Id.Value, AttachedDisk{attachment, {diskFlags, Request.DeviceTimeout, std::move(backingFile)}});
+    m_attachedDisks.emplace(
+        attachment.Id.Value,
+        AttachedDisk{attachment, {diskFlags, Request.DeviceTimeout, passThrough ? wil::shared_handle{} : userToken, std::move(backingFile)}});
     ++m_nextDiskId;
     cleanup.release();
 
@@ -939,6 +971,7 @@ void HcsVirtualMachineBackend::DetachDisk(VmDiskId Disk)
         m_vmIdString.c_str(),
         disk->second.Path.c_str(),
         disk->second.GuestAddress.Lun,
+        disk->second.PassThrough ? nullptr : disk->second.Backend.UserToken.get(),
         disk->second.Backend.Flags,
         static_cast<size_t>(disk->second.Backend.DeviceTimeout.count()));
 
