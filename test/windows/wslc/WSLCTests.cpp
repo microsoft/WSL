@@ -15216,11 +15216,29 @@ class WSLCTests
             VERIFY_IS_TRUE(IsVmRunning(c_sessionName));
         }
 
-        // Releasing the process wrapper removes its activity hold, allowing idle termination.
+        // A plugin process has no activity hold and can outlive the VM through its COM proxy.
+        const char* commandLine[] = {"/bin/sleep", "600"};
+        WSLCProcessOptions options{};
+        options.CommandLine = {commandLine, RTL_NUMBER_OF(commandLine)};
+        options.Flags = WSLCProcessFlagsTty | WSLCProcessFlagsStdin;
+        wil::com_ptr<IWSLCProcess> pluginProcess;
+        int errnoValue = -1;
+        VERIFY_SUCCEEDED(session->CreateRootNamespaceProcess("/bin/sleep", &options, 24, 80, FALSE, &pluginProcess, &errnoValue));
+        VERIFY_SUCCEEDED(pluginProcess->ResizeTty(25, 81));
+
+        // Releasing the ordinary process wrapper removes its activity hold, allowing idle termination.
         wasAlreadyIdle = TRUE;
         VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
         VERIFY_IS_FALSE(wasAlreadyIdle);
         VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
+
+        WSLCProcessState state{};
+        int exitCode{};
+        VERIFY_SUCCEEDED(pluginProcess->GetState(&state, &exitCode));
+        VERIFY_ARE_EQUAL(state, WslcProcessStateExited);
+        VERIFY_ARE_EQUAL(exitCode, 128 + WSLCSignalSIGKILL);
+        VERIFY_ARE_EQUAL(pluginProcess->Signal(WSLCSignalSIGKILL), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+        VERIFY_ARE_EQUAL(pluginProcess->ResizeTty(24, 80), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
         // A second trigger is now a no-op.
         wasAlreadyIdle = FALSE;
@@ -15231,6 +15249,7 @@ class WSLCTests
         WSLCProcessLauncher launcher2("/bin/sleep", {"/bin/sleep", "60"});
         auto process2 = launcher2.Launch(*session);
         VERIFY_IS_TRUE(IsVmRunning(c_sessionName));
+        VERIFY_ARE_EQUAL(pluginProcess->ResizeTty(24, 80), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
     }
 
     // A tmpfs-backed session has no persistent storage, so its VM state cannot be recovered after a

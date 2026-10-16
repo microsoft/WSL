@@ -234,6 +234,7 @@ void VMProcessControl::ResizeTty(ULONG Rows, ULONG Columns)
 {
     std::lock_guard lock{m_lock};
 
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_vm == nullptr || m_exitEvent.is_signaled());
     THROW_WIN32_IF(ERROR_INVALID_STATE, !m_ttyControlChannel.Connected());
     THROW_HR_IF(E_INVALIDARG, Rows == 0 || Columns == 0 || Rows > USHORT_MAX || Columns > USHORT_MAX);
 
@@ -264,6 +265,7 @@ void VMProcessControl::OnVmTerminated()
 {
     std::lock_guard lock{m_lock};
     m_vm = nullptr;
+    m_ttyControlChannel.Close();
 
     // Make sure that the process is in a terminated state, so users don't think that it might still be running.
     if (!m_exitEvent.is_signaled())

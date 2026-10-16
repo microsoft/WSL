@@ -389,28 +389,34 @@ WSLCVirtualMachine::~WSLCVirtualMachine()
 
     m_vmTerminatingEvent.SetEvent();
 
-    m_initChannel.Close();
-
-    // Terminate the VM.
-    m_vm.reset();
-
     if (m_processExitThread.joinable())
     {
         m_processExitThread.join();
     }
 
-    if (m_crashDumpThread.joinable())
+    // Detach under the tracking lock, but notify outside it so process releases can unregister.
+    std::vector<std::weak_ptr<VMProcessControl>> processes;
     {
-        m_crashDumpThread.join();
+        std::lock_guard lock{m_trackedProcessesLock};
+        processes.swap(m_trackedProcesses);
     }
 
-    // Clear the state of all remaining processes now that the VM has exited.
-    for (auto& e : m_trackedProcesses)
+    for (const auto& e : processes)
     {
         if (auto locked = e.lock())
         {
             locked->OnVmTerminated();
         }
+    }
+
+    m_initChannel.Close();
+
+    // Terminate the VM.
+    m_vm.reset();
+
+    if (m_crashDumpThread.joinable())
+    {
+        m_crashDumpThread.join();
     }
 }
 
