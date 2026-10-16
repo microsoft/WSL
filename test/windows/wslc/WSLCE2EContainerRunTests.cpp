@@ -838,10 +838,15 @@ class WSLCE2EContainerRunTests
             ElevationType::Elevated,
             PseudoConsole{120, 30});
 
-        // U+3010 and U+3011 have the same low bytes as the ctrl-p, ctrl-q detach sequence. The marker is only
-        // relayed to the container if those characters did not trigger a detach.
+        // U+3010 and U+3011 have the same low bytes as the ctrl-p, ctrl-q detach sequence. They are written on
+        // their own so no other input follows them in the same read batch. The marker is written separately and
+        // is only relayed to the container if those characters did not trigger a detach.
+        const std::string unicodePair = "\xE3\x80\x90\xE3\x80\x91";
+        session.Write(unicodePair);
+        WaitForPseudoConsoleOutput(session, unicodePair);
+
         const std::string marker = "wslc-detach-marker";
-        session.WriteLine("\xE3\x80\x90\xE3\x80\x91" + marker);
+        session.WriteLine(marker);
         WaitForPseudoConsoleOutput(session, marker);
         VERIFY_IS_TRUE(session.IsRunning(), L"wslc should not detach on characters whose low bytes match the detach sequence");
         VERIFY_ARE_EQUAL(std::string::npos, session.GetStdoutData().find("[detached]"));
