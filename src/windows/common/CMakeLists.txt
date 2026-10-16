@@ -136,6 +136,7 @@ set(HEADERS
     NatNetworking.h
     notifications.h
     precomp.h
+    ProxyBypass.hpp
     Redirector.h
     registry.hpp
     relay.hpp
