@@ -119,14 +119,20 @@ inline void PrettyPrint(std::stringstream& Out, const T& Value)
     }
     else if constexpr (std::is_same_v<T, StringArray>)
     {
-        if (Value.Index <= 0)
+        if (Value.Index == 0)
         {
             Out << "<empty>";
             return;
         }
 
-        gsl::span<const char> span(Value.MessageHead + Value.Index, Value.MessageHead + Value.MessageSize);
-        Out << wsl::shared::string::Join(wsl::shared::string::ArrayFromSpan(gsl::as_bytes(span)), ',');
+        if (Value.Index >= Value.MessageSize)
+        {
+            Out << "<out-of-bounds>";
+            return;
+        }
+
+        gsl::span<const char> span(Value.MessageHead, Value.MessageSize);
+        Out << wsl::shared::string::Join(wsl::shared::string::ArrayFromSpan(gsl::as_bytes(span), Value.Index), ',');
     }
     else
     {
