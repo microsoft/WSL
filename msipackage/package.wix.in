@@ -287,6 +287,8 @@
                 <!-- Session 0 service -->
                 <File Id="wslservice.exe" Source="${PACKAGE_INPUT_DIR}/wslservice.exe" KeyPath="yes" />
                 <ServiceInstall Name="WSLService" DisplayName="WSL Service" Description="WSL Service" Start="auto" Type="ownProcess" ErrorControl="normal" Account="LocalSystem" Vital="yes" Interactive="no" />
+                <!-- Enable ACG at process creation, before the service can apply its runtime mitigations. -->
+                <RegistryValue Root="HKLM" Key="SYSTEM\CurrentControlSet\Services\WSLService" Name="MitigationFlags" Type="integer" Value="2048" />
 
                 <!-- The service is stopped on uninstall and upgrade.
                      N.B. It shouldn't be started on install because it will fail to start if the OC is missing, 
