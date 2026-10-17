@@ -105,7 +105,12 @@ const WslcContainerOptionsInternal* GetInternalType(const WslcContainerSettings*
 // Use to allocate the actual objects on the heap to keep it alive.
 struct WslcSessionImpl
 {
+    explicit WslcSessionImpl(const WSLCCompatVersion& version) : runtimeVersion(version)
+    {
+    }
+
     wil::com_ptr<IWSLCCompatSession> session;
+    WSLCCompatVersion runtimeVersion;
 };
 
 WslcSessionImpl* GetInternalType(WslcSession handle);
