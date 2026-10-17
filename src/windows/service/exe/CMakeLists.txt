@@ -76,5 +76,11 @@ target_link_libraries(wslservice
                       Synchronization.lib
                       yaml-cpp)
 
+if (WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+    target_link_libraries(wslservice wsl_virtio_sound)
+    # The release pipeline signs service outputs before building the MSI.
+    add_dependencies(wslservice wsl-audio-worker)
+endif()
+
 target_precompile_headers(wslservice REUSE_FROM common)
 set_target_properties(wslservice PROPERTIES FOLDER windows)

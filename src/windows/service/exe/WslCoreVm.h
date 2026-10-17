@@ -30,6 +30,13 @@ Abstract:
 #include "SocketChannel.h"
 #include "DeviceHostProxy.h"
 #include "GuestDeviceManager.h"
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+#include "HdvPciDeviceHost.hpp"
+namespace wsl::virtio_sound::process_host {
+class HdvHostProcess;
+}
+#include "WindowsCaptureSource.hpp"
+#endif
 
 #define UTILITY_VM_SHUTDOWN_TIMEOUT (30 * 1000)
 #define UTILITY_VM_TERMINATE_TIMEOUT (30 * 1000)
@@ -333,6 +340,11 @@ private:
     _Guarded_by_(m_persistentMemoryLock) ULONG m_nextPersistentMemoryId = 0;
 
     std::unique_ptr<wsl::core::INetworkingEngine> m_networkingEngine;
+
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+    GUID m_virtioSoundInstanceId{};
+    std::unique_ptr<wsl::virtio_sound::process_host::HdvHostProcess> m_hdvHostProcess;
+#endif
 
     // Job object that terminates child processes (wslhost.exe, wslrelay.exe)
     // when the VM shuts down.
