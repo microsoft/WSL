@@ -897,6 +897,10 @@ Para obtener más información sobre Admin Protection, visite https://aka.ms/apd
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>No se admite la virtualización anidada en esta máquina.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>No se pudo detectar la compatibilidad con la virtualización anidada, error: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>No se pudo crear el punto de conexión de red con la dirección "{}". Dirección nueva asignada: "{}".</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
