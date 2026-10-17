@@ -4659,6 +4659,54 @@ class WSLCTests
         ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "lsmod | grep ^xsk_diag"}, 0);
     }
 
+    WSLC_TEST_METHOD(RootNamespaceProcessReleaseAndExitStress)
+    {
+        constexpr unsigned int c_threadCount = 4;
+        constexpr unsigned int c_iterations = 50;
+
+        std::atomic<unsigned int> failures = 0;
+        std::vector<std::thread> threads;
+
+        {
+            auto joinThreads = wil::scope_exit([&]() {
+                for (auto& thread : threads)
+                {
+                    thread.join();
+                }
+            });
+
+            for (auto t = 0; t < c_threadCount; ++t)
+            {
+                threads.emplace_back([&]() {
+                    try
+                    {
+                        const auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
+                        for (auto i = 0; i < c_iterations; ++i)
+                        {
+                            auto [result, process, error] = WSLCProcessLauncher("/bin/true", {"/bin/true"}).LaunchNoThrow(*m_defaultSession);
+                            if (FAILED(result))
+                            {
+                                LogError("Root process launch failed: 0x%08x, errno: %i", result, error);
+                                ++failures;
+                                return;
+                            }
+                        }
+                    }
+                    catch (...)
+                    {
+                        LOG_CAUGHT_EXCEPTION();
+                        ++failures;
+                    }
+                });
+            }
+        }
+
+        VERIFY_ARE_EQUAL(failures.load(), 0u);
+
+        // Validate that exit notifications are still functional.
+        ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "echo OK"}, 0);
+    }
+
     WSLC_TEST_METHOD(CreateRootNamespaceProcess)
     {
         // Reject invalid process flags.
