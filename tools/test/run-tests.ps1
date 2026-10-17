@@ -36,6 +36,9 @@ param (
     [switch]$PullRequest = $false,
     [string]$TestDllPath = ".\wsltests.dll",
     [switch]$Fast = $false,
+    # Set only on x64 hosts whose nested-virtualization prerequisite has been
+    # independently established by the test job. Forwarded to TAEF as a runtime parameter.
+    [switch]$NestedVirtualizationSupported = $false,
     [parameter(ValueFromRemainingArguments = $true)]
     [string[]]$TeArgs
 )
@@ -91,7 +94,8 @@ if ($TeArgs -and ($TeArgs -icontains '/attachdebugger'))
 }
 
 $teArgList = @($TestDllPath, "/p:SetupScript=$SetupScript", "/p:Version=$Version", "/p:DistroPath=$DistroPath", "/p:TestDataPath=$TestDataPath",
-    "/p:Package=$Package", "/p:UnitTestsPath=$UnitTestsPath", "/p:PullRequest=$PullRequest", "/p:AllowUnsigned=1") + $TeArgs
+    "/p:Package=$Package", "/p:UnitTestsPath=$UnitTestsPath", "/p:PullRequest=$PullRequest", "/p:AllowUnsigned=1",
+    "/p:NestedVirtualizationSupported=$NestedVirtualizationSupported") + $TeArgs
 
 $verifierTargetsEnabled = @()
 $testExitCode = 0
