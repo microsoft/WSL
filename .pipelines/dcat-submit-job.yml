@@ -39,37 +39,32 @@ jobs:
     dependsOn: ${{ parameters.dependsOn }}
     timeoutInMinutes: 30
     pool:
-      type: release
-      os: windows
+      type: windows
+      isCustom: true
+      name: wsl-release-pool
 
     variables:
       dcatSubmissionPath: $(Pipeline.Workspace)\dcat
+      cabDownloadPath: $(Pipeline.Workspace)\cabs
       dcatContentPath: $(Pipeline.Workspace)\dcat-content
 
     templateContext:
-      inputs:
-        - input: pipelineArtifact
-          ${{ if ne(parameters.artifactPipeline, '') }}:
-            pipeline: ${{ parameters.artifactPipeline }}
-          artifactName: drop_wsl_dcat
-          targetPath: $(Pipeline.Workspace)\dcat
-
-        # The build artifacts are large, so only pull the CABs that are actually submitted.
-        - input: pipelineArtifact
-          ${{ if ne(parameters.artifactPipeline, '') }}:
-            pipeline: ${{ parameters.artifactPipeline }}
-          artifactName: drop_wsl_build
-          targetPath: $(Pipeline.Workspace)\drop_x64
-          itemPattern: bundle/*.cab
-
-        - input: pipelineArtifact
-          ${{ if ne(parameters.artifactPipeline, '') }}:
-            pipeline: ${{ parameters.artifactPipeline }}
-          artifactName: drop_wsl_build_arm64
-          targetPath: $(Pipeline.Workspace)\drop_arm64
-          itemPattern: bundle/*.cab
+      type: releaseJob
 
     steps:
+      - template: dcat-download-steps.yml
+        parameters:
+          artifactPipeline: ${{ parameters.artifactPipeline }}
+          artifacts:
+            - name: drop_wsl_dcat
+              targetPath: $(dcatSubmissionPath)
+            - name: drop_wsl_build
+              targetPath: $(cabDownloadPath)
+              patterns: bundle/*.cab
+            - name: drop_wsl_build_arm64
+              targetPath: $(cabDownloadPath)
+              patterns: bundle/*.cab
+
       - ${{ if eq(parameters.updateRunName, true) }}:
           - pwsh: |
               # Surface the version being published as the run name. The version is extracted from the CAB file name.
@@ -87,7 +82,7 @@ jobs:
           - pwsh: |
               New-Item -ItemType Directory -Path '$(dcatContentPath)' -Force | Out-Null
 
-              $cabs = @(Get-ChildItem -Path '$(Pipeline.Workspace)\drop_${{ platform }}\bundle' -Filter '*.cab')
+              $cabs = @(Get-ChildItem -Path '$(cabDownloadPath)\bundle' -Filter '*.${{ platform }}.cab')
               if ($cabs.Count -ne 1) {
                   throw "Expected exactly one ${{ platform }} CAB file, found $($cabs.Count)."
               }
