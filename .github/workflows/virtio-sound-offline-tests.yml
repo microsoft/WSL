@@ -1,0 +1,33 @@
+name: Virtio sound offline tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/windows/virtiosound/**'
+      - '.github/workflows/virtio-sound-offline-tests.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline-tests:
+    name: Windows CTest suite
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Configure standalone test build
+        run: cmake -S src/windows/virtiosound -B "${env:RUNNER_TEMP}\wsl-virtio-sound" -A x64 -DWSL_VIRTIO_SOUND_BUILD_TESTS=ON
+
+      - name: Build standalone tests
+        run: cmake --build "${env:RUNNER_TEMP}\wsl-virtio-sound" --config Release --parallel 2
+
+      - name: Run hardware-independent CTest suites
+        run: ctest --test-dir "${env:RUNNER_TEMP}\wsl-virtio-sound" --build-config Release --output-on-failure

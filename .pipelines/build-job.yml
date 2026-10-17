@@ -14,6 +14,10 @@ parameters:
   - name: packageVersion
     type: string
 
+  - name: enableExperimentalVirtioSound
+    type: boolean
+    default: false
+
   - name: traceLoggingConfig
     type: string
     default: ''
@@ -124,7 +128,7 @@ jobs:
         displayName: "CMake ${{ parameters.platform }}"
         inputs:
           workingDirectory: "."
-          cmakeArgs: . --fresh -A ${{ parameters.platform }} -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_VERSION=10.0.26100.0 -DPACKAGE_VERSION=$(version.WSL_PACKAGE_VERSION) -DWSL_NUGET_PACKAGE_VERSION=$(version.WSL_NUGET_PACKAGE_VERSION) -DSKIP_PACKAGE_SIGNING=${{ parameters.isRelease }} -DOFFICIAL_BUILD=${{ parameters.isRelease }} -DINCLUDE_PACKAGE_STAGE=${{ or(parameters.isRelease, parameters.isNightly) }} -DPIPELINE_BUILD_ID=$(Build.BuildId) -DVSO_ORG=${{ parameters.vsoOrg }} -DVSO_PROJECT=${{ parameters.vsoProject }} -DWSL_BUILD_WSL_SETTINGS=true -DWSL_INCLUDE_SDK_CSHARP=true -DWSL_UNITY_BATCH_SIZE=4 $(packageInputDirArg)\${{ parameters.platform }}
+          cmakeArgs: . --fresh -A ${{ parameters.platform }} -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_VERSION=10.0.26100.0 -DPACKAGE_VERSION=$(version.WSL_PACKAGE_VERSION) -DWSL_NUGET_PACKAGE_VERSION=$(version.WSL_NUGET_PACKAGE_VERSION) -DSKIP_PACKAGE_SIGNING=${{ parameters.isRelease }} -DOFFICIAL_BUILD=${{ parameters.isRelease }} -DINCLUDE_PACKAGE_STAGE=${{ or(parameters.isRelease, parameters.isNightly) }} -DPIPELINE_BUILD_ID=$(Build.BuildId) -DVSO_ORG=${{ parameters.vsoOrg }} -DVSO_PROJECT=${{ parameters.vsoProject }} -DWSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND=${{ parameters.enableExperimentalVirtioSound }} -DWSL_VIRTIO_SOUND_BUILD_TESTS=${{ parameters.enableExperimentalVirtioSound }} -DWSL_BUILD_WSL_SETTINGS=true -DWSL_INCLUDE_SDK_CSHARP=true -DWSL_UNITY_BATCH_SIZE=4 $(packageInputDirArg)\${{ parameters.platform }}
 
       # Workaround for WSL Settings NuGet restore authentication issue
       - script: _deps\nuget.exe restore -NonInteractive
@@ -148,7 +152,10 @@ jobs:
                   AppRegistrationClientId: ${{ parameters.esrp.AppRegistrationClientId }}
                   AppRegistrationTenantId: ${{ parameters.esrp.AppRegistrationTenantId }}
                   FolderPath: "bin\\${{ parameters.platform }}\\Release"
-                  Pattern: "${{ target.pattern }}"
+                  ${{ if and(parameters.enableExperimentalVirtioSound, contains(target.target, 'wslservice')) }}:
+                    Pattern: "${{ target.pattern }},wsl-audio-worker.exe"
+                  ${{ else }}:
+                    Pattern: "${{ target.pattern }}"
                   UseMSIAuthentication: true
                   EsrpClientId: ${{ parameters.esrp.EsrpClientId }}
                   inlineOperation: |
@@ -182,6 +189,10 @@ jobs:
                   script: |
                       $arch = '${{ parameters.platform }}'
                       $pattern = '${{ target.pattern }}'
+                      $buildTargets = '${{ target.target }}'.Split(';')
+                      if ('${{ parameters.enableExperimentalVirtioSound }}' -eq 'True' -and $buildTargets -contains 'wslservice') {
+                          $pattern += ',wsl-audio-worker.exe'
+                      }
                       $inputDir = "bin\$arch\Release"
                       $outputDir = "$(packageStagingDir)\$arch"
                       New-Item -ItemType Directory -Path "$outputDir\wslsettings" -Force
@@ -198,6 +209,10 @@ jobs:
 
       - script: cmake --build . --config Release -- -m /bl:$(ob_outputDirectory)\binlogs\${{ parameters.platform }}.binlog
         displayName: "Build remaining targets (${{ parameters.platform }})"
+
+      - ${{ if and(parameters.enableExperimentalVirtioSound, parameters.includeTestArtifacts) }}:
+        - script: ctest --test-dir src/windows/virtiosound --build-config Release --output-on-failure
+          displayName: "Run offline virtio-sound CTest suite (${{ parameters.platform }})"
 
       - task: PowerShell@2
         displayName: "Stage MSI and installer msix (${{ parameters.platform }})"
