@@ -128,7 +128,7 @@ inline int Run(int argc, wchar_t** argv) noexcept
         const HANDLE waits[]{stop, parent};
         for (;;)
         {
-            const DWORD wait = WaitForMultipleObjects(2, waits, FALSE, 10);
+            const DWORD wait = WaitForMultipleObjects(2, waits, FALSE, native::VirtioSoundDevice::c_capturePumpIntervalMs);
             if (wait == WAIT_OBJECT_0)
             {
                 // The parent signals stop only after confirming guest shutdown.

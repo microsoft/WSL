@@ -114,3 +114,10 @@ Record results against the exact source revision, WSL package version, matched
 kernel/module pair, and input backend. Earlier binary results are not runtime
 validation of changed source. WSL package version numbers and the WSL1/WSL2
 architecture designation are separate version axes.
+
+Source-clocked capture rejects PCM buffer/period configurations that cannot
+sustain the nominal 10 ms host pump interval. The per-pump budget retains one
+guest period of headroom and must contain at least 10 ms of frames in complete
+periods. At 48 kHz, a 512-frame buffer with a 128-frame period is unsupported;
+a 1024-frame buffer with a 256-frame period satisfies this capacity check.
+This is a throughput constraint, not a guarantee against host scheduling stalls.

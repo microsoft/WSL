@@ -76,6 +76,8 @@ public:
     // Sources paced by an external clock may expose the number of frames
     // already buffered for immediate delivery. nullopt keeps the device's
     // elapsed-time pacing for sources whose clock is unknown to the device.
+    // Whether this returns nullopt must remain stable across stream states,
+    // including before SET_PARAMS. This is also used to validate pump capacity.
     // This query must remain a bounded state-only operation.
     virtual std::optional<std::uint32_t> AvailableFrames() const noexcept
     {
@@ -112,6 +114,7 @@ public:
     static constexpr std::uint32_t c_queueCount = 4;
     static constexpr std::uint16_t c_maxQueueSize = 128;
     static constexpr std::uint32_t c_maxTransferBytes = 1024 * 1024;
+    static constexpr std::uint32_t c_capturePumpIntervalMs = 10;
 
     // A null PCM source selects the deterministic stereo 48 kHz S16 ramp.
     // Any other format requires an explicit source.

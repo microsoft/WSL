@@ -71,6 +71,9 @@ if(WIN32)
         HdvPciDeviceHostTests.cpp
         ../src/VirtioSoundDevice.cpp
         ../src/windows/HdvPciDeviceHost.cpp)
+    # The test and adapter intentionally define matching test-only types in
+    # separate translation units; they must not be merged by the parent build.
+    set_target_properties(wsl_virtio_sound_hdv_lifecycle_tests PROPERTIES UNITY_BUILD OFF)
     target_include_directories(wsl_virtio_sound_hdv_lifecycle_tests
         PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
     target_compile_features(wsl_virtio_sound_hdv_lifecycle_tests

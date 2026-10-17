@@ -723,6 +723,21 @@ public:
         {
             return StatusResponse(c_statusBadMessage);
         }
+        if (m_pcmSource && m_pcmSource->AvailableFrames().has_value())
+        {
+            // A clocked source must drain at least one pump interval per tick,
+            // in whole guest periods, while retaining one period of headroom.
+            const auto bufferFrames = newBufferBytes / m_frameBytes;
+            const auto periodFrames = newPeriodBytes / m_frameBytes;
+            const auto burstFrames = (std::min)(c_maxTransferBytes / m_frameBytes, bufferFrames - periodFrames);
+            const auto wholePeriodFrames = (burstFrames / periodFrames) * periodFrames;
+            const auto intervalFrames =
+                (static_cast<std::uint64_t>(m_format.m_sampleRate) * c_capturePumpIntervalMs + 999) / 1000;
+            if (wholePeriodFrames < intervalFrames)
+            {
+                return StatusResponse(c_statusNotSupported);
+            }
+        }
         StopSource();
         m_bufferBytes = newBufferBytes;
         m_periodBytes = newPeriodBytes;
