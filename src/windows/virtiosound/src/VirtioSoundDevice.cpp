@@ -1309,7 +1309,17 @@ public:
                 // buffer through even on the first tick after START.
                 m_elapsedFrameCredit = 0;
                 const std::uint32_t maximumFrames = VirtioSoundDevice::c_maxTransferBytes / m_frameBytes;
-                const std::uint32_t availableBudget = (std::min)(*availableFrames, maximumFrames);
+                std::uint32_t maximumBurstFrames = maximumFrames;
+                const std::uint32_t bufferFrames = m_bufferBytes / m_frameBytes;
+                const std::uint32_t periodFrames = m_periodBytes / m_frameBytes;
+                if (bufferFrames > periodFrames)
+                {
+                    // Preserve one period of guest-ring headroom. A single
+                    // source burst that fills the modulo-indexed guest ring
+                    // can look like no pointer movement to the consumer.
+                    maximumBurstFrames = (std::min)(maximumBurstFrames, bufferFrames - periodFrames);
+                }
+                const std::uint32_t availableBudget = (std::min)(*availableFrames, maximumBurstFrames);
                 return PumpCapture(static_cast<int>(availableBudget));
             }
         }

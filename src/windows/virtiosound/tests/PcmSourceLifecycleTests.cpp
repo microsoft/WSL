@@ -255,12 +255,12 @@ struct Fixture
         return static_cast<std::uint32_t>(Get(guest, descriptor.responseAddress, 4U));
     }
 
-    std::uint32_t SetParams()
+    std::uint32_t SetParams(std::uint32_t bufferBytes = 16U, std::uint32_t periodBytes = 8U)
     {
         std::vector<std::uint8_t> request(24U, 0U);
         PutVector(request, 0U, 0x0101U, 4U);
-        PutVector(request, 8U, 16U, 4U);
-        PutVector(request, 12U, 8U, 4U);
+        PutVector(request, 8U, bufferBytes, 4U);
+        PutVector(request, 12U, periodBytes, 4U);
         PutVector(request, 16U, 1U << 4, 4U); // Enable PCM_XRUN notifications.
         request[20U] = 2U;
         request[21U] = 5U; // S16_LE
@@ -492,6 +492,110 @@ void TestHardwareAvailabilityBypassesStartupCreditAndBoundsHugeElapsedTime()
         "the next descriptor completes when its own hardware frames arrive");
 }
 
+void TestHardwareBurstLeavesOneGuestPeriodOfRingHeadroom()
+{
+    constexpr std::uint32_t frameBytes = 4U;
+    constexpr std::uint32_t bufferFrames = 8192U;
+    constexpr std::uint32_t periodFrames = 2048U;
+    auto source = std::make_shared<TrackingPcmSource>();
+    Fixture fixture(source);
+    Require(
+        fixture.SetParams(bufferFrames * frameBytes, periodFrames * frameBytes) == c_statusOk,
+        "four-period SET_PARAMS succeeds");
+    Require(fixture.Command(0x0102U) == c_statusOk, "PREPARE succeeds");
+    Require(fixture.Command(0x0104U) == c_statusOk, "START succeeds");
+
+    for (std::uint16_t period = 0U; period < 4U; ++period)
+    {
+        const std::uint16_t availableIndex = static_cast<std::uint16_t>(period + 1U);
+        const std::uint16_t ringSlot = period;
+        const std::uint16_t head = static_cast<std::uint16_t>(period * 2U);
+        const std::uint16_t descriptorIndex = head;
+        const std::uint64_t requestAddress = 0xc000U + 0x10000ULL * period;
+        const std::uint64_t responseAddress = 0xd000U + 0x10000ULL * period;
+        fixture.QueueRxAt(
+            availableIndex,
+            ringSlot,
+            head,
+            descriptorIndex,
+            requestAddress,
+            responseAddress,
+            periodFrames);
+    }
+    source->availableFrames = bufferFrames;
+
+    const int deliveredFrames = fixture.device->PumpCaptureElapsed(0U);
+    Require(
+        deliveredFrames == static_cast<int>(bufferFrames - periodFrames),
+        ("a source burst completes only the guest ring's free headroom, not an exact full-buffer wrap (got " +
+         std::to_string(deliveredFrames) + " frames)").c_str());
+    Require(
+        source->readCalls == 3U && source->availableFrames == periodFrames && Get(fixture.guest, 0x9002U, 2U) == 3U,
+        "three RX periods complete while the fourth remains queued with one period of source frames");
+    Require(
+        Get(fixture.guest, 0xd000U + 0x10000ULL * 2U + periodFrames * frameBytes, 4U) == c_statusOk &&
+            Get(fixture.guest, 0xd000U + 0x10000ULL * 3U + periodFrames * frameBytes, 4U) == 0U,
+        "headroom completion publishes the third status and leaves the fourth descriptor untouched");
+}
+
+void TestHardwareBurstHeadroomRetainsMultiPeriodThroughput()
+{
+    constexpr std::uint32_t frameBytes = 4U;
+    constexpr std::uint32_t bufferFrames = 8U;
+    constexpr std::uint32_t periodFrames = 2U;
+    auto source = std::make_shared<TrackingPcmSource>();
+    Fixture fixture(source);
+    Require(
+        fixture.SetParams(bufferFrames * frameBytes, periodFrames * frameBytes) == c_statusOk,
+        "four-small-period SET_PARAMS succeeds");
+    Require(fixture.Command(0x0102U) == c_statusOk, "PREPARE succeeds");
+    Require(fixture.Command(0x0104U) == c_statusOk, "START succeeds");
+
+    for (std::uint16_t period = 0U; period < 4U; ++period)
+    {
+        const std::uint16_t availableIndex = static_cast<std::uint16_t>(period + 1U);
+        const std::uint16_t head = static_cast<std::uint16_t>(period * 2U);
+        fixture.QueueRxAt(
+            availableIndex,
+            period,
+            head,
+            head,
+            0xc000U + 0x100ULL * period,
+            0xd000U + 0x100ULL * period,
+            periodFrames);
+    }
+    source->availableFrames = bufferFrames;
+
+    Require(
+        fixture.device->PumpCaptureElapsed(0U) == static_cast<int>(bufferFrames - periodFrames),
+        "small periods still make progress up to the negotiated ring headroom");
+    Require(
+        source->readCalls == 3U && source->availableFrames == periodFrames && Get(fixture.guest, 0x9002U, 2U) == 3U,
+        "the headroom limit permits three periods in one pump rather than reducing throughput to one period");
+}
+
+void TestHardwareBurstDoesNotDeadlockOnePeriodBuffer()
+{
+    constexpr std::uint32_t frameBytes = 4U;
+    constexpr std::uint32_t periodFrames = 2U;
+    auto source = std::make_shared<TrackingPcmSource>();
+    Fixture fixture(source);
+    Require(
+        fixture.SetParams(periodFrames * frameBytes, periodFrames * frameBytes) == c_statusOk,
+        "one-period SET_PARAMS succeeds");
+    Require(fixture.Command(0x0102U) == c_statusOk, "PREPARE succeeds");
+    Require(fixture.Command(0x0104U) == c_statusOk, "START succeeds");
+    fixture.QueueRxAt(1U, 0U, 0U, 0U, 0xc000U, 0xd000U, periodFrames);
+    source->availableFrames = periodFrames;
+
+    Require(
+        fixture.device->PumpCaptureElapsed(0U) == static_cast<int>(periodFrames),
+        "when the negotiated ring is one period, capture remains able to deliver that period");
+    Require(
+        source->readCalls == 1U && source->availableFrames == 0U && Get(fixture.guest, 0x9002U, 2U) == 1U,
+        "the one-period RX descriptor completes instead of being blocked by a zero headroom budget");
+}
+
 void TestHardwareAvailabilityLeavesZeroAndPartialDescriptorsQueued()
 {
     auto source = std::make_shared<TrackingPcmSource>();
@@ -689,6 +793,9 @@ int main()
         TestResetCancelsPendingStartWithoutStaleCompletion();
         TestPendingStartGuestWriteFailureFaultsAndDropsChain();
         TestHardwareAvailabilityBypassesStartupCreditAndBoundsHugeElapsedTime();
+        TestHardwareBurstLeavesOneGuestPeriodOfRingHeadroom();
+        TestHardwareBurstHeadroomRetainsMultiPeriodThroughput();
+        TestHardwareBurstDoesNotDeadlockOnePeriodBuffer();
         TestHardwareAvailabilityLeavesZeroAndPartialDescriptorsQueued();
         TestHardwareAvailabilityDoesNotSurviveStopOrReset();
         TestStartAndAsyncReadinessFailuresSurfaceErrors();
