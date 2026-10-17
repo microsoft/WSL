@@ -120,7 +120,7 @@ void ParseArgumentsStateMachine::SetFlag(ArgType type, bool value)
     // (e.g. "--flag --flag=false" ends up false). Read flags back via ArgMap::GetValue(defaultValue), which
     // folds the presence check and the stored value into one test, rather than a bare Contains().
     ClearArgument(type);
-    m_executionArgs.Add(type, value);
+    m_executionArgs.Add(type, value, Source::CommandLine);
 
     if (type == ArgType::Help && value)
     {
@@ -177,7 +177,7 @@ void ParseArgumentsStateMachine::AddValue(ArgType type, std::wstring value)
         ClearArgument(type);
     }
 
-    m_executionArgs.Add(type, std::move(value));
+    m_executionArgs.Add(type, std::move(value), Source::CommandLine);
 }
 
 // Parse rules:
@@ -280,7 +280,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessPositionalA
         m_anchorPositional = Argument(*nextPositional);
     }
 
-    m_executionArgs.Add(nextPositional->Type(), std::wstring{currArg});
+    m_executionArgs.Add(nextPositional->Type(), std::wstring{currArg}, Source::CommandLine);
     return {};
 }
 
@@ -294,7 +294,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPos
     // Unlimited anchors are never full and therefore always treat subsequent positionals as anchors.
     if (m_anchorPositional.value().IsUnlimited() || (m_executionArgs.Count(m_anchorPositional.value().Type()) < 1))
     {
-        m_executionArgs.Add(m_anchorPositional.value().Type(), std::wstring{currArg});
+        m_executionArgs.Add(m_anchorPositional.value().Type(), std::wstring{currArg}, Source::CommandLine);
         return {};
     }
 
@@ -307,7 +307,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPos
     const Argument* nextPositional = NextPositional();
     if (nextPositional)
     {
-        m_executionArgs.Add(nextPositional->Type(), std::wstring{currArg});
+        m_executionArgs.Add(nextPositional->Type(), std::wstring{currArg}, Source::CommandLine);
         return {};
     }
 
@@ -329,7 +329,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPos
         ++m_invocationItr;
     }
 
-    m_executionArgs.Add(m_forwardArgs.front().Type(), std::move(forwardedArgs));
+    m_executionArgs.Add(m_forwardArgs.front().Type(), std::move(forwardedArgs), Source::CommandLine);
     return {};
 }
 
