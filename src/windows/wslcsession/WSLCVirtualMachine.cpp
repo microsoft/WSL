@@ -389,19 +389,9 @@ WSLCVirtualMachine::~WSLCVirtualMachine()
 
     m_vmTerminatingEvent.SetEvent();
 
-    m_initChannel.Close();
-
-    // Terminate the VM.
-    m_vm.reset();
-
     if (m_processExitThread.joinable())
     {
         m_processExitThread.join();
-    }
-
-    if (m_crashDumpThread.joinable())
-    {
-        m_crashDumpThread.join();
     }
 
     // Detach under the registry lock, but notify processes outside it so their destructors can unregister.
@@ -418,6 +408,16 @@ WSLCVirtualMachine::~WSLCVirtualMachine()
         {
             locked->OnVmTerminated();
         }
+    }
+
+    m_initChannel.Close();
+
+    // Terminate the VM.
+    m_vm.reset();
+
+    if (m_crashDumpThread.joinable())
+    {
+        m_crashDumpThread.join();
     }
 }
 

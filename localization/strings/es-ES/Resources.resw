@@ -925,6 +925,14 @@ Revirtiendo a las redes NAT.</value>
     <value>IPv6 está deshabilitado en el host de forma no compatible (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>Las redes reflejadas usan un intervalo de puertos efímeros más pequeño (puertos {} en lugar de {}). Esto puede limitar el número de conexiones simultáneas.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>Las redes reflejadas no pudieron reservar el intervalo contiguo mínimo de {} puertos TCP y UDP. Compruebe el uso y las exclusiones del puerto de Windows.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>No se admite el firewall de Hyper-V</value>
   </data>
@@ -2681,14 +2689,6 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
   <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
     <value>Copia archivos entre un contenedor y el sistema de archivos local.</value>
   </data>
-  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
-    <value>Copiar archivos entre un contenedor y el sistema de archivos local.
-Uso: wslc container cp [OPCIONES] ORIGEN DESTINO
- Local a contenedor: wslc container cp LOCAL_PATH CONTAINER:PATH
- Contenedor a local: wslc container cp CONTAINER:PATH LOCAL_PATH
- Entrada estándar a contenedor: wslc container cp - CONTAINER:PATH</value>
-    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
-  </data>
   <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
     <value>Origen: ruta de acceso local, CONTAINER:PATH o "-" para stdin</value>
     <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
@@ -3295,6 +3295,10 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>No se admite la opción "{}".</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
+    <value>Modo "{}" no válido.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
     <value>El destino de montaje es obligatorio.</value>
   </data>
@@ -3881,28 +3885,25 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>No se puede exportar el contenedor al terminal. Use la opción -o o redirija stdout.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>Formato esperado: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
+    <value>Formato esperado: [&lt;host path | named volume&gt;:]&lt;container path&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
-  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>Especificaciones de volumen no válidas: “{}”. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
+    <value>Especificación de volumen no válida: "{}". {} {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>Especificaciones de volumen no válidas: “{}”. La ruta de acceso no puede estar vacía. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
+    <value>La especificación de volumen está vacía.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
-    <value>Especificaciones de volumen no válidas: “{}”. La ruta del contenedor no puede estar vacía. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
+    <value>La especificación de volumen contiene una sección vacía entre dos puntos.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
-    <value>Especificaciones de volumen no válidas: “{}”. La ruta del contenedor debe ser una ruta absoluta (que comience con “/”). {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
+    <value>La especificación de volumen contiene demasiados signos de dos puntos.</value>
   </data>
-  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
-    <value>Especificaciones de volumen no válidas: “{}”. La ruta del host “{}” no es una ruta válida de Windows.</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
+    <value>La ruta de acceso del host '{}' no es una ruta de acceso de Windows válida.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
     <value>Nombre o id. de cualquier tipo de objeto</value>

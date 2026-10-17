@@ -925,6 +925,14 @@ NAT ネットワークにフォールバックしています。</value>
     <value>IPv6 が、サポートされていない方法でホスト上で無効になっています (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>ミラー化されたネットワークでは、より小さなエフェメラル ポート範囲 ({} ではなく {} ポート) が使用されています。これにより、同時接続の数が制限される可能性があります。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>ミラー化されたネットワークでは、{} 個の TCP ポートと UDP ポートの最小連続範囲を予約できませんでした。Windows ポートの使用状況と除外を確認します。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Hyper-V ファイアウォールはサポートされていません</value>
   </data>
@@ -2681,14 +2689,6 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
     <value>コンテナーとローカル ファイル システムの間でファイルをコピーします。</value>
   </data>
-  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
-    <value>コンテナーとローカル ファイルシステムの間でファイルをコピーします。
-使用法: wslc container cp [OPTIONS] SOURCE DEST
-  ローカルからコンテナーへ: wslc container cp LOCAL_PATH CONTAINER:PATH
-  コンテナーからローカルへ: wslc container cp CONTAINER:PATH LOCAL_PATH
-  Stdin からコンテナーへ: wslc container cp - CONTAINER:PATH</value>
-    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
-  </data>
   <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
     <value>ソース: ローカル パス、CONTAINER:PATH、または '-' で stdin</value>
     <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
@@ -3295,6 +3295,10 @@ Windows バージョン: {}</value>
     <value>オプション '{}' はサポートされていません。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
+    <value>モード '{}' が無効です。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
     <value>マウント ターゲットが必要です。</value>
   </data>
@@ -3881,28 +3885,25 @@ Windows バージョン: {}</value>
     <value>コンテナーをターミナルにエクスポートできません。-o オプションを使用するか、stdout をリダイレクトします。</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>必要な形式: &lt;ホスト パス | 名前付きボリューム&gt;:&lt;コンテナー パス&gt;[:モード]</value>
+    <value>必要な形式: [&lt;ホスト パス | 名前付きボリューム&gt;:]&lt;コンテナー パス&gt;[:モード]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
-  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>ボリュームの指定が無効です: '{}'。{}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
+    <value>ボリュームの指定が無効です: '{}'。{} {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>ボリュームの指定が無効です: '{}'。ホスト パスを空にすることはできません。{}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
+    <value>ボリューム指定が空です。</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
-    <value>ボリュームの指定が無効です: '{}'。コンテナパスは空にできません。{}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
+    <value>ボリューム指定に、コロンで区切られた空のセクションがあります。</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
-    <value>ボリュームの指定が無効です: '{}'。コンテナー パスは絶対パス ('/' で始まる) である必要があります。{}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
+    <value>ボリューム指定に含まれているコロンが多すぎます。</value>
   </data>
-  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
-    <value>ボリュームの指定が無効です: '{}'。ホスト パス '{}' は有効な Windows パスではありません。</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
+    <value>ホスト パス '{}' は有効な Windows パスではありません。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
     <value>任意のオブジェクトの種類の名前または ID</value>

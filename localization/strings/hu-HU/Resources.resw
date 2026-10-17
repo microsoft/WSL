@@ -919,6 +919,14 @@ Visszaállás NAT-hálózatkezelésre.</value>
     <value>Az IPv6 nem támogatott módon van letiltva a gazdagépen (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>A tükrözött hálózatkezelés kisebb rövid élettartamú porttartományt használ ({} port helyett {}). Ez korlátozhatja az egyidejű kapcsolatok számát.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>A tükrözött hálózatkezelés nem tudta lefoglalni a legalább {} egymást követő TCP- és UDP-portból álló tartományt. Ellenőrizze a Windows porthasználatát és a kizárásokat.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>A Hyper-V tűzfal nem támogatott</value>
   </data>
@@ -2675,14 +2683,6 @@ További információ a termékről: https://aka.ms/privacy.</value>
   <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
     <value>Fájlok másolása egy tároló és a helyi fájlrendszer között.</value>
   </data>
-  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
-    <value>Fájlok másolása egy tároló és a helyi fájlrendszer között.
-Használat: wslc container cp [OPTIONS] SOURCE DEST
-  Helyi tároló: wslc container cp LOCAL_PATH CONTAINER:PATH
-  Tárolóból helyi: wslc container cp CONTAINER:PATH LOCAL_PATH
-  Stdin-ről tárolóba: wslc container cp - CONTAINER:PATH</value>
-    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
-  </data>
   <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
     <value>Forrás: helyi elérési út, CONTAINER:PATH vagy "-" az stdin esetében</value>
     <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
@@ -3289,6 +3289,10 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>A(z) {} beállítás nem támogatott.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
+    <value>Érvénytelen mód: '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
     <value>A csatlakoztatási cél megadása kötelező.</value>
   </data>
@@ -3875,28 +3879,25 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Nem lehet a tárolót a terminálba exportálni. Használja az -o opciót, vagy irányítsa át a stdout-ot.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>Várt formátum: &lt;gazdaelérési út | elnevezett kötet&gt;:&lt;tároló elérési útja&gt;[:mód]</value>
+    <value>Várt formátum: [&lt;gazdaelérési út | elnevezett kötet&gt;:]&lt;tároló elérési útja&gt;[:mód]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
-  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>Érvénytelen kötetspecifikációk: {}. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
+    <value>Érvénytelen kötetspecifikációk: „{}”. {} {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>Érvénytelen kötetspecifikációk: {}. A gazdagép elérési útja nem lehet üres. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
+    <value>A kötetspecifikáció üres.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
-    <value>Érvénytelen kötetspecifikációk: {}. A tároló elérési útja nem lehet üres. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
+    <value>A kötetspecifikáció kettőspontok közötti szakasza üres.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
-    <value>Érvénytelen kötetspecifikációk: '{}'. A tároló elérési útjának abszolút elérési útnak kell lennie (/ karakterrel kezdődik). {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
+    <value>A kötetspecifikáció túl sok kettőspontot tartalmaz.</value>
   </data>
-  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
-    <value>Érvénytelen kötetspecifikációk: {}. A gazdagép {} elérési útja nem érvényes Windows-elérési út.</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
+    <value>A gazdagép {} elérési útja nem érvényes Windows-elérési út.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
     <value>Bármely objektumtípus neve vagy azonosítója</value>

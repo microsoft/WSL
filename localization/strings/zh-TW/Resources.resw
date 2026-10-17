@@ -925,6 +925,14 @@ Windows 版本： {}</value>
     <value>在主機上以不受支援的方式停用 IPv6 (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>鏡像網路正在使用較小的暫時性連接埠範圍 ({} 個連接埠，而不是 {})。這可能會限制同時連線的數目。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>鏡像網路無法保留 {} TCP 和 UDP 連接埠的最小連續範圍。檢查 Windows 連接埠使用方式和排除項目。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>不支援 Hyper-V 防火牆</value>
   </data>
@@ -2681,14 +2689,6 @@ Windows 版本： {}</value>
   <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
     <value>在容器與本機檔案系統之間複製檔案。</value>
   </data>
-  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
-    <value>在容器與本機檔案系統之間複製檔案。
-使用方式: wslc container cp [OPTIONS] SOURCE DEST
-  本機至容器: wslc container cp LOCAL_PATH CONTAINER:PATH
-  容器至區域l: wslc container cp CONTAINER:PATH LOCAL_PATH
-  Stdin 至容器: wslc container cp - CONTAINER:PATH</value>
-    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
-  </data>
   <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
     <value>來源: stdin 的本機路徑、CONTAINER:PATH 或針對 stdin 的「-」</value>
     <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
@@ -3295,6 +3295,10 @@ Windows 版本：{}</value>
     <value>不支援選項 '{}'。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
+    <value>無效的模式 '{}'。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
     <value>需要掛接目標。</value>
   </data>
@@ -3884,25 +3888,22 @@ Windows 版本：{}</value>
     <value>預期的格式: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
-  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>無效的磁碟區規格: '{}'。{}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
+    <value>無效的磁碟區規格: '{}'。{} {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>磁碟區規格無效： '{}'。主機路徑不可為空白。{}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
+    <value>磁碟區規格為空白。</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
-    <value>磁碟區規格無效： '{}'。容器路徑不可為空白。{}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
+    <value>磁碟區規格在冒號之間包含空白區段。</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
-    <value>磁碟區規格無效： '{}'。容器路徑必須是絕對路徑 (開頭為 '/')。{}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
+    <value>磁碟區規格包含太多冒號。</value>
   </data>
-  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
-    <value>磁碟區規格無效： '{}'。主機路徑 '{}' 不是有效的 Windows 路徑。</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
+    <value>主機路徑 '{}' 不是有效的 Windows 路徑。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
     <value>任何物件類型的名稱或識別碼</value>
