@@ -425,7 +425,7 @@ void HandleMessageImpl(
     wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_ACCEPT& Message, const gsl::span<gsl::byte>& Buffer)
 {
     sockaddr_vm SocketAddress{};
-    wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, 1, true)};
+    wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, 1, true, LX_INIT_HVSOCKET_LISTEN_BUFFER_SIZE)};
     THROW_LAST_ERROR_IF(!ListenSocket);
 
     Transaction.SendResultMessage<uint32_t>(SocketAddress.svm_port);
@@ -722,7 +722,8 @@ void HandleMessageImpl(
     wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_FORK& Message, const gsl::span<gsl::byte>& Buffer)
 {
     sockaddr_vm SocketAddress{};
-    wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, 1, true)};
+    wil::unique_fd ListenSocket{UtilListenVsockAnyPort(
+        &SocketAddress, 1, true, Message.ForkType == WSLC_FORK::Thread ? std::optional<int>{} : LX_INIT_HVSOCKET_LISTEN_BUFFER_SIZE)};
     THROW_LAST_ERROR_IF(!ListenSocket);
 
     WSLC_FORK_RESULT Response{};
