@@ -162,7 +162,7 @@ inline int Run(int argc, wchar_t** argv) noexcept
             last = now;
             if (elapsed > 0)
             {
-                host->PumpCaptureElapsed(std::min<std::uint64_t>(static_cast<std::uint64_t>(elapsed), 20000000));
+                host->PumpCaptureElapsed(static_cast<std::uint64_t>(elapsed));
             }
         }
         // The parent confirms guest shutdown before signaling stop. Keep the
