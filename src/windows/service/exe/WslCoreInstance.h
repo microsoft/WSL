@@ -26,6 +26,12 @@ Abstract:
 class WslCoreInstance : public LxssRunningInstance
 {
 public:
+    struct FileSystemSpaceInfo
+    {
+        uint64_t TotalBytes;
+        uint64_t UsedBytes;
+    };
+
     class WslCorePort final : public LxssPort
     {
     public:
@@ -138,6 +144,7 @@ private:
     // System-distro access must not wait on m_lock, which can be held while waiting for OOBE.
     std::atomic<std::shared_ptr<WslCoreInstance>> m_systemDistro;
     WSLDistributionInformation m_distributionInfo{};
+    std::optional<FileSystemSpaceInfo> m_fileSystemSpace;
     DWORD m_socketTimeout{};
     HANDLE m_jobObject{};
     std::thread m_oobeThread;

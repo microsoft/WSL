@@ -55,6 +55,15 @@ void wsl::windows::common::hcs::RemovePlan9Share(_In_ HCS_SYSTEM ComputeSystem, 
 
 void wsl::windows::common::hcs::AddVhd(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR VhdPath, _In_ ULONG Lun, _In_ bool ReadOnly)
 {
+    const auto sparseVhd = filesystem::GetSparseFileState(VhdPath);
+
+    WSL_LOG_TELEMETRY(
+        "AttachVhd",
+        PDT_ProductAndServicePerformance,
+        TraceLoggingValue(Lun, "lun"),
+        TraceLoggingValue(ReadOnly, "readOnly"),
+        TraceLoggingValue(sparseVhd.value_or(-1), "sparseVhd"));
+
     ModifySettingRequest<Attachment> request{};
     request.RequestType = ModifyRequestType::Add;
     request.ResourcePath = c_scsiResourcePath + std::to_wstring(Lun);
