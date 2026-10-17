@@ -47,6 +47,35 @@ void EncodeFrames(std::uint32_t firstSequence, std::size_t count, std::uint8_t* 
     }
 }
 
+enum class ConsumerBatchRead
+{
+    Read,
+    Retry,
+    Finished,
+};
+
+template <typename AfterEmptyRead>
+ConsumerBatchRead ReadConsumerBatch(
+    S16LePcmRingSource& ring,
+    const std::atomic<bool>& producerDone,
+    std::uint32_t frames,
+    std::uint8_t* destination,
+    std::size_t byteCount,
+    AfterEmptyRead&& afterEmptyRead)
+{
+    // Observe completion first. If it is true, the acquire pairs with the
+    // producer's release after its final ring publication, so the read below
+    // cannot mistake that final batch for an empty ring.
+    const bool producerFinishedBeforeRead = producerDone.load(std::memory_order_acquire);
+    if (ring.ReadFrames(frames, destination, byteCount))
+    {
+        return ConsumerBatchRead::Read;
+    }
+
+    afterEmptyRead();
+    return producerFinishedBeforeRead ? ConsumerBatchRead::Finished : ConsumerBatchRead::Retry;
+}
+
 void TestOverflowUnderflowWholeFramesAndWrap(int& assertions)
 {
     S16LePcmRingSource ring(PcmFormat{2, 48000}, 4);
@@ -183,6 +212,50 @@ void TestResetGeneration(int& assertions)
     Assert(snapshot.m_resetCount == 1 && snapshot.m_staleGenerationWrites == 1, "Reset and stale-write counters remain observable", assertions);
 }
 
+void TestConsumerFinalPublicationRace(int& assertions)
+{
+    S16LePcmRingSource ring(PcmFormat{2, 48000}, c_concurrentBatchFrames);
+    const std::uint64_t generation = ring.Generation();
+    std::array<std::uint8_t, c_concurrentBatchBytes> finalBatch{};
+    std::array<std::uint8_t, c_concurrentBatchBytes> output{};
+    EncodeFrames(700, c_concurrentBatchFrames, finalBatch.data());
+    std::atomic<bool> producerDone{};
+
+    const ConsumerBatchRead firstRead = ReadConsumerBatch(
+        ring,
+        producerDone,
+        c_concurrentBatchFrames,
+        output.data(),
+        output.size(),
+        [&] {
+            // Deterministically publish the producer's final batch after an
+            // empty read but before the consumer decides whether to terminate.
+            Assert(
+                ring.TryWriteFrames(generation, finalBatch.data(), c_concurrentBatchFrames, finalBatch.size()) ==
+                    PcmRingWriteResult::Written,
+                "Final producer batch is published after the initial empty read",
+                assertions);
+            producerDone.store(true, std::memory_order_release);
+        });
+
+    Assert(
+        firstRead == ConsumerBatchRead::Retry,
+        "A read that began before producer completion retries instead of reporting terminal empty",
+        assertions);
+    Assert(
+        producerDone.load(std::memory_order_acquire) && ring.Snapshot().m_queuedFrames == c_concurrentBatchFrames,
+        "Producer completion follows publication of the final batch",
+        assertions);
+
+    const ConsumerBatchRead finalRead = ReadConsumerBatch(
+        ring, producerDone, c_concurrentBatchFrames, output.data(), output.size(), [] {});
+    Assert(
+        finalRead == ConsumerBatchRead::Read && output == finalBatch,
+        "Acquire-before-read exposes the final batch after producer completion",
+        assertions);
+    Assert(ring.Snapshot().m_queuedFrames == 0, "Final batch is consumed exactly once", assertions);
+}
+
 void TestConcurrentProducerConsumer(int& assertions)
 {
     S16LePcmRingSource ring(PcmFormat{2, 48000}, 1024);
@@ -224,16 +297,24 @@ void TestConcurrentProducerConsumer(int& assertions)
     std::thread consumer([&] {
         std::array<std::uint8_t, c_concurrentBatchBytes> output{};
         std::uint32_t expectedSequence = 0;
+        const auto noAfterEmptyRead = [] {};
         while (expectedSequence < c_concurrentTotalFrames && !abort.load(std::memory_order_relaxed))
         {
-            if (!ring.ReadFrames(c_concurrentBatchFrames, output.data(), output.size()))
+            const ConsumerBatchRead readResult = ReadConsumerBatch(
+                ring,
+                producerDone,
+                c_concurrentBatchFrames,
+                output.data(),
+                output.size(),
+                noAfterEmptyRead);
+            if (readResult == ConsumerBatchRead::Finished)
             {
-                if (producerDone.load(std::memory_order_acquire))
-                {
-                    mismatch.store(true, std::memory_order_relaxed);
-                    abort.store(true, std::memory_order_relaxed);
-                    break;
-                }
+                mismatch.store(true, std::memory_order_relaxed);
+                abort.store(true, std::memory_order_relaxed);
+                break;
+            }
+            if (readResult == ConsumerBatchRead::Retry)
+            {
                 std::this_thread::yield();
             }
             else
@@ -281,9 +362,10 @@ int main()
         int assertions = 0;
         TestOverflowUnderflowWholeFramesAndWrap(assertions);
         TestResetGeneration(assertions);
+        TestConsumerFinalPublicationRace(assertions);
         TestConcurrentProducerConsumer(assertions);
         std::cout << "PASS: S16_LE PCM ring " << assertions
-                  << " assertions; overflow/underflow, reset generations, wrap, and concurrent transfer.\n";
+                  << " assertions; overflow/underflow, reset generations, wrap, final-publication handoff, and concurrent transfer.\n";
         return 0;
     }
     catch (const std::exception& error)

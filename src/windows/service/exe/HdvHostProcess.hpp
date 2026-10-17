@@ -234,32 +234,6 @@ public:
         THROW_IF_WIN32_BOOL_FALSE(WriteFile(configurationWrite.get(), &startupPacket, sizeof(startupPacket), &sent, nullptr));
         THROW_HR_IF(E_FAIL, sent != sizeof(startupPacket));
         configurationWrite.reset();
-        SIZE_T bytes{};
-        SetLastError(ERROR_SUCCESS);
-        const BOOL attributeListSizeQuery = InitializeProcThreadAttributeList(nullptr, 1, 0, &bytes);
-        const DWORD attributeListSizeError = GetLastError();
-        THROW_HR_IF(E_UNEXPECTED, attributeListSizeQuery != FALSE || bytes == 0);
-        THROW_HR_IF(E_UNEXPECTED, attributeListSizeError == ERROR_SUCCESS);
-        THROW_HR_IF(HRESULT_FROM_WIN32(attributeListSizeError), attributeListSizeError != ERROR_INSUFFICIENT_BUFFER);
-        std::vector<BYTE> storage(bytes);
-        auto list = reinterpret_cast<PPROC_THREAD_ATTRIBUTE_LIST>(storage.data());
-        THROW_IF_WIN32_BOOL_FALSE(InitializeProcThreadAttributeList(list, 1, 0, &bytes));
-        auto deleteList = wil::scope_exit([&] { DeleteProcThreadAttributeList(list); });
-        THROW_IF_WIN32_BOOL_FALSE(UpdateProcThreadAttribute(
-            list, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, inherited.data(), inherited.size() * sizeof(HANDLE), nullptr, nullptr));
-        wchar_t image[32768]{};
-        const auto length = GetModuleFileNameW(nullptr, image, ARRAYSIZE(image));
-        THROW_LAST_ERROR_IF(!length || length == ARRAYSIZE(image));
-        wchar_t instanceText[40]{};
-        THROW_HR_IF(E_FAIL, !StringFromGUID2(instance, instanceText, ARRAYSIZE(instanceText)));
-        auto handleText = [](HANDLE h) { return std::to_wstring(reinterpret_cast<ULONG_PTR>(h)); };
-        std::wstring command = L"\"" + std::wstring(image) + L"\" --virtio-sound-host " + vm + L" " + instanceText + L" " +
-                               handleText(write.get()) + L" " + handleText(host->m_stop.get()) + L" " + handleText(parent.get()) +
-                               L" " + handleText(configurationRead.get());
-        STARTUPINFOEXW startup{};
-        startup.StartupInfo.cb = sizeof(startup);
-        startup.lpAttributeList = list;
-        PROCESS_INFORMATION process{};
         host->m_job = wsl::windows::common::helpers::CreateKillOnCloseJob();
         if (restrictedUserToken)
         {
@@ -272,6 +246,26 @@ public:
             limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_BREAKAWAY_OK;
             THROW_IF_WIN32_BOOL_FALSE(SetInformationJobObject(host->m_job.get(), JobObjectExtendedLimitInformation, &limits, sizeof(limits)));
         }
+        HANDLE jobHandle = host->m_job.get();
+        auto processAttributes = wsl::windows::common::helpers::CreateProcThreadAttributeList(2);
+        THROW_IF_WIN32_BOOL_FALSE(UpdateProcThreadAttribute(
+            processAttributes.get(), 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, inherited.data(), inherited.size() * sizeof(HANDLE), nullptr, nullptr));
+        // Keep jobHandle alive until after the attribute list is destroyed.
+        THROW_IF_WIN32_BOOL_FALSE(UpdateProcThreadAttribute(
+            processAttributes.get(), 0, PROC_THREAD_ATTRIBUTE_JOB_LIST, &jobHandle, sizeof(jobHandle), nullptr, nullptr));
+        wchar_t image[32768]{};
+        const auto length = GetModuleFileNameW(nullptr, image, ARRAYSIZE(image));
+        THROW_LAST_ERROR_IF(!length || length == ARRAYSIZE(image));
+        wchar_t instanceText[40]{};
+        THROW_HR_IF(E_FAIL, !StringFromGUID2(instance, instanceText, ARRAYSIZE(instanceText)));
+        auto handleText = [](HANDLE h) { return std::to_wstring(reinterpret_cast<ULONG_PTR>(h)); };
+        std::wstring command = L"\"" + std::wstring(image) + L"\" --virtio-sound-host " + vm + L" " + instanceText + L" " +
+                               handleText(write.get()) + L" " + handleText(host->m_stop.get()) + L" " + handleText(parent.get()) +
+                               L" " + handleText(configurationRead.get());
+        STARTUPINFOEXW startup{};
+        startup.StartupInfo.cb = sizeof(startup);
+        startup.lpAttributeList = processAttributes.get();
+        PROCESS_INFORMATION process{};
         THROW_IF_WIN32_BOOL_FALSE(CreateProcessAsUserW(
             childToken.get(),
             image,
@@ -287,7 +281,12 @@ public:
         host->m_child.reset(process.hProcess);
         wil::unique_handle thread{process.hThread};
         auto killOnFailure = wil::scope_exit([&] { TerminateProcess(host->m_child.get(), 1); });
-        THROW_IF_WIN32_BOOL_FALSE(AssignProcessToJobObject(host->m_job.get(), host->m_child.get()));
+        // PROC_THREAD_ATTRIBUTE_JOB_LIST assigns the suspended process before
+        // CreateProcessAsUserW returns. Verify the expected job before allowing
+        // the child to execute; a failure here cannot leave an unbounded host.
+        BOOL inHostJob = FALSE;
+        THROW_IF_WIN32_BOOL_FALSE(IsProcessInJob(host->m_child.get(), host->m_job.get(), &inHostJob));
+        THROW_HR_IF(E_UNEXPECTED, !inHostJob);
         THROW_LAST_ERROR_IF(ResumeThread(thread.get()) == static_cast<DWORD>(-1));
         write.reset();
         configurationRead.reset();
