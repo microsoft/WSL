@@ -897,6 +897,10 @@ Windows 版本： {}</value>
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>此電腦不支援巢狀虛擬化。</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>無法偵測巢狀虛擬化支援，錯誤： {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>無法建立位址為 '{}'、已指派新位址為 '{}' 的網络端點</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3708,7 +3712,7 @@ Windows 版本：{}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>找不到映像 '{}'，正在提取</value>
+    <value>無法在本機找到影像 '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">
