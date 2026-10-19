@@ -151,7 +151,6 @@ protected:
     /// <summary>
     /// Creates a process in the instance.
     /// </summary>
-    _Requires_lock_held_(m_stateLock)
     wil::unique_handle _CreateLxProcess(
         _In_ const std::shared_ptr<LxssMessagePort>& MessagePort,
         _In_ const CreateLxProcessData& CreateProcessData,
@@ -287,7 +286,7 @@ private:
     /// </summary>
     wsl::windows::common::redirector::ConnectionTargetManager m_redirectorConnectionTargets;
 
-    _Guarded_by_(m_stateLock) std::thread m_oobeThread;
+    std::thread m_oobeThread;
     wil::unique_event m_destroyingEvent{wil::EventOptions::ManualReset};
-    _Guarded_by_(m_stateLock) wil::shared_event m_oobeCompleteEvent;
+    wil::unique_event m_oobeCompleteEvent;
 };

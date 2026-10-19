@@ -213,31 +213,10 @@ void LxssInstance::CreateLxProcess(
         }
     }
 
-    std::unique_lock lock(m_stateLock);
-    THROW_HR_IF(E_ABORT, !m_running);
-
-    bool warningEmitted = false;
-    while (m_oobeCompleteEvent && !m_oobeCompleteEvent.is_signaled())
+    if (m_oobeCompleteEvent && !m_oobeCompleteEvent.is_signaled())
     {
-        if (!warningEmitted)
-        {
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageWaitingForOobe(m_configuration.Name.c_str()));
-            warningEmitted = true;
-        }
-
-        // Keep this attempt's event alive if another caller starts a retry while the lock is released.
-        const auto oobeCompleteEvent = m_oobeCompleteEvent;
-        std::vector<HANDLE> exitHandles{m_destroyingEvent.get()};
-        if (ConsoleData.ClientProcess)
-        {
-            exitHandles.push_back(ConsoleData.ClientProcess.get());
-        }
-
-        lock.unlock();
-        THROW_HR_IF(E_ABORT, !wsl::windows::common::relay::InterruptableWait(oobeCompleteEvent.get(), exitHandles));
-        lock.lock();
-
-        THROW_HR_IF(E_ABORT, !m_running);
+        EMIT_USER_WARNING(wsl::shared::Localization::MessageWaitingForOobe(m_configuration.Name.c_str()));
+        m_oobeCompleteEvent.wait();
     }
 
     // Duplicate the handles from the calling process into the current process.
@@ -395,8 +374,6 @@ void LxssInstance::Stop()
     {
         return;
     }
-
-    m_destroyingEvent.SetEvent();
 
     // Logs when a distro is stopped
     WSL_LOG_TELEMETRY(
@@ -561,7 +538,7 @@ wil::unique_handle LxssInstance::_CreateLxProcess(
         auto OobeMessagePort = ServerPort->WaitForConnection();
 
         {
-            auto oobeCompleteEvent = wil::shared_event(wil::EventOptions::ManualReset);
+            m_oobeCompleteEvent.create(wil::EventOptions::ManualReset);
 
             auto impersonate = wil::CoImpersonateClient();
             auto registration = wsl::windows::service::DistributionRegistration::Open(
@@ -573,44 +550,41 @@ wil::unique_handle LxssInstance::_CreateLxProcess(
                 m_oobeThread.join();
             }
 
-            m_oobeThread = std::thread(
-                [this, OobeMessagePort = std::move(OobeMessagePort), registration = std::move(registration), oobeCompleteEvent]() mutable {
-                    try
+            m_oobeThread = std::thread([this, OobeMessagePort = std::move(OobeMessagePort), registration = std::move(registration)]() mutable {
+                try
+                {
+                    // N.B. The LX_INIT_OOBE_RESULT message is only sent once the OOBE process completes, which might be waiting on user input.
+                    // Do no set a timeout here otherwise the OOBE flow will fail if the OOBE process takes longer than expected.
+                    auto Message = OobeMessagePort->Receive(INFINITE);
+                    auto* OobeResult = gslhelpers::try_get_struct<LX_INIT_OOBE_RESULT>(gsl::make_span(Message));
+                    THROW_HR_IF(E_INVALIDARG, !OobeResult || (OobeResult->Header.MessageType != LxInitOobeResult));
+
+                    WSL_LOG(
+                        "OOBEResult",
+                        TraceLoggingValue(OobeResult->Result, "Result"),
+                        TraceLoggingValue(OobeResult->DefaultUid, "DefaultUid"),
+                        TraceLoggingValue(m_configuration.Name.c_str(), "Name"),
+                        TraceLoggingValue(1, "Version"));
+
+                    if (OobeResult->Result == 0)
                     {
-                        // N.B. The LX_INIT_OOBE_RESULT message is only sent once the OOBE process completes, which might be waiting on user input.
-                        // Do no set a timeout here otherwise the OOBE flow will fail if the OOBE process takes longer than expected.
-                        auto Message = OobeMessagePort->Receive(INFINITE);
-                        auto* OobeResult = gslhelpers::try_get_struct<LX_INIT_OOBE_RESULT>(gsl::make_span(Message));
-                        THROW_HR_IF(E_INVALIDARG, !OobeResult || (OobeResult->Header.MessageType != LxInitOobeResult));
+                        // OOBE was successful, don't run it again.
+                        m_configuration.RunOOBE = false;
+                        registration.Write(wsl::windows::service::Property::RunOOBE, 0);
 
-                        WSL_LOG(
-                            "OOBEResult",
-                            TraceLoggingValue(OobeResult->Result, "Result"),
-                            TraceLoggingValue(OobeResult->DefaultUid, "DefaultUid"),
-                            TraceLoggingValue(m_configuration.Name.c_str(), "Name"),
-                            TraceLoggingValue(1, "Version"));
-
-                        if (OobeResult->Result == 0)
+                        if (OobeResult->DefaultUid != -1)
                         {
-                            // OOBE was successful, don't run it again.
-                            m_configuration.RunOOBE = false;
-                            registration.Write(wsl::windows::service::Property::RunOOBE, 0);
-
-                            if (OobeResult->DefaultUid != -1)
-                            {
-                                registration.Write(wsl::windows::service::Property::DefaultUid, static_cast<int>(OobeResult->DefaultUid));
-                                m_defaultUid = static_cast<int>(OobeResult->DefaultUid);
-                            }
-
-                            m_redirectorConnectionTargets.UpdateUid(m_defaultUid);
+                            registration.Write(wsl::windows::service::Property::DefaultUid, static_cast<int>(OobeResult->DefaultUid));
+                            m_defaultUid = static_cast<int>(OobeResult->DefaultUid);
                         }
+
+                        m_redirectorConnectionTargets.UpdateUid(m_defaultUid);
                     }
-                    CATCH_LOG()
+                }
+                CATCH_LOG()
 
-                    oobeCompleteEvent.SetEvent();
-                });
-
-            m_oobeCompleteEvent = std::move(oobeCompleteEvent);
+                m_oobeCompleteEvent.SetEvent();
+            });
         }
     }
 
