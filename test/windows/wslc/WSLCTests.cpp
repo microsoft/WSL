@@ -7208,6 +7208,424 @@ class WSLCTests
         return actions;
     }
 
+    static size_t CountContainerRuns(RunningWSLCContainer& container, std::string_view marker = "run\n")
+    {
+        COMOutputHandle stdoutLogs{};
+        COMOutputHandle stderrLogs{};
+        VERIFY_SUCCEEDED(container.Get().Logs(WSLCLogsFlagsNone, &stdoutLogs, &stderrLogs, 0, 0, 0));
+
+        const auto output = ReadToString(stdoutLogs.Get());
+        size_t count = 0;
+        for (auto position = output.find(marker); position != std::string::npos; position = output.find(marker, position + marker.size()))
+        {
+            ++count;
+        }
+
+        return count;
+    }
+
+    static size_t WaitForContainerRuns(RunningWSLCContainer& container, size_t minimumRuns, std::chrono::milliseconds timeout = 60s)
+    {
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        auto runs = CountContainerRuns(container);
+        while (runs < minimumRuns && std::chrono::steady_clock::now() < deadline)
+        {
+            std::this_thread::sleep_for(100ms);
+            runs = CountContainerRuns(container);
+        }
+
+        VERIFY_IS_TRUE(runs >= minimumRuns, std::format(L"Expected at least {} runs, observed {}", minimumRuns, runs).c_str());
+        return runs;
+    }
+
+    static void WaitForContainerState(RunningWSLCContainer& container, WSLCContainerState expected, std::chrono::milliseconds timeout = 60s)
+    {
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        auto state = container.State();
+        while (state != expected && std::chrono::steady_clock::now() < deadline)
+        {
+            std::this_thread::sleep_for(100ms);
+            state = container.State();
+        }
+
+        VERIFY_ARE_EQUAL(expected, state);
+    }
+
+    // Verifies that an automatically restarting container stays down after a user-initiated stop. The
+    // observation window exceeds the largest backoff delay the container can have reached.
+    static void VerifyContainerStaysDown(RunningWSLCContainer& container)
+    {
+        const auto runs = CountContainerRuns(container);
+        std::this_thread::sleep_for(3s);
+        VERIFY_ARE_EQUAL(WslcContainerStateExited, container.State());
+        VERIFY_ARE_EQUAL(runs, CountContainerRuns(container));
+    }
+
+    WSLC_TEST_METHOD(ContainerRestartPolicyInspect)
+    {
+        // WSLC reports the requested policy while Docker's own restart policy is always "no".
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-policy-inspect-always", {"sleep", "99999"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Create(*m_defaultSession);
+
+            const auto inspect = container.Inspect();
+            VERIFY_ARE_EQUAL(std::string{"always"}, inspect.HostConfig.RestartPolicy.Name);
+            VERIFY_ARE_EQUAL(0, inspect.HostConfig.RestartPolicy.MaximumRetryCount);
+
+            const auto result = ExpectCommandResult(
+                m_defaultSession.get(), {"/usr/bin/docker", "inspect", "-f", "{{.HostConfig.RestartPolicy.Name}}", inspect.Id}, 0);
+            VERIFY_ARE_EQUAL(std::string{"no\n"}, result.Output.at(1));
+        }
+
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-policy-inspect-no", {"sleep", "99999"});
+            auto container = launcher.Create(*m_defaultSession);
+            VERIFY_ARE_EQUAL(std::string{"no"}, container.Inspect().HostConfig.RestartPolicy.Name);
+        }
+
+        // An automatic restart is incompatible with automatic removal.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-policy-rm", {"sleep", "99999"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            launcher.SetContainerFlags(WSLCContainerFlagsRm);
+            auto [hr, container] = launcher.CreateNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(E_INVALIDARG, hr);
+            ValidateCOMErrorMessage(wsl::shared::Localization::MessageWslcRestartPolicyConflictsWithRm());
+        }
+
+        // Policies that need persisted lifecycle state are not supported.
+        for (const auto policy : {WSLCContainerRestartPolicyOnFailure, WSLCContainerRestartPolicyUnlessStopped})
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-policy-unsupported", {"sleep", "99999"});
+            launcher.SetRestartPolicy(policy);
+            auto [hr, container] = launcher.CreateNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), hr);
+
+            wil::com_ptr<IWSLCContainer> notFound;
+            VERIFY_ARE_EQUAL(WSLC_E_CONTAINER_NOT_FOUND, m_defaultSession->OpenContainer("test-restart-policy-unsupported", &notFound));
+        }
+
+        // Unknown policy values are rejected.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-policy-invalid", {"sleep", "99999"});
+            launcher.SetRestartPolicy(static_cast<WSLCContainerRestartPolicy>(42));
+            auto [hr, container] = launcher.CreateNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(E_INVALIDARG, hr);
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysRestartsOnExit)
+    {
+        // Both successful and failing exits restart the container, and a stop ends the loop.
+        for (const auto* exitCode : {"0", "3"})
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest", std::format("test-restart-always-exit-{}", exitCode), {"sh", "-c", std::format("echo run; exit {}", exitCode)});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+
+            WaitForContainerRuns(container, 3);
+
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            VerifyContainerStaysDown(container);
+
+            // An explicit start re-enables the policy.
+            const auto runs = CountContainerRuns(container);
+            VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+            WaitForContainerRuns(container, runs + 2);
+
+            VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
+            VerifyContainerStaysDown(container);
+        }
+
+        // A container whose process is killed from inside the VM is restarted.
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest", "test-restart-always-process-kill", {"sh", "-c", "echo run; sleep 99999"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+            WaitForContainerRuns(container, 1);
+
+            const auto id = container.Inspect().Id;
+            ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "kill", id}, 0);
+
+            WaitForContainerRuns(container, 2);
+            WaitForContainerState(container, WslcContainerStateRunning);
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysUserStop)
+    {
+        // Stop and kill of a running container leave it down.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-always-stop", {"sleep", "99999"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGTERM, 0));
+            VerifyContainerStaysDown(container);
+
+            VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+            VERIFY_ARE_EQUAL(WslcContainerStateRunning, container.State());
+
+            VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
+            VerifyContainerStaysDown(container);
+        }
+
+        // A kill with a signal the container handles by exiting also leaves it down.
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest",
+                "test-restart-always-usr1",
+                {"sh", "-c", "trap 'exit 0' USR1; echo run; while true; do sleep 1; done"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+            WaitForContainerRuns(container, 1);
+
+            VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGUSR1));
+            WaitForContainerState(container, WslcContainerStateExited);
+            VerifyContainerStaysDown(container);
+        }
+
+        // Every kill counts as a user stop, including a signal other than the configured stop signal. Docker keeps
+        // the restart policy in effect in this case.
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest",
+                "test-restart-always-usr1-stop-signal",
+                {"sh", "-c", "trap 'exit 0' USR1; echo run; while true; do sleep 1; done"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            launcher.SetDefaultStopSignal(WSLCSignalSIGTERM);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+            WaitForContainerRuns(container, 1);
+
+            VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGUSR1));
+            WaitForContainerState(container, WslcContainerStateExited);
+            VerifyContainerStaysDown(container);
+        }
+
+        // A restart of a stopped container starts it and re-enables the policy.
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest", "test-restart-always-restart-stopped", {"sh", "-c", "echo run; sleep 99999"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+            WaitForContainerRuns(container, 1);
+
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            VerifyContainerStaysDown(container);
+
+            VERIFY_SUCCEEDED(container.Get().Restart(WSLCSignalSIGKILL, 0, nullptr));
+            WaitForContainerRuns(container, 2);
+            WaitForContainerState(container, WslcContainerStateRunning);
+
+            ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "kill", container.Inspect().Id}, 0);
+            WaitForContainerRuns(container, 3);
+            WaitForContainerState(container, WslcContainerStateRunning);
+        }
+
+        // A running container is only removed by a forced delete, which does not restart it.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-always-rm-running", {"sleep", "99999"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+
+            VERIFY_ARE_EQUAL(WSLC_E_CONTAINER_IS_RUNNING, container.Get().Delete(WSLCDeleteFlagsNone));
+            VERIFY_ARE_EQUAL(WslcContainerStateRunning, container.State());
+
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsForce));
+            std::this_thread::sleep_for(3s);
+
+            wil::com_ptr<IWSLCContainer> notFound;
+            VERIFY_ARE_EQUAL(WSLC_E_CONTAINER_NOT_FOUND, m_defaultSession->OpenContainer("test-restart-always-rm-running", &notFound));
+        }
+
+        // A restart of a running container keeps the policy active.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-always-restart", {"sh", "-c", "echo run; sleep 99999"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+            WaitForContainerRuns(container, 1);
+
+            VERIFY_SUCCEEDED(container.Get().Restart(WSLCSignalSIGKILL, 0, nullptr));
+            WaitForContainerRuns(container, 2);
+
+            ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "kill", container.Inspect().Id}, 0);
+            WaitForContainerRuns(container, 3);
+            WaitForContainerState(container, WslcContainerStateRunning);
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysPendingRestart)
+    {
+        // Stop and kill of a container that is waiting for an automatic restart cancel the restart. The
+        // container exits immediately, so it spends most of its time waiting for a restart.
+        for (const bool kill : {false, true})
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest",
+                std::format("test-restart-always-pending-{}", kill ? "kill" : "stop"),
+                {"sh", "-c", "echo run; exit 1"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+            WaitForContainerRuns(container, 2);
+
+            if (kill)
+            {
+                VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
+            }
+            else
+            {
+                VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            }
+
+            VerifyContainerStaysDown(container);
+        }
+
+        // A non-forced delete of a container under an active restart policy is rejected, whether it is running or
+        // waiting for an automatic restart. Once stopped, the same delete succeeds.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-always-pending-rm", {"sh", "-c", "echo run; exit 1"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+            WaitForContainerRuns(container, 2);
+
+            VERIFY_ARE_EQUAL(WSLC_E_CONTAINER_IS_RUNNING, container.Get().Delete(WSLCDeleteFlagsNone));
+
+            wil::com_ptr<IWSLCContainer> stillThere;
+            VERIFY_SUCCEEDED(m_defaultSession->OpenContainer("test-restart-always-pending-rm", &stillThere));
+
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            VerifyContainerStaysDown(container);
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
+        }
+
+        // A forced delete of a container that is waiting for an automatic restart succeeds.
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest", "test-restart-always-pending-delete", {"sh", "-c", "echo run; exit 1"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+            WaitForContainerRuns(container, 2);
+
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsForce));
+            VERIFY_ARE_EQUAL(RPC_E_DISCONNECTED, container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+
+            wil::com_ptr<IWSLCContainer> notFound;
+            VERIFY_ARE_EQUAL(WSLC_E_CONTAINER_NOT_FOUND, m_defaultSession->OpenContainer("test-restart-always-pending-delete", &notFound));
+        }
+    }
+
+    // Repeated automatic restarts must not leak host port allocations.
+    WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysPortsNotLeaked)
+    {
+        constexpr uint16_t hostPort = 1253;
+
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest", "test-restart-always-ports", {"sh", "-c", "echo run; exit 1"}, {}, "bridge");
+            launcher.AddPort(hostPort, 8000, AF_INET);
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+
+            WaitForContainerRuns(container, 6);
+
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
+        }
+
+        // The host port is available to a new container once the restarting container is gone.
+        WSLCContainerLauncher launcher("debian:latest", "test-restart-always-ports-reuse", {"sleep", "99999"}, {}, "bridge");
+        launcher.AddPort(hostPort, 8000, AF_INET);
+        auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+        VERIFY_ARE_EQUAL(WslcContainerStateRunning, container.State());
+    }
+
+    // A session start is the equivalent of a Docker daemon start: containers with the always policy are
+    // started again, unless they were never started. A VM restart inside the same session is not a
+    // session start.
+    WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysSessionStart)
+    {
+        auto restore = ResetTestSession(); // Required to access the storage folder.
+
+        constexpr auto c_sessionName = L"restart-policy-session-test";
+        size_t loopRuns = 0;
+
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(c_sessionName, true));
+
+            WSLCContainerLauncher runningLauncher("debian:latest", "test-restart-session-running", {"sleep", "99999"});
+            runningLauncher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto running = runningLauncher.Launch(*session, WSLCContainerStartFlagsNone);
+            running.SetDeleteOnClose(false);
+
+            WSLCContainerLauncher stoppedLauncher("debian:latest", "test-restart-session-stopped", {"sleep", "99999"});
+            stoppedLauncher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto stopped = stoppedLauncher.Launch(*session, WSLCContainerStartFlagsNone);
+            stopped.SetDeleteOnClose(false);
+            VERIFY_SUCCEEDED(stopped.Get().Stop(WSLCSignalSIGKILL, 0));
+
+            WSLCContainerLauncher createdLauncher("debian:latest", "test-restart-session-created", {"sleep", "99999"});
+            createdLauncher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto created = createdLauncher.Create(*session);
+            created.SetDeleteOnClose(false);
+
+            WSLCContainerLauncher noPolicyLauncher("debian:latest", "test-restart-session-no-policy", {"sleep", "99999"});
+            auto noPolicy = noPolicyLauncher.Launch(*session, WSLCContainerStartFlagsNone);
+            noPolicy.SetDeleteOnClose(false);
+
+            // The session ends while this container is between runs or waiting for its automatic restart.
+            WSLCContainerLauncher loopLauncher("debian:latest", "test-restart-session-loop", {"sh", "-c", "echo run; exit 1"});
+            loopLauncher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto loop = loopLauncher.Launch(*session, WSLCContainerStartFlagsNone);
+            loop.SetDeleteOnClose(false);
+            loopRuns = WaitForContainerRuns(loop, 2);
+        }
+
+        auto session = CreateSession(GetDefaultSessionSettings(c_sessionName, true));
+
+        auto running = OpenContainer(session.get(), "test-restart-session-running");
+        auto stopped = OpenContainer(session.get(), "test-restart-session-stopped");
+        auto created = OpenContainer(session.get(), "test-restart-session-created");
+        auto noPolicy = OpenContainer(session.get(), "test-restart-session-no-policy");
+        auto loop = OpenContainer(session.get(), "test-restart-session-loop");
+
+        WaitForContainerState(running, WslcContainerStateRunning);
+        WaitForContainerState(stopped, WslcContainerStateRunning);
+        VERIFY_ARE_EQUAL(WslcContainerStateCreated, created.State());
+        VERIFY_ARE_EQUAL(WslcContainerStateExited, noPolicy.State());
+        VERIFY_ARE_EQUAL(std::string{"always"}, running.Inspect().HostConfig.RestartPolicy.Name);
+        WaitForContainerRuns(loop, loopRuns + 1);
+
+        // A running or restarting container keeps the VM up.
+        BOOL wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_TRUE(IsVmRunning(c_sessionName));
+
+        // After a stop, idle termination and a VM restart within the same session do not start the container.
+        VERIFY_SUCCEEDED(running.Get().Stop(WSLCSignalSIGKILL, 0));
+        VERIFY_SUCCEEDED(stopped.Get().Stop(WSLCSignalSIGKILL, 0));
+        VERIFY_SUCCEEDED(loop.Get().Stop(WSLCSignalSIGKILL, 0));
+
+        wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
+
+        {
+            WSLCProcessLauncher launcher("/bin/true", {"/bin/true"});
+            auto process = launcher.Launch(*session);
+            VERIFY_ARE_EQUAL(0, process.Wait());
+        }
+
+        std::this_thread::sleep_for(3s);
+        VERIFY_ARE_EQUAL(WslcContainerStateExited, running.State());
+        VERIFY_ARE_EQUAL(WslcContainerStateExited, stopped.State());
+        VERIFY_ARE_EQUAL(WslcContainerStateExited, loop.State());
+    }
+
     WSLC_TEST_METHOD(EventStream)
     {
         constexpr auto c_containerName = "wslc-test-events";

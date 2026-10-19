@@ -3588,6 +3588,11 @@ try
     }
 
     auto terminationComplete = m_terminationCompleteEvent.SetEvent_scope_exit();
+
+    // A restart callback may be waiting for the runtime lock, so the scheduler can only be joined
+    // after sessionLock (declared below, so released first) is gone.
+    auto stopRestartScheduler = wil::scope_exit([this]() { m_restartScheduler.Stop(); });
+
     wil::rwlock_release_exclusive_scope_exit sessionLock;
 
     // Because it's not possible to synchronize CancelIoEx() with ReadFile() calls, keep attempting to acquire the session lock while cancelling IO & callbacks.
@@ -4214,48 +4219,64 @@ void WSLCSession::RecoverExistingContainers()
 
     auto containers = m_runtime.Docker().ListContainers(true); // all=true to include stopped containers
 
-    std::lock_guard containersLock(m_containersLock);
-    for (const auto& dockerContainer : containers)
+    std::vector<std::shared_ptr<WSLCContainerImpl>> sessionStartContainers;
+
     {
-        // Keep existing wrappers and their client COM references in place, then re-register their
-        // ports against the restarted VM.
-        if (auto existing = m_containers.find(dockerContainer.Id); existing != m_containers.end())
+        std::lock_guard containersLock(m_containersLock);
+        const bool sessionStart = !std::exchange(m_sessionStartRecoveryDone, true);
+
+        for (const auto& dockerContainer : containers)
         {
-            // Isolate recovery failures to this container so one bad container cannot fail lazy start
-            // for every client, mirroring the Open() failure path below.
+            // Keep existing wrappers and their client COM references in place, then re-register their
+            // ports against the restarted VM.
+            if (auto existing = m_containers.find(dockerContainer.Id); existing != m_containers.end())
+            {
+                // Isolate recovery failures to this container so one bad container cannot fail lazy start
+                // for every client, mirroring the Open() failure path below.
+                try
+                {
+                    existing->second->RecoverPorts(dockerContainer);
+                }
+                catch (...)
+                {
+                    LOG_CAUGHT_EXCEPTION_MSG("Failed to recover container state: %hs", dockerContainer.Id.c_str());
+                    EMIT_USER_WARNING(
+                        Localization::MessageWslcFailedToRecoverContainer(wsl::shared::string::MultiByteToWide(dockerContainer.Id)));
+                }
+                continue;
+            }
+
             try
             {
-                existing->second->RecoverPorts(dockerContainer);
+                auto container = WSLCContainerImpl::Open(
+                    dockerContainer, *this, m_runtime, m_pluginNotifier.get(), std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1), m_eventStore);
+
+                if (sessionStart)
+                {
+                    sessionStartContainers.push_back(container);
+                }
+
+                auto [it, inserted] = m_containers.emplace(container->ID(), std::move(container));
+                WI_ASSERT(inserted);
             }
             catch (...)
             {
-                LOG_CAUGHT_EXCEPTION_MSG("Failed to recover container state: %hs", dockerContainer.Id.c_str());
+                LOG_CAUGHT_EXCEPTION_MSG("Failed to recover container: %hs", dockerContainer.Id.c_str());
                 EMIT_USER_WARNING(
                     Localization::MessageWslcFailedToRecoverContainer(wsl::shared::string::MultiByteToWide(dockerContainer.Id)));
             }
-            continue;
         }
 
-        try
-        {
-            auto container = WSLCContainerImpl::Open(
-                dockerContainer, *this, m_runtime, m_pluginNotifier.get(), std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1), m_eventStore);
-
-            auto [it, inserted] = m_containers.emplace(container->ID(), std::move(container));
-            WI_ASSERT(inserted);
-        }
-        catch (...)
-        {
-            LOG_CAUGHT_EXCEPTION_MSG("Failed to recover container: %hs", dockerContainer.Id.c_str());
-            EMIT_USER_WARNING(
-                Localization::MessageWslcFailedToRecoverContainer(wsl::shared::string::MultiByteToWide(dockerContainer.Id)));
-        }
+        WSL_LOG(
+            "ContainersRecovered",
+            TraceLoggingValue(m_displayName.c_str(), "SessionName"),
+            TraceLoggingValue(m_containers.size(), "ContainerCount"));
     }
 
-    WSL_LOG(
-        "ContainersRecovered",
-        TraceLoggingValue(m_displayName.c_str(), "SessionName"),
-        TraceLoggingValue(m_containers.size(), "ContainerCount"));
+    for (const auto& container : sessionStartContainers)
+    {
+        container->OnSessionStart();
+    }
 }
 
 void WSLCSession::RecoverExistingNetworks()

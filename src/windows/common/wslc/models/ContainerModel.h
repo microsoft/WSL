@@ -63,6 +63,7 @@ struct ContainerOptions
     bool Interactive = false;
     std::string Name;
     bool Remove = false;
+    WSLCContainerRestartPolicy Restart = WSLCContainerRestartPolicyNo;
     bool TTY = false;
     bool PublishAll = false;
     WSLCSignal StopSignal = WSLCSignalNone;

@@ -698,6 +698,86 @@ models::PullPolicy GetPullPolicyFromString(const std::wstring& input, const std:
     throw ArgumentException(Localization::WSLCCLI_InvalidPullPolicyError(argName, input, supportedValues));
 }
 
+WSLCContainerRestartPolicy GetRestartPolicyFromString(const std::wstring& input, const std::wstring& argName)
+{
+    enum class RestartPolicyName
+    {
+        No,
+        Always,
+        OnFailure,
+        UnlessStopped,
+    };
+
+    static constexpr std::pair<std::wstring_view, RestartPolicyName> c_restartPolicies[] = {
+        {L"no", RestartPolicyName::No},
+        {L"always", RestartPolicyName::Always},
+        {L"on-failure", RestartPolicyName::OnFailure},
+        {L"unless-stopped", RestartPolicyName::UnlessStopped},
+    };
+
+    // Docker parity: an empty policy is the same as "no".
+    if (input.empty())
+    {
+        return WSLCContainerRestartPolicyNo;
+    }
+
+    const auto parts = SplitKeyValue(input, L':');
+
+    const auto match = std::ranges::find_if(c_restartPolicies, [&](const auto& entry) { return parts.Key == entry.first; });
+    if (match == std::end(c_restartPolicies))
+    {
+        throw ArgumentException(Localization::WSLCCLI_InvalidRestartPolicyError(argName, input));
+    }
+
+    // Docker parity: the retry count accepts an optional '+' sign and must not be empty or negative.
+    int64_t maximumRetryCount{};
+    if (parts.HadSeparator)
+    {
+        const auto retryText = WideToMultiByte(parts.Value);
+        std::string_view retryView{retryText};
+        if (retryView.starts_with('+'))
+        {
+            retryView.remove_prefix(1);
+        }
+
+        const auto [ptr, error] = std::from_chars(retryView.data(), retryView.data() + retryView.size(), maximumRetryCount);
+        if (retryView.empty() || error != std::errc{} || ptr != retryView.data() + retryView.size() || maximumRetryCount < 0)
+        {
+            throw ArgumentException(Localization::WSLCCLI_InvalidRestartPolicyError(argName, input));
+        }
+    }
+
+    switch (match->second)
+    {
+    case RestartPolicyName::No:
+    case RestartPolicyName::Always:
+    case RestartPolicyName::UnlessStopped:
+        if (maximumRetryCount != 0)
+        {
+            throw ArgumentException(Localization::WSLCCLI_InvalidRestartPolicyError(argName, input));
+        }
+        break;
+
+    case RestartPolicyName::OnFailure:
+        break;
+    }
+
+    switch (match->second)
+    {
+    case RestartPolicyName::No:
+        return WSLCContainerRestartPolicyNo;
+
+    case RestartPolicyName::Always:
+        return WSLCContainerRestartPolicyAlways;
+
+    case RestartPolicyName::OnFailure:
+    case RestartPolicyName::UnlessStopped:
+        throw ArgumentException(Localization::WSLCCLI_UnsupportedRestartPolicyError(std::wstring{match->first}));
+    }
+
+    throw ArgumentException(Localization::WSLCCLI_InvalidRestartPolicyError(argName, input));
+}
+
 models::ProgressMode GetProgressModeFromString(const std::wstring& input, const std::wstring& argName)
 {
     static constexpr std::pair<std::wstring_view, models::ProgressMode> c_progressModes[] = {
