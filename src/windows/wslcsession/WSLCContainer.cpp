@@ -37,6 +37,7 @@ using wsl::windows::common::io::HTTPChunkBasedReadHandle;
 using wsl::windows::common::io::OverlappedIOHandle;
 using wsl::windows::common::io::ReadHandle;
 using wsl::windows::common::io::RelayHandle;
+using wsl::windows::service::wslc::CleanContainerName;
 using wsl::windows::service::wslc::ContainerPortMapping;
 using wsl::windows::service::wslc::DockerEventTracker;
 using wsl::windows::service::wslc::DockerHTTPClient;
@@ -489,16 +490,6 @@ std::string WSLCStateToEventAction(WSLCContainerState state)
         return "unknown";
     }
 }
-std::string CleanContainerName(const std::string& name)
-{
-    // Docker container names have a leading '/', strip it.
-    if (!name.empty() && name[0] == '/')
-    {
-        return name.substr(1);
-    }
-
-    return name;
-}
 
 std::string ExtractContainerName(const std::vector<std::string>& names, const std::string& id)
 {
@@ -768,6 +759,17 @@ void ProcessNamedVolumes(const WSLCContainerOptions& containerOptions, wsl::wind
 
 } // namespace
 
+std::string wsl::windows::service::wslc::CleanContainerName(const std::string& name)
+{
+    // Docker container names have a leading '/', strip it.
+    if (!name.empty() && name[0] == '/')
+    {
+        return name.substr(1);
+    }
+
+    return name;
+}
+
 ContainerPortMapping::ContainerPortMapping(VMPortMapping&& VmMapping, uint16_t ContainerPort) :
     VmMapping(std::move(VmMapping)), ContainerPort(ContainerPort)
 {
@@ -854,7 +856,7 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_namedVolumes(std::move(namedVolumes)),
     m_mappedPorts(std::move(ports)),
     m_labels(std::move(labels)),
-    m_comWrapper(wil::MakeOrThrow<WSLCContainer>(wslcSession, std::move(onDeleted))),
+    m_comWrapper(wil::MakeOrThrow<WSLCContainer>(wslcSession, m_id, m_name, InitialState, std::move(onDeleted))),
     m_containerEvents(runtime.Events().RegisterContainerStateUpdates(
         m_id, std::bind(&WSLCContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4))),
     m_eventStore(eventStore),
@@ -1113,12 +1115,14 @@ void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProc
         std::lock_guard processesLock{m_processesLock};
         m_initProcessControl = control.get();
         m_initProcess = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io), m_initProcessFlags);
+        m_comWrapper->CacheState(m_state, m_initProcess);
     }
 
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() mutable {
         std::lock_guard processesLock{m_processesLock};
         m_initProcess.Reset();
         m_initProcessControl = nullptr;
+        m_comWrapper->CacheState(m_state, m_initProcess);
     });
 
     // Refuse to start if any referenced named volume is in a failed state.
@@ -3240,16 +3244,6 @@ __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::
 
 __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::PrepareDisconnectComWrapper()
 {
-    if (m_comWrapper)
-    {
-        // Cache read-only properties in the COM wrapper before disconnecting,
-        // so callers can still query state/process after the impl is gone.
-        {
-            std::lock_guard processesLock{m_processesLock};
-            m_comWrapper->CacheState(m_id, m_name, m_state, m_initProcess);
-        }
-    }
-
     return unique_com_disconnect{std::exchange(m_comWrapper, nullptr)};
 }
 
@@ -3288,6 +3282,12 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(
     // the hold on the transition out of Running is what lets an otherwise-idle VM be torn down; a
     // Created or Exited container does not pin the VM, since its metadata survives teardown.
     UpdateActivityHoldLockHeld();
+
+    if (m_comWrapper)
+    {
+        std::lock_guard processesLock{m_processesLock};
+        m_comWrapper->CacheState(m_state, m_initProcess);
+    }
 }
 
 __requires_lock_held(m_lock) void WSLCContainerImpl::UpdateActivityHoldLockHeld() noexcept
@@ -3303,16 +3303,26 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::UpdateActivityHoldLockHeld(
     }
 }
 
-WSLCContainer::WSLCContainer(WSLCSession& session, std::function<void(const WSLCContainerImpl*)>&& OnDeleted) :
-    m_session(session), m_onDeleted(std::move(OnDeleted))
+WSLCContainer::WSLCContainer(
+    WSLCSession& session, const std::string& id, const std::string& name, WSLCContainerState state, std::function<void(const WSLCContainerImpl*)>&& OnDeleted) :
+    m_session(session), m_onDeleted(std::move(OnDeleted)), m_cachedId(id), m_cachedName(name), m_cachedState(state)
 {
+    Microsoft::WRL::ComPtr<IWeakReferenceSource> weakRefSource;
+    THROW_IF_FAILED(session.QueryInterface(IID_PPV_ARGS(&weakRefSource)));
+    THROW_IF_FAILED(weakRefSource->GetWeakReference(&m_weakSession));
+}
+
+Microsoft::WRL::ComPtr<IWSLCSession> WSLCContainer::ResolveSession(bool Required) const
+{
+    Microsoft::WRL::ComPtr<IWSLCSession> session;
+    THROW_IF_FAILED(m_weakSession->Resolve(__uuidof(IWSLCSession), reinterpret_cast<IInspectable**>(session.GetAddressOf())));
+    THROW_HR_IF(RPC_E_DISCONNECTED, Required && !session);
+    return session;
 }
 
 HRESULT WSLCContainer::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr)
 try
 {
-    WSLCExecutionContext context(&m_session);
-
     RETURN_HR_IF_NULL(E_POINTER, Stdin);
     RETURN_HR_IF_NULL(E_POINTER, Stdout);
     RETURN_HR_IF_NULL(E_POINTER, Stderr);
@@ -3321,54 +3331,52 @@ try
     *Stdout = {};
     *Stderr = {};
 
+    auto sessionLifetime = ResolveSession();
+    WSLCExecutionContext context(&m_session);
     auto vmLease = m_session.Runtime().AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Attach, DetachKeys, Stdin, Stdout, Stderr);
 }
 CATCH_RETURN();
 
 HRESULT WSLCContainer::GetState(WSLCContainerState* Result)
+try
 {
-    WSLCExecutionContext context(&m_session);
     RETURN_HR_IF_NULL(E_POINTER, Result);
-
     *Result = WslcContainerStateInvalid;
-    HRESULT hr = CallImpl(&WSLCContainerImpl::GetState, Result);
+
+    auto sessionLifetime = ResolveSession(false);
+    WSLCExecutionContext context(sessionLifetime ? &m_session : nullptr);
+    HRESULT hr = sessionLifetime ? CallImpl(&WSLCContainerImpl::GetState, Result) : RPC_E_DISCONNECTED;
     if (SUCCEEDED(hr))
     {
         return S_OK;
     }
 
-    // PrepareDisconnectComWrapper() populates the cache before setting m_impl to null,
-    // so if CallImpl failed with RPC_E_DISCONNECTED, the cache must be populated.
     if (hr == RPC_E_DISCONNECTED)
     {
         auto cacheLock = m_cacheLock.lock_shared();
-        if (WI_VERIFY(m_cachedState.has_value()))
-        {
-            *Result = m_cachedState.value();
-            return S_OK;
-        }
+        *Result = m_cachedState;
+        return S_OK;
     }
 
     return hr;
 }
+CATCH_RETURN();
 
 HRESULT WSLCContainer::GetInitProcess(IWSLCProcess** Process)
+try
 {
-    WSLCExecutionContext context(&m_session);
-
     RETURN_HR_IF_NULL(E_POINTER, Process);
-
     *Process = nullptr;
 
-    HRESULT hr = CallImpl(&WSLCContainerImpl::GetInitProcess, Process);
+    auto sessionLifetime = ResolveSession(false);
+    WSLCExecutionContext context(sessionLifetime ? &m_session : nullptr);
+    HRESULT hr = sessionLifetime ? CallImpl(&WSLCContainerImpl::GetInitProcess, Process) : RPC_E_DISCONNECTED;
     if (SUCCEEDED(hr))
     {
         return S_OK;
     }
 
-    // PrepareDisconnectComWrapper() populates the cache before setting m_impl to null,
-    // so if CallImpl failed with RPC_E_DISCONNECTED, the cache must be populated.
     if (hr == RPC_E_DISCONNECTED)
     {
         auto cacheLock = m_cacheLock.lock_shared();
@@ -3380,17 +3388,18 @@ HRESULT WSLCContainer::GetInitProcess(IWSLCProcess** Process)
 
     return hr;
 }
+CATCH_RETURN();
 
 HRESULT WSLCContainer::Exec(const WSLCProcessOptions* Options, const WSLCProcessStartOptions* StartOptions, IWSLCProcess** Process)
 try
 {
-    WSLCExecutionContext context(&m_session);
-
     RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Process);
-    RETURN_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Options->Flags, ~WSLCProcessFlagsValid), "Invalid flags: 0x%x", Options->Flags);
-
     *Process = nullptr;
+
+    auto sessionLifetime = ResolveSession();
+    WSLCExecutionContext context(&m_session);
+    RETURN_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Options->Flags, ~WSLCProcessFlagsValid), "Invalid flags: 0x%x", Options->Flags);
 
     auto vmLease = m_session.Runtime().AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Exec, Options, StartOptions, Process);
@@ -3400,6 +3409,7 @@ CATCH_RETURN();
 HRESULT WSLCContainer::Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds)
 try
 {
+    auto sessionLifetime = ResolveSession();
     WSLCExecutionContext context(&m_session);
 
     // Hold a VM lease for the whole operation: --rm containers self-delete during Stop, which
@@ -3413,6 +3423,7 @@ CATCH_RETURN();
 HRESULT WSLCContainer::Kill(_In_ WSLCSignal Signal)
 try
 {
+    auto sessionLifetime = ResolveSession();
     WSLCExecutionContext context(&m_session);
 
     // Hold a VM lease for the same reason as Stop(): --rm can self-delete and drop activity.
@@ -3424,6 +3435,7 @@ CATCH_RETURN();
 HRESULT WSLCContainer::Restart(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, IWarningCallback* WarningCallback)
 try
 {
+    auto sessionLifetime = ResolveSession();
     WSLCExecutionContext context(&m_session, WarningCallback);
 
     // Hold a VM lease across both phases: the container is not Running in between, so nothing else
@@ -3436,6 +3448,7 @@ CATCH_RETURN();
 HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, IWarningCallback* WarningCallback)
 try
 {
+    auto sessionLifetime = ResolveSession();
     WSLCExecutionContext context(&m_session, WarningCallback);
 
     THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCContainerStartFlagsValid), "Invalid flags: 0x%x", Flags);
@@ -3448,12 +3461,11 @@ CATCH_RETURN();
 HRESULT WSLCContainer::Inspect(BOOL Size, LPSTR* Output)
 try
 {
-    WSLCExecutionContext context(&m_session);
-
     RETURN_HR_IF_NULL(E_POINTER, Output);
-
     *Output = nullptr;
 
+    auto sessionLifetime = ResolveSession();
+    WSLCExecutionContext context(&m_session);
     auto vmLease = m_session.Runtime().AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Inspect, Size, Output);
 }
@@ -3462,12 +3474,11 @@ CATCH_RETURN();
 HRESULT WSLCContainer::Stats(LPSTR* Output)
 try
 {
-    WSLCExecutionContext context(&m_session);
-
     RETURN_HR_IF(E_POINTER, Output == nullptr);
-
     *Output = nullptr;
 
+    auto sessionLifetime = ResolveSession();
+    WSLCExecutionContext context(&m_session);
     auto vmLease = m_session.Runtime().AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Stats, Output);
 }
@@ -3476,6 +3487,7 @@ CATCH_RETURN();
 HRESULT WSLCContainer::Delete(WSLCDeleteFlags Flags)
 try
 {
+    auto sessionLifetime = ResolveSession();
     WSLCExecutionContext context(&m_session);
 
     THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCDeleteFlagsValid), "Invalid flags: 0x%x", Flags);
@@ -3495,24 +3507,18 @@ try
 }
 CATCH_RETURN();
 
-void WSLCContainer::CacheState(const std::string& id, const std::string& name, WSLCContainerState state, const Microsoft::WRL::ComPtr<IWSLCProcess>& initProcess) noexcept
-try
+void WSLCContainer::CacheState(WSLCContainerState state, const Microsoft::WRL::ComPtr<IWSLCProcess>& initProcess) noexcept
 {
     auto cacheLock = m_cacheLock.lock_exclusive();
 
-    // CacheState must only be called once, during PrepareDisconnectComWrapper().
-    WI_ASSERT(!m_cachedState.has_value());
-
-    m_cachedId = id;
-    m_cachedName = name;
     m_cachedState = state;
     m_cachedInitProcess = initProcess;
 }
-CATCH_LOG();
 
 HRESULT WSLCContainer::Export(WSLCHandle TarHandle)
 try
 {
+    auto sessionLifetime = ResolveSession();
     WSLCExecutionContext context(&m_session);
 
     auto vmLease = m_session.Runtime().AcquireVmLease();
@@ -3523,6 +3529,7 @@ CATCH_RETURN();
 HRESULT WSLCContainer::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize)
 try
 {
+    auto sessionLifetime = ResolveSession();
     WSLCExecutionContext context(&m_session);
 
     RETURN_HR_IF(E_POINTER, DestPath == nullptr);
@@ -3536,6 +3543,7 @@ CATCH_RETURN();
 HRESULT WSLCContainer::DownloadArchive(LPCSTR SrcPath, BOOL FollowLink, WSLCHandle OutHandle)
 try
 {
+    auto sessionLifetime = ResolveSession();
     WSLCExecutionContext context(&m_session);
 
     RETURN_HR_IF(E_POINTER, SrcPath == nullptr);
@@ -3549,13 +3557,14 @@ CATCH_RETURN();
 HRESULT WSLCContainer::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, LONGLONG Since, LONGLONG Until, ULONGLONG Tail)
 try
 {
-    WSLCExecutionContext context(&m_session);
     RETURN_HR_IF(E_POINTER, Stdout == nullptr || Stderr == nullptr);
-
-    THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCLogsFlagsValid), "Invalid flags: 0x%x", Flags);
 
     *Stdout = {};
     *Stderr = {};
+
+    auto sessionLifetime = ResolveSession();
+    WSLCExecutionContext context(&m_session);
+    THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCLogsFlagsValid), "Invalid flags: 0x%x", Flags);
 
     auto vmLease = m_session.Runtime().AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Logs, Flags, Stdout, Stderr, Since, Until, Tail);
@@ -3565,55 +3574,43 @@ CATCH_RETURN();
 HRESULT WSLCContainer::GetId(WSLCContainerId Id)
 try
 {
-    WSLCExecutionContext context(&m_session);
-
     RETURN_HR_IF_NULL(E_POINTER, Id);
 
+    auto sessionLifetime = ResolveSession(false);
+    WSLCExecutionContext context(sessionLifetime ? &m_session : nullptr);
+
     const auto hr = wil::ResultFromException([&] {
+        THROW_HR_IF(RPC_E_DISCONNECTED, !sessionLifetime);
         auto [lock, impl] = LockImpl();
         WI_VERIFY(strcpy_s(Id, std::size<char>(WSLCContainerId{}), impl->ID().c_str()) == 0);
     });
 
     RETURN_HR_IF(hr, hr != RPC_E_DISCONNECTED);
 
-    // PrepareDisconnectComWrapper() populates the cache before setting m_impl to null,
-    // so if LockImpl failed with RPC_E_DISCONNECTED, the cache must be populated.
-    auto cacheLock = m_cacheLock.lock_shared();
-    if (WI_VERIFY(m_cachedId.has_value()))
-    {
-        WI_VERIFY(strcpy_s(Id, std::size<char>(WSLCContainerId{}), m_cachedId->c_str()) == 0);
-        return S_OK;
-    }
-
-    return hr;
+    WI_VERIFY(strcpy_s(Id, std::size<char>(WSLCContainerId{}), m_cachedId.c_str()) == 0);
+    return S_OK;
 }
 CATCH_RETURN();
 
 HRESULT WSLCContainer::GetName(LPSTR* Name)
 try
 {
-    WSLCExecutionContext context(&m_session);
-
     RETURN_HR_IF_NULL(E_POINTER, Name);
     *Name = nullptr;
 
+    auto sessionLifetime = ResolveSession(false);
+    WSLCExecutionContext context(sessionLifetime ? &m_session : nullptr);
+
     const auto hr = wil::ResultFromException([&] {
+        THROW_HR_IF(RPC_E_DISCONNECTED, !sessionLifetime);
         auto [lock, impl] = LockImpl();
         *Name = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(impl->Name().c_str()).release();
     });
 
     RETURN_HR_IF(hr, hr != RPC_E_DISCONNECTED);
 
-    // PrepareDisconnectComWrapper() populates the cache before setting m_impl to null,
-    // so if LockImpl failed with RPC_E_DISCONNECTED, the cache must be populated.
-    auto cacheLock = m_cacheLock.lock_shared();
-    if (WI_VERIFY(m_cachedName.has_value()))
-    {
-        *Name = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(m_cachedName->c_str()).release();
-        return S_OK;
-    }
-
-    return hr;
+    *Name = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(m_cachedName.c_str()).release();
+    return S_OK;
 }
 CATCH_RETURN();
 
@@ -3719,12 +3716,13 @@ void WSLCContainerImpl::DisconnectFromNetwork(LPCSTR NetworkName)
 HRESULT WSLCContainer::GetLabels(WSLCLabelInformation** Labels, ULONG* Count)
 try
 {
-    WSLCExecutionContext context(&m_session);
-
     RETURN_HR_IF(E_POINTER, Labels == nullptr || Count == nullptr);
 
     *Count = 0;
     *Labels = nullptr;
+
+    auto sessionLifetime = ResolveSession();
+    WSLCExecutionContext context(&m_session);
     return CallImpl(&WSLCContainerImpl::GetLabels, Labels, Count);
 }
 CATCH_RETURN();
@@ -3732,6 +3730,7 @@ CATCH_RETURN();
 HRESULT WSLCContainer::ConnectToNetwork(const WSLCNetworkConnectionOptions* Options)
 try
 {
+    auto sessionLifetime = ResolveSession();
     COMServiceExecutionContext context;
 
     auto vmLease = m_session.Runtime().AcquireVmLease();
@@ -3742,6 +3741,7 @@ CATCH_RETURN();
 HRESULT WSLCContainer::DisconnectFromNetwork(LPCSTR NetworkName)
 try
 {
+    auto sessionLifetime = ResolveSession();
     COMServiceExecutionContext context;
 
     auto vmLease = m_session.Runtime().AcquireVmLease();

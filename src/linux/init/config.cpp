@@ -56,8 +56,6 @@ Abstract:
 #define LOCALE_FILE_PATH ETC_DEFAULT_FOLDER "locale"
 #define LOCALE_CONF_FILE_PATH ETC_FOLDER "locale.conf"
 #define PATH_ENV "PATH"
-#define PERF_BINARY_PATH "/usr/bin/perf"
-#define PERF_EXEC_PATH_ENV "PERF_EXEC_PATH"
 #define RESOLV_CONF_DIRECTORY_MODE 0755
 #define RESOLV_CONF_FILE_MODE 0644
 #define RESOLV_CONF_FILE_NAME "resolv.conf"
@@ -1199,33 +1197,6 @@ Return Value:
         }
     });
 
-    MoveTemporaryMount(LX_WSL2_KERNEL_PERF_MOUNT_ENV, LX_WSL2_KERNEL_PERF_PATH_ENV, [&](const std::string& target) {
-        //
-        // Expose the kernel-matched perf via the environment block (see ConfigCreateEnvironmentBlock).
-        //
-
-        Config.KernelPerfPath = target;
-
-        //
-        // If the distro ships its own perf, shadow it with a bind mount so that the binary matching the
-        // running kernel is used.
-        //
-        // N.B. The distro's file system is only modified if perf is already present as a regular file.
-        //      Distros without perf pick it up via $PATH instead.
-        //
-
-        struct stat existing{};
-        if ((stat(PERF_BINARY_PATH, &existing) == 0) && S_ISREG(existing.st_mode))
-        {
-            const std::string perfBinary = target + "/bin/perf";
-            const auto perfMountPoint = std::filesystem::canonical(PERF_BINARY_PATH);
-            if (UtilMountFile(perfBinary.c_str(), perfMountPoint.c_str()) < 0)
-            {
-                LOG_ERROR("UtilMountFile({}, {}) failed {}", perfBinary, perfMountPoint.string(), errno);
-            }
-        }
-    });
-
     //
     // Change the permission of some devtmpfs devices to be more permissive.
     //
@@ -1787,25 +1758,6 @@ Return Value:
         if (Config.AppendGpuLibPath && Config.GpuEnabled)
         {
             ConfigAppendToPath(Environment, LXSS_LIB_PATH);
-        }
-
-        //
-        // Add the kernel-matched perf tools to the $PATH variable and point perf at its helper
-        // scripts since it is built with a prefix that does not match where it is mounted.
-        //
-
-        if (Config.KernelPerfPath.has_value())
-        {
-            ConfigAppendToPath(Environment, std::format("{}/bin", *Config.KernelPerfPath));
-
-            //
-            // N.B. This is only set if the user has not provided a value via WSLENV.
-            //
-
-            if (Environment.GetVariable(PERF_EXEC_PATH_ENV).empty())
-            {
-                Environment.AddVariable(PERF_EXEC_PATH_ENV, std::format("{}/libexec/perf-core", *Config.KernelPerfPath));
-            }
         }
     }
 

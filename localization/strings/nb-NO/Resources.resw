@@ -891,6 +891,10 @@ Hvis du vil ha mer informasjon om Admin Protection, kan du gå til https://aka.m
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>Nestet virtualisering støttes ikke på denne maskinen.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>Kan ikke oppdage støtte for nestet virtualisering, feil: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Kan ikke opprette et nettverksendepunkt med adressen {}, tilordnet ny adresse: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3702,7 +3706,7 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>Finner ikke avbildningen «{}», henter</value>
+    <value>Finner ikke bildet '{}' lokalt</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">

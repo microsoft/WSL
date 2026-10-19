@@ -4408,6 +4408,245 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerGpuLinkerCache)
+    {
+        auto contextDir = std::filesystem::current_path() / "build-context-gpu-linker-cache";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-gpu-wrapped-ldconfig:latest", WSLCDeleteImageFlagsForce).first);
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-gpu-failing-ldconfig:latest", WSLCDeleteImageFlagsForce).first);
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-gpu-no-ldconfig:latest", WSLCDeleteImageFlagsForce).first);
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-gpu-musl-default-path:latest", WSLCDeleteImageFlagsForce).first);
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-gpu-musl-custom-path:latest", WSLCDeleteImageFlagsForce).first);
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-gpu-musl-configured-path:latest", WSLCDeleteImageFlagsForce).first);
+
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM debian:latest\n";
+            dockerfile << "RUN mv /sbin/ldconfig /sbin/ldconfig.image\n";
+            dockerfile << "COPY ldconfig /sbin/ldconfig\n";
+            dockerfile << "RUN chmod 755 /sbin/ldconfig && rm -f /etc/ld.so.cache\n";
+        }
+
+        {
+            std::ofstream ldconfig(contextDir / "ldconfig", std::ios::binary);
+            // An interpreter exposes dropped-root regressions that a native ldconfig would not.
+            ldconfig << "#!/bin/sh\n";
+            ldconfig << "test ! -e " LX_INIT_WSLC_GPU_START_HOOK_PATH " || exit 99\n";
+            ldconfig << "id -u > /image-ldconfig-uid\n";
+            ldconfig << "grep CapEff /proc/self/status > /image-ldconfig-ran\n";
+            ldconfig << "grep -E '^(CapBnd|NoNewPrivs|Seccomp):' /proc/self/status > /image-ldconfig-restrictions\n";
+            ldconfig << "test ! -e /fail-image-ldconfig || exit 42\n";
+            ldconfig << "exec /sbin/ldconfig.image \"$@\"\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-gpu-wrapped-ldconfig:latest"));
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM wslc-test-gpu-wrapped-ldconfig:latest\n";
+            dockerfile << "RUN touch /fail-image-ldconfig\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-gpu-failing-ldconfig:latest"));
+
+        // A glibc image without ldconfig, a linker cache, or an ld.so.conf, like some minimal images.
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM debian:latest\n";
+            dockerfile << "RUN rm -f /sbin/ldconfig /sbin/ldconfig.real /etc/ld.so.cache /etc/ld.so.conf\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-gpu-no-ldconfig:latest"));
+
+        constexpr auto c_muslArchitecture = wsl::shared::Arm64 ? "aarch64" : "x86_64";
+        const auto muslPathFile = std::format("/etc/ld-musl-{}.path", c_muslArchitecture);
+        const auto muslLoader = std::format("/lib/ld-musl-{}.so.1", c_muslArchitecture);
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM alpine:latest\n";
+            dockerfile << std::format("RUN rm -f {}\n", muslPathFile);
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-gpu-musl-default-path:latest"));
+
+        // /custom/lib represents an image-specific search directory; it needn't exist for the file-preservation check.
+        // Omit the final newline to verify that GPU setup adds a separator before appending its directory.
+        {
+            std::ofstream libraryPaths(contextDir / "musl-library-path", std::ios::binary);
+            libraryPaths << "/custom/lib:/lib:/usr/local/lib:/usr/lib";
+        }
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM alpine:latest\n";
+            dockerfile << std::format("COPY musl-library-path {}\n", muslPathFile);
+            dockerfile << std::format("RUN chmod 644 {}\n", muslPathFile);
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-gpu-musl-custom-path:latest"));
+
+        // An already-configured image whose path file is readable only by its owner.
+        {
+            std::ofstream libraryPaths(contextDir / "musl-library-path", std::ios::binary);
+            libraryPaths << "/custom/lib:/usr/lib/wsl/lib:/lib:/usr/local/lib:/usr/lib\n";
+        }
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM alpine:latest\n";
+            dockerfile << std::format("COPY musl-library-path {}\n", muslPathFile);
+            dockerfile << std::format("RUN chmod u=rw,go= {}\n", muslPathFile);
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-gpu-musl-configured-path:latest"));
+
+        auto restore = ResetTestSession();
+
+        auto settings = GetDefaultSessionSettings(L"container-gpu-linker-cache-test", true);
+        WI_SetFlag(settings.FeatureFlags, WslcFeatureFlagsGPU);
+
+        auto session = CreateSession(settings);
+
+        auto launch = [&](LPCSTR Image, LPCSTR Name, LPCSTR User = nullptr) {
+            WSLCContainerLauncher launcher(Image, Name, {"sleep", "99999"});
+            launcher.SetContainerFlags(WSLCContainerFlagsGpu);
+            if (User != nullptr)
+            {
+                launcher.SetUser(User);
+            }
+
+            return launcher.Launch(*session);
+        };
+
+        auto expect = [&](RunningWSLCContainer& Container,
+                          const std::vector<std::string>& Command,
+                          int ExitCode,
+                          const std::map<int, std::string>& ExpectedOutput = {}) {
+            auto process = WSLCProcessLauncher({}, Command).Launch(Container.Get());
+            ValidateProcessOutput(process, ExpectedOutput, ExitCode);
+        };
+
+        auto expectGpuLibrariesCached = [&](RunningWSLCContainer& Container) {
+            expect(Container, {"grep", "-a", "-q", "/usr/lib/wsl/lib/", "/etc/ld.so.cache"}, 0);
+        };
+
+        auto expectInitDeleted = [&](RunningWSLCContainer& Container) {
+            expect(Container, {"test", "-e", LX_INIT_WSLC_GPU_START_HOOK_PATH}, 1);
+        };
+
+        auto expectGpuLibraryLoads = [&](RunningWSLCContainer& Container) {
+            // Use bundled Debian's Perl to exercise glibc lookup by soname without pulling another image.
+            expect(
+                Container,
+                {"perl", "-MDynaLoader", "-e", "DynaLoader::dl_load_file('libd3d12core.so') or die DynaLoader::dl_error()"},
+                0);
+        };
+
+        auto expectMuslLibraryPath = [&](RunningWSLCContainer& Container, const std::string& ExpectedPaths, const std::string& ExpectedMode) {
+            expect(Container, {"cat", muslPathFile}, 0, {{1, ExpectedPaths}});
+            expect(Container, {"stat", "-c", "%a", muslPathFile}, 0, {{1, ExpectedMode}});
+            expect(Container, {muslLoader, "--list", "/usr/lib/wsl/lib/libd3d12core.so"}, 0);
+            expectInitDeleted(Container);
+        };
+
+        std::string rootCapabilities;
+
+        // Moving image code out of createContainer must not grant more capabilities than an ordinary root workload.
+        {
+            auto container = launch("wslc-test-gpu-wrapped-ldconfig:latest", "test-container-gpu-image-ldconfig");
+
+            const auto capabilities =
+                WSLCProcessLauncher({}, {"grep", "CapEff", "/proc/self/status"}).Launch(container.Get()).WaitAndCaptureOutput();
+            VERIFY_ARE_EQUAL(capabilities.Code, 0);
+            rootCapabilities = capabilities.Output.at(1);
+            expect(container, {"cat", "/image-ldconfig-ran"}, 0, {{1, rootCapabilities}});
+            expect(container, {"cat", "/image-ldconfig-uid"}, 0, {{1, "0\n"}});
+
+            expectGpuLibrariesCached(container);
+            expectGpuLibraryLoads(container);
+            expectInitDeleted(container);
+        }
+
+        // Starting successfully is not enough: glibc must resolve GPU libraries while the workload stays non-root.
+        // Restart recreates the runtime task, so it must preserve the same separation between helper and workload.
+        {
+            auto container = launch("wslc-test-gpu-wrapped-ldconfig:latest", "test-container-gpu-image-ldconfig-nobody", "nobody");
+
+            auto verifyNonRootGpuAccess = [&]() {
+                expect(container, {"id", "-u"}, 0, {{1, "65534\n"}});
+                expect(container, {"cat", "/image-ldconfig-uid"}, 0, {{1, "0\n"}});
+                expect(container, {"sh", "-c", "grep -q '^Uid:[[:space:]]*65534[[:space:]]' /proc/1/status"}, 0);
+
+                const auto restrictions =
+                    WSLCProcessLauncher({}, {"grep", "-E", "^(CapBnd|NoNewPrivs|Seccomp):", "/proc/self/status"})
+                        .Launch(container.Get())
+                        .WaitAndCaptureOutput();
+                VERIFY_ARE_EQUAL(restrictions.Code, 0);
+                expect(container, {"cat", "/image-ldconfig-restrictions"}, 0, {{1, restrictions.Output.at(1)}});
+                expect(container, {"cat", "/image-ldconfig-ran"}, 0, {{1, rootCapabilities}});
+
+                expectGpuLibrariesCached(container);
+                expectGpuLibraryLoads(container);
+                expectInitDeleted(container);
+            };
+
+            verifyNonRootGpuAccess();
+            VERIFY_SUCCEEDED(container.Get().Restart(WSLCSignalSIGKILL, 0, nullptr));
+            verifyNonRootGpuAccess();
+        }
+
+        // A failing image ldconfig must prevent workload execution, with the helper already removed before it runs.
+        {
+            auto container = launch("wslc-test-gpu-failing-ldconfig:latest", "test-container-gpu-ldconfig-failure", "nobody");
+
+            // runc signals start before running startContainer hooks; hook failures surface through container exit.
+            const auto result = container.GetInitProcess().WaitAndCaptureOutput();
+            VERIFY_ARE_EQUAL(result.Code, 255);
+            VERIFY_IS_TRUE((result.Output.at(1) + result.Output.at(2)).find("exit status 42") != std::string::npos);
+        }
+
+        // Images without ldconfig must start without generating a VM fallback cache.
+        {
+            auto container = launch("wslc-test-gpu-no-ldconfig:latest", "test-container-gpu-no-ldconfig");
+
+            expect(container, {"test", "-e", "/etc/ld.so.cache"}, 1);
+            expectInitDeleted(container);
+        }
+
+        // Preserve musl's default search directories when adding GPU discovery to an image without a .path file.
+        {
+            auto container = launch("wslc-test-gpu-musl-default-path:latest", "test-container-gpu-musl");
+            expectMuslLibraryPath(container, "/lib\n/usr/local/lib\n/usr/lib\n/usr/lib/wsl/lib\n", "644\n");
+        }
+
+        // Keep the existing paths in order, adding a separator before the GPU directory.
+        {
+            auto container = launch("wslc-test-gpu-musl-custom-path:latest", "test-container-gpu-musl-custom-path");
+            expectMuslLibraryPath(container, "/custom/lib:/lib:/usr/local/lib:/usr/lib\n/usr/lib/wsl/lib\n", "644\n");
+        }
+
+        // Keep an already-configured list and its owner-only permissions unchanged.
+        {
+            auto container = launch("wslc-test-gpu-musl-configured-path:latest", "test-container-gpu-musl-configured-path");
+            expectMuslLibraryPath(container, "/custom/lib:/usr/lib/wsl/lib:/lib:/usr/local/lib:/usr/lib\n", "600\n");
+        }
+
+        // Validate that images with no shell, ldconfig, or /etc start. hello-world only contains a static program.
+        {
+            WSLCContainerLauncher launcher("hello-world:latest", "test-container-gpu-scratch");
+            launcher.SetContainerFlags(WSLCContainerFlagsGpu);
+
+            auto container = launcher.Launch(*session);
+            ValidateContainerOutput(container, {}, 0);
+        }
+    }
+
     WSLC_TEST_METHOD(Modules)
     {
         // Sanity check.
@@ -4418,6 +4657,54 @@ class WSLCTests
 
         // Validate that xsk_diag is now loaded.
         ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "lsmod | grep ^xsk_diag"}, 0);
+    }
+
+    WSLC_TEST_METHOD(RootNamespaceProcessReleaseAndExitStress)
+    {
+        constexpr unsigned int c_threadCount = 4;
+        constexpr unsigned int c_iterations = 50;
+
+        std::atomic<unsigned int> failures = 0;
+        std::vector<std::thread> threads;
+
+        {
+            auto joinThreads = wil::scope_exit([&]() {
+                for (auto& thread : threads)
+                {
+                    thread.join();
+                }
+            });
+
+            for (auto t = 0; t < c_threadCount; ++t)
+            {
+                threads.emplace_back([&]() {
+                    try
+                    {
+                        const auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
+                        for (auto i = 0; i < c_iterations; ++i)
+                        {
+                            auto [result, process, error] = WSLCProcessLauncher("/bin/true", {"/bin/true"}).LaunchNoThrow(*m_defaultSession);
+                            if (FAILED(result))
+                            {
+                                LogError("Root process launch failed: 0x%08x, errno: %i", result, error);
+                                ++failures;
+                                return;
+                            }
+                        }
+                    }
+                    catch (...)
+                    {
+                        LOG_CAUGHT_EXCEPTION();
+                        ++failures;
+                    }
+                });
+            }
+        }
+
+        VERIFY_ARE_EQUAL(failures.load(), 0u);
+
+        // Validate that exit notifications are still functional.
+        ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "echo OK"}, 0);
     }
 
     WSLC_TEST_METHOD(CreateRootNamespaceProcess)
@@ -6723,6 +7010,13 @@ class WSLCTests
 
         // Validate error paths
         {
+            WSLCContainerLauncher launcher("debian:latest", "/invalid-name", {"/bin/cat"});
+            auto [hresult, container] = launcher.CreateNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(hresult, E_INVALIDARG);
+            ValidateCOMErrorMessage(L"Invalid name: '/invalid-name'");
+        }
+
+        {
             WSLCContainerLauncher launcher("debian:latest", std::string(WSLC_MAX_CONTAINER_NAME_LENGTH + 1, 'a'), {"/bin/cat"});
             auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(hresult, E_INVALIDARG);
@@ -8469,12 +8763,26 @@ class WSLCTests
             // Validate that the container can be opened by name.
             expectOpen("named-container");
 
+            // Validate that the "/name" form returned by inspect can be opened.
+            auto openedByName = expectOpen(container->Inspect().Name.c_str());
+            WSLCContainerId openedId{};
+            VERIFY_SUCCEEDED(openedByName->GetId(openedId));
+            VERIFY_ARE_EQUAL(container->Id(), std::string{openedId});
+
             // Validate that the container can be opened by ID.
             expectOpen(container->Id().c_str());
 
             // Validate that the container can be opened by a prefix of the ID.
             expectOpen(container->Id().substr(0, 8).c_str());
             expectOpen(container->Id().substr(0, 1).c_str());
+
+            // A single leading slash is ignored, so slash-prefixed IDs and ID prefixes also resolve.
+            for (const auto& reference : {"/" + container->Id(), "/" + container->Id().substr(0, 8)})
+            {
+                auto opened = expectOpen(reference.c_str());
+                VERIFY_SUCCEEDED(opened->GetId(openedId));
+                VERIFY_ARE_EQUAL(container->Id(), std::string{openedId});
+            }
 
             // Validate that prefix conflicts are correctly handled.
             std::vector<RunningWSLCContainer> createdContainers;
@@ -8514,6 +8822,17 @@ class WSLCTests
             }
         }
 
+        // Validate that a maximum-length name can be opened with and without a leading slash.
+        {
+            const std::string name(WSLC_MAX_CONTAINER_NAME_LENGTH, 'a');
+            WSLCContainerLauncher launcher("debian:latest", name, {"echo", "OK"});
+            auto [result, container] = launcher.CreateNoThrow(*m_defaultSession);
+            VERIFY_SUCCEEDED(result);
+
+            expectOpen(name.c_str());
+            expectOpen(("/" + name).c_str());
+        }
+
         // Test error paths
         {
             // A null id and a null output pointer are rejected by the marshaller.
@@ -8528,6 +8847,9 @@ class WSLCTests
 
             expectOpen("non-existing-container", WSLC_E_CONTAINER_NOT_FOUND);
             ValidateCOMErrorMessage(L"Container 'non-existing-container' not found.");
+
+            expectOpen("/non-existing-container", WSLC_E_CONTAINER_NOT_FOUND);
+            ValidateCOMErrorMessage(L"Container '/non-existing-container' not found.");
 
             expectOpen("/", E_INVALIDARG);
             ValidateCOMErrorMessage(L"Invalid name: '/'");
@@ -12955,6 +13277,93 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerCachedProperties)
+    {
+        auto verifyDeletedProperties = [](RunningWSLCContainer& container, IWSLCProcess* expectedProcess = nullptr) {
+            const auto id = container.Id();
+            const auto name = container.Name();
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
+            container.SetDeleteOnClose(false);
+
+            VERIFY_ARE_EQUAL(id, container.Id());
+            VERIFY_ARE_EQUAL(name, container.Name());
+            VERIFY_ARE_EQUAL(WslcContainerStateDeleted, container.State());
+
+            wil::com_ptr<IWSLCProcess> cachedProcess;
+            if (expectedProcess != nullptr)
+            {
+                VERIFY_SUCCEEDED(container.Get().GetInitProcess(&cachedProcess));
+                wil::com_ptr<IUnknown> expectedIdentity;
+                wil::com_ptr<IUnknown> cachedIdentity;
+                VERIFY_SUCCEEDED(expectedProcess->QueryInterface(IID_PPV_ARGS(&expectedIdentity)));
+                VERIFY_SUCCEEDED(cachedProcess->QueryInterface(IID_PPV_ARGS(&cachedIdentity)));
+                VERIFY_ARE_EQUAL(expectedIdentity.get(), cachedIdentity.get());
+            }
+            else
+            {
+                VERIFY_ARE_EQUAL(RPC_E_DISCONNECTED, container.Get().GetInitProcess(&cachedProcess));
+                VERIFY_IS_NULL(cachedProcess.get());
+            }
+        };
+
+        {
+            WSLCContainerLauncher launcher("alpine:latest", "cached-created", {"/bin/true"});
+            auto container = launcher.Create(*m_defaultSession);
+            VERIFY_ARE_EQUAL(WslcContainerStateCreated, container.State());
+            verifyDeletedProperties(container);
+        }
+
+        {
+            WSLCContainerLauncher launcher("alpine:latest", "cached-restarted", {"/bin/sh", "-c", "exit 42"});
+            auto container = launcher.Launch(*m_defaultSession);
+            VERIFY_ARE_EQUAL(42, container.GetInitProcess().Wait());
+
+            wil::com_ptr<IWSLCProcess> firstProcess;
+            VERIFY_SUCCEEDED(container.Get().GetInitProcess(&firstProcess));
+            VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+            VERIFY_ARE_EQUAL(42, container.GetInitProcess().Wait());
+
+            wil::com_ptr<IWSLCProcess> lastProcess;
+            VERIFY_SUCCEEDED(container.Get().GetInitProcess(&lastProcess));
+            VERIFY_ARE_NOT_EQUAL(firstProcess.get(), lastProcess.get());
+            verifyDeletedProperties(container, lastProcess.get());
+        }
+
+        {
+            WSLCContainerLauncher launcher("alpine:latest", "cached-failed-start", {"/wslc-nonexistent-executable"});
+            auto container = launcher.Create(*m_defaultSession);
+            VERIFY_FAILED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+
+            // Failed start rolls back the provisional init process, including its cached reference.
+            verifyDeletedProperties(container);
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerCallRetainsSession)
+    {
+        auto session = CreateSession(GetDefaultSessionSettings(L"container-call-lifetime"));
+        LoadTestImage(*session, "alpine:latest");
+
+        ULONG sessionId{};
+        wil::unique_handle terminationEvent;
+        VERIFY_SUCCEEDED(session->GetId(&sessionId));
+        VERIFY_SUCCEEDED(session->GetTerminationEvent(&terminationEvent));
+
+        WSLCContainerLauncher launcher("alpine:latest", "export-retains-session", {"/bin/true"});
+        auto container = launcher.Create(*session);
+        container.SetDeleteOnClose(false);
+
+        // Block a container operation to verify that this keeps the session alive.
+        BlockingOperation operation([&](HANDLE handle) { return container.Get().Export(ToCOMInputHandle(handle)); });
+        auto unblock = wil::scope_exit([&]() { operation.m_testCompleteEvent.SetEvent(); });
+
+        session.reset();
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(terminationEvent.get(), 1000));
+
+        operation.Complete();
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(terminationEvent.get(), 120 * 1000));
+    }
+
     WSLC_TEST_METHOD(SessionCleanupWaitsForHostExit)
     {
         const auto manager = OpenSessionManager();
@@ -13846,11 +14255,15 @@ class WSLCTests
         expectInvalidArg("?foo");
         expectInvalidArg("?foo&bar");
         expectInvalidArg("/url/path");
+        expectInvalidArg("//container");
+        expectInvalidArg("/container/");
+        expectInvalidArg("/?foo");
         expectInvalidArg("");
         expectInvalidArg("\\escaped\n\\chars");
 
         std::string longName(WSLC_MAX_CONTAINER_NAME_LENGTH + 1, 'a');
         expectInvalidArg(longName);
+        expectInvalidArg("/" + longName);
 
         auto expectInvalidPull = [&](const char* name) {
             VERIFY_ARE_EQUAL(m_defaultSession->PullImage(name, nullptr, FALSE, nullptr, nullptr), E_INVALIDARG);
@@ -14938,11 +15351,29 @@ class WSLCTests
             VERIFY_IS_TRUE(IsVmRunning(c_sessionName));
         }
 
-        // Releasing the process wrapper removes its activity hold, allowing idle termination.
+        // A plugin process has no activity hold and can outlive the VM through its COM proxy.
+        const char* commandLine[] = {"/bin/sleep", "600"};
+        WSLCProcessOptions options{};
+        options.CommandLine = {commandLine, RTL_NUMBER_OF(commandLine)};
+        options.Flags = WSLCProcessFlagsTty | WSLCProcessFlagsStdin;
+        wil::com_ptr<IWSLCProcess> pluginProcess;
+        int errnoValue = -1;
+        VERIFY_SUCCEEDED(session->CreateRootNamespaceProcess("/bin/sleep", &options, 24, 80, FALSE, &pluginProcess, &errnoValue));
+        VERIFY_SUCCEEDED(pluginProcess->ResizeTty(25, 81));
+
+        // Releasing the ordinary process wrapper removes its activity hold, allowing idle termination.
         wasAlreadyIdle = TRUE;
         VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
         VERIFY_IS_FALSE(wasAlreadyIdle);
         VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
+
+        WSLCProcessState state{};
+        int exitCode{};
+        VERIFY_SUCCEEDED(pluginProcess->GetState(&state, &exitCode));
+        VERIFY_ARE_EQUAL(state, WslcProcessStateExited);
+        VERIFY_ARE_EQUAL(exitCode, 128 + WSLCSignalSIGKILL);
+        VERIFY_ARE_EQUAL(pluginProcess->Signal(WSLCSignalSIGKILL), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+        VERIFY_ARE_EQUAL(pluginProcess->ResizeTty(24, 80), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
         // A second trigger is now a no-op.
         wasAlreadyIdle = FALSE;
@@ -14953,6 +15384,7 @@ class WSLCTests
         WSLCProcessLauncher launcher2("/bin/sleep", {"/bin/sleep", "60"});
         auto process2 = launcher2.Launch(*session);
         VERIFY_IS_TRUE(IsVmRunning(c_sessionName));
+        VERIFY_ARE_EQUAL(pluginProcess->ResizeTty(24, 80), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
     }
 
     // A tmpfs-backed session has no persistent storage, so its VM state cannot be recovered after a

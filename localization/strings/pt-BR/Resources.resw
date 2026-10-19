@@ -898,6 +898,10 @@ Para obter mais informações sobre Admin Protection, visite https://aka.ms/apde
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>Não há suporte para virtualização aninhada nesta máquina.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>Falha ao detectar suporte à virtualização aninhada, erro: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Falha ao criar o ponto de extremidade de rede com o endereço: '{}', novo endereço atribuído: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3709,7 +3713,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>Imagem '{}' não encontrada, transferindo</value>
+    <value>Não foi possível encontrar a imagem '{}' localmente</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">

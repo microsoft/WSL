@@ -898,6 +898,10 @@ Pour plus d’informations sur Admin Protection, veuillez consulter https://aka.
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>La virtualisation imbriquée n’est pas prise en charge sur cet ordinateur.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>Échec de la détection de la prise en charge de la virtualisation imbriquée, erreur : {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Échec de la création du point de terminaison réseau avec l’adresse : « {} », nouvelle adresse affectée : « {} »</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3709,7 +3713,7 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>Image '{}' non trouvée, extraction en cours</value>
+    <value>Impossible de trouver une image « {} » localement</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">

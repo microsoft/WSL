@@ -3192,10 +3192,7 @@ Usage:
 
     WSL2_TEST_METHOD(KernelArtifacts)
     {
-        // The unified kernel artifacts VHD provides the kernel headers and the perf tooling
-        // alongside the kernel modules. Headers are mounted at /usr/src/linux-headers-$(uname -r)
-        // with /lib/modules/$(uname -r)/build symlinked to that directory; perf is mounted at
-        // /usr/lib/linux-tools/$(uname -r) and exposed via $PATH.
+        // Kernel artifacts provide headers at /usr/src/linux-headers-$(uname -r).
 
         // Headers: the build symlink and a representative uapi header are present.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -L /lib/modules/$(uname -r)/build", nullptr, nullptr, nullptr, nullptr), 0u);
@@ -3234,54 +3231,16 @@ EOF
                 nullptr),
             0u);
 
-        // perf: leave no trace in the distro's file system and make the versioned binary reachable
-        // via $PATH, with PERF_EXEC_PATH pointing at its helper scripts.
-        //
-        // N.B. The test distro does not ship perf, so nothing should be created at /usr/bin/perf.
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -x /usr/lib/linux-tools/$(uname -r)/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /usr/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(L"test \"$(command -v perf)\" = \"/usr/lib/linux-tools/$(uname -r)/bin/perf\"", nullptr, nullptr, nullptr, nullptr), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"perf --version", nullptr, nullptr, nullptr, nullptr), 0u);
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(L"test \"$(perf --exec-path)\" = \"/usr/lib/linux-tools/$(uname -r)/libexec/perf-core\"", nullptr, nullptr, nullptr, nullptr),
-            0u);
-
-        // Stale distro-provided artifacts are replaced or hidden after the VM restarts. A distro
-        // provided perf is shadowed by the binary matching the running kernel.
-        //
-        // N.B. The cleanup is registered before the distro's file system is modified so that a
-        //      failure can't leave a perf binary or a broken build symlink behind, which would
-        //      break subsequent runs.
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            LxsstuLaunchWsl(
-                L"umount /usr/bin/distro-perf 2>/dev/null; rm -f /usr/bin/perf /usr/bin/distro-perf; ln -snf"
-                L" /usr/src/linux-headers-$(uname -r) /lib/modules/$(uname -r)/build",
-                nullptr,
-                nullptr,
-                nullptr,
-                nullptr);
+            LxsstuLaunchWsl(L"ln -snf /usr/src/linux-headers-$(uname -r) /lib/modules/$(uname -r)/build");
         });
 
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(
-                L"rm /lib/modules/$(uname -r)/build && ln -s /tmp /lib/modules/$(uname -r)/build && printf old-perf >"
-                L" /usr/bin/distro-perf && ln -s distro-perf /usr/bin/perf",
-                nullptr,
-                nullptr,
-                nullptr,
-                nullptr),
-            0u);
+        // Stale header links are refreshed after restart.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"rm /lib/modules/$(uname -r)/build && ln -s /tmp /lib/modules/$(uname -r)/build"), 0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(L"test \"$(readlink /lib/modules/$(uname -r)/build)\" = \"/usr/src/linux-headers-$(uname -r)\"", nullptr, nullptr, nullptr, nullptr),
             0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(readlink /usr/bin/perf)\" = \"distro-perf\"", nullptr, nullptr, nullptr, nullptr), 0u);
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(
-                L"test \"$(stat -Lc %d:%i /usr/bin/perf)\" = \"$(stat -Lc %d:%i /usr/lib/linux-tools/$(uname -r)/bin/perf)\"", nullptr, nullptr, nullptr, nullptr),
-            0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"/usr/bin/perf --version", nullptr, nullptr, nullptr, nullptr), 0u);
     }
 
     WSL2_TEST_METHOD(CrashCollection)
@@ -5294,6 +5253,116 @@ VERSION_ID="Invalid|Format"
             VERIFY_ARE_EQUAL(wsl::windows::common::registry::ReadDword(distroKey.get(), nullptr, L"RunOOBE", 1), 0);
             validateOutput(nullptr, L"");
         }
+    }
+
+    static void ValidateOOBEWait(bool TerminateWhileWaiting, bool Retry)
+    {
+        using wsl::windows::common::SubProcess;
+        constexpr DWORD c_timeout = 30 * 1000;
+
+        DistroFileChange distributionconf(L"/etc/wsl-distribution.conf", false);
+        distributionconf.SetContent(
+            L"[oobe]\ncommand = /bin/bash -c 'echo ready; read -r result; exit \"${result:-1}\"'\ndefaultUid = 0\n");
+
+        const auto distroKey = OpenDistributionKey(LXSS_DISTRO_NAME_TEST_L);
+        RegistryKeyChange<DWORD> runOOBE(distroKey.get(), L"", L"RunOOBE", 1);
+        const RegistryKeyChange<DWORD> defaultUid(distroKey.get(), L"", L"DefaultUid", 0);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { TerminateDistribution(); });
+        TerminateDistribution();
+
+        struct Process
+        {
+            Process(wil::unique_handle process, wil::unique_hfile output) : handle(std::move(process)), reader(std::move(output))
+            {
+            }
+
+            wil::unique_handle handle;
+            PartialHandleRead reader;
+        };
+
+        auto startProcess = [](LPCWSTR command, HANDLE input) {
+            SubProcess process(nullptr, LxssGenerateWslCommandLine(command).c_str());
+            auto [read, write] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+            THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(write.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+            process.SetStdHandles(input, write.get(), write.get());
+
+            return std::make_unique<Process>(process.Start(), std::move(read));
+        };
+
+        auto waitForOutput = [&](const Process& process, const std::string& expected) {
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { THROW_HR_IF(E_ABORT, process.reader.GetData().find(expected) == std::string::npos); },
+                std::chrono::milliseconds(100),
+                std::chrono::milliseconds(c_timeout));
+        };
+
+        auto [emptyInput, emptyWrite] = CreateSubprocessPipe(true, false);
+        emptyWrite.reset();
+        std::vector<std::unique_ptr<Process>> waiters;
+
+        for (int attempt = 0; attempt < (Retry ? 2 : 1); ++attempt)
+        {
+            auto [input, write] = CreateSubprocessPipe(true, false);
+
+            auto releaseOOBE = wil::scope_exit([&]() { write.reset(); });
+            auto oobe = startProcess(nullptr, input.get());
+            input.reset();
+            waitForOutput(*oobe, "ready\n");
+
+            for (int index = 0; index < (TerminateWhileWaiting ? 1 : 2); ++index)
+            {
+                waiters.emplace_back(startProcess(L"--exec /bin/echo completed", emptyInput.get()));
+                waitForOutput(*waiters.back(), "Waiting for OOBE command to complete");
+            }
+
+            if (TerminateWhileWaiting)
+            {
+                // Terminate the distribution while OOBE is still running.
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--terminate {}", LXSS_DISTRO_NAME_TEST_L).c_str()), 0L);
+
+                // The original OOBE process should fail.
+                VERIFY_ARE_EQUAL(SubProcess::GetExitCode(oobe->handle.get(), c_timeout), 1);
+
+                // All processes blocked on OOBE should fail as well.
+                for (auto& waiter : waiters)
+                {
+                    VERIFY_ARE_EQUAL(SubProcess::GetExitCode(waiter->handle.get(), c_timeout), -1);
+                }
+
+                return;
+            }
+
+            const bool fail = Retry && attempt == 0;
+            const std::string result = fail ? "1\n" : "0\n";
+
+            DWORD written{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(write.get(), result.data(), static_cast<DWORD>(result.size()), &written, nullptr));
+            VERIFY_ARE_EQUAL(written, result.size());
+            write.reset();
+
+            VERIFY_ARE_EQUAL(SubProcess::GetExitCode(oobe->handle.get(), c_timeout), fail ? 1 : 0);
+        }
+
+        // All processes blocked on OOBE should succeed.
+        for (auto& waiter : waiters)
+        {
+            VERIFY_ARE_EQUAL(SubProcess::GetExitCode(waiter->handle.get(), c_timeout), 0);
+            waiter->reader.ExpectClosed(c_timeout);
+
+            const auto expected =
+                std::format("wsl: Waiting for OOBE command to complete for distribution \"{}\"...\r\ncompleted\n", LXSS_DISTRO_NAME_TEST_L);
+
+            VERIFY_ARE_EQUAL(EscapeString(expected), EscapeString(waiter->reader.GetData()));
+        }
+
+        VERIFY_ARE_EQUAL(runOOBE.Get(), 0);
+    }
+
+    WSL2_TEST_METHOD(OOBEAvanced)
+    {
+        ValidateOOBEWait(true, false);
+        ValidateOOBEWait(false, false);
+        ValidateOOBEWait(false, true);
     }
 
     static void ValidateDistributionStarts(LPCWSTR Name)

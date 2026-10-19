@@ -121,7 +121,7 @@ class InstallerTests
 
         try
         {
-            wsl::shared::retry::RetryWithTimeout<void>(pred, std::chrono::hours(3), std::chrono::minutes(2));
+            wsl::shared::retry::RetryWithTimeout<void>(pred, std::chrono::milliseconds(100), std::chrono::minutes(2));
         }
         catch (...)
         {
