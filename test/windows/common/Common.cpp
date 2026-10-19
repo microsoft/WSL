@@ -832,6 +832,7 @@ void CreateWerReports()
         L"wsl.exe",
         L"wslhost.exe",
         L"wslrelay.exe",
+        L"wslpluginhost.exe",
         L"wslservice.exe",
         L"wslg.exe",
         L"vmcompute.exe",

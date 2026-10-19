@@ -855,6 +855,7 @@ void RegisterLspCategoriesImpl(DWORD flags)
          {L"wsl.exe",
           L"wslhost.exe",
           L"wslrelay.exe",
+          L"wslpluginhost.exe",
           L"wslg.exe",
           L"wslservice.exe",
           L"wslc.exe",

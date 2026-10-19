@@ -16,6 +16,7 @@ Abstract:
 #include "Common.h"
 #include "registry.hpp"
 #include "PluginTests.h"
+#include "WslPluginApi.h"
 #include "wslc.h"
 #include "WSLCContainerLauncher.h"
 #include "WSLCProcessLauncher.h"
@@ -101,6 +102,7 @@ class PluginTests
         WriteDword(testKey.get(), nullptr, c_testType, static_cast<DWORD>(testCase));
         WriteString(testKey.get(), nullptr, c_logFile, logFile.c_str());
         WriteString(testKey.get(), nullptr, c_mountFolder, mountFolder);
+        WriteDword(testKey.get(), nullptr, c_callbackResult, E_PENDING);
 
         const auto lxssKey =
             CreateKey(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Lxss\\Plugins", KEY_SET_VALUE, nullptr, 0);
@@ -155,6 +157,129 @@ class PluginTests
                 VERIFY_FAIL(message.c_str());
             }
         }
+    }
+
+    static DWORD ServicePid()
+    {
+        wil::unique_schandle manager{OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT)};
+        VERIFY_IS_NOT_NULL(manager);
+        wil::unique_schandle service{OpenServiceW(manager.get(), L"WslService", SERVICE_QUERY_STATUS)};
+        VERIFY_IS_NOT_NULL(service);
+        const auto [state, pid] = GetServiceState(service.get());
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(SERVICE_RUNNING), state);
+        VERIFY_ARE_NOT_EQUAL(0ul, pid);
+        return pid;
+    }
+
+    void VerifyCrashIsolation(PluginTestType Mode)
+    {
+        ConfigurePlugin(Mode);
+        const auto servicePid = ServicePid();
+        wil::unique_handle service{OpenProcess(SYNCHRONIZE, FALSE, servicePid)};
+        VERIFY_IS_NOT_NULL(service);
+        const auto key = OpenTestRegistryKey(KEY_READ);
+        const auto hostPid = ReadDword(key.get(), nullptr, c_hostPid, 0);
+        VERIFY_ARE_NOT_EQUAL(0ul, hostPid);
+        VERIFY_ARE_NOT_EQUAL(servicePid, hostPid);
+
+        wil::unique_handle host;
+        if (Mode != PluginTestType::CrashOnLoad)
+        {
+            host.reset(OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, hostPid));
+            VERIFY_IS_NOT_NULL(host);
+            const auto path = wil::QueryFullProcessImageNameW<std::wstring>(host.get());
+            VERIFY_ARE_EQUAL(L"wslpluginhost.exe", std::filesystem::path(path).filename().wstring());
+        }
+        if (Mode == PluginTestType::CrashOnVmStop)
+        {
+            StartWsl(0);
+            VERIFY_ARE_EQUAL(0ul, LxsstuLaunchWsl(L"--shutdown"));
+        }
+        else
+        {
+            const auto [output, error] = LxsstuLaunchWslAndCaptureOutput(L"echo -n OK", -1);
+            VERIFY_IS_TRUE(output.find(L"TestPlugin") != std::wstring::npos);
+        }
+        if (host)
+        {
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(host.get(), 30000));
+        }
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(service.get(), 0));
+        VERIFY_ARE_EQUAL(servicePid, ServicePid());
+
+        const auto [output, error] = LxsstuLaunchWslAndCaptureOutput(L"echo -n OK", -1);
+        VERIFY_IS_TRUE(output.find(L"TestPlugin") != std::wstring::npos);
+        VERIFY_ARE_EQUAL(hostPid, ReadDword(key.get(), nullptr, c_hostPid, 0));
+        VERIFY_ARE_EQUAL(servicePid, ServicePid());
+    }
+
+    WSL2_TEST_METHOD(CrashDuringPluginLoad)
+    {
+        VerifyCrashIsolation(PluginTestType::CrashOnLoad);
+    }
+
+    WSL2_TEST_METHOD(CrashDuringVmStart)
+    {
+        VerifyCrashIsolation(PluginTestType::CrashOnVmStart);
+    }
+
+    WSL2_TEST_METHOD(CrashDuringDistributionStart)
+    {
+        VerifyCrashIsolation(PluginTestType::CrashOnDistributionStart);
+    }
+
+    WSL2_TEST_METHOD(CrashDuringVmStop)
+    {
+        VerifyCrashIsolation(PluginTestType::CrashOnVmStop);
+    }
+
+    WSL2_TEST_METHOD(ConcurrentCallbacks)
+    {
+        ConfigurePlugin(PluginTestType::ConcurrentCallbacks);
+        StartWsl(0);
+        ValidateLogFile(
+            LR"(Plugin loaded. TestMode=31
+            VM created (settings->CustomConfigurationFlags=0)
+            Concurrent callbacks passed
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
+            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
+            VM Stopping)");
+    }
+
+    WSL2_TEST_METHOD(AsyncCallbackAfterNotification)
+    {
+        wil::unique_event start;
+        start.create(wil::EventOptions::ManualReset, c_asyncCallbackStart);
+        wil::unique_event done;
+        done.create(wil::EventOptions::ManualReset, c_asyncCallbackDone);
+        auto release = wil::scope_exit([&] { start.SetEvent(); });
+        ConfigurePlugin(PluginTestType::AsyncCallback);
+        StartWsl(0);
+        start.SetEvent();
+        VERIFY_IS_TRUE(done.wait(30000));
+        const auto key = OpenTestRegistryKey(KEY_READ);
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(S_OK), ReadDword(key.get(), nullptr, c_callbackResult, E_PENDING));
+    }
+
+    WSL2_TEST_METHOD(HostExitsWithService)
+    {
+        ConfigurePlugin(PluginTestType::Success);
+        StartWsl(0);
+        const auto key = OpenTestRegistryKey(KEY_READ);
+        const auto hostPid = ReadDword(key.get(), nullptr, c_hostPid, 0);
+        wil::unique_handle host{OpenProcess(SYNCHRONIZE, FALSE, hostPid)};
+        VERIFY_IS_NOT_NULL(host);
+        StopWslService();
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(host.get(), 30000));
+    }
+
+    WSL2_TEST_METHOD(WslcCrossApartmentProcess)
+    {
+        ConfigurePlugin(PluginTestType::WslcCrossApartmentProcess);
+        auto session = CreateWslcSession(L"plugin-wslc-sta");
+        LoadTestImage(*session, "debian:latest");
+        const auto key = OpenTestRegistryKey(KEY_READ);
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(S_OK), ReadDword(key.get(), nullptr, c_callbackResult, E_PENDING));
     }
 
     WSL2_TEST_METHOD(Success)
@@ -575,6 +700,38 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
+    WSL2_TEST_METHOD(RegistrationSerializesWithDistributionStart)
+    {
+        wil::unique_event entered;
+        entered.create(wil::EventOptions::ManualReset, c_registrationEntered);
+        wil::unique_event release;
+        release.create(wil::EventOptions::ManualReset, c_registrationRelease);
+        ConfigurePlugin(PluginTestType::ConcurrentRegistration);
+
+        using wsl::windows::common::SubProcess;
+        const auto importCommand =
+            LxssGenerateWslCommandLine((L"--import plugin-concurrent-registration . \"" + g_testDistroPath + L"\" --version 2").c_str());
+        const auto import = SubProcess(nullptr, importCommand.c_str()).Start();
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+            release.SetEvent();
+            LOG_HR_IF(E_FAIL, SubProcess::GetExitCode(import.get(), 60000) != 0);
+            LOG_HR_IF(E_FAIL, LxsstuLaunchWsl(L"--unregister plugin-concurrent-registration") != 0);
+        });
+        VERIFY_IS_TRUE(entered.wait(60000));
+
+        const auto startCommand = LxssGenerateWslCommandLine(L"-d test_distro --exec /bin/true");
+        const auto start = SubProcess(nullptr, startCommand.c_str()).Start();
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(start.get(), 1000));
+
+        release.SetEvent();
+        VERIFY_ARE_EQUAL(0ul, SubProcess::GetExitCode(start.get(), 60000));
+        VERIFY_ARE_EQUAL(0ul, SubProcess::GetExitCode(import.get(), 60000));
+        const auto key = OpenTestRegistryKey(KEY_READ);
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(S_OK), ReadDword(key.get(), nullptr, c_callbackResult, E_PENDING));
+        VERIFY_ARE_EQUAL(0ul, LxsstuLaunchWsl(L"--unregister plugin-concurrent-registration"));
+        cleanup.release();
+    }
+
     WSL2_TEST_METHOD(ImportInplaceSuccess)
     {
         ConfigurePlugin(PluginTestType::Success);
@@ -812,6 +969,46 @@ class PluginTests
             WSLC Session stopping, name=plugin-wslc-pull-test, id=*)";
 
         ValidateLogFile(ExpectedOutput);
+    }
+
+    void VerifyWslcPluginLoadFailure(PluginTestType Mode, HRESULT ExpectedResult, LPCWSTR ExpectedMessage)
+    {
+        ConfigurePlugin(Mode);
+
+        WSLCSessionSettings settings{};
+        settings.DisplayName = L"plugin-wslc-load-failure";
+        settings.CpuCount = 4;
+        settings.MemoryMb = 2048;
+        settings.BootTimeoutMs = 30 * 1000;
+        settings.MaximumStorageSizeMb = 1024 * 20;
+        settings.NetworkingMode = WSLCNetworkingModeNone;
+
+        auto manager = OpenWslcSessionManager();
+        wil::com_ptr<IWSLCSession> session;
+        const auto result = manager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session);
+        ValidateCOMErrorMessageContains(ExpectedMessage);
+        VERIFY_ARE_EQUAL(ExpectedResult, result);
+        VERIFY_IS_NULL(session.get());
+    }
+
+    WSL2_TEST_METHOD(WslcPluginLoadFailure)
+    {
+        VerifyWslcPluginLoadFailure(
+            PluginTestType::FailToLoad, E_UNEXPECTED, L"A fatal error was returned by plugin 'TestPlugin'");
+        ValidateLogFile(
+            LR"(Plugin loaded. TestMode=2
+            OnLoad: E_UNEXPECTED)");
+    }
+
+    WSL2_TEST_METHOD(WslcPluginUpdateRequired)
+    {
+        VerifyWslcPluginLoadFailure(
+            PluginTestType::PluginRequiresUpdate,
+            WSL_E_PLUGIN_REQUIRES_UPDATE,
+            L"The plugin 'TestPlugin' requires a newer version of WSL");
+        ValidateLogFile(
+            LR"(Plugin loaded. TestMode=9
+            OnLoad: WSL_E_PLUGINREQUIRESUPDATE)");
     }
 
     WSL2_TEST_METHOD(WslcSessionRejected)

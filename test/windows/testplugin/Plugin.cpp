@@ -49,6 +49,7 @@ HRESULT g_stopWindowCallerResult = E_PENDING;
 std::atomic<bool> g_leakedProcessDied = false;
 
 std::optional<uint32_t> g_previousInitPid;
+std::thread g_asyncCallback;
 
 std::vector<char> ReadFromSocket(SOCKET socket)
 {
@@ -71,7 +72,91 @@ HRESULT OnVmStarted(const WSLSessionInformation* Session, const WSLVmCreationSet
 {
     g_logfile << "VM created (settings->CustomConfigurationFlags=" << Settings->CustomConfigurationFlags << ")" << std::endl;
 
-    if (g_testType == PluginTestType::FailToStartVm)
+    if (g_testType == PluginTestType::CrashOnVmStart)
+    {
+        TerminateProcess(GetCurrentProcess(), ERROR_UNHANDLED_EXCEPTION);
+        return E_UNEXPECTED;
+    }
+    else if (g_testType == PluginTestType::ConcurrentCallbacks)
+    {
+        const auto directory = std::filesystem::path(wil::GetModuleFileNameW<std::wstring>(wil::GetModuleInstanceHandle())).parent_path();
+        {
+            std::ofstream file(directory / "concurrent-plugin.txt");
+            file << "callback";
+            RETURN_HR_IF(E_FAIL, !file);
+        }
+        auto cleanupFile = wil::scope_exit_log(
+            WI_DIAGNOSTICS_INFO, [&] { THROW_IF_WIN32_BOOL_FALSE(DeleteFileW((directory / "concurrent-plugin.txt").c_str())); });
+        wil::unique_event start{wil::EventOptions::ManualReset};
+        std::array<std::thread, 4> threads;
+        std::array<HRESULT, 4> results{};
+        auto join = wil::scope_exit([&] {
+            start.SetEvent();
+            for (auto& thread : threads)
+            {
+                if (thread.joinable())
+                {
+                    thread.join();
+                }
+            }
+        });
+        for (size_t index = 0; index < threads.size(); ++index)
+        {
+            threads[index] = std::thread([&, index] {
+                results[index] = wil::ResultFromException([&] {
+                    wil::unique_couninitialize_call apartment;
+                    if (index == 0)
+                    {
+                        apartment = wil::CoInitializeEx(COINIT_APARTMENTTHREADED);
+                    }
+                    start.wait();
+                    const auto mountpoint = std::format(L"/test-concurrent-{}", index);
+                    const auto name = std::format(L"test-concurrent-{}", index);
+                    THROW_IF_FAILED(g_api->MountFolder(Session->SessionId, directory.c_str(), mountpoint.c_str(), TRUE, name.c_str()));
+                    const auto path = std::format("/test-concurrent-{}/concurrent-plugin.txt", index);
+                    LPCSTR arguments[] = {"/bin/cat", path.c_str(), nullptr};
+                    wil::unique_socket socket;
+                    THROW_IF_FAILED(g_api->ExecuteBinary(Session->SessionId, arguments[0], arguments, &socket));
+                    THROW_HR_IF(E_FAIL, ReadFromSocket(socket.get()) != std::vector<char>({'c', 'a', 'l', 'l', 'b', 'a', 'c', 'k'}));
+                });
+            });
+        }
+        start.SetEvent();
+        for (auto& thread : threads)
+        {
+            thread.join();
+        }
+        for (const auto result : results)
+        {
+            RETURN_IF_FAILED(result);
+        }
+        g_logfile << "Concurrent callbacks passed" << std::endl;
+    }
+    else if (g_testType == PluginTestType::AsyncCallback)
+    {
+        const auto sessionId = Session->SessionId;
+        g_asyncCallback = std::thread([sessionId] {
+            const auto result = wil::ResultFromException([&] {
+                wil::unique_event start{OpenEventW(SYNCHRONIZE, FALSE, c_asyncCallbackStart)};
+                THROW_LAST_ERROR_IF_NULL(start);
+                THROW_HR_IF(HRESULT_FROM_WIN32(WAIT_TIMEOUT), !start.wait(30000));
+                LPCSTR arguments[] = {"/bin/echo", "callback", nullptr};
+                wil::unique_socket socket;
+                THROW_IF_FAILED(g_api->ExecuteBinary(sessionId, arguments[0], arguments, &socket));
+                THROW_HR_IF(E_FAIL, ReadFromSocket(socket.get()) != std::vector<char>({'c', 'a', 'l', 'l', 'b', 'a', 'c', 'k', '\n'}));
+            });
+            try
+            {
+                const auto key = OpenTestRegistryKey(KEY_SET_VALUE);
+                WriteDword(key.get(), nullptr, c_callbackResult, result);
+                wil::unique_event done{OpenEventW(EVENT_MODIFY_STATE, FALSE, c_asyncCallbackDone)};
+                THROW_LAST_ERROR_IF_NULL(done);
+                done.SetEvent();
+            }
+            CATCH_LOG()
+        });
+    }
+    else if (g_testType == PluginTestType::FailToStartVm)
     {
         g_logfile << "OnVmStarted: E_UNEXPECTED" << std::endl;
         return E_UNEXPECTED;
@@ -227,8 +312,17 @@ HRESULT OnVmStarted(const WSLSessionInformation* Session, const WSLVmCreationSet
 
 HRESULT OnVmStopping(const WSLSessionInformation* Session)
 {
+    if (g_asyncCallback.joinable())
+    {
+        g_asyncCallback.join();
+    }
     g_logfile << "VM Stopping" << std::endl;
 
+    if (g_testType == PluginTestType::CrashOnVmStop)
+    {
+        TerminateProcess(GetCurrentProcess(), ERROR_UNHANDLED_EXCEPTION);
+        return E_UNEXPECTED;
+    }
     if (g_testType == PluginTestType::FailToStopVm)
     {
         g_logfile << "OnVmStopping: E_UNEXPECTED" << std::endl;
@@ -240,6 +334,11 @@ HRESULT OnVmStopping(const WSLSessionInformation* Session)
 
 HRESULT OnDistroStarted(const WSLSessionInformation* Session, const WSLDistributionInformation* Distribution)
 {
+    if (g_testType == PluginTestType::CrashOnDistributionStart)
+    {
+        TerminateProcess(GetCurrentProcess(), ERROR_UNHANDLED_EXCEPTION);
+        return E_UNEXPECTED;
+    }
     g_logfile << "Distribution started, name=" << wsl::shared::string::WideToMultiByte(Distribution->Name)
               << ", package=" << wsl::shared::string::WideToMultiByte(Distribution->PackageFamilyName)
               << ", PidNs=" << Distribution->PidNamespace << ", InitPid=" << Distribution->InitPid
@@ -360,6 +459,26 @@ HRESULT OnDistributionRegistered(const WSLSessionInformation* Session, const Wsl
     {
         g_logfile << "OnDistributionRegistered: E_UNEXPECTED" << std::endl;
         return E_UNEXPECTED;
+    }
+    else if (g_testType == PluginTestType::ConcurrentRegistration)
+    {
+        const auto result = wil::ResultFromException([&] {
+            wil::unique_event entered{OpenEventW(EVENT_MODIFY_STATE, FALSE, c_registrationEntered)};
+            THROW_LAST_ERROR_IF_NULL(entered);
+            wil::unique_event release{OpenEventW(SYNCHRONIZE, FALSE, c_registrationRelease)};
+            THROW_LAST_ERROR_IF_NULL(release);
+            entered.SetEvent();
+            THROW_HR_IF(HRESULT_FROM_WIN32(WAIT_TIMEOUT), !release.wait(60000));
+
+            LPCSTR arguments[] = {"/bin/echo", "registration", nullptr};
+            wil::unique_socket socket;
+            THROW_IF_FAILED(g_api->ExecuteBinary(Session->SessionId, arguments[0], arguments, &socket));
+            const auto expected = std::string_view{"registration\n"};
+            THROW_HR_IF(E_FAIL, ReadFromSocket(socket.get()) != std::vector<char>(expected.begin(), expected.end()));
+        });
+        const auto key = OpenTestRegistryKey(KEY_SET_VALUE);
+        WriteDword(key.get(), nullptr, c_callbackResult, result);
+        return result;
     }
 
     return S_OK;
@@ -682,6 +801,44 @@ HRESULT OnWslcImageDeleted(const WSLCSessionInformation* Session, LPCSTR ImageId
 HRESULT OnWslcVmStarted(const WSLCSessionInformation* Session)
 try
 {
+    if (g_testType == PluginTestType::WslcCrossApartmentProcess)
+    {
+        LPCSTR arguments[] = {"/bin/sh", "-c", "printf callback", nullptr};
+        WSLCProcessHandle process = nullptr;
+        THROW_IF_FAILED(g_api->WSLCCreateProcess(Session->SessionId, arguments[0], arguments, nullptr, &process, nullptr));
+        auto releaseProcess = wil::scope_exit([&] {
+            if (process)
+            {
+                g_api->WSLCReleaseProcess(process);
+            }
+        });
+        HRESULT result = E_PENDING;
+        std::thread thread([&] {
+            result = wil::ResultFromException([&] {
+                const auto apartment = wil::CoInitializeEx(COINIT_APARTMENTTHREADED);
+                THROW_IF_FAILED(g_api->WSLCMountFolder(Session->SessionId, L"C:\\", "/test-sta-callback", TRUE));
+                THROW_IF_FAILED(g_api->WSLCUnmountFolder(Session->SessionId, "/test-sta-callback"));
+                wil::unique_socket output;
+                THROW_IF_FAILED(g_api->WSLCProcessGetFd(process, WSLCProcessFdStdout, &output));
+                wil::unique_handle exited;
+                THROW_IF_FAILED(g_api->WSLCProcessGetExitEvent(process, &exited));
+                THROW_HR_IF(E_FAIL, ReadFromSocket(output.get()) != std::vector<char>({'c', 'a', 'l', 'l', 'b', 'a', 'c', 'k'}));
+                THROW_HR_IF(HRESULT_FROM_WIN32(WAIT_TIMEOUT), WaitForSingleObject(exited.get(), 30000) != WAIT_OBJECT_0);
+                int exitCode;
+                THROW_IF_FAILED(g_api->WSLCProcessGetExitCode(process, &exitCode));
+                THROW_HR_IF(E_FAIL, exitCode != 0);
+                output.reset();
+                exited.reset();
+                g_api->WSLCReleaseProcess(process);
+                process = nullptr;
+            });
+        });
+        thread.join();
+        const auto key = OpenTestRegistryKey(KEY_SET_VALUE);
+        WriteDword(key.get(), nullptr, c_callbackResult, result);
+        return result;
+    }
+
     if (g_testType == PluginTestType::WslcSuccess)
     {
         // Run once: the checks are written against the first VM of the session.
@@ -879,12 +1036,16 @@ EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPlugin
         THROW_HR_IF(E_UNEXPECTED, !g_logfile);
 
         g_testType = static_cast<PluginTestType>(ReadDword(key.get(), nullptr, c_testType, static_cast<DWORD>(PluginTestType::Invalid)));
-        THROW_HR_IF(
-            E_INVALIDARG,
-            static_cast<DWORD>(g_testType) <= 0 ||
-                static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::WslcVmExitDuringSessionRelease));
+        THROW_HR_IF(E_INVALIDARG, static_cast<DWORD>(g_testType) <= 0 || static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::ConcurrentRegistration));
 
         g_logfile << "Plugin loaded. TestMode=" << static_cast<DWORD>(g_testType) << std::endl;
+        const auto writableKey = OpenTestRegistryKey(KEY_SET_VALUE);
+        WriteDword(writableKey.get(), nullptr, c_hostPid, GetCurrentProcessId());
+        if (g_testType == PluginTestType::CrashOnLoad)
+        {
+            TerminateProcess(GetCurrentProcess(), ERROR_UNHANDLED_EXCEPTION);
+            return E_UNEXPECTED;
+        }
         g_api = Api;
         Hooks->OnVMStarted = &OnVmStarted;
         Hooks->OnVMStopping = &OnVmStopping;

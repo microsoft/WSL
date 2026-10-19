@@ -11,6 +11,7 @@ file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS
 add_compile_definitions(INLINE_TEST_METHOD_MARKUP)
 
 add_library(wsltests SHARED ${SOURCES} ${HEADERS})
+target_sources(wsltests PRIVATE ${CMAKE_SOURCE_DIR}/src/windows/service/exe/PluginCallPump.cpp)
 
 target_include_directories(wsltests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/common
@@ -18,6 +19,8 @@ target_include_directories(wsltests PRIVATE
     ${CMAKE_SOURCE_DIR}/src/windows/WslcSDK
     ${CMAKE_BINARY_DIR}/src/windows/WslcSDK/winrt/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
 set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/wsl/NetworkTests.cpp APPEND PROPERTY INCLUDE_DIRECTORIES
+    ${CMAKE_SOURCE_DIR}/src/windows/service/exe)
+set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/common/PluginCallPumpTests.cpp APPEND PROPERTY INCLUDE_DIRECTORIES
     ${CMAKE_SOURCE_DIR}/src/windows/service/exe)
 target_link_directories(wsltests PRIVATE ${BIN})
 target_precompile_headers(wsltests REUSE_FROM common)

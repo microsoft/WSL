@@ -217,6 +217,8 @@ HRESULT WslService::ServiceStarted()
 {
     m_coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
 
+    g_pluginManager.Initialize();
+
     // Cleanup any data from a previously aborted session (crash, power loss, etc).
     LxssIpTables::CleanupRemnants();
     g_networkingReady.SetEvent();
@@ -258,6 +260,9 @@ void WslService::ServiceStopped()
     {
         LxssClientUninitialize();
     }
+
+    // Release plugin hosts while COM and its proxy/stub are still initialized.
+    g_pluginManager.Shutdown();
 
     // There is a potential deadlock if CoUninitialize() is called before the LanguageChangeNotifyThread
     // isn't done initializing. Clearing the COM objects before calling CoUninitialize() works around the issue.

@@ -1,0 +1,13 @@
+// Copyright (C) Microsoft Corporation. All rights reserved.
+
+#include <windows.h>
+#include "resource.h"
+#include "wslversioninfo.h"
+
+#define VER_INTERNALNAME_STR "wslpluginhost.exe"
+#define VER_ORIGINALFILENAME_STR "wslpluginhost.exe"
+
+#define VER_FILEDESCRIPTION_STR "Windows Subsystem for Linux"
+ID_ICON ICON PRELOAD DISCARDABLE "..\..\..\..\Images\wsl.ico"
+
+#include <common.ver>
