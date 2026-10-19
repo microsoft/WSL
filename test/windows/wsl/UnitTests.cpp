@@ -2708,6 +2708,39 @@ Usage:
         validateEnvironment(true);
     }
 
+    WSL2_TEST_METHOD(GuiApplicationsGlobalDisableOverridesDistroOptIn)
+    {
+        auto validateDistroStartup = []() {
+            TerminateDistribution();
+
+            auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"--exec /bin/echo ok");
+            VERIFY_ARE_EQUAL(L"ok\n", output);
+            VERIFY_ARE_EQUAL(L"", warnings);
+
+            std::tie(output, warnings) = LxsstuLaunchWslAndCaptureOutput(L"echo -n \"$DISPLAY$WAYLAND_DISPLAY\"");
+            VERIFY_ARE_EQUAL(L"", output);
+            VERIFY_ARE_EQUAL(L"", warnings);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /run/tmpfiles.d/x11.conf"), 0L);
+        };
+
+        constexpr auto c_distroConfig = "[general]\nguiApplications=true\n";
+        WslConfigChange configChange(LxssGenerateTestConfig({.guiApplications = false}));
+
+        {
+            LogInfo("Validate with systemd disabled.");
+            DistroFileChange wslConf(L"/etc/wsl.conf", false);
+            wslConf.SetContent(wsl::shared::string::MultiByteToWide(c_distroConfig).c_str());
+            validateDistroStartup();
+        }
+
+        {
+            LogInfo("Validate with systemd enabled.");
+            auto revertSystemd = EnableSystemd(c_distroConfig);
+            VERIFY_IS_TRUE(IsSystemdRunning(L"--system"));
+            validateDistroStartup();
+        }
+    }
+
     WSL2_TEST_METHOD(GuiApplicationsSystemd)
     {
         DistroFileChange wslConf(L"/etc/wsl.conf", false);
