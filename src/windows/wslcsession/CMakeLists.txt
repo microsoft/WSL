@@ -43,6 +43,7 @@ set(HEADERS
     ServiceProcessLauncher.h
     WSLCContainer.h
     WSLCContainerMetadata.h
+    WSLCExitRequestState.h
     WSLCRestartScheduler.h
     WindowsCertStore.h
     WSLCProcess.h

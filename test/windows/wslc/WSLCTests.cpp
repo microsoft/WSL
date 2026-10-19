@@ -7540,13 +7540,14 @@ class WSLCTests
         launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
         auto container = launcher.Launch(*m_defaultSession);
         auto initProcess = container.GetInitProcess();
-        WaitForOutput(initProcess.GetStdHandle(1), "run");
+        auto stdoutHandle = initProcess.GetStdHandle(1);
+        WaitForOutput(wsl::windows::common::io::HandleWrapper{stdoutHandle.Get()}, "run");
 
         std::promise<HRESULT> stopResult;
         std::thread stopThread([&]() { stopResult.set_value(container.Get().Stop(WSLCSignalSIGTERM, 30)); });
         auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { stopThread.join(); });
 
-        WaitForOutput(initProcess.GetStdHandle(1), "stopping");
+        WaitForOutput(wsl::windows::common::io::HandleWrapper{stdoutHandle.Get()}, "stopping");
         VERIFY_FAILED(container.Get().Kill(invalidSignal));
         VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGCONT));
         ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "kill", container.Inspect().Id}, 0);

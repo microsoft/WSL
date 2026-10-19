@@ -1246,9 +1246,8 @@ wil::com_ptr<IWSLCProcess> WSLCContainerImpl::StartPhase(
         m_runtimeResourcesHeld = true;
     }
 
-    // The run this starts is subject to the restart policy until a stop is requested.
-    m_exitRequested = false;
-    m_pendingExitRequests = 0;
+    // Staging a replacement run invalidates responses to requests against its predecessor.
+    m_exitRequests.BeginRun();
 
     try
     {
@@ -1275,7 +1274,7 @@ wil::com_ptr<IWSLCProcess> WSLCContainerImpl::StartPhase(
         LOG_HR_MSG(pluginResult, "Plugin rejected start of container '%hs' (0x%x)", m_id.c_str(), pluginResult);
 
         // The rejected run must not be brought back by the restart policy.
-        m_exitRequested = true;
+        m_exitRequests.RequestExit();
 
         try
         {
@@ -1561,6 +1560,11 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
             return;
         }
 
+        if (!Kill && m_state == WslcContainerStateExited)
+        {
+            m_exitRequests.RequestExit();
+        }
+
         transition = m_transition;
         WI_ASSERT(!transition || transition->Kind == TransitionKind::Stop);
 
@@ -1600,7 +1604,7 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
             const auto generation = m_stateGeneration;
 
             // In-flight requests suppress an exit before Docker responds. Only successful requests retain that intent.
-            ++m_pendingExitRequests;
+            const auto exitRequestEpoch = m_exitRequests.BeginRequest();
             bool requestSucceeded = false;
             auto requestCleanup = wil::scope_exit([&]() {
                 if (!lock)
@@ -1608,13 +1612,10 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
                     lock = m_lock.lock_exclusive();
                 }
 
-                if (m_stateGeneration == generation || (m_state == WslcContainerStateExited && m_stateGeneration == generation + 1))
+                if (m_exitRequests.CompleteRequest(exitRequestEpoch, requestSucceeded))
                 {
-                    --m_pendingExitRequests;
-                    m_exitRequested = m_exitRequested || requestSucceeded;
-
                     // An exit observed during the request waits for its outcome before applying the policy.
-                    if (m_state == WslcContainerStateExited && !m_exitRequested && m_pendingExitRequests == 0 &&
+                    if (m_state == WslcContainerStateExited && !m_exitRequests.SuppressesRestart() &&
                         PolicyRestartsContainer(m_restartPolicy) && !m_restart && !m_transition && !m_wslcSession.IsTerminating())
                     {
                         if (std::chrono::steady_clock::now() - m_runStartedAt >= c_restartBackoffResetRunDuration)
@@ -1624,6 +1625,8 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
 
                         SchedulePolicyRestartLockHeld(NextPolicyRestartDelayLockHeld());
                     }
+
+                    UpdateActivityHoldLockHeld();
                 }
             });
 
@@ -1826,9 +1829,9 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
     }
 
     // Only the end of a run applies the restart policy, never a duplicate or late exit event.
-    const bool policyRestart = PolicyRestartsContainer(m_restartPolicy) && m_state == WslcContainerStateRunning &&
-                               !m_exitRequested && m_pendingExitRequests == 0 && !m_restart &&
-                               !(transition && transition->ExpectedEvent == ContainerEvent::Destroy) && !m_wslcSession.IsTerminating();
+    const bool policyRestart =
+        PolicyRestartsContainer(m_restartPolicy) && m_state == WslcContainerStateRunning && !m_exitRequests.SuppressesRestart() &&
+        !m_restart && !(transition && transition->ExpectedEvent == ContainerEvent::Destroy) && !m_wslcSession.IsTerminating();
 
     if (policyRestart)
     {
@@ -2055,7 +2058,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::RequestDeleteExcl
     THROW_HR_WITH_USER_ERROR_IF(
         WSLC_E_CONTAINER_IS_RUNNING,
         Localization::MessageWslcCannotRemoveRestartingContainer(m_id),
-        m_policyRestartPending && WI_IsFlagClear(Flags, WSLCDeleteFlagsForce));
+        (m_policyRestartPending || m_exitRequests.HasPendingRequests()) && WI_IsFlagClear(Flags, WSLCDeleteFlagsForce));
 
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_state == WslcContainerStateDeleted, "Container %hs is already deleted", m_id.c_str());
@@ -3567,7 +3570,8 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(
 
 __requires_lock_held(m_lock) void WSLCContainerImpl::UpdateActivityHoldLockHeld() noexcept
 {
-    const bool active = (m_state == WslcContainerStateRunning) || m_policyRestartPending;
+    const bool active = (m_state == WslcContainerStateRunning) || m_policyRestartPending ||
+                        (m_state == WslcContainerStateExited && m_exitRequests.HasPendingRequests());
     if (active && !m_activityHold)
     {
         m_activityHold = ActivityRef(m_wslcSession.Runtime().IdleStateShared());

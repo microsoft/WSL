@@ -25,6 +25,7 @@ Abstract:
 #include "wslc_schema.h"
 #include "WSLCCompat.h"
 #include "WSLCContainerMetadata.h"
+#include "WSLCExitRequestState.h"
 #include "WSLCNetworkMetadata.h"
 #include "WSLCVhdVolume.h"
 #include <unordered_map>
@@ -329,7 +330,7 @@ private:
     EventStore& m_eventStore;
     std::string m_networkMode;
 
-    // Held (non-empty) exactly while the container is Running or has a policy restart pending so the
+    // Held (non-empty) while the container is Running, has a policy restart pending, or awaits an exit-request outcome so the
     // session's VM stays alive even when no client holds the wrapper (e.g. a detached `run -d`
     // container). Maintained by UpdateActivityHoldLockHeld(); released automatically when the
     // container is destroyed.
@@ -340,8 +341,7 @@ private:
     const WSLCContainerRestartPolicy m_restartPolicy;
 
     // Successful stop or kill requests suppress restart for the run. In-flight requests defer the exit decision.
-    _Guarded_by_(m_lock) bool m_exitRequested = false;
-    _Guarded_by_(m_lock) size_t m_pendingExitRequests = 0;
+    _Guarded_by_(m_lock) WSLCExitRequestState m_exitRequests;
 
     // Set while a policy restart is scheduled and not yet started. The container is Exited meanwhile.
     _Guarded_by_(m_lock) bool m_policyRestartPending = false;
