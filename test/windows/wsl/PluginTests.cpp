@@ -888,7 +888,10 @@ class PluginTests
 
             // The observation window exceeds several automatic restart backoff delays.
             std::this_thread::sleep_for(std::chrono::seconds(3));
-            VERIFY_ARE_EQUAL(container->State(), WslcContainerStateExited);
+            VERIFY_ARE_EQUAL(container->State(), WslcContainerStateCreated);
+            const auto inspect = container->Inspect();
+            VERIFY_IS_FALSE(inspect.State.Running);
+            VERIFY_ARE_EQUAL(std::string{"exited"}, inspect.State.Status);
         }
 
         constexpr auto ExpectedOutput =
