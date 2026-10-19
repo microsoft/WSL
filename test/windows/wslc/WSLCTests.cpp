@@ -15487,11 +15487,7 @@ class WSLCTests
         }
     }
 
-    // A container that outlives an idle teardown still owns VM-scoped state (bind mounts, port
-    // relays) that is released from ~WSLCContainerImpl when the session is finally torn down. By
-    // then the VM object is gone, and a graceful idle teardown leaves VmExited() false, so the
-    // release path must key off "no VM" as well; a throw out of the destructor is unrecoverable
-    // because destructors are noexcept and would terminate the session host.
+    // Permanent rundown must also work after idle teardown has already released the VM.
     WSLC_TEST_METHOD(SessionTerminationAfterIdleTerminationWithContainer)
     {
         const auto hostFolder = std::filesystem::current_path() / "test-idle-terminate-volume";
@@ -15527,7 +15523,7 @@ class WSLCTests
         VERIFY_IS_FALSE(wasAlreadyIdle);
         VERIFY_IS_FALSE(IsVmRunning(c_testSessionName));
 
-        // Terminating clears m_containers, running ~WSLCContainerImpl with no VM to unmount from.
+        // Terminating runs down the implementations with no VM to unmount from.
         VERIFY_SUCCEEDED(m_defaultSession->Terminate());
         WaitForSessionTermination(m_defaultSession.get());
 
@@ -15542,6 +15538,98 @@ class WSLCTests
         VERIFY_ARE_EQUAL(process.Wait(), 0);
         PruneResult pruneResult;
         LOG_IF_FAILED(m_defaultSession->PruneContainers(nullptr, 0, &pruneResult.result));
+    }
+
+    WSLC_TEST_METHOD(SessionTerminationConcurrentWithContainerGetters)
+    {
+        const auto hostFolder = std::filesystem::current_path() / "test-container-rundown-volume";
+        std::filesystem::create_directories(hostFolder);
+        auto folderCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(hostFolder); });
+        auto sessionCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(m_defaultSession->Terminate());
+            {
+                auto restore = ResetTestSession();
+            }
+
+            PruneResult pruneResult;
+            LOG_IF_FAILED(m_defaultSession->PruneContainers(nullptr, 0, &pruneResult.result));
+        });
+
+        WSLCContainerLauncher launcher("debian:latest", "wslc-container-rundown", {"/bin/sleep", "600"}, {}, "bridge", WSLCProcessFlagsTty);
+        launcher.AddVolume(hostFolder.wstring(), "/data", true);
+        launcher.AddPort(WSLC_EPHEMERAL_PORT, 8000, AF_INET);
+        auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+        container.SetDeleteOnClose(false);
+        auto initProcess = container.GetInitProcess();
+
+        WSLCProcessLauncher execLauncher("/bin/sleep", {"/bin/sleep", "600"}, {}, WSLCProcessFlagsTty);
+        auto execProcess = execLauncher.Launch(container.Get());
+
+        wil::unique_handle hostProcess;
+        VERIFY_SUCCEEDED(m_defaultSession->GetProcessHandle(&hostProcess));
+        wil::unique_event terminated;
+        VERIFY_SUCCEEDED(m_defaultSession->GetTerminationEvent(&terminated));
+
+        std::atomic<bool> stop = false;
+        std::atomic<size_t> readyCount = 0;
+        wil::unique_event readersReady{wil::EventOptions::ManualReset};
+        std::array<std::future<HRESULT>, 8> readers;
+        auto readersCleanup = wil::scope_exit([&]() {
+            stop.store(true);
+            for (auto& reader : readers)
+            {
+                if (reader.valid())
+                {
+                    FAIL_FAST_IF_MSG(
+                        reader.wait_for(60s) != std::future_status::ready,
+                        "container getter did not drain after session termination");
+                }
+            }
+        });
+
+        for (auto& reader : readers)
+        {
+            reader = std::async(std::launch::async, [&]() {
+                return wil::ResultFromException([&]() {
+                    const auto coInitialize = wil::CoInitializeEx(COINIT_MULTITHREADED);
+                    bool ready = false;
+                    do
+                    {
+                        WSLCContainerState state{};
+                        THROW_IF_FAILED(container.Get().GetState(&state));
+                        wil::com_ptr<IWSLCProcess> process;
+                        THROW_IF_FAILED(container.Get().GetInitProcess(&process));
+                        THROW_HR_IF_NULL(E_UNEXPECTED, process);
+                        if (!std::exchange(ready, true) && ++readyCount == readers.size())
+                        {
+                            readersReady.SetEvent();
+                        }
+                    } while (!stop.load());
+                });
+            });
+        }
+
+        VERIFY_IS_TRUE(readersReady.wait(30 * 1000));
+        VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+        VERIFY_IS_TRUE(terminated.is_signaled());
+        VERIFY_ARE_EQUAL(WAIT_TIMEOUT, WaitForSingleObject(hostProcess.get(), 0));
+
+        stop.store(true);
+        for (auto& reader : readers)
+        {
+            FAIL_FAST_IF_MSG(
+                reader.wait_for(60s) != std::future_status::ready, "container getter did not drain after session termination");
+            VERIFY_SUCCEEDED(reader.get());
+        }
+
+        // Process controls must be detached before termination completes, even while clients retain them.
+        VERIFY_ARE_EQUAL(initProcess.Wait(10000), 128 + WSLCSignalSIGKILL);
+        VERIFY_ARE_EQUAL(execProcess.Wait(10000), 128 + WSLCSignalSIGKILL);
+        VERIFY_ARE_EQUAL(initProcess.Get().Signal(WSLCSignalSIGKILL), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+        VERIFY_ARE_EQUAL(initProcess.Get().ResizeTty(24, 80), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+        VERIFY_ARE_EQUAL(execProcess.Get().ResizeTty(24, 80), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+        VERIFY_ARE_EQUAL(container.GetInitProcess().State(), WslcProcessStateExited);
+        VERIFY_IS_FALSE(IsVmRunning(c_testSessionName));
     }
 
     // Hammer the idle-teardown path concurrently with VM-level operations to surface deadlocks or

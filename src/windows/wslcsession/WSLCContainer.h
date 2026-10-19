@@ -98,6 +98,8 @@ public:
 
     void Initialize();
 
+    void Rundown() noexcept;
+
     void Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions);
     void Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr) const;
     void Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, bool Kill);
@@ -262,6 +264,7 @@ private:
     // N.B. Stop releases it across the docker request, which can block indefinitely, and re-checks m_stateGeneration instead.
     wil::srwlock m_lifecycleLock;
     mutable wil::srwlock m_lock;
+    std::once_flag m_rundown;
     std::string m_name;
     std::string m_image;
     std::string m_id;

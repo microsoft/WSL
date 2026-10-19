@@ -467,6 +467,13 @@ try
         // so client COM references stay valid; RecoverState reattaches them to the restarted VM.
         if (permanent)
         {
+            // The exclusive runtime lock pins VM-scoped state, but lease-free metadata calls can
+            // still own implementations. Detach their resources before destroying Docker or the VM.
+            for (const auto& [_, container] : m_containers)
+            {
+                container->Rundown();
+            }
+
             m_containers.clear();
         }
     };

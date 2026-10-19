@@ -876,15 +876,15 @@ WSLCContainerImpl::WSLCContainerImpl(
 
 WSLCContainerImpl::~WSLCContainerImpl()
 {
-    // Destructors are implicitly noexcept, so any escaping exception terminates the session host.
-    // Everything below touches VM-scoped state that may already be gone.
-    try
-    {
-        WSL_LOG(
-            "~WSLCContainerImpl",
-            TraceLoggingValue(m_name.c_str(), "Name"),
-            TraceLoggingValue(m_id.c_str(), "Id"),
-            TraceLoggingValue((int)m_state, "State"));
+    Rundown();
+}
+
+void WSLCContainerImpl::Rundown() noexcept
+{
+    std::call_once(m_rundown, [this]() {
+        WSL_LOG("ContainerRundown", TraceLoggingValue(m_name.c_str(), "Name"), TraceLoggingValue(m_id.c_str(), "Id"));
+
+        m_containerEvents.Reset();
 
         // Snapshot and clear process references under the lock.
         // Callbacks are then invoked without holding m_lock.
@@ -911,18 +911,27 @@ WSLCContainerImpl::~WSLCContainerImpl()
             }
         }
 
-        m_containerEvents.Reset();
-
         // Release resources under m_lock, but extract the COM wrapper so Disconnect()
         // can be called without holding m_lock. Calling Disconnect() under m_lock can
         // deadlock if an in-flight COM caller is waiting for m_lock.
         unique_com_disconnect wrapper;
         {
             auto lock = m_lock.lock_exclusive();
-            wrapper = ReleaseResources();
+            wrapper = PrepareDisconnectComWrapper();
+
+            try
+            {
+                ReleaseRuntimeResources();
+            }
+            CATCH_LOG()
+
+            // Explicitely clean resources so that a subsequent call to Rundown() is a no-op.
+            // This is required because the destructor can be called after the VM has been destroyed.
+            m_mappedPorts.clear();
+            m_mountedVolumes.clear();
+            m_activityHold.reset();
         }
-    }
-    CATCH_LOG()
+    });
 }
 
 void WSLCContainerImpl::Initialize()
