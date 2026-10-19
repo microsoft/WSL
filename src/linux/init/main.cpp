@@ -2267,16 +2267,6 @@ void ProcessLaunchInitMessage(
         auto MiniInitDirectChildPidPath = std::filesystem::read_symlink(PROCFS_PATH "/self");
         pid_t MiniInitDirectChildPid = std::stoul(MiniInitDirectChildPidPath.string());
 
-        bool enableGuiApps = Config.EnableGuiApps;
-        {
-            wil::unique_file File{fopen(DISTRO_PATH ETC_PATH "/wsl.conf", "r")};
-            if (File)
-            {
-                std::vector<ConfigKey> ConfigKeys = {ConfigKey("general.guiApplications", enableGuiApps)};
-                ParseConfigFile(ConfigKeys, File.get(), (CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES), STRING_TO_WSTRING(CONFIG_FILE));
-            }
-        }
-
         //
         // Set up the per-distro cgroup before potentially forking into two inits.
         //
@@ -2315,9 +2305,20 @@ void ProcessLaunchInitMessage(
         //      of GUI app support because WslService is waiting to accept a connection.
         //
 
+        bool enableGuiApps = false;
         if (Message->Flags & LxMiniInitMessageFlagLaunchSystemDistro && Config.EnableGuiApps)
         {
             Step = LxInitCreateInstanceStepLaunchSystemDistro;
+
+            enableGuiApps = true;
+            {
+                wil::unique_file File{fopen(DISTRO_PATH ETC_PATH "/wsl.conf", "r")};
+                if (File)
+                {
+                    std::vector<ConfigKey> ConfigKeys = {ConfigKey("general.guiApplications", enableGuiApps)};
+                    ParseConfigFile(ConfigKeys, File.get(), (CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES), STRING_TO_WSTRING(CONFIG_FILE));
+                }
+            }
 
             //
             // If the distro did not opt-out of GUI applications, continue launching the system distro.
