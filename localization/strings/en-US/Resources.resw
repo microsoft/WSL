@@ -4057,6 +4057,10 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Warning: Invalid value for setting '{}' in {}:{}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCHttpsProxyLoopbackNotReachable" xml:space="preserve">
+    <value>A proxy URL using HTTPS and a loopback address cannot be reached from a Consomme session. Use the host loopback name as the proxy host and configure the proxy certificate for that name.</value>
+    <comment>Shown when a Consomme session is configured with an HTTPS proxy URL using localhost, 127.0.0.1, or [::1].</comment>
+  </data>
   <data name="WSLCUserSettings_Warning_InvalidType" xml:space="preserve">
     <value>Warning: Invalid type for setting '{}' in {}:{}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

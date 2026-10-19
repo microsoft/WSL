@@ -25,6 +25,7 @@ Abstract:
 #include "wslpolicies.h"
 #include "APICompat.h"
 #include "WSLCContainerEntry.h"
+#include <WSLCUserSettings.h>
 
 using namespace wsl::windows::common;
 using io::MultiHandleWait;
@@ -37,6 +38,7 @@ using wsl::windows::service::wslc::UserHandle;
 using wsl::windows::service::wslc::WSLCExecutionContext;
 using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
+namespace settings = wsl::windows::wslc::settings;
 
 constexpr auto c_containerdSocket = "/run/containerd/containerd.sock";
 constexpr auto c_storageVhdFilename = wsl::windows::wslc::DefaultStorageVhdName;
@@ -379,6 +381,13 @@ try
     // failures are streamed to the CLI.
     WSLCExecutionContext warningContext(this, WarningCallback);
 
+    const auto isHttpsLoopbackProxy = [](LPCSTR proxy) { return proxy != nullptr && settings::IsHttpsLoopbackProxyUrl(proxy); };
+    if (Settings->NetworkingMode == WSLCNetworkingModeConsomme &&
+        (isHttpsLoopbackProxy(Settings->HttpProxy) || isHttpsLoopbackProxy(Settings->HttpsProxy)))
+    {
+        EMIT_USER_WARNING(Localization::WSLCHttpsProxyLoopbackNotReachable());
+    }
+
     // The VM (and storage VHD) is created lazily on the first operation. Validate the storage
     // configuration eagerly here so misconfiguration is reported at session creation rather than
     // surfacing later on the first VM-starting operation.
@@ -552,6 +561,15 @@ void WSLCSession::PersistSettings(const WSLCSessionInitSettings& Settings, PSID 
     {
         m_settings.RootVhdTypeOverride = nullptr;
     }
+
+    auto persistString = [](LPCSTR Value, std::optional<std::string>& Storage, LPCSTR& Field) {
+        Storage = Value != nullptr ? std::optional<std::string>{Value} : std::nullopt;
+        Field = Storage ? Storage->c_str() : nullptr;
+    };
+
+    persistString(Settings.HttpProxy, m_settingsHttpProxy, m_settings.HttpProxy);
+    persistString(Settings.HttpsProxy, m_settingsHttpsProxy, m_settings.HttpsProxy);
+    persistString(Settings.NoProxy, m_settingsNoProxy, m_settings.NoProxy);
 
     THROW_HR_IF(E_UNEXPECTED, UserSid == nullptr);
 
@@ -727,9 +745,16 @@ void WSLCSession::OnContainerdExited()
 }
 
 ServiceRunningProcess WSLCSession::StartProcess(
-    const std::string& Executable, const std::vector<std::string>& Args, PCSTR LogSource, std::function<void()>&& ExitCallback)
+    const std::string& Executable,
+    const std::vector<std::string>& Args,
+    PCSTR LogSource,
+    std::function<void()>&& ExitCallback,
+    const std::vector<std::string>& ExtraEnvironment)
 {
-    ServiceProcessLauncher launcher{Executable, Args, {{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"}}};
+    std::vector<std::string> environment{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"};
+    environment.insert(environment.end(), ExtraEnvironment.begin(), ExtraEnvironment.end());
+
+    ServiceProcessLauncher launcher{Executable, Args, environment};
 
     auto process = launcher.Launch(m_runtime.Vm());
 
@@ -770,7 +795,21 @@ void WSLCSession::StartDockerd()
         args.emplace_back("--debug");
     }
 
-    m_runtime.SetDockerdProcess(StartProcess("/usr/bin/dockerd", args, "dockerd", std::bind(&WSLCSession::OnDockerdExited, this)));
+    // Proxy values go through the environment because process arguments are logged and may contain credentials.
+    std::vector<std::string> environment;
+    auto addProxy = [&](LPCSTR Value, std::string_view Upper, std::string_view Lower) {
+        if (Value != nullptr)
+        {
+            environment.emplace_back(std::format("{}={}", Upper, Value));
+            environment.emplace_back(std::format("{}={}", Lower, Value));
+        }
+    };
+
+    addProxy(m_settings.HttpProxy, "HTTP_PROXY", "http_proxy");
+    addProxy(m_settings.HttpsProxy, "HTTPS_PROXY", "https_proxy");
+    addProxy(m_settings.NoProxy, "NO_PROXY", "no_proxy");
+
+    m_runtime.SetDockerdProcess(StartProcess("/usr/bin/dockerd", args, "dockerd", std::bind(&WSLCSession::OnDockerdExited, this), environment));
     WSL_LOG("DockerdStarted");
 }
 
