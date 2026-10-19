@@ -213,6 +213,7 @@ void LxssInstance::CreateLxProcess(
         }
     }
 
+    std::unique_lock createProcessLock(m_createProcessLock);
     std::unique_lock lock(m_stateLock);
     THROW_HR_IF(E_ABORT, !m_running);
 
@@ -234,11 +235,15 @@ void LxssInstance::CreateLxProcess(
         }
 
         lock.unlock();
+        createProcessLock.unlock();
         THROW_HR_IF(E_ABORT, !wsl::windows::common::relay::InterruptableWait(oobeCompleteEvent.get(), exitHandles));
+        createProcessLock.lock();
         lock.lock();
 
         THROW_HR_IF(E_ABORT, !m_running);
     }
+
+    lock.unlock();
 
     // Duplicate the handles from the calling process into the current process.
     std::vector<wil::unique_handle> StdHandlesLocal(3);
@@ -561,6 +566,9 @@ wil::unique_handle LxssInstance::_CreateLxProcess(
         auto OobeMessagePort = ServerPort->WaitForConnection();
 
         {
+            std::lock_guard stateLock(m_stateLock);
+            THROW_HR_IF(E_ABORT, !m_running);
+
             auto oobeCompleteEvent = wil::shared_event(wil::EventOptions::ManualReset);
 
             auto impersonate = wil::CoImpersonateClient();

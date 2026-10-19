@@ -151,7 +151,7 @@ protected:
     /// <summary>
     /// Creates a process in the instance.
     /// </summary>
-    _Requires_lock_held_(m_stateLock)
+    _Requires_lock_held_(m_createProcessLock)
     wil::unique_handle _CreateLxProcess(
         _In_ const std::shared_ptr<LxssMessagePort>& MessagePort,
         _In_ const CreateLxProcessData& CreateProcessData,
@@ -219,6 +219,8 @@ private:
     std::mutex m_stateLock;
     _Guarded_by_(m_stateLock) bool m_initialized;
     _Guarded_by_(m_stateLock) bool m_running;
+
+    std::mutex m_createProcessLock;
 
     /// <summary>
     /// Provides iptables emulation support.
