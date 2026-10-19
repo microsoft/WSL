@@ -1634,6 +1634,12 @@ std::wstring WslCoreVm::GenerateConfigJson()
     const bool disablePerfmonForNestedVirtualization =
         m_vmConfig.EnableNestedVirtualization && !wsl::windows::common::helpers::IsWindows11OrAbove();
 
+    if (disablePerfmonForNestedVirtualization && m_vmConfig.EnableHardwarePerformanceCounters &&
+        m_vmConfig.HardwarePerformanceCountersConfigPresence == ConfigKeyPresence::Present)
+    {
+        EMIT_USER_WARNING(wsl::shared::Localization::MessageNestedVirtualizationAndHardwarePerformanceCountersNotSupported());
+    }
+
     // Enable hardware performance counters if they are supported.
     if (m_vmConfig.EnableHardwarePerformanceCounters && !disablePerfmonForNestedVirtualization)
     {

@@ -34,6 +34,7 @@ Abstract:
 #include "WslCoreConfigInterface.h"
 #include "WslCoreFilesystem.h"
 #include "WslSecurity.h"
+#include "hcs.hpp"
 #include "CommandLine.h"
 #include "retryshared.h"
 
@@ -2574,27 +2575,27 @@ Usage:
 
     static bool IsNestedVirtualizationSupportedTestHost()
     {
-        WEX::Common::String supported;
-        WEX::TestExecution::RuntimeParameters::TryGetValue(L"NestedVirtualizationSupported", supported);
-        if (supported.IsEmpty())
+        try
         {
+            const auto& processorFeatures = wsl::windows::common::hcs::GetProcessorFeatures();
+            return std::find(processorFeatures.begin(), processorFeatures.end(), "NestedVirt") != processorFeatures.end();
+        }
+        catch (...)
+        {
+            // Windows 10 can lack this HCS capability query; skip rather than
+            // treating an unsupported host as a regression.
             return false;
         }
-
-        const auto value = static_cast<LPCWSTR>(supported);
-        return ::_wcsicmp(value, L"1") == 0 || ::_wcsicmp(value, L"true") == 0;
     }
 
     WSL2_TEST_METHOD(NestedVirtualization)
     {
         SKIP_TEST_ARM64();
 
-        // The test job must set this parameter only on hosts with the independently
-        // established hardware and Hyper-V prerequisite. Do not use /dev/kvm here:
-        // that is the behavior this regression test validates.
+        // /dev/kvm is the behavior this regression test validates, not its prerequisite.
         if (!IsNestedVirtualizationSupportedTestHost())
         {
-            LogSkipped("Nested virtualization host prerequisite was not declared");
+            LogSkipped("Nested virtualization is not supported on this host");
             return;
         }
 

@@ -95,7 +95,7 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         ConfigKey(ConfigSetting::Virtio, EnableVirtio),
         ConfigKey(ConfigSetting::HostFileSystemAccess, EnableHostFileSystemAccess),
         ConfigKey(ConfigSetting::MountDeviceTimeout, MountDeviceTimeout),
-        ConfigKey(ConfigSetting::HardwarePerformanceCounters, EnableHardwarePerformanceCounters),
+        ConfigKey(ConfigSetting::HardwarePerformanceCounters, EnableHardwarePerformanceCounters, &HardwarePerformanceCountersConfigPresence),
         ConfigKey(ConfigSetting::VmSwitch, VmSwitch),
         ConfigKey(ConfigSetting::MacAddress, MacAddress, &macAddressPresent),
         ConfigKey(ConfigSetting::Dhcp, EnableDhcp),

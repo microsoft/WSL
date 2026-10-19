@@ -895,6 +895,9 @@ For more information on Admin Protection, please visit https://aka.ms/apdevguide
     <value>Failed to detect nested virtualization support, error: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageNestedVirtualizationAndHardwarePerformanceCountersNotSupported" xml:space="preserve">
+    <value>Nested and performance counters are not supported at the same time on Windows 10.</value>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Failed to create network endpoint with address: '{}', assigned new address: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
