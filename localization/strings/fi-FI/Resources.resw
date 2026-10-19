@@ -891,6 +891,10 @@ Lisätietoja Admin Protection saat osoitteesta https://aka.ms/apdevguide</value>
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>Sisäkkäistä virtualisointia ei tueta tässä tietokoneessa.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>Sisäkkäisen virtualisoinnin tuen havaitseminen epäonnistui. Virhe: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Verkon päätepisteen luominen osoitteella {} epäonnistui, määritetty uusi osoite: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3702,7 +3706,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>Kuvaa '{}' ei löytynyt, vedetään</value>
+    <value>Kuvaa "{}" ei löydy paikallisesti</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">

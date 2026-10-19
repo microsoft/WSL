@@ -891,6 +891,10 @@ Więcej informacji na temat Admin Protection można znaleźć na stronie https:/
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>Wirtualizacja zagnieżdżona nie jest obsługiwana na tej maszynie.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>Nie można wykryć zagnieżdżonej obsługi wirtualizacji. Błąd: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Nie można utworzyć sieciowego punktu końcowego z adresem: „{}”. Przypisano nowy adres: „{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3702,7 +3706,7 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>Nie znaleziono obrazu „{}”, pobieranie</value>
+    <value>Nie można znaleźć obrazu „{}” lokalnie</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">
