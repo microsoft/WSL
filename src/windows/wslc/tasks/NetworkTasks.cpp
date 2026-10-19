@@ -131,6 +131,7 @@ void CreateNetwork(CLIExecutionContext& context)
     }
 
     options.Internal = context.Args.GetValue<ArgType::Internal>();
+    options.EnableIPv6 = context.Args.GetValue<ArgType::Ipv6>();
 
     if (context.Args.Contains(ArgType::Subnet))
     {
