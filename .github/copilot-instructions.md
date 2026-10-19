@@ -241,9 +241,9 @@ Key points:
 - Skip macros: `WSL1_TEST_ONLY()`, `WSL2_TEST_ONLY()`, `SKIP_TEST_ARM64()`
 - Test infrastructure is in `test/windows/common/Common.h` (include it as `"Common.h"`)
 - Test layout under `test/windows/`:
-  - `common/` — shared fixtures and helpers, plus unit tests for `src/windows/common`
+  - `common/` — shared fixtures and helpers; `common/unit/` holds unit tests for `src/windows/common`
   - `wsl/` — WSL tests
-  - `wslc/` — WSLC tests
+  - `wslc/` — WSLC tests, split into `unit/` (in-process, no session) and `e2e/` (run against a live session)
   - `testplugin/` — test plugin used by the plugin tests
 
 ### Running Tests (Windows Only)

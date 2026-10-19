@@ -1,7 +1,6 @@
 # WSL Tests
 #
-# Shared fixtures and helpers live in ../common/, along with the unit tests for
-# src/windows/common.
+# Shared fixtures and helpers live in ../common/.
 
 file(GLOB_RECURSE WSL_TEST_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp

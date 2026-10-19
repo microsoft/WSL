@@ -1,6 +1,8 @@
 # WSLC Tests
 #
-# Shared fixtures and helpers live in ../common/.
+# unit/ holds tests that run in-process without a WSLC session, and e2e/ holds
+# tests that run against a live WSLC session. Shared fixtures and helpers live in
+# ../common/.
 
 file(GLOB_RECURSE WSLC_TEST_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
@@ -24,7 +26,7 @@ target_include_directories(wsltests PRIVATE
     ${CMAKE_SOURCE_DIR}/test
     ${CMAKE_SOURCE_DIR}/test/windows
     ${CMAKE_SOURCE_DIR}/test/windows/common
-    ${CMAKE_SOURCE_DIR}/test/windows/wslc
+    ${CMAKE_SOURCE_DIR}/test/windows/wslc/unit
     ${CMAKE_SOURCE_DIR}/src/windows/wslc/core
     ${CMAKE_SOURCE_DIR}/src/windows/wslc/commands
     ${CMAKE_SOURCE_DIR}/src/windows/wslc/arguments
