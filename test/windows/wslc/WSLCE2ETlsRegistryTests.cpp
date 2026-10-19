@@ -8,10 +8,7 @@ Module Name:
 
 Abstract:
 
-    End-to-end test for private-registry SSL trust. Stands up a registry that serves TLS with a
-    private CA, verifies that a push fails with an "unknown authority" error while the CA is not
-    trusted, then adds the CA to the machine's Trusted Root store and verifies that a push from a
-    freshly created session succeeds.
+    End-to-end tests for private-registry TLS trust and session proxy routing.
 
 --*/
 
@@ -20,6 +17,7 @@ Abstract:
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
 #include "TestImageRegistry.h"
+#include <atomic>
 #include <wslutil.h>
 #include <ncrypt.h>
 
@@ -33,6 +31,8 @@ namespace {
     // the first container we start in this test's session, so this is deterministic.
     constexpr auto c_registryIp = "172.17.0.2";
     constexpr USHORT c_registryPort = 5000;
+    constexpr auto c_proxyRegistryHost = "host.wslc.internal";
+    constexpr USHORT c_proxyRegistryPort = 15011;
 
     // DER-encodes a certificate-extension value structure (e.g. CERT_ALT_NAME_INFO for the SAN OID).
     std::vector<BYTE> EncodeCertExtensionValue(LPCSTR Oid, const void* StructInfo)
@@ -59,7 +59,8 @@ namespace {
     // Generates a self-signed certificate usable as both a TLS server cert and a CA,
     // writes server.crt and server.key (PEM) into OutDir for the registry to serve,
     // and returns the certificate context so the test can add it to a trust store later.
-    wil::unique_cert_context GenerateRegistryTlsCertificate(const std::string& IpAddress, const std::filesystem::path& OutDir)
+    wil::unique_cert_context GenerateRegistryTlsCertificate(
+        const std::string& IpAddress, const std::filesystem::path& OutDir, const std::wstring& DnsName = L"")
     {
         // Create an exportable RSA key
         NCRYPT_PROV_HANDLE prov{};
@@ -84,11 +85,13 @@ namespace {
         // Build the extensions (SAN, basic constraints, key usage, extended key usage)
         in_addr ipv4{};
         wslutil::ParseIpv4Address(IpAddress.c_str(), ipv4);
-        CERT_ALT_NAME_ENTRY altEntry{};
-        altEntry.dwAltNameChoice = CERT_ALT_NAME_IP_ADDRESS;
-        altEntry.IPAddress.cbData = sizeof(ipv4);
-        altEntry.IPAddress.pbData = reinterpret_cast<BYTE*>(&ipv4);
-        CERT_ALT_NAME_INFO altInfo{1, &altEntry};
+        CERT_ALT_NAME_ENTRY altEntries[2]{};
+        altEntries[0].dwAltNameChoice = CERT_ALT_NAME_IP_ADDRESS;
+        altEntries[0].IPAddress.cbData = sizeof(ipv4);
+        altEntries[0].IPAddress.pbData = reinterpret_cast<BYTE*>(&ipv4);
+        altEntries[1].dwAltNameChoice = CERT_ALT_NAME_DNS_NAME;
+        altEntries[1].pwszDNSName = const_cast<LPWSTR>(DnsName.c_str());
+        CERT_ALT_NAME_INFO altInfo{DnsName.empty() ? 1u : 2u, altEntries};
         auto sanEncoded = EncodeCertExtensionValue(szOID_SUBJECT_ALT_NAME2, &altInfo);
 
         CERT_BASIC_CONSTRAINTS2_INFO basicConstraints{};
@@ -194,11 +197,312 @@ namespace {
         wil::unique_cert_context m_added;
     };
 
+    namespace io = wsl::windows::common::io;
+    namespace socket = wsl::windows::common::socket;
+
+    class CountingReadHandle : public io::ReadHandle
+    {
+    public:
+        CountingReadHandle(io::HandleWrapper&& handle, std::function<void(const gsl::span<char>&)>&& onRead, std::atomic<uint64_t>& bytes) :
+            ReadHandle(std::move(handle), [onRead = std::move(onRead), &bytes](const gsl::span<char>& buffer) {
+                bytes.fetch_add(buffer.size(), std::memory_order_relaxed);
+                onRead(buffer);
+            })
+        {
+        }
+    };
+
+    class RecordingConnectProxy
+    {
+    public:
+        NON_COPYABLE(RecordingConnectProxy);
+        NON_MOVABLE(RecordingConnectProxy);
+
+        RecordingConnectProxy()
+        {
+            m_listener.reset(::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+            THROW_LAST_ERROR_IF(!m_listener);
+
+            sockaddr_in address{};
+            address.sin_family = AF_INET;
+            address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+            THROW_LAST_ERROR_IF(bind(m_listener.get(), reinterpret_cast<sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR);
+            THROW_LAST_ERROR_IF(listen(m_listener.get(), SOMAXCONN) == SOCKET_ERROR);
+            int addressSize = sizeof(address);
+            THROW_LAST_ERROR_IF(getsockname(m_listener.get(), reinterpret_cast<sockaddr*>(&address), &addressSize) == SOCKET_ERROR);
+            m_port = ntohs(address.sin_port);
+
+            m_thread = std::thread([this] {
+                try
+                {
+                    while (!m_exit.is_signaled())
+                    {
+                        auto accepted = socket::CancellableAccept(m_listener.get(), INFINITE, m_exit.get());
+                        if (!accepted)
+                        {
+                            break;
+                        }
+
+                        THROW_HR_IF(E_UNEXPECTED, m_connections.size() >= 64);
+                        m_connections.emplace_back([this, client = std::move(*accepted)] {
+                            try
+                            {
+                                Serve(client.get());
+                            }
+                            CATCH_LOG()
+                        });
+                    }
+                }
+                CATCH_LOG()
+            });
+        }
+
+        ~RecordingConnectProxy()
+        {
+            Stop();
+        }
+
+        void Stop()
+        {
+            m_exit.SetEvent();
+            if (m_thread.joinable())
+            {
+                m_thread.join();
+            }
+
+            for (auto& connection : m_connections)
+            {
+                if (connection.joinable())
+                {
+                    connection.join();
+                }
+            }
+
+            m_listener.reset();
+        }
+
+        USHORT Port() const
+        {
+            return m_port;
+        }
+
+        uint64_t ResponseBytes() const
+        {
+            return m_responseBytes.load(std::memory_order_relaxed);
+        }
+
+    private:
+        void Serve(SOCKET client)
+        {
+            std::string request;
+            while (request.find("\r\n\r\n") == std::string::npos)
+            {
+                char buffer[1024];
+                const auto received = socket::Receive(client, gsl::as_writable_bytes(gsl::make_span(buffer)), m_exit.get(), 0, 10000);
+                if (received == 0)
+                {
+                    return;
+                }
+
+                request.append(buffer, received);
+                THROW_HR_IF(E_INVALIDARG, request.size() > 8192);
+            }
+
+            const auto expected = std::format("CONNECT {}:{} HTTP/1.1\r\n", c_proxyRegistryHost, c_proxyRegistryPort);
+            THROW_HR_IF(E_ACCESSDENIED, !request.starts_with(expected) || !request.ends_with("\r\n\r\n"));
+
+            wil::unique_socket upstream{::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)};
+            THROW_LAST_ERROR_IF(!upstream);
+            sockaddr_in address{};
+            address.sin_family = AF_INET;
+            address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+            address.sin_port = htons(c_proxyRegistryPort);
+            THROW_LAST_ERROR_IF(connect(upstream.get(), reinterpret_cast<sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR);
+
+            constexpr std::string_view response = "HTTP/1.1 200 Connection Established\r\n\r\n";
+            socket::Send(client, gsl::as_bytes(gsl::make_span(response.data(), response.size())), m_exit.get());
+
+            io::MultiHandleWait relay;
+            // Half-close upstream on EOF and let its response drain before ending the tunnel.
+            io::HandleWrapper clientInput{
+                client, [socket = upstream.get()] { LOG_LAST_ERROR_IF(shutdown(socket, SD_SEND) == SOCKET_ERROR); }};
+            auto requestRelay = std::make_unique<io::RelayHandle<>>(std::move(clientInput), upstream.get());
+            relay.AddHandle(std::move(requestRelay), io::MultiHandleWait::NeedNotComplete);
+            auto responseRelay = std::make_unique<io::RelayHandle<CountingReadHandle>>(upstream.get(), client, m_responseBytes);
+            relay.AddHandle(std::move(responseRelay));
+            const auto exitFlags = io::MultiHandleWait::CancelOnCompleted | io::MultiHandleWait::NeedNotComplete;
+            relay.AddHandle(std::make_unique<io::EventHandle>(m_exit.get()), exitFlags);
+            relay.Run(std::nullopt);
+        }
+
+        wil::unique_socket m_listener;
+        wil::unique_event m_exit{wil::EventOptions::ManualReset};
+        USHORT m_port{};
+        std::atomic<uint64_t> m_responseBytes{};
+        std::vector<std::thread> m_connections;
+        std::thread m_thread;
+    };
+
+    struct PublishedRegistryImage
+    {
+        std::wstring Reference;
+        std::string Id;
+    };
+
+    void PullAndVerifyImage(const PublishedRegistryImage& image)
+    {
+        RunWslcAndVerify(std::format(L"image pull {}", image.Reference), {.Stderr = L"", .ExitCode = 0});
+        VERIFY_ARE_EQUAL(image.Id, InspectImage(image.Reference).Id);
+    }
+
+    std::string ReadBootId(IWSLCSession& session)
+    {
+        wsl::windows::common::WSLCProcessLauncher launcher("/bin/cat", {"/bin/cat", "/proc/sys/kernel/random/boot_id"});
+        auto process = launcher.Launch(session);
+        const auto result = process.WaitAndCaptureOutput(30000);
+        VERIFY_ARE_EQUAL(0, result.Code);
+        const auto id = result.Output.at(1);
+        VERIFY_IS_FALSE(id.empty());
+        return id;
+    }
+
+    template <typename T>
+    void WithColdProxySession(const std::filesystem::path& storagePath, const std::string& proxySettings, T&& verify)
+    {
+        EnsureSessionIsTerminated();
+        auto terminate = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [] { EnsureSessionIsTerminated(); });
+        const auto settingsPath = wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc" / L"settings.yaml";
+        HostFileChange settings(
+            settingsPath,
+            std::format(
+                "session:\n  cpuCount: 2\n  memorySize: 2GB\n  maxStorageSize: 4GB\n  idleTimeout: 600\n  storagePath: {}\n{}",
+                nlohmann::json(string::WideToMultiByte(storagePath.wstring())).dump(),
+                proxySettings));
+
+        // A new storage location emits a warning; the image listing itself must be empty.
+        RunWslc(L"image list --format json").Verify({.Stdout = L"", .ExitCode = 0});
+        auto session = OpenDefaultElevatedSession();
+        verify(*session, settings);
+    }
+
+    template <typename T>
+    void WithProxyRegistry(T&& verify)
+    {
+        WSADATA data{};
+        THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &data));
+        auto cleanupWinsock = wil::scope_exit([] { WSACleanup(); });
+
+        GUID guid{};
+        VERIFY_SUCCEEDED(CoCreateGuid(&guid));
+        const auto name = L"wslc-proxy-" + string::GuidToString<wchar_t>(guid, string::GuidToStringFlags::None);
+        const auto directory = std::filesystem::current_path() / name;
+        auto cleanupDirectory = SetupTestDirectory(directory);
+        auto certificate = GenerateRegistryTlsCertificate(c_registryIp, directory, string::MultiByteToWide(c_proxyRegistryHost));
+        TrustedRootCertificate trustedCa{*certificate.get()};
+
+        auto producer = TestSession::Create(name, WSLCNetworkingModeConsomme);
+        auto [registry, address] = StartLocalRegistry(producer.Session(), "", "", c_proxyRegistryPort, directory.wstring(), true);
+        VERIFY_ARE_EQUAL(std::format("{}:{}", c_registryIp, c_proxyRegistryPort), address);
+
+        const auto prefix = std::format(L"--session \"{}\" ", producer.Name());
+        const auto publish = [&](const TestImage& image) {
+            RunWslcAndVerify(std::format(L"{}image load --input \"{}\"", prefix, image.Path.wstring()), {.Stderr = L"", .ExitCode = 0});
+            const auto id = InspectImage(image.NameAndTag(), producer.Name()).Id;
+            const auto registryImage = std::format(L"{}/{}", string::MultiByteToWide(address), image.NameAndTag());
+            RunWslcAndVerify(std::format(L"{}image tag {} {}", prefix, image.NameAndTag(), registryImage), {.ExitCode = 0});
+            RunWslcAndVerify(std::format(L"{}push {}", prefix, registryImage), {.Stderr = L"", .ExitCode = 0});
+            return PublishedRegistryImage{
+                std::format(L"{}:{}/{}", string::MultiByteToWide(c_proxyRegistryHost), c_proxyRegistryPort, image.NameAndTag()), id};
+        };
+
+        const auto alpine = publish(AlpineTestImage());
+        const auto helloWorld = publish(HelloWorldTestImage());
+        RecordingConnectProxy proxy;
+        verify(directory, proxy, alpine, helloWorld);
+    }
+
 } // namespace
 
 class WSLCE2ETlsRegistryTests
 {
     WSLC_TEST_CLASS(WSLCE2ETlsRegistryTests)
+
+    WSLC_TEST_METHOD(WSLCE2E_Registry_Proxy_ColdPullAndIdleRestart)
+    {
+        WithProxyRegistry([](const auto& directory, auto& proxy, const auto& alpine, const auto& helloWorld) {
+            for (const auto* host : {"localhost", "127.0.0.1"})
+            {
+                const auto proxySettings =
+                    std::format("  proxy:\n    http: http://{}:{}\n    https: http://{}:{}\n", host, proxy.Port(), host, proxy.Port());
+                WithColdProxySession(directory / host, proxySettings, [&](IWSLCSession& session, const HostFileChange& settings) {
+                    const auto beforePull = proxy.ResponseBytes();
+                    PullAndVerifyImage(helloWorld);
+                    VERIFY_IS_TRUE(proxy.ResponseBytes() > beforePull, L"Expected registry traffic through CONNECT");
+
+                    const auto missing = RunWslc(std::format(L"image inspect {}", alpine.Reference));
+                    missing.Verify({
+                        .Stdout = L"[]\r\n",
+                        .Stderr = Localization::MessageWslcImageNotFound(string::WideToMultiByte(alpine.Reference).c_str()) + L"\r\n",
+                        .ExitCode = 1,
+                    });
+                    const auto bootId = ReadBootId(session);
+                    ULONG sessionId{};
+                    VERIFY_SUCCEEDED(session.GetId(&sessionId));
+
+                    // Idle VM recreation must retain the session's owned settings, not reread YAML.
+                    settings.Update("session: {}\n");
+                    BOOL wasAlreadyIdle = TRUE;
+                    VERIFY_SUCCEEDED(session.TriggerIdleTermination(&wasAlreadyIdle));
+                    VERIFY_IS_FALSE(wasAlreadyIdle);
+                    VERIFY_ARE_NOT_EQUAL(bootId, ReadBootId(session));
+                    ULONG restartedSessionId{};
+                    VERIFY_SUCCEEDED(OpenDefaultElevatedSession()->GetId(&restartedSessionId));
+                    VERIFY_ARE_EQUAL(sessionId, restartedSessionId);
+
+                    const auto beforeRestartedPull = proxy.ResponseBytes();
+                    PullAndVerifyImage(alpine);
+                    VERIFY_IS_TRUE(
+                        proxy.ResponseBytes() - beforeRestartedPull > 1024 * 1024,
+                        L"Expected uncached image payload after restart");
+                });
+            }
+        });
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Registry_Proxy_NoProxy)
+    {
+        WithProxyRegistry([](const auto& directory, auto& proxy, const auto& alpine, const auto&) {
+            proxy.Stop();
+
+            WithColdProxySession(
+                directory / L"unset", "", [&](IWSLCSession&, const HostFileChange&) { PullAndVerifyImage(alpine); });
+
+            for (const auto* noProxy : {"", ".unrelated.invalid", c_proxyRegistryHost})
+            {
+                auto proxySettings = std::format("  proxy:\n    https: http://127.0.0.1:{}\n", proxy.Port());
+                if (noProxy[0] != '\0')
+                {
+                    proxySettings += std::format("    noProxy: {}\n", noProxy);
+                }
+
+                const auto storage = directory / (noProxy[0] == '\0' ? "stopped" : noProxy);
+                WithColdProxySession(storage, proxySettings, [&](IWSLCSession&, const HostFileChange&) {
+                    if (std::string_view(noProxy) == c_proxyRegistryHost)
+                    {
+                        PullAndVerifyImage(alpine);
+                    }
+                    else
+                    {
+                        const auto result = RunWslc(std::format(L"image pull {}", alpine.Reference));
+                        result.Verify({.ExitCode = 1});
+                        VERIFY_IS_TRUE(
+                            result.StderrContainsSubstring(L"proxyconnect tcp"), L"Failure must come from the stopped proxy");
+                        RunWslc(L"image list --format json").Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+                    }
+                });
+            }
+        });
+    }
 
     // Verifies registry SSL trust end to end: a push to a registry serving a private-CA cert fails
     // with "unknown authority" and succeeds after the CA is added to the host Trusted Root store.

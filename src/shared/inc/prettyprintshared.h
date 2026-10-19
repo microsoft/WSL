@@ -35,6 +35,8 @@ Abstract:
 
 #define STRING_ARRAY_FIELD(Name) #Name, (StringArray((char*)(this), Name, Header.MessageSize))
 
+#define ENVIRONMENT_ARRAY_FIELD(Name) #Name, (StringArray(reinterpret_cast<const char*>(this), Name, Header.MessageSize, true))
+
 // Safe pretty-print for flexible array members (char Buffer[]). Bounds the read
 // using the struct's Header.MessageSize so it never reads past the received data.
 #define BUFFER_FIELD(Name) #Name, PrettyPrintSafeBufferView(this, Header.MessageSize, Name)
@@ -84,6 +86,7 @@ struct StringArray
     const char* MessageHead = nullptr;
     unsigned int Index = 0;
     unsigned int MessageSize = 0;
+    bool RedactProxyValues = false;
 };
 
 template <typename T>
@@ -132,7 +135,27 @@ inline void PrettyPrint(std::stringstream& Out, const T& Value)
         }
 
         gsl::span<const char> span(Value.MessageHead, Value.MessageSize);
-        Out << wsl::shared::string::Join(wsl::shared::string::ArrayFromSpan(gsl::as_bytes(span), Value.Index), ',');
+        auto strings = wsl::shared::string::ArrayFromSpan(gsl::as_bytes(span), Value.Index);
+        if (Value.RedactProxyValues)
+        {
+            for (auto& value : strings)
+            {
+                const auto separator = value.find('=');
+                if (separator == std::string::npos || separator + 1 == value.size())
+                {
+                    continue;
+                }
+
+                const std::string_view name{value.data(), separator};
+                if (wsl::shared::string::IsEqual(name, "HTTP_PROXY", true) ||
+                    wsl::shared::string::IsEqual(name, "HTTPS_PROXY", true) || wsl::shared::string::IsEqual(name, "NO_PROXY", true))
+                {
+                    value.replace(separator + 1, std::string::npos, "<redacted>");
+                }
+            }
+        }
+
+        Out << wsl::shared::string::Join(strings, ',');
     }
     else
     {
