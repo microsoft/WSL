@@ -43,6 +43,7 @@ void RunningWSLCContainer::Reset()
     }
 
     m_container.reset();
+    m_startedProcess.reset();
 }
 
 WSLCContainerState RunningWSLCContainer::State()
@@ -58,6 +59,25 @@ ClientRunningWSLCProcess RunningWSLCContainer::GetInitProcess()
     THROW_IF_FAILED(m_container->GetInitProcess(&process));
 
     return ClientRunningWSLCProcess{std::move(process), m_flags};
+}
+
+ClientRunningWSLCProcess RunningWSLCContainer::GetStartedProcess()
+{
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_startedProcess);
+    auto process = m_startedProcess;
+    return ClientRunningWSLCProcess{std::move(process), m_flags};
+}
+
+HRESULT RunningWSLCContainer::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, IWarningCallback* WarningCallback)
+{
+    wil::com_ptr<IWSLCProcess> process;
+    const auto result = m_container->StartWithProcess(Flags, StartOptions, WarningCallback, &process);
+    if (SUCCEEDED(result))
+    {
+        m_startedProcess = std::move(process);
+    }
+
+    return result;
 }
 
 void RunningWSLCContainer::SetDeleteOnClose(bool deleteOnClose)
@@ -350,7 +370,7 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::L
     startOptions.TtyRows = m_rows;
     startOptions.TtyColumns = m_columns;
 
-    result = container.value().Get().Start(Flags, &startOptions, WarningCallback);
+    result = container.value().Start(Flags, &startOptions, WarningCallback);
 
     return std::make_pair(result, std::move(container));
 }

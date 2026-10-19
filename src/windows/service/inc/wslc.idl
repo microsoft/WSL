@@ -598,6 +598,8 @@ interface IWSLCContainer : IUnknown
     // When FollowLink is set and SrcPath names a symbolic link, the archive is taken from the link's target.
     HRESULT DownloadArchive([in, string] LPCSTR SrcPath, [in] BOOL FollowLink, [in] WSLCHandle OutHandle);
     HRESULT Restart([in] WSLCSignal Signal, [in] LONG TimeoutSeconds, [in, unique] IWarningCallback* WarningCallback);
+    // Process identifies this start's init process, even if the container starts another run before the caller attaches.
+    HRESULT StartWithProcess([in] WSLCContainerStartFlags Flags, [in, unique] const WSLCProcessStartOptions* StartOptions, [in, unique] IWarningCallback* WarningCallback, [out] IWSLCProcess** Process);
 }
 
 typedef struct _WSLCDeletedImageInformation

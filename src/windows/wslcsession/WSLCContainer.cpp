@@ -1118,12 +1118,12 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
     *Stderr = common::wslutil::ToCOMOutputHandle(reinterpret_cast<HANDLE>(stderrRead.get()), GENERIC_READ | SYNCHRONIZE, WSLCHandleTypePipe);
 }
 
-void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions)
+wil::com_ptr<IWSLCProcess> WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions)
 {
-    StartPhase(Flags, StartOptions, false);
+    return StartPhase(Flags, StartOptions, false);
 }
 
-void WSLCContainerImpl::StartPhase(
+wil::com_ptr<IWSLCProcess> WSLCContainerImpl::StartPhase(
     WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, bool RestartPhase, std::optional<std::uint64_t> PolicyRestartToken)
 {
     std::shared_ptr<StateTransition> transition;
@@ -1137,7 +1137,7 @@ void WSLCContainerImpl::StartPhase(
         // Anything that happened to the container since the restart was scheduled supersedes it.
         if (!m_policyRestartPending || m_policyRestartToken != PolicyRestartToken.value() || m_state != WslcContainerStateExited)
         {
-            return;
+            return {};
         }
 
         m_policyRestartPending = false;
@@ -1248,6 +1248,7 @@ void WSLCContainerImpl::StartPhase(
 
     // The run this starts is subject to the restart policy until a stop is requested.
     m_exitRequested = false;
+    m_pendingExitRequests = 0;
 
     try
     {
@@ -1297,6 +1298,12 @@ void WSLCContainerImpl::StartPhase(
         }
     }
 
+    wil::com_ptr<IWSLCProcess> process;
+    {
+        std::lock_guard processesLock{m_processesLock};
+        THROW_IF_FAILED(m_initProcess.CopyTo(__uuidof(IWSLCProcess), process.put_void()));
+    }
+
     transition = StartTransition(TransitionKind::Start, ContainerEvent::Start);
 
     resourceCleanup.release();
@@ -1305,6 +1312,7 @@ void WSLCContainerImpl::StartPhase(
     lock.reset();
     lifecycleLock.reset();
     AttachToTransition(transition);
+    return process;
 }
 
 void WSLCContainerImpl::WaitForConflictingTransitionToComplete(
@@ -1591,8 +1599,33 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
             bool waitForStop = !Kill || (SignalArg.value_or(WSLCSignalSIGKILL) == WSLCSignalSIGKILL);
             const auto generation = m_stateGeneration;
 
-            // Set before Docker is asked, so the exit cannot be observed without it.
-            m_exitRequested = true;
+            // In-flight requests suppress an exit before Docker responds. Only successful requests retain that intent.
+            ++m_pendingExitRequests;
+            bool requestSucceeded = false;
+            auto requestCleanup = wil::scope_exit([&]() {
+                if (!lock)
+                {
+                    lock = m_lock.lock_exclusive();
+                }
+
+                if (m_stateGeneration == generation || (m_state == WslcContainerStateExited && m_stateGeneration == generation + 1))
+                {
+                    --m_pendingExitRequests;
+                    m_exitRequested = m_exitRequested || requestSucceeded;
+
+                    // An exit observed during the request waits for its outcome before applying the policy.
+                    if (m_state == WslcContainerStateExited && !m_exitRequested && m_pendingExitRequests == 0 &&
+                        PolicyRestartsContainer(m_restartPolicy) && !m_restart && !m_transition && !m_wslcSession.IsTerminating())
+                    {
+                        if (std::chrono::steady_clock::now() - m_runStartedAt >= c_restartBackoffResetRunDuration)
+                        {
+                            m_restartBackoff = {};
+                        }
+
+                        SchedulePolicyRestartLockHeld(NextPolicyRestartDelayLockHeld());
+                    }
+                }
+            });
 
             lock.reset();
             lifecycleLock.reset();
@@ -1622,12 +1655,6 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
                 {
                     lock = m_lock.lock_exclusive();
 
-                    // The request failed, so a later exit of the same run is still subject to the restart policy.
-                    if (m_stateGeneration == generation)
-                    {
-                        m_exitRequested = false;
-                    }
-
                     // A force delete can win the locks released above, so the container may be gone rather than stuck.
                     THROW_HR_WITH_USER_ERROR_IF(
                         WSLC_E_CONTAINER_DELETED,
@@ -1638,9 +1665,11 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
                 }
             }
 
+            requestSucceeded = true;
+            requestCleanup.reset();
+
             if (waitForStop)
             {
-                lock = m_lock.lock_exclusive();
                 transition = m_transition;
 
                 // The container can exit and start again while the locks are released, so an unchanged generation is
@@ -1797,9 +1826,9 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
     }
 
     // Only the end of a run applies the restart policy, never a duplicate or late exit event.
-    const bool policyRestart = PolicyRestartsContainer(m_restartPolicy) && m_state == WslcContainerStateRunning && !m_exitRequested &&
-                               !m_restart && !(transition && transition->ExpectedEvent == ContainerEvent::Destroy) &&
-                               !m_wslcSession.IsTerminating();
+    const bool policyRestart = PolicyRestartsContainer(m_restartPolicy) && m_state == WslcContainerStateRunning &&
+                               !m_exitRequested && m_pendingExitRequests == 0 && !m_restart &&
+                               !(transition && transition->ExpectedEvent == ContainerEvent::Destroy) && !m_wslcSession.IsTerminating();
 
     if (policyRestart)
     {
@@ -3680,14 +3709,28 @@ try
 CATCH_RETURN();
 
 HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, IWarningCallback* WarningCallback)
+{
+    wil::com_ptr<IWSLCProcess> process;
+    return StartWithProcess(Flags, StartOptions, WarningCallback, &process);
+}
+
+HRESULT WSLCContainer::StartWithProcess(
+    WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, IWarningCallback* WarningCallback, IWSLCProcess** Process)
 try
 {
     WSLCExecutionContext context(&m_session, WarningCallback);
 
+    RETURN_HR_IF_NULL(E_POINTER, Process);
+    *Process = nullptr;
+
     THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCContainerStartFlagsValid), "Invalid flags: 0x%x", Flags);
 
     auto vmLease = m_session.Runtime().AcquireVmLease();
-    return CallImpl(&WSLCContainerImpl::Start, Flags, StartOptions);
+    auto [lock, impl] = LockImpl();
+    auto process = impl->Start(Flags, StartOptions);
+    *Process = process.detach();
+
+    return S_OK;
 }
 CATCH_RETURN();
 

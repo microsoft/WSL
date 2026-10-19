@@ -7315,6 +7315,45 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysForegroundHandoff)
+    {
+        for (const bool useLauncher : {false, true})
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest",
+                useLauncher ? "test-restart-handoff-launcher" : "test-restart-handoff-start",
+                {"sh",
+                 "-c",
+                 "if [ ! -e /first-run-complete ]; then touch /first-run-complete; "
+                 "echo run; echo first-output; echo first-error >&2; exit 23; fi; "
+                 "echo run; echo second-output; exec sleep 99999"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = useLauncher ? launcher.Launch(*m_defaultSession) : launcher.Create(*m_defaultSession);
+
+            wil::com_ptr<IWSLCProcess> process;
+            if (!useLauncher)
+            {
+                VERIFY_SUCCEEDED(container.Get().StartWithProcess(WSLCContainerStartFlagsAttach, nullptr, nullptr, &process));
+                VERIFY_IS_NOT_NULL(process.get());
+            }
+
+            // Delay foreground handoff until the next run is producing output.
+            VERIFY_ARE_EQUAL(WaitForContainerRuns(container, 2), 2u);
+            WaitForContainerState(container, WslcContainerStateRunning);
+            auto currentProcess = container.GetInitProcess();
+            VERIFY_ARE_EQUAL(currentProcess.State(), WslcProcessStateRunning);
+
+            auto firstProcess =
+                useLauncher ? container.GetStartedProcess() : ClientRunningWSLCProcess{std::move(process), WSLCProcessFlagsNone};
+            const auto result = firstProcess.WaitAndCaptureOutput(30 * 1000);
+            VERIFY_ARE_EQUAL(result.Code, 23);
+            VERIFY_ARE_EQUAL(result.Output.size(), 2u);
+            VERIFY_ARE_EQUAL(result.Output.at(1), std::string{"run\nfirst-output\n"});
+            VERIFY_ARE_EQUAL(result.Output.at(2), std::string{"first-error\n"});
+            VERIFY_ARE_EQUAL(currentProcess.State(), WslcProcessStateRunning);
+        }
+    }
+
     WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysRestartsOnExit)
     {
         // Both successful and failing exits restart the container, and a stop ends the loop.
@@ -7455,6 +7494,65 @@ class WSLCTests
             WaitForContainerRuns(container, 3);
             WaitForContainerState(container, WslcContainerStateRunning);
         }
+    }
+
+    WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysFailedKill)
+    {
+        constexpr auto invalidSignal = static_cast<WSLCSignal>(999);
+
+        // A rejected kill cannot establish stop intent or erase an earlier successful kill's intent.
+        for (const bool suppressRestart : {false, true})
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest",
+                std::format("test-restart-failed-kill-{}", suppressRestart),
+                {"sh", "-c", "echo run; sleep 99999"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+            WaitForContainerRuns(container, 1);
+
+            if (suppressRestart)
+            {
+                VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGCONT));
+            }
+
+            VERIFY_FAILED(container.Get().Kill(invalidSignal));
+            VERIFY_ARE_EQUAL(WslcContainerStateRunning, container.State());
+            ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "kill", container.Inspect().Id}, 0);
+
+            if (suppressRestart)
+            {
+                WaitForContainerState(container, WslcContainerStateExited);
+                VerifyContainerStaysDown(container);
+            }
+            else
+            {
+                WaitForContainerRuns(container, 2);
+                WaitForContainerState(container, WslcContainerStateRunning);
+            }
+        }
+
+        // A failed kill cannot remove suppression belonging to a stop that is still awaiting process exit.
+        WSLCContainerLauncher launcher(
+            "debian:latest",
+            "test-restart-overlapping-kill",
+            {"sh", "-c", "trap 'echo stopping' TERM; echo run; while true; do sleep 1; done"});
+        launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+        auto container = launcher.Launch(*m_defaultSession);
+        auto initProcess = container.GetInitProcess();
+        WaitForOutput(initProcess.GetStdHandle(1), "run");
+
+        std::promise<HRESULT> stopResult;
+        std::thread stopThread([&]() { stopResult.set_value(container.Get().Stop(WSLCSignalSIGTERM, 30)); });
+        auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { stopThread.join(); });
+
+        WaitForOutput(initProcess.GetStdHandle(1), "stopping");
+        VERIFY_FAILED(container.Get().Kill(invalidSignal));
+        VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGCONT));
+        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "kill", container.Inspect().Id}, 0);
+
+        VERIFY_SUCCEEDED(stopResult.get_future().get());
+        VerifyContainerStaysDown(container);
     }
 
     WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysPendingRestart)

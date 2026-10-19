@@ -31,6 +31,9 @@ public:
 
     WSLCContainerState State();
     ClientRunningWSLCProcess GetInitProcess();
+    // Returns the init process retained by this wrapper's latest successful Start().
+    ClientRunningWSLCProcess GetStartedProcess();
+    HRESULT Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, IWarningCallback* WarningCallback);
     void SetDeleteOnClose(bool deleteOnClose);
     void Reset();
     wslc_schema::InspectContainer Inspect();
@@ -40,6 +43,7 @@ public:
 
 private:
     wil::com_ptr<IWSLCContainer> m_container;
+    wil::com_ptr<IWSLCProcess> m_startedProcess;
     WSLCProcessFlags m_flags;
     bool m_deleteOnClose = true;
 };

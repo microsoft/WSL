@@ -102,7 +102,7 @@ public:
     // Applies the restart policy to a container found when the session starts.
     void OnSessionStart();
 
-    void Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions);
+    wil::com_ptr<IWSLCProcess> Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions);
     void Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr) const;
     void Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, bool Kill);
     void Restart(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds);
@@ -218,7 +218,7 @@ private:
     // Phases of Restart(). Identical to Start() and Stop() except that they do not stand down for the
     // restart they are part of. PolicyRestartToken identifies a start requested by the restart policy,
     // which does nothing unless that scheduled restart is still pending.
-    void StartPhase(
+    wil::com_ptr<IWSLCProcess> StartPhase(
         WSLCContainerStartFlags Flags,
         const WSLCProcessStartOptions* StartOptions,
         bool RestartPhase,
@@ -339,9 +339,9 @@ private:
     // when the session ends.
     const WSLCContainerRestartPolicy m_restartPolicy;
 
-    // Set when a stop or kill is requested and cleared by every start, so the exit it causes does not
-    // trigger the restart policy.
+    // Successful stop or kill requests suppress restart for the run. In-flight requests defer the exit decision.
     _Guarded_by_(m_lock) bool m_exitRequested = false;
+    _Guarded_by_(m_lock) size_t m_pendingExitRequests = 0;
 
     // Set while a policy restart is scheduled and not yet started. The container is Exited meanwhile.
     _Guarded_by_(m_lock) bool m_policyRestartPending = false;
@@ -375,6 +375,11 @@ public:
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLCProcess** process) override;
     IFACEMETHOD(Exec)(_In_ const WSLCProcessOptions* Options, _In_opt_ const WSLCProcessStartOptions* StartOptions, _Out_ IWSLCProcess** Process) override;
     IFACEMETHOD(Start)(WSLCContainerStartFlags Flags, _In_opt_ const WSLCProcessStartOptions* StartOptions, _In_opt_ IWarningCallback* WarningCallback) override;
+    IFACEMETHOD(StartWithProcess)(
+        WSLCContainerStartFlags Flags,
+        _In_opt_ const WSLCProcessStartOptions* StartOptions,
+        _In_opt_ IWarningCallback* WarningCallback,
+        _Out_ IWSLCProcess** Process) override;
     IFACEMETHOD(Inspect)(_In_ BOOL Size, _Out_ LPSTR* Output) override;
     IFACEMETHOD(Logs)(_In_ WSLCLogsFlags Flags, _Out_ WSLCHandle* Stdout, _Out_ WSLCHandle* Stderr, _In_ LONGLONG Since, _In_ LONGLONG Until, _In_ ULONGLONG Tail) override;
     IFACEMETHOD(GetId)(_Out_ WSLCContainerId Id) override;

@@ -612,7 +612,7 @@ int ContainerService::Run(Terminal& terminal, Session& session, const std::strin
     }
 
     WarningCallback warningCallback(terminal);
-    THROW_IF_FAILED(container.Start(startFlags, &startOptions, &warningCallback)); // TODO: detach keys
+    THROW_IF_FAILED(runningContainer.Start(startFlags, &startOptions, &warningCallback)); // TODO: detach keys
 
     // Disable auto-delete only after successful start
     runningContainer.SetDeleteOnClose(false);
@@ -621,7 +621,7 @@ int ContainerService::Run(Terminal& terminal, Session& session, const std::strin
     // Handle attach if requested
     if (attach)
     {
-        return ConsoleService::AttachToCurrentConsole(terminal, console, runningContainer.GetInitProcess());
+        return ConsoleService::AttachToCurrentConsole(terminal, console, runningContainer.GetStartedProcess());
     }
 
     terminal.Output(L"{}\n", wsl::shared::string::MultiByteToWide(containerId));
@@ -654,15 +654,19 @@ int ContainerService::Start(Terminal& terminal, Session& session, const std::str
     startOptions.TtyColumns = size.X;
 
     WarningCallback warningCallback(terminal);
-    THROW_IF_FAILED_EXCEPT(container->Start(flags, &startOptions, &warningCallback), WSLC_E_CONTAINER_IS_RUNNING);
+    wil::com_ptr<IWSLCProcess> process;
+    const auto startResult = container->StartWithProcess(flags, &startOptions, &warningCallback, &process);
+    THROW_IF_FAILED_EXCEPT(startResult, WSLC_E_CONTAINER_IS_RUNNING);
 
     if (!attach)
     {
         return 0;
     }
 
-    wil::com_ptr<IWSLCProcess> process;
-    THROW_IF_FAILED(container->GetInitProcess(&process));
+    if (startResult == WSLC_E_CONTAINER_IS_RUNNING)
+    {
+        THROW_IF_FAILED(container->GetInitProcess(&process));
+    }
 
     WSLCProcessFlags processFlags{};
     THROW_IF_FAILED(process->GetFlags(&processFlags));

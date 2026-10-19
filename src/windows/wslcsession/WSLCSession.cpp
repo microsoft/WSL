@@ -4031,11 +4031,14 @@ MultiHandleWait WSLCSession::CreateIOContext(HANDLE CancelHandle)
             m_sessionTerminatingEvent.get(), [this]() { THROW_HR_MSG(E_ABORT, "Session %lu is terminating", m_id); }),
         io::MultiHandleWait::NeedNotComplete);
 
-    // Cancel with E_ABORT if the client process exits.
-    io.AddHandle(
-        std::make_unique<io::EventHandle>(
-            wslutil::OpenCallingProcess(SYNCHRONIZE), [this]() { THROW_HR_MSG(E_ABORT, "Client process has exited"); }),
-        io::MultiHandleWait::NeedNotComplete);
+    auto callerProcess = wslutil::OpenCallingProcess(SYNCHRONIZE);
+    if (callerProcess)
+    {
+        io.AddHandle(
+            std::make_unique<io::EventHandle>(
+                std::move(callerProcess), [this]() { THROW_HR_MSG(E_ABORT, "Client process has exited"); }),
+            io::MultiHandleWait::NeedNotComplete);
+    }
 
     if (CancelHandle != nullptr)
     {
