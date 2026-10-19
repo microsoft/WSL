@@ -382,8 +382,7 @@ class InstallerTests
         else
         {
             VERIFY_ARE_EQUAL(
-                -1,
-                ReadDword(HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Services\\WSLService", L"MitigationFlags", -1));
+                -1, ReadDword(HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Services\\WSLService", L"MitigationFlags", -1));
         }
 
         // TODO: check wslsupport, wslapi and p9rdr
