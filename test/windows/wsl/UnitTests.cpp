@@ -2582,9 +2582,22 @@ Usage:
         }
         catch (...)
         {
-            // Windows 10 can lack this HCS capability query; skip rather than
-            // treating an unsupported host as a regression.
-            return false;
+            // Windows 10 can lack this HCS capability query. On that platform,
+            // the qualified nightly job explicitly declares the prerequisite.
+            if (wsl::windows::common::helpers::IsWindows11OrAbove())
+            {
+                return false;
+            }
+
+            WEX::Common::String supported;
+            WEX::TestExecution::RuntimeParameters::TryGetValue(L"NestedVirtualizationSupported", supported);
+            if (supported.IsEmpty())
+            {
+                return false;
+            }
+
+            const auto value = static_cast<LPCWSTR>(supported);
+            return ::_wcsicmp(value, L"1") == 0 || ::_wcsicmp(value, L"true") == 0;
         }
     }
 
