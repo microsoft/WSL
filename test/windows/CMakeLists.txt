@@ -1,5 +1,5 @@
-# common/ holds the fixtures and helpers shared by the wsl/ and wslc/ tests, along
-# with the unit tests for src/windows/common.
+# common/ holds the fixtures and helpers shared by the wsl/ and wslc/ tests, and
+# common/unit/ holds the unit tests for src/windows/common.
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/common/*.cpp
 )
