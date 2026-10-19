@@ -8,8 +8,8 @@
 #include <cfgmgr32.h>
 #include <wil/resource.h>
 #include <atomic>
+#include <functional>
 #include <list>
-#include <map>
 #include <thread>
 
 namespace wsl::windows::common::usb {
@@ -17,23 +17,26 @@ namespace wsl::windows::common::usb {
 class Manager
 {
 public:
+    using RemovalCallback = std::function<void(const GUID&)>;
+
     Manager();
     ~Manager();
     NON_COPYABLE(Manager);
     NON_MOVABLE(Manager);
 
     std::vector<ListedDevice> List(PSID UserSid);
-    void Attach(PSID UserSid, PortSelector Port);
-    void Detach(PSID UserSid, PortSelector Port);
-    void VmStarted(PSID UserSid, const GUID& VmId);
-    void VmStopped(PSID UserSid) noexcept;
-    void ShutdownByUser(PSID UserSid) noexcept;
     void Stop() noexcept;
+
+    DeviceReservation Reserve(PSID UserSid, PortSelector Port, RemovalCallback OnRemoval);
+    void Commit(PSID UserSid, const GUID& ReservationId);
+    void Release(PSID UserSid, const GUID& ReservationId);
+    GUID GetReservationId(PSID UserSid, PortSelector Port);
+    bool IsValid(PSID UserSid, const GUID& ReservationId);
+    void Cancel() noexcept;
 
 private:
     // Records include pending attachments and incomplete cleanup.
-    // Active permits replay; it does not require a running VM.
-    // VmId tracks the VM binding independently; GUID_NULL means no recorded binding.
+    // Active identifies reservations committed by their owner.
     struct Record
     {
         UxdReservationIdentity Reservation;
@@ -42,8 +45,9 @@ private:
         std::wstring DisplayInstanceId;
         std::wstring InterfacePath;
         std::wstring InstanceId;
-        GUID VmId{};
+        RemovalCallback OnRemoval;
         bool Active = false;
+        bool Removed = false;
     };
 
     struct Removal
@@ -66,15 +70,14 @@ private:
     void ReleaseReservation(Record& Value);
     void QueueDeviceRemoval(std::wstring Identifier, bool Instance);
     void ProcessDeviceRemovals();
-    void AttachDeviceToVm(Record& Value);
-    void DetachDeviceFromVm(Record& Value);
     void ThrowIfStopping() const;
     void RunNotificationWorker() noexcept;
+    std::list<Record>::iterator FindReservationRecord(const GUID& ReservationId);
+    bool ValidateReservation(Record& Value);
 
     wil::srwlock m_lock;
     _Guarded_by_(m_lock) std::list<Record> m_records;
     _Guarded_by_(m_lock) std::vector<std::wstring> m_hubs;
-    _Guarded_by_(m_lock) std::map<std::wstring, GUID> m_vms;
     UxdRegistry m_registry;
     wil::unique_hkey m_journal;
     wil::unique_event m_stop;

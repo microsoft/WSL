@@ -37,18 +37,6 @@ namespace {
         return key;
     }
 
-    void MockAttachDeviceToVm(const GUID& VmId, const std::wstring& Path)
-    {
-        // TODO: Replace this logging-only success placeholder with the VM USB attach API once it is implemented.
-        WSL_LOG("UsbAttachDeviceMock", TraceLoggingGuid(VmId, "VmId"), TraceLoggingWideString(Path.c_str(), "DevicePath"));
-    }
-
-    void MockDetachDeviceFromVm(const GUID& VmId, const std::wstring& Path)
-    {
-        // TODO: Replace this logging-only success placeholder with the VM USB detach API once it is implemented.
-        WSL_LOG("UsbDetachDeviceMock", TraceLoggingGuid(VmId, "VmId"), TraceLoggingWideString(Path.c_str(), "DevicePath"));
-    }
-
 } // namespace
 
 PortSelector ParsePortSelector(std::wstring_view Value)
@@ -264,209 +252,6 @@ Device Manager::WaitForWinUsbDevice(const UxdReservationIdentity& Value, std::ws
     }
 }
 
-void Manager::Attach(PSID UserSid, PortSelector Port)
-{
-    const auto sid = ConvertSidToString(UserSid);
-    auto lock = m_lock.lock_exclusive();
-    ThrowIfStopping();
-
-    // Validate the selected device and reject existing reservations.
-    ProcessDeviceRemovals();
-    const auto inventory = RefreshDeviceInventory();
-    auto identity = ResolvePortSelector(Port);
-    const auto existing = FindReservationRecord(identity);
-    if (existing != m_records.end())
-    {
-        THROW_HR_WITH_USER_ERROR_IF(E_ACCESSDENIED, wsl::shared::Localization::MessageUsbUnavailable(), existing->OwnerSid != sid);
-        THROW_HR_WITH_USER_ERROR_IF(
-            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), wsl::shared::Localization::MessageUsbAlreadyAttached(), existing->Active);
-        THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(ERROR_BUSY), wsl::shared::Localization::MessageUsbUnavailable());
-    }
-
-    const auto source = FindDeviceAtPort(inventory, identity);
-    THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), wsl::shared::Localization::MessageUsbNotFound(), !source);
-    THROW_HR_WITH_USER_ERROR_IF(
-        HRESULT_FROM_WIN32(ERROR_BUSY),
-        wsl::shared::Localization::MessageUsbUnavailable(),
-        m_registry.HasReservation(identity) || source->IsRedirected());
-
-    THROW_IF_FAILED(CoCreateGuid(&identity.Id));
-    Record value;
-    value.Reservation = identity;
-    value.OwnerSid = sid;
-    value.Name = source->Name;
-    value.DisplayInstanceId = source->DisplayInstanceId;
-    m_records.push_back(std::move(value));
-    const auto record = std::prev(m_records.end());
-
-    bool persisted = false;
-    try
-    {
-        // Make ownership durable before publishing redirection state.
-        PersistReservationRecord(*record);
-        persisted = true;
-        m_registry.CreateMapping(identity);
-        m_registry.PublishReservation(identity);
-
-        // Reload the port and grant the owner access to the redirected interface.
-        CyclePort(identity.HubInstanceId, identity.Port);
-        const auto redirected = WaitForWinUsbDevice(identity, record->InterfacePath);
-        record->InstanceId = redirected.InstanceId;
-        GrantDeviceAccess(record->InterfacePath, UserSid);
-
-        // Activate the reservation and bind it if the user's VM is running.
-        record->Active = true;
-        AttachDeviceToVm(*record);
-    }
-    catch (...)
-    {
-        const auto error = wil::ResultFromCaughtException();
-
-        // Roll back partial redirection; keep the record if cleanup fails.
-        try
-        {
-            if (persisted)
-            {
-                ReleaseReservation(*record);
-            }
-            m_records.erase(record);
-        }
-        CATCH_LOG_MSG("Failed to roll back USB attachment after error 0x%08X", error)
-        THROW_HR(error);
-    }
-}
-
-void Manager::Detach(PSID UserSid, PortSelector Port)
-{
-    const auto sid = ConvertSidToString(UserSid);
-    auto lock = m_lock.lock_exclusive();
-    ThrowIfStopping();
-
-    ProcessDeviceRemovals();
-    RefreshDeviceInventory();
-
-    const auto record = FindReservationRecord(ResolvePortSelector(Port));
-    THROW_HR_WITH_USER_ERROR_IF(
-        HRESULT_FROM_WIN32(ERROR_NOT_FOUND), wsl::shared::Localization::MessageUsbNotAttached(), record == m_records.end());
-    THROW_HR_WITH_USER_ERROR_IF(E_ACCESSDENIED, wsl::shared::Localization::MessageUsbUnavailable(), record->OwnerSid != sid);
-
-    // Return the device to Windows before forgetting its ownership record.
-    ReleaseReservation(*record);
-    m_records.erase(record);
-}
-
-void Manager::AttachDeviceToVm(Record& Value)
-{
-    const auto vm = m_vms.find(Value.OwnerSid);
-    if (Value.Active && vm != m_vms.end() && IsEqualGUID(Value.VmId, GUID_NULL))
-    {
-        MockAttachDeviceToVm(vm->second, Value.InterfacePath);
-        Value.VmId = vm->second;
-    }
-}
-
-void Manager::DetachDeviceFromVm(Record& Value)
-{
-    if (!IsEqualGUID(Value.VmId, GUID_NULL))
-    {
-        MockDetachDeviceFromVm(Value.VmId, Value.InterfacePath);
-        Value.VmId = GUID_NULL;
-    }
-}
-
-void Manager::VmStarted(PSID UserSid, const GUID& VmId)
-{
-    const auto sid = ConvertSidToString(UserSid);
-    auto lock = m_lock.lock_exclusive();
-    ThrowIfStopping();
-    ProcessDeviceRemovals();
-
-    // Attaching another device to the same VM must not replay existing reservations.
-    const auto existing = m_vms.find(sid);
-    if (existing != m_vms.end() && IsEqualGUID(existing->second, VmId))
-    {
-        return;
-    }
-
-    // Revalidate and replay this user's active reservations into the new VM.
-    m_vms[sid] = VmId;
-    for (auto record = m_records.begin(); record != m_records.end();)
-    {
-        if (record->OwnerSid != sid || !record->Active)
-        {
-            ++record;
-            continue;
-        }
-
-        // Release only confirmed mismatches; read or replay failures retain the record.
-        try
-        {
-            if (!MatchesRecordedReservation(*record))
-            {
-                ReleaseReservation(*record);
-                record = m_records.erase(record);
-                continue;
-            }
-
-            AttachDeviceToVm(*record);
-        }
-        CATCH_LOG()
-        ++record;
-    }
-}
-
-void Manager::VmStopped(PSID UserSid) noexcept
-try
-{
-    const auto sid = ConvertSidToString(UserSid);
-    auto lock = m_lock.lock_exclusive();
-
-    // Preserve Windows reservations while forgetting bindings to the stopped VM.
-    m_vms.erase(sid);
-    for (auto& record : m_records)
-    {
-        if (record.OwnerSid == sid)
-        {
-            try
-            {
-                DetachDeviceFromVm(record);
-            }
-            CATCH_LOG()
-            record.VmId = GUID_NULL;
-        }
-    }
-}
-CATCH_LOG()
-
-void Manager::ShutdownByUser(PSID UserSid) noexcept
-try
-{
-    const auto sid = ConvertSidToString(UserSid);
-    auto lock = m_lock.lock_exclusive();
-
-    // Explicit shutdown releases this user's reservations back to Windows.
-    m_vms.erase(sid);
-    for (auto record = m_records.begin(); record != m_records.end();)
-    {
-        if (record->OwnerSid != sid)
-        {
-            ++record;
-            continue;
-        }
-        try
-        {
-            ReleaseReservation(*record);
-            record = m_records.erase(record);
-        }
-        catch (...)
-        {
-            LOG_CAUGHT_EXCEPTION();
-            ++record;
-        }
-    }
-}
-CATCH_LOG()
-
 void Manager::LoadReservationRecords()
 {
     // Restore ownership metadata for cleanup, without reactivating attachments.
@@ -511,9 +296,8 @@ void Manager::PersistReservationRecord(const Record& Value)
 
 void Manager::ReleaseReservation(Record& Value)
 {
-    // Disable replay and drop any VM binding before restoring Windows ownership.
+    // Stop reporting the reservation as active before restoring Windows ownership.
     Value.Active = false;
-    DetachDeviceFromVm(Value);
 
     // Leave reservations belonging to other owners untouched.
     const auto reservation = m_registry.ReadReservation(Value.Reservation);
@@ -556,26 +340,16 @@ void Manager::ProcessDeviceRemovals()
         removals.swap(m_removals);
     }
 
-    // Release only reservations matched by received removal notifications.
-    for (auto record = m_records.begin(); record != m_records.end();)
+    // Invalidate only reservations matched by received removal notifications.
+    for (auto& record : m_records)
     {
         const auto removed = std::ranges::any_of(removals, [&](const auto& removal) {
-            return IsEqual(removal.Identifier, removal.Instance ? record->InstanceId : record->InterfacePath, true);
+            return IsEqual(removal.Identifier, removal.Instance ? record.InstanceId : record.InterfacePath, true);
         });
-        if (!removed)
+        if (removed)
         {
-            ++record;
-            continue;
-        }
-        try
-        {
-            ReleaseReservation(*record);
-            record = m_records.erase(record);
-        }
-        catch (...)
-        {
-            LOG_CAUGHT_EXCEPTION();
-            ++record;
+            record.Active = false;
+            record.Removed = true;
         }
     }
 }
@@ -629,11 +403,50 @@ try
             return;
         }
 
-        // Drop a failed batch without stopping subsequent notification processing.
         try
         {
-            auto lock = m_lock.lock_exclusive();
-            ProcessDeviceRemovals();
+            std::vector<std::pair<GUID, RemovalCallback>> notifications;
+            {
+                auto lock = m_lock.lock_exclusive();
+                ProcessDeviceRemovals();
+                for (const auto& record : m_records)
+                {
+                    if (record.Removed)
+                    {
+                        notifications.emplace_back(record.Reservation.Id, record.OnRemoval);
+                    }
+                }
+            }
+
+            for (const auto& [reservationId, callback] : notifications)
+            {
+                if (m_stopping.load())
+                {
+                    return;
+                }
+
+                try
+                {
+                    if (callback)
+                    {
+                        callback(reservationId);
+                    }
+                }
+                CATCH_LOG()
+
+                auto lock = m_lock.lock_exclusive();
+                const auto record = FindReservationRecord(reservationId);
+                if (record != m_records.end())
+                {
+                    record->OnRemoval = {};
+                    try
+                    {
+                        ReleaseReservation(*record);
+                        m_records.erase(record);
+                    }
+                    CATCH_LOG()
+                }
+            }
         }
         CATCH_LOG()
     }
@@ -643,13 +456,8 @@ CATCH_LOG()
 void Manager::Stop() noexcept
 try
 {
-    if (m_stopping.exchange(true))
-    {
-        return;
-    }
-
     // Cancel readiness waits before waiting for callbacks and the worker to finish.
-    m_stop.SetEvent();
+    Cancel();
     m_interfaceNotification.reset();
     m_instanceNotification.reset();
 
@@ -660,7 +468,6 @@ try
 
     // Release remaining reservations before service teardown completes.
     auto lock = m_lock.lock_exclusive();
-    m_vms.clear();
     for (auto record = m_records.begin(); record != m_records.end();)
     {
         try
@@ -676,5 +483,161 @@ try
     }
 }
 CATCH_LOG()
+
+DeviceReservation Manager::Reserve(PSID UserSid, PortSelector Port, RemovalCallback OnRemoval)
+{
+    THROW_HR_IF(E_INVALIDARG, !OnRemoval);
+    const auto sid = ConvertSidToString(UserSid);
+    auto lock = m_lock.lock_exclusive();
+    ThrowIfStopping();
+    ProcessDeviceRemovals();
+
+    const auto inventory = RefreshDeviceInventory();
+    auto identity = ResolvePortSelector(Port);
+    const auto existing = FindReservationRecord(identity);
+    if (existing != m_records.end())
+    {
+        THROW_HR_WITH_USER_ERROR_IF(E_ACCESSDENIED, wsl::shared::Localization::MessageUsbUnavailable(), existing->OwnerSid != sid);
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), wsl::shared::Localization::MessageUsbAlreadyAttached(), existing->Active);
+        THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(ERROR_BUSY), wsl::shared::Localization::MessageUsbUnavailable());
+    }
+
+    const auto source = FindDeviceAtPort(inventory, identity);
+    THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), wsl::shared::Localization::MessageUsbNotFound(), !source);
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_BUSY),
+        wsl::shared::Localization::MessageUsbUnavailable(),
+        m_registry.HasReservation(identity) || source->IsRedirected());
+
+    THROW_IF_FAILED(CoCreateGuid(&identity.Id));
+    Record value;
+    value.Reservation = identity;
+    value.OwnerSid = sid;
+    value.Name = source->Name;
+    value.DisplayInstanceId = source->DisplayInstanceId;
+    value.OnRemoval = std::move(OnRemoval);
+    m_records.push_back(std::move(value));
+    const auto record = std::prev(m_records.end());
+
+    bool persisted = false;
+    try
+    {
+        PersistReservationRecord(*record);
+        persisted = true;
+        m_registry.CreateMapping(identity);
+        m_registry.PublishReservation(identity);
+
+        CyclePort(identity.HubInstanceId, identity.Port);
+        const auto redirected = WaitForWinUsbDevice(identity, record->InterfacePath);
+        record->InstanceId = redirected.InstanceId;
+        GrantDeviceAccess(record->InterfacePath, UserSid);
+        return {identity.Id, Port, record->InterfacePath};
+    }
+    catch (...)
+    {
+        const auto error = wil::ResultFromCaughtException();
+        try
+        {
+            if (persisted)
+            {
+                ReleaseReservation(*record);
+            }
+            m_records.erase(record);
+        }
+        CATCH_LOG_MSG("Failed to roll back USB reservation after error 0x%08X", error)
+        THROW_HR(error);
+    }
+}
+
+void Manager::Commit(PSID UserSid, const GUID& ReservationId)
+{
+    const auto sid = ConvertSidToString(UserSid);
+    auto lock = m_lock.lock_exclusive();
+    ThrowIfStopping();
+    ProcessDeviceRemovals();
+
+    const auto record = FindReservationRecord(ReservationId);
+    THROW_HR_IF(E_CHANGED_STATE, record == m_records.end());
+    THROW_HR_IF(E_ACCESSDENIED, record->OwnerSid != sid);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_DEVICE_NOT_CONNECTED), !ValidateReservation(*record));
+    record->Active = true;
+}
+
+void Manager::Release(PSID UserSid, const GUID& ReservationId)
+{
+    const auto sid = ConvertSidToString(UserSid);
+    auto lock = m_lock.lock_exclusive();
+    const auto record = FindReservationRecord(ReservationId);
+    if (record == m_records.end())
+    {
+        return;
+    }
+
+    THROW_HR_WITH_USER_ERROR_IF(E_ACCESSDENIED, wsl::shared::Localization::MessageUsbUnavailable(), record->OwnerSid != sid);
+    ReleaseReservation(*record);
+    m_records.erase(record);
+}
+
+GUID Manager::GetReservationId(PSID UserSid, PortSelector Port)
+{
+    const auto sid = ConvertSidToString(UserSid);
+    auto lock = m_lock.lock_exclusive();
+    ThrowIfStopping();
+    ProcessDeviceRemovals();
+    RefreshDeviceInventory();
+
+    const auto record = FindReservationRecord(ResolvePortSelector(Port));
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_NOT_FOUND), wsl::shared::Localization::MessageUsbNotAttached(), record == m_records.end());
+    THROW_HR_WITH_USER_ERROR_IF(E_ACCESSDENIED, wsl::shared::Localization::MessageUsbUnavailable(), record->OwnerSid != sid);
+    return record->Reservation.Id;
+}
+
+bool Manager::IsValid(PSID UserSid, const GUID& ReservationId)
+{
+    const auto sid = ConvertSidToString(UserSid);
+    auto lock = m_lock.lock_exclusive();
+    ThrowIfStopping();
+    ProcessDeviceRemovals();
+
+    const auto record = FindReservationRecord(ReservationId);
+    if (record == m_records.end())
+    {
+        return false;
+    }
+
+    THROW_HR_IF(E_ACCESSDENIED, record->OwnerSid != sid);
+    return ValidateReservation(*record);
+}
+
+void Manager::Cancel() noexcept
+{
+    m_stopping.store(true);
+    m_stop.SetEvent();
+}
+
+std::list<Manager::Record>::iterator Manager::FindReservationRecord(const GUID& ReservationId)
+{
+    return std::ranges::find_if(m_records, [&](const auto& record) { return IsEqualGUID(record.Reservation.Id, ReservationId); });
+}
+
+bool Manager::ValidateReservation(Record& Value)
+{
+    if (!Value.Removed)
+    {
+        const auto current = FindDeviceAtPort(RefreshDeviceInventory(), Value.Reservation);
+        if (MatchesRecordedReservation(Value) && current && current->IsReady() && IsEqual(current->InstanceId, Value.InstanceId, true))
+        {
+            return true;
+        }
+
+        Value.Active = false;
+        Value.Removed = true;
+        m_work.SetEvent();
+    }
+
+    return false;
+}
 
 } // namespace wsl::windows::common::usb

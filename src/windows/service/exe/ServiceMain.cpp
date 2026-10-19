@@ -258,7 +258,7 @@ void WslService::ServiceStopped()
     // Cancel USB attach waits before session teardown acquires the instance locks.
     if (g_usbManager)
     {
-        g_usbManager->Stop();
+        g_usbManager->Cancel();
     }
 
     // Terminate all user sessions.
@@ -267,6 +267,10 @@ void WslService::ServiceStopped()
     // Also tear down WSLC sessions.
     wsl::windows::service::wslc::ClearWslcSessionsAndBlockNewInstances();
 
+    if (g_usbManager)
+    {
+        g_usbManager->Stop();
+    }
     g_usbManager.reset();
 
     // Disconnect from the LxCore driver.

@@ -27,6 +27,7 @@ namespace {
 constexpr GUID c_virtioFsDeviceId{0x872270E1, 0xA899, 0x4AF6, {0xB4, 0x54, 0x71, 0x93, 0x63, 0x44, 0x35, 0xAD}};
 constexpr GUID c_virtioNetDeviceId{0xF07010D0, 0x0EA9, 0x447F, {0x88, 0xEF, 0xBD, 0x95, 0x2A, 0x4D, 0x2F, 0x14}};
 constexpr GUID c_virtioPmemDeviceId{0xEDBB24BB, 0x5E19, 0x40F4, {0x8A, 0x0F, 0x82, 0x24, 0x31, 0x30, 0x64, 0xFD}};
+constexpr GUID c_usbControllerDeviceId{0xEC64FDDE, 0xBBD3, 0x45D0, {0xB7, 0xD5, 0xB9, 0x7A, 0xB7, 0x81, 0x0E, 0x17}};
 } // namespace
 
 DeviceHostProxy::DeviceHostProxy(const std::wstring& VmId, const GUID& RuntimeId, bool EnableTelemetry) :
@@ -460,6 +461,10 @@ void DeviceHostProxy::TeardownDevice(const wil::com_ptr<IUnknown>& Device) noexc
     {
         LOG_IF_FAILED(pmemDevice->Teardown());
     }
+    else if (const auto usbController = Device.try_query<IWslUsbControllerDevice>())
+    {
+        LOG_IF_FAILED(usbController->Teardown());
+    }
 }
 
 HRESULT
@@ -681,3 +686,63 @@ try
     return S_OK;
 }
 CATCH_RETURN()
+
+GUID DeviceHostProxy::AddUsbControllerDevice(_In_ HANDLE UserToken)
+{
+    std::lock_guard lifecycleLock(m_deviceLifecycleLock);
+
+    GUID instanceId{};
+    THROW_IF_FAILED(UuidCreate(&instanceId));
+
+    {
+        auto lock = m_devicesLock.lock_exclusive();
+        THROW_HR_IF(E_CHANGED_STATE, m_devicesShutdown);
+        m_devices.emplace(instanceId, DeviceHostProxyEntry{.Type = c_usbControllerDeviceId});
+    }
+
+    wil::com_ptr<IUnknown> device;
+    auto removeOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        TeardownDevice(device);
+        auto lock = m_devicesLock.lock_exclusive();
+        m_devices.erase(instanceId);
+    });
+    wil::com_ptr<IWslUsbControllerDevice> controller;
+    auto instanceIdForCall = instanceId;
+    THROW_IF_FAILED(GetWslVm(UserToken)->CreateUsbControllerDevice(&instanceIdForCall, GetCallback().get(), controller.put()));
+    device = controller.query<IUnknown>();
+
+    {
+        auto lock = m_devicesLock.lock_exclusive();
+        const auto entry = m_devices.find(instanceId);
+        THROW_HR_IF(E_CHANGED_STATE, m_devicesShutdown || entry == m_devices.end());
+        entry->second.Device = device;
+    }
+
+    AddFlexibleIoDevice(c_usbControllerDeviceId, instanceId);
+    removeOnFailure.release();
+    return instanceId;
+}
+
+void DeviceHostProxy::AttachUsbDevice(const GUID& ControllerId, const std::wstring& Path)
+{
+    std::lock_guard lifecycleLock(m_deviceLifecycleLock);
+    const auto path = wil::make_bstr(Path.c_str());
+    THROW_IF_FAILED(GetUsbControllerDevice(ControllerId)->AttachDevice(path.get()));
+}
+
+void DeviceHostProxy::DetachUsbDevice(const GUID& ControllerId, const std::wstring& Path)
+{
+    std::lock_guard lifecycleLock(m_deviceLifecycleLock);
+    const auto path = wil::make_bstr(Path.c_str());
+    THROW_IF_FAILED(GetUsbControllerDevice(ControllerId)->DetachDevice(path.get()));
+}
+
+wil::com_ptr<IWslUsbControllerDevice> DeviceHostProxy::GetUsbControllerDevice(const GUID& InstanceId)
+{
+    auto lock = m_devicesLock.lock_shared();
+    THROW_HR_IF(E_CHANGED_STATE, m_devicesShutdown);
+
+    const auto device = m_devices.find(InstanceId);
+    THROW_HR_IF(E_NOT_SET, device == m_devices.end() || device->second.ShuttingDown || !device->second.Device);
+    return device->second.Device.query<IWslUsbControllerDevice>();
+}

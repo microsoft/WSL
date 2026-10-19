@@ -52,6 +52,12 @@ public:
     _Requires_lock_not_held_(m_lock)
     void RemoveGuestDevice(_In_ const GUID& InstanceId);
 
+    _Requires_lock_not_held_(m_lock)
+    void AttachUsbDevice(const std::wstring& Path, _In_ HANDLE UserToken);
+
+    _Requires_lock_not_held_(m_lock)
+    void DetachUsbDevice(const std::wstring& Path);
+
 private:
     struct DirectoryObjectLifetime
     {
@@ -68,4 +74,5 @@ private:
     wil::com_ptr<DeviceHostProxy> m_deviceHostSupport;
     _Guarded_by_(m_lock) std::vector<DirectoryObjectLifetime> m_objectDirectories;
     _Guarded_by_(m_lock) std::map<std::wstring, GUID> m_virtioNetDevices;
+    _Guarded_by_(m_lock) GUID m_usbControllerId {};
 };

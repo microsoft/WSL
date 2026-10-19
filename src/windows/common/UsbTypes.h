@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <guiddef.h>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -30,5 +31,12 @@ struct ListedDevice
 };
 
 PortSelector ParsePortSelector(std::wstring_view Value);
+
+struct DeviceReservation
+{
+    GUID Id;
+    PortSelector Port;
+    std::wstring InterfacePath;
+};
 
 } // namespace wsl::windows::common::usb

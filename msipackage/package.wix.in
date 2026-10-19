@@ -225,6 +225,12 @@
                         <RegistryValue Value="{6D32A4B7-9E1F-4C82-A573-F8B1C4D29E60}" Type="string" />
                     </RegistryKey>
                 </RegistryKey>
+                <RegistryKey Root="HKCR" Key="Interface\{A812C506-CABE-4E4F-AF3B-BA1FB83AE7D3}">
+                    <RegistryValue Value="IWslUsbControllerDevice" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{6D32A4B7-9E1F-4C82-A573-F8B1C4D29E60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
                 <RegistryKey Root="HKCR" Key="Interface\{16283FCE-5272-4D3D-AAF9-B02C3D4E5F60}">
                     <RegistryValue Value="IWslVm" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">

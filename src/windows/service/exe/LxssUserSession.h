@@ -23,6 +23,7 @@ Abstract:
 #include "PluginManager.h"
 #include "Lifetime.h"
 #include "DistributionRegistration.h"
+#include "UsbTypes.h"
 
 #define WSL_NEW_DISTRO_LXFS L"NewDistributionLxFs"
 #define WSL_DISTRO_CONFIG_DEFAULT_UID L"DefaultUid"
@@ -581,6 +582,8 @@ public:
     /// </summary>
     HRESULT DetachUsbDevice(_In_ LPCWSTR Port);
 
+    void OnUsbDeviceRemoved(const GUID& ReservationId);
+
 private:
     /// <summary>
     /// Adds a distro to the list of converting distros.
@@ -840,6 +843,15 @@ private:
 
     static LRESULT CALLBACK s_TimezoneWindowProc(HWND windowHandle, UINT messageCode, WPARAM wParameter, LPARAM lParameter);
 
+    _Requires_lock_held_(m_instanceLock)
+    void _ReleaseUsbAttachment(const GUID& ReservationId);
+
+    _Requires_lock_held_(m_instanceLock)
+    void _ReleaseUsbAttachments() noexcept;
+
+    _Requires_lock_held_(m_instanceLock)
+    void _ReplayUsbAttachments() noexcept;
+
     /// <summary>
     /// Lock for protecting various lists.
     /// </summary>
@@ -927,6 +939,15 @@ private:
     std::shared_ptr<HttpProxyStateTracker> m_httpProxyStateTracker{};
 
     std::thread m_timezoneThread;
+
+    struct UsbAttachment
+    {
+        wsl::windows::common::usb::DeviceReservation Reservation;
+        bool Requested = false;
+        bool Attached = false;
+    };
+
+    _Guarded_by_(m_instanceLock) std::map<GUID, UsbAttachment, wsl::windows::common::helpers::GuidLess> m_usbAttachments;
 };
 
 #define LXSS_CLIENT_ID_WILDCARD ((ULONG)0)

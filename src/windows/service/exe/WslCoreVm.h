@@ -140,6 +140,10 @@ public:
 
     void ValidateNetworkingMode();
 
+    void AttachUsbDevice(const std::wstring& Path);
+
+    void DetachUsbDevice(const std::wstring& Path);
+
 private:
     struct AttachedDisk
     {

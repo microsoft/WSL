@@ -745,6 +745,11 @@ LxssUserSessionImpl::~LxssUserSessionImpl()
 
     m_lifetimeManager.ClearCallbacks();
 
+    {
+        std::lock_guard lock(m_instanceLock);
+        _ReleaseUsbAttachments();
+    }
+
     // Ensure that if there are no running instances.
     WI_ASSERT(m_runningInstances.empty());
 }
@@ -2321,11 +2326,8 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, ShutdownBeh
             }
 
             // Terminate the utility VM.
-            if (m_usbManager)
-            {
-                m_usbManager->ShutdownByUser(&m_userSid.Sid);
-            }
             _VmTerminate();
+            _ReleaseUsbAttachments();
             resetVmTerminationCallback.reset();
 
             // Reset the proxy state.
@@ -2612,11 +2614,39 @@ HRESULT LxssUserSessionImpl::AttachUsbDevice(_In_ LPCWSTR Port)
     std::lock_guard lock(m_instanceLock);
     THROW_HR_IF(CO_E_SERVER_STOPPING, m_disableNewInstanceCreation);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_READY), !m_usbManager);
-    if (m_utilityVm)
+    _CreateVm();
+
+    auto reservation = m_usbManager->Reserve(&m_userSid.Sid, port, [session = weak_from_this()](const GUID& reservationId) {
+        if (const auto owner = session.lock())
+        {
+            owner->OnUsbDeviceRemoved(reservationId);
+        }
+    });
+    const auto reservationId = reservation.Id;
+    auto releaseOnFailure =
+        wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { m_usbManager->Release(&m_userSid.Sid, reservationId); });
+    const auto [entry, inserted] = m_usbAttachments.emplace(reservationId, UsbAttachment{std::move(reservation)});
+    THROW_HR_IF(E_UNEXPECTED, !inserted);
+    releaseOnFailure.release();
+
+    try
     {
-        m_usbManager->VmStarted(&m_userSid.Sid, m_vmId.load());
+        m_utilityVm->AttachUsbDevice(entry->second.Reservation.InterfacePath);
+        entry->second.Attached = true;
+        m_usbManager->Commit(&m_userSid.Sid, reservationId);
+        entry->second.Requested = true;
     }
-    m_usbManager->Attach(&m_userSid.Sid, port);
+    catch (...)
+    {
+        const auto error = wil::ResultFromCaughtException();
+        try
+        {
+            _ReleaseUsbAttachment(reservationId);
+        }
+        CATCH_LOG_MSG("Failed to roll back USB attachment after error 0x%08X", error)
+        THROW_HR(error);
+    }
+
     return S_OK;
 }
 
@@ -2626,7 +2656,12 @@ HRESULT LxssUserSessionImpl::DetachUsbDevice(_In_ LPCWSTR Port)
     std::lock_guard lock(m_instanceLock);
     THROW_HR_IF(CO_E_SERVER_STOPPING, m_disableNewInstanceCreation);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_READY), !m_usbManager);
-    m_usbManager->Detach(&m_userSid.Sid, port);
+    const auto attachment = std::ranges::find_if(m_usbAttachments, [&](const auto& entry) {
+        return entry.second.Reservation.Port.Hub == port.Hub && entry.second.Reservation.Port.Port == port.Port;
+    });
+    const auto reservationId =
+        attachment == m_usbAttachments.end() ? m_usbManager->GetReservationId(&m_userSid.Sid, port) : attachment->first;
+    _ReleaseUsbAttachment(reservationId);
     return S_OK;
 }
 
@@ -3127,14 +3162,7 @@ void LxssUserSessionImpl::_CreateVm()
             }
 
             m_pluginManager.OnVmStarted(&m_session, &userSettings);
-            try
-            {
-                if (m_usbManager)
-                {
-                    m_usbManager->VmStarted(&m_userSid.Sid, vmId);
-                }
-            }
-            CATCH_LOG()
+            _ReplayUsbAttachments();
         }
         catch (...)
         {
@@ -4161,16 +4189,16 @@ void LxssUserSessionImpl::_VmTerminate()
     }
 
     m_vmTerminating.SetEvent();
-    if (m_usbManager)
-    {
-        m_usbManager->VmStopped(&m_userSid.Sid);
-    }
     if (m_telemetryThread.joinable())
     {
         m_telemetryThread.join();
     }
 
     m_utilityVm.reset();
+    for (auto& [reservationId, attachment] : m_usbAttachments)
+    {
+        attachment.Attached = false;
+    }
     m_vmId.store(GUID_NULL);
 
     // Reset the user's token since its lifetime is tied to the VM.
@@ -4473,3 +4501,78 @@ try
     return;
 }
 CATCH_LOG()
+
+void LxssUserSessionImpl::OnUsbDeviceRemoved(const GUID& ReservationId)
+{
+    std::lock_guard lock(m_instanceLock);
+    const auto entry = m_usbAttachments.find(ReservationId);
+    if (entry != m_usbAttachments.end())
+    {
+        auto& attachment = entry->second;
+        attachment.Requested = false;
+        if (attachment.Attached)
+        {
+            m_utilityVm->DetachUsbDevice(attachment.Reservation.InterfacePath);
+        }
+
+        m_usbAttachments.erase(entry);
+    }
+}
+
+_Requires_lock_held_(m_instanceLock)
+void LxssUserSessionImpl::_ReleaseUsbAttachment(const GUID& ReservationId)
+{
+    const auto entry = m_usbAttachments.find(ReservationId);
+    if (entry != m_usbAttachments.end())
+    {
+        auto& attachment = entry->second;
+        attachment.Requested = false;
+        if (attachment.Attached)
+        {
+            m_utilityVm->DetachUsbDevice(attachment.Reservation.InterfacePath);
+            attachment.Attached = false;
+        }
+    }
+
+    m_usbManager->Release(&m_userSid.Sid, ReservationId);
+    if (entry != m_usbAttachments.end())
+    {
+        m_usbAttachments.erase(entry);
+    }
+}
+
+_Requires_lock_held_(m_instanceLock)
+void LxssUserSessionImpl::_ReleaseUsbAttachments() noexcept
+{
+    for (auto entry = m_usbAttachments.begin(); entry != m_usbAttachments.end();)
+    {
+        const auto reservationId = (entry++)->first;
+        try
+        {
+            _ReleaseUsbAttachment(reservationId);
+        }
+        CATCH_LOG()
+    }
+}
+
+_Requires_lock_held_(m_instanceLock)
+void LxssUserSessionImpl::_ReplayUsbAttachments() noexcept
+{
+    for (auto entry = m_usbAttachments.begin(); entry != m_usbAttachments.end();)
+    {
+        auto& attachment = (entry++)->second;
+        try
+        {
+            if (!attachment.Requested || !m_usbManager->IsValid(&m_userSid.Sid, attachment.Reservation.Id))
+            {
+                _ReleaseUsbAttachment(attachment.Reservation.Id);
+                continue;
+            }
+
+            m_utilityVm->AttachUsbDevice(attachment.Reservation.InterfacePath);
+            attachment.Attached = true;
+            m_usbManager->Commit(&m_userSid.Sid, attachment.Reservation.Id);
+        }
+        CATCH_LOG()
+    }
+}
