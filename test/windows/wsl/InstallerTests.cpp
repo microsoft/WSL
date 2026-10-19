@@ -348,17 +348,17 @@ class InstallerTests
         VERIFY_ARE_EQUAL(version, expectedVersion);
         VERIFY_IS_FALSE(GetMsiProductCode().empty());
 
-        constexpr DWORD c_acgMitigationFlag = 0x800;
-        const auto mitigationFlags =
-            ReadDword(HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Services\\WSLService", L"MitigationFlags", 0);
-
-        VERIFY_ARE_EQUAL(mitigationFlags & c_acgMitigationFlag, c_acgMitigationFlag);
-
         // SCM's service ACG support first appears in main build 27841.
         constexpr DWORD c_serviceAcgMinBuild = 27841;
         const auto buildNumber = wsl::windows::common::helpers::GetWindowsVersion().BuildNumber;
         if (buildNumber >= c_serviceAcgMinBuild)
         {
+            constexpr DWORD c_acgMitigationFlag = 0x800;
+            const auto mitigationFlags =
+                ReadDword(HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Services\\WSLService", L"MitigationFlags", 0);
+
+            VERIFY_ARE_EQUAL(mitigationFlags & c_acgMitigationFlag, c_acgMitigationFlag);
+
             LogInfo("Checking running WSLService dynamic-code policy on Windows build %lu.", buildNumber);
 
             const WslKeepAlive keepAlive;
@@ -384,9 +384,13 @@ class InstallerTests
         }
         else
         {
+            VERIFY_ARE_EQUAL(
+                ERROR_FILE_NOT_FOUND,
+                RegGetValueW(HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Services\\WSLService", L"MitigationFlags", RRF_RT_REG_DWORD, nullptr, nullptr, nullptr));
+
             LogInfo(
                 "Skipping running WSLService dynamic-code policy checks on Windows build %lu; "
-                "service ACG support requires build %lu or later. Registry flag was verified.",
+                "service ACG support requires build %lu or later. Registry flag absence was verified.",
                 buildNumber,
                 c_serviceAcgMinBuild);
         }
