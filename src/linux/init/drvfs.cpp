@@ -248,6 +248,8 @@ Arguments:
 
     Options - Supplies the DrvFs mount options.
 
+    Config - Supplies the distribution configuration.
+
 Return Value:
 
     A pair representing the 9p mount options, and standard mount options.
@@ -262,13 +264,7 @@ Return Value:
     while (!Options.empty())
     {
         auto Option = UtilStringNextToken(Options, ",");
-        if (Option == "ro")
-        {
-            Plan9Options += ";ro";
-            StandardOptions += "ro,";
-        }
-        else if (
-            (Option == "metadata") || (StartsWith(Option, PLAN9_CASE_OPTION)) || (StartsWith(Option, "uid=")) ||
+        if ((Option == "metadata") || (StartsWith(Option, PLAN9_CASE_OPTION)) || (StartsWith(Option, "uid=")) ||
             (StartsWith(Option, "gid=")) || (StartsWith(Option, "umask=")) || (StartsWith(Option, "dmask=")) ||
             (StartsWith(Option, "fmask=")) || (StartsWith(Option, PLAN9_SYMLINK_ROOT_OPTION)))
         {
@@ -733,6 +729,11 @@ try
     //
 
     auto [Plan9Options, MountOptions] = ConvertDrvfsMountOptionsToPlan9(Options ? Options : "", Config);
+    const auto ParsedOptions = mountutil::MountParseFlags(MountOptions);
+    if ((ParsedOptions.MountFlags & MS_RDONLY) != 0)
+    {
+        Plan9Options += ";ro";
+    }
 
     //
     // Construct a request to add a virtiofs share.

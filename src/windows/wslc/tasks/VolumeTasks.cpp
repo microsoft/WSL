@@ -14,10 +14,11 @@ Abstract:
 #include "Argument.h"
 #include "ArgumentConvertedTypes.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "VolumeModel.h"
 #include "VolumeService.h"
 #include "VolumeTasks.h"
-#include "TableOutput.h"
+#include "TableData.h"
 #include <wslc_schema.h>
 
 using namespace wsl::shared;
@@ -31,27 +32,28 @@ using wsl::windows::common::string::FormatHumanReadableSize;
 
 namespace wsl::windows::wslc::task {
 
-constexpr uint32_t c_reclaimedSpacePrecision = 4;
+using namespace wsl::windows::wslc::cli;
+using namespace wsl::windows::cli::table;
 
 namespace {
 
     // Reported for the fields that only carry a value when volume usage data or swarm cluster
     // information is available, neither of which applies here.
-    constexpr std::string_view c_notAvailable = "N/A";
+    constexpr std::string_view c_volumeNotAvailable = "N/A";
 
     // Converts session volume entries into the all-string shape used for "volume list --format json".
     VolumeOutputInformation ToVolumeOutput(const wslc_schema::VolumeListEntry& volume)
     {
         VolumeOutputInformation entry;
-        entry.Availability = c_notAvailable;
+        entry.Availability = c_volumeNotAvailable;
         entry.Driver = volume.Driver;
-        entry.Group = c_notAvailable;
-        entry.Links = c_notAvailable;
+        entry.Group = c_volumeNotAvailable;
+        entry.Links = c_volumeNotAvailable;
         entry.Mountpoint = volume.Mountpoint;
         entry.Name = volume.Name;
         entry.Scope = volume.Scope;
-        entry.Size = c_notAvailable;
-        entry.Status = c_notAvailable;
+        entry.Size = c_volumeNotAvailable;
+        entry.Status = c_volumeNotAvailable;
 
         for (const auto& [key, value] : volume.Labels)
         {
@@ -189,46 +191,56 @@ void InspectVolumes(CLIExecutionContext& context)
     context.Terminal.Output(L"{}\n", MultiByteToWide(json));
 }
 
-void ListVolumes(CLIExecutionContext& context)
+void FormatVolumeOutput(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Volumes));
     auto& volumes = context.Data.Get<Data::Volumes>();
+    const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
 
     if (context.Args.GetValue<ArgType::Quiet>())
     {
+        TableData table{Localization::WSLCCLI_TableHeaderVolumeName()};
+        table.ShowHeader = false;
+        table.Reserve(volumes.size());
+
         for (const auto& volume : volumes)
         {
-            context.Terminal.Output(L"{}\n", MultiByteToWide(volume.Name));
+            table.AddRow({MultiByteToWide(volume.Name)});
         }
 
+        context.Data.Add<Data::Table>(std::move(table));
         return;
     }
-
-    const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
 
     switch (format)
     {
     case FormatType::Json:
     {
+        std::vector<std::wstring> json;
+        json.reserve(volumes.size());
+
         for (const auto& volume : volumes)
         {
-            context.Terminal.Output(L"{}\n", ToJsonW(ToVolumeOutput(volume), c_jsonCompactIndent));
+            json.push_back(ToJsonW(ToVolumeOutput(volume), c_jsonCompactIndent));
         }
 
+        context.Data.Add<Data::Json>(std::move(json));
         break;
     }
     case FormatType::Table:
     {
-        auto table = wsl::windows::wslc::TableOutput<2>(context.Terminal, {L"DRIVER", L"VOLUME NAME"});
+        TableData table{Localization::WSLCCLI_TableHeaderDriver(), Localization::WSLCCLI_TableHeaderVolumeName()};
+        table.Reserve(volumes.size());
+
         for (const auto& volume : volumes)
         {
-            table.WriteRow({
+            table.AddRow({
                 MultiByteToWide(volume.Driver),
                 MultiByteToWide(volume.Name),
             });
         }
 
-        table.Complete();
+        context.Data.Add<Data::Table>(std::move(table));
         break;
     }
     default:
@@ -238,6 +250,11 @@ void ListVolumes(CLIExecutionContext& context)
 
 void PruneVolumes(CLIExecutionContext& context)
 {
+    context.Data.Add<Data::ConfirmWarning>(
+        context.Args.GetValue<ArgType::All>() ? Localization::WSLCCLI_VolumePruneAllConfirm() : Localization::WSLCCLI_VolumePruneConfirm());
+    context.Data.Add<Data::ConfirmMessage>(Localization::WSLCCLI_PruneConfirmPrompt());
+    ConfirmAction(context);
+
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
 

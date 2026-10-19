@@ -18,6 +18,7 @@ Abstract:
 #include "ImageModel.h"
 #include "NetworkModel.h"
 #include "SessionModel.h"
+#include "TableData.h"
 #include "wslc.h"
 #include <wslc_schema.h>
 
@@ -44,6 +45,10 @@ enum class Data : size_t
     Volumes,
     Networks,
     NetworkEndpointOptions,
+    ConfirmWarning,
+    ConfirmMessage,
+    Table,
+    Json,
 
     Max
 };
@@ -62,6 +67,10 @@ namespace details {
     DEFINE_DATA_MAPPING(Volumes, std::vector<wsl::windows::common::wslc_schema::VolumeListEntry>);
     DEFINE_DATA_MAPPING(Networks, std::vector<wsl::windows::common::wslc_schema::NetworkListEntry>);
     DEFINE_DATA_MAPPING(NetworkEndpointOptions, wsl::windows::wslc::models::NetworkEndpointOptions);
+    DEFINE_DATA_MAPPING(ConfirmWarning, std::wstring);
+    DEFINE_DATA_MAPPING(ConfirmMessage, std::wstring);
+    DEFINE_DATA_MAPPING(Table, wsl::windows::cli::table::TableData);
+    DEFINE_DATA_MAPPING(Json, std::vector<std::wstring>);
 } // namespace details
 
 struct DataMap : wsl::windows::wslc::EnumBasedVariantMap<Data, wsl::windows::wslc::execution::details::DataMapping>

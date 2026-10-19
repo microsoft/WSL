@@ -45,12 +45,27 @@ std::string EpochToLocalDisplayTime(LONGLONG timestamp);
 // preserved. An empty input returns an empty string; anything else that cannot be parsed throws.
 std::string Rfc3339ToUtcDisplayTime(std::string_view timestamp);
 
+// Renders nanoseconds since the unix epoch in docker's fixed layout "2006-01-02T15:04:05.000000000Z07:00",
+// shifted by offset, with 'Z' for a zero offset.
+std::string EpochToRfc3339Nano(std::int64_t epochNanoseconds, std::chrono::seconds offset);
+
+// Renders the same layout in the local time zone. Falls back to UTC when the time zone database is unavailable.
+std::string EpochToLocalRfc3339Nano(std::int64_t epochNanoseconds);
+
 // Renders an elapsed number of seconds as a coarse, localized description such as "About a minute"
 // or "3 weeks". Negative values are treated as zero.
 std::wstring FormatElapsedSeconds(LONGLONG elapsedSeconds);
 
+// The invariant English form of FormatElapsedSeconds, matching the strings docker produces through
+// go-units HumanDuration. Machine readable output uses this so its values do not vary by display
+// language.
+std::wstring FormatInvariantElapsedSeconds(LONGLONG elapsedSeconds);
+
 // Renders how long ago a timestamp given in seconds since the unix epoch occurred. A timestamp of
 // zero means "unset" and returns an empty string.
 std::wstring FormatRelativeTime(LONGLONG timestamp);
+
+// The invariant English form of FormatRelativeTime.
+std::wstring FormatInvariantRelativeTime(LONGLONG timestamp);
 
 } // namespace wsl::windows::common::timestamp

@@ -26,7 +26,7 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ComposeStopCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::Project, true),
+        Argument::Create(ArgType::Project, {.Required = true}),
         Argument::Create(ArgType::Time),
     };
 }

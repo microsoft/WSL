@@ -22,6 +22,8 @@ Abstract:
 
 namespace wsl::windows::wslc::services {
 
+using namespace wsl::windows::wslc::cli;
+
 struct ComposeProjectReference
 {
     explicit ComposeProjectReference(std::filesystem::path path) : Value(std::move(path))

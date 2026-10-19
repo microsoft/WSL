@@ -19,7 +19,7 @@ using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 
-std::vector<std::unique_ptr<Command>> ComposeCommand::GetCommands() const
+std::vector<std::unique_ptr<Command>> ComposeCommand::CreateCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<ComposeAttachCommand>(FullName()));

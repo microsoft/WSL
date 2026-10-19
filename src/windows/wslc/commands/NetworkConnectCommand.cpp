@@ -27,13 +27,13 @@ namespace wsl::windows::wslc {
 std::vector<Argument> NetworkConnectCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::NetworkName, true),
-        Argument::Create(ArgType::ContainerId, true),
-        Argument::Create(ArgType::DriverOpt, false, Limit::Unlimited),
-        Argument::Create(ArgType::IpAddress, false),
-        Argument::Create(ArgType::Link, false, Limit::Unlimited),
-        Argument::Create(ArgType::LinkLocalIp, false, Limit::Unlimited),
-        Argument::Create(ArgType::NetworkAlias, false, Limit::Unlimited),
+        Argument::Create(ArgType::NetworkName, {.Required = true}),
+        Argument::Create(ArgType::ContainerId, {.Required = true}),
+        Argument::Create(ArgType::DriverOpt, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::IpAddress),
+        Argument::Create(ArgType::Link, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::LinkLocalIp, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::NetworkAlias, {.Limit = Limit::Unlimited}),
     };
 }
 

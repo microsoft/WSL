@@ -57,13 +57,7 @@ HRESULT WSLCSessionManagerFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_
 
         THROW_IF_FAILED(g_sessionManager.CopyTo(riid, ppCreated));
     }
-    catch (...)
-    {
-        const auto result = wil::ResultFromCaughtException();
-
-        // Note: S_FALSE will cause COM to retry if the service is stopping.
-        return result == CO_E_SERVER_STOPPING ? S_FALSE : result;
-    }
+    CATCH_RETURN()
 
     return S_OK;
 }

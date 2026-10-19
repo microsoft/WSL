@@ -7,6 +7,8 @@
 
 namespace wsl::windows::wslc::services {
 
+using namespace wsl::windows::wslc::cli;
+
 class DECLSPEC_UUID("6A2033FE-B0DD-4CBD-8EA6-7D6628D9AF9A") ComposeProgressCallback
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IComposeProgressCallback, IFastRundown>
 {

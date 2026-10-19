@@ -4,11 +4,13 @@
 #include "ArgumentConvertedTypes.h"
 #include "ComposeService.h"
 #include "ComposeTasks.h"
-#include "TableOutput.h"
+#include "TableData.h"
+#include "TableRenderer.h"
 
 using namespace wsl::windows::wslc::argument;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::services;
+using namespace wsl::windows::cli::table;
 using namespace wsl::shared;
 
 namespace wsl::windows::wslc::task {
@@ -121,16 +123,14 @@ void ListComposeProjects(CLIExecutionContext& context)
 
     case models::FormatType::Table:
     {
-        TableOutput<2> table(
-            context.Terminal,
-            TableOutput<2>::header_t{Localization::WSLCCLI_TableHeaderName(), Localization::WSLCCLI_TableHeaderStatus()},
-            projects.size());
+        TableData table{Localization::WSLCCLI_TableHeaderName(), Localization::WSLCCLI_TableHeaderStatus()};
+        table.Reserve(projects.size());
         for (const auto& project : projects)
         {
-            table.WriteRow({wsl::shared::string::MultiByteToWide(project.Name), wsl::shared::string::MultiByteToWide(project.Status)});
+            table.AddRow({wsl::shared::string::MultiByteToWide(project.Name), wsl::shared::string::MultiByteToWide(project.Status)});
         }
 
-        table.Complete();
+        RenderTable(context.Terminal, table);
         break;
     }
 
