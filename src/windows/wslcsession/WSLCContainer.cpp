@@ -925,7 +925,7 @@ void WSLCContainerImpl::Rundown() noexcept
             }
             CATCH_LOG()
 
-            // Explicitely clean resources so that a subsequent call to Rundown() is a no-op.
+            // Explicitly clean resources so that a subsequent call to Rundown() is a no-op.
             // This is required because the destructor can be called after the VM has been destroyed.
             m_mappedPorts.clear();
             m_mountedVolumes.clear();
