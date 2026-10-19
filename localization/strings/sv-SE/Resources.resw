@@ -891,6 +891,10 @@ Mer information om Admin Protection finns på https://aka.ms/apdevguide</value>
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>Kapslad virtualisering stöds inte på den här datorn.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>Det gick inte att identifiera stöd för kapslad virtualisering. Fel: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Det gick inte att skapa nätverksslutpunkten med adressen: '{}', tilldelad ny adress: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -920,11 +924,11 @@ Mer information om Admin Protection finns på https://aka.ms/apdevguide</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
   <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
-    <value>Mirrored networking is using a smaller ephemeral port range ({} ports instead of {}). This may limit the number of simultaneous connections.</value>
+    <value>Speglat nätverk använder ett mindre intervall med tillfälliga portar ({} portar i stället för {}). Detta kan begränsa antalet samtidiga anslutningar.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
-    <value>Mirrored networking could not reserve the minimum contiguous range of {} TCP and UDP ports. Check Windows port usage and exclusions.</value>
+    <value>Speglat nätverk kunde inte reservera det minsta sammanhängande intervallet med {} TCP- och UDP-portar. Kontrollera portanvändning och undantag i Windows.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
@@ -3703,7 +3707,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>Avbildningen {} hittades inte, hämtar</value>
+    <value>Det går inte att hitta bilden ''{}'' lokalt</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">
@@ -3884,7 +3888,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <comment>Usage string for volume mount specification.</comment>
   </data>
   <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
-    <value>Ogiltiga volymspecifikationer: ''{}''. {} {}</value>
+    <value>Ogiltiga volymspecifikation: ''{}''. {} {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">

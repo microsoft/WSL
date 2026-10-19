@@ -891,6 +891,10 @@ Admin Protection hakkında daha fazla bilgi için lütfen https://aka.ms/apdevgu
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>İç içe sanallaştırma bu makinede desteklenmiyor.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>İç içe sanallaştırma desteği algılanamadı, hata: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Ağ uç noktası şu adresle oluşturulamadı: '{}', atanan yeni adres: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -924,7 +928,7 @@ NAT ağ bağlantısına geri dönülüyor.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
-    <value>Mirrored networking could not reserve the minimum contiguous range of {} TCP and UDP ports. Check Windows port usage and exclusions.</value>
+    <value>Yansıtılmış ağ, {} TCP ve UDP bağlantı noktasından oluşan minimum bitişik aralığı ayıramadı. Windows bağlantı noktası kullanımını ve dışlamaları denetleyin.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
@@ -3702,7 +3706,7 @@ Windows sürümü: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>'{}' görüntüsü bulunamadı, getiriliyor</value>
+    <value>'{}' resmi yerel olarak bulunamadı</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">

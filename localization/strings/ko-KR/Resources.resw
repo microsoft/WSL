@@ -897,6 +897,10 @@ Admin Protection에 대해 자세히 알아보려면 https://aka.ms/apdevguide�
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>이 컴퓨터에서는 중첩 가상화가 지원되지 않습니다.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>중첩된 가상화 지원을 검색하지 못했습니다. 오류: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>주소가 '{}'인 네트워크 엔드포인트를 만들지 못했습니다. 할당된 새 주소: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -926,7 +930,7 @@ NAT 네트워킹으로 대체합니다.</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
   <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
-    <value>Mirrored networking is using a smaller ephemeral port range ({} ports instead of {}). This may limit the number of simultaneous connections.</value>
+    <value>미러링 네트워킹에서 더 작은 동적 포트 범위({}개 포트 대신 {}개 포트)를 사용하고 있습니다. 이로 인해 동시 연결 수가 제한될 수 있습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
@@ -3708,7 +3712,7 @@ Windows 버전: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>이미지 '{}'을(를) 찾을 수 없습니다. 끌어오는 중</value>
+    <value>로컬에서 '{}' 이미지를 찾을 수 없음</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">
