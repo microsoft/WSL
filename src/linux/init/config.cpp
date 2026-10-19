@@ -569,10 +569,7 @@ Return Value:
 
     wsl::linux::WslDistributionConfig Config{CONFIG_FILE};
 
-    if (getenv(LX_WSL2_SYSTEM_DISTRO_SHARE_ENV) != nullptr)
-    {
-        Config.GuiAppsEnabled = true;
-    }
+    Config.GuiAppsEnabled = getenv(LX_WSL2_SYSTEM_DISTRO_SHARE_ENV) != nullptr;
 
     //
     // Initialize the static entries.
