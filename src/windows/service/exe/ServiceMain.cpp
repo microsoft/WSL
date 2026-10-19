@@ -20,6 +20,7 @@ Abstract:
 #include "LxssUserSessionFactory.h"
 #include "WSLCSessionManagerFactory.h"
 #include "UsbManager.h"
+#include "UsbUxdRegistry.h"
 #include <ctime>
 
 using namespace wsl::windows::common::registry;
@@ -203,7 +204,10 @@ try
 
     try
     {
-        g_usbManager = std::make_shared<wsl::windows::common::usb::Manager>();
+        if (wsl::windows::common::usb::UxdRegistry::IsSupported())
+        {
+            g_usbManager = std::make_shared<wsl::windows::common::usb::Manager>();
+        }
     }
     CATCH_LOG()
 

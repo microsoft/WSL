@@ -50,9 +50,11 @@ public:
     bool MappingReferenced(const UxdReservationIdentity& Value) const;
     void RemoveMapping(const UxdReservationIdentity& Value);
     void Flush() const;
+    static bool IsSupported();
 
 private:
     std::wstring GetReservationRegistryPath(const UxdReservationIdentity& Value) const;
+    static HRESULT QuerySupport() noexcept;
 };
 
 } // namespace wsl::windows::common::usb

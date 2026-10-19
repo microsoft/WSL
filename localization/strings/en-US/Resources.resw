@@ -1248,6 +1248,9 @@ See recovery instructions on: https://aka.ms/wsldiskmountrecovery</value>
   <data name="MessageUsbNotFound" xml:space="preserve">
     <value>No physical USB device was found at this port. Refresh the list and try again.</value>
   </data>
+  <data name="MessageUsbWindowsUpdateRequired" xml:space="preserve">
+    <value>USB device redirect is not supported on this version of Windows. Please update Windows and try again.</value>
+  </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Something went wrong. Try again later.</value>
   </data>

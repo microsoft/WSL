@@ -21,6 +21,7 @@ Abstract:
 #include "WslInstall.h"
 #include "WslCoreInstance.h"
 #include "UsbManager.h"
+#include "UsbUxdRegistry.h"
 #include "resource.h"
 #include <winrt\Windows.ApplicationModel.Background.h>
 #include <nlohmann\json.hpp>
@@ -2582,6 +2583,10 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid)
 
 HRESULT LxssUserSessionImpl::EnumerateUsbDevices(_Out_ ULONG* DeviceCount, _Out_ WSL_USB_DEVICE** Devices)
 {
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+        wsl::shared::Localization::MessageUsbWindowsUpdateRequired(),
+        !wsl::windows::common::usb::UxdRegistry::IsSupported());
     std::lock_guard lock(m_instanceLock);
     THROW_HR_IF(CO_E_SERVER_STOPPING, m_disableNewInstanceCreation);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_READY), !m_usbManager);
@@ -2610,10 +2615,14 @@ HRESULT LxssUserSessionImpl::EnumerateUsbDevices(_Out_ ULONG* DeviceCount, _Out_
 
 HRESULT LxssUserSessionImpl::AttachUsbDevice(_In_ LPCWSTR Port)
 {
-    const auto port = wsl::windows::common::usb::ParsePortSelector(Port);
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+        wsl::shared::Localization::MessageUsbWindowsUpdateRequired(),
+        !wsl::windows::common::usb::UxdRegistry::IsSupported());
     std::lock_guard lock(m_instanceLock);
     THROW_HR_IF(CO_E_SERVER_STOPPING, m_disableNewInstanceCreation);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_READY), !m_usbManager);
+    const auto port = wsl::windows::common::usb::ParsePortSelector(Port);
     _CreateVm();
 
     auto reservation = m_usbManager->Reserve(&m_userSid.Sid, port, [session = weak_from_this()](const GUID& reservationId) {
@@ -2652,10 +2661,14 @@ HRESULT LxssUserSessionImpl::AttachUsbDevice(_In_ LPCWSTR Port)
 
 HRESULT LxssUserSessionImpl::DetachUsbDevice(_In_ LPCWSTR Port)
 {
-    const auto port = wsl::windows::common::usb::ParsePortSelector(Port);
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+        wsl::shared::Localization::MessageUsbWindowsUpdateRequired(),
+        !wsl::windows::common::usb::UxdRegistry::IsSupported());
     std::lock_guard lock(m_instanceLock);
     THROW_HR_IF(CO_E_SERVER_STOPPING, m_disableNewInstanceCreation);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_READY), !m_usbManager);
+    const auto port = wsl::windows::common::usb::ParsePortSelector(Port);
     const auto attachment = std::ranges::find_if(m_usbAttachments, [&](const auto& entry) {
         return entry.second.Reservation.Port.Hub == port.Hub && entry.second.Reservation.Port.Port == port.Port;
     });
