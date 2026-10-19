@@ -590,6 +590,7 @@ bool PluginManager::IsInWslcNotification() noexcept
 
 void PluginManager::OnWslcSessionCreated(const WSLCSessionInformation* Session)
 {
+    ThrowIfFatalPluginError();
     WslcPluginNotificationContext context;
 
     for (const auto& e : m_plugins)
@@ -632,6 +633,7 @@ void PluginManager::OnWslcSessionStopping(const WSLCSessionInformation* Session)
 HRESULT PluginManager::OnWslcContainerStarted(const WSLCSessionInformation* Session, LPCSTR InspectJson) const
 try
 {
+    ThrowIfFatalPluginError();
     WslcPluginNotificationContext context;
 
     for (const auto& e : m_plugins)
