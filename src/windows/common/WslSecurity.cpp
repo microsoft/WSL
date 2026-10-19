@@ -58,7 +58,7 @@ void wsl::windows::common::security::ApplyProcessMitigationPolicies()
 
     // Note: Enabling PROCESS_MITIGATION_REDIRECTION_TRUST_POLICY::EnforceRedirectionTrust can break MSIX based distributions
     // and should not be enabled.
-    // See: https://github.com/microsoft/WSL/issues/41737
+    // See: https://github.com/microsoft/WSL/issues/41737 .
 }
 
 SECURITY_DESCRIPTOR wsl::windows::common::security::CreateSecurityDescriptor(_In_ PSID userSid)
