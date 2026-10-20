@@ -23,6 +23,7 @@ Abstract:
 #pragma warning(pop)
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <format>
 #include <fstream>
 #include <set>
@@ -120,6 +121,23 @@ namespace {
         if (end <= begin)
         {
             return std::nullopt;
+        }
+
+        if (end < authorityEnd)
+        {
+            if (url[end] != ':')
+            {
+                return std::nullopt;
+            }
+
+            uint16_t port{};
+            const auto portBegin = url.data() + end + 1;
+            const auto portEnd = url.data() + authorityEnd;
+            const auto result = std::from_chars(portBegin, portEnd, port);
+            if (result.ec != std::errc{} || result.ptr != portEnd || port == 0)
+            {
+                return std::nullopt;
+            }
         }
 
         return std::make_pair(begin, end - begin);

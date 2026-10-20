@@ -3492,8 +3492,8 @@ class WSLCTests
 
             HRESULT OnCrashDump(LPCWSTR DumpPath, LPCSTR ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp) override
             {
-                m_promise.set_value(Invocation{
-                    DumpPath ? std::wstring{DumpPath} : std::wstring{}, ProcessName ? std::string{ProcessName} : std::string{}, Pid, Signal, Timestamp});
+                m_promise.set_value(
+                    Invocation{DumpPath ? std::wstring{DumpPath} : std::wstring{}, ProcessName ? std::string{ProcessName} : std::string{}, Pid, Signal, Timestamp});
 
                 // Block until the test has finished probing, so anything the test verifies is observed mid-callback.
                 m_release.wait();
@@ -10426,10 +10426,11 @@ class WSLCTests
 
             wil::com_ptr<IWSLCContainer> container;
             VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateContainer(&options, nullptr, &container));
-            ValidateCOMErrorMessage(std::format(
-                L"Unknown endpoint setting '{}' for network '{}'.",
-                std::wstring(unknownKey.begin(), unknownKey.end()),
-                std::wstring(networkName.begin(), networkName.end())));
+            ValidateCOMErrorMessage(
+                std::format(
+                    L"Unknown endpoint setting '{}' for network '{}'.",
+                    std::wstring(unknownKey.begin(), unknownKey.end()),
+                    std::wstring(networkName.begin(), networkName.end())));
         }
 
         // Primary endpoint settings (IPAddress + Aliases + LinkLocalIPs + DriverOpts) round-trip via inspect at create time.
@@ -10511,8 +10512,10 @@ class WSLCTests
 
                 auto retVal = launcher.LaunchNoThrow(*m_defaultSession);
                 VERIFY_ARE_EQUAL(E_INVALIDARG, retVal.first);
-                ValidateCOMErrorMessage(std::format(
-                    L"Endpoint settings are not supported for network mode '{}'.", std::wstring(networkMode.begin(), networkMode.end())));
+                ValidateCOMErrorMessage(
+                    std::format(
+                        L"Endpoint settings are not supported for network mode '{}'.",
+                        std::wstring(networkMode.begin(), networkMode.end())));
             };
 
             expectEndpointSettingsError("alias-ctr-ip-host", "host");
@@ -12469,15 +12472,18 @@ class WSLCTests
             std::string readStdout;
             std::string readStderr;
 
-            io.AddHandle(std::make_unique<DockerIORelayHandle>(
-                std::move(readPipe), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+            io.AddHandle(
+                std::make_unique<DockerIORelayHandle>(
+                    std::move(readPipe), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
             io.AddHandle(std::make_unique<WriteHandle>(std::move(writePipe), Input));
 
-            io.AddHandle(std::make_unique<ReadHandle>(
-                std::move(stdoutRead), [&](const auto& buffer) { readStdout.append(buffer.data(), buffer.size()); }));
+            io.AddHandle(std::make_unique<ReadHandle>(std::move(stdoutRead), [&](const auto& buffer) {
+                readStdout.append(buffer.data(), buffer.size());
+            }));
 
-            io.AddHandle(std::make_unique<ReadHandle>(
-                std::move(stderrRead), [&](const auto& buffer) { readStderr.append(buffer.data(), buffer.size()); }));
+            io.AddHandle(std::make_unique<ReadHandle>(std::move(stderrRead), [&](const auto& buffer) {
+                readStderr.append(buffer.data(), buffer.size());
+            }));
 
             io.Run({});
 
@@ -12556,8 +12562,9 @@ class WSLCTests
                 std::string output;
                 MultiHandleWait io;
 
-                io.AddHandle(std::make_unique<DockerIORelayHandle>(
-                    std::move(inputRead), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+                io.AddHandle(
+                    std::make_unique<DockerIORelayHandle>(
+                        std::move(inputRead), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
 
                 io.AddHandle(std::make_unique<ReadHandle>(std::move(stdoutRead), [&](const auto& buffer) {
                     output.append(buffer.data(), buffer.size());
@@ -12597,8 +12604,9 @@ class WSLCTests
 
         // Collect the relayed output.
         std::string output;
-        io.AddHandle(std::make_unique<ReadHandle>(
-            std::move(dstRead), [&](const gsl::span<char>& buffer) { output.append(buffer.data(), buffer.size()); }));
+        io.AddHandle(std::make_unique<ReadHandle>(std::move(dstRead), [&](const gsl::span<char>& buffer) {
+            output.append(buffer.data(), buffer.size());
+        }));
 
         io.Run({});
 
@@ -15187,12 +15195,30 @@ class WSLCTests
         : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWarningCallback, IFastRundown>
     {
     public:
+        explicit CapturingWarningCallback(bool listSessionsOnWarning = false) : m_listSessionsOnWarning(listSessionsOnWarning)
+        {
+        }
+
         HRESULT OnWarning(LPCWSTR Message) override
+        try
         {
             std::lock_guard lock(m_lock);
             m_warnings.emplace_back(Message);
+            if (m_listSessionsOnWarning)
+            {
+                m_listSessions = std::async(std::launch::async, []() {
+                    return wil::ResultFromException([]() {
+                        const auto coInitialize = wil::CoInitializeEx();
+                        const auto manager = OpenSessionManager();
+                        wil::unique_cotaskmem_array_ptr<WSLCSessionListEntry> sessions;
+                        THROW_IF_FAILED(manager->ListSessions(&sessions, sessions.size_address<ULONG>()));
+                    });
+                });
+                m_listSessionsCompletedWithinCallback = m_listSessions.wait_for(5s) == std::future_status::ready;
+            }
             return S_OK;
         }
+        CATCH_RETURN();
 
         std::vector<std::wstring> GetWarnings()
         {
@@ -15200,9 +15226,21 @@ class WSLCTests
             return m_warnings;
         }
 
+        bool ListSessionsCompletedWithinCallback()
+        {
+            FAIL_FAST_IF_MSG(
+                m_listSessions.wait_for(60s) != std::future_status::ready,
+                "Reentrant ListSessions did not finish after session creation");
+            VERIFY_SUCCEEDED(m_listSessions.get());
+            return m_listSessionsCompletedWithinCallback;
+        }
+
     private:
         std::mutex m_lock;
         std::vector<std::wstring> m_warnings;
+        bool m_listSessionsOnWarning = false;
+        bool m_listSessionsCompletedWithinCallback = false;
+        std::future<HRESULT> m_listSessions;
     };
 
     WSLC_TEST_METHOD(WarningCallbackHttpsLoopbackProxy)
@@ -15215,7 +15253,7 @@ class WSLCTests
             settings.HttpProxy = httpProxy;
             settings.HttpsProxy = httpsProxy;
 
-            auto warningCallback = Microsoft::WRL::Make<CapturingWarningCallback>();
+            auto warningCallback = Microsoft::WRL::Make<CapturingWarningCallback>(expectWarning);
             auto sessionManager = OpenSessionManager();
             wil::com_ptr<IWSLCSession> session;
             VERIFY_SUCCEEDED(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, warningCallback.Get(), &session));
@@ -15226,6 +15264,7 @@ class WSLCTests
             if (expectWarning)
             {
                 VERIFY_IS_TRUE(std::ranges::find(warnings, expectedWarning) != warnings.end());
+                VERIFY_IS_TRUE(warningCallback->ListSessionsCompletedWithinCallback());
             }
             else
             {

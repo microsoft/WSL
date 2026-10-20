@@ -652,15 +652,45 @@ class WSLCCLISettingsUnitTests
     TEST_METHOD(Validation_Proxy_InvalidValues_UseDefaultAndWarn)
     {
         for (const auto* value :
-             {"proxy.example.com:3128", "ftp://proxy.example.com", "http://", "http://user@:3128", "'http://proxy example.com'"})
+             {"proxy.example.com:3128",
+              "ftp://proxy.example.com",
+              "http://",
+              "http://user@:3128",
+              "http://proxy example.com",
+              "http://proxy.example.com:not-a-port",
+              "http://proxy.example.com:65536",
+              "http://proxy.example.com:0",
+              "http://proxy.example.com:",
+              "http://proxy.example.com:-1",
+              "http://proxy.example.com:3128:80",
+              "http://[::1]garbage",
+              "http://[::1]:invalid",
+              "https://[::1]:65536"})
         {
             auto dir = UniqueTempDir();
-            WriteFile(dir / L"settings.yaml", std::format("session:\n  proxy:\n    http: {}\n", value));
+            WriteFile(dir / L"settings.yaml", std::format("session:\n  proxy:\n    http: '{0}'\n    https: '{0}'\n", value));
 
             UserSettingsTest s{dir};
 
-            VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+            VERIFY_ARE_EQUAL(2u, s.GetWarnings().size());
             VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionProxyHttp>());
+            VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionProxyHttps>());
+        }
+    }
+
+    TEST_METHOD(Validation_Proxy_PortBoundaries)
+    {
+        for (const auto* value :
+             {"http://proxy.example.com", "http://proxy.example.com:1", "http://[::1]:65535/", "https://proxy.example.com:65535"})
+        {
+            auto dir = UniqueTempDir();
+            WriteFile(dir / L"settings.yaml", std::format("session:\n  proxy:\n    http: {0}\n    https: {0}\n", value));
+
+            UserSettingsTest s{dir};
+
+            VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+            VERIFY_ARE_EQUAL(std::string(value), s.Get<Setting::SessionProxyHttp>());
+            VERIFY_ARE_EQUAL(std::string(value), s.Get<Setting::SessionProxyHttps>());
         }
     }
 
