@@ -134,6 +134,11 @@ void GnsPortTracker::Run()
                             allocationRequest.Family,
                             allocationRequest.Port,
                             allocationRequest.Protocol);
+
+                        if (bindCall.DualStackRequest.has_value())
+                        {
+                            TrackDualStackPort(bindCall.DualStackRequest.value());
+                        }
                     }
                 }
                 else
@@ -148,13 +153,20 @@ void GnsPortTracker::Run()
                 {
                     try
                     {
-                        auto allocation = ResolvePortZeroBind(std::move(bindCall.PortZeroBind.value()));
+                        const auto& lookup = bindCall.PortZeroBind.value();
+                        auto allocation = ResolvePortZeroBind(lookup);
                         if (allocation.has_value())
                         {
                             const auto portResult = HandleRequest(allocation.value());
                             if (portResult == 0)
                             {
+                                auto dualStackAllocation = GetDualStackAllocation(allocation.value(), lookup.DuplicatedSocketFd.get());
                                 TrackPort(std::move(allocation.value()));
+
+                                if (dualStackAllocation.has_value())
+                                {
+                                    TrackDualStackPort(dualStackAllocation.value());
+                                }
                             }
                             else
                             {
@@ -214,6 +226,23 @@ GnsPortTracker::ActivePorts GnsPortTracker::ListBoundPorts()
 
             ports.FullAllocations.emplace(
                 ntohs(payload->id.idiag_sport), static_cast<int>(payload->idiag_family), static_cast<int>(message.sdiag_protocol), address);
+
+            if (!IsMirroredMode() && payload->idiag_family == AF_INET6 && IN6_IS_ADDR_UNSPECIFIED(&address))
+            {
+                try
+                {
+                    const auto ipv6Only = e.Attributes<uint8_t>(INET_DIAG_SKV6ONLY);
+                    if (ipv6Only.size() == 1 && *ipv6Only.front() == 0)
+                    {
+                        in6_addr ipv4Address = {};
+                        ports.FullAllocations.emplace(ntohs(payload->id.idiag_sport), AF_INET, static_cast<int>(message.sdiag_protocol), ipv4Address);
+                    }
+                }
+                catch (const NetlinkParseException& exception)
+                {
+                    GNS_LOG_ERROR("Failed to read bound socket IPv6-only attribute: {}", exception.what());
+                }
+            }
         }
     };
 
@@ -437,6 +466,16 @@ GnsPortTracker::BindCall GnsPortTracker::GetCallInfo(uint64_t CallId, pid_t Pid,
         // doesn't match the underlying socket family or a bad fd. If that's the case,
         // then GetSocketProtocol() will throw
         const int protocol = GetSocketProtocol(Pid, Socket);
+        PortAllocation allocation(port, address.sa_family, protocol, storedAddress);
+
+        std::optional<PortAllocation> dualStackAllocation;
+        if (IsDualStackCandidate(allocation))
+        {
+            if (const auto dupFd = DuplicateSocketFd(Pid, Socket))
+            {
+                dualStackAllocation = GetDualStackAllocation(allocation, dupFd.get());
+            }
+        }
 
         // As GetSocketProtocol interacts with /proc/<pid>, to avoid TOCTOU races we need to
         // verify that call is still valid (call id is the same thing as cookie)
@@ -445,7 +484,7 @@ GnsPortTracker::BindCall GnsPortTracker::GetCallInfo(uint64_t CallId, pid_t Pid,
             throw RuntimeErrorWithSourceLocation(std::format("Invalid call id {}", CallId));
         }
 
-        return {PortAllocation(port, address.sa_family, protocol, storedAddress), {}, CallId};
+        return {std::move(allocation), {}, CallId, std::move(dualStackAllocation)};
     };
 
     // listen() can trigger an implicit autobind (assigning an ephemeral port) on a socket that
@@ -503,7 +542,9 @@ GnsPortTracker::BindCall GnsPortTracker::GetCallInfo(uint64_t CallId, pid_t Pid,
 
                 if (port != 0)
                 {
-                    return {PortAllocation(port, static_cast<int>(storage.ss_family), protocol, address), {}, CallId};
+                    PortAllocation allocation(port, static_cast<int>(storage.ss_family), protocol, address);
+                    auto dualStackAllocation = GetDualStackAllocation(allocation, dupFd.get());
+                    return {std::move(allocation), {}, CallId, std::move(dualStackAllocation)};
                 }
             }
 
@@ -651,7 +692,53 @@ catch (const std::exception& e)
     GNS_LOG_ERROR("Failed to track port allocation, {}", e.what());
 }
 
-std::optional<GnsPortTracker::PortAllocation> GnsPortTracker::ResolvePortZeroBind(DeferredPortLookup lookup)
+bool GnsPortTracker::IsDualStackCandidate(const PortAllocation& Allocation) const
+{
+    // Mirrored mode reserves ports regardless of address family.
+    return !IsMirroredMode() && Allocation.Family == AF_INET6 && IN6_IS_ADDR_UNSPECIFIED(&Allocation.Address);
+}
+
+std::optional<GnsPortTracker::PortAllocation> GnsPortTracker::GetDualStackAllocation(const PortAllocation& Allocation, int SocketFd) const
+{
+    // A socket bound to [::] without IPV6_V6ONLY also accepts IPv4, which the host relays separately.
+    if (!IsDualStackCandidate(Allocation))
+    {
+        return {};
+    }
+
+    int ipv6Only = 1;
+    socklen_t length = sizeof(ipv6Only);
+    if (getsockopt(SocketFd, IPPROTO_IPV6, IPV6_V6ONLY, &ipv6Only, &length) != 0)
+    {
+        GNS_LOG_ERROR("Failed to read IPV6_V6ONLY for port ({}) (errno {})", Allocation.Port, errno);
+        return {};
+    }
+
+    if (ipv6Only != 0)
+    {
+        return {};
+    }
+
+    in6_addr ipv4Address = {};
+    return PortAllocation(Allocation.Port, AF_INET, Allocation.Protocol, ipv4Address);
+}
+
+void GnsPortTracker::TrackDualStackPort(const PortAllocation& allocation)
+{
+    // Best effort, the IPv6 side is already allocated so don't fail the bind().
+    const auto result = HandleRequest(allocation);
+    if (result != 0)
+    {
+        GNS_LOG_ERROR(
+            "Failed to allocate IPv4 side of dual-stack bind: port ({}) protocol ({}), error {}", allocation.Port, allocation.Protocol, result);
+        return;
+    }
+
+    TrackPort(allocation);
+    GNS_LOG_INFO("Tracking IPv4 side of dual-stack bind: port ({}) protocol ({})", allocation.Port, allocation.Protocol);
+}
+
+std::optional<GnsPortTracker::PortAllocation> GnsPortTracker::ResolvePortZeroBind(const DeferredPortLookup& lookup)
 {
     // This resolves the port for both an explicit bind(port=0) and an implicit
     // autobind triggered by listen(), since neither can be known until after the
