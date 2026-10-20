@@ -657,27 +657,63 @@ wil::unique_fd GnsPortTracker::DuplicateSocketFd(pid_t Pid, int SocketFd)
     // Duplicate the socket fd from the target process into our address space.
     // We cannot use open("/proc/pid/fd/N") for sockets because the symlink target
     // (socket:[inode]) is not a valid filesystem path. Use pidfd_getfd() instead.
-    // PIDFD_THREAD requires kernel >= 6.9. Fallback to process only if not supported.
+    // PIDFD_THREAD requires kernel >= 6.9. Without it, only a thread group leader can be opened,
+    // so open the leader of the calling thread instead.
+    pid_t target = Pid;
     int pidFdResult = static_cast<int>(syscall(SYS_pidfd_open, Pid, PIDFD_THREAD));
     if (pidFdResult < 0 && errno == EINVAL)
     {
-        pidFdResult = static_cast<int>(syscall(SYS_pidfd_open, Pid, 0u));
+        target = GetThreadGroupId(Pid);
+        pidFdResult = static_cast<int>(syscall(SYS_pidfd_open, target, 0u));
     }
 
     wil::unique_fd pidFd(pidFdResult);
     if (!pidFd)
     {
-        GNS_LOG_INFO("Port-0 bind: pidfd_open failed for pid {} (errno {})", Pid, errno);
+        GNS_LOG_INFO("Port-0 bind: pidfd_open failed for pid {} (errno {})", target, errno);
         return {};
     }
 
     wil::unique_fd dupFd(static_cast<int>(syscall(SYS_pidfd_getfd, pidFd.get(), SocketFd, 0u)));
     if (!dupFd)
     {
-        GNS_LOG_INFO("Port-0 bind: pidfd_getfd failed for pid {} fd {} (errno {})", Pid, SocketFd, errno);
+        GNS_LOG_INFO("Port-0 bind: pidfd_getfd failed for pid {} fd {} (errno {})", target, SocketFd, errno);
+        return {};
+    }
+
+    // A thread can have its own fd table, so check that the leader's fd is the caller's socket.
+    if (target != Pid)
+    {
+        struct stat expected{};
+        struct stat actual{};
+        if (stat(std::format("/proc/{}/fd/{}", Pid, SocketFd).c_str(), &expected) != 0 || fstat(dupFd.get(), &actual) != 0 ||
+            expected.st_dev != actual.st_dev || expected.st_ino != actual.st_ino)
+        {
+            GNS_LOG_INFO("Port-0 bind: thread {} doesn't share fd {} with pid {}", Pid, SocketFd, target);
+            return {};
+        }
     }
 
     return dupFd;
+}
+
+pid_t GnsPortTracker::GetThreadGroupId(pid_t Tid)
+try
+{
+    constexpr std::string_view prefix = "\nTgid:";
+    const auto status = UtilReadFileContent(std::format("/proc/{}/status", Tid));
+    const auto position = status.find(prefix);
+    if (position == std::string::npos)
+    {
+        throw RuntimeErrorWithSourceLocation("Tgid not found");
+    }
+
+    return std::stoi(status.substr(position + prefix.size()));
+}
+catch (const std::exception& e)
+{
+    GNS_LOG_INFO("Failed to read the thread group of thread {}, {}", Tid, e.what());
+    return Tid;
 }
 
 void GnsPortTracker::TrackPort(PortAllocation allocation)

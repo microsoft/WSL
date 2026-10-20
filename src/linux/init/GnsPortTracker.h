@@ -164,6 +164,8 @@ private:
 
     static wil::unique_fd DuplicateSocketFd(pid_t Pid, int SocketFd);
 
+    static pid_t GetThreadGroupId(pid_t Tid);
+
     std::optional<PortAllocation> ResolvePortZeroBind(const DeferredPortLookup& lookup);
 
     bool IsDualStackCandidate(const PortAllocation& Allocation) const;

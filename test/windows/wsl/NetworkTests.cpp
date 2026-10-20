@@ -6197,6 +6197,36 @@ class ConsommeTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"socat -u OPEN:/dev/null TCP4:127.0.0.1:{}", assignedPort)), 0L);
     }
 
+    WSL2_TEST_METHOD(DualStackBindFromThreadIsReachableOverIpv4)
+    {
+        CONSOMME_TEST_ONLY();
+        WINDOWS_11_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+
+        // Make sure the VM doesn't time out
+        WslKeepAlive keepAlive;
+
+        {
+            // A worker thread binds [::]:1234 and listens, so the port tracker sees a thread id instead of a process id.
+            // LXT uses one bit per variation; the threaded dual-stack server is the seventh server variation.
+            constexpr unsigned long long c_dualStackThreadVariationMask = 1ull << 6;
+            const auto commandLine = std::format(L"/data/test/wsl_unit_tests socket -s -v {}", c_dualStackThreadVariationMask);
+            auto cmd = LxssGenerateWslCommandLine(commandLine.data());
+            auto [readPipe, writePipe] = CreateSubprocessPipe(false, true);
+            NetworkTests::unique_kill_process serverProcess(LxsstuStartProcess(cmd.data(), nullptr, writePipe.get()));
+            writePipe.reset();
+
+            std::string output;
+            VERIFY_IS_TRUE(NetworkTests::FindSubstring(readPipe, "DUAL_STACK_THREAD_LISTENER_READY", output));
+
+            NetworkTests::BindHostPort(1234, SOCK_STREAM, IPPROTO_TCP, false);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"socat -u OPEN:/dev/null TCP4:127.0.0.1:1234"), 0L);
+        }
+
+        NetworkTests::BindHostPort(1234, SOCK_STREAM, IPPROTO_TCP, true, false, false, std::chrono::minutes(2));
+    }
+
     WSL2_TEST_METHOD(ConfigurationV6DnsServers)
     {
         CONSOMME_TEST_ONLY();
