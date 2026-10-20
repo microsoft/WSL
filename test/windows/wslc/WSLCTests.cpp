@@ -7631,6 +7631,9 @@ class WSLCTests
             VERIFY_ARE_EQUAL(E_INVALIDARG, container.Get().Restart(static_cast<WSLCSignal>(signal), 0, nullptr));
         }
 
+        VERIFY_ARE_EQUAL(E_INVALIDARG, container.Get().Stop(WSLCSignalSIGTERM, -2));
+        ValidateCOMErrorMessage(wsl::shared::Localization::MessageWslcInvalidStopTimeout(-2));
+
         WaitForContainerRuns(container, runs + 1);
         VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
     }
@@ -7763,6 +7766,27 @@ class WSLCTests
         VERIFY_ARE_EQUAL(WslcContainerStateExited, running.State());
         VERIFY_ARE_EQUAL(WslcContainerStateExited, stopped.State());
         VERIFY_ARE_EQUAL(WslcContainerStateExited, loop.State());
+    }
+
+    WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysFailedStartAllowsIdleTermination)
+    {
+        auto restore = ResetTestSession();
+        constexpr auto c_sessionName = L"restart-policy-failed-start";
+        auto session = CreateSession(GetDefaultSessionSettings(c_sessionName, true));
+        WSLCContainerLauncher launcher("debian:latest", "test-restart-failed-start", {"sh", "-c", "rm /bin/sh; echo run; exit 1"});
+        launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+        auto container = launcher.Launch(*session, WSLCContainerStartFlagsNone);
+        WaitForContainerRuns(container, 1);
+        WaitForContainerState(container, WslcContainerStateExited);
+        VerifyContainerStaysDown(container);
+
+        VERIFY_FAILED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+        VERIFY_ARE_EQUAL(WslcContainerStateExited, container.State());
+
+        BOOL wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
     }
 
     WSLC_TEST_METHOD(EventStream)

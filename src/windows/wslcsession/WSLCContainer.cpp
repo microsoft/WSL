@@ -1257,6 +1257,7 @@ wil::com_ptr<IWSLCProcess> WSLCContainerImpl::StartPhase(
 
     // Staging a replacement run invalidates responses to requests against its predecessor.
     m_exitRequests.BeginRun();
+    UpdateActivityHoldLockHeld();
 
     try
     {
@@ -1549,6 +1550,7 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
 void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill, bool RestartPhase)
 {
     ValidateSignal(Signal);
+    ValidateStopTimeout(TimeoutSeconds, true);
 
     std::shared_ptr<StateTransition> transition;
 
@@ -1606,8 +1608,6 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
             {
                 SignalArg = Signal;
             }
-
-            ValidateStopTimeout(TimeoutSeconds, true);
 
             // Don't wait for the container to stop if we're not sending SIGKILL, since it may not stop the container.
             // N.B. If the signal was SIGTERM for instance, we'll receive the exit notification via OnEvent().
