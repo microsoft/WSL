@@ -884,6 +884,14 @@ void WSLCContainerImpl::Rundown() noexcept
     std::call_once(m_rundown, [this]() {
         WSL_LOG("ContainerRundown", TraceLoggingValue(m_name.c_str(), "Name"), TraceLoggingValue(m_id.c_str(), "Id"));
 
+        {
+            auto lock = m_lock.lock_exclusive();
+            m_comWrapperDisconnected = true;
+        }
+
+        // Wait for COM calls to complete before releasing resources.
+        // N.B. Events must be active until disconnected, since a potential state transition could be waiting for one.
+        m_comWrapper->Disconnect();
         m_containerEvents.Reset();
 
         // Snapshot and clear process references under the lock.
@@ -911,14 +919,8 @@ void WSLCContainerImpl::Rundown() noexcept
             }
         }
 
-        // Release resources under m_lock, but extract the COM wrapper so Disconnect()
-        // can be called without holding m_lock. Calling Disconnect() under m_lock can
-        // deadlock if an in-flight COM caller is waiting for m_lock.
-        unique_com_disconnect wrapper;
         {
             auto lock = m_lock.lock_exclusive();
-            wrapper = PrepareDisconnectComWrapper();
-
             try
             {
                 ReleaseRuntimeResources();
@@ -1001,7 +1003,7 @@ void WSLCContainerImpl::CopyTo(IWSLCContainer** Container) const
 {
     auto lock = m_lock.lock_shared();
 
-    THROW_HR_IF_MSG(RPC_E_DISCONNECTED, m_comWrapper == nullptr, "Container '%hs' is being released", m_id.c_str());
+    THROW_HR_IF_MSG(RPC_E_DISCONNECTED, m_comWrapperDisconnected, "Container '%hs' is being released", m_id.c_str());
 
     THROW_IF_FAILED(m_comWrapper.CopyTo(Container));
 }
@@ -1129,6 +1131,9 @@ void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProc
 
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() mutable {
         std::lock_guard processesLock{m_processesLock};
+
+        // Disconnect the init process from the container on failure since a caller could acquire a reference to it while Start() is running.
+        m_initProcessControl->OnContainerReleased();
         m_initProcess.Reset();
         m_initProcessControl = nullptr;
         m_comWrapper->CacheState(m_state, m_initProcess);
@@ -3253,7 +3258,12 @@ __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::
 
 __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::PrepareDisconnectComWrapper()
 {
-    return unique_com_disconnect{std::exchange(m_comWrapper, nullptr)};
+    if (std::exchange(m_comWrapperDisconnected, true))
+    {
+        return {};
+    }
+
+    return unique_com_disconnect{Microsoft::WRL::ComPtr<WSLCContainer>{m_comWrapper}};
 }
 
 __requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(
@@ -3292,11 +3302,8 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(
     // Created or Exited container does not pin the VM, since its metadata survives teardown.
     UpdateActivityHoldLockHeld();
 
-    if (m_comWrapper)
-    {
-        std::lock_guard processesLock{m_processesLock};
-        m_comWrapper->CacheState(m_state, m_initProcess);
-    }
+    std::lock_guard processesLock{m_processesLock};
+    m_comWrapper->CacheState(m_state, m_initProcess);
 }
 
 __requires_lock_held(m_lock) void WSLCContainerImpl::UpdateActivityHoldLockHeld() noexcept
@@ -3507,7 +3514,7 @@ try
     // lock exclusively and clear m_containers (destroying this container) concurrently, racing
     // the delete and inverting the container->session lock order.
     auto vmLease = m_session.Runtime().AcquireVmLease();
-    auto [lock, impl] = LockImpl();
+    auto [impl, lock] = LockImpl();
 
     impl->Delete(Flags);
     m_onDeleted(impl.get());
@@ -3590,7 +3597,7 @@ try
 
     const auto hr = wil::ResultFromException([&] {
         THROW_HR_IF(RPC_E_DISCONNECTED, !sessionLifetime);
-        auto [lock, impl] = LockImpl();
+        auto [impl, lock] = LockImpl();
         WI_VERIFY(strcpy_s(Id, std::size<char>(WSLCContainerId{}), impl->ID().c_str()) == 0);
     });
 
@@ -3612,7 +3619,7 @@ try
 
     const auto hr = wil::ResultFromException([&] {
         THROW_HR_IF(RPC_E_DISCONNECTED, !sessionLifetime);
-        auto [lock, impl] = LockImpl();
+        auto [impl, lock] = LockImpl();
         *Name = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(impl->Name().c_str()).release();
     });
 

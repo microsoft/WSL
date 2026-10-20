@@ -313,6 +313,7 @@ private:
 
     std::map<std::string, std::string> m_labels;
     Microsoft::WRL::ComPtr<WSLCContainer> m_comWrapper;
+    _Guarded_by_(m_lock) bool m_comWrapperDisconnected = false;
     DockerEventTracker::EventTrackingReference m_containerEvents;
     EventStore& m_eventStore;
     std::string m_networkMode;

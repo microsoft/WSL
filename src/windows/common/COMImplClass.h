@@ -48,7 +48,7 @@ protected:
     HRESULT CallImpl(void (TImpl::*routine)(Args... args), Args... args)
     try
     {
-        auto [lock, impl] = LockImpl();
+        auto [impl, lock] = LockImpl();
         ((*impl).*routine)(std::forward<Args>(args)...);
 
         return S_OK;
@@ -59,7 +59,7 @@ protected:
     HRESULT CallImpl(void (TImpl::*routine)(Args... args) const, Args... args)
     try
     {
-        auto [lock, impl] = LockImpl();
+        auto [impl, lock] = LockImpl();
         ((*impl).*routine)(std::forward<Args>(args)...);
 
         return S_OK;
@@ -98,10 +98,12 @@ protected:
             auto removed = m_callers.erase(std::this_thread::get_id());
             WI_ASSERT(removed == 1);
 
-            m_cv.notify_one();
+            m_cv.notify_all();
         });
 
-        return std::make_pair(std::move(release), std::move(impl));
+        // Unregister the caller before releasing the impl: its destructor may wait for a callback
+        // that is itself waiting in Disconnect().
+        return std::make_pair(std::move(impl), std::move(release));
     }
 
 private:
