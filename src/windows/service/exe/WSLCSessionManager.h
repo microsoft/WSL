@@ -61,7 +61,6 @@ public:
     explicit MarshaledSessionReference(IWSLCSessionReference* Reference);
     ~MarshaledSessionReference();
 
-
     MarshaledSessionReference(MarshaledSessionReference&& Other) noexcept;
     MarshaledSessionReference& operator=(MarshaledSessionReference&& Other) noexcept;
 
