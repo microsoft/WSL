@@ -2291,21 +2291,16 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
 
     sharePath = wsl::windows::common::filesystem::GetCanonicalPath(sharePath).wstring();
 
-    std::wstring effectiveOptions;
-    for (const auto& option : wsl::shared::string::Split(std::wstring{Options}, L';'))
+    auto options = wsl::shared::string::Split(std::wstring{Options}, L';');
+    for (auto& option : options)
     {
-        if (!effectiveOptions.empty())
-        {
-            effectiveOptions += L';';
-        }
-
         if (option.starts_with(L"uid=") || option.starts_with(L"gid="))
         {
-            effectiveOptions += L"default_";
+            option.insert(0, L"default_");
         }
-
-        effectiveOptions += option;
     }
+
+    const auto effectiveOptions = wsl::shared::string::Join(options, L';');
 
     // Check if a matching share already exists.
     bool created = false;
