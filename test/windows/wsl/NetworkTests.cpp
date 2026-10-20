@@ -2339,9 +2339,13 @@ class NetworkTests
         auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(command.c_str(), 0);
         VERIFY_IS_TRUE(warnings.empty());
 
-        const auto assignedPort = static_cast<uint16_t>(std::stoul(output));
-        VERIFY_IS_TRUE(assignedPort > 0);
-        return assignedPort;
+        // Parse into a wider type and validate before narrowing so malformed or out-of-range output fails the test
+        // cleanly instead of throwing or truncating to a different port.
+        wchar_t* end{};
+        const auto parsedPort = std::wcstoul(output.c_str(), &end, 10);
+        VERIFY_IS_TRUE(end != output.c_str());
+        VERIFY_IS_TRUE(parsedPort > 0 && parsedPort <= USHRT_MAX);
+        return static_cast<uint16_t>(parsedPort);
     }
 
     // Create a TCP listening socket in the guest via listen() WITHOUT ever calling bind() first
