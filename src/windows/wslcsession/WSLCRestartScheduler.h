@@ -37,9 +37,8 @@ public:
     // Ignored once Stop() has been called.
     void Schedule(std::chrono::milliseconds Delay, std::function<void()>&& Callback);
 
-    // Discards pending callbacks and waits for a running callback to return. Called from a callback, it
-    // returns without waiting and the destructor joins the thread. Must not be called with a lock that a
-    // callback can acquire.
+    // Discards pending callbacks and waits for a running callback to return. Must be called outside the
+    // scheduler thread and without a lock that a callback can acquire.
     void Stop() noexcept;
 
 private:

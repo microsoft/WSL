@@ -3589,15 +3589,12 @@ try
 
     auto terminationComplete = m_terminationCompleteEvent.SetEvent_scope_exit();
 
-    // A restart callback may be waiting for the runtime lock, so the scheduler can only be joined
-    // after sessionLock (declared below, so released first) is gone.
-    auto stopRestartScheduler = wil::scope_exit([this]() { m_restartScheduler.Stop(); });
-
     wil::rwlock_release_exclusive_scope_exit sessionLock;
 
     // Because it's not possible to synchronize CancelIoEx() with ReadFile() calls, keep attempting to acquire the session lock while cancelling IO & callbacks.
     // This is required because calling CancelIoEx() between two ReadFile() calls does nothing, and therefore could still allow another thread to get stuck doing synchronous IO.
     bool retrying = false;
+    bool restartSchedulerStopped = false;
     while (!sessionLock)
     {
         // If this isn't the first iteration, sleep to prevent this loop from burning too much CPU.
@@ -3634,6 +3631,14 @@ try
         }
 
         sessionLock = m_runtime.TryLockExclusive();
+        if (sessionLock && !restartSchedulerStopped)
+        {
+            // Drain callback-owned containers before VM teardown. Callbacks need the runtime lock to observe termination.
+            sessionLock.reset();
+            m_restartScheduler.Stop();
+            restartSchedulerStopped = true;
+        }
+
         retrying = true;
     }
 

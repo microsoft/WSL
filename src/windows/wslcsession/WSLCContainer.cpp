@@ -81,6 +81,15 @@ void ValidateStopTimeout(LONG TimeoutSeconds, bool allowDefault)
         TimeoutSeconds < 0 && TimeoutSeconds != WSLC_STOP_TIMEOUT_NONE && (!allowDefault || TimeoutSeconds != WSLC_STOP_TIMEOUT_DEFAULT));
 }
 
+void ValidateSignal(WSLCSignal signal)
+{
+    // Docker accepts standard Linux signals 1 through 31 and real-time signals 34 through 64.
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG,
+        Localization::MessageWslcInvalidSignal(static_cast<int>(signal)),
+        signal != WSLCSignalNone && !(signal >= WSLCSignalSIGHUP && signal <= WSLCSignalSIGSYS) && !(signal >= 34 && signal <= 64));
+}
+
 std::vector<std::string> StringArrayToVector(const WSLCStringArray& array)
 {
     if (array.Count == 0)
@@ -1539,6 +1548,8 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
 
 void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill, bool RestartPhase)
 {
+    ValidateSignal(Signal);
+
     std::shared_ptr<StateTransition> transition;
 
     {
@@ -1708,6 +1719,7 @@ void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds)
 {
     // The stop phase is skipped when the container is not running, so it cannot be the only validation.
     ValidateStopTimeout(TimeoutSeconds, true);
+    ValidateSignal(Signal);
 
     bool wasRunning{};
     auto restart = std::make_shared<RestartTransaction>();

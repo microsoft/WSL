@@ -20,12 +20,6 @@ using wsl::windows::service::wslc::WSLCRestartScheduler;
 WSLCRestartScheduler::~WSLCRestartScheduler()
 {
     Stop();
-
-    // Only reached when the owner is destroyed by a callback on the scheduler thread itself.
-    if (m_thread.joinable())
-    {
-        m_thread.detach();
-    }
 }
 
 void WSLCRestartScheduler::Schedule(std::chrono::milliseconds Delay, std::function<void()>&& Callback)
@@ -53,15 +47,13 @@ void WSLCRestartScheduler::Stop() noexcept
 
     {
         std::lock_guard lock{m_lock};
+
+        // Callback-initiated shutdown or owner destruction cannot join this worker; continuing would permit unsafe teardown.
+        FAIL_FAST_IF(m_thread.get_id() == std::this_thread::get_id());
         m_stopped = true;
         discarded = std::exchange(m_queue, {});
 
-        // A callback can reach Stop() (e.g. a failed start that terminates the session) and cannot join its own
-        // thread. The thread stays owned here so the destructor joins it.
-        if (m_thread.get_id() != std::this_thread::get_id())
-        {
-            thread = std::move(m_thread);
-        }
+        thread = std::move(m_thread);
     }
 
     m_wake.notify_all();

@@ -7616,6 +7616,46 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysInvalidSignalPendingRestart)
+    {
+        WSLCContainerLauncher launcher("debian:latest", "test-restart-invalid-pending", {"sh", "-c", "echo run; exit 1"});
+        launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+        auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+        const auto runs = WaitForContainerRuns(container, 6);
+        WaitForContainerState(container, WslcContainerStateExited);
+
+        for (const int signal : {-1, 32, 33, 65, 999})
+        {
+            VERIFY_ARE_EQUAL(E_INVALIDARG, container.Get().Kill(static_cast<WSLCSignal>(signal)));
+            ValidateCOMErrorMessage(wsl::shared::Localization::MessageWslcInvalidSignal(signal));
+            VERIFY_ARE_EQUAL(E_INVALIDARG, container.Get().Restart(static_cast<WSLCSignal>(signal), 0, nullptr));
+        }
+
+        WaitForContainerRuns(container, runs + 1);
+        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+    }
+
+    WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysTerminateWithPorts)
+    {
+        for (int iteration = 0; iteration < 3; ++iteration)
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(L"restart-policy-terminate", false, WSLCNetworkingModeConsomme));
+            LoadTestImage(*session, "debian:latest");
+            WSLCContainerLauncher launcher(
+                "debian:latest", "test-restart-terminate-ports", {"sh", "-c", "echo run; exit 1"}, {}, "bridge");
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            launcher.AddPort(1253, 8000, AF_INET);
+            auto container = launcher.Launch(*session, WSLCContainerStartFlagsNone);
+            container.SetDeleteOnClose(false);
+            WaitForContainerRuns(container, 2);
+
+            VERIFY_SUCCEEDED(session->Terminate());
+            WSLCSessionState state{};
+            VERIFY_SUCCEEDED(session->GetState(&state));
+            VERIFY_ARE_EQUAL(WSLCSessionStateTerminated, state);
+        }
+    }
+
     // Repeated automatic restarts must not leak host port allocations.
     WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysPortsNotLeaked)
     {
