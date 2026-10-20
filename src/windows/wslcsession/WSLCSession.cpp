@@ -2935,7 +2935,7 @@ try
     auto lock = AcquireLease();
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 
-    std::lock_guard containersLock{m_containersLock};
+    std::unique_lock containersLock{m_containersLock};
 
     docker_schema::PruneContainerResult pruneResult;
 
@@ -2949,19 +2949,30 @@ try
 
     if (pruneResult.ContainersDeleted.has_value() && pruneResult.ContainersDeleted->size() > 0)
     {
-        // Remove deleted containers from m_containers.
-        size_t erased = 0;
+        std::vector<std::shared_ptr<WSLCContainerImpl>> prunedContainers;
+        prunedContainers.reserve(pruneResult.ContainersDeleted->size());
+
         for (const auto& deletedId : pruneResult.ContainersDeleted.value())
         {
-            erased += m_containers.erase(deletedId);
+            if (auto container = m_containers.extract(deletedId); !container.empty())
+            {
+                prunedContainers.push_back(std::move(container.mapped()));
+            }
+        }
+
+        // Rundown may wait for callbacks and disconnect COM callers that need m_containersLock.
+        containersLock.unlock();
+        for (const auto& container : prunedContainers)
+        {
+            container->Rundown();
         }
 
         LOG_HR_IF_MSG(
             E_UNEXPECTED,
-            erased != pruneResult.ContainersDeleted->size(),
+            prunedContainers.size() != pruneResult.ContainersDeleted->size(),
             "Expected to erase %zu containers, but erased %zu",
             pruneResult.ContainersDeleted->size(),
-            erased);
+            prunedContainers.size());
 
         auto containers = wil::make_unique_cotaskmem<WSLCContainerId[]>(pruneResult.ContainersDeleted->size());
 
