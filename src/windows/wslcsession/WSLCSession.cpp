@@ -227,6 +227,23 @@ std::string GenerateContainerName(int retry)
     return name;
 }
 
+std::vector<std::string> CreateProxyEnvironment(const WSLCSessionInitSettings& Settings)
+{
+    std::vector<std::string> environment;
+    auto addProxy = [&](LPCSTR Value, std::string_view Upper, std::string_view Lower) {
+        if (Value != nullptr)
+        {
+            environment.emplace_back(std::format("{}={}", Upper, Value));
+            environment.emplace_back(std::format("{}={}", Lower, Value));
+        }
+    };
+
+    addProxy(Settings.HttpProxy, "HTTP_PROXY", "http_proxy");
+    addProxy(Settings.HttpsProxy, "HTTPS_PROXY", "https_proxy");
+    addProxy(Settings.NoProxy, "NO_PROXY", "no_proxy");
+    return environment;
+}
+
 } // namespace
 
 namespace wsl::windows::service::wslc {
@@ -796,18 +813,7 @@ void WSLCSession::StartDockerd()
     }
 
     // Proxy values go through the environment because process arguments are logged and may contain credentials.
-    std::vector<std::string> environment;
-    auto addProxy = [&](LPCSTR Value, std::string_view Upper, std::string_view Lower) {
-        if (Value != nullptr)
-        {
-            environment.emplace_back(std::format("{}={}", Upper, Value));
-            environment.emplace_back(std::format("{}={}", Lower, Value));
-        }
-    };
-
-    addProxy(m_settings.HttpProxy, "HTTP_PROXY", "http_proxy");
-    addProxy(m_settings.HttpsProxy, "HTTPS_PROXY", "https_proxy");
-    addProxy(m_settings.NoProxy, "NO_PROXY", "no_proxy");
+    const auto environment = CreateProxyEnvironment(m_settings);
 
     m_runtime.SetDockerdProcess(StartProcess("/usr/bin/dockerd", args, "dockerd", std::bind(&WSLCSession::OnDockerdExited, this), environment));
     WSL_LOG("DockerdStarted");
@@ -1125,9 +1131,8 @@ try
     // one parent directory per file secret are mounted.
     mountedPaths.reserve(static_cast<size_t>(3) + Options->Secrets.Count);
 
-    // Environment for the docker process. Env/in-memory secrets are delivered as variables here so their
-    // values never touch disk; kept off telemetry (only buildArgs is logged).
-    std::vector<std::string> buildEnv;
+    // The buildx auth provider fetches registry tokens in the client process, separately from dockerd.
+    auto buildEnv = CreateProxyEnvironment(m_settings);
 
     if (policyState == WSLCVirtualMachine::BuildKitPolicyState::Configured)
     {
