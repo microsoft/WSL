@@ -39,7 +39,6 @@ set(SOURCES
     )
 
 set(HEADERS
-    ComposeLabels.h
     ComposeNormalizer.h
     ComposeReconciler.h
     ComposeSpec.h
@@ -48,6 +47,7 @@ set(HEADERS
     EventStore.h
     IORelay.h
     OptionParser.h
+    ResourceName.h
     ServiceProcessLauncher.h
     ServiceContainerLauncher.h
     WSLCContainer.h

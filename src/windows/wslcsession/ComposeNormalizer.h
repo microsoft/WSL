@@ -34,6 +34,7 @@ struct ComposeProjectSelection
 struct ComposeNormalizer
 {
     static ComposeSpec Normalize(const ComposeDocuments& documents, const ComposeProjectSelection& selection);
+    static std::string DefaultNetworkName(std::string_view projectName);
     static bool IsValidProjectKey(std::string_view projectKey) noexcept;
     static std::string ValidateProjectKey(std::string_view projectKey);
     static void ValidateSelection(const ComposeProjectSelection& selection);

@@ -15,6 +15,8 @@ Abstract:
 #include "precomp.h"
 #include "WSLCSession.h"
 #include "ComposeLabels.h"
+#include "ComposeNormalizer.h"
+#include "ResourceName.h"
 #include "WSLCComposeOperation.h"
 #include "WSLCExecutionContext.h"
 #include "WSLCContainer.h"
@@ -121,22 +123,6 @@ std::string IndentLines(const std::string& input, const std::string& prefix, boo
     }
 
     return result;
-}
-
-void ValidateName(LPCSTR Name, size_t maxLength)
-{
-    const auto& locale = std::locale::classic();
-    size_t i = 0;
-
-    for (; Name[i] != '\0'; i++)
-    {
-        if (!std::isalnum(Name[i], locale) && Name[i] != '_' && Name[i] != '-' && Name[i] != '.')
-        {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidName(Name));
-        }
-    }
-
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidName(Name), i == 0 || i > maxLength);
 }
 
 wslc_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage& dockerInspect)
@@ -2634,17 +2620,22 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::DiscoverCompose
 std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeContainers(
     const ComposeSpec& spec, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter)
 {
+    bool cancellationObserved = false;
     const auto checkCancelled = [&]() {
         THROW_HR_IF_NULL(E_POINTER, cancelEvent);
         const auto waitResult = WaitForSingleObject(cancelEvent, 0);
         THROW_LAST_ERROR_IF(waitResult == WAIT_FAILED);
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_CANCELLED), waitResult == WAIT_OBJECT_0);
-        THROW_HR_IF(E_UNEXPECTED, waitResult != WAIT_TIMEOUT);
+        THROW_HR_IF(E_UNEXPECTED, waitResult != WAIT_OBJECT_0 && waitResult != WAIT_TIMEOUT);
+        if (waitResult == WAIT_OBJECT_0)
+        {
+            cancellationObserved = true;
+            THROW_HR(HRESULT_FROM_WIN32(ERROR_CANCELLED));
+        }
     };
 
     checkCancelled();
     std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> containers;
-    std::string networkName = spec.ProjectName + "_default"; // TODO: Implement this properly.
+    const std::string networkName = ComposeNormalizer::DefaultNetworkName(spec.ProjectName);
 
     // Create a network for the compose session.
     // TODO: open an existing network instead of deleting.
@@ -2688,7 +2679,13 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeCo
     }
     THROW_IF_FAILED(CreateNetworkImpl(&networkOptions));
 
+    // Cancellation leaves completed resources in place; they remain discoverable through their Compose labels.
     auto cleanup = wil::scope_exit([&] {
+        if (cancellationObserved)
+        {
+            return;
+        }
+
         for (const auto& container : containers)
         {
             LOG_IF_FAILED(container->Delete(WSLCDeleteFlagsForce));

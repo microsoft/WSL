@@ -13,10 +13,12 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include "ComposeLabels.h"
 #include "ComposeProgressCallback.h"
 #include "ComposeService.h"
 #include "ConsoleService.h"
 #include <relay.hpp>
+#include <WSLCContainerEntry.h>
 #include <WSLCProcessLauncher.h>
 
 namespace wsl::windows::wslc::services {
@@ -134,47 +136,13 @@ namespace {
         WSLCComposeOperationResult value{};
     };
 
-    void ForceKillContainers(Terminal& terminal, models::Session& session, const ComposeOperationResult& result)
+    struct CompletedComposeOperation
     {
-        [[maybe_unused]] auto operation = session.BeginContainerOperation();
-        std::vector<std::pair<std::string, wil::com_ptr<IWSLCContainer>>> running;
-        for (ULONG index = 0; index < result.value.AffectedContainersCount; ++index)
-        {
-            const auto& entry = result.value.AffectedContainers[index];
-            wil::com_ptr<IWSLCContainer> container;
-            const HRESULT openResult = session.Get()->OpenContainer(entry.Id, &container);
-            if (openResult == WSLC_E_CONTAINER_NOT_FOUND)
-            {
-                continue;
-            }
-            THROW_IF_FAILED(openResult);
+        ComposeOperationResult Result;
+        bool ForceCancellationRequested{};
+    };
 
-            WSLCContainerState state{};
-            THROW_IF_FAILED(container->GetState(&state));
-            if (state == WslcContainerStateRunning)
-            {
-                running.emplace_back(entry.Name, std::move(container));
-            }
-        }
-
-        for (size_t index = 0; index < running.size(); ++index)
-        {
-            const auto& [name, container] = running[index];
-            terminal.Info(
-                L"{}\n",
-                wsl::shared::Localization::MessageWslcComposeProgress(
-                    wsl::shared::Localization::WSLCCLI_ComposeProgressKilling(),
-                    wsl::shared::Localization::MessageWslcComposeResource(
-                        wsl::shared::Localization::WSLCCLI_ComposeResourceContainer(), wsl::shared::string::MultiByteToWide(name)),
-                    index + 1,
-                    running.size()));
-
-            const HRESULT killResult = container->Kill(WSLCSignalSIGKILL);
-            THROW_IF_FAILED_EXCEPT(killResult, WSLC_E_CONTAINER_NOT_RUNNING);
-        }
-    }
-
-    ComposeOperationResult Execute(
+    CompletedComposeOperation RunOperation(
         Terminal& terminal,
         models::Session& session,
         const ComposeProjectReference& project,
@@ -257,17 +225,36 @@ namespace {
             THROW_LAST_ERROR_IF(WaitForSingleObject(completionEvent.get(), INFINITE) == WAIT_FAILED);
         }
 
-        ComposeOperationResult result;
-        THROW_IF_FAILED(operation->GetResult(&result.value));
-        if (forceCancellationRequested && result.value.Result == HRESULT_FROM_WIN32(ERROR_CANCELLED))
+        CompletedComposeOperation completed{.ForceCancellationRequested = forceCancellationRequested};
+        THROW_IF_FAILED(operation->GetResult(&completed.Result.value));
+        return completed;
+    }
+
+    ComposeOperationResult VerifyResult(CompletedComposeOperation&& completed)
+    {
+        const auto& value = completed.Result.value;
+        if (completed.ForceCancellationRequested && value.Result == HRESULT_FROM_WIN32(ERROR_CANCELLED))
         {
-            THROW_HR_IF(E_UNEXPECTED, result.value.Status != WSLCComposeOperationStatusCancelled);
-            return result;
+            THROW_HR_IF(E_UNEXPECTED, value.Status != WSLCComposeOperationStatusCancelled);
+            return std::move(completed.Result);
         }
 
-        THROW_IF_FAILED(result.value.Result);
-        THROW_HR_IF(E_UNEXPECTED, result.value.Status != WSLCComposeOperationStatusSucceeded);
-        return result;
+        THROW_IF_FAILED(value.Result);
+        THROW_HR_IF(E_UNEXPECTED, value.Status != WSLCComposeOperationStatusSucceeded);
+        return std::move(completed.Result);
+    }
+
+    ComposeOperationResult Execute(
+        Terminal& terminal,
+        models::Session& session,
+        const ComposeProjectReference& project,
+        WSLCComposeAction action,
+        HANDLE cancelEvent,
+        std::optional<ULONG> timeout = std::nullopt,
+        HANDLE forceCancelEvent = nullptr,
+        std::function<void()> forceAction = {})
+    {
+        return VerifyResult(RunOperation(terminal, session, project, action, cancelEvent, timeout, forceCancelEvent, std::move(forceAction)));
     }
 
     int AttachContainers(models::Session& session, const ComposeOperationResult& result, HANDLE cancelEvent)
@@ -335,7 +322,7 @@ void ComposeService::Create(Terminal& terminal, models::Session& session, const 
 int ComposeService::Up(Terminal& terminal, models::Session& session, const std::wstring& path, HANDLE cancelEvent, HANDLE forceCancelEvent)
 {
     const ComposeProjectReference project{std::filesystem::path{path}};
-    std::optional<ComposeOperationResult> result;
+    std::optional<std::string> projectKey;
     auto stopOnCancellation = wil::scope_exit([&]() {
         LOG_IF_FAILED(wil::ResultFromException([&]() {
             if (cancelEvent == nullptr)
@@ -350,17 +337,23 @@ int ComposeService::Up(Terminal& terminal, models::Session& session, const std::
             {
                 terminal.Info(L"\n{}\n", wsl::shared::Localization::WSLCCLI_ComposeGracefullyStopping());
                 Execute(terminal, session, project, WSLCComposeActionStop, nullptr, c_defaultStopTimeoutSeconds, forceCancelEvent, [&]() {
-                    if (result.has_value())
+                    if (projectKey.has_value())
                     {
-                        ForceKillContainers(terminal, session, *result);
+                        ForceKill(terminal, session, *projectKey);
                     }
                 });
             }
         }));
     });
 
-    result.emplace(Execute(terminal, session, project, WSLCComposeActionUp, cancelEvent));
-    return AttachContainers(session, *result, cancelEvent);
+    auto completed = RunOperation(terminal, session, project, WSLCComposeActionUp, cancelEvent);
+    if (completed.Result.value.ProjectKey[0] != '\0')
+    {
+        projectKey.emplace(completed.Result.value.ProjectKey);
+    }
+
+    const auto result = VerifyResult(std::move(completed));
+    return AttachContainers(session, result, cancelEvent);
 }
 
 void ComposeService::Start(Terminal& terminal, models::Session& session, const ComposeProjectReference& project, HANDLE cancelEvent)
@@ -377,6 +370,65 @@ int ComposeService::Attach(Terminal& terminal, models::Session& session, const C
 void ComposeService::Stop(Terminal& terminal, models::Session& session, const ComposeProjectReference& project, ULONG timeout, HANDLE cancelEvent)
 {
     Execute(terminal, session, project, WSLCComposeActionStop, cancelEvent, timeout);
+}
+
+void ComposeService::ForceKill(Terminal& terminal, models::Session& session, const std::string& projectKey)
+{
+    namespace label = wsl::windows::service::wslc::compose::label;
+
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
+    const std::string managedFilter = std::format("{}={}", label::c_managed, label::c_managedValue);
+    const std::string projectFilter = std::format("{}={}", label::c_project, projectKey);
+    const std::array filters{
+        WSLCFilter{.Key = "label", .Value = managedFilter.c_str()},
+        WSLCFilter{.Key = "label", .Value = projectFilter.c_str()},
+    };
+
+    WSLCListContainersOptions options{};
+    options.Flags = WSLCListContainersFlagsNone;
+    options.Limit = -1;
+    options.Filters = filters.data();
+    options.FiltersCount = static_cast<ULONG>(filters.size());
+
+    wsl::windows::common::wslc::unique_container_entry_array containers;
+    wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
+    THROW_IF_FAILED(
+        session.Get()->ListContainers(&options, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+
+    std::vector<std::pair<std::string, wil::com_ptr<IWSLCContainer>>> running;
+    for (const auto& entry : containers)
+    {
+        if (entry.State != WslcContainerStateRunning)
+        {
+            continue;
+        }
+
+        wil::com_ptr<IWSLCContainer> container;
+        const HRESULT openResult = session.Get()->OpenContainer(entry.Id, &container);
+        if (openResult == WSLC_E_CONTAINER_NOT_FOUND)
+        {
+            continue;
+        }
+        THROW_IF_FAILED(openResult);
+
+        running.emplace_back(entry.Name, std::move(container));
+    }
+
+    for (size_t index = 0; index < running.size(); ++index)
+    {
+        const auto& [name, container] = running[index];
+        terminal.Info(
+            L"{}\n",
+            wsl::shared::Localization::MessageWslcComposeProgress(
+                wsl::shared::Localization::WSLCCLI_ComposeProgressKilling(),
+                wsl::shared::Localization::MessageWslcComposeResource(
+                    wsl::shared::Localization::WSLCCLI_ComposeResourceContainer(), wsl::shared::string::MultiByteToWide(name)),
+                index + 1,
+                running.size()));
+
+        const HRESULT killResult = container->Kill(WSLCSignalSIGKILL);
+        THROW_IF_FAILED_EXCEPT(killResult, WSLC_E_CONTAINER_NOT_RUNNING);
+    }
 }
 
 void ComposeService::Remove(Terminal& terminal, models::Session& session, const ComposeProjectReference& project, HANDLE cancelEvent)

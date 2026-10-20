@@ -2,6 +2,7 @@
 
 #include "precomp.h"
 #include "ComposeNormalizer.h"
+#include "ResourceName.h"
 
 namespace wsl::windows::service::wslc {
 
@@ -59,15 +60,23 @@ ComposeSpec ComposeNormalizer::Normalize(const ComposeDocuments& documents, cons
     }
 
     spec.ProjectName = std::move(projectName);
+    ValidateName(DefaultNetworkName(spec.ProjectName).c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
     for (auto& container : spec.Containers)
     {
         if (container.Name.empty())
         {
             container.Name = std::format("{}-{}-1", spec.ProjectName, container.ServiceName);
         }
+
+        ValidateName(container.Name.c_str(), WSLC_MAX_CONTAINER_NAME_LENGTH);
     }
 
     return spec;
+}
+
+std::string ComposeNormalizer::DefaultNetworkName(std::string_view projectName)
+{
+    return std::format("{}_default", projectName);
 }
 
 void ComposeNormalizer::ValidateSelection(const ComposeProjectSelection& selection)
