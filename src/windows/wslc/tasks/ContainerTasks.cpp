@@ -742,36 +742,33 @@ void FormatContainerStatsOutput(CLIExecutionContext& context)
 
     // Fetch stats for all containers concurrently. The Docker engine blocks for ~1s
     // per request to collect a valid precpu_stats sample, so issuing requests in parallel keeps
-    // wall time proportional to ceil(N / poolSize) rather than N.
+    // wall time proportional to ceil(N / maxConcurrency) rather than N.
     nlohmann::json statsJson = nlohmann::json::array();
-    wsl::windows::wslc::ForEachAsync<std::wstring>(
+    wsl::windows::common::ForEachAsync<std::wstring>(
         containers,
-        // Work to be done for each container ID on a separate thread.
-        // cancelHandle is signalled if the overall operation times out, check it before
-        // the blocking Stats call so we exit cooperatively without waiting a full ~1s sample.
-        [session, userSpecifiedContainers](const std::wstring& containerId, HANDLE cancelHandle) mutable {
-            if (::WaitForSingleObject(cancelHandle, 0) == WAIT_OBJECT_0)
-            {
-                THROW_HR(HRESULT_FROM_WIN32(ERROR_CANCELLED));
-            }
-
+        // Work to be done for each container ID on a thread pool thread.
+        [&session](const std::wstring& containerId) {
             // ContainerService::Stats makes COM calls, so we must ensure COM is initialized on this thread.
             auto comCleanup = wil::CoInitializeEx(COINIT_MULTITHREADED);
             return ComputeContainerStatsJson(ContainerService::Stats(session, WideToMultiByte(containerId)));
         },
         // On Success
-        [&](const nlohmann::json& entry) { statsJson.push_back(entry); },
+        [&](nlohmann::json entry) { statsJson.push_back(std::move(entry)); },
         // On Error
-        [&](const std::wstring& containerId, wil::ResultException error) {
-            if (error.GetErrorCode() == HRESULT_FROM_WIN32(ERROR_CANCELLED))
+        [&](const std::wstring& containerId, const std::exception_ptr& error) {
+            HRESULT hr = S_OK;
+            try
             {
-                // Cancellation due to timeout. Let ForEachAsync surface ERROR_TIMEOUT to the caller.
-                return;
+                std::rethrow_exception(error);
+            }
+            catch (...)
+            {
+                hr = wil::ResultFromCaughtException();
             }
 
             if (!userSpecifiedContainers)
             {
-                switch (error.GetErrorCode())
+                switch (hr)
                 {
                 case RPC_E_DISCONNECTED:
                 case WSLC_E_CONTAINER_NOT_FOUND:
@@ -783,12 +780,10 @@ void FormatContainerStatsOutput(CLIExecutionContext& context)
 
             // Failure to retrieve a container should stop execution with
             // no container information displayed.
-            LOG_HR_MSG(error.GetErrorCode(), "Failed to get stats for container %ws", containerId.c_str());
-            throw error;
+            LOG_HR_MSG(hr, "Failed to get stats for container %ws", containerId.c_str());
+            std::rethrow_exception(error);
         },
-        10,                       // Thread pool size - typical expected container use while protecting against extreme cases.
-        std::chrono::seconds(30), // Timeout - Docker stats blocks ~1s per sample; 30s gives ample headroom on a taxed system.
-        std::chrono::seconds(5)   // Cancel drain - grace period for workers to observe the cancel event and exit cleanly.
+        10 // Max concurrency - chosen to be around typical expected container use while protecting against extreme cases.
     );
 
     const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
