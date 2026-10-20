@@ -466,12 +466,12 @@ try
         const auto queryResult = compatSession->QueryInterface(IID_PPV_ARGS(compatSession2.put()));
         if (queryResult == E_NOINTERFACE)
         {
-            result->session = std::move(compatSession);
+            result->SetSession(std::move(compatSession));
         }
         else
         {
             RETURN_IF_FAILED(queryResult);
-            result->session = std::move(compatSession2);
+            result->SetSession(std::move(compatSession2));
             compatSession.reset();
         }
 
