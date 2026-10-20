@@ -2622,7 +2622,7 @@ HRESULT LxssUserSessionImpl::AttachUsbDevice(_In_ LPCWSTR Port)
     std::lock_guard lock(m_instanceLock);
     THROW_HR_IF(CO_E_SERVER_STOPPING, m_disableNewInstanceCreation);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_READY), !m_usbManager);
-    const auto port = wsl::windows::common::usb::ParsePortSelector(Port);
+    const auto port = wsl::windows::common::usb::PortId{Port};
     _CreateVm();
 
     auto reservation = m_usbManager->Reserve(&m_userSid.Sid, port, [session = weak_from_this()](const GUID& reservationId) {
@@ -2668,10 +2668,9 @@ HRESULT LxssUserSessionImpl::DetachUsbDevice(_In_ LPCWSTR Port)
     std::lock_guard lock(m_instanceLock);
     THROW_HR_IF(CO_E_SERVER_STOPPING, m_disableNewInstanceCreation);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_READY), !m_usbManager);
-    const auto port = wsl::windows::common::usb::ParsePortSelector(Port);
-    const auto attachment = std::ranges::find_if(m_usbAttachments, [&](const auto& entry) {
-        return entry.second.Reservation.Port.Hub == port.Hub && entry.second.Reservation.Port.Port == port.Port;
-    });
+    const auto port = wsl::windows::common::usb::PortId{Port};
+    const auto attachment =
+        std::ranges::find_if(m_usbAttachments, [&](const auto& entry) { return entry.second.Reservation.Port == port; });
     const auto reservationId =
         attachment == m_usbAttachments.end() ? m_usbManager->GetReservationId(&m_userSid.Sid, port) : attachment->first;
     _ReleaseUsbAttachment(reservationId);

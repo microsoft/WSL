@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace wsl::windows::common::usb {
 
@@ -16,10 +17,15 @@ enum class DeviceState
     Unavailable
 };
 
-struct PortSelector
+struct PortId
 {
-    uint32_t Hub;
-    uint32_t Port;
+    std::vector<uint32_t> Parts;
+
+    PortId() = default;
+    explicit PortId(std::wstring_view Value);
+
+    std::wstring ToString() const;
+    bool operator==(const PortId&) const = default;
 };
 
 struct ListedDevice
@@ -30,12 +36,10 @@ struct ListedDevice
     DeviceState State;
 };
 
-PortSelector ParsePortSelector(std::wstring_view Value);
-
 struct DeviceReservation
 {
     GUID Id;
-    PortSelector Port;
+    PortId Port;
     std::wstring InterfacePath;
 };
 

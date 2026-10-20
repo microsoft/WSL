@@ -27,10 +27,10 @@ public:
     std::vector<ListedDevice> List(PSID UserSid);
     void Stop() noexcept;
 
-    DeviceReservation Reserve(PSID UserSid, PortSelector Port, RemovalCallback OnRemoval);
+    DeviceReservation Reserve(PSID UserSid, const PortId& Port, RemovalCallback OnRemoval);
     void Commit(PSID UserSid, const GUID& ReservationId);
     void Release(PSID UserSid, const GUID& ReservationId);
-    GUID GetReservationId(PSID UserSid, PortSelector Port);
+    GUID GetReservationId(PSID UserSid, const PortId& Port);
     bool IsValid(PSID UserSid, const GUID& ReservationId);
     void Cancel() noexcept;
 
@@ -58,9 +58,7 @@ private:
 
     static DWORD CALLBACK OnDeviceNotification(HCMNOTIFICATION, PVOID Context, CM_NOTIFY_ACTION Action, PCM_NOTIFY_EVENT_DATA Data, DWORD) noexcept;
     static std::wstring ConvertSidToString(PSID Sid);
-    Inventory RefreshDeviceInventory();
-    UxdReservationIdentity ResolvePortSelector(PortSelector Port) const;
-    uint32_t GetHubNumber(const std::wstring& InstanceId) const;
+    UxdReservationIdentity ResolvePortId(const Inventory& Current, const PortId& Port) const;
     std::list<Record>::iterator FindReservationRecord(const UxdReservationIdentity& Value);
     std::optional<Device> FindDeviceAtPort(const Inventory& Current, const UxdReservationIdentity& Value) const;
     bool MatchesRecordedReservation(const Record& Value) const;
@@ -77,7 +75,6 @@ private:
 
     wil::srwlock m_lock;
     _Guarded_by_(m_lock) std::list<Record> m_records;
-    _Guarded_by_(m_lock) std::vector<std::wstring> m_hubs;
     UxdRegistry m_registry;
     wil::unique_hkey m_journal;
     wil::unique_event m_stop;

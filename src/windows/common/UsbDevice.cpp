@@ -5,6 +5,7 @@
 #include "UsbUxdRegistry.h"
 #include "stringshared.h"
 #include <cfgmgr32.h>
+#include <limits>
 #include <setupapi.h>
 #include <usbiodef.h>
 #include <usbioctl.h>
@@ -121,17 +122,104 @@ namespace {
             SP_DEVINFO_DATA node{sizeof(node)};
             THROW_IF_WIN32_BOOL_FALSE(SetupDiGetDeviceInterfaceDetailW(devices.get(), &entry, details, size, nullptr, &node));
 
-            result.push_back({GetDeviceInstanceId(node.DevInst), details->DevicePath});
+            Hub hub{GetDeviceInstanceId(node.DevInst), details->DevicePath};
+            if (IsEqualGUID(Class, GUID_DEVINTERFACE_USB_HUB))
+            {
+                DEVINST parent{};
+                ThrowIfConfigurationManagerError(CM_Get_Parent(&parent, node.DevInst, 0));
+                hub.ParentInstanceId = GetDeviceInstanceId(parent);
+                const auto address = GetDevicePropertyBytes(node.DevInst, DEVPKEY_Device_Address, DEVPROP_TYPE_UINT32);
+                if (address.size() == sizeof(hub.Port))
+                {
+                    memcpy(&hub.Port, address.data(), sizeof(hub.Port));
+                }
+            }
+            result.push_back(std::move(hub));
         }
     }
 
 } // namespace
 
+PortId::PortId(std::wstring_view Value)
+{
+    const auto parse = [](std::wstring_view text) {
+        THROW_HR_IF(E_INVALIDARG, text.empty());
+        uint32_t result = 0;
+        for (const auto digit : text)
+        {
+            THROW_HR_IF(E_INVALIDARG, digit < L'0' || digit > L'9');
+            const auto number = static_cast<uint32_t>(digit - L'0');
+            THROW_HR_IF(E_INVALIDARG, result > (std::numeric_limits<uint32_t>::max() - number) / 10);
+            result = result * 10 + number;
+        }
+
+        THROW_HR_IF(E_INVALIDARG, result == 0);
+        return result;
+    };
+
+    for (const auto component : Value | std::views::split(L'.'))
+    {
+        const std::wstring_view text(component.begin(), component.end());
+        Parts.push_back(parse(text));
+    }
+    THROW_HR_IF(E_INVALIDARG, Parts.size() < 2);
+}
+
+std::wstring PortId::ToString() const
+{
+    std::wstring result;
+    for (const auto part : Parts)
+    {
+        if (!result.empty())
+        {
+            result += L'.';
+        }
+        result += std::to_wstring(part);
+    }
+    return result;
+}
+
+wil::srwlock Inventory::s_rootHubsLock;
+std::vector<std::wstring> Inventory::s_rootHubs;
+
+Inventory::Inventory(std::vector<Hub> Hubs) : Hubs(std::move(Hubs))
+{
+    std::vector<std::wstring> roots;
+    for (const auto& hub : this->Hubs)
+    {
+        if (hub.ParentInstanceId.empty())
+        {
+            roots.push_back(hub.InstanceId);
+        }
+    }
+    std::ranges::sort(roots);
+
+    auto lock = s_rootHubsLock.lock_exclusive();
+    for (const auto& root : roots)
+    {
+        if (!std::ranges::any_of(s_rootHubs, [&](const auto& id) { return IsEqual(id, root, true); }))
+        {
+            s_rootHubs.push_back(root);
+        }
+    }
+    m_rootHubs = s_rootHubs;
+}
+
 Inventory Inventory::Enumerate()
 {
     // Enumerate hubs first so physical devices can be identified by their parent.
-    Inventory result;
-    result.Hubs = EnumerateDeviceInterfaces(GUID_DEVINTERFACE_USB_HUB);
+    auto hubs = EnumerateDeviceInterfaces(GUID_DEVINTERFACE_USB_HUB);
+    const auto controllers = EnumerateDeviceInterfaces(GUID_DEVINTERFACE_USB_HOST_CONTROLLER);
+    for (auto& hub : hubs)
+    {
+        if (std::ranges::any_of(
+                controllers, [&](const auto& controller) { return IsEqual(controller.InstanceId, hub.ParentInstanceId, true); }))
+        {
+            hub.ParentInstanceId.clear();
+            hub.Port = 0;
+        }
+    }
+    Inventory result(std::move(hubs));
 
     const auto raw = SetupDiGetClassDevsW(nullptr, L"USB", nullptr, DIGCF_PRESENT | DIGCF_ALLCLASSES);
     THROW_LAST_ERROR_IF(raw == INVALID_HANDLE_VALUE);
@@ -179,10 +267,11 @@ Inventory Inventory::Enumerate()
                 continue;
             }
             memcpy(&device.Port, address.data(), sizeof(device.Port));
-            if (device.Port == 0 || device.Port > 999)
+            if (device.Port == 0)
             {
                 continue;
             }
+            result.GetHubPath(device.HubInstanceId);
 
             // Prefer the friendly name, then fall back to bus and device descriptions.
             device.Name = GetDevicePropertyString(node.DevInst, DEVPKEY_Device_FriendlyName);
@@ -210,6 +299,62 @@ Inventory Inventory::Enumerate()
         }
         CATCH_LOG()
     }
+}
+
+std::vector<const Hub*> Inventory::GetHubPath(std::wstring_view InstanceId) const
+{
+    std::vector<const Hub*> path;
+    while (!InstanceId.empty())
+    {
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_DATA), path.size() >= Hubs.size());
+        const auto hub = std::ranges::find_if(Hubs, [&](const auto& value) { return IsEqual(value.InstanceId, InstanceId, true); });
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), hub == Hubs.end());
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_DATA), !hub->ParentInstanceId.empty() && hub->Port == 0);
+        path.push_back(&*hub);
+        InstanceId = hub->ParentInstanceId;
+    }
+
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), path.empty());
+    std::ranges::reverse(path);
+    return path;
+}
+
+PortId Inventory::GetPortId(const Device& Value) const
+{
+    THROW_HR_IF(E_INVALIDARG, Value.Port == 0);
+    const auto path = GetHubPath(Value.HubInstanceId);
+    const auto root = std::ranges::find_if(m_rootHubs, [&](const auto& id) { return IsEqual(id, path.front()->InstanceId, true); });
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), root == m_rootHubs.end());
+
+    PortId result;
+    result.Parts.push_back(gsl::narrow_cast<uint32_t>(std::distance(m_rootHubs.begin(), root) + 1));
+    for (const auto* hub : path | std::views::drop(1))
+    {
+        result.Parts.push_back(hub->Port);
+    }
+    result.Parts.push_back(Value.Port);
+    return result;
+}
+
+const Hub& Inventory::ResolveParentHub(const PortId& Port) const
+{
+    THROW_HR_IF(
+        HRESULT_FROM_WIN32(ERROR_NOT_FOUND),
+        Port.Parts.size() < 2 || Port.Parts.front() == 0 || Port.Parts.front() > m_rootHubs.size() ||
+            std::ranges::any_of(Port.Parts | std::views::drop(1), [](uint32_t value) { return value == 0; }));
+
+    auto hub = std::ranges::find_if(Hubs, [&](const auto& value) {
+        return value.ParentInstanceId.empty() && IsEqual(value.InstanceId, m_rootHubs[Port.Parts.front() - 1], true);
+    });
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), hub == Hubs.end());
+    for (const auto port : Port.Parts | std::views::drop(1) | std::views::take(Port.Parts.size() - 2))
+    {
+        const auto& parent = hub->InstanceId;
+        hub = std::ranges::find_if(
+            Hubs, [&](const auto& value) { return value.Port == port && IsEqual(value.ParentInstanceId, parent, true); });
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), hub == Hubs.end());
+    }
+    return *hub;
 }
 
 bool Device::IsRedirected() const

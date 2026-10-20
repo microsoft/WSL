@@ -3,7 +3,6 @@
 #include "precomp.h"
 #include "UsbManager.h"
 #include "stringshared.h"
-#include <limits>
 #include <nlohmann/json.hpp>
 #include <usbiodef.h>
 
@@ -38,29 +37,6 @@ namespace {
     }
 
 } // namespace
-
-PortSelector ParsePortSelector(std::wstring_view Value)
-{
-    const auto separator = Value.find(L'-');
-    THROW_HR_IF(E_INVALIDARG, separator == std::wstring_view::npos);
-
-    const auto parse = [](std::wstring_view text, uint32_t maximum) {
-        THROW_HR_IF(E_INVALIDARG, text.empty());
-        uint32_t result = 0;
-        for (const auto digit : text)
-        {
-            THROW_HR_IF(E_INVALIDARG, digit < L'0' || digit > L'9');
-            const auto number = static_cast<uint32_t>(digit - L'0');
-            THROW_HR_IF(E_INVALIDARG, result > (maximum - number) / 10);
-            result = result * 10 + number;
-        }
-
-        THROW_HR_IF(E_INVALIDARG, result == 0 || result > maximum);
-        return result;
-    };
-
-    return {parse(Value.substr(0, separator), std::numeric_limits<uint32_t>::max()), parse(Value.substr(separator + 1), 999)};
-}
 
 Manager::Manager() : m_journal(CreateJournalKey())
 {
@@ -127,34 +103,9 @@ void Manager::ThrowIfStopping() const
     THROW_HR_IF(CO_E_SERVER_STOPPING, m_stopping.load());
 }
 
-Inventory Manager::RefreshDeviceInventory()
+UxdReservationIdentity Manager::ResolvePortId(const Inventory& Current, const PortId& Port) const
 {
-    auto inventory = Inventory::Enumerate();
-    std::ranges::sort(inventory.Hubs, {}, &Hub::InstanceId);
-
-    // Keep existing hub numbers stable for the lifetime of the manager.
-    for (const auto& hub : inventory.Hubs)
-    {
-        if (!std::ranges::any_of(m_hubs, [&](const auto& id) { return IsEqual(id, hub.InstanceId, true); }))
-        {
-            m_hubs.push_back(hub.InstanceId);
-        }
-    }
-
-    return inventory;
-}
-
-uint32_t Manager::GetHubNumber(const std::wstring& InstanceId) const
-{
-    const auto found = std::ranges::find_if(m_hubs, [&](const auto& id) { return IsEqual(id, InstanceId, true); });
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), found == m_hubs.end());
-    return gsl::narrow_cast<uint32_t>(std::distance(m_hubs.begin(), found) + 1);
-}
-
-UxdReservationIdentity Manager::ResolvePortSelector(PortSelector Port) const
-{
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), Port.Hub == 0 || Port.Hub > m_hubs.size() || Port.Port == 0 || Port.Port > 999);
-    return {m_hubs[Port.Hub - 1], Port.Port, {}};
+    return {Current.ResolveParentHub(Port).InstanceId, Port.Parts.back(), {}};
 }
 
 std::list<Manager::Record>::iterator Manager::FindReservationRecord(const UxdReservationIdentity& Value)
@@ -189,7 +140,7 @@ std::vector<ListedDevice> Manager::List(PSID UserSid)
     ThrowIfStopping();
 
     ProcessDeviceRemovals();
-    const auto inventory = RefreshDeviceInventory();
+    const auto inventory = Inventory::Enumerate();
 
     std::vector<ListedDevice> result;
     for (const auto& device : inventory.Devices)
@@ -213,7 +164,7 @@ std::vector<ListedDevice> Manager::List(PSID UserSid)
         }
 
         result.push_back(
-            {std::format(L"{}-{}", GetHubNumber(device.HubInstanceId), device.Port),
+            {inventory.GetPortId(device).ToString(),
              record == m_records.end() || record->Name.empty() ? device.Name : record->Name,
              record == m_records.end() || record->DisplayInstanceId.empty() ? device.DisplayInstanceId : record->DisplayInstanceId,
              reserved ? (owner == sid ? DeviceState::Attached : DeviceState::Unavailable) : DeviceState::Unattached});
@@ -232,7 +183,7 @@ Device Manager::WaitForWinUsbDevice(const UxdReservationIdentity& Value, std::ws
         const auto reservation = m_registry.ReadReservation(Value);
         THROW_HR_IF(E_CHANGED_STATE, !reservation || !OwnsReservation(Value.Id, *reservation));
 
-        const auto current = FindDeviceAtPort(RefreshDeviceInventory(), Value);
+        const auto current = FindDeviceAtPort(Inventory::Enumerate(), Value);
         if (current)
         {
             if (auto path = current->ProbeWinUsb())
@@ -303,7 +254,7 @@ void Manager::ReleaseReservation(Record& Value)
     const auto reservation = m_registry.ReadReservation(Value.Reservation);
     if (!reservation || OwnsReservation(Value.Reservation.Id, *reservation))
     {
-        const auto current = FindDeviceAtPort(RefreshDeviceInventory(), Value.Reservation);
+        const auto current = FindDeviceAtPort(Inventory::Enumerate(), Value.Reservation);
         const bool removed = m_registry.RemoveReservation(Value.Reservation);
         if (current && (removed || current->IsRedirected()))
         {
@@ -484,7 +435,7 @@ try
 }
 CATCH_LOG()
 
-DeviceReservation Manager::Reserve(PSID UserSid, PortSelector Port, RemovalCallback OnRemoval)
+DeviceReservation Manager::Reserve(PSID UserSid, const PortId& Port, RemovalCallback OnRemoval)
 {
     THROW_HR_IF(E_INVALIDARG, !OnRemoval);
     const auto sid = ConvertSidToString(UserSid);
@@ -492,8 +443,8 @@ DeviceReservation Manager::Reserve(PSID UserSid, PortSelector Port, RemovalCallb
     ThrowIfStopping();
     ProcessDeviceRemovals();
 
-    const auto inventory = RefreshDeviceInventory();
-    auto identity = ResolvePortSelector(Port);
+    const auto inventory = Inventory::Enumerate();
+    auto identity = ResolvePortId(inventory, Port);
     const auto existing = FindReservationRecord(identity);
     if (existing != m_records.end())
     {
@@ -579,15 +530,15 @@ void Manager::Release(PSID UserSid, const GUID& ReservationId)
     m_records.erase(record);
 }
 
-GUID Manager::GetReservationId(PSID UserSid, PortSelector Port)
+GUID Manager::GetReservationId(PSID UserSid, const PortId& Port)
 {
     const auto sid = ConvertSidToString(UserSid);
     auto lock = m_lock.lock_exclusive();
     ThrowIfStopping();
     ProcessDeviceRemovals();
-    RefreshDeviceInventory();
+    const auto inventory = Inventory::Enumerate();
 
-    const auto record = FindReservationRecord(ResolvePortSelector(Port));
+    const auto record = FindReservationRecord(ResolvePortId(inventory, Port));
     THROW_HR_WITH_USER_ERROR_IF(
         HRESULT_FROM_WIN32(ERROR_NOT_FOUND), wsl::shared::Localization::MessageUsbNotAttached(), record == m_records.end());
     THROW_HR_WITH_USER_ERROR_IF(E_ACCESSDENIED, wsl::shared::Localization::MessageUsbUnavailable(), record->OwnerSid != sid);
@@ -626,7 +577,7 @@ bool Manager::ValidateReservation(Record& Value)
 {
     if (!Value.Removed)
     {
-        const auto current = FindDeviceAtPort(RefreshDeviceInventory(), Value.Reservation);
+        const auto current = FindDeviceAtPort(Inventory::Enumerate(), Value.Reservation);
         if (MatchesRecordedReservation(Value) && current && current->IsReady() && IsEqual(current->InstanceId, Value.InstanceId, true))
         {
             return true;

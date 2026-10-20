@@ -2,10 +2,13 @@
 
 #pragma once
 
+#include "UsbTypes.h"
 #include <windows.h>
+#include <wil/resource.h>
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace wsl::windows::common::usb {
@@ -14,6 +17,8 @@ struct Hub
 {
     std::wstring InstanceId;
     std::wstring InterfacePath;
+    std::wstring ParentInstanceId;
+    uint32_t Port = 0;
 };
 
 struct Device
@@ -34,12 +39,23 @@ struct Device
     ULONG Problem = 0;
 };
 
-struct Inventory
+class Inventory
 {
+public:
+    explicit Inventory(std::vector<Hub> Hubs);
+
     static Inventory Enumerate();
+    std::vector<const Hub*> GetHubPath(std::wstring_view InstanceId) const;
+    PortId GetPortId(const Device& Value) const;
+    const Hub& ResolveParentHub(const PortId& Port) const;
 
     std::vector<Hub> Hubs;
     std::vector<Device> Devices;
+
+private:
+    static wil::srwlock s_rootHubsLock;
+    _Guarded_by_(s_rootHubsLock) static std::vector<std::wstring> s_rootHubs;
+    std::vector<std::wstring> m_rootHubs;
 };
 
 void GrantDeviceAccess(const std::wstring& InterfacePath, PSID UserSid);

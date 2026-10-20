@@ -17,17 +17,139 @@ class UsbTests
 {
     WSL_TEST_CLASS(UsbTests)
 
-    TEST_METHOD(PortSelectors)
+    TEST_METHOD(PortIds)
     {
-        const auto port = usb::ParsePortSelector(L"2-1");
-        VERIFY_ARE_EQUAL(2u, port.Hub);
-        VERIFY_ARE_EQUAL(1u, port.Port);
-        VERIFY_ARE_EQUAL(999u, usb::ParsePortSelector(L"1-999").Port);
+        const usb::PortId port{L"2.1"};
+        VERIFY_IS_TRUE((port.Parts == std::vector<uint32_t>{2, 1}));
+        VERIFY_ARE_EQUAL(std::wstring(L"2.1"), port.ToString());
+        const usb::PortId nested{L"2.1.3.4"};
+        VERIFY_IS_TRUE((nested.Parts == std::vector<uint32_t>{2, 1, 3, 4}));
+        VERIFY_ARE_EQUAL(std::wstring(L"2.1.3.4"), nested.ToString());
+        VERIFY_IS_TRUE(nested == usb::PortId{nested.ToString()});
+        VERIFY_IS_TRUE(usb::PortId{L"02.01.003.004"} == nested);
+        VERIFY_IS_FALSE(port == nested);
+        VERIFY_ARE_EQUAL(999u, usb::PortId{L"1.999"}.Parts.back());
+        VERIFY_ARE_EQUAL(1000u, usb::PortId{L"1.1000"}.Parts.back());
+        VERIFY_ARE_EQUAL(4294967295u, usb::PortId{L"1.4294967295"}.Parts.back());
+        VERIFY_ARE_EQUAL(4294967295u, usb::PortId{L"4294967295.1"}.Parts.front());
         VERIFY_ARE_EQUAL(std::wstring(L"uxd_port_001"), usb::GetUxdPortRegistryValueName(1));
-        for (const auto* invalid : {L"", L"2", L"2:1", L"0-1", L"1-0", L"1-1000", L"-1-2", L"1-2-3", L"1-2 ", L"4294967296-1"})
+        VERIFY_THROWS(usb::GetUxdPortRegistryValueName(1000), wil::ResultException);
+        for (const auto* invalid :
+             {L"",
+              L"2",
+              L"2-1",
+              L"2:1",
+              L"0.1",
+              L"1.0",
+              L"-1.2",
+              L"1..2",
+              L"1.2 ",
+              L"4294967296.1",
+              L".1",
+              L"1.",
+              L"1.2.",
+              L"1.-2",
+              L"1.2-3",
+              L"1.2.0",
+              L"1.4294967296"})
         {
-            VERIFY_THROWS(usb::ParsePortSelector(invalid), wil::ResultException);
+            VERIFY_THROWS(usb::PortId{invalid}, wil::ResultException);
         }
+    }
+
+    TEST_METHOD(HubPathTracksTopology)
+    {
+        usb::Inventory inventory(
+            {{L"root-a", L"", L"", 0}, {L"root-b", L"", L"", 0}, {L"external", L"", L"root-a", 1}, {L"nested", L"", L"external", 2}});
+        usb::Device device;
+        device.Port = 3;
+        device.HubInstanceId = L"root-a";
+        const auto rootA = inventory.GetPortId(device).Parts.front();
+        device.HubInstanceId = L"root-b";
+        const auto rootB = inventory.GetPortId(device).Parts.front();
+        device.HubInstanceId = L"nested";
+        const auto original = inventory.GetPortId(device);
+        VERIFY_ARE_EQUAL(std::format(L"{}.1.2.3", rootA), original.ToString());
+        VERIFY_ARE_EQUAL(device.HubInstanceId, inventory.ResolveParentHub(original).InstanceId);
+
+        auto path = inventory.GetHubPath(L"NESTED");
+        VERIFY_ARE_EQUAL(size_t{3}, path.size());
+        VERIFY_ARE_EQUAL(std::wstring(L"root-a"), path[0]->InstanceId);
+        VERIFY_ARE_EQUAL(1u, path[1]->Port);
+        VERIFY_ARE_EQUAL(2u, path[2]->Port);
+
+        inventory.Hubs[2].Port = 1000;
+        path = inventory.GetHubPath(L"nested");
+        VERIFY_ARE_EQUAL(1000u, path[1]->Port);
+        VERIFY_ARE_EQUAL(2u, path[2]->Port);
+        const auto moved = inventory.GetPortId(device);
+        VERIFY_ARE_EQUAL(std::format(L"{}.1000.2.3", rootA), moved.ToString());
+        VERIFY_ARE_EQUAL(device.HubInstanceId, inventory.ResolveParentHub(moved).InstanceId);
+        VERIFY_THROWS(inventory.ResolveParentHub(original), wil::ResultException);
+
+        inventory.Hubs[2].ParentInstanceId = L"root-b";
+        path = inventory.GetHubPath(L"nested");
+        VERIFY_ARE_EQUAL(std::wstring(L"root-b"), path[0]->InstanceId);
+        VERIFY_ARE_EQUAL(std::wstring(L"external"), path[1]->InstanceId);
+        const auto movedRoot = inventory.GetPortId(device);
+        VERIFY_ARE_EQUAL(std::format(L"{}.1000.2.3", rootB), movedRoot.ToString());
+        VERIFY_ARE_EQUAL(device.HubInstanceId, inventory.ResolveParentHub(movedRoot).InstanceId);
+        VERIFY_THROWS(inventory.ResolveParentHub(moved), wil::ResultException);
+
+        inventory.Hubs[2].InstanceId = L"external-new-instance";
+        inventory.Hubs[3].ParentInstanceId = L"external-new-instance";
+        VERIFY_IS_TRUE(inventory.GetPortId(device) == movedRoot);
+        VERIFY_ARE_EQUAL(device.HubInstanceId, inventory.ResolveParentHub(movedRoot).InstanceId);
+
+        path = inventory.GetHubPath(L"root-a");
+        VERIFY_ARE_EQUAL(size_t{1}, path.size());
+        VERIFY_ARE_EQUAL(std::wstring(L"root-a"), path[0]->InstanceId);
+        device.HubInstanceId = L"root-a";
+        device.Port = 1000;
+        const auto direct = inventory.GetPortId(device);
+        VERIFY_ARE_EQUAL(std::format(L"{}.1000", rootA), direct.ToString());
+        VERIFY_ARE_EQUAL(device.HubInstanceId, inventory.ResolveParentHub(direct).InstanceId);
+        VERIFY_THROWS(inventory.ResolveParentHub(usb::PortId{L"4294967295.1"}), wil::ResultException);
+        VERIFY_THROWS(inventory.ResolveParentHub(usb::PortId{}), wil::ResultException);
+        usb::PortId incomplete;
+        incomplete.Parts = {rootA};
+        VERIFY_THROWS(inventory.ResolveParentHub(incomplete), wil::ResultException);
+
+        VERIFY_THROWS(inventory.GetHubPath(L"missing"), wil::ResultException);
+        inventory.Hubs[2].ParentInstanceId = L"missing";
+        VERIFY_THROWS(inventory.GetHubPath(L"nested"), wil::ResultException);
+        inventory.Hubs[2].ParentInstanceId = L"nested";
+        VERIFY_THROWS(inventory.GetHubPath(L"nested"), wil::ResultException);
+    }
+
+    TEST_METHOD(RootHubNumbersAreStable)
+    {
+        const usb::Inventory initial({{L"stable-root-b", L"", L"", 0}, {L"stable-root-a", L"", L"", 0}});
+        usb::Device device;
+        device.Port = 1;
+        device.HubInstanceId = L"stable-root-a";
+        const auto rootA = initial.GetPortId(device);
+        device.HubInstanceId = L"stable-root-b";
+        const auto rootB = initial.GetPortId(device);
+        VERIFY_IS_TRUE(rootA.Parts.front() < rootB.Parts.front());
+
+        const usb::Inventory changed({{L"stable-root-c", L"", L"", 0}, {L"stable-root-b", L"", L"", 0}});
+        VERIFY_IS_TRUE(rootB == changed.GetPortId(device));
+        VERIFY_THROWS(changed.ResolveParentHub(rootA), wil::ResultException);
+        device.HubInstanceId = L"stable-root-c";
+        const auto rootC = changed.GetPortId(device);
+        VERIFY_IS_TRUE(rootC.Parts.front() > rootB.Parts.front());
+        VERIFY_THROWS(initial.ResolveParentHub(rootC), wil::ResultException);
+
+        const usb::Inventory restored(
+            {{L"stable-root-c", L"", L"", 0}, {L"STABLE-ROOT-A", L"", L"", 0}, {L"stable-root-b", L"", L"", 0}});
+        VERIFY_IS_TRUE(rootC == restored.GetPortId(device));
+        device.HubInstanceId = L"stable-root-a";
+        VERIFY_IS_TRUE(rootA == restored.GetPortId(device));
+        VERIFY_ARE_EQUAL(std::wstring(L"STABLE-ROOT-A"), restored.ResolveParentHub(rootA).InstanceId);
+        VERIFY_IS_TRUE(rootA == initial.GetPortId(device));
+        device.HubInstanceId = L"stable-root-b";
+        VERIFY_IS_TRUE(rootB == restored.GetPortId(device));
     }
 
     TEST_METHOD(ReservationLayoutAndOwnership)
@@ -194,7 +316,11 @@ class UsbTests
         const auto inventory = usb::Inventory::Enumerate();
         for (const auto& device : inventory.Devices)
         {
-            VERIFY_IS_TRUE(device.Port > 0 && device.Port <= 999);
+            VERIFY_IS_TRUE(device.Port > 0);
+            const auto port = inventory.GetPortId(device);
+            VERIFY_IS_TRUE(port == usb::PortId{port.ToString()});
+            VERIFY_ARE_EQUAL(device.HubInstanceId, inventory.ResolveParentHub(port).InstanceId);
+            VERIFY_ARE_EQUAL(device.Port, port.Parts.back());
             VERIFY_IS_TRUE(std::ranges::any_of(inventory.Hubs, [&](const auto& hub) {
                 return wsl::shared::string::IsEqual(hub.InstanceId, device.HubInstanceId, true);
             }));

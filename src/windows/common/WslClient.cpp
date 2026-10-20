@@ -788,7 +788,7 @@ int Usb(_In_ std::wstring_view commandLine)
     if (!list)
     {
         const auto& port = attachPort ? *attachPort : *detachPort;
-        const auto result = wil::ResultFromException([&]() { usb::ParsePortSelector(port); });
+        const auto result = wil::ResultFromException([&]() { usb::PortId{port}; });
         THROW_HR_WITH_USER_ERROR_IF(result, Localization::MessageUsbInvalidPort(port), FAILED(result));
     }
 
