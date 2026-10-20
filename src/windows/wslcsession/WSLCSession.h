@@ -266,7 +266,7 @@ public:
     IFACEMETHOD(OpenContainer)(_In_ LPCSTR NameOrId, _Out_ IWSLCCompatContainer** Container) override;
     IFACEMETHOD(CreateVolume)(_In_ const WSLCCompatVolumeOptions* Options, _Out_ WSLCCompatVolumeInformation* VolumeInfo) override;
     IFACEMETHOD(RegisterCrashDumpCallback)(_In_ IWSLCCompatCrashDumpCallback* Callback, _Out_ IUnknown** Subscription) override;
-    IFACEMETHOD(ListNetworks)(_Outptr_result_buffer_maybenull_(*Count) WSLCCompatNetworkInformation** Networks, _Out_ ULONG* Count) override;
+    IFACEMETHOD(ListNetworks)(_Out_ LPSTR* Output) override;
 
     common::io::MultiHandleWait CreateIOContext(HANDLE CancelHandle = nullptr);
 
@@ -327,8 +327,6 @@ private:
     __requires_lock_held(m_userCOMCallbacksLock) void CancelUserCOMCallbacks();
 
     void CreateContainerImpl(const WSLCContainerOptions* Options, IWSLCContainer** Container);
-
-    std::vector<wsl::windows::common::wslc_schema::NetworkListEntry> ListNetworksImpl(const WSLCFilter* Filters, ULONG FiltersCount);
 
     // A create RPC hands the container off to the Docker event stream thread here and waits, so the
     // container is committed and its create event recorded from that thread. Recording it from the RPC

@@ -226,36 +226,6 @@ std::string GenerateContainerName(int retry)
     return name;
 }
 
-template <size_t Size>
-void CopyNetworkString(char (&Destination)[Size], const std::string& Source)
-{
-    THROW_HR_IF_MSG(E_UNEXPECTED, Source.size() >= Size, "Unexpected network field length: %hs", Source.c_str());
-    memcpy(Destination, Source.c_str(), Source.size() + 1);
-}
-
-LONGLONG NetworkCreatedToUnixTime(const std::string& Created) noexcept
-try
-{
-    return Created.empty() ? 0 : timestamp::Rfc3339ToEpoch(Created);
-}
-catch (...)
-{
-    LOG_CAUGHT_EXCEPTION_MSG("Failed to parse network creation time: %hs", Created.c_str());
-    return 0;
-}
-
-void ConvertNetworkEntry(const wslc_schema::NetworkListEntry& Entry, WSLCCompatNetworkInformation& Output)
-{
-    CopyNetworkString(Output.Id, Entry.Id);
-    CopyNetworkString(Output.Name, Entry.Name);
-    CopyNetworkString(Output.Driver, Entry.Driver);
-    CopyNetworkString(Output.Scope, Entry.Scope);
-    Output.Created = NetworkCreatedToUnixTime(Entry.Created);
-    Output.EnableIPv4 = Entry.EnableIPv4;
-    Output.EnableIPv6 = Entry.EnableIPv6;
-    Output.Internal = Entry.Internal;
-}
-
 } // namespace
 
 namespace wsl::windows::service::wslc {
@@ -3398,17 +3368,6 @@ try
 
     *Output = nullptr;
 
-    const auto networks = ListNetworksImpl(Filters, FiltersCount);
-
-    std::string json = wsl::shared::ToJson(networks);
-    *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(json.c_str()).release();
-
-    return S_OK;
-}
-CATCH_RETURN();
-
-std::vector<wslc_schema::NetworkListEntry> WSLCSession::ListNetworksImpl(const WSLCFilter* Filters, ULONG FiltersCount)
-{
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
 
     auto lock = AcquireLease();
@@ -3437,12 +3396,26 @@ std::vector<wslc_schema::NetworkListEntry> WSLCSession::ListNetworksImpl(const W
         entry.Internal = network.Internal;
         entry.Labels = network.Labels;
         entry.Labels.erase(WSLCNetworkManagedLabel);
+        entry.IPAM.Driver = network.IPAM.Driver;
+        entry.IPAM.Options = network.IPAM.Options;
+        if (network.IPAM.Config)
+        {
+            auto& configs = entry.IPAM.Config.emplace();
+            for (const auto& cfg : *network.IPAM.Config)
+            {
+                configs.push_back({.Subnet = cfg.Subnet, .Gateway = cfg.Gateway, .IPRange = cfg.IPRange});
+            }
+        }
 
         networks.push_back(std::move(entry));
     }
 
-    return networks;
+    std::string json = wsl::shared::ToJson(networks);
+    *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(json.c_str()).release();
+
+    return S_OK;
 }
+CATCH_RETURN();
 
 HRESULT WSLCSession::InspectNetwork(LPCSTR Name, LPSTR* Output)
 try
@@ -4055,36 +4028,10 @@ HRESULT WSLCSession::RegisterCrashDumpCallback(IWSLCCompatCrashDumpCallback* Cal
     return RegisterCrashDumpCallback(callback.Get(), Subscription);
 }
 
-HRESULT WSLCSession::ListNetworks(WSLCCompatNetworkInformation** Networks, ULONG* Count)
-try
+HRESULT WSLCSession::ListNetworks(LPSTR* Output)
 {
-    WSLCExecutionContext context(this);
-
-    RETURN_HR_IF_NULL(E_POINTER, Networks);
-    RETURN_HR_IF_NULL(E_POINTER, Count);
-
-    *Networks = nullptr;
-    *Count = 0;
-
-    const auto entries = ListNetworksImpl(nullptr, 0);
-    if (entries.empty())
-    {
-        return S_OK;
-    }
-
-    auto output = wil::make_unique_cotaskmem<WSLCCompatNetworkInformation[]>(entries.size());
-    for (size_t index = 0; index < entries.size(); index++)
-    {
-        output[index] = {};
-        ConvertNetworkEntry(entries[index], output[index]);
-    }
-
-    *Networks = output.release();
-    *Count = static_cast<ULONG>(entries.size());
-
-    return S_OK;
+    return ListNetworks(nullptr, 0, Output);
 }
-CATCH_RETURN();
 
 MultiHandleWait WSLCSession::CreateIOContext(HANDLE CancelHandle)
 {

@@ -353,8 +353,9 @@ struct NetworkListEntry
     bool EnableIPv6{};
     bool Internal{};
     std::map<std::string, std::string> Labels;
+    wslc_schema::IPAM IPAM;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkListEntry, Id, Name, Driver, Scope, Created, EnableIPv4, EnableIPv6, Internal, Labels);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkListEntry, Id, Name, Driver, Scope, Created, EnableIPv4, EnableIPv6, Internal, Labels, IPAM);
 };
 
 // The volume properties carried from the session to the CLI for "volume list". Values keep their

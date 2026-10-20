@@ -16,17 +16,46 @@ Abstract:
 #include "NetworkInfo.h"
 #include "Microsoft.WSL.Containers.NetworkInfo.g.cpp"
 
+namespace {
+template <typename TAddress>
+winrt::Windows::Networking::HostName ToHostName(int family, const TAddress& address)
+{
+    wchar_t buffer[INET6_ADDRSTRLEN]{};
+    THROW_LAST_ERROR_IF_NULL(InetNtopW(family, &address, buffer, ARRAYSIZE(buffer)));
+    return winrt::Windows::Networking::HostName{buffer};
+}
+
+template <typename TAddress>
+winrt::Windows::Networking::HostName ToSubnetHostName(int family, const TAddress& address, uint8_t prefixLength)
+{
+    return prefixLength == 0 ? nullptr : ToHostName(family, address);
+}
+
+winrt::Windows::Networking::HostName ToGatewayHostName(const IN_ADDR& address)
+{
+    return address.s_addr == 0 ? nullptr : ToHostName(AF_INET, address);
+}
+
+winrt::Windows::Networking::HostName ToGatewayHostName(const IN6_ADDR& address)
+{
+    return IN6_IS_ADDR_UNSPECIFIED(&address) ? nullptr : ToHostName(AF_INET6, address);
+}
+} // namespace
+
 namespace winrt::Microsoft::WSL::Containers::implementation {
 NetworkInfo::NetworkInfo(WslcNetworkInfo const& info)
 {
     m_id = winrt::to_hstring(info.id);
     m_name = winrt::to_hstring(info.name);
     m_driver = winrt::to_hstring(info.driver);
-    m_scope = winrt::to_hstring(info.scope);
     m_createdTimestamp = winrt::clock::from_time_t(static_cast<time_t>(info.createdUnixTime));
-    m_enableIPv4 = info.enableIPv4 != FALSE;
-    m_enableIPv6 = info.enableIPv6 != FALSE;
-    m_internal = info.internal != FALSE;
+    m_flags = static_cast<winrt::Microsoft::WSL::Containers::NetworkFlags>(info.flags);
+    m_ipv4Subnet = ToSubnetHostName(AF_INET, info.ipv4Subnet, info.ipv4PrefixLength);
+    m_ipv4SubnetPrefixLength = info.ipv4PrefixLength;
+    m_ipv4Gateway = ToGatewayHostName(info.ipv4Gateway);
+    m_ipv6Subnet = ToSubnetHostName(AF_INET6, info.ipv6Subnet, info.ipv6PrefixLength);
+    m_ipv6SubnetPrefixLength = info.ipv6PrefixLength;
+    m_ipv6Gateway = ToGatewayHostName(info.ipv6Gateway);
 }
 
 hstring NetworkInfo::Id()
@@ -44,28 +73,43 @@ hstring NetworkInfo::Driver()
     return m_driver;
 }
 
-hstring NetworkInfo::Scope()
-{
-    return m_scope;
-}
-
 winrt::Windows::Foundation::DateTime NetworkInfo::CreatedTimestamp()
 {
     return m_createdTimestamp;
 }
 
-bool NetworkInfo::EnableIPv4()
+winrt::Microsoft::WSL::Containers::NetworkFlags NetworkInfo::Flags()
 {
-    return m_enableIPv4;
+    return m_flags;
 }
 
-bool NetworkInfo::EnableIPv6()
+winrt::Windows::Networking::HostName NetworkInfo::IPv4Subnet()
 {
-    return m_enableIPv6;
+    return m_ipv4Subnet;
 }
 
-bool NetworkInfo::Internal()
+uint8_t NetworkInfo::IPv4SubnetPrefixLength()
 {
-    return m_internal;
+    return m_ipv4SubnetPrefixLength;
+}
+
+winrt::Windows::Networking::HostName NetworkInfo::IPv4Gateway()
+{
+    return m_ipv4Gateway;
+}
+
+winrt::Windows::Networking::HostName NetworkInfo::IPv6Subnet()
+{
+    return m_ipv6Subnet;
+}
+
+uint8_t NetworkInfo::IPv6SubnetPrefixLength()
+{
+    return m_ipv6SubnetPrefixLength;
+}
+
+winrt::Windows::Networking::HostName NetworkInfo::IPv6Gateway()
+{
+    return m_ipv6Gateway;
 }
 } // namespace winrt::Microsoft::WSL::Containers::implementation

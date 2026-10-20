@@ -478,6 +478,8 @@ class WslcSdkTests
     WSLC_TEST_METHOD(NetworkList)
     {
         constexpr auto c_networkName = "wslc-sdk-list-network";
+        constexpr auto c_subnet = "10.231.45.0/24";
+        constexpr auto c_gateway = "10.231.45.1";
 
         auto comSession = reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session.query<IWSLCSession>();
         LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName));
@@ -486,6 +488,8 @@ class WslcSdkTests
         options.Name = c_networkName;
         options.Driver = "bridge";
         options.Internal = TRUE;
+        options.Subnet = c_subnet;
+        options.Gateway = c_gateway;
         VERIFY_SUCCEEDED(comSession->CreateNetwork(&options, nullptr));
         auto cleanupNetwork = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName)); });
 
@@ -514,10 +518,21 @@ class WslcSdkTests
             VERIFY_IS_NOT_NULL(created);
             VERIFY_ARE_EQUAL(strlen(created->id), size_t{64});
             VERIFY_ARE_EQUAL(std::string("bridge"), created->driver);
-            VERIFY_ARE_EQUAL(std::string("local"), created->scope);
             VERIFY_IS_GREATER_THAN(created->createdUnixTime, 0ll);
-            VERIFY_IS_TRUE(created->internal);
-            VERIFY_IS_FALSE(created->enableIPv6);
+            VERIFY_IS_TRUE(WI_IsFlagSet(created->flags, WSLC_NETWORK_FLAG_ENABLE_IPV4));
+            VERIFY_IS_TRUE(WI_IsFlagSet(created->flags, WSLC_NETWORK_FLAG_INTERNAL));
+            VERIFY_IS_FALSE(WI_IsFlagSet(created->flags, WSLC_NETWORK_FLAG_ENABLE_IPV6));
+
+            IN_ADDR expectedSubnet{};
+            IN_ADDR expectedGateway{};
+            VERIFY_ARE_EQUAL(inet_pton(AF_INET, "10.231.45.0", &expectedSubnet), 1);
+            VERIFY_ARE_EQUAL(inet_pton(AF_INET, c_gateway, &expectedGateway), 1);
+            VERIFY_ARE_EQUAL(created->ipv4PrefixLength, uint8_t{24});
+            VERIFY_ARE_EQUAL(created->ipv4Subnet.s_addr, expectedSubnet.s_addr);
+            VERIFY_ARE_EQUAL(created->ipv4Gateway.s_addr, expectedGateway.s_addr);
+            VERIFY_ARE_EQUAL(created->ipv6PrefixLength, uint8_t{0});
+            VERIFY_IS_TRUE(IN6_IS_ADDR_UNSPECIFIED(&created->ipv6Subnet));
+            VERIFY_IS_TRUE(IN6_IS_ADDR_UNSPECIFIED(&created->ipv6Gateway));
         }
 
         // Positive: a deleted network is no longer listed.

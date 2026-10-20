@@ -24,6 +24,7 @@ Abstract:
 #include "wslutil.h"
 #include "APICompat.h"
 #include "WindowsUpdateIntegration.h"
+#include "wslc_schema.h"
 
 using namespace std::string_view_literals;
 using namespace wsl::windows::common::wslutil;
@@ -364,6 +365,97 @@ wil::com_ptr<IWSLCCompatSessionManager> CreateSessionManager()
     wsl::windows::common::security::ConfigureForCOMImpersonation(result.get());
 
     return result;
+}
+
+template <size_t Size>
+void CopyNetworkString(CHAR (&Destination)[Size], const std::string& Source)
+{
+    THROW_HR_IF_MSG(E_UNEXPECTED, Source.size() >= Size, "Unexpected network field length: %hs", Source.c_str());
+    THROW_HR_IF(E_UNEXPECTED, memcpy_s(Destination, Size, Source.c_str(), Source.size() + 1) != 0);
+}
+
+int64_t NetworkCreatedToUnixTime(const std::string& Created) noexcept
+try
+{
+    return Created.empty() ? 0 : wsl::windows::common::timestamp::Rfc3339ToEpoch(Created);
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION_MSG("Failed to parse network creation time: %hs", Created.c_str());
+    return 0;
+}
+
+template <typename TAddress>
+bool ParseNetworkSubnet(int Family, uint8_t MaxPrefixLength, const std::string& Subnet, TAddress& Address, uint8_t& PrefixLength)
+{
+    const auto separator = Subnet.find('/');
+    if (separator == std::string::npos)
+    {
+        return false;
+    }
+
+    TAddress address{};
+    if (inet_pton(Family, Subnet.substr(0, separator).c_str(), &address) != 1)
+    {
+        return false;
+    }
+
+    const std::string_view prefixString = std::string_view{Subnet}.substr(separator + 1);
+    unsigned int prefix{};
+    const auto [end, error] = std::from_chars(prefixString.data(), prefixString.data() + prefixString.size(), prefix);
+    if (error != std::errc{} || end != prefixString.data() + prefixString.size() || prefix == 0 || prefix > MaxPrefixLength)
+    {
+        return false;
+    }
+
+    Address = address;
+    PrefixLength = static_cast<uint8_t>(prefix);
+    return true;
+}
+
+template <typename TAddress>
+void ParseNetworkGateway(int Family, const std::string& Gateway, TAddress& Address)
+{
+    if (!Gateway.empty() && inet_pton(Family, Gateway.c_str(), &Address) != 1)
+    {
+        LOG_HR_MSG(E_UNEXPECTED, "Failed to parse network gateway: %hs", Gateway.c_str());
+        Address = {};
+    }
+}
+
+// Only the first subnet of each address family is reported.
+void ConvertNetworkIpamConfig(const wsl::windows::common::wslc_schema::IPAMConfig& Config, WslcNetworkInfo& Network)
+{
+    if (Network.ipv4PrefixLength == 0 && ParseNetworkSubnet(AF_INET, 32, Config.Subnet, Network.ipv4Subnet, Network.ipv4PrefixLength))
+    {
+        ParseNetworkGateway(AF_INET, Config.Gateway, Network.ipv4Gateway);
+        return;
+    }
+
+    if (Network.ipv6PrefixLength == 0 && ParseNetworkSubnet(AF_INET6, 128, Config.Subnet, Network.ipv6Subnet, Network.ipv6PrefixLength))
+    {
+        ParseNetworkGateway(AF_INET6, Config.Gateway, Network.ipv6Gateway);
+    }
+}
+
+void ConvertNetworkEntry(const wsl::windows::common::wslc_schema::NetworkListEntry& Entry, WslcNetworkInfo& Network)
+{
+    Network = {};
+    CopyNetworkString(Network.id, Entry.Id);
+    CopyNetworkString(Network.name, Entry.Name);
+    CopyNetworkString(Network.driver, Entry.Driver);
+    Network.createdUnixTime = NetworkCreatedToUnixTime(Entry.Created);
+    WI_SetFlagIf(Network.flags, WSLC_NETWORK_FLAG_ENABLE_IPV4, Entry.EnableIPv4);
+    WI_SetFlagIf(Network.flags, WSLC_NETWORK_FLAG_ENABLE_IPV6, Entry.EnableIPv6);
+    WI_SetFlagIf(Network.flags, WSLC_NETWORK_FLAG_INTERNAL, Entry.Internal);
+
+    if (Entry.IPAM.Config)
+    {
+        for (const auto& config : *Entry.IPAM.Config)
+        {
+            ConvertNetworkIpamConfig(config, Network);
+        }
+    }
 }
 
 } // namespace
@@ -1697,11 +1789,6 @@ STDAPI WslcListSessionNetworks(
     _In_ WslcSession session, _Outptr_result_buffer_maybenull_(*count) WslcNetworkInfo** networks, _Out_ uint32_t* count, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
-    static_assert(sizeof(WslcNetworkInfo::id) == sizeof(WSLCCompatNetworkInformation::Id), "Network ID size mismatch.");
-    static_assert(sizeof(WslcNetworkInfo::name) == sizeof(WSLCCompatNetworkInformation::Name), "Network name size mismatch.");
-    static_assert(
-        sizeof(WslcNetworkInfo::driver) == sizeof(WSLCCompatNetworkInformation::Driver), "Network driver size mismatch.");
-    static_assert(sizeof(WslcNetworkInfo::scope) == sizeof(WSLCCompatNetworkInformation::Scope), "Network scope size mismatch.");
     static_assert(std::is_trivial_v<WslcNetworkInfo>, "WslcNetworkInfo must be trivial.");
 
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
@@ -1714,32 +1801,27 @@ try
     auto internalType = CheckAndGetInternalType(session);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
 
-    wil::unique_cotaskmem_array_ptr<WSLCCompatNetworkInformation> networkInformation;
-    HRESULT hr = internalType->session->ListNetworks(&networkInformation, networkInformation.size_address<ULONG>());
-    if (FAILED(hr) || networkInformation.size() == 0)
+    wil::unique_cotaskmem_ansistring output;
+    HRESULT hr = internalType->session->ListNetworks(&output);
+    if (FAILED(hr))
     {
         return errorInfoWrapper.CaptureResult(hr);
     }
 
-    auto result = wil::make_unique_cotaskmem<WslcNetworkInfo[]>(networkInformation.size());
-    for (size_t i = 0; i < networkInformation.size(); ++i)
+    const auto entries = wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::NetworkListEntry>>(output.get());
+    if (entries.empty())
     {
-        const auto& source = networkInformation[i];
-        auto& target = result[i];
-        target = {};
+        return errorInfoWrapper.CaptureResult(S_OK);
+    }
 
-        THROW_HR_IF(E_UNEXPECTED, memcpy_s(target.id, sizeof(target.id), source.Id, sizeof(source.Id)) != 0);
-        THROW_HR_IF(E_UNEXPECTED, memcpy_s(target.name, sizeof(target.name), source.Name, sizeof(source.Name)) != 0);
-        THROW_HR_IF(E_UNEXPECTED, memcpy_s(target.driver, sizeof(target.driver), source.Driver, sizeof(source.Driver)) != 0);
-        THROW_HR_IF(E_UNEXPECTED, memcpy_s(target.scope, sizeof(target.scope), source.Scope, sizeof(source.Scope)) != 0);
-        target.createdUnixTime = source.Created;
-        target.enableIPv4 = source.EnableIPv4;
-        target.enableIPv6 = source.EnableIPv6;
-        target.internal = source.Internal;
+    auto result = wil::make_unique_cotaskmem<WslcNetworkInfo[]>(entries.size());
+    for (size_t i = 0; i < entries.size(); ++i)
+    {
+        ConvertNetworkEntry(entries[i], result[i]);
     }
 
     *networks = result.release();
-    *count = static_cast<uint32_t>(networkInformation.size());
+    *count = static_cast<uint32_t>(entries.size());
 
     return errorInfoWrapper.CaptureResult(S_OK);
 }

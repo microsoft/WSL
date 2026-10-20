@@ -15,6 +15,7 @@ Abstract:
 #pragma once
 #include "Microsoft.WSL.Containers.NetworkInfo.g.h"
 #include "Helpers.h"
+#include <winrt/Windows.Networking.h>
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
 struct NetworkInfo : NetworkInfoT<NetworkInfo>
@@ -25,21 +26,27 @@ struct NetworkInfo : NetworkInfoT<NetworkInfo>
     hstring Id();
     hstring Name();
     hstring Driver();
-    hstring Scope();
     winrt::Windows::Foundation::DateTime CreatedTimestamp();
-    bool EnableIPv4();
-    bool EnableIPv6();
-    bool Internal();
+    winrt::Microsoft::WSL::Containers::NetworkFlags Flags();
+    winrt::Windows::Networking::HostName IPv4Subnet();
+    uint8_t IPv4SubnetPrefixLength();
+    winrt::Windows::Networking::HostName IPv4Gateway();
+    winrt::Windows::Networking::HostName IPv6Subnet();
+    uint8_t IPv6SubnetPrefixLength();
+    winrt::Windows::Networking::HostName IPv6Gateway();
 
 private:
     hstring m_id{};
     hstring m_name{};
     hstring m_driver{};
-    hstring m_scope{};
     winrt::Windows::Foundation::DateTime m_createdTimestamp{};
-    bool m_enableIPv4{};
-    bool m_enableIPv6{};
-    bool m_internal{};
+    winrt::Microsoft::WSL::Containers::NetworkFlags m_flags{};
+    winrt::Windows::Networking::HostName m_ipv4Subnet{nullptr};
+    uint8_t m_ipv4SubnetPrefixLength{};
+    winrt::Windows::Networking::HostName m_ipv4Gateway{nullptr};
+    winrt::Windows::Networking::HostName m_ipv6Subnet{nullptr};
+    uint8_t m_ipv6SubnetPrefixLength{};
+    winrt::Windows::Networking::HostName m_ipv6Gateway{nullptr};
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation
 

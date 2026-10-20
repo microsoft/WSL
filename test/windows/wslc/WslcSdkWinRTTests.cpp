@@ -611,6 +611,9 @@ class WslcSdkWinRtTests
     WSLC_TEST_METHOD(NetworkList)
     {
         constexpr auto c_networkName = "wslc-sdk-winrt-list-network";
+        constexpr auto c_subnet = "10.231.46.0/24";
+        constexpr auto c_subnetAddress = L"10.231.46.0";
+        constexpr auto c_gateway = "10.231.46.1";
         const winrt::hstring networkName = winrt::to_hstring(c_networkName);
 
         auto comSession =
@@ -621,6 +624,8 @@ class WslcSdkWinRtTests
         options.Name = c_networkName;
         options.Driver = "bridge";
         options.Internal = TRUE;
+        options.Subnet = c_subnet;
+        options.Gateway = c_gateway;
         VERIFY_SUCCEEDED(comSession->CreateNetwork(&options, nullptr));
         auto cleanupNetwork = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName)); });
 
@@ -648,10 +653,16 @@ class WslcSdkWinRtTests
             VERIFY_IS_NOT_NULL(created);
             VERIFY_ARE_EQUAL(created.Id().size(), 64u);
             VERIFY_ARE_EQUAL(created.Driver(), winrt::hstring{L"bridge"});
-            VERIFY_ARE_EQUAL(created.Scope(), winrt::hstring{L"local"});
             VERIFY_IS_GREATER_THAN(created.CreatedTimestamp().time_since_epoch().count(), 0ll);
-            VERIFY_IS_TRUE(created.Internal());
-            VERIFY_IS_FALSE(created.EnableIPv6());
+            VERIFY_ARE_EQUAL(created.Flags(), WSLCSDK::NetworkFlags::EnableIPv4 | WSLCSDK::NetworkFlags::Internal);
+            VERIFY_IS_NOT_NULL(created.IPv4Subnet());
+            VERIFY_ARE_EQUAL(created.IPv4Subnet().CanonicalName(), winrt::hstring{c_subnetAddress});
+            VERIFY_ARE_EQUAL(created.IPv4SubnetPrefixLength(), static_cast<uint8_t>(24));
+            VERIFY_IS_NOT_NULL(created.IPv4Gateway());
+            VERIFY_ARE_EQUAL(created.IPv4Gateway().CanonicalName(), winrt::to_hstring(c_gateway));
+            VERIFY_IS_NULL(created.IPv6Subnet());
+            VERIFY_ARE_EQUAL(created.IPv6SubnetPrefixLength(), static_cast<uint8_t>(0));
+            VERIFY_IS_NULL(created.IPv6Gateway());
         }
 
         // Positive: a deleted network is no longer listed.

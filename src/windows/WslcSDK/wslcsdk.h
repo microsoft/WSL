@@ -654,18 +654,33 @@ STDAPI WslcListSessionImages(_In_ WslcSession session, _Outptr_result_buffer_(*c
 #define WSLC_NETWORK_ID_LENGTH 65      // 64 chars + null
 #define WSLC_NETWORK_NAME_LENGTH 256   // 255 chars + null
 #define WSLC_NETWORK_DRIVER_LENGTH 256 // 255 chars + null
-#define WSLC_NETWORK_SCOPE_LENGTH 256  // 255 chars + null
+
+typedef enum WslcNetworkFlags
+{
+    WSLC_NETWORK_FLAG_NONE = 0x00000000,
+    WSLC_NETWORK_FLAG_ENABLE_IPV4 = 0x00000001,
+    WSLC_NETWORK_FLAG_ENABLE_IPV6 = 0x00000002,
+    WSLC_NETWORK_FLAG_INTERNAL = 0x00000004,
+} WslcNetworkFlags;
+
+DEFINE_ENUM_FLAG_OPERATORS(WslcNetworkFlags);
 
 typedef struct WslcNetworkInfo
 {
     CHAR id[WSLC_NETWORK_ID_LENGTH];
     CHAR name[WSLC_NETWORK_NAME_LENGTH];
     CHAR driver[WSLC_NETWORK_DRIVER_LENGTH];
-    CHAR scope[WSLC_NETWORK_SCOPE_LENGTH];
     int64_t createdUnixTime; // 0 if unknown.
-    BOOL enableIPv4;
-    BOOL enableIPv6;
-    BOOL internal;
+    WslcNetworkFlags flags;
+
+    // Subnets and gateways in network byte order. A prefix length of 0 means the network has no
+    // subnet for that address family, and an all-zero gateway means no gateway is configured.
+    uint8_t ipv4PrefixLength;
+    uint8_t ipv6PrefixLength;
+    IN_ADDR ipv4Subnet;
+    IN_ADDR ipv4Gateway;
+    IN6_ADDR ipv6Subnet;
+    IN6_ADDR ipv6Gateway;
 } WslcNetworkInfo;
 
 // Retrieves the list of networks in a session.

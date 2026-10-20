@@ -1,0 +1,18 @@
+# WslcNetworkFlags
+
+```c
+typedef enum WslcNetworkFlags
+{
+    WSLC_NETWORK_FLAG_NONE = 0x00000000,
+    WSLC_NETWORK_FLAG_ENABLE_IPV4 = 0x00000001,
+    WSLC_NETWORK_FLAG_ENABLE_IPV6 = 0x00000002,
+    WSLC_NETWORK_FLAG_INTERNAL = 0x00000004,
+} WslcNetworkFlags;
+```
+
+| Enumerator | Value |
+|---|---|
+| `WSLC_NETWORK_FLAG_NONE` | `0` |
+| `WSLC_NETWORK_FLAG_ENABLE_IPV4` | `0x01` |
+| `WSLC_NETWORK_FLAG_ENABLE_IPV6` | `0x02` |
+| `WSLC_NETWORK_FLAG_INTERNAL` | `0x04` |
