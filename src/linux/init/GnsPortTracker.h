@@ -119,6 +119,7 @@ public:
         std::optional<PortAllocation> Request;
         std::optional<DeferredPortLookup> PortZeroBind;
         std::uint64_t CallId;
+        std::optional<PortAllocation> DualStackRequest;
     };
 
 private:
@@ -164,9 +165,15 @@ private:
 
     static wil::unique_fd DuplicateSocketFd(pid_t Pid, int SocketFd);
 
-    std::optional<PortAllocation> ResolvePortZeroBind(DeferredPortLookup lookup);
+    std::optional<PortAllocation> ResolvePortZeroBind(const DeferredPortLookup& lookup);
+
+    bool IsDualStackCandidate(const PortAllocation& Allocation) const;
+
+    std::optional<PortAllocation> GetDualStackAllocation(const PortAllocation& Allocation, int SocketFd) const;
 
     void TrackPort(PortAllocation allocation);
+
+    void TrackDualStackPort(const PortAllocation& allocation);
 
     int HandleInterfaceStateChange(const seccomp_notif& Notification);
 
