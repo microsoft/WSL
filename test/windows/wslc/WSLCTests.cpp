@@ -7773,7 +7773,8 @@ class WSLCTests
         auto restore = ResetTestSession();
         constexpr auto c_sessionName = L"restart-policy-failed-start";
         auto session = CreateSession(GetDefaultSessionSettings(c_sessionName, true));
-        WSLCContainerLauncher launcher("debian:latest", "test-restart-failed-start", {"sh", "-c", "rm /bin/sh && echo run; exit 1"});
+        WSLCContainerLauncher launcher(
+            "debian:latest", "test-restart-failed-start", {"sh", "-c", "rm /bin/sh && echo run; exit 1"});
         launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
         auto container = launcher.Launch(*session, WSLCContainerStartFlagsNone);
         WaitForContainerRuns(container, 1);
