@@ -3712,7 +3712,10 @@ try
         ReservedPorts += std::format("{}-{}", End + 1, USHRT_MAX);
     }
 
-    return WriteToFile(ReservedPortsPath, ReservedPorts.c_str());
+    // N.B. The host range is already applied above; the reservation only guards against the range being widened later,
+    //      so a failure here is logged by WriteToFile but does not fail boot.
+    WriteToFile(ReservedPortsPath, ReservedPorts.c_str());
+    return 0;
 }
 CATCH_RETURN_ERRNO()
 
