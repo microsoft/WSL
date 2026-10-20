@@ -62,9 +62,10 @@ void ForEachAsync(const std::vector<TItem>& items, TWork onWork, TSuccess onSucc
     // Declared after workItems so that the pool is destroyed first; its destructor cancels work
     // that has not started and waits for running work on every exit path.
     ThreadPool pool{threadCount, threadCount};
-    for (const auto& item : items)
+    for (size_t i = 0; i < items.size(); ++i)
     {
-        workItems.push_back(pool.SubmitWork([&onWork, &item]() { return onWork(item); }));
+        // Items are read by index when the work runs; iterating std::vector<bool> yields temporaries.
+        workItems.push_back(pool.SubmitWork([&onWork, &items, i]() { return onWork(items[i]); }));
     }
 
     for (size_t i = 0; i < items.size(); ++i)

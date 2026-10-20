@@ -344,6 +344,26 @@ class ForEachAsyncUnitTests
         VERIFY_ARE_EQUAL(7, results[0]);
     }
 
+    TEST_METHOD(ForEachAsync_BoolItemsAreReadWhenWorkRuns)
+    {
+        const std::vector<bool> items = {true, false, false, true, true, false, true, false};
+        std::vector<bool> results;
+
+        ForEachAsync<bool>(
+            items,
+            [](const bool& item) {
+                // Delays the work so that queued items typically run after submission has finished
+                // iterating the input vector. The result must match the input regardless of timing.
+                Sleep(10);
+                return item;
+            },
+            [&](bool result) { results.push_back(result); },
+            [](const bool& /*item*/, const std::exception_ptr& /*error*/) { VERIFY_FAIL(L"Unexpected error"); },
+            1);
+
+        VERIFY_IS_TRUE(items == results);
+    }
+
     TEST_METHOD(ForEachAsync_ConcurrencyOfOneRunsSerially)
     {
         const std::vector<int> items = {1, 2, 3, 4, 5};
