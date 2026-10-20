@@ -6952,7 +6952,7 @@ class WSLCTests
 
             WSLCContainerState state{};
             VERIFY_SUCCEEDED(container.Get().GetState(&state));
-            VERIFY_ARE_NOT_EQUAL(WslcContainerStateInvalid, state);
+            VERIFY_ARE_EQUAL(WslcContainerStateExited, state);
             container.SetDeleteOnClose(false);
         }
 
@@ -13349,6 +13349,7 @@ class WSLCTests
     WSLC_TEST_METHOD(ContainerCallRetainsSession)
     {
         auto session = CreateSession(GetDefaultSessionSettings(L"container-call-lifetime"));
+        LoadTestImage(*session, "alpine:latest");
 
         ULONG sessionId{};
         wil::unique_handle terminationEvent;
@@ -13417,6 +13418,8 @@ class WSLCTests
             {
                 const auto settings = GetDefaultSessionSettings(L"container-process-host-lifetime");
                 auto session = CreateSession(settings);
+                LoadTestImage(*session, "alpine:latest");
+
                 wil::unique_handle hostProcess;
                 wil::unique_handle terminationEvent;
                 VERIFY_SUCCEEDED(session->GetProcessHandle(&hostProcess));
@@ -13491,6 +13494,41 @@ class WSLCTests
 
                 VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(hostProcess.get(), 60 * 1000));
             }
+        }
+    }
+
+    WSLC_TEST_METHOD(RunningContainerOutlivesSession)
+    {
+        for (const bool terminate : {false, true})
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(L"running-container-host-lifetime"));
+            LoadTestImage(*session, "alpine:latest");
+
+            wil::unique_handle hostProcess;
+            wil::unique_handle terminationEvent;
+            VERIFY_SUCCEEDED(session->GetProcessHandle(&hostProcess));
+            VERIFY_SUCCEEDED(session->GetTerminationEvent(&terminationEvent));
+
+            WSLCContainerLauncher launcher("alpine:latest", "outlive-session", {"/bin/sleep", "600"});
+            auto container = launcher.Launch(*session);
+            container.SetDeleteOnClose(false);
+            VERIFY_ARE_EQUAL(WslcContainerStateRunning, container.State());
+
+            if (terminate)
+            {
+                VERIFY_SUCCEEDED(session->Terminate());
+                VERIFY_ARE_EQUAL(WslcContainerStateExited, container.State());
+            }
+
+            session.reset();
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(terminationEvent.get(), 60 * 1000));
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(hostProcess.get(), 0));
+
+            VERIFY_ARE_EQUAL(WslcContainerStateExited, container.State());
+            VERIFY_ARE_EQUAL(128 + WSLCSignalSIGKILL, container.GetInitProcess().Wait(30 * 1000));
+
+            container.Reset();
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(hostProcess.get(), 60 * 1000));
         }
     }
 

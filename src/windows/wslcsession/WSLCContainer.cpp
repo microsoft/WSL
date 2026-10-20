@@ -919,6 +919,17 @@ WSLCContainerImpl::~WSLCContainerImpl()
         unique_com_disconnect wrapper;
         {
             auto lock = m_lock.lock_exclusive();
+            if (m_state == WslcContainerStateRunning)
+            {
+                // Session teardown may not deliver a Docker exit event before disconnecting the wrapper.
+                m_state = WslcContainerStateExited;
+                if (m_comWrapper)
+                {
+                    std::lock_guard processesLock{m_processesLock};
+                    m_comWrapper->CacheState(m_state, m_initProcess);
+                }
+            }
+
             wrapper = ReleaseResources();
         }
     }
