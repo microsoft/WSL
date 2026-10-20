@@ -649,6 +649,53 @@ STDAPI WslcSessionAuthenticate(
 
 STDAPI WslcListSessionImages(_In_ WslcSession session, _Outptr_result_buffer_(*count) WslcImageInfo** images, _Out_ uint32_t* count);
 
+// NETWORKS
+
+#define WSLC_NETWORK_ID_LENGTH 65      // 64 chars + null
+#define WSLC_NETWORK_NAME_LENGTH 256   // 255 chars + null
+#define WSLC_NETWORK_DRIVER_LENGTH 256 // 255 chars + null
+#define WSLC_NETWORK_SCOPE_LENGTH 256  // 255 chars + null
+
+typedef struct WslcNetworkInfo
+{
+    CHAR id[WSLC_NETWORK_ID_LENGTH];
+    CHAR name[WSLC_NETWORK_NAME_LENGTH];
+    CHAR driver[WSLC_NETWORK_DRIVER_LENGTH];
+    CHAR scope[WSLC_NETWORK_SCOPE_LENGTH];
+    int64_t createdUnixTime; // 0 if unknown.
+    BOOL enableIPv4;
+    BOOL enableIPv6;
+    BOOL internal;
+} WslcNetworkInfo;
+
+// Retrieves the list of networks in a session.
+//
+// Parameters:
+//   session
+//       A valid WslcSession handle.
+//
+//   networks
+//       On success, receives a pointer to a contiguous array of WslcNetworkInfo structures
+//       describing the networks, or null if there are none.
+//
+//       The array is allocated using CoTaskMemAlloc. The caller takes ownership of the
+//       memory and must free it by calling CoTaskMemFree when it is no longer needed.
+//
+//   count
+//       On success, receives the number of elements in the networks array.
+//       On failure, *count is set to 0.
+//
+//   errorMessage
+//       Optional. On failure, receives a human-readable error message. May be null.
+//
+// Return Value:
+//   S_OK on success. Otherwise, an HRESULT error code indicating the reason for failure.
+STDAPI WslcListSessionNetworks(
+    _In_ WslcSession session,
+    _Outptr_result_buffer_maybenull_(*count) WslcNetworkInfo** networks,
+    _Out_ uint32_t* count,
+    _Outptr_opt_result_z_ PWSTR* errorMessage);
+
 // STORAGE
 
 STDAPI WslcCreateSessionVhdVolume(_In_ WslcSession session, _In_ const WslcVhdRequirements* options, _Outptr_opt_result_z_ PWSTR* errorMessage);

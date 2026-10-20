@@ -1693,6 +1693,58 @@ try
 }
 CATCH_RETURN();
 
+STDAPI WslcListSessionNetworks(
+    _In_ WslcSession session, _Outptr_result_buffer_maybenull_(*count) WslcNetworkInfo** networks, _Out_ uint32_t* count, _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    static_assert(sizeof(WslcNetworkInfo::id) == sizeof(WSLCCompatNetworkInformation::Id), "Network ID size mismatch.");
+    static_assert(sizeof(WslcNetworkInfo::name) == sizeof(WSLCCompatNetworkInformation::Name), "Network name size mismatch.");
+    static_assert(
+        sizeof(WslcNetworkInfo::driver) == sizeof(WSLCCompatNetworkInformation::Driver), "Network driver size mismatch.");
+    static_assert(sizeof(WslcNetworkInfo::scope) == sizeof(WSLCCompatNetworkInformation::Scope), "Network scope size mismatch.");
+    static_assert(std::is_trivial_v<WslcNetworkInfo>, "WslcNetworkInfo must be trivial.");
+
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+
+    RETURN_HR_IF_NULL(E_POINTER, networks);
+    *networks = nullptr;
+    RETURN_HR_IF_NULL(E_POINTER, count);
+    *count = 0;
+
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+
+    wil::unique_cotaskmem_array_ptr<WSLCCompatNetworkInformation> networkInformation;
+    HRESULT hr = internalType->session->ListNetworks(&networkInformation, networkInformation.size_address<ULONG>());
+    if (FAILED(hr) || networkInformation.size() == 0)
+    {
+        return errorInfoWrapper.CaptureResult(hr);
+    }
+
+    auto result = wil::make_unique_cotaskmem<WslcNetworkInfo[]>(networkInformation.size());
+    for (size_t i = 0; i < networkInformation.size(); ++i)
+    {
+        const auto& source = networkInformation[i];
+        auto& target = result[i];
+        target = {};
+
+        THROW_HR_IF(E_UNEXPECTED, memcpy_s(target.id, sizeof(target.id), source.Id, sizeof(source.Id)) != 0);
+        THROW_HR_IF(E_UNEXPECTED, memcpy_s(target.name, sizeof(target.name), source.Name, sizeof(source.Name)) != 0);
+        THROW_HR_IF(E_UNEXPECTED, memcpy_s(target.driver, sizeof(target.driver), source.Driver, sizeof(source.Driver)) != 0);
+        THROW_HR_IF(E_UNEXPECTED, memcpy_s(target.scope, sizeof(target.scope), source.Scope, sizeof(source.Scope)) != 0);
+        target.createdUnixTime = source.Created;
+        target.enableIPv4 = source.EnableIPv4;
+        target.enableIPv6 = source.EnableIPv6;
+        target.internal = source.Internal;
+    }
+
+    *networks = result.release();
+    *count = static_cast<uint32_t>(networkInformation.size());
+
+    return errorInfoWrapper.CaptureResult(S_OK);
+}
+CATCH_RETURN();
+
 // STORAGE
 
 // INSTALL

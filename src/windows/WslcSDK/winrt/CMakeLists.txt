@@ -12,6 +12,7 @@ set(SOURCES
     ImageProgress.cpp
     InstallOptions.cpp
     InstallProgress.cpp
+    NetworkInfo.cpp
     Process.cpp
     ProcessCrashInformation.cpp
     ProcessSettings.cpp
@@ -38,6 +39,7 @@ set(HEADERS
     ImageProgress.h
     InstallOptions.h
     InstallProgress.h
+    NetworkInfo.h
     Process.h
     ProcessCrashInformation.h
     ProcessSettings.h

@@ -29,6 +29,10 @@ cpp_quote("#endif")
 #define WSLCCompat_MAX_VOLUME_DRIVER_LENGTH 255
 #define WSLCCompat_CONTAINER_ID_LENGTH 64
 #define WSLCCompat_MAX_BINDING_ADDRESS_LENGTH 45
+#define WSLCCompat_NETWORK_ID_LENGTH 64
+#define WSLCCompat_MAX_NETWORK_NAME_LENGTH 255
+#define WSLCCompat_MAX_NETWORK_DRIVER_LENGTH 255
+#define WSLCCompat_MAX_NETWORK_SCOPE_LENGTH 255
 
 typedef
 struct _WSLCCompatVersion {
@@ -308,6 +312,18 @@ typedef struct _WSLCCompatVolumeInformation
     char Driver[WSLCCompat_MAX_VOLUME_DRIVER_LENGTH + 1];
 } WSLCCompatVolumeInformation;
 
+typedef struct _WSLCCompatNetworkInformation
+{
+    char Id[WSLCCompat_NETWORK_ID_LENGTH + 1];
+    char Name[WSLCCompat_MAX_NETWORK_NAME_LENGTH + 1];
+    char Driver[WSLCCompat_MAX_NETWORK_DRIVER_LENGTH + 1];
+    char Scope[WSLCCompat_MAX_NETWORK_SCOPE_LENGTH + 1];
+    LONGLONG Created; // Unix timestamp, 0 if unknown
+    BOOL EnableIPv4;
+    BOOL EnableIPv6;
+    BOOL Internal;
+} WSLCCompatNetworkInformation;
+
 [
     uuid(DD7B2EF9-AA01-4F21-8A3A-29D394CBB579),
     pointer_default(unique),
@@ -347,6 +363,9 @@ interface IWSLCCompatSession : IUnknown
     HRESULT PushImage([in] LPCSTR Image, [in] LPCSTR RegistryAuthenticationInformation, [in, unique] IWSLCCompatProgressCallback* ProgressCallback, [in, unique] IWSLCCompatWarningCallback* WarningCallback);
 
     HRESULT RegisterCrashDumpCallback([in] IWSLCCompatCrashDumpCallback* Callback, [out] IUnknown** Subscription);
+
+    // Network management.
+    HRESULT ListNetworks([out, size_is(, *Count)] WSLCCompatNetworkInformation** Networks, [out] ULONG* Count);
 }
 
 [

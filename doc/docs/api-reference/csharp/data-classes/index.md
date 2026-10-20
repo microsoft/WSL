@@ -10,6 +10,7 @@
 - [ImageInfo](imageinfo.md)
 - [ImageProgress](imageprogress.md)
 - [InstallProgress](installprogress.md)
+- [NetworkInfo](networkinfo.md)
 - [ProcessCrashInformation](processcrashinformation.md)
 - [ServiceVersion](serviceversion.md)
 - [VhdOwner](vhdowner.md)

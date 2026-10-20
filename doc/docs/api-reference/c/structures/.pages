@@ -20,4 +20,5 @@ nav:
   - wslcimageinfo.md
   - wslctagimageoptions.md
   - wslcpushimageoptions.md
+  - wslcnetworkinfo.md
   - wslcversion.md

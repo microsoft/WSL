@@ -178,6 +178,18 @@ for (auto const& image : images)
 }
 ```
 
+## Session::GetNetworks()
+
+Returns a snapshot of networks in the session.
+
+```cpp
+auto networks = session.GetNetworks();
+for (auto const& network : networks)
+{
+    printf("%ws %ws\n", network.Name().c_str(), network.Driver().c_str());
+}
+```
+
 ## Session::Terminated event
 
 Raised when the session termination event is signaled.

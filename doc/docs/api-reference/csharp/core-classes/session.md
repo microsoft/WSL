@@ -28,6 +28,7 @@ public sealed class Session : IDisposable
     public void DeleteVhdVolume(string name);
     public AuthenticateResult Authenticate(Uri serverAddress, string username, string password);
     public IReadOnlyList<ImageInfo> GetImages();
+    public IReadOnlyList<NetworkInfo> GetNetworks();
     public void Dispose();
 }
 ```
@@ -224,6 +225,17 @@ Returns a snapshot of images known to the session.
 foreach (var image in session.GetImages())
 {
     Console.WriteLine(image.Name);
+}
+```
+
+## Session.GetNetworks()
+
+Returns a snapshot of networks in the session.
+
+```csharp
+foreach (var network in session.GetNetworks())
+{
+    Console.WriteLine($"{network.Name} ({network.Driver})");
 }
 ```
 

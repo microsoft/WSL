@@ -605,6 +605,64 @@ class WslcSdkWinRtTests
     }
 
     // -----------------------------------------------------------------------
+    // Network tests
+    // -----------------------------------------------------------------------
+
+    WSLC_TEST_METHOD(NetworkList)
+    {
+        constexpr auto c_networkName = "wslc-sdk-winrt-list-network";
+        const winrt::hstring networkName = winrt::to_hstring(c_networkName);
+
+        auto comSession =
+            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->session.query<IWSLCSession>();
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName));
+
+        WSLCNetworkOptions options{};
+        options.Name = c_networkName;
+        options.Driver = "bridge";
+        options.Internal = TRUE;
+        VERIFY_SUCCEEDED(comSession->CreateNetwork(&options, nullptr));
+        auto cleanupNetwork = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName)); });
+
+        auto findNetwork = [](auto const& networks, winrt::hstring const& name) -> WSLCSDK::NetworkInfo {
+            for (auto const& network : networks)
+            {
+                if (network.Name() == name)
+                {
+                    return network;
+                }
+            }
+
+            return nullptr;
+        };
+
+        // Positive: the list includes the predefined bridge network and the created network with all fields.
+        {
+            const auto networks = m_defaultSession.GetNetworks();
+
+            const auto bridge = findNetwork(networks, L"bridge");
+            VERIFY_IS_NOT_NULL(bridge);
+            VERIFY_ARE_EQUAL(bridge.Driver(), winrt::hstring{L"bridge"});
+
+            const auto created = findNetwork(networks, networkName);
+            VERIFY_IS_NOT_NULL(created);
+            VERIFY_ARE_EQUAL(created.Id().size(), 64u);
+            VERIFY_ARE_EQUAL(created.Driver(), winrt::hstring{L"bridge"});
+            VERIFY_ARE_EQUAL(created.Scope(), winrt::hstring{L"local"});
+            VERIFY_IS_GREATER_THAN(created.CreatedTimestamp().time_since_epoch().count(), 0ll);
+            VERIFY_IS_TRUE(created.Internal());
+            VERIFY_IS_FALSE(created.EnableIPv6());
+        }
+
+        // Positive: a deleted network is no longer listed.
+        {
+            VERIFY_SUCCEEDED(comSession->DeleteNetwork(c_networkName));
+            cleanupNetwork.release();
+
+            VERIFY_IS_NULL(findNetwork(m_defaultSession.GetNetworks(), networkName));
+        }
+    }
+    // -----------------------------------------------------------------------
     // Container lifecycle tests
     // -----------------------------------------------------------------------
 

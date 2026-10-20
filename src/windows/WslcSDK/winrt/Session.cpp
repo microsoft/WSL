@@ -404,6 +404,25 @@ IVectorView<winrt::Microsoft::WSL::Containers::ImageInfo> Session::GetImages()
     return winrt::single_threaded_vector(std::move(images)).GetView();
 }
 
+IVectorView<winrt::Microsoft::WSL::Containers::NetworkInfo> Session::GetNetworks()
+{
+    EnsureStarted();
+
+    wil::unique_cotaskmem_array_ptr<WslcNetworkInfo> networksArray;
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcListSessionNetworks(ToHandle(), networksArray.put(), networksArray.size_address<uint32_t>(), errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
+
+    auto networks = std::vector<winrt::Microsoft::WSL::Containers::NetworkInfo>();
+    networks.reserve(networksArray.size());
+    for (uint32_t i = 0; i < networksArray.size(); i++)
+    {
+        networks.push_back(winrt::make<implementation::NetworkInfo>(networksArray[i]));
+    }
+
+    return winrt::single_threaded_vector(std::move(networks)).GetView();
+}
+
 WslcSession Session::ToHandle()
 {
     EnsureStarted();

@@ -8,6 +8,7 @@ nav:
   - imageinfo.md
   - imageprogress.md
   - installprogress.md
+  - networkinfo.md
   - processcrashinformation.md
   - serviceversion.md
   - vhdowner.md

@@ -91,6 +91,8 @@ namespace Microsoft.WSL.Containers
 
         IVectorView<ImageInfo> GetImages();
 
+        IVectorView<NetworkInfo> GetNetworks();
+
         event SessionTerminationHandler Terminated;
         event ProcessCrashHandler ProcessCrashed;
     };
@@ -363,6 +365,18 @@ namespace Microsoft.WSL.Containers
         Windows.Storage.Streams.IBuffer Sha256 { get; };
         UInt64 Size { get; };
         Windows.Foundation.DateTime CreatedTimestamp { get; };
+    };
+
+    runtimeclass NetworkInfo
+    {
+        String Id { get; };
+        String Name { get; };
+        String Driver { get; };
+        String Scope { get; };
+        Windows.Foundation.DateTime CreatedTimestamp { get; };
+        Boolean EnableIPv4 { get; };
+        Boolean EnableIPv6 { get; };
+        Boolean Internal { get; };
     };
 
     // Ensure wslcsdk.h and wslc.idl are also updated.

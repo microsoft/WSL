@@ -471,6 +471,73 @@ class WslcSdkTests
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Network tests
+    // -----------------------------------------------------------------------
+
+    WSLC_TEST_METHOD(NetworkList)
+    {
+        constexpr auto c_networkName = "wslc-sdk-list-network";
+
+        auto comSession = reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session.query<IWSLCSession>();
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName));
+
+        WSLCNetworkOptions options{};
+        options.Name = c_networkName;
+        options.Driver = "bridge";
+        options.Internal = TRUE;
+        VERIFY_SUCCEEDED(comSession->CreateNetwork(&options, nullptr));
+        auto cleanupNetwork = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName)); });
+
+        auto findNetwork = [](const WslcNetworkInfo* networks, uint32_t count, std::string_view name) -> const WslcNetworkInfo* {
+            for (uint32_t i = 0; i < count; ++i)
+            {
+                if (name == networks[i].name)
+                {
+                    return &networks[i];
+                }
+            }
+
+            return nullptr;
+        };
+
+        // Positive: the list includes the predefined bridge network and the created network with all fields.
+        {
+            wil::unique_cotaskmem_array_ptr<WslcNetworkInfo> networks;
+            VERIFY_SUCCEEDED(WslcListSessionNetworks(m_defaultSession, networks.addressof(), networks.size_address<uint32_t>(), nullptr));
+
+            const auto* bridge = findNetwork(networks.get(), static_cast<uint32_t>(networks.size()), "bridge");
+            VERIFY_IS_NOT_NULL(bridge);
+            VERIFY_ARE_EQUAL(std::string("bridge"), bridge->driver);
+
+            const auto* created = findNetwork(networks.get(), static_cast<uint32_t>(networks.size()), c_networkName);
+            VERIFY_IS_NOT_NULL(created);
+            VERIFY_ARE_EQUAL(strlen(created->id), size_t{64});
+            VERIFY_ARE_EQUAL(std::string("bridge"), created->driver);
+            VERIFY_ARE_EQUAL(std::string("local"), created->scope);
+            VERIFY_IS_GREATER_THAN(created->createdUnixTime, 0ll);
+            VERIFY_IS_TRUE(created->internal);
+            VERIFY_IS_FALSE(created->enableIPv6);
+        }
+
+        // Positive: a deleted network is no longer listed.
+        {
+            VERIFY_SUCCEEDED(comSession->DeleteNetwork(c_networkName));
+            cleanupNetwork.release();
+
+            wil::unique_cotaskmem_array_ptr<WslcNetworkInfo> networks;
+            VERIFY_SUCCEEDED(WslcListSessionNetworks(m_defaultSession, networks.addressof(), networks.size_address<uint32_t>(), nullptr));
+            VERIFY_IS_NULL(findNetwork(networks.get(), static_cast<uint32_t>(networks.size()), c_networkName));
+        }
+
+        // Negative: invalid arguments.
+        {
+            WslcNetworkInfo* networks = nullptr;
+            uint32_t count = 0;
+            VERIFY_ARE_EQUAL(WslcListSessionNetworks(m_defaultSession, nullptr, &count, nullptr), E_POINTER);
+            VERIFY_ARE_EQUAL(WslcListSessionNetworks(m_defaultSession, &networks, nullptr, nullptr), E_POINTER);
+        }
+    }
     WSLC_TEST_METHOD(LoadImage)
     {
         // Positive: load a saved image tar and verify the image can be run.
