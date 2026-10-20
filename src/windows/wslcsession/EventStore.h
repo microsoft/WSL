@@ -13,6 +13,7 @@
 #include <vector>
 #include "wslc.h"
 #include "wslc_schema.h"
+#include "RuntimeClass.h"
 
 namespace wsl::windows::service::wslc {
 
@@ -62,8 +63,7 @@ private:
     _Guarded_by_(m_lock) bool m_terminating = false;
 };
 
-class EventStream
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCEventStream, IFastRundown>
+class EventStream : public common::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCEventStream, IFastRundown>
 {
 public:
     HRESULT RuntimeClassInitialize(

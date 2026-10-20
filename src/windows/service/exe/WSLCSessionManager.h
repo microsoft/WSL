@@ -34,6 +34,7 @@ Abstract:
 #include "wslc.h"
 #include "WSLCCompat.h"
 #include "COMImplClass.h"
+#include "RuntimeClass.h"
 #include "wslutil.h"
 #include <atomic>
 #include <algorithm>
@@ -124,7 +125,7 @@ private:
         auto each = [&](SessionEntry& entry) {
             // Try to open the session via the service ref.
             // Fails with ERROR_OBJECT_NO_LONGER_EXISTS if released,
-            // ERROR_INVALID_STATE if terminated, or RPC error if per-user process is dead.
+            // ERROR_INVALID_STATE if terminated, or RPC error if the reference is disconnected or the host exited.
             wil::com_ptr<IWSLCSession> lockedSession;
             if (FAILED_LOG(entry.Ref->OpenSession(&lockedSession)))
             {
@@ -201,7 +202,7 @@ private:
 } // namespace wsl::windows::service::wslc
 
 class DECLSPEC_UUID("a9b7a1b9-0671-405c-95f1-e0612cb4ce8f") WSLCSessionManager
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCSessionManager, IWSLCCompatSessionManager, IFastRundown, ISupportErrorInfo>,
+    : public wsl::windows::common::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCSessionManager, IWSLCCompatSessionManager, IFastRundown, ISupportErrorInfo>,
       public wsl::windows::service::wslc::COMImplClass<wsl::windows::service::wslc::WSLCSessionManagerImpl>
 {
 public:
