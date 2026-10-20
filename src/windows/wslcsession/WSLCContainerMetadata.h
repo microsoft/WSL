@@ -44,21 +44,23 @@ struct WSLCVolumeMount
 
     // Non-empty when the mount target is a single file rather than a directory.
     std::wstring SourceFilename;
+    bool CreateSourceIfMissing{true};
 
     // Runtime-only field. Not serialized to JSON.
     bool Mounted{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCVolumeMount, HostPath, ParentVMPath, ContainerPath, ReadOnly, SourceFilename);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCVolumeMount, HostPath, ParentVMPath, ContainerPath, ReadOnly, SourceFilename, CreateSourceIfMissing);
 };
 
 struct WSLCContainerMetadataV1
 {
     WSLCContainerFlags Flags{WSLCContainerFlagsNone};
     WSLCProcessFlags InitProcessFlags{WSLCProcessFlagsNone};
+    std::string Image;
     std::vector<WSLCPortMapping> Ports;
     std::vector<WSLCVolumeMount> Volumes;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCContainerMetadataV1, Flags, InitProcessFlags, Ports, Volumes);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCContainerMetadataV1, Flags, InitProcessFlags, Image, Ports, Volumes);
 };
 
 struct WSLCContainerMetadata

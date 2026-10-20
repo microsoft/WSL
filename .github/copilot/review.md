@@ -3,9 +3,9 @@
 When reviewing code, enforce the conventions in `.github/copilot-instructions.md`. Focus especially on these high-risk areas:
 
 ### ABI Safety (Critical)
-- **Flag** new methods added to existing COM interfaces without a new versioned interface/IID
-- **Flag** changed struct layouts in IDL files
-- **Flag** changes to `WSLPluginHooksV1` or `WSLPluginAPIV1` structs (public API)
+Only the SDK-facing and public surfaces require a backward-compatible ABI. Every other COM interface (`wslc.idl`, `wslservice.idl`, etc.) is internal and non-stable: shipped in lockstep with its only clients, with the proxy/stub regenerated each build, so methods may be appended to those freely. Do **not** flag internal, non-stable interfaces.
+- **Flag** ABI-breaking changes (new, removed, or reordered methods, changed struct layouts) only in the stable surfaces: `WSLCCompat.idl` (the WSLC SDK-facing layer, which must stay backward compatible) and the public plugin API (`WSLPluginHooksV1` / `WSLPluginAPIV1` structs in `WslPluginApi.h`).
+- **Do not flag** new methods appended to internal, non-stable interfaces such as `IWSLCSession` in `wslc.idl`, or interfaces in `wslservice.idl`.
 
 ### Resource Safety
 - **Flag** raw `CloseHandle()`, `delete`, `free()`, or manual resource cleanup — require WIL smart pointers

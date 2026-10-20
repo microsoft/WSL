@@ -191,6 +191,11 @@ public:
     IFACEMETHOD(ResizeDistribution)(_In_ LPCGUID DistroGuid, _In_ HANDLE OutputHandle, _In_ ULONG64 NewSize, _Out_ LXSS_ERROR_INFO* Error) override;
 
     /// <summary>
+    /// Compacts the virtual disk of a distribution.
+    /// </summary>
+    IFACEMETHOD(CompactDistribution)(_In_ LPCGUID DistroGuid, _Out_ LXSS_ERROR_INFO* Error) override;
+
+    /// <summary>
     /// Sets the default distribution.
     /// </summary>
     IFACEMETHOD(SetDefaultDistribution)(_In_ LPCGUID DistroGuid, _Out_ LXSS_ERROR_INFO* Error) override;
@@ -308,7 +313,7 @@ private:
 /// <summary>
 /// Each user gets its own LxssUserSessionImpl object, This object manages the lifetime of running instances.
 /// </summary>
-class LxssUserSessionImpl
+class LxssUserSessionImpl : public std::enable_shared_from_this<LxssUserSessionImpl>
 {
 public:
     LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId, _Inout_ wsl::windows::service::PluginManager& pluginManager);
@@ -468,6 +473,12 @@ public:
     ResizeDistribution(_In_ LPCGUID DistroGuid, _In_ HANDLE OutputHandle, _In_ ULONG64 NewSize);
 
     /// <summary>
+    /// Compacts the disk of a distribution.
+    /// </summary>
+    HRESULT
+    CompactDistribution(_In_ LPCGUID DistroGuid);
+
+    /// <summary>
     /// Sets the default distribution.
     /// </summary>
     HRESULT
@@ -533,6 +544,13 @@ public:
     static CreateLxProcessContext s_GetCreateProcessContext(_In_ const GUID& DistroGuid, _In_ bool SystemDistro);
 
 private:
+    /// <summary>
+    /// Clear the list of terminated instances.
+    /// </summary>
+    _Requires_lock_not_held_(m_instanceLock)
+    _Requires_lock_not_held_(m_terminatedInstanceLock)
+    void _ClearTerminatedInstances();
+
     /// <summary>
     /// Adds a distro to the list of converting distros.
     /// </summary>
@@ -620,6 +638,7 @@ private:
     /// <summary>
     /// Return a new config after policies have been applied.
     /// </summary>
+    _Requires_exclusive_lock_held_(m_instanceLock)
     wsl::core::Config _GetResultantConfig(_In_ const HANDLE userToken);
 
     _Requires_exclusive_lock_held_(m_instanceLock)
@@ -673,10 +692,10 @@ private:
     static void _SetDistributionInstalled(_In_ HKEY LxssKey, _In_ const GUID& DistroGuid);
 
     /// <summary>
-    /// Removes a utility vm from the list.
+    /// Terminates the distribution only if its current instance matches the callback's lifetime registration.
     /// </summary>
     _Requires_lock_not_held_(m_instanceLock)
-    bool _TerminateInstance(_In_ LPCGUID DistroGuid, _In_ bool CheckForClients);
+    bool _TerminateInstance(_In_ LPCGUID DistroGuid, _In_ ULONG64 ClientLifetimeId, _In_ bool CheckForClients);
 
     _Requires_exclusive_lock_held_(m_instanceLock)
     bool _TerminateInstanceInternal(_In_ LPCGUID DistroGuid, _In_ bool CheckForClients = false);
@@ -707,6 +726,7 @@ private:
 
     /// <summary>
     /// Validates that the given path or name is not already in use by a registered distribution.
+    /// N.B. Enumeration may unregister orphaned distributions and terminate their instances.
     /// </summary>
     _Requires_lock_held_(m_instanceLock)
     void _ValidateDistributionNameAndPathNotInUse(
@@ -739,7 +759,7 @@ private:
     /// <summary>
     /// Configures HttpProxy info for the process
     /// </summary>
-    void _SetHttpProxyInfo(_Inout_ std::vector<std::string>& environment) const noexcept;
+    void _SetHttpProxyInfo(_Inout_ std::vector<std::string>& environment) noexcept;
 
     /// <summary>
     /// Launch OOBE for the first time or skip.
@@ -757,9 +777,11 @@ private:
     static LXSS_DISTRO_CONFIGURATION s_GetDistributionConfiguration(const wsl::windows::service::DistributionRegistration& Distro, bool skipName = false);
 
     /// <summary>
-    /// Impersonate the user and open the lxss registry key
+    /// Impersonate the specified user and open the lxss registry key.
     /// </summary>
-    static wil::unique_hkey s_OpenLxssUserKey();
+    static wil::unique_hkey s_OpenLxssUserKey(_In_ HANDLE UserToken);
+
+    static LX_INIT_DRVFS_MOUNT s_InitializeDrvFs(_In_ const std::weak_ptr<LxssUserSessionImpl>& Session, _In_ const GUID& VmId, _In_ HANDLE UserToken) noexcept;
 
     /// <summary>
     /// Ensures the distribution name is valid.
@@ -767,14 +789,16 @@ private:
     static void s_ValidateDistroName(_In_ LPCWSTR Name);
 
     /// <summary>
-    /// Callback for when a VM unexpectedly exits (crashes).
+    /// Queues cleanup when a VM unexpectedly exits (crashes).
     /// </summary>
     static void s_VmTerminated(_Inout_ LxssUserSessionImpl* UserSession, _In_ const GUID& VmId);
 
+    static VOID CALLBACK s_ProcessVmExit(_Inout_ PTP_CALLBACK_INSTANCE, _Inout_opt_ PVOID Context, _Inout_ PTP_WORK);
+
     /// <summary>
-    /// Callback to terminate a utility VM.
+    /// Callback to terminate a specific instance of a distribution.
     /// </summary>
-    static bool s_TerminateInstance(_Inout_ LxssUserSessionImpl* UserSession, _In_ GUID DistroGuid, _In_ bool CheckForClients);
+    static bool s_TerminateInstance(_Inout_ LxssUserSessionImpl* UserSession, _In_ GUID DistroGuid, _In_ ULONG64 ClientLifetimeId, _In_ bool CheckForClients);
 
     /// <summary>
     /// Ensures that the init binary for the specified distribution is up-to-date.
@@ -817,6 +841,11 @@ private:
     std::atomic<GUID> m_vmId{GUID_NULL};
 
     /// <summary>
+    /// True when the VM termination callback should not perform session cleanup.
+    /// </summary>
+    std::atomic<bool> m_suppressVmTerminationCallback{false};
+
+    /// <summary>
     /// Contains the user sid for the session.
     /// </summary>
     SE_SID m_userSid;
@@ -835,6 +864,16 @@ private:
     /// Timer to control terminating the Linux utility VM.
     /// </summary>
     wil::unique_threadpool_timer m_vmTerminationTimer;
+
+    /// <summary>
+    /// ID of the last VM that exited.
+    /// </summary>
+    std::atomic<GUID> m_exitedVmId{GUID_NULL};
+
+    /// <summary>
+    /// Work item to handle VM exit.
+    /// </summary>
+    wil::unique_threadpool_work m_vmExitWork;
 
     /// <summary>
     /// Signaled when the utility vm is terminating.
@@ -865,8 +904,9 @@ private:
     /// Listens to host http proxy setting changes, tracks ongoing proxy queries, and stores current settings.
     /// Information used to configure Linux proxy environment variables.
     /// </summary>
-    std::shared_ptr<HttpProxyStateTracker> m_httpProxyStateTracker{};
+    _Guarded_by_(m_instanceLock) std::shared_ptr<HttpProxyStateTracker> m_httpProxyStateTracker {};
 
+    wil::unique_event m_timezoneStopEvent{wil::EventOptions::ManualReset};
     std::thread m_timezoneThread;
 };
 

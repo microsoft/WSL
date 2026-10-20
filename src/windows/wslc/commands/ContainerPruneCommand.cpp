@@ -27,7 +27,8 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ContainerPruneCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::Session),
+        Argument::Create(ArgType::Filter, {.Alias = NO_ALIAS, .Limit = Limit::Unlimited, .Desc = Localization::WSLCCLI_PruneFilterArgDescription()}),
+        Argument::Create(ArgType::Force, {.Desc = Localization::WSLCCLI_PruneForceArgDescription()}),
     };
 }
 
@@ -43,8 +44,8 @@ std::wstring ContainerPruneCommand::LongDescription() const
 
 void ContainerPruneCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << PruneContainers;
 }
 } // namespace wsl::windows::wslc

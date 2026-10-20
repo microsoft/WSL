@@ -16,10 +16,13 @@ namespace wil {
 #define FAIL_FAST() raise(SIGABRT);
 #define FAIL_FAST_CAUGHT_EXCEPTION() FAIL_FAST()
 #define FAIL_FAST_IF(condition) \
-    if ((condition)) \
+    do \
     { \
-        FAIL_FAST() \
-    }
+        if ((condition)) \
+        { \
+            FAIL_FAST(); \
+        } \
+    } while ((void)0, 0)
 
 typedef void LogFunction(const char* message, const char* exceptionDescription) noexcept;
 __declspec(selectany) LogFunction* g_LogExceptionCallback{};
@@ -90,59 +93,6 @@ private:
 };
 
 namespace details {
-    template <typename TLambda>
-    class lambda_call
-    {
-    public:
-        lambda_call(const lambda_call&) = delete;
-        lambda_call& operator=(const lambda_call&) = delete;
-        lambda_call& operator=(lambda_call&& other) = delete;
-
-        explicit lambda_call(TLambda&& lambda) noexcept : m_lambda(std::move(lambda))
-        {
-            static_assert(std::is_same<decltype(lambda()), void>::value, "scope_exit lambdas must not have a return value");
-            static_assert(
-                !std::is_lvalue_reference<TLambda>::value && !std::is_rvalue_reference<TLambda>::value,
-                "scope_exit should only be directly used with a lambda");
-        }
-
-        lambda_call(lambda_call&& other) noexcept : m_lambda(std::move(other.m_lambda)), m_call(other.m_call)
-        {
-            other.m_call = false;
-        }
-
-        ~lambda_call() noexcept
-        {
-            reset();
-        }
-
-        // Ensures the scope_exit lambda will not be called
-        void release() noexcept
-        {
-            m_call = false;
-        }
-
-        // Executes the scope_exit lambda immediately if not yet run; ensures it will not run again
-        void reset() noexcept
-        {
-            if (m_call)
-            {
-                m_call = false;
-                m_lambda();
-            }
-        }
-
-        // Returns true if the scope_exit lambda is still going to be executed
-        explicit operator bool() const noexcept
-        {
-            return m_call;
-        }
-
-    protected:
-        TLambda m_lambda;
-        bool m_call = true;
-    };
-
     inline void ThrowErrorIf(bool condition, int error, FailureInfo info)
     {
         if (condition)
@@ -190,6 +140,68 @@ namespace details {
             LogFailure(message, nullptr);
         }
     }
+
+    template <typename TLambda>
+    class lambda_call
+    {
+    public:
+        lambda_call(const lambda_call&) = delete;
+        lambda_call& operator=(const lambda_call&) = delete;
+        lambda_call& operator=(lambda_call&& other) = delete;
+
+        explicit lambda_call(TLambda&& lambda) noexcept : m_lambda(std::move(lambda))
+        {
+            static_assert(std::is_same<decltype(lambda()), void>::value, "scope_exit lambdas must not have a return value");
+            static_assert(
+                !std::is_lvalue_reference<TLambda>::value && !std::is_rvalue_reference<TLambda>::value,
+                "scope_exit should only be directly used with a lambda");
+        }
+
+        lambda_call(lambda_call&& other) noexcept : m_lambda(std::move(other.m_lambda)), m_call(other.m_call)
+        {
+            other.m_call = false;
+        }
+
+        ~lambda_call() noexcept
+        {
+            reset();
+        }
+
+        // Ensures the scope_exit lambda will not be called
+        void release() noexcept
+        {
+            m_call = false;
+        }
+
+        // Executes the scope_exit lambda immediately if not yet run; ensures it will not run again
+        void reset() noexcept
+        {
+            if (m_call)
+            {
+                m_call = false;
+
+                try
+                {
+                    m_lambda();
+                }
+                catch (...)
+                {
+                    LogCaughtException("Exception thrown from a scope_exit lambda");
+                }
+            }
+        }
+
+        // Returns true if the scope_exit lambda is still going to be executed
+        explicit operator bool() const noexcept
+        {
+            return m_call;
+        }
+
+    protected:
+        TLambda m_lambda;
+        bool m_call = true;
+    };
+
 } // namespace details
 
 inline int ResultFromCaughtException()
@@ -641,10 +653,13 @@ using integral_from_enum = typename details::variable_size_mapping<T>::type;
 #define WI_ASSERT(condition) assert(condition)
 
 #define EMIT_USER_WARNING(Warning) \
-    if (::wil::ScopedWarningsCollector::CanCollectWarning()) \
+    do \
     { \
-        ::wil::ScopedWarningsCollector::CollectWarning(Warning); \
-    }
+        if (::wil::ScopedWarningsCollector::CanCollectWarning()) \
+        { \
+            ::wil::ScopedWarningsCollector::CollectWarning(Warning); \
+        } \
+    } while ((void)0, 0)
 
 class ScopedWarningsCollector
 {

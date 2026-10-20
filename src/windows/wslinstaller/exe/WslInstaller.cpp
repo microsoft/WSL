@@ -24,7 +24,7 @@ std::wstring GetMsiPackagePath()
 
     static_assert(!wsl::shared::OfficialBuild);
 
-    return std::filesystem::weakly_canonical(WSL_DEV_THIN_MSI_PACKAGE).wstring();
+    return wsl::windows::common::filesystem::GetCanonicalPath(WSL_DEV_THIN_MSI_PACKAGE).wstring();
 
 #endif
 
@@ -50,7 +50,7 @@ try
     }
 
     // A canonical path is required because msiexec doesn't like symlinks.
-    return UpgradeLogInfo{std::filesystem::weakly_canonical(path), true};
+    return UpgradeLogInfo{wsl::windows::common::filesystem::GetCanonicalPath(path), true};
 }
 catch (...)
 {

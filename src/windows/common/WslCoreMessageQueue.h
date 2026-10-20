@@ -171,10 +171,11 @@ public:
             const auto queueLock = m_lock.lock_exclusive();
             THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_CANCELLED), m_isCanceled);
             m_workItems.emplace_back(new_result);
+
+            // always maintain a 1:1 ratio for calls to submit_with_results() and ::SubmitThreadpoolWork
+            SubmitThreadpoolWork(m_tpHandle.get());
         }
 
-        // always maintain a 1:1 ratio for calls to SubmitWorkWithResults() and ::SubmitThreadpoolWork
-        SubmitThreadpoolWork(m_tpHandle.get());
         return new_result;
     }
     catch (...)
@@ -194,10 +195,11 @@ public:
             const auto queueLock = m_lock.lock_exclusive();
             THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_CANCELLED), m_isCanceled);
             m_workItems.emplace_back(std::forward<SimpleFunction_t>(functor));
+
+            // always maintain a 1:1 ratio for calls to submit() and ::SubmitThreadpoolWork
+            SubmitThreadpoolWork(m_tpHandle.get());
         }
 
-        // always maintain a 1:1 ratio for calls to SubmitWork() and ::SubmitThreadpoolWork
-        SubmitThreadpoolWork(m_tpHandle.get());
         return true;
     }
     catch (...)

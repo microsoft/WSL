@@ -34,11 +34,9 @@ void wsl::core::filesystem::CreateVhd(_In_ LPCWSTR target, _In_ ULONGLONG maximu
         !wsl::windows::common::string::IsPathComponentEqual(
             std::filesystem::path{target}.extension().native(), windows::common::wslutil::c_vhdxFileExtension));
 
-    // Disable creation of sparse VHDs while data corruption is being debugged.
     if (sparse)
     {
-        sparse = false;
-        EMIT_USER_WARNING(wsl::shared::Localization::MessageSparseVhdDisabled());
+        EMIT_USER_WARNING(wsl::shared::Localization::MessageSparseVhdUnsafe());
     }
 
     VIRTUAL_STORAGE_TYPE storageType{};
@@ -67,6 +65,30 @@ void wsl::core::filesystem::CreateVhd(_In_ LPCWSTR target, _In_ ULONGLONG maximu
     //      to the VHD because the operation is done while impersonating the user.
     auto sd = windows::common::security::CreateSecurityDescriptor(userSid);
 
+    // Explicitly grant access to the user and BUILTIN\Administrators.
+    // Administrator access preserves compatibility with older WSL versions that open VHDs as SYSTEM,
+    // whose token includes the Administrators group.
+    auto [administratorsSid, administratorsSidBuffer] =
+        windows::common::security::CreateSid(SECURITY_NT_AUTHORITY, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS);
+
+    EXPLICIT_ACCESS access[2]{};
+    access[0].grfAccessMode = SET_ACCESS;
+    access[0].grfAccessPermissions = FILE_ALL_ACCESS;
+    access[0].grfInheritance = NO_INHERITANCE;
+    BuildTrusteeWithSid(&access[0].Trustee, userSid);
+
+    access[1].grfAccessMode = SET_ACCESS;
+    access[1].grfAccessPermissions = FILE_ALL_ACCESS;
+    access[1].grfInheritance = NO_INHERITANCE;
+    BuildTrusteeWithSid(&access[1].Trustee, administratorsSid);
+
+    windows::common::security::unique_acl acl;
+    THROW_IF_WIN32_ERROR(SetEntriesInAcl(ARRAYSIZE(access), access, nullptr, &acl));
+    THROW_IF_WIN32_BOOL_FALSE(SetSecurityDescriptorDacl(&sd, true, acl.get(), false));
+
+    // Do not inherit permissions that could grant other users access to the VHD.
+    THROW_IF_WIN32_BOOL_FALSE(SetSecurityDescriptorControl(&sd, SE_DACL_PROTECTED, SE_DACL_PROTECTED));
+
     wil::unique_hfile vhd{};
     auto result = HRESULT_FROM_WIN32(
         ::CreateVirtualDisk(&storageType, target, VIRTUAL_DISK_ACCESS_NONE, &sd, flags, 0, &createVhdParameters, nullptr, &vhd));
@@ -90,6 +112,16 @@ wil::unique_handle wsl::core::filesystem::OpenVhd(_In_ LPCWSTR Path, _In_ VIRTUA
     THROW_IF_WIN32_ERROR(OpenVirtualDisk(&storageType, Path, Mask, OPEN_VIRTUAL_DISK_FLAG_NONE, nullptr, &disk));
 
     return disk;
+}
+
+void wsl::core::filesystem::CompactVhd(_In_ LPCWSTR Path)
+{
+    auto diskHandle = OpenVhd(Path, VIRTUAL_DISK_ACCESS_GET_INFO | VIRTUAL_DISK_ACCESS_METAOPS);
+
+    COMPACT_VIRTUAL_DISK_PARAMETERS compact{};
+    compact.Version = COMPACT_VIRTUAL_DISK_VERSION_1;
+
+    THROW_IF_WIN32_ERROR(CompactVirtualDisk(diskHandle.get(), COMPACT_VIRTUAL_DISK_FLAG_NONE, &compact, nullptr));
 }
 
 void wsl::core::filesystem::ResizeExistingVhd(_In_ HANDLE diskHandle, _In_ ULONGLONG maximumSize, _In_ RESIZE_VIRTUAL_DISK_FLAG resizeFlag)

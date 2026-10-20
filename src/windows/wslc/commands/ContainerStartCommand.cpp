@@ -27,10 +27,9 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ContainerStartCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ContainerId, true),
+        Argument::Create(ArgType::ContainerId, {.Required = true}),
         Argument::Create(ArgType::Attach),
         Argument::Create(ArgType::Interactive), // NYI
-        Argument::Create(ArgType::Session),     // NYI
     };
 }
 
@@ -46,6 +45,6 @@ std::wstring ContainerStartCommand::LongDescription() const
 
 void ContainerStartCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << CreateSession << StartContainer;
+    context << ResolveSession << StartContainer;
 }
 } // namespace wsl::windows::wslc

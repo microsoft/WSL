@@ -22,20 +22,28 @@ struct Container : ContainerT<Container>
 {
     Container() = default;
     Container(WslcSession session, winrt::Microsoft::WSL::Containers::ContainerSettings const& settings);
+    // Package-internal: wraps an already-opened container handle (from WslcOpenContainer).
+    explicit Container(WslcContainer handle, winrt::Microsoft::WSL::Containers::ProcessOutputMode initProcessOutputMode);
 
     void Start();
     void Stop(winrt::Microsoft::WSL::Containers::Signal const& signal, winrt::Windows::Foundation::TimeSpan timeout);
-    void Delete(winrt::Microsoft::WSL::Containers::DeleteContainerFlags const& flags);
+    void Delete(winrt::Microsoft::WSL::Containers::DeleteContainerOption const& flags);
     winrt::Microsoft::WSL::Containers::Process CreateProcess(winrt::Microsoft::WSL::Containers::ProcessSettings const& newProcessSettings);
     hstring Inspect();
     hstring Id();
     winrt::Microsoft::WSL::Containers::Process InitProcess();
     winrt::Microsoft::WSL::Containers::ContainerState State();
 
+    void Close();
+    static void final_release(std::unique_ptr<Container> self);
+
     WslcContainer ToHandle();
 
 private:
+    void EnsureNotClosed() const;
+
     winrt::com_ptr<implementation::Process> m_initProcess;
+    bool m_opened = false;
 
     // Releasing the container handle will end the processes and disconnect the callbacks.
     // Keep this at the end so that it is released first, ensuring the init process' events aren't destroyed while they may still be signaled.

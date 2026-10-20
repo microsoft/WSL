@@ -34,6 +34,8 @@ public:
     IFACEMETHOD(OnContainerStopping)(_In_ LPCSTR ContainerId) override;
     IFACEMETHOD(OnImageCreated)(_In_ LPCSTR InspectJson) override;
     IFACEMETHOD(OnImageDeleted)(_In_ LPCSTR ImageId) override;
+    IFACEMETHOD(OnVmStarted)() override;
+    IFACEMETHOD(OnVmStopping)() override;
 
 private:
     wsl::windows::service::PluginManager& m_plugins;

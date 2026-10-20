@@ -26,9 +26,8 @@ struct SessionCommand final : public Command
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 
-    std::vector<std::unique_ptr<Command>> GetCommands() const override;
-
 protected:
+    std::vector<std::unique_ptr<Command>> CreateCommands() const override;
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
@@ -52,6 +51,21 @@ struct SessionShellCommand final : public Command
 {
     constexpr static std::wstring_view CommandName = L"shell";
     SessionShellCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
+// Run Command
+struct SessionRunCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"run";
+    SessionRunCommand(const std::wstring& parent) : Command(CommandName, parent)
     {
     }
     std::vector<Argument> GetArguments() const override;

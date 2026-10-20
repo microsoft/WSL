@@ -36,13 +36,26 @@ std::vector<Route> RoutingTable::ListRoutes(int family)
             }
 
             auto readOptionalAddress = [&](int type) -> std::optional<Address> {
-                auto attribute = e.UniqueAttribute<const void*>(type);
-                if (!attribute.has_value())
+                const void* address = nullptr;
+                if (message->rtm_family == AF_INET)
+                {
+                    address = e.UniqueAttribute<in_addr>(type).value_or(nullptr);
+                }
+                else if (message->rtm_family == AF_INET6)
+                {
+                    address = e.UniqueAttribute<in6_addr>(type).value_or(nullptr);
+                }
+                else
+                {
+                    throw RuntimeErrorWithSourceLocation(std::format("Unexpected address family: {}", message->rtm_family));
+                }
+
+                if (address == nullptr)
                 {
                     return {};
                 }
 
-                return Address::FromBinary(message->rtm_family, message->rtm_dst_len, attribute.value());
+                return Address::FromBinary(message->rtm_family, message->rtm_dst_len, address);
             };
 
             auto to = readOptionalAddress(RTA_DST);
@@ -73,7 +86,7 @@ void RoutingTable::ModifyRoute(const Route& route, Operation action)
         throw RuntimeErrorWithSourceLocation(std::format("Unexpected address family: {}", route.family));
     }
 
-    assert(action == Operation::Create || action == Operation::Update || action == Operation::Remove);
+    assert(action == Operation::Create || action == Operation::Remove);
 
     if (route.family == AF_INET)
     {
@@ -90,12 +103,7 @@ void RoutingTable::ModifyRouteImpl(const Route& route, Operation action)
 {
     int flags = 0;
     int operation = 0;
-    if (action == Update)
-    {
-        flags = NLM_F_CREATE | NLM_F_REPLACE;
-        operation = RTM_NEWROUTE;
-    }
-    else if (action == Create)
+    if (action == Create)
     {
         flags = NLM_F_CREATE;
         operation = RTM_NEWROUTE;
@@ -139,6 +147,12 @@ void RoutingTable::SendMessage(const Route& route, int operation, int flags, con
     message.route.rtm_type = route.IsMulticast() ? RTN_MULTICAST : RTN_UNICAST;
     message.route.rtm_scope = route.IsOnlink() ? RT_SCOPE_LINK : RT_SCOPE_UNIVERSE;
     message.route.rtm_flags = RTM_F_NOTIFY;
+    // Default gateways received from the host are directly reachable through the specified interface,
+    // even when a VPN exposes the interface as a host route and the gateway is outside that prefix.
+    if (route.via.has_value() && (route.defaultRoute || route.via.value().IsLinkLocal()))
+    {
+        message.route.rtm_flags |= RTNH_F_ONLINK;
+    }
     message.route.rtm_dst_len = route.to.has_value() ? route.to.value().PrefixLength() : 0;
 
     utils::InitializeIntegerAttribute(message.tableId, m_table, RTA_TABLE);

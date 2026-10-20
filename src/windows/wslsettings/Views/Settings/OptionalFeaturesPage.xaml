@@ -41,7 +41,10 @@
                 <ctControls:SettingsCard x:Uid="Settings_SparseVHD">
                     <ToggleSwitch x:Uid="Settings_SparseVHDToggleSwitch" HorizontalAlignment="Right" MinWidth="0" IsOn="{x:Bind ViewModel.IsOnSparseVHD, Mode=TwoWay}"/>
                 </ctControls:SettingsCard>
-                <ctControls:SettingsExpander x:Name="VMIdleTimeoutExpander" x:Uid="Settings_VMIdleTimeout">
+                <ctControls:SettingsCard x:Uid="Settings_KeepWslRunning">
+                    <ToggleSwitch x:Uid="Settings_KeepWslRunningToggleSwitch" HorizontalAlignment="Right" MinWidth="0" IsOn="{x:Bind ViewModel.IsOnKeepWslRunning, Mode=TwoWay}"/>
+                </ctControls:SettingsCard>
+                <ctControls:SettingsExpander x:Name="VMIdleTimeoutExpander" x:Uid="Settings_VMIdleTimeout" IsEnabled="{x:Bind ViewModel.VMIdleTimeoutEnabled, Mode=OneWay}">
                     <TextBlock Style="{StaticResource TextBlockSettingStyle}" Text="{x:Bind ViewModel.VMIdleTimeout, Mode=OneWay, Converter={StaticResource MillisecondsStringConverter}}"/>
                     <ctControls:SettingsExpander.Items>
                         <ctControls:SettingsCard HorizontalContentAlignment="Left" ContentAlignment="Left" Margin="{StaticResource SettingsExpanderItemMargin}">
@@ -50,6 +53,20 @@
                                     Text="{x:Bind ViewModel.VMIdleTimeout, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" TextChanged="VMIdleTimeoutTextBox_TextChanged"/>
                                 <Button x:Uid="Settings_VMIdleTimeoutResetButton" Style="{StaticResource ButtonSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
                                     Command="{x:Bind ViewModel.VMIdleTimeout_ResetCommand}" IsEnabled="{x:Bind ViewModel.VMIdleTimeout_ResetEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                    Click="Settings_ResetButton_Click"/>
+                            </StackPanel>
+                        </ctControls:SettingsCard>
+                    </ctControls:SettingsExpander.Items>
+                </ctControls:SettingsExpander>
+                <ctControls:SettingsExpander x:Name="InstanceIdleTimeoutExpander" x:Uid="Settings_InstanceIdleTimeout" IsEnabled="{x:Bind ViewModel.InstanceIdleTimeoutEnabled, Mode=OneWay}">
+                    <TextBlock Style="{StaticResource TextBlockSettingStyle}" Text="{x:Bind ViewModel.InstanceIdleTimeout, Mode=OneWay, Converter={StaticResource MillisecondsStringConverter}}"/>
+                    <ctControls:SettingsExpander.Items>
+                        <ctControls:SettingsCard HorizontalContentAlignment="Left" ContentAlignment="Left" Margin="{StaticResource SettingsExpanderItemMargin}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBox x:Name="InstanceIdleTimeoutTextBox" x:Uid="Settings_InstanceIdleTimeoutTextBox" Style="{StaticResource TextBoxFilePathStyle}" Margin="{StaticResource InputControlSpacingMargin}"
+                                    Text="{x:Bind ViewModel.InstanceIdleTimeout, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" TextChanged="InstanceIdleTimeoutTextBox_TextChanged"/>
+                                <Button x:Uid="Settings_InstanceIdleTimeoutResetButton" Style="{StaticResource ButtonSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
+                                    Command="{x:Bind ViewModel.InstanceIdleTimeout_ResetCommand}" IsEnabled="{x:Bind ViewModel.InstanceIdleTimeout_ResetEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                     Click="Settings_ResetButton_Click"/>
                             </StackPanel>
                         </ctControls:SettingsCard>

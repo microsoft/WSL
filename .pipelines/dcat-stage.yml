@@ -1,0 +1,62 @@
+stages:
+  - stage: dcat_prepare
+    displayName: Prepare DCAT submissions
+    dependsOn:
+      - build_x64
+      - build_arm64
+    jobs:
+      - job: prepare
+        displayName: Generate DCAT submission metadata
+        pool:
+          type: windows
+        variables:
+          ob_outputDirectory: '$(Pipeline.Workspace)\dcat-output'
+          ob_artifactBaseName: drop_wsl
+          ob_artifactSuffix: _dcat
+          ob_sdl_checkcflags_enabled: false
+          DcatContentPath: '$(Pipeline.Workspace)\dcat'
+          buildStagePackageVersion: $[ stageDependencies.build_x64.build_x64.outputs['version.WSL_PACKAGE_VERSION'] ]
+        steps:
+          - checkout: releaseScripts
+            path: s\wsl-release-scripts
+
+          - task: DownloadPipelineArtifact@2
+            displayName: Download x64 build artifact
+            inputs:
+              artifact: drop_wsl_build
+              path: '$(Pipeline.Workspace)\drop_x64'
+
+          - task: DownloadPipelineArtifact@2
+            displayName: Download arm64 build artifact
+            inputs:
+              artifact: drop_wsl_build_arm64
+              path: '$(Pipeline.Workspace)\drop_arm64'
+
+          - task: PowerShell@2
+            displayName: Generate DCAT submission metadata
+            inputs:
+              targetType: inline
+              failOnStderr: true
+              pwsh: true
+              script: |
+                $contentPath = '$(DcatContentPath)'
+                $outputPath = '$(ob_outputDirectory)'
+                $version = '$(buildStagePackageVersion)'
+
+                New-Item -ItemType Directory -Path $contentPath -Force | Out-Null
+                Copy-Item "$(Pipeline.Workspace)\drop_x64\bundle\wsl.$version.x64.msi" $contentPath
+                Copy-Item "$(Pipeline.Workspace)\drop_x64\bundle\wsl.$version.x64.cab" $contentPath
+                Copy-Item "$(Pipeline.Workspace)\drop_arm64\bundle\wsl.$version.arm64.msi" $contentPath
+                Copy-Item "$(Pipeline.Workspace)\drop_arm64\bundle\wsl.$version.arm64.cab" $contentPath
+
+                & "$(Pipeline.Workspace)\s\wsl-release-scripts\scripts\Dcat\New-DcatSubmission.ps1" `
+                    -ContentFolderPath $contentPath `
+                    -Version $version
+
+                $jsonFiles = @(Get-ChildItem -Path $contentPath -Filter *.json)
+                if ($jsonFiles.Count -ne 10) {
+                    throw "Expected 10 JSON files, found $($jsonFiles.Count)."
+                }
+
+                New-Item -ItemType Directory -Path $outputPath -Force | Out-Null
+                Copy-Item $jsonFiles.FullName $outputPath

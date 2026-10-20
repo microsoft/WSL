@@ -17,18 +17,30 @@ Abstract:
 #include "ConsoleService.h"
 #include "ImageService.h"
 #include "ImageProgressCallback.h"
+#include "WarningCallback.h"
 #include <wslutil.h>
+#include <HandleConsoleProgressBar.h>
 #include <WSLCProcessLauncher.h>
+#include <WSLCContainerEntry.h>
+#include <ConsoleState.h>
 #include <CommandLine.h>
+#include <WSLCUserSettings.h>
 #include <filesystem>
+#include <filesystem.hpp>
 #include <unordered_map>
 #include <wslc.h>
 
 namespace wsl::windows::wslc::services {
+
+using namespace wsl::windows::wslc::cli;
+namespace mount = wsl::windows::common::mount;
+
 using wsl::windows::common::ClientRunningWSLCProcess;
 using wsl::windows::common::wslc_schema::InspectContainer;
-using wsl::windows::common::wslutil::PrintMessage;
+using namespace wsl::windows::common;
 using namespace wsl::windows::common::wslutil;
+using namespace wsl::windows::common::string;
+using namespace wsl::windows::common::filesystem;
 using namespace wsl::shared;
 using namespace wsl::windows::wslc::models;
 using namespace std::chrono_literals;
@@ -38,8 +50,28 @@ static void SetContainerArguments(WSLCProcessOptions& options, std::vector<const
     options.CommandLine = {.Values = argsStorage.data(), .Count = static_cast<ULONG>(argsStorage.size())};
 }
 
-static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& session, const std::string& image, const ContainerOptions& options)
+static bool SupportsNetworkAliases(std::string_view network)
 {
+    // Aliases are only supported for user-defined networks, not built-in or container-sourced network modes.
+    return network != "bridge" && network != "host" && network != "none" && !network.starts_with("container:");
+}
+
+static void PullImage(Terminal& terminal, Session& session, const std::string& image)
+{
+    ImageProgressCallback callback(terminal, Terminal::Level::Info);
+    ImageService imageService;
+    imageService.Pull(terminal, session, image, &callback);
+}
+
+static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& terminal, Session& session, const std::string& image, const ContainerOptions& options)
+{
+    WarningCallback warningCallback(terminal);
+
+    if (options.Pull == PullPolicy::Always)
+    {
+        PullImage(terminal, session, image);
+    }
+
     auto processFlags = WSLCProcessFlagsNone;
     WI_SetFlagIf(processFlags, WSLCProcessFlagsStdin, options.Interactive);
     WI_SetFlagIf(processFlags, WSLCProcessFlagsTty, options.TTY);
@@ -49,50 +81,97 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsPublishAll, options.PublishAll);
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsGpu, options.Gpu);
 
+    std::string networkMode = options.Networks.empty() ? std::string("bridge") : options.Networks.front().Name;
+
     wsl::windows::common::WSLCContainerLauncher containerLauncher(
-        image, options.Name, options.Arguments, options.EnvironmentVariables, WSLCContainerNetworkTypeBridged, processFlags);
+        image, options.Name, options.Arguments, options.EnvironmentVariables, std::move(networkMode), processFlags);
+
+    for (size_t i = 1; i < options.Networks.size(); ++i)
+    {
+        const auto& network = options.Networks[i];
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG,
+            Localization::MessageWslcAliasRequiresUserDefinedNetwork(),
+            !network.Aliases.empty() && !SupportsNetworkAliases(network.Name));
+
+        containerLauncher.AddAdditionalNetwork(network.Name, network.Aliases);
+    }
+
+    if (!options.NetworkAliases.empty())
+    {
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcAliasRequiresUserDefinedNetwork(), options.Networks.empty());
+
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcAliasAmbiguousWithMultipleNetworks(), options.Networks.size() > 1);
+
+        const auto& primary = options.Networks.front().Name;
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcAliasRequiresUserDefinedNetwork(), !SupportsNetworkAliases(primary));
+
+        for (const auto& alias : options.NetworkAliases)
+        {
+            containerLauncher.AddPrimaryNetworkAlias(alias);
+        }
+    }
+
+    if (options.IpAddress.has_value())
+    {
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcIpRequiresUserDefinedNetwork(), options.Networks.empty());
+
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcIpAmbiguousWithMultipleNetworks(), options.Networks.size() > 1);
+
+        const auto& primary = options.Networks.front().Name;
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcIpRequiresUserDefinedNetwork(), !SupportsNetworkAliases(primary));
+
+        containerLauncher.SetPrimaryNetworkIpAddress(std::string(options.IpAddress.value()));
+    }
+
+    if (!options.Networks.empty())
+    {
+        const auto& primary = options.Networks.front();
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG,
+            Localization::MessageWslcAliasRequiresUserDefinedNetwork(),
+            !primary.Aliases.empty() && !SupportsNetworkAliases(primary.Name));
+
+        for (const auto& alias : primary.Aliases)
+        {
+            containerLauncher.AddPrimaryNetworkAlias(alias);
+        }
+    }
+
+    const auto defaultBindingAddress = settings::User().Get<settings::Setting::SessionDefaultBindingAddress>();
 
     // Set port options if provided
     for (const auto& port : options.Ports)
     {
         auto portMapping = PublishPort::Parse(port);
 
+        const int protocol = portMapping.PortProtocol() == PublishPort::Protocol::UDP ? IPPROTO_UDP : IPPROTO_TCP;
+        const int family = (portMapping.HostIP().has_value() && portMapping.HostIP()->IsIPv6()) ? AF_INET6 : AF_INET;
+        std::optional<std::string> bindAddress;
+        if (portMapping.HostIP().has_value())
         {
-            // https://github.com/microsoft/WSL/issues/14433
-            // The following scenarios are currently not implemented:
-            // - Host port mappings with a specific host IP
-            // - Host port mappings with UDP protocol
-            if (portMapping.HostIP().has_value() || portMapping.PortProtocol() == PublishPort::Protocol::UDP)
-            {
-                THROW_HR_WITH_USER_ERROR(
-                    HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
-                    "Port mappings with specific host IPs or UDP protocol are not currently supported");
-            }
+            bindAddress = portMapping.HostIP()->IP();
+        }
+        else if (!defaultBindingAddress.empty())
+        {
+            // No explicit host IP: apply the configured default binding address (IPv4 only,
+            // since IPv6 bindings are always explicit). When unset, AddPort falls back to loopback.
+            bindAddress = defaultBindingAddress;
         }
 
         auto containerPort = portMapping.ContainerPort();
         for (uint16_t i = 0; i < containerPort.Count(); ++i)
         {
             auto currentContainerPort = static_cast<uint16_t>(containerPort.Start() + i);
-            auto currentHostPort = static_cast<uint16_t>(portMapping.HostPort().Start() + i);
-            containerLauncher.AddPort(currentHostPort, currentContainerPort, AF_INET);
+            auto currentHostPort = portMapping.HostPort().IsEphemeral() ? static_cast<uint16_t>(WSLC_EPHEMERAL_PORT)
+                                                                        : static_cast<uint16_t>(portMapping.HostPort().Start() + i);
+            containerLauncher.AddPort(currentHostPort, currentContainerPort, family, protocol, bindAddress);
         }
     }
 
-    // Add volumes if specified
-    for (const auto& volumeSpec : options.Volumes)
+    for (const auto& mountSpec : options.Mounts)
     {
-        auto volume = VolumeMount::Parse(volumeSpec);
-        auto host = volume.Host();
-        auto container = volume.ContainerPath();
-        if (volume.IsNamedVolume())
-        {
-            containerLauncher.AddNamedVolume(string::WideToMultiByte(host), container, volume.IsReadOnly());
-        }
-        else
-        {
-            containerLauncher.AddVolume(host, container, volume.IsReadOnly());
-        }
+        containerLauncher.AddMount(mountSpec);
     }
 
     containerLauncher.SetContainerFlags(containerFlags);
@@ -102,9 +181,59 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
         containerLauncher.SetDefaultStopSignal(options.StopSignal);
     }
 
+    if (options.StopTimeout.has_value())
+    {
+        containerLauncher.SetStopTimeout(options.StopTimeout.value());
+    }
+
     if (options.ShmSize.has_value())
     {
         containerLauncher.SetShmSize(options.ShmSize.value());
+    }
+
+    if (options.HealthCmd.has_value())
+    {
+        containerLauncher.SetHealthCmd(std::string(options.HealthCmd.value()));
+    }
+
+    if (options.HealthInterval.has_value())
+    {
+        containerLauncher.SetHealthInterval(options.HealthInterval.value());
+    }
+
+    if (options.HealthTimeout.has_value())
+    {
+        containerLauncher.SetHealthTimeout(options.HealthTimeout.value());
+    }
+
+    if (options.HealthStartPeriod.has_value())
+    {
+        containerLauncher.SetHealthStartPeriod(options.HealthStartPeriod.value());
+    }
+
+    if (options.HealthRetries.has_value())
+    {
+        containerLauncher.SetHealthRetries(options.HealthRetries.value());
+    }
+
+    if (options.NoHealthcheck)
+    {
+        containerLauncher.SetNoHealthcheck();
+    }
+
+    if (options.MemoryBytes.has_value())
+    {
+        containerLauncher.SetMemoryLimit(options.MemoryBytes.value());
+    }
+
+    if (options.NanoCpus.has_value())
+    {
+        containerLauncher.SetNanoCpus(options.NanoCpus.value());
+    }
+
+    for (const auto& [name, soft, hard] : options.Ulimits)
+    {
+        containerLauncher.AddUlimit(name, soft, hard);
     }
 
     if (!options.Entrypoint.empty())
@@ -149,28 +278,17 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
         containerLauncher.SetDnsOptions(std::vector<std::string>(options.DnsOptions));
     }
 
-    for (const auto& tmpfsSpec : options.Tmpfs)
-    {
-        auto tmpfsMount = TmpfsMount::Parse(tmpfsSpec);
-        containerLauncher.AddTmpfs(tmpfsMount.ContainerPath(), tmpfsMount.Options());
-    }
-
     for (const auto& [key, value] : options.Labels)
     {
         containerLauncher.AddLabel(key, value);
     }
 
-    auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
-    if (result == WSLC_E_IMAGE_NOT_FOUND)
+    auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get(), &warningCallback);
+    if (result == WSLC_E_IMAGE_NOT_FOUND && options.Pull == PullPolicy::Missing)
     {
-        {
-            // Attempt to pull the image if not found
-            ImageProgressCallback callback;
-            PrintMessage(Localization::WSLCCLI_ImageNotFoundPulling(wsl::shared::string::MultiByteToWide(image)), stderr);
-            ImageService imageService;
-            imageService.Pull(session, image, &callback);
-        }
-        return containerLauncher.Create(*session.Get());
+        terminal.Info(L"{}\n", Localization::WSLCCLI_ImageNotFoundPulling(wsl::shared::string::MultiByteToWide(image)));
+        PullImage(terminal, session, image);
+        return containerLauncher.Create(*session.Get(), &warningCallback);
     }
 
     THROW_IF_FAILED(result);
@@ -188,60 +306,9 @@ static PortInformation PortInformationFromWSLCPortMapping(const WSLCPortMapping&
     };
 }
 
-std::wstring ContainerService::FormatRelativeTime(ULONGLONG timestamp)
+int ContainerService::Attach(Terminal& terminal, Session& session, const std::string& id)
 {
-    if (timestamp == 0)
-    {
-        return L"";
-    }
-
-    constexpr LONGLONG SecondsPerMinute = std::chrono::duration_cast<std::chrono::seconds>(1min).count();
-    constexpr LONGLONG SecondsPerHour = std::chrono::duration_cast<std::chrono::seconds>(1h).count();
-    constexpr LONGLONG SecondsPerDay = std::chrono::duration_cast<std::chrono::seconds>(24h).count();
-    constexpr LONGLONG SecondsPerWeek = SecondsPerDay * 7;
-    constexpr LONGLONG SecondsPerMonth = SecondsPerDay * 30;
-    constexpr LONGLONG SecondsPerYear = SecondsPerDay * 365;
-
-    auto elapsed = static_cast<LONGLONG>(std::time(nullptr)) - static_cast<LONGLONG>(timestamp);
-    if (elapsed < 0)
-    {
-        elapsed = 0;
-    }
-
-    auto pluralize = [](LONGLONG count, const wchar_t* singular, const wchar_t* plural) {
-        return std::format(L"{} {} ago", count, (count == 1 ? singular : plural));
-    };
-
-    if (elapsed < SecondsPerMinute)
-    {
-        return pluralize(elapsed, L"second", L"seconds");
-    }
-    else if (elapsed < SecondsPerHour)
-    {
-        return pluralize(elapsed / SecondsPerMinute, L"minute", L"minutes");
-    }
-    else if (elapsed < SecondsPerDay)
-    {
-        return pluralize(elapsed / SecondsPerHour, L"hour", L"hours");
-    }
-    else if (elapsed < SecondsPerWeek)
-    {
-        return pluralize(elapsed / SecondsPerDay, L"day", L"days");
-    }
-    else if (elapsed < SecondsPerMonth)
-    {
-        return pluralize(elapsed / SecondsPerWeek, L"week", L"weeks");
-    }
-    else if (elapsed < SecondsPerYear)
-    {
-        return pluralize(elapsed / SecondsPerMonth, L"month", L"months");
-    }
-
-    return pluralize(elapsed / SecondsPerYear, L"year", L"years");
-}
-
-int ContainerService::Attach(Session& session, const std::string& id)
-{
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
 
@@ -268,9 +335,10 @@ int ContainerService::Attach(Session& session, const std::string& id)
     {
         // TTY process - relay using interactive TTY handling
         WI_ASSERT(stderrLogs.Empty());
-        if (!ConsoleService::RelayInteractiveTty(runningProcess, stdinLogs.Release().get(), true))
+        wsl::windows::common::ConsoleState console;
+        if (!ConsoleService::RelayInteractiveTty(console, runningProcess, stdinLogs.Release().Get(), true))
         {
-            wsl::windows::common::wslutil::PrintMessage(L"[detached]", stderr);
+            terminal.Info(L"[detached]\n");
             return 0; // Exit early if user detached
         }
     }
@@ -279,35 +347,206 @@ int ContainerService::Attach(Session& session, const std::string& id)
     return runningProcess.Wait();
 }
 
-std::wstring ContainerService::ContainerStateToString(WSLCContainerState state, ULONGLONG stateChangedAt)
+// The invariant state name. This is what "container list --format json" reports.
+std::wstring ContainerService::ContainerStateName(WSLCContainerState state)
 {
-    std::wstring stateString;
     switch (state)
     {
     case WSLCContainerState::WslcContainerStateCreated:
-        stateString = L"created";
-        break;
+        return L"created";
     case WSLCContainerState::WslcContainerStateRunning:
-        stateString = L"running";
-        break;
+        return L"running";
     case WSLCContainerState::WslcContainerStateDeleted:
-        stateString = L"stopped";
-        break;
+        return L"stopped";
     case WSLCContainerState::WslcContainerStateExited:
-        stateString = L"exited";
-        break;
+        return L"exited";
     case WSLCContainerState::WslcContainerStateInvalid:
         return L"invalid";
     default:
         THROW_HR(E_UNEXPECTED);
     }
+}
 
-    if (stateChangedAt == 0)
+std::wstring ContainerService::LocalizedContainerStateName(WSLCContainerState state)
+{
+    switch (state)
+    {
+    case WSLCContainerState::WslcContainerStateCreated:
+        return Localization::WSLCCLI_ContainerStateCreated();
+    case WSLCContainerState::WslcContainerStateRunning:
+        return Localization::WSLCCLI_ContainerStateRunning();
+    case WSLCContainerState::WslcContainerStateDeleted:
+        return Localization::WSLCCLI_ContainerStateStopped();
+    case WSLCContainerState::WslcContainerStateExited:
+        return Localization::WSLCCLI_ContainerStateExited();
+    case WSLCContainerState::WslcContainerStateInvalid:
+        return Localization::WSLCCLI_ContainerStateInvalid();
+    default:
+        THROW_HR(E_UNEXPECTED);
+    }
+}
+
+std::wstring ContainerService::ContainerStateToString(WSLCContainerState state, LONGLONG stateChangedAt, FormatType format)
+{
+    const auto invariant = format == FormatType::Json;
+    auto stateString = invariant ? ContainerStateName(state) : LocalizedContainerStateName(state);
+    if (stateChangedAt == 0 || state == WSLCContainerState::WslcContainerStateInvalid)
     {
         return stateString;
     }
 
-    return std::format(L"{} {}", stateString, FormatRelativeTime(stateChangedAt));
+    const auto relative = invariant ? wsl::windows::common::timestamp::FormatInvariantRelativeTime(stateChangedAt)
+                                    : wsl::windows::common::timestamp::FormatRelativeTime(stateChangedAt);
+
+    return std::format(L"{} {}", stateString, relative);
+}
+
+// Reports whether a code point is printable using the same rule as Go's unicode.IsPrint, which docker relies on when
+// quoting: letters, marks, numbers, punctuation, symbols and the ASCII space.
+static bool IsPrintable(UChar32 codePoint)
+{
+    constexpr auto printableMask = U_GC_L_MASK | U_GC_M_MASK | U_GC_N_MASK | U_GC_P_MASK | U_GC_S_MASK;
+    return codePoint == U' ' || (U_GET_GC_MASK(codePoint) & printableMask) != 0;
+}
+
+// Appends a code point that has no printable representation, mirroring the escapes Go's strconv.Quote emits.
+static void AppendEscape(std::wstring& quoted, UChar32 codePoint)
+{
+    switch (codePoint)
+    {
+    case L'\a':
+        quoted += L"\\a";
+        return;
+    case L'\b':
+        quoted += L"\\b";
+        return;
+    case L'\f':
+        quoted += L"\\f";
+        return;
+    case L'\n':
+        quoted += L"\\n";
+        return;
+    case L'\r':
+        quoted += L"\\r";
+        return;
+    case L'\t':
+        quoted += L"\\t";
+        return;
+    case L'\v':
+        quoted += L"\\v";
+        return;
+    default:
+        break;
+    }
+
+    if (codePoint < L' ' || codePoint == 0x7F)
+    {
+        quoted += std::format(L"\\x{:02x}", static_cast<unsigned int>(codePoint));
+    }
+    else if (U_IS_SURROGATE(codePoint))
+    {
+        // An unpaired surrogate is not a valid code point, and Go substitutes the replacement character.
+        quoted += L"\\ufffd";
+    }
+    else if (codePoint < 0x10000)
+    {
+        quoted += std::format(L"\\u{:04x}", static_cast<unsigned int>(codePoint));
+    }
+    else
+    {
+        quoted += std::format(L"\\U{:08x}", static_cast<unsigned int>(codePoint));
+    }
+}
+
+std::wstring ContainerService::FormatCommand(const std::string& command, bool truncate)
+{
+    constexpr size_t c_maxDisplayWidth = 20;
+
+    auto wide = wsl::shared::string::MultiByteToWide(command);
+    if (truncate)
+    {
+        wide = wsl::windows::common::string::Ellipsis(wide, c_maxDisplayWidth);
+    }
+
+    // Quoting happens after truncation, so the result can exceed c_maxDisplayWidth. This matches docker, which truncates
+    // the command first and quotes the truncated value.
+    const auto length = static_cast<int32_t>(wide.size());
+    std::wstring quoted{L'"'};
+    for (int32_t index = 0; index < length;)
+    {
+        const auto start = index;
+        UChar32 codePoint{};
+        U16_NEXT(wide.data(), index, length, codePoint);
+
+        if (codePoint == L'"' || codePoint == L'\\')
+        {
+            quoted += L'\\';
+            quoted += static_cast<wchar_t>(codePoint);
+        }
+        else if (IsPrintable(codePoint))
+        {
+            quoted.append(wide, start, static_cast<size_t>(index - start));
+        }
+        else
+        {
+            AppendEscape(quoted, codePoint);
+        }
+    }
+
+    quoted += L'"';
+    return quoted;
+}
+
+std::wstring ContainerService::FormatMounts(const std::string& mounts, bool truncate)
+{
+    constexpr size_t c_maxDisplayWidth = 15;
+
+    auto wide = wsl::shared::string::MultiByteToWide(mounts);
+    if (!truncate || wide.empty())
+    {
+        return wide;
+    }
+
+    std::vector<std::wstring> shortened;
+    for (const auto& mount : wsl::shared::string::SplitPreserveEmpty(std::wstring_view{wide}, L','))
+    {
+        shortened.emplace_back(wsl::windows::common::string::Ellipsis(mount, c_maxDisplayWidth));
+    }
+
+    return wsl::shared::string::Join(shortened, L',');
+}
+
+std::wstring ContainerService::FormatStatus(const std::string& status, WSLCContainerState state, LONGLONG stateChangedAt, FormatType format)
+{
+    if (!status.empty())
+    {
+        return wsl::shared::string::MultiByteToWide(status);
+    }
+
+    return ContainerStateToString(state, stateChangedAt, format);
+}
+
+std::string ContainerService::FormatHealthStatus(const std::string& status)
+{
+    const auto open = status.find('(');
+    if (open == std::string::npos || status.back() != ')')
+    {
+        return {};
+    }
+
+    constexpr std::string_view c_healthPrefix = "health: ";
+    auto health = std::string_view{status}.substr(open + 1, status.size() - open - 2);
+    if (health.starts_with(c_healthPrefix))
+    {
+        health.remove_prefix(c_healthPrefix.size());
+    }
+
+    if (health == "healthy" || health == "unhealthy" || health == "starting")
+    {
+        return std::string{health};
+    }
+
+    return {};
 }
 
 std::wstring ContainerService::FormatPorts(WSLCContainerState state, const std::vector<PortInformation>& ports)
@@ -340,7 +579,7 @@ std::wstring ContainerService::FormatPorts(WSLCContainerState state, const std::
     return result;
 }
 
-int ContainerService::Run(Session& session, const std::string& image, ContainerOptions runOptions)
+int ContainerService::Run(Terminal& terminal, Session& session, const std::string& image, ContainerOptions runOptions)
 {
     // Reserve the CID file (fails if it already exists) before creating the container so a
     // container isn't created when the caller-requested path can't be written. The file is
@@ -348,7 +587,7 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
     CidFile cidFile(runOptions.CidFile);
 
     // Create the container
-    auto runningContainer = CreateInternal(session, image, runOptions);
+    auto runningContainer = CreateInternal(terminal, session, image, runOptions);
     auto& container = runningContainer.Get();
 
     WSLCContainerId containerId{};
@@ -357,27 +596,40 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
     // Start the created container
     WSLCContainerStartFlags startFlags{};
     WI_SetFlagIf(startFlags, WSLCContainerStartFlagsAttach, !runOptions.Detach);
-    THROW_IF_FAILED(container.Start(startFlags, nullptr)); // TODO: Error message, detach keys
+
+    const bool attach = WI_IsFlagSet(startFlags, WSLCContainerStartFlagsAttach);
+
+    wsl::windows::common::ConsoleState console;
+    WSLCProcessStartOptions startOptions{};
+    if (runOptions.TTY)
+    {
+
+        const auto size = console.GetWindowSize();
+        startOptions.TtyRows = size.Y;
+        startOptions.TtyColumns = size.X;
+    }
+
+    WarningCallback warningCallback(terminal);
+    THROW_IF_FAILED(container.Start(startFlags, &startOptions, &warningCallback)); // TODO: detach keys
 
     // Disable auto-delete only after successful start
     runningContainer.SetDeleteOnClose(false);
     cidFile.Commit(containerId);
 
     // Handle attach if requested
-    if (WI_IsFlagSet(startFlags, WSLCContainerStartFlagsAttach))
+    if (attach)
     {
-        ConsoleService consoleService;
-        return consoleService.AttachToCurrentConsole(runningContainer.GetInitProcess());
+        return ConsoleService::AttachToCurrentConsole(terminal, console, runningContainer.GetInitProcess());
     }
 
-    PrintMessage(L"%hs", stdout, containerId);
+    terminal.Output(L"{}\n", wsl::shared::string::MultiByteToWide(containerId));
     return 0;
 }
 
-CreateContainerResult ContainerService::Create(Session& session, const std::string& image, ContainerOptions runOptions)
+CreateContainerResult ContainerService::Create(Terminal& terminal, Session& session, const std::string& image, ContainerOptions runOptions)
 {
     CidFile cidFile(runOptions.CidFile);
-    auto runningContainer = CreateInternal(session, image, runOptions);
+    auto runningContainer = CreateInternal(terminal, session, image, runOptions);
     runningContainer.SetDeleteOnClose(false);
     auto& container = runningContainer.Get();
     WSLCContainerId id{};
@@ -386,12 +638,21 @@ CreateContainerResult ContainerService::Create(Session& session, const std::stri
     return {.Id = id};
 }
 
-int ContainerService::Start(Session& session, const std::string& id, bool attach)
+int ContainerService::Start(Terminal& terminal, Session& session, const std::string& id, bool attach)
 {
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     WSLCContainerStartFlags flags = attach ? WSLCContainerStartFlagsAttach : WSLCContainerStartFlagsNone;
-    THROW_IF_FAILED_EXCEPT(container->Start(flags, nullptr), WSLC_E_CONTAINER_IS_RUNNING);
+
+    wsl::windows::common::ConsoleState console;
+    WSLCProcessStartOptions startOptions{};
+    const auto size = console.GetWindowSize();
+    startOptions.TtyRows = size.Y;
+    startOptions.TtyColumns = size.X;
+
+    WarningCallback warningCallback(terminal);
+    THROW_IF_FAILED_EXCEPT(container->Start(flags, &startOptions, &warningCallback), WSLC_E_CONTAINER_IS_RUNNING);
 
     if (!attach)
     {
@@ -405,33 +666,49 @@ int ContainerService::Start(Session& session, const std::string& id, bool attach
     THROW_IF_FAILED(process->GetFlags(&processFlags));
     ClientRunningWSLCProcess runningProcess(std::move(process), processFlags);
 
-    ConsoleService consoleService;
-    return consoleService.AttachToCurrentConsole(std::move(runningProcess));
+    return ConsoleService::AttachToCurrentConsole(terminal, console, std::move(runningProcess), true);
 }
 
 void ContainerService::Stop(Session& session, const std::string& id, StopContainerOptions options)
 {
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     THROW_IF_FAILED_EXCEPT(container->Stop(options.Signal, options.Timeout), WSLC_E_CONTAINER_NOT_RUNNING);
 }
 
+void ContainerService::Restart(Terminal& terminal, Session& session, const std::string& id, StopContainerOptions options)
+{
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
+    wil::com_ptr<IWSLCContainer> container;
+    THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
+
+    WarningCallback warningCallback(terminal);
+    THROW_IF_FAILED(container->Restart(options.Signal, options.Timeout, &warningCallback));
+}
+
 void ContainerService::Kill(Session& session, const std::string& id, WSLCSignal signal)
 {
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     THROW_IF_FAILED(container->Kill(signal));
 }
 
-void ContainerService::Delete(Session& session, const std::string& id, bool force)
+void ContainerService::Delete(Session& session, const std::string& id, bool force, bool deleteVolumes)
 {
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
-    THROW_IF_FAILED(container->Delete(force ? WSLCDeleteFlagsForce : WSLCDeleteFlagsNone));
+
+    auto flags = WSLCDeleteFlagsNone;
+    WI_SetFlagIf(flags, WSLCDeleteFlagsForce, force);
+    WI_SetFlagIf(flags, WSLCDeleteFlagsDeleteVolumes, deleteVolumes);
+    THROW_IF_FAILED(container->Delete(flags));
 }
 
 std::vector<ContainerInformation> ContainerService::List(
-    Session& session, bool all, int limit, const std::vector<std::pair<std::string, std::string>>& filters)
+    Session& session, bool all, int limit, const std::vector<std::pair<std::string, std::string>>& filters, bool size)
 {
     std::vector<WSLCFilter> filterEntries;
     filterEntries.reserve(filters.size());
@@ -442,11 +719,12 @@ std::vector<ContainerInformation> ContainerService::List(
 
     WSLCListContainersOptions options{};
     options.Flags = all ? WSLCListContainersFlagsAll : WSLCListContainersFlagsNone;
+    WI_SetFlagIf(options.Flags, WSLCListContainersFlagsSize, size);
     options.Limit = limit;
     options.Filters = filterEntries.data();
     options.FiltersCount = static_cast<ULONG>(filterEntries.size());
 
-    wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+    wsl::windows::common::wslc::unique_container_entry_array containers;
     wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
     THROW_IF_FAILED(
         session.Get()->ListContainers(&options, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
@@ -458,10 +736,18 @@ std::vector<ContainerInformation> ContainerService::List(
         ContainerInformation entry;
         entry.Name = current.Name;
         entry.Image = current.Image;
+        entry.Command = current.Command == nullptr ? "" : current.Command;
+        entry.Status = current.Status == nullptr ? "" : current.Status;
+        entry.Labels = current.Labels == nullptr ? "" : current.Labels;
+        entry.Networks = current.Networks == nullptr ? "" : current.Networks;
+        entry.Mounts = current.Mounts == nullptr ? "" : current.Mounts;
+        entry.LocalVolumes = current.LocalVolumes;
         entry.State = current.State;
         entry.Id = current.Id;
         entry.StateChangedAt = current.StateChangedAt;
         entry.CreatedAt = current.CreatedAt;
+        entry.SizeRw = current.SizeRw;
+        entry.SizeRootFs = current.SizeRootFs;
 
         for (const auto& port : ports)
         {
@@ -477,8 +763,9 @@ std::vector<ContainerInformation> ContainerService::List(
     return result;
 }
 
-int ContainerService::Exec(Session& session, const std::string& id, ContainerOptions options)
+int ContainerService::Exec(Terminal& terminal, Session& session, const std::string& id, ContainerOptions options)
 {
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
 
@@ -487,6 +774,14 @@ int ContainerService::Exec(Session& session, const std::string& id, ContainerOpt
     WI_SetFlagIf(execFlags, WSLCProcessFlagsTty, options.TTY);
 
     auto processLauncher = wsl::windows::common::WSLCProcessLauncher({}, options.Arguments, options.EnvironmentVariables, execFlags);
+
+    wsl::windows::common::ConsoleState console;
+    if (options.TTY)
+    {
+        const auto size = console.GetWindowSize();
+        processLauncher.SetTtySize(size.Y, size.X);
+    }
+
     if (options.User.has_value())
     {
         auto user = options.User.value();
@@ -497,20 +792,270 @@ int ContainerService::Exec(Session& session, const std::string& id, ContainerOpt
         processLauncher.SetWorkingDirectory(std::move(options.WorkingDirectory));
     }
 
-    return ConsoleService::AttachToCurrentConsole(processLauncher.Launch(*container));
+    return ConsoleService::AttachToCurrentConsole(terminal, console, processLauncher.Launch(*container));
 }
 
-InspectContainer ContainerService::Inspect(Session& session, const std::string& id)
+InspectContainer ContainerService::Inspect(Session& session, const std::string& id, bool size)
 {
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     wil::unique_cotaskmem_ansistring output;
-    THROW_IF_FAILED(container->Inspect(&output));
+    THROW_IF_FAILED(container->Inspect(size ? TRUE : FALSE, &output));
     return wsl::shared::FromJson<InspectContainer>(output.get());
 }
 
-void ContainerService::Logs(Session& session, const std::string& id, bool follow, bool timestamps, ULONGLONG since, ULONGLONG until, ULONGLONG tail)
+void ContainerService::Export(Session& session, const std::string& id, const std::wstring& outputPath)
 {
+    wil::unique_hfile outputFile{
+        CreateFileW(outputPath.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+    THROW_LAST_ERROR_IF(!outputFile);
+
+    Export(session, id, outputFile.get());
+}
+
+void ContainerService::Export(Session& session, const std::string& id, HANDLE outputHandle)
+{
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
+
+    wil::com_ptr<IWSLCContainer> container;
+    THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
+
+    wsl::windows::common::HandleConsoleProgressBar progressBar(
+        outputHandle, Localization::MessageWslcExportInProgress(), wsl::windows::common::HandleConsoleProgressBar::Format::FileSize);
+
+    THROW_IF_FAILED(container->Export(ToCOMInputHandle(outputHandle)));
+}
+
+bool ContainerService::IsCopyingToContainer(const std::wstring& source, const std::wstring& target)
+{
+    // Determine copy direction by looking for CONTAINER:PATH patterns.
+    auto isContainerPath = [](const std::wstring& path) -> bool {
+        auto colonPos = path.find(L':');
+        if (colonPos == std::wstring::npos || colonPos == 0)
+        {
+            return false;
+        }
+
+        // Single letter before colon is a Windows drive path
+        if (colonPos == 1 && std::isalpha(static_cast<unsigned char>(path[0])))
+        {
+            return false;
+        }
+
+        return true;
+    };
+
+    bool sourceIsStdin = (source == L"-");
+    bool sourceIsContainer = !sourceIsStdin && isContainerPath(source);
+    bool targetIsContainer = isContainerPath(target);
+
+    if (!sourceIsContainer && targetIsContainer)
+    {
+        return true;
+    }
+    else if (sourceIsContainer && !targetIsContainer)
+    {
+        return false;
+    }
+
+    // Both sides name the container, or both name the host.
+    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_CpInvalidDirectionError());
+}
+
+std::pair<std::string, std::string> ContainerService::ParseContainerPath(const std::wstring& path)
+{
+    auto colonPos = path.find(L':');
+
+    THROW_HR_IF(
+        E_UNEXPECTED,
+        colonPos == std::wstring::npos || colonPos == 0 || (colonPos == 1 && std::isalpha(static_cast<unsigned char>(path[0]))));
+
+    auto container = WideToMultiByte(path.substr(0, colonPos));
+    auto containerPath = WideToMultiByte(path.substr(colonPos + 1));
+    return {container, containerPath};
+}
+
+void ContainerService::CopyStdinToContainer(models::Session& session, const std::string& containerId, const std::string& destPath)
+{
+    auto inputHandle = GetStdHandle(STD_INPUT_HANDLE);
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::WSLCCLI_CpStdinIsTerminalError(), wsl::windows::common::wslutil::IsConsoleHandle(inputHandle));
+
+    LARGE_INTEGER fileSize{};
+    ULONGLONG contentSize = 0;
+    if (GetFileSizeEx(inputHandle, &fileSize))
+    {
+        contentSize = static_cast<ULONGLONG>(fileSize.QuadPart);
+    }
+
+    // --archive is a no-op: tar headers already carry uid/gid.
+    ContainerService::CopyToContainer(session, containerId, destPath, inputHandle, contentSize);
+}
+
+void ContainerService::CopyContainerPathToStdout(models::Session& session, const std::string& containerId, const std::string& srcPath, bool followLink)
+{
+    auto outputHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::WSLCCLI_CpStdoutIsTerminalError(), wsl::windows::common::wslutil::IsConsoleHandle(outputHandle));
+
+    ContainerService::CopyFromContainer(session, containerId, srcPath, followLink, outputHandle);
+}
+
+void ContainerService::CopyLocalPathToContainer(
+    models::Session& session, const std::wstring& source, const std::string& containerId, const std::string& destPath, bool followLink)
+{
+    // Local path → container: create tar from local path using tar.exe
+    std::error_code fsError;
+    bool pathExists = std::filesystem::exists(source, fsError);
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpSourceNotFoundError(source), fsError || !pathExists);
+
+    auto absPath = std::filesystem::absolute(source);
+
+    // A trailing separator leaves filename() empty, which would name an empty tar entry.
+    if (!absPath.has_filename())
+    {
+        absPath = absPath.parent_path();
+    }
+
+    // tar -h dereferences every link it walks, so only use it for a link to a single file.
+    std::optional<StagingDirectory> staging;
+
+    bool dereference = false;
+    if (followLink && std::filesystem::is_symlink(absPath, fsError))
+    {
+        std::error_code resolveError;
+        const auto resolved = std::filesystem::canonical(absPath, resolveError);
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpSourceNotFoundError(source), !!resolveError);
+
+        if (std::filesystem::is_directory(resolved))
+        {
+            // The archive must carry the link's name while holding the target's tree.
+            staging.emplace(std::filesystem::temp_directory_path());
+            absPath = wsl::windows::common::filesystem::StageDereferencedTree(staging->Path(), absPath.filename(), resolved);
+        }
+        else
+        {
+            dereference = true;
+        }
+    }
+
+    std::wstring parentDir = wsl::windows::common::filesystem::StripTrailingSeparators(absPath.parent_path());
+    std::wstring fileName = absPath.filename().wstring();
+
+    // Create a temp file with DELETE_ON_CLOSE and InheritHandle so tar can write to it via stdout
+    TempFile tarFile(GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, TempFileFlags::DeleteOnClose | TempFileFlags::InheritHandle);
+
+    // Run tar.exe writing to stdout, redirected to our temp file handle.
+    auto tarCmd = std::format(L"tar.exe -c{}f - -C \"{}\" \"{}\"", dereference ? L"h" : L"", parentDir, fileName);
+    SubProcess process(nullptr, tarCmd.c_str());
+    process.SetStdHandles(nullptr, tarFile.Handle.get(), nullptr);
+    auto exitCode = process.Run();
+    THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
+
+    // Rewind and get size for upload
+    LARGE_INTEGER zero{};
+    THROW_LAST_ERROR_IF(!SetFilePointerEx(tarFile.Handle.get(), zero, nullptr, FILE_BEGIN));
+
+    LARGE_INTEGER fileSize{};
+    THROW_LAST_ERROR_IF(!GetFileSizeEx(tarFile.Handle.get(), &fileSize));
+
+    ContainerService::CopyToContainer(session, containerId, destPath, tarFile.Handle.get(), static_cast<ULONGLONG>(fileSize.QuadPart));
+}
+
+void ContainerService::CopyFromContainerIntoLocalDir(
+    models::Session& session, const std::string& containerId, const std::string& srcPath, const std::filesystem::path& canonicalTarget, bool followLink)
+{
+    // A followed link's archive is named after its target; keep the requested name.
+    std::optional<std::wstring> rebaseName;
+    if (followLink)
+    {
+        rebaseName = MultiByteToWide(PosixBaseName(srcPath));
+    }
+
+    ExtractArchiveInto(canonicalTarget, rebaseName, [&](HANDLE archive) {
+        ContainerService::CopyFromContainer(session, containerId, srcPath, followLink, archive);
+    });
+}
+
+void ContainerService::CopyFromContainerIntoLocalFile(
+    models::Session& session, const std::string& containerId, const std::string& srcPath, const std::filesystem::path& canonicalTarget, bool followLink)
+{
+    ExtractSingleFileAs(canonicalTarget, [&](HANDLE archive) {
+        ContainerService::CopyFromContainer(session, containerId, srcPath, followLink, archive);
+    });
+}
+
+void ContainerService::Copy(models::Session& session, const std::wstring& source, const std::wstring& target, bool followLink)
+{
+
+    if (IsCopyingToContainer(source, target))
+    {
+        auto [containerId, destPath] = ParseContainerPath(target);
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpInvalidTargetError(), containerId.empty() || destPath.empty());
+
+        bool isSourceStdin = source == L"-";
+        if (isSourceStdin)
+        {
+            CopyStdinToContainer(session, containerId, destPath);
+            return;
+        }
+
+        CopyLocalPathToContainer(session, source, containerId, destPath, followLink);
+    }
+    else
+    {
+        auto [containerId, srcPath] = ParseContainerPath(source);
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpInvalidSourceError(), containerId.empty() || srcPath.empty());
+
+        bool isTargetStdout = target == L"-";
+        if (isTargetStdout)
+        {
+            CopyContainerPathToStdout(session, containerId, srcPath, followLink);
+            return;
+        }
+
+        // Resolve any symlinks in the target path since tar.exe refuses to extract through a symlink.
+        std::error_code canonicalError;
+        auto canonicalTarget = GetCanonicalPath(target, canonicalError);
+        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(canonicalError.value()), Localization::WSLCCLI_CpInvalidTargetError(), !!canonicalError);
+
+        bool targetIsDir = (!target.empty() && (target.back() == L'\\' || target.back() == L'/')) ||
+                           std::filesystem::is_directory(canonicalTarget);
+
+        if (targetIsDir)
+        {
+            CopyFromContainerIntoLocalDir(session, containerId, srcPath, canonicalTarget, followLink);
+            return;
+        }
+
+        CopyFromContainerIntoLocalFile(session, containerId, srcPath, canonicalTarget, followLink);
+    }
+}
+
+void ContainerService::CopyToContainer(Session& session, const std::string& id, const std::string& destPath, HANDLE inputHandle, ULONGLONG contentSize)
+{
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
+
+    wil::com_ptr<IWSLCContainer> container;
+    THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
+
+    THROW_IF_FAILED(container->UploadArchive(ToCOMInputHandle(inputHandle), destPath.c_str(), contentSize));
+}
+
+void ContainerService::CopyFromContainer(Session& session, const std::string& id, const std::string& srcPath, bool followLink, HANDLE outputHandle)
+{
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
+
+    wil::com_ptr<IWSLCContainer> container;
+    THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
+
+    THROW_IF_FAILED(container->DownloadArchive(srcPath.c_str(), followLink, ToCOMInputHandle(outputHandle)));
+}
+
+void ContainerService::Logs(Session& session, const std::string& id, bool follow, bool timestamps, bool details, LONGLONG since, LONGLONG until, ULONGLONG tail)
+{
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
 
@@ -519,8 +1064,13 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
     WSLCLogsFlags flags = WSLCLogsFlagsNone;
     WI_SetFlagIf(flags, WSLCLogsFlagsFollow, follow);
     WI_SetFlagIf(flags, WSLCLogsFlagsTimestamps, timestamps);
+    WI_SetFlagIf(flags, WSLCLogsFlagsDetails, details);
 
     THROW_IF_FAILED(container->Logs(flags, &stdoutHandle, &stderrHandle, since, until, tail));
+
+    // Container output is UTF-8.
+    wsl::windows::common::ConsoleState console;
+    console.SetOutputCodePageUtf8();
 
     wsl::windows::common::io::MultiHandleWait io;
     io.AddHandle(std::make_unique<wsl::windows::common::io::RelayHandle<wsl::windows::common::io::ReadHandle>>(
@@ -538,6 +1088,7 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
 
 wsl::windows::common::docker_schema::ContainerStats ContainerService::Stats(Session& session, const std::string& id)
 {
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     wil::unique_cotaskmem_ansistring output;
@@ -545,10 +1096,18 @@ wsl::windows::common::docker_schema::ContainerStats ContainerService::Stats(Sess
     return wsl::shared::FromJson<wsl::windows::common::docker_schema::ContainerStats>(output.get());
 }
 
-PruneContainersResult ContainerService::Prune(Session& session)
+PruneContainersResult ContainerService::Prune(Session& session, const std::vector<std::pair<std::string, std::string>>& filters)
 {
+    std::vector<WSLCFilter> filterEntries;
+    filterEntries.reserve(filters.size());
+    for (const auto& [key, value] : filters)
+    {
+        filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
+    }
+
     PruneResult result;
-    THROW_IF_FAILED(session.Get()->PruneContainers(nullptr, 0, &result.result));
+    THROW_IF_FAILED(session.Get()->PruneContainers(
+        filterEntries.empty() ? nullptr : filterEntries.data(), static_cast<ULONG>(filterEntries.size()), &result.result));
 
     PruneContainersResult pruneResult;
     pruneResult.SpaceReclaimed = result.result.SpaceReclaimed;

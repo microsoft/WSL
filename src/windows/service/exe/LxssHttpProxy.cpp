@@ -34,37 +34,50 @@ try
 {
     static wil::shared_hmodule winHttpModule;
     static std::once_flag winHttpLoadFlag;
+    static HRESULT loadResult = E_UNEXPECTED;
 
-    // Load Winhttp dll only once
     std::call_once(winHttpLoadFlag, [&]() {
-        winHttpModule.reset(LoadLibraryEx(c_winhttpModuleName, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32));
-        THROW_LAST_ERROR_IF(!winHttpModule);
+        loadResult = [&]() {
+            winHttpModule.reset(LoadLibraryEx(c_winhttpModuleName, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32));
+            RETURN_LAST_ERROR_IF(!winHttpModule);
+
+            // Initialize dynamic functions for the WinHttp Proxy OS APIs
+            // Not using the throwing constructor
+            // as failures should not show up in the Error logs as they can falsely flag failure to start the container
+            LxssDynamicFunction<decltype(RegisterProxyChangeNotification)> local_WinHttpRegisterProxyChangeNotification{
+                DynamicFunctionErrorLogs::None};
+
+            LxssDynamicFunction<decltype(UnregisterProxyChangeNotification)> local_WinHttpUnregisterProxyChangeNotification{
+                DynamicFunctionErrorLogs::None};
+
+            LxssDynamicFunction<decltype(GetProxySettingsEx)> local_WinHttpGetProxySettingsEx{DynamicFunctionErrorLogs::None};
+            LxssDynamicFunction<decltype(GetProxySettingsResultEx)> local_WinHttpGetProxySettingsResultEx{DynamicFunctionErrorLogs::None};
+            LxssDynamicFunction<decltype(FreeProxySettingsEx)> local_WinHttpFreeProxySettingsEx{DynamicFunctionErrorLogs::None};
+
+            // try to load each function - only save if all succeed
+            RETURN_IF_FAILED_EXPECTED(
+                local_WinHttpRegisterProxyChangeNotification.load(winHttpModule, "WinHttpRegisterProxyChangeNotification"));
+
+            RETURN_IF_FAILED_EXPECTED(
+                local_WinHttpUnregisterProxyChangeNotification.load(winHttpModule, "WinHttpUnregisterProxyChangeNotification"));
+
+            RETURN_IF_FAILED_EXPECTED(local_WinHttpGetProxySettingsEx.load(winHttpModule, "WinHttpGetProxySettingsEx"));
+
+            RETURN_IF_FAILED_EXPECTED(
+                local_WinHttpGetProxySettingsResultEx.load(winHttpModule, "WinHttpGetProxySettingsResultEx"));
+
+            RETURN_IF_FAILED_EXPECTED(local_WinHttpFreeProxySettingsEx.load(winHttpModule, "WinHttpFreeProxySettingsEx"));
+
+            s_WinHttpRegisterProxyChangeNotification.emplace(std::move(local_WinHttpRegisterProxyChangeNotification));
+            s_WinHttpUnregisterProxyChangeNotification.emplace(std::move(local_WinHttpUnregisterProxyChangeNotification));
+            s_WinHttpGetProxySettingsEx.emplace(std::move(local_WinHttpGetProxySettingsEx));
+            s_WinHttpGetProxySettingsResultEx.emplace(std::move(local_WinHttpGetProxySettingsResultEx));
+            s_WinHttpFreeProxySettingsEx.emplace(std::move(local_WinHttpFreeProxySettingsEx));
+            return S_OK;
+        }();
     });
 
-    // Initialize dynamic functions for the WinHttp Proxy OS APIs
-    // Not using the throwing constructor
-    // as failures should not show up in the Error logs as they can falsely flag failure to start the container
-    LxssDynamicFunction<decltype(RegisterProxyChangeNotification)> local_WinHttpRegisterProxyChangeNotification{DynamicFunctionErrorLogs::None};
-    LxssDynamicFunction<decltype(UnregisterProxyChangeNotification)> local_WinHttpUnregisterProxyChangeNotification{DynamicFunctionErrorLogs::None};
-    LxssDynamicFunction<decltype(GetProxySettingsEx)> local_WinHttpGetProxySettingsEx{DynamicFunctionErrorLogs::None};
-    LxssDynamicFunction<decltype(GetProxySettingsResultEx)> local_WinHttpGetProxySettingsResultEx{DynamicFunctionErrorLogs::None};
-    LxssDynamicFunction<decltype(FreeProxySettingsEx)> local_WinHttpFreeProxySettingsEx{DynamicFunctionErrorLogs::None};
-
-    // try to load each function - only save if all succeed
-    RETURN_IF_FAILED_EXPECTED(
-        local_WinHttpRegisterProxyChangeNotification.load(winHttpModule, "WinHttpRegisterProxyChangeNotification"));
-    RETURN_IF_FAILED_EXPECTED(
-        local_WinHttpUnregisterProxyChangeNotification.load(winHttpModule, "WinHttpUnregisterProxyChangeNotification"));
-    RETURN_IF_FAILED_EXPECTED(local_WinHttpGetProxySettingsEx.load(winHttpModule, "WinHttpGetProxySettingsEx"));
-    RETURN_IF_FAILED_EXPECTED(local_WinHttpGetProxySettingsResultEx.load(winHttpModule, "WinHttpGetProxySettingsResultEx"));
-    RETURN_IF_FAILED_EXPECTED(local_WinHttpFreeProxySettingsEx.load(winHttpModule, "WinHttpFreeProxySettingsEx"));
-
-    s_WinHttpRegisterProxyChangeNotification.emplace(std::move(local_WinHttpRegisterProxyChangeNotification));
-    s_WinHttpUnregisterProxyChangeNotification.emplace(std::move(local_WinHttpUnregisterProxyChangeNotification));
-    s_WinHttpGetProxySettingsEx.emplace(std::move(local_WinHttpGetProxySettingsEx));
-    s_WinHttpGetProxySettingsResultEx.emplace(std::move(local_WinHttpGetProxySettingsResultEx));
-    s_WinHttpFreeProxySettingsEx.emplace(std::move(local_WinHttpFreeProxySettingsEx));
-    return S_OK;
+    return loadResult;
 }
 CATCH_RETURN()
 
@@ -277,8 +290,11 @@ try
 
     // It is guaranteed that after closing the handles, a callback with status WINHTTP_CALLBACK_STATUS_HANDLE_CLOSING
     // will be issued to indicate that the callback has been cleaned up.
-    m_resolver.reset();
-    m_session.reset();
+    {
+        const auto requestLock = m_requestLock.lock();
+        m_resolver.reset();
+        m_session.reset();
+    }
 }
 CATCH_LOG()
 
@@ -442,6 +458,12 @@ void HttpProxyStateTracker::QueryProxySettingsAsync()
     try
     {
         WI_ASSERT(m_callbackQueue.isRunningInQueue());
+        const auto requestLock = m_requestLock.lock();
+        if (m_stopping)
+        {
+            return;
+        }
+
         if (m_queryState == QueryState::PendingAndQueueAdditional)
         {
             return;
@@ -469,6 +491,10 @@ void HttpProxyStateTracker::QueryProxySettingsAsync()
         wil::unique_winhttp_hinternet resolver{};
         THROW_IF_WIN32_ERROR(WinHttpCreateProxyResolver(session.get(), &resolver));
 
+        executionStep = "WinHttpSetOption";
+        DWORD_PTR context = reinterpret_cast<DWORD_PTR>(this);
+        THROW_IF_WIN32_BOOL_FALSE(WinHttpSetOption(resolver.get(), WINHTTP_OPTION_CONTEXT_VALUE, &context, sizeof(context)));
+
         executionStep = "WinHttpSetStatusCallback";
         // We need to set flag WINHTTP_CALLBACK_FLAG_HANDLES in order to get the WINHTTP_CALLBACK_STATUS_HANDLE_CLOSING
         // status callback when a handle is closed.
@@ -483,10 +509,13 @@ void HttpProxyStateTracker::QueryProxySettingsAsync()
 
         WINHTTP_PROXY_SETTINGS_PARAM ProxySettingsParam{0, nullptr, nullptr};
 
+        // Track the request before calling WinHttp because it can complete asynchronously before returning.
+        m_requestFinished.ResetEvent();
+        m_queryState = QueryState::Pending;
+
         executionStep = "WinHttpGetProxySettingsEx";
         // Query the proxy settings
-        const DWORD dwError = s_WinHttpGetProxySettingsEx.value()(
-            resolver.get(), WinHttpProxySettingsTypeWsl, &ProxySettingsParam, reinterpret_cast<DWORD_PTR>(this));
+        const DWORD dwError = s_WinHttpGetProxySettingsEx.value()(resolver.get(), WinHttpProxySettingsTypeWsl, &ProxySettingsParam, context);
 
         if (dwError != ERROR_IO_PENDING && dwError != ERROR_SUCCESS)
         {
@@ -496,8 +525,6 @@ void HttpProxyStateTracker::QueryProxySettingsAsync()
         // Transfer ownership of HTTP handles and track request
         m_resolver = std::move(resolver);
         m_session = std::move(session);
-        m_requestFinished.ResetEvent();
-        m_queryState = QueryState::Pending;
     }
     catch (...)
     {
@@ -514,8 +541,8 @@ HttpProxyStateTracker::HttpProxyStateTracker(int ProxyTimeout, HANDLE UserToken,
     m_localizedProxyChangeString{wsl::shared::Localization::MessageHttpProxyChangeDetected()}
 {
     THROW_IF_WIN32_BOOL_FALSE(::DuplicateTokenEx(UserToken, MAXIMUM_ALLOWED, nullptr, SecurityImpersonation, TokenImpersonation, &m_userToken));
-    m_callbackQueue.submit([this] { QueryProxySettingsAsync(); });
     THROW_IF_WIN32_ERROR(s_WinHttpRegisterProxyChangeNotification.value()(WINHTTP_PROXY_NOTIFY_CHANGE, s_OnProxyChange, this, &m_proxyRegistrationHandle));
+    m_callbackQueue.submit([this] { QueryProxySettingsAsync(); });
 }
 
 HttpProxyStateTracker::~HttpProxyStateTracker()
@@ -529,10 +556,16 @@ HttpProxyStateTracker::~HttpProxyStateTracker()
         }
         CATCH_LOG()
     }
-    // It is guaranteed that after closing the handles, a callback with status WINHTTP_CALLBACK_STATUS_HANDLE_CLOSING
-    // will be issued and it will be the last callback for this request, making it safe to delete the ProxyStateTracker.
-    m_resolver.reset();
-    m_session.reset();
+
+    {
+        const auto requestLock = m_requestLock.lock();
+        m_stopping = true;
+
+        // It is guaranteed that after closing the handles, a callback with status WINHTTP_CALLBACK_STATUS_HANDLE_CLOSING
+        // will be issued and it will be the last callback for this request, making it safe to delete the ProxyStateTracker.
+        m_resolver.reset();
+        m_session.reset();
+    }
 
     // Wait for all requests to complete. At this point no new requests can be started since we unregistered for proxy change
     // notifications. Without this we risk racing proxy callbacks and them calling into a cleaned up ProxyStateTracker.

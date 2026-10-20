@@ -57,7 +57,7 @@ public:
 
     void EnableLoopbackRouting(Interface& interface);
 
-    void InitializeLoopbackConfiguration(Interface& gelnic);
+    void InitializeLoopbackConfiguration(Interface& gelnic, wsl::shared::hns::CreateDeviceFlags flags);
 
     void AddMirroredLoopbackRoutingRules(Interface& gelnic, int addressFamily);
 

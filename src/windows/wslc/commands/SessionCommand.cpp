@@ -19,12 +19,15 @@ using namespace wsl::windows::wslc::execution;
 using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
+
+using namespace wsl::windows::wslc::cli;
 // Session Root Command
-std::vector<std::unique_ptr<Command>> SessionCommand::GetCommands() const
+std::vector<std::unique_ptr<Command>> SessionCommand::CreateCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<SessionEnterCommand>(FullName()));
     commands.push_back(std::make_unique<SessionListCommand>(FullName()));
+    commands.push_back(std::make_unique<SessionRunCommand>(FullName()));
     commands.push_back(std::make_unique<SessionShellCommand>(FullName()));
     commands.push_back(std::make_unique<SessionTerminateCommand>(FullName()));
     return commands;
@@ -47,6 +50,6 @@ std::wstring SessionCommand::LongDescription() const
 
 void SessionCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    OutputHelp();
+    OutputHelp(context.Terminal);
 }
 } // namespace wsl::windows::wslc

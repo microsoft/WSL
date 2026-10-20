@@ -694,7 +694,7 @@ Return Value:
 
         //
         // Check session and foreground process group for both endpoints of
-        // the psuedo-terminal.
+        // the pseudo-terminal.
         //
 
         LxtCheckErrno(TerminalSessionId = tcgetsid(PtsFd));
@@ -876,7 +876,7 @@ Return Value:
 
             //
             // Check session and foreground process group for both endpoints of
-            // the psuedo-terminal.
+            // the pseudo-terminal.
             //
 
             LxtCheckErrno(TerminalSessionId = tcgetsid(PtsFd));
@@ -1104,7 +1104,7 @@ Return Value:
 
             //
             // Check session and foreground process group for both endpoints of
-            // the psuedo-terminal.
+            // the pseudo-terminal.
             //
 
             LxtCheckErrno(TerminalSessionId = tcgetsid(PtsFd));
@@ -1169,7 +1169,7 @@ Return Value:
 
             //
             // Check session and foreground process group for both endpoints of
-            // the psuedo-terminal.
+            // the pseudo-terminal.
             //
 
             LxtCheckErrno(TerminalSessionId = tcgetsid(PtsFd));
@@ -1678,7 +1678,7 @@ Return Value:
 
     //
     // Check session and foreground process group for both endpoints of
-    // the psuedo-terminal.
+    // the pseudo-terminal.
     //
 
     LxtCheckErrno(TerminalSessionId = tcgetsid(ThreadParameters->PtsFd));
@@ -1810,7 +1810,7 @@ Return Value:
     // number of bytes written.
     //
     // N.B. On Ubuntu16, because the buffer size grows asynchronously under
-    //      pressure the buffer may be writeable again by this point.
+    //      pressure the buffer may be writable again by this point.
     //
 
     if (BytesReadWrite < 0)

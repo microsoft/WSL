@@ -30,7 +30,7 @@ Abstract:
 namespace wsl::windows::service::wslc {
 
 class DECLSPEC_UUID("9FCD2067-9FC6-4EFA-9EB0-698169EBF7D3") WSLCSessionFactory
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCSessionFactory, IFastRundown>
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCSessionFactory, IFastRundown, ISupportErrorInfo>
 {
 public:
     NON_COPYABLE(WSLCSessionFactory);
@@ -45,12 +45,16 @@ public:
     // IWSLCSessionFactory
     IFACEMETHOD(CreateSession)
     (_In_ const WSLCSessionInitSettings* Settings,
-     _In_ IWSLCVirtualMachine* Vm,
+     _In_ IWSLCVirtualMachineFactory* VmFactory,
      _In_ IWSLCPluginNotifier* PluginNotifier,
+     _In_opt_ IWarningCallback* WarningCallback,
      _Out_ IWSLCSession** Session,
      _Out_ IWSLCSessionReference** ServiceRef) override;
 
     IFACEMETHOD(GetProcessHandle)(_Out_ HANDLE* ProcessHandle) override;
+
+    // ISupportErrorInfo: enables IErrorInfo marshaling across COM boundaries.
+    IFACEMETHOD(InterfaceSupportsErrorInfo)(_In_ REFIID riid) override;
 
 private:
     std::function<void()> m_destructionCallback;

@@ -166,6 +166,10 @@ foreach($entry in $allStrings[$defaultLanguage].Keys)
 }
 
 $content += @"
+public:
+#ifdef WIN32
+    static bool IsCurrentLanguageEnglish(Options options = Options::Default);
+#endif
 private:
     static const TChar* LookupString(const std::vector<std::pair<TString, const TChar*>>& strings, Options options);
 };

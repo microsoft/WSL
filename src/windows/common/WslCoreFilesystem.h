@@ -31,11 +31,14 @@ wil::unique_hfile CreateFile(
     _In_ LPCWSTR fileName, _In_ DWORD desiredAccess, _In_ DWORD shareMode, _In_ DWORD creationDisposition, _In_ DWORD flagsAndAttributes, _In_ PSID userSid);
 
 /// <summary>
-/// Create a VHD of the specified size.
+/// Create a VHD of the specified size, granting full access only to the specified user and BUILTIN\Administrators.
+/// Administrator access preserves compatibility with older WSL versions; inherited access is disabled.
 /// </summary>
 void CreateVhd(_In_ LPCWSTR target, _In_ ULONGLONG maximumSize, _In_ PSID userSid, _In_ BOOL sparse, _In_ BOOL fixed);
 
 wil::unique_handle OpenVhd(_In_ LPCWSTR Path, _In_ VIRTUAL_DISK_ACCESS_MASK Mask);
+
+void CompactVhd(_In_ LPCWSTR Path);
 
 void ResizeExistingVhd(_In_ HANDLE diskHandle, _In_ ULONGLONG maximumSize, _In_ RESIZE_VIRTUAL_DISK_FLAG resizeFlag);
 

@@ -24,12 +24,12 @@ struct RegistryCommand final : public Command
     {
     }
 
-    std::vector<std::unique_ptr<Command>> GetCommands() const override;
     std::vector<Argument> GetArguments() const override;
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 
 protected:
+    std::vector<std::unique_ptr<Command>> CreateCommands() const override;
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
@@ -47,7 +47,7 @@ struct RegistryLoginCommand final : public Command
     std::wstring LongDescription() const override;
 
 protected:
-    void ValidateArgumentsInternal(const ArgMap& execArgs) const override;
+    void ValidateArgumentsInternal(ArgMap& execArgs) const override;
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 

@@ -57,8 +57,6 @@ std::tuple<WSLCProcessOptions, std::vector<const char*>, std::vector<const char*
     WSLCProcessOptions options{};
     options.CommandLine = {.Values = commandLine.data(), .Count = static_cast<DWORD>(commandLine.size())};
     options.Environment = {.Values = environment.data(), .Count = static_cast<DWORD>(environment.size())};
-    options.TtyColumns = m_columns;
-    options.TtyRows = m_rows;
     options.Flags = m_flags;
 
     if (!m_workingDirectory.empty())
@@ -182,7 +180,8 @@ std::tuple<HRESULT, std::optional<ClientRunningWSLCProcess>, int> WSLCProcessLau
 
     wil::com_ptr<IWSLCProcess> process;
     int error = -1;
-    auto result = Session.CreateRootNamespaceProcess(m_executable.c_str(), &options, &process, &error);
+    auto result =
+        Session.CreateRootNamespaceProcess(m_executable.c_str(), &options, m_rows, m_columns, /* AcquireVmLease */ TRUE, &process, &error);
     if (FAILED(result))
     {
         return std::make_tuple(result, std::optional<ClientRunningWSLCProcess>(), error);
@@ -198,7 +197,12 @@ std::tuple<HRESULT, std::optional<ClientRunningWSLCProcess>> WSLCProcessLauncher
     auto [options, commandLine, env] = CreateProcessOptions();
 
     wil::com_ptr<IWSLCProcess> process;
-    auto result = Container.Exec(&options, m_detachKeys.has_value() ? m_detachKeys->c_str() : nullptr, &process);
+    WSLCProcessStartOptions startOptions{};
+    startOptions.TtyRows = m_rows;
+    startOptions.TtyColumns = m_columns;
+    startOptions.DetachKeys = m_detachKeys.has_value() ? m_detachKeys->c_str() : nullptr;
+
+    auto result = Container.Exec(&options, &startOptions, &process);
     if (FAILED(result))
     {
         return std::make_pair(result, std::optional<ClientRunningWSLCProcess>());
@@ -219,7 +223,7 @@ ClientRunningWSLCProcess::ClientRunningWSLCProcess(wil::com_ptr<IWSLCProcess>&& 
 {
 }
 
-wil::unique_handle ClientRunningWSLCProcess::GetStdHandle(int Index)
+wsl::windows::common::io::HandleWrapper ClientRunningWSLCProcess::GetStdHandle(int Index)
 {
     wslutil::COMOutputHandle handle;
     THROW_IF_FAILED_MSG(m_process->GetStdHandle(static_cast<WSLCFD>(Index), &handle), "Failed to get handle: %i", Index);

@@ -108,7 +108,7 @@ struct ShellExecOptions
     }
 };
 
-void PromptForKeyPress()
+void PromptForKeyPressToExit()
 {
     if (wsl::windows::common::wslutil::IsInteractiveConsole())
     {
@@ -145,6 +145,15 @@ struct WslVersion
 };
 
 // Function definitions.
+void ValidateNoMoreArguments(_In_ std::wstring_view commandLine)
+{
+    if (!commandLine.empty())
+    {
+        const auto argument = wsl::windows::common::helpers::ParseArgument(commandLine, true);
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageInvalidCommandLine(argument, WSL_BINARY_NAME));
+    }
+}
+
 int BashMain(_In_ std::wstring_view commandLine)
 {
     // Call the MSI package if we're in an MSIX context
@@ -223,8 +232,9 @@ int ExportDistribution(_In_ std::wstring_view commandLine)
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
     std::filesystem::path filePath;
     LPCWSTR name{};
+    int tarFormatSet = 0;
 
-    auto parseFormat = [&flags](LPCWSTR Value) {
+    auto parseFormat = [&flags, &tarFormatSet](LPCWSTR Value) {
         if (Value == nullptr)
         {
             return -1;
@@ -242,7 +252,11 @@ int ExportDistribution(_In_ std::wstring_view commandLine)
         {
             WI_SetFlag(flags, LXSS_EXPORT_DISTRO_FLAGS_VHD);
         }
-        else if (!wsl::shared::string::IsEqual(L"tar", Value))
+        else if (wsl::shared::string::IsEqual(L"tar", Value))
+        {
+            tarFormatSet = 1;
+        }
+        else
         {
             THROW_HR(E_INVALIDARG);
         }
@@ -256,9 +270,8 @@ int ExportDistribution(_In_ std::wstring_view commandLine)
     parser.AddArgument(parseFormat, WSL_EXPORT_ARG_FORMAT_OPTION);
     parser.Parse();
 
-    THROW_HR_IF(
-        WSL_E_INVALID_USAGE,
-        filePath.empty() || (WI_IsFlagSet(flags, LXSS_EXPORT_DISTRO_FLAGS_GZIP) && WI_IsFlagSet(flags, LXSS_EXPORT_DISTRO_FLAGS_VHD)));
+    constexpr ULONG c_exportFormatFlags = LXSS_EXPORT_DISTRO_FLAGS_VHD | LXSS_EXPORT_DISTRO_FLAGS_GZIP | LXSS_EXPORT_DISTRO_FLAGS_XZIP;
+    THROW_HR_IF(WSL_E_INVALID_USAGE, filePath.empty() || std::popcount(flags & c_exportFormatFlags) + tarFormatSet > 1);
 
     // Determine if the target is stdout, or an on-disk file.
     wil::unique_hfile file;
@@ -765,6 +778,10 @@ int ListDistributionsHelper(_In_ ListOptions options)
                 state = L"Exporting";
                 break;
 
+            case LxssDistributionStateCompacting:
+                state = L"Compacting";
+                break;
+
             default:
                 break;
             }
@@ -790,7 +807,8 @@ int ListDistributionsHelper(_In_ ListOptions options)
             std::erase_if(distros, [&](const auto& entry) {
                 return (
                     (entry.State == LxssDistributionStateInstalling) || (entry.State == LxssDistributionStateUninstalling) ||
-                    (entry.State == LxssDistributionStateConverting) || (entry.State == LxssDistributionStateExporting));
+                    (entry.State == LxssDistributionStateConverting) || (entry.State == LxssDistributionStateExporting) ||
+                    (entry.State == LxssDistributionStateCompacting));
             });
         }
 
@@ -887,6 +905,7 @@ int Manage(_In_ std::wstring_view commandLine)
     std::optional<std::wstring> move;
     std::optional<std::wstring> defaultUser;
     std::optional<uint64_t> resize;
+    bool compact = false;
     bool allowUnsafe = false;
 
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME, 0);
@@ -895,6 +914,7 @@ int Manage(_In_ std::wstring_view commandLine)
     parser.AddArgument(AbsolutePath(move), WSL_MANAGE_ARG_MOVE_OPTION_LONG, WSL_MANAGE_ARG_MOVE_OPTION);
     parser.AddArgument(defaultUser, WSL_MANAGE_ARG_SET_DEFAULT_USER_OPTION_LONG);
     parser.AddArgument(SizeString(resize), WSL_MANAGE_ARG_RESIZE_OPTION_LONG, WSL_MANAGE_ARG_RESIZE_OPTION);
+    parser.AddArgument(compact, WSL_MANAGE_ARG_COMPACT_OPTION_LONG);
     parser.AddArgument(allowUnsafe, WSL_MANAGE_ARG_ALLOW_UNSAFE);
     parser.Parse();
 
@@ -903,7 +923,7 @@ int Manage(_In_ std::wstring_view commandLine)
     wsl::windows::common::SvcComm service;
     auto distroGuid = service.GetDistributionId(distribution);
 
-    if (sparse.has_value() + move.has_value() + defaultUser.has_value() + resize.has_value() != 1)
+    if (sparse.has_value() + move.has_value() + defaultUser.has_value() + resize.has_value() + compact != 1)
     {
         THROW_HR(WSL_E_INVALID_USAGE);
     }
@@ -919,12 +939,10 @@ int Manage(_In_ std::wstring_view commandLine)
     else if (defaultUser)
     {
         auto wslExe = wil::GetModuleFileNameW<std::wstring>(wil::GetModuleInstanceHandle());
-
-        auto commandLine = std::format(
-            L"\"{}\" {} -u root /usr/bin/id -u -- '{}'",
-            wslExe,
-            wsl::shared::string::GuidToString<wchar_t>(distroGuid),
-            defaultUser.value());
+        const auto distroGuidString = wsl::shared::string::GuidToString<wchar_t>(distroGuid);
+        const std::array<std::wstring_view, 9> arguments{
+            wslExe, distroGuidString, WSL_USER_ARG, L"root", WSL_EXEC_ARG, L"/usr/bin/id", L"-u", L"--", defaultUser.value()};
+        const auto commandLine = wil::ArgvToCommandLine(arguments);
 
         wsl::windows::common::SubProcess process{wslExe.c_str(), commandLine.c_str()};
 
@@ -949,6 +967,13 @@ int Manage(_In_ std::wstring_view commandLine)
     else if (resize)
     {
         THROW_IF_FAILED(service.ResizeDistribution(&distroGuid, resize.value()));
+    }
+    else if (compact)
+    {
+        auto progress = wsl::windows::common::ConsoleProgressIndicator(wsl::shared::Localization::MessageCompactionStart(), true);
+        const auto result = service.CompactDistribution(&distroGuid);
+        progress.End();
+        THROW_IF_FAILED(result);
     }
 
     wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
@@ -1091,6 +1116,8 @@ int SetDefaultDistribution(_In_ LPCWSTR distributionName)
 int SetDefaultVersion(_In_ std::wstring_view commandLine)
 {
     const auto argument = wsl::windows::common::helpers::ParseArgument(commandLine);
+    ValidateNoMoreArguments(wsl::windows::common::helpers::ConsumeArgument(commandLine, argument));
+
     const auto version = ParseVersionString(argument);
     if (version == LXSS_WSL_VERSION_1)
     {
@@ -1143,11 +1170,12 @@ int SetVersion(_In_ std::wstring_view commandLine)
     }
 
     const std::wstring distributionName(argument);
-    wsl::windows::common::SvcComm service;
-    const auto distroGuid = service.GetDistributionId(distributionName.c_str());
-
     commandLine = wsl::windows::common::helpers::ConsumeArgument(commandLine, argument);
     argument = wsl::windows::common::helpers::ParseArgument(commandLine);
+    ValidateNoMoreArguments(wsl::windows::common::helpers::ConsumeArgument(commandLine, argument));
+
+    wsl::windows::common::SvcComm service;
+    const auto distroGuid = service.GetDistributionId(distributionName.c_str());
     const auto version = ParseVersionString(argument);
     if (version == LXSS_WSL_VERSION_2)
     {
@@ -1501,6 +1529,7 @@ int RunDebugShell()
 
     // Create a thread to relay stdin to the pipe.
     wsl::windows::common::ConsoleState console;
+    console.SetInteractiveMode();
     auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
     std::thread inputThread([&]() {
         wsl::windows::common::relay::StandardInputRelay(GetStdHandle(STD_INPUT_HANDLE), pipe.get(), []() {}, exitEvent.get());
@@ -1524,7 +1553,14 @@ int WslMain(_In_ std::wstring_view commandLine)
     // Call the MSI package if we're in an MSIX context
     if (wsl::windows::common::wslutil::IsRunningInMsix())
     {
-        return wsl::windows::common::install::CallMsiPackage();
+        const bool launchedViaAppActivation = winrt::Windows::ApplicationModel::AppInstance::GetActivatedEventArgs() != nullptr;
+        const auto exitCode = wsl::windows::common::install::CallMsiPackage();
+        if (launchedViaAppActivation && exitCode == -1)
+        {
+            g_promptBeforeExit = true;
+        }
+
+        return exitCode;
     }
 
     // Use exit code -1 so invokers of wsl.exe can distinguish between a Linux
@@ -1548,6 +1584,7 @@ int WslMain(_In_ std::wstring_view commandLine)
 
         if (argument == WSL_DEBUG_SHELL_ARG_LONG)
         {
+            ValidateNoMoreArguments(wsl::windows::common::helpers::ConsumeArgument(commandLine, argument));
             return RunDebugShell();
         }
         else if ((argument == WSL_DISTRO_ARG) || (argument == WSL_DISTRO_ARG_LONG))
@@ -1609,6 +1646,7 @@ int WslMain(_In_ std::wstring_view commandLine)
         }
         else if (argument == WSL_HELP_ARG)
         {
+            ValidateNoMoreArguments(wsl::windows::common::helpers::ConsumeArgument(commandLine, argument));
             wsl::windows::common::wslutil::PrintMessage(Localization::MessageWslUsage());
             return exitCode;
         }
@@ -1663,6 +1701,7 @@ int WslMain(_In_ std::wstring_view commandLine)
                 return exitCode;
             }
 
+            ValidateNoMoreArguments(wsl::windows::common::helpers::ConsumeArgument(commandLine, argument));
             return SetDefaultDistribution(std::wstring(argument).c_str());
         }
         else if (argument == WSL_PARENT_CONSOLE_ARG)
@@ -1690,6 +1729,7 @@ int WslMain(_In_ std::wstring_view commandLine)
                 return exitCode;
             }
 
+            ValidateNoMoreArguments(wsl::windows::common::helpers::ConsumeArgument(commandLine, argument));
             return TerminateDistribution(std::wstring(argument).c_str());
         }
         else if (argument == WSL_UNREGISTER_ARG)
@@ -1702,6 +1742,7 @@ int WslMain(_In_ std::wstring_view commandLine)
                 return exitCode;
             }
 
+            ValidateNoMoreArguments(wsl::windows::common::helpers::ConsumeArgument(commandLine, argument));
             return UnregisterDistribution(std::wstring(argument).c_str());
         }
         else if (argument == WSL_SET_DEFAULT_VERSION_ARG)
@@ -1742,10 +1783,12 @@ int WslMain(_In_ std::wstring_view commandLine)
         }
         else if (argument == WSL_STATUS_ARG)
         {
+            ValidateNoMoreArguments(wsl::windows::common::helpers::ConsumeArgument(commandLine, argument));
             return Status();
         }
         else if ((argument == WSL_VERSION_ARG) || (argument == WSL_VERSION_ARG_LONG))
         {
+            ValidateNoMoreArguments(wsl::windows::common::helpers::ConsumeArgument(commandLine, argument));
             return Version();
         }
         else if (argument == WSL_UNINSTALL_ARG)
@@ -1965,7 +2008,7 @@ int wsl::windows::common::WslClient::Main(_In_ LPCWSTR commandLine)
     if (g_promptBeforeExit)
     {
         g_promptBeforeExit = false;
-        PromptForKeyPress();
+        PromptForKeyPressToExit();
     }
 
     return exitCode;

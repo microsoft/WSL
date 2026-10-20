@@ -29,12 +29,14 @@ body:
 
 - type: checkboxes
   attributes:
-    label: Are you using WSL 1 or WSL 2?
+    label: Are you using WSL 1, WSL 2, or WSLC?
     description: |
-      Tell us whether the issue is on WSL 2 and/or WSL 1. You can tell by running `wsl -l -v`. 
+      For WSL distributions, run `wsl -l -v` to identify WSL 1 or WSL 2.
+      Select WSLC if the issue involves WSL Containers (`wslc`).
     options:
       - label: "WSL 2"
       - label: "WSL 1"
+      - label: "WSLC"
 
 - type: input
   attributes:

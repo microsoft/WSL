@@ -1077,7 +1077,7 @@ Return Value:
 
         //
         // Check session and foreground process group for both endpoints of
-        // the psuedo-terminal.
+        // the pseudo-terminal.
         //
 
         LxtCheckErrno(TerminalSessionId = tcgetsid(PtsFd));

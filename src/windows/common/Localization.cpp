@@ -100,3 +100,21 @@ LPCWSTR wsl::shared::Localization::LookupString(const std::vector<std::pair<std:
     // Default to English is string is not found (English is always the first entry)
     return strings[0].second;
 }
+
+bool wsl::shared::Localization::IsCurrentLanguageEnglish(Options options)
+{
+    try
+    {
+        const auto languages = GetUserLanguages(options != Options::DontImpersonate && g_runningInService);
+        if (!languages.empty())
+        {
+            return languages[0] == L"en" || languages[0].starts_with(L"en-");
+        }
+    }
+    catch (...)
+    {
+        LOG_CAUGHT_EXCEPTION();
+    }
+
+    return true;
+}

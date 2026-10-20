@@ -34,6 +34,8 @@ public:
 
     bool RemoveCallback(_In_ ULONG64 ClientKey);
 
+    // Permanently stop registration and drain all callbacks before the owner is destroyed.
+    // Must be called without locks that client callbacks acquire.
     void ClearCallbacks();
 
     struct OwnedProcess
@@ -77,6 +79,11 @@ private:
     _Requires_lock_held_(m_lock)
     std::list<ClientCallback>::iterator _FindClient(_In_ ULONG64 ClientKey);
 
+    _Requires_lock_held_(m_lock)
+    void _RetireCallback(std::list<ClientCallback>::iterator Client);
+
+    static VOID CALLBACK s_DrainRetiredCallbacks(_Inout_ PTP_CALLBACK_INSTANCE, _Inout_opt_ PVOID Context, _Inout_ PTP_WORK);
+
     static VOID CALLBACK s_OnClientProcessTerminated(_Inout_ PTP_CALLBACK_INSTANCE, _Inout_opt_ PVOID Context, _Inout_ PTP_WAIT Wait, _In_ TP_WAIT_RESULT WaitResult);
 
     static VOID CALLBACK s_OnTimeout(_Inout_ PTP_CALLBACK_INSTANCE Instance, _Inout_opt_ PVOID Context, _Inout_ PTP_TIMER Timer);
@@ -89,11 +96,17 @@ private:
 
     _Guarded_by_(m_lock) std::list<ClientCallback> m_callbackList;
 
+    _Guarded_by_(m_lock) std::list<ClientCallback> m_retiredCallbacks;
+
+    // Removal cannot wait while callers hold locks needed by the callbacks.
+    // Keep their resources alive until this worker drains them outside those locks.
+    wil::unique_threadpool_work m_cleanupWork;
+
     // N.B. There is a race that could cause AV between callbacks firing and
     //      the destruction of the lifetime manager class. To avoid the race
     //      create a chain of waits where each callback waits for the previous
     //      callback to finish. The destructor of the class waits on the final
-    //      callback before returning.
+    //      callback before returning from ClearCallbacks().
     wil::unique_threadpool_wait m_lastCallbackWait;
     wil::unique_threadpool_timer m_lastTimerWait;
 };

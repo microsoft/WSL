@@ -281,11 +281,6 @@ void GnsEngine::ProcessRouteChange(Interface& interface, const wsl::shared::hns:
         GNS_LOG_INFO("Remove route {} on interfaceName {}", routeString.c_str(), interface.Name().c_str());
         manager.ModifyRoute(interfaceRoute, Operation::Remove);
     }
-    else if (action == ModifyRequestType::Update)
-    {
-        GNS_LOG_INFO("Update route {} on interfaceName {}", routeString.c_str(), interface.Name().c_str());
-        manager.ModifyRoute(interfaceRoute, Operation::Update);
-    }
     else
     {
         throw RuntimeErrorWithSourceLocation(std::format("Unexpected route action: {}", static_cast<int>(action)));
@@ -488,7 +483,8 @@ std::tuple<bool, int> GnsEngine::ProcessNextMessage(wsl::shared::Transaction& tr
                 "LxGnsMessageCreateDeviceRequest [Loopback]: InitializeLoopbackConfiguration deviceName {}, interfaceName {}",
                 wsl::shared::string::GuidToString<char>(createDeviceRequest.lowerEdgeAdapterId.value_or(emptyGuid)).c_str(),
                 gelnic.Name().c_str());
-            manager.InitializeLoopbackConfiguration(gelnic);
+            manager.InitializeLoopbackConfiguration(gelnic, createDeviceRequest.flags);
+
             break;
         }
         default:

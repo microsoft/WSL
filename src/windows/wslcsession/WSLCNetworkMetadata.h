@@ -30,6 +30,7 @@ struct NetworkIPAMConfig
 {
     std::string Subnet;
     std::string Gateway;
+    std::string IPRange;
 };
 
 struct NetworkIPAM
@@ -44,7 +45,9 @@ struct NetworkEntry
     std::string Driver;
     std::string Scope;
     bool Internal{false};
+    bool EnableIPv6{false};
     std::map<std::string, std::string> Labels;
+    std::map<std::string, std::string> Options;
     NetworkIPAM IPAM;
 };
 

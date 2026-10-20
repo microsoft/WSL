@@ -1,0 +1,18 @@
+# Custom container image for the WSLC-CustomContainer sample.
+#
+# A tiny Python tool that turns text (e.g. a URL) into a scannable QR code drawn
+# with Unicode block characters, printed straight to the terminal.
+#
+# This image is built automatically when the C# project is built, via the
+# <WslcImage> item in WSLCCustomContainer.csproj (no manual docker/wslc steps).
+
+FROM python:3.11-slim
+
+# qrcode renders ASCII/Unicode QR codes with no extra native dependencies.
+RUN pip install --no-cache-dir qrcode
+
+COPY qr.py /app/qr.py
+
+# No ENTRYPOINT/CMD: the host keeps the container alive with its own init
+# process (sleep) and then execs `python /app/qr.py <text>` to render the code.
+# (Run it directly with: wslc run customcontainer python /app/qr.py "your text".)

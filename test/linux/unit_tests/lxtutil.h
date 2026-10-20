@@ -262,9 +262,9 @@ int LxtClosePipe(PLXT_PIPE Pipe);
 
 int LxtCreatePipe(PLXT_PIPE Pipe);
 
-int LxtExecuteAndReadOutput(char** Argv, char* OutputBuffer, size_t OutputBufferSize);
+int LxtExecuteAndReadOutput(char** Argv, char* OutputBuffer, size_t OutputBufferSize, int ExpectedExitCode);
 
-int LxtExecuteWslPath(char* Path, bool WinPath, char* OutputBuffer, size_t OutputBufferSize);
+int LxtExecuteWslPath(char* Path, bool WinPath, char* OutputBuffer, size_t OutputBufferSize, int ExpectedExitCode);
 
 int LxtJoinThread(pid_t* Tid);
 

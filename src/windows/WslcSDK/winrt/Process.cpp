@@ -34,6 +34,13 @@ Process::Process(winrt::Microsoft::WSL::Containers::ProcessSettings const& setti
     }
 }
 
+Process::Process(winrt::Microsoft::WSL::Containers::ProcessOutputMode outputMode) : m_outputMode(outputMode)
+{
+    // No ProcessSettings; used for opened-container paths where output mode is set independently.
+    // For Event mode, callers are responsible for registering callbacks via
+    // WslcSetContainerInitProcessIOCallbacks using the OutputCallback/ExitCallback statics.
+}
+
 void Process::ApplyCallbacksToSettings()
 {
     // Callbacks are only used with OutputMode::Event.
@@ -45,11 +52,7 @@ void Process::ApplyCallbacksToSettings()
 
     auto settingsPtr = GetStructPointer(m_settings);
 
-    WslcProcessCallbacks callbacks{};
-    callbacks.onExit = ExitCallback;
-    callbacks.onStdOut = OutputCallback;
-    callbacks.onStdErr = OutputCallback;
-
+    WslcProcessCallbacks callbacks = GetEventCallbacks();
     winrt::check_hresult(WslcSetProcessSettingsCallbacks(settingsPtr, &callbacks, this));
 }
 
@@ -97,6 +100,15 @@ void Process::AttachHandle(WslcProcess handle)
     StartWaitingForExit();
 }
 
+WslcProcessCallbacks Process::GetEventCallbacks() const noexcept
+{
+    WslcProcessCallbacks callbacks{};
+    callbacks.onStdOut = OutputCallback;
+    callbacks.onStdErr = OutputCallback;
+    callbacks.onExit = ExitCallback;
+    return callbacks;
+}
+
 ProcessOutputMode Process::OutputMode()
 {
     return m_outputMode;
@@ -141,10 +153,10 @@ void Process::EnsureCanStart() const
         throw winrt::hresult_illegal_method_call(L"Start() cannot be called on the init process, it is started by the container");
     }
 
-    auto cmdLine = GetImplementation(m_settings)->CmdLine();
+    auto cmdLine = GetImplementation(m_settings)->CommandLine();
     if (!cmdLine || cmdLine.Size() == 0)
     {
-        throw winrt::hresult_invalid_argument(L"Process requires a non-empty CmdLine to start");
+        throw winrt::hresult_invalid_argument(L"Process requires a non-empty CommandLine to start");
     }
 }
 
@@ -261,4 +273,23 @@ WslcProcess Process::ToHandle()
     EnsureStarted();
     return m_process.get();
 }
+
+void Process::Close()
+{
+    if (m_waitForExitAction)
+    {
+        m_waitForExitAction.Cancel();
+        m_waitForExitAction = nullptr;
+    }
+
+    // Methods called after Close() will fail due to EnsureStarted().
+    m_process.reset();
+}
+
+void Process::final_release(std::unique_ptr<Process> self)
+{
+    // Ensure cleanup when refcount drops to zero even if Close() was not called explicitly.
+    self->Close();
+}
+
 } // namespace winrt::Microsoft::WSL::Containers::implementation

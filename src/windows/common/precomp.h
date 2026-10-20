@@ -97,6 +97,7 @@ Abstract:
 #include <format>
 #include <cwctype>
 #include <variant>
+#include <bit>
 
 // Socket APIs
 #include <mswsock.h>
@@ -135,6 +136,7 @@ Abstract:
 
 // Telemetry Header
 #include "WslTelemetry.h"
+#include "SlowOperationWatcher.h"
 
 // LxCore headers
 #include <lxcoreapi.h>
@@ -145,6 +147,7 @@ Abstract:
 #include "conncheckshared.h"
 #include "helpers.hpp"
 #include "string.hpp"
+#include "timestamp.hpp"
 #include "filesystem.hpp"
 #include "Localization.h"
 #include "wslutil.h"

@@ -1,10 +1,10 @@
 # WSL open source documentation
 
-Build instructions: 
+Build instructions:
 
 ```
-$ pip install mkdocs mkdocs-mermaid2-plugin
-$ mkdocs serve
+$ pip install -r doc/requirements.txt
+$ mkdocs serve -f doc/mkdocs.yml
 ```
 
 You can then view the documentation at `http://127.0.0.1:8000/`.

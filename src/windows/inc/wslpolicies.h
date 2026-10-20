@@ -34,6 +34,7 @@ inline constexpr auto c_allowCustomNetworkingModeUserSetting = L"AllowNetworking
 inline constexpr auto c_allowCustomFirewallUserSetting = L"AllowFirewallUserSetting";
 inline constexpr auto c_defaultNetworkingMode = L"DefaultNetworkingMode";
 inline constexpr auto c_allowWSLContainer = L"AllowWSLContainer";
+inline constexpr auto c_allowWSLContainerPrivileged = L"AllowWSLContainerPrivileged";
 inline constexpr auto c_wslContainerRegistryAllowlist = L"WSLContainerRegistryAllowlist";
 
 inline std::optional<DWORD> GetPolicyValue(HKEY key, LPCWSTR name)
@@ -198,6 +199,65 @@ inline bool HasRegistryAllowlist(HKEY policiesKey)
 {
     auto subKey = OpenRegistryAllowlistKey(policiesKey);
     return subKey && !EnumerateRegistryAllowlist(subKey.get()).empty();
+}
+
+// Snapshot of the WSLContainerRegistryAllowlist policy captured in a single read. Callers use
+// State to distinguish an unconfigured policy (fail open) from a policy that is present.
+enum class RegistryAllowlistState
+{
+    NotConfigured,
+    Configured
+};
+
+struct RegistryAllowlistSnapshot
+{
+    RegistryAllowlistState State{RegistryAllowlistState::NotConfigured};
+    std::vector<std::wstring> Hosts{};
+};
+
+// subKey must be the WSLContainerRegistryAllowlist sub-key; enumeration failures throw MessageRegistryAllowlistPolicyInvalid.
+inline RegistryAllowlistSnapshot ReadRegistryAllowlistSnapshot(HKEY subKey)
+try
+{
+    RegistryAllowlistSnapshot snapshot;
+    for (auto& [name, value] : wsl::windows::common::registry::EnumStringValues(subKey))
+    {
+        if (value.empty())
+        {
+            continue;
+        }
+
+        snapshot.Hosts.emplace_back(std::move(value));
+    }
+
+    if (!snapshot.Hosts.empty())
+    {
+        snapshot.State = RegistryAllowlistState::Configured;
+    }
+
+    return snapshot;
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION();
+    THROW_HR_WITH_USER_ERROR(wil::ResultFromCaughtException(), wsl::shared::Localization::MessageRegistryAllowlistPolicyInvalid());
+}
+
+// Throws MessageRegistryAllowlistPolicyInvalid on an unreadable sub-key so callers fail closed.
+inline RegistryAllowlistSnapshot ReadRegistryAllowlistSnapshotFromPoliciesRoot()
+{
+    const auto subKeyPath = std::wstring{c_registryKey} + L"\\" + c_wslContainerRegistryAllowlist;
+    wil::unique_hkey subKey;
+    const auto openResult = RegOpenKeyExW(HKEY_LOCAL_MACHINE, subKeyPath.c_str(), 0, KEY_READ, &subKey);
+    if (openResult == ERROR_PATH_NOT_FOUND || openResult == ERROR_FILE_NOT_FOUND)
+    {
+        return {};
+    }
+
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(openResult), wsl::shared::Localization::MessageRegistryAllowlistPolicyInvalid(), openResult != ERROR_SUCCESS);
+
+    return ReadRegistryAllowlistSnapshot(subKey.get());
 }
 
 } // namespace wsl::windows::policies

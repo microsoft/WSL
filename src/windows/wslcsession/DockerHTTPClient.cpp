@@ -56,6 +56,16 @@ bool IsResponseChunked(const http::response_parser<http::buffer_body>::value_typ
 
 } // namespace
 
+std::string wsl::windows::service::wslc::FormatDockerEngineError(const std::string& EngineMessage)
+{
+    if (EngineMessage.empty() || wsl::shared::Localization::IsCurrentLanguageEnglish())
+    {
+        return EngineMessage;
+    }
+
+    return wsl::shared::string::WideToMultiByte(wsl::shared::Localization::MessageWslcDockerEngineErrorPrefix()) + " " + EngineMessage;
+}
+
 DockerHTTPClient::URL::URL(std::string&& Path) : m_path(std::move(Path))
 {
 }
@@ -125,8 +135,7 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PullImag
     auto url = URL::Create("/images/create");
 
     // Normalize the repo server & path
-    auto [server, path] = wslutil::NormalizeRepo(Repo);
-    url.SetParameter("fromImage", std::format("{}/{}", server, path));
+    url.SetParameter("fromImage", wslutil::RepositoryReference::Parse(Repo).GetCanonical());
 
     if (tagOrDigest.has_value())
     {
@@ -227,6 +236,21 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SaveImage(const std::s
     return {response.result_int(), std::move(socket)};
 }
 
+std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SaveImages(const std::vector<std::string>& NamesOrIds)
+{
+    auto url = URL::Create("/images/get");
+    for (const auto& name : NamesOrIds)
+    {
+        // 'names' is a repeated query parameter.
+        // See: https://docs.docker.com/reference/api/engine/version/v1.52/#tag/Image/operation/ImageGet
+        url.SetParameter("names", name);
+    }
+
+    auto [response, socket] = SendRequest(verb::get, url, {}, {});
+
+    return {response.result_int(), std::move(socket)};
+}
+
 docker_schema::PruneImageResult DockerHTTPClient::PruneImages(const std::map<std::string, std::vector<std::string>>& filters)
 {
     auto url = URL::Create("/images/prune");
@@ -241,11 +265,12 @@ docker_schema::PruneImageResult DockerHTTPClient::PruneImages(const std::map<std
 }
 
 std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListContainers(
-    bool all, int limit, const std::map<std::string, std::vector<std::string>>& filters)
+    bool all, int limit, const std::map<std::string, std::vector<std::string>>& filters, bool size)
 {
     auto url = URL::Create("/containers/json");
     url.SetParameter("all", all);
     url.SetParameter("limit", std::to_string(limit));
+    url.SetParameter("size", size);
 
     if (!filters.empty())
     {
@@ -287,7 +312,7 @@ void DockerHTTPClient::StartContainer(const std::string& Id, const std::optional
     Transaction(verb::post, url);
 }
 
-void DockerHTTPClient::StopContainer(const std::string& Id, std::optional<WSLCSignal> Signal, std::optional<ULONG> TimeoutSeconds)
+void DockerHTTPClient::StopContainer(const std::string& Id, std::optional<WSLCSignal> Signal, std::optional<LONG> TimeoutSeconds)
 {
     auto url = URL::Create("/containers/{}/stop", Id);
     if (Signal.has_value())
@@ -331,9 +356,12 @@ void DockerHTTPClient::DeleteContainer(const std::string& Id, bool Force, bool D
     Transaction(verb::delete_, url);
 }
 
-docker_schema::InspectContainer DockerHTTPClient::InspectContainer(const std::string& Id)
+docker_schema::InspectContainer DockerHTTPClient::InspectContainer(const std::string& Id, bool Size)
 {
-    return Transaction<EmptyRequest, docker_schema::InspectContainer>(verb::get, URL::Create("/containers/{}/json", Id));
+    auto url = URL::Create("/containers/{}/json", Id);
+    url.SetParameter("size", Size);
+
+    return Transaction<EmptyRequest, docker_schema::InspectContainer>(verb::get, url);
 }
 
 docker_schema::ContainerStats DockerHTTPClient::ContainerStats(const std::string& Id)
@@ -382,6 +410,60 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::ExportContainer(const 
     auto [response, socket] = SendRequest(verb::get, URL::Create("/containers/{}/export", ContainerNameOrId), {}, {});
 
     return {response.result_int(), std::move(socket)};
+}
+
+std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PutArchive(
+    const std::string& ContainerID, const std::string& Path, std::optional<uint64_t> ContentLength)
+{
+    auto url = URL::Create("/containers/{}/archive", ContainerID);
+    url.SetParameter("path", Path);
+
+    std::map<std::string, std::string> headers = {{"Content-Type", "application/x-tar"}};
+    if (ContentLength.has_value())
+    {
+        headers["Content-Length"] = std::to_string(ContentLength.value());
+    }
+
+    return SendRequestImpl(verb::put, url, {}, headers);
+}
+
+std::tuple<uint32_t, wil::unique_socket, bool> DockerHTTPClient::GetArchive(const std::string& ContainerID, const std::string& Path)
+{
+    auto url = URL::Create("/containers/{}/archive", ContainerID);
+    url.SetParameter("path", Path);
+
+    auto [response, socket] = SendRequest(verb::get, url, {}, {});
+
+    return {response.result_int(), std::move(socket), response.chunked()};
+}
+
+std::optional<docker_schema::ContainerPathStat> DockerHTTPClient::StatArchivePath(const std::string& ContainerID, const std::string& Path)
+{
+    auto url = URL::Create("/containers/{}/archive", ContainerID);
+    url.SetParameter("path", Path);
+
+    // The engine reports the stat in a response header, so a HEAD request is enough.
+    auto [response, socket] = SendRequest(verb::head, url, {}, {});
+    socket.reset();
+
+    if (response.result_int() == 404)
+    {
+        return std::nullopt;
+    }
+
+    if (response.result_int() != 200)
+    {
+        throw DockerHTTPException(std::move(response), verb::head, url.Get(), "", "");
+    }
+
+    const auto header = response["X-Docker-Container-Path-Stat"];
+    if (header.empty())
+    {
+        return std::nullopt;
+    }
+
+    const auto decoded = wslutil::Base64Decode(std::string(header));
+    return wsl::shared::FromJson<docker_schema::ContainerPathStat>(decoded.c_str());
 }
 
 docker_schema::Volume DockerHTTPClient::CreateVolume(const docker_schema::CreateVolume& Request)
@@ -434,9 +516,26 @@ void DockerHTTPClient::RemoveNetwork(const std::string& Name)
     Transaction(verb::delete_, URL::Create("/networks/{}", Name));
 }
 
-std::vector<docker_schema::Network> DockerHTTPClient::ListNetworks()
+void DockerHTTPClient::ConnectContainerToNetwork(const std::string& NetworkName, const docker_schema::ContainerNetworkRequest& Request)
 {
-    return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Network>>(verb::get, URL::Create("/networks"));
+    Transaction(verb::post, URL::Create("/networks/{}/connect", NetworkName), Request);
+}
+
+void DockerHTTPClient::DisconnectContainerFromNetwork(const std::string& NetworkName, const docker_schema::ContainerNetworkRequest& Request)
+{
+    Transaction(verb::post, URL::Create("/networks/{}/disconnect", NetworkName), Request);
+}
+
+std::vector<docker_schema::Network> DockerHTTPClient::ListNetworks(const std::map<std::string, std::vector<std::string>>& filters)
+{
+    auto url = URL::Create("/networks");
+
+    if (!filters.empty())
+    {
+        url.SetParameter("filters", nlohmann::json(filters).dump());
+    }
+
+    return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Network>>(verb::get, url);
 }
 
 docker_schema::Network DockerHTTPClient::InspectNetwork(const std::string& Name)
@@ -444,13 +543,26 @@ docker_schema::Network DockerHTTPClient::InspectNetwork(const std::string& Name)
     return Transaction<docker_schema::EmptyRequest, docker_schema::Network>(verb::get, URL::Create("/networks/{}", Name));
 }
 
-wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
+docker_schema::PruneNetworkResult DockerHTTPClient::PruneNetworks(const std::map<std::string, std::vector<std::string>>& filters)
+{
+    auto url = URL::Create("/networks/prune");
+
+    if (!filters.empty())
+    {
+        url.SetParameter("filters", nlohmann::json(filters).dump());
+    }
+
+    return Transaction<docker_schema::EmptyRequest, docker_schema::PruneNetworkResult>(verb::post, url);
+}
+
+wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, LONGLONG Since, LONGLONG Until, ULONGLONG Tail)
 {
     auto url = URL::Create("/containers/{}/logs", Id);
     url.SetParameter("follow", WI_IsFlagSet(Flags, WSLCLogsFlagsFollow));
     url.SetParameter("stdout", true);
     url.SetParameter("stderr", true);
     url.SetParameter("timestamps", WI_IsFlagSet(Flags, WSLCLogsFlagsTimestamps));
+    url.SetParameter("details", WI_IsFlagSet(Flags, WSLCLogsFlagsDetails));
 
     if (Tail != 0)
     {
@@ -626,16 +738,9 @@ void DockerHTTPClient::DockerHttpResponseHandle::OnRead(const gsl::span<char>& C
     {
         // Otherwise keep parsing the HTTP response header.
         size_t i{};
-        for (i = 0; i < Content.size() && LineFeeds < 2; i++)
+        for (i = 0; i < Content.size() && !HeaderEnd.IsDone(); i++)
         {
-            if (Content[i] == '\n')
-            {
-                LineFeeds++;
-            }
-            else if (Content[i] != '\r')
-            {
-                LineFeeds = 0;
-            }
+            HeaderEnd.Consume(Content[i]);
         }
 
         // Feed the parser up to the end of the header.
@@ -760,16 +865,21 @@ std::pair<DockerHTTPClient::HTTPResponse, wil::unique_socket> DockerHTTPClient::
 
     // Parse the response header
     constexpr auto bufferSize = 16 * 1024;
+    // Docker response header max size.
+    constexpr size_t maxHeaderSize = _1MB;
     size_t Offset = 0;
     std::vector<char> buffer;
     http::response_parser<http::buffer_body> parser;
     parser.eager(false);
     parser.skip(false);
 
-    size_t lineFeeds = 0;
+    HttpHeaderEndDetector headerEnd;
     // Consume the socket until the header end is reached
     while (!parser.is_header_done())
     {
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_BUFFER_OVERFLOW), Offset >= maxHeaderSize, "HTTP response header exceeded %zu bytes", maxHeaderSize);
+
         buffer.resize(Offset + bufferSize);
 
         // Peek for the end of the HTTP header '\r\n'
@@ -778,28 +888,27 @@ std::pair<DockerHTTPClient::HTTPResponse, wil::unique_socket> DockerHTTPClient::
 
         THROW_HR_IF(E_ABORT, bytesRead == 0);
 
-        size_t i{};
-        for (i = 0; i < bytesRead + Offset && lineFeeds < 2; i++)
+        // Scan only the newly peeked bytes [Offset, Offset + bytesRead)
+        size_t i = 0;
+        for (i = Offset; i < bytesRead + Offset && !headerEnd.IsDone(); i++)
         {
-            if (buffer[i] == '\n')
-            {
-                lineFeeds++;
-            }
-            else if (buffer[i] != '\r')
-            {
-                lineFeeds = 0;
-            }
+            headerEnd.Consume(buffer[i]);
         }
 
-        // Consume the buffer from the socket.
+        WI_ASSERT(i >= Offset);
+        const size_t toConsume = i - Offset;
+
+        // Consume the scanned header bytes from the socket
         bytesRead = common::socket::Receive(
-            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data() + Offset), i - Offset), m_exitingEvent);
-        WI_ASSERT(bytesRead == i - Offset);
+            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data() + Offset), toConsume), m_exitingEvent, 0);
+        THROW_HR_IF(E_ABORT, bytesRead == 0); // E_ABORT case after peek but before consume
+        THROW_HR_IF_MSG(
+            E_UNEXPECTED, static_cast<size_t>(bytesRead) != toConsume, "Short read consuming HTTP header: got %d, expected %zu", bytesRead, toConsume);
 
         Offset += bytesRead;
         buffer.resize(Offset);
 
-        if (lineFeeds == 2) // Header is complete, feed it to the parser.
+        if (headerEnd.IsDone()) // Header is complete, feed it to the parser.
         {
 
 #ifdef WSLC_HTTP_DEBUG

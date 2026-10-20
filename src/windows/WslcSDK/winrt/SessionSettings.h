@@ -29,14 +29,14 @@ struct SessionSettings : SessionSettingsT<SessionSettings>
     void StoragePath(hstring const& value);
     winrt::Windows::Foundation::IReference<uint32_t> CpuCount();
     void CpuCount(winrt::Windows::Foundation::IReference<uint32_t> const& value);
-    winrt::Windows::Foundation::IReference<uint32_t> MemoryMB();
-    void MemoryMB(winrt::Windows::Foundation::IReference<uint32_t> const& value);
+    winrt::Windows::Foundation::IReference<uint32_t> MemorySizeInMB();
+    void MemorySizeInMB(winrt::Windows::Foundation::IReference<uint32_t> const& value);
     winrt::Windows::Foundation::IReference<winrt::Windows::Foundation::TimeSpan> Timeout();
     void Timeout(winrt::Windows::Foundation::IReference<winrt::Windows::Foundation::TimeSpan> const& value);
     winrt::Microsoft::WSL::Containers::VhdOptions VhdRequirements();
     void VhdRequirements(winrt::Microsoft::WSL::Containers::VhdOptions const& value);
-    winrt::Microsoft::WSL::Containers::SessionFeatureFlags FeatureFlags();
-    void FeatureFlags(winrt::Microsoft::WSL::Containers::SessionFeatureFlags const& value);
+    bool EnableGpu();
+    void EnableGpu(bool value);
 
     WslcSessionSettings* ToStructPointer();
 
@@ -44,10 +44,10 @@ private:
     std::wstring m_name;
     std::wstring m_storagePath;
     winrt::Windows::Foundation::IReference<uint32_t> m_cpuCount{nullptr};
-    winrt::Windows::Foundation::IReference<uint32_t> m_memoryMB{nullptr};
+    winrt::Windows::Foundation::IReference<uint32_t> m_memorySizeInMB{nullptr};
     winrt::Windows::Foundation::IReference<winrt::Windows::Foundation::TimeSpan> m_timeout{nullptr};
     winrt::Microsoft::WSL::Containers::VhdOptions m_vhdRequirements{nullptr};
-    winrt::Microsoft::WSL::Containers::SessionFeatureFlags m_featureFlags{winrt::Microsoft::WSL::Containers::SessionFeatureFlags::None};
+    WslcSessionFeatureFlags m_featureFlags{WSLC_SESSION_FEATURE_FLAG_NONE};
 
     std::unique_ptr<WslcSessionSettings> m_sessionSettings;
 };

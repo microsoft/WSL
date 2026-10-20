@@ -25,9 +25,9 @@ ServiceRunningProcess::ServiceRunningProcess(const Microsoft::WRL::ComPtr<WSLCPr
     process.CopyTo(m_process.GetAddressOf());
 }
 
-wil::unique_handle ServiceRunningProcess::GetStdHandle(int Index)
+wsl::windows::common::io::HandleWrapper ServiceRunningProcess::GetStdHandle(int Index)
 {
-    return std::move(Get().GetStdHandle(Index));
+    return Get().GetStdHandle(Index);
 }
 
 wil::unique_event ServiceRunningProcess::GetExitEvent()
@@ -57,8 +57,9 @@ std::tuple<HRESULT, int, std::optional<ServiceRunningProcess>> ServiceProcessLau
     int error = -1;
 
     std::optional<ServiceRunningProcess> process;
-    auto result = wil::ResultFromException(
-        [&]() { process.emplace(virtualMachine.CreateLinuxProcess(m_executable.c_str(), options, &error), m_flags); });
+    auto result = wil::ResultFromException([&]() {
+        process.emplace(virtualMachine.CreateLinuxProcess(m_executable.c_str(), options, m_rows, m_columns, &error), m_flags);
+    });
 
     return {result, error, std::move(process)};
 }

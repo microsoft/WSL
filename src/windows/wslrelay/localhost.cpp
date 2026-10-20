@@ -291,15 +291,11 @@ try
 {
     // Begin accepting connections until the relay is stopped.
 
-    const int AddressFamily = WindowsAddressFamily(Arguments->Family);
-
     for (;;)
     {
-        wil::unique_socket InetSocket(WSASocket(AddressFamily, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED));
-        THROW_LAST_ERROR_IF(!InetSocket);
-
-        if (!wsl::windows::common::socket::CancellableAccept(
-                Arguments->ListenSocket.get(), InetSocket.get(), INFINITE, Arguments->ExitEvent.get()))
+        auto InetSocket =
+            wsl::windows::common::socket::CancellableAccept(Arguments->ListenSocket.get(), INFINITE, Arguments->ExitEvent.get());
+        if (!InetSocket)
         {
             break; // Exit event was signaled, exit.
         }
@@ -308,16 +304,21 @@ try
 
         WSL_LOG("PortRelayUsage", TraceLoggingValue(Arguments->Family, "family"), TraceLoggingValue(Arguments->Port, "port"), TraceLoggingLevel(WINEVENT_LEVEL_INFO));
 
-        auto RelayThread = std::thread([Arguments, InetSocket = std::move(InetSocket)]() {
+        // Established connections must not retain the port's listening socket.
+        auto RelayThread = std::thread([VmId = Arguments->VmId,
+                                        HvSocketPort = Arguments->HvSocketPort,
+                                        Family = Arguments->Family,
+                                        Port = Arguments->Port,
+                                        InetSocket = std::move(*InetSocket)]() {
             try
             {
                 wsl::windows::common::wslutil::SetThreadDescription(L"Port relay");
-                const auto HvSocket = wsl::windows::common::hvsocket::Connect(Arguments->VmId, Arguments->HvSocketPort);
+                const auto HvSocket = wsl::windows::common::hvsocket::Connect(VmId, HvSocketPort);
                 LX_INIT_START_SOCKET_RELAY Message{};
                 Message.Header.MessageType = LxInitMessageStartSocketRelay;
                 Message.Header.MessageSize = sizeof(Message);
-                Message.Family = Arguments->Family;
-                Message.Port = Arguments->Port;
+                Message.Family = Family;
+                Message.Port = Port;
                 Message.BufferSize = LOCALHOST_RELAY_BUFFER_SIZE;
                 wsl::windows::common::socket::Send(HvSocket.get(), gslhelpers::struct_as_bytes(Message));
                 wsl::windows::common::relay::SocketRelay(InetSocket.get(), HvSocket.get(), Message.BufferSize);
@@ -401,6 +402,7 @@ struct PortRelay
         wsl::windows::common::relay::SocketRelay(WindowsSocket, channel.Socket(), message.BufferSize);
     }
 
+    // Completes the overlapped AcceptEx initiated by ScheduleAccept, and sets accept context on the accepted socket.
     void CompleteAccept()
     {
         Pending = false;
@@ -411,8 +413,12 @@ struct PortRelay
         {
             THROW_WIN32(WSAGetLastError());
         }
+
+        // Set the accept context to mark the socket as connected.
+        wsl::windows::common::socket::SetAcceptContext(PendingSocket.get(), ListenSocket.get());
     }
 
+    // If the accept completes immediately, accept context will be set on the accepted socket.
     bool ScheduleAccept()
     {
         WI_VERIFY(!Pending);
@@ -429,6 +435,8 @@ struct PortRelay
             return false;
         }
 
+        // Set the accept context to mark the socket as connected.
+        wsl::windows::common::socket::SetAcceptContext(PendingSocket.get(), ListenSocket.get());
         return true;
     }
 };
@@ -590,7 +598,7 @@ void wsl::windows::wslrelay::localhost::RunWSLCPortRelay(const GUID& VmId, uint3
         {
             if (it != ports.end())
             {
-                result = HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS);
+                result = HRESULT_FROM_WIN32(WSAEADDRINUSE);
                 continue;
             }
             else
@@ -612,6 +620,12 @@ void wsl::windows::wslrelay::localhost::RunWSLCPortRelay(const GUID& VmId, uint3
                 catch (...)
                 {
                     result = wil::ResultFromCaughtException();
+                    if (result == HRESULT_FROM_WIN32(WSAEACCES))
+                    {
+                        // Translate WSAEACCES to WSAEADDRINUSE to match the virtionet behavior.
+                        result = HRESULT_FROM_WIN32(WSAEADDRINUSE);
+                    }
+
                     continue;
                 }
             }

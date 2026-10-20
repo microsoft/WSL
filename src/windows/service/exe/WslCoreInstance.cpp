@@ -46,8 +46,12 @@ WslCoreInstance::WslCoreInstance(
     m_initChannel = std::make_shared<WslCorePort>(InitSocket.release(), m_runtimeId, m_socketTimeout);
 
     // Read a message from the init daemon. This will let us know if anything failed during startup.
+    // The watcher is disarmed as soon as the receive returns so its reported duration reflects
+    // only the wait, not the rest of the constructor.
     gsl::span<gsl::byte> span;
+    SlowOperationWatcher slowOperation{"WaitForCreateInstanceResult"};
     const auto& result = m_initChannel->GetChannel().ReceiveMessage<LX_MINI_INIT_CREATE_INSTANCE_RESULT>(&span, m_socketTimeout);
+    slowOperation.Reset();
     if (result.WarningsOffset != 0)
     {
         for (const auto& e : wsl::shared::string::Split<char>(wsl::shared::string::FromSpan(span, result.WarningsOffset), '\n'))
@@ -61,8 +65,10 @@ WslCoreInstance::WslCoreInstance(
 
     if (result.Result != 0)
     {
-        // N.B. EUCLEAN (117) can be returned if the disk's journal is corrupted.
-        if ((result.Result == EINVAL || result.Result == 117) && result.FailureStep == LxInitCreateInstanceStepMountDisk)
+        // N.B. EFSBADCRC (74) or EFSCORRUPTED (117) can be returned if the disk's journal is corrupted.
+        // EIO (5) can be returned during LaunchInit if corruption is detected after the initial mount succeeds.
+        if (((result.Result == EINVAL || result.Result == 74 || result.Result == 117) && result.FailureStep == LxInitCreateInstanceStepMountDisk) ||
+            (result.Result == 5 && result.FailureStep == LxInitCreateInstanceStepLaunchInit))
         {
             THROW_HR(WSL_E_DISK_CORRUPTED);
         }
@@ -84,6 +90,7 @@ WslCoreInstance::WslCoreInstance(
     // N.B. The system distro has an empty base path.
     if (!m_configuration.BasePath.empty())
     {
+        auto runAsUser = wil::impersonate_token(UserToken);
         WI_SetFlagIf(m_featureFlags, LxInitFeatureRootfsCompressed, WI_IsFlagSet(GetFileAttributesW(m_configuration.BasePath.c_str()), FILE_ATTRIBUTE_COMPRESSED));
     }
 
@@ -169,18 +176,36 @@ void WslCoreInstance::CreateLxProcess(
 
     // Ensure the instance is still running.
 
-    std::lock_guard lock(m_lock);
+    std::unique_lock lock(m_lock);
     THROW_HR_IF(HCS_E_TERMINATED, (!m_initChannel || !m_consoleManager));
 
-    if (m_oobeCompleteEvent && !m_oobeCompleteEvent.is_signaled())
+    bool warningEmitted = false;
+    while (m_oobeCompleteEvent && !m_oobeCompleteEvent.is_signaled())
     {
-        EMIT_USER_WARNING(wsl::shared::Localization::MessageWaitingForOobe(m_configuration.Name.c_str()));
-        m_oobeCompleteEvent.wait();
+        if (!warningEmitted)
+        {
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageWaitingForOobe(m_configuration.Name));
+            warningEmitted = true;
+        }
+
+        // Keep this attempt's event alive if another caller starts a retry while the lock is released.
+        const auto oobeCompleteEvent = m_oobeCompleteEvent;
+        std::vector<HANDLE> exitHandles{m_destroyingEvent.get()};
+        if (ConsoleData.ClientProcess)
+        {
+            exitHandles.push_back(ConsoleData.ClientProcess.get());
+        }
+
+        lock.unlock();
+        THROW_HR_IF(E_ABORT, !wsl::windows::common::relay::InterruptableWait(oobeCompleteEvent.get(), exitHandles));
+        lock.lock();
+
+        THROW_HR_IF(HCS_E_TERMINATED, (!m_initChannel || !m_consoleManager));
     }
 
     // Initialize the create process message.
     // N.B. m_defaultUid can only be read after m_oobeCompleteEvent is signaled since OOBE can change the default UID.
-    auto messageBuffer = LxssCreateProcess::CreateMessage(LxInitMessageCreateProcessUtilityVm, CreateProcessData, m_defaultUid);
+    auto messageBuffer = LxssCreateProcess::CreateMessage<LX_INIT_CREATE_PROCESS_UTILITY_VM>(CreateProcessData, m_defaultUid);
 
     const auto messageSpan = gsl::make_span(messageBuffer);
     const auto message = gslhelpers::get_struct<LX_INIT_CREATE_PROCESS_UTILITY_VM>(messageSpan);
@@ -199,15 +224,15 @@ void WslCoreInstance::CreateLxProcess(
 
     message->Columns = Columns;
     message->Rows = Rows;
-    WI_SetFlagIf(message->Common.Flags, LxInitCreateProcessFlagsStdInConsole, (StdHandles->StdIn.HandleType == LxssHandleConsole));
-    WI_SetFlagIf(message->Common.Flags, LxInitCreateProcessFlagsStdOutConsole, (StdHandles->StdOut.HandleType == LxssHandleConsole));
-    WI_SetFlagIf(message->Common.Flags, LxInitCreateProcessFlagsStdErrConsole, (StdHandles->StdErr.HandleType == LxssHandleConsole));
-    WI_SetFlagIf(message->Common.Flags, LxInitCreateProcessFlagsElevated, (drvfsMount == LxInitDrvfsMountElevated));
-    WI_SetFlagIf(message->Common.Flags, LxInitCreateProcessFlagsInteropEnabled, LXSS_INTEROP_ENABLED(CreateProcessContext.Flags));
+    WI_SetFlagIf(message->Flags, LxInitCreateProcessFlagsStdInConsole, (StdHandles->StdIn.HandleType == LxssHandleConsole));
+    WI_SetFlagIf(message->Flags, LxInitCreateProcessFlagsStdOutConsole, (StdHandles->StdOut.HandleType == LxssHandleConsole));
+    WI_SetFlagIf(message->Flags, LxInitCreateProcessFlagsStdErrConsole, (StdHandles->StdErr.HandleType == LxssHandleConsole));
+    WI_SetFlagIf(message->Flags, LxInitCreateProcessFlagsElevated, (drvfsMount == LxInitDrvfsMountElevated));
+    WI_SetFlagIf(message->Flags, LxInitCreateProcessFlagsInteropEnabled, LXSS_INTEROP_ENABLED(CreateProcessContext.Flags));
 
     if (m_configuration.RunOOBE && CreateProcessData.Filename.empty() && CreateProcessData.CommandLine.empty())
     {
-        WI_SetFlag(message->Common.Flags, LxInitCreateProcessFlagAllowOOBE);
+        WI_SetFlag(message->Flags, LxInitCreateProcessFlagAllowOOBE);
     }
 
     // Create a session leader if needed.
@@ -226,7 +251,7 @@ void WslCoreInstance::CreateLxProcess(
 
     // Connect to the port specified by the session leader.
     std::vector<wil::unique_socket> sockets(LX_INIT_UTILITY_VM_CREATE_PROCESS_SOCKET_COUNT);
-    if (WI_IsFlagSet(message->Common.Flags, LxInitCreateProcessFlagAllowOOBE))
+    if (WI_IsFlagSet(message->Flags, LxInitCreateProcessFlagAllowOOBE))
     {
         sockets.emplace_back();
     }
@@ -245,10 +270,10 @@ void WslCoreInstance::CreateLxProcess(
     *CommunicationChannel = reinterpret_cast<HANDLE>(sockets[3].release());
     *InteropSocket = reinterpret_cast<HANDLE>(sockets[4].release());
 
-    if (WI_IsFlagSet(message->Common.Flags, LxInitCreateProcessFlagAllowOOBE))
+    if (WI_IsFlagSet(message->Flags, LxInitCreateProcessFlagAllowOOBE))
     {
         {
-            m_oobeCompleteEvent.create(wil::EventOptions::ManualReset);
+            m_oobeCompleteEvent = wil::shared_event(wil::EventOptions::ManualReset);
 
             auto impersonate = wil::CoImpersonateClient();
             auto registration = wsl::windows::service::DistributionRegistration::Open(
@@ -260,15 +285,16 @@ void WslCoreInstance::CreateLxProcess(
                 m_oobeThread.join();
             }
 
-            m_oobeThread = std::thread([this, socket = std::move(sockets[5]), registration = std::move(registration)]() mutable {
-                try
-                {
-                    ReadOOBEResult(std::move(socket), std::move(registration));
-                }
-                CATCH_LOG()
+            m_oobeThread = std::thread(
+                [this, socket = std::move(sockets[5]), registration = std::move(registration), oobeCompleteEvent = m_oobeCompleteEvent]() mutable {
+                    try
+                    {
+                        ReadOOBEResult(std::move(socket), std::move(registration));
+                    }
+                    CATCH_LOG()
 
-                m_oobeCompleteEvent.SetEvent();
-            });
+                    oobeCompleteEvent.SetEvent();
+                });
         }
     }
 }
@@ -305,6 +331,8 @@ void WslCoreInstance::ReadOOBEResult(wil::unique_socket&& Socket, wsl::windows::
             registration.Write(wsl::windows::service::Property::DefaultUid, static_cast<int>(oobeResult->DefaultUid));
             m_defaultUid = static_cast<int>(oobeResult->DefaultUid);
         }
+
+        m_redirectorConnectionTargets.UpdateUid(m_defaultUid);
     }
 }
 
@@ -312,9 +340,9 @@ ULONG WslCoreInstance::GetClientId() const
 {
     // Return the system distro ClientId if any so that this distribution is correctly
     // identified if the system distro init process terminates.
-    if (m_systemDistro)
+    if (const auto systemDistro = m_systemDistro.load())
     {
-        return m_systemDistro->GetClientId();
+        return systemDistro->GetClientId();
     }
 
     return m_clientId;
@@ -327,6 +355,7 @@ GUID WslCoreInstance::GetDistributionId() const
 
 std::shared_ptr<LxssPort> WslCoreInstance::GetInitPort()
 {
+    std::lock_guard lock(m_lock);
     THROW_HR_IF(HCS_E_TERMINATED, !m_initChannel);
 
     return m_initChannel;
@@ -334,14 +363,14 @@ std::shared_ptr<LxssPort> WslCoreInstance::GetInitPort()
 
 std::shared_ptr<LxssRunningInstance> WslCoreInstance::GetSystemDistro()
 {
-    return m_systemDistro;
+    return m_systemDistro.load();
 }
 
 void WslCoreInstance::UpdateTimezone()
 {
-    if (m_systemDistro)
+    if (const auto systemDistro = m_systemDistro.load())
     {
-        m_systemDistro->UpdateTimezone();
+        systemDistro->UpdateTimezone();
     }
 
     auto message =
@@ -367,9 +396,9 @@ void WslCoreInstance::Initialize()
     }
 
     // If a system distro was created, initialize it first.
-    if (m_systemDistro)
+    if (const auto systemDistro = m_systemDistro.load())
     {
-        m_systemDistro->Initialize();
+        systemDistro->Initialize();
     }
 
     LX_INIT_DRVFS_MOUNT drvfsMount = LxInitDrvfsMountNone;
@@ -377,6 +406,7 @@ void WslCoreInstance::Initialize()
     // If drive mounting is supported, ensure that DrvFs has been initialized.
     if (WI_IsFlagSet(m_configuration.Flags, LXSS_DISTRO_FLAGS_ENABLE_DRIVE_MOUNTING))
     {
+        SlowOperationWatcher slowOperation{"WaitForDrvFsInit"};
         drvfsMount = m_initializeDrvFs(m_userToken.get());
     }
 
@@ -398,8 +428,12 @@ void WslCoreInstance::Initialize()
     transaction.Send<LX_INIT_CONFIGURATION_INFORMATION>(gsl::span(config));
 
     // Init replies with information about the distribution.
+    // The watcher is disarmed as soon as the receive returns so its reported duration reflects
+    // only the wait, not the subsequent interop-server launch.
     gsl::span<gsl::byte> span;
+    SlowOperationWatcher slowOperation{"WaitForInitConfigResponse"};
     const auto& response = transaction.Receive<LX_INIT_CONFIGURATION_INFORMATION_RESPONSE>(&span);
+    slowOperation.Reset();
     m_defaultUid = response.DefaultUid;
     m_plan9Port = response.Plan9Port;
     m_distributionInfo.PidNamespace = response.PidNamespace;
@@ -514,7 +548,7 @@ void WslCoreInstance::Stop()
     m_redirectorConnectionTargets.RemoveAll();
 
     // If the instance was terminated, terminate the associated system distro.
-    m_systemDistro.reset();
+    m_systemDistro.store(nullptr);
 
     return;
 }

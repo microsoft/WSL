@@ -5,7 +5,7 @@ parameters:
   default: false
 
 - name: testVersion
-  displayName: 'Test the release pipeline'
+  displayName: 'Override package version (required for testing / manual invocation)'
   type: string
   default: ''
   
@@ -14,6 +14,11 @@ parameters:
   type: string
   default: ''
 
+- name: includePublishInManual
+  displayName: 'Include publishing stages in this manual run. Pipeline will fail at the end of the package stage.'
+  type: boolean
+  default: false
+
 trigger:
   tags:
     include: ['*.*.*']
@@ -21,7 +26,12 @@ trigger:
 variables:
   WindowsContainerImage: "onebranch.azurecr.io/windows/ltsc2022/vse2022:latest"
   WindowsHostVersion: '1ESWindows2022'
-  ob_sdl_codeSignValidation_excludes: -|**\*.ps1
+  preventPublishing: ${{ and(eq(variables['Build.Reason'], 'Manual'), eq(parameters.includePublishInManual, true)) }}
+  includePublishingStages: >-
+    ${{ or(
+    and(eq(variables['Build.Reason'], 'Manual'), eq(parameters.includePublishInManual, true)),
+    and(ne(variables['Build.Reason'], 'Manual'), eq(parameters.testVersion, ''))
+    ) }}
 
 resources:
   repositories:
@@ -29,10 +39,16 @@ resources:
       type: git
       name: OneBranch.Pipelines/GovernedTemplates
       ref: refs/heads/main
+    - repository: releaseScripts
+      type: git
+      name: Microsoft.WSL/wsl-release-scripts
+      ref: refs/tags/v2
 
 extends:
   template: v2/Microsoft.Official.yml@templates
   parameters:
+    release:
+      category: NonAzure
     platform:
       name: "windows_undocked"
     featureFlags:
@@ -49,7 +65,12 @@ extends:
         credscan:
           enabled: true
       tsa:
-        enabled: false
+        # The 1ES Official governed template force-runs TSA onboarding regardless of this flag.
+        # Without a config file it auto-derives the codebase name "microsoft_Microsoft.WSL_microsoft/WSL",
+        # which contains the illegal characters '.' and '/', so onboarding fails with PreconditionFailed
+        # and breaks every release build. Point TSA at an explicit, sanitized codebase config instead.
+        enabled: true
+        configFile: $(Build.SourcesDirectory)\.config\tsaoptions.json
       evidence:
         enabled: false
     git:
@@ -66,15 +87,41 @@ extends:
         vsoOrg: microsoft
         vsoProject: Microsoft.WSL
 
+    - template: dcat-stage.yml@self
+
     - template: test-stage.yml@self
       parameters:
         rs_prerelease_only: false
 
-    - template: flight-stage.yml@self
+    - template: github-release-stage.yml@self
       parameters:
         publishPackage: ${{ iif(eq(parameters.testVersion, ''), true, false) }}
         packageVersion: ${{ iif(eq(parameters.testVersion, ''), variables['Build.SourceBranchName'], parameters.testVersion) }}
         bypassTests: ${{ parameters.bypassTests }}
+
+    - ${{ if eq(variables['includePublishingStages'], true) }}:
+        - template: dcat-publish-stages.yml@self
+          parameters:
+            releaseEnvironment: Production
+            initialDependsOn:
+              - dcat_prepare
+              - package
+              - ${{ if eq(parameters.bypassTests, false) }}:
+                  - test
+            dcat:
+              environment: PROD
+              serviceConnection: wsl-dcat-publish-prod
+              clientId: 9752ce08-bcf4-432b-ab86-d60856f646c0
+              tenantId: 33e01921-4d64-4f8c-a055-5bdaffd5e33d
+              publisher: WSL
+
+        - template: store-flight-stage.yml@self
+          parameters:
+            bypassTests: ${{ parameters.bypassTests }}
+
+        - template: nuget-publish-stage.yml@self
+          parameters:
+            bypassTests: ${{ parameters.bypassTests }}
 
     - ${{ if or(eq(parameters.testVersion, ''), not(eq(parameters.nugetSuffix, ''))) }}:
         - template: nuget-stage.yml@self

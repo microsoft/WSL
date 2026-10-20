@@ -14,6 +14,9 @@ Abstract:
 #include "ImageService.h"
 #include "RegistryService.h"
 #include "SessionService.h"
+#include "SpecParsing.h"
+#include "WarningCallback.h"
+#include <filesystem.hpp>
 #include <wslutil.h>
 #include <HandleConsoleProgressBar.h>
 #include <relay.hpp>
@@ -67,9 +70,7 @@ wil::unique_hfile ResolveBuildFile(const std::filesystem::path& contextPath)
 
 std::string GetServerFromImage(const std::string& image)
 {
-    auto [repo, tag] = wsl::windows::common::wslutil::ParseImage(image);
-    auto [server, path] = wsl::windows::common::wslutil::NormalizeRepo(repo);
-    return server;
+    return wsl::windows::common::wslutil::ImageReference::Parse(image).Repository.Server;
 }
 
 struct InputSource
@@ -106,9 +107,117 @@ InputSource OpenImageInput(const std::wstring& input)
     return InputSource{std::move(handle), static_cast<ULONGLONG>(fileSize.QuadPart)};
 }
 
+// Where the build context and Dockerfile come from. Either ContextPath names a Windows directory and
+// DockerfileHandle supplies the Dockerfile, or ContextHandle streams the whole context over stdin and
+// DockerfilePath optionally names the Dockerfile inside it.
+struct BuildContextInput
+{
+    std::wstring ContextPath;
+    HANDLE ContextHandle = nullptr;
+    HANDLE DockerfileHandle = nullptr;
+    wil::unique_hfile Dockerfile;
+    std::optional<wsl::windows::common::filesystem::TempFile> SpooledStdin;
+    std::string DockerfilePath;
+};
+
+// Returns a relayable stdin handle. Character devices need a file because COM cannot relay their handles.
+HANDLE OpenStdin(BuildContextInput& input)
+{
+    auto handle = GetStdHandle(STD_INPUT_HANDLE);
+
+    // Intentional divergence from docker, which accepts a Dockerfile typed into an interactive terminal.
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_BuildStdinIsTerminalError(), IsConsoleHandle(handle));
+
+    if (GetFileType(handle) != FILE_TYPE_CHAR)
+    {
+        return handle;
+    }
+
+    input.SpooledStdin.emplace(
+        GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, wsl::windows::common::filesystem::TempFileFlags::DeleteOnClose);
+    std::array<char, 4096> buffer{};
+    for (;;)
+    {
+        DWORD read{};
+        if (!ReadFile(handle, buffer.data(), static_cast<DWORD>(buffer.size()), &read, nullptr))
+        {
+            const auto error = GetLastError();
+            // NUL reports ERROR_INVALID_FUNCTION instead of EOF when read as a character device.
+            if (error == ERROR_INVALID_FUNCTION)
+            {
+                break;
+            }
+
+            THROW_WIN32(error);
+        }
+
+        if (read == 0)
+        {
+            break;
+        }
+
+        DWORD written{};
+        THROW_IF_WIN32_BOOL_FALSE(WriteFile(input.SpooledStdin->Handle.get(), buffer.data(), read, &written, nullptr));
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_WRITE_FAULT), written != read);
+    }
+
+    THROW_LAST_ERROR_IF(SetFilePointer(input.SpooledStdin->Handle.get(), 0, nullptr, FILE_BEGIN) == INVALID_SET_FILE_POINTER);
+    return input.SpooledStdin->Handle.get();
+}
+
+BuildContextInput OpenBuildContext(const std::wstring& contextPath, const std::wstring& dockerfilePath)
+{
+    BuildContextInput input;
+
+    if (contextPath == L"-")
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, Localization::MessageWslcBuildStdinContextAndDockerfile(), dockerfilePath == L"-");
+
+        // The Dockerfile path is resolved inside the streamed context by the Linux builder.
+        auto pathInContext = dockerfilePath;
+        std::ranges::replace(pathInContext, L'\\', L'/');
+
+        input.ContextHandle = OpenStdin(input);
+        input.DockerfilePath = wsl::windows::common::string::WideToMultiByte(pathInContext);
+        return input;
+    }
+
+    auto absolutePath = std::filesystem::absolute(contextPath);
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_DIRECTORY),
+        !std::filesystem::is_directory(absolutePath),
+        "Path must be a directory: %ls",
+        absolutePath.c_str());
+
+    input.ContextPath = absolutePath.wstring();
+
+    if (dockerfilePath == L"-")
+    {
+        input.DockerfileHandle = OpenStdin(input);
+        return input;
+    }
+
+    if (dockerfilePath.empty())
+    {
+        input.Dockerfile = ResolveBuildFile(absolutePath);
+    }
+    else
+    {
+        input.Dockerfile.reset(
+            CreateFileW(dockerfilePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+        THROW_LAST_ERROR_IF_MSG(!input.Dockerfile, "Failed to open Dockerfile: %ls", dockerfilePath.c_str());
+    }
+
+    input.DockerfileHandle = input.Dockerfile.get();
+    return input;
+}
+
 } // namespace
 
 namespace wsl::windows::wslc::services {
+
+using namespace wsl::windows::wslc::cli;
 
 using namespace wsl::windows::wslc::models;
 using wsl::windows::common::wslc_schema::InspectImage;
@@ -118,36 +227,17 @@ void ImageService::Build(
     const std::wstring& contextPath,
     const std::vector<std::wstring>& tags,
     const std::vector<std::wstring>& buildArgs,
+    const std::vector<std::wstring>& labels,
+    const std::vector<BuildSecret>& secrets,
     const std::wstring& dockerfilePath,
     const std::wstring& target,
+    const std::optional<BuildOutput>& output,
+    const std::optional<std::wstring>& iidFilePath,
     WSLCBuildImageFlags flags,
     IProgressCallback* callback,
     HANDLE cancelEvent)
 {
-    auto absolutePath = std::filesystem::absolute(contextPath);
-    THROW_HR_IF_MSG(
-        HRESULT_FROM_WIN32(ERROR_DIRECTORY),
-        !std::filesystem::is_directory(absolutePath),
-        "Path must be a directory: %ls",
-        absolutePath.c_str());
-
-    HANDLE dockerfileHandle = nullptr;
-    wil::unique_hfile dockerfile;
-    if (dockerfilePath == L"-")
-    {
-        dockerfileHandle = GetStdHandle(STD_INPUT_HANDLE);
-    }
-    else if (!dockerfilePath.empty())
-    {
-        dockerfile.reset(CreateFileW(dockerfilePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
-        THROW_LAST_ERROR_IF_MSG(!dockerfile, "Failed to open Dockerfile: %ls", dockerfilePath.c_str());
-        dockerfileHandle = dockerfile.get();
-    }
-    else
-    {
-        dockerfile = ResolveBuildFile(absolutePath);
-        dockerfileHandle = dockerfile.get();
-    }
+    auto buildContext = OpenBuildContext(contextPath, dockerfilePath);
 
     auto toMultiByte = [](const std::vector<std::wstring>& input, std::vector<std::string>& strings, std::vector<LPCSTR>& pointers) {
         strings.reserve(input.size());
@@ -166,26 +256,147 @@ void ImageService::Build(
     std::vector<LPCSTR> buildArgPointers;
     toMultiByte(buildArgs, buildArgStrings, buildArgPointers);
 
+    std::vector<std::string> labelStrings;
+    std::vector<LPCSTR> labelPointers;
+    toMultiByte(labels, labelStrings, labelPointers);
+
+    // Keep narrow-encoded id strings alive for the duration of the COM call. The source path and raw
+    // secret bytes are referenced in place from the caller's BuildSecret objects (which outlive this
+    // call), so they are never copied or NUL-truncated.
+    std::vector<std::string> secretIdStrings;
+    std::vector<WSLCBuildSecret> secretEntries;
+    secretIdStrings.reserve(secrets.size());
+    secretEntries.reserve(secrets.size());
+    for (const auto& secret : secrets)
+    {
+        secretIdStrings.push_back(wsl::windows::common::string::WideToMultiByte(secret.Id));
+        secretEntries.push_back(WSLCBuildSecret{
+            .Id = secretIdStrings.back().c_str(),
+            .SourcePath = secret.SourcePath.empty() ? nullptr : secret.SourcePath.c_str(),
+            .Value = secret.Value.empty() ? nullptr : secret.Value.data(),
+            .ValueSize = static_cast<ULONG>(secret.Value.size()),
+        });
+    }
+
     auto targetStr = wsl::windows::common::string::WideToMultiByte(target);
 
-    auto contextPathStr = absolutePath.wstring();
+    // Route the docker-style --output exporter. A single-file exporter with a real destination (tar/oci/
+    // docker with dest=) has the destination's parent directory mounted read-write into the VM, so buildx
+    // writes the output file straight to the destination in place. dest=- (stdout) streams the exporter
+    // tarball back out of the VM to OutputHandle. Exporters with no client destination (docker load,
+    // image, registry, cacheonly) run entirely in the VM and the spec is forwarded as-is. Directory
+    // exporters (type=local, or oci/docker with tar=false) are rejected up front by ParseOutputSpec: a
+    // Linux tree cannot be written faithfully to a Windows-backed destination.
+    std::string outputStr;
+    HANDLE outputHandle = nullptr;
+
+    // For a single-file exporter with a real destination the server writes the exporter output into a
+    // read-write virtiofs mount of the destination's parent directory rather than streaming it back:
+    // outputMountPath is that parent directory and outputMountFile the destination file's leaf name.
+    std::wstring outputMountPath;
+    std::wstring outputMountFile;
+
+    if (output.has_value())
+    {
+        const auto& spec = output.value();
+        // Route the exporter the same way `docker buildx build --output` does: some exporters produce a
+        // result the client must materialize (a file or a stdout stream), while others run entirely in
+        // the build VM. Directory exporters are already rejected by ParseOutputSpec. See
+        // OutputStreamsToClient.
+        const bool streamsBack = validation::OutputStreamsToClient(spec);
+
+        if (streamsBack)
+        {
+            if (spec.Dest == L"-")
+            {
+                // dest=- streams the exporter tarball to the client's stdout, matching docker.
+                outputHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+
+                // Refuse to dump the binary exporter stream onto an interactive console (matching docker).
+                // Otherwise ToCOMInputHandle would fail the marshal with a cryptic ERROR_NOT_SUPPORTED for
+                // the console handle. A redirected character device such as NUL is not a console, so
+                // IsConsoleHandle (which also checks GetConsoleMode) still lets those through.
+                THROW_HR_WITH_USER_ERROR_IF(
+                    E_INVALIDARG,
+                    Localization::MessageWslcOutputConsoleNotSupported(validation::FormatOutputSpec(spec)),
+                    IsConsoleHandle(outputHandle));
+            }
+            else
+            {
+                // Single-file exporter with a real destination: mount the destination's parent directory
+                // read-write into the VM so buildx writes the exporter output file straight to the
+                // destination in place.
+                auto destPath = std::filesystem::absolute(spec.Dest);
+                auto destDir = destPath.parent_path();
+                std::filesystem::create_directories(destDir);
+
+                outputMountPath = destDir.wstring();
+                outputMountFile = destPath.filename().wstring();
+            }
+
+            // The server picks the VM-side dest, so forward the spec without the client's dest.
+            BuildOutput vmSpec = spec;
+            vmSpec.Dest.clear();
+            outputStr = wsl::windows::common::string::WideToMultiByte(validation::FormatOutputSpec(vmSpec));
+        }
+        else
+        {
+            outputStr = wsl::windows::common::string::WideToMultiByte(validation::FormatOutputSpec(spec));
+        }
+    }
+
+    // Resolve the --iidfile destination against the client's working directory; the server mounts its
+    // parent directory read-write into the VM so buildx writes the image ID straight to it.
+    std::wstring iidPathStr;
+    if (iidFilePath.has_value())
+    {
+        iidPathStr = wsl::windows::common::filesystem::GetCanonicalPath(*iidFilePath).wstring();
+    }
+
     WSLCBuildImageOptions options{
-        .ContextPath = contextPathStr.c_str(),
-        .DockerfileHandle = ToCOMInputHandle(dockerfileHandle),
+        .ContextPath = buildContext.ContextPath.empty() ? nullptr : buildContext.ContextPath.c_str(),
+        .DockerfileHandle = buildContext.DockerfileHandle != nullptr ? ToCOMInputHandle(buildContext.DockerfileHandle)
+                                                                     : WSLCHandle{.Type = WSLCHandleTypeUnknown},
         .Tags = {tagPointers.data(), static_cast<ULONG>(tagPointers.size())},
         .BuildArgs = {buildArgPointers.data(), static_cast<ULONG>(buildArgPointers.size())},
         .Target = targetStr.empty() ? nullptr : targetStr.c_str(),
         .Flags = flags,
+        .Labels = {labelPointers.data(), static_cast<ULONG>(labelPointers.size())},
+        .Secrets = {secretEntries.data(), static_cast<ULONG>(secretEntries.size())},
+        .Output = outputStr.empty() ? nullptr : outputStr.c_str(),
+        .OutputHandle = outputHandle != nullptr ? ToCOMInputHandle(outputHandle) : WSLCHandle{.Type = WSLCHandleTypeUnknown},
+        .OutputMountPath = outputMountPath.empty() ? nullptr : outputMountPath.c_str(),
+        .OutputMountFile = outputMountFile.empty() ? nullptr : outputMountFile.c_str(),
+        .IidFilePath = iidPathStr.empty() ? nullptr : iidPathStr.c_str(),
+        .ContextHandle = buildContext.ContextHandle != nullptr ? ToCOMInputHandle(buildContext.ContextHandle)
+                                                               : WSLCHandle{.Type = WSLCHandleTypeUnknown},
+        .DockerfilePath = buildContext.DockerfilePath.empty() ? nullptr : buildContext.DockerfilePath.c_str(),
     };
 
     THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, cancelEvent));
 }
 
-std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Session& session)
+std::vector<ImageInformation> ImageService::List(
+    wsl::windows::wslc::models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters, bool containerCounts, bool all, bool digests)
 {
+    std::vector<WSLCFilter> filterEntries;
+    filterEntries.reserve(filters.size());
+    for (const auto& [key, value] : filters)
+    {
+        filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
+    }
+
+    WSLCListImagesOptions options{};
+    options.Flags = WSLCListImagesFlagsNone;
+    WI_SetFlagIf(options.Flags, WSLCListImagesFlagsContainerCounts, containerCounts);
+    WI_SetFlagIf(options.Flags, WSLCListImagesFlagsAll, all);
+    WI_SetFlagIf(options.Flags, WSLCListImagesFlagsDigests, digests);
+    options.Filters = filterEntries.empty() ? nullptr : filterEntries.data();
+    options.FiltersCount = static_cast<ULONG>(filterEntries.size());
+
     wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
     ULONG count = 0;
-    THROW_IF_FAILED(session.Get()->ListImages(nullptr, &images, &count));
+    THROW_IF_FAILED(session.Get()->ListImages(&options, &images, &count));
 
     std::vector<ImageInformation> result;
     for (auto ptr = images.get(), end = images.get() + count; ptr != end; ++ptr)
@@ -197,34 +408,46 @@ std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Ses
         std::string imageRef = image.Image;
         if (imageRef != "<none>:<none>")
         {
-            auto parsed = wsl::windows::common::wslutil::ParseImage(imageRef);
-            info.Repository = parsed.first;
-            info.Tag = parsed.second;
+            auto parsed = wsl::windows::common::wslutil::ImageReference::Parse(imageRef);
+            info.Repository = parsed.Repository.Name;
+            info.Tag = parsed.TagOrDigest();
         }
 
         info.Id = image.Hash;
+
+        if (digests)
+        {
+            info.Digest = DigestFromRepoDigest(image.Digest);
+        }
+
         info.Created = image.Created;
         info.Size = image.Size;
+        info.Containers = image.Containers;
         result.push_back(info);
     }
 
     return result;
 }
 
-void ImageService::Load(wsl::windows::wslc::models::Session& session, const std::wstring& input)
+void ImageService::Load(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::wstring& input, IImageLoadCallback* callback)
 {
+    WarningCallback warningCallback(terminal);
     auto source = OpenImageInput(input);
-    THROW_IF_FAILED(session.Get()->LoadImage(ToCOMInputHandle(source.Handle.Get()), nullptr, source.ContentLength));
+    THROW_IF_FAILED(session.Get()->LoadImage(ToCOMInputHandle(source.Handle.Get()), source.ContentLength, &warningCallback, callback));
 }
 
-void ImageService::Import(wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName)
+std::string ImageService::Import(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName)
 {
+    WarningCallback warningCallback(terminal);
     auto source = OpenImageInput(input);
+    wil::unique_cotaskmem_ansistring imageId;
     THROW_IF_FAILED(session.Get()->ImportImage(
-        ToCOMInputHandle(source.Handle.Get()), imageName.empty() ? nullptr : imageName.c_str(), nullptr, source.ContentLength));
+        ToCOMInputHandle(source.Handle.Get()), imageName.empty() ? nullptr : imageName.c_str(), source.ContentLength, &warningCallback, &imageId));
+    return imageId.get() ? std::string(imageId.get()) : std::string();
 }
 
-void ImageService::Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune)
+std::vector<wsl::windows::wslc::models::DeletedImageEntry> ImageService::Delete(
+    wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune)
 {
     WSLCDeleteImageOptions options{};
     options.Image = image.c_str();
@@ -241,28 +464,37 @@ void ImageService::Delete(wsl::windows::wslc::models::Session& session, const st
 
     wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
     THROW_IF_FAILED(session.Get()->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
+
+    std::vector<wsl::windows::wslc::models::DeletedImageEntry> result;
+    result.reserve(deletedImages.size());
+    for (const auto& entry : deletedImages)
+    {
+        result.push_back({entry.Image, entry.Type == WSLCDeletedImageTypeDeleted});
+    }
+
+    return result;
 }
 
-void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
+void ImageService::Pull(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback, bool allTags)
 {
+    WarningCallback warningCallback(terminal);
     auto server = GetServerFromImage(image);
     auto auth = RegistryService::Get(server);
-    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), auth.c_str(), callback));
+    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), auth.c_str(), allTags ? TRUE : FALSE, callback, &warningCallback));
 }
 
 void ImageService::Tag(wsl::windows::wslc::models::Session& session, const std::string& sourceImage, const std::string& targetImage)
 {
-    EnumReferenceFormat format;
-    auto [repo, tag] = ParseImage(targetImage, &format);
-    if (format == EnumReferenceFormat::Digest)
+    auto reference = ImageReference::Parse(targetImage);
+    if (reference.Format == EnumReferenceFormatDigest)
     {
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcTagImageInvalidFormat(targetImage.c_str()));
     }
 
     WSLCTagImageOptions options{};
     options.Image = sourceImage.c_str();
-    options.Repo = repo.c_str();
-    options.Tag = tag ? tag->c_str() : "";
+    options.Repo = reference.Repository.Name.c_str();
+    options.Tag = reference.Tag ? reference.Tag->c_str() : "";
 
     THROW_IF_FAILED(session.Get()->TagImage(&options));
 }
@@ -274,48 +506,89 @@ InspectImage ImageService::Inspect(wsl::windows::wslc::models::Session& session,
     return wsl::shared::FromJson<InspectImage>(inspectData.get());
 }
 
-void ImageService::Push(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
+void ImageService::Push(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback, bool allTags)
 {
+    WarningCallback warningCallback(terminal);
     auto server = GetServerFromImage(image);
     auto auth = RegistryService::Get(server);
-    THROW_IF_FAILED(session.Get()->PushImage(image.c_str(), auth.c_str(), callback));
+    THROW_IF_FAILED(session.Get()->PushImage(image.c_str(), auth.c_str(), allTags ? TRUE : FALSE, callback, &warningCallback));
 }
 
-void ImageService::Save(wsl::windows::wslc::models::Session& session, const std::string& image, const std::wstring& output, HANDLE cancelEvent)
+void ImageService::Save(wsl::windows::wslc::models::Session& session, const std::vector<std::string>& images, const std::wstring& output, HANDLE cancelEvent)
 {
     wil::unique_hfile outputFile{
         CreateFileW(output.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
     THROW_LAST_ERROR_IF(!outputFile);
 
-    Save(session, image, outputFile.get(), cancelEvent);
+    Save(session, images, outputFile.get(), cancelEvent);
 }
 
-void ImageService::Save(wsl::windows::wslc::models::Session& session, const std::string& image, HANDLE outputHandle, HANDLE cancelEvent)
+void ImageService::Save(wsl::windows::wslc::models::Session& session, const std::vector<std::string>& images, HANDLE outputHandle, HANDLE cancelEvent)
 {
+    WI_ASSERT(!images.empty());
+
     wsl::windows::common::HandleConsoleProgressBar progressBar(
-        outputHandle, L"Save in progress.", wsl::windows::common::HandleConsoleProgressBar::Format::FileSize);
-    THROW_IF_FAILED(session.Get()->SaveImage(ToCOMInputHandle(outputHandle), image.c_str(), nullptr, cancelEvent));
+        outputHandle, Localization::MessageWslcSaveInProgress(), wsl::windows::common::HandleConsoleProgressBar::Format::FileSize);
+
+    if (images.size() == 1)
+    {
+        THROW_IF_FAILED(session.Get()->SaveImage(ToCOMInputHandle(outputHandle), images[0].c_str(), nullptr, cancelEvent));
+    }
+    else
+    {
+        std::vector<LPCSTR> imagePointers;
+        imagePointers.reserve(images.size());
+        for (const auto& image : images)
+        {
+            imagePointers.push_back(image.c_str());
+        }
+
+        WSLCStringArray imageArray{
+            .Values = imagePointers.data(),
+            .Count = static_cast<ULONG>(imagePointers.size()),
+        };
+
+        THROW_IF_FAILED(session.Get()->SaveImages(ToCOMInputHandle(outputHandle), &imageArray, nullptr, cancelEvent));
+    }
 }
 
-wsl::windows::wslc::models::PruneImagesResult ImageService::Prune(wsl::windows::wslc::models::Session& session, bool all)
+wsl::windows::wslc::models::PruneImagesResult ImageService::Prune(
+    wsl::windows::wslc::models::Session& session, bool all, const std::vector<std::pair<std::string, std::string>>& filters)
 {
-    WSLCFilter filter{.Key = "dangling", .Value = all ? "false" : "true"};
+    // The --all flag is translated into a `dangling` filter. Skip the implicit
+    // filter if the caller already supplied an explicit `dangling` filter so the
+    // user's value wins (matching docker's behavior).
+    const bool hasExplicitDangling =
+        std::any_of(filters.begin(), filters.end(), [](const auto& f) { return f.first == "dangling"; });
+
+    std::vector<WSLCFilter> filterEntries;
+    filterEntries.reserve(filters.size() + (hasExplicitDangling ? 0 : 1));
+    if (!hasExplicitDangling)
+    {
+        filterEntries.push_back({.Key = "dangling", .Value = all ? "false" : "true"});
+    }
+
+    for (const auto& [key, value] : filters)
+    {
+        filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
+    }
 
     wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
     ULONGLONG spaceReclaimed = 0;
-    THROW_IF_FAILED(session.Get()->PruneImages(&filter, 1, &deletedImages, deletedImages.size_address<ULONG>(), &spaceReclaimed));
+    THROW_IF_FAILED(session.Get()->PruneImages(
+        filterEntries.data(), static_cast<ULONG>(filterEntries.size()), &deletedImages, deletedImages.size_address<ULONG>(), &spaceReclaimed));
 
     wsl::windows::wslc::models::PruneImagesResult result;
     result.SpaceReclaimed = spaceReclaimed;
-    for (auto ptr = deletedImages.get(), end = deletedImages.get() + deletedImages.size(); ptr != end; ++ptr)
+    for (const auto& entry : deletedImages)
     {
-        if (ptr->Type == WSLCDeletedImageTypeDeleted)
+        if (entry.Type == WSLCDeletedImageTypeDeleted)
         {
-            result.DeletedImages.push_back(ptr->Image);
+            result.DeletedImages.push_back(entry.Image);
         }
         else
         {
-            result.UntaggedImages.push_back(ptr->Image);
+            result.UntaggedImages.push_back(entry.Image);
         }
     }
 
