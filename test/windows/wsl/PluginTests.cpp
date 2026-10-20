@@ -1069,33 +1069,6 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    // This test must run last so it doesn't break test cases that depends on plugin signature.
-    WSL2_TEST_METHOD(InvalidPluginSignature)
-    {
-        if constexpr (!wsl::shared::OfficialBuild)
-        {
-            LogSkipped("This test only applies to signed builds");
-            return;
-        }
-
-        StopWslService();
-
-        // Append one byte at the end of the plugin dll to break its signature
-        wil::unique_handle plugin{CreateFile(pluginDll.c_str(), FILE_APPEND_DATA, 0, nullptr, OPEN_EXISTING, 0, nullptr)};
-        VERIFY_IS_TRUE(plugin.is_valid());
-
-        char c{};
-        VERIFY_IS_TRUE(WriteFile(plugin.get(), &c, sizeof(c), nullptr, nullptr));
-        plugin.reset();
-
-        ConfigurePlugin(PluginTestType::ErrorMessageStartDistro);
-        StartWsl(
-            -1,
-            FormatErrorMessage(
-                L"A fatal error was returned by plugin 'TestPlugin'",
-                L"Wsl/Service/CreateInstance/CreateVm/Plugin/TRUST_E_NOSIGNATURE"));
-    }
-
     WSL2_TEST_METHOD(CgroupIsolation)
     {
         WslConfigChange isolatedConfig(LxssGenerateTestConfig({.vmIdleTimeout = -1, .isolateDistroCgroup = true}));
@@ -1142,5 +1115,32 @@ class PluginTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown --force"), 0L);
         LogInfo("Debug shell output: %ls\n%ls", output.c_str(), error.c_str());
         VERIFY_IS_TRUE(output.find(L"CGROUP_PASS") != std::wstring::npos);
+    }
+
+    // This test must run last so it doesn't break test cases that depends on plugin signature.
+    WSL2_TEST_METHOD(InvalidPluginSignature)
+    {
+        if constexpr (!wsl::shared::OfficialBuild)
+        {
+            LogSkipped("This test only applies to signed builds");
+            return;
+        }
+
+        StopWslService();
+
+        // Append one byte at the end of the plugin dll to break its signature
+        wil::unique_handle plugin{CreateFile(pluginDll.c_str(), FILE_APPEND_DATA, 0, nullptr, OPEN_EXISTING, 0, nullptr)};
+        VERIFY_IS_TRUE(plugin.is_valid());
+
+        char c{};
+        VERIFY_IS_TRUE(WriteFile(plugin.get(), &c, sizeof(c), nullptr, nullptr));
+        plugin.reset();
+
+        ConfigurePlugin(PluginTestType::ErrorMessageStartDistro);
+        StartWsl(
+            -1,
+            FormatErrorMessage(
+                L"A fatal error was returned by plugin 'TestPlugin'",
+                L"Wsl/Service/CreateInstance/CreateVm/Plugin/TRUST_E_NOSIGNATURE"));
     }
 };

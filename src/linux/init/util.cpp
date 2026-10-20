@@ -3482,18 +3482,30 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
     const int ChildPid = UtilCreateChildProcess("CreateChildProcess", [&]() {
         try
         {
-            if (CgroupPath.has_value())
-            {
-                THROW_LAST_ERROR_IF(UtilMoveSelfToCgroup(CgroupPath.value(), "CreateChildProcess") < 0);
-            }
-
-            if (CgroupNamespaceFd >= 0)
-            {
-                THROW_LAST_ERROR_IF(UtilEnterCgroupNamespace(CgroupNamespaceFd, "CreateChildProcess") < 0);
-            }
-
             wil::unique_fd ProcessSocket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS)};
             THROW_LAST_ERROR_IF(!ProcessSocket);
+
+            if (Message->PluginId != 0)
+            {
+                if (access(WSL_USER_CGROUP_PATH, F_OK) == 0)
+                {
+                    const auto PluginCgroupPath = std::format("{}/plugin-{}", WSL_USER_CGROUP_PATH, Message->PluginId);
+                    THROW_LAST_ERROR_IF(UtilMkdir(PluginCgroupPath.c_str(), 0755) < 0);
+                    THROW_LAST_ERROR_IF(UtilMoveSelfToCgroup(PluginCgroupPath, "CreateChildProcess") < 0);
+                }
+            }
+            else
+            {
+                if (CgroupPath.has_value())
+                {
+                    THROW_LAST_ERROR_IF(UtilMoveSelfToCgroup(CgroupPath.value(), "CreateChildProcess") < 0);
+                }
+
+                if (CgroupNamespaceFd >= 0)
+                {
+                    THROW_LAST_ERROR_IF(UtilEnterCgroupNamespace(CgroupNamespaceFd, "CreateChildProcess") < 0);
+                }
+            }
 
             THROW_LAST_ERROR_IF(dup2(ProcessSocket.get(), STDIN_FILENO) < 0);
             THROW_LAST_ERROR_IF(dup2(ProcessSocket.get(), STDOUT_FILENO) < 0);

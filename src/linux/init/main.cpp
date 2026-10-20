@@ -3404,24 +3404,8 @@ try
 
     case LxInitCreateProcess:
     {
-        const auto* Message = gslhelpers::try_get_struct<CREATE_PROCESS_MESSAGE>(Buffer);
-        if (!Message)
-        {
-            LOG_ERROR("Unexpected message size {}", Buffer.size());
-            return -1;
-        }
-
         std::optional<std::string> CgroupPath;
-        if (Message->PluginId != 0 && access(WSL_USER_CGROUP_PATH, F_OK) == 0)
-        {
-            CgroupPath = std::format("{}/plugin-{}", WSL_USER_CGROUP_PATH, Message->PluginId);
-            if (UtilMkdir(CgroupPath->c_str(), 0755) < 0)
-            {
-                LOG_ERROR("Failed to create cgroup directory {}:{}", *CgroupPath, errno);
-                return -1;
-            }
-        }
-        else if (access(WSL_USER_INTERNAL_CGROUP_PATH, F_OK) == 0)
+        if (access(WSL_USER_INTERNAL_CGROUP_PATH, F_OK) == 0)
         {
             CgroupPath = WSL_USER_INTERNAL_CGROUP_PATH;
         }
