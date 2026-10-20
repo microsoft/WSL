@@ -891,6 +891,10 @@ Du kan få flere oplysninger om Admin Protection ved at besøge https://aka.ms/a
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>Indlejret virtualisering understøttes ikke på denne maskine.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>Understøttelse af indlejret virtualisering blev ikke registreret, fejl: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Der kunne ikke oprettes et netværksslutpunkt med adressen: '{}', tildelt ny adresse: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3702,7 +3706,7 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>Billedet '{}' blev ikke fundet, henter</value>
+    <value>Billedet '{}' blev ikke fundet lokalt</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">

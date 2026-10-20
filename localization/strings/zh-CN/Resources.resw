@@ -891,6 +891,10 @@ Windows 版本: {}</value>
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>此计算机上不支持嵌套虚拟化。</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>无法检测嵌套虚拟化支持，错误： {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>无法创建地址为“{}”的网络端点，已分配新地址:“{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3701,7 +3705,7 @@ Windows 版本: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>找不到映像 '{}'，正在拉取</value>
+    <value>无法在本地找到图像“{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">

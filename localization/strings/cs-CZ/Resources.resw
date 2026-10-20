@@ -891,6 +891,10 @@ Další informace o Admin Protection najdete na https://aka.ms/apdevguide</value
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>Vnořená virtualizace není v tomto počítači podporována.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>Nepodařilo se zjistit podporu vnořené virtualizace, chyba: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Nepovedlo se vytvořit koncový bod sítě s adresou '{}', byla přiřazena nová adresa: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -920,11 +924,11 @@ Návrat k sítím NAT.</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
   <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
-    <value>Mirrored networking is using a smaller ephemeral port range ({} ports instead of {}). This may limit the number of simultaneous connections.</value>
+    <value>Zrcadlená síť používá menší rozsah dočasných portů ({} portů místo {}). To může omezit počet současných připojení.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
-    <value>Mirrored networking could not reserve the minimum contiguous range of {} TCP and UDP ports. Check Windows port usage and exclusions.</value>
+    <value>Zrcadlená síť nedokázala rezervovat minimální souvislý rozsah {} portů TCP a UDP. Zkontrolujte využití a vyloučení portů systému Windows.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
@@ -3702,7 +3706,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>Image {} nebyl nalezen, stahuje se</value>
+    <value>Obrázek '{}' se nepodařilo najít místně</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">
