@@ -53,11 +53,34 @@ struct CallingProcessTokenInfo
     bool Elevated;
 };
 
+class MarshaledSessionReference
+{
+public:
+    NON_COPYABLE(MarshaledSessionReference);
+
+    explicit MarshaledSessionReference(IWSLCSessionReference* Reference);
+    ~MarshaledSessionReference();
+
+
+    MarshaledSessionReference(MarshaledSessionReference&& Other) noexcept;
+    MarshaledSessionReference& operator=(MarshaledSessionReference&& Other) noexcept;
+
+    HRESULT OpenSession(IWSLCSession** Session) const noexcept;
+    HRESULT Terminate() const noexcept;
+
+private:
+    HRESULT Resolve(IWSLCSessionReference** Reference) const noexcept;
+    void Reset() noexcept;
+
+    wil::com_ptr<IGlobalInterfaceTable> m_git;
+    DWORD m_cookie{};
+};
+
 // Metadata for a tracked session, stored service-side at creation time.
 // Security info is stored here (not queried from the per-user process) to prevent spoofing.
 struct SessionEntry
 {
-    wil::com_ptr<IWSLCSessionReference> Ref;
+    MarshaledSessionReference Ref;
     ULONG SessionId = 0;
     DWORD CreatorPid = 0;
     std::wstring DisplayName;
@@ -127,7 +150,7 @@ private:
             // Fails with ERROR_OBJECT_NO_LONGER_EXISTS if released,
             // ERROR_INVALID_STATE if terminated, or RPC error if the reference is disconnected or the host exited.
             wil::com_ptr<IWSLCSession> lockedSession;
-            if (FAILED_LOG(entry.Ref->OpenSession(&lockedSession)))
+            if (FAILED_LOG(entry.Ref.OpenSession(&lockedSession)))
             {
                 // FindSession is used by plugin callbacks into the API. Defer cleanup in that path so
                 // OnWslcSessionStopping is not nested inside another plugin notification.
