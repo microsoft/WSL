@@ -2918,7 +2918,7 @@ bool WslCoreVm::AttachedDisk::operator==(const AttachedDisk& other) const
 
 WslCoreVm::VirtioFsShare::VirtioFsShare(PCWSTR Path, PCWSTR Options, bool Admin) : Path(Path), Admin(Admin)
 {
-    // Parse the options string into a map representing mount options to ensure that shares with functionally
+    // Translate DrvFs options into a map of virtiofs options so that shares with functionally
     // identical options can share a single device.
     // For example: "uid=1000;gid=1000" and "gid=1000;uid=1000"
     auto optionsVector = wsl::shared::string::Split(std::wstring{Options}, L';');
@@ -2939,16 +2939,22 @@ WslCoreVm::VirtioFsShare::VirtioFsShare(PCWSTR Path, PCWSTR Options, bool Admin)
 
         if (!key.empty())
         {
-            this->Options.insert({std::move(key), std::move(value)});
-        }
-    }
+            // DrvFs uid/gid provide defaults for files without Linux metadata. In lxutil,
+            // uid/gid override even stored metadata; default_uid/default_gid preserve it.
+            // Leave already-translated options unchanged when a share is remounted.
+            if (key == L"uid")
+            {
+                key = L"default_uid";
+            }
+            else if (key == L"gid")
+            {
+                key = L"default_gid";
+            }
 
-    if constexpr (wsl::shared::Debug)
-    {
-        const auto originalSet = std::set<std::wstring>(optionsVector.begin(), optionsVector.end());
-        auto newVector = wsl::shared::string::Split(OptionsString(), L';');
-        const auto newSet = std::set<std::wstring>(newVector.begin(), newVector.end());
-        WI_ASSERT_MSG(originalSet == newSet, "mount options do not match");
+            // Automount places default uid/gid values before user-specified options.
+            // Keep the last value for each option; for uid/gid this matches DrvFs/Plan9 precedence.
+            this->Options.insert_or_assign(std::move(key), std::move(value));
+        }
     }
 }
 

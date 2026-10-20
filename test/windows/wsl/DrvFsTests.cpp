@@ -557,6 +557,94 @@ public:
         }
     }
 
+    static void DrvfsMountOwnerOptions(DrvFsMode Mode)
+    {
+        if (Mode == DrvFsMode::VirtioFs)
+        {
+            WINDOWS_11_TEST_ONLY();
+        }
+
+        const auto testDir = std::filesystem::current_path() / "drvfs-owner-options-test";
+        VERIFY_IS_TRUE(std::filesystem::create_directory(testDir));
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(testDir, ec);
+        });
+
+        struct TestCase
+        {
+            std::wstring_view Options;
+            std::wstring_view Owner;
+        };
+
+        // Automount prepends the distribution's default uid/gid before user-specified options.
+        // The last value must win, including an explicit override back to root.
+        constexpr TestCase testCases[] = {
+            {L"uid=0,gid=0,uid=991,gid=992", L"991:992\n"},
+            {L"uid=991,gid=992,uid=0,gid=0", L"0:0\n"},
+            {L"uid=1,gid=2,uid=3,gid=4,uid=991,gid=992", L"991:992\n"},
+            {L"uid=991,gid=992,uid=991,gid=992", L"991:992\n"},
+            {L"uid=0,gid=0,metadata,uid=991,gid=992", L"991:992\n"},
+            {L"uid=991,gid=992,metadata,uid=0,gid=0", L"0:0\n"},
+        };
+
+        for (size_t index = 0; index < std::size(testCases); ++index)
+        {
+            const auto& testCase = testCases[index];
+            const auto sourceDir = testDir / std::to_string(index);
+            const auto mountPoint = std::format(L"/tmp/drvfs-owner-options-test-{}", index);
+            const std::wstring expectedFileSystem = Mode == DrvFsMode::VirtioFs ? L"virtiofs\n" : L"9p\n";
+            const auto verifyFileSystem = [&]() {
+                // VirtioFs can silently fall back to Plan9; that must not satisfy this test.
+                const auto [type, error] =
+                    LxsstuLaunchWslAndCaptureOutput(std::format(L"findmnt -n -o FSTYPE --mountpoint '{}'", mountPoint));
+                VERIFY_ARE_EQUAL(expectedFileSystem, type);
+            };
+            std::filesystem::create_directory(sourceDir);
+            {
+                // Windows-created files have no Linux ownership metadata.
+                std::ofstream markerFile(sourceDir / "marker");
+                markerFile << "mount owner options";
+            }
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mkdir '{}'", mountPoint)), 0);
+            auto unmountCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                LxsstuLaunchWsl(std::format(L"umount '{}'", mountPoint));
+                LxsstuLaunchWsl(std::format(L"rmdir '{}'", mountPoint));
+            });
+
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(std::format(L"mount -t drvfs -o '{}' '{}' '{}'", testCase.Options, sourceDir.string(), mountPoint)), 0);
+            verifyFileSystem();
+
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"stat -c '%u:%g' '{}/marker'", mountPoint));
+            VERIFY_ARE_EQUAL(std::wstring(testCase.Owner), out);
+
+            if (testCase.Options.find(L"metadata") != std::wstring_view::npos)
+            {
+                // Mount defaults must not replace per-file Linux ownership.
+                std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(
+                    L"-u root sh -c \"touch '{0}/owned' && chown 1001:1002 '{0}/owned' && stat -c '%u:%g' '{0}/owned'\"", mountPoint));
+                VERIFY_ARE_EQUAL(L"1001:1002\n", out);
+
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-u root chmod 777 '{}'", mountPoint)), 0);
+                std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(
+                    L"-u nobody --exec /bin/sh -c \"umask 022 && printf first > '{0}/nonroot' && stat -c '%u' '{0}/nonroot'"
+                    L" && printf second >> '{0}/nonroot' && chmod 600 '{0}/nonroot'"
+                    L" && mv '{0}/nonroot' '{0}/renamed' && rm '{0}/renamed'\"",
+                    mountPoint));
+                VERIFY_ARE_EQUAL(L"65534\n", out);
+
+                // DrvFs also honors existing ownership when creating new metadata is disabled.
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"umount '{}'", mountPoint)), 0);
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mount -t drvfs -o uid=42,gid=43 '{}' '{}'", sourceDir.string(), mountPoint)), 0);
+                verifyFileSystem();
+                std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"stat -c '%u:%g' '{}/owned'", mountPoint));
+                VERIFY_ARE_EQUAL(L"1001:1002\n", out);
+            }
+        }
+    }
+
     // DrvFsTests Private Methods
 private:
     static VOID CreateDrvFsTestFiles(bool Metadata)
@@ -1471,6 +1559,11 @@ class WSL1 : public DrvFsTests
         WSL2_TEST_METHOD(DrvfsMountReadOnly) \
         { \
             DrvFsTests::DrvfsMountReadOnly(); \
+        } \
+\
+        WSL2_TEST_METHOD(DrvfsMountOwnerOptions) \
+        { \
+            DrvFsTests::DrvfsMountOwnerOptions(DrvFsMode::##_mode##); \
         } \
     }
 
