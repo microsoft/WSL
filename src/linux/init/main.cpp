@@ -3687,10 +3687,10 @@ try
 
     // Mirrored networking reserves this exact range on the Windows host. Keep ports outside the range out of Linux
     // autobind selection even if a distro later widens ip_local_port_range. Explicit bind() calls are unaffected.
-    constexpr auto ReservedPortsPath = "/proc/sys/net/ipv4/ip_local_reserved_ports";
+    constexpr auto c_reservedPortsPath = "/proc/sys/net/ipv4/ip_local_reserved_ports";
     std::string ReservedPorts;
     {
-        std::ifstream ExistingReservedPorts{ReservedPortsPath};
+        std::ifstream ExistingReservedPorts{c_reservedPortsPath};
         std::getline(ExistingReservedPorts, ReservedPorts);
     }
 
@@ -3714,7 +3714,7 @@ try
 
     // N.B. The host range is already applied above; the reservation only guards against the range being widened later,
     //      so a failure here is logged by WriteToFile but does not fail boot.
-    WriteToFile(ReservedPortsPath, ReservedPorts.c_str());
+    WriteToFile(c_reservedPortsPath, ReservedPorts.c_str());
     return 0;
 }
 CATCH_RETURN_ERRNO()
