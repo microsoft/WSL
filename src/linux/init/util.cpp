@@ -3445,7 +3445,7 @@ Return Value:
     return 0;
 }
 
-int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer, const std::optional<std::string>& DistroCgroupPath, int CgroupNamespaceFd)
+int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer, const std::optional<std::string>& CgroupPath, int CgroupNamespaceFd)
 {
     auto* Message = gslhelpers::try_get_struct<CREATE_PROCESS_MESSAGE>(Buffer);
     if (!Message)
@@ -3482,9 +3482,9 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
     const int ChildPid = UtilCreateChildProcess("CreateChildProcess", [&]() {
         try
         {
-            if (DistroCgroupPath.has_value())
+            if (CgroupPath.has_value())
             {
-                THROW_LAST_ERROR_IF(UtilMoveSelfToDistroCgroup(DistroCgroupPath.value(), "CreateChildProcess") < 0);
+                THROW_LAST_ERROR_IF(UtilMoveSelfToCgroup(CgroupPath.value(), "CreateChildProcess") < 0);
             }
 
             if (CgroupNamespaceFd >= 0)
@@ -4043,7 +4043,7 @@ int UtilEnableAllCgroupControllers(const std::string& CgroupPath)
     return 0;
 }
 
-int UtilMoveSelfToDistroCgroup(const std::string& CgroupPath, const std::string& LogSubject)
+int UtilMoveSelfToCgroup(const std::string& CgroupPath, const std::string& LogSubject)
 try
 {
     const auto ProcsFile = CgroupPath + "/cgroup.procs";

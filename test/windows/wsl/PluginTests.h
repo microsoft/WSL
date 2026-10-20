@@ -46,7 +46,8 @@ enum class PluginTestType
     WslcVmStopCommitted,
     WslcVmNeverStarted,
     MountFolderAccess,
-    WslcVmExitDuringSessionRelease
+    WslcVmExitDuringSessionRelease,
+    CgroupIsolation
 };
 
 constexpr auto c_testType = L"TestType";

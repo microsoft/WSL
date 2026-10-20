@@ -68,7 +68,7 @@ public:
 
 public:
     static inline wil::unique_socket CreateLinuxProcess(
-        _In_ LPCSTR Path, _In_ LPCSTR* Arguments, const GUID& RuntimeId, wsl::shared::SocketChannel& channel, HANDLE terminatingEvent, DWORD Timeout)
+        _In_ LPCSTR Path, _In_ LPCSTR* Arguments, const GUID& RuntimeId, wsl::shared::SocketChannel& channel, HANDLE terminatingEvent, DWORD Timeout, uint64_t PluginId = 0)
     {
         size_t argumentCount = 0;
         while (Arguments[argumentCount] != nullptr)
@@ -77,6 +77,7 @@ public:
         }
 
         wsl::shared::MessageWriter<CREATE_PROCESS_MESSAGE> message(LxInitCreateProcess);
+        message->PluginId = PluginId;
         message.WriteString(message->PathIndex, Path);
         message.WriteStringArray(message->CommandLineIndex, Arguments, argumentCount);
         auto transaction = channel.StartTransaction(Timeout);

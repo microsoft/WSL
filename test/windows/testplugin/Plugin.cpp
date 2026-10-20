@@ -221,6 +221,17 @@ HRESULT OnVmStarted(const WSLSessionInformation* Session, const WSLVmCreationSet
 
         return S_OK;
     }
+    else if (g_testType == PluginTestType::CgroupIsolation)
+    {
+        const auto moduleName =
+            std::filesystem::path(wil::GetModuleFileNameW(wil::GetModuleInstanceHandle()).get()).filename().string();
+        const char* arguments[] = {moduleName.c_str(), "3600", nullptr};
+        for (int processIndex = 0; processIndex < 2; ++processIndex)
+        {
+            wil::unique_socket socket;
+            RETURN_IF_FAILED(g_api->ExecuteBinary(Session->SessionId, "/bin/sleep", arguments, &socket));
+        }
+    }
 
     return S_OK;
 }
@@ -879,10 +890,7 @@ EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPlugin
         THROW_HR_IF(E_UNEXPECTED, !g_logfile);
 
         g_testType = static_cast<PluginTestType>(ReadDword(key.get(), nullptr, c_testType, static_cast<DWORD>(PluginTestType::Invalid)));
-        THROW_HR_IF(
-            E_INVALIDARG,
-            static_cast<DWORD>(g_testType) <= 0 ||
-                static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::WslcVmExitDuringSessionRelease));
+        THROW_HR_IF(E_INVALIDARG, static_cast<DWORD>(g_testType) <= 0 || static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::CgroupIsolation));
 
         g_logfile << "Plugin loaded. TestMode=" << static_cast<DWORD>(g_testType) << std::endl;
         g_api = Api;

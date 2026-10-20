@@ -3403,14 +3403,31 @@ try
         return ProcessMountFolderMessage(Transaction, Buffer);
 
     case LxInitCreateProcess:
-        if (access(WSL_USER_NON_DISTRO_CGROUP_PATH, F_OK) == 0)
+    {
+        const auto* Message = gslhelpers::try_get_struct<CREATE_PROCESS_MESSAGE>(Buffer);
+        if (!Message)
         {
-            return ProcessCreateProcessMessage(Transaction, Buffer, WSL_USER_NON_DISTRO_CGROUP_PATH);
+            LOG_ERROR("Unexpected message size {}", Buffer.size());
+            return -1;
         }
-        else
+
+        std::optional<std::string> CgroupPath;
+        if (Message->PluginId != 0 && access(WSL_USER_CGROUP_PATH, F_OK) == 0)
         {
-            return ProcessCreateProcessMessage(Transaction, Buffer, std::nullopt);
+            CgroupPath = std::format("{}/plugin-{}", WSL_USER_CGROUP_PATH, Message->PluginId);
+            if (UtilMkdir(CgroupPath->c_str(), 0755) < 0)
+            {
+                LOG_ERROR("Failed to create cgroup directory {}:{}", *CgroupPath, errno);
+                return -1;
+            }
         }
+        else if (access(WSL_USER_INTERNAL_CGROUP_PATH, F_OK) == 0)
+        {
+            CgroupPath = WSL_USER_INTERNAL_CGROUP_PATH;
+        }
+
+        return ProcessCreateProcessMessage(Transaction, Buffer, CgroupPath);
+    }
 
     case LxMiniInitMessageWaitForPmemDevice:
     {
@@ -3921,9 +3938,9 @@ Return Value:
         return;
     }
 
-    if (UtilMkdir(WSL_USER_NON_DISTRO_CGROUP_PATH, 0755) < 0)
+    if (UtilMkdir(WSL_USER_INTERNAL_CGROUP_PATH, 0755) < 0)
     {
-        LOG_ERROR("Failed to create wsl-user non-distro cgroup directory {}", errno);
+        LOG_ERROR("Failed to create wsl-user internal cgroup directory {}", errno);
         return;
     }
 
@@ -3977,7 +3994,7 @@ wil::unique_fd CreateDistroCgroupNamespace(const std::string& CgroupPath)
         }
     });
 
-    THROW_LAST_ERROR_IF(UtilMoveSelfToDistroCgroup(CgroupPath, "cgroup namespace") < 0);
+    THROW_LAST_ERROR_IF(UtilMoveSelfToCgroup(CgroupPath, "cgroup namespace") < 0);
     RestoreCgroup = true;
 
     THROW_LAST_ERROR_IF(unshare(CLONE_NEWCGROUP) < 0);
