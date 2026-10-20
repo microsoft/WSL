@@ -6143,6 +6143,60 @@ class ConsommeTests
             std::chrono::minutes(2));
     }
 
+    WSL2_TEST_METHOD(DualStackBindIsReachableOverIpv4)
+    {
+        CONSOMME_TEST_ONLY();
+        WINDOWS_11_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+
+        // Make sure the VM doesn't time out
+        WslKeepAlive keepAlive;
+
+        {
+            auto guestProcess = NetworkTests::BindGuestPort(L"TCP6-LISTEN:1234,bind=::,ipv6only=0,fork", true);
+            NetworkTests::BindHostPort(1234, SOCK_STREAM, IPPROTO_TCP, false);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"socat -u OPEN:/dev/null TCP4:127.0.0.1:1234"), 0L);
+
+            // Wait past the port tracker's bind timeout to verify that the IPv4 side isn't released.
+            std::this_thread::sleep_for(std::chrono::seconds(65));
+            NetworkTests::BindHostPort(1234, SOCK_STREAM, IPPROTO_TCP, false);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"socat -u OPEN:/dev/null TCP4:127.0.0.1:1234"), 0L);
+        }
+
+        NetworkTests::BindHostPort(1234, SOCK_STREAM, IPPROTO_TCP, true, false, false, std::chrono::minutes(2));
+    }
+
+    WSL2_TEST_METHOD(DualStackPortZeroBindIsReachableOverIpv4)
+    {
+        CONSOMME_TEST_ONLY();
+        WINDOWS_11_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+
+        auto revertEphemeralPortRange = SetTestEphemeralPortRange();
+
+        // Make sure the VM doesn't time out while we wait for async port resolution
+        WslKeepAlive keepAlive;
+
+        auto [guestProcess, assignedPort] = NetworkTests::BindGuestPortZero(true);
+
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&assignedPort]() {
+                wil::unique_socket sock(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+                THROW_LAST_ERROR_IF(!sock);
+
+                SOCKADDR_IN addr{};
+                addr.sin_family = AF_INET;
+                addr.sin_port = htons(assignedPort);
+                THROW_HR_IF(E_FAIL, bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) != SOCKET_ERROR);
+            },
+            std::chrono::seconds(1),
+            std::chrono::seconds(30)));
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"socat -u OPEN:/dev/null TCP4:127.0.0.1:{}", assignedPort)), 0L);
+    }
+
     WSL2_TEST_METHOD(ConfigurationV6DnsServers)
     {
         CONSOMME_TEST_ONLY();
