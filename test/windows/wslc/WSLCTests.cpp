@@ -13349,6 +13349,7 @@ class WSLCTests
     WSLC_TEST_METHOD(ContainerCallRetainsSession)
     {
         auto session = CreateSession(GetDefaultSessionSettings(L"container-call-lifetime"));
+        LoadTestImage(*session, "alpine:latest");
 
         ULONG sessionId{};
         wil::unique_handle terminationEvent;
@@ -13417,6 +13418,8 @@ class WSLCTests
             {
                 const auto settings = GetDefaultSessionSettings(L"container-process-host-lifetime");
                 auto session = CreateSession(settings);
+                LoadTestImage(*session, "alpine:latest");
+
                 wil::unique_handle hostProcess;
                 wil::unique_handle terminationEvent;
                 VERIFY_SUCCEEDED(session->GetProcessHandle(&hostProcess));
