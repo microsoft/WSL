@@ -910,6 +910,19 @@ services:
             VERIFY_ARE_EQUAL(WslcContainerStateRunning, upResult.value.AffectedContainers[0].State);
         }
 
+        WSLCContainerLauncher unsupportedLauncher(
+            "alpine:latest",
+            std::format("{}-unsupported", targetKey),
+            {"/bin/sh", "-c", "trap '' TERM; while true; do sleep 1; done"});
+        unsupportedLauncher.AddLabel("com.docker.compose.project", targetKey);
+        unsupportedLauncher.AddLabel("com.docker.compose.service", "unsupported");
+        unsupportedLauncher.AddLabel("com.docker.compose.container-number", "1");
+        unsupportedLauncher.AddLabel("com.docker.compose.oneoff", "False");
+        unsupportedLauncher.AddLabel("com.microsoft.wslc.compose.managed", "true");
+        unsupportedLauncher.AddLabel("com.microsoft.wslc.compose.metadata-version", "2");
+        auto unsupportedContainer = unsupportedLauncher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+        VERIFY_ARE_EQUAL(WslcContainerStateRunning, unsupportedContainer.State());
+
         wil::unique_file output;
         VERIFY_ARE_EQUAL(0, tmpfile_s(&output));
         wsl::windows::wslc::cli::Terminal terminal{output.get(), false, output.get(), false};
@@ -931,6 +944,7 @@ services:
             100ms,
             30s);
         VERIFY_ARE_EQUAL(WslcContainerStateRunning, containerState(otherContainerName));
+        VERIFY_ARE_EQUAL(WslcContainerStateRunning, unsupportedContainer.State());
     }
 
     TEST_METHOD(ComposeLifecycleDiscoversManagedContainersByLabel)

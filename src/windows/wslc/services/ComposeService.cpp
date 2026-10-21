@@ -324,7 +324,7 @@ int ComposeService::Up(Terminal& terminal, models::Session& session, const std::
     const ComposeProjectReference project{std::filesystem::path{path}};
     std::optional<std::string> projectKey;
     auto stopOnCancellation = wil::scope_exit([&]() {
-        LOG_IF_FAILED(wil::ResultFromException([&]() {
+        const HRESULT stopResult = wil::ResultFromException([&]() {
             if (cancelEvent == nullptr)
             {
                 return;
@@ -343,7 +343,19 @@ int ComposeService::Up(Terminal& terminal, models::Session& session, const std::
                     }
                 });
             }
-        }));
+        });
+
+        if (FAILED(stopResult))
+        {
+            LOG_HR(stopResult);
+            LOG_IF_FAILED(wil::ResultFromException([&]() {
+                terminal.Error(
+                    L"{}\n",
+                    wsl::shared::Localization::MessageErrorCode(
+                        wsl::shared::Localization::WSLCCLI_ComposeStopAfterCancellationFailed(),
+                        wsl::windows::common::wslutil::ErrorCodeToString(stopResult)));
+            }));
+        }
     });
 
     auto completed = RunOperation(terminal, session, project, WSLCComposeActionUp, cancelEvent);
@@ -378,9 +390,11 @@ void ComposeService::ForceKill(Terminal& terminal, models::Session& session, con
 
     [[maybe_unused]] auto operation = session.BeginContainerOperation();
     const std::string managedFilter = std::format("{}={}", label::c_managed, label::c_managedValue);
+    const std::string metadataVersionFilter = std::format("{}={}", label::c_metadataVersion, label::c_metadataVersionValue);
     const std::string projectFilter = std::format("{}={}", label::c_project, projectKey);
     const std::array filters{
         WSLCFilter{.Key = "label", .Value = managedFilter.c_str()},
+        WSLCFilter{.Key = "label", .Value = metadataVersionFilter.c_str()},
         WSLCFilter{.Key = "label", .Value = projectFilter.c_str()},
     };
 
