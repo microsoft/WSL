@@ -17,6 +17,8 @@ Return value: `HRESULT`. Returns `E_INVALIDARG` if:
 - An IP address was set with [WslcSetContainerSettingsIPAddress](wslcsetcontainersettingsipaddress.md) without exactly one network, or on a primary network that is not user-defined.
 - Aliases are set on a network that is not user-defined.
 
+Returns [`WSLC_E_RUNTIME_UPDATE_NEEDED`](../error-codes.md) if the installed WSL runtime does not support the requested settings, such as capabilities, aliases on the primary network, or an IP address.
+
 Example:
 
 ```c

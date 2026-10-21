@@ -19,6 +19,7 @@ Abstract:
 #include "WSLCContainerLauncher.h"
 #include "wslutil.h"
 #include "wslc_schema.h"
+#include "wslpolicies.h"
 #include "WSLCE2EHelpers.h"
 
 #include "winrt/Session.h"
@@ -262,8 +263,10 @@ class WslcSdkWinRtTests
         const std::string& username = {}, const std::string& password = {}, uint16_t port = 5000)
     {
         // Get the IWSLCSession COM object from the SDK session handle and delegate to the shared helper.
-        auto comSession =
-            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->session.query<IWSLCSession>();
+        wil::com_ptr<IWSLCSession> comSession;
+        VERIFY_SUCCEEDED(reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))
+                             ->GetSession()
+                             ->QueryInterface(IID_PPV_ARGS(comSession.put())));
         return WSLCE2ETests::StartLocalRegistry(*comSession, username, password, port);
     }
 
@@ -617,8 +620,8 @@ class WslcSdkWinRtTests
         constexpr auto c_gateway = "10.231.46.1";
         const winrt::hstring networkName = winrt::to_hstring(c_networkName);
 
-        auto comSession =
-            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->session.query<IWSLCSession>();
+        auto comSession = wil::com_query<IWSLCSession>(
+            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->GetSession());
         LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName));
 
         WSLCNetworkOptions options{};
@@ -680,8 +683,8 @@ class WslcSdkWinRtTests
         constexpr auto c_networkName = "wslc-sdk-winrt-delete-network";
         const winrt::hstring networkName = winrt::to_hstring(c_networkName);
 
-        auto comSession =
-            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->session.query<IWSLCSession>();
+        auto comSession = wil::com_query<IWSLCSession>(
+            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->GetSession());
         LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName));
 
         WSLCNetworkOptions options{};
@@ -719,8 +722,8 @@ class WslcSdkWinRtTests
         constexpr auto c_gateway = L"10.231.48.1";
         const winrt::hstring networkName = winrt::to_hstring(c_networkName);
 
-        auto comSession =
-            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->session.query<IWSLCSession>();
+        auto comSession = wil::com_query<IWSLCSession>(
+            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->GetSession());
         LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName));
 
         // Positive: the created network is returned and listed with the requested settings.
@@ -786,8 +789,8 @@ class WslcSdkWinRtTests
         const winrt::hstring primaryNetwork = winrt::to_hstring(c_primaryNetwork);
         const winrt::hstring additionalNetwork = winrt::to_hstring(c_additionalNetwork);
 
-        auto comSession =
-            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->session.query<IWSLCSession>();
+        auto comSession = wil::com_query<IWSLCSession>(
+            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->GetSession());
         LOG_IF_FAILED(comSession->DeleteNetwork(c_primaryNetwork));
         LOG_IF_FAILED(comSession->DeleteNetwork(c_additionalNetwork));
 
@@ -894,9 +897,34 @@ class WslcSdkWinRtTests
             aliasOnBridge.Networks().Append(bridgeWithAlias);
             VERIFY_THROWS_HR(m_defaultSession.CreateContainer(aliasOnBridge), E_INVALIDARG);
 
+            // A failed conversion must not be cached and reused by a later call.
             auto nullNetwork = makeSettings();
             nullNetwork.Networks().Append(nullptr);
             VERIFY_THROWS_HR(m_defaultSession.CreateContainer(nullNetwork), E_POINTER);
+            VERIFY_THROWS_HR(m_defaultSession.CreateContainer(nullNetwork), E_POINTER);
+        }
+
+        // Positive: settings can be reused after the caller releases the applied networks.
+        {
+            auto containerSettings = makeSettings();
+            {
+                WSLCSDK::ContainerNetwork primary{primaryNetwork};
+                primary.Aliases().Append(L"reused");
+                containerSettings.Networks().Append(primary);
+            }
+
+            auto first = m_defaultSession.CreateContainer(containerSettings);
+            auto cleanupFirst = DELETE_CONTAINER_ON_SCOPE_EXIT(first);
+
+            containerSettings.Networks().Clear();
+
+            auto second = m_defaultSession.CreateContainer(containerSettings);
+            auto cleanupSecond = DELETE_CONTAINER_ON_SCOPE_EXIT(second);
+            second.Start();
+
+            const auto inspectObject = inspect(second);
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_primaryNetwork));
+            VERIFY_IS_TRUE(hasAlias(inspectObject.NetworkSettings.Networks.at(c_primaryNetwork), "reused"));
         }
 
         // Negative: invalid property values.
@@ -1253,7 +1281,11 @@ class WslcSdkWinRtTests
 
     WSLC_TEST_METHOD(ContainerInspect)
     {
-        auto container = m_defaultSession.CreateContainer(WSLCSDK::ContainerSettings(L"debian:latest"));
+        auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+        containerSettings.CapabilityAdditions(winrt::single_threaded_vector<winrt::hstring>({L"NET_ADMIN", L"SYS_TIME"}));
+        containerSettings.CapabilityDrops(winrt::single_threaded_vector<winrt::hstring>({L"NET_RAW", L"CHOWN"}));
+
+        auto container = m_defaultSession.CreateContainer(containerSettings);
         auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
         const auto inspectJson = container.Inspect();
@@ -1262,8 +1294,18 @@ class WslcSdkWinRtTests
         const auto id = container.Id();
         VERIFY_IS_FALSE(id.empty());
 
-        // The inspect JSON must contain the container ID.
-        VERIFY_IS_TRUE(winrt::to_string(inspectJson).find(winrt::to_string(id)) != std::string::npos);
+        const auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(inspectJson.c_str());
+        VERIFY_ARE_EQUAL(winrt::to_string(id), inspect.Id);
+        VERIFY_ARE_EQUAL(2u, inspect.HostConfig.CapAdd.size());
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("NET_ADMIN"); }));
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("SYS_TIME"); }));
+        VERIFY_ARE_EQUAL(2u, inspect.HostConfig.CapDrop.size());
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapDrop, [](const auto& capability) { return capability.ends_with("NET_RAW"); }));
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapDrop, [](const auto& capability) { return capability.ends_with("CHOWN"); }));
 
         container.Delete(WSLCSDK::DeleteContainerOption::None);
         cleanup.release();
@@ -1336,6 +1378,31 @@ class WslcSdkWinRtTests
         StartContainerAndWaitForInitProcessExit(container);
         VERIFY_ARE_EQUAL(container.InitProcess().ExitCode(), 0);
         container.Delete(WSLCSDK::DeleteContainerOption::Force);
+    }
+
+    WSLC_TEST_METHOD(ContainerCapabilityAdditions)
+    {
+        auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+        containerSettings.CapabilityAdditions(winrt::single_threaded_vector<winrt::hstring>({L"NET_ADMIN"}));
+
+        auto container = m_defaultSession.CreateContainer(containerSettings);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+        const auto inspectJson = container.Inspect();
+        const auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(inspectJson.c_str());
+        VERIFY_ARE_EQUAL(1u, inspect.HostConfig.CapAdd.size());
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("NET_ADMIN"); }));
+    }
+
+    WSLC_TEST_METHOD(ContainerCapabilityAdditionsBlockedByPolicy)
+    {
+        namespace policies = wsl::windows::policies;
+        RegistryKeyChange<DWORD> policy(HKEY_LOCAL_MACHINE, policies::c_registryKey, policies::c_allowWSLContainerPrivileged, 0);
+
+        auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+        containerSettings.CapabilityAdditions(winrt::single_threaded_vector<winrt::hstring>({L"NET_ADMIN"}));
+        VERIFY_THROWS_HR(m_defaultSession.CreateContainer(containerSettings), static_cast<HRESULT>(WSLCSDK::Error::CapabilityAdditionsDisabled));
     }
 
     // -----------------------------------------------------------------------

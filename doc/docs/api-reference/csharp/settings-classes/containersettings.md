@@ -21,12 +21,14 @@ public sealed class ContainerSettings
     public IList<ContainerNamedVolume> NamedVolumes { get; set; }
     public IList<ContainerNetwork> Networks { get; set; }
     public HostName IPAddress { get; set; }
+    public IList<string> CapabilityAdditions { get; set; }
+    public IList<string> CapabilityDrops { get; set; }
 }
 ```
 
 Notes:
 
-- `PortMappings`, `Volumes`, `NamedVolumes`, and `Networks` are mutable collections.
+- `PortMappings`, `Volumes`, `NamedVolumes`, `Networks`, `CapabilityAdditions`, and `CapabilityDrops` are mutable collections.
 - `InitProcess` is optional.
 - `NetworkingMode` is nullable; `null` means “leave default behavior”.
 - The first entry in `Networks` is the primary network. `Networks` cannot be combined with `NetworkingMode`.

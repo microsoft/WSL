@@ -555,6 +555,16 @@ std::string FormatNetworkSubnet(int Family, const TAddress& Address, uint8_t Pre
     return std::format("{}/{}", FormatNetworkAddress(Family, Address), static_cast<unsigned int>(PrefixLength));
 }
 
+void ValidateStringArray(PCSTR const* strings, uint32_t count)
+{
+    THROW_HR_IF(E_INVALIDARG, (strings == nullptr && count != 0) || (strings != nullptr && count == 0));
+
+    for (uint32_t index = 0; index < count; ++index)
+    {
+        THROW_HR_IF_NULL(E_INVALIDARG, strings[index]);
+    }
+}
+
 } // namespace
 
 // SESSION DEFINITIONS
@@ -638,10 +648,37 @@ try
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsDnsTunneling);
 
-    if (SUCCEEDED(errorInfoWrapper.CaptureResult(
-            sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, nullptr, &result->session))))
+    wil::com_ptr<IWSLCCompatSession> compatSession;
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, nullptr, &compatSession))))
     {
-        wsl::windows::common::security::ConfigureForCOMImpersonation(result->session.get());
+        wil::com_ptr<IWSLCCompatSession3> compatSession3;
+        wil::com_ptr<IWSLCCompatSession2> compatSession2;
+        auto queryResult = compatSession->QueryInterface(IID_PPV_ARGS(compatSession3.put()));
+        if (SUCCEEDED(queryResult))
+        {
+            result->SetSession(std::move(compatSession3));
+        }
+        else if (queryResult == E_NOINTERFACE)
+        {
+            queryResult = compatSession->QueryInterface(IID_PPV_ARGS(compatSession2.put()));
+            if (queryResult == E_NOINTERFACE)
+            {
+                result->SetSession(std::move(compatSession));
+            }
+            else
+            {
+                RETURN_IF_FAILED(queryResult);
+                result->SetSession(std::move(compatSession2));
+            }
+        }
+        else
+        {
+            RETURN_HR(queryResult);
+        }
+
+        compatSession.reset();
+
+        wsl::windows::common::security::ConfigureForCOMImpersonation(result->GetSession());
         *session = reinterpret_cast<WslcSession>(result.release());
     }
 
@@ -653,9 +690,9 @@ STDAPI WslcTerminateSession(_In_ WslcSession session)
 try
 {
     auto internalType = CheckAndGetInternalType(session);
-    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
 
-    RETURN_HR(internalType->session->Terminate());
+    RETURN_HR(internalType->GetSession()->Terminate());
 }
 CATCH_RETURN();
 
@@ -683,7 +720,7 @@ try
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
 
     auto internalType = CheckAndGetInternalType(session);
-    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
     RETURN_HR_IF_NULL(E_POINTER, options);
 
     RETURN_HR_IF_NULL(E_INVALIDARG, options->name);
@@ -726,7 +763,7 @@ try
     volumeOptions.DriverOptsCount = static_cast<ULONG>(driverOpts.size());
 
     WSLCCompatVolumeInformation volumeInfo{};
-    return errorInfoWrapper.CaptureResult(internalType->session->CreateVolume(&volumeOptions, &volumeInfo));
+    return errorInfoWrapper.CaptureResult(internalType->GetSession()->CreateVolume(&volumeOptions, &volumeInfo));
 }
 CATCH_RETURN();
 
@@ -736,10 +773,10 @@ try
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
 
     auto internalType = CheckAndGetInternalType(session);
-    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
     RETURN_HR_IF_NULL(E_POINTER, name);
 
-    return errorInfoWrapper.CaptureResult(internalType->session->DeleteVolume(name));
+    return errorInfoWrapper.CaptureResult(internalType->GetSession()->DeleteVolume(name));
 }
 CATCH_RETURN();
 
@@ -787,9 +824,9 @@ try
     *terminationEvent = nullptr;
 
     auto internalType = CheckAndGetInternalType(session);
-    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
 
-    RETURN_HR(internalType->session->GetTerminationEvent(terminationEvent));
+    RETURN_HR(internalType->GetSession()->GetTerminationEvent(terminationEvent));
 }
 CATCH_RETURN();
 
@@ -806,11 +843,11 @@ try
     *reason = WSLC_SESSION_TERMINATION_REASON_UNKNOWN;
 
     auto internalType = CheckAndGetInternalType(session);
-    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
 
     WSLCVirtualMachineTerminationReason runtimeReason = WSLCVirtualMachineTerminationReasonUnknown;
     wil::unique_cotaskmem_string details;
-    RETURN_IF_FAILED(internalType->session->GetTerminationReason(&runtimeReason, &details));
+    RETURN_IF_FAILED(internalType->GetSession()->GetTerminationReason(&runtimeReason, &details));
 
     *reason = static_cast<WslcSessionTerminationReason>(runtimeReason);
 
@@ -832,14 +869,14 @@ try
 
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
     auto internalSession = CheckAndGetInternalType(session);
-    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalSession->session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalSession->GetSession());
 
     auto result = std::make_unique<WslcCrashDumpSubscriptionImpl>();
     auto callback = winrt::make_self<CrashDumpCallback>(crashDumpCallback, crashDumpContext);
     result->callback = callback.get();
 
     if (SUCCEEDED(errorInfoWrapper.CaptureResult(
-            internalSession->session->RegisterCrashDumpCallback(result->callback.get(), &result->subscription))))
+            internalSession->GetSession()->RegisterCrashDumpCallback(result->callback.get(), &result->subscription))))
     {
         *subscription = reinterpret_cast<WslcCrashDumpSubscription>(result.release());
     }
@@ -866,7 +903,7 @@ try
 {
     auto internalType = CheckAndGetInternalTypeUniquePointer(session);
 
-    internalType->session.reset();
+    internalType.reset();
 
     return S_OK;
 }
@@ -963,12 +1000,19 @@ try
     *container = nullptr;
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
     auto internalSession = CheckAndGetInternalType(session);
-    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalSession->session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalSession->GetSession());
     auto internalContainerSettings = CheckAndGetInternalType(containerSettings);
+
+    auto* compatSession2 = internalSession->GetSession2();
+    RETURN_HR_IF(
+        WSLC_E_RUNTIME_UPDATE_NEEDED,
+        compatSession2 == nullptr &&
+            (internalContainerSettings->capabilityAdditionsCount != 0 || internalContainerSettings->capabilityDropsCount != 0));
 
     auto result = std::make_unique<WslcContainerImpl>();
 
-    WSLCCompatContainerOptions containerOptions{};
+    WSLCCompatContainerOptions2 containerOptions2{};
+    auto& containerOptions = containerOptions2.Base;
     std::unique_ptr<WSLCCompatPortMapping[]> convertedPorts; // this must stay in same scope as containerOptions since containerOptions.Ports is getting a raw pointer to the array owned by convertedPorts.
 
     containerOptions.Image = internalContainerSettings->image;
@@ -1088,15 +1132,34 @@ try
     // containerOptions.StopSignal;
     // containerOptions.ShmSize;
 
-    // Only use the newer method when needed so that containers without primary network settings work with older services.
-    const auto& primarySettings = networkStorage.PrimarySettings;
-    const HRESULT createResult =
-        primarySettings.empty()
-            ? internalSession->session->CreateContainer(&containerOptions, nullptr, &result->container)
-            : internalSession->session->CreateContainerWithNetworkSettings(
-                  &containerOptions, primarySettings.data(), static_cast<ULONG>(primarySettings.size()), nullptr, &result->container);
+    containerOptions2.CapAdd = {
+        internalContainerSettings->capabilityAdditions, static_cast<ULONG>(internalContainerSettings->capabilityAdditionsCount)};
+    containerOptions2.CapDrop = {internalContainerSettings->capabilityDrops, static_cast<ULONG>(internalContainerSettings->capabilityDropsCount)};
 
-    if (SUCCEEDED(errorInfoWrapper.CaptureResult(createResult)))
+    const auto& primarySettings = networkStorage.PrimarySettings;
+    auto* compatSession3 = internalSession->GetSession3();
+    RETURN_HR_IF(WSLC_E_RUNTIME_UPDATE_NEEDED, compatSession3 == nullptr && !primarySettings.empty());
+
+    HRESULT hr;
+    if (compatSession3 != nullptr)
+    {
+        WSLCCompatContainerOptions3 containerOptions3{};
+        containerOptions3.Base = containerOptions2;
+        containerOptions3.PrimaryNetworkSettings = primarySettings.empty() ? nullptr : primarySettings.data();
+        containerOptions3.PrimaryNetworkSettingsCount = static_cast<ULONG>(primarySettings.size());
+
+        hr = compatSession3->CreateContainer3(&containerOptions3, nullptr, &result->container);
+    }
+    else if (compatSession2 != nullptr)
+    {
+        hr = compatSession2->CreateContainer2(&containerOptions2, nullptr, &result->container);
+    }
+    else
+    {
+        hr = internalSession->GetSession()->CreateContainer(&containerOptions2.Base, nullptr, &result->container);
+    }
+
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(hr)))
     {
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->container.get());
 
@@ -1120,11 +1183,11 @@ try
     RETURN_HR_IF_NULL(E_POINTER, nameOrId);
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
     auto internalSession = CheckAndGetInternalType(session);
-    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalSession->session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalSession->GetSession());
 
     auto result = std::make_unique<WslcContainerImpl>();
 
-    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalSession->session->OpenContainer(nameOrId, &result->container))))
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalSession->GetSession()->OpenContainer(nameOrId, &result->container))))
     {
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->container.get());
         *container = reinterpret_cast<WslcContainer>(result.release());
@@ -1321,12 +1384,7 @@ try
     {
         const auto& network = networks[i];
         RETURN_HR_IF(E_INVALIDARG, network.name == nullptr || *network.name == '\0');
-        RETURN_HR_IF(E_INVALIDARG, (network.aliases == nullptr && network.aliasCount != 0) || (network.aliases != nullptr && network.aliasCount == 0));
-
-        for (uint32_t j = 0; j < network.aliasCount; ++j)
-        {
-            RETURN_HR_IF_NULL(E_INVALIDARG, network.aliases[j]);
-        }
+        ValidateStringArray(network.aliases, network.aliasCount);
     }
 
     internalType->networks = networks;
@@ -1343,6 +1401,34 @@ try
 
     internalType->hasIpAddress = ipAddress != nullptr;
     internalType->ipAddress = ipAddress != nullptr ? *ipAddress : IN_ADDR{};
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+STDAPI WslcSetContainerSettingsCapabilityAdditions(
+    _In_ WslcContainerSettings* containerSettings, _In_reads_opt_(capabilityCount) PCSTR const* capabilities, _In_ uint32_t capabilityCount)
+try
+{
+    auto internalType = CheckAndGetInternalType(containerSettings);
+    ValidateStringArray(capabilities, capabilityCount);
+
+    internalType->capabilityAdditions = capabilities;
+    internalType->capabilityAdditionsCount = capabilityCount;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+STDAPI WslcSetContainerSettingsCapabilityDrops(
+    _In_ WslcContainerSettings* containerSettings, _In_reads_opt_(capabilityCount) PCSTR const* capabilities, _In_ uint32_t capabilityCount)
+try
+{
+    auto internalType = CheckAndGetInternalType(containerSettings);
+    ValidateStringArray(capabilities, capabilityCount);
+
+    internalType->capabilityDrops = capabilities;
+    internalType->capabilityDropsCount = capabilityCount;
 
     return S_OK;
 }
@@ -1679,13 +1765,14 @@ try
 {
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
     auto internalType = CheckAndGetInternalType(session);
-    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
     RETURN_HR_IF_NULL(E_POINTER, options);
     RETURN_HR_IF_NULL(E_INVALIDARG, options->uri);
 
     auto progressCallback = ProgressCallback::CreateIf(options);
 
-    return errorInfoWrapper.CaptureResult(internalType->session->PullImage(options->uri, options->registryAuth, progressCallback.get(), nullptr));
+    return errorInfoWrapper.CaptureResult(
+        internalType->GetSession()->PullImage(options->uri, options->registryAuth, progressCallback.get(), nullptr));
 }
 CATCH_RETURN();
 
@@ -1695,7 +1782,7 @@ static HRESULT WslcImportSessionImageImpl(
     auto progressCallback = ProgressCallback::CreateIf(options);
     wil::unique_cotaskmem_ansistring imageId;
 
-    return errorInfoWrapper.CaptureResult(internalSession->session->ImportImage(
+    return errorInfoWrapper.CaptureResult(internalSession->GetSession()->ImportImage(
         wsl::windows::common::apicompat::Convert(ToCOMInputHandle(imageFile.Handle())),
         imageName,
         progressCallback.get(),
@@ -1715,7 +1802,7 @@ try
 {
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
     auto internalType = CheckAndGetInternalType(session);
-    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
     THROW_HR_IF_NULL(E_POINTER, imageName);
     return WslcImportSessionImageImpl(internalType, imageName, options, errorInfoWrapper, {imageContent, imageContentLength});
 }
@@ -1727,7 +1814,7 @@ try
 {
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
     auto internalType = CheckAndGetInternalType(session);
-    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
     THROW_HR_IF_NULL(E_POINTER, imageName);
     return WslcImportSessionImageImpl(internalType, imageName, options, errorInfoWrapper, {path});
 }
@@ -1738,7 +1825,7 @@ static HRESULT WslcLoadSessionImageImpl(
 {
     auto progressCallback = ProgressCallback::CreateIf(options);
 
-    return errorInfoWrapper.CaptureResult(internalSession->session->LoadImage(
+    return errorInfoWrapper.CaptureResult(internalSession->GetSession()->LoadImage(
         wsl::windows::common::apicompat::Convert(ToCOMInputHandle(imageFile.Handle())), progressCallback.get(), imageFile.Length(), nullptr));
 }
 
@@ -1752,7 +1839,7 @@ try
 {
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
     auto internalType = CheckAndGetInternalType(session);
-    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
     return WslcLoadSessionImageImpl(internalType, options, errorInfoWrapper, {imageContent, imageContentLength});
 }
 CATCH_RETURN();
@@ -1762,7 +1849,7 @@ try
 {
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
     auto internalType = CheckAndGetInternalType(session);
-    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
     return WslcLoadSessionImageImpl(internalType, options, errorInfoWrapper, {path});
 }
 CATCH_RETURN();
@@ -1772,7 +1859,7 @@ try
 {
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
     auto internalType = CheckAndGetInternalType(session);
-    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
     RETURN_HR_IF_NULL(E_POINTER, nameOrID);
 
     WSLCCompatDeleteImageOptions options{};
@@ -1782,7 +1869,7 @@ try
     wil::unique_cotaskmem_array_ptr<WSLCCompatDeletedImageInformation> deletedImageInformation;
 
     return errorInfoWrapper.CaptureResult(
-        internalType->session->DeleteImage(&options, &deletedImageInformation, deletedImageInformation.size_address<ULONG>()));
+        internalType->GetSession()->DeleteImage(&options, &deletedImageInformation, deletedImageInformation.size_address<ULONG>()));
 }
 CATCH_RETURN();
 
@@ -1791,7 +1878,7 @@ try
 {
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
     auto internalType = CheckAndGetInternalType(session);
-    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
     RETURN_HR_IF_NULL(E_POINTER, options);
     RETURN_HR_IF_NULL(E_INVALIDARG, options->image);
     RETURN_HR_IF_NULL(E_INVALIDARG, options->repo);
@@ -1802,7 +1889,7 @@ try
     runtimeOptions.Repo = options->repo;
     runtimeOptions.Tag = options->tag;
 
-    return errorInfoWrapper.CaptureResult(internalType->session->TagImage(&runtimeOptions));
+    return errorInfoWrapper.CaptureResult(internalType->GetSession()->TagImage(&runtimeOptions));
 }
 CATCH_RETURN();
 
@@ -1811,7 +1898,7 @@ try
 {
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
     auto internalType = CheckAndGetInternalType(session);
-    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
     RETURN_HR_IF_NULL(E_POINTER, options);
     RETURN_HR_IF_NULL(E_INVALIDARG, options->image);
     RETURN_HR_IF_NULL(E_INVALIDARG, options->registryAuth);
@@ -1819,7 +1906,7 @@ try
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     return errorInfoWrapper.CaptureResult(
-        internalType->session->PushImage(options->image, options->registryAuth, progressCallback.get(), nullptr));
+        internalType->GetSession()->PushImage(options->image, options->registryAuth, progressCallback.get(), nullptr));
 }
 CATCH_RETURN();
 
@@ -1835,7 +1922,7 @@ try
 {
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
     auto internalType = CheckAndGetInternalType(session);
-    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
     RETURN_HR_IF_NULL(E_POINTER, serverAddress);
     RETURN_HR_IF_NULL(E_POINTER, username);
     RETURN_HR_IF_NULL(E_POINTER, password);
@@ -1848,7 +1935,7 @@ try
     }
 
     wil::unique_cotaskmem_ansistring rawToken;
-    auto hr = errorInfoWrapper.CaptureResult(internalType->session->Authenticate(serverAddress, username, password, &rawToken));
+    auto hr = errorInfoWrapper.CaptureResult(internalType->GetSession()->Authenticate(serverAddress, username, password, &rawToken));
     if (SUCCEEDED(hr))
     {
         std::string authHeader;
@@ -1889,13 +1976,13 @@ try
     RETURN_HR_IF_NULL(E_POINTER, count);
     *count = 0;
     auto internalType = CheckAndGetInternalType(session);
-    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
 
     // TODO: Many filtering options are available via WSLC_LIST_IMAGES_OPTIONS
 
     wil::unique_cotaskmem_array_ptr<WSLCCompatImageInformation> imageInformation;
 
-    RETURN_IF_FAILED(internalType->session->ListImages(nullptr, &imageInformation, imageInformation.size_address<ULONG>()));
+    RETURN_IF_FAILED(internalType->GetSession()->ListImages(nullptr, &imageInformation, imageInformation.size_address<ULONG>()));
 
     if (imageInformation.size())
     {
@@ -1940,10 +2027,12 @@ try
     *count = 0;
 
     auto internalType = CheckAndGetInternalType(session);
-    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
+    auto* compatSession3 = internalType->GetSession3();
+    RETURN_HR_IF_NULL(WSLC_E_RUNTIME_UPDATE_NEEDED, compatSession3);
 
     wil::unique_cotaskmem_ansistring output;
-    HRESULT hr = internalType->session->ListNetworks(&output);
+    HRESULT hr = compatSession3->ListNetworks(&output);
     if (FAILED(hr))
     {
         return errorInfoWrapper.CaptureResult(hr);
@@ -1975,7 +2064,7 @@ try
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
 
     auto internalType = CheckAndGetInternalType(session);
-    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
     RETURN_HR_IF_NULL(E_POINTER, settings);
     RETURN_HR_IF_NULL(E_POINTER, settings->name);
 
@@ -2014,8 +2103,11 @@ try
         }
     }
 
+    auto* compatSession3 = internalType->GetSession3();
+    RETURN_HR_IF_NULL(WSLC_E_RUNTIME_UPDATE_NEEDED, compatSession3);
+
     wil::unique_cotaskmem_ansistring output;
-    HRESULT hr = internalType->session->CreateNetwork(wsl::shared::ToJson(options).c_str(), nullptr, &output);
+    HRESULT hr = compatSession3->CreateNetwork(wsl::shared::ToJson(options).c_str(), nullptr, &output);
     if (FAILED(hr))
     {
         return errorInfoWrapper.CaptureResult(hr);
@@ -2036,10 +2128,12 @@ try
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
 
     auto internalType = CheckAndGetInternalType(session);
-    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
     RETURN_HR_IF_NULL(E_POINTER, name);
+    auto* compatSession3 = internalType->GetSession3();
+    RETURN_HR_IF_NULL(WSLC_E_RUNTIME_UPDATE_NEEDED, compatSession3);
 
-    return errorInfoWrapper.CaptureResult(internalType->session->DeleteNetwork(name));
+    return errorInfoWrapper.CaptureResult(compatSession3->DeleteNetwork(name));
 }
 CATCH_RETURN();
 

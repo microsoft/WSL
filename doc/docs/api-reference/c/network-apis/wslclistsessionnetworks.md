@@ -15,7 +15,7 @@ STDAPI WslcListSessionNetworks(
 | `count` | `uint32_t*` | out |
 | `errorMessage` | `PWSTR*` | out, optional |
 
-Return value: `HRESULT`.
+Return value: `HRESULT`. Returns [`WSLC_E_RUNTIME_UPDATE_NEEDED`](../error-codes.md) if the installed WSL runtime does not support network management.
 
 `networks` is allocated using `CoTaskMemAlloc`; free it with `CoTaskMemFree`. `networks` is `NULL` when `count` is `0`.
 

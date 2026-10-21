@@ -59,10 +59,9 @@ public:
     NON_COPYABLE(ContainerOptionsConversion);
     DEFAULT_MOVABLE(ContainerOptionsConversion);
 
-    explicit ContainerOptionsConversion(
-        const WSLCCompatContainerOptions& Options,
-        const WSLCCompatKeyValuePair* PrimaryNetworkSettings = nullptr,
-        ULONG PrimaryNetworkSettingsCount = 0);
+    explicit ContainerOptionsConversion(const WSLCCompatContainerOptions& Options);
+    explicit ContainerOptionsConversion(const WSLCCompatContainerOptions2& Options);
+    explicit ContainerOptionsConversion(const WSLCCompatContainerOptions3& Options);
 
     const WSLCContainerOptions* Get() const noexcept
     {
@@ -136,10 +135,19 @@ private:
     WSLCSessionSettings m_value{};
 };
 
-inline ContainerOptionsConversion Convert(
-    const WSLCCompatContainerOptions& Options, const WSLCCompatKeyValuePair* PrimaryNetworkSettings = nullptr, ULONG PrimaryNetworkSettingsCount = 0)
+inline ContainerOptionsConversion Convert(const WSLCCompatContainerOptions& Options)
 {
-    return ContainerOptionsConversion(Options, PrimaryNetworkSettings, PrimaryNetworkSettingsCount);
+    return ContainerOptionsConversion(Options);
+}
+
+inline ContainerOptionsConversion Convert(const WSLCCompatContainerOptions2& Options)
+{
+    return ContainerOptionsConversion(Options);
+}
+
+inline ContainerOptionsConversion Convert(const WSLCCompatContainerOptions3& Options)
+{
+    return ContainerOptionsConversion(Options);
 }
 
 inline ListImagesOptionsConversion Convert(const WSLCCompatListImagesOptions& Options)

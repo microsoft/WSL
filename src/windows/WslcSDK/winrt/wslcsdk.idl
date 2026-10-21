@@ -188,6 +188,8 @@ namespace Microsoft.WSL.Containers
 
         // IPv4 address on the primary network. Requires exactly one user-defined network in Networks.
         Windows.Networking.HostName IPAddress;
+        IVector<String> CapabilityAdditions;
+        IVector<String> CapabilityDrops;
     };
 
     enum Signal
@@ -444,5 +446,7 @@ namespace Microsoft.WSL.Containers
         RegistryBlockedByPolicy = 0x8004060D,
         VolumeNotAvailable = 0x8004060E,
         ContainerDeleted = 0x80040613,
+        CapabilityAdditionsDisabled = 0x80040614,
+        RuntimeUpdateNeeded = 0x80040615,
     };
 }

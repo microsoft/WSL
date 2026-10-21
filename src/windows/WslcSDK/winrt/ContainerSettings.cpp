@@ -271,120 +271,209 @@ void ContainerSettings::IPAddress(winrt::Windows::Networking::HostName const& va
     m_ipAddress = value;
 }
 
-WslcContainerSettings* ContainerSettings::ToStructPointer()
+winrt::Windows::Foundation::Collections::IVector<hstring> ContainerSettings::CapabilityAdditions()
 {
-    if (!m_containerSettings)
+    return m_capabilityAdditions;
+}
+
+void ContainerSettings::CapabilityAdditions(winrt::Windows::Foundation::Collections::IVector<hstring> const& value)
+{
+    if (m_containerSettings)
     {
-        m_containerSettings = std::make_unique<WslcContainerSettings>();
-        winrt::check_hresult(WslcInitContainerSettings(m_imageName.c_str(), m_containerSettings.get()));
-
-        if (!m_name.empty())
-        {
-            winrt::check_hresult(WslcSetContainerSettingsName(m_containerSettings.get(), m_name.c_str()));
-        }
-
-        if (m_initProcess)
-        {
-            winrt::check_hresult(WslcSetContainerSettingsInitProcess(m_containerSettings.get(), GetStructPointer(m_initProcess)));
-        }
-
-        if (m_networkingMode)
-        {
-            winrt::check_hresult(WslcSetContainerSettingsNetworkingMode(
-                m_containerSettings.get(), static_cast<WslcContainerNetworkingMode>(m_networkingMode.Value())));
-        }
-
-        if (!m_hostName.empty())
-        {
-            winrt::check_hresult(WslcSetContainerSettingsHostName(m_containerSettings.get(), m_hostName.c_str()));
-        }
-
-        if (!m_domainName.empty())
-        {
-            winrt::check_hresult(WslcSetContainerSettingsDomainName(m_containerSettings.get(), m_domainName.c_str()));
-        }
-
-        winrt::check_hresult(WslcSetContainerSettingsFlags(m_containerSettings.get(), m_containerFlags));
-
-        if (m_portMappings.Size() > 0)
-        {
-            m_portMappingsStructs.clear();
-            m_portMappingsStructs.reserve(m_portMappings.Size());
-            for (auto const& portMapping : m_portMappings)
-            {
-                if (!portMapping)
-                {
-                    throw winrt::hresult_error(E_POINTER, L"Port mappings collection contains a null element");
-                }
-                m_portMappingsStructs.push_back(GetStruct(portMapping));
-            }
-
-            winrt::check_hresult(WslcSetContainerSettingsPortMappings(
-                m_containerSettings.get(), m_portMappingsStructs.data(), static_cast<uint32_t>(m_portMappingsStructs.size())));
-        }
-
-        if (m_volumes.Size() > 0)
-        {
-            m_volumesStructs.clear();
-            m_volumesStructs.reserve(m_volumes.Size());
-            for (auto const& volume : m_volumes)
-            {
-                if (!volume)
-                {
-                    throw winrt::hresult_error(E_POINTER, L"Volumes collection contains a null element");
-                }
-                m_volumesStructs.push_back(GetStruct(volume));
-            }
-
-            winrt::check_hresult(WslcSetContainerSettingsVolumes(
-                m_containerSettings.get(), m_volumesStructs.data(), static_cast<uint32_t>(m_volumesStructs.size())));
-        }
-
-        if (m_namedVolumes.Size() > 0)
-        {
-            m_namedVolumesStructs.clear();
-            m_namedVolumesStructs.reserve(m_namedVolumes.Size());
-            for (auto const& namedVolume : m_namedVolumes)
-            {
-                if (!namedVolume)
-                {
-                    throw winrt::hresult_error(E_POINTER, L"Named volumes collection contains a null element");
-                }
-                m_namedVolumesStructs.push_back(GetStruct(namedVolume));
-            }
-
-            winrt::check_hresult(WslcSetContainerSettingsNamedVolumes(
-                m_containerSettings.get(), m_namedVolumesStructs.data(), static_cast<uint32_t>(m_namedVolumesStructs.size())));
-        }
-
-        if (m_networks.Size() > 0)
-        {
-            m_networksStructs.clear();
-            m_networksStructs.reserve(m_networks.Size());
-            for (auto const& network : m_networks)
-            {
-                if (!network)
-                {
-                    throw winrt::hresult_error(E_POINTER, L"Networks collection contains a null element");
-                }
-                m_networksStructs.push_back(GetStruct(network));
-            }
-
-            winrt::check_hresult(WslcSetContainerSettingsNetworks(
-                m_containerSettings.get(), m_networksStructs.data(), static_cast<uint32_t>(m_networksStructs.size())));
-        }
-
-        if (m_ipAddress)
-        {
-            if (inet_pton(AF_INET, winrt::to_string(m_ipAddress.RawName()).c_str(), &m_ipAddressStruct) != 1)
-            {
-                throw winrt::hresult_invalid_argument(L"Invalid IPv4 address format");
-            }
-
-            winrt::check_hresult(WslcSetContainerSettingsIPAddress(m_containerSettings.get(), &m_ipAddressStruct));
-        }
+        throw winrt::hresult_illegal_state_change(L"Cannot change capabilities after container has been initialized");
     }
 
+    if (!value)
+    {
+        winrt::throw_hresult(E_POINTER);
+    }
+
+    m_capabilityAdditions = value;
+}
+
+winrt::Windows::Foundation::Collections::IVector<hstring> ContainerSettings::CapabilityDrops()
+{
+    return m_capabilityDrops;
+}
+
+void ContainerSettings::CapabilityDrops(winrt::Windows::Foundation::Collections::IVector<hstring> const& value)
+{
+    if (m_containerSettings)
+    {
+        winrt::throw_hresult(E_ILLEGAL_STATE_CHANGE);
+    }
+
+    if (!value)
+    {
+        winrt::throw_hresult(E_POINTER);
+    }
+
+    m_capabilityDrops = value;
+}
+
+WslcContainerSettings* ContainerSettings::ToStructPointer()
+{
+    if (m_containerSettings)
+    {
+        return m_containerSettings.get();
+    }
+
+    // Cache the settings only after every conversion succeeds so a failed attempt is not reused by a later call.
+    auto settings = std::make_unique<WslcContainerSettings>();
+    winrt::check_hresult(WslcInitContainerSettings(m_imageName.c_str(), settings.get()));
+
+    if (!m_name.empty())
+    {
+        winrt::check_hresult(WslcSetContainerSettingsName(settings.get(), m_name.c_str()));
+    }
+
+    if (m_initProcess)
+    {
+        winrt::check_hresult(WslcSetContainerSettingsInitProcess(settings.get(), GetStructPointer(m_initProcess)));
+    }
+
+    if (m_networkingMode)
+    {
+        winrt::check_hresult(WslcSetContainerSettingsNetworkingMode(
+            settings.get(), static_cast<WslcContainerNetworkingMode>(m_networkingMode.Value())));
+    }
+
+    if (!m_hostName.empty())
+    {
+        winrt::check_hresult(WslcSetContainerSettingsHostName(settings.get(), m_hostName.c_str()));
+    }
+
+    if (!m_domainName.empty())
+    {
+        winrt::check_hresult(WslcSetContainerSettingsDomainName(settings.get(), m_domainName.c_str()));
+    }
+
+    winrt::check_hresult(WslcSetContainerSettingsFlags(settings.get(), m_containerFlags));
+
+    if (m_portMappings.Size() > 0)
+    {
+        m_portMappingsStructs.clear();
+        m_portMappingsStructs.reserve(m_portMappings.Size());
+        for (auto const& portMapping : m_portMappings)
+        {
+            if (!portMapping)
+            {
+                throw winrt::hresult_error(E_POINTER, L"Port mappings collection contains a null element");
+            }
+            m_portMappingsStructs.push_back(GetStruct(portMapping));
+        }
+
+        winrt::check_hresult(WslcSetContainerSettingsPortMappings(
+            settings.get(), m_portMappingsStructs.data(), static_cast<uint32_t>(m_portMappingsStructs.size())));
+    }
+
+    if (m_volumes.Size() > 0)
+    {
+        m_volumesStructs.clear();
+        m_volumesStructs.reserve(m_volumes.Size());
+        for (auto const& volume : m_volumes)
+        {
+            if (!volume)
+            {
+                throw winrt::hresult_error(E_POINTER, L"Volumes collection contains a null element");
+            }
+            m_volumesStructs.push_back(GetStruct(volume));
+        }
+
+        winrt::check_hresult(
+            WslcSetContainerSettingsVolumes(settings.get(), m_volumesStructs.data(), static_cast<uint32_t>(m_volumesStructs.size())));
+    }
+
+    if (m_namedVolumes.Size() > 0)
+    {
+        m_namedVolumesStructs.clear();
+        m_namedVolumesStructs.reserve(m_namedVolumes.Size());
+        for (auto const& namedVolume : m_namedVolumes)
+        {
+            if (!namedVolume)
+            {
+                throw winrt::hresult_error(E_POINTER, L"Named volumes collection contains a null element");
+            }
+            m_namedVolumesStructs.push_back(GetStruct(namedVolume));
+        }
+
+        winrt::check_hresult(WslcSetContainerSettingsNamedVolumes(
+            settings.get(), m_namedVolumesStructs.data(), static_cast<uint32_t>(m_namedVolumesStructs.size())));
+    }
+
+    if (m_networks.Size() > 0)
+    {
+        // Hold references to the applied networks since m_networksStructs points into them and the Networks
+        // collection can still be modified by the caller.
+        m_appliedNetworks.clear();
+        m_appliedNetworks.reserve(m_networks.Size());
+        m_networksStructs.clear();
+        m_networksStructs.reserve(m_networks.Size());
+        for (auto const& network : m_networks)
+        {
+            if (!network)
+            {
+                throw winrt::hresult_error(E_POINTER, L"Networks collection contains a null element");
+            }
+            m_appliedNetworks.push_back(network);
+            m_networksStructs.push_back(GetStruct(network));
+        }
+
+        winrt::check_hresult(WslcSetContainerSettingsNetworks(
+            settings.get(), m_networksStructs.data(), static_cast<uint32_t>(m_networksStructs.size())));
+    }
+
+    if (m_ipAddress)
+    {
+        if (inet_pton(AF_INET, winrt::to_string(m_ipAddress.RawName()).c_str(), &m_ipAddressStruct) != 1)
+        {
+            throw winrt::hresult_invalid_argument(L"Invalid IPv4 address format");
+        }
+
+        winrt::check_hresult(WslcSetContainerSettingsIPAddress(settings.get(), &m_ipAddressStruct));
+    }
+
+    if (m_capabilityAdditions.Size() > 0)
+    {
+        m_capabilityAdditionStrings.clear();
+        m_capabilityAdditionStrings.reserve(m_capabilityAdditions.Size());
+        for (const auto& capability : m_capabilityAdditions)
+        {
+            m_capabilityAdditionStrings.push_back(winrt::to_string(capability));
+        }
+
+        m_capabilityAdditionPointers.clear();
+        m_capabilityAdditionPointers.reserve(m_capabilityAdditionStrings.size());
+        for (const auto& capability : m_capabilityAdditionStrings)
+        {
+            m_capabilityAdditionPointers.push_back(capability.c_str());
+        }
+
+        winrt::check_hresult(WslcSetContainerSettingsCapabilityAdditions(
+            settings.get(), m_capabilityAdditionPointers.data(), static_cast<uint32_t>(m_capabilityAdditionPointers.size())));
+    }
+
+    if (m_capabilityDrops.Size() > 0)
+    {
+        m_capabilityDropStrings.clear();
+        m_capabilityDropStrings.reserve(m_capabilityDrops.Size());
+        for (const auto& capability : m_capabilityDrops)
+        {
+            m_capabilityDropStrings.push_back(winrt::to_string(capability));
+        }
+
+        m_capabilityDropPointers.clear();
+        m_capabilityDropPointers.reserve(m_capabilityDropStrings.size());
+        for (const auto& capability : m_capabilityDropStrings)
+        {
+            m_capabilityDropPointers.push_back(capability.c_str());
+        }
+
+        winrt::check_hresult(WslcSetContainerSettingsCapabilityDrops(
+            settings.get(), m_capabilityDropPointers.data(), static_cast<uint32_t>(m_capabilityDropPointers.size())));
+    }
+
+    m_containerSettings = std::move(settings);
     return m_containerSettings.get();
 }
 

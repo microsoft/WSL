@@ -16,6 +16,8 @@ nav:
   - wslcsetcontainersettingsnamedvolumes.md
   - wslcsetcontainersettingsnetworks.md
   - wslcsetcontainersettingsipaddress.md
+  - wslcsetcontainersettingscapabilityadditions.md
+  - wslcsetcontainersettingscapabilitydrops.md
   - wslcsetcontainerinitprocessiocallbacks.md
   - wslccreatecontainerprocess.md
   - wslcgetcontainerid.md

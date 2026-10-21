@@ -19,6 +19,7 @@ Abstract:
 #include "WSLCContainerLauncher.h"
 #include "WSLCProcessLauncher.h"
 #include "wslc_schema.h"
+#include "wslpolicies.h"
 #include "WSLCE2EHelpers.h"
 #include <optional>
 
@@ -410,7 +411,8 @@ class WslcSdkTests
         UniqueCrashDumpSubscription subscription;
         VERIFY_SUCCEEDED(WslcRegisterSessionCrashDumpCallback(session.get(), callback, &promise, &subscription, nullptr));
 
-        auto comSession = reinterpret_cast<WslcSessionImpl*>(session.get())->session.query<IWSLCSession>();
+        wil::com_ptr<IWSLCSession> comSession;
+        VERIFY_SUCCEEDED(reinterpret_cast<WslcSessionImpl*>(session.get())->GetSession()->QueryInterface(IID_PPV_ARGS(comSession.put())));
 
         wsl::windows::common::WSLCProcessLauncher launcher{"/bin/sh", {"/bin/sh", "-c", "kill -SEGV $$"}};
         auto process = launcher.Launch(*comSession);
@@ -481,7 +483,7 @@ class WslcSdkTests
         constexpr auto c_subnet = "10.231.45.0/24";
         constexpr auto c_gateway = "10.231.45.1";
 
-        auto comSession = reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session.query<IWSLCSession>();
+        auto comSession = wil::com_query<IWSLCSession>(reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->GetSession());
         LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName));
 
         WSLCNetworkOptions options{};
@@ -558,7 +560,7 @@ class WslcSdkTests
     {
         constexpr auto c_networkName = "wslc-sdk-delete-network";
 
-        auto comSession = reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session.query<IWSLCSession>();
+        auto comSession = wil::com_query<IWSLCSession>(reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->GetSession());
         LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName));
 
         WSLCNetworkOptions options{};
@@ -599,7 +601,7 @@ class WslcSdkTests
         constexpr auto c_subnet = "10.231.47.0";
         constexpr auto c_gateway = "10.231.47.1";
 
-        auto comSession = reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session.query<IWSLCSession>();
+        auto comSession = wil::com_query<IWSLCSession>(reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->GetSession());
         LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName));
 
         WslcNetworkSettings settings{};
@@ -683,7 +685,7 @@ class WslcSdkTests
         constexpr auto c_additionalNetwork = "wslc-sdk-container-additional";
         constexpr auto c_primaryIp = "10.231.49.10";
 
-        auto comSession = reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session.query<IWSLCSession>();
+        auto comSession = wil::com_query<IWSLCSession>(reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->GetSession());
         LOG_IF_FAILED(comSession->DeleteNetwork(c_primaryNetwork));
         LOG_IF_FAILED(comSession->DeleteNetwork(c_additionalNetwork));
 
@@ -1566,6 +1568,10 @@ class WslcSdkTests
         UniqueContainer container;
         WslcContainerSettings containerSettings;
         VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+        const char* capabilities[] = {"NET_ADMIN", "SYS_TIME"};
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsCapabilityAdditions(&containerSettings, capabilities, ARRAYSIZE(capabilities)));
+        const char* drops[] = {"NET_RAW", "CHOWN"};
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsCapabilityDrops(&containerSettings, drops, ARRAYSIZE(drops)));
         VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
 
         wil::unique_cotaskmem_ansistring inspectData;
@@ -1579,6 +1585,16 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcGetContainerID(container.get(), containerId));
 
         VERIFY_ARE_EQUAL(containerId, inspectObject.Id);
+        VERIFY_ARE_EQUAL(2u, inspectObject.HostConfig.CapAdd.size());
+        VERIFY_IS_TRUE(std::ranges::any_of(
+            inspectObject.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("NET_ADMIN"); }));
+        VERIFY_IS_TRUE(std::ranges::any_of(
+            inspectObject.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("SYS_TIME"); }));
+        VERIFY_ARE_EQUAL(2u, inspectObject.HostConfig.CapDrop.size());
+        VERIFY_IS_TRUE(std::ranges::any_of(
+            inspectObject.HostConfig.CapDrop, [](const auto& capability) { return capability.ends_with("NET_RAW"); }));
+        VERIFY_IS_TRUE(std::ranges::any_of(
+            inspectObject.HostConfig.CapDrop, [](const auto& capability) { return capability.ends_with("CHOWN"); }));
     }
 
     WSLC_TEST_METHOD(ContainerExec)
@@ -1680,6 +1696,38 @@ class WslcSdkTests
             auto output = RunContainerAndCapture(m_defaultSession, containerSettings);
             VERIFY_ARE_EQUAL(output.stdoutOutput, "test.local\n");
         }
+    }
+
+    WSLC_TEST_METHOD(ContainerCapabilityAdditionsValidation)
+    {
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+
+        const char* capabilities[] = {"NET_ADMIN"};
+        VERIFY_ARE_EQUAL(WslcSetContainerSettingsCapabilityAdditions(&containerSettings, nullptr, 1), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(WslcSetContainerSettingsCapabilityAdditions(&containerSettings, capabilities, 0), E_INVALIDARG);
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsCapabilityAdditions(&containerSettings, nullptr, 0));
+
+        const char* capabilitiesWithNull[] = {nullptr};
+        VERIFY_ARE_EQUAL(WslcSetContainerSettingsCapabilityAdditions(&containerSettings, capabilitiesWithNull, 1), E_INVALIDARG);
+    }
+
+    WSLC_TEST_METHOD(ContainerCapabilityAdditionsBlockedByPolicy)
+    {
+        namespace policies = wsl::windows::policies;
+        RegistryKeyChange<DWORD> policy(HKEY_LOCAL_MACHINE, policies::c_registryKey, policies::c_allowWSLContainerPrivileged, 0);
+
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+        const char* capabilities[] = {"NET_ADMIN"};
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsCapabilityAdditions(&containerSettings, capabilities, ARRAYSIZE(capabilities)));
+
+        UniqueContainer container;
+        wil::unique_cotaskmem_string errorMessage;
+        VERIFY_ARE_EQUAL(WSLC_E_CAPABILITY_ADDITIONS_DISABLED, WslcCreateContainer(m_defaultSession, &containerSettings, &container, &errorMessage));
+        VERIFY_IS_NULL(container.get());
+        VERIFY_IS_NOT_NULL(errorMessage.get());
+        VERIFY_ARE_EQUAL(wsl::shared::Localization::MessageWslcCapabilityAdditionsDisabled(), std::wstring(errorMessage.get()));
     }
 
     WSLC_TEST_METHOD(ProcessEnvVariables)
@@ -2799,7 +2847,8 @@ class WslcSdkTests
         const std::string& username = {}, const std::string& password = {}, uint16_t port = 5000)
     {
         // Get the IWSLCSession COM object from the SDK session handle and delegate to the shared helper.
-        auto session = reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session.query<IWSLCSession>();
+        wil::com_ptr<IWSLCSession> session;
+        VERIFY_SUCCEEDED(reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->GetSession()->QueryInterface(IID_PPV_ARGS(session.put())));
         return WSLCE2ETests::StartLocalRegistry(*session, username, password, port);
     }
 

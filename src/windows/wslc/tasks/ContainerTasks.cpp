@@ -188,6 +188,7 @@ using namespace wsl::windows::wslc::cli;
 using namespace wsl::windows::cli::table;
 
 // Every container is attempted even if an earlier one fails; the command still exits nonzero.
+// An action returning bool can return false to skip a container without printing its id.
 template <typename TAction>
 static void ForEachContainer(CLIExecutionContext& context, TAction&& action)
 {
@@ -195,7 +196,18 @@ static void ForEachContainer(CLIExecutionContext& context, TAction&& action)
     {
         try
         {
-            action(WideToMultiByte(id));
+            if constexpr (std::is_same_v<std::invoke_result_t<TAction&, std::string>, bool>)
+            {
+                if (!action(WideToMultiByte(id)))
+                {
+                    continue;
+                }
+            }
+            else
+            {
+                action(WideToMultiByte(id));
+            }
+
             context.Terminal.Output(L"{}\n", id);
         }
         catch (...)
@@ -455,7 +467,23 @@ void RemoveContainers(CLIExecutionContext& context)
     const bool force = context.Args.GetValue<ArgType::Force>();
     const bool deleteVolumes = context.Args.GetValue<ArgType::Volumes>();
 
-    ForEachContainer(context, [&](const std::string& id) { ContainerService::Delete(session, id, force, deleteVolumes); });
+    ForEachContainer(context, [&](const std::string& id) {
+        try
+        {
+            ContainerService::Delete(session, id, force, deleteVolumes);
+            return true;
+        }
+        catch (const wil::ResultException& ex)
+        {
+            // --force ignores containers that do not exist.
+            if (force && ex.GetErrorCode() == WSLC_E_CONTAINER_NOT_FOUND)
+            {
+                return false;
+            }
+
+            throw;
+        }
+    });
 }
 
 void RunContainer(CLIExecutionContext& context)
@@ -710,6 +738,26 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
     if (context.Args.Contains(ArgType::WorkDir))
     {
         options.WorkingDirectory = WideToMultiByte(context.Args.GetValue<ArgType::WorkDir>());
+    }
+
+    if (context.Args.Contains(ArgType::CapAdd))
+    {
+        auto capabilities = context.Args.GetAllValues<ArgType::CapAdd>();
+        options.CapAdd.reserve(capabilities.size());
+        for (const auto& capability : capabilities)
+        {
+            options.CapAdd.emplace_back(WideToMultiByte(capability));
+        }
+    }
+
+    if (context.Args.Contains(ArgType::CapDrop))
+    {
+        auto capabilities = context.Args.GetAllValues<ArgType::CapDrop>();
+        options.CapDrop.reserve(capabilities.size());
+        for (const auto& capability : capabilities)
+        {
+            options.CapDrop.emplace_back(WideToMultiByte(capability));
+        }
     }
 
     context.Data.Add<Data::ContainerOptions>(std::move(options));

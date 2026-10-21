@@ -273,8 +273,7 @@ WSLCCompatVolumeInformation Convert(const WSLCVolumeInformation& Volume)
 // Composite struct conversions.
 //
 
-ContainerOptionsConversion::ContainerOptionsConversion(
-    const WSLCCompatContainerOptions& Options, const WSLCCompatKeyValuePair* PrimaryNetworkSettings, ULONG PrimaryNetworkSettingsCount)
+ContainerOptionsConversion::ContainerOptionsConversion(const WSLCCompatContainerOptions& Options)
 {
     m_value.Image = Options.Image;
     m_value.Name = Options.Name;
@@ -306,12 +305,6 @@ ContainerOptionsConversion::ContainerOptionsConversion(
 
     // Container network (nested arrays whose elements have their own arrays).
     m_value.ContainerNetwork.NetworkMode = Options.ContainerNetwork.NetworkMode;
-
-    THROW_HR_IF(E_INVALIDARG, PrimaryNetworkSettingsCount > 0 && PrimaryNetworkSettings == nullptr);
-    m_primaryNetworkSettings = ConvertArray<KeyValuePair>(PrimaryNetworkSettings, PrimaryNetworkSettingsCount);
-    m_value.ContainerNetwork.Settings = m_primaryNetworkSettings.empty() ? nullptr : m_primaryNetworkSettings.data();
-    m_value.ContainerNetwork.SettingsCount = PrimaryNetworkSettingsCount;
-
     const ULONG networksCount = Options.ContainerNetwork.NetworksCount;
     THROW_HR_IF(E_INVALIDARG, networksCount > 0 && Options.ContainerNetwork.Networks == nullptr);
 
@@ -348,6 +341,22 @@ ContainerOptionsConversion::ContainerOptionsConversion(
     m_ulimits = ConvertArray<WSLCUlimit>(Options.Ulimits, Options.UlimitsCount);
     m_value.Ulimits = m_ulimits.empty() ? nullptr : m_ulimits.data();
     m_value.UlimitsCount = Options.UlimitsCount;
+}
+
+ContainerOptionsConversion::ContainerOptionsConversion(const WSLCCompatContainerOptions2& Options) :
+    ContainerOptionsConversion(Options.Base)
+{
+    m_value.CapAdd = Convert(Options.CapAdd);
+    m_value.CapDrop = Convert(Options.CapDrop);
+}
+
+ContainerOptionsConversion::ContainerOptionsConversion(const WSLCCompatContainerOptions3& Options) :
+    ContainerOptionsConversion(Options.Base)
+{
+    THROW_HR_IF(E_INVALIDARG, Options.PrimaryNetworkSettingsCount > 0 && Options.PrimaryNetworkSettings == nullptr);
+    m_primaryNetworkSettings = ConvertArray<KeyValuePair>(Options.PrimaryNetworkSettings, Options.PrimaryNetworkSettingsCount);
+    m_value.ContainerNetwork.Settings = m_primaryNetworkSettings.empty() ? nullptr : m_primaryNetworkSettings.data();
+    m_value.ContainerNetwork.SettingsCount = Options.PrimaryNetworkSettingsCount;
 }
 
 ListImagesOptionsConversion::ListImagesOptionsConversion(const WSLCCompatListImagesOptions& Options)

@@ -23,6 +23,8 @@
   - The first network is the primary network. Cannot be combined with `NetworkingMode`.
 - `IPAddress()` / setter
   - IPv4 only. Requires exactly one user-defined network in `Networks`.
+- `CapabilityAdditions()` / setter
+- `CapabilityDrops()` / setter
 
 **Important notes**
 

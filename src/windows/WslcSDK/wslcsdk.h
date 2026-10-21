@@ -23,25 +23,27 @@ EXTERN_C_START
 // WSLC specific error codes
 // Ensure wslc.idl and wslcsdk.idl are also updated.
 #define WSLC_E_BASE (0x0600)
-#define WSLC_E_IMAGE_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 1)             /* 0x80040601 */
-#define WSLC_E_CONTAINER_PREFIX_AMBIGUOUS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 2)  /* 0x80040602 */
-#define WSLC_E_CONTAINER_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 3)         /* 0x80040603 */
-#define WSLC_E_VOLUME_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 4)            /* 0x80040604 */
-#define WSLC_E_CONTAINER_NOT_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 5)       /* 0x80040605 */
-#define WSLC_E_CONTAINER_IS_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 6)        /* 0x80040606 */
-#define WSLC_E_SESSION_RESERVED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 7)            /* 0x80040607 */
-#define WSLC_E_INVALID_SESSION_NAME MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 8)        /* 0x80040608 */
-#define WSLC_E_NETWORK_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 9)           /* 0x80040609 */
-#define WSLC_E_WU_SEARCH_FAILED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 10)           /* 0x8004060A */
-#define WSLC_E_SDK_UPDATE_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 11)          /* 0x8004060B */
-#define WSLC_E_CONTAINER_DISABLED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 12)         /* 0x8004060C */
-#define WSLC_E_REGISTRY_BLOCKED_BY_POLICY MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 13) /* 0x8004060D */
-#define WSLC_E_VOLUME_NOT_AVAILABLE MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 14)       /* 0x8004060E */
-#define WSLC_E_SESSION_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 15)          /* 0x8004060F */
-#define WSLC_E_VM_NOT_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 16)             /* 0x80040610 */
-#define WSLC_E_EVENTS_LOST MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 17)                /* 0x80040611 */
-#define WSLC_E_EVENT_STREAM_FINISHED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 18)      /* 0x80040612 */
-#define WSLC_E_CONTAINER_DELETED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 19)          /* 0x80040613 */
+#define WSLC_E_IMAGE_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 1)                /* 0x80040601 */
+#define WSLC_E_CONTAINER_PREFIX_AMBIGUOUS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 2)     /* 0x80040602 */
+#define WSLC_E_CONTAINER_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 3)            /* 0x80040603 */
+#define WSLC_E_VOLUME_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 4)               /* 0x80040604 */
+#define WSLC_E_CONTAINER_NOT_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 5)          /* 0x80040605 */
+#define WSLC_E_CONTAINER_IS_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 6)           /* 0x80040606 */
+#define WSLC_E_SESSION_RESERVED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 7)               /* 0x80040607 */
+#define WSLC_E_INVALID_SESSION_NAME MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 8)           /* 0x80040608 */
+#define WSLC_E_NETWORK_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 9)              /* 0x80040609 */
+#define WSLC_E_WU_SEARCH_FAILED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 10)              /* 0x8004060A */
+#define WSLC_E_SDK_UPDATE_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 11)             /* 0x8004060B */
+#define WSLC_E_CONTAINER_DISABLED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 12)            /* 0x8004060C */
+#define WSLC_E_REGISTRY_BLOCKED_BY_POLICY MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 13)    /* 0x8004060D */
+#define WSLC_E_VOLUME_NOT_AVAILABLE MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 14)          /* 0x8004060E */
+#define WSLC_E_SESSION_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 15)             /* 0x8004060F */
+#define WSLC_E_VM_NOT_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 16)                /* 0x80040610 */
+#define WSLC_E_EVENTS_LOST MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 17)                   /* 0x80040611 */
+#define WSLC_E_EVENT_STREAM_FINISHED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 18)         /* 0x80040612 */
+#define WSLC_E_CONTAINER_DELETED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 19)             /* 0x80040613 */
+#define WSLC_E_CAPABILITY_ADDITIONS_DISABLED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 20) /* 0x80040614 */
+#define WSLC_E_RUNTIME_UPDATE_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 21)         /* 0x80040615 */
 
 // Session values
 #define WSLC_SESSION_OPTIONS_SIZE 72
@@ -55,7 +57,7 @@ typedef struct WslcSessionSettings
 DECLARE_HANDLE(WslcSession);
 
 // Container values
-#define WSLC_CONTAINER_OPTIONS_SIZE 120
+#define WSLC_CONTAINER_OPTIONS_SIZE 152
 #define WSLC_CONTAINER_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcContainerSettings
@@ -237,6 +239,8 @@ STDAPI WslcInitContainerSettings(_In_ PCSTR imageName, _Out_ WslcContainerSettin
 //   - Returns E_INVALIDARG if both WslcSetContainerSettingsNetworkingMode and WslcSetContainerSettingsNetworks were called,
 //     if an IP address is set without exactly one network or on a primary network that is not user-defined,
 //     or if aliases are set on a network that is not user-defined.
+//   - Returns WSLC_E_RUNTIME_UPDATE_NEEDED if the installed WSL runtime does not support the requested settings, such as
+//     capabilities, aliases on the primary network, or an IP address.
 STDAPI WslcCreateContainer(_In_ WslcSession session, _In_ const WslcContainerSettings* containerSettings, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // Opens an existing container by name, full ID, or partial ID prefix.
@@ -290,6 +294,14 @@ STDAPI WslcSetContainerSettingsNetworks(
 // Sets the container's IPv4 address on its primary network. Requires exactly one user-defined network
 // set with WslcSetContainerSettingsNetworks. Pass null to clear.
 STDAPI WslcSetContainerSettingsIPAddress(_In_ WslcContainerSettings* containerSettings, _In_opt_ const IN_ADDR* ipAddress);
+
+// Both setters borrow the array and strings until WslcCreateContainer returns. Pass nullptr/0 to clear.
+// Creation fails with WSLC_E_CAPABILITY_ADDITIONS_DISABLED if computer policy blocks capability additions.
+STDAPI WslcSetContainerSettingsCapabilityAdditions(
+    _In_ WslcContainerSettings* containerSettings, _In_reads_opt_(capabilityCount) PCSTR const* capabilities, _In_ uint32_t capabilityCount);
+
+STDAPI WslcSetContainerSettingsCapabilityDrops(
+    _In_ WslcContainerSettings* containerSettings, _In_reads_opt_(capabilityCount) PCSTR const* capabilities, _In_ uint32_t capabilityCount);
 
 STDAPI WslcCreateContainerProcess(
     _In_ WslcContainer container, _In_ WslcProcessSettings* newProcessSettings, _Out_ WslcProcess* newProcess, _Outptr_opt_result_z_ PWSTR* errorMessage);
@@ -732,6 +744,9 @@ typedef struct WslcNetworkInfo
 //
 // Return Value:
 //   S_OK on success. Otherwise, an HRESULT error code indicating the reason for failure.
+//
+// Notes:
+//   - Returns WSLC_E_RUNTIME_UPDATE_NEEDED if the installed WSL runtime does not support network management.
 STDAPI WslcListSessionNetworks(
     _In_ WslcSession session,
     _Outptr_result_buffer_maybenull_(*count) WslcNetworkInfo** networks,
@@ -778,6 +793,7 @@ typedef struct WslcNetworkSettings
 //   - Returns E_INVALIDARG if the name is invalid or reserved, if flags contains an unsupported value, if both prefix
 //     lengths are set, if a prefix length is out of range, if an IPv6 subnet is set without WSLC_NETWORK_FLAG_ENABLE_IPV6,
 //     or if a gateway is set without a subnet of the same address family.
+//   - Returns WSLC_E_RUNTIME_UPDATE_NEEDED if the installed WSL runtime does not support network management.
 STDAPI WslcCreateSessionNetwork(
     _In_ WslcSession session, _In_ const WslcNetworkSettings* settings, _Out_opt_ WslcNetworkInfo* networkInfo, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
@@ -799,6 +815,7 @@ STDAPI WslcCreateSessionNetwork(
 // Notes:
 //   - Returns WSLC_E_NETWORK_NOT_FOUND if the network does not exist.
 //   - Returns HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION) if a container is connected to the network.
+//   - Returns WSLC_E_RUNTIME_UPDATE_NEEDED if the installed WSL runtime does not support network management.
 STDAPI WslcDeleteSessionNetwork(_In_ WslcSession session, _In_z_ PCSTR name, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // STORAGE

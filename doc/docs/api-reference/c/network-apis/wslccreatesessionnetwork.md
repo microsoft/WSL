@@ -16,7 +16,7 @@ Return value: `HRESULT`.
 
 Creates a bridge network in the session. When `networkInfo` is provided, it receives the created network.
 
-Returns `HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS)` if a network with the same name exists. Returns `E_INVALIDARG` if the name is invalid or reserved, `flags` contains anything other than `WSLC_NETWORK_FLAG_ENABLE_IPV6` and `WSLC_NETWORK_FLAG_INTERNAL`, both prefix lengths are set, a prefix length is out of range, an IPv6 subnet is set without `WSLC_NETWORK_FLAG_ENABLE_IPV6`, or a gateway is set without a subnet of the same family.
+Returns `HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS)` if a network with the same name exists. Returns `E_INVALIDARG` if the name is invalid or reserved, `flags` contains anything other than `WSLC_NETWORK_FLAG_ENABLE_IPV6` and `WSLC_NETWORK_FLAG_INTERNAL`, both prefix lengths are set, a prefix length is out of range, an IPv6 subnet is set without `WSLC_NETWORK_FLAG_ENABLE_IPV6`, or a gateway is set without a subnet of the same family. Returns [`WSLC_E_RUNTIME_UPDATE_NEEDED`](../error-codes.md) if the installed WSL runtime does not support network management.
 
 Example:
 

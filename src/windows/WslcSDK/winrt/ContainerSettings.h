@@ -52,6 +52,10 @@ struct ContainerSettings : ContainerSettingsT<ContainerSettings>
     void Networks(winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerNetwork> const& value);
     winrt::Windows::Networking::HostName IPAddress();
     void IPAddress(winrt::Windows::Networking::HostName const& value);
+    winrt::Windows::Foundation::Collections::IVector<hstring> CapabilityAdditions();
+    void CapabilityAdditions(winrt::Windows::Foundation::Collections::IVector<hstring> const& value);
+    winrt::Windows::Foundation::Collections::IVector<hstring> CapabilityDrops();
+    void CapabilityDrops(winrt::Windows::Foundation::Collections::IVector<hstring> const& value);
 
     WslcContainerSettings* ToStructPointer();
 
@@ -72,13 +76,20 @@ private:
     winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerNetwork> m_networks{
         winrt::single_threaded_vector<winrt::Microsoft::WSL::Containers::ContainerNetwork>()};
     winrt::Windows::Networking::HostName m_ipAddress{nullptr};
+    winrt::Windows::Foundation::Collections::IVector<hstring> m_capabilityAdditions{winrt::single_threaded_vector<hstring>()};
+    winrt::Windows::Foundation::Collections::IVector<hstring> m_capabilityDrops{winrt::single_threaded_vector<hstring>()};
 
     std::unique_ptr<WslcContainerSettings> m_containerSettings;
     std::vector<WslcContainerPortMapping> m_portMappingsStructs;
     std::vector<WslcContainerVolume> m_volumesStructs;
     std::vector<WslcContainerNamedVolume> m_namedVolumesStructs;
+    std::vector<winrt::Microsoft::WSL::Containers::ContainerNetwork> m_appliedNetworks;
     std::vector<WslcContainerNetwork> m_networksStructs;
     IN_ADDR m_ipAddressStruct{};
+    std::vector<std::string> m_capabilityAdditionStrings;
+    std::vector<PCSTR> m_capabilityAdditionPointers;
+    std::vector<std::string> m_capabilityDropStrings;
+    std::vector<PCSTR> m_capabilityDropPointers;
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation
 

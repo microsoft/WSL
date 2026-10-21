@@ -17,6 +17,7 @@ Abstract:
 #include "WSLCCompat.h"
 #include "IOCallback.h"
 #include <stdint.h>
+#include <utility>
 #include <wil/com.h> // COM helpers
 // #include <wil/resource.h> // handle wrappers
 // #include <wil/result.h>   // error handling
@@ -88,6 +89,10 @@ typedef struct WslcContainerOptionsInternal
     const WslcContainerProcessOptionsInternal* initProcessOptions;
     PCSTR networkMode; // null when not explicitly set
     WslcContainerFlags containerFlags;
+    PCSTR const* capabilityAdditions;
+    uint32_t capabilityAdditionsCount;
+    PCSTR const* capabilityDrops;
+    uint32_t capabilityDropsCount;
     IN_ADDR ipAddress;
     const WslcContainerNetwork* networks;
     uint32_t networksCount;
@@ -109,7 +114,46 @@ const WslcContainerOptionsInternal* GetInternalType(const WslcContainerSettings*
 // Use to allocate the actual objects on the heap to keep it alive.
 struct WslcSessionImpl
 {
-    wil::com_ptr<IWSLCCompatSession> session;
+    void SetSession(wil::com_ptr<IWSLCCompatSession>&& input)
+    {
+        m_session2 = nullptr;
+        m_session3 = nullptr;
+        m_session = std::move(input);
+    }
+
+    void SetSession(wil::com_ptr<IWSLCCompatSession2>&& input)
+    {
+        m_session2 = input.get();
+        m_session3 = nullptr;
+        m_session = std::move(input);
+    }
+
+    void SetSession(wil::com_ptr<IWSLCCompatSession3>&& input)
+    {
+        m_session2 = input.get();
+        m_session3 = input.get();
+        m_session = std::move(input);
+    }
+
+    IWSLCCompatSession* GetSession() const
+    {
+        return m_session.get();
+    }
+
+    IWSLCCompatSession2* GetSession2() const
+    {
+        return m_session2;
+    }
+
+    IWSLCCompatSession3* GetSession3() const
+    {
+        return m_session3;
+    }
+
+private:
+    wil::com_ptr<IWSLCCompatSession> m_session;
+    IWSLCCompatSession2* m_session2 = nullptr;
+    IWSLCCompatSession3* m_session3 = nullptr;
 };
 
 WslcSessionImpl* GetInternalType(WslcSession handle);
