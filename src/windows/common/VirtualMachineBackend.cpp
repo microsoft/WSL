@@ -17,7 +17,6 @@ Abstract:
 #include "socket.hpp"
 #include "string.hpp"
 #include "IVirtualMachineBackend.h"
-#include "OpenVmmVirtualMachineBackend.h"
 
 wsl::shared::string::MacAddress VmUserModeNatNetwork::ClientMacAddress() const
 {
@@ -179,7 +178,7 @@ std::unique_ptr<IVirtualMachineBackend> CreateVirtualMachineBackend(BackendKind 
     switch (Kind)
     {
     case BackendKind::OpenVmm:
-        return OpenVmmVirtualMachineBackend::Create(Request);
+        THROW_HR(wsl::windows::common::vm::c_notSupported);
 
     case BackendKind::Hcs:
         return HcsVirtualMachineBackend::Create(Request);
@@ -193,7 +192,7 @@ VmPlatformCapabilities QueryVirtualMachineBackendCapabilities(BackendKind Kind)
     switch (Kind)
     {
     case BackendKind::OpenVmm:
-        return OpenVmmVirtualMachineBackend::QueryCapabilities();
+        THROW_HR(wsl::windows::common::vm::c_notSupported);
 
     case BackendKind::Hcs:
         return HcsVirtualMachineBackend::QueryCapabilities();

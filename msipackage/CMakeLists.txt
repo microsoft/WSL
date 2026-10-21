@@ -27,10 +27,6 @@ foreach(binary ${WINDOWS_BINARIES})
     list(APPEND BINARIES_DEPENDENCIES "${PACKAGE_INPUT_DIR}/${binary}")
 endforeach()
 
-foreach(binary openvmm.exe wslopenvmm.dll)
-    list(APPEND BINARIES_DEPENDENCIES "${WSL_OPENVMM_SOURCE_DIR}/bin/${TARGET_PLATFORM}/${binary}")
-endforeach()
-
 set(LINUX_BINARIES init;initrd.img)
 foreach(binary ${LINUX_BINARIES})
     list(APPEND BINARIES_DEPENDENCIES "${BIN}/${binary}")

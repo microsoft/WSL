@@ -12,7 +12,7 @@ add_compile_definitions(INLINE_TEST_METHOD_MARKUP)
 
 add_library(wsltests SHARED ${SOURCES} ${HEADERS})
 
-target_sources(wsltests PRIVATE HcsVirtualMachineBackendTests.cpp OpenVmmVirtualMachineBackendTests.cpp)
+target_sources(wsltests PRIVATE HcsVirtualMachineBackendTests.cpp)
 add_dependencies(wsltests initramfs)
 
 add_custom_command(
@@ -20,12 +20,6 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${KERNEL_SOURCE_DIR}/bin/${TARGET_PLATFORM}/kernel"
         "$<TARGET_FILE_DIR:wsltests>/kernel"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${WSL_OPENVMM_SOURCE_DIR}/bin/${TARGET_PLATFORM}/openvmm.exe"
-        "$<TARGET_FILE_DIR:wsltests>/openvmm.exe"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "$<TARGET_FILE:wslopenvmm_client>"
-        "$<TARGET_FILE_DIR:wsltests>/wslopenvmm.dll"
     VERBATIM)
 
 target_include_directories(wsltests PRIVATE

@@ -148,6 +148,13 @@ class HcsVirtualMachineBackendTests
         VERIFY_IS_TRUE(std::holds_alternative<VmVirtioFsShareAddress>(result.GuestAddress));
     }
 
+    TEST_METHOD(RejectsUnavailableBackends)
+    {
+        const VmCreateRequest request;
+        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { CreateVirtualMachineBackend(BackendKind::OpenVmm, request); }));
+        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { QueryVirtualMachineBackendCapabilities(BackendKind::OpenVmm); }));
+    }
+
     TEST_METHOD(PreservesCallerIdentityAndBootInputs)
     {
         SKIP_TEST_ARM64();

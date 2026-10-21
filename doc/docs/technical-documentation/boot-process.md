@@ -56,9 +56,9 @@ When [wslservice.exe](wslservice.exe.md) receives the CreateInstance() call via 
 
 To start a WSL2 distribution, [wslservice.exe](wslservice.exe.md) needs a virtual machine. If the virtual machine isn't already running, it will be created as part of the `CreateInstance()` call. 
 
-The WSL2 virtual machine is created via the [Host Compute System (HCS) service](https://learn.microsoft.com/virtualization/api/hcs/overview) (see `src/windows/service/exe/WslCoreVm.cpp`).
+The WSL2 virtual machine is created via the [Host Compute System (HCS) service](https://learn.microsoft.com/virtualization/api/hcs/overview). `src/windows/service/exe/WslCoreVm.cpp` owns WSL-specific policy and guest startup. It passes a `VmCreateRequest` to `HcsVirtualMachineBackend` (`src/windows/common/HcsVirtualMachineBackend.cpp`), which owns the HCS configuration and compute-system lifetime.
 
-To create a new virtual machine, [wslservice.exe](wslservice.exe.md) generates a JSON string, which describes the virtual machine configuration. This JSON is then passed to [HcsCreateComputeSystem()](https://learn.microsoft.com/virtualization/api/hcs/reference/hcscreatecomputesystem) to create a new virtual machine.
+To create a new virtual machine, the HCS backend generates a JSON string, which describes the virtual machine configuration. This JSON is then passed to [HcsCreateComputeSystem()](https://learn.microsoft.com/virtualization/api/hcs/reference/hcscreatecomputesystem) to create a new virtual machine.
 
 See `src/windows/common/hcs_schema.h` for more details on the HCS JSON schema.
 

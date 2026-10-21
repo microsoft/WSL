@@ -3889,7 +3889,7 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Impossibile esportare il contenitore nel terminale. Utilizzare l'opzione -o o reindirizzare stdout.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>Expected format: [&lt;host path | named volume&gt;:]&lt;container path&gt;[:mode]</value>
+    <value>Formato previsto: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
   <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">

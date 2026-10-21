@@ -32,8 +32,7 @@ Abstract:
 #include <winrt/Windows.Networking.h>
 #include <winrt/Windows.Storage.Streams.h>
 
-using winrt::Windows::Foundation::TimeSpan;
-using winrt::Windows::Foundation::Uri;
+using namespace winrt::Windows::Foundation;
 using namespace winrt::Windows::Foundation::Collections;
 using namespace winrt::Windows::Storage::Streams;
 using namespace std::chrono_literals;

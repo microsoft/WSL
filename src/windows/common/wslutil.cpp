@@ -297,8 +297,7 @@ static const std::map<Context, LPCWSTR> g_contextStrings{
     X(ReadDistroConfig),
     X(MoveDistro),
     X(VerifyChecksum),
-    X(WslC),
-    X(OpenVmm)};
+    X(WslC)};
 
 #undef X
 

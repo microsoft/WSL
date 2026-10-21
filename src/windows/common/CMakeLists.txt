@@ -63,7 +63,6 @@ set(SOURCES
     WslSecurity.cpp
     VirtualMachineBackend.cpp
     HcsVirtualMachineBackend.cpp
-    OpenVmmVirtualMachineBackend.cpp
     SlowOperationWatcher.cpp
     WslTelemetry.cpp
     wslutil.cpp
@@ -168,7 +167,6 @@ set(HEADERS
     WslSecurity.h
     IVirtualMachineBackend.h
     HcsVirtualMachineBackend.h
-    OpenVmmVirtualMachineBackend.h
     SlowOperationWatcher.h
     WslTelemetry.h
     wslutil.h
@@ -191,13 +189,12 @@ target_include_directories(common PUBLIC
 # PUBLIC propagates them instead of making each consumer restate them.
 # yaml-cpp backs WSLCUserSettings, advapi32 the credential manager APIs used by
 # WinCredStorage, and Crypt32 the data protection APIs used by FileCredStorage.
-target_link_libraries(common PUBLIC ${HCS_LINK_LIBRARIES} ${MSI_LINK_LIBRARIES} VirtDisk.lib configfile yaml-cpp advapi32 Crypt32.lib wslopenvmm_client)
+target_link_libraries(common PUBLIC ${HCS_LINK_LIBRARIES} ${MSI_LINK_LIBRARIES} VirtDisk.lib configfile yaml-cpp advapi32 Crypt32.lib)
 
 # Keep backend imports out of clients that only use common utilities, such as the MSIX launchers.
 set_source_files_properties(
     VirtualMachineBackend.cpp
     HcsVirtualMachineBackend.cpp
-    OpenVmmVirtualMachineBackend.cpp
     PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 
 # WSLCUserSettings.cpp uses yaml-cpp headers.

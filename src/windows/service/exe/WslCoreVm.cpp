@@ -343,10 +343,6 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     if (m_vmConfig.EnableNestedVirtualization && !description.Processor.NestedVirtualization)
     {
         m_vmConfig.EnableNestedVirtualization = false;
-        if (description.Backend != BackendKind::Hcs)
-        {
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageNestedVirtualizationNotSupported());
-        }
     }
 
     const auto systemDistro = description.BootDisks.find(L"system-distro");
