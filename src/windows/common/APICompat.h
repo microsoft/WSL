@@ -61,7 +61,6 @@ public:
 
     explicit ContainerOptionsConversion(const WSLCCompatContainerOptions& Options);
     explicit ContainerOptionsConversion(const WSLCCompatContainerOptions2& Options);
-    explicit ContainerOptionsConversion(const WSLCCompatContainerOptions3& Options);
 
     const WSLCContainerOptions* Get() const noexcept
     {
@@ -141,11 +140,6 @@ inline ContainerOptionsConversion Convert(const WSLCCompatContainerOptions& Opti
 }
 
 inline ContainerOptionsConversion Convert(const WSLCCompatContainerOptions2& Options)
-{
-    return ContainerOptionsConversion(Options);
-}
-
-inline ContainerOptionsConversion Convert(const WSLCCompatContainerOptions3& Options)
 {
     return ContainerOptionsConversion(Options);
 }

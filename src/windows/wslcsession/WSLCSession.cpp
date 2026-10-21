@@ -3870,10 +3870,7 @@ CATCH_RETURN();
 
 HRESULT WSLCSession::InterfaceSupportsErrorInfo(REFIID riid)
 {
-    return riid == __uuidof(IWSLCSession) || riid == __uuidof(IWSLCCompatSession) || riid == __uuidof(IWSLCCompatSession2) ||
-                   riid == __uuidof(IWSLCCompatSession3)
-               ? S_OK
-               : S_FALSE;
+    return riid == __uuidof(IWSLCSession) || riid == __uuidof(IWSLCCompatSession) || riid == __uuidof(IWSLCCompatSession2) ? S_OK : S_FALSE;
 }
 
 HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IWSLCCompatProgressCallback* ProgressCallback, IWSLCCompatWarningCallback* WarningCallback)
@@ -4011,24 +4008,6 @@ try
 CATCH_RETURN();
 
 HRESULT WSLCSession::CreateContainer2(const WSLCCompatContainerOptions2* Options, IWSLCCompatWarningCallback* WarningCallback, IWSLCCompatContainer** Container)
-try
-{
-    RETURN_HR_IF_NULL(E_POINTER, Container);
-    *Container = nullptr;
-    RETURN_HR_IF_NULL(E_POINTER, Options);
-
-    const auto warning = apicompat::Convert(WarningCallback);
-    const auto options = apicompat::Convert(*Options);
-
-    Microsoft::WRL::ComPtr<IWSLCContainer> container;
-    RETURN_IF_FAILED(CreateContainer(options.Get(), warning.Get(), &container));
-    RETURN_HR_IF_NULL(E_UNEXPECTED, container);
-
-    return container.CopyTo(Container);
-}
-CATCH_RETURN();
-
-HRESULT WSLCSession::CreateContainer3(const WSLCCompatContainerOptions3* Options, IWSLCCompatWarningCallback* WarningCallback, IWSLCCompatContainer** Container)
 try
 {
     RETURN_HR_IF_NULL(E_POINTER, Container);

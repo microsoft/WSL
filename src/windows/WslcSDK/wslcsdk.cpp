@@ -644,32 +644,18 @@ try
     wil::com_ptr<IWSLCCompatSession> compatSession;
     if (SUCCEEDED(errorInfoWrapper.CaptureResult(sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, nullptr, &compatSession))))
     {
-        wil::com_ptr<IWSLCCompatSession3> compatSession3;
         wil::com_ptr<IWSLCCompatSession2> compatSession2;
-        auto queryResult = compatSession->QueryInterface(IID_PPV_ARGS(compatSession3.put()));
-        if (SUCCEEDED(queryResult))
+        const auto queryResult = compatSession->QueryInterface(IID_PPV_ARGS(compatSession2.put()));
+        if (queryResult == E_NOINTERFACE)
         {
-            result->SetSession(std::move(compatSession3));
-        }
-        else if (queryResult == E_NOINTERFACE)
-        {
-            queryResult = compatSession->QueryInterface(IID_PPV_ARGS(compatSession2.put()));
-            if (queryResult == E_NOINTERFACE)
-            {
-                result->SetSession(std::move(compatSession));
-            }
-            else
-            {
-                RETURN_IF_FAILED(queryResult);
-                result->SetSession(std::move(compatSession2));
-            }
+            result->SetSession(std::move(compatSession));
         }
         else
         {
-            RETURN_HR(queryResult);
+            RETURN_IF_FAILED(queryResult);
+            result->SetSession(std::move(compatSession2));
+            compatSession.reset();
         }
-
-        compatSession.reset();
 
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->GetSession());
         *session = reinterpret_cast<WslcSession>(result.release());
@@ -1130,20 +1116,12 @@ try
     containerOptions2.CapDrop = {internalContainerSettings->capabilityDrops, static_cast<ULONG>(internalContainerSettings->capabilityDropsCount)};
 
     const auto& primarySettings = networkStorage.PrimarySettings;
-    auto* compatSession3 = internalSession->GetSession3();
-    RETURN_HR_IF(WSLC_E_RUNTIME_UPDATE_NEEDED, compatSession3 == nullptr && !primarySettings.empty());
+    RETURN_HR_IF(WSLC_E_RUNTIME_UPDATE_NEEDED, compatSession2 == nullptr && !primarySettings.empty());
+    containerOptions2.PrimaryNetworkSettings = primarySettings.empty() ? nullptr : primarySettings.data();
+    containerOptions2.PrimaryNetworkSettingsCount = static_cast<ULONG>(primarySettings.size());
 
     HRESULT hr;
-    if (compatSession3 != nullptr)
-    {
-        WSLCCompatContainerOptions3 containerOptions3{};
-        containerOptions3.Base = containerOptions2;
-        containerOptions3.PrimaryNetworkSettings = primarySettings.empty() ? nullptr : primarySettings.data();
-        containerOptions3.PrimaryNetworkSettingsCount = static_cast<ULONG>(primarySettings.size());
-
-        hr = compatSession3->CreateContainer3(&containerOptions3, nullptr, &result->container);
-    }
-    else if (compatSession2 != nullptr)
+    if (compatSession2 != nullptr)
     {
         hr = compatSession2->CreateContainer2(&containerOptions2, nullptr, &result->container);
     }
@@ -2009,11 +1987,11 @@ try
 
     auto internalType = CheckAndGetInternalType(session);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
-    auto* compatSession3 = internalType->GetSession3();
-    RETURN_HR_IF_NULL(WSLC_E_RUNTIME_UPDATE_NEEDED, compatSession3);
+    auto* compatSession2 = internalType->GetSession2();
+    RETURN_HR_IF_NULL(WSLC_E_RUNTIME_UPDATE_NEEDED, compatSession2);
 
     wil::unique_cotaskmem_ansistring output;
-    HRESULT hr = compatSession3->ListNetworks(&output);
+    HRESULT hr = compatSession2->ListNetworks(&output);
     if (FAILED(hr))
     {
         return errorInfoWrapper.CaptureResult(hr);
@@ -2084,11 +2062,11 @@ try
         }
     }
 
-    auto* compatSession3 = internalType->GetSession3();
-    RETURN_HR_IF_NULL(WSLC_E_RUNTIME_UPDATE_NEEDED, compatSession3);
+    auto* compatSession2 = internalType->GetSession2();
+    RETURN_HR_IF_NULL(WSLC_E_RUNTIME_UPDATE_NEEDED, compatSession2);
 
     wil::unique_cotaskmem_ansistring output;
-    HRESULT hr = compatSession3->CreateNetwork(wsl::shared::ToJson(options).c_str(), nullptr, &output);
+    HRESULT hr = compatSession2->CreateNetwork(wsl::shared::ToJson(options).c_str(), nullptr, &output);
     if (FAILED(hr))
     {
         return errorInfoWrapper.CaptureResult(hr);
@@ -2111,10 +2089,10 @@ try
     auto internalType = CheckAndGetInternalType(session);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
     RETURN_HR_IF_NULL(E_POINTER, name);
-    auto* compatSession3 = internalType->GetSession3();
-    RETURN_HR_IF_NULL(WSLC_E_RUNTIME_UPDATE_NEEDED, compatSession3);
+    auto* compatSession2 = internalType->GetSession2();
+    RETURN_HR_IF_NULL(WSLC_E_RUNTIME_UPDATE_NEEDED, compatSession2);
 
-    return errorInfoWrapper.CaptureResult(compatSession3->DeleteNetwork(name));
+    return errorInfoWrapper.CaptureResult(compatSession2->DeleteNetwork(name));
 }
 CATCH_RETURN();
 

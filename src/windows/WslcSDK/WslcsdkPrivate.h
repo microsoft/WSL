@@ -115,21 +115,12 @@ struct WslcSessionImpl
     void SetSession(wil::com_ptr<IWSLCCompatSession>&& input)
     {
         m_session2 = nullptr;
-        m_session3 = nullptr;
         m_session = std::move(input);
     }
 
     void SetSession(wil::com_ptr<IWSLCCompatSession2>&& input)
     {
         m_session2 = input.get();
-        m_session3 = nullptr;
-        m_session = std::move(input);
-    }
-
-    void SetSession(wil::com_ptr<IWSLCCompatSession3>&& input)
-    {
-        m_session2 = input.get();
-        m_session3 = input.get();
         m_session = std::move(input);
     }
 
@@ -143,15 +134,9 @@ struct WslcSessionImpl
         return m_session2;
     }
 
-    IWSLCCompatSession3* GetSession3() const
-    {
-        return m_session3;
-    }
-
 private:
     wil::com_ptr<IWSLCCompatSession> m_session;
     IWSLCCompatSession2* m_session2 = nullptr;
-    IWSLCCompatSession3* m_session3 = nullptr;
 };
 
 WslcSessionImpl* GetInternalType(WslcSession handle);
