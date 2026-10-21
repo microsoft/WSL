@@ -6041,8 +6041,8 @@ class ConsommeTests
         for (const auto* address : {L"::ffff:127.0.0.1", L"::ffff:0.0.0.0"})
         {
             {
-                auto [guestProcess, read] = NetworkTests::BindGuestPort(
-                    std::format(L"TCP6-LISTEN:{},bind={},ipv6only=0", c_port, address), true);
+                auto [guestProcess, read] =
+                    NetworkTests::BindGuestPort(std::format(L"TCP6-LISTEN:{},bind={},ipv6only=0", c_port, address), true);
                 // Note: expect failure.
                 NetworkTests::BindHostPort(c_port, SOCK_STREAM, IPPROTO_TCP, false, false, true);
                 NetworkTests::ValidateLocalhostRelayTraffic(AF_INET, read.get());
