@@ -874,11 +874,7 @@ class WSLCE2EContainerCpTests
         // Extracting the archive must give back the file that was copied.
         const auto extractDir = workDir / L"extracted";
         std::filesystem::create_directories(extractDir);
-<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
-        RunTar(std::format(L"tar.exe -xf \"{}\" -C \"{}\"", TarPath.wstring(), extractDir.wstring()));
-=======
         RunTar(std::format(L"tar.exe -xf \"{}\" -C \"{}\"", TarPath.wstring(), std::filesystem::canonical(extractDir).wstring()));
->>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
         VERIFY_ARE_EQUAL(std::wstring(L"stdout-dest-test\n"), ReadFileContent((extractDir / L"stdoutfile.txt").wstring()));
 
         // Copying a directory to a file path fails and leaves nothing behind.

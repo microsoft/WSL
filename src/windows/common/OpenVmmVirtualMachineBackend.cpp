@@ -36,17 +36,6 @@ constexpr std::wstring_view c_vsockServiceIdSuffix = L"-facb-11e6-bd58-64006a798
 
 using validation::ValidateResourceId;
 
-std::unique_ptr<ExecutionContext> CreateExecutionContext(Context Context)
-{
-    const auto* current = ExecutionContext::Current();
-    if (current != nullptr && current->CurrentContext() >= static_cast<ULONGLONG>(Context))
-    {
-        return {};
-    }
-
-    return std::make_unique<ExecutionContext>(Context);
-}
-
 void DestroyConfig(WslOpenVmmConfig* Config) noexcept
 {
     WslOpenVmmDestroyConfig(&Config);
@@ -243,7 +232,7 @@ OpenVmmVirtualMachineBackend::~OpenVmmVirtualMachineBackend() noexcept
 
 std::unique_ptr<OpenVmmVirtualMachineBackend> OpenVmmVirtualMachineBackend::Create(const VmCreateRequest& Request)
 {
-    const auto context = CreateExecutionContext(Context::CreateVm);
+    ExecutionContext context(Context::OpenVmm);
     const auto startTimeMs = GetTickCount64();
     WSL_LOG(
         "OpenVmmCreateVmBegin",
@@ -430,9 +419,9 @@ void OpenVmmVirtualMachineBackend::OnProcessExit(DWORD ExitCode) noexcept
     }
     if (ExitCode != ERROR_SUCCESS)
     {
-        LOG_IF_WIN32_BOOL_FALSE(SetEvent(m_crashEvent.get()));
+        m_crashEvent.SetEvent();
     }
-    LOG_IF_WIN32_BOOL_FALSE(SetEvent(m_exitEvent.get()));
+    m_exitEvent.SetEvent();
     NotifyTerminated(m_description.Identity);
 }
 
@@ -478,14 +467,14 @@ VmTerminationInformation OpenVmmVirtualMachineBackend::GetTerminationReason() co
     return m_terminationInformation;
 }
 
-wil::unique_handle OpenVmmVirtualMachineBackend::GetTerminationEvent() const
+wil::shared_event OpenVmmVirtualMachineBackend::GetTerminationEvent() const
 {
-    return wil::unique_handle{wsl::windows::common::wslutil::DuplicateHandle(m_exitEvent.get())};
+    return m_exitEvent;
 }
 
-wil::unique_handle OpenVmmVirtualMachineBackend::GetCrashEvent() const
+wil::shared_event OpenVmmVirtualMachineBackend::GetCrashEvent() const
 {
-    return wil::unique_handle{wsl::windows::common::wslutil::DuplicateHandle(m_crashEvent.get())};
+    return m_crashEvent;
 }
 
 std::optional<std::filesystem::path> OpenVmmVirtualMachineBackend::GetCrashLogPath() const
@@ -734,7 +723,7 @@ std::vector<VmDiskAttachment> OpenVmmVirtualMachineBackend::GetAttachedDisks() c
 
 void OpenVmmVirtualMachineBackend::DetachDisk(VmDiskId Disk)
 {
-    ExecutionContext context(Context::DetachDisk);
+    ExecutionContext context(Context::OpenVmm);
     WSL_LOG(
         "OpenVmmDetachDiskBegin", TraceLoggingValue(m_description.Identity.VmId, "vmId"), TraceLoggingValue(Disk.Value, "diskId"));
     ValidateResourceId(Disk, m_description.Identity);
@@ -955,27 +944,27 @@ void OpenVmmVirtualMachineBackend::RemoveDevice(VmDeviceId Device)
 
 VmNetworkAttachment OpenVmmVirtualMachineBackend::AddNetworkAdapter(const VmNetworkAdapterRequest& Request)
 {
-    ExecutionContext context(Context::ConfigureNetworking);
+    ExecutionContext context(Context::OpenVmm);
     THROW_HR_MSG(c_notSupported, "OpenVMM network adapter '%ls' must be configured at VM creation time", Request.Tag.c_str());
 }
 
 void OpenVmmVirtualMachineBackend::UpdateNetworkAdapter(VmDeviceId Device, const VmNetworkConfiguration&)
 {
-    ExecutionContext context(Context::ConfigureNetworking);
+    ExecutionContext context(Context::OpenVmm);
     validation::ValidateResourceId(Device, m_description.Identity);
     THROW_HR_MSG(c_notSupported, "OpenVMM network adapters cannot be updated after VM creation");
 }
 
 void OpenVmmVirtualMachineBackend::RemoveNetworkAdapter(VmDeviceId Device)
 {
-    ExecutionContext context(Context::ConfigureNetworking);
+    ExecutionContext context(Context::OpenVmm);
     validation::ValidateResourceId(Device, m_description.Identity);
     THROW_HR_MSG(c_notSupported, "OpenVMM network adapters cannot be removed after VM creation");
 }
 
 VmPortBinding OpenVmmVirtualMachineBackend::BindPort(VmDeviceId Device, const VmPortBindingRequest& Request)
 {
-    ExecutionContext context(Context::ConfigureNetworking);
+    ExecutionContext context(Context::OpenVmm);
     WSL_LOG(
         "OpenVmmBindPortBegin",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
@@ -1035,7 +1024,7 @@ VmPortBinding OpenVmmVirtualMachineBackend::BindPort(VmDeviceId Device, const Vm
 
 void OpenVmmVirtualMachineBackend::UnbindPort(VmPortBindingId Binding)
 {
-    ExecutionContext context(Context::ConfigureNetworking);
+    ExecutionContext context(Context::OpenVmm);
     WSL_LOG(
         "OpenVmmUnbindPortBegin",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
@@ -1065,14 +1054,14 @@ void OpenVmmVirtualMachineBackend::UnbindPort(VmPortBindingId Binding)
 
 IpAddress OpenVmmVirtualMachineBackend::CreateVirtualAddress(VmDeviceId Device, const IpAddress&)
 {
-    ExecutionContext context(Context::ConfigureNetworking);
+    ExecutionContext context(Context::OpenVmm);
     validation::ValidateResourceId(Device, m_description.Identity);
     THROW_HR_MSG(c_notSupported, "OpenVMM does not support virtual host addresses");
 }
 
 void OpenVmmVirtualMachineBackend::CreateDnsRecord(VmDeviceId Device, const VmDnsRecord&)
 {
-    ExecutionContext context(Context::ConfigureNetworking);
+    ExecutionContext context(Context::OpenVmm);
     validation::ValidateResourceId(Device, m_description.Identity);
     THROW_HR_MSG(c_notSupported, "OpenVMM does not support static DNS records");
 }

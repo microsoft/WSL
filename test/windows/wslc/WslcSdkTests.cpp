@@ -19,10 +19,7 @@ Abstract:
 #include "WSLCContainerLauncher.h"
 #include "WSLCProcessLauncher.h"
 #include "wslc_schema.h"
-<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
-=======
 #include "wslpolicies.h"
->>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
 #include "WSLCE2EHelpers.h"
 #include <optional>
 

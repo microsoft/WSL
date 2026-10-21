@@ -575,14 +575,6 @@ WSLCSession::~WSLCSession()
     // Wait for any relay-driven termination to complete before returning from the destructor.
     m_terminationCompleteEvent.wait();
     if (auto* relay = m_runtime.Relay())
-<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
-    {
-        relay->Stop();
-    }
-
-    if (m_destructionCallback)
-=======
->>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
     {
         relay->Stop();
     }

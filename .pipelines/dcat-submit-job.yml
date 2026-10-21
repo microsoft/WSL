@@ -39,39 +39,6 @@ jobs:
     dependsOn: ${{ parameters.dependsOn }}
     timeoutInMinutes: 30
     pool:
-<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
-      type: release
-      os: windows
-
-    variables:
-      dcatSubmissionPath: $(Pipeline.Workspace)\dcat
-      dcatContentPath: $(Pipeline.Workspace)\dcat-content
-
-    templateContext:
-      inputs:
-        - input: pipelineArtifact
-          ${{ if ne(parameters.artifactPipeline, '') }}:
-            pipeline: ${{ parameters.artifactPipeline }}
-          artifactName: drop_wsl_dcat
-          targetPath: $(Pipeline.Workspace)\dcat
-
-        # The build artifacts are large, so only pull the CABs that are actually submitted.
-        - input: pipelineArtifact
-          ${{ if ne(parameters.artifactPipeline, '') }}:
-            pipeline: ${{ parameters.artifactPipeline }}
-          artifactName: drop_wsl_build
-          targetPath: $(Pipeline.Workspace)\drop_x64
-          itemPattern: bundle/*.cab
-
-        - input: pipelineArtifact
-          ${{ if ne(parameters.artifactPipeline, '') }}:
-            pipeline: ${{ parameters.artifactPipeline }}
-          artifactName: drop_wsl_build_arm64
-          targetPath: $(Pipeline.Workspace)\drop_arm64
-          itemPattern: bundle/*.cab
-
-    steps:
-=======
       type: windows
       isCustom: true
       name: wsl-release-pool
@@ -98,7 +65,6 @@ jobs:
               targetPath: $(cabDownloadPath)
               patterns: bundle/*.cab
 
->>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
       - ${{ if eq(parameters.updateRunName, true) }}:
           - pwsh: |
               # Surface the version being published as the run name. The version is extracted from the CAB file name.
@@ -116,11 +82,7 @@ jobs:
           - pwsh: |
               New-Item -ItemType Directory -Path '$(dcatContentPath)' -Force | Out-Null
 
-<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
-              $cabs = @(Get-ChildItem -Path '$(Pipeline.Workspace)\drop_${{ platform }}\bundle' -Filter '*.cab')
-=======
               $cabs = @(Get-ChildItem -Path '$(cabDownloadPath)\bundle' -Filter '*.${{ platform }}.cab')
->>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
               if ($cabs.Count -ne 1) {
                   throw "Expected exactly one ${{ platform }} CAB file, found $($cabs.Count)."
               }

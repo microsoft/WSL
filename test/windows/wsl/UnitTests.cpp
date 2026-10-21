@@ -952,13 +952,6 @@ class UnitTests
         const auto wslSupport =
             wil::CoCreateInstance<LxssUserSession, IWslSupport>(CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA);
         wsl::windows::common::security::ConfigureForCOMImpersonation(wslSupport.get());
-<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
-
-        // REVIEW: The test process initializes COM with static cloaking, so configure this raw proxy for dynamic
-        // cloaking to let the service impersonate the caller instead of failing with ERROR_BAD_IMPERSONATION_LEVEL.
-        wsl::windows::common::security::ConfigureForCOMImpersonation(wslSupport.get());
-=======
->>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
 
         ULONG Version;
         ULONG DefaultUid;
@@ -3232,14 +3225,7 @@ Usage:
 
     WSL2_TEST_METHOD(KernelArtifacts)
     {
-<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
-        // The unified kernel artifacts VHD provides the kernel headers and the perf tooling
-        // alongside the kernel modules. Headers are mounted at /usr/src/linux-headers-$(uname -r)
-        // with /lib/modules/$(uname -r)/build symlinked to that directory; perf is mounted at
-        // /usr/lib/linux-tools/$(uname -r) and exposed via $PATH.
-=======
         // Kernel artifacts provide headers at /usr/src/linux-headers-$(uname -r).
->>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
 
         // Headers: the build symlink and a representative uapi header are present.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -L /lib/modules/$(uname -r)/build", nullptr, nullptr, nullptr, nullptr), 0u);
@@ -3278,66 +3264,16 @@ EOF
                 nullptr),
             0u);
 
-<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
-        // perf: leave no trace in the distro's file system and make the versioned binary reachable
-        // via $PATH, with PERF_EXEC_PATH pointing at its helper scripts.
-        //
-        // N.B. The test distro does not ship perf, so nothing should be created at /usr/bin/perf.
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -x /usr/lib/linux-tools/$(uname -r)/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /usr/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(L"test \"$(command -v perf)\" = \"/usr/lib/linux-tools/$(uname -r)/bin/perf\"", nullptr, nullptr, nullptr, nullptr), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"perf --version", nullptr, nullptr, nullptr, nullptr), 0u);
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(L"test \"$(perf --exec-path)\" = \"/usr/lib/linux-tools/$(uname -r)/libexec/perf-core\"", nullptr, nullptr, nullptr, nullptr),
-            0u);
-
-        // Stale distro-provided artifacts are replaced or hidden after the VM restarts. A distro
-        // provided perf is shadowed by the binary matching the running kernel.
-        //
-        // N.B. The cleanup is registered before the distro's file system is modified so that a
-        //      failure can't leave a perf binary or a broken build symlink behind, which would
-        //      break subsequent runs.
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            LxsstuLaunchWsl(
-                L"umount /usr/bin/distro-perf 2>/dev/null; rm -f /usr/bin/perf /usr/bin/distro-perf; ln -snf"
-                L" /usr/src/linux-headers-$(uname -r) /lib/modules/$(uname -r)/build",
-                nullptr,
-                nullptr,
-                nullptr,
-                nullptr);
-        });
-
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(
-                L"rm /lib/modules/$(uname -r)/build && ln -s /tmp /lib/modules/$(uname -r)/build && printf old-perf >"
-                L" /usr/bin/distro-perf && ln -s distro-perf /usr/bin/perf",
-                nullptr,
-                nullptr,
-                nullptr,
-                nullptr),
-            0u);
-=======
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
             LxsstuLaunchWsl(L"ln -snf /usr/src/linux-headers-$(uname -r) /lib/modules/$(uname -r)/build");
         });
 
         // Stale header links are refreshed after restart.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"rm /lib/modules/$(uname -r)/build && ln -s /tmp /lib/modules/$(uname -r)/build"), 0u);
->>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(L"test \"$(readlink /lib/modules/$(uname -r)/build)\" = \"/usr/src/linux-headers-$(uname -r)\"", nullptr, nullptr, nullptr, nullptr),
             0u);
-<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(readlink /usr/bin/perf)\" = \"distro-perf\"", nullptr, nullptr, nullptr, nullptr), 0u);
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(
-                L"test \"$(stat -Lc %d:%i /usr/bin/perf)\" = \"$(stat -Lc %d:%i /usr/lib/linux-tools/$(uname -r)/bin/perf)\"", nullptr, nullptr, nullptr, nullptr),
-            0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"/usr/bin/perf --version", nullptr, nullptr, nullptr, nullptr), 0u);
-=======
->>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
     }
 
     WSL2_TEST_METHOD(CrashCollection)
@@ -3935,8 +3871,6 @@ EOF
 
         WslShutdown();
         VerifyNoVmAccessToVhd(vhdPath.c_str());
-<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
-=======
     }
 
     WSL2_TEST_METHOD(CompactEncrypted)
@@ -3969,7 +3903,6 @@ EOF
         }
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--manage {} --compact", name)), 0L);
->>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
     }
 
     WSL2_TEST_METHOD(FileOffsets)
@@ -5385,8 +5318,6 @@ VERSION_ID="Invalid|Format"
             VERIFY_ARE_EQUAL(wsl::windows::common::registry::ReadDword(distroKey.get(), nullptr, L"RunOOBE", 1), 0);
             validateOutput(nullptr, L"");
         }
-<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
-=======
     }
 
     static void ValidateOOBEWait(bool TerminateWhileWaiting, bool Retry)
@@ -5497,7 +5428,6 @@ VERSION_ID="Invalid|Format"
         ValidateOOBEWait(true, false);
         ValidateOOBEWait(false, false);
         ValidateOOBEWait(false, true);
->>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
     }
 
     static void ValidateDistributionStarts(LPCWSTR Name)

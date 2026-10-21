@@ -56,8 +56,6 @@ Abstract:
 #define LOCALE_FILE_PATH ETC_DEFAULT_FOLDER "locale"
 #define LOCALE_CONF_FILE_PATH ETC_FOLDER "locale.conf"
 #define PATH_ENV "PATH"
-#define PERF_BINARY_PATH "/usr/bin/perf"
-#define PERF_EXEC_PATH_ENV "PERF_EXEC_PATH"
 #define RESOLV_CONF_DIRECTORY_MODE 0755
 #define RESOLV_CONF_FILE_MODE 0644
 #define RESOLV_CONF_FILE_NAME "resolv.conf"
@@ -1163,7 +1161,6 @@ Return Value:
         if (kernelModulesPath.empty())
         {
             return;
-<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
         }
 
         //
@@ -1195,66 +1192,6 @@ Return Value:
         {
             LOG_ERROR("symlink({}, {}) failed {}", target, linkPath, errno);
         }
-    });
-
-    MoveTemporaryMount(LX_WSL2_KERNEL_PERF_MOUNT_ENV, LX_WSL2_KERNEL_PERF_PATH_ENV, [&](const std::string& target) {
-        //
-        // Expose the kernel-matched perf via the environment block (see ConfigCreateEnvironmentBlock).
-        //
-
-        Config.KernelPerfPath = target;
-
-        //
-        // If the distro ships its own perf, shadow it with a bind mount so that the binary matching the
-        // running kernel is used.
-        //
-        // N.B. The distro's file system is only modified if perf is already present as a regular file.
-        //      Distros without perf pick it up via $PATH instead.
-        //
-
-        struct stat existing{};
-        if ((stat(PERF_BINARY_PATH, &existing) == 0) && S_ISREG(existing.st_mode))
-        {
-            const std::string perfBinary = target + "/bin/perf";
-            const auto perfMountPoint = std::filesystem::canonical(PERF_BINARY_PATH);
-            if (UtilMountFile(perfBinary.c_str(), perfMountPoint.c_str()) < 0)
-            {
-                LOG_ERROR("UtilMountFile({}, {}) failed {}", perfBinary, perfMountPoint.string(), errno);
-            }
-        }
-=======
-        }
-
-        //
-        // Point /lib/modules/<release>/build at the kernel headers, replacing any entry that the
-        // distro may have created so that it can't shadow the headers matching the running kernel.
-        //
-        // N.B. A directory can't be replaced with a symlink (and removing it would mean a recursive
-        //      delete), so bind mount the headers over it instead.
-        //
-
-        const std::string linkPath = kernelModulesPath + "/build";
-        struct stat existing{};
-        if ((lstat(linkPath.c_str(), &existing) == 0) && S_ISDIR(existing.st_mode))
-        {
-            if (UtilMount(target.c_str(), linkPath.c_str(), nullptr, (MS_BIND | MS_REC), nullptr) < 0)
-            {
-                LOG_ERROR("UtilMount({}, {}) failed {}", target, linkPath, errno);
-            }
-
-            return;
-        }
-
-        if ((unlink(linkPath.c_str()) < 0) && (errno != ENOENT))
-        {
-            LOG_ERROR("unlink({}) failed {}", linkPath, errno);
-        }
-
-        if (symlink(target.c_str(), linkPath.c_str()) < 0)
-        {
-            LOG_ERROR("symlink({}, {}) failed {}", target, linkPath, errno);
-        }
->>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
     });
 
     //
@@ -1818,25 +1755,6 @@ Return Value:
         if (Config.AppendGpuLibPath && Config.GpuEnabled)
         {
             ConfigAppendToPath(Environment, LXSS_LIB_PATH);
-        }
-
-        //
-        // Add the kernel-matched perf tools to the $PATH variable and point perf at its helper
-        // scripts since it is built with a prefix that does not match where it is mounted.
-        //
-
-        if (Config.KernelPerfPath.has_value())
-        {
-            ConfigAppendToPath(Environment, std::format("{}/bin", *Config.KernelPerfPath));
-
-            //
-            // N.B. This is only set if the user has not provided a value via WSLENV.
-            //
-
-            if (Environment.GetVariable(PERF_EXEC_PATH_ENV).empty())
-            {
-                Environment.AddVariable(PERF_EXEC_PATH_ENV, std::format("{}/libexec/perf-core", *Config.KernelPerfPath));
-            }
         }
     }
 

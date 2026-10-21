@@ -3,11 +3,7 @@ file(MAKE_DIRECTORY ${OUT})
 
 if (${TARGET_PLATFORM} STREQUAL x64)
     set(CLOUDTEST_IMAGES
-<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
         "wsl-test-image-rs_prerelease-2026-10-05"
-=======
-        "wsl-test-image-rs_prerelease-2025-01-30"
->>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
         "wsl-test-image-rs_base2-2026-10-05"
         "wsl-test-image-ge_current-2026-09-28"
         "wsl-test-image-2025-datacenter-g2-2026-09-29"

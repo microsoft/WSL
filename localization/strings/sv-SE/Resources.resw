@@ -3295,11 +3295,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
-<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
-    <value>Invalid mode '{}'.</value>
-=======
     <value>Ogiltigt läge. ''{}''.</value>
->>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
@@ -3888,26 +3884,6 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Det går inte att exportera containern till terminalen. Använd alternativet -o eller omdirigera stdout.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
-    <value>Expected format: [&lt;host path | named volume&gt;:]&lt;container path&gt;[:mode]</value>
-    <comment>Usage string for volume mount specification.</comment>
-  </data>
-  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
-    <value>Invalid volume specification: '{}'. {} {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
-    <value>The volume specification is empty.</value>
-  </data>
-  <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
-    <value>The volume specification contains an empty section between colons.</value>
-  </data>
-  <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
-    <value>The volume specification contains too many colons.</value>
-  </data>
-  <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
-    <value>Host path '{}' is not a valid Windows path.</value>
-=======
     <value>Förväntat format: [&lt;host path | named volume&gt;:]&lt;container path&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
@@ -3926,7 +3902,6 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   </data>
   <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
     <value>Värdsökvägen '{}' är inte en giltig Windows-sökväg.</value>
->>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">

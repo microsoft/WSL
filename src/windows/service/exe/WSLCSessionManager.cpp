@@ -142,8 +142,6 @@ private:
 
 } // namespace
 
-<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
-=======
 MarshaledSessionReference::MarshaledSessionReference(IWSLCSessionReference* Reference) :
     m_git(wil::CoCreateInstance<IGlobalInterfaceTable>(CLSID_StdGlobalInterfaceTable, CLSCTX_INPROC_SERVER))
 {
@@ -202,7 +200,6 @@ void MarshaledSessionReference::Reset() noexcept
     }
 }
 
->>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
 WSLCSessionManagerImpl::~WSLCSessionManagerImpl()
 {
     // Terminate all sessions on shutdown.

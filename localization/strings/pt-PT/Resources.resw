@@ -3294,11 +3294,7 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
-<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
-    <value>Invalid mode '{}'.</value>
-=======
     <value>Modo inválido "{}".</value>
->>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
@@ -3887,17 +3883,6 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
     <value>Não é possível exportar o contentor para o terminal. Utilize a opção -o ou redirecione stdout.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
-    <value>Expected format: [&lt;host path | named volume&gt;:]&lt;container path&gt;[:mode]</value>
-    <comment>Usage string for volume mount specification.</comment>
-  </data>
-  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
-    <value>Invalid volume specification: '{}'. {} {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
-    <value>The volume specification is empty.</value>
-=======
     <value>Formato esperado: [&lt;caminho do anfitrião | volume nomeado&gt;:]&lt;caminho do contentor&gt;[:modo]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
@@ -3907,7 +3892,6 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
   </data>
   <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
     <value>A especificação do volume está vazia.</value>
->>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
   </data>
   <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
     <value>A especificação de volume contém uma seção vazia entre os dois pontos.</value>
