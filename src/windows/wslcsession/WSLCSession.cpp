@@ -4243,8 +4243,11 @@ void WSLCSession::RecoverExistingContainers()
             auto container = WSLCContainerImpl::Open(
                 dockerContainer, *this, m_runtime, m_pluginNotifier.get(), std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1), m_eventStore);
 
-            auto [it, inserted] = m_containers.emplace(container->ID(), std::move(container));
-            WI_ASSERT(inserted);
+            if (container)
+            {
+                auto [it, inserted] = m_containers.emplace(container->ID(), std::move(container));
+                WI_ASSERT(inserted);
+            }
         }
         catch (...)
         {

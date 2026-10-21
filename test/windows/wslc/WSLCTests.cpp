@@ -13029,6 +13029,78 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerAutoRemoveOnSessionRecovery)
+    {
+        auto restore = ResetTestSession();
+        constexpr auto c_sessionName = L"auto-remove-recovery-test";
+        constexpr auto c_removedName = "test-recovery-auto-remove";
+        constexpr auto c_createdName = "test-recovery-auto-remove-created";
+        constexpr auto c_retainedName = "test-recovery-retained";
+        std::string removedId;
+        std::string anonymousVolume;
+
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(c_sessionName, true));
+
+            WSLCContainerLauncher launcher("debian:latest", c_removedName, {"sleep", "9999"});
+            launcher.SetContainerFlags(WSLCContainerFlagsRm);
+            launcher.AddMount({.MountType = WSLCMountTypeVolume, .Target = "/anonymous"});
+
+            auto container = launcher.Launch(*session);
+            container.SetDeleteOnClose(false);
+            removedId = container.Id();
+            const auto inspect = container.Inspect();
+            VERIFY_ARE_EQUAL(inspect.Mounts.size(), 1u);
+            anonymousVolume = inspect.Mounts[0].Name;
+            VERIFY_IS_FALSE(anonymousVolume.empty());
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+
+            WSLCContainerLauncher createdLauncher("debian:latest", c_createdName, {"sleep", "9999"});
+            createdLauncher.SetContainerFlags(WSLCContainerFlagsRm);
+            auto created = createdLauncher.Create(*session);
+            created.SetDeleteOnClose(false);
+            VERIFY_ARE_EQUAL(created.State(), WslcContainerStateCreated);
+
+            WSLCContainerLauncher retainedLauncher("debian:latest", c_retainedName, {"sleep", "9999"});
+            auto retained = retainedLauncher.Launch(*session);
+            retained.SetDeleteOnClose(false);
+            VERIFY_ARE_EQUAL(retained.State(), WslcContainerStateRunning);
+
+            // Terminating the session stops event monitoring before the containers exit, as a reboot does.
+            VERIFY_SUCCEEDED(session->Terminate());
+        }
+
+        // Check a second recovery as well so a container hidden only from the session's map cannot pass.
+        for (int recovery = 0; recovery < 2; ++recovery)
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(c_sessionName, true));
+
+            wil::com_ptr<IWSLCContainer> notFound;
+            VERIFY_ARE_EQUAL(session->OpenContainer(c_removedName, &notFound), WSLC_E_CONTAINER_NOT_FOUND);
+            VERIFY_ARE_EQUAL(session->OpenContainer(removedId.c_str(), &notFound), WSLC_E_CONTAINER_NOT_FOUND);
+
+            auto [containers, ports] = ListContainers(session.get());
+            VERIFY_ARE_EQUAL(containers.size(), 2u);
+            ExpectCommandResult(session.get(), {"/usr/bin/docker", "volume", "inspect", anonymousVolume}, 1);
+
+            auto created = OpenContainer(session.get(), c_createdName);
+            created.SetDeleteOnClose(false);
+            VERIFY_ARE_EQUAL(created.State(), WslcContainerStateCreated);
+
+            auto retained = OpenContainer(session.get(), c_retainedName);
+            retained.SetDeleteOnClose(false);
+            VERIFY_ARE_EQUAL(retained.State(), WslcContainerStateExited);
+
+            if (recovery == 1)
+            {
+                VERIFY_SUCCEEDED(created.Get().Delete(WSLCDeleteFlagsNone));
+                VERIFY_SUCCEEDED(retained.Get().Delete(WSLCDeleteFlagsNone));
+            }
+
+            VERIFY_SUCCEEDED(session->Terminate());
+        }
+    }
+
     WSLC_TEST_METHOD(ContainerRecoveryKeepsRequestedImage)
     {
         auto restore = ResetTestSession(); // Required to access the storage folder.
