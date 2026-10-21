@@ -211,6 +211,7 @@ typedef struct WslcContainerNetwork
     _In_z_ PCSTR name; // Network name (e.g. "bridge" or a network created with WslcCreateSessionNetwork)
     _In_reads_opt_(aliasCount) const PCSTR* aliases; // DNS aliases for the container on this network; user-defined networks only
     _In_ uint32_t aliasCount;
+    _In_opt_ const IN_ADDR* ipAddress; // Static IPv4 address for the container on this network; user-defined networks only
 } WslcContainerNetwork;
 
 typedef enum WslcContainerFlags
@@ -290,10 +291,6 @@ STDAPI WslcSetContainerSettingsNamedVolumes(
 //     or if aliases and aliasCount disagree on being empty or an alias is null.
 STDAPI WslcSetContainerSettingsNetworks(
     _In_ WslcContainerSettings* containerSettings, _In_reads_opt_(networkCount) const WslcContainerNetwork* networks, _In_ uint32_t networkCount);
-
-// Sets the container's IPv4 address on its primary network. Requires exactly one user-defined network
-// set with WslcSetContainerSettingsNetworks. Pass null to clear.
-STDAPI WslcSetContainerSettingsIPAddress(_In_ WslcContainerSettings* containerSettings, _In_opt_ const IN_ADDR* ipAddress);
 
 // Both setters borrow the array and strings until WslcCreateContainer returns. Pass nullptr/0 to clear.
 // Creation fails with WSLC_E_CAPABILITY_ADDITIONS_DISABLED if computer policy blocks capability additions.

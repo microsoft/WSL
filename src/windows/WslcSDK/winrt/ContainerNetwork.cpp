@@ -66,10 +66,35 @@ void ContainerNetwork::Aliases(winrt::Windows::Foundation::Collections::IVector<
     m_aliases = value;
 }
 
+winrt::Windows::Networking::HostName ContainerNetwork::IPAddress()
+{
+    return m_ipAddress;
+}
+
+void ContainerNetwork::IPAddress(winrt::Windows::Networking::HostName const& value)
+{
+    if (m_containerNetwork)
+    {
+        throw hresult_illegal_state_change(L"Cannot change value after options have been applied");
+    }
+
+    if (value && value.Type() != winrt::Windows::Networking::HostNameType::Ipv4)
+    {
+        throw hresult_invalid_argument(L"Only IPv4 addresses are supported");
+    }
+
+    m_ipAddress = value;
+}
+
 WslcContainerNetwork ContainerNetwork::ToStruct()
 {
     if (!m_containerNetwork)
     {
+        if (m_ipAddress && inet_pton(AF_INET, winrt::to_string(m_ipAddress.RawName()).c_str(), &m_ipAddressStruct) != 1)
+        {
+            throw hresult_invalid_argument(L"Invalid IPv4 address format");
+        }
+
         m_aliasStrings.clear();
         m_aliasStrings.reserve(m_aliases.Size());
         for (auto const& alias : m_aliases)
@@ -88,6 +113,7 @@ WslcContainerNetwork ContainerNetwork::ToStruct()
         m_containerNetwork->name = m_name.c_str();
         m_containerNetwork->aliases = m_aliasPointers.empty() ? nullptr : m_aliasPointers.data();
         m_containerNetwork->aliasCount = static_cast<uint32_t>(m_aliasPointers.size());
+        m_containerNetwork->ipAddress = m_ipAddress ? &m_ipAddressStruct : nullptr;
     }
 
     return *m_containerNetwork;

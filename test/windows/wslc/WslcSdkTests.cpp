@@ -684,6 +684,7 @@ class WslcSdkTests
         constexpr auto c_primaryNetwork = "wslc-sdk-container-primary";
         constexpr auto c_additionalNetwork = "wslc-sdk-container-additional";
         constexpr auto c_primaryIp = "10.231.49.10";
+        constexpr auto c_additionalIp = "10.231.50.10";
 
         auto comSession = wil::com_query<IWSLCSession>(reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->GetSession());
         LOG_IF_FAILED(comSession->DeleteNetwork(c_primaryNetwork));
@@ -719,8 +720,8 @@ class WslcSdkTests
             const PCSTR primaryAliases[] = {"db", "primary"};
             const PCSTR additionalAliases[] = {"cache"};
             const WslcContainerNetwork networks[] = {
-                {c_primaryNetwork, primaryAliases, ARRAYSIZE(primaryAliases)},
-                {c_additionalNetwork, additionalAliases, ARRAYSIZE(additionalAliases)},
+                {c_primaryNetwork, primaryAliases, ARRAYSIZE(primaryAliases), nullptr},
+                {c_additionalNetwork, additionalAliases, ARRAYSIZE(additionalAliases), nullptr},
             };
 
             WslcProcessSettings procSettings;
@@ -751,11 +752,16 @@ class WslcSdkTests
             VERIFY_IS_FALSE(additional.IPAddress.empty());
         }
 
-        // Positive: a static IP is applied to the primary network.
+        // Positive: each network gets its own static IP.
         {
-            const WslcContainerNetwork networks[] = {{c_primaryNetwork, nullptr, 0}};
-            IN_ADDR ipAddress{};
-            VERIFY_ARE_EQUAL(inet_pton(AF_INET, c_primaryIp, &ipAddress), 1);
+            IN_ADDR primaryIp{};
+            VERIFY_ARE_EQUAL(inet_pton(AF_INET, c_primaryIp, &primaryIp), 1);
+            IN_ADDR additionalIp{};
+            VERIFY_ARE_EQUAL(inet_pton(AF_INET, c_additionalIp, &additionalIp), 1);
+            const WslcContainerNetwork networks[] = {
+                {c_primaryNetwork, nullptr, 0, &primaryIp},
+                {c_additionalNetwork, nullptr, 0, &additionalIp},
+            };
 
             WslcProcessSettings procSettings;
             VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
@@ -765,7 +771,6 @@ class WslcSdkTests
             VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
             VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
             VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworks(&containerSettings, networks, ARRAYSIZE(networks)));
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsIPAddress(&containerSettings, &ipAddress));
 
             UniqueContainer container;
             VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
@@ -773,28 +778,35 @@ class WslcSdkTests
 
             const auto inspectObject = inspect(container.get());
             VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_primaryNetwork));
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_additionalNetwork));
+
             const auto& primary = inspectObject.NetworkSettings.Networks.at(c_primaryNetwork);
             VERIFY_IS_TRUE(primary.IPAMConfig.has_value());
             VERIFY_ARE_EQUAL(std::string(c_primaryIp), primary.IPAMConfig->IPv4Address);
             VERIFY_ARE_EQUAL(std::string(c_primaryIp), primary.IPAddress);
+
+            const auto& additional = inspectObject.NetworkSettings.Networks.at(c_additionalNetwork);
+            VERIFY_IS_TRUE(additional.IPAMConfig.has_value());
+            VERIFY_ARE_EQUAL(std::string(c_additionalIp), additional.IPAMConfig->IPv4Address);
+            VERIFY_ARE_EQUAL(std::string(c_additionalIp), additional.IPAddress);
         }
 
         // Negative: invalid combinations are rejected at create time.
         {
             const PCSTR aliases[] = {"web"};
-            const WslcContainerNetwork userDefined[] = {{c_primaryNetwork, nullptr, 0}};
-            const WslcContainerNetwork twoNetworks[] = {{c_primaryNetwork, nullptr, 0}, {c_additionalNetwork, nullptr, 0}};
-            const WslcContainerNetwork bridge[] = {{"bridge", nullptr, 0}};
-            const WslcContainerNetwork bridgeWithAliases[] = {{"bridge", aliases, ARRAYSIZE(aliases)}};
-            const WslcContainerNetwork additionalBridgeWithAliases[] = {{c_primaryNetwork, nullptr, 0}, {"bridge", aliases, ARRAYSIZE(aliases)}};
             IN_ADDR ipAddress{};
             VERIFY_ARE_EQUAL(inet_pton(AF_INET, c_primaryIp, &ipAddress), 1);
+            const WslcContainerNetwork userDefined[] = {{c_primaryNetwork, nullptr, 0, nullptr}};
+            const WslcContainerNetwork bridgeWithIp[] = {{"bridge", nullptr, 0, &ipAddress}};
+            const WslcContainerNetwork additionalBridgeWithIp[] = {{c_primaryNetwork, nullptr, 0, nullptr}, {"bridge", nullptr, 0, &ipAddress}};
+            const WslcContainerNetwork bridgeWithAliases[] = {{"bridge", aliases, ARRAYSIZE(aliases), nullptr}};
+            const WslcContainerNetwork additionalBridgeWithAliases[] = {
+                {c_primaryNetwork, nullptr, 0, nullptr}, {"bridge", aliases, ARRAYSIZE(aliases), nullptr}};
 
-            auto expectCreateFails = [&](const WslcContainerNetwork* networks, uint32_t count, bool setMode, const IN_ADDR* ip) {
+            auto expectCreateFails = [&](const WslcContainerNetwork* networks, uint32_t count, bool setMode) {
                 WslcContainerSettings containerSettings;
                 VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
                 VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworks(&containerSettings, networks, count));
-                VERIFY_SUCCEEDED(WslcSetContainerSettingsIPAddress(&containerSettings, ip));
                 if (setMode)
                 {
                     VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworkingMode(&containerSettings, WSLC_CONTAINER_NETWORKING_MODE_BRIDGED));
@@ -806,16 +818,15 @@ class WslcSdkTests
             };
 
             // Networking mode and networks are mutually exclusive.
-            expectCreateFails(userDefined, ARRAYSIZE(userDefined), true, nullptr);
+            expectCreateFails(userDefined, ARRAYSIZE(userDefined), true);
 
-            // An IP address requires exactly one user-defined network.
-            expectCreateFails(nullptr, 0, false, &ipAddress);
-            expectCreateFails(twoNetworks, ARRAYSIZE(twoNetworks), false, &ipAddress);
-            expectCreateFails(bridge, ARRAYSIZE(bridge), false, &ipAddress);
+            // Static IPs require a user-defined network.
+            expectCreateFails(bridgeWithIp, ARRAYSIZE(bridgeWithIp), false);
+            expectCreateFails(additionalBridgeWithIp, ARRAYSIZE(additionalBridgeWithIp), false);
 
             // Aliases require a user-defined network.
-            expectCreateFails(bridgeWithAliases, ARRAYSIZE(bridgeWithAliases), false, nullptr);
-            expectCreateFails(additionalBridgeWithAliases, ARRAYSIZE(additionalBridgeWithAliases), false, nullptr);
+            expectCreateFails(bridgeWithAliases, ARRAYSIZE(bridgeWithAliases), false);
+            expectCreateFails(additionalBridgeWithAliases, ARRAYSIZE(additionalBridgeWithAliases), false);
         }
 
         // Negative: invalid arguments to the setter.
@@ -823,21 +834,21 @@ class WslcSdkTests
             WslcContainerSettings containerSettings;
             VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
 
-            const WslcContainerNetwork valid[] = {{c_primaryNetwork, nullptr, 0}};
+            const WslcContainerNetwork valid[] = {{c_primaryNetwork, nullptr, 0, nullptr}};
             VERIFY_ARE_EQUAL(WslcSetContainerSettingsNetworks(&containerSettings, nullptr, 1), E_INVALIDARG);
             VERIFY_ARE_EQUAL(WslcSetContainerSettingsNetworks(&containerSettings, valid, 0), E_INVALIDARG);
 
-            const WslcContainerNetwork nullName[] = {{nullptr, nullptr, 0}};
+            const WslcContainerNetwork nullName[] = {{nullptr, nullptr, 0, nullptr}};
             VERIFY_ARE_EQUAL(WslcSetContainerSettingsNetworks(&containerSettings, nullName, ARRAYSIZE(nullName)), E_INVALIDARG);
 
-            const WslcContainerNetwork emptyName[] = {{"", nullptr, 0}};
+            const WslcContainerNetwork emptyName[] = {{"", nullptr, 0, nullptr}};
             VERIFY_ARE_EQUAL(WslcSetContainerSettingsNetworks(&containerSettings, emptyName, ARRAYSIZE(emptyName)), E_INVALIDARG);
 
-            const WslcContainerNetwork missingAliases[] = {{c_primaryNetwork, nullptr, 1}};
+            const WslcContainerNetwork missingAliases[] = {{c_primaryNetwork, nullptr, 1, nullptr}};
             VERIFY_ARE_EQUAL(WslcSetContainerSettingsNetworks(&containerSettings, missingAliases, ARRAYSIZE(missingAliases)), E_INVALIDARG);
 
             const PCSTR nullAlias[] = {nullptr};
-            const WslcContainerNetwork withNullAlias[] = {{c_primaryNetwork, nullAlias, ARRAYSIZE(nullAlias)}};
+            const WslcContainerNetwork withNullAlias[] = {{c_primaryNetwork, nullAlias, ARRAYSIZE(nullAlias), nullptr}};
             VERIFY_ARE_EQUAL(WslcSetContainerSettingsNetworks(&containerSettings, withNullAlias, ARRAYSIZE(withNullAlias)), E_INVALIDARG);
         }
     }

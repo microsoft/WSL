@@ -786,6 +786,7 @@ class WslcSdkWinRtTests
         constexpr auto c_primaryNetwork = "wslc-sdk-winrt-container-primary";
         constexpr auto c_additionalNetwork = "wslc-sdk-winrt-container-additional";
         constexpr auto c_primaryIp = L"10.231.51.10";
+        constexpr auto c_additionalIp = L"10.231.52.10";
         const winrt::hstring primaryNetwork = winrt::to_hstring(c_primaryNetwork);
         const winrt::hstring additionalNetwork = winrt::to_hstring(c_additionalNetwork);
 
@@ -856,11 +857,16 @@ class WslcSdkWinRtTests
             VERIFY_THROWS_HR(containerSettings.Networks(winrt::single_threaded_vector<WSLCSDK::ContainerNetwork>()), E_ILLEGAL_STATE_CHANGE);
         }
 
-        // Positive: a static IP is applied to the primary network.
+        // Positive: each network gets its own static IP.
         {
+            WSLCSDK::ContainerNetwork primary{primaryNetwork};
+            primary.IPAddress(winrt::Windows::Networking::HostName{c_primaryIp});
+            WSLCSDK::ContainerNetwork additional{additionalNetwork};
+            additional.IPAddress(winrt::Windows::Networking::HostName{c_additionalIp});
+
             auto containerSettings = makeSettings();
-            containerSettings.Networks().Append(WSLCSDK::ContainerNetwork{primaryNetwork});
-            containerSettings.IPAddress(winrt::Windows::Networking::HostName{c_primaryIp});
+            containerSettings.Networks().Append(primary);
+            containerSettings.Networks().Append(additional);
 
             auto container = m_defaultSession.CreateContainer(containerSettings);
             auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
@@ -868,10 +874,20 @@ class WslcSdkWinRtTests
 
             const auto inspectObject = inspect(container);
             VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_primaryNetwork));
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_additionalNetwork));
+
             const auto& primaryEndpoint = inspectObject.NetworkSettings.Networks.at(c_primaryNetwork);
             VERIFY_IS_TRUE(primaryEndpoint.IPAMConfig.has_value());
             VERIFY_ARE_EQUAL(winrt::to_string(c_primaryIp), primaryEndpoint.IPAMConfig->IPv4Address);
             VERIFY_ARE_EQUAL(winrt::to_string(c_primaryIp), primaryEndpoint.IPAddress);
+
+            const auto& additionalEndpoint = inspectObject.NetworkSettings.Networks.at(c_additionalNetwork);
+            VERIFY_IS_TRUE(additionalEndpoint.IPAMConfig.has_value());
+            VERIFY_ARE_EQUAL(winrt::to_string(c_additionalIp), additionalEndpoint.IPAMConfig->IPv4Address);
+            VERIFY_ARE_EQUAL(winrt::to_string(c_additionalIp), additionalEndpoint.IPAddress);
+
+            // Negative: the IP cannot change after the network has been applied.
+            VERIFY_THROWS_HR(primary.IPAddress(nullptr), E_ILLEGAL_STATE_CHANGE);
         }
 
         // Negative: invalid combinations are rejected at create time.
@@ -881,15 +897,11 @@ class WslcSdkWinRtTests
             withMode.NetworkingMode(WSLCSDK::ContainerNetworkingMode::Bridged);
             VERIFY_THROWS_HR(m_defaultSession.CreateContainer(withMode), E_INVALIDARG);
 
-            auto ipWithoutNetwork = makeSettings();
-            ipWithoutNetwork.IPAddress(winrt::Windows::Networking::HostName{c_primaryIp});
-            VERIFY_THROWS_HR(m_defaultSession.CreateContainer(ipWithoutNetwork), E_INVALIDARG);
-
-            auto ipWithTwoNetworks = makeSettings();
-            ipWithTwoNetworks.Networks().Append(WSLCSDK::ContainerNetwork{primaryNetwork});
-            ipWithTwoNetworks.Networks().Append(WSLCSDK::ContainerNetwork{additionalNetwork});
-            ipWithTwoNetworks.IPAddress(winrt::Windows::Networking::HostName{c_primaryIp});
-            VERIFY_THROWS_HR(m_defaultSession.CreateContainer(ipWithTwoNetworks), E_INVALIDARG);
+            WSLCSDK::ContainerNetwork bridgeWithIp{L"bridge"};
+            bridgeWithIp.IPAddress(winrt::Windows::Networking::HostName{c_primaryIp});
+            auto ipOnBridge = makeSettings();
+            ipOnBridge.Networks().Append(bridgeWithIp);
+            VERIFY_THROWS_HR(m_defaultSession.CreateContainer(ipOnBridge), E_INVALIDARG);
 
             WSLCSDK::ContainerNetwork bridgeWithAlias{L"bridge"};
             bridgeWithAlias.Aliases().Append(L"web");
@@ -935,10 +947,11 @@ class WslcSdkWinRtTests
             VERIFY_THROWS_HR(network.Name(L""), E_INVALIDARG);
             VERIFY_THROWS_HR(network.Aliases(nullptr), E_POINTER);
 
+            VERIFY_THROWS_HR(network.IPAddress(winrt::Windows::Networking::HostName{L"example.com"}), E_INVALIDARG);
+            VERIFY_THROWS_HR(network.IPAddress(winrt::Windows::Networking::HostName{L"fd00::1"}), E_INVALIDARG);
+
             WSLCSDK::ContainerSettings containerSettings{L"debian:latest"};
             VERIFY_THROWS_HR(containerSettings.Networks(nullptr), E_POINTER);
-            VERIFY_THROWS_HR(containerSettings.IPAddress(winrt::Windows::Networking::HostName{L"example.com"}), E_INVALIDARG);
-            VERIFY_THROWS_HR(containerSettings.IPAddress(winrt::Windows::Networking::HostName{L"fd00::1"}), E_INVALIDARG);
         }
     }
 

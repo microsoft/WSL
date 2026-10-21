@@ -144,16 +144,28 @@ struct ContainerNetworkStorage
     std::vector<WSLCCompatKeyValuePair> PrimarySettings;
     std::vector<std::vector<WSLCCompatKeyValuePair>> AdditionalSettings;
     std::vector<WSLCCompatNetworkConnection> AdditionalNetworks;
-    char IpAddress[INET_ADDRSTRLEN]{};
+    std::vector<std::array<char, INET_ADDRSTRLEN>> IpAddresses;
 };
 
-std::vector<WSLCCompatKeyValuePair> ConvertAliases(const WslcContainerNetwork& network)
+// ipAddressBuffer must outlive the returned settings since the IPAddress entry points into it.
+std::vector<WSLCCompatKeyValuePair> ConvertNetworkSettings(const WslcContainerNetwork& network, std::array<char, INET_ADDRSTRLEN>& ipAddressBuffer)
 {
+    const bool userDefined = SupportsNetworkAliases(network.name);
+    THROW_HR_IF_MSG(E_INVALIDARG, network.aliasCount != 0 && !userDefined, "Network '%hs' does not support aliases", network.name);
+    THROW_HR_IF_MSG(
+        E_INVALIDARG, network.ipAddress != nullptr && !userDefined, "Network '%hs' does not support a static IP address", network.name);
+
     std::vector<WSLCCompatKeyValuePair> settings;
-    settings.reserve(network.aliasCount);
+    settings.reserve(network.aliasCount + 1);
     for (uint32_t i = 0; i < network.aliasCount; ++i)
     {
         settings.push_back({"Aliases", network.aliases[i]});
+    }
+
+    if (network.ipAddress != nullptr)
+    {
+        THROW_IF_FAILED(InetNtopToHresult(AF_INET, network.ipAddress, ipAddressBuffer.data(), ipAddressBuffer.size()));
+        settings.push_back({"IPAddress", ipAddressBuffer.data()});
     }
 
     return settings;
@@ -163,41 +175,22 @@ void ConvertContainerNetworks(const WslcContainerOptionsInternal& settings, WSLC
 {
     if (settings.networksCount == 0)
     {
-        THROW_HR_IF_MSG(E_INVALIDARG, settings.hasIpAddress, "An IP address requires a network");
         network.NetworkMode = settings.networkMode != nullptr ? settings.networkMode : "none";
         return;
     }
 
     THROW_HR_IF_MSG(E_INVALIDARG, settings.networkMode != nullptr, "Networking mode and networks are mutually exclusive");
 
+    // Sized up front so the IPAddress entries keep pointing at stable buffers.
+    storage.IpAddresses.resize(settings.networksCount);
+
     const auto& primary = settings.networks[0];
-    const bool primarySupportsAliases = SupportsNetworkAliases(primary.name);
-
-    THROW_HR_IF_MSG(
-        E_INVALIDARG, primary.aliasCount != 0 && !primarySupportsAliases, "Network '%hs' does not support aliases", primary.name);
-
-    storage.PrimarySettings = ConvertAliases(primary);
-
-    if (settings.hasIpAddress)
-    {
-        THROW_HR_IF_MSG(E_INVALIDARG, settings.networksCount > 1, "An IP address is ambiguous with multiple networks");
-        THROW_HR_IF_MSG(E_INVALIDARG, !primarySupportsAliases, "Network '%hs' does not support a static IP address", primary.name);
-
-        THROW_IF_FAILED(InetNtopToHresult(AF_INET, &settings.ipAddress, storage.IpAddress, sizeof(storage.IpAddress)));
-        storage.PrimarySettings.push_back({"IPAddress", storage.IpAddress});
-    }
+    storage.PrimarySettings = ConvertNetworkSettings(primary, storage.IpAddresses[0]);
 
     storage.AdditionalSettings.reserve(settings.networksCount - 1);
     for (uint32_t i = 1; i < settings.networksCount; ++i)
     {
-        const auto& additional = settings.networks[i];
-        THROW_HR_IF_MSG(
-            E_INVALIDARG,
-            additional.aliasCount != 0 && !SupportsNetworkAliases(additional.name),
-            "Network '%hs' does not support aliases",
-            additional.name);
-
-        storage.AdditionalSettings.push_back(ConvertAliases(additional));
+        storage.AdditionalSettings.push_back(ConvertNetworkSettings(settings.networks[i], storage.IpAddresses[i]));
     }
 
     storage.AdditionalNetworks.reserve(storage.AdditionalSettings.size());
@@ -1389,18 +1382,6 @@ try
 
     internalType->networks = networks;
     internalType->networksCount = networkCount;
-
-    return S_OK;
-}
-CATCH_RETURN();
-
-STDAPI WslcSetContainerSettingsIPAddress(_In_ WslcContainerSettings* containerSettings, _In_opt_ const IN_ADDR* ipAddress)
-try
-{
-    auto internalType = CheckAndGetInternalType(containerSettings);
-
-    internalType->hasIpAddress = ipAddress != nullptr;
-    internalType->ipAddress = ipAddress != nullptr ? *ipAddress : IN_ADDR{};
 
     return S_OK;
 }

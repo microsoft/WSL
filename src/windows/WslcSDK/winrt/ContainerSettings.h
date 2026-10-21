@@ -50,8 +50,6 @@ struct ContainerSettings : ContainerSettingsT<ContainerSettings>
     void NamedVolumes(winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerNamedVolume> const& value);
     winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerNetwork> Networks();
     void Networks(winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerNetwork> const& value);
-    winrt::Windows::Networking::HostName IPAddress();
-    void IPAddress(winrt::Windows::Networking::HostName const& value);
     winrt::Windows::Foundation::Collections::IVector<hstring> CapabilityAdditions();
     void CapabilityAdditions(winrt::Windows::Foundation::Collections::IVector<hstring> const& value);
     winrt::Windows::Foundation::Collections::IVector<hstring> CapabilityDrops();
@@ -75,7 +73,6 @@ private:
         winrt::single_threaded_vector<winrt::Microsoft::WSL::Containers::ContainerNamedVolume>()};
     winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerNetwork> m_networks{
         winrt::single_threaded_vector<winrt::Microsoft::WSL::Containers::ContainerNetwork>()};
-    winrt::Windows::Networking::HostName m_ipAddress{nullptr};
     winrt::Windows::Foundation::Collections::IVector<hstring> m_capabilityAdditions{winrt::single_threaded_vector<hstring>()};
     winrt::Windows::Foundation::Collections::IVector<hstring> m_capabilityDrops{winrt::single_threaded_vector<hstring>()};
 
@@ -85,7 +82,6 @@ private:
     std::vector<WslcContainerNamedVolume> m_namedVolumesStructs;
     std::vector<winrt::Microsoft::WSL::Containers::ContainerNetwork> m_appliedNetworks;
     std::vector<WslcContainerNetwork> m_networksStructs;
-    IN_ADDR m_ipAddressStruct{};
     std::vector<std::string> m_capabilityAdditionStrings;
     std::vector<PCSTR> m_capabilityAdditionPointers;
     std::vector<std::string> m_capabilityDropStrings;

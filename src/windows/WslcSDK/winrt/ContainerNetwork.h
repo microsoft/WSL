@@ -26,16 +26,20 @@ struct ContainerNetwork : ContainerNetworkT<ContainerNetwork>
     void Name(hstring const& value);
     winrt::Windows::Foundation::Collections::IVector<hstring> Aliases();
     void Aliases(winrt::Windows::Foundation::Collections::IVector<hstring> const& value);
+    winrt::Windows::Networking::HostName IPAddress();
+    void IPAddress(winrt::Windows::Networking::HostName const& value);
 
     WslcContainerNetwork ToStruct();
 
 private:
     std::string m_name;
     winrt::Windows::Foundation::Collections::IVector<hstring> m_aliases{winrt::single_threaded_vector<hstring>()};
+    winrt::Windows::Networking::HostName m_ipAddress{nullptr};
 
     std::unique_ptr<WslcContainerNetwork> m_containerNetwork;
     std::vector<std::string> m_aliasStrings;
     std::vector<PCSTR> m_aliasPointers;
+    IN_ADDR m_ipAddressStruct{};
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation
 

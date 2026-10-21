@@ -93,10 +93,8 @@ typedef struct WslcContainerOptionsInternal
     uint32_t capabilityAdditionsCount;
     PCSTR const* capabilityDrops;
     uint32_t capabilityDropsCount;
-    IN_ADDR ipAddress;
     const WslcContainerNetwork* networks;
     uint32_t networksCount;
-    BOOL hasIpAddress;
 
 } WslcContainerOptionsInternal;
 

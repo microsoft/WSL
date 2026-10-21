@@ -147,6 +147,9 @@ namespace Microsoft.WSL.Containers
 
         String Name;
         IVector<String> Aliases;
+
+        // Static IPv4 address for the container on this network. User-defined networks only.
+        Windows.Networking.HostName IPAddress;
     };
 
     enum ContainerState
@@ -185,9 +188,6 @@ namespace Microsoft.WSL.Containers
 
         // The first network is the primary network. Cannot be combined with NetworkingMode.
         IVector<ContainerNetwork> Networks;
-
-        // IPv4 address on the primary network. Requires exactly one user-defined network in Networks.
-        Windows.Networking.HostName IPAddress;
         IVector<String> CapabilityAdditions;
         IVector<String> CapabilityDrops;
     };

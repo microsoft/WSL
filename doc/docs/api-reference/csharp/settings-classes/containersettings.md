@@ -20,7 +20,6 @@ public sealed class ContainerSettings
     public IList<ContainerVolume> Volumes { get; set; }
     public IList<ContainerNamedVolume> NamedVolumes { get; set; }
     public IList<ContainerNetwork> Networks { get; set; }
-    public HostName IPAddress { get; set; }
     public IList<string> CapabilityAdditions { get; set; }
     public IList<string> CapabilityDrops { get; set; }
 }
@@ -32,7 +31,6 @@ Notes:
 - `InitProcess` is optional.
 - `NetworkingMode` is nullable; `null` means “leave default behavior”.
 - The first entry in `Networks` is the primary network. `Networks` cannot be combined with `NetworkingMode`.
-- `IPAddress` must be an IPv4 address and requires exactly one user-defined network in `Networks`.
 
 Example:
 

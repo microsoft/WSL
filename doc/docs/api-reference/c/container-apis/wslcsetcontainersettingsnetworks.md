@@ -19,20 +19,24 @@ Notes:
 
 - The first network is the primary network.
 - Cannot be combined with [WslcSetContainerSettingsNetworkingMode](wslcsetcontainersettingsnetworkingmode.md); [WslcCreateContainer](wslccreatecontainer.md) returns `E_INVALIDARG` if both are set.
-- Aliases are only supported on user-defined networks (not `bridge`, `host`, `none`, or `container:<name>`); [WslcCreateContainer](wslccreatecontainer.md) returns `E_INVALIDARG` otherwise.
-- The `networks` array and the strings it references are not copied and must stay valid until `WslcCreateContainer` returns.
+- Aliases and `ipAddress` are only supported on user-defined networks (not `bridge`, `host`, `none`, or `container:<name>`); [WslcCreateContainer](wslccreatecontainer.md) returns `E_INVALIDARG` otherwise.
+- Each network can have its own `ipAddress`. Set it to `NULL` to let the network assign one.
+- The `networks` array and the strings and addresses it references are not copied and must stay valid until `WslcCreateContainer` returns.
 - Pass `NULL` and `0` to clear.
 
 Example:
 
 ```c
 PCSTR aliases[] = { "web" };
+IN_ADDR backendIp = { 0 };
+inet_pton(AF_INET, "10.0.1.10", &backendIp);
 
 WslcContainerNetwork networks[2] = { 0 };
 networks[0].name = "frontend";
 networks[0].aliases = aliases;
 networks[0].aliasCount = (uint32_t)_countof(aliases);
 networks[1].name = "backend";
+networks[1].ipAddress = &backendIp;
 
 HRESULT hr = WslcSetContainerSettingsNetworks(
     &containerSettings,
