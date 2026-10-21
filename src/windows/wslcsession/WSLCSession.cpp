@@ -4033,6 +4033,54 @@ HRESULT WSLCSession::ListNetworks(LPSTR* Output)
     return ListNetworks(nullptr, 0, Output);
 }
 
+HRESULT WSLCSession::CreateNetwork(LPCSTR Options, IWSLCCompatWarningCallback* WarningCallback, LPSTR* Network)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+    RETURN_HR_IF_NULL(E_POINTER, Network);
+    *Network = nullptr;
+
+    const auto createOptions = wsl::shared::FromJson<wslc_schema::CreateNetworkOptions>(Options);
+
+    WSLCNetworkOptions options{};
+    options.Name = createOptions.Name.c_str();
+    options.Internal = createOptions.Internal;
+    options.EnableIPv6 = createOptions.EnableIPv6;
+    options.Subnet = createOptions.Subnet.has_value() ? createOptions.Subnet->c_str() : nullptr;
+    options.Gateway = createOptions.Gateway.has_value() ? createOptions.Gateway->c_str() : nullptr;
+
+    const auto warning = apicompat::Convert(WarningCallback);
+    RETURN_IF_FAILED(CreateNetwork(&options, warning.Get()));
+
+    // Remove the network if its properties cannot be returned, so a failed call leaves nothing behind.
+    auto deleteNetwork = wil::scope_exit([&]() { LOG_IF_FAILED(DeleteNetwork(createOptions.Name.c_str())); });
+
+    wil::unique_cotaskmem_ansistring inspectOutput;
+    RETURN_IF_FAILED(InspectNetwork(createOptions.Name.c_str(), inspectOutput.put()));
+
+    const auto network = wsl::shared::FromJson<wslc_schema::Network>(inspectOutput.get());
+
+    wslc_schema::NetworkListEntry entry;
+    entry.Id = network.Id;
+    entry.Name = network.Name;
+    entry.Driver = network.Driver;
+    entry.Scope = network.Scope;
+    entry.Created = network.Created;
+    entry.EnableIPv4 = network.EnableIPv4;
+    entry.EnableIPv6 = network.EnableIPv6;
+    entry.Internal = network.Internal;
+    entry.Labels = network.Labels;
+    entry.Labels.erase(WSLCNetworkManagedLabel);
+    entry.IPAM = network.IPAM;
+
+    const std::string json = wsl::shared::ToJson(entry);
+    *Network = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(json.c_str()).release();
+
+    deleteNetwork.release();
+    return S_OK;
+}
+CATCH_RETURN();
+
 MultiHandleWait WSLCSession::CreateIOContext(HANDLE CancelHandle)
 {
     io::MultiHandleWait io;

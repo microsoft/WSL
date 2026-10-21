@@ -37,6 +37,7 @@ WslcLoadSessionImageFromFile
 WslcDeleteSessionImage
 WslcListSessionImages
 WslcListSessionNetworks
+WslcCreateSessionNetwork
 WslcDeleteSessionNetwork
 WslcCreateSessionVhdVolume
 WslcDeleteSessionVhdVolume

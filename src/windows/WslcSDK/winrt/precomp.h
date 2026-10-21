@@ -35,6 +35,7 @@ Abstract:
 #include "ImageProgress.h"
 #include "InstallProgress.h"
 #include "NetworkInfo.h"
+#include "NetworkSettings.h"
 #include "Process.h"
 #include "ProcessSettings.h"
 #include "PullImageOptions.h"

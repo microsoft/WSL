@@ -423,6 +423,23 @@ IVectorView<winrt::Microsoft::WSL::Containers::NetworkInfo> Session::GetNetworks
     return winrt::single_threaded_vector(std::move(networks)).GetView();
 }
 
+winrt::Microsoft::WSL::Containers::NetworkInfo Session::CreateNetwork(winrt::Microsoft::WSL::Containers::NetworkSettings const& settings)
+{
+    if (!settings)
+    {
+        throw winrt::hresult_error(E_POINTER, L"Network settings cannot be null");
+    }
+
+    EnsureStarted();
+
+    WslcNetworkInfo networkInfo{};
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcCreateSessionNetwork(ToHandle(), GetStructPointer(settings), &networkInfo, errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
+
+    return winrt::make<implementation::NetworkInfo>(networkInfo);
+}
+
 void Session::DeleteNetwork(hstring const& name)
 {
     if (name.empty())

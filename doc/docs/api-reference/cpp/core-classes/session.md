@@ -190,6 +190,14 @@ for (auto const& network : networks)
 }
 ```
 
+## Session::CreateNetwork(NetworkSettings)
+
+Creates a bridge network in the session and returns it. Throws `HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS)` if a network with the same name exists.
+
+```cpp
+auto network = session.CreateNetwork(NetworkSettings{L"backend"});
+```
+
 ## Session::DeleteNetwork(hstring)
 
 Deletes a network from the session. Throws `WSLC_E_NETWORK_NOT_FOUND` if the network does not exist.

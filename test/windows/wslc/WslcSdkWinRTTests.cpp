@@ -711,6 +711,72 @@ class WslcSdkWinRtTests
         }
     }
 
+    WSLC_TEST_METHOD(NetworkCreate)
+    {
+        constexpr auto c_networkName = "wslc-sdk-winrt-create-network";
+        constexpr auto c_subnet = L"10.231.48.0";
+        constexpr auto c_gateway = L"10.231.48.1";
+        const winrt::hstring networkName = winrt::to_hstring(c_networkName);
+
+        auto comSession =
+            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->session.query<IWSLCSession>();
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName));
+
+        // Positive: the created network is returned and listed with the requested settings.
+        {
+            WSLCSDK::NetworkSettings settings{networkName};
+            settings.Flags(WSLCSDK::NetworkFlags::Internal);
+            settings.Subnet(winrt::Windows::Networking::HostName{c_subnet});
+            settings.SubnetPrefixLength(24);
+            settings.Gateway(winrt::Windows::Networking::HostName{c_gateway});
+
+            const auto created = m_defaultSession.CreateNetwork(settings);
+            auto cleanupNetwork = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName)); });
+
+            VERIFY_ARE_EQUAL(created.Name(), networkName);
+            VERIFY_ARE_EQUAL(created.Id().size(), 64u);
+            VERIFY_ARE_EQUAL(created.Driver(), winrt::hstring{L"bridge"});
+            VERIFY_ARE_EQUAL(created.Flags(), WSLCSDK::NetworkFlags::EnableIPv4 | WSLCSDK::NetworkFlags::Internal);
+            VERIFY_IS_NOT_NULL(created.IPv4Subnet());
+            VERIFY_ARE_EQUAL(created.IPv4Subnet().CanonicalName(), winrt::hstring{c_subnet});
+            VERIFY_ARE_EQUAL(created.IPv4SubnetPrefixLength(), static_cast<uint8_t>(24));
+            VERIFY_IS_NOT_NULL(created.IPv4Gateway());
+            VERIFY_ARE_EQUAL(created.IPv4Gateway().CanonicalName(), winrt::hstring{c_gateway});
+
+            bool listed = false;
+            for (auto const& network : m_defaultSession.GetNetworks())
+            {
+                listed |= network.Id() == created.Id();
+            }
+
+            VERIFY_IS_TRUE(listed);
+
+            // Negative: settings cannot change after they have been applied.
+            VERIFY_THROWS_HR(settings.Flags(WSLCSDK::NetworkFlags::None), E_ILLEGAL_STATE_CHANGE);
+
+            // Negative: creating a duplicate network fails.
+            VERIFY_THROWS_HR(m_defaultSession.CreateNetwork(WSLCSDK::NetworkSettings{networkName}), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+        }
+
+        // Negative: invalid arguments.
+        {
+            VERIFY_THROWS_HR(m_defaultSession.CreateNetwork(nullptr), E_POINTER);
+            VERIFY_THROWS_HR(WSLCSDK::NetworkSettings{L""}, E_INVALIDARG);
+
+            WSLCSDK::NetworkSettings settings{networkName};
+            VERIFY_THROWS_HR(settings.Subnet(winrt::Windows::Networking::HostName{L"example.com"}), E_INVALIDARG);
+
+            settings.Subnet(winrt::Windows::Networking::HostName{c_subnet});
+            VERIFY_THROWS_HR(m_defaultSession.CreateNetwork(settings), E_INVALIDARG);
+
+            WSLCSDK::NetworkSettings mismatched{networkName};
+            mismatched.Subnet(winrt::Windows::Networking::HostName{c_subnet});
+            mismatched.SubnetPrefixLength(24);
+            mismatched.Gateway(winrt::Windows::Networking::HostName{L"fd00::1"});
+            VERIFY_THROWS_HR(m_defaultSession.CreateNetwork(mismatched), E_INVALIDARG);
+        }
+    }
+
     // -----------------------------------------------------------------------
     // Container lifecycle tests
     // -----------------------------------------------------------------------

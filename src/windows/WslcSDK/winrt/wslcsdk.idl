@@ -92,6 +92,7 @@ namespace Microsoft.WSL.Containers
         IVectorView<ImageInfo> GetImages();
 
         IVectorView<NetworkInfo> GetNetworks();
+        NetworkInfo CreateNetwork(NetworkSettings settings);
         void DeleteNetwork(String name);
 
         event SessionTerminationHandler Terminated;
@@ -393,6 +394,22 @@ namespace Microsoft.WSL.Containers
         Windows.Networking.HostName IPv6Subnet { get; };
         UInt8 IPv6SubnetPrefixLength { get; };
         Windows.Networking.HostName IPv6Gateway { get; };
+    };
+
+    runtimeclass NetworkSettings
+    {
+        NetworkSettings(String name);
+
+        String Name;
+
+        // Only EnableIPv6 and Internal are accepted; IPv4 is always enabled.
+        NetworkFlags Flags;
+
+        // Optional. The subnet address family must match the gateway and requires EnableIPv6 for IPv6.
+        // When Subnet is null the session chooses an IPv4 subnet.
+        Windows.Networking.HostName Subnet;
+        UInt8 SubnetPrefixLength;
+        Windows.Networking.HostName Gateway;
     };
 
     // Ensure wslcsdk.h and wslc.idl are also updated.

@@ -711,6 +711,49 @@ STDAPI WslcListSessionNetworks(
     _Out_ uint32_t* count,
     _Outptr_opt_result_z_ PWSTR* errorMessage);
 
+typedef struct WslcNetworkSettings
+{
+    _In_z_ PCSTR name;
+
+    // Only WSLC_NETWORK_FLAG_ENABLE_IPV6 and WSLC_NETWORK_FLAG_INTERNAL are accepted; IPv4 is always enabled.
+    WslcNetworkFlags flags;
+
+    // Optional subnet and gateway in network byte order. Set the prefix length of at most one address family; when both
+    // are 0 the session chooses an IPv4 subnet. An all-zero gateway lets the session choose the gateway.
+    uint8_t ipv4PrefixLength;
+    uint8_t ipv6PrefixLength;
+    IN_ADDR ipv4Subnet;
+    IN_ADDR ipv4Gateway;
+    IN6_ADDR ipv6Subnet;
+    IN6_ADDR ipv6Gateway;
+} WslcNetworkSettings;
+
+// Creates a bridge network in a session.
+//
+// Parameters:
+//   session
+//       A valid WslcSession handle.
+//
+//   settings
+//       The settings of the network to create.
+//
+//   networkInfo
+//       Optional. On success, receives the properties of the created network. May be null.
+//
+//   errorMessage
+//       Optional. On failure, receives a human-readable error message. May be null.
+//
+// Return Value:
+//   S_OK on success. Otherwise, an HRESULT error code indicating the reason for failure.
+//
+// Notes:
+//   - Returns HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS) if a network with the same name exists.
+//   - Returns E_INVALIDARG if the name is invalid or reserved, if flags contains an unsupported value, if both prefix
+//     lengths are set, if a prefix length is out of range, if an IPv6 subnet is set without WSLC_NETWORK_FLAG_ENABLE_IPV6,
+//     or if a gateway is set without a subnet of the same address family.
+STDAPI WslcCreateSessionNetwork(
+    _In_ WslcSession session, _In_ const WslcNetworkSettings* settings, _Out_opt_ WslcNetworkInfo* networkInfo, _Outptr_opt_result_z_ PWSTR* errorMessage);
+
 // Deletes a network from a session.
 //
 // Parameters:

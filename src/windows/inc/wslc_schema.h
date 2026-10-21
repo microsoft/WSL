@@ -358,6 +358,18 @@ struct NetworkListEntry
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkListEntry, Id, Name, Driver, Scope, Created, EnableIPv4, EnableIPv6, Internal, Labels, IPAM);
 };
 
+// The network creation options carried from the SDK to the session. Subnet uses CIDR notation.
+struct CreateNetworkOptions
+{
+    std::string Name;
+    bool Internal{};
+    bool EnableIPv6{};
+    std::optional<std::string> Subnet;
+    std::optional<std::string> Gateway;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateNetworkOptions, Name, Internal, EnableIPv6, Subnet, Gateway);
+};
+
 // The volume properties carried from the session to the CLI for "volume list". Values keep their
 // native types; the CLI renders the string output.
 struct VolumeListEntry

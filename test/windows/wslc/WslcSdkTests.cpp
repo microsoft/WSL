@@ -593,6 +593,92 @@ class WslcSdkTests
         }
     }
 
+    WSLC_TEST_METHOD(NetworkCreate)
+    {
+        constexpr auto c_networkName = "wslc-sdk-create-network";
+        constexpr auto c_subnet = "10.231.47.0";
+        constexpr auto c_gateway = "10.231.47.1";
+
+        auto comSession = reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session.query<IWSLCSession>();
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName));
+
+        WslcNetworkSettings settings{};
+        settings.name = c_networkName;
+        settings.flags = WSLC_NETWORK_FLAG_INTERNAL;
+        settings.ipv4PrefixLength = 24;
+        VERIFY_ARE_EQUAL(inet_pton(AF_INET, c_subnet, &settings.ipv4Subnet), 1);
+        VERIFY_ARE_EQUAL(inet_pton(AF_INET, c_gateway, &settings.ipv4Gateway), 1);
+
+        // Positive: the created network is returned and listed with the requested settings.
+        {
+            WslcNetworkInfo created{};
+            VERIFY_SUCCEEDED(WslcCreateSessionNetwork(m_defaultSession, &settings, &created, nullptr));
+            auto cleanupNetwork = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName)); });
+
+            VERIFY_ARE_EQUAL(std::string(c_networkName), created.name);
+            VERIFY_ARE_EQUAL(strlen(created.id), size_t{64});
+            VERIFY_ARE_EQUAL(std::string("bridge"), created.driver);
+            VERIFY_IS_TRUE(WI_IsFlagSet(created.flags, WSLC_NETWORK_FLAG_ENABLE_IPV4));
+            VERIFY_IS_TRUE(WI_IsFlagSet(created.flags, WSLC_NETWORK_FLAG_INTERNAL));
+            VERIFY_IS_FALSE(WI_IsFlagSet(created.flags, WSLC_NETWORK_FLAG_ENABLE_IPV6));
+            VERIFY_ARE_EQUAL(created.ipv4PrefixLength, uint8_t{24});
+            VERIFY_ARE_EQUAL(created.ipv4Subnet.s_addr, settings.ipv4Subnet.s_addr);
+            VERIFY_ARE_EQUAL(created.ipv4Gateway.s_addr, settings.ipv4Gateway.s_addr);
+
+            wil::unique_cotaskmem_array_ptr<WslcNetworkInfo> networks;
+            VERIFY_SUCCEEDED(WslcListSessionNetworks(m_defaultSession, networks.addressof(), networks.size_address<uint32_t>(), nullptr));
+            const auto listed = std::find_if(networks.begin(), networks.end(), [&](const WslcNetworkInfo& network) {
+                return std::string_view(c_networkName) == network.name;
+            });
+            VERIFY_IS_TRUE(listed != networks.end());
+            VERIFY_ARE_EQUAL(std::string(created.id), listed->id);
+
+            // Negative: creating a duplicate network fails with an error message.
+            wil::unique_cotaskmem_string errorMessage;
+            VERIFY_ARE_EQUAL(WslcCreateSessionNetwork(m_defaultSession, &settings, nullptr, errorMessage.put()), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+            VERIFY_IS_NOT_NULL(errorMessage.get());
+        }
+
+        // Positive: the session chooses a subnet when none is provided, and networkInfo is optional.
+        {
+            WslcNetworkSettings defaultSettings{};
+            defaultSettings.name = c_networkName;
+            VERIFY_SUCCEEDED(WslcCreateSessionNetwork(m_defaultSession, &defaultSettings, nullptr, nullptr));
+            VERIFY_SUCCEEDED(WslcDeleteSessionNetwork(m_defaultSession, c_networkName, nullptr));
+        }
+
+        // Negative: invalid arguments.
+        {
+            VERIFY_ARE_EQUAL(WslcCreateSessionNetwork(m_defaultSession, nullptr, nullptr, nullptr), E_POINTER);
+
+            WslcNetworkSettings invalid{};
+            VERIFY_ARE_EQUAL(WslcCreateSessionNetwork(m_defaultSession, &invalid, nullptr, nullptr), E_POINTER);
+
+            invalid.name = c_networkName;
+            invalid.flags = WSLC_NETWORK_FLAG_ENABLE_IPV4;
+            VERIFY_ARE_EQUAL(WslcCreateSessionNetwork(m_defaultSession, &invalid, nullptr, nullptr), E_INVALIDARG);
+
+            invalid = settings;
+            invalid.flags = WSLC_NETWORK_FLAG_ENABLE_IPV6;
+            invalid.ipv6PrefixLength = 64;
+            VERIFY_ARE_EQUAL(WslcCreateSessionNetwork(m_defaultSession, &invalid, nullptr, nullptr), E_INVALIDARG);
+
+            invalid = settings;
+            invalid.ipv4PrefixLength = 33;
+            VERIFY_ARE_EQUAL(WslcCreateSessionNetwork(m_defaultSession, &invalid, nullptr, nullptr), E_INVALIDARG);
+
+            invalid = settings;
+            invalid.flags = WSLC_NETWORK_FLAG_NONE;
+            invalid.ipv4PrefixLength = 0;
+            invalid.ipv6PrefixLength = 64;
+            VERIFY_ARE_EQUAL(WslcCreateSessionNetwork(m_defaultSession, &invalid, nullptr, nullptr), E_INVALIDARG);
+
+            invalid = settings;
+            invalid.ipv4PrefixLength = 0;
+            VERIFY_ARE_EQUAL(WslcCreateSessionNetwork(m_defaultSession, &invalid, nullptr, nullptr), E_INVALIDARG);
+        }
+    }
+
     WSLC_TEST_METHOD(LoadImage)
     {
         // Positive: load a saved image tar and verify the image can be run.

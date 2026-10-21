@@ -458,6 +458,20 @@ void ConvertNetworkEntry(const wsl::windows::common::wslc_schema::NetworkListEnt
     }
 }
 
+template <typename TAddress>
+std::string FormatNetworkAddress(int Family, const TAddress& Address)
+{
+    char buffer[INET6_ADDRSTRLEN]{};
+    THROW_IF_FAILED(InetNtopToHresult(Family, &Address, buffer, ARRAYSIZE(buffer)));
+    return buffer;
+}
+
+template <typename TAddress>
+std::string FormatNetworkSubnet(int Family, const TAddress& Address, uint8_t PrefixLength)
+{
+    return std::format("{}/{}", FormatNetworkAddress(Family, Address), static_cast<unsigned int>(PrefixLength));
+}
+
 } // namespace
 
 // SESSION DEFINITIONS
@@ -1822,6 +1836,68 @@ try
 
     *networks = result.release();
     *count = static_cast<uint32_t>(entries.size());
+
+    return errorInfoWrapper.CaptureResult(S_OK);
+}
+CATCH_RETURN();
+
+STDAPI WslcCreateSessionNetwork(
+    _In_ WslcSession session, _In_ const WslcNetworkSettings* settings, _Out_opt_ WslcNetworkInfo* networkInfo, _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(E_POINTER, settings);
+    RETURN_HR_IF_NULL(E_POINTER, settings->name);
+
+    if (networkInfo != nullptr)
+    {
+        *networkInfo = {};
+    }
+
+    constexpr auto supportedFlags = WSLC_NETWORK_FLAG_ENABLE_IPV6 | WSLC_NETWORK_FLAG_INTERNAL;
+    RETURN_HR_IF(E_INVALIDARG, WI_IsAnyFlagSet(settings->flags, ~supportedFlags));
+    RETURN_HR_IF(E_INVALIDARG, settings->ipv4PrefixLength != 0 && settings->ipv6PrefixLength != 0);
+    RETURN_HR_IF(E_INVALIDARG, settings->ipv4PrefixLength > 32 || settings->ipv6PrefixLength > 128);
+    RETURN_HR_IF(E_INVALIDARG, settings->ipv6PrefixLength != 0 && WI_IsFlagClear(settings->flags, WSLC_NETWORK_FLAG_ENABLE_IPV6));
+    RETURN_HR_IF(E_INVALIDARG, settings->ipv4Gateway.s_addr != 0 && settings->ipv4PrefixLength == 0);
+    RETURN_HR_IF(E_INVALIDARG, !IN6_IS_ADDR_UNSPECIFIED(&settings->ipv6Gateway) && settings->ipv6PrefixLength == 0);
+
+    wsl::windows::common::wslc_schema::CreateNetworkOptions options;
+    options.Name = settings->name;
+    options.Internal = WI_IsFlagSet(settings->flags, WSLC_NETWORK_FLAG_INTERNAL);
+    options.EnableIPv6 = WI_IsFlagSet(settings->flags, WSLC_NETWORK_FLAG_ENABLE_IPV6);
+
+    if (settings->ipv4PrefixLength != 0)
+    {
+        options.Subnet = FormatNetworkSubnet(AF_INET, settings->ipv4Subnet, settings->ipv4PrefixLength);
+        if (settings->ipv4Gateway.s_addr != 0)
+        {
+            options.Gateway = FormatNetworkAddress(AF_INET, settings->ipv4Gateway);
+        }
+    }
+    else if (settings->ipv6PrefixLength != 0)
+    {
+        options.Subnet = FormatNetworkSubnet(AF_INET6, settings->ipv6Subnet, settings->ipv6PrefixLength);
+        if (!IN6_IS_ADDR_UNSPECIFIED(&settings->ipv6Gateway))
+        {
+            options.Gateway = FormatNetworkAddress(AF_INET6, settings->ipv6Gateway);
+        }
+    }
+
+    wil::unique_cotaskmem_ansistring output;
+    HRESULT hr = internalType->session->CreateNetwork(wsl::shared::ToJson(options).c_str(), nullptr, &output);
+    if (FAILED(hr))
+    {
+        return errorInfoWrapper.CaptureResult(hr);
+    }
+
+    if (networkInfo != nullptr)
+    {
+        ConvertNetworkEntry(wsl::shared::FromJson<wsl::windows::common::wslc_schema::NetworkListEntry>(output.get()), *networkInfo);
+    }
 
     return errorInfoWrapper.CaptureResult(S_OK);
 }

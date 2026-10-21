@@ -29,6 +29,7 @@ public sealed class Session : IDisposable
     public AuthenticateResult Authenticate(Uri serverAddress, string username, string password);
     public IReadOnlyList<ImageInfo> GetImages();
     public IReadOnlyList<NetworkInfo> GetNetworks();
+    public NetworkInfo CreateNetwork(NetworkSettings settings);
     public void DeleteNetwork(string name);
     public void Dispose();
 }
@@ -238,6 +239,14 @@ foreach (var network in session.GetNetworks())
 {
     Console.WriteLine($"{network.Name} ({network.Driver})");
 }
+```
+
+## Session.CreateNetwork(NetworkSettings settings)
+
+Creates a bridge network in the session and returns it. Throws `HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS)` if a network with the same name exists.
+
+```csharp
+var network = session.CreateNetwork(new NetworkSettings("backend"));
 ```
 
 ## Session.DeleteNetwork(string name)

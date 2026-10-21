@@ -23,4 +23,5 @@
 - [WslcTagImageOptions](wslctagimageoptions.md)
 - [WslcPushImageOptions](wslcpushimageoptions.md)
 - [WslcNetworkInfo](wslcnetworkinfo.md)
+- [WslcNetworkSettings](wslcnetworksettings.md)
 - [WslcVersion](wslcversion.md)
