@@ -571,10 +571,7 @@ Return Value:
 
     wsl::linux::WslDistributionConfig Config{CONFIG_FILE};
 
-    if (getenv(LX_WSL2_SYSTEM_DISTRO_SHARE_ENV) != nullptr)
-    {
-        Config.GuiAppsEnabled = true;
-    }
+    Config.GuiAppsEnabled = getenv(LX_WSL2_SYSTEM_DISTRO_SHARE_ENV) != nullptr;
 
     //
     // Initialize the static entries.
@@ -1166,6 +1163,7 @@ Return Value:
         if (kernelModulesPath.empty())
         {
             return;
+<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
         }
 
         //
@@ -1224,6 +1222,39 @@ Return Value:
                 LOG_ERROR("UtilMountFile({}, {}) failed {}", perfBinary, perfMountPoint.string(), errno);
             }
         }
+=======
+        }
+
+        //
+        // Point /lib/modules/<release>/build at the kernel headers, replacing any entry that the
+        // distro may have created so that it can't shadow the headers matching the running kernel.
+        //
+        // N.B. A directory can't be replaced with a symlink (and removing it would mean a recursive
+        //      delete), so bind mount the headers over it instead.
+        //
+
+        const std::string linkPath = kernelModulesPath + "/build";
+        struct stat existing{};
+        if ((lstat(linkPath.c_str(), &existing) == 0) && S_ISDIR(existing.st_mode))
+        {
+            if (UtilMount(target.c_str(), linkPath.c_str(), nullptr, (MS_BIND | MS_REC), nullptr) < 0)
+            {
+                LOG_ERROR("UtilMount({}, {}) failed {}", target, linkPath, errno);
+            }
+
+            return;
+        }
+
+        if ((unlink(linkPath.c_str()) < 0) && (errno != ENOENT))
+        {
+            LOG_ERROR("unlink({}) failed {}", linkPath, errno);
+        }
+
+        if (symlink(target.c_str(), linkPath.c_str()) < 0)
+        {
+            LOG_ERROR("symlink({}, {}) failed {}", target, linkPath, errno);
+        }
+>>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
     });
 
     //

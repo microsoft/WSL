@@ -891,6 +891,10 @@ Hvis du vil ha mer informasjon om Admin Protection, kan du gå til https://aka.m
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>Nestet virtualisering støttes ikke på denne maskinen.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>Kan ikke oppdage støtte for nestet virtualisering, feil: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Kan ikke opprette et nettverksendepunkt med adressen {}, tilordnet ny adresse: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -918,6 +922,14 @@ Faller tilbake til NAT-nettverk.</value>
   <data name="MessageMirroredNetworkingNotSupportedIpv6Disabled" xml:space="preserve">
     <value>IPv6 er deaktivert på verten på en ikke-støttet måte (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
+  </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>Speilet nettverk bruker et mindre område for flyktige porter ({} porter i stedet for {}). Dette kan begrense antall samtidige tilkoblinger.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>Avspeilet nettverk kan ikke reservere det minste sammenhengende området på {} TCP- og UDP-porter. Kontroller bruk og utelatelser for Windows-porter.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Brannmuren støtter ikke Hyper-V</value>
@@ -3694,7 +3706,7 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>Finner ikke avbildningen «{}», henter</value>
+    <value>Finner ikke bildet '{}' lokalt</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">

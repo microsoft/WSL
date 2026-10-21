@@ -105,7 +105,7 @@ bool ConsoleService::RelayInteractiveTty(wsl::windows::common::ConsoleState& Con
         };
 
         // TODO: Make this configurable (default to ctrl-p, ctrl-q).
-        std::vector<char> detachSequence{0x10, 0x11};
+        std::vector<wchar_t> detachSequence{0x10, 0x11};
 
         auto onDetach = [&detached]() { detached = true; };
 

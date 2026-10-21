@@ -898,6 +898,10 @@ Para obter mais informações sobre Admin Protection, visite https://aka.ms/apde
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>Não há suporte para virtualização aninhada nesta máquina.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>Falha ao detectar suporte à virtualização aninhada, erro: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Falha ao criar o ponto de extremidade de rede com o endereço: '{}', novo endereço atribuído: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -925,6 +929,14 @@ Voltando à rede NAT.</value>
   <data name="MessageMirroredNetworkingNotSupportedIpv6Disabled" xml:space="preserve">
     <value>O IPv6 está desabilitado no host de uma forma sem suporte (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
+  </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>A rede espelhada está usando um intervalo de portas efêmero menor ({} portas em vez de {}). Isso pode limitar o número de conexões simultâneas.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>A rede espelhada não pôde reservar o intervalo contíguo mínimo de {} portas TCP e UDP. Verifique o uso e as exclusões de portas do Windows.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Não há suporte para o firewall do Hyper-V</value>
@@ -3289,7 +3301,11 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
+<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
     <value>Invalid mode '{}'.</value>
+=======
+    <value>Modo inválido '{}'.</value>
+>>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
@@ -3701,7 +3717,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>Imagem '{}' não encontrada, transferindo</value>
+    <value>Não foi possível encontrar a imagem '{}' localmente</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">
@@ -3878,6 +3894,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Não é possível exportar o contêiner para o terminal. Use a opção -o ou redirecione stdout.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
+<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
     <value>Expected format: [&lt;host path | named volume&gt;:]&lt;container path&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
@@ -3887,6 +3904,17 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   </data>
   <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
     <value>The volume specification is empty.</value>
+=======
+    <value>Formato esperado: [&lt;host path | named volume&gt;:]&lt;container path&gt;[:mode]</value>
+    <comment>Usage string for volume mount specification.</comment>
+  </data>
+  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
+    <value>Especificação de volume inválida: '{}'. {} {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
+    <value>A especificação do volume está vazia.</value>
+>>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
   </data>
   <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
     <value>A especificação do volume contém uma seção vazia entre dois-pontos.</value>

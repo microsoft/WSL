@@ -168,6 +168,11 @@ int WslInitWatcher(int Argc, char** Argv);
 
 int WslcGpuHookEntry();
 
+<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
+=======
+int WslcGpuStartHookEntry();
+
+>>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
 void MountDistroCgroupNamespace(int CgroupNamespaceFd);
 
 int WslEntryPoint(int Argc, char* Argv[])
@@ -239,6 +244,10 @@ int WslEntryPoint(int Argc, char* Argv[])
         else if (strcmp(BaseName, LX_INIT_WSLC_GPU_HOOK) == 0)
         {
             ExitCode = WslcGpuHookEntry();
+        }
+        else if (strcmp(BaseName, LX_INIT_WSLC_GPU_START_HOOK) == 0)
+        {
+            ExitCode = WslcGpuStartHookEntry();
         }
         else
         {

@@ -952,10 +952,13 @@ class UnitTests
         const auto wslSupport =
             wil::CoCreateInstance<LxssUserSession, IWslSupport>(CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA);
         wsl::windows::common::security::ConfigureForCOMImpersonation(wslSupport.get());
+<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
 
         // REVIEW: The test process initializes COM with static cloaking, so configure this raw proxy for dynamic
         // cloaking to let the service impersonate the caller instead of failing with ERROR_BAD_IMPERSONATION_LEVEL.
         wsl::windows::common::security::ConfigureForCOMImpersonation(wslSupport.get());
+=======
+>>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
 
         ULONG Version;
         ULONG DefaultUid;
@@ -2712,6 +2715,39 @@ Usage:
         validateEnvironment(true);
     }
 
+    WSL2_TEST_METHOD(GuiApplicationsGlobalDisableOverridesDistroOptIn)
+    {
+        auto validateDistroStartup = []() {
+            TerminateDistribution();
+
+            auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"--exec /bin/echo ok");
+            VERIFY_ARE_EQUAL(L"ok\n", output);
+            VERIFY_ARE_EQUAL(L"", warnings);
+
+            std::tie(output, warnings) = LxsstuLaunchWslAndCaptureOutput(L"echo -n \"$DISPLAY$WAYLAND_DISPLAY\"");
+            VERIFY_ARE_EQUAL(L"", output);
+            VERIFY_ARE_EQUAL(L"", warnings);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /run/tmpfiles.d/x11.conf"), 0L);
+        };
+
+        constexpr auto c_distroConfig = "[general]\nguiApplications=true\n";
+        WslConfigChange configChange(LxssGenerateTestConfig({.guiApplications = false}));
+
+        {
+            LogInfo("Validate with systemd disabled.");
+            DistroFileChange wslConf(L"/etc/wsl.conf", false);
+            wslConf.SetContent(wsl::shared::string::MultiByteToWide(c_distroConfig).c_str());
+            validateDistroStartup();
+        }
+
+        {
+            LogInfo("Validate with systemd enabled.");
+            auto revertSystemd = EnableSystemd(c_distroConfig);
+            VERIFY_IS_TRUE(IsSystemdRunning(L"--system"));
+            validateDistroStartup();
+        }
+    }
+
     WSL2_TEST_METHOD(GuiApplicationsSystemd)
     {
         DistroFileChange wslConf(L"/etc/wsl.conf", false);
@@ -3196,10 +3232,14 @@ Usage:
 
     WSL2_TEST_METHOD(KernelArtifacts)
     {
+<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
         // The unified kernel artifacts VHD provides the kernel headers and the perf tooling
         // alongside the kernel modules. Headers are mounted at /usr/src/linux-headers-$(uname -r)
         // with /lib/modules/$(uname -r)/build symlinked to that directory; perf is mounted at
         // /usr/lib/linux-tools/$(uname -r) and exposed via $PATH.
+=======
+        // Kernel artifacts provide headers at /usr/src/linux-headers-$(uname -r).
+>>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
 
         // Headers: the build symlink and a representative uapi header are present.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -L /lib/modules/$(uname -r)/build", nullptr, nullptr, nullptr, nullptr), 0u);
@@ -3238,6 +3278,7 @@ EOF
                 nullptr),
             0u);
 
+<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
         // perf: leave no trace in the distro's file system and make the versioned binary reachable
         // via $PATH, with PERF_EXEC_PATH pointing at its helper scripts.
         //
@@ -3276,16 +3317,27 @@ EOF
                 nullptr,
                 nullptr),
             0u);
+=======
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LxsstuLaunchWsl(L"ln -snf /usr/src/linux-headers-$(uname -r) /lib/modules/$(uname -r)/build");
+        });
+
+        // Stale header links are refreshed after restart.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"rm /lib/modules/$(uname -r)/build && ln -s /tmp /lib/modules/$(uname -r)/build"), 0u);
+>>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(L"test \"$(readlink /lib/modules/$(uname -r)/build)\" = \"/usr/src/linux-headers-$(uname -r)\"", nullptr, nullptr, nullptr, nullptr),
             0u);
+<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(readlink /usr/bin/perf)\" = \"distro-perf\"", nullptr, nullptr, nullptr, nullptr), 0u);
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(
                 L"test \"$(stat -Lc %d:%i /usr/bin/perf)\" = \"$(stat -Lc %d:%i /usr/lib/linux-tools/$(uname -r)/bin/perf)\"", nullptr, nullptr, nullptr, nullptr),
             0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"/usr/bin/perf --version", nullptr, nullptr, nullptr, nullptr), 0u);
+=======
+>>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
     }
 
     WSL2_TEST_METHOD(CrashCollection)
@@ -3883,6 +3935,41 @@ EOF
 
         WslShutdown();
         VerifyNoVmAccessToVhd(vhdPath.c_str());
+<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
+=======
+    }
+
+    WSL2_TEST_METHOD(CompactEncrypted)
+    {
+        constexpr auto name = L"compact-encrypted-test-distro";
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
+        auto cleanupName =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
+        WslShutdown();
+
+        const auto distroKey = OpenDistributionKey(name);
+        VERIFY_IS_NOT_NULL(distroKey.get());
+
+        const auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath", L"");
+        const auto vhdFileName =
+            wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"VhdFileName", L"ext4.vhdx");
+        const auto vhdPath = std::filesystem::path(basePath) / vhdFileName;
+
+        if (!EncryptFileW(vhdPath.c_str()))
+        {
+            const auto error = GetLastError();
+            if (error == ERROR_NOT_SUPPORTED || error == ERROR_EFS_DISABLED)
+            {
+                LogSkipped("EFS is unavailable for the test VHDX: %lu", error);
+                return;
+            }
+
+            VERIFY_ARE_EQUAL(ERROR_SUCCESS, error);
+        }
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--manage {} --compact", name)), 0L);
+>>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
     }
 
     WSL2_TEST_METHOD(FileOffsets)
@@ -5298,6 +5385,119 @@ VERSION_ID="Invalid|Format"
             VERIFY_ARE_EQUAL(wsl::windows::common::registry::ReadDword(distroKey.get(), nullptr, L"RunOOBE", 1), 0);
             validateOutput(nullptr, L"");
         }
+<<<<<<< 596a87a58d250ab1572014213ee5e4c1a12db4a1
+=======
+    }
+
+    static void ValidateOOBEWait(bool TerminateWhileWaiting, bool Retry)
+    {
+        using wsl::windows::common::SubProcess;
+        constexpr DWORD c_timeout = 30 * 1000;
+
+        DistroFileChange distributionconf(L"/etc/wsl-distribution.conf", false);
+        distributionconf.SetContent(
+            L"[oobe]\ncommand = /bin/bash -c 'echo ready; read -r result; exit \"${result:-1}\"'\ndefaultUid = 0\n");
+
+        const auto distroKey = OpenDistributionKey(LXSS_DISTRO_NAME_TEST_L);
+        RegistryKeyChange<DWORD> runOOBE(distroKey.get(), L"", L"RunOOBE", 1);
+        const RegistryKeyChange<DWORD> defaultUid(distroKey.get(), L"", L"DefaultUid", 0);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { TerminateDistribution(); });
+        TerminateDistribution();
+
+        struct Process
+        {
+            Process(wil::unique_handle process, wil::unique_hfile output) : handle(std::move(process)), reader(std::move(output))
+            {
+            }
+
+            wil::unique_handle handle;
+            PartialHandleRead reader;
+        };
+
+        auto startProcess = [](LPCWSTR command, HANDLE input) {
+            SubProcess process(nullptr, LxssGenerateWslCommandLine(command).c_str());
+            auto [read, write] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+            THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(write.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+            process.SetStdHandles(input, write.get(), write.get());
+
+            return std::make_unique<Process>(process.Start(), std::move(read));
+        };
+
+        auto waitForOutput = [&](const Process& process, const std::string& expected) {
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { THROW_HR_IF(E_ABORT, process.reader.GetData().find(expected) == std::string::npos); },
+                std::chrono::milliseconds(100),
+                std::chrono::milliseconds(c_timeout));
+        };
+
+        auto [emptyInput, emptyWrite] = CreateSubprocessPipe(true, false);
+        emptyWrite.reset();
+        std::vector<std::unique_ptr<Process>> waiters;
+
+        for (int attempt = 0; attempt < (Retry ? 2 : 1); ++attempt)
+        {
+            auto [input, write] = CreateSubprocessPipe(true, false);
+
+            auto releaseOOBE = wil::scope_exit([&]() { write.reset(); });
+            auto oobe = startProcess(nullptr, input.get());
+            input.reset();
+            waitForOutput(*oobe, "ready\n");
+
+            for (int index = 0; index < (TerminateWhileWaiting ? 1 : 2); ++index)
+            {
+                waiters.emplace_back(startProcess(L"--exec /bin/echo completed", emptyInput.get()));
+                waitForOutput(*waiters.back(), "Waiting for OOBE command to complete");
+            }
+
+            if (TerminateWhileWaiting)
+            {
+                // Terminate the distribution while OOBE is still running.
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--terminate {}", LXSS_DISTRO_NAME_TEST_L).c_str()), 0L);
+
+                // The original OOBE process should fail.
+                VERIFY_ARE_EQUAL(SubProcess::GetExitCode(oobe->handle.get(), c_timeout), LxsstuVmMode() ? 1 : -1);
+
+                // All processes blocked on OOBE should fail as well.
+                for (auto& waiter : waiters)
+                {
+                    VERIFY_ARE_EQUAL(SubProcess::GetExitCode(waiter->handle.get(), c_timeout), -1);
+                }
+
+                return;
+            }
+
+            const bool fail = Retry && attempt == 0;
+            const std::string result = fail ? "1\n" : "0\n";
+
+            DWORD written{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(write.get(), result.data(), static_cast<DWORD>(result.size()), &written, nullptr));
+            VERIFY_ARE_EQUAL(written, result.size());
+            write.reset();
+
+            VERIFY_ARE_EQUAL(SubProcess::GetExitCode(oobe->handle.get(), c_timeout), fail ? 1 : 0);
+        }
+
+        // All processes blocked on OOBE should succeed.
+        for (auto& waiter : waiters)
+        {
+            VERIFY_ARE_EQUAL(SubProcess::GetExitCode(waiter->handle.get(), c_timeout), 0);
+            waiter->reader.ExpectClosed(c_timeout);
+
+            const auto expected =
+                std::format("wsl: Waiting for OOBE command to complete for distribution \"{}\"...\r\ncompleted\n", LXSS_DISTRO_NAME_TEST_L);
+
+            VERIFY_ARE_EQUAL(EscapeString(expected), EscapeString(waiter->reader.GetData()));
+        }
+
+        VERIFY_ARE_EQUAL(runOOBE.Get(), 0);
+    }
+
+    TEST_METHOD(OOBEAdvanced)
+    {
+        ValidateOOBEWait(true, false);
+        ValidateOOBEWait(false, false);
+        ValidateOOBEWait(false, true);
+>>>>>>> ab075604403b08df668f5481d06844cd23d1e8eb
     }
 
     static void ValidateDistributionStarts(LPCWSTR Name)

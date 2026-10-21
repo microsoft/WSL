@@ -33,6 +33,9 @@ MirroredNetworking::~MirroredNetworking()
     // will also unblock m_networkManager, if that's waiting for calls through the GNS channel into Linux
     m_gnsChannel.Stop();
 
+    // Join the port-request thread before releasing GNS reservations and closing the service handle.
+    m_gnsPortTrackerChannel.reset();
+
     // Stop DNS suffix change notifications before stopping m_networkManager and m_networkingQueue, as they can call into those objects.
     m_dnsSuffixRegistryWatcher.reset();
 
@@ -57,7 +60,6 @@ MirroredNetworking::~MirroredNetworking()
     m_interfaceNotificationHandle.reset();
     m_networkNotificationHandle.reset();
 
-    m_gnsPortTrackerChannel.reset();
     m_networkingQueue.cancel();
     m_gnsMessageQueue.cancel();
 }
