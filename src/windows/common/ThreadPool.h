@@ -88,18 +88,23 @@ namespace details {
 
         virtual void Execute() = 0;
 
-        void Run() noexcept
+        // Called by the pool while it holds its own lock, so that the item leaves the pending
+        // queue and becomes Running atomically with respect to pool shutdown.
+        bool TryStart() noexcept
         {
+            const auto lock = m_lock.lock_exclusive();
+            if (m_state != State::Pending)
             {
-                const auto lock = m_lock.lock_exclusive();
-                if (m_state != State::Pending)
-                {
-                    return;
-                }
-
-                m_state = State::Running;
+                return false;
             }
 
+            m_state = State::Running;
+            return true;
+        }
+
+        // Runs an item that TryStart() has moved to Running.
+        void Run() noexcept
+        {
             std::exception_ptr error;
             try
             {
@@ -280,6 +285,12 @@ private:
 
             item = std::move(self->m_pending.front());
             self->m_pending.pop_front();
+
+            // An item canceled through its WorkItem handle still consumes the callback queued for it.
+            if (!item->TryStart())
+            {
+                return;
+            }
         }
 
         item->Run();
