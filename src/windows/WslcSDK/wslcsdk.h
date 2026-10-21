@@ -238,10 +238,9 @@ STDAPI WslcInitContainerSettings(_In_ PCSTR imageName, _Out_ WslcContainerSettin
 
 // Notes:
 //   - Returns E_INVALIDARG if both WslcSetContainerSettingsNetworkingMode and WslcSetContainerSettingsNetworks were called,
-//     if an IP address is set without exactly one network or on a primary network that is not user-defined,
-//     or if aliases are set on a network that is not user-defined.
+//     or if aliases or an IP address are set on a network that is not user-defined.
 //   - Returns WSLC_E_RUNTIME_UPDATE_NEEDED if the installed WSL runtime does not support the requested settings, such as
-//     capabilities, aliases on the primary network, or an IP address.
+//     capabilities, or aliases or an IP address on the primary network.
 STDAPI WslcCreateContainer(_In_ WslcSession session, _In_ const WslcContainerSettings* containerSettings, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // Opens an existing container by name, full ID, or partial ID prefix.
@@ -284,7 +283,8 @@ STDAPI WslcSetContainerSettingsNamedVolumes(
 
 // Connects the container to one or more networks. The first network is the primary network.
 // Cannot be combined with WslcSetContainerSettingsNetworkingMode. Pass null and 0 to clear.
-// The networks array and the strings it references are not copied and must stay valid until WslcCreateContainer returns.
+// The networks array and the strings and addresses it references are not copied and must stay valid until
+// WslcCreateContainer returns.
 //
 // Notes:
 //   - Returns E_INVALIDARG if networks and networkCount disagree on being empty, if a network name is null or empty,
