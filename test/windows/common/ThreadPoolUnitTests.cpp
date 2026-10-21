@@ -427,6 +427,35 @@ class ForEachAsyncUnitTests
         VERIFY_ARE_EQUAL(c_maxConcurrency, peak.load());
     }
 
+    TEST_METHOD(ForEachAsync_CompletedItemFreesSlotWhileOthersRun)
+    {
+        // With two slots, item 1 completes only after item 3 starts. Item 3 can start only if the
+        // slot freed by item 2 is reused while item 1 is still running.
+        const std::vector<int> items = {1, 2, 3};
+        wil::unique_event thirdStarted{wil::EventOptions::ManualReset};
+        std::vector<int> results;
+
+        ForEachAsync<int>(
+            items,
+            [&](const int& item) {
+                if (item == 1)
+                {
+                    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_TIMEOUT), !thirdStarted.wait(c_failTimeoutMs));
+                }
+                else if (item == 3)
+                {
+                    thirdStarted.SetEvent();
+                }
+
+                return item;
+            },
+            [&](int result) { results.push_back(result); },
+            [](const int& /*item*/, const std::exception_ptr& /*error*/) { VERIFY_FAIL(L"Unexpected error"); },
+            2);
+
+        VERIFY_IS_TRUE(items == results);
+    }
+
     TEST_METHOD(ForEachAsync_ConcurrencyLargerThanItemCountIsHandled)
     {
         const std::vector<int> items = {1, 2};
