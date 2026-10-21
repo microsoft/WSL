@@ -100,6 +100,7 @@ set(HEADERS
     ConsoleProgressIndicator.h
     ConsoleState.h
     COMImplClass.h
+    RuntimeClass.h
     wslc/models/ContainerModel.h
     DeviceHostProxy.h
     disk.hpp

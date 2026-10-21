@@ -21,6 +21,7 @@ Abstract:
 #include "GuestDeviceManager.h"
 #include "Dmesg.h"
 #include "INetworkingEngine.h"
+#include "RuntimeClass.h"
 #include "WslCoreConfig.h"
 #include <filesystem>
 #include <map>
@@ -32,7 +33,7 @@ Abstract:
 namespace wsl::windows::service::wslc {
 
 class HcsVirtualMachine
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCVirtualMachine, IFastRundown>
+    : public common::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCVirtualMachine, IFastRundown>
 {
 public:
     HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings);
@@ -125,7 +126,7 @@ private:
 // was idle-terminated, without the SYSTEM service holding a VM up front.
 //
 class WSLCVirtualMachineFactory
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCVirtualMachineFactory, IFastRundown>
+    : public common::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCVirtualMachineFactory, IFastRundown>
 {
 public:
     explicit WSLCVirtualMachineFactory(_In_ const WSLCSessionSettings* Settings);

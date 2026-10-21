@@ -579,15 +579,28 @@ WSLCSession::~WSLCSession()
         relay->Stop();
     }
 
-    if (m_destructionCallback)
+    if (m_serviceReference)
     {
-        m_destructionCallback();
+        // wslservice holds a reference to this object until this process exits.
+        // Manually disconnect from the service when the session terminates so the service doesn't keep a reference to this module indefinitely.
+        ComCallData data{};
+        data.pUserDefined = m_serviceReference.get();
+
+        LOG_IF_FAILED(m_serviceReferenceContext->ContextCallback(
+            [](ComCallData* data) -> HRESULT {
+                return CoDisconnectObject(static_cast<IWSLCSessionReference*>(data->pUserDefined), 0);
+            },
+            &data,
+            IID_IContextCallback,
+            5,
+            nullptr));
     }
 }
 
-void WSLCSession::SetDestructionCallback(std::function<void()>&& callback)
+void WSLCSession::SetServiceReference(IWSLCSessionReference* Reference)
 {
-    m_destructionCallback = std::move(callback);
+    THROW_IF_FAILED(CoGetObjectContext(IID_PPV_ARGS(&m_serviceReferenceContext)));
+    m_serviceReference = Reference;
 }
 
 void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid)
@@ -2391,6 +2404,7 @@ try
     WSLCExecutionContext context(this, WarningCallback);
     THROW_HR_IF_NULL(E_POINTER, containerOptions);
     THROW_HR_IF_NULL(E_POINTER, Container);
+    *Container = nullptr;
     THROW_HR_IF_NULL(E_POINTER, containerOptions->Image);
     THROW_HR_IF_MSG(
         E_INVALIDARG,
@@ -2402,6 +2416,13 @@ try
         WI_IsAnyFlagSet(containerOptions->InitProcessOptions.Flags, ~WSLCProcessFlagsValid),
         "Invalid process flags: 0x%x",
         containerOptions->InitProcessOptions.Flags);
+
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_CAPABILITY_ADDITIONS_DISABLED,
+        Localization::MessageWslcCapabilityAdditionsDisabled(),
+        containerOptions->CapAdd.Count > 0 &&
+            !wsl::windows::policies::IsFeatureAllowed(
+                wsl::windows::policies::OpenPoliciesKey().get(), wsl::windows::policies::c_allowWSLContainerPrivileged));
 
     auto lock = AcquireLease();
 
@@ -3224,6 +3245,7 @@ try
     request.Labels[WSLCNetworkManagedLabel] = "true";
 
     request.Internal = static_cast<bool>(Options->Internal);
+    request.EnableIPv6 = static_cast<bool>(Options->EnableIPv6);
 
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG, Localization::MessageWslcGatewayRequiresSubnet(), Options->Gateway != nullptr && Options->Subnet == nullptr);
@@ -3296,6 +3318,7 @@ try
     entry.Driver = full.Driver;
     entry.Scope = full.Scope;
     entry.Internal = full.Internal;
+    entry.EnableIPv6 = full.EnableIPv6;
     entry.Labels = full.Labels;
     entry.Options = full.Options;
     entry.IPAM.Driver = full.IPAM.Driver;
@@ -3847,7 +3870,7 @@ CATCH_RETURN();
 
 HRESULT WSLCSession::InterfaceSupportsErrorInfo(REFIID riid)
 {
-    return riid == __uuidof(IWSLCSession) || riid == __uuidof(IWSLCCompatSession) ? S_OK : S_FALSE;
+    return riid == __uuidof(IWSLCSession) || riid == __uuidof(IWSLCCompatSession) || riid == __uuidof(IWSLCCompatSession2) ? S_OK : S_FALSE;
 }
 
 HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IWSLCCompatProgressCallback* ProgressCallback, IWSLCCompatWarningCallback* WarningCallback)
@@ -3969,9 +3992,27 @@ HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInform
 HRESULT WSLCSession::CreateContainer(const WSLCCompatContainerOptions* Options, IWSLCCompatWarningCallback* WarningCallback, IWSLCCompatContainer** Container)
 try
 {
-    RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Container);
     *Container = nullptr;
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+
+    const auto warning = apicompat::Convert(WarningCallback);
+    const auto options = apicompat::Convert(*Options);
+
+    Microsoft::WRL::ComPtr<IWSLCContainer> container;
+    RETURN_IF_FAILED(CreateContainer(options.Get(), warning.Get(), &container));
+    RETURN_HR_IF_NULL(E_UNEXPECTED, container);
+
+    return container.CopyTo(Container);
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::CreateContainer2(const WSLCCompatContainerOptions2* Options, IWSLCCompatWarningCallback* WarningCallback, IWSLCCompatContainer** Container)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Container);
+    *Container = nullptr;
+    RETURN_HR_IF_NULL(E_POINTER, Options);
 
     const auto warning = apicompat::Convert(WarningCallback);
     const auto options = apicompat::Convert(*Options);
@@ -4312,6 +4353,7 @@ void WSLCSession::RecoverExistingNetworks()
             entry.Driver = network.Driver;
             entry.Scope = network.Scope;
             entry.Internal = network.Internal;
+            entry.EnableIPv6 = network.EnableIPv6;
             entry.Labels = network.Labels;
             entry.Options = network.Options;
             entry.IPAM.Driver = network.IPAM.Driver;

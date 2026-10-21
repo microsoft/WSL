@@ -898,6 +898,10 @@
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>Вложенная виртуализация не поддерживается на этом компьютере.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>Не удалось обнаружить поддержку вложенной виртуализации, ошибка: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Не удалось создать конечную точку сети с адресом "{}", назначенный новый адрес: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -927,11 +931,11 @@
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
   <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
-    <value>Mirrored networking is using a smaller ephemeral port range ({} ports instead of {}). This may limit the number of simultaneous connections.</value>
+    <value>В зеркальной сети используется меньший диапазон временных портов ({} портов вместо {}). Это может ограничить количество одновременных подключений.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
-    <value>Mirrored networking could not reserve the minimum contiguous range of {} TCP and UDP ports. Check Windows port usage and exclusions.</value>
+    <value>При использовании зеркальной сети не удалось зарезервировать минимальный непрерывный диапазон из {} портов TCP и UDP. Проверьте использование портов Windows и исключения.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
@@ -3709,7 +3713,7 @@
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>Образ '{}' не найден, выполняется загрузка</value>
+    <value>Не удалось найти изображение "{}" локально</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">

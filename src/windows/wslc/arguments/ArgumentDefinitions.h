@@ -43,6 +43,8 @@ _(BuildLabel,       "label",                L"l",             Kind::Value,      
 _(BuildOutput,      "output",               L"o",             Kind::Value,      BuildOutput,  Localization::WSLCCLI_OutputArgDescription()) \
 _(BuildPull,        "pull",                 NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_BuildPullArgDescription()) \
 _(BuildTarget,      "target",               NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_BuildTargetArgDescription()) \
+_(CapAdd,           "cap-add",              NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_CapAddArgDescription()) \
+_(CapDrop,          "cap-drop",             NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_CapDropArgDescription()) \
 _(CIDFile,          "cidfile",              NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_CIDFileArgDescription()) \
 _(Command,          "command",              NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_CommandArgDescription()) \
 _(ContainerId,      "container-id",         NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_ContainerIdArgDescription()) \
@@ -88,6 +90,7 @@ _(Input,            "input",                L"i",             Kind::Value,      
 _(InspectFormat,    "format",               L"f",             Kind::Value,      JsonIndent,   Localization::WSLCCLI_InspectFormatArgDescription()) \
 _(Interactive,      "interactive",          L"i",             Kind::Flag,       NoConversion, Localization::WSLCCLI_InteractiveArgDescription()) \
 _(Internal,         "internal",             NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_NetworkInternalArgDescription()) \
+_(Ipv6,             "ipv6",                 NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_NetworkIpv6ArgDescription()) \
 _(IpAddress,        "ip",                   NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_IpAddressArgDescription()) \
 _(IpRange,          "ip-range",             NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_NetworkIpRangeArgDescription()) \
 _(Label,            "label",                L"l",             Kind::Value,      KeyValuePair, Localization::WSLCCLI_LabelArgDescription()) \
