@@ -268,6 +268,12 @@ public:
     IFACEMETHOD(RegisterCrashDumpCallback)(_In_ IWSLCCompatCrashDumpCallback* Callback, _Out_ IUnknown** Subscription) override;
     IFACEMETHOD(ListNetworks)(_Out_ LPSTR* Output) override;
     IFACEMETHOD(CreateNetwork)(_In_ LPCSTR Options, _In_opt_ IWSLCCompatWarningCallback* WarningCallback, _Out_ LPSTR* Network) override;
+    IFACEMETHOD(CreateContainerWithNetworkSettings)(
+        _In_ const WSLCCompatContainerOptions* Options,
+        _In_reads_opt_(PrimaryNetworkSettingsCount) const WSLCCompatKeyValuePair* PrimaryNetworkSettings,
+        _In_ ULONG PrimaryNetworkSettingsCount,
+        _In_opt_ IWSLCCompatWarningCallback* WarningCallback,
+        _Out_ IWSLCCompatContainer** Container) override;
 
     common::io::MultiHandleWait CreateIOContext(HANDLE CancelHandle = nullptr);
 

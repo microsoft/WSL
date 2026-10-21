@@ -141,6 +141,14 @@ namespace Microsoft.WSL.Containers
         Boolean ReadOnly;
     };
 
+    runtimeclass ContainerNetwork
+    {
+        ContainerNetwork(String name);
+
+        String Name;
+        IVector<String> Aliases;
+    };
+
     enum ContainerState
     {
         Invalid = 0,
@@ -174,6 +182,12 @@ namespace Microsoft.WSL.Containers
         IVector<ContainerPortMapping> PortMappings;
         IVector<ContainerVolume> Volumes;
         IVector<ContainerNamedVolume> NamedVolumes;
+
+        // The first network is the primary network. Cannot be combined with NetworkingMode.
+        IVector<ContainerNetwork> Networks;
+
+        // IPv4 address on the primary network. Requires exactly one user-defined network in Networks.
+        Windows.Networking.HostName IPAddress;
     };
 
     enum Signal

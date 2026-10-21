@@ -5,6 +5,7 @@ nav:
   - containerportmapping.md
   - containervolume.md
   - containernamedvolume.md
+  - containernetwork.md
   - imageinfo.md
   - imageprogress.md
   - installprogress.md

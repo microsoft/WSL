@@ -18,6 +18,7 @@ Abstract:
 #include "WslcsdkPrivate.h"
 #include "WSLCContainerLauncher.h"
 #include "wslutil.h"
+#include "wslc_schema.h"
 #include "WSLCE2EHelpers.h"
 
 #include "winrt/Session.h"
@@ -774,6 +775,142 @@ class WslcSdkWinRtTests
             mismatched.SubnetPrefixLength(24);
             mismatched.Gateway(winrt::Windows::Networking::HostName{L"fd00::1"});
             VERIFY_THROWS_HR(m_defaultSession.CreateNetwork(mismatched), E_INVALIDARG);
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerNetworks)
+    {
+        constexpr auto c_primaryNetwork = "wslc-sdk-winrt-container-primary";
+        constexpr auto c_additionalNetwork = "wslc-sdk-winrt-container-additional";
+        constexpr auto c_primaryIp = L"10.231.51.10";
+        const winrt::hstring primaryNetwork = winrt::to_hstring(c_primaryNetwork);
+        const winrt::hstring additionalNetwork = winrt::to_hstring(c_additionalNetwork);
+
+        auto comSession =
+            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->session.query<IWSLCSession>();
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_primaryNetwork));
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_additionalNetwork));
+
+        auto createNetwork = [&](winrt::hstring const& name, const wchar_t* subnet) {
+            WSLCSDK::NetworkSettings settings{name};
+            settings.Subnet(winrt::Windows::Networking::HostName{subnet});
+            settings.SubnetPrefixLength(24);
+            m_defaultSession.CreateNetwork(settings);
+        };
+
+        createNetwork(primaryNetwork, L"10.231.51.0");
+        auto cleanupPrimary = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_primaryNetwork)); });
+        createNetwork(additionalNetwork, L"10.231.52.0");
+        auto cleanupAdditional = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_additionalNetwork)); });
+
+        auto makeSettings = []() {
+            auto procSettings = WSLCSDK::ProcessSettings();
+            procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
+            WSLCSDK::ContainerSettings containerSettings{L"debian:latest"};
+            containerSettings.InitProcess(procSettings);
+            return containerSettings;
+        };
+
+        auto inspect = [](WSLCSDK::Container const& container) {
+            return wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(
+                winrt::to_string(container.Inspect()).c_str());
+        };
+
+        auto hasAlias = [](const wsl::windows::common::wslc_schema::InspectEndpointSettings& endpoint, std::string_view alias) {
+            return std::ranges::find(endpoint.Aliases, alias) != endpoint.Aliases.end();
+        };
+
+        // Positive: the container joins every network with its aliases, and the first network is primary.
+        {
+            WSLCSDK::ContainerNetwork primary{primaryNetwork};
+            primary.Aliases().Append(L"db");
+            primary.Aliases().Append(L"primary");
+            WSLCSDK::ContainerNetwork additional{additionalNetwork};
+            additional.Aliases(winrt::single_threaded_vector<winrt::hstring>({L"cache"}));
+
+            auto containerSettings = makeSettings();
+            containerSettings.Networks().Append(primary);
+            containerSettings.Networks().Append(additional);
+
+            auto container = m_defaultSession.CreateContainer(containerSettings);
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+            container.Start();
+
+            const auto inspectObject = inspect(container);
+            VERIFY_ARE_EQUAL(std::string(c_primaryNetwork), inspectObject.HostConfig.NetworkMode);
+            VERIFY_ARE_EQUAL(inspectObject.NetworkSettings.Networks.size(), size_t{2});
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_primaryNetwork));
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_additionalNetwork));
+
+            const auto& primaryEndpoint = inspectObject.NetworkSettings.Networks.at(c_primaryNetwork);
+            const auto& additionalEndpoint = inspectObject.NetworkSettings.Networks.at(c_additionalNetwork);
+            VERIFY_IS_TRUE(hasAlias(primaryEndpoint, "db"));
+            VERIFY_IS_TRUE(hasAlias(primaryEndpoint, "primary"));
+            VERIFY_IS_TRUE(hasAlias(additionalEndpoint, "cache"));
+
+            // Negative: networks cannot change after they have been applied.
+            VERIFY_THROWS_HR(primary.Aliases(winrt::single_threaded_vector<winrt::hstring>()), E_ILLEGAL_STATE_CHANGE);
+            VERIFY_THROWS_HR(containerSettings.Networks(winrt::single_threaded_vector<WSLCSDK::ContainerNetwork>()), E_ILLEGAL_STATE_CHANGE);
+        }
+
+        // Positive: a static IP is applied to the primary network.
+        {
+            auto containerSettings = makeSettings();
+            containerSettings.Networks().Append(WSLCSDK::ContainerNetwork{primaryNetwork});
+            containerSettings.IPAddress(winrt::Windows::Networking::HostName{c_primaryIp});
+
+            auto container = m_defaultSession.CreateContainer(containerSettings);
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+            container.Start();
+
+            const auto inspectObject = inspect(container);
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_primaryNetwork));
+            const auto& primaryEndpoint = inspectObject.NetworkSettings.Networks.at(c_primaryNetwork);
+            VERIFY_IS_TRUE(primaryEndpoint.IPAMConfig.has_value());
+            VERIFY_ARE_EQUAL(winrt::to_string(c_primaryIp), primaryEndpoint.IPAMConfig->IPv4Address);
+            VERIFY_ARE_EQUAL(winrt::to_string(c_primaryIp), primaryEndpoint.IPAddress);
+        }
+
+        // Negative: invalid combinations are rejected at create time.
+        {
+            auto withMode = makeSettings();
+            withMode.Networks().Append(WSLCSDK::ContainerNetwork{primaryNetwork});
+            withMode.NetworkingMode(WSLCSDK::ContainerNetworkingMode::Bridged);
+            VERIFY_THROWS_HR(m_defaultSession.CreateContainer(withMode), E_INVALIDARG);
+
+            auto ipWithoutNetwork = makeSettings();
+            ipWithoutNetwork.IPAddress(winrt::Windows::Networking::HostName{c_primaryIp});
+            VERIFY_THROWS_HR(m_defaultSession.CreateContainer(ipWithoutNetwork), E_INVALIDARG);
+
+            auto ipWithTwoNetworks = makeSettings();
+            ipWithTwoNetworks.Networks().Append(WSLCSDK::ContainerNetwork{primaryNetwork});
+            ipWithTwoNetworks.Networks().Append(WSLCSDK::ContainerNetwork{additionalNetwork});
+            ipWithTwoNetworks.IPAddress(winrt::Windows::Networking::HostName{c_primaryIp});
+            VERIFY_THROWS_HR(m_defaultSession.CreateContainer(ipWithTwoNetworks), E_INVALIDARG);
+
+            WSLCSDK::ContainerNetwork bridgeWithAlias{L"bridge"};
+            bridgeWithAlias.Aliases().Append(L"web");
+            auto aliasOnBridge = makeSettings();
+            aliasOnBridge.Networks().Append(bridgeWithAlias);
+            VERIFY_THROWS_HR(m_defaultSession.CreateContainer(aliasOnBridge), E_INVALIDARG);
+
+            auto nullNetwork = makeSettings();
+            nullNetwork.Networks().Append(nullptr);
+            VERIFY_THROWS_HR(m_defaultSession.CreateContainer(nullNetwork), E_POINTER);
+        }
+
+        // Negative: invalid property values.
+        {
+            VERIFY_THROWS_HR(WSLCSDK::ContainerNetwork{L""}, E_INVALIDARG);
+
+            WSLCSDK::ContainerNetwork network{primaryNetwork};
+            VERIFY_THROWS_HR(network.Name(L""), E_INVALIDARG);
+            VERIFY_THROWS_HR(network.Aliases(nullptr), E_POINTER);
+
+            WSLCSDK::ContainerSettings containerSettings{L"debian:latest"};
+            VERIFY_THROWS_HR(containerSettings.Networks(nullptr), E_POINTER);
+            VERIFY_THROWS_HR(containerSettings.IPAddress(winrt::Windows::Networking::HostName{L"example.com"}), E_INVALIDARG);
+            VERIFY_THROWS_HR(containerSettings.IPAddress(winrt::Windows::Networking::HostName{L"fd00::1"}), E_INVALIDARG);
         }
     }
 

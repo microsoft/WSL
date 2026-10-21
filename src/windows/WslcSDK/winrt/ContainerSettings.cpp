@@ -231,6 +231,46 @@ void ContainerSettings::NamedVolumes(winrt::Windows::Foundation::Collections::IV
     m_namedVolumes = value;
 }
 
+winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerNetwork> ContainerSettings::Networks()
+{
+    return m_networks;
+}
+
+void ContainerSettings::Networks(winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerNetwork> const& value)
+{
+    if (m_containerSettings)
+    {
+        throw winrt::hresult_illegal_state_change(L"Cannot change networks after container has been initialized");
+    }
+
+    if (!value)
+    {
+        throw winrt::hresult_error(E_POINTER, L"Value cannot be null");
+    }
+
+    m_networks = value;
+}
+
+winrt::Windows::Networking::HostName ContainerSettings::IPAddress()
+{
+    return m_ipAddress;
+}
+
+void ContainerSettings::IPAddress(winrt::Windows::Networking::HostName const& value)
+{
+    if (m_containerSettings)
+    {
+        throw winrt::hresult_illegal_state_change(L"Cannot change IP address after container has been initialized");
+    }
+
+    if (value && value.Type() != winrt::Windows::Networking::HostNameType::Ipv4)
+    {
+        throw winrt::hresult_invalid_argument(L"Only IPv4 addresses are supported");
+    }
+
+    m_ipAddress = value;
+}
+
 WslcContainerSettings* ContainerSettings::ToStructPointer()
 {
     if (!m_containerSettings)
@@ -315,6 +355,33 @@ WslcContainerSettings* ContainerSettings::ToStructPointer()
 
             winrt::check_hresult(WslcSetContainerSettingsNamedVolumes(
                 m_containerSettings.get(), m_namedVolumesStructs.data(), static_cast<uint32_t>(m_namedVolumesStructs.size())));
+        }
+
+        if (m_networks.Size() > 0)
+        {
+            m_networksStructs.clear();
+            m_networksStructs.reserve(m_networks.Size());
+            for (auto const& network : m_networks)
+            {
+                if (!network)
+                {
+                    throw winrt::hresult_error(E_POINTER, L"Networks collection contains a null element");
+                }
+                m_networksStructs.push_back(GetStruct(network));
+            }
+
+            winrt::check_hresult(WslcSetContainerSettingsNetworks(
+                m_containerSettings.get(), m_networksStructs.data(), static_cast<uint32_t>(m_networksStructs.size())));
+        }
+
+        if (m_ipAddress)
+        {
+            if (inet_pton(AF_INET, winrt::to_string(m_ipAddress.RawName()).c_str(), &m_ipAddressStruct) != 1)
+            {
+                throw winrt::hresult_invalid_argument(L"Invalid IPv4 address format");
+            }
+
+            winrt::check_hresult(WslcSetContainerSettingsIPAddress(m_containerSettings.get(), &m_ipAddressStruct));
         }
     }
 

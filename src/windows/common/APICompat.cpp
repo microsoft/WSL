@@ -273,7 +273,8 @@ WSLCCompatVolumeInformation Convert(const WSLCVolumeInformation& Volume)
 // Composite struct conversions.
 //
 
-ContainerOptionsConversion::ContainerOptionsConversion(const WSLCCompatContainerOptions& Options)
+ContainerOptionsConversion::ContainerOptionsConversion(
+    const WSLCCompatContainerOptions& Options, const WSLCCompatKeyValuePair* PrimaryNetworkSettings, ULONG PrimaryNetworkSettingsCount)
 {
     m_value.Image = Options.Image;
     m_value.Name = Options.Name;
@@ -305,6 +306,12 @@ ContainerOptionsConversion::ContainerOptionsConversion(const WSLCCompatContainer
 
     // Container network (nested arrays whose elements have their own arrays).
     m_value.ContainerNetwork.NetworkMode = Options.ContainerNetwork.NetworkMode;
+
+    THROW_HR_IF(E_INVALIDARG, PrimaryNetworkSettingsCount > 0 && PrimaryNetworkSettings == nullptr);
+    m_primaryNetworkSettings = ConvertArray<KeyValuePair>(PrimaryNetworkSettings, PrimaryNetworkSettingsCount);
+    m_value.ContainerNetwork.Settings = m_primaryNetworkSettings.empty() ? nullptr : m_primaryNetworkSettings.data();
+    m_value.ContainerNetwork.SettingsCount = PrimaryNetworkSettingsCount;
+
     const ULONG networksCount = Options.ContainerNetwork.NetworksCount;
     THROW_HR_IF(E_INVALIDARG, networksCount > 0 && Options.ContainerNetwork.Networks == nullptr);
 

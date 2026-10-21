@@ -13,6 +13,7 @@
 - [WslcContainerPortMapping](wslccontainerportmapping.md)
 - [WslcContainerVolume](wslccontainervolume.md)
 - [WslcContainerNamedVolume](wslccontainernamedvolume.md)
+- [WslcContainerNetwork](wslccontainernetwork.md)
 - [WslcProcessCallbacks](wslcprocesscallbacks.md)
 - [WslcImageProgressDetail](wslcimageprogressdetail.md)
 - [WslcImageProgressMessage](wslcimageprogressmessage.md)

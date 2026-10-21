@@ -124,6 +124,97 @@ PCSTR Convert(WslcContainerNetworkingMode mode)
     }
 }
 
+bool SupportsNetworkAliases(std::string_view network) noexcept
+{
+    return network != "bridge" && network != "host" && network != "none" && !network.starts_with("container:");
+}
+
+static HRESULT InetNtopToHresult(int af, const void* src, char* dst, size_t dstCount)
+{
+    if (inet_ntop(af, src, dst, dstCount) == nullptr)
+    {
+        return HRESULT_FROM_WIN32(WSAGetLastError());
+    }
+    return S_OK;
+}
+
+// Owns the memory referenced by WSLCCompatContainerNetwork; must outlive the CreateContainer call.
+struct ContainerNetworkStorage
+{
+    std::vector<WSLCCompatKeyValuePair> PrimarySettings;
+    std::vector<std::vector<WSLCCompatKeyValuePair>> AdditionalSettings;
+    std::vector<WSLCCompatNetworkConnection> AdditionalNetworks;
+    char IpAddress[INET_ADDRSTRLEN]{};
+};
+
+std::vector<WSLCCompatKeyValuePair> ConvertAliases(const WslcContainerNetwork& network)
+{
+    std::vector<WSLCCompatKeyValuePair> settings;
+    settings.reserve(network.aliasCount);
+    for (uint32_t i = 0; i < network.aliasCount; ++i)
+    {
+        settings.push_back({"Aliases", network.aliases[i]});
+    }
+
+    return settings;
+}
+
+void ConvertContainerNetworks(const WslcContainerOptionsInternal& settings, WSLCCompatContainerNetwork& network, ContainerNetworkStorage& storage)
+{
+    if (settings.networksCount == 0)
+    {
+        THROW_HR_IF_MSG(E_INVALIDARG, settings.hasIpAddress, "An IP address requires a network");
+        network.NetworkMode = settings.networkMode != nullptr ? settings.networkMode : "none";
+        return;
+    }
+
+    THROW_HR_IF_MSG(E_INVALIDARG, settings.networkMode != nullptr, "Networking mode and networks are mutually exclusive");
+
+    const auto& primary = settings.networks[0];
+    const bool primarySupportsAliases = SupportsNetworkAliases(primary.name);
+
+    THROW_HR_IF_MSG(
+        E_INVALIDARG, primary.aliasCount != 0 && !primarySupportsAliases, "Network '%hs' does not support aliases", primary.name);
+
+    storage.PrimarySettings = ConvertAliases(primary);
+
+    if (settings.hasIpAddress)
+    {
+        THROW_HR_IF_MSG(E_INVALIDARG, settings.networksCount > 1, "An IP address is ambiguous with multiple networks");
+        THROW_HR_IF_MSG(E_INVALIDARG, !primarySupportsAliases, "Network '%hs' does not support a static IP address", primary.name);
+
+        THROW_IF_FAILED(InetNtopToHresult(AF_INET, &settings.ipAddress, storage.IpAddress, sizeof(storage.IpAddress)));
+        storage.PrimarySettings.push_back({"IPAddress", storage.IpAddress});
+    }
+
+    storage.AdditionalSettings.reserve(settings.networksCount - 1);
+    for (uint32_t i = 1; i < settings.networksCount; ++i)
+    {
+        const auto& additional = settings.networks[i];
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            additional.aliasCount != 0 && !SupportsNetworkAliases(additional.name),
+            "Network '%hs' does not support aliases",
+            additional.name);
+
+        storage.AdditionalSettings.push_back(ConvertAliases(additional));
+    }
+
+    storage.AdditionalNetworks.reserve(storage.AdditionalSettings.size());
+    for (uint32_t i = 1; i < settings.networksCount; ++i)
+    {
+        const auto& additionalSettings = storage.AdditionalSettings[i - 1];
+        storage.AdditionalNetworks.push_back(
+            {settings.networks[i].name,
+             additionalSettings.empty() ? nullptr : additionalSettings.data(),
+             static_cast<ULONG>(additionalSettings.size())});
+    }
+
+    network.NetworkMode = primary.name;
+    network.Networks = storage.AdditionalNetworks.empty() ? nullptr : storage.AdditionalNetworks.data();
+    network.NetworksCount = static_cast<ULONG>(storage.AdditionalNetworks.size());
+}
+
 void ConvertSHA256Hash(const char* hashString, uint8_t sha256[32])
 {
     static constexpr std::string_view s_sha256Prefix = "sha256:"sv;
@@ -209,14 +300,6 @@ void EnsureAbsolutePath(const std::filesystem::path& path, bool containerPath)
     {
         THROW_HR_IF(E_INVALIDARG, path.is_relative());
     }
-}
-static HRESULT InetNtopToHresult(int af, const void* src, char* dst, size_t dstCount)
-{
-    if (inet_ntop(af, src, dst, dstCount) == nullptr)
-    {
-        return HRESULT_FROM_WIN32(WSAGetLastError());
-    }
-    return S_OK;
 }
 
 bool CopyProcessSettingsToRuntime(WSLCCompatProcessOptions& runtimeOptions, const WslcContainerProcessOptionsInternal* initProcessOptions)
@@ -868,8 +951,6 @@ try
     *internalType = {};
 
     internalType->image = imageName;
-    // Default network configuration to WSLC SDK `0`, which is NONE.
-    internalType->networkMode = "none";
 
     return S_OK;
 }
@@ -998,8 +1079,8 @@ try
         containerOptions.PortsCount = static_cast<ULONG>(internalContainerSettings->portsCount);
     }
 
-    // SDK only exposes the network mode (no additional endpoints today).
-    containerOptions.ContainerNetwork.NetworkMode = internalContainerSettings->networkMode;
+    ContainerNetworkStorage networkStorage; // Must stay in scope for life of containerOptions.
+    ConvertContainerNetworks(*internalContainerSettings, containerOptions.ContainerNetwork, networkStorage);
 
     // TODO: No user access
     // containerOptions.Labels;
@@ -1007,7 +1088,15 @@ try
     // containerOptions.StopSignal;
     // containerOptions.ShmSize;
 
-    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalSession->session->CreateContainer(&containerOptions, nullptr, &result->container))))
+    // Only use the newer method when needed so that containers without primary network settings work with older services.
+    const auto& primarySettings = networkStorage.PrimarySettings;
+    const HRESULT createResult =
+        primarySettings.empty()
+            ? internalSession->session->CreateContainer(&containerOptions, nullptr, &result->container)
+            : internalSession->session->CreateContainerWithNetworkSettings(
+                  &containerOptions, primarySettings.data(), static_cast<ULONG>(primarySettings.size()), nullptr, &result->container);
+
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(createResult)))
     {
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->container.get());
 
@@ -1216,6 +1305,44 @@ try
 
     internalType->namedVolumes = namedVolumes;
     internalType->namedVolumesCount = namedVolumeCount;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+STDAPI WslcSetContainerSettingsNetworks(
+    _In_ WslcContainerSettings* containerSettings, _In_reads_opt_(networkCount) const WslcContainerNetwork* networks, _In_ uint32_t networkCount)
+try
+{
+    auto internalType = CheckAndGetInternalType(containerSettings);
+    RETURN_HR_IF(E_INVALIDARG, (networks == nullptr && networkCount != 0) || (networks != nullptr && networkCount == 0));
+
+    for (uint32_t i = 0; i < networkCount; ++i)
+    {
+        const auto& network = networks[i];
+        RETURN_HR_IF(E_INVALIDARG, network.name == nullptr || *network.name == '\0');
+        RETURN_HR_IF(E_INVALIDARG, (network.aliases == nullptr && network.aliasCount != 0) || (network.aliases != nullptr && network.aliasCount == 0));
+
+        for (uint32_t j = 0; j < network.aliasCount; ++j)
+        {
+            RETURN_HR_IF_NULL(E_INVALIDARG, network.aliases[j]);
+        }
+    }
+
+    internalType->networks = networks;
+    internalType->networksCount = networkCount;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+STDAPI WslcSetContainerSettingsIPAddress(_In_ WslcContainerSettings* containerSettings, _In_opt_ const IN_ADDR* ipAddress)
+try
+{
+    auto internalType = CheckAndGetInternalType(containerSettings);
+
+    internalType->hasIpAddress = ipAddress != nullptr;
+    internalType->ipAddress = ipAddress != nullptr ? *ipAddress : IN_ADDR{};
 
     return S_OK;
 }

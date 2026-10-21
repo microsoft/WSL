@@ -59,7 +59,10 @@ public:
     NON_COPYABLE(ContainerOptionsConversion);
     DEFAULT_MOVABLE(ContainerOptionsConversion);
 
-    explicit ContainerOptionsConversion(const WSLCCompatContainerOptions& Options);
+    explicit ContainerOptionsConversion(
+        const WSLCCompatContainerOptions& Options,
+        const WSLCCompatKeyValuePair* PrimaryNetworkSettings = nullptr,
+        ULONG PrimaryNetworkSettingsCount = 0);
 
     const WSLCContainerOptions* Get() const noexcept
     {
@@ -68,6 +71,7 @@ public:
 
 private:
     WSLCContainerOptions m_value{};
+    std::vector<KeyValuePair> m_primaryNetworkSettings;
     std::vector<WSLCVolume> m_volumes;
     std::vector<WSLCPortMapping> m_ports;
     std::vector<WSLCLabel> m_labels;
@@ -132,9 +136,10 @@ private:
     WSLCSessionSettings m_value{};
 };
 
-inline ContainerOptionsConversion Convert(const WSLCCompatContainerOptions& Options)
+inline ContainerOptionsConversion Convert(
+    const WSLCCompatContainerOptions& Options, const WSLCCompatKeyValuePair* PrimaryNetworkSettings = nullptr, ULONG PrimaryNetworkSettingsCount = 0)
 {
-    return ContainerOptionsConversion(Options);
+    return ContainerOptionsConversion(Options, PrimaryNetworkSettings, PrimaryNetworkSettingsCount);
 }
 
 inline ListImagesOptionsConversion Convert(const WSLCCompatListImagesOptions& Options)

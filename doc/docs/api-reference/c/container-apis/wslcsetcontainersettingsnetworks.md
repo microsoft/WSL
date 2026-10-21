@@ -1,0 +1,41 @@
+# WslcSetContainerSettingsNetworks
+
+```c
+STDAPI WslcSetContainerSettingsNetworks(
+    _In_ WslcContainerSettings* containerSettings,
+    _In_reads_opt_(networkCount) const WslcContainerNetwork* networks,
+    _In_ uint32_t networkCount);
+```
+
+| Parameter | Type | Direction |
+|---|---|---|
+| `containerSettings` | `WslcContainerSettings*` | in |
+| `networks` | `const WslcContainerNetwork*` | in, optional |
+| `networkCount` | `uint32_t` | in |
+
+Return value: `HRESULT`. Returns `E_INVALIDARG` if `networks` and `networkCount` disagree on being empty, a network name is null or empty, or `aliases` and `aliasCount` disagree on being empty or an alias is null.
+
+Notes:
+
+- The first network is the primary network.
+- Cannot be combined with [WslcSetContainerSettingsNetworkingMode](wslcsetcontainersettingsnetworkingmode.md); [WslcCreateContainer](wslccreatecontainer.md) returns `E_INVALIDARG` if both are set.
+- Aliases are only supported on user-defined networks (not `bridge`, `host`, `none`, or `container:<name>`); [WslcCreateContainer](wslccreatecontainer.md) returns `E_INVALIDARG` otherwise.
+- The `networks` array and the strings it references are not copied and must stay valid until `WslcCreateContainer` returns.
+- Pass `NULL` and `0` to clear.
+
+Example:
+
+```c
+PCSTR aliases[] = { "web" };
+
+WslcContainerNetwork networks[2] = { 0 };
+networks[0].name = "frontend";
+networks[0].aliases = aliases;
+networks[0].aliasCount = (uint32_t)_countof(aliases);
+networks[1].name = "backend";
+
+HRESULT hr = WslcSetContainerSettingsNetworks(
+    &containerSettings,
+    networks,
+    (uint32_t)_countof(networks));
+```

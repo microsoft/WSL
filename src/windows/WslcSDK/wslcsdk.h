@@ -55,7 +55,7 @@ typedef struct WslcSessionSettings
 DECLARE_HANDLE(WslcSession);
 
 // Container values
-#define WSLC_CONTAINER_OPTIONS_SIZE 104
+#define WSLC_CONTAINER_OPTIONS_SIZE 120
 #define WSLC_CONTAINER_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcContainerSettings
@@ -204,6 +204,13 @@ typedef struct WslcContainerNamedVolume
     _In_ BOOL readOnly;
 } WslcContainerNamedVolume;
 
+typedef struct WslcContainerNetwork
+{
+    _In_z_ PCSTR name; // Network name (e.g. "bridge" or a network created with WslcCreateSessionNetwork)
+    _In_reads_opt_(aliasCount) const PCSTR* aliases; // DNS aliases for the container on this network; user-defined networks only
+    _In_ uint32_t aliasCount;
+} WslcContainerNetwork;
+
 typedef enum WslcContainerFlags
 {
     WSLC_CONTAINER_FLAG_NONE = 0x00000000,
@@ -226,6 +233,10 @@ DEFINE_ENUM_FLAG_OPERATORS(WslcContainerStartFlags);
 
 STDAPI WslcInitContainerSettings(_In_ PCSTR imageName, _Out_ WslcContainerSettings* containerSettings);
 
+// Notes:
+//   - Returns E_INVALIDARG if both WslcSetContainerSettingsNetworkingMode and WslcSetContainerSettingsNetworks were called,
+//     if an IP address is set without exactly one network or on a primary network that is not user-defined,
+//     or if aliases are set on a network that is not user-defined.
 STDAPI WslcCreateContainer(_In_ WslcSession session, _In_ const WslcContainerSettings* containerSettings, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // Opens an existing container by name, full ID, or partial ID prefix.
@@ -241,6 +252,8 @@ STDAPI WslcSetContainerSettingsName(_In_ WslcContainerSettings* containerSetting
 
 STDAPI WslcSetContainerSettingsInitProcess(_In_ WslcContainerSettings* containerSettings, _In_ WslcProcessSettings* initProcess);
 
+// Sets the networking mode. Defaults to WSLC_CONTAINER_NETWORKING_MODE_NONE when neither this nor
+// WslcSetContainerSettingsNetworks is called. Cannot be combined with WslcSetContainerSettingsNetworks.
 STDAPI WslcSetContainerSettingsNetworkingMode(_In_ WslcContainerSettings* containerSettings, _In_ WslcContainerNetworkingMode networkingMode);
 
 STDAPI WslcSetContainerSettingsHostName(_In_ WslcContainerSettings* containerSettings, _In_ PCSTR hostName);
@@ -263,6 +276,20 @@ STDAPI WslcSetContainerSettingsNamedVolumes(
     _In_ WslcContainerSettings* containerSettings,
     _In_reads_opt_(namedVolumeCount) const WslcContainerNamedVolume* namedVolumes,
     _In_ uint32_t namedVolumeCount);
+
+// Connects the container to one or more networks. The first network is the primary network.
+// Cannot be combined with WslcSetContainerSettingsNetworkingMode. Pass null and 0 to clear.
+// The networks array and the strings it references are not copied and must stay valid until WslcCreateContainer returns.
+//
+// Notes:
+//   - Returns E_INVALIDARG if networks and networkCount disagree on being empty, if a network name is null or empty,
+//     or if aliases and aliasCount disagree on being empty or an alias is null.
+STDAPI WslcSetContainerSettingsNetworks(
+    _In_ WslcContainerSettings* containerSettings, _In_reads_opt_(networkCount) const WslcContainerNetwork* networks, _In_ uint32_t networkCount);
+
+// Sets the container's IPv4 address on its primary network. Requires exactly one user-defined network
+// set with WslcSetContainerSettingsNetworks. Pass null to clear.
+STDAPI WslcSetContainerSettingsIPAddress(_In_ WslcContainerSettings* containerSettings, _In_opt_ const IN_ADDR* ipAddress);
 
 STDAPI WslcCreateContainerProcess(
     _In_ WslcContainer container, _In_ WslcProcessSettings* newProcessSettings, _Out_ WslcProcess* newProcess, _Outptr_opt_result_z_ PWSTR* errorMessage);

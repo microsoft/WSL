@@ -677,6 +677,169 @@ class WslcSdkTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerNetworks)
+    {
+        constexpr auto c_primaryNetwork = "wslc-sdk-container-primary";
+        constexpr auto c_additionalNetwork = "wslc-sdk-container-additional";
+        constexpr auto c_primaryIp = "10.231.49.10";
+
+        auto comSession = reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session.query<IWSLCSession>();
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_primaryNetwork));
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_additionalNetwork));
+
+        auto createNetwork = [&](const char* name, const char* subnet) {
+            WslcNetworkSettings settings{};
+            settings.name = name;
+            settings.ipv4PrefixLength = 24;
+            VERIFY_ARE_EQUAL(inet_pton(AF_INET, subnet, &settings.ipv4Subnet), 1);
+            VERIFY_SUCCEEDED(WslcCreateSessionNetwork(m_defaultSession, &settings, nullptr, nullptr));
+        };
+
+        createNetwork(c_primaryNetwork, "10.231.49.0");
+        auto cleanupPrimary = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_primaryNetwork)); });
+        createNetwork(c_additionalNetwork, "10.231.50.0");
+        auto cleanupAdditional = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_additionalNetwork)); });
+
+        auto inspect = [](WslcContainer container) {
+            wil::unique_cotaskmem_ansistring inspectData;
+            VERIFY_SUCCEEDED(WslcInspectContainer(container, &inspectData));
+            return wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(inspectData.get());
+        };
+
+        auto hasAlias = [](const wsl::windows::common::wslc_schema::InspectEndpointSettings& endpoint, std::string_view alias) {
+            return std::ranges::find(endpoint.Aliases, alias) != endpoint.Aliases.end();
+        };
+
+        const char* sleepArgv[] = {"/bin/sleep", "99"};
+
+        // Positive: the container joins every network with its aliases, and the first network is primary.
+        {
+            const PCSTR primaryAliases[] = {"db", "primary"};
+            const PCSTR additionalAliases[] = {"cache"};
+            const WslcContainerNetwork networks[] = {
+                {c_primaryNetwork, primaryAliases, ARRAYSIZE(primaryAliases)},
+                {c_additionalNetwork, additionalAliases, ARRAYSIZE(additionalAliases)},
+            };
+
+            WslcProcessSettings procSettings;
+            VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, sleepArgv, ARRAYSIZE(sleepArgv)));
+
+            WslcContainerSettings containerSettings;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworks(&containerSettings, networks, ARRAYSIZE(networks)));
+
+            UniqueContainer container;
+            VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+            VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_NONE, nullptr));
+
+            const auto inspectObject = inspect(container.get());
+            VERIFY_ARE_EQUAL(std::string(c_primaryNetwork), inspectObject.HostConfig.NetworkMode);
+            VERIFY_ARE_EQUAL(inspectObject.NetworkSettings.Networks.size(), size_t{2});
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_primaryNetwork));
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_additionalNetwork));
+
+            const auto& primary = inspectObject.NetworkSettings.Networks.at(c_primaryNetwork);
+            const auto& additional = inspectObject.NetworkSettings.Networks.at(c_additionalNetwork);
+            VERIFY_IS_TRUE(hasAlias(primary, "db"));
+            VERIFY_IS_TRUE(hasAlias(primary, "primary"));
+            VERIFY_IS_TRUE(hasAlias(additional, "cache"));
+            VERIFY_IS_FALSE(primary.IPAddress.empty());
+            VERIFY_IS_FALSE(additional.IPAddress.empty());
+        }
+
+        // Positive: a static IP is applied to the primary network.
+        {
+            const WslcContainerNetwork networks[] = {{c_primaryNetwork, nullptr, 0}};
+            IN_ADDR ipAddress{};
+            VERIFY_ARE_EQUAL(inet_pton(AF_INET, c_primaryIp, &ipAddress), 1);
+
+            WslcProcessSettings procSettings;
+            VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, sleepArgv, ARRAYSIZE(sleepArgv)));
+
+            WslcContainerSettings containerSettings;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworks(&containerSettings, networks, ARRAYSIZE(networks)));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsIPAddress(&containerSettings, &ipAddress));
+
+            UniqueContainer container;
+            VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+            VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_NONE, nullptr));
+
+            const auto inspectObject = inspect(container.get());
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_primaryNetwork));
+            const auto& primary = inspectObject.NetworkSettings.Networks.at(c_primaryNetwork);
+            VERIFY_IS_TRUE(primary.IPAMConfig.has_value());
+            VERIFY_ARE_EQUAL(std::string(c_primaryIp), primary.IPAMConfig->IPv4Address);
+            VERIFY_ARE_EQUAL(std::string(c_primaryIp), primary.IPAddress);
+        }
+
+        // Negative: invalid combinations are rejected at create time.
+        {
+            const PCSTR aliases[] = {"web"};
+            const WslcContainerNetwork userDefined[] = {{c_primaryNetwork, nullptr, 0}};
+            const WslcContainerNetwork twoNetworks[] = {{c_primaryNetwork, nullptr, 0}, {c_additionalNetwork, nullptr, 0}};
+            const WslcContainerNetwork bridge[] = {{"bridge", nullptr, 0}};
+            const WslcContainerNetwork bridgeWithAliases[] = {{"bridge", aliases, ARRAYSIZE(aliases)}};
+            const WslcContainerNetwork additionalBridgeWithAliases[] = {{c_primaryNetwork, nullptr, 0}, {"bridge", aliases, ARRAYSIZE(aliases)}};
+            IN_ADDR ipAddress{};
+            VERIFY_ARE_EQUAL(inet_pton(AF_INET, c_primaryIp, &ipAddress), 1);
+
+            auto expectCreateFails = [&](const WslcContainerNetwork* networks, uint32_t count, bool setMode, const IN_ADDR* ip) {
+                WslcContainerSettings containerSettings;
+                VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+                VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworks(&containerSettings, networks, count));
+                VERIFY_SUCCEEDED(WslcSetContainerSettingsIPAddress(&containerSettings, ip));
+                if (setMode)
+                {
+                    VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworkingMode(&containerSettings, WSLC_CONTAINER_NETWORKING_MODE_BRIDGED));
+                }
+
+                WslcContainer container = nullptr;
+                VERIFY_ARE_EQUAL(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr), E_INVALIDARG);
+                VERIFY_IS_NULL(container);
+            };
+
+            // Networking mode and networks are mutually exclusive.
+            expectCreateFails(userDefined, ARRAYSIZE(userDefined), true, nullptr);
+
+            // An IP address requires exactly one user-defined network.
+            expectCreateFails(nullptr, 0, false, &ipAddress);
+            expectCreateFails(twoNetworks, ARRAYSIZE(twoNetworks), false, &ipAddress);
+            expectCreateFails(bridge, ARRAYSIZE(bridge), false, &ipAddress);
+
+            // Aliases require a user-defined network.
+            expectCreateFails(bridgeWithAliases, ARRAYSIZE(bridgeWithAliases), false, nullptr);
+            expectCreateFails(additionalBridgeWithAliases, ARRAYSIZE(additionalBridgeWithAliases), false, nullptr);
+        }
+
+        // Negative: invalid arguments to the setter.
+        {
+            WslcContainerSettings containerSettings;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+
+            const WslcContainerNetwork valid[] = {{c_primaryNetwork, nullptr, 0}};
+            VERIFY_ARE_EQUAL(WslcSetContainerSettingsNetworks(&containerSettings, nullptr, 1), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(WslcSetContainerSettingsNetworks(&containerSettings, valid, 0), E_INVALIDARG);
+
+            const WslcContainerNetwork nullName[] = {{nullptr, nullptr, 0}};
+            VERIFY_ARE_EQUAL(WslcSetContainerSettingsNetworks(&containerSettings, nullName, ARRAYSIZE(nullName)), E_INVALIDARG);
+
+            const WslcContainerNetwork emptyName[] = {{"", nullptr, 0}};
+            VERIFY_ARE_EQUAL(WslcSetContainerSettingsNetworks(&containerSettings, emptyName, ARRAYSIZE(emptyName)), E_INVALIDARG);
+
+            const WslcContainerNetwork missingAliases[] = {{c_primaryNetwork, nullptr, 1}};
+            VERIFY_ARE_EQUAL(WslcSetContainerSettingsNetworks(&containerSettings, missingAliases, ARRAYSIZE(missingAliases)), E_INVALIDARG);
+
+            const PCSTR nullAlias[] = {nullptr};
+            const WslcContainerNetwork withNullAlias[] = {{c_primaryNetwork, nullAlias, ARRAYSIZE(nullAlias)}};
+            VERIFY_ARE_EQUAL(WslcSetContainerSettingsNetworks(&containerSettings, withNullAlias, ARRAYSIZE(withNullAlias)), E_INVALIDARG);
+        }
+    }
+
     WSLC_TEST_METHOD(LoadImage)
     {
         // Positive: load a saved image tar and verify the image can be run.

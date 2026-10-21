@@ -354,6 +354,15 @@ interface IWSLCCompatSession : IUnknown
 
     // Options is a JSON wslc_schema::CreateNetworkOptions; Network receives a JSON wslc_schema::NetworkListEntry.
     HRESULT CreateNetwork([in] LPCSTR Options, [in, unique] IWSLCCompatWarningCallback* WarningCallback, [out] LPSTR* Network);
+
+    // Same as CreateContainer, with endpoint settings for the primary network (Options->ContainerNetwork.NetworkMode).
+    // KVP-encoded; duplicate keys are allowed (e.g., multiple "Aliases" entries).
+    HRESULT CreateContainerWithNetworkSettings(
+        [in] const WSLCCompatContainerOptions* Options,
+        [in, unique, size_is(PrimaryNetworkSettingsCount)] const WSLCCompatKeyValuePair* PrimaryNetworkSettings,
+        [in] ULONG PrimaryNetworkSettingsCount,
+        [in, unique] IWSLCCompatWarningCallback* WarningCallback,
+        [out] IWSLCCompatContainer** Container);
 }
 
 [

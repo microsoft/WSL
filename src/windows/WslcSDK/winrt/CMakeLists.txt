@@ -5,6 +5,7 @@ set(SOURCES
     AuthenticateResult.cpp
     Container.cpp
     ContainerNamedVolume.cpp
+    ContainerNetwork.cpp
     ContainerPortMapping.cpp
     ContainerSettings.cpp
     ContainerVolume.cpp
@@ -32,6 +33,7 @@ set(HEADERS
     AuthenticateResult.h
     Container.h
     ContainerNamedVolume.h
+    ContainerNetwork.h
     ContainerPortMapping.h
     ContainerSettings.h
     ContainerVolume.h

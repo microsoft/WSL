@@ -28,6 +28,7 @@ Abstract:
 
 #include "Container.h"
 #include "ContainerNamedVolume.h"
+#include "ContainerNetwork.h"
 #include "ContainerPortMapping.h"
 #include "ContainerSettings.h"
 #include "ContainerVolume.h"

@@ -3969,6 +3969,16 @@ HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInform
 }
 
 HRESULT WSLCSession::CreateContainer(const WSLCCompatContainerOptions* Options, IWSLCCompatWarningCallback* WarningCallback, IWSLCCompatContainer** Container)
+{
+    return CreateContainerWithNetworkSettings(Options, nullptr, 0, WarningCallback, Container);
+}
+
+HRESULT WSLCSession::CreateContainerWithNetworkSettings(
+    const WSLCCompatContainerOptions* Options,
+    const WSLCCompatKeyValuePair* PrimaryNetworkSettings,
+    ULONG PrimaryNetworkSettingsCount,
+    IWSLCCompatWarningCallback* WarningCallback,
+    IWSLCCompatContainer** Container)
 try
 {
     RETURN_HR_IF_NULL(E_POINTER, Options);
@@ -3976,7 +3986,7 @@ try
     *Container = nullptr;
 
     const auto warning = apicompat::Convert(WarningCallback);
-    const auto options = apicompat::Convert(*Options);
+    const auto options = apicompat::Convert(*Options, PrimaryNetworkSettings, PrimaryNetworkSettingsCount);
 
     Microsoft::WRL::ComPtr<IWSLCContainer> container;
     RETURN_IF_FAILED(CreateContainer(options.Get(), warning.Get(), &container));

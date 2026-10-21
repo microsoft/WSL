@@ -16,6 +16,7 @@ Abstract:
 #include "Microsoft.WSL.Containers.ContainerSettings.g.h"
 #include "ProcessSettings.h"
 #include "Helpers.h"
+#include <winrt/Windows.Networking.h>
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
 struct ContainerSettings : ContainerSettingsT<ContainerSettings>
@@ -47,6 +48,10 @@ struct ContainerSettings : ContainerSettingsT<ContainerSettings>
     void Volumes(winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerVolume> const& value);
     winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerNamedVolume> NamedVolumes();
     void NamedVolumes(winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerNamedVolume> const& value);
+    winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerNetwork> Networks();
+    void Networks(winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerNetwork> const& value);
+    winrt::Windows::Networking::HostName IPAddress();
+    void IPAddress(winrt::Windows::Networking::HostName const& value);
 
     WslcContainerSettings* ToStructPointer();
 
@@ -64,11 +69,16 @@ private:
         winrt::single_threaded_vector<winrt::Microsoft::WSL::Containers::ContainerVolume>()};
     winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerNamedVolume> m_namedVolumes{
         winrt::single_threaded_vector<winrt::Microsoft::WSL::Containers::ContainerNamedVolume>()};
+    winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerNetwork> m_networks{
+        winrt::single_threaded_vector<winrt::Microsoft::WSL::Containers::ContainerNetwork>()};
+    winrt::Windows::Networking::HostName m_ipAddress{nullptr};
 
     std::unique_ptr<WslcContainerSettings> m_containerSettings;
     std::vector<WslcContainerPortMapping> m_portMappingsStructs;
     std::vector<WslcContainerVolume> m_volumesStructs;
     std::vector<WslcContainerNamedVolume> m_namedVolumesStructs;
+    std::vector<WslcContainerNetwork> m_networksStructs;
+    IN_ADDR m_ipAddressStruct{};
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation
 
