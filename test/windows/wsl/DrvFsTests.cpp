@@ -557,29 +557,52 @@ public:
         }
     }
 
-    static void DrvfsMountMetadataOwnership(DrvFsMode Mode)
+    static void DrvfsMountMetadataOwnership()
     {
         WslKeepAlive keepAlive;
         const auto testDir = std::filesystem::current_path() / "drvfs-metadata-ownership-test";
         constexpr auto mountPoint = L"/tmp/drvfs-metadata-ownership-test";
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            LxsstuLaunchWsl(std::format(L"-u root umount '{}'", mountPoint));
             LxsstuLaunchWsl(std::format(L"-u root rmdir '{}'", mountPoint));
             std::filesystem::remove_all(testDir);
         });
 
         std::filesystem::create_directory(testDir);
         VERIFY_ARE_EQUAL(0, LxsstuLaunchWsl(std::format(L"-u root mkdir -p '{}'", mountPoint)));
-        VERIFY_ARE_EQUAL(
-            0, LxsstuLaunchWsl(std::format(L"-u root mount -t drvfs -o metadata,uid=0,gid=0 '{}' '{}'", testDir.string(), mountPoint)));
+        for (const bool metadata : {false, true})
+        {
+            const auto sourceDir = testDir / (metadata ? "metadata-on" : "metadata-off");
+            std::filesystem::create_directory(sourceDir);
+            VERIFY_NO_THROW(CreateMetadataTestFile((sourceDir / "existing").c_str(), 1234, 5678, LX_S_IFREG | 0644, 0, 0, false));
+            {
+                std::ofstream file(sourceDir / "plain");
+                VERIFY_IS_TRUE(file.good());
+            }
 
-        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-u root findmnt -rn -M '{}' -o FSTYPE", mountPoint));
-        VERIFY_ARE_EQUAL(Mode == DrvFsMode::VirtioFs ? L"virtiofs\n" : L"9p\n", out);
+            auto unmount = wil::scope_exit_log(
+                WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"-u root umount '{}'", mountPoint)); });
+            VERIFY_ARE_EQUAL(
+                0,
+                LxsstuLaunchWsl(std::format(
+                    L"-u root mount -t drvfs -o {}uid=1000,gid=2000 '{}' '{}'", metadata ? L"metadata," : L"", sourceDir.string(), mountPoint)));
 
-        VERIFY_ARE_EQUAL(0, LxsstuLaunchWsl(std::format(L"-u root touch '{}/file'", mountPoint)));
-        VERIFY_ARE_EQUAL(0, LxsstuLaunchWsl(std::format(L"-u root chown 1234:5678 '{}/file'", mountPoint)));
-        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"-u root stat -c '%u:%g' '{}/file'", mountPoint));
-        VERIFY_ARE_EQUAL(L"1234:5678\n", out);
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-u root stat -c '%a %u:%g' '{}/existing'", mountPoint));
+            VERIFY_ARE_EQUAL(L"644 1234:5678\n", out);
+            std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"-u root stat -c '%u:%g' '{}/plain'", mountPoint));
+            VERIFY_ARE_EQUAL(L"1000:2000\n", out);
+
+            VERIFY_ARE_EQUAL(0, LxsstuLaunchWsl(std::format(L"-u root touch '{}/created'", mountPoint)));
+            std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"-u root stat -c '%u:%g' '{}/created'", mountPoint));
+            VERIFY_ARE_EQUAL(metadata ? L"0:0\n" : L"1000:2000\n", out);
+
+            VERIFY_ARE_EQUAL(0, LxsstuLaunchWsl(std::format(L"-u root chmod 0600 '{}/existing'", mountPoint)));
+            std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"-u root stat -c '%a %u:%g' '{}/existing'", mountPoint));
+            VERIFY_ARE_EQUAL(metadata ? L"600 1234:5678\n" : L"644 1234:5678\n", out);
+
+            VERIFY_ARE_EQUAL(0, LxsstuLaunchWsl(std::format(L"-u root chown 4321:8765 '{}/existing'", mountPoint)));
+            std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"-u root stat -c '%a %u:%g' '{}/existing'", mountPoint));
+            VERIFY_ARE_EQUAL(metadata ? L"600 4321:8765\n" : L"644 1234:5678\n", out);
+        }
     }
 
     // DrvFsTests Private Methods
@@ -1500,7 +1523,7 @@ class WSL1 : public DrvFsTests
 \
         WSL2_TEST_METHOD(DrvfsMountMetadataOwnership) \
         { \
-            DrvFsTests::DrvfsMountMetadataOwnership(DrvFsMode::##_mode##); \
+            DrvFsTests::DrvfsMountMetadataOwnership(); \
         } \
     }
 
