@@ -8780,10 +8780,9 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_ARE_NOT_EQUAL(std::string::npos, output.find("CommandLineIndex = /usr/bin/dockerd,--debug,HTTP_PROXY=argument-value\n"));
         VERIFY_ARE_NOT_EQUAL(
             std::string::npos,
-            output.find(
-                "EnvironmentIndex = PATH=/usr/bin:/bin,HTTP_PROXY=<redacted>,HTTPS_PROXY=<redacted>,NO_PROXY=<redacted>,"
-                "http_proxy=<redacted>,https_proxy=<redacted>,no_proxy=<redacted>,HtTp_PrOxY=<redacted>,"
-                "HTTP_PROXY_EXTRA=visible,HTTPS_PROXY=,HTTP_PROXY\n"));
+            output.find("EnvironmentIndex = PATH=/usr/bin:/bin,HTTP_PROXY=<redacted>,HTTPS_PROXY=<redacted>,NO_PROXY=<redacted>,"
+                        "http_proxy=<redacted>,https_proxy=<redacted>,no_proxy=<redacted>,HtTp_PrOxY=<redacted>,"
+                        "HTTP_PROXY_EXTRA=visible,HTTPS_PROXY=,HTTP_PROXY\n"));
         VERIFY_ARE_EQUAL(std::string::npos, output.find("synthetic-"));
         VERIFY_ARE_EQUAL(std::string::npos, output.find("private.example"));
         VERIFY_IS_TRUE(std::ranges::equal(originalMessage, message.Span()));

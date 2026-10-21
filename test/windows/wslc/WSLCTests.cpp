@@ -3492,8 +3492,8 @@ class WSLCTests
 
             HRESULT OnCrashDump(LPCWSTR DumpPath, LPCSTR ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp) override
             {
-                m_promise.set_value(
-                    Invocation{DumpPath ? std::wstring{DumpPath} : std::wstring{}, ProcessName ? std::string{ProcessName} : std::string{}, Pid, Signal, Timestamp});
+                m_promise.set_value(Invocation{
+                    DumpPath ? std::wstring{DumpPath} : std::wstring{}, ProcessName ? std::string{ProcessName} : std::string{}, Pid, Signal, Timestamp});
 
                 // Block until the test has finished probing, so anything the test verifies is observed mid-callback.
                 m_release.wait();
@@ -10426,11 +10426,10 @@ class WSLCTests
 
             wil::com_ptr<IWSLCContainer> container;
             VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateContainer(&options, nullptr, &container));
-            ValidateCOMErrorMessage(
-                std::format(
-                    L"Unknown endpoint setting '{}' for network '{}'.",
-                    std::wstring(unknownKey.begin(), unknownKey.end()),
-                    std::wstring(networkName.begin(), networkName.end())));
+            ValidateCOMErrorMessage(std::format(
+                L"Unknown endpoint setting '{}' for network '{}'.",
+                std::wstring(unknownKey.begin(), unknownKey.end()),
+                std::wstring(networkName.begin(), networkName.end())));
         }
 
         // Primary endpoint settings (IPAddress + Aliases + LinkLocalIPs + DriverOpts) round-trip via inspect at create time.
@@ -10512,10 +10511,8 @@ class WSLCTests
 
                 auto retVal = launcher.LaunchNoThrow(*m_defaultSession);
                 VERIFY_ARE_EQUAL(E_INVALIDARG, retVal.first);
-                ValidateCOMErrorMessage(
-                    std::format(
-                        L"Endpoint settings are not supported for network mode '{}'.",
-                        std::wstring(networkMode.begin(), networkMode.end())));
+                ValidateCOMErrorMessage(std::format(
+                    L"Endpoint settings are not supported for network mode '{}'.", std::wstring(networkMode.begin(), networkMode.end())));
             };
 
             expectEndpointSettingsError("alias-ctr-ip-host", "host");
@@ -12472,18 +12469,15 @@ class WSLCTests
             std::string readStdout;
             std::string readStderr;
 
-            io.AddHandle(
-                std::make_unique<DockerIORelayHandle>(
-                    std::move(readPipe), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+            io.AddHandle(std::make_unique<DockerIORelayHandle>(
+                std::move(readPipe), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
             io.AddHandle(std::make_unique<WriteHandle>(std::move(writePipe), Input));
 
-            io.AddHandle(std::make_unique<ReadHandle>(std::move(stdoutRead), [&](const auto& buffer) {
-                readStdout.append(buffer.data(), buffer.size());
-            }));
+            io.AddHandle(std::make_unique<ReadHandle>(
+                std::move(stdoutRead), [&](const auto& buffer) { readStdout.append(buffer.data(), buffer.size()); }));
 
-            io.AddHandle(std::make_unique<ReadHandle>(std::move(stderrRead), [&](const auto& buffer) {
-                readStderr.append(buffer.data(), buffer.size());
-            }));
+            io.AddHandle(std::make_unique<ReadHandle>(
+                std::move(stderrRead), [&](const auto& buffer) { readStderr.append(buffer.data(), buffer.size()); }));
 
             io.Run({});
 
@@ -12562,9 +12556,8 @@ class WSLCTests
                 std::string output;
                 MultiHandleWait io;
 
-                io.AddHandle(
-                    std::make_unique<DockerIORelayHandle>(
-                        std::move(inputRead), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+                io.AddHandle(std::make_unique<DockerIORelayHandle>(
+                    std::move(inputRead), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
 
                 io.AddHandle(std::make_unique<ReadHandle>(std::move(stdoutRead), [&](const auto& buffer) {
                     output.append(buffer.data(), buffer.size());
@@ -12604,9 +12597,8 @@ class WSLCTests
 
         // Collect the relayed output.
         std::string output;
-        io.AddHandle(std::make_unique<ReadHandle>(std::move(dstRead), [&](const gsl::span<char>& buffer) {
-            output.append(buffer.data(), buffer.size());
-        }));
+        io.AddHandle(std::make_unique<ReadHandle>(
+            std::move(dstRead), [&](const gsl::span<char>& buffer) { output.append(buffer.data(), buffer.size()); }));
 
         io.Run({});
 
