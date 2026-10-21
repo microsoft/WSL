@@ -18,14 +18,12 @@ Abstract:
 
 #include "precomp.h"
 #include "WSLCSessionFactory.h"
+#include <wrl/module.h>
 
 using namespace wsl::windows::common;
 using namespace wsl::windows::common::wslutil;
 
 namespace {
-
-// Event used to signal that the COM server should exit.
-wil::unique_event g_exitEvent{wil::EventOptions::ManualReset};
 
 class WSLCSessionFactoryClassFactory : public winrt::implements<WSLCSessionFactoryClassFactory, IClassFactory>
 {
@@ -37,13 +35,23 @@ public:
         THROW_HR_IF(CLASS_E_NOAGGREGATION, outer != nullptr);
 
         auto factory = Microsoft::WRL::Make<wsl::windows::service::wslc::WSLCSessionFactory>();
-        factory->SetDestructionCallback([]() { g_exitEvent.SetEvent(); });
+        THROW_IF_NULL_ALLOC(factory.Get());
         return factory->QueryInterface(iid, result);
     }
     CATCH_RETURN()
 
-    STDMETHODIMP LockServer(BOOL) noexcept override
+    STDMETHODIMP LockServer(BOOL lock) noexcept override
     {
+        auto& module = Microsoft::WRL::Module<Microsoft::WRL::OutOfProc>::GetModule();
+        if (lock)
+        {
+            module.IncrementObjectCount();
+        }
+        else
+        {
+            module.DecrementObjectCount();
+        }
+
         return S_OK;
     }
 };
@@ -78,6 +86,10 @@ try
     wsl::windows::common::wslutil::CoInitializeSecurity();
     auto cleanupWinrt = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { winrt::clear_factory_cache(); });
 
+    wil::unique_event exitEvent{wil::EventOptions::ManualReset};
+
+    Microsoft::WRL::Module<Microsoft::WRL::OutOfProc>::Create([&]() { exitEvent.SetEvent(); });
+
     // Register the class factory (single-use: one factory per process)
     auto factory = winrt::make<WSLCSessionFactoryClassFactory>();
     wil::unique_com_class_object_cookie cookie;
@@ -87,7 +99,7 @@ try
     WSL_LOG("Per-user session server registered, waiting for activations", TraceLoggingLevel(WINEVENT_LEVEL_INFO));
 
     // Wait until all objects have been released
-    g_exitEvent.wait();
+    exitEvent.wait();
 
     WSL_LOG("Per-user session server exiting", TraceLoggingLevel(WINEVENT_LEVEL_INFO));
 

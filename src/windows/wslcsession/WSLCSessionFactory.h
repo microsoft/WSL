@@ -25,7 +25,6 @@ Abstract:
 #include "wslc.h"
 #include <wrl/implements.h>
 #include <wil/com.h>
-#include <functional>
 
 namespace wsl::windows::service::wslc {
 
@@ -37,10 +36,6 @@ public:
     NON_MOVABLE(WSLCSessionFactory);
 
     WSLCSessionFactory() = default;
-
-    // Sets a callback invoked when the session in this process is destroyed.
-    // Used by the COM server host to signal process exit.
-    void SetDestructionCallback(std::function<void()>&& callback);
 
     // IWSLCSessionFactory
     IFACEMETHOD(CreateSession)
@@ -55,9 +50,6 @@ public:
 
     // ISupportErrorInfo: enables IErrorInfo marshaling across COM boundaries.
     IFACEMETHOD(InterfaceSupportsErrorInfo)(_In_ REFIID riid) override;
-
-private:
-    std::function<void()> m_destructionCallback;
 };
 
 } // namespace wsl::windows::service::wslc

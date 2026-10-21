@@ -4827,7 +4827,9 @@ class WSLCTests
 
             // Validate that the process object correctly handle requests after the VM has terminated.
             ResetTestSession();
-            VERIFY_ARE_EQUAL(process.Get().Signal(WSLCSignalSIGKILL), HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE));
+            VERIFY_ARE_EQUAL(process.Get().Signal(WSLCSignalSIGKILL), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(WslcProcessStateExited, process.State());
+            VERIFY_ARE_EQUAL(128 + WSLCSignalSIGKILL, process.GetExitCode());
         }
 
         // Validate that empty arguments are correctly handled.
@@ -6944,10 +6946,14 @@ class WSLCTests
 
             WSLCProcessState processState{};
             int exitCode{};
-            VERIFY_ARE_EQUAL(process.Get().GetState(&processState, &exitCode), HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE));
+            VERIFY_SUCCEEDED(process.Get().GetState(&processState, &exitCode));
+            VERIFY_ARE_EQUAL(WslcProcessStateExited, processState);
+            VERIFY_ARE_EQUAL(128 + WSLCSignalSIGKILL, exitCode);
 
             WSLCContainerState state{};
-            VERIFY_ARE_EQUAL(container.Get().GetState(&state), HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE));
+            VERIFY_SUCCEEDED(container.Get().GetState(&state));
+            VERIFY_ARE_NOT_EQUAL(WslcContainerStateInvalid, state);
+            container.SetDeleteOnClose(false);
         }
 
         // Validate error handling when the username / group doesn't exist
@@ -9225,10 +9231,11 @@ class WSLCTests
             // Terminate the session
             ResetTestSession();
 
-            // Validate that calling into the container returns RPC_S_SERVER_UNAVAILABLE.
+            // Cached properties remain available after the session has been released.
             WSLCContainerState state = WslcContainerStateRunning;
-            VERIFY_ARE_EQUAL(container.Get().GetState(&state), HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE));
-            VERIFY_ARE_EQUAL(state, WslcContainerStateInvalid);
+            VERIFY_SUCCEEDED(container.Get().GetState(&state));
+            VERIFY_ARE_EQUAL(state, WslcContainerStateDeleted);
+            container.SetDeleteOnClose(false);
         }
     }
 
@@ -13346,8 +13353,10 @@ class WSLCTests
 
         ULONG sessionId{};
         wil::unique_handle terminationEvent;
+        wil::unique_handle hostProcess;
         VERIFY_SUCCEEDED(session->GetId(&sessionId));
         VERIFY_SUCCEEDED(session->GetTerminationEvent(&terminationEvent));
+        VERIFY_SUCCEEDED(session->GetProcessHandle(&hostProcess));
 
         WSLCContainerLauncher launcher("alpine:latest", "export-retains-session", {"/bin/true"});
         auto container = launcher.Create(*session);
@@ -13359,9 +13368,216 @@ class WSLCTests
 
         session.reset();
         VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(terminationEvent.get(), 1000));
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(hostProcess.get(), 0));
 
         operation.Complete();
         VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(terminationEvent.get(), 120 * 1000));
+        VERIFY_ARE_EQUAL(WslcContainerStateCreated, container.State());
+
+        container.Reset();
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(hostProcess.get(), 60 * 1000));
+    }
+
+    WSLC_TEST_METHOD(SessionHostExitsAfterLastSessionReference)
+    {
+        const auto manager = OpenSessionManager();
+        for (const bool terminate : {false, true})
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(L"session-host-lifetime"));
+            wil::unique_handle hostProcess;
+            VERIFY_SUCCEEDED(session->GetProcessHandle(&hostProcess));
+
+            ULONG id{};
+            VERIFY_SUCCEEDED(session->GetId(&id));
+            wil::com_ptr<IWSLCSession> otherSession;
+            VERIFY_SUCCEEDED(manager->OpenSession(id, &otherSession));
+
+            if (terminate)
+            {
+                VERIFY_SUCCEEDED(session->Terminate());
+            }
+
+            session.reset();
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(hostProcess.get(), 1000));
+
+            WSLCSessionState state{};
+            VERIFY_SUCCEEDED(otherSession->GetState(&state));
+            VERIFY_ARE_EQUAL(terminate ? WSLCSessionStateTerminated : WSLCSessionStateRunning, state);
+
+            otherSession.reset();
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(hostProcess.get(), 60 * 1000));
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerAndProcessOutliveSession)
+    {
+        const auto manager = OpenSessionManager();
+        for (const bool terminate : {false, true})
+        {
+            for (const bool releaseContainerFirst : {false, true})
+            {
+                const auto settings = GetDefaultSessionSettings(L"container-process-host-lifetime");
+                auto session = CreateSession(settings);
+                LoadTestImage(*session, "alpine:latest");
+
+                wil::unique_handle hostProcess;
+                wil::unique_handle terminationEvent;
+                VERIFY_SUCCEEDED(session->GetProcessHandle(&hostProcess));
+                VERIFY_SUCCEEDED(session->GetTerminationEvent(&terminationEvent));
+
+                WSLCContainerLauncher launcher("alpine:latest", "outlive-session", {"/bin/sh", "-c", "exit 42"});
+                auto container = launcher.Launch(*session);
+                container.SetDeleteOnClose(false);
+                VERIFY_ARE_EQUAL(42, container.GetInitProcess().Wait(30 * 1000));
+
+                const auto id = container.Id();
+                const auto name = container.Name();
+                wil::com_ptr<IWSLCProcess> process;
+                VERIFY_SUCCEEDED(container.Get().GetInitProcess(&process));
+
+                auto verifyProcess = [](IWSLCProcess* process) {
+                    WSLCProcessState state{};
+                    int code{};
+                    VERIFY_SUCCEEDED(process->GetState(&state, &code));
+                    VERIFY_ARE_EQUAL(WslcProcessStateExited, state);
+                    VERIFY_ARE_EQUAL(42, code);
+
+                    wil::unique_handle exitEvent;
+                    VERIFY_SUCCEEDED(process->GetExitEvent(&exitEvent));
+                    VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(exitEvent.get(), 0));
+                    VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), process->Signal(WSLCSignalSIGKILL));
+                };
+
+                auto verifyContainer = [&]() {
+                    VERIFY_ARE_EQUAL(id, container.Id());
+                    VERIFY_ARE_EQUAL(name, container.Name());
+                    VERIFY_ARE_EQUAL(WslcContainerStateExited, container.State());
+
+                    wil::com_ptr<IWSLCProcess> cachedProcess;
+                    VERIFY_SUCCEEDED(container.Get().GetInitProcess(&cachedProcess));
+                    verifyProcess(cachedProcess.get());
+                };
+
+                if (terminate)
+                {
+                    VERIFY_SUCCEEDED(session->Terminate());
+
+                    verifyContainer();
+                    verifyProcess(process.get());
+                }
+
+                session.reset();
+                VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(terminationEvent.get(), 60 * 1000));
+                VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(hostProcess.get(), 1000));
+
+                // Validate that service cleanup hides the session without killing its surviving objects.
+                VERIFY_IS_FALSE(ListTestSessionNames(manager.get()).contains(settings.DisplayName));
+                verifyContainer();
+                verifyProcess(process.get());
+
+                VERIFY_ARE_EQUAL(RPC_E_DISCONNECTED, container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+
+                if (releaseContainerFirst)
+                {
+                    container.Reset();
+                    VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(hostProcess.get(), 1000));
+
+                    verifyProcess(process.get());
+                    process.reset();
+                }
+                else
+                {
+                    process.reset();
+                    verifyContainer();
+                    container.Reset();
+                }
+
+                VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(hostProcess.get(), 60 * 1000));
+            }
+        }
+    }
+
+    WSLC_TEST_METHOD(RootNamespaceProcessOutlivesSession)
+    {
+        for (const bool terminate : {false, true})
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(L"process-host-lifetime"));
+            wil::unique_handle hostProcess;
+            wil::unique_handle terminationEvent;
+            VERIFY_SUCCEEDED(session->GetProcessHandle(&hostProcess));
+            VERIFY_SUCCEEDED(session->GetTerminationEvent(&terminationEvent));
+
+            // The plugin-style call below cannot start the VM or acquire an activity token.
+            VERIFY_ARE_EQUAL(0, RunCommand(session.get(), {"/bin/true"}).Code);
+
+            const char* commandLine[] = {"/bin/sleep", "600"};
+            WSLCProcessOptions options{};
+            options.CommandLine = {commandLine, RTL_NUMBER_OF(commandLine)};
+
+            wil::com_ptr<IWSLCProcess> process;
+            int errnoValue{};
+            VERIFY_SUCCEEDED(session->CreateRootNamespaceProcess("/bin/sleep", &options, 0, 0, FALSE, &process, &errnoValue));
+
+            int pid{};
+            VERIFY_SUCCEEDED(process->GetPid(&pid));
+
+            if (terminate)
+            {
+                VERIFY_SUCCEEDED(session->Terminate());
+            }
+
+            session.reset();
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(terminationEvent.get(), 60 * 1000));
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(hostProcess.get(), 1000));
+
+            WSLCProcessState state{};
+            int code{};
+            VERIFY_SUCCEEDED(process->GetState(&state, &code));
+            VERIFY_ARE_EQUAL(WslcProcessStateExited, state);
+            VERIFY_ARE_EQUAL(128 + WSLCSignalSIGKILL, code);
+
+            int cachedPid{};
+            VERIFY_SUCCEEDED(process->GetPid(&cachedPid));
+            VERIFY_ARE_EQUAL(pid, cachedPid);
+
+            wil::unique_handle exitEvent;
+            VERIFY_SUCCEEDED(process->GetExitEvent(&exitEvent));
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(exitEvent.get(), 0));
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), process->Signal(WSLCSignalSIGKILL));
+
+            process.reset();
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(hostProcess.get(), 60 * 1000));
+        }
+    }
+
+    WSLC_TEST_METHOD(ActivityTokenOutlivesSession)
+    {
+        for (const bool terminate : {false, true})
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(L"activity-host-lifetime"));
+
+            wil::unique_handle hostProcess;
+            wil::unique_handle terminationEvent;
+            VERIFY_SUCCEEDED(session->GetProcessHandle(&hostProcess));
+            VERIFY_SUCCEEDED(session->GetTerminationEvent(&terminationEvent));
+
+            wil::com_ptr<IUnknown> activity;
+            VERIFY_SUCCEEDED(session->BeginContainerOperation(&activity));
+
+            if (terminate)
+            {
+                VERIFY_SUCCEEDED(session->Terminate());
+            }
+
+            // Validate that session stays alive while the activity token is alive.
+            session.reset();
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(terminationEvent.get(), 60 * 1000));
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(hostProcess.get(), 1000));
+
+            // Reset the activity token and validate that the host process terminates.
+            activity.reset();
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(hostProcess.get(), 60 * 1000));
+        }
     }
 
     WSLC_TEST_METHOD(SessionCleanupWaitsForHostExit)

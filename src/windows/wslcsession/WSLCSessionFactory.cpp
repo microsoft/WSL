@@ -42,11 +42,6 @@ std::wstring SanitizeDisplayName(LPCWSTR displayName)
 
 } // namespace
 
-void wslc::WSLCSessionFactory::SetDestructionCallback(std::function<void()>&& callback)
-{
-    m_destructionCallback = std::move(callback);
-}
-
 HRESULT wslc::WSLCSessionFactory::CreateSession(
     _In_ const WSLCSessionInitSettings* Settings,
     _In_ IWSLCVirtualMachineFactory* VmFactory,
@@ -90,15 +85,12 @@ try
 
     // Create the service session ref. It extracts metadata and a weak reference from the session.
     auto serviceRef = Microsoft::WRL::Make<wslc::WSLCSessionReference>(session.Get());
+    THROW_IF_NULL_ALLOC(serviceRef.Get());
+    session->SetServiceReference(serviceRef.Get());
 
     // Return the session as IWSLCSession interface
     RETURN_IF_FAILED(session->QueryInterface(IID_PPV_ARGS(Session)));
     *ServiceRef = serviceRef.Detach();
-
-    // N.B. The destruction callback must be installed last, after all fallible operations.
-    // If installed earlier, an unwinding session local would fire the exit callback and race
-    // with the COM stub marshaling IErrorInfo back to the caller.
-    session->SetDestructionCallback(std::move(m_destructionCallback));
 
     WSL_LOG(
         "WSLCSessionFactoryCreatedSession",

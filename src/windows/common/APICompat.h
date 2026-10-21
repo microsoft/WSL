@@ -60,6 +60,7 @@ public:
     DEFAULT_MOVABLE(ContainerOptionsConversion);
 
     explicit ContainerOptionsConversion(const WSLCCompatContainerOptions& Options);
+    explicit ContainerOptionsConversion(const WSLCCompatContainerOptions2& Options);
 
     const WSLCContainerOptions* Get() const noexcept
     {
@@ -133,6 +134,11 @@ private:
 };
 
 inline ContainerOptionsConversion Convert(const WSLCCompatContainerOptions& Options)
+{
+    return ContainerOptionsConversion(Options);
+}
+
+inline ContainerOptionsConversion Convert(const WSLCCompatContainerOptions2& Options)
 {
     return ContainerOptionsConversion(Options);
 }
