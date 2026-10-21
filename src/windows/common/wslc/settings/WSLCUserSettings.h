@@ -109,9 +109,9 @@ namespace details {
     DEFINE_SETTING_MAPPING(SessionDefaultBindingAddress, std::string, std::string,     std::string{},                 "session.defaultBindingAddress")
     DEFINE_SETTING_MAPPING(SessionStoragePath,       std::string, std::string,         std::string{},                 "session.storagePath")
     DEFINE_SETTING_MAPPING(SessionIdleTimeout,       uint32_t,    uint32_t,            30,                            "session.idleTimeout")
-        DEFINE_SETTING_MAPPING(SessionProxyHttp,         std::string, std::string,         std::string{},                 "session.proxy.http")
-        DEFINE_SETTING_MAPPING(SessionProxyHttps,        std::string, std::string,         std::string{},                 "session.proxy.https")
-        DEFINE_SETTING_MAPPING(SessionProxyNoProxy,      std::string, std::string,         std::string{},                 "session.proxy.noProxy")
+    DEFINE_SETTING_MAPPING(SessionProxyHttp,         std::string, std::string,         std::string{},                 "session.proxy.http")
+    DEFINE_SETTING_MAPPING(SessionProxyHttps,        std::string, std::string,         std::string{},                 "session.proxy.https")
+    DEFINE_SETTING_MAPPING(SessionProxyNoProxy,      std::string, std::string,         std::string{},                 "session.proxy.noProxy")
 
     #undef DEFINE_SETTING_MAPPING
     // clang-format on

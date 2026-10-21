@@ -51,11 +51,12 @@ using wsl::windows::service::wslc::WSLCVirtualMachineFactory;
 namespace wslutil = wsl::windows::common::wslutil;
 namespace apicompat = wsl::windows::common::apicompat;
 namespace settings = wsl::windows::wslc::settings;
+namespace WRL = Microsoft::WRL;
 
 namespace {
 
 class DeferredWarningCallback
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWarningCallback, IFastRundown>
+    : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, IWarningCallback, IFastRundown>
 {
 public:
     HRESULT OnWarning(LPCWSTR Message) override
