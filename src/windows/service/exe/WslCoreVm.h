@@ -324,6 +324,7 @@ private:
     std::shared_ptr<DmesgCollector> m_dmesgCollector;
     std::shared_ptr<GuestTelemetryLogger> m_gnsTelemetryLogger;
     std::wstring m_debugShellPipe;
+    std::thread m_drvfsInitialThread;
     std::thread m_distroExitThread;
     std::thread m_virtioFsThread;
     std::thread m_crashDumpCollectionThread;

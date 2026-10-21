@@ -45,6 +45,7 @@ extern wsl::windows::service::PluginManager g_pluginManager;
 using wsl::windows::common::COMServiceExecutionContext;
 using wsl::windows::service::wslc::CallingProcessTokenInfo;
 using wsl::windows::service::wslc::HcsVirtualMachine;
+using wsl::windows::service::wslc::MarshaledSessionReference;
 using wsl::windows::service::wslc::WSLCPluginNotifier;
 using wsl::windows::service::wslc::WSLCSessionManagerImpl;
 using wsl::windows::service::wslc::WSLCVirtualMachineFactory;
@@ -53,8 +54,6 @@ namespace apicompat = wsl::windows::common::apicompat;
 namespace settings = wsl::windows::wslc::settings;
 
 namespace {
-
-std::atomic<wsl::windows::service::wslc::WSLCSessionManagerImpl*> g_managerInstance{nullptr};
 
 // Session settings built server-side from the caller's settings.yaml.
 struct SessionSettings
@@ -143,15 +142,66 @@ private:
 
 } // namespace
 
-WSLCSessionManagerImpl::WSLCSessionManagerImpl()
+MarshaledSessionReference::MarshaledSessionReference(IWSLCSessionReference* Reference) :
+    m_git(wil::CoCreateInstance<IGlobalInterfaceTable>(CLSID_StdGlobalInterfaceTable, CLSCTX_INPROC_SERVER))
 {
-    g_managerInstance.store(this);
+    THROW_IF_FAILED(m_git->RegisterInterfaceInGlobal(Reference, __uuidof(IWSLCSessionReference), &m_cookie));
+}
+
+MarshaledSessionReference::~MarshaledSessionReference()
+{
+    Reset();
+}
+
+MarshaledSessionReference::MarshaledSessionReference(MarshaledSessionReference&& Other) noexcept :
+    m_git(std::move(Other.m_git)), m_cookie(std::exchange(Other.m_cookie, 0))
+{
+}
+
+MarshaledSessionReference& MarshaledSessionReference::operator=(MarshaledSessionReference&& Other) noexcept
+{
+    if (this != &Other)
+    {
+        Reset();
+        m_git = std::move(Other.m_git);
+        m_cookie = std::exchange(Other.m_cookie, 0);
+    }
+
+    return *this;
+}
+
+HRESULT MarshaledSessionReference::OpenSession(IWSLCSession** Session) const noexcept
+{
+    RETURN_HR_IF_NULL(E_POINTER, Session);
+    *Session = nullptr;
+    wil::com_ptr<IWSLCSessionReference> reference;
+    RETURN_IF_FAILED(Resolve(reference.put()));
+    return reference->OpenSession(Session);
+}
+
+HRESULT MarshaledSessionReference::Terminate() const noexcept
+{
+    wil::com_ptr<IWSLCSessionReference> reference;
+    RETURN_IF_FAILED(Resolve(reference.put()));
+    return reference->Terminate();
+}
+
+HRESULT MarshaledSessionReference::Resolve(IWSLCSessionReference** Reference) const noexcept
+{
+    return m_git->GetInterfaceFromGlobal(m_cookie, __uuidof(IWSLCSessionReference), reinterpret_cast<void**>(Reference));
+}
+
+void MarshaledSessionReference::Reset() noexcept
+{
+    if (m_cookie != 0)
+    {
+        LOG_IF_FAILED(m_git->RevokeInterfaceFromGlobal(m_cookie));
+        m_cookie = 0;
+    }
 }
 
 WSLCSessionManagerImpl::~WSLCSessionManagerImpl()
 {
-    g_managerInstance.store(nullptr);
-
     // Terminate all sessions on shutdown.
     // Call Terminate() directly rather than going through ForEachSession(),
     // which would needlessly resolve weak references and call GetState().
@@ -160,7 +210,7 @@ WSLCSessionManagerImpl::~WSLCSessionManagerImpl()
     for (auto& entry : m_sessions)
     {
         NotifySessionStoppingLockHeld(entry);
-        LOG_IF_FAILED(entry.Ref->Terminate());
+        LOG_IF_FAILED(entry.Ref.Terminate());
     }
 }
 
@@ -293,7 +343,9 @@ void WSLCSessionManagerImpl::CreateSession(
 
         // Launch per-user COM server factory and add it to a fresh per-session job object for crash cleanup.
         auto factory = wslutil::CreateComServerAsUser<IWSLCSessionFactory>(__uuidof(WSLCSessionFactory), userToken.get());
-        wil::unique_handle sessionJob = CreateSessionProcessJob(factory.get());
+        wil::unique_handle hostProcess;
+        THROW_IF_FAILED(factory->GetProcessHandle(hostProcess.put()));
+        wil::unique_handle sessionJob = CreateSessionProcessJob(hostProcess.get());
 
         const auto sessionSettings = CreateSessionSettings(sessionId, callerFileName.c_str(), Settings, resolvedDisplayName.c_str());
         wil::com_ptr<IWSLCSession> session;
@@ -312,7 +364,17 @@ void WSLCSessionManagerImpl::CreateSession(
 
         // Track the session via its service ref, along with metadata and security info.
         m_sessions.push_back(SessionEntry{
-            std::move(serviceRef), sessionId, creatorPid, resolvedDisplayName, std::move(tokenInfo), notifier, false, sharedToken, std::move(storedSid), std::move(sessionJob)});
+            MarshaledSessionReference{serviceRef.get()},
+            sessionId,
+            creatorPid,
+            resolvedDisplayName,
+            std::move(tokenInfo),
+            notifier,
+            false,
+            sharedToken,
+            std::move(storedSid),
+            std::move(sessionJob),
+            std::move(hostProcess)});
 
         // For persistent sessions, also hold a strong reference to keep them alive.
         const bool persistent = WI_IsFlagSet(Flags, WSLCSessionFlagsPersistent);
@@ -339,7 +401,7 @@ void WSLCSessionManagerImpl::CreateSession(
 
             // Plugin rejected the session: tear it down before propagating.
             m_sessions.back().StoppingNotified = true; // Don't fire stopping for a session that never started successfully.
-            LOG_IF_FAILED(m_sessions.back().Ref->Terminate());
+            LOG_IF_FAILED(m_sessions.back().Ref.Terminate());
             m_sessions.pop_back();
 
             auto remove = std::ranges::remove_if(m_persistentSessions, [&](const auto& e) { return e.first == sessionId; });
@@ -485,16 +547,13 @@ WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
     return sessionSettings;
 }
 
-wil::unique_handle WSLCSessionManagerImpl::CreateSessionProcessJob(_In_ IWSLCSessionFactory* Factory)
+wil::unique_handle WSLCSessionManagerImpl::CreateSessionProcessJob(_In_ HANDLE Process)
 {
     // Use a fresh job per session; reusing one fails intermittently with
     // ERROR_ACCESS_DENIED once it's assigned to a process the system put in another job.
     wil::unique_handle jobObject = wsl::windows::common::helpers::CreateKillOnCloseJob();
 
-    wil::unique_handle process;
-    THROW_IF_FAILED(Factory->GetProcessHandle(process.put()));
-
-    THROW_IF_WIN32_BOOL_FALSE(AssignProcessToJobObject(jobObject.get(), process.get()));
+    THROW_IF_WIN32_BOOL_FALSE(AssignProcessToJobObject(jobObject.get(), Process));
 
     return jobObject;
 }
@@ -685,11 +744,6 @@ try
 CATCH_RETURN();
 
 namespace wsl::windows::service::wslc {
-
-WSLCSessionManagerImpl* WSLCSessionManagerImpl::Instance() noexcept
-{
-    return g_managerInstance.load();
-}
 
 wil::com_ptr<IWSLCSession> WSLCSessionManagerImpl::FindSession(ULONG Id)
 {

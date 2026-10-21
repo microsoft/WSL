@@ -5570,6 +5570,77 @@ class MirroredTests
         // Verify WSL is actually running in NAT mode.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'nat'"), 0u);
     }
+
+    static std::vector<wil::unique_socket> FragmentHostPortRange(int Interval)
+    {
+        std::vector<wil::unique_socket> sockets;
+        for (int port = 1024; port <= UINT16_MAX; port += Interval)
+        {
+            wil::unique_socket hostSocket(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+            THROW_LAST_ERROR_IF(!hostSocket);
+
+            const int exclusive = 1;
+            THROW_LAST_ERROR_IF(
+                setsockopt(hostSocket.get(), SOL_SOCKET, SO_EXCLUSIVEADDRUSE, reinterpret_cast<const char*>(&exclusive), sizeof(exclusive)) ==
+                SOCKET_ERROR);
+
+            SOCKADDR_IN address{};
+            address.sin_family = AF_INET;
+            address.sin_port = htons(static_cast<uint16_t>(port));
+            address.sin_addr.s_addr = htonl(INADDR_ANY);
+            if (bind(hostSocket.get(), reinterpret_cast<const SOCKADDR*>(&address), sizeof(address)) == SOCKET_ERROR)
+            {
+                continue;
+            }
+
+            sockets.emplace_back(std::move(hostSocket));
+        }
+
+        return sockets;
+    }
+
+    WSL2_TEST_METHOD(EphemeralPortRangeFallback)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WslShutdown();
+
+        auto sockets = FragmentHostPortRange(1024);
+        auto shutdown = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [] { WslShutdown(); });
+
+        auto [networkingMode, warnings] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --networking-mode", 0);
+        VERIFY_ARE_EQUAL(wsl::shared::string::Trim(networkingMode), L"mirrored");
+        VERIFY_ARE_EQUAL(std::format(L"wsl: {}\r\n", wsl::shared::Localization::MessageMirroredNetworkingReducedPortRange(512, 4096)), warnings);
+
+        auto [range, rangeWarnings] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range", 0);
+        std::wistringstream rangeStream(range);
+        int rangeStart = 0;
+        int rangeEnd = 0;
+        VERIFY_IS_TRUE(static_cast<bool>(rangeStream >> rangeStart >> rangeEnd));
+        VERIFY_ARE_EQUAL(rangeEnd - rangeStart + 1, 512);
+    }
+
+    WSL2_TEST_METHOD(EphemeralPortRangeAllocationFailure)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WslShutdown();
+
+        auto sockets = FragmentHostPortRange(512);
+        auto shutdown = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [] { WslShutdown(); });
+
+        auto [networkingMode, warnings] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --networking-mode", 0);
+        VERIFY_ARE_EQUAL(wsl::shared::string::Trim(networkingMode), L"none");
+        const auto expectedWarnings = std::format(
+            L"wsl: {}\r\nwsl: {}wsl: {}\r\n",
+            wsl::shared::Localization::MessageMirroredNetworkingPortRangeAllocationFailed(512),
+            FormatErrorMessage(L"An internal error occurred. ", L"CreateInstance/CreateVm/ConfigureNetworking/0x8007054f"),
+            wsl::shared::Localization::MessageNetworkInitializationFailedFallback2(
+                ToString(wsl::core::NetworkingMode::Mirrored), ToString(wsl::core::NetworkingMode::None)));
+        VERIFY_ARE_EQUAL(expectedWarnings, warnings);
+    }
 };
 
 class BridgedTests
@@ -5841,6 +5912,19 @@ class ConsommeTests
 
         // Make sure the VM doesn't time out
         WslKeepAlive keepAlive;
+
+        {
+            auto hostPort = NetworkTests::BindHostPort(1234, SOCK_STREAM, IPPROTO_TCP, true, false, false, std::chrono::minutes(2));
+            VERIFY_ARE_EQUAL(listen(hostPort.get(), SOMAXCONN), 0);
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(L"perl -MSocket -MErrno=EADDRINUSE -e '"
+                                L"socket(my $s,AF_INET,SOCK_STREAM,0) or die \"socket: $!\\n\";"
+                                L"bind($s,sockaddr_in(1234,INADDR_ANY)) and die \"bind unexpectedly succeeded\\n\";"
+                                L"$!{EADDRINUSE} or die \"expected EADDRINUSE: $!\\n\";"
+                                L"my ($port)=sockaddr_in(getsockname($s));"
+                                L"$port==0 or die \"failed bind assigned port $port\\n\";'"),
+                0L);
+        }
 
         {
             auto guestProcess = NetworkTests::BindGuestPort(L"TCP4-LISTEN:1234", true);

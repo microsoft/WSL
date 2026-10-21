@@ -989,6 +989,63 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
+    WSL2_TEST_METHOD(WslcVmExitDuringSessionRelease)
+    {
+        ConfigurePlugin(PluginTestType::WslcVmExitDuringSessionRelease);
+
+        wil::unique_event entered;
+        entered.create(wil::EventOptions::ManualReset, c_vmStoppingEnteredEvent);
+        wil::unique_event release;
+        release.create(wil::EventOptions::ManualReset, c_vmStoppingReleaseEvent);
+
+        constexpr auto c_sessionName = L"plugin-wslc-vm-exit-release";
+        auto session = CreateWslcSession(c_sessionName);
+        wil::unique_event terminated;
+        VERIFY_SUCCEEDED(session->GetTerminationEvent(&terminated));
+
+        wil::unique_event releaseStarted{wil::EventOptions::ManualReset};
+        wil::unique_event releaseCompleted{wil::EventOptions::ManualReset};
+        HRESULT releaseResult = E_PENDING;
+        std::thread releaseThread;
+        auto unblockAndJoin = wil::scope_exit([&]() {
+            release.SetEvent();
+            if (releaseThread.joinable())
+            {
+                releaseThread.join();
+            }
+        });
+
+        // Start the VM, then drop the process wrapper so only the client owns the session.
+        {
+            wsl::windows::common::WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
+            auto process = launcher.Launch(*session);
+        }
+
+        WSLCE2ETests::KillVmByOwner(c_sessionName);
+        VERIFY_IS_TRUE(entered.wait(30000));
+        VERIFY_IS_FALSE(terminated.is_signaled());
+
+        // The relay owns Terminate() now. Releasing the last COM reference must wait for it.
+        releaseThread = std::thread([&, session = std::move(session)]() mutable {
+            releaseResult = wil::ResultFromException([&]() {
+                const auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
+                releaseStarted.SetEvent();
+                session.reset();
+            });
+            releaseCompleted.SetEvent();
+        });
+
+        VERIFY_IS_TRUE(releaseStarted.wait(10000));
+        VERIFY_IS_FALSE(releaseCompleted.wait(1000));
+
+        release.SetEvent();
+        VERIFY_IS_TRUE(terminated.wait(30000));
+        VERIFY_IS_TRUE(releaseCompleted.wait(30000));
+
+        releaseThread.join();
+        VERIFY_SUCCEEDED(releaseResult);
+    }
+
     WSL2_TEST_METHOD(WslcVmNeverStarted)
     {
         ConfigurePlugin(PluginTestType::WslcVmNeverStarted);

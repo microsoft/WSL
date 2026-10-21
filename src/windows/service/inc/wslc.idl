@@ -261,9 +261,10 @@ typedef enum _WSLCMountSpecFlags
     WSLCMountSpecFlagsTmpfsSize = 1,
     WSLCMountSpecFlagsTmpfsMode = 2,
     WSLCMountSpecFlagsCreateSourceIfMissing = 4,
+    WSLCMountSpecFlagsConfigVolume = 8,
 } WSLCMountSpecFlags;
 
-cpp_quote("#define WSLCMountSpecFlagsValid (WSLCMountSpecFlagsTmpfsSize | WSLCMountSpecFlagsTmpfsMode | WSLCMountSpecFlagsCreateSourceIfMissing)")
+cpp_quote("#define WSLCMountSpecFlagsValid (WSLCMountSpecFlagsTmpfsSize | WSLCMountSpecFlagsTmpfsMode | WSLCMountSpecFlagsCreateSourceIfMissing | WSLCMountSpecFlagsConfigVolume)")
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCMountSpecFlags);")
 
 typedef struct _WSLCMountSpec
@@ -660,6 +661,7 @@ typedef struct _WSLCNetworkOptions
     [unique] LPCSTR Subnet;
     [unique] LPCSTR Gateway;
     [unique] LPCSTR IpRange;
+    BOOL EnableIPv6;
 } WSLCNetworkOptions;
 
 typedef char WSLCNetworkName[WSLC_MAX_NETWORK_NAME_LENGTH + 1];
@@ -740,7 +742,7 @@ interface IWSLCSession : IUnknown
     // is inclusive and UntilTime is exclusive. 0 means unbounded on that end.
     // Filters are key/value pairs. Values sharing a key are OR'd, except label values, which must all match.
     // Distinct keys are AND'd.
-    //   container=X and network=X match any event whose actor id or name starts with X. Use type= to restrict
+    //   container=X, network=X and volume=X match any event whose actor id or name starts with X. Use type= to restrict
     //   the event type.
     //   image=X matches the actor id or image name exactly, or by their familiar name without a tag or digest
     //   (e.g. image=ubuntu matches "docker.io/library/ubuntu:22.04"). X itself is compared as written.
@@ -796,7 +798,7 @@ interface IWSLCSession : IUnknown
     HRESULT UnmapVmPort([in] int Family, [in] unsigned short WindowsPort, [in] unsigned short LinuxPort);
 
     // Session initialization - called by SYSTEM service after launching per-user process.
-    // Returns a handle to this COM server process (used to add to job object).
+    // Returns a handle to this COM server process for job assignment and waiting for process exit.
     HRESULT GetProcessHandle([out, system_handle(sh_process)] HANDLE* ProcessHandle);
 
     // Initializes the session with a VM factory. VMs are created through the factory.
@@ -885,7 +887,7 @@ interface IWSLCSessionFactory : IUnknown
         [out] IWSLCSession** Session,
         [out] IWSLCSessionReference** ServiceRef);
 
-    // Gets the process handle for adding to job object.
+    // Gets the process handle for job assignment and waiting for process exit.
     HRESULT GetProcessHandle([out, system_handle(sh_process)] HANDLE* ProcessHandle);
 }
 

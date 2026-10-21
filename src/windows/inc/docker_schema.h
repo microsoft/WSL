@@ -212,11 +212,12 @@ struct CreateNetwork
     std::string Name;
     std::string Driver;
     bool Internal{};
+    bool EnableIPv6{};
     std::optional<IPAM> IPAM;
     std::optional<std::map<std::string, std::string>> Options;
     std::map<std::string, std::string> Labels;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateNetwork, Name, Driver, Internal, IPAM, Options, Labels);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateNetwork, Name, Driver, Internal, EnableIPv6, IPAM, Options, Labels);
 };
 
 struct Network
@@ -485,13 +486,33 @@ struct CreateContainer
     std::optional<std::vector<std::string>> Entrypoint;
     std::vector<std::string> Env;
     std::map<std::string, EmptyObject> ExposedPorts;
+    std::map<std::string, EmptyObject> Volumes;
     std::map<std::string, std::string> Labels;
     std::optional<HealthConfig> Healthcheck;
     HostConfig HostConfig;
     NetworkingConfig NetworkingConfig;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(
-        CreateContainer, Image, Cmd, Tty, OpenStdin, StdinOnce, Entrypoint, Env, ExposedPorts, HostConfig, StopSignal, StopTimeout, WorkingDir, User, Hostname, Domainname, Labels, Healthcheck, NetworkingConfig);
+        CreateContainer,
+        Image,
+        Cmd,
+        Tty,
+        OpenStdin,
+        StdinOnce,
+        Entrypoint,
+        Env,
+        ExposedPorts,
+        Volumes,
+        HostConfig,
+        StopSignal,
+        StopTimeout,
+        WorkingDir,
+        User,
+        Hostname,
+        Domainname,
+        Labels,
+        Healthcheck,
+        NetworkingConfig);
 };
 
 struct HealthcheckResult

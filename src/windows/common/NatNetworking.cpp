@@ -62,15 +62,14 @@ NatNetworking::~NatNetworking()
     // Stop DNS suffix change notifications first, as those can call into the GNS channel.
     m_dnsSuffixRegistryWatcher.reset();
 
-    // Stop the GNS channel to unblock any stuck communications with the guest
-    // calling this before m_connectivityTelemetry.Reset() to unblock that callback if it's attempting a connectivity request in Linux
+    // Unblock guest communications before draining network notification and telemetry callbacks.
     m_gnsChannel.Stop();
 
-    // Stop the telemetry timer which could queue work to linux (through m_gnsChannel)
-    m_connectivityTelemetry.Reset();
-
-    // Unregister the network notification callback to prevent notifications from running while the remainder of the object is destroyed.
+    // Drain network notifications before destroying the telemetry timer they can rearm.
     m_networkNotifyHandle.reset();
+
+    // Stop and drain telemetry callbacks after all rearming notifications have finished.
+    m_connectivityTelemetry.Reset();
 
     auto lock = g_endpointsInUseLock.lock_exclusive();
     auto eraseRange = std::ranges::remove(g_endpointsInUse, m_endpoint.Id);

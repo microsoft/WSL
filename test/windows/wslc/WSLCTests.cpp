@@ -38,6 +38,8 @@ using wsl::windows::common::WSLCProcessLauncher;
 using wsl::windows::common::io::OverlappedIOHandle;
 using wsl::windows::common::io::WriteHandle;
 using namespace wsl::windows::common::wslutil;
+using WSLCE2ETests::KillVmByOwner;
+using WSLCE2ETests::ListVms;
 using WSLCE2ETests::StartLocalRegistry;
 
 extern std::wstring g_testDataPath;
@@ -572,46 +574,6 @@ class WSLCTests
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->GetId(nullptr));
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->GetDisplayName(nullptr));
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->GetState(nullptr));
-    }
-
-    struct VmInfo
-    {
-        std::wstring Id;
-        std::wstring Owner;
-    };
-
-    // Returns VM info (Id + Owner) for all compute systems via the HCS API.
-    static std::vector<VmInfo> ListVms()
-    {
-        const wsl::windows::common::ExecutionContext context(wsl::windows::common::Context::HCS);
-
-        auto operation = wsl::windows::common::hcs::CreateOperation();
-        THROW_IF_FAILED(::HcsEnumerateComputeSystems(L"{}", operation.get()));
-
-        wil::unique_cotaskmem_string resultDocument;
-        const auto result = ::HcsWaitForOperationResult(operation.get(), 10000, &resultDocument);
-        THROW_IF_FAILED_MSG(result, "HcsEnumerateComputeSystems failed (error: %ls)", resultDocument.get());
-
-        LogInfo("HcsEnumerateComputeSystems result='%ws'", resultDocument.get());
-
-        std::vector<VmInfo> vms;
-        const auto json = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(resultDocument.get()));
-        if (!json.is_array())
-        {
-            return vms;
-        }
-
-        for (const auto& entry : json)
-        {
-            if (entry.contains("Owner") && entry["Owner"].is_string() && entry.contains("Id") && entry["Id"].is_string())
-            {
-                vms.push_back(
-                    {wsl::shared::string::MultiByteToWide(entry["Id"].get<std::string>()),
-                     wsl::shared::string::MultiByteToWide(entry["Owner"].get<std::string>())});
-            }
-        }
-
-        return vms;
     }
 
     WSLC_TEST_METHOD(VmOwnerMatchesSessionDisplayName)
@@ -4446,6 +4408,245 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerGpuLinkerCache)
+    {
+        auto contextDir = std::filesystem::current_path() / "build-context-gpu-linker-cache";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-gpu-wrapped-ldconfig:latest", WSLCDeleteImageFlagsForce).first);
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-gpu-failing-ldconfig:latest", WSLCDeleteImageFlagsForce).first);
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-gpu-no-ldconfig:latest", WSLCDeleteImageFlagsForce).first);
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-gpu-musl-default-path:latest", WSLCDeleteImageFlagsForce).first);
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-gpu-musl-custom-path:latest", WSLCDeleteImageFlagsForce).first);
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-gpu-musl-configured-path:latest", WSLCDeleteImageFlagsForce).first);
+
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM debian:latest\n";
+            dockerfile << "RUN mv /sbin/ldconfig /sbin/ldconfig.image\n";
+            dockerfile << "COPY ldconfig /sbin/ldconfig\n";
+            dockerfile << "RUN chmod 755 /sbin/ldconfig && rm -f /etc/ld.so.cache\n";
+        }
+
+        {
+            std::ofstream ldconfig(contextDir / "ldconfig", std::ios::binary);
+            // An interpreter exposes dropped-root regressions that a native ldconfig would not.
+            ldconfig << "#!/bin/sh\n";
+            ldconfig << "test ! -e " LX_INIT_WSLC_GPU_START_HOOK_PATH " || exit 99\n";
+            ldconfig << "id -u > /image-ldconfig-uid\n";
+            ldconfig << "grep CapEff /proc/self/status > /image-ldconfig-ran\n";
+            ldconfig << "grep -E '^(CapBnd|NoNewPrivs|Seccomp):' /proc/self/status > /image-ldconfig-restrictions\n";
+            ldconfig << "test ! -e /fail-image-ldconfig || exit 42\n";
+            ldconfig << "exec /sbin/ldconfig.image \"$@\"\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-gpu-wrapped-ldconfig:latest"));
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM wslc-test-gpu-wrapped-ldconfig:latest\n";
+            dockerfile << "RUN touch /fail-image-ldconfig\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-gpu-failing-ldconfig:latest"));
+
+        // A glibc image without ldconfig, a linker cache, or an ld.so.conf, like some minimal images.
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM debian:latest\n";
+            dockerfile << "RUN rm -f /sbin/ldconfig /sbin/ldconfig.real /etc/ld.so.cache /etc/ld.so.conf\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-gpu-no-ldconfig:latest"));
+
+        constexpr auto c_muslArchitecture = wsl::shared::Arm64 ? "aarch64" : "x86_64";
+        const auto muslPathFile = std::format("/etc/ld-musl-{}.path", c_muslArchitecture);
+        const auto muslLoader = std::format("/lib/ld-musl-{}.so.1", c_muslArchitecture);
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM alpine:latest\n";
+            dockerfile << std::format("RUN rm -f {}\n", muslPathFile);
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-gpu-musl-default-path:latest"));
+
+        // /custom/lib represents an image-specific search directory; it needn't exist for the file-preservation check.
+        // Omit the final newline to verify that GPU setup adds a separator before appending its directory.
+        {
+            std::ofstream libraryPaths(contextDir / "musl-library-path", std::ios::binary);
+            libraryPaths << "/custom/lib:/lib:/usr/local/lib:/usr/lib";
+        }
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM alpine:latest\n";
+            dockerfile << std::format("COPY musl-library-path {}\n", muslPathFile);
+            dockerfile << std::format("RUN chmod 644 {}\n", muslPathFile);
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-gpu-musl-custom-path:latest"));
+
+        // An already-configured image whose path file is readable only by its owner.
+        {
+            std::ofstream libraryPaths(contextDir / "musl-library-path", std::ios::binary);
+            libraryPaths << "/custom/lib:/usr/lib/wsl/lib:/lib:/usr/local/lib:/usr/lib\n";
+        }
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM alpine:latest\n";
+            dockerfile << std::format("COPY musl-library-path {}\n", muslPathFile);
+            dockerfile << std::format("RUN chmod u=rw,go= {}\n", muslPathFile);
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-gpu-musl-configured-path:latest"));
+
+        auto restore = ResetTestSession();
+
+        auto settings = GetDefaultSessionSettings(L"container-gpu-linker-cache-test", true);
+        WI_SetFlag(settings.FeatureFlags, WslcFeatureFlagsGPU);
+
+        auto session = CreateSession(settings);
+
+        auto launch = [&](LPCSTR Image, LPCSTR Name, LPCSTR User = nullptr) {
+            WSLCContainerLauncher launcher(Image, Name, {"sleep", "99999"});
+            launcher.SetContainerFlags(WSLCContainerFlagsGpu);
+            if (User != nullptr)
+            {
+                launcher.SetUser(User);
+            }
+
+            return launcher.Launch(*session);
+        };
+
+        auto expect = [&](RunningWSLCContainer& Container,
+                          const std::vector<std::string>& Command,
+                          int ExitCode,
+                          const std::map<int, std::string>& ExpectedOutput = {}) {
+            auto process = WSLCProcessLauncher({}, Command).Launch(Container.Get());
+            ValidateProcessOutput(process, ExpectedOutput, ExitCode);
+        };
+
+        auto expectGpuLibrariesCached = [&](RunningWSLCContainer& Container) {
+            expect(Container, {"grep", "-a", "-q", "/usr/lib/wsl/lib/", "/etc/ld.so.cache"}, 0);
+        };
+
+        auto expectInitDeleted = [&](RunningWSLCContainer& Container) {
+            expect(Container, {"test", "-e", LX_INIT_WSLC_GPU_START_HOOK_PATH}, 1);
+        };
+
+        auto expectGpuLibraryLoads = [&](RunningWSLCContainer& Container) {
+            // Use bundled Debian's Perl to exercise glibc lookup by soname without pulling another image.
+            expect(
+                Container,
+                {"perl", "-MDynaLoader", "-e", "DynaLoader::dl_load_file('libd3d12core.so') or die DynaLoader::dl_error()"},
+                0);
+        };
+
+        auto expectMuslLibraryPath = [&](RunningWSLCContainer& Container, const std::string& ExpectedPaths, const std::string& ExpectedMode) {
+            expect(Container, {"cat", muslPathFile}, 0, {{1, ExpectedPaths}});
+            expect(Container, {"stat", "-c", "%a", muslPathFile}, 0, {{1, ExpectedMode}});
+            expect(Container, {muslLoader, "--list", "/usr/lib/wsl/lib/libd3d12core.so"}, 0);
+            expectInitDeleted(Container);
+        };
+
+        std::string rootCapabilities;
+
+        // Moving image code out of createContainer must not grant more capabilities than an ordinary root workload.
+        {
+            auto container = launch("wslc-test-gpu-wrapped-ldconfig:latest", "test-container-gpu-image-ldconfig");
+
+            const auto capabilities =
+                WSLCProcessLauncher({}, {"grep", "CapEff", "/proc/self/status"}).Launch(container.Get()).WaitAndCaptureOutput();
+            VERIFY_ARE_EQUAL(capabilities.Code, 0);
+            rootCapabilities = capabilities.Output.at(1);
+            expect(container, {"cat", "/image-ldconfig-ran"}, 0, {{1, rootCapabilities}});
+            expect(container, {"cat", "/image-ldconfig-uid"}, 0, {{1, "0\n"}});
+
+            expectGpuLibrariesCached(container);
+            expectGpuLibraryLoads(container);
+            expectInitDeleted(container);
+        }
+
+        // Starting successfully is not enough: glibc must resolve GPU libraries while the workload stays non-root.
+        // Restart recreates the runtime task, so it must preserve the same separation between helper and workload.
+        {
+            auto container = launch("wslc-test-gpu-wrapped-ldconfig:latest", "test-container-gpu-image-ldconfig-nobody", "nobody");
+
+            auto verifyNonRootGpuAccess = [&]() {
+                expect(container, {"id", "-u"}, 0, {{1, "65534\n"}});
+                expect(container, {"cat", "/image-ldconfig-uid"}, 0, {{1, "0\n"}});
+                expect(container, {"sh", "-c", "grep -q '^Uid:[[:space:]]*65534[[:space:]]' /proc/1/status"}, 0);
+
+                const auto restrictions =
+                    WSLCProcessLauncher({}, {"grep", "-E", "^(CapBnd|NoNewPrivs|Seccomp):", "/proc/self/status"})
+                        .Launch(container.Get())
+                        .WaitAndCaptureOutput();
+                VERIFY_ARE_EQUAL(restrictions.Code, 0);
+                expect(container, {"cat", "/image-ldconfig-restrictions"}, 0, {{1, restrictions.Output.at(1)}});
+                expect(container, {"cat", "/image-ldconfig-ran"}, 0, {{1, rootCapabilities}});
+
+                expectGpuLibrariesCached(container);
+                expectGpuLibraryLoads(container);
+                expectInitDeleted(container);
+            };
+
+            verifyNonRootGpuAccess();
+            VERIFY_SUCCEEDED(container.Get().Restart(WSLCSignalSIGKILL, 0, nullptr));
+            verifyNonRootGpuAccess();
+        }
+
+        // A failing image ldconfig must prevent workload execution, with the helper already removed before it runs.
+        {
+            auto container = launch("wslc-test-gpu-failing-ldconfig:latest", "test-container-gpu-ldconfig-failure", "nobody");
+
+            // runc signals start before running startContainer hooks; hook failures surface through container exit.
+            const auto result = container.GetInitProcess().WaitAndCaptureOutput();
+            VERIFY_ARE_EQUAL(result.Code, 255);
+            VERIFY_IS_TRUE((result.Output.at(1) + result.Output.at(2)).find("exit status 42") != std::string::npos);
+        }
+
+        // Images without ldconfig must start without generating a VM fallback cache.
+        {
+            auto container = launch("wslc-test-gpu-no-ldconfig:latest", "test-container-gpu-no-ldconfig");
+
+            expect(container, {"test", "-e", "/etc/ld.so.cache"}, 1);
+            expectInitDeleted(container);
+        }
+
+        // Preserve musl's default search directories when adding GPU discovery to an image without a .path file.
+        {
+            auto container = launch("wslc-test-gpu-musl-default-path:latest", "test-container-gpu-musl");
+            expectMuslLibraryPath(container, "/lib\n/usr/local/lib\n/usr/lib\n/usr/lib/wsl/lib\n", "644\n");
+        }
+
+        // Keep the existing paths in order, adding a separator before the GPU directory.
+        {
+            auto container = launch("wslc-test-gpu-musl-custom-path:latest", "test-container-gpu-musl-custom-path");
+            expectMuslLibraryPath(container, "/custom/lib:/lib:/usr/local/lib:/usr/lib\n/usr/lib/wsl/lib\n", "644\n");
+        }
+
+        // Keep an already-configured list and its owner-only permissions unchanged.
+        {
+            auto container = launch("wslc-test-gpu-musl-configured-path:latest", "test-container-gpu-musl-configured-path");
+            expectMuslLibraryPath(container, "/custom/lib:/usr/lib/wsl/lib:/lib:/usr/local/lib:/usr/lib\n", "600\n");
+        }
+
+        // Validate that images with no shell, ldconfig, or /etc start. hello-world only contains a static program.
+        {
+            WSLCContainerLauncher launcher("hello-world:latest", "test-container-gpu-scratch");
+            launcher.SetContainerFlags(WSLCContainerFlagsGpu);
+
+            auto container = launcher.Launch(*session);
+            ValidateContainerOutput(container, {}, 0);
+        }
+    }
+
     WSLC_TEST_METHOD(Modules)
     {
         // Sanity check.
@@ -4456,6 +4657,54 @@ class WSLCTests
 
         // Validate that xsk_diag is now loaded.
         ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "lsmod | grep ^xsk_diag"}, 0);
+    }
+
+    WSLC_TEST_METHOD(RootNamespaceProcessReleaseAndExitStress)
+    {
+        constexpr unsigned int c_threadCount = 4;
+        constexpr unsigned int c_iterations = 50;
+
+        std::atomic<unsigned int> failures = 0;
+        std::vector<std::thread> threads;
+
+        {
+            auto joinThreads = wil::scope_exit([&]() {
+                for (auto& thread : threads)
+                {
+                    thread.join();
+                }
+            });
+
+            for (auto t = 0; t < c_threadCount; ++t)
+            {
+                threads.emplace_back([&]() {
+                    try
+                    {
+                        const auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
+                        for (auto i = 0; i < c_iterations; ++i)
+                        {
+                            auto [result, process, error] = WSLCProcessLauncher("/bin/true", {"/bin/true"}).LaunchNoThrow(*m_defaultSession);
+                            if (FAILED(result))
+                            {
+                                LogError("Root process launch failed: 0x%08x, errno: %i", result, error);
+                                ++failures;
+                                return;
+                            }
+                        }
+                    }
+                    catch (...)
+                    {
+                        LOG_CAUGHT_EXCEPTION();
+                        ++failures;
+                    }
+                });
+            }
+        }
+
+        VERIFY_ARE_EQUAL(failures.load(), 0u);
+
+        // Validate that exit notifications are still functional.
+        ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "echo OK"}, 0);
     }
 
     WSLC_TEST_METHOD(CreateRootNamespaceProcess)
@@ -4578,7 +4827,9 @@ class WSLCTests
 
             // Validate that the process object correctly handle requests after the VM has terminated.
             ResetTestSession();
-            VERIFY_ARE_EQUAL(process.Get().Signal(WSLCSignalSIGKILL), HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE));
+            VERIFY_ARE_EQUAL(process.Get().Signal(WSLCSignalSIGKILL), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(WslcProcessStateExited, process.State());
+            VERIFY_ARE_EQUAL(128 + WSLCSignalSIGKILL, process.GetExitCode());
         }
 
         // Validate that empty arguments are correctly handled.
@@ -6695,10 +6946,14 @@ class WSLCTests
 
             WSLCProcessState processState{};
             int exitCode{};
-            VERIFY_ARE_EQUAL(process.Get().GetState(&processState, &exitCode), HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE));
+            VERIFY_SUCCEEDED(process.Get().GetState(&processState, &exitCode));
+            VERIFY_ARE_EQUAL(WslcProcessStateExited, processState);
+            VERIFY_ARE_EQUAL(128 + WSLCSignalSIGKILL, exitCode);
 
             WSLCContainerState state{};
-            VERIFY_ARE_EQUAL(container.Get().GetState(&state), HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE));
+            VERIFY_SUCCEEDED(container.Get().GetState(&state));
+            VERIFY_ARE_NOT_EQUAL(WslcContainerStateInvalid, state);
+            container.SetDeleteOnClose(false);
         }
 
         // Validate error handling when the username / group doesn't exist
@@ -6760,6 +7015,13 @@ class WSLCTests
         }
 
         // Validate error paths
+        {
+            WSLCContainerLauncher launcher("debian:latest", "/invalid-name", {"/bin/cat"});
+            auto [hresult, container] = launcher.CreateNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(hresult, E_INVALIDARG);
+            ValidateCOMErrorMessage(L"Invalid name: '/invalid-name'");
+        }
+
         {
             WSLCContainerLauncher launcher("debian:latest", std::string(WSLC_MAX_CONTAINER_NAME_LENGTH + 1, 'a'), {"/bin/cat"});
             auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
@@ -7232,6 +7494,13 @@ class WSLCTests
         return stream;
     }
 
+    static std::vector<std::string> EventActions(const std::vector<wsl::windows::common::wslc_schema::Event>& Events)
+    {
+        std::vector<std::string> actions;
+        std::ranges::transform(Events, std::back_inserter(actions), &wsl::windows::common::wslc_schema::Event::Action);
+        return actions;
+    }
+
     WSLC_TEST_METHOD(EventStream)
     {
         constexpr auto c_containerName = "wslc-test-events";
@@ -7630,6 +7899,9 @@ class WSLCTests
         // A network filter matches a container by its id or name too.
         VERIFY_ARE_EQUAL(id, matchingIds({{"network", "wslc-test-event-fil"}}));
 
+        // So does a volume filter.
+        VERIFY_ARE_EQUAL(id, matchingIds({{"volume", "wslc-test-event-fil"}}));
+
         // The recorded image matches exactly or by its familiar name, while the filter value is compared as written.
         // Repeated values are OR'd.
         VERIFY_ARE_EQUAL(id, matchingThisContainer({{"image", "docker.io/library/debian:latest"}}));
@@ -7955,6 +8227,210 @@ class WSLCTests
         VERIFY_ARE_EQUAL(static_cast<size_t>(2), events.size());
         VERIFY_ARE_EQUAL("create", events[0].Action);
         VERIFY_ARE_EQUAL("destroy", events[1].Action);
+    }
+
+    void ValidateVolumeEventLifecycle(const std::string& Driver, const std::vector<WSLCDriverOption>& DriverOpts = {})
+    {
+        const auto volumeName = GenerateNetworkEventTestName(std::format("wslc-test-volume-events-{}", Driver));
+        auto stream = OpenEventStream({{"volume", volumeName.c_str()}});
+
+        // Docker doesn't report a volume's labels in its events.
+        CreateNamedVolume(volumeName, Driver, {{"wslc-test-volume-label", "yes"}}, DriverOpts);
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
+
+        // Running a container makes Docker mount and unmount the volume.
+        std::string containerId;
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest", std::format("wslc-test-volume-events-{}-container", Driver), {"sleep", "99999"});
+            launcher.AddNamedVolume(volumeName, "/data", false);
+            auto container = launcher.Launch(*m_defaultSession);
+            containerId = container.Id();
+
+            // Deleting a volume in use fails without an event.
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), m_defaultSession->DeleteVolume(volumeName.c_str()));
+        }
+
+        // WSLC skips its own destroy when updating its volumes, but the event is still recorded.
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+        cleanup.release();
+
+        const std::vector<std::string> lifecycleActions{"create", "mount", "unmount", "destroy"};
+        const auto events = ReadEvents(stream.get(), lifecycleActions.size());
+        VERIFY_ARE_EQUAL(lifecycleActions, EventActions(events));
+
+        // Docker reports its own volume driver rather than the WSLC one.
+        VERIFY_IS_TRUE(std::ranges::all_of(events, [&](const auto& event) {
+            return event.Type == "volume" && event.Actor.ID == volumeName && event.Actor.Attributes.at("driver") == "local" &&
+                   event.timeNano > 0;
+        }));
+
+        const std::map<std::string, std::string> driverAttributes{{"driver", "local"}};
+        VERIFY_IS_TRUE(events[0].Actor.Attributes == driverAttributes);
+        VERIFY_IS_TRUE(events[3].Actor.Attributes == driverAttributes);
+
+        const std::map<std::string, std::string> mountAttributes{
+            {"container", containerId},
+            {"destination", "/data"},
+            {"driver", "local"},
+            {"propagation", ""},
+            {"read/write", "true"}};
+        VERIFY_IS_TRUE(events[1].Actor.Attributes == mountAttributes);
+
+        const std::map<std::string, std::string> unmountAttributes{{"container", containerId}, {"driver", "local"}};
+        VERIFY_IS_TRUE(events[2].Actor.Attributes == unmountAttributes);
+
+        const LONGLONG until = events.back().timeNano / 1'000'000'000 + 1;
+        auto actionsMatching = [&](const std::vector<WSLCFilter>& Filters) {
+            wil::com_ptr<IWSLCEventStream> replayStream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, until, Filters.data(), static_cast<ULONG>(Filters.size()), &replayStream));
+
+            return EventActions(DrainEventStream(replayStream.get()));
+        };
+
+        // The events outlive the volume, and a volume filter matches its name or a prefix of it.
+        const auto volumeNamePrefix = volumeName.substr(0, volumeName.size() - 1);
+        VERIFY_ARE_EQUAL(lifecycleActions, actionsMatching({{"type", "volume"}, {"volume", volumeName.c_str()}}));
+        VERIFY_ARE_EQUAL(lifecycleActions, actionsMatching({{"volume", volumeNamePrefix.c_str()}}));
+
+        // A container filter matches the volume by name, but not by the container recorded on its mount events.
+        VERIFY_ARE_EQUAL(lifecycleActions, actionsMatching({{"type", "volume"}, {"container", volumeName.c_str()}}));
+        VERIFY_IS_TRUE(actionsMatching({{"type", "volume"}, {"container", containerId.c_str()}}).empty());
+
+        // Distinct filter keys are AND'd.
+        VERIFY_ARE_EQUAL(std::vector<std::string>{"mount"}, actionsMatching({{"volume", volumeName.c_str()}, {"event", "mount"}}));
+
+        // A label filter only sees the event's attributes, so the volume's own label doesn't select its events.
+        VERIFY_IS_TRUE(actionsMatching({{"volume", volumeName.c_str()}, {"label", "wslc-test-volume-label"}}).empty());
+    }
+
+    WSLC_TEST_METHOD(VolumeEventStream)
+    {
+        ValidateVolumeEventLifecycle("guest");
+        ValidateVolumeEventLifecycle("vhd", {{"SizeBytes", "1073741824"}});
+
+        // Volumes created and removed directly through Docker are applied to the session before their events are published.
+        {
+            const auto volumeName = GenerateNetworkEventTestName("wslc-test-volume-external");
+
+            auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
+
+            auto stream = OpenEventStream({{"volume", volumeName.c_str()}});
+            wil::unique_cotaskmem_ansistring output;
+
+            ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "volume", "create", volumeName}, 0);
+            VERIFY_ARE_EQUAL("create", ReadEvents(stream.get(), 1)[0].Action);
+            VERIFY_SUCCEEDED(m_defaultSession->InspectVolume(volumeName.c_str(), &output));
+
+            ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "volume", "rm", volumeName}, 0);
+            cleanup.release();
+
+            VERIFY_ARE_EQUAL("destroy", ReadEvents(stream.get(), 1)[0].Action);
+            VERIFY_ARE_EQUAL(WSLC_E_VOLUME_NOT_FOUND, m_defaultSession->InspectVolume(volumeName.c_str(), &output));
+        }
+
+        // Prune events, including those of a prune that matches nothing.
+        {
+            const auto firstVolume = GenerateNetworkEventTestName("wslc-test-volume-prune-a");
+            const auto secondVolume = GenerateNetworkEventTestName("wslc-test-volume-prune-b");
+            const std::string pruneLabelFilter = firstVolume + "=yes";
+
+            auto cleanup = wil::scope_exit([&]() {
+                LOG_IF_FAILED(m_defaultSession->DeleteVolume(firstVolume.c_str()));
+                LOG_IF_FAILED(m_defaultSession->DeleteVolume(secondVolume.c_str()));
+            });
+
+            // The aggregate prune event names no volume, so the network marker bounds this test's volume events instead.
+            auto stream = OpenEventStream({{"type", "network"}, {"type", "volume"}});
+            ReadNetworkEventsThroughMarker(stream.get());
+
+            const auto readVolumeEvents = [&]() {
+                std::vector<wsl::windows::common::wslc_schema::Event> events;
+                std::ranges::copy_if(ReadNetworkEventsThroughMarker(stream.get()), std::back_inserter(events), [](const auto& event) {
+                    return event.Type == "volume";
+                });
+                return events;
+            };
+
+            // The label scopes the prune to the test volumes.
+            CreateNamedVolume(firstVolume, "guest", {{firstVolume.c_str(), "yes"}});
+            CreateNamedVolume(secondVolume, "guest", {{firstVolume.c_str(), "yes"}});
+
+            // Write to a volume so the prune reclaims space.
+            {
+                WSLCContainerLauncher launcher(
+                    "debian:latest", "wslc-test-volume-prune-writer", {"/bin/sh", "-c", "head -c 4096 /dev/zero >/data/file"});
+                launcher.AddNamedVolume(firstVolume, "/data", false);
+                auto container = launcher.Launch(*m_defaultSession);
+                auto process = container.GetInitProcess();
+                ValidateProcessOutput(process, {});
+            }
+
+            WSLCFilter pruneFilters[]{{"all", "true"}, {"label", pruneLabelFilter.c_str()}};
+            wil::unique_cotaskmem_array_ptr<WSLCVolumeName> deleted;
+            ULONGLONG spaceReclaimed{};
+            VERIFY_SUCCEEDED(m_defaultSession->PruneVolumes(
+                pruneFilters, ARRAYSIZE(pruneFilters), nullptr, deleted.addressof(), deleted.size_address<ULONG>(), &spaceReclaimed));
+            VERIFY_ARE_EQUAL(static_cast<size_t>(2), deleted.size());
+            VERIFY_IS_GREATER_THAN(spaceReclaimed, 0ULL);
+
+            cleanup.release();
+
+            // Docker emits per-volume destroys before one aggregate prune.
+            const auto events = readVolumeEvents();
+            const std::vector<std::string> expectedActions{"create", "create", "mount", "unmount", "destroy", "destroy", "prune"};
+            VERIFY_ARE_EQUAL(expectedActions, EventActions(events));
+            VerifyAreEqualUnordered(
+                std::vector<std::string>{firstVolume, secondVolume}, std::vector<std::string>{events[4].Actor.ID, events[5].Actor.ID});
+
+            VERIFY_IS_TRUE(events[6].Actor.ID.empty());
+            VERIFY_ARE_EQUAL(std::to_string(spaceReclaimed), events[6].Actor.Attributes.at("reclaimed"));
+
+            // A prune that matches nothing still reports an aggregate prune.
+            VERIFY_SUCCEEDED(m_defaultSession->PruneVolumes(
+                pruneFilters, ARRAYSIZE(pruneFilters), nullptr, deleted.addressof(), deleted.size_address<ULONG>(), &spaceReclaimed));
+            VERIFY_ARE_EQUAL(static_cast<size_t>(0), deleted.size());
+
+            const auto emptyPruneEvents = readVolumeEvents();
+            VERIFY_ARE_EQUAL(std::vector<std::string>{"prune"}, EventActions(emptyPruneEvents));
+            VERIFY_ARE_EQUAL("0", emptyPruneEvents[0].Actor.Attributes.at("reclaimed"));
+        }
+    }
+
+    // Verify volume events are recorded after the VM restarts, and that recovering a volume records no create.
+    WSLC_TEST_METHOD(VolumeEventsSurviveVmRestart)
+    {
+        const auto volumeName = GenerateNetworkEventTestName("wslc-test-volume-reconnect");
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
+
+        auto stream = OpenEventStream({{"volume", volumeName.c_str()}});
+
+        CreateNamedVolume(volumeName, "vhd", {}, {{"SizeBytes", "1073741824"}});
+
+        // Teardown stops the relay that delivers events, so the create must land before the restart.
+        const auto createEvents = ReadEvents(stream.get(), 1);
+        VERIFY_ARE_EQUAL("create", createEvents[0].Action);
+
+        BOOL wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(m_defaultSession->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_testSessionName));
+
+        // Listing restarts the VM and recovers the volume.
+        VERIFY_IS_TRUE(ListVolumes().contains(volumeName));
+        VERIFY_IS_TRUE(IsVmRunning(c_testSessionName));
+
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+        cleanup.release();
+
+        const auto destroyEvents = ReadEvents(stream.get(), 1);
+        VERIFY_ARE_EQUAL("destroy", destroyEvents[0].Action);
+
+        WSLCFilter filter{"volume", volumeName.c_str()};
+        wil::com_ptr<IWSLCEventStream> replayStream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, destroyEvents[0].timeNano / 1'000'000'000 + 1, &filter, 1, &replayStream));
+        VERIFY_ARE_EQUAL((std::vector<std::string>{"create", "destroy"}), EventActions(DrainEventStream(replayStream.get())));
     }
 
     WSLC_TEST_METHOD(EventStreamReportsLostEvents)
@@ -8293,12 +8769,26 @@ class WSLCTests
             // Validate that the container can be opened by name.
             expectOpen("named-container");
 
+            // Validate that the "/name" form returned by inspect can be opened.
+            auto openedByName = expectOpen(container->Inspect().Name.c_str());
+            WSLCContainerId openedId{};
+            VERIFY_SUCCEEDED(openedByName->GetId(openedId));
+            VERIFY_ARE_EQUAL(container->Id(), std::string{openedId});
+
             // Validate that the container can be opened by ID.
             expectOpen(container->Id().c_str());
 
             // Validate that the container can be opened by a prefix of the ID.
             expectOpen(container->Id().substr(0, 8).c_str());
             expectOpen(container->Id().substr(0, 1).c_str());
+
+            // A single leading slash is ignored, so slash-prefixed IDs and ID prefixes also resolve.
+            for (const auto& reference : {"/" + container->Id(), "/" + container->Id().substr(0, 8)})
+            {
+                auto opened = expectOpen(reference.c_str());
+                VERIFY_SUCCEEDED(opened->GetId(openedId));
+                VERIFY_ARE_EQUAL(container->Id(), std::string{openedId});
+            }
 
             // Validate that prefix conflicts are correctly handled.
             std::vector<RunningWSLCContainer> createdContainers;
@@ -8338,6 +8828,17 @@ class WSLCTests
             }
         }
 
+        // Validate that a maximum-length name can be opened with and without a leading slash.
+        {
+            const std::string name(WSLC_MAX_CONTAINER_NAME_LENGTH, 'a');
+            WSLCContainerLauncher launcher("debian:latest", name, {"echo", "OK"});
+            auto [result, container] = launcher.CreateNoThrow(*m_defaultSession);
+            VERIFY_SUCCEEDED(result);
+
+            expectOpen(name.c_str());
+            expectOpen(("/" + name).c_str());
+        }
+
         // Test error paths
         {
             // A null id and a null output pointer are rejected by the marshaller.
@@ -8352,6 +8853,9 @@ class WSLCTests
 
             expectOpen("non-existing-container", WSLC_E_CONTAINER_NOT_FOUND);
             ValidateCOMErrorMessage(L"Container 'non-existing-container' not found.");
+
+            expectOpen("/non-existing-container", WSLC_E_CONTAINER_NOT_FOUND);
+            ValidateCOMErrorMessage(L"Container '/non-existing-container' not found.");
 
             expectOpen("/", E_INVALIDARG);
             ValidateCOMErrorMessage(L"Invalid name: '/'");
@@ -8727,10 +9231,11 @@ class WSLCTests
             // Terminate the session
             ResetTestSession();
 
-            // Validate that calling into the container returns RPC_S_SERVER_UNAVAILABLE.
+            // Cached properties remain available after the session has been released.
             WSLCContainerState state = WslcContainerStateRunning;
-            VERIFY_ARE_EQUAL(container.Get().GetState(&state), HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE));
-            VERIFY_ARE_EQUAL(state, WslcContainerStateInvalid);
+            VERIFY_SUCCEEDED(container.Get().GetState(&state));
+            VERIFY_ARE_EQUAL(state, WslcContainerStateDeleted);
+            container.SetDeleteOnClose(false);
         }
     }
 
@@ -12779,6 +13284,352 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerCachedProperties)
+    {
+        auto verifyDeletedProperties = [](RunningWSLCContainer& container, IWSLCProcess* expectedProcess = nullptr) {
+            const auto id = container.Id();
+            const auto name = container.Name();
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
+            container.SetDeleteOnClose(false);
+
+            VERIFY_ARE_EQUAL(id, container.Id());
+            VERIFY_ARE_EQUAL(name, container.Name());
+            VERIFY_ARE_EQUAL(WslcContainerStateDeleted, container.State());
+
+            wil::com_ptr<IWSLCProcess> cachedProcess;
+            if (expectedProcess != nullptr)
+            {
+                VERIFY_SUCCEEDED(container.Get().GetInitProcess(&cachedProcess));
+                wil::com_ptr<IUnknown> expectedIdentity;
+                wil::com_ptr<IUnknown> cachedIdentity;
+                VERIFY_SUCCEEDED(expectedProcess->QueryInterface(IID_PPV_ARGS(&expectedIdentity)));
+                VERIFY_SUCCEEDED(cachedProcess->QueryInterface(IID_PPV_ARGS(&cachedIdentity)));
+                VERIFY_ARE_EQUAL(expectedIdentity.get(), cachedIdentity.get());
+            }
+            else
+            {
+                VERIFY_ARE_EQUAL(RPC_E_DISCONNECTED, container.Get().GetInitProcess(&cachedProcess));
+                VERIFY_IS_NULL(cachedProcess.get());
+            }
+        };
+
+        {
+            WSLCContainerLauncher launcher("alpine:latest", "cached-created", {"/bin/true"});
+            auto container = launcher.Create(*m_defaultSession);
+            VERIFY_ARE_EQUAL(WslcContainerStateCreated, container.State());
+            verifyDeletedProperties(container);
+        }
+
+        {
+            WSLCContainerLauncher launcher("alpine:latest", "cached-restarted", {"/bin/sh", "-c", "exit 42"});
+            auto container = launcher.Launch(*m_defaultSession);
+            VERIFY_ARE_EQUAL(42, container.GetInitProcess().Wait());
+
+            wil::com_ptr<IWSLCProcess> firstProcess;
+            VERIFY_SUCCEEDED(container.Get().GetInitProcess(&firstProcess));
+            VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+            VERIFY_ARE_EQUAL(42, container.GetInitProcess().Wait());
+
+            wil::com_ptr<IWSLCProcess> lastProcess;
+            VERIFY_SUCCEEDED(container.Get().GetInitProcess(&lastProcess));
+            VERIFY_ARE_NOT_EQUAL(firstProcess.get(), lastProcess.get());
+            verifyDeletedProperties(container, lastProcess.get());
+        }
+
+        {
+            WSLCContainerLauncher launcher("alpine:latest", "cached-failed-start", {"/wslc-nonexistent-executable"});
+            auto container = launcher.Create(*m_defaultSession);
+            VERIFY_FAILED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+
+            // Failed start rolls back the provisional init process, including its cached reference.
+            verifyDeletedProperties(container);
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerCallRetainsSession)
+    {
+        auto session = CreateSession(GetDefaultSessionSettings(L"container-call-lifetime"));
+        LoadTestImage(*session, "alpine:latest");
+
+        ULONG sessionId{};
+        wil::unique_handle terminationEvent;
+        wil::unique_handle hostProcess;
+        VERIFY_SUCCEEDED(session->GetId(&sessionId));
+        VERIFY_SUCCEEDED(session->GetTerminationEvent(&terminationEvent));
+        VERIFY_SUCCEEDED(session->GetProcessHandle(&hostProcess));
+
+        WSLCContainerLauncher launcher("alpine:latest", "export-retains-session", {"/bin/true"});
+        auto container = launcher.Create(*session);
+        container.SetDeleteOnClose(false);
+
+        // Block a container operation to verify that this keeps the session alive.
+        BlockingOperation operation([&](HANDLE handle) { return container.Get().Export(ToCOMInputHandle(handle)); });
+        auto unblock = wil::scope_exit([&]() { operation.m_testCompleteEvent.SetEvent(); });
+
+        session.reset();
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(terminationEvent.get(), 1000));
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(hostProcess.get(), 0));
+
+        operation.Complete();
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(terminationEvent.get(), 120 * 1000));
+        VERIFY_ARE_EQUAL(WslcContainerStateCreated, container.State());
+
+        container.Reset();
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(hostProcess.get(), 60 * 1000));
+    }
+
+    WSLC_TEST_METHOD(SessionHostExitsAfterLastSessionReference)
+    {
+        const auto manager = OpenSessionManager();
+        for (const bool terminate : {false, true})
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(L"session-host-lifetime"));
+            wil::unique_handle hostProcess;
+            VERIFY_SUCCEEDED(session->GetProcessHandle(&hostProcess));
+
+            ULONG id{};
+            VERIFY_SUCCEEDED(session->GetId(&id));
+            wil::com_ptr<IWSLCSession> otherSession;
+            VERIFY_SUCCEEDED(manager->OpenSession(id, &otherSession));
+
+            if (terminate)
+            {
+                VERIFY_SUCCEEDED(session->Terminate());
+            }
+
+            session.reset();
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(hostProcess.get(), 1000));
+
+            WSLCSessionState state{};
+            VERIFY_SUCCEEDED(otherSession->GetState(&state));
+            VERIFY_ARE_EQUAL(terminate ? WSLCSessionStateTerminated : WSLCSessionStateRunning, state);
+
+            otherSession.reset();
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(hostProcess.get(), 60 * 1000));
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerAndProcessOutliveSession)
+    {
+        const auto manager = OpenSessionManager();
+        for (const bool terminate : {false, true})
+        {
+            for (const bool releaseContainerFirst : {false, true})
+            {
+                const auto settings = GetDefaultSessionSettings(L"container-process-host-lifetime");
+                auto session = CreateSession(settings);
+                LoadTestImage(*session, "alpine:latest");
+
+                wil::unique_handle hostProcess;
+                wil::unique_handle terminationEvent;
+                VERIFY_SUCCEEDED(session->GetProcessHandle(&hostProcess));
+                VERIFY_SUCCEEDED(session->GetTerminationEvent(&terminationEvent));
+
+                WSLCContainerLauncher launcher("alpine:latest", "outlive-session", {"/bin/sh", "-c", "exit 42"});
+                auto container = launcher.Launch(*session);
+                container.SetDeleteOnClose(false);
+                VERIFY_ARE_EQUAL(42, container.GetInitProcess().Wait(30 * 1000));
+
+                const auto id = container.Id();
+                const auto name = container.Name();
+                wil::com_ptr<IWSLCProcess> process;
+                VERIFY_SUCCEEDED(container.Get().GetInitProcess(&process));
+
+                auto verifyProcess = [](IWSLCProcess* process) {
+                    WSLCProcessState state{};
+                    int code{};
+                    VERIFY_SUCCEEDED(process->GetState(&state, &code));
+                    VERIFY_ARE_EQUAL(WslcProcessStateExited, state);
+                    VERIFY_ARE_EQUAL(42, code);
+
+                    wil::unique_handle exitEvent;
+                    VERIFY_SUCCEEDED(process->GetExitEvent(&exitEvent));
+                    VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(exitEvent.get(), 0));
+                    VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), process->Signal(WSLCSignalSIGKILL));
+                };
+
+                auto verifyContainer = [&]() {
+                    VERIFY_ARE_EQUAL(id, container.Id());
+                    VERIFY_ARE_EQUAL(name, container.Name());
+                    VERIFY_ARE_EQUAL(WslcContainerStateExited, container.State());
+
+                    wil::com_ptr<IWSLCProcess> cachedProcess;
+                    VERIFY_SUCCEEDED(container.Get().GetInitProcess(&cachedProcess));
+                    verifyProcess(cachedProcess.get());
+                };
+
+                if (terminate)
+                {
+                    VERIFY_SUCCEEDED(session->Terminate());
+
+                    verifyContainer();
+                    verifyProcess(process.get());
+                }
+
+                session.reset();
+                VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(terminationEvent.get(), 60 * 1000));
+                VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(hostProcess.get(), 1000));
+
+                // Validate that service cleanup hides the session without killing its surviving objects.
+                VERIFY_IS_FALSE(ListTestSessionNames(manager.get()).contains(settings.DisplayName));
+                verifyContainer();
+                verifyProcess(process.get());
+
+                VERIFY_ARE_EQUAL(RPC_E_DISCONNECTED, container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+
+                if (releaseContainerFirst)
+                {
+                    container.Reset();
+                    VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(hostProcess.get(), 1000));
+
+                    verifyProcess(process.get());
+                    process.reset();
+                }
+                else
+                {
+                    process.reset();
+                    verifyContainer();
+                    container.Reset();
+                }
+
+                VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(hostProcess.get(), 60 * 1000));
+            }
+        }
+    }
+
+    WSLC_TEST_METHOD(RootNamespaceProcessOutlivesSession)
+    {
+        for (const bool terminate : {false, true})
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(L"process-host-lifetime"));
+            wil::unique_handle hostProcess;
+            wil::unique_handle terminationEvent;
+            VERIFY_SUCCEEDED(session->GetProcessHandle(&hostProcess));
+            VERIFY_SUCCEEDED(session->GetTerminationEvent(&terminationEvent));
+
+            // The plugin-style call below cannot start the VM or acquire an activity token.
+            VERIFY_ARE_EQUAL(0, RunCommand(session.get(), {"/bin/true"}).Code);
+
+            const char* commandLine[] = {"/bin/sleep", "600"};
+            WSLCProcessOptions options{};
+            options.CommandLine = {commandLine, RTL_NUMBER_OF(commandLine)};
+
+            wil::com_ptr<IWSLCProcess> process;
+            int errnoValue{};
+            VERIFY_SUCCEEDED(session->CreateRootNamespaceProcess("/bin/sleep", &options, 0, 0, FALSE, &process, &errnoValue));
+
+            int pid{};
+            VERIFY_SUCCEEDED(process->GetPid(&pid));
+
+            if (terminate)
+            {
+                VERIFY_SUCCEEDED(session->Terminate());
+            }
+
+            session.reset();
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(terminationEvent.get(), 60 * 1000));
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(hostProcess.get(), 1000));
+
+            WSLCProcessState state{};
+            int code{};
+            VERIFY_SUCCEEDED(process->GetState(&state, &code));
+            VERIFY_ARE_EQUAL(WslcProcessStateExited, state);
+            VERIFY_ARE_EQUAL(128 + WSLCSignalSIGKILL, code);
+
+            int cachedPid{};
+            VERIFY_SUCCEEDED(process->GetPid(&cachedPid));
+            VERIFY_ARE_EQUAL(pid, cachedPid);
+
+            wil::unique_handle exitEvent;
+            VERIFY_SUCCEEDED(process->GetExitEvent(&exitEvent));
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(exitEvent.get(), 0));
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), process->Signal(WSLCSignalSIGKILL));
+
+            process.reset();
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(hostProcess.get(), 60 * 1000));
+        }
+    }
+
+    WSLC_TEST_METHOD(ActivityTokenOutlivesSession)
+    {
+        for (const bool terminate : {false, true})
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(L"activity-host-lifetime"));
+
+            wil::unique_handle hostProcess;
+            wil::unique_handle terminationEvent;
+            VERIFY_SUCCEEDED(session->GetProcessHandle(&hostProcess));
+            VERIFY_SUCCEEDED(session->GetTerminationEvent(&terminationEvent));
+
+            wil::com_ptr<IUnknown> activity;
+            VERIFY_SUCCEEDED(session->BeginContainerOperation(&activity));
+
+            if (terminate)
+            {
+                VERIFY_SUCCEEDED(session->Terminate());
+            }
+
+            // Validate that session stays alive while the activity token is alive.
+            session.reset();
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(terminationEvent.get(), 60 * 1000));
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(hostProcess.get(), 1000));
+
+            // Reset the activity token and validate that the host process terminates.
+            activity.reset();
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(hostProcess.get(), 60 * 1000));
+        }
+    }
+
+    WSLC_TEST_METHOD(SessionCleanupWaitsForHostExit)
+    {
+        const auto manager = OpenSessionManager();
+        const auto settings = GetDefaultSessionSettings(L"session-cleanup-host-exit");
+
+        for (const auto flags : {WSLCSessionFlagsNone, WSLCSessionFlagsPersistent})
+        {
+            auto session = CreateSession(settings, flags);
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                if (session)
+                {
+                    LOG_IF_FAILED(session->Terminate());
+                }
+
+                wil::unique_cotaskmem_array_ptr<WSLCSessionListEntry> sessions;
+                LOG_IF_FAILED(manager->ListSessions(&sessions, sessions.size_address<ULONG>()));
+            });
+
+            wil::unique_handle hostProcess;
+            VERIFY_SUCCEEDED(session->GetProcessHandle(&hostProcess));
+            ULONG id{};
+            VERIFY_SUCCEEDED(session->GetId(&id));
+
+            // Keep the terminated session's client reference so its host cannot exit.
+            VERIFY_SUCCEEDED(session->Terminate());
+
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(hostProcess.get(), 1000));
+            VERIFY_IS_FALSE(ListTestSessionNames(manager.get()).contains(settings.DisplayName));
+
+            WSLCSessionState state{};
+            VERIFY_SUCCEEDED(session->GetState(&state));
+            VERIFY_ARE_EQUAL(WSLCSessionStateTerminated, state);
+
+            wil::com_ptr<IWSLCSession> opened;
+            VERIFY_ARE_EQUAL(WSLC_E_SESSION_NOT_FOUND, manager->OpenSession(id, &opened));
+            VERIFY_ARE_EQUAL(WSLC_E_SESSION_NOT_FOUND, manager->OpenSessionByName(settings.DisplayName, &opened));
+
+            // Validate that the session can be recreated under the same name.
+            auto replacement = CreateSession(settings);
+            ULONG replacementId{};
+            VERIFY_SUCCEEDED(replacement->GetId(&replacementId));
+            VERIFY_ARE_NOT_EQUAL(id, replacementId);
+
+            // Validate that releasing the final client reference lets the host exit.
+            session.reset();
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(hostProcess.get(), 60 * 1000));
+            VERIFY_IS_TRUE(ListTestSessionNames(manager.get()).contains(settings.DisplayName));
+        }
+    }
+
     static void ValidateHandleOutput(HANDLE handle, const std::string& expectedOutput)
     {
         VERIFY_ARE_EQUAL(EscapeString(expectedOutput), EscapeString(ReadToString(handle)));
@@ -13620,11 +14471,15 @@ class WSLCTests
         expectInvalidArg("?foo");
         expectInvalidArg("?foo&bar");
         expectInvalidArg("/url/path");
+        expectInvalidArg("//container");
+        expectInvalidArg("/container/");
+        expectInvalidArg("/?foo");
         expectInvalidArg("");
         expectInvalidArg("\\escaped\n\\chars");
 
         std::string longName(WSLC_MAX_CONTAINER_NAME_LENGTH + 1, 'a');
         expectInvalidArg(longName);
+        expectInvalidArg("/" + longName);
 
         auto expectInvalidPull = [&](const char* name) {
             VERIFY_ARE_EQUAL(m_defaultSession->PullImage(name, nullptr, FALSE, nullptr, nullptr), E_INVALIDARG);
@@ -14625,22 +15480,6 @@ class WSLCTests
         ValidateProcessOutput(initProcess, {{1, "OK\n"}});
     }
 
-    // Kills all VMs matching the given owner name via hcsdiag.
-    static void KillVmByOwner(const std::wstring& owner)
-    {
-        bool found = false;
-        for (const auto& vm : ListVms())
-        {
-            if (vm.Owner == owner)
-            {
-                found = true;
-                VERIFY_ARE_EQUAL(wsl::windows::common::SubProcess(nullptr, std::format(L"hcsdiag.exe kill {}", vm.Id).c_str()).Run(10000), 0u);
-            }
-        }
-
-        VERIFY_IS_TRUE(found, std::format(L"VM with owner '{}' not found", owner).c_str());
-    }
-
     // Waits for a session to report the terminated state.
     static void WaitForSessionTermination(IWSLCSession* session)
     {
@@ -14728,11 +15567,29 @@ class WSLCTests
             VERIFY_IS_TRUE(IsVmRunning(c_sessionName));
         }
 
-        // Releasing the process wrapper removes its activity hold, allowing idle termination.
+        // A plugin process has no activity hold and can outlive the VM through its COM proxy.
+        const char* commandLine[] = {"/bin/sleep", "600"};
+        WSLCProcessOptions options{};
+        options.CommandLine = {commandLine, RTL_NUMBER_OF(commandLine)};
+        options.Flags = WSLCProcessFlagsTty | WSLCProcessFlagsStdin;
+        wil::com_ptr<IWSLCProcess> pluginProcess;
+        int errnoValue = -1;
+        VERIFY_SUCCEEDED(session->CreateRootNamespaceProcess("/bin/sleep", &options, 24, 80, FALSE, &pluginProcess, &errnoValue));
+        VERIFY_SUCCEEDED(pluginProcess->ResizeTty(25, 81));
+
+        // Releasing the ordinary process wrapper removes its activity hold, allowing idle termination.
         wasAlreadyIdle = TRUE;
         VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
         VERIFY_IS_FALSE(wasAlreadyIdle);
         VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
+
+        WSLCProcessState state{};
+        int exitCode{};
+        VERIFY_SUCCEEDED(pluginProcess->GetState(&state, &exitCode));
+        VERIFY_ARE_EQUAL(state, WslcProcessStateExited);
+        VERIFY_ARE_EQUAL(exitCode, 128 + WSLCSignalSIGKILL);
+        VERIFY_ARE_EQUAL(pluginProcess->Signal(WSLCSignalSIGKILL), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+        VERIFY_ARE_EQUAL(pluginProcess->ResizeTty(24, 80), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
         // A second trigger is now a no-op.
         wasAlreadyIdle = FALSE;
@@ -14743,6 +15600,7 @@ class WSLCTests
         WSLCProcessLauncher launcher2("/bin/sleep", {"/bin/sleep", "60"});
         auto process2 = launcher2.Launch(*session);
         VERIFY_IS_TRUE(IsVmRunning(c_sessionName));
+        VERIFY_ARE_EQUAL(pluginProcess->ResizeTty(24, 80), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
     }
 
     // A tmpfs-backed session has no persistent storage, so its VM state cannot be recovered after a

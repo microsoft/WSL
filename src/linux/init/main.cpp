@@ -88,8 +88,6 @@ Abstract:
 #define KERNEL_MODULES_OVERLAY "/modules_overlay"
 #define KERNEL_HEADERS_TEMP_PATH "/kernel_headers"
 #define KERNEL_HEADERS_PATH_PREFIX "/usr/src/linux-headers-"
-#define KERNEL_PERF_TEMP_PATH "/kernel_perf"
-#define KERNEL_PERF_PATH_PREFIX "/usr/lib/linux-tools/"
 #define MODPROBE_PATH "/sbin/modprobe"
 #define PROCFS_PATH "/proc"
 #define RESOLV_CONF_FILE "resolv.conf"
@@ -121,7 +119,6 @@ struct VmConfiguration
     bool EnableCrashDumpCollection = false;
     std::string KernelModulesPath;
     std::string KernelHeadersTarget;
-    std::string KernelPerfTarget;
     LX_MINI_INIT_NETWORKING_MODE NetworkingMode = LxMiniInitNetworkingModeNone;
 };
 
@@ -1649,18 +1646,6 @@ Return Value:
     }
 
     //
-    // If the perf tooling was mounted, move it to a temporary location and pass the desired target
-    // path to the distro init via an environment variable. Distro init will move the mount to
-    // /usr/lib/linux-tools/<uname -r> and add it to the default $PATH.
-    //
-
-    if (!Config.KernelPerfTarget.empty())
-    {
-        AddTemporaryMount(LX_WSL2_KERNEL_PERF_MOUNT_ENV, KERNEL_PERF_TEMP_PATH, (MS_MOVE | MS_REC));
-        AddEnvironmentVariable(LX_WSL2_KERNEL_PERF_PATH_ENV, Config.KernelPerfTarget.c_str());
-    }
-
-    //
     // Bind mount the init daemon into the distro namespace.
     //
 
@@ -2282,16 +2267,6 @@ void ProcessLaunchInitMessage(
         auto MiniInitDirectChildPidPath = std::filesystem::read_symlink(PROCFS_PATH "/self");
         pid_t MiniInitDirectChildPid = std::stoul(MiniInitDirectChildPidPath.string());
 
-        bool enableGuiApps = Config.EnableGuiApps;
-        {
-            wil::unique_file File{fopen(DISTRO_PATH ETC_PATH "/wsl.conf", "r")};
-            if (File)
-            {
-                std::vector<ConfigKey> ConfigKeys = {ConfigKey("general.guiApplications", enableGuiApps)};
-                ParseConfigFile(ConfigKeys, File.get(), (CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES), STRING_TO_WSTRING(CONFIG_FILE));
-            }
-        }
-
         //
         // Set up the per-distro cgroup before potentially forking into two inits.
         //
@@ -2330,9 +2305,20 @@ void ProcessLaunchInitMessage(
         //      of GUI app support because WslService is waiting to accept a connection.
         //
 
+        bool enableGuiApps = false;
         if (Message->Flags & LxMiniInitMessageFlagLaunchSystemDistro && Config.EnableGuiApps)
         {
             Step = LxInitCreateInstanceStepLaunchSystemDistro;
+
+            enableGuiApps = true;
+            {
+                wil::unique_file File{fopen(DISTRO_PATH ETC_PATH "/wsl.conf", "r")};
+                if (File)
+                {
+                    std::vector<ConfigKey> ConfigKeys = {ConfigKey("general.guiApplications", enableGuiApps)};
+                    ParseConfigFile(ConfigKeys, File.get(), (CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES), STRING_TO_WSTRING(CONFIG_FILE));
+                }
+            }
 
             //
             // If the distro did not opt-out of GUI applications, continue launching the system distro.
@@ -3250,7 +3236,7 @@ try
         // N.B. The VHD is mounted as read-only but with a writable overlayfs layer. The modules
         //      directory must be writable for tools like depmod to work.
         //
-        // N.B. The artifacts VHD nests its payloads under <release>/{modules,linux-headers,perf}.
+        // N.B. The artifacts VHD nests its modules and headers under <release>/{modules,linux-headers}.
         //      Older module-only VHDs place the modules tree at the filesystem root; fall back to that
         //      layout when the nested modules directory is not present.
         //
@@ -3280,7 +3266,7 @@ try
             {
                 LOG_WARNING(
                     "kernel modules VHD uses the legacy flat layout; support for the legacy modules VHD format will be "
-                    "removed in a future version; kernel headers and perf tooling are unavailable");
+                    "removed in a future version; kernel headers are unavailable");
             }
             else if (!NestedLayout)
             {
@@ -3305,9 +3291,8 @@ try
             Config.KernelModulesPath = std::move(Target);
 
             //
-            // When the nested artifacts layout is present, bind mount the kernel headers and perf
-            // tooling to temporary locations. Each distro init moves them into the distro namespace
-            // at /usr/src/linux-headers-<release> and /usr/lib/linux-tools/<release> (see config.cpp).
+            // When the nested artifacts layout is present, bind mount the kernel headers to a temporary
+            // location. Each distro init moves them to /usr/src/linux-headers-<release> (see config.cpp).
             //
 
             if (NestedLayout)
@@ -3316,12 +3301,6 @@ try
                 if (UtilMount(HeadersSource.c_str(), KERNEL_HEADERS_TEMP_PATH, nullptr, (MS_BIND | MS_REC), nullptr) == 0)
                 {
                     Config.KernelHeadersTarget = std::format("{}{}", KERNEL_HEADERS_PATH_PREFIX, Release);
-                }
-
-                const std::string PerfSource = ArtifactsBase + "/perf";
-                if (UtilMount(PerfSource.c_str(), KERNEL_PERF_TEMP_PATH, nullptr, (MS_BIND | MS_REC), nullptr) == 0)
-                {
-                    Config.KernelPerfTarget = std::format("{}{}", KERNEL_PERF_PATH_PREFIX, Release);
                 }
             }
         }
