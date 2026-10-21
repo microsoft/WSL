@@ -26,7 +26,9 @@ Abstract:
 #include "DockerHTTPClient.h"
 #include "EventStore.h"
 #include "IORelay.h"
+#include "RuntimeClass.h"
 #include <atomic>
+#include <ctxtcall.h>
 #include <list>
 #include <optional>
 #include <unordered_map>
@@ -80,7 +82,7 @@ private:
 // lazily on first use and may be torn down when idle and recreated on demand.
 //
 class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLCSession
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCSession, IWSLCCompatSession, IFastRundown, ISupportErrorInfo>
+    : public common::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCSession, IWSLCCompatSession, IFastRundown, ISupportErrorInfo>
 {
     // WSLCContainer::Delete acquires a VmLease to keep the VM alive (and block idle
     // teardown) for the duration of a container deletion.
@@ -93,9 +95,7 @@ public:
 
     ~WSLCSession();
 
-    // Sets a callback invoked when this object is destroyed.
-    // Used by the COM server host to signal process exit.
-    void SetDestructionCallback(std::function<void()>&& callback);
+    void SetServiceReference(IWSLCSessionReference* Reference);
 
     // Type of m_crashDumpCallbacks. Exposed so CrashDumpSubscription can hold an iterator into
     // it as an O(1) registration handle.
@@ -429,7 +429,8 @@ private:
     std::vector<BYTE> m_userSid;
 
     WSLCFeatureFlags m_featureFlags{};
-    std::function<void()> m_destructionCallback;
+    wil::com_ptr<IWSLCSessionReference> m_serviceReference;
+    wil::com_ptr<IContextCallback> m_serviceReferenceContext;
     std::atomic<bool> m_terminating{false};
 
     // Signals that the winning Terminate() call has finished, including cleanup or failure.

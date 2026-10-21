@@ -45,6 +45,7 @@ extern wsl::windows::service::PluginManager g_pluginManager;
 using wsl::windows::common::COMServiceExecutionContext;
 using wsl::windows::service::wslc::CallingProcessTokenInfo;
 using wsl::windows::service::wslc::HcsVirtualMachine;
+using wsl::windows::service::wslc::MarshaledSessionReference;
 using wsl::windows::service::wslc::WSLCPluginNotifier;
 using wsl::windows::service::wslc::WSLCSessionManagerImpl;
 using wsl::windows::service::wslc::WSLCVirtualMachineFactory;
@@ -141,6 +142,64 @@ private:
 
 } // namespace
 
+MarshaledSessionReference::MarshaledSessionReference(IWSLCSessionReference* Reference) :
+    m_git(wil::CoCreateInstance<IGlobalInterfaceTable>(CLSID_StdGlobalInterfaceTable, CLSCTX_INPROC_SERVER))
+{
+    THROW_IF_FAILED(m_git->RegisterInterfaceInGlobal(Reference, __uuidof(IWSLCSessionReference), &m_cookie));
+}
+
+MarshaledSessionReference::~MarshaledSessionReference()
+{
+    Reset();
+}
+
+MarshaledSessionReference::MarshaledSessionReference(MarshaledSessionReference&& Other) noexcept :
+    m_git(std::move(Other.m_git)), m_cookie(std::exchange(Other.m_cookie, 0))
+{
+}
+
+MarshaledSessionReference& MarshaledSessionReference::operator=(MarshaledSessionReference&& Other) noexcept
+{
+    if (this != &Other)
+    {
+        Reset();
+        m_git = std::move(Other.m_git);
+        m_cookie = std::exchange(Other.m_cookie, 0);
+    }
+
+    return *this;
+}
+
+HRESULT MarshaledSessionReference::OpenSession(IWSLCSession** Session) const noexcept
+{
+    RETURN_HR_IF_NULL(E_POINTER, Session);
+    *Session = nullptr;
+    wil::com_ptr<IWSLCSessionReference> reference;
+    RETURN_IF_FAILED(Resolve(reference.put()));
+    return reference->OpenSession(Session);
+}
+
+HRESULT MarshaledSessionReference::Terminate() const noexcept
+{
+    wil::com_ptr<IWSLCSessionReference> reference;
+    RETURN_IF_FAILED(Resolve(reference.put()));
+    return reference->Terminate();
+}
+
+HRESULT MarshaledSessionReference::Resolve(IWSLCSessionReference** Reference) const noexcept
+{
+    return m_git->GetInterfaceFromGlobal(m_cookie, __uuidof(IWSLCSessionReference), reinterpret_cast<void**>(Reference));
+}
+
+void MarshaledSessionReference::Reset() noexcept
+{
+    if (m_cookie != 0)
+    {
+        LOG_IF_FAILED(m_git->RevokeInterfaceFromGlobal(m_cookie));
+        m_cookie = 0;
+    }
+}
+
 WSLCSessionManagerImpl::~WSLCSessionManagerImpl()
 {
     // Terminate all sessions on shutdown.
@@ -151,7 +210,7 @@ WSLCSessionManagerImpl::~WSLCSessionManagerImpl()
     for (auto& entry : m_sessions)
     {
         NotifySessionStoppingLockHeld(entry);
-        LOG_IF_FAILED(entry.Ref->Terminate());
+        LOG_IF_FAILED(entry.Ref.Terminate());
     }
 }
 
@@ -305,7 +364,7 @@ void WSLCSessionManagerImpl::CreateSession(
 
         // Track the session via its service ref, along with metadata and security info.
         m_sessions.push_back(SessionEntry{
-            std::move(serviceRef),
+            MarshaledSessionReference{serviceRef.get()},
             sessionId,
             creatorPid,
             resolvedDisplayName,
@@ -342,7 +401,7 @@ void WSLCSessionManagerImpl::CreateSession(
 
             // Plugin rejected the session: tear it down before propagating.
             m_sessions.back().StoppingNotified = true; // Don't fire stopping for a session that never started successfully.
-            LOG_IF_FAILED(m_sessions.back().Ref->Terminate());
+            LOG_IF_FAILED(m_sessions.back().Ref.Terminate());
             m_sessions.pop_back();
 
             auto remove = std::ranges::remove_if(m_persistentSessions, [&](const auto& e) { return e.first == sessionId; });
