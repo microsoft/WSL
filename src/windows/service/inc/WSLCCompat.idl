@@ -350,6 +350,7 @@ interface IWSLCCompatSession : IUnknown
 
     // Returns a JSON array of wslc_schema::NetworkListEntry.
     HRESULT ListNetworks([out] LPSTR* Output);
+    HRESULT DeleteNetwork([in] LPCSTR Name);
 }
 
 [

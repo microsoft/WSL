@@ -673,6 +673,44 @@ class WslcSdkWinRtTests
             VERIFY_IS_NULL(findNetwork(m_defaultSession.GetNetworks(), networkName));
         }
     }
+
+    WSLC_TEST_METHOD(NetworkDelete)
+    {
+        constexpr auto c_networkName = "wslc-sdk-winrt-delete-network";
+        const winrt::hstring networkName = winrt::to_hstring(c_networkName);
+
+        auto comSession =
+            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->session.query<IWSLCSession>();
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName));
+
+        WSLCNetworkOptions options{};
+        options.Name = c_networkName;
+        options.Driver = "bridge";
+        VERIFY_SUCCEEDED(comSession->CreateNetwork(&options, nullptr));
+        auto cleanupNetwork = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName)); });
+
+        // Positive: the deleted network is no longer listed.
+        {
+            m_defaultSession.DeleteNetwork(networkName);
+            cleanupNetwork.release();
+
+            for (auto const& network : m_defaultSession.GetNetworks())
+            {
+                VERIFY_ARE_NOT_EQUAL(network.Name(), networkName);
+            }
+        }
+
+        // Negative: deleting a missing network fails.
+        {
+            VERIFY_THROWS_HR(m_defaultSession.DeleteNetwork(networkName), WSLC_E_NETWORK_NOT_FOUND);
+        }
+
+        // Negative: invalid arguments.
+        {
+            VERIFY_THROWS_HR(m_defaultSession.DeleteNetwork(L""), E_INVALIDARG);
+        }
+    }
+
     // -----------------------------------------------------------------------
     // Container lifecycle tests
     // -----------------------------------------------------------------------

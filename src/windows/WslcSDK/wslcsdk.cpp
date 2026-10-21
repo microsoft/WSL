@@ -1827,6 +1827,19 @@ try
 }
 CATCH_RETURN();
 
+STDAPI WslcDeleteSessionNetwork(_In_ WslcSession session, _In_z_ PCSTR name, _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(E_POINTER, name);
+
+    return errorInfoWrapper.CaptureResult(internalType->session->DeleteNetwork(name));
+}
+CATCH_RETURN();
+
 // STORAGE
 
 // INSTALL

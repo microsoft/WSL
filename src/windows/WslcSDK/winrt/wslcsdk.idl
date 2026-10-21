@@ -92,6 +92,7 @@ namespace Microsoft.WSL.Containers
         IVectorView<ImageInfo> GetImages();
 
         IVectorView<NetworkInfo> GetNetworks();
+        void DeleteNetwork(String name);
 
         event SessionTerminationHandler Terminated;
         event ProcessCrashHandler ProcessCrashed;

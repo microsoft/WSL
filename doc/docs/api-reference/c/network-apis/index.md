@@ -4,3 +4,4 @@
 ## Members
 
 - [WslcListSessionNetworks](wslclistsessionnetworks.md)
+- [WslcDeleteSessionNetwork](wslcdeletesessionnetwork.md)

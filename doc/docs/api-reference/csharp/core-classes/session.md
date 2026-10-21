@@ -29,6 +29,7 @@ public sealed class Session : IDisposable
     public AuthenticateResult Authenticate(Uri serverAddress, string username, string password);
     public IReadOnlyList<ImageInfo> GetImages();
     public IReadOnlyList<NetworkInfo> GetNetworks();
+    public void DeleteNetwork(string name);
     public void Dispose();
 }
 ```
@@ -237,6 +238,14 @@ foreach (var network in session.GetNetworks())
 {
     Console.WriteLine($"{network.Name} ({network.Driver})");
 }
+```
+
+## Session.DeleteNetwork(string name)
+
+Deletes a network from the session. Throws `WSLC_E_NETWORK_NOT_FOUND` if the network does not exist.
+
+```csharp
+session.DeleteNetwork("backend");
 ```
 
 ## Session.Terminated event

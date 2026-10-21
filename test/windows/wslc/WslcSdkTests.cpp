@@ -553,6 +553,46 @@ class WslcSdkTests
             VERIFY_ARE_EQUAL(WslcListSessionNetworks(m_defaultSession, &networks, nullptr, nullptr), E_POINTER);
         }
     }
+
+    WSLC_TEST_METHOD(NetworkDelete)
+    {
+        constexpr auto c_networkName = "wslc-sdk-delete-network";
+
+        auto comSession = reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session.query<IWSLCSession>();
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName));
+
+        WSLCNetworkOptions options{};
+        options.Name = c_networkName;
+        options.Driver = "bridge";
+        VERIFY_SUCCEEDED(comSession->CreateNetwork(&options, nullptr));
+        auto cleanupNetwork = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName)); });
+
+        // Positive: the deleted network is no longer listed.
+        {
+            VERIFY_SUCCEEDED(WslcDeleteSessionNetwork(m_defaultSession, c_networkName, nullptr));
+            cleanupNetwork.release();
+
+            wil::unique_cotaskmem_array_ptr<WslcNetworkInfo> networks;
+            VERIFY_SUCCEEDED(WslcListSessionNetworks(m_defaultSession, networks.addressof(), networks.size_address<uint32_t>(), nullptr));
+            for (const auto& network : networks)
+            {
+                VERIFY_ARE_NOT_EQUAL(std::string(c_networkName), network.name);
+            }
+        }
+
+        // Negative: deleting a missing network fails with an error message.
+        {
+            wil::unique_cotaskmem_string errorMessage;
+            VERIFY_ARE_EQUAL(WslcDeleteSessionNetwork(m_defaultSession, c_networkName, errorMessage.put()), WSLC_E_NETWORK_NOT_FOUND);
+            VERIFY_IS_NOT_NULL(errorMessage.get());
+        }
+
+        // Negative: invalid arguments.
+        {
+            VERIFY_ARE_EQUAL(WslcDeleteSessionNetwork(m_defaultSession, nullptr, nullptr), E_POINTER);
+        }
+    }
+
     WSLC_TEST_METHOD(LoadImage)
     {
         // Positive: load a saved image tar and verify the image can be run.

@@ -190,6 +190,14 @@ for (auto const& network : networks)
 }
 ```
 
+## Session::DeleteNetwork(hstring)
+
+Deletes a network from the session. Throws `WSLC_E_NETWORK_NOT_FOUND` if the network does not exist.
+
+```cpp
+session.DeleteNetwork(L"backend");
+```
+
 ## Session::Terminated event
 
 Raised when the session termination event is signaled.

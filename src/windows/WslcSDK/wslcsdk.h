@@ -711,6 +711,26 @@ STDAPI WslcListSessionNetworks(
     _Out_ uint32_t* count,
     _Outptr_opt_result_z_ PWSTR* errorMessage);
 
+// Deletes a network from a session.
+//
+// Parameters:
+//   session
+//       A valid WslcSession handle.
+//
+//   name
+//       The name of the network to delete.
+//
+//   errorMessage
+//       Optional. On failure, receives a human-readable error message. May be null.
+//
+// Return Value:
+//   S_OK on success. Otherwise, an HRESULT error code indicating the reason for failure.
+//
+// Notes:
+//   - Returns WSLC_E_NETWORK_NOT_FOUND if the network does not exist.
+//   - Returns HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION) if a container is connected to the network.
+STDAPI WslcDeleteSessionNetwork(_In_ WslcSession session, _In_z_ PCSTR name, _Outptr_opt_result_z_ PWSTR* errorMessage);
+
 // STORAGE
 
 STDAPI WslcCreateSessionVhdVolume(_In_ WslcSession session, _In_ const WslcVhdRequirements* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
