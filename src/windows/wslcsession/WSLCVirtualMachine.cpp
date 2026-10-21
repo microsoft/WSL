@@ -389,28 +389,35 @@ WSLCVirtualMachine::~WSLCVirtualMachine()
 
     m_vmTerminatingEvent.SetEvent();
 
-    m_initChannel.Close();
-
-    // Terminate the VM.
-    m_vm.reset();
-
     if (m_processExitThread.joinable())
     {
         m_processExitThread.join();
     }
 
-    if (m_crashDumpThread.joinable())
+    // Detach under the registry lock, but notify processes outside it so their destructors can unregister.
+    std::vector<std::weak_ptr<VMProcessControl>> processes;
     {
-        m_crashDumpThread.join();
+        std::lock_guard lock{m_processRegistry->Mutex};
+        processes.swap(m_processRegistry->Processes);
     }
+    m_processRegistry.reset();
 
-    // Clear the state of all remaining processes now that the VM has exited.
-    for (auto& e : m_trackedProcesses)
+    for (const auto& e : processes)
     {
         if (auto locked = e.lock())
         {
             locked->OnVmTerminated();
         }
+    }
+
+    m_initChannel.Close();
+
+    // Terminate the VM.
+    m_vm.reset();
+
+    if (m_crashDumpThread.joinable())
+    {
+        m_crashDumpThread.join();
     }
 }
 
@@ -573,21 +580,21 @@ try
             TraceLoggingValue(message->Code, "Code"),
             TraceLoggingValue(message->Signaled, "Signaled"));
 
-        // Signal the exited process, if it's been monitored.
-        // N.B. Lock weak_ptr under lock, then call OnExited outside it to avoid
-        // deadlock with the destructor's m_lock -> m_trackedProcessesLock ordering.
-        std::shared_ptr<VMProcessControl> exited;
+        // Releasing the last process reference acquires the registry lock, so snapshot weak references first.
+        std::vector<std::weak_ptr<VMProcessControl>> processes;
         {
-            std::lock_guard lock{m_trackedProcessesLock};
+            std::lock_guard lock{m_processRegistry->Mutex};
+            processes = m_processRegistry->Processes;
+        }
 
-            for (auto& e : m_trackedProcesses)
+        std::shared_ptr<VMProcessControl> exited;
+        for (const auto& process : processes)
+        {
+            auto locked = process.lock();
+            if (locked && locked->GetPid() == message->Pid)
             {
-                auto locked = e.lock();
-                if (locked && locked->GetPid() == message->Pid)
-                {
-                    exited = std::move(locked);
-                    break;
-                }
+                exited = std::move(locked);
+                break;
             }
         }
 
@@ -870,10 +877,10 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
     // N.B. The process control needs to be registered before the actual exec message is sent. Otherwise, if the process exits quickly, we might receive the exit notification before registering it.
     std::shared_ptr<VMProcessControl> control;
     auto registerProcess = [&](int processPid) {
-        control = std::make_shared<VMProcessControl>(*this, processPid, std::move(ttyControlhandle.Socket));
+        control = std::make_shared<VMProcessControl>(*this, processPid, std::move(ttyControlhandle.Socket), m_processRegistry);
         {
-            std::lock_guard lock{m_trackedProcessesLock};
-            m_trackedProcesses.emplace_back(control);
+            std::lock_guard lock{m_processRegistry->Mutex};
+            m_processRegistry->Processes.emplace_back(control);
         }
     };
 
@@ -1344,16 +1351,6 @@ void WSLCVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_
         THROW_IF_FAILED(MountWindowsFolderImpl(packagedLibPath.c_str(), LibrariesMountPoint, WSLCMountFlagsReadOnly));
     }
 }
-void WSLCVirtualMachine::OnProcessReleased(int Pid)
-{
-    std::lock_guard lock{m_trackedProcessesLock};
-
-    std::erase_if(m_trackedProcesses, [Pid](const auto& e) {
-        auto locked = e.lock();
-        return !locked || locked->GetPid() == Pid;
-    });
-}
-
 void WSLCVirtualMachine::OnSessionTerminated()
 {
     std::lock_guard lock{m_lock};

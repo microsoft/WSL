@@ -897,6 +897,10 @@ Weitere Informationen zu Admin Protection finden Sie unter https://aka.ms/apdevg
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>Geschachtelte Virtualisierung wird auf diesem Computer nicht unterstützt.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>Fehler beim Ermitteln der Unterstützung für geschachtelte Virtualisierung, Fehler: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Fehler beim Erstellen des Netzwerkendpunkts mit folgender Adresse: "{}", zugewiesene neue Adresse: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -924,6 +928,14 @@ Fallback auf NAT-Netzwerk.</value>
   <data name="MessageMirroredNetworkingNotSupportedIpv6Disabled" xml:space="preserve">
     <value>IPv6 ist auf dem Host auf eine nicht unterstützte Weise deaktiviert (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
+  </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>Die Netzwerkspiegelung verwendet einen kleineren Bereich kurzlebiger Ports ({} Ports statt {}). Dadurch kann die Anzahl gleichzeitiger Verbindungen begrenzt werden.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>Die Netzwerkspiegelung konnte den kleinsten zusammenhängenden Bereich mit {} TCP- und UDP-Ports nicht reservieren. Überprüfen Sie die Portverwendung und die Ausschlüsse unter Windows.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Hyper-V-Firewall wird nicht unterstützt</value>
@@ -3288,7 +3300,7 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
-    <value>Invalid mode '{}'.</value>
+    <value>Ungültiger Modus '{}'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
@@ -3700,7 +3712,7 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>Image „{}“ nicht gefunden, wird abgerufen</value>
+    <value>Das Bild „{}“ konnte lokal nicht gefunden werden</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">
@@ -3881,11 +3893,11 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <comment>Usage string for volume mount specification.</comment>
   </data>
   <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
-    <value>Invalid volume specification: '{}'. {} {}</value>
+    <value>Ungültige Volumenspezifikation: '{}'. {} {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
-    <value>The volume specification is empty.</value>
+    <value>Die Volumenspezifikation ist leer.</value>
   </data>
   <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
     <value>Die Volumenspezifikation enthält einen leeren Abschnitt zwischen Doppelpunkten.</value>

@@ -22,6 +22,7 @@ Abstract:
 #include "WSLCProcessControl.h"
 #include "IORelay.h"
 #include "COMImplClass.h"
+#include "RuntimeClass.h"
 #include "wslc_schema.h"
 #include "WSLCCompat.h"
 #include "WSLCContainerMetadata.h"
@@ -36,6 +37,8 @@ class WSLCSession;
 class WSLCSessionRuntime;
 class WSLCVolumes;
 class EventStore;
+
+std::string CleanContainerName(const std::string& name);
 
 class unique_com_disconnect
 {
@@ -319,12 +322,12 @@ private:
 };
 
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLCContainer
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCContainer, IWSLCCompatContainer, IFastRundown, ISupportErrorInfo>,
+    : public common::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCContainer, IWSLCCompatContainer, IFastRundown, ISupportErrorInfo>,
       public COMImplClass<WSLCContainerImpl, std::weak_ptr<WSLCContainerImpl>>
 {
 
 public:
-    WSLCContainer(WSLCSession& session, std::function<void(const WSLCContainerImpl*)>&& OnDeleted);
+    WSLCContainer(WSLCSession& session, const std::string& id, const std::string& name, WSLCContainerState state, std::function<void(const WSLCContainerImpl*)>&& OnDeleted);
 
     IFACEMETHOD(Attach)(_In_opt_ LPCSTR DetachKeys, _Out_ WSLCHandle* Stdin, _Out_ WSLCHandle* Stdout, _Out_ WSLCHandle* Stderr) override;
     IFACEMETHOD(Stop)(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds) override;
@@ -355,20 +358,22 @@ public:
 
     IFACEMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);
 
-    // Cache read-only properties so they remain accessible after the impl is disconnected.
-    // Called from WSLCContainerImpl::PrepareDisconnectComWrapper() while m_lock is held exclusively.
-    void CacheState(const std::string& id, const std::string& name, WSLCContainerState state, const Microsoft::WRL::ComPtr<IWSLCProcess>& initProcess) noexcept;
+    // Called with the impl's state and process locks held whenever either property changes.
+    void CacheState(WSLCContainerState state, const Microsoft::WRL::ComPtr<IWSLCProcess>& initProcess) noexcept;
 
 private:
+    Microsoft::WRL::ComPtr<IWSLCSession> ResolveSession(bool Required = true) const;
+
+    Microsoft::WRL::ComPtr<IWeakReference> m_weakSession;
+
+    // Only access this reference while holding a successfully resolved m_weakSession.
     WSLCSession& m_session;
     std::function<void(const WSLCContainerImpl*)> m_onDeleted;
 
-    // Cached read-only properties populated by CacheState() so they remain
-    // accessible after the impl is disconnected.
     mutable wil::srwlock m_cacheLock;
-    _Guarded_by_(m_cacheLock) std::optional<std::string> m_cachedId;
-    _Guarded_by_(m_cacheLock) std::optional<std::string> m_cachedName;
-    _Guarded_by_(m_cacheLock) std::optional<WSLCContainerState> m_cachedState;
+    const std::string m_cachedId;
+    const std::string m_cachedName;
+    _Guarded_by_(m_cacheLock) WSLCContainerState m_cachedState;
     _Guarded_by_(m_cacheLock) Microsoft::WRL::ComPtr<IWSLCProcess> m_cachedInitProcess;
 };
 

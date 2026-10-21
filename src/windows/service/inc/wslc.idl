@@ -365,6 +365,9 @@ typedef struct _WSLCContainerOptions
 
     [unique, size_is(MountsCount)] const WSLCMountSpec* Mounts;
     ULONG MountsCount;
+
+    WSLCStringArray CapAdd;
+    WSLCStringArray CapDrop;
 } WSLCContainerOptions;
 
 typedef char WSLCContainerId[WSLC_CONTAINER_ID_LENGTH + 1] ;
@@ -658,6 +661,7 @@ typedef struct _WSLCNetworkOptions
     [unique] LPCSTR Subnet;
     [unique] LPCSTR Gateway;
     [unique] LPCSTR IpRange;
+    BOOL EnableIPv6;
 } WSLCNetworkOptions;
 
 typedef char WSLCNetworkName[WSLC_MAX_NETWORK_NAME_LENGTH + 1];
@@ -794,7 +798,7 @@ interface IWSLCSession : IUnknown
     HRESULT UnmapVmPort([in] int Family, [in] unsigned short WindowsPort, [in] unsigned short LinuxPort);
 
     // Session initialization - called by SYSTEM service after launching per-user process.
-    // Returns a handle to this COM server process (used to add to job object).
+    // Returns a handle to this COM server process for job assignment and waiting for process exit.
     HRESULT GetProcessHandle([out, system_handle(sh_process)] HANDLE* ProcessHandle);
 
     // Initializes the session with a VM factory. VMs are created through the factory.
@@ -883,7 +887,7 @@ interface IWSLCSessionFactory : IUnknown
         [out] IWSLCSession** Session,
         [out] IWSLCSessionReference** ServiceRef);
 
-    // Gets the process handle for adding to job object.
+    // Gets the process handle for job assignment and waiting for process exit.
     HRESULT GetProcessHandle([out, system_handle(sh_process)] HANDLE* ProcessHandle);
 }
 
@@ -934,3 +938,5 @@ cpp_quote("#define WSLC_E_VM_NOT_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_I
 cpp_quote("#define WSLC_E_EVENTS_LOST MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 17) /* 0x80040611 */")
 cpp_quote("#define WSLC_E_EVENT_STREAM_FINISHED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 18) /* 0x80040612 */")
 cpp_quote("#define WSLC_E_CONTAINER_DELETED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 19) /* 0x80040613 */")
+cpp_quote("#define WSLC_E_CAPABILITY_ADDITIONS_DISABLED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 20) /* 0x80040614 */")
+cpp_quote("#define WSLC_E_RUNTIME_UPDATE_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 21) /* 0x80040615 */")

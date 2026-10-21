@@ -106,8 +106,30 @@ VmEffectiveProcessor ConfigureProcessor(const VmProcessorRequest& Request, schem
     processor.Count = Request.Count;
     Settings.Count = processor.Count;
 
-    const bool nestedVirtualizationSupported =
-        Request.NestedVirtualization == VmFeatureRequest::Disabled ? false : schema::IsNestedVirtualizationSupported();
+    bool nestedVirtualizationSupported = false;
+    if (Request.NestedVirtualization != VmFeatureRequest::Disabled)
+    {
+        try
+        {
+            nestedVirtualizationSupported = schema::IsNestedVirtualizationSupported();
+            if (!nestedVirtualizationSupported && Request.NestedVirtualization == VmFeatureRequest::Preferred)
+            {
+                EMIT_USER_WARNING(wsl::shared::Localization::MessageNestedVirtualizationNotSupported());
+            }
+        }
+        catch (...)
+        {
+            if (Request.NestedVirtualization != VmFeatureRequest::Preferred)
+            {
+                throw;
+            }
+
+            LOG_CAUGHT_EXCEPTION();
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageNestedVirtualizationDetectionFailed(
+                wsl::windows::common::wslutil::ErrorCodeToString(wil::ResultFromCaughtException())));
+        }
+    }
+
     processor.NestedVirtualization =
         validation::ValidateFeature(Request.NestedVirtualization, L"nested virtualization", nestedVirtualizationSupported);
     Settings.ExposeVirtualizationExtensions = processor.NestedVirtualization;
@@ -589,8 +611,7 @@ VmPlatformCapabilities HcsVirtualMachineBackend::QueryCapabilities()
     VmPlatformCapabilities capabilities{};
     capabilities.Backend = BackendKind::Hcs;
     for (const auto feature :
-         {VmFeature::NestedVirtualization,
-          VmFeature::DeferredMemoryCommit,
+         {VmFeature::DeferredMemoryCommit,
           VmFeature::ColdDiscard,
           VmFeature::SmallPageMemory,
           VmFeature::SerialConsole,
@@ -605,7 +626,12 @@ VmPlatformCapabilities HcsVirtualMachineBackend::QueryCapabilities()
         capabilities.Features.set(static_cast<size_t>(feature));
     }
 
-    capabilities.Features.set(static_cast<size_t>(VmFeature::NestedVirtualization), schema::IsNestedVirtualizationSupported());
+    try
+    {
+        capabilities.Features.set(static_cast<size_t>(VmFeature::NestedVirtualization), schema::IsNestedVirtualizationSupported());
+    }
+    CATCH_LOG()
+
     capabilities.Features.set(static_cast<size_t>(VmFeature::SmallPageMemory), schema::IsSmallPageMemorySupported());
     // Saved-state crash capture needs the DebugOptions of schema 2.7, which Windows 10 does not have.
     capabilities.Features.set(static_cast<size_t>(VmFeature::SavedStateOnCrash), wsl::windows::common::helpers::IsWindows11OrAbove());
@@ -966,6 +992,7 @@ void HcsVirtualMachineBackend::DetachDisk(VmDiskId Disk)
     //
     // N.B. Volumes that the guest mounted from this disk must be unmounted by the caller before the
     //      disk is detached, since the guest protocol is not part of the backend.
+    auto runAsSelf = wil::run_as_self();
     schema::RemoveDiskWithAccess(
         m_system.get(),
         m_vmIdString.c_str(),
