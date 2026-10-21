@@ -1,6 +1,7 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
 #include "precomp.h"
+#include <fstream>
 #include "Common.h"
 #include "HcsVirtualMachineBackend.h"
 #include "VirtualMachineBackendTestHelpers.h"
@@ -204,6 +205,26 @@ class HcsVirtualMachineBackendTests
     {
         SKIP_TEST_ARM64();
         VerifyBootsAndTerminates(HcsVirtualMachineBackend::Create(CreateRunnableRequest()));
+    }
+
+    TEST_METHOD(WritesCrashLogToPrecomputedPath)
+    {
+        const auto directory = CreateTestDirectory();
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { std::filesystem::remove_all(directory); });
+        GUID vmId{};
+        THROW_IF_FAILED(CoCreateGuid(&vmId));
+        const auto path = wsl::windows::common::hcs::GenerateVmCrashLogPath(directory / L"crashes", vmId);
+        VERIFY_IS_FALSE(std::filesystem::exists(path));
+
+        const auto userToken = GetElevatedTestToken();
+        constexpr std::wstring_view c_crashLog = L"test crash log";
+        wsl::windows::common::hcs::WriteVmCrashLog(path, 2, userToken.get(), c_crashLog);
+
+        std::wifstream input(path);
+        VERIFY_IS_TRUE(input.is_open());
+        const std::wstring contents{std::istreambuf_iterator<wchar_t>{input}, std::istreambuf_iterator<wchar_t>{}};
+        VERIFY_ARE_EQUAL(std::wstring{c_crashLog}, contents);
+        VERIFY_IS_TRUE(WI_IsFlagSet(GetFileAttributesW(path.c_str()), FILE_ATTRIBUTE_TEMPORARY));
     }
 
     TEST_METHOD(AllocatesFirstFreeBootDiskLun)

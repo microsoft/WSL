@@ -489,7 +489,6 @@ HcsVirtualMachineBackend::~HcsVirtualMachineBackend() noexcept
 
     try
     {
-        auto crashLock = m_crashInformationLock.lock_shared();
         auto runAsUser = wil::impersonate_token(m_configuration.Description.Identity.UserToken.get());
         if (m_vmSavedStateFile && std::filesystem::exists(m_vmSavedStateFile.value()) &&
             std::filesystem::is_empty(m_vmSavedStateFile.value()))
@@ -517,6 +516,10 @@ std::unique_ptr<HcsVirtualMachineBackend> HcsVirtualMachineBackend::Create(const
         if (Request.CrashCapture)
         {
             newInstance->m_crashCapture = Request.CrashCapture;
+            if (!Request.CrashCapture->Path.empty())
+            {
+                newInstance->m_vmCrashLogFile = schema::GenerateVmCrashLogPath(Request.CrashCapture->Path, Request.Identity.VmId);
+            }
         }
 
         const auto startTimeMs = GetTickCount64();
@@ -539,13 +542,13 @@ std::unique_ptr<HcsVirtualMachineBackend> HcsVirtualMachineBackend::Create(const
             // A kernel panic can cause an hvsocket error. Wait for an HCS notification to provide a better error for the user.
             if (newInstance->m_vmCrashEvent.wait(1000))
             {
-                auto crashLock = newInstance->m_crashInformationLock.lock_shared();
-                if (newInstance->m_vmCrashLogFile.has_value())
+                const auto crashLogPath = newInstance->GetCrashLogPath();
+                if (crashLogPath.has_value())
                 {
                     THROW_HR_WITH_USER_ERROR(
                         WSL_E_VM_CRASHED,
                         wsl::shared::Localization::MessageWSL2Crashed() + L"\r\n" +
-                            wsl::shared::Localization::MessageWSL2CrashedStackTrace(newInstance->m_vmCrashLogFile.value()));
+                            wsl::shared::Localization::MessageWSL2CrashedStackTrace(crashLogPath.value()));
                 }
                 else
                 {
@@ -660,23 +663,19 @@ VmTerminationInformation HcsVirtualMachineBackend::GetTerminationReason() const
     return m_terminationInformation;
 }
 
-wil::unique_handle HcsVirtualMachineBackend::GetTerminationEvent() const
+wil::shared_event HcsVirtualMachineBackend::GetTerminationEvent() const
 {
-    wil::unique_handle event;
-    THROW_IF_WIN32_BOOL_FALSE(DuplicateHandle(
-        GetCurrentProcess(), m_terminatingEvent.get(), GetCurrentProcess(), event.put(), 0, FALSE, DUPLICATE_SAME_ACCESS));
-    return event;
+    return m_terminatingEvent;
 }
 
-wil::unique_handle HcsVirtualMachineBackend::GetCrashEvent() const
+wil::shared_event HcsVirtualMachineBackend::GetCrashEvent() const
 {
-    return wil::unique_handle{wsl::windows::common::wslutil::DuplicateHandle(m_vmCrashEvent.get())};
+    return m_vmCrashEvent;
 }
 
 std::optional<std::filesystem::path> HcsVirtualMachineBackend::GetCrashLogPath() const
 {
-    auto lock = m_crashInformationLock.lock_shared();
-    return m_vmCrashLogFile;
+    return m_vmCrashLogCaptured ? m_vmCrashLogFile : std::nullopt;
 }
 
 void HcsVirtualMachineBackend::Start()
@@ -2206,12 +2205,11 @@ void HcsVirtualMachineBackend::OnCrash(PCWSTR Details)
         m_vmSavedStateCaptured = true;
     }
 
-    if (!m_vmCrashLogCaptured && m_crashCapture && !m_crashCapture->Path.empty() && !crashInformation.CrashLog.empty())
+    if (!m_vmCrashLogCaptured && m_crashCapture && m_vmCrashLogFile && !crashInformation.CrashLog.empty())
     {
-        m_vmCrashLogFile = wsl::windows::common::hcs::WriteVmCrashLog(
-            m_crashCapture->Path,
+        schema::WriteVmCrashLog(
+            m_vmCrashLogFile.value(),
             m_crashCapture->MaxCrashLogCount,
-            m_configuration.Description.Identity.VmId,
             m_configuration.Description.Identity.UserToken.get(),
             crashInformation.CrashLog);
         m_vmCrashLogCaptured = true;

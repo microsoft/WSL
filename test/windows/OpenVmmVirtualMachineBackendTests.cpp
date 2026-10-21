@@ -79,6 +79,20 @@ class OpenVmmVirtualMachineBackendTests
         return true;
     }
 
+    TEST_METHOD(PreservesParentExecutionContextOnCreationFailure)
+    {
+        using namespace wsl::windows::common;
+        const ExecutionContext context(Context::CreateVm);
+        const VmCreateRequest request;
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { OpenVmmVirtualMachineBackend::Create(request); }));
+
+        VERIFY_IS_TRUE(context.ReportedError().has_value());
+        const auto& error = context.ReportedError().value();
+        VERIFY_ARE_EQUAL(E_INVALIDARG, error.Code);
+        VERIFY_IS_TRUE(WI_IsFlagSet(error.Context, Context::CreateVm));
+        VERIFY_IS_TRUE(WI_IsFlagSet(error.Context, Context::OpenVmm));
+    }
+
     TEST_METHOD(PreservesCallerIdentityAndBootInputs)
     {
         SKIP_TEST_ARM64();

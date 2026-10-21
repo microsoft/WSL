@@ -14,6 +14,7 @@ Abstract:
 
 #pragma once
 
+#include <atomic>
 #include "IVirtualMachineBackend.h"
 #include "GuestDeviceManager.h"
 #include "hcs.hpp"
@@ -37,8 +38,8 @@ public:
     VmDescription GetDescription() const override;
     VmState GetState() const override;
     VmTerminationInformation GetTerminationReason() const override;
-    wil::unique_handle GetTerminationEvent() const override;
-    wil::unique_handle GetCrashEvent() const override;
+    wil::shared_event GetTerminationEvent() const override;
+    wil::shared_event GetCrashEvent() const override;
     std::optional<std::filesystem::path> GetCrashLogPath() const override;
     void Start() override;
     void Terminate() override;
@@ -206,15 +207,16 @@ private:
 
     VmConfiguration m_configuration;
     std::wstring m_vmIdString;
-    wil::unique_event m_terminatingEvent{wil::EventOptions::ManualReset};
+    wil::shared_event m_terminatingEvent{wil::EventOptions::ManualReset};
     wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
-    wil::unique_event m_vmCrashEvent{wil::EventOptions::ManualReset};
+    wil::shared_event m_vmCrashEvent{wil::EventOptions::ManualReset};
     std::optional<VmCrashCaptureRequest> m_crashCapture;
+    // Paths are fixed during initialization, before HCS callbacks are registered.
+    std::optional<std::filesystem::path> m_vmCrashLogFile;
+    std::optional<std::filesystem::path> m_vmSavedStateFile;
+    std::atomic<bool> m_vmCrashLogCaptured{false};
     mutable wil::srwlock m_crashInformationLock;
-    _Guarded_by_(m_crashInformationLock) bool m_vmCrashLogCaptured = false;
-    _Guarded_by_(m_crashInformationLock) std::optional<std::filesystem::path> m_vmCrashLogFile;
     _Guarded_by_(m_crashInformationLock) bool m_vmSavedStateCaptured = false;
-    _Guarded_by_(m_crashInformationLock) std::optional<std::filesystem::path> m_vmSavedStateFile;
     mutable wil::srwlock m_terminationInformationLock;
     _Guarded_by_(m_terminationInformationLock) VmTerminationInformation m_terminationInformation;
     // Closing the system drains callbacks before their event and context are destroyed.

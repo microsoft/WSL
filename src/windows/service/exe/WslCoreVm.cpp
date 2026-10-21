@@ -335,7 +335,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         SlowOperationWatcher slowOperation{"HcsCreateSystem"};
         m_backend = HcsVirtualMachineBackend::Create(backendRequest);
     }
-    m_vmCrashEvent.reset(m_backend->GetCrashEvent().release());
+    m_vmCrashEvent = m_backend->GetCrashEvent();
     m_runtimeId = m_backend->GetDescription().Identity.VmId;
     WI_ASSERT(IsEqualGUID(VmId, m_runtimeId));
 
