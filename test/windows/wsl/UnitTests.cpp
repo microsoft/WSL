@@ -36,6 +36,7 @@ Abstract:
 #include "WslSecurity.h"
 #include "CommandLine.h"
 #include "retryshared.h"
+#include "GnsPortTrackerChannel.h"
 
 #define LXSST_TEST_USERNAME L"kerneltest"
 
@@ -8380,6 +8381,38 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             {
                 VERIFY_IS_TRUE(fired[i]);
             }
+        }
+    }
+
+    TEST_METHOD(GnsPortTrackerRejectsUnterminatedInterfaceNames)
+    {
+        for (const bool oversized : {false, true})
+        {
+            size_t callbackCount = 0;
+            HRESULT result;
+            {
+                auto [client, server] = MakeSocketPair();
+                wsl::core::GnsPortTrackerChannel tracker{
+                    std::move(server),
+                    [](const SOCKADDR_INET&, int, bool) { return 0; },
+                    [&](const std::string&, bool) { ++callbackCount; }};
+                wsl::shared::SocketChannel sender{std::move(client), "sender"};
+
+                std::vector<gsl::byte> buffer(sizeof(LX_GNS_TUN_BRIDGE_REQUEST) + (oversized ? 16 : 0));
+                const auto span = gsl::make_span(buffer);
+                auto* request = gslhelpers::get_struct<LX_GNS_TUN_BRIDGE_REQUEST>(span);
+                request->Header.MessageType = request->Type;
+                request->Header.MessageSize = gsl::narrow_cast<unsigned int>(buffer.size());
+                memset(request->InterfaceName, 'x', sizeof(request->InterfaceName));
+                request->InterfaceUp = oversized;
+
+                auto transaction = sender.StartTransaction(1000);
+                transaction.Send<LX_GNS_TUN_BRIDGE_REQUEST>(span);
+                result = wil::ResultFromException([&]() { transaction.Receive<RESULT_MESSAGE<int32_t>>(); });
+            }
+
+            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_TIMEOUT));
+            VERIFY_ARE_EQUAL(callbackCount, size_t{0});
         }
     }
 
