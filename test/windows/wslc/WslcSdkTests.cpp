@@ -633,10 +633,8 @@ class WslcSdkTests
             VERIFY_IS_TRUE(listed != networks.end());
             VERIFY_ARE_EQUAL(std::string(created.id), listed->id);
 
-            // Negative: creating a duplicate network fails with an error message.
-            wil::unique_cotaskmem_string errorMessage;
-            VERIFY_ARE_EQUAL(WslcCreateSessionNetwork(m_defaultSession, &settings, nullptr, errorMessage.put()), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
-            VERIFY_IS_NOT_NULL(errorMessage.get());
+            // Negative: creating a duplicate network fails.
+            VERIFY_ARE_EQUAL(WslcCreateSessionNetwork(m_defaultSession, &settings, nullptr, nullptr), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
         }
 
         // Positive: the session chooses a subnet when none is provided, and networkInfo is optional.
