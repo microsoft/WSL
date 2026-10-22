@@ -7931,6 +7931,26 @@ class WSLCTests
         VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
     }
 
+    WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysRejectedStartPreservesRestart)
+    {
+        WSLCContainerLauncher launcher(
+            "debian:latest", "test-restart-rejected-start", {"sh", "-c", "stty -onlcr && echo run; exit 1"}, {}, {}, WSLCProcessFlagsTty | WSLCProcessFlagsStdin);
+        launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+        auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+        const auto runs = WaitForContainerRuns(container, 6);
+        WaitForContainerState(container, WslcContainerStateExited);
+
+        WSLCProcessStartOptions options{};
+        VERIFY_ARE_EQUAL(E_INVALIDARG, container.Get().Start(WSLCContainerStartFlagsNone, &options, nullptr));
+        options.TtyRows = 24;
+        options.TtyColumns = 80;
+        options.DetachKeys = "invalid";
+        VERIFY_ARE_EQUAL(E_INVALIDARG, container.Get().Start(WSLCContainerStartFlagsAttach, &options, nullptr));
+
+        WaitForContainerRuns(container, runs + 1);
+        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+    }
+
     WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysTerminateWithPorts)
     {
         for (int iteration = 0; iteration < 3; ++iteration)

@@ -26,7 +26,7 @@ public:
 
     bool CompleteRequest(std::uint64_t Epoch, bool Succeeded) noexcept
     {
-        if (Epoch != m_epoch)
+        if (!OwnsRun(Epoch))
         {
             return false;
         }
@@ -34,6 +34,11 @@ public:
         --m_pending;
         m_requested = m_requested || Succeeded;
         return true;
+    }
+
+    bool OwnsRun(std::uint64_t Epoch) const noexcept
+    {
+        return Epoch == m_epoch;
     }
 
     void RequestExit() noexcept

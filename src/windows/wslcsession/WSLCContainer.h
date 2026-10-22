@@ -27,6 +27,7 @@ Abstract:
 #include "WSLCCompat.h"
 #include "WSLCContainerMetadata.h"
 #include "WSLCExitRequestState.h"
+#include "WSLCRestartBackoff.h"
 #include "WSLCNetworkMetadata.h"
 #include "WSLCVhdVolume.h"
 #include <unordered_map>
@@ -229,7 +230,7 @@ private:
 
     __requires_exclusive_lock_held(m_lock) void SchedulePolicyRestartLockHeld(std::chrono::milliseconds Delay) noexcept;
     __requires_exclusive_lock_held(m_lock) void CancelPolicyRestartLockHeld() noexcept;
-    __requires_exclusive_lock_held(m_lock) std::chrono::milliseconds NextPolicyRestartDelayLockHeld() noexcept;
+    __requires_shared_lock_held(m_lock) bool HasPolicyRestartAuthorityLockHeld(std::uint64_t Token) const noexcept;
     void RunPolicyRestart(std::uint64_t Token) noexcept;
     void OnPolicyRestartFailed(std::uint64_t Token) noexcept;
 
@@ -337,8 +338,10 @@ private:
     // container is destroyed.
     ActivityRef m_activityHold;
 
-    // Restart policy state. It lives only in memory: it is kept across idle VM teardown and discarded
-    // when the session ends.
+    // Policy admission checks authority under the lifecycle and container locks without transition waits.
+    // Rejected validation and attachment preserve pending work; accepted starts consume or cancel it.
+    // VM leases protect accepted work; pending policy work holds activity and cannot create a VM.
+    // Run duration is captured once at exit and reused for deferred policy decisions.
     const WSLCContainerRestartPolicy m_restartPolicy;
 
     // Successful stop or kill requests suppress restart for the run. In-flight requests defer the exit decision.
@@ -352,8 +355,7 @@ private:
     _Guarded_by_(m_lock) std::uint64_t m_policyRestartToken = 0;
 
     // Delay before the next policy restart; reset when a run lasts long enough or by an explicit start.
-    _Guarded_by_(m_lock) std::chrono::milliseconds m_restartBackoff { 0 };
-    _Guarded_by_(m_lock) std::chrono::steady_clock::time_point m_runStartedAt {};
+    _Guarded_by_(m_lock) WSLCRestartBackoff m_restartBackoff;
 };
 
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLCContainer
