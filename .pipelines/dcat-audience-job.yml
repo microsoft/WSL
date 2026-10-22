@@ -34,21 +34,24 @@ jobs:
     displayName: ${{ parameters.displayName }}
     dependsOn: ${{ parameters.dependsOn }}
     pool:
-      type: release
-      os: windows
+      type: windows
+      isCustom: true
+      name: wsl-release-pool
 
     variables:
       dcatSubmissionPath: $(Pipeline.Workspace)\dcat
 
     templateContext:
-      inputs:
-        - input: pipelineArtifact
-          ${{ if ne(parameters.artifactPipeline, '') }}:
-            pipeline: ${{ parameters.artifactPipeline }}
-          artifactName: drop_wsl_dcat
-          targetPath: $(Pipeline.Workspace)\dcat
+      type: releaseJob
 
     steps:
+      - template: dcat-download-steps.yml
+        parameters:
+          artifactPipeline: ${{ parameters.artifactPipeline }}
+          artifacts:
+            - name: drop_wsl_dcat
+              targetPath: $(dcatSubmissionPath)
+
       - ${{ each platform in parameters.platforms }}:
           - task: dcat-publishing@1
             displayName: Add ${{ parameters.audience }} audience (${{ platform }})

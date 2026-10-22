@@ -109,7 +109,7 @@ wil::unique_handle wsl::core::filesystem::OpenVhd(_In_ LPCWSTR Path, _In_ VIRTUA
     storageType.VendorId = VIRTUAL_STORAGE_TYPE_VENDOR_UNKNOWN;
 
     wil::unique_handle disk;
-    THROW_IF_WIN32_ERROR(OpenVirtualDisk(&storageType, Path, Mask, OPEN_VIRTUAL_DISK_FLAG_NONE, nullptr, &disk));
+    THROW_IF_WIN32_ERROR(OpenVirtualDisk(&storageType, Path, Mask, OPEN_VIRTUAL_DISK_FLAG_SUPPORT_ENCRYPTED_FILES, nullptr, &disk));
 
     return disk;
 }

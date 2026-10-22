@@ -28,40 +28,41 @@ constexpr auto c_processorCapabilities = "ProcessorCapabilities";
 constexpr LPCWSTR c_processorCapabilitiesQuery = L"{ \"PropertyQueries\": {\"ProcessorCapabilities\" : {}}}";
 constexpr LPCWSTR c_scsiResourcePath = L"VirtualMachine/Devices/Scsi/0/Attachments/";
 constexpr LPCWSTR c_gpuResourcePath = L"VirtualMachine/ComputeTopology/Gpu";
+constexpr auto c_vmCrashLogExtension = L".txt";
+constexpr auto c_vmCrashLogPrefix = L"kernel-panic-";
 
-std::filesystem::path wsl::windows::common::hcs::WriteVmCrashLog(
-    const std::filesystem::path& Folder, std::uint32_t MaxFileCount, const GUID& VmId, HANDLE UserToken, std::wstring_view CrashLog)
+std::filesystem::path wsl::windows::common::hcs::GenerateVmCrashLogPath(const std::filesystem::path& Folder, const GUID& VmId)
+{
+    const auto vmId = wsl::shared::string::GuidToString<wchar_t>(VmId, wsl::shared::string::GuidToStringFlags::None);
+    return Folder / std::format(L"{}{}-{}{}", c_vmCrashLogPrefix, std::time(nullptr), vmId, c_vmCrashLogExtension);
+}
+
+void wsl::windows::common::hcs::WriteVmCrashLog(const std::filesystem::path& Path, std::uint32_t MaxFileCount, HANDLE UserToken, std::wstring_view CrashLog)
 {
     auto runAsUser = wil::impersonate_token(UserToken);
+    const auto folder = Path.parent_path();
 
     std::error_code error;
-    std::filesystem::create_directories(Folder, error);
+    std::filesystem::create_directories(folder, error);
     if (error.value())
     {
-        THROW_WIN32_MSG(error.value(), "Failed to create folder: %ls", Folder.c_str());
+        THROW_WIN32_MSG(error.value(), "Failed to create folder: %ls", folder.c_str());
     }
 
-    constexpr auto c_extension = L".txt";
-    constexpr auto c_prefix = L"kernel-panic-";
-    const auto vmId = wsl::shared::string::GuidToString<wchar_t>(VmId, wsl::shared::string::GuidToStringFlags::None);
-    const auto fileName = std::format(L"{}{}-{}{}", c_prefix, std::time(nullptr), vmId, c_extension);
-    const auto filePath = Folder / fileName;
-
-    auto pred = [&c_extension, &c_prefix](const auto& entry) {
+    auto pred = [](const auto& entry) {
         return WI_IsFlagSet(GetFileAttributes(entry.path().c_str()), FILE_ATTRIBUTE_TEMPORARY) && entry.path().has_extension() &&
-               entry.path().extension() == c_extension && entry.path().has_filename() &&
-               entry.path().filename().wstring().find(c_prefix) == 0;
+               entry.path().extension() == c_vmCrashLogExtension && entry.path().has_filename() &&
+               entry.path().filename().wstring().find(c_vmCrashLogPrefix) == 0;
     };
 
-    wslutil::EnforceFileLimit(Folder.c_str(), MaxFileCount, pred);
+    wslutil::EnforceFileLimit(folder.c_str(), MaxFileCount, pred);
 
     {
-        std::wofstream outputFile(filePath.wstring());
+        std::wofstream outputFile(Path.wstring());
         THROW_HR_IF(E_UNEXPECTED, !outputFile.is_open() || !(outputFile << CrashLog));
     }
 
-    THROW_IF_WIN32_BOOL_FALSE(SetFileAttributesW(filePath.c_str(), FILE_ATTRIBUTE_TEMPORARY));
-    return filePath;
+    THROW_IF_WIN32_BOOL_FALSE(SetFileAttributesW(Path.c_str(), FILE_ATTRIBUTE_TEMPORARY));
 }
 
 std::filesystem::path wsl::windows::common::hcs::CreateVmSavedStateFile(const std::filesystem::path& Folder, const GUID& VmId, HANDLE UserToken)

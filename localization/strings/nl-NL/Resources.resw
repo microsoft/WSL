@@ -891,6 +891,10 @@ Ga voor meer informatie over Admin Protection naar https://aka.ms/apdevguide</va
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>Geneste virtualisatie wordt niet ondersteund op deze computer.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>Geneste virtualisatieondersteuning is niet gedetecteerd, fout: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Kan het netwerkeindpunt met het adres {} niet maken, er is een nieuw adres toegewezen: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -918,6 +922,14 @@ Terugvallen op NAT-netwerken.</value>
   <data name="MessageMirroredNetworkingNotSupportedIpv6Disabled" xml:space="preserve">
     <value>IPv6 is op de host uitgeschakeld op een niet-ondersteunde manier (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
+  </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>Gespiegelde netwerken gebruiken een kleiner bereik voor tijdelijke poorten ({} poorten in plaats van {}). Dit kan het aantal gelijktijdige verbindingen beperken.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>Gespiegeld netwerken kan het minimale aaneengesloten bereik van {} TCP- en UDP-poorten niet reserveren. Controleer het gebruik en de uitsluitingen van Windows-poorten.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Hyper-V-firewall wordt niet ondersteund</value>
@@ -3694,7 +3706,7 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>Afbeelding {} niet gevonden, wordt opgehaald</value>
+    <value>Kan afbeelding '{}' niet lokaal vinden</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">

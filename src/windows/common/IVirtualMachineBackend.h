@@ -682,9 +682,11 @@ public:
     virtual VmState GetState() const = 0;
     // Returns the cached reason and backend-specific details after exit; fails before the VM has exited.
     virtual VmTerminationInformation GetTerminationReason() const = 0;
-    virtual wil::unique_handle GetTerminationEvent() const = 0;
+    // Shared events remain valid after the backend is destroyed.
+    virtual wil::shared_event GetTerminationEvent() const = 0;
     // Signals when the backend has identified a VM crash, which can precede termination.
-    virtual wil::unique_handle GetCrashEvent() const = 0;
+    virtual wil::shared_event GetCrashEvent() const = 0;
+    // Returns a path only after the crash log has been successfully captured.
     virtual std::optional<std::filesystem::path> GetCrashLogPath() const = 0;
     virtual void Start() = 0;
     virtual void Terminate() = 0;

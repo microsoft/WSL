@@ -103,6 +103,7 @@ set(HEADERS
     ConsoleProgressIndicator.h
     ConsoleState.h
     COMImplClass.h
+    RuntimeClass.h
     wslc/models/ContainerModel.h
     DeviceHostProxy.h
     disk.hpp
@@ -188,6 +189,8 @@ target_include_directories(common PUBLIC
 # common calls into HCS, HNS, the IP helper API, the VHD APIs, MSI, WinTrust and
 # the config file parser, so anything linking common needs those libraries too.
 # PUBLIC propagates them instead of making each consumer restate them.
+# yaml-cpp backs WSLCUserSettings, advapi32 the credential manager APIs used by
+# WinCredStorage, and Crypt32 the data protection APIs used by FileCredStorage.
 target_link_libraries(common PUBLIC ${HCS_LINK_LIBRARIES} ${MSI_LINK_LIBRARIES} VirtDisk.lib configfile yaml-cpp advapi32 Crypt32.lib wslopenvmm_client)
 
 # Keep backend imports out of clients that only use common utilities, such as the MSIX launchers.

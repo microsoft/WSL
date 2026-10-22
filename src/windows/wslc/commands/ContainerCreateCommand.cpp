@@ -31,6 +31,8 @@ std::vector<Argument> ContainerCreateCommand::GetArguments() const
         Argument::Create(ArgType::ImageId, {.Required = true}),
         Argument::Create(ArgType::Command),
         Argument::Create(ArgType::ForwardArgs),
+        Argument::Create(ArgType::CapAdd, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::CapDrop, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::CIDFile),
         Argument::Create(ArgType::Cpus),
         Argument::Create(ArgType::DNS, {.Limit = Limit::Unlimited}),

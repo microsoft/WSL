@@ -496,6 +496,34 @@ class Plan9Tests
         VERIFY_ARE_EQUAL(content, L"foo");
     }
 
+    TEST_METHOD(TestTruncateAfterLinuxReplacement)
+    {
+        constexpr auto c_originalData = "0123456789";
+        constexpr auto c_replacementData = "abcdefghij";
+        constexpr auto c_fileName = L"truncate-replaced";
+        constexpr auto c_originalFileName = L"truncate-original";
+        constexpr auto c_replacementFileName = L"truncate-replacement";
+        constexpr size_t c_truncatedSize = 5;
+
+        const auto file = CreateNewTestFile(std::format(L"\\{}", c_fileName), c_originalData);
+        VERIFY_WIN32_BOOL_SUCCEEDED(FlushFileBuffers(file.get()));
+
+        VERIFY_ARE_EQUAL(
+            0u,
+            LxsstuLaunchWsl(std::format(
+                L"cd /data/p9_test && ln '{0}' '{1}' && printf '%s' '{2}' > '{3}' && mv -f '{3}' '{0}'", c_fileName, c_originalFileName, c_replacementData, c_replacementFileName)));
+
+        LARGE_INTEGER size{};
+        size.QuadPart = c_truncatedSize;
+        VERIFY_WIN32_BOOL_SUCCEEDED(SetFilePointerEx(file.get(), size, nullptr, FILE_BEGIN));
+        VERIFY_WIN32_BOOL_SUCCEEDED(SetEndOfFile(file.get()));
+
+        const auto originalContents = LxsstuLaunchWslAndCaptureOutput(std::format(L"cat /data/p9_test/{}", c_originalFileName));
+        const auto replacementContents = LxsstuLaunchWslAndCaptureOutput(std::format(L"cat /data/p9_test/{}", c_fileName));
+        VERIFY_ARE_EQUAL(std::format(L"{}", c_replacementData), replacementContents.first);
+        VERIFY_ARE_EQUAL(std::format(L"{}", c_originalData).substr(0, c_truncatedSize), originalContents.first);
+    }
+
     /* Plan9 Test Helper Methods */
 
     static wil::unique_hfile CreateTestFile(std::wstring_view path, DWORD desiredAccess, DWORD disposition = OPEN_EXISTING, DWORD flags = 0)

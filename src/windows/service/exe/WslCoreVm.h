@@ -223,7 +223,7 @@ private:
     _Guarded_by_(m_lock) wil::com_ptr<IPlan9FileSystem> m_pluginPlan9Server;
     _Guarded_by_(m_lock) wil::unique_event m_terminatingEvent { wil::EventOptions::ManualReset };
     _Guarded_by_(m_lock) wil::unique_event m_vmExitEvent { wil::EventOptions::ManualReset };
-    wil::unique_event m_vmCrashEvent{wil::EventOptions::ManualReset};
+    wil::shared_event m_vmCrashEvent{wil::EventOptions::ManualReset};
 
     wil::srwlock m_exitCallbackLock;
     _Guarded_by_(m_exitCallbackLock) std::optional<VmTerminationInformation> m_terminationInformation;

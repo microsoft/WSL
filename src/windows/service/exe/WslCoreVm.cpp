@@ -335,7 +335,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         SlowOperationWatcher slowOperation{"HcsCreateSystem"};
         m_backend = HcsVirtualMachineBackend::Create(backendRequest);
     }
-    m_vmCrashEvent.reset(m_backend->GetCrashEvent().release());
+    m_vmCrashEvent = m_backend->GetCrashEvent();
     m_runtimeId = m_backend->GetDescription().Identity.VmId;
     WI_ASSERT(IsEqualGUID(VmId, m_runtimeId));
 
@@ -343,7 +343,10 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     if (m_vmConfig.EnableNestedVirtualization && !description.Processor.NestedVirtualization)
     {
         m_vmConfig.EnableNestedVirtualization = false;
-        EMIT_USER_WARNING(wsl::shared::Localization::MessageNestedVirtualizationNotSupported());
+        if (description.Backend != BackendKind::Hcs)
+        {
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageNestedVirtualizationNotSupported());
+        }
     }
 
     const auto systemDistro = description.BootDisks.find(L"system-distro");

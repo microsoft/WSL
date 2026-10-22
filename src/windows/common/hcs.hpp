@@ -141,8 +141,9 @@ void StartComputeSystem(_In_ HCS_SYSTEM ComputeSystem, _In_ LPCWSTR Configuratio
 
 void TerminateComputeSystem(_In_ HCS_SYSTEM ComputeSystem);
 
-std::filesystem::path WriteVmCrashLog(
-    const std::filesystem::path& Folder, std::uint32_t MaxFileCount, const GUID& VmId, HANDLE UserToken, std::wstring_view CrashLog);
+std::filesystem::path GenerateVmCrashLogPath(const std::filesystem::path& Folder, const GUID& VmId);
+
+void WriteVmCrashLog(const std::filesystem::path& Path, std::uint32_t MaxFileCount, HANDLE UserToken, std::wstring_view CrashLog);
 
 std::filesystem::path CreateVmSavedStateFile(const std::filesystem::path& Folder, const GUID& VmId, HANDLE UserToken);
 
