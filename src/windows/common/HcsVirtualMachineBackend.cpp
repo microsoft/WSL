@@ -468,6 +468,7 @@ HcsVirtualMachineBackend::~HcsVirtualMachineBackend() noexcept
     std::shared_ptr<GuestDeviceManager> guestDeviceManager;
     schema::unique_hcs_system system;
     std::map<std::uint64_t, AttachedDisk> attachedDisks;
+    std::map<std::uint64_t, std::shared_ptr<VmGuestListenerState>> guestListeners;
     {
         auto lock = m_lock.lock_exclusive();
         CloseNetworkAdaptersLocked();
@@ -475,7 +476,12 @@ HcsVirtualMachineBackend::~HcsVirtualMachineBackend() noexcept
         CloseGuestDevicesLocked();
         system = std::move(m_system);
         attachedDisks = std::move(m_attachedDisks);
-        CloseGuestListenersLocked(m_configuration.Description.Identity);
+        guestListeners = RemoveGuestListenersLocked(m_configuration.Description.Identity);
+    }
+
+    for (const auto& entry : guestListeners)
+    {
+        entry.second->Close();
     }
 
     // Device hosts must be shut down while the compute system and callback context still exist.
@@ -704,6 +710,7 @@ void HcsVirtualMachineBackend::Terminate()
     std::shared_ptr<GuestDeviceManager> guestDeviceManager;
     schema::unique_hcs_system system;
     std::map<std::uint64_t, AttachedDisk> attachedDisks;
+    std::map<std::uint64_t, std::shared_ptr<VmGuestListenerState>> guestListeners;
     {
         auto lock = m_lock.lock_exclusive();
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
@@ -713,7 +720,12 @@ void HcsVirtualMachineBackend::Terminate()
         system = std::move(m_system);
         m_state = VmState::Stopped;
         attachedDisks = std::move(m_attachedDisks);
-        CloseGuestListenersLocked(m_configuration.Description.Identity);
+        guestListeners = RemoveGuestListenersLocked(m_configuration.Description.Identity);
+    }
+
+    for (const auto& entry : guestListeners)
+    {
+        entry.second->Close();
     }
 
     guestDeviceManager.reset();
@@ -732,6 +744,7 @@ std::shared_ptr<VmGuestListenerState> HcsVirtualMachineBackend::ConfigureGuestLi
 {
     auto state = std::make_shared<VmGuestListenerState>();
     state->Listener = Listener;
+    auto lock = state->Lock.lock_exclusive();
     state->Socket = wsl::windows::common::hvsocket::Listen(Listener.Id.Owner.VmId, Listener.Port.Value);
     return state;
 }
@@ -752,9 +765,13 @@ wil::unique_socket HcsVirtualMachineBackend::ConnectGuest(GuestServicePort Port)
 
 void HcsVirtualMachineBackend::CloseGuestListener(VmListenerId Listener)
 {
-    auto lock = m_lock.lock_exclusive();
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
-    RemoveGuestListenerLocked(Listener, m_configuration.Description.Identity);
+    std::shared_ptr<VmGuestListenerState> state;
+    {
+        auto lock = m_lock.lock_exclusive();
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
+        state = RemoveGuestListenerLocked(Listener, m_configuration.Description.Identity);
+    }
+    state->Close();
 }
 
 std::uint32_t HcsVirtualMachineBackend::ReserveLunLocked(const std::optional<VmScsiPlacement>& Placement) const
