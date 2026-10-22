@@ -172,9 +172,13 @@ GuestDeviceManager::DirectoryObjectLifetime GuestDeviceManager::CreateSectionObj
     DWORD bytesWritten;
     THROW_LAST_ERROR_IF(!GetTokenInformation(GetCurrentThreadToken(), TokenSessionId, &sessionId, sizeof(sessionId), &bytesWritten));
 
-    // /Sessions/1/BaseNamedObjects/WSL/<VM ID>/<Relative Path>
+    // Session 0 uses the global named-object directory rather than \Sessions\0\BaseNamedObjects.
     std::wstringstream sectionPathBuilder;
-    sectionPathBuilder << L"\\Sessions\\" << sessionId << L"\\BaseNamedObjects" << L"\\WSL\\" << m_machineId << L"\\" << RelativeRootPath;
+    if (sessionId != 0)
+    {
+        sectionPathBuilder << L"\\Sessions\\" << sessionId;
+    }
+    sectionPathBuilder << L"\\BaseNamedObjects\\WSL\\" << m_machineId << L"\\" << RelativeRootPath;
     auto sectionPath = sectionPathBuilder.str();
 
     UNICODE_STRING ntPath{};

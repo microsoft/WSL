@@ -58,6 +58,18 @@ using wsl::windows::common::Context;
 using wsl::windows::common::ExecutionContext;
 
 namespace {
+VmVirtualDiskSource CreateVirtualDiskSource(const std::filesystem::path& Path)
+{
+    const auto extension = Path.extension().native();
+    if (IsPathComponentEqual(extension, wslutil::c_vhdFileExtension))
+    {
+        return {Path, VmDiskFormat::Vhd};
+    }
+
+    THROW_HR_IF(E_INVALIDARG, !IsPathComponentEqual(extension, wslutil::c_vhdxFileExtension));
+    return {Path, VmDiskFormat::Vhdx};
+}
+
 INT64
 RequiredExtraMmioSpaceForPmemFileInMb(_In_ PCWSTR FilePath)
 {
@@ -1034,28 +1046,20 @@ ULONG WslCoreVm::AttachDiskLockHeld(
         }
         else
         {
-            const std::filesystem::path path{Disk};
-            VmDiskFormat format;
-            if (wsl::windows::common::string::IsPathComponentEqual(path.extension().native(), wsl::windows::common::wslutil::c_vhdFileExtension))
-            {
-                format = VmDiskFormat::Vhd;
-            }
-            else
-            {
-                THROW_HR_IF(
-                    E_INVALIDARG,
-                    !wsl::windows::common::string::IsPathComponentEqual(path.extension().native(), wsl::windows::common::wslutil::c_vhdxFileExtension));
-                format = VmDiskFormat::Vhdx;
-            }
-
-            request.Source = VmVirtualDiskSource{path, format};
+            request.Source = CreateVirtualDiskSource(Disk);
         }
         request.ReadOnly = WI_IsFlagSet(Flags, MountFlags::ReadOnly);
         request.UserDisk = IsUserDisk;
         request.DeviceTimeout = std::chrono::milliseconds{m_vmConfig.MountDeviceTimeout};
         if (Lun)
         {
-            request.Placement = VmScsiPlacement{{0, Lun.value()}};
+            // Restored LUNs are preferences, unlike exact backend placements.
+            const auto attachedDisks = m_backend->GetAttachedDisks();
+            if (std::ranges::none_of(
+                    attachedDisks, [&](const VmDiskAttachment& disk) { return disk.GuestAddress.Lun == Lun.value(); }))
+            {
+                request.Placement = VmScsiPlacement{{0, Lun.value()}};
+            }
         }
         if (UserToken)
         {
@@ -1523,7 +1527,7 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
     auto addBootDisk = [&](std::wstring key, const std::filesystem::path& path, bool grantHostAccess) {
         VmBootDiskRequest disk{};
         disk.Key = std::move(key);
-        disk.Disk.Source = VmVirtualDiskSource{path, VmDiskFormat::Vhd};
+        disk.Disk.Source = CreateVirtualDiskSource(path);
         disk.Disk.ReadOnly = true;
         disk.Disk.DeviceTimeout = std::chrono::milliseconds{m_vmConfig.MountDeviceTimeout};
         disk.GrantHostAccess = grantHostAccess;
@@ -2295,42 +2299,44 @@ try
 {
     wsl::windows::common::wslutil::SetThreadDescription(L"VirtioFs - Worker");
 
-    io::MultiHandleWait io;
+    Listener.WithSocket([&](SOCKET listenSocket, HANDLE cancellationEvent) {
+        io::MultiHandleWait io;
+        io.AddHandle(std::make_unique<io::AcceptHandle>(listenSocket, false, [this, &io](wil::unique_socket&& socket) {
+            auto channel = std::make_shared<wsl::shared::SocketChannel>(std::move(socket), "VirtioFs");
+            auto buffer = std::make_shared<std::vector<gsl::byte>>();
+            auto pendingBytes = std::make_shared<std::vector<gsl::byte>>();
 
-    io.AddHandle(std::make_unique<io::AcceptHandle>(Listener.Socket(), false, [this, &io](wil::unique_socket&& socket) {
-        auto channel = std::make_shared<wsl::shared::SocketChannel>(std::move(socket), "VirtioFs");
-        auto buffer = std::make_shared<std::vector<gsl::byte>>();
-        auto pendingBytes = std::make_shared<std::vector<gsl::byte>>();
+            io.AddHandle(
+                std::make_unique<io::ReadSocketMessageHandle>(
+                    io::HandleWrapper(channel->Socket()),
+                    *buffer,
+                    *pendingBytes,
+                    [this, &io, channel, buffer, pendingBytes](const gsl::span<gsl::byte>& message) {
+                        if (message.empty())
+                        {
+                            return; // Channel closed, exit.
+                        }
 
-        io.AddHandle(
-            std::make_unique<io::ReadSocketMessageHandle>(
-                io::HandleWrapper(channel->Socket()),
-                *buffer,
-                *pendingBytes,
-                [this, &io, channel, buffer, pendingBytes](const gsl::span<gsl::byte>& message) {
-                    if (message.empty())
-                    {
-                        return; // Channel closed, exit.
-                    }
+                        THROW_HR_IF_MSG(
+                            E_UNEXPECTED, !pendingBytes->empty(), "Received message with additional bytes: %zu", pendingBytes->size());
 
-                    THROW_HR_IF_MSG(
-                        E_UNEXPECTED, !pendingBytes->empty(), "Received message with additional bytes: %zu", pendingBytes->size());
+                        try
+                        {
+                            auto response = ProcessVirtioFsRequest(message);
 
-                    try
-                    {
-                        auto response = ProcessVirtioFsRequest(message);
+                            // Move the socket out of the channel into the WriteHandle so it is closed once the reply is sent.
+                            io.AddHandle(std::make_unique<io::WriteHandle>(channel->Release(), response), io::MultiHandleWait::IgnoreErrors);
+                        }
+                        CATCH_LOG();
+                    }),
+                io::MultiHandleWait::IgnoreErrors);
+        }));
 
-                        // Move the socket out of the channel into the WriteHandle so it is closed once the reply is sent.
-                        io.AddHandle(std::make_unique<io::WriteHandle>(channel->Release(), response), io::MultiHandleWait::IgnoreErrors);
-                    }
-                    CATCH_LOG();
-                }),
-            io::MultiHandleWait::IgnoreErrors);
-    }));
+        io.AddHandle(std::make_unique<io::EventHandle>(m_terminatingEvent.get()), io::MultiHandleWait::CancelOnCompleted);
+        io.AddHandle(std::make_unique<io::EventHandle>(cancellationEvent), io::MultiHandleWait::CancelOnCompleted);
 
-    io.AddHandle(std::make_unique<io::EventHandle>(m_terminatingEvent.get()), io::MultiHandleWait::CancelOnCompleted);
-
-    io.Run({});
+        io.Run({});
+    });
 }
 CATCH_LOG()
 

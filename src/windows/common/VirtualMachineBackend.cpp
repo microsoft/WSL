@@ -121,7 +121,10 @@ wil::unique_socket VmGuestListener::Accept(DWORD Timeout, const std::source_loca
     THROW_HR_IF(E_INVALIDARG, Id.Value == 0 || !State);
     WSL_LOG("VmAcceptGuestConnectionBegin", TraceLoggingValue(Id.Owner.VmId, "vmId"), TraceLoggingValue(Id.Value, "listenerId"));
 
-    auto socket = wsl::windows::common::socket::CancellableAccept(State->Socket.get(), Timeout, State->CancellationEvent.get(), Location);
+    std::optional<wil::unique_socket> socket;
+    WithSocket([&](SOCKET listenSocket, HANDLE cancellationEvent) {
+        socket = wsl::windows::common::socket::CancellableAccept(listenSocket, Timeout, cancellationEvent, Location);
+    });
     WSL_LOG(
         "VmAcceptGuestConnectionEnd",
         TraceLoggingValue(Id.Owner.VmId, "vmId"),
@@ -132,10 +135,19 @@ wil::unique_socket VmGuestListener::Accept(DWORD Timeout, const std::source_loca
     return std::move(*socket);
 }
 
-SOCKET VmGuestListener::Socket() const
+void VmGuestListener::WithSocket(const std::function<void(SOCKET, HANDLE)>& Callback) const
 {
-    THROW_HR_IF(E_INVALIDARG, Id.Value == 0 || !State);
-    return State->Socket.get();
+    THROW_HR_IF(E_INVALIDARG, Id.Value == 0 || !State || !Callback);
+    auto lock = State->Lock.lock_shared();
+    THROW_HR_IF(E_ABORT, State->CancellationEvent.is_signaled() || !State->Socket);
+    Callback(State->Socket.get(), State->CancellationEvent.get());
+}
+
+void VmGuestListenerState::Close() noexcept
+{
+    LOG_IF_WIN32_BOOL_FALSE(SetEvent(CancellationEvent.get()));
+    auto lock = Lock.lock_exclusive();
+    Socket.reset();
 }
 
 std::shared_ptr<VmGuestListenerState> IVirtualMachineBackend::RemoveGuestListenerLocked(VmListenerId Listener, const VmInstanceId& Identity)
@@ -159,7 +171,7 @@ void IVirtualMachineBackend::CancelGuestListeners() noexcept
     }
 }
 
-void IVirtualMachineBackend::CloseGuestListenersLocked(const VmInstanceId& Identity) noexcept
+std::map<std::uint64_t, std::shared_ptr<VmGuestListenerState>> IVirtualMachineBackend::RemoveGuestListenersLocked(const VmInstanceId& Identity) noexcept
 {
     WSL_LOG(
         "VmCloseGuestListeners",
@@ -170,7 +182,7 @@ void IVirtualMachineBackend::CloseGuestListenersLocked(const VmInstanceId& Ident
         LOG_IF_WIN32_BOOL_FALSE(SetEvent(entry.second->CancellationEvent.get()));
     }
 
-    m_guestListeners.clear();
+    return std::exchange(m_guestListeners, {});
 }
 
 std::unique_ptr<IVirtualMachineBackend> CreateVirtualMachineBackend(BackendKind Kind, const VmCreateRequest& Request)

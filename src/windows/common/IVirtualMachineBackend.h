@@ -153,14 +153,19 @@ struct VmGuestListener
     std::shared_ptr<VmGuestListenerState> State;
 
     wil::unique_socket Accept(DWORD Timeout = INFINITE, const std::source_location& Location = std::source_location::current()) const;
-    SOCKET Socket() const;
+    // The callback must stop using the socket when the cancellation event is signaled.
+    // CloseGuestListener waits for the callback to return before closing the socket.
+    void WithSocket(const std::function<void(SOCKET, HANDLE)>& Callback) const;
 };
 
 struct VmGuestListenerState
 {
     VmGuestListener Listener;
-    wil::unique_socket Socket;
+    wil::srwlock Lock;
+    _Guarded_by_(Lock) wil::unique_socket Socket;
     wil::unique_event CancellationEvent{wil::EventOptions::ManualReset};
+
+    void Close() noexcept;
 };
 
 struct VmProcessorRequest
@@ -694,6 +699,7 @@ public:
 
     virtual VmGuestListener CreateGuestListener(GuestServicePort Port) = 0;
     virtual wil::unique_socket ConnectGuest(GuestServicePort Port) = 0;
+    // Cancel and drain listener users, then release the socket even if descriptors are retained.
     virtual void CloseGuestListener(VmListenerId Listener) = 0;
 
     virtual VmDiskAttachment AttachDisk(const VmDiskRequest& Request) = 0;
@@ -737,8 +743,9 @@ protected:
     // These helpers require m_lock to be held exclusively. ConfigureGuestListener runs while
     // m_lock is held and must not re-enter another listener helper.
     VmGuestListener RegisterGuestListenerLocked(const VmInstanceId& Identity, GuestServicePort Port);
+    // Returned states must be closed after releasing m_lock so that listener users can finish.
     std::shared_ptr<VmGuestListenerState> RemoveGuestListenerLocked(VmListenerId Listener, const VmInstanceId& Identity);
-    void CloseGuestListenersLocked(const VmInstanceId& Identity) noexcept;
+    std::map<std::uint64_t, std::shared_ptr<VmGuestListenerState>> RemoveGuestListenersLocked(const VmInstanceId& Identity) noexcept;
     void NotifyTerminated(const VmInstanceId& Identity) noexcept;
 
     /// <summary>

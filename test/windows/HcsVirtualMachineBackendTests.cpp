@@ -214,6 +214,56 @@ class HcsVirtualMachineBackendTests
         VerifyBootsAndTerminates(HcsVirtualMachineBackend::Create(CreateRunnableRequest()));
     }
 
+    TEST_METHOD(ClosesGuestListenersBeforeRebinding)
+    {
+        SKIP_TEST_ARM64();
+        auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        const auto listener = backend->CreateGuestListener({LX_INIT_UTILITY_VM_INIT_PORT});
+        const auto retainedListener = listener;
+        backend->CloseGuestListener(listener.Id);
+
+        const auto replacement = backend->CreateGuestListener(listener.Port);
+        VERIFY_ARE_NOT_EQUAL(listener.Id.Value, replacement.Id.Value);
+        VERIFY_ARE_EQUAL(E_ABORT, OperationResult([&] { retainedListener.Accept(0); }));
+        backend->CloseGuestListener(replacement.Id);
+
+        auto guest = StartGuest(*backend);
+        backend->Terminate();
+    }
+
+    TEST_METHOD(CancelsGuestListenerUsersBeforeClosing)
+    {
+        SKIP_TEST_ARM64();
+        auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        const auto listener = backend->CreateGuestListener({LX_INIT_UTILITY_VM_INIT_PORT});
+        wil::unique_event socketInUse{wil::EventOptions::ManualReset};
+        auto socketUser = std::async(std::launch::async, [&] {
+            return OperationResult([&] {
+                listener.WithSocket([&](SOCKET socket, HANDLE cancellationEvent) {
+                    socketInUse.SetEvent();
+                    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_TIMEOUT), WaitForSingleObject(cancellationEvent, 30 * 1000) != WAIT_OBJECT_0);
+                    int accepting{};
+                    int size = sizeof(accepting);
+                    THROW_LAST_ERROR_IF(getsockopt(socket, SOL_SOCKET, SO_ACCEPTCONN, reinterpret_cast<char*>(&accepting), &size) == SOCKET_ERROR);
+                    backend->GetDescription();
+                });
+            });
+        });
+        auto accept = std::async(std::launch::async, [&] { return OperationResult([&] { listener.Accept(); }); });
+        auto closeListener = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { backend->CloseGuestListener(listener.Id); });
+
+        VERIFY_IS_TRUE(socketInUse.wait(30 * 1000));
+        VERIFY_IS_TRUE(accept.wait_for(100ms) == std::future_status::timeout);
+        backend->CloseGuestListener(listener.Id);
+        closeListener.release();
+        VERIFY_ARE_EQUAL(S_OK, socketUser.get());
+        VERIFY_ARE_EQUAL(E_ABORT, accept.get());
+
+        const auto replacement = backend->CreateGuestListener(listener.Port);
+        backend->CloseGuestListener(replacement.Id);
+        backend->Terminate();
+    }
+
     TEST_METHOD(WritesCrashLogToPrecomputedPath)
     {
         const auto directory = CreateTestDirectory();
@@ -737,6 +787,13 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(UINT64{8 * c_mib}, sharedMemory.SizeBytes);
         VERIFY_ARE_EQUAL(std::wstring{L"test-memory"}, sharedMemory.Tag);
         VERIFY_IS_FALSE(IsEqualGUID(GUID_NULL, sharedMemory.GuestInstanceId));
+        {
+            auto impersonate = wil::impersonate_token(backend->GetDescription().Identity.UserToken.get());
+            const auto mappingName = L"Local\\" + sharedMemory.ObjectPath + L"\\test-section";
+            wil::unique_handle mapping{CreateFileMappingW(
+                INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, static_cast<DWORD>(sharedMemory.SizeBytes), mappingName.c_str())};
+            VERIFY_IS_NOT_NULL(mapping.get());
+        }
         backend->RemoveDevice(sharedMemory.Id);
 
         VmPlan9VirtioDevice virtioDevice{L"plan9-virtio"};
