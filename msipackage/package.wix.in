@@ -16,6 +16,10 @@
         <Icon Id="wsl.ico" SourceFile="${CMAKE_SOURCE_DIR}/images/wsl.ico"/>
         <Property Id="ARPPRODUCTICON" Value="wsl.ico"/>
 
+        <Property Id="WSL_WINDOWS_BUILD" Secure="yes">
+            <RegistrySearch Id="WindowsBuildNumber" Root="HKLM" Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion" Name="CurrentBuildNumber" Type="raw" Bitness="always64" />
+        </Property>
+
         <DirectoryRef Id="INSTALLDIR">
             <Component Id="wsl" Guid="F0C8D6BA-1502-41E7-BF72-D93DFA134730" UninstallWhenSuperseded="yes" DisableRegistryReflection="yes" Bitness="always64">
                 <RemoveFile Id="CleanUpWSLShortCut" Directory="ProgramMenuFolder" Name="WSL" On="uninstall"/>
@@ -143,6 +147,11 @@
                     <!-- FTA_AlwaysUnsafe -->
                     <RegistryValue Name="EditFlags" Value="131072" Type="integer" />
                 </RegistryKey>
+            </Component>
+
+            <!-- Apply ACG at the service level, if the Windows build supports it. -->
+            <Component Id="wslservicemitigations" Guid="E7D21D48-DE80-4481-865A-C278001A4666" UninstallWhenSuperseded="yes" DisableRegistryReflection="yes" Bitness="always64" Transitive="yes" Condition="WSL_WINDOWS_BUILD &gt;= 27841">
+                <RegistryValue Root="HKLM" Key="SYSTEM\CurrentControlSet\Services\WSLService" Name="MitigationFlags" Type="integer" Value="2048" KeyPath="yes" />
             </Component>
 
             <Component Id="wslservice" Guid="F0C8D6BA-1502-41E7-BF72-D93DFA134735" UninstallWhenSuperseded="yes" DisableRegistryReflection="yes" Bitness="always64">
@@ -287,7 +296,6 @@
                 <!-- Session 0 service -->
                 <File Id="wslservice.exe" Source="${PACKAGE_INPUT_DIR}/wslservice.exe" KeyPath="yes" />
                 <ServiceInstall Name="WSLService" DisplayName="WSL Service" Description="WSL Service" Start="auto" Type="ownProcess" ErrorControl="normal" Account="LocalSystem" Vital="yes" Interactive="no" />
-
                 <!-- The service is stopped on uninstall and upgrade.
                      N.B. It shouldn't be started on install because it will fail to start if the OC is missing, 
                      which would fail the install. -->
@@ -649,6 +657,7 @@
         <Feature Id="WSL" Title="Windows Subsystem for Linux" Level="1">
             <ComponentRef Id="wsl" />
             <ComponentRef Id="wslservice" />
+            <ComponentRef Id="wslservicemitigations" />
             <ComponentRef Id="wslg" />
             <ComponentRef Id="tools" />
             <ComponentRef Id="explorershell" />
