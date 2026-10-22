@@ -639,10 +639,6 @@ std::optional<ULONGLONG> NatNetworking::FindNatInterfaceLuid(const SOCKADDR_INET
 
 wsl::windows::common::hcs::unique_hcn_network NatNetworking::CreateNetwork(wsl::core::Config& config)
 {
-    // Prevent multiple VM's from creating / deleting each other's networks at the same time.
-    static wil::srwlock networkCreationLock;
-    auto lock = networkCreationLock.lock_exclusive();
-
     wsl::windows::common::hcs::unique_hcn_network natNetwork;
     wil::ResultFromException(WI_DIAGNOSTICS_INFO, [&] {
         try
@@ -689,6 +685,10 @@ wsl::windows::common::hcs::unique_hcn_network NatNetworking::CreateNetwork(wsl::
 
 wsl::windows::common::hcs::unique_hcn_network NatNetworking::CreateNetworkInternal(wsl::core::Config& config)
 {
+    // Prevent multiple VMs from creating / deleting each other's networks at the same time.
+    static wil::srwlock networkCreationLock;
+    auto lock = networkCreationLock.lock_exclusive();
+
     HRESULT hr = S_OK;
     PCSTR executionStep = "";
 
@@ -804,6 +804,14 @@ wsl::windows::common::hcs::unique_hcn_network NatNetworking::CreateNetworkIntern
                             // Throw other errors to allow for retries
                             THROW_IF_FAILED_MSG(hns_hr, "HcnCreateNetwork %ls", error.get());
                         }
+                    }
+                    else
+                    {
+                        // Reopen the handle on every attempt so that we can correctly retry if HNS got restarted between attempts.
+                        // If reopening fails, leave network empty so the next attempt can recreate it.
+                        executionStep = "HcnOpenNetwork";
+                        auto previousNetwork = std::move(network);
+                        network = wsl::core::networking::OpenNetwork(GetNatNetworkId(config.FirewallConfig.Enabled()));
                     }
 
                     executionStep = "HcnQueryNetworkProperties";
