@@ -18,8 +18,6 @@ using wsl::windows::common::Context;
 using wsl::windows::common::ExecutionContext;
 using wsl::windows::common::hcs::unique_hcn_endpoint;
 
-
-
 // This static list is used to keep of which endpoints are in use by other users.
 // It's needed because when we see an endpoint with the same ip address we want,
 // we have no way to differentiate between an endpoint that we previously used
