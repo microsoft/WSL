@@ -55,8 +55,7 @@ namespace WRL = Microsoft::WRL;
 
 namespace {
 
-class DeferredWarningCallback
-    : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, IWarningCallback, IFastRundown>
+class DeferredWarningCallback : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, IWarningCallback, IFastRundown>
 {
 public:
     HRESULT OnWarning(LPCWSTR Message) override
