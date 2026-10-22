@@ -151,6 +151,9 @@ struct ContainerNetworkStorage
     std::vector<std::vector<WSLCCompatKeyValuePair>> AdditionalSettings;
     std::vector<WSLCCompatNetworkConnection> AdditionalNetworks;
     std::vector<NetworkAddressBuffers> IpAddresses;
+
+    // Primary network settings and IPv6 static addresses are only understood by IWSLCCompatSession2 runtimes.
+    bool RequiresCompatSession2 = false;
 };
 
 // addressBuffers must outlive the returned settings since the IP address entries point into it.
@@ -221,6 +224,12 @@ void ConvertContainerNetworks(const WslcContainerOptionsInternal& settings, WSLC
     network.NetworkMode = primary.name;
     network.Networks = storage.AdditionalNetworks.empty() ? nullptr : storage.AdditionalNetworks.data();
     network.NetworksCount = static_cast<ULONG>(storage.AdditionalNetworks.size());
+
+    storage.RequiresCompatSession2 =
+        !storage.PrimarySettings.empty() ||
+        std::any_of(settings.networks, settings.networks + settings.networksCount, [](const WslcContainerNetwork& n) {
+            return n.ipv6Address != nullptr;
+        });
 }
 
 void ConvertSHA256Hash(const char* hashString, uint8_t sha256[32])
@@ -1131,7 +1140,7 @@ try
     containerOptions2.CapDrop = {internalContainerSettings->capabilityDrops, static_cast<ULONG>(internalContainerSettings->capabilityDropsCount)};
 
     const auto& primarySettings = networkStorage.PrimarySettings;
-    RETURN_HR_IF(WSLC_E_RUNTIME_UPDATE_NEEDED, compatSession2 == nullptr && !primarySettings.empty());
+    RETURN_HR_IF(WSLC_E_RUNTIME_UPDATE_NEEDED, compatSession2 == nullptr && networkStorage.RequiresCompatSession2);
     containerOptions2.PrimaryNetworkSettings = primarySettings.empty() ? nullptr : primarySettings.data();
     containerOptions2.PrimaryNetworkSettingsCount = static_cast<ULONG>(primarySettings.size());
 

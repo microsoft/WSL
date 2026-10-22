@@ -396,6 +396,10 @@ private:
     void RecoverExistingContainers();
     void RecoverExistingNetworks();
 
+    // Creates a managed network. When Network is set it receives the created network as a serialized
+    // NetworkListEntry, written only once the network is committed.
+    void CreateNetworkImpl(const WSLCNetworkOptions& Options, _Out_opt_ LPSTR* Network);
+
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent);
     // Returns the manifest digest each pulled tag resolved to, in the order the daemon reported them.
     std::vector<std::string> StreamImageOperation(
