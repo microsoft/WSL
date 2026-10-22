@@ -58,18 +58,6 @@ using wsl::windows::common::Context;
 using wsl::windows::common::ExecutionContext;
 
 namespace {
-VmVirtualDiskSource CreateVirtualDiskSource(const std::filesystem::path& Path)
-{
-    const auto extension = Path.extension().native();
-    if (IsPathComponentEqual(extension, wslutil::c_vhdFileExtension))
-    {
-        return {Path, VmDiskFormat::Vhd};
-    }
-
-    THROW_HR_IF(E_INVALIDARG, !IsPathComponentEqual(extension, wslutil::c_vhdxFileExtension));
-    return {Path, VmDiskFormat::Vhdx};
-}
-
 INT64
 RequiredExtraMmioSpaceForPmemFileInMb(_In_ PCWSTR FilePath)
 {
@@ -1046,7 +1034,7 @@ ULONG WslCoreVm::AttachDiskLockHeld(
         }
         else
         {
-            request.Source = CreateVirtualDiskSource(Disk);
+            request.Source = VmVirtualDiskSource{Disk};
         }
         request.ReadOnly = WI_IsFlagSet(Flags, MountFlags::ReadOnly);
         request.UserDisk = IsUserDisk;
@@ -1527,7 +1515,7 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
     auto addBootDisk = [&](std::wstring key, const std::filesystem::path& path, bool grantHostAccess) {
         VmBootDiskRequest disk{};
         disk.Key = std::move(key);
-        disk.Disk.Source = CreateVirtualDiskSource(path);
+        disk.Disk.Source = VmVirtualDiskSource{path};
         disk.Disk.ReadOnly = true;
         disk.Disk.DeviceTimeout = std::chrono::milliseconds{m_vmConfig.MountDeviceTimeout};
         disk.GrantHostAccess = grantHostAccess;

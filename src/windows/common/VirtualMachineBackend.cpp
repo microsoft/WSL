@@ -225,18 +225,6 @@ const VmVirtualDiskSource& wsl::windows::common::vm::validation::ValidateDiskReq
 {
     const auto* source = std::get_if<VmVirtualDiskSource>(&Request.Source);
     THROW_HR_IF(c_notSupported, source == nullptr);
-    switch (source->Format)
-    {
-    case VmDiskFormat::Vhd:
-        THROW_HR_IF(E_INVALIDARG, _wcsicmp(source->Path.extension().c_str(), L".vhd") != 0);
-        break;
-    case VmDiskFormat::Vhdx:
-        THROW_HR_IF(E_INVALIDARG, _wcsicmp(source->Path.extension().c_str(), L".vhdx") != 0);
-        break;
-    default:
-        THROW_HR(E_INVALIDARG);
-    }
-
     ValidateDiskPlacement(Request);
 
     return *source;

@@ -69,7 +69,7 @@ wil::unique_handle GetElevatedTestToken()
 VmDiskRequest CreateDiskRequest(const std::filesystem::path& Path, std::optional<UINT32> Lun = std::nullopt)
 {
     VmDiskRequest request;
-    request.Source = VmVirtualDiskSource{Path, VmDiskFormat::Vhdx};
+    request.Source = VmVirtualDiskSource{Path};
     if (Lun)
     {
         request.Placement = VmScsiPlacement{{0, Lun.value()}};
@@ -153,6 +153,12 @@ class HcsVirtualMachineBackendTests
         const VmCreateRequest request;
         VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { CreateVirtualMachineBackend(BackendKind::OpenVmm, request); }));
         VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { QueryVirtualMachineBackendCapabilities(BackendKind::OpenVmm); }));
+    }
+
+    TEST_METHOD(LeavesVirtualDiskFileNamesToBackend)
+    {
+        const auto request = CreateDiskRequest(L"C:\\images\\modules.img");
+        VERIFY_ARE_EQUAL(std::wstring{L"C:\\images\\modules.img"}, wsl::windows::common::vm::validation::ValidateDiskSource(request));
     }
 
     TEST_METHOD(PreservesCallerIdentityAndBootInputs)

@@ -251,16 +251,10 @@ struct VmScsiAddress
 
 using VmGuestDiskAddress = VmScsiAddress;
 
-enum class VmDiskFormat
-{
-    Vhd,
-    Vhdx
-};
-
+// The path is passed to the backend as-is; its filename is not validated.
 struct VmVirtualDiskSource
 {
     std::filesystem::path Path;
-    VmDiskFormat Format = VmDiskFormat::Vhdx;
 };
 
 struct VmPhysicalDiskSource
