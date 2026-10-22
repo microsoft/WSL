@@ -903,6 +903,10 @@ For more information on Admin Protection, please visit https://aka.ms/apdevguide
     <value>Failed to create virtual network with address range: '{}', created new network with range: '{}', {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
+    <value>WSL's NAT network ({}) conflicts with docker's default network</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
     <value>SAFE MODE ENABLED - many features will be disabled</value>
     <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
