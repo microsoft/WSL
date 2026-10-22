@@ -9,11 +9,13 @@ Connects a container to a network.
 - `Name()` / setter
 - `Aliases()` / setter
   - Only supported on user-defined networks (not `bridge`, `host`, `none`, or `container:<name>`).
-- `IPAddress()` / setter
+- `IPv4Address()` / setter
   - Static IPv4 address on this network. Only supported on user-defined networks. `nullptr` lets the network assign one.
+- `IPv6Address()` / setter
+  - Static IPv6 address on this network. Only supported on user-defined networks with IPv6 enabled. `nullptr` lets the network assign one.
 
 ```cpp
 ContainerNetwork network{ L"frontend" };
 network.Aliases().Append(L"web");
-network.IPAddress(winrt::Windows::Networking::HostName{ L"10.0.0.10" });
+network.IPv4Address(winrt::Windows::Networking::HostName{ L"10.0.0.10" });
 ```

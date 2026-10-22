@@ -762,6 +762,28 @@ class WslcSdkWinRtTests
             VERIFY_THROWS_HR(m_defaultSession.CreateNetwork(WSLCSDK::NetworkSettings{networkName}), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
         }
 
+        // Positive: a dual-stack network.
+        {
+            WSLCSDK::NetworkSettings settings{networkName};
+            settings.Flags(WSLCSDK::NetworkFlags::EnableIPv4 | WSLCSDK::NetworkFlags::EnableIPv6);
+            settings.Subnet(winrt::Windows::Networking::HostName{L"fd00:231:48::"});
+            settings.SubnetPrefixLength(64);
+
+            const auto created = m_defaultSession.CreateNetwork(settings);
+            auto cleanupNetwork = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName)); });
+
+            VERIFY_ARE_EQUAL(created.Flags(), WSLCSDK::NetworkFlags::EnableIPv4 | WSLCSDK::NetworkFlags::EnableIPv6);
+            VERIFY_IS_NOT_NULL(created.IPv6Subnet());
+            VERIFY_ARE_EQUAL(created.IPv6SubnetPrefixLength(), static_cast<uint8_t>(64));
+        }
+
+        // Negative: IPv4 cannot be disabled.
+        {
+            WSLCSDK::NetworkSettings ipv6Only{networkName};
+            ipv6Only.Flags(WSLCSDK::NetworkFlags::EnableIPv6);
+            VERIFY_THROWS_HR(m_defaultSession.CreateNetwork(ipv6Only), E_NOTIMPL);
+        }
+
         // Negative: invalid arguments.
         {
             VERIFY_THROWS_HR(m_defaultSession.CreateNetwork(nullptr), E_POINTER);
@@ -772,6 +794,11 @@ class WslcSdkWinRtTests
 
             settings.Subnet(winrt::Windows::Networking::HostName{c_subnet});
             VERIFY_THROWS_HR(m_defaultSession.CreateNetwork(settings), E_INVALIDARG);
+
+            WSLCSDK::NetworkSettings disabledFamily{networkName};
+            disabledFamily.Subnet(winrt::Windows::Networking::HostName{L"fd00:231:48::"});
+            disabledFamily.SubnetPrefixLength(64);
+            VERIFY_THROWS_HR(m_defaultSession.CreateNetwork(disabledFamily), E_INVALIDARG);
 
             WSLCSDK::NetworkSettings mismatched{networkName};
             mismatched.Subnet(winrt::Windows::Networking::HostName{c_subnet});
@@ -785,15 +812,19 @@ class WslcSdkWinRtTests
     {
         constexpr auto c_primaryNetwork = "wslc-sdk-winrt-container-primary";
         constexpr auto c_additionalNetwork = "wslc-sdk-winrt-container-additional";
+        constexpr auto c_ipv6Network = "wslc-sdk-winrt-container-ipv6";
         constexpr auto c_primaryIp = L"10.231.51.10";
         constexpr auto c_additionalIp = L"10.231.52.10";
+        constexpr auto c_ipv6Ip = L"fd00:231:53::10";
         const winrt::hstring primaryNetwork = winrt::to_hstring(c_primaryNetwork);
         const winrt::hstring additionalNetwork = winrt::to_hstring(c_additionalNetwork);
+        const winrt::hstring ipv6Network = winrt::to_hstring(c_ipv6Network);
 
         auto comSession = wil::com_query<IWSLCSession>(
             reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->GetSession());
         LOG_IF_FAILED(comSession->DeleteNetwork(c_primaryNetwork));
         LOG_IF_FAILED(comSession->DeleteNetwork(c_additionalNetwork));
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_ipv6Network));
 
         auto createNetwork = [&](winrt::hstring const& name, const wchar_t* subnet) {
             WSLCSDK::NetworkSettings settings{name};
@@ -806,6 +837,15 @@ class WslcSdkWinRtTests
         auto cleanupPrimary = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_primaryNetwork)); });
         createNetwork(additionalNetwork, L"10.231.52.0");
         auto cleanupAdditional = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_additionalNetwork)); });
+
+        {
+            WSLCSDK::NetworkSettings settings{ipv6Network};
+            settings.Flags(WSLCSDK::NetworkFlags::EnableIPv4 | WSLCSDK::NetworkFlags::EnableIPv6);
+            settings.Subnet(winrt::Windows::Networking::HostName{L"fd00:231:53::"});
+            settings.SubnetPrefixLength(64);
+            m_defaultSession.CreateNetwork(settings);
+        }
+        auto cleanupIpv6 = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_ipv6Network)); });
 
         auto makeSettings = []() {
             auto procSettings = WSLCSDK::ProcessSettings();
@@ -860,13 +900,16 @@ class WslcSdkWinRtTests
         // Positive: each network gets its own static IP.
         {
             WSLCSDK::ContainerNetwork primary{primaryNetwork};
-            primary.IPAddress(winrt::Windows::Networking::HostName{c_primaryIp});
+            primary.IPv4Address(winrt::Windows::Networking::HostName{c_primaryIp});
             WSLCSDK::ContainerNetwork additional{additionalNetwork};
-            additional.IPAddress(winrt::Windows::Networking::HostName{c_additionalIp});
+            additional.IPv4Address(winrt::Windows::Networking::HostName{c_additionalIp});
+            WSLCSDK::ContainerNetwork ipv6{ipv6Network};
+            ipv6.IPv6Address(winrt::Windows::Networking::HostName{c_ipv6Ip});
 
             auto containerSettings = makeSettings();
             containerSettings.Networks().Append(primary);
             containerSettings.Networks().Append(additional);
+            containerSettings.Networks().Append(ipv6);
 
             auto container = m_defaultSession.CreateContainer(containerSettings);
             auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
@@ -886,8 +929,14 @@ class WslcSdkWinRtTests
             VERIFY_ARE_EQUAL(winrt::to_string(c_additionalIp), additionalEndpoint.IPAMConfig->IPv4Address);
             VERIFY_ARE_EQUAL(winrt::to_string(c_additionalIp), additionalEndpoint.IPAddress);
 
-            // Negative: the IP cannot change after the network has been applied.
-            VERIFY_THROWS_HR(primary.IPAddress(nullptr), E_ILLEGAL_STATE_CHANGE);
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_ipv6Network));
+            const auto& ipv6Endpoint = inspectObject.NetworkSettings.Networks.at(c_ipv6Network);
+            VERIFY_IS_TRUE(ipv6Endpoint.IPAMConfig.has_value());
+            VERIFY_ARE_EQUAL(winrt::to_string(c_ipv6Ip), ipv6Endpoint.IPAMConfig->IPv6Address);
+
+            // Negative: the IPs cannot change after the network has been applied.
+            VERIFY_THROWS_HR(primary.IPv4Address(nullptr), E_ILLEGAL_STATE_CHANGE);
+            VERIFY_THROWS_HR(ipv6.IPv6Address(nullptr), E_ILLEGAL_STATE_CHANGE);
         }
 
         // Negative: invalid combinations are rejected at create time.
@@ -898,10 +947,16 @@ class WslcSdkWinRtTests
             VERIFY_THROWS_HR(m_defaultSession.CreateContainer(withMode), E_INVALIDARG);
 
             WSLCSDK::ContainerNetwork bridgeWithIp{L"bridge"};
-            bridgeWithIp.IPAddress(winrt::Windows::Networking::HostName{c_primaryIp});
+            bridgeWithIp.IPv4Address(winrt::Windows::Networking::HostName{c_primaryIp});
             auto ipOnBridge = makeSettings();
             ipOnBridge.Networks().Append(bridgeWithIp);
             VERIFY_THROWS_HR(m_defaultSession.CreateContainer(ipOnBridge), E_INVALIDARG);
+
+            WSLCSDK::ContainerNetwork bridgeWithIpv6{L"bridge"};
+            bridgeWithIpv6.IPv6Address(winrt::Windows::Networking::HostName{c_ipv6Ip});
+            auto ipv6OnBridge = makeSettings();
+            ipv6OnBridge.Networks().Append(bridgeWithIpv6);
+            VERIFY_THROWS_HR(m_defaultSession.CreateContainer(ipv6OnBridge), E_INVALIDARG);
 
             WSLCSDK::ContainerNetwork bridgeWithAlias{L"bridge"};
             bridgeWithAlias.Aliases().Append(L"web");
@@ -947,8 +1002,10 @@ class WslcSdkWinRtTests
             VERIFY_THROWS_HR(network.Name(L""), E_INVALIDARG);
             VERIFY_THROWS_HR(network.Aliases(nullptr), E_POINTER);
 
-            VERIFY_THROWS_HR(network.IPAddress(winrt::Windows::Networking::HostName{L"example.com"}), E_INVALIDARG);
-            VERIFY_THROWS_HR(network.IPAddress(winrt::Windows::Networking::HostName{L"fd00::1"}), E_INVALIDARG);
+            VERIFY_THROWS_HR(network.IPv4Address(winrt::Windows::Networking::HostName{L"example.com"}), E_INVALIDARG);
+            VERIFY_THROWS_HR(network.IPv4Address(winrt::Windows::Networking::HostName{L"fd00::1"}), E_INVALIDARG);
+            VERIFY_THROWS_HR(network.IPv6Address(winrt::Windows::Networking::HostName{L"example.com"}), E_INVALIDARG);
+            VERIFY_THROWS_HR(network.IPv6Address(winrt::Windows::Networking::HostName{L"10.0.0.1"}), E_INVALIDARG);
 
             WSLCSDK::ContainerSettings containerSettings{L"debian:latest"};
             VERIFY_THROWS_HR(containerSettings.Networks(nullptr), E_POINTER);

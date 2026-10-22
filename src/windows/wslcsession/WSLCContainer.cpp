@@ -255,7 +255,7 @@ EndpointConfig ResolveEndpointConfig(const KeyValuePair* settings, ULONG count, 
 
     auto parsed = ParseKeyMultiValuePairs(settings, count);
 
-    static constexpr std::array knownKeys{"Aliases", "IPAddress", "Links", "LinkLocalIPs", "DriverOpts"};
+    static constexpr std::array knownKeys{"Aliases", "IPAddress", "IPv6Address", "Links", "LinkLocalIPs", "DriverOpts"};
     for (const auto& [key, _] : parsed)
     {
         THROW_HR_WITH_USER_ERROR_IF(
@@ -287,9 +287,24 @@ EndpointConfig ResolveEndpointConfig(const KeyValuePair* settings, ULONG count, 
         in_addr parsedAddress{};
         ParseIpv4Address(address.c_str(), parsedAddress);
 
-        EndpointIPAMConfig ipam{};
-        ipam.IPv4Address = address;
-        config.IPAMConfig = std::move(ipam);
+        config.IPAMConfig = EndpointIPAMConfig{};
+        config.IPAMConfig->IPv4Address = address;
+    }
+
+    if (auto it = parsed.find("IPv6Address"); it != parsed.end())
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, Localization::MessageWslcIpAddressSingleValue(std::string{networkName}), it->second.size() != 1);
+
+        const auto& address = it->second.front();
+        in_addr6 parsedAddress{};
+        ParseIpv6Address(address.c_str(), parsedAddress);
+
+        if (!config.IPAMConfig.has_value())
+        {
+            config.IPAMConfig = EndpointIPAMConfig{};
+        }
+        config.IPAMConfig->IPv6Address = address;
     }
 
     if (auto it = parsed.find("Links"); it != parsed.end())
@@ -2355,6 +2370,7 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
         {
             wslc_schema::InspectEndpointIPAMConfig ipam{};
             ipam.IPv4Address = endpoint.IPAMConfig->IPv4Address;
+            ipam.IPv6Address = endpoint.IPAMConfig->IPv6Address;
             ipam.LinkLocalIPs = endpoint.IPAMConfig->LinkLocalIPs.value_or(std::vector<std::string>{});
             wslcEndpoint.IPAMConfig = std::move(ipam);
         }

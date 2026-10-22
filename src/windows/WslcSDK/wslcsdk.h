@@ -211,7 +211,8 @@ typedef struct WslcContainerNetwork
     _In_z_ PCSTR name; // Network name (e.g. "bridge" or a network created with WslcCreateSessionNetwork)
     _In_reads_opt_(aliasCount) const PCSTR* aliases; // DNS aliases for the container on this network; user-defined networks only
     _In_ uint32_t aliasCount;
-    _In_opt_ const IN_ADDR* ipAddress; // Static IPv4 address for the container on this network; user-defined networks only
+    _In_opt_ const IN_ADDR* ipv4Address;  // Static IPv4 address for the container on this network; user-defined networks only
+    _In_opt_ const IN6_ADDR* ipv6Address; // Static IPv6 address for the container on this network; user-defined networks only
 } WslcContainerNetwork;
 
 typedef enum WslcContainerFlags
@@ -754,11 +755,14 @@ typedef struct WslcNetworkSettings
 {
     _In_z_ PCSTR name;
 
-    // Only WSLC_NETWORK_FLAG_ENABLE_IPV6 and WSLC_NETWORK_FLAG_INTERNAL are accepted; IPv4 is always enabled.
+    // WSLC_NETWORK_FLAG_ENABLE_IPV4, WSLC_NETWORK_FLAG_ENABLE_IPV6 and WSLC_NETWORK_FLAG_INTERNAL are accepted. IPv4 is
+    // always enabled; set both WSLC_NETWORK_FLAG_ENABLE_IPV4 and WSLC_NETWORK_FLAG_ENABLE_IPV6 for a dual-stack network.
+    // WSLC_NETWORK_FLAG_ENABLE_IPV6 without WSLC_NETWORK_FLAG_ENABLE_IPV4 (IPv6 only) returns E_NOTIMPL.
     WslcNetworkFlags flags;
 
-    // Optional subnet and gateway in network byte order. Set the prefix length of at most one address family; when both
-    // are 0 the session chooses an IPv4 subnet. An all-zero gateway lets the session choose the gateway.
+    // Optional subnet and gateway in network byte order. Set the prefix length of at most one address family. The
+    // session chooses an IPv4 subnet when none is set, but has no default IPv6 subnets, so set an IPv6 subnet when
+    // IPv6 is enabled. An all-zero gateway lets the session choose the gateway.
     uint8_t ipv4PrefixLength;
     uint8_t ipv6PrefixLength;
     IN_ADDR ipv4Subnet;
@@ -788,7 +792,7 @@ typedef struct WslcNetworkSettings
 // Notes:
 //   - Returns HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS) if a network with the same name exists.
 //   - Returns E_INVALIDARG if the name is invalid or reserved, if flags contains an unsupported value, if both prefix
-//     lengths are set, if a prefix length is out of range, if an IPv6 subnet is set without WSLC_NETWORK_FLAG_ENABLE_IPV6,
+//     lengths are set, if a prefix length is out of range, if a subnet is set for an address family that is not enabled,
 //     or if a gateway is set without a subnet of the same address family.
 //   - Returns WSLC_E_RUNTIME_UPDATE_NEEDED if the installed WSL runtime does not support network management.
 STDAPI WslcCreateSessionNetwork(

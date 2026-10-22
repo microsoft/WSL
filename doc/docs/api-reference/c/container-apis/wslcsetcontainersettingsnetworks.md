@@ -19,8 +19,8 @@ Notes:
 
 - The first network is the primary network.
 - Cannot be combined with [WslcSetContainerSettingsNetworkingMode](wslcsetcontainersettingsnetworkingmode.md); [WslcCreateContainer](wslccreatecontainer.md) returns `E_INVALIDARG` if both are set.
-- Aliases and `ipAddress` are only supported on user-defined networks (not `bridge`, `host`, `none`, or `container:<name>`); [WslcCreateContainer](wslccreatecontainer.md) returns `E_INVALIDARG` otherwise.
-- Each network can have its own `ipAddress`. Set it to `NULL` to let the network assign one.
+- Aliases, `ipv4Address` and `ipv6Address` are only supported on user-defined networks (not `bridge`, `host`, `none`, or `container:<name>`); [WslcCreateContainer](wslccreatecontainer.md) returns `E_INVALIDARG` otherwise.
+- Each network can have its own `ipv4Address` and `ipv6Address`. Set either to `NULL` to let the network assign one. An `ipv6Address` requires a network with IPv6 enabled.
 - The `networks` array and the strings and addresses it references are not copied and must stay valid until `WslcCreateContainer` returns.
 - Pass `NULL` and `0` to clear.
 
@@ -36,7 +36,7 @@ networks[0].name = "frontend";
 networks[0].aliases = aliases;
 networks[0].aliasCount = (uint32_t)_countof(aliases);
 networks[1].name = "backend";
-networks[1].ipAddress = &backendIp;
+networks[1].ipv4Address = &backendIp;
 
 HRESULT hr = WslcSetContainerSettingsNetworks(
     &containerSettings,

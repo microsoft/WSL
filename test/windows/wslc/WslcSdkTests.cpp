@@ -647,6 +647,36 @@ class WslcSdkTests
             VERIFY_SUCCEEDED(WslcDeleteSessionNetwork(m_defaultSession, c_networkName, nullptr));
         }
 
+        // Positive: the address family flags select the enabled families.
+        {
+            auto expectFamilies = [&](const WslcNetworkSettings& familySettings, bool expectIPv6) {
+                WslcNetworkInfo created{};
+                VERIFY_SUCCEEDED(WslcCreateSessionNetwork(m_defaultSession, &familySettings, &created, nullptr));
+                auto cleanupNetwork = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName)); });
+
+                VERIFY_IS_TRUE(WI_IsFlagSet(created.flags, WSLC_NETWORK_FLAG_ENABLE_IPV4));
+                VERIFY_ARE_EQUAL(WI_IsFlagSet(created.flags, WSLC_NETWORK_FLAG_ENABLE_IPV6), expectIPv6);
+            };
+
+            WslcNetworkSettings familySettings{};
+            familySettings.name = c_networkName;
+            familySettings.flags = WSLC_NETWORK_FLAG_ENABLE_IPV4;
+            expectFamilies(familySettings, false);
+
+            familySettings.flags = WSLC_NETWORK_FLAG_ENABLE_IPV4 | WSLC_NETWORK_FLAG_ENABLE_IPV6;
+            familySettings.ipv6PrefixLength = 64;
+            VERIFY_ARE_EQUAL(inet_pton(AF_INET6, "fd00:231:47::", &familySettings.ipv6Subnet), 1);
+            expectFamilies(familySettings, true);
+        }
+
+        // Negative: IPv4 cannot be disabled.
+        {
+            WslcNetworkSettings ipv6Only{};
+            ipv6Only.name = c_networkName;
+            ipv6Only.flags = WSLC_NETWORK_FLAG_ENABLE_IPV6;
+            VERIFY_ARE_EQUAL(WslcCreateSessionNetwork(m_defaultSession, &ipv6Only, nullptr, nullptr), E_NOTIMPL);
+        }
+
         // Negative: invalid arguments.
         {
             VERIFY_ARE_EQUAL(WslcCreateSessionNetwork(m_defaultSession, nullptr, nullptr, nullptr), E_POINTER);
@@ -655,11 +685,11 @@ class WslcSdkTests
             VERIFY_ARE_EQUAL(WslcCreateSessionNetwork(m_defaultSession, &invalid, nullptr, nullptr), E_POINTER);
 
             invalid.name = c_networkName;
-            invalid.flags = WSLC_NETWORK_FLAG_ENABLE_IPV4;
+            invalid.flags = static_cast<WslcNetworkFlags>(0x8);
             VERIFY_ARE_EQUAL(WslcCreateSessionNetwork(m_defaultSession, &invalid, nullptr, nullptr), E_INVALIDARG);
 
             invalid = settings;
-            invalid.flags = WSLC_NETWORK_FLAG_ENABLE_IPV6;
+            invalid.flags = WSLC_NETWORK_FLAG_ENABLE_IPV4 | WSLC_NETWORK_FLAG_ENABLE_IPV6;
             invalid.ipv6PrefixLength = 64;
             VERIFY_ARE_EQUAL(WslcCreateSessionNetwork(m_defaultSession, &invalid, nullptr, nullptr), E_INVALIDARG);
 
@@ -683,12 +713,15 @@ class WslcSdkTests
     {
         constexpr auto c_primaryNetwork = "wslc-sdk-container-primary";
         constexpr auto c_additionalNetwork = "wslc-sdk-container-additional";
+        constexpr auto c_ipv6Network = "wslc-sdk-container-ipv6";
         constexpr auto c_primaryIp = "10.231.49.10";
         constexpr auto c_additionalIp = "10.231.50.10";
+        constexpr auto c_ipv6Ip = "fd00:231:51::10";
 
         auto comSession = wil::com_query<IWSLCSession>(reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->GetSession());
         LOG_IF_FAILED(comSession->DeleteNetwork(c_primaryNetwork));
         LOG_IF_FAILED(comSession->DeleteNetwork(c_additionalNetwork));
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_ipv6Network));
 
         auto createNetwork = [&](const char* name, const char* subnet) {
             WslcNetworkSettings settings{};
@@ -702,6 +735,16 @@ class WslcSdkTests
         auto cleanupPrimary = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_primaryNetwork)); });
         createNetwork(c_additionalNetwork, "10.231.50.0");
         auto cleanupAdditional = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_additionalNetwork)); });
+
+        {
+            WslcNetworkSettings settings{};
+            settings.name = c_ipv6Network;
+            settings.flags = WSLC_NETWORK_FLAG_ENABLE_IPV4 | WSLC_NETWORK_FLAG_ENABLE_IPV6;
+            settings.ipv6PrefixLength = 64;
+            VERIFY_ARE_EQUAL(inet_pton(AF_INET6, "fd00:231:51::", &settings.ipv6Subnet), 1);
+            VERIFY_SUCCEEDED(WslcCreateSessionNetwork(m_defaultSession, &settings, nullptr, nullptr));
+        }
+        auto cleanupIpv6 = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_ipv6Network)); });
 
         auto inspect = [](WslcContainer container) {
             wil::unique_cotaskmem_ansistring inspectData;
@@ -720,8 +763,8 @@ class WslcSdkTests
             const PCSTR primaryAliases[] = {"db", "primary"};
             const PCSTR additionalAliases[] = {"cache"};
             const WslcContainerNetwork networks[] = {
-                {c_primaryNetwork, primaryAliases, ARRAYSIZE(primaryAliases), nullptr},
-                {c_additionalNetwork, additionalAliases, ARRAYSIZE(additionalAliases), nullptr},
+                {c_primaryNetwork, primaryAliases, ARRAYSIZE(primaryAliases), nullptr, nullptr},
+                {c_additionalNetwork, additionalAliases, ARRAYSIZE(additionalAliases), nullptr, nullptr},
             };
 
             WslcProcessSettings procSettings;
@@ -758,9 +801,12 @@ class WslcSdkTests
             VERIFY_ARE_EQUAL(inet_pton(AF_INET, c_primaryIp, &primaryIp), 1);
             IN_ADDR additionalIp{};
             VERIFY_ARE_EQUAL(inet_pton(AF_INET, c_additionalIp, &additionalIp), 1);
+            IN6_ADDR ipv6Ip{};
+            VERIFY_ARE_EQUAL(inet_pton(AF_INET6, c_ipv6Ip, &ipv6Ip), 1);
             const WslcContainerNetwork networks[] = {
-                {c_primaryNetwork, nullptr, 0, &primaryIp},
-                {c_additionalNetwork, nullptr, 0, &additionalIp},
+                {c_primaryNetwork, nullptr, 0, &primaryIp, nullptr},
+                {c_additionalNetwork, nullptr, 0, &additionalIp, nullptr},
+                {c_ipv6Network, nullptr, 0, nullptr, &ipv6Ip},
             };
 
             WslcProcessSettings procSettings;
@@ -789,6 +835,11 @@ class WslcSdkTests
             VERIFY_IS_TRUE(additional.IPAMConfig.has_value());
             VERIFY_ARE_EQUAL(std::string(c_additionalIp), additional.IPAMConfig->IPv4Address);
             VERIFY_ARE_EQUAL(std::string(c_additionalIp), additional.IPAddress);
+
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_ipv6Network));
+            const auto& ipv6 = inspectObject.NetworkSettings.Networks.at(c_ipv6Network);
+            VERIFY_IS_TRUE(ipv6.IPAMConfig.has_value());
+            VERIFY_ARE_EQUAL(std::string(c_ipv6Ip), ipv6.IPAMConfig->IPv6Address);
         }
 
         // Negative: invalid combinations are rejected at create time.
@@ -796,12 +847,16 @@ class WslcSdkTests
             const PCSTR aliases[] = {"web"};
             IN_ADDR ipAddress{};
             VERIFY_ARE_EQUAL(inet_pton(AF_INET, c_primaryIp, &ipAddress), 1);
-            const WslcContainerNetwork userDefined[] = {{c_primaryNetwork, nullptr, 0, nullptr}};
-            const WslcContainerNetwork bridgeWithIp[] = {{"bridge", nullptr, 0, &ipAddress}};
-            const WslcContainerNetwork additionalBridgeWithIp[] = {{c_primaryNetwork, nullptr, 0, nullptr}, {"bridge", nullptr, 0, &ipAddress}};
-            const WslcContainerNetwork bridgeWithAliases[] = {{"bridge", aliases, ARRAYSIZE(aliases), nullptr}};
+            IN6_ADDR ipv6Address{};
+            VERIFY_ARE_EQUAL(inet_pton(AF_INET6, c_ipv6Ip, &ipv6Address), 1);
+            const WslcContainerNetwork userDefined[] = {{c_primaryNetwork, nullptr, 0, nullptr, nullptr}};
+            const WslcContainerNetwork bridgeWithIp[] = {{"bridge", nullptr, 0, &ipAddress, nullptr}};
+            const WslcContainerNetwork bridgeWithIpv6[] = {{"bridge", nullptr, 0, nullptr, &ipv6Address}};
+            const WslcContainerNetwork additionalBridgeWithIp[] = {
+                {c_primaryNetwork, nullptr, 0, nullptr, nullptr}, {"bridge", nullptr, 0, &ipAddress, nullptr}};
+            const WslcContainerNetwork bridgeWithAliases[] = {{"bridge", aliases, ARRAYSIZE(aliases), nullptr, nullptr}};
             const WslcContainerNetwork additionalBridgeWithAliases[] = {
-                {c_primaryNetwork, nullptr, 0, nullptr}, {"bridge", aliases, ARRAYSIZE(aliases), nullptr}};
+                {c_primaryNetwork, nullptr, 0, nullptr, nullptr}, {"bridge", aliases, ARRAYSIZE(aliases), nullptr, nullptr}};
 
             auto expectCreateFails = [&](const WslcContainerNetwork* networks, uint32_t count, bool setMode) {
                 WslcContainerSettings containerSettings;
@@ -822,6 +877,7 @@ class WslcSdkTests
 
             // Static IPs require a user-defined network.
             expectCreateFails(bridgeWithIp, ARRAYSIZE(bridgeWithIp), false);
+            expectCreateFails(bridgeWithIpv6, ARRAYSIZE(bridgeWithIpv6), false);
             expectCreateFails(additionalBridgeWithIp, ARRAYSIZE(additionalBridgeWithIp), false);
 
             // Aliases require a user-defined network.
@@ -834,21 +890,21 @@ class WslcSdkTests
             WslcContainerSettings containerSettings;
             VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
 
-            const WslcContainerNetwork valid[] = {{c_primaryNetwork, nullptr, 0, nullptr}};
+            const WslcContainerNetwork valid[] = {{c_primaryNetwork, nullptr, 0, nullptr, nullptr}};
             VERIFY_ARE_EQUAL(WslcSetContainerSettingsNetworks(&containerSettings, nullptr, 1), E_INVALIDARG);
             VERIFY_ARE_EQUAL(WslcSetContainerSettingsNetworks(&containerSettings, valid, 0), E_INVALIDARG);
 
-            const WslcContainerNetwork nullName[] = {{nullptr, nullptr, 0, nullptr}};
+            const WslcContainerNetwork nullName[] = {{nullptr, nullptr, 0, nullptr, nullptr}};
             VERIFY_ARE_EQUAL(WslcSetContainerSettingsNetworks(&containerSettings, nullName, ARRAYSIZE(nullName)), E_INVALIDARG);
 
-            const WslcContainerNetwork emptyName[] = {{"", nullptr, 0, nullptr}};
+            const WslcContainerNetwork emptyName[] = {{"", nullptr, 0, nullptr, nullptr}};
             VERIFY_ARE_EQUAL(WslcSetContainerSettingsNetworks(&containerSettings, emptyName, ARRAYSIZE(emptyName)), E_INVALIDARG);
 
-            const WslcContainerNetwork missingAliases[] = {{c_primaryNetwork, nullptr, 1, nullptr}};
+            const WslcContainerNetwork missingAliases[] = {{c_primaryNetwork, nullptr, 1, nullptr, nullptr}};
             VERIFY_ARE_EQUAL(WslcSetContainerSettingsNetworks(&containerSettings, missingAliases, ARRAYSIZE(missingAliases)), E_INVALIDARG);
 
             const PCSTR nullAlias[] = {nullptr};
-            const WslcContainerNetwork withNullAlias[] = {{c_primaryNetwork, nullAlias, ARRAYSIZE(nullAlias), nullptr}};
+            const WslcContainerNetwork withNullAlias[] = {{c_primaryNetwork, nullAlias, ARRAYSIZE(nullAlias), nullptr, nullptr}};
             VERIFY_ARE_EQUAL(WslcSetContainerSettingsNetworks(&containerSettings, withNullAlias, ARRAYSIZE(withNullAlias)), E_INVALIDARG);
         }
     }

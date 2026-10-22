@@ -120,9 +120,10 @@ struct ContainerConfig
 struct InspectEndpointIPAMConfig
 {
     std::string IPv4Address;
+    std::string IPv6Address;
     std::vector<std::string> LinkLocalIPs;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointIPAMConfig, IPv4Address, LinkLocalIPs);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointIPAMConfig, IPv4Address, IPv6Address, LinkLocalIPs);
 };
 
 struct InspectEndpointSettings

@@ -300,7 +300,7 @@ typedef struct _WSLCNetworkConnection
 typedef struct _WSLCNetworkConnectionOptions
 {
     [unique] LPCSTR NetworkName;
-    // Endpoint settings for the network connection (Aliases, IPAddress, Links, LinkLocalIPs, DriverOpts).
+    // Endpoint settings for the network connection (Aliases, IPAddress, IPv6Address, Links, LinkLocalIPs, DriverOpts).
     // KVP-encoded; duplicate keys are allowed (e.g., multiple "Aliases" entries).
     [unique, size_is(SettingsCount)] const KeyValuePair* Settings;
     ULONG SettingsCount;

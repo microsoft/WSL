@@ -138,34 +138,49 @@ static HRESULT InetNtopToHresult(int af, const void* src, char* dst, size_t dstC
     return S_OK;
 }
 
+struct NetworkAddressBuffers
+{
+    std::array<char, INET_ADDRSTRLEN> Ipv4;
+    std::array<char, INET6_ADDRSTRLEN> Ipv6;
+};
+
 // Owns the memory referenced by WSLCCompatContainerNetwork; must outlive the CreateContainer call.
 struct ContainerNetworkStorage
 {
     std::vector<WSLCCompatKeyValuePair> PrimarySettings;
     std::vector<std::vector<WSLCCompatKeyValuePair>> AdditionalSettings;
     std::vector<WSLCCompatNetworkConnection> AdditionalNetworks;
-    std::vector<std::array<char, INET_ADDRSTRLEN>> IpAddresses;
+    std::vector<NetworkAddressBuffers> IpAddresses;
 };
 
-// ipAddressBuffer must outlive the returned settings since the IPAddress entry points into it.
-std::vector<WSLCCompatKeyValuePair> ConvertNetworkSettings(const WslcContainerNetwork& network, std::array<char, INET_ADDRSTRLEN>& ipAddressBuffer)
+// addressBuffers must outlive the returned settings since the IP address entries point into it.
+std::vector<WSLCCompatKeyValuePair> ConvertNetworkSettings(const WslcContainerNetwork& network, NetworkAddressBuffers& addressBuffers)
 {
     const bool userDefined = SupportsNetworkAliases(network.name);
     THROW_HR_IF_MSG(E_INVALIDARG, network.aliasCount != 0 && !userDefined, "Network '%hs' does not support aliases", network.name);
     THROW_HR_IF_MSG(
-        E_INVALIDARG, network.ipAddress != nullptr && !userDefined, "Network '%hs' does not support a static IP address", network.name);
+        E_INVALIDARG,
+        (network.ipv4Address != nullptr || network.ipv6Address != nullptr) && !userDefined,
+        "Network '%hs' does not support a static IP address",
+        network.name);
 
     std::vector<WSLCCompatKeyValuePair> settings;
-    settings.reserve(network.aliasCount + 1);
+    settings.reserve(network.aliasCount + 2);
     for (uint32_t i = 0; i < network.aliasCount; ++i)
     {
         settings.push_back({"Aliases", network.aliases[i]});
     }
 
-    if (network.ipAddress != nullptr)
+    if (network.ipv4Address != nullptr)
     {
-        THROW_IF_FAILED(InetNtopToHresult(AF_INET, network.ipAddress, ipAddressBuffer.data(), ipAddressBuffer.size()));
-        settings.push_back({"IPAddress", ipAddressBuffer.data()});
+        THROW_IF_FAILED(InetNtopToHresult(AF_INET, network.ipv4Address, addressBuffers.Ipv4.data(), addressBuffers.Ipv4.size()));
+        settings.push_back({"IPAddress", addressBuffers.Ipv4.data()});
+    }
+
+    if (network.ipv6Address != nullptr)
+    {
+        THROW_IF_FAILED(InetNtopToHresult(AF_INET6, network.ipv6Address, addressBuffers.Ipv6.data(), addressBuffers.Ipv6.size()));
+        settings.push_back({"IPv6Address", addressBuffers.Ipv6.data()});
     }
 
     return settings;
@@ -181,7 +196,7 @@ void ConvertContainerNetworks(const WslcContainerOptionsInternal& settings, WSLC
 
     THROW_HR_IF_MSG(E_INVALIDARG, settings.networkMode != nullptr, "Networking mode and networks are mutually exclusive");
 
-    // Sized up front so the IPAddress entries keep pointing at stable buffers.
+    // Sized up front so the IP address entries keep pointing at stable buffers.
     storage.IpAddresses.resize(settings.networksCount);
 
     const auto& primary = settings.networks[0];
@@ -2032,18 +2047,24 @@ try
         *networkInfo = {};
     }
 
-    constexpr auto supportedFlags = WSLC_NETWORK_FLAG_ENABLE_IPV6 | WSLC_NETWORK_FLAG_INTERNAL;
+    constexpr auto supportedFlags = WSLC_NETWORK_FLAG_ENABLE_IPV4 | WSLC_NETWORK_FLAG_ENABLE_IPV6 | WSLC_NETWORK_FLAG_INTERNAL;
     RETURN_HR_IF(E_INVALIDARG, WI_IsAnyFlagSet(settings->flags, ~supportedFlags));
+
+    const bool enableIPv6 = WI_IsFlagSet(settings->flags, WSLC_NETWORK_FLAG_ENABLE_IPV6);
+
+    // The runtime cannot create a network with IPv4 disabled.
+    RETURN_HR_IF(E_NOTIMPL, enableIPv6 && WI_IsFlagClear(settings->flags, WSLC_NETWORK_FLAG_ENABLE_IPV4));
+
     RETURN_HR_IF(E_INVALIDARG, settings->ipv4PrefixLength != 0 && settings->ipv6PrefixLength != 0);
     RETURN_HR_IF(E_INVALIDARG, settings->ipv4PrefixLength > 32 || settings->ipv6PrefixLength > 128);
-    RETURN_HR_IF(E_INVALIDARG, settings->ipv6PrefixLength != 0 && WI_IsFlagClear(settings->flags, WSLC_NETWORK_FLAG_ENABLE_IPV6));
+    RETURN_HR_IF(E_INVALIDARG, settings->ipv6PrefixLength != 0 && !enableIPv6);
     RETURN_HR_IF(E_INVALIDARG, settings->ipv4Gateway.s_addr != 0 && settings->ipv4PrefixLength == 0);
     RETURN_HR_IF(E_INVALIDARG, !IN6_IS_ADDR_UNSPECIFIED(&settings->ipv6Gateway) && settings->ipv6PrefixLength == 0);
 
     wsl::windows::common::wslc_schema::CreateNetworkOptions options;
     options.Name = settings->name;
     options.Internal = WI_IsFlagSet(settings->flags, WSLC_NETWORK_FLAG_INTERNAL);
-    options.EnableIPv6 = WI_IsFlagSet(settings->flags, WSLC_NETWORK_FLAG_ENABLE_IPV6);
+    options.EnableIPv6 = enableIPv6;
 
     if (settings->ipv4PrefixLength != 0)
     {

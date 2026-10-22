@@ -149,7 +149,10 @@ namespace Microsoft.WSL.Containers
         IVector<String> Aliases;
 
         // Static IPv4 address for the container on this network. User-defined networks only.
-        Windows.Networking.HostName IPAddress;
+        Windows.Networking.HostName IPv4Address;
+
+        // Static IPv6 address for the container on this network. User-defined networks with IPv6 enabled only.
+        Windows.Networking.HostName IPv6Address;
     };
 
     enum ContainerState
@@ -418,11 +421,13 @@ namespace Microsoft.WSL.Containers
 
         String Name;
 
-        // Only EnableIPv6 and Internal are accepted; IPv4 is always enabled.
+        // EnableIPv4, EnableIPv6 and Internal are accepted. IPv4 is always enabled; set both EnableIPv4 and EnableIPv6
+        // for a dual-stack network. EnableIPv6 without EnableIPv4 (IPv6 only) fails with E_NOTIMPL.
         NetworkFlags Flags;
 
-        // Optional. The subnet address family must match the gateway and requires EnableIPv6 for IPv6.
-        // When Subnet is null the session chooses an IPv4 subnet.
+        // Optional. The subnet address family must match the gateway and must be enabled by Flags.
+        // When Subnet is null the session chooses an IPv4 subnet; it has no default IPv6 subnets, so set an IPv6
+        // subnet when EnableIPv6 is set.
         Windows.Networking.HostName Subnet;
         UInt8 SubnetPrefixLength;
         Windows.Networking.HostName Gateway;
