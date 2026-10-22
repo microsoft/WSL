@@ -202,6 +202,8 @@ private:
     _Requires_lock_held_(m_lock)
     void CloseNetworkAdaptersLocked() noexcept;
 
+    void Shutdown();
+
     NON_COPYABLE(HcsVirtualMachineBackend);
     NON_MOVABLE(HcsVirtualMachineBackend);
 
@@ -229,8 +231,9 @@ private:
     _Guarded_by_(m_lock) std::map<std::uint64_t, VmSharedMemoryDevice> m_sharedMemoryDevices;
     _Guarded_by_(m_lock) std::optional<VmGpuAttachment> m_gpu;
     _Guarded_by_(m_lock) VmState m_state = VmState::Unknown;
-    // Serializes persistent memory additions, including the caller's wait for the device to appear
-    // in the guest. Acquired before m_lock, which is released while the wait runs.
+    _Guarded_by_(m_lock) bool m_cleanupStarted = false;
+    // Serializes persistent memory additions. Termination signals cancellation and releases m_lock
+    // before waiting for an in-flight addition to complete.
     wil::srwlock m_persistentMemoryLock;
     _Guarded_by_(m_persistentMemoryLock) std::uint32_t m_nextPersistentMemoryIndex = 0;
     _Guarded_by_(m_lock) std::map<std::uint64_t, FileSystemShare> m_fileSystemShares;
