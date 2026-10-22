@@ -5636,7 +5636,8 @@ class MirroredTests
         const auto expectedWarnings = std::format(
             L"wsl: {}\r\nwsl: {}wsl: {}\r\n",
             wsl::shared::Localization::MessageMirroredNetworkingPortRangeAllocationFailed(512),
-            FormatErrorMessage(L"An internal error occurred. ", L"CreateInstance/CreateVm/ConfigureNetworking/0x8007054f"),
+            FormatErrorMessage(
+                L"An internal error occurred. ", L"CreateInstance/CreateVm/ConfigureNetworking/ERROR_INTERNAL_ERROR"),
             wsl::shared::Localization::MessageNetworkInitializationFailedFallback2(
                 ToString(wsl::core::NetworkingMode::Mirrored), ToString(wsl::core::NetworkingMode::None)));
         VERIFY_ARE_EQUAL(expectedWarnings, warnings);
