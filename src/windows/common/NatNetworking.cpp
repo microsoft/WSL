@@ -18,6 +18,8 @@ using wsl::windows::common::Context;
 using wsl::windows::common::ExecutionContext;
 using wsl::windows::common::hcs::unique_hcn_endpoint;
 
+
+
 // This static list is used to keep of which endpoints are in use by other users.
 // It's needed because when we see an endpoint with the same ip address we want,
 // we have no way to differentiate between an endpoint that we previously used
@@ -639,6 +641,10 @@ std::optional<ULONGLONG> NatNetworking::FindNatInterfaceLuid(const SOCKADDR_INET
 
 wsl::windows::common::hcs::unique_hcn_network NatNetworking::CreateNetwork(wsl::core::Config& config)
 {
+    // Prevent multiple VM's from creating / deleting each other's networks at the same time.
+    static wil::srwlock networkCreationLock;
+    auto lock = networkCreationLock.lock_exclusive();
+
     wsl::windows::common::hcs::unique_hcn_network natNetwork;
     wil::ResultFromException(WI_DIAGNOSTICS_INFO, [&] {
         try
@@ -766,36 +772,40 @@ wsl::windows::common::hcs::unique_hcn_network NatNetworking::CreateNetworkIntern
             bool networkAlreadyExisted = false;
             wsl::shared::retry::RetryWithTimeout<void>(
                 [&] {
-                    executionStep = "HcnCreateNetwork";
                     ExecutionContext context(Context::HNS);
-                    wil::unique_cotaskmem_string error;
-                    HRESULT hns_hr =
-                        HcnCreateNetwork(GetNatNetworkId(config.FirewallConfig.Enabled()), ToJsonW(settings).c_str(), &network, &error);
-                    WSL_LOG(
-                        "NatNetworking::CreateNetwork [HcnCreateNetwork]",
-                        TraceLoggingValue(GetNatNetworkId(config.FirewallConfig.Enabled()), "networkGuid"),
-                        TraceLoggingValue(settings.Name.c_str(), "settingsName"),
-                        TraceLoggingValue(JsonEnumToString(settings.Type).c_str(), "settingsType"),
-                        TraceLoggingValue(
-                            settings.InterfaceConstraint.InterfaceAlias.c_str(), "settingsInterfaceConstraintInterfaceAlias"),
-                        TraceLoggingValue(settings.IsolateSwitch, "settingsIsolateSwitch"),
-                        TraceLoggingValue(static_cast<uint32_t>(settings.Flags), "settingsFlags"),
-                        TraceLoggingValue(hns_hr, "hr"),
-                        TraceLoggingValue(retryCount, "retryCount"));
 
-                    ++retryCount;
+                    if (!network)
+                    {
+                        executionStep = "HcnCreateNetwork";
+                        wil::unique_cotaskmem_string error;
+                        HRESULT hns_hr =
+                            HcnCreateNetwork(GetNatNetworkId(config.FirewallConfig.Enabled()), ToJsonW(settings).c_str(), &network, &error);
+                        WSL_LOG(
+                            "NatNetworking::CreateNetwork [HcnCreateNetwork]",
+                            TraceLoggingValue(GetNatNetworkId(config.FirewallConfig.Enabled()), "networkGuid"),
+                            TraceLoggingValue(settings.Name.c_str(), "settingsName"),
+                            TraceLoggingValue(JsonEnumToString(settings.Type).c_str(), "settingsType"),
+                            TraceLoggingValue(
+                                settings.InterfaceConstraint.InterfaceAlias.c_str(), "settingsInterfaceConstraintInterfaceAlias"),
+                            TraceLoggingValue(settings.IsolateSwitch, "settingsIsolateSwitch"),
+                            TraceLoggingValue(static_cast<uint32_t>(settings.Flags), "settingsFlags"),
+                            TraceLoggingValue(hns_hr, "hr"),
+                            TraceLoggingValue(retryCount, "retryCount"));
 
-                    // Open the existing network if it already exists.
-                    networkAlreadyExisted = hns_hr == HCN_E_NETWORK_ALREADY_EXISTS;
-                    if (networkAlreadyExisted)
-                    {
-                        executionStep = "HcnOpenNetwork";
-                        network = wsl::core::networking::OpenNetwork(GetNatNetworkId(config.FirewallConfig.Enabled()));
-                    }
-                    else
-                    {
-                        // Throw other errors to allow for retries
-                        THROW_IF_FAILED_MSG(hns_hr, "HcnCreateNetwork %ls", error.get());
+                        ++retryCount;
+
+                        // Open the existing network if it already exists.
+                        networkAlreadyExisted = hns_hr == HCN_E_NETWORK_ALREADY_EXISTS;
+                        if (networkAlreadyExisted)
+                        {
+                            executionStep = "HcnOpenNetwork";
+                            network = wsl::core::networking::OpenNetwork(GetNatNetworkId(config.FirewallConfig.Enabled()));
+                        }
+                        else
+                        {
+                            // Throw other errors to allow for retries
+                            THROW_IF_FAILED_MSG(hns_hr, "HcnCreateNetwork %ls", error.get());
+                        }
                     }
 
                     executionStep = "HcnQueryNetworkProperties";
