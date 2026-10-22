@@ -73,9 +73,9 @@ void NetworkService::Create(Terminal& terminal, models::Session& session, const 
     THROW_IF_FAILED(session.Get()->CreateNetwork(&options, &warningCallback));
 }
 
-void NetworkService::Delete(models::Session& session, const std::string& name)
+void NetworkService::Delete(models::Session& session, const std::string& nameOrId)
 {
-    THROW_IF_FAILED(session.Get()->DeleteNetwork(name.c_str()));
+    THROW_IF_FAILED(session.Get()->DeleteNetwork(nameOrId.c_str()));
 }
 
 std::vector<wsl::windows::common::wslc_schema::NetworkListEntry> NetworkService::List(
@@ -95,10 +95,10 @@ std::vector<wsl::windows::common::wslc_schema::NetworkListEntry> NetworkService:
     return FromJson<std::vector<wsl::windows::common::wslc_schema::NetworkListEntry>>(output.get());
 }
 
-wsl::windows::common::wslc_schema::Network NetworkService::Inspect(models::Session& session, const std::string& name)
+wsl::windows::common::wslc_schema::Network NetworkService::Inspect(models::Session& session, const std::string& nameOrId)
 {
     wil::unique_cotaskmem_ansistring output;
-    THROW_IF_FAILED(session.Get()->InspectNetwork(name.c_str(), &output));
+    THROW_IF_FAILED(session.Get()->InspectNetwork(nameOrId.c_str(), &output));
     return FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
 }
 
@@ -168,10 +168,10 @@ void NetworkService::Connect(models::Session& session, const models::ConnectNetw
     THROW_IF_FAILED(container->ConnectToNetwork(&options));
 }
 
-void NetworkService::Disconnect(models::Session& session, const std::string& networkName, const std::string& containerId)
+void NetworkService::Disconnect(models::Session& session, const std::string& networkNameOrId, const std::string& containerId)
 {
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(containerId.c_str(), &container));
-    THROW_IF_FAILED(container->DisconnectFromNetwork(networkName.c_str()));
+    THROW_IF_FAILED(container->DisconnectFromNetwork(networkNameOrId.c_str()));
 }
 } // namespace wsl::windows::wslc::services

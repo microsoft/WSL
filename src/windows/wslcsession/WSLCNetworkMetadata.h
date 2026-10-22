@@ -51,4 +51,41 @@ struct NetworkEntry
     NetworkIPAM IPAM;
 };
 
+struct ResolvedNetwork
+{
+    std::string Name;
+    std::string Id;
+};
+
+// Resolves a network name, full ID, or unique ID prefix against a name-keyed network map.
+// Resolution order is exact name, exact ID, then unique ID prefix. Returns networks.end() if nothing matches.
+template <typename TNetworkMap>
+auto FindNetwork(TNetworkMap& networks, const std::string& nameOrId) -> decltype(networks.end())
+{
+    if (auto it = networks.find(nameOrId); it != networks.end())
+    {
+        return it;
+    }
+
+    auto match = networks.end();
+    for (auto it = networks.begin(); it != networks.end(); ++it)
+    {
+        if (it->second.Id == nameOrId)
+        {
+            return it;
+        }
+
+        if (nameOrId.empty() || !it->second.Id.starts_with(nameOrId))
+        {
+            continue;
+        }
+
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, wsl::shared::Localization::MessageWslcNetworkPrefixAmbiguous(nameOrId), match != networks.end());
+        match = it;
+    }
+
+    return match;
+}
+
 } // namespace wsl::windows::service::wslc

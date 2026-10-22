@@ -804,8 +804,8 @@ STDAPI WslcCreateSessionNetwork(
 //   session
 //       A valid WslcSession handle.
 //
-//   name
-//       The name of the network to delete.
+//   nameOrId
+//       The name, full ID, or unique ID prefix of the network to delete. A name match takes precedence over an ID match.
 //
 //   errorMessage
 //       Optional. On failure, receives a human-readable error message. May be null.
@@ -814,10 +814,11 @@ STDAPI WslcCreateSessionNetwork(
 //   S_OK on success. Otherwise, an HRESULT error code indicating the reason for failure.
 //
 // Notes:
-//   - Returns WSLC_E_NETWORK_NOT_FOUND if the network does not exist.
+//   - Returns WSLC_E_NETWORK_NOT_FOUND if no network matches nameOrId.
+//   - Returns E_INVALIDARG if nameOrId is an ID prefix that matches more than one network.
 //   - Returns HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION) if a container is connected to the network.
 //   - Returns WSLC_E_RUNTIME_UPDATE_NEEDED if the installed WSL runtime does not support network management.
-STDAPI WslcDeleteSessionNetwork(_In_ WslcSession session, _In_z_ PCSTR name, _Outptr_opt_result_z_ PWSTR* errorMessage);
+STDAPI WslcDeleteSessionNetwork(_In_ WslcSession session, _In_z_ PCSTR nameOrId, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // STORAGE
 

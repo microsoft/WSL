@@ -595,6 +595,62 @@ class WslcSdkTests
         }
     }
 
+    WSLC_TEST_METHOD(NetworkDeleteById)
+    {
+        constexpr auto c_networkName = "wslc-sdk-delete-network-by-id";
+
+        auto comSession = wil::com_query<IWSLCSession>(reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->GetSession());
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName));
+
+        auto findNetworkId = [&]() -> std::optional<std::string> {
+            wil::unique_cotaskmem_array_ptr<WslcNetworkInfo> networks;
+            VERIFY_SUCCEEDED(WslcListSessionNetworks(m_defaultSession, networks.addressof(), networks.size_address<uint32_t>(), nullptr));
+            for (const auto& network : networks)
+            {
+                if (std::string_view{c_networkName} == network.name)
+                {
+                    return std::string{network.id};
+                }
+            }
+
+            return std::nullopt;
+        };
+
+        auto createNetwork = [&]() {
+            WSLCNetworkOptions options{};
+            options.Name = c_networkName;
+            options.Driver = "bridge";
+            VERIFY_SUCCEEDED(comSession->CreateNetwork(&options, nullptr));
+            const auto id = findNetworkId();
+            VERIFY_IS_TRUE(id.has_value());
+            return id.value();
+        };
+
+        auto cleanupNetwork = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName)); });
+
+        // Positive: a network can be deleted by its full ID.
+        {
+            const auto id = createNetwork();
+            VERIFY_SUCCEEDED(WslcDeleteSessionNetwork(m_defaultSession, id.c_str(), nullptr));
+            VERIFY_IS_FALSE(findNetworkId().has_value());
+        }
+
+        // Positive: a network can be deleted by a unique ID prefix.
+        {
+            const auto prefix = createNetwork().substr(0, 12);
+            VERIFY_SUCCEEDED(WslcDeleteSessionNetwork(m_defaultSession, prefix.c_str(), nullptr));
+            VERIFY_IS_FALSE(findNetworkId().has_value());
+        }
+
+        // Negative: deleting an unknown ID fails.
+        {
+            const std::string unknownId(64, '0');
+            wil::unique_cotaskmem_string errorMessage;
+            VERIFY_ARE_EQUAL(WslcDeleteSessionNetwork(m_defaultSession, unknownId.c_str(), errorMessage.put()), WSLC_E_NETWORK_NOT_FOUND);
+            VERIFY_IS_NOT_NULL(errorMessage.get());
+        }
+    }
+
     WSLC_TEST_METHOD(NetworkCreate)
     {
         constexpr auto c_networkName = "wslc-sdk-create-network";

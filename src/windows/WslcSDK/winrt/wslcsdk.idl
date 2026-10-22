@@ -93,7 +93,7 @@ namespace Microsoft.WSL.Containers
 
         IVectorView<NetworkInfo> GetNetworks();
         NetworkInfo CreateNetwork(NetworkSettings settings);
-        void DeleteNetwork(String name);
+        void DeleteNetwork(String nameOrId);
 
         event SessionTerminationHandler Terminated;
         event ProcessCrashHandler ProcessCrashed;

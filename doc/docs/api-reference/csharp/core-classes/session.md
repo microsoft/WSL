@@ -30,7 +30,7 @@ public sealed class Session : IDisposable
     public IReadOnlyList<ImageInfo> GetImages();
     public IReadOnlyList<NetworkInfo> GetNetworks();
     public NetworkInfo CreateNetwork(NetworkSettings settings);
-    public void DeleteNetwork(string name);
+    public void DeleteNetwork(string nameOrId);
     public void Dispose();
 }
 ```
@@ -249,9 +249,9 @@ Creates a bridge network in the session and returns it. Throws `HRESULT_FROM_WIN
 var network = session.CreateNetwork(new NetworkSettings("backend"));
 ```
 
-## Session.DeleteNetwork(string name)
+## Session.DeleteNetwork(string nameOrId)
 
-Deletes a network from the session. Throws `WSLC_E_NETWORK_NOT_FOUND` if the network does not exist.
+Deletes a network from the session by name, full ID, or unique ID prefix. An exact name match takes precedence over an ID match. Throws `WSLC_E_NETWORK_NOT_FOUND` if no network matches, or `E_INVALIDARG` if an ID prefix matches more than one network.
 
 ```csharp
 session.DeleteNetwork("backend");

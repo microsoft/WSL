@@ -200,7 +200,7 @@ auto network = session.CreateNetwork(NetworkSettings{L"backend"});
 
 ## Session::DeleteNetwork(hstring)
 
-Deletes a network from the session. Throws `WSLC_E_NETWORK_NOT_FOUND` if the network does not exist.
+Deletes a network from the session by name, full ID, or unique ID prefix. An exact name match takes precedence over an ID match. Throws `WSLC_E_NETWORK_NOT_FOUND` if no network matches, or `E_INVALIDARG` if an ID prefix matches more than one network.
 
 ```cpp
 session.DeleteNetwork(L"backend");

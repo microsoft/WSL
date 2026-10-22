@@ -27,7 +27,7 @@ namespace wsl::windows::wslc {
 std::vector<Argument> NetworkConnectCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::NetworkName, {.Required = true}),
+        Argument::Create(ArgType::NetworkNameOrId, {.Required = true}),
         Argument::Create(ArgType::ContainerId, {.Required = true}),
         Argument::Create(ArgType::DriverOpt, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::IpAddress),

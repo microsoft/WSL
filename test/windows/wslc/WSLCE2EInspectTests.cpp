@@ -371,6 +371,24 @@ class WSLCE2EInspectTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Inspect_Network_ById)
+    {
+        auto createNetworkResult = RunWslc(std::format(L"network create --driver bridge {}", WslcNetworkName));
+        createNetworkResult.Verify({.Stderr = L"", .ExitCode = 0});
+        auto deleteNetwork = wil::scope_exit([&]() { EnsureNetworkDoesNotExist(WslcNetworkName); });
+
+        const auto id = wsl::shared::string::MultiByteToWide(InspectNetwork(WslcNetworkName).Id);
+        for (const auto& command : {std::format(L"inspect {}", id), std::format(L"inspect --type network {}", id.substr(0, 12))})
+        {
+            auto result = RunWslc(command);
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+            auto inspectData =
+                wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::Network>>(result.Stdout.value().c_str());
+            VERIFY_ARE_EQUAL(1u, inspectData.size());
+            VERIFY_ARE_EQUAL(WslcNetworkName, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
+        }
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Inspect_MultipleObjects)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
