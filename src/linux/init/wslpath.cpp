@@ -22,6 +22,7 @@ Abstract:
 #include <endian.h>
 #include <lxbusapi.h>
 #include <pwd.h>
+#include <iostream>
 #include "wslpath.h"
 
 #include "util.h"
@@ -428,9 +429,6 @@ Return Value:
     int Flags = TRANSLATE_FLAG_RESOLVE_SYMLINKS;
     std::optional<char> Mode;
     const char* OriginalPath{};
-    std::string OutputPath;
-    int Result{};
-    char* SourcePath = nullptr;
 
     //
     // With the current version of musl, this has no useful effect but is also
@@ -460,40 +458,54 @@ Return Value:
         return 1;
     }
 
-    if (OriginalPath == nullptr || Mode == TRANSLATE_MODE_HELP)
+    if (Mode == TRANSLATE_MODE_HELP || (OriginalPath == nullptr && isatty(STDIN_FILENO)))
     {
         INVALID_USAGE();
     }
 
-    SourcePath = strdup(OriginalPath);
-    if (SourcePath == nullptr)
+    auto translatePath = [&](const std::string& path) {
+        // WslPathTranslate modifies its input. Keep a copy for error reporting.
+        std::string sourcePath = path;
+        const auto outputPath = WslPathTranslate(sourcePath.data(), Flags, Mode.value_or(TRANSLATE_MODE_UNIX));
+        if (outputPath.empty())
+        {
+            Die(Argv[0], errno, false, "%s", path.c_str());
+        }
+
+        if (printf("%s\n", outputPath.c_str()) < 0)
+        {
+            Die(Argv[0], errno, false, nullptr);
+        }
+    };
+
+    if (OriginalPath != nullptr)
     {
-        Die(Argv[0], errno, false, nullptr);
+        translatePath(OriginalPath);
+        return 0;
     }
 
-    //
-    // Translate the path.
-    //
-
-    OutputPath = WslPathTranslate(SourcePath, Flags, Mode.value_or(TRANSLATE_MODE_UNIX));
-    if (OutputPath.empty())
+    // Without a path argument, translate one path per line from redirected input.
+    // Accept CRLF as well as LF so Windows-generated path lists work too.
+    std::string path;
+    while (std::getline(std::cin, path))
     {
-        Die(Argv[0], errno, false, "%s", OriginalPath);
+        if (!path.empty() && path.back() == '\r')
+        {
+            path.pop_back();
+        }
+
+        if (path.empty() || path.find('\0') != std::string::npos)
+        {
+            Die(Argv[0], EINVAL, false, nullptr);
+        }
+
+        translatePath(path);
     }
 
-    //
-    // Print the translated path and a newline.
-    //
-
-    Result = printf("%s\n", OutputPath.empty() ? "." : OutputPath.c_str());
-    if (Result < 0)
+    if (std::cin.bad() || ferror(stdin))
     {
-        Die(Argv[0], errno, false, nullptr);
+        Die(Argv[0], EIO, false, nullptr);
     }
-
-    //
-    // Don't bother cleaning up since the process is exiting.
-    //
 
     return 0;
 }

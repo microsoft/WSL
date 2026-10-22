@@ -53,6 +53,8 @@ LXT_VARIATION_HANDLER WslPathTestLxFromWinPath;
 
 LXT_VARIATION_HANDLER WslPathTestLxToWinPath;
 
+LXT_VARIATION_HANDLER WslPathTestStandardInput;
+
 static const LXT_VARIATION g_LxtVariations[] = {
     {"WslPath - Windows to DrvFs", WslPathTestDrvFsFromWinPath},
     {"WslPath - DrvFs to Windows", WslPathTestDrvFsToWinPath},
@@ -62,6 +64,7 @@ static const LXT_VARIATION g_LxtVariations[] = {
     {"WslPath - Linux to \\\\wsl.localhost", WslPathTestLxToWinPath},
     {"WslPath - \\\\wsl.localhost escaped characters", WslPathTestLxEscaped},
     {"WslPath - Invalid mountinfo line", WslPathTestInvalidMountInfo},
+    {"WslPath - Standard input", WslPathTestStandardInput},
 };
 
 int WslPathTestEntry(int Argc, char* Argv[])
@@ -420,6 +423,57 @@ Return Value:
     LxtCheckResult(LxtCheckWslPathTranslation("/root", WSLPATH_DISTRO_PREFIX "\\root", false));
     LxtCheckResult(LxtCheckWslPathTranslation("/proc/stat", WSLPATH_DISTRO_PREFIX "\\proc\\stat", false));
     LxtCheckResult(LxtCheckWslPathTranslation("/proc/1/", WSLPATH_DISTRO_PREFIX "\\proc\\1\\", false));
+
+ErrorExit:
+    return Result;
+}
+
+int WslPathTestStandardInput(PLXT_ARGS Args)
+
+/*++
+
+Description:
+
+    This routine tests reading paths from standard input and argument precedence.
+
+Arguments:
+
+    Args - Supplies the command line arguments.
+
+Return Value:
+
+    Returns 0 on success, -1 on failure.
+
+--*/
+
+{
+    int Result;
+    char Output[1024];
+    struct
+    {
+        char* Command;
+        const char* ExpectedOutput;
+        int ExpectedExitCode;
+    } TestCases[] = {
+        {"printf '%s\\n' 'C:/Foo' | /bin/wslpath", "/mnt/c/Foo\n", 0},
+        {"printf '%s\\n' '/mnt/c/Foo' | /bin/wslpath -w", "C:\\Foo\n", 0},
+        {"printf '%s\\n' '/mnt/c/Foo' | /bin/wslpath -m", "C:/Foo\n", 0},
+        {"printf '%s\\n' 'C:/Program Files' 'C:/Foo' | /bin/wslpath", "/mnt/c/Program Files\n/mnt/c/Foo\n", 0},
+        {"printf '%s' 'C:/Foo' | /bin/wslpath", "/mnt/c/Foo\n", 0},
+        {"printf '%s\\r\\n' 'C:/Foo' | /bin/wslpath", "/mnt/c/Foo\n", 0},
+        {"printf '%s\\n' 'ignored' | /bin/wslpath 'C:/Foo'", "/mnt/c/Foo\n", 0},
+        {"/bin/wslpath </dev/null", "", 0},
+        {"printf '\\n' | /bin/wslpath", "", 1},
+        {"printf 'C:/Foo\\000bar\\n' | /bin/wslpath", "", 1},
+        {"/bin/wslpath </", "", 1},
+    };
+
+    for (size_t Index = 0; Index < LXT_COUNT_OF(TestCases); Index += 1)
+    {
+        char* Argv[] = {"/bin/sh", "-c", TestCases[Index].Command, NULL};
+        LxtCheckResult(LxtExecuteAndReadOutput(Argv, Output, sizeof(Output), TestCases[Index].ExpectedExitCode));
+        LxtCheckStringEqual(Output, TestCases[Index].ExpectedOutput);
+    }
 
 ErrorExit:
     return Result;

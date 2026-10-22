@@ -369,6 +369,8 @@ Please enable the "Windows Subsystem for Linux" optional component to use WSL1.<
     -m
         Translate from a WSL path to a Windows path, with '/' instead of '\\'
 
+With no path argument, read one path per line from standard input (LF or CRLF).
+
 Example: wslpath 'c:\\users'</value>
     <comment>{Locked="-a
 "}{Locked="-u
