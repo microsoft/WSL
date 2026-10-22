@@ -4078,6 +4078,8 @@ MultiHandleWait WSLCSession::CreateIOContext(HANDLE CancelHandle)
         io::MultiHandleWait::NeedNotComplete);
 
     auto callerProcess = wslutil::OpenCallingProcess(SYNCHRONIZE);
+
+    // Background operations, including automatic restarts, have no COM caller process.
     if (callerProcess)
     {
         io.AddHandle(

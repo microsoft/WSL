@@ -1618,7 +1618,7 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
             const auto generation = m_stateGeneration;
 
             // In-flight requests suppress an exit before Docker responds. Only successful requests retain that intent.
-            const auto exitRequestEpoch = m_exitRequests.BeginRequest();
+            const auto runIteration = m_exitRequests.BeginRequest();
             bool requestSucceeded = false;
             auto requestCleanup = wil::scope_exit([&]() {
                 if (!lock)
@@ -1626,7 +1626,7 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
                     lock = m_lock.lock_exclusive();
                 }
 
-                if (m_exitRequests.CompleteRequest(exitRequestEpoch, requestSucceeded))
+                if (m_exitRequests.CompleteRequest(runIteration, requestSucceeded))
                 {
                     // An exit observed during the request waits for its outcome before applying the policy.
                     if (m_state == WslcContainerStateExited && !m_exitRequests.SuppressesRestart() &&
@@ -1684,7 +1684,7 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
             {
                 transition = m_transition;
 
-                if (!m_exitRequests.OwnsRun(exitRequestEpoch))
+                if (!m_exitRequests.OwnsRun(runIteration))
                 {
                     transition.reset();
                 }

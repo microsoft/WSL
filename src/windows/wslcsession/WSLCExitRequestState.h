@@ -7,13 +7,13 @@
 
 namespace wsl::windows::service::wslc {
 
-// Access is serialized by the container lock. Epochs belong to staged runs, not committed state transitions.
+// Access is serialized by the container lock. Iterations identify accepted run attempts, not committed state transitions.
 class WSLCExitRequestState
 {
 public:
     void BeginRun() noexcept
     {
-        ++m_epoch;
+        ++m_iteration;
         m_pending = 0;
         m_requested = false;
     }
@@ -21,12 +21,12 @@ public:
     std::uint64_t BeginRequest() noexcept
     {
         ++m_pending;
-        return m_epoch;
+        return m_iteration;
     }
 
-    bool CompleteRequest(std::uint64_t Epoch, bool Succeeded) noexcept
+    bool CompleteRequest(std::uint64_t Iteration, bool Succeeded) noexcept
     {
-        if (!OwnsRun(Epoch))
+        if (!OwnsRun(Iteration))
         {
             return false;
         }
@@ -36,9 +36,9 @@ public:
         return true;
     }
 
-    bool OwnsRun(std::uint64_t Epoch) const noexcept
+    bool OwnsRun(std::uint64_t Iteration) const noexcept
     {
-        return Epoch == m_epoch;
+        return Iteration == m_iteration;
     }
 
     void RequestExit() noexcept
@@ -57,7 +57,7 @@ public:
     }
 
 private:
-    std::uint64_t m_epoch = 0;
+    std::uint64_t m_iteration = 0;
     size_t m_pending = 0;
     bool m_requested = false;
 };
