@@ -80,13 +80,15 @@ private:
 // lazily on first use and may be torn down when idle and recreated on demand.
 //
 class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLCSession
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCSession, IWSLCCompatSession, IFastRundown, ISupportErrorInfo>
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCSession, IWSLCCompatSession, IWSLCNativeAuditProcessFactory, IFastRundown, ISupportErrorInfo>
 {
     // WSLCContainer::Delete acquires a VmLease to keep the VM alive (and block idle
     // teardown) for the duration of a container deletion.
     friend class WSLCContainer;
 
 public:
+    IFACEMETHOD(CreateAuditProcess)(ULONGLONG Generation, ULONG InitPid, LPCSTR ContainerId, WSLCHandle* Input, WSLCHandle* Output, WSLCHandle* Error) override;
+
     WSLCSession() : m_runtime(*this)
     {
     }

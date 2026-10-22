@@ -17,6 +17,12 @@
         <Property Id="ARPPRODUCTICON" Value="wsl.ico"/>
 
         <DirectoryRef Id="INSTALLDIR">
+            <!-- Permanent: Security records must retain their message resource after uninstall.
+                 The old prototype source/DLL are intentionally never modified by this package. -->
+            <Component Id="wslsecurityauditresources" Guid="DAEF1E4E-B7C2-485F-A634-90FF2D781424" Permanent="yes" Bitness="always64">
+                <File Id="wslsecurityaudit.dll" Name="wslsecurityaudit.dll" Source="${PACKAGE_INPUT_DIR}/wslsecurityaudit.dll" KeyPath="yes" />
+            </Component>
+
             <Component Id="wsl" Guid="F0C8D6BA-1502-41E7-BF72-D93DFA134730" UninstallWhenSuperseded="yes" DisableRegistryReflection="yes" Bitness="always64">
                 <RemoveFile Id="CleanUpWSLShortCut" Directory="ProgramMenuFolder" Name="WSL" On="uninstall"/>
                 <File Id="wsl.exe" Name="wsl.exe" Source="${PACKAGE_INPUT_DIR}/wsl.exe" KeyPath="yes">
@@ -447,6 +453,14 @@
                     </RegistryKey>
                 </RegistryKey>
 
+                <!-- IWSLCNativeAuditProcessFactory-->
+                <RegistryKey Root="HKCR" Key="Interface\{62D4A9C5-B632-413D-A4DB-EBAB88E9C623}">
+                    <RegistryValue Value="IWSLCNativeAuditProcessFactory" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
                 <!-- IWSLCCompatCrashDumpCallback-->
                 <RegistryKey Root="HKCR" Key="Interface\{EAA15E20-7FCC-485B-B798-ED4095DBACA5}">
                     <RegistryValue Value="IWSLCCompatCrashDumpCallback" Type="string" />
@@ -641,6 +655,7 @@
         <Feature Id="WSL" Title="Windows Subsystem for Linux" Level="1">
             <ComponentRef Id="wsl" />
             <ComponentRef Id="wslservice" />
+            <ComponentRef Id="wslsecurityauditresources" />
             <ComponentRef Id="wslg" />
             <ComponentRef Id="tools" />
             <ComponentRef Id="explorershell" />
@@ -660,6 +675,17 @@
 
         <Binary Id="wslinstall.dll" SourceFile="${PACKAGE_INPUT_DIR}/wslinstall.dll" />
         <Binary Id="msixpackage" SourceFile="${PACKAGE_INPUT_DIR}/gluepackage.msix"/>
+
+        <!-- Commit actions do not mutate Security source ownership on an installation that rolls back.
+             Failure is explicitly logged, but must not prevent WSL installation/removal. -->
+        <CustomAction Id="InstallNativeSecurityAuditSource.SetProperty" Property="InstallNativeSecurityAuditSource"
+            Value="[INSTALLDIR]wslsecurityaudit.dll" Execute="immediate" />
+        <CustomAction Id="InstallNativeSecurityAuditSource" BinaryRef="wslinstall.dll" DllEntry="InstallNativeSecurityAuditSource"
+            Execute="commit" Impersonate="no" Return="ignore" />
+        <CustomAction Id="UninstallNativeSecurityAuditSource.SetProperty" Property="UninstallNativeSecurityAuditSource"
+            Value="[INSTALLDIR]wslsecurityaudit.dll" Execute="immediate" />
+        <CustomAction Id="UninstallNativeSecurityAuditSource" BinaryRef="wslinstall.dll" DllEntry="UninstallNativeSecurityAuditSource"
+            Execute="commit" Impersonate="no" Return="ignore" />
 
         <CustomAction Id="ValidateInstall"
             Impersonate="no"
@@ -779,6 +805,14 @@
 
         <!-- See https://learn.microsoft.com/en-us/windows/win32/msi/examples-of-conditional-statement-syntax -->
         <InstallExecuteSequence>
+            <Custom Action="InstallNativeSecurityAuditSource.SetProperty" After="InstallFiles"
+                Condition='((not REMOVE~="ALL") or WIX_UPGRADE_DETECTED) and (not UPGRADINGPRODUCTCODE)' />
+            <Custom Action="InstallNativeSecurityAuditSource" After="InstallNativeSecurityAuditSource.SetProperty"
+                Condition='((not REMOVE~="ALL") or WIX_UPGRADE_DETECTED) and (not UPGRADINGPRODUCTCODE)' />
+            <Custom Action="UninstallNativeSecurityAuditSource.SetProperty" Before="RemoveFiles"
+                Condition='REMOVE~="ALL" and (not UPGRADINGPRODUCTCODE) and (not WIX_UPGRADE_DETECTED)' />
+            <Custom Action="UninstallNativeSecurityAuditSource" After="UninstallNativeSecurityAuditSource.SetProperty"
+                Condition='REMOVE~="ALL" and (not UPGRADINGPRODUCTCODE) and (not WIX_UPGRADE_DETECTED)' />
             <Custom Action="ValidateInstall" After="InstallInitialize" Condition="(not INSTALLED) and (not SKIPVALIDATION = 1)" />
 
             <!-- Must run before InstallServices or else we'll fail if wslservice already exists.

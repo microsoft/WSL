@@ -17,6 +17,7 @@ set(SOURCES
     telemetry.cpp
     timezone.cpp
     SecCompDispatcher.cpp
+    SecurityAuditLaunch.cpp
     util.cpp
     WslDistributionConfig.cpp
     wslinfo.cpp
@@ -41,12 +42,14 @@ set(HEADERS
     telemetry.h
     timezone.h
     SecCompDispatcher.h
+    SecurityAuditLaunch.h
     util.h
     WslDistributionConfig.h
     wslinfo.h
     wslpath.h)
 
 set(LINUX_CXXFLAGS ${LINUX_CXXFLAGS} -I "${CMAKE_CURRENT_LIST_DIR}/../netlinkutil")
+set(LINUX_CXXFLAGS ${LINUX_CXXFLAGS} -I "${CMAKE_SOURCE_DIR}/src/shared/securityaudit")
 set(INIT_LIBRARIES ${COMMON_LINUX_LINK_LIBRARIES} netlinkutil plan9 mountutil configfile)
 add_linux_executable(init "${SOURCES}" "${HEADERS};${COMMON_LINUX_HEADERS}" "${INIT_LIBRARIES}")
 add_dependencies(init localization)
@@ -57,8 +60,14 @@ set(INITRAMFS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/initrd.img)
 set(INIT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/init)
 add_custom_command(
     OUTPUT ${INITRAMFS} "${CMAKE_CURRENT_BINARY_DIR}/CmakeFiles/initramfs"
-    DEPENDS init ${INIT}
-    COMMAND powershell.exe -ExecutionPolicy Bypass -NoProfile -NonInteractive -File "${CMAKE_SOURCE_DIR}/tools/create-initrd.ps1" "${INIT}" "${INITRAMFS}"
+    DEPENDS init ${INIT} wsl_audit_collector
+        "${WSL_SECURITYAUDIT_STAGED_PAYLOAD}/wsl-audit-collector"
+        "${WSL_SECURITYAUDIT_STAGED_PAYLOAD}/audit-payload.json"
+        "${CMAKE_SOURCE_DIR}/tools/create-initrd.ps1"
+        "${CMAKE_SOURCE_DIR}/tools/securityaudit/Validate-Payload.ps1"
+    COMMAND powershell.exe -ExecutionPolicy Bypass -NoProfile -NonInteractive
+        -File "${CMAKE_SOURCE_DIR}/tools/create-initrd.ps1" "${INIT}" "${INITRAMFS}"
+        -AuditPayloadDirectory "${WSL_SECURITYAUDIT_STAGED_PAYLOAD}" -Architecture "${LLVM_ARCH}"
     COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/CmakeFiles/initramfs"
     VERBATIM)
 add_custom_target(initramfs DEPENDS ${INITRAMFS})

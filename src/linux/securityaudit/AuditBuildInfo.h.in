@@ -1,0 +1,6 @@
+// Copyright (C) Microsoft Corporation. All rights reserved.
+
+#pragma once
+
+#define WSL_SECURITYAUDIT_LOADER_REVISION "@WSL_SECURITYAUDIT_LOADER_REVISION@"
+#define WSL_SECURITYAUDIT_SOURCE_DIGEST "@WSL_SECURITYAUDIT_SOURCE_DIGEST@"

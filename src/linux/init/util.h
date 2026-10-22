@@ -345,7 +345,11 @@ int WriteToFile(const char* Path, const char* Content, int OpenFlags = O_WRONLY 
 void StartMemoryReductionThread(LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode);
 
 int ProcessCreateProcessMessage(
-    wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer, const std::optional<std::string>& DistroCgroupPath, int CgroupNamespaceFd = -1);
+    wsl::shared::Transaction& Transaction,
+    gsl::span<gsl::byte> Buffer,
+    const std::optional<std::string>& DistroCgroupPath,
+    int CgroupNamespaceFd = -1,
+    bool HostOnly = false);
 
 std::string UtilGetDistroCgroupPath(pid_t DistroInitPid);
 

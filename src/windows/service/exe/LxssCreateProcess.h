@@ -70,6 +70,16 @@ public:
     static inline wil::unique_socket CreateLinuxProcess(
         _In_ LPCSTR Path, _In_ LPCSTR* Arguments, const GUID& RuntimeId, wsl::shared::SocketChannel& channel, HANDLE terminatingEvent, DWORD Timeout)
     {
+        return CreateLinuxProcess(
+            Path, Arguments, RuntimeId, channel, terminatingEvent, Timeout, [](const GUID& runtimeId, ULONG port, HANDLE exitEvent) {
+                return wsl::windows::common::hvsocket::Connect(runtimeId, port, exitEvent);
+            });
+    }
+
+    template <typename TConnector>
+    static wil::unique_socket CreateLinuxProcess(
+        LPCSTR Path, LPCSTR* Arguments, const GUID& RuntimeId, wsl::shared::SocketChannel& channel, HANDLE terminatingEvent, DWORD Timeout, const TConnector& Connect)
+    {
         size_t argumentCount = 0;
         while (Arguments[argumentCount] != nullptr)
         {
@@ -87,7 +97,7 @@ public:
             return message.Result;
         };
 
-        auto processSocket = wsl::windows::common::hvsocket::Connect(RuntimeId, readResult(), terminatingEvent);
+        auto processSocket = Connect(RuntimeId, readResult(), terminatingEvent);
         const auto execResult = readResult();
         THROW_HR_IF_MSG(E_FAIL, execResult != 0, "Failed to execute '%hs', error=%d", Path, execResult);
 

@@ -108,6 +108,16 @@ interface IImageLoadCallback : IUnknown
     HRESULT OnImageLoaded([in, string] LPCSTR Image, [in] EnumReferenceFormat Format);
 };
 
+interface IWSLCNativeAuditProcessFactory;
+
+typedef struct _WSLCNativeAuditContainer
+{
+    char Id[65];
+    char Name[257];
+    char StartedAt[129];
+    ULONG InitPid;
+} WSLCNativeAuditContainer;
+
 [
     uuid(F3E6D5B2-1D40-4E8B-9C39-7A45D1C0F8A2),
     pointer_default(unique),
@@ -136,6 +146,14 @@ interface IWSLCPluginNotifier : IUnknown
     // committed to stopping: session calls made from this callback are served by it, while any other
     // caller waits for the teardown and is served by the next VM. Errors are logged but ignored.
     HRESULT OnVmStopping();
+
+    // Native service-owned auditing, independent of plugin dispatch. All failures are best effort.
+    HRESULT OnNativeAuditStarted([in] ULONGLONG Generation, [in] IWSLCNativeAuditProcessFactory* Factory);
+    HRESULT OnNativeAuditStopping([in] ULONGLONG Generation);
+    HRESULT OnNativeAuditContainerStarted([in] ULONGLONG Generation, [in] const WSLCNativeAuditContainer* Container);
+    HRESULT OnNativeAuditContainerStopping([in] ULONGLONG Generation, [in, string] LPCSTR ContainerId);
+    // Availability-first startup gate. Called without VM/runtime or lifecycle notification locks.
+    HRESULT WaitForNativeAuditStartup([in] ULONGLONG Generation);
 };
 
 typedef struct _WSLCImageInformation
@@ -414,6 +432,25 @@ typedef struct _WSLCHandle
         [default];
     } Handle;
 } WSLCHandle;
+
+[
+    uuid(62D4A9C5-B632-413D-A4DB-EBAB88E9C623),
+    pointer_default(unique),
+    object
+]
+interface IWSLCNativeAuditProcessFactory : IUnknown
+{
+    // InitPid=0 starts collection; otherwise inspect that container's namespaces.
+    // A stale/stopping VM is rejected; this never acquires a VM lifetime token.
+    // Input and Output are duplex-process socket duplicates. Error can be Unknown.
+    HRESULT CreateAuditProcess(
+        [in] ULONGLONG Generation,
+        [in] ULONG InitPid,
+        [in, unique, string] LPCSTR ContainerId,
+        [out] WSLCHandle* Input,
+        [out] WSLCHandle* Output,
+        [out] WSLCHandle* Error);
+};
 
 [
     uuid(1AD163CD-393D-4B33-83A2-8A3F3F23E608),

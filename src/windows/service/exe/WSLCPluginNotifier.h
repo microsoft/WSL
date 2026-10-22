@@ -4,6 +4,7 @@
 
 #include "wslc.h"
 #include "PluginManager.h"
+#include "NativeAudit.h"
 #include <wil/resource.h>
 #include <vector>
 
@@ -36,6 +37,11 @@ public:
     IFACEMETHOD(OnImageDeleted)(_In_ LPCSTR ImageId) override;
     IFACEMETHOD(OnVmStarted)() override;
     IFACEMETHOD(OnVmStopping)() override;
+    IFACEMETHOD(OnNativeAuditStarted)(ULONGLONG Generation, IWSLCNativeAuditProcessFactory* Factory) override;
+    IFACEMETHOD(OnNativeAuditStopping)(ULONGLONG Generation) override;
+    IFACEMETHOD(OnNativeAuditContainerStarted)(ULONGLONG Generation, const WSLCNativeAuditContainer* Container) override;
+    IFACEMETHOD(OnNativeAuditContainerStopping)(ULONGLONG Generation, LPCSTR ContainerId) override;
+    IFACEMETHOD(WaitForNativeAuditStartup)(ULONGLONG Generation) override;
 
 private:
     wsl::windows::service::PluginManager& m_plugins;
@@ -43,6 +49,9 @@ private:
     wil::shared_handle m_userToken;
     std::vector<BYTE> m_userSid;
     WSLCSessionInformation m_sessionInfo{};
+    wil::srwlock m_auditLock;
+    ULONGLONG m_auditGeneration{};
+    wsl::audit::NativeAudit m_securityAudit;
 };
 
 } // namespace wsl::windows::service::wslc

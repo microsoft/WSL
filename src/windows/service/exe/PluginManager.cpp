@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "install.h"
 #include "PluginManager.h"
+#include "NativeAudit.h"
 #include "WslPluginApi.h"
 #include "LxssUserSessionFactory.h"
 #include "WSLCSessionManager.h"
@@ -379,6 +380,14 @@ void PluginManager::LoadPlugins()
         if (e.second != REG_SZ)
         {
             LOG_HR_MSG(E_UNEXPECTED, "Plugin value: '%ls' has incorrect type: %lu, skipping", e.first.c_str(), e.second);
+            continue;
+        }
+
+        // Core owns collection now. Retain the legacy registration and message resources
+        // for rollback/history, but never load this one obsolete collector alongside core.
+        if (wsl::audit::IsLegacyAuditPlugin(e.first))
+        {
+            WSL_LOG("SecurityAuditLegacyPluginSuppressed", TraceLoggingValue(e.first.c_str(), "Name"));
             continue;
         }
 

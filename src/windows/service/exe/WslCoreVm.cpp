@@ -2134,6 +2134,13 @@ wil::unique_socket WslCoreVm::CreateRootNamespaceProcess(_In_ LPCSTR Path, _In_ 
         Path, Arguments, m_runtimeId, m_miniInitChannel, m_terminatingEvent.get(), m_vmConfig.DistributionStartTimeout);
 }
 
+wsl::windows::common::NativeAuditLaunch WslCoreVm::CaptureNativeAuditLaunch()
+{
+    auto lock = m_lock.try_lock_exclusive();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_BUSY), !lock);
+    return {m_runtimeId, m_terminatingEvent.get()};
+}
+
 void WslCoreVm::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR GuestPath, _In_ bool ReadOnly, _In_ LPCWSTR Name)
 {
     auto lock = m_lock.lock_exclusive();

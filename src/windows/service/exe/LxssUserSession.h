@@ -23,6 +23,7 @@ Abstract:
 #include "PluginManager.h"
 #include "Lifetime.h"
 #include "DistributionRegistration.h"
+#include "NativeAudit.h"
 
 #define WSL_NEW_DISTRO_LXFS L"NewDistributionLxFs"
 #define WSL_DISTRO_CONFIG_DEFAULT_UID L"DefaultUid"
@@ -870,6 +871,9 @@ private:
     /// </summary>
     bool m_disableNewInstanceCreation = false;
 
+    _Guarded_by_(m_instanceLock) unsigned int m_pendingInstanceStarts {};
+    _Guarded_by_(m_instanceLock) bool m_notifyingVmStarted {};
+
     /// <summary>
     /// The user's token. Shared with WslCoreVm and plugins.
     /// </summary>
@@ -878,6 +882,7 @@ private:
     WSLSessionInformation m_session{};
 
     wsl::windows::service::PluginManager& m_pluginManager;
+    wsl::audit::NativeAudit m_securityAudit;
 
     /// <summary>
     /// Listens to host http proxy setting changes, tracks ongoing proxy queries, and stores current settings.

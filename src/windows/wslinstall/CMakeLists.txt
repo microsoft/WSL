@@ -12,6 +12,7 @@ target_link_libraries(wslinstall
                       ${COMMON_LINK_LIBRARIES}
                       ${MSI_LINK_LIBRARIES}
                       common
+                      wsl_securityaudit_windows
                       legacy_stdio_definitions
                       Crypt32.lib
                       sfc.lib)

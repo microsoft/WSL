@@ -23,6 +23,7 @@ nav:
        - 'plan9': technical-documentation/plan9.md
     - 'Technical documentation':
        - 'Security model': technical-documentation/security.md
+       - 'Native Linux security auditing': technical-documentation/security-audit.md
        - 'Boot process': technical-documentation/boot-process.md
        - 'Interop': technical-documentation/interop.md
        - 'Drvfs & Plan9': technical-documentation/drvfs.md

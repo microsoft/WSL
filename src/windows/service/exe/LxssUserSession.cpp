@@ -2598,8 +2598,38 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
     DistributionRegistration registration;
 
     std::shared_ptr<LxssRunningInstance> instance;
+    GUID auditedVm{};
+    bool pendingStart = false;
+    auto pending = wil::scope_exit([&] {
+        if (pendingStart)
+        {
+            std::lock_guard lock(m_instanceLock);
+            --m_pendingInstanceStarts;
+            _VmCheckIdle();
+        }
+    });
+    for (;;)
     {
-        std::lock_guard lock(m_instanceLock);
+        std::unique_lock lock(m_instanceLock);
+        const auto holdStartup = [&] {
+            if (!pendingStart)
+            {
+                ++m_pendingInstanceStarts;
+                pendingStart = true;
+            }
+        };
+        const auto waitForAudit = [&] {
+            if (m_notifyingVmStarted || auditedVm == m_vmId.load())
+            {
+                return false;
+            }
+            holdStartup();
+            auditedVm = m_vmId.load();
+            const auto startup = m_securityAudit.CaptureStartupWait();
+            lock.unlock();
+            (void)startup.Wait();
+            return true;
+        };
 
         // m_disableNewInstanceCreation is set when the session is being deleted.
         // In that code path, don't create a new session.
@@ -2610,6 +2640,10 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
         // Check if an instance is already running for this distribution, if
         // not create one.
         instance = _RunningInstance(&registration.Id());
+        if (instance && m_utilityVm && WI_IsFlagSet(registration.Read(Property::Flags), LXSS_DISTRO_FLAGS_VM_MODE) && waitForAudit())
+        {
+            continue;
+        }
         if (!instance)
         {
             THROW_HR_IF(E_NOT_SET, WI_IsFlagSet(Flags, LXSS_CREATE_INSTANCE_FLAGS_OPEN_EXISTING));
@@ -2622,6 +2656,18 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
 
             // Determine the distribution version.
             ULONG version = WI_IsFlagSet(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE) ? LXSS_WSL_VERSION_2 : LXSS_WSL_VERSION_1;
+
+            if (version == LXSS_WSL_VERSION_2)
+            {
+                // A waiting user request, unlike the sidecar itself, prevents idle termination.
+                holdStartup();
+                _CreateVm();
+                if (waitForAudit())
+                {
+                    // Reopen registration and recheck VM/instance state after dropping the owning lock.
+                    continue;
+                }
+            }
 
             // Create a GUID for the instance.
             GUID instanceId;
@@ -2735,6 +2781,13 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
                     auto cleanupOnFailure =
                         wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { m_runningInstances.erase(registration.Id()); });
                     m_pluginManager.OnDistributionStarted(&m_session, instance->DistributionInformation());
+                    try
+                    {
+                        const auto& info = *instance->DistributionInformation();
+                        m_securityAudit.DistributionStarted(
+                            {wsl::audit::ToUtf8(info.Name), wsl::shared::string::GuidToString<char>(info.Id), info.PidNamespace});
+                    }
+                    CATCH_LOG();
                     cleanupOnFailure.release();
                 }
 
@@ -2760,6 +2813,7 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
                 throw;
             }
         }
+        break;
     }
 
     // Register the Plan 9 Redirector connection targets for the calling user if necessary.
@@ -3012,6 +3066,24 @@ void LxssUserSessionImpl::_CreateVm()
                 m_telemetryThread = std::thread(&LxssUserSessionImpl::TelemetryWorker, this, std::move(socket));
             }
 
+            // Launch asynchronously under the owning lock; instance startup waits outside that lock.
+            try
+            {
+                wsl::audit::HostIdentity identity{
+                    wsl::audit::SidString(m_session.UserSid), m_session.SessionId, wsl::audit::QueryTokenSessionId(m_userToken.get())};
+                const auto launch = m_utilityVm->CaptureNativeAuditLaunch();
+                m_securityAudit.Start(std::move(identity), [launch](const std::vector<std::string>& arguments) {
+                    // Capture happened under the owning lock, but this worker needs no session/VM reference.
+                    // In particular, a slow distro startup cannot consume the retry budget by holding that lock.
+                    wsl::audit::AuditTransport transport;
+                    transport.output = launch.CreateRootNamespaceProcess(arguments);
+                    return transport;
+                });
+            }
+            CATCH_LOG();
+
+            m_notifyingVmStarted = true;
+            const auto notification = wil::scope_exit([&] { m_notifyingVmStarted = false; });
             m_pluginManager.OnVmStarted(&m_session, &userSettings);
         }
         catch (...)
@@ -3741,6 +3813,12 @@ bool LxssUserSessionImpl::_TerminateInstanceInternal(_In_ LPCGUID DistroGuid, _I
                 if (const auto* wslcoreInstance = dynamic_cast<WslCoreInstance*>(instance->second.get()); wslcoreInstance != nullptr)
                 {
                     m_pluginManager.OnDistributionStopping(&m_session, wslcoreInstance->DistributionInformation());
+                    try
+                    {
+                        m_securityAudit.DistributionStopping(
+                            wsl::shared::string::GuidToString<char>(wslcoreInstance->DistributionInformation()->Id));
+                    }
+                    CATCH_LOG();
                 }
 
                 instance->second->Stop();
@@ -4021,12 +4099,13 @@ bool LxssUserSessionImpl::_VmIsIdle()
         return (pair.second->GetClientId() != LXSS_CLIENT_ID_INVALID);
     });
 
-    return (m_utilityVm && m_lockedDistributions.empty() && (found == m_runningInstances.end()));
+    return (m_utilityVm && m_pendingInstanceStarts == 0 && m_lockedDistributions.empty() && (found == m_runningInstances.end()));
 }
 
 _Requires_exclusive_lock_held_(m_instanceLock)
 void LxssUserSessionImpl::_VmTerminate()
 {
+    m_securityAudit.Stop();
     // Cancel any pending termination timers and terminate the system distro and VM.
     SetThreadpoolTimer(m_vmTerminationTimer.get(), nullptr, 0, 0);
 

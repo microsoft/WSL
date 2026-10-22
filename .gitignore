@@ -19,6 +19,7 @@ Debug/
 Release/
 Properties/
 /_deps/
+/.build-securityaudit-*/
 /package/Strings/en-US/
 /packages/
 CMakeFiles/

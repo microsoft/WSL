@@ -57,6 +57,7 @@ Abstract:
 #include "lxfsshares.h"
 #include "common.h"
 #include "util.h"
+#include "SecurityAuditLaunch.h"
 #include "seccomp_defs.h"
 #include "mountutilcpp.h"
 #include "message.h"
@@ -4190,6 +4191,8 @@ int main(int Argc, char* Argv[])
     //
     // Establish the message channel with the service via hvsocket.
     //
+
+    StartSecurityAuditListener();
 
     channel = {UtilConnectVsock(LX_INIT_UTILITY_VM_INIT_PORT, true), "mini_init"};
     if (channel.Socket() < 0)

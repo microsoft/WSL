@@ -1,0 +1,2896 @@
+{
+  "fixtureKind": "synthetic-not-live",
+  "description": "Six-field writer and compiled General snapshots. Native XML constructed from fields, never rewritten from a live event. System metadata is deliberately fictional. Message resource source matches CORE.",
+  "supportedEventIds": [
+    62010,
+    62011,
+    62020,
+    62021,
+    62022,
+    62023,
+    62024,
+    62030,
+    62031,
+    62040,
+    62041,
+    62042
+  ],
+  "samples": [
+    {
+      "eventId": 62010,
+      "variant": "ordinary",
+      "fields": [
+        "4",
+        "    Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n",
+        "    Process ID: 123\n    Thread ID: 124\n    Parent process ID: 42\n    Process ID in PID namespace: 321\n    PID namespace ID: 5678\n    Mount namespace ID: 11\n    Network namespace ID: 12\n    Cgroup ID: 18446744073709551615\n    User ID (UID): 1000\n    Effective user ID (EUID): 1001\n    Group ID (GID): 1002\n    Effective group ID (EGID): 1003\n",
+        "    Executable: \"/usr/bin/printf\"\n    Working directory: \"/workspace\"\n    Arguments (in order): \"printf\",\"argument\\n\\\"<&\\u00251\\\\u0025\"\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62010</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100001</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>4</Data><Data>    Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n</Data><Data>    Process ID: 123\n    Thread ID: 124\n    Parent process ID: 42\n    Process ID in PID namespace: 321\n    PID namespace ID: 5678\n    Mount namespace ID: 11\n    Network namespace ID: 12\n    Cgroup ID: 18446744073709551615\n    User ID (UID): 1000\n    Effective user ID (EUID): 1001\n    Group ID (GID): 1002\n    Effective group ID (EGID): 1003\n</Data><Data>    Executable: \"/usr/bin/printf\"\n    Working directory: \"/workspace\"\n    Arguments (in order): \"printf\",\"argument\\n\\\"&lt;&amp;\\u00251\\\\u0025\"\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux ProcessExecuted Security audit (experimental event 62010).\r\n A Linux program was executed successfully.\r\n This records program execution, not process exit or creation of a new process.\r\n\r\n Operation details\r\n     Executable: \"/usr/bin/printf\"\n    Working directory: \"/workspace\"\n    Arguments (in order): \"printf\",\"argument\\n\\\"<&\\u00251\\\\u0025\"\n\r\n Linux process and observed identity\r\n     Process ID: 123\n    Thread ID: 124\n    Parent process ID: 42\n    Process ID in PID namespace: 321\n    PID namespace ID: 5678\n    Mount namespace ID: 11\n    Network namespace ID: 12\n    Cgroup ID: 18446744073709551615\n    User ID (UID): 1000\n    Effective user ID (EUID): 1001\n    Group ID (GID): 1002\n    Effective group ID (EGID): 1003\n\r\n Windows and distribution\r\n     Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 4\r\n\r\n Process and thread IDs are VM IDs; credentials are observed after execution.\r\n Not available means the value was not collected; it does not mean zero.\r\n Quoted text uses backslash escapes. Arguments are separated by commas, not reconstructed as a shell command.\r\n The optional [truncated] suffix describes incomplete recorded text, not an additional field.\r\n The Linux event clock is monotonic, not UTC. ",
+      "expected": {
+        "eventId": 62010,
+        "schemaVersion": 4,
+        "eventType": "ProcessExecuted",
+        "distroGuid": "{12345678-1234-5678-abcd-123456789abc}",
+        "distroName": "ordinary distribution",
+        "data": {
+          "argv": {
+            "status": "present",
+            "truncated": false,
+            "value": [
+              "printf",
+              "argument\n\"<&%1\\u0025"
+            ]
+          },
+          "cgroupId": {
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "cwd": {
+            "status": "present",
+            "truncated": false,
+            "value": "/workspace"
+          },
+          "egid": {
+            "status": "present",
+            "value": 1003
+          },
+          "euid": {
+            "status": "present",
+            "value": 1001
+          },
+          "eventType": "ProcessExecuted",
+          "executable": {
+            "status": "present",
+            "truncated": false,
+            "value": "/usr/bin/printf"
+          },
+          "gid": {
+            "status": "present",
+            "value": 1002
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "namespacePid": {
+            "status": "present",
+            "value": 321
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "schemaVersion": 4,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmParentPid": {
+            "status": "present",
+            "value": 42
+          },
+          "vmPid": 123,
+          "vmTid": 124
+        }
+      }
+    },
+    {
+      "eventId": 62011,
+      "variant": "ordinary",
+      "fields": [
+        "3",
+        "    Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 123\n    Process ID in child PID namespace: 321\n    Child PID namespace ID: 5678\n    Child mount namespace ID: 11\n    Child network namespace ID: 12\n    Creator cgroup ID: 13\n    User ID (UID): 1000\n    Effective user ID (EUID): 0\n    Group ID (GID): 1001\n    Effective group ID (EGID): 0\n",
+        "    Creator process ID (VM): 42\n",
+        "",
+        "    Linux creation clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62011</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100002</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>3</Data><Data>    Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 123\n    Process ID in child PID namespace: 321\n    Child PID namespace ID: 5678\n    Child mount namespace ID: 11\n    Child network namespace ID: 12\n    Creator cgroup ID: 13\n    User ID (UID): 1000\n    Effective user ID (EUID): 0\n    Group ID (GID): 1001\n    Effective group ID (EGID): 0\n</Data><Data>    Creator process ID (VM): 42\n</Data><Data></Data><Data>    Linux creation clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux ProcessCreated Security audit (experimental event 62011).\r\n A new Linux user process was created.\r\n This is not a program-execution or process-exit event.\r\n\r\n Operation details\r\n     Creator process ID (VM): 42\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 123\n    Process ID in child PID namespace: 321\n    Child PID namespace ID: 5678\n    Child mount namespace ID: 11\n    Child network namespace ID: 12\n    Creator cgroup ID: 13\n    User ID (UID): 1000\n    Effective user ID (EUID): 0\n    Group ID (GID): 1001\n    Effective group ID (EGID): 0\n\r\n Windows and distribution\r\n     Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n\r\n Timing and collection\r\n     Linux creation clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 3\r\n\r\n Credentials describe the child at creation; its creator may differ from its Linux parent.\r\n Not available means the value was not collected; it does not mean zero.\r\n The cgroup identity describes the creator, not necessarily the child.\r\n Creation API, clone flags, creator thread ID, paths and command-line arguments are not recorded.\r\n Quoted text uses backslash escapes. The Linux creation clock is monotonic, not UTC. ",
+      "expected": {
+        "eventId": 62011,
+        "schemaVersion": 3,
+        "eventType": "ProcessCreated",
+        "distroGuid": "{12345678-1234-5678-abcd-123456789abc}",
+        "distroName": "ordinary distribution",
+        "data": {
+          "creatorCgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "present",
+            "value": 0
+          },
+          "euid": {
+            "status": "present",
+            "value": 0
+          },
+          "eventType": "ProcessCreated",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "namespacePid": {
+            "status": "present",
+            "value": 321
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "schemaVersion": 3,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmCreatorPid": {
+            "status": "present",
+            "value": 42
+          },
+          "vmPid": 123,
+          "vmTid": 123
+        }
+      }
+    },
+    {
+      "eventId": 62020,
+      "variant": "ordinary",
+      "fields": [
+        "3",
+        "    Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n",
+        "    Linux operation: socket\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Requested protocol number: 0\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62020</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100003</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>3</Data><Data>    Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n</Data><Data>    Linux operation: socket\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Requested protocol number: 0\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux SocketCreated Security audit (experimental event 62020).\r\n Socket creation\r\n AuditSuccess means this observation was recorded, not that the Linux operation succeeded.\r\n\r\n Operation details\r\n     Linux operation: socket\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Requested protocol number: 0\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n\r\n Windows and distribution\r\n     Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 3\r\n\r\n Requested protocol is not the actual socket protocol. No program path or arguments are collected.\r\n Not available includes uncertain effective-ID zero readings; it does not mean root.\r\n Quoted text uses backslash escapes. Fields without a supported source are not recorded. ",
+      "expected": {
+        "eventId": 62020,
+        "schemaVersion": 3,
+        "eventType": "SocketCreated",
+        "distroGuid": "{12345678-1234-5678-abcd-123456789abc}",
+        "distroName": "ordinary distribution",
+        "data": {
+          "cgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "euid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "eventType": "SocketCreated",
+          "family": "network",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "operation": "socket",
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "requestedProtocol": {
+            "status": "present",
+            "value": 0
+          },
+          "result": {
+            "status": "present",
+            "value": "0"
+          },
+          "schemaVersion": 3,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmPid": {
+            "status": "present",
+            "value": 123
+          },
+          "vmTid": {
+            "status": "present",
+            "value": 124
+          }
+        }
+      }
+    },
+    {
+      "eventId": 62021,
+      "variant": "ordinary",
+      "fields": [
+        "3",
+        "    Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n",
+        "    Linux operation: bind\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Requested bind IP: \"0.0.0.0\"\n    Requested bind port: 0\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62021</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100004</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>3</Data><Data>    Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n</Data><Data>    Linux operation: bind\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Requested bind IP: \"0.0.0.0\"\n    Requested bind port: 0\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux SocketBound Security audit (experimental event 62021).\r\n Requested socket binding\r\n AuditSuccess means this observation was recorded, not that the Linux operation succeeded.\r\n\r\n Operation details\r\n     Linux operation: bind\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Requested bind IP: \"0.0.0.0\"\n    Requested bind port: 0\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n\r\n Windows and distribution\r\n     Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 3\r\n\r\n The requested bind endpoint is not proof of the assigned endpoint; requested port zero is valid.\r\n Not available includes uncertain effective-ID zero readings; it does not mean root.\r\n Quoted text uses backslash escapes. Fields without a supported source are not recorded. ",
+      "expected": {
+        "eventId": 62021,
+        "schemaVersion": 3,
+        "eventType": "SocketBound",
+        "distroGuid": "{12345678-1234-5678-abcd-123456789abc}",
+        "distroName": "ordinary distribution",
+        "data": {
+          "cgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "euid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "eventType": "SocketBound",
+          "family": "network",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "operation": "bind",
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "requestedIp": {
+            "status": "present",
+            "value": "0.0.0.0"
+          },
+          "requestedPort": {
+            "status": "present",
+            "value": 0
+          },
+          "result": {
+            "status": "present",
+            "value": "0"
+          },
+          "schemaVersion": 3,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmPid": {
+            "status": "present",
+            "value": 123
+          },
+          "vmTid": {
+            "status": "present",
+            "value": 124
+          }
+        }
+      }
+    },
+    {
+      "eventId": 62022,
+      "variant": "ordinary",
+      "fields": [
+        "3",
+        "    Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n",
+        "    Linux operation: connect\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62022</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100005</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>3</Data><Data>    Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n</Data><Data>    Linux operation: connect\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux SocketConnect Security audit (experimental event 62022).\r\n Socket connection attempt\r\n AuditSuccess means this observation was recorded, not that the Linux operation succeeded.\r\n\r\n Operation details\r\n     Linux operation: connect\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n\r\n Windows and distribution\r\n     Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 3\r\n\r\n Pending (-115) is not connection completion or final failure. No later completion or DNS correlation is claimed.\r\n Not available includes uncertain effective-ID zero readings; it does not mean root.\r\n Quoted text uses backslash escapes. Fields without a supported source are not recorded. ",
+      "expected": {
+        "eventId": 62022,
+        "schemaVersion": 3,
+        "eventType": "SocketConnect",
+        "distroGuid": "{12345678-1234-5678-abcd-123456789abc}",
+        "distroName": "ordinary distribution",
+        "data": {
+          "cgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "euid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "eventType": "SocketConnect",
+          "family": "network",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "localIp": {
+            "status": "present",
+            "value": "127.0.0.1"
+          },
+          "localPort": {
+            "status": "present",
+            "value": 12345
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "operation": "connect",
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "remoteIp": {
+            "status": "present",
+            "value": "127.0.0.1"
+          },
+          "remotePort": {
+            "status": "present",
+            "value": 80
+          },
+          "result": {
+            "status": "present",
+            "value": "0"
+          },
+          "schemaVersion": 3,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmPid": {
+            "status": "present",
+            "value": 123
+          },
+          "vmTid": {
+            "status": "present",
+            "value": 124
+          }
+        }
+      }
+    },
+    {
+      "eventId": 62023,
+      "variant": "ordinary",
+      "fields": [
+        "3",
+        "    Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n",
+        "    Linux operation: accept\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62023</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100006</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>3</Data><Data>    Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n</Data><Data>    Linux operation: accept\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux SocketAccepted Security audit (experimental event 62023).\r\n Socket accept\r\n AuditSuccess means this observation was recorded, not that the Linux operation succeeded.\r\n\r\n Operation details\r\n     Linux operation: accept\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n\r\n Windows and distribution\r\n     Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 3\r\n\r\n Missing peer data is not fabricated.\r\n Not available includes uncertain effective-ID zero readings; it does not mean root.\r\n Quoted text uses backslash escapes. Fields without a supported source are not recorded. ",
+      "expected": {
+        "eventId": 62023,
+        "schemaVersion": 3,
+        "eventType": "SocketAccepted",
+        "distroGuid": "{12345678-1234-5678-abcd-123456789abc}",
+        "distroName": "ordinary distribution",
+        "data": {
+          "cgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "euid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "eventType": "SocketAccepted",
+          "family": "network",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "localIp": {
+            "status": "present",
+            "value": "127.0.0.1"
+          },
+          "localPort": {
+            "status": "present",
+            "value": 12345
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "operation": "accept",
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "remoteIp": {
+            "status": "present",
+            "value": "127.0.0.1"
+          },
+          "remotePort": {
+            "status": "present",
+            "value": 80
+          },
+          "result": {
+            "status": "present",
+            "value": "0"
+          },
+          "schemaVersion": 3,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmPid": {
+            "status": "present",
+            "value": 123
+          },
+          "vmTid": {
+            "status": "present",
+            "value": 124
+          }
+        }
+      }
+    },
+    {
+      "eventId": 62024,
+      "variant": "ordinary",
+      "fields": [
+        "3",
+        "    Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n",
+        "    Linux operation: accept4\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62024</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100007</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>3</Data><Data>    Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n</Data><Data>    Linux operation: accept4\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux SocketAccepted4 Security audit (experimental event 62024).\r\n Socket accept4\r\n AuditSuccess means this observation was recorded, not that the Linux operation succeeded.\r\n\r\n Operation details\r\n     Linux operation: accept4\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n\r\n Windows and distribution\r\n     Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 3\r\n\r\n Missing peer data is not fabricated. Accept4 flags are not recorded.\r\n Not available includes uncertain effective-ID zero readings; it does not mean root.\r\n Quoted text uses backslash escapes. Fields without a supported source are not recorded. ",
+      "expected": {
+        "eventId": 62024,
+        "schemaVersion": 3,
+        "eventType": "SocketAccepted4",
+        "distroGuid": "{12345678-1234-5678-abcd-123456789abc}",
+        "distroName": "ordinary distribution",
+        "data": {
+          "cgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "euid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "eventType": "SocketAccepted4",
+          "family": "network",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "localIp": {
+            "status": "present",
+            "value": "127.0.0.1"
+          },
+          "localPort": {
+            "status": "present",
+            "value": 12345
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "operation": "accept4",
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "remoteIp": {
+            "status": "present",
+            "value": "127.0.0.1"
+          },
+          "remotePort": {
+            "status": "present",
+            "value": 80
+          },
+          "result": {
+            "status": "present",
+            "value": "0"
+          },
+          "schemaVersion": 3,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmPid": {
+            "status": "present",
+            "value": 123
+          },
+          "vmTid": {
+            "status": "present",
+            "value": 124
+          }
+        }
+      }
+    },
+    {
+      "eventId": 62030,
+      "variant": "ordinary",
+      "fields": [
+        "3",
+        "    Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n",
+        "    Linux operation: init_module\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62030</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100008</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>3</Data><Data>    Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n</Data><Data>    Linux operation: init_module\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux ModuleLoaded Security audit (experimental event 62030).\r\n Module image load\r\n AuditSuccess describes recording. Linux outcome describes the init_module result.\r\n\r\n Operation details\r\n     Linux operation: init_module\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n\r\n Windows and distribution\r\n     Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 3\r\n\r\n No pointer is interpreted as a module name, path or parameter string. Current policy permits success only.\r\n Not available includes uncertain effective-ID zero readings; it does not mean root.\r\n Module identity, path, parameters, signer and hash are not recorded. The Linux event clock is monotonic, not UTC. ",
+      "expected": {
+        "eventId": 62030,
+        "schemaVersion": 3,
+        "eventType": "ModuleLoaded",
+        "distroGuid": "{12345678-1234-5678-abcd-123456789abc}",
+        "distroName": "ordinary distribution",
+        "data": {
+          "cgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "euid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "eventType": "ModuleLoaded",
+          "family": "module-load",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "operation": "init_module",
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "result": {
+            "status": "present",
+            "value": "0"
+          },
+          "schemaVersion": 3,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmPid": {
+            "status": "present",
+            "value": 123
+          },
+          "vmTid": {
+            "status": "present",
+            "value": 124
+          }
+        }
+      }
+    },
+    {
+      "eventId": 62031,
+      "variant": "ordinary",
+      "fields": [
+        "3",
+        "    Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n",
+        "    Linux operation: finit_module\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62031</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100009</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>3</Data><Data>    Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n</Data><Data>    Linux operation: finit_module\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux ModuleLoadedFromFd Security audit (experimental event 62031).\r\n Module load from file descriptor\r\n AuditSuccess describes recording. Linux outcome describes the finit_module result.\r\n\r\n Operation details\r\n     Linux operation: finit_module\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n\r\n Windows and distribution\r\n     Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 3\r\n\r\n No verified module path or signature is available. Current policy permits success only.\r\n Not available includes uncertain effective-ID zero readings; it does not mean root.\r\n Module identity, path, parameters, signer and hash are not recorded. The Linux event clock is monotonic, not UTC. ",
+      "expected": {
+        "eventId": 62031,
+        "schemaVersion": 3,
+        "eventType": "ModuleLoadedFromFd",
+        "distroGuid": "{12345678-1234-5678-abcd-123456789abc}",
+        "distroName": "ordinary distribution",
+        "data": {
+          "cgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "euid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "eventType": "ModuleLoadedFromFd",
+          "family": "module-load",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "operation": "finit_module",
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "result": {
+            "status": "present",
+            "value": "0"
+          },
+          "schemaVersion": 3,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmPid": {
+            "status": "present",
+            "value": 123
+          },
+          "vmTid": {
+            "status": "present",
+            "value": 124
+          }
+        }
+      }
+    },
+    {
+      "eventId": 62040,
+      "variant": "ordinary",
+      "fields": [
+        "3",
+        "    Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n",
+        "    Linux operation: setuid\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Previous group ID (unchanged dimension only): 1001\n    Observed user ID after operation: 1000\n    Observed group ID after operation: 1001\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62040</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100010</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>3</Data><Data>    Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n</Data><Data>    Linux operation: setuid\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Previous group ID (unchanged dimension only): 1001\n    Observed user ID after operation: 1000\n    Observed group ID after operation: 1001\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux UserIdChanged Security audit (experimental event 62040).\r\n User identity request\r\n A successful request need not change the numerical ID. Current policy permits success only.\r\n\r\n Operation details\r\n     Linux operation: setuid\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Previous group ID (unchanged dimension only): 1001\n    Observed user ID after operation: 1000\n    Observed group ID after operation: 1001\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n\r\n Windows and distribution\r\n     Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 3\r\n\r\n Only the unchanged group dimension can supply a previous ID; the previous user ID is unsupported.\r\n Not available includes uncertain effective-ID zero readings; it does not mean root.\r\n No complete credential or capability snapshot is claimed. ",
+      "expected": {
+        "eventId": 62040,
+        "schemaVersion": 3,
+        "eventType": "UserIdChanged",
+        "distroGuid": "{12345678-1234-5678-abcd-123456789abc}",
+        "distroName": "ordinary distribution",
+        "data": {
+          "cgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "euid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "eventType": "UserIdChanged",
+          "family": "privilege-transition",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "newGid": {
+            "status": "present",
+            "value": 1001
+          },
+          "newUid": {
+            "status": "present",
+            "value": 1000
+          },
+          "oldGid": {
+            "status": "present",
+            "value": 1001
+          },
+          "operation": "setuid",
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "result": {
+            "status": "present",
+            "value": "0"
+          },
+          "schemaVersion": 3,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmPid": {
+            "status": "present",
+            "value": 123
+          },
+          "vmTid": {
+            "status": "present",
+            "value": 124
+          }
+        }
+      }
+    },
+    {
+      "eventId": 62041,
+      "variant": "ordinary",
+      "fields": [
+        "3",
+        "    Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n",
+        "    Linux operation: setgid\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Previous user ID (unchanged dimension only): 1000\n    Observed user ID after operation: 1000\n    Observed group ID after operation: 1001\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62041</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100011</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>3</Data><Data>    Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n</Data><Data>    Linux operation: setgid\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Previous user ID (unchanged dimension only): 1000\n    Observed user ID after operation: 1000\n    Observed group ID after operation: 1001\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux GroupIdChanged Security audit (experimental event 62041).\r\n Group identity request\r\n A successful request need not change the numerical ID. Current policy permits success only.\r\n\r\n Operation details\r\n     Linux operation: setgid\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Previous user ID (unchanged dimension only): 1000\n    Observed user ID after operation: 1000\n    Observed group ID after operation: 1001\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n\r\n Windows and distribution\r\n     Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 3\r\n\r\n Only the unchanged user dimension can supply a previous ID; the previous group ID is unsupported.\r\n Not available includes uncertain effective-ID zero readings; it does not mean root.\r\n No complete credential or capability snapshot is claimed. ",
+      "expected": {
+        "eventId": 62041,
+        "schemaVersion": 3,
+        "eventType": "GroupIdChanged",
+        "distroGuid": "{12345678-1234-5678-abcd-123456789abc}",
+        "distroName": "ordinary distribution",
+        "data": {
+          "cgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "euid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "eventType": "GroupIdChanged",
+          "family": "privilege-transition",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "newGid": {
+            "status": "present",
+            "value": 1001
+          },
+          "newUid": {
+            "status": "present",
+            "value": 1000
+          },
+          "oldUid": {
+            "status": "present",
+            "value": 1000
+          },
+          "operation": "setgid",
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "result": {
+            "status": "present",
+            "value": "0"
+          },
+          "schemaVersion": 3,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmPid": {
+            "status": "present",
+            "value": 123
+          },
+          "vmTid": {
+            "status": "present",
+            "value": 124
+          }
+        }
+      }
+    },
+    {
+      "eventId": 62042,
+      "variant": "ordinary",
+      "fields": [
+        "3",
+        "    Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n",
+        "    Linux operation: setresgid\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Previous user ID (unchanged dimension only): 1000\n    Observed user ID after operation: 1000\n    Observed group ID after operation: 1001\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62042</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100012</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>3</Data><Data>    Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n</Data><Data>    Linux operation: setresgid\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Previous user ID (unchanged dimension only): 1000\n    Observed user ID after operation: 1000\n    Observed group ID after operation: 1001\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux GroupIdsChanged Security audit (experimental event 62042).\r\n Real, effective and saved group identity request\r\n A successful request need not change the numerical IDs. Current policy permits success only.\r\n\r\n Operation details\r\n     Linux operation: setresgid\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Previous user ID (unchanged dimension only): 1000\n    Observed user ID after operation: 1000\n    Observed group ID after operation: 1001\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n\r\n Windows and distribution\r\n     Distribution name: \"ordinary distribution\"\n    Distribution ID: {12345678-1234-5678-abcd-123456789abc}\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 3\r\n\r\n Only the unchanged user dimension can supply a previous ID. No saved-ID or capability snapshot is claimed.\r\n Not available includes uncertain effective-ID zero readings; it does not mean root.\r\n Requested group-ID arguments are not recorded. ",
+      "expected": {
+        "eventId": 62042,
+        "schemaVersion": 3,
+        "eventType": "GroupIdsChanged",
+        "distroGuid": "{12345678-1234-5678-abcd-123456789abc}",
+        "distroName": "ordinary distribution",
+        "data": {
+          "cgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "euid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "eventType": "GroupIdsChanged",
+          "family": "privilege-transition",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "newGid": {
+            "status": "present",
+            "value": 1001
+          },
+          "newUid": {
+            "status": "present",
+            "value": 1000
+          },
+          "oldUid": {
+            "status": "present",
+            "value": 1000
+          },
+          "operation": "setresgid",
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "result": {
+            "status": "present",
+            "value": "0"
+          },
+          "schemaVersion": 3,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmPid": {
+            "status": "present",
+            "value": 123
+          },
+          "vmTid": {
+            "status": "present",
+            "value": 124
+          }
+        }
+      }
+    },
+    {
+      "eventId": 62010,
+      "variant": "known",
+      "fields": [
+        "5",
+        "    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n",
+        "    Process ID: 123\n    Thread ID: 124\n    Parent process ID: 42\n    Process ID in PID namespace: 321\n    PID namespace ID: 5678\n    Mount namespace ID: 11\n    Network namespace ID: 12\n    Cgroup ID: 18446744073709551615\n    User ID (UID): 1000\n    Effective user ID (EUID): 1001\n    Group ID (GID): 1002\n    Effective group ID (EGID): 1003\n",
+        "    Executable: \"/usr/bin/printf\"\n    Working directory: \"/workspace\"\n    Arguments (in order): \"printf\",\"argument\\n\\\"<&\\u00251\\\\u0025\"\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62010</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100013</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>5</Data><Data>    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n</Data><Data>    Process ID: 123\n    Thread ID: 124\n    Parent process ID: 42\n    Process ID in PID namespace: 321\n    PID namespace ID: 5678\n    Mount namespace ID: 11\n    Network namespace ID: 12\n    Cgroup ID: 18446744073709551615\n    User ID (UID): 1000\n    Effective user ID (EUID): 1001\n    Group ID (GID): 1002\n    Effective group ID (EGID): 1003\n</Data><Data>    Executable: \"/usr/bin/printf\"\n    Working directory: \"/workspace\"\n    Arguments (in order): \"printf\",\"argument\\n\\\"&lt;&amp;\\u00251\\\\u0025\"\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux ProcessExecuted Security audit (experimental event 62010).\r\n A Linux program was executed successfully.\r\n This records program execution, not process exit or creation of a new process.\r\n\r\n Operation details\r\n     Executable: \"/usr/bin/printf\"\n    Working directory: \"/workspace\"\n    Arguments (in order): \"printf\",\"argument\\n\\\"<&\\u00251\\\\u0025\"\n\r\n Linux process and observed identity\r\n     Process ID: 123\n    Thread ID: 124\n    Parent process ID: 42\n    Process ID in PID namespace: 321\n    PID namespace ID: 5678\n    Mount namespace ID: 11\n    Network namespace ID: 12\n    Cgroup ID: 18446744073709551615\n    User ID (UID): 1000\n    Effective user ID (EUID): 1001\n    Group ID (GID): 1002\n    Effective group ID (EGID): 1003\n\r\n Windows and distribution\r\n     Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 5\r\n\r\n Process and thread IDs are VM IDs; credentials are observed after execution.\r\n Not available means the value was not collected; it does not mean zero.\r\n Quoted text uses backslash escapes. Arguments are separated by commas, not reconstructed as a shell command.\r\n The optional [truncated] suffix describes incomplete recorded text, not an additional field.\r\n The Linux event clock is monotonic, not UTC. ",
+      "expected": {
+        "eventId": 62010,
+        "schemaVersion": 5,
+        "eventType": "ProcessExecuted",
+        "distroGuid": null,
+        "distroName": null,
+        "data": {
+          "argv": {
+            "status": "present",
+            "truncated": false,
+            "value": [
+              "printf",
+              "argument\n\"<&%1\\u0025"
+            ]
+          },
+          "cgroupId": {
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "cwd": {
+            "status": "present",
+            "truncated": false,
+            "value": "/workspace"
+          },
+          "egid": {
+            "status": "present",
+            "value": 1003
+          },
+          "euid": {
+            "status": "present",
+            "value": 1001
+          },
+          "eventType": "ProcessExecuted",
+          "executable": {
+            "status": "present",
+            "truncated": false,
+            "value": "/usr/bin/printf"
+          },
+          "gid": {
+            "status": "present",
+            "value": 1002
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "namespacePid": {
+            "status": "present",
+            "value": 321
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "schemaVersion": 5,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmParentPid": {
+            "status": "present",
+            "value": 42
+          },
+          "vmPid": 123,
+          "vmTid": 124
+        },
+        "wslcSessionId": 41,
+        "wslcSessionName": "build session",
+        "containerId": "container-123",
+        "containerName": "build container"
+      }
+    },
+    {
+      "eventId": 62011,
+      "variant": "known",
+      "fields": [
+        "4",
+        "    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 123\n    Process ID in child PID namespace: 321\n    Child PID namespace ID: 5678\n    Child mount namespace ID: 11\n    Child network namespace ID: 12\n    Creator cgroup ID: 13\n    User ID (UID): 1000\n    Effective user ID (EUID): 0\n    Group ID (GID): 1001\n    Effective group ID (EGID): 0\n",
+        "    Creator process ID (VM): 42\n",
+        "",
+        "    Linux creation clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62011</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100014</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>4</Data><Data>    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 123\n    Process ID in child PID namespace: 321\n    Child PID namespace ID: 5678\n    Child mount namespace ID: 11\n    Child network namespace ID: 12\n    Creator cgroup ID: 13\n    User ID (UID): 1000\n    Effective user ID (EUID): 0\n    Group ID (GID): 1001\n    Effective group ID (EGID): 0\n</Data><Data>    Creator process ID (VM): 42\n</Data><Data></Data><Data>    Linux creation clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux ProcessCreated Security audit (experimental event 62011).\r\n A new Linux user process was created.\r\n This is not a program-execution or process-exit event.\r\n\r\n Operation details\r\n     Creator process ID (VM): 42\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 123\n    Process ID in child PID namespace: 321\n    Child PID namespace ID: 5678\n    Child mount namespace ID: 11\n    Child network namespace ID: 12\n    Creator cgroup ID: 13\n    User ID (UID): 1000\n    Effective user ID (EUID): 0\n    Group ID (GID): 1001\n    Effective group ID (EGID): 0\n\r\n Windows and distribution\r\n     Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n\r\n Timing and collection\r\n     Linux creation clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 4\r\n\r\n Credentials describe the child at creation; its creator may differ from its Linux parent.\r\n Not available means the value was not collected; it does not mean zero.\r\n The cgroup identity describes the creator, not necessarily the child.\r\n Creation API, clone flags, creator thread ID, paths and command-line arguments are not recorded.\r\n Quoted text uses backslash escapes. The Linux creation clock is monotonic, not UTC. ",
+      "expected": {
+        "eventId": 62011,
+        "schemaVersion": 4,
+        "eventType": "ProcessCreated",
+        "distroGuid": null,
+        "distroName": null,
+        "data": {
+          "creatorCgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "present",
+            "value": 0
+          },
+          "euid": {
+            "status": "present",
+            "value": 0
+          },
+          "eventType": "ProcessCreated",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "namespacePid": {
+            "status": "present",
+            "value": 321
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "schemaVersion": 4,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmCreatorPid": {
+            "status": "present",
+            "value": 42
+          },
+          "vmPid": 123,
+          "vmTid": 123
+        },
+        "wslcSessionId": 41,
+        "wslcSessionName": "build session",
+        "containerId": "container-123",
+        "containerName": "build container"
+      }
+    },
+    {
+      "eventId": 62020,
+      "variant": "known",
+      "fields": [
+        "4",
+        "    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n",
+        "    Linux operation: socket\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Requested protocol number: 0\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62020</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100015</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>4</Data><Data>    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n</Data><Data>    Linux operation: socket\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Requested protocol number: 0\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux SocketCreated Security audit (experimental event 62020).\r\n Socket creation\r\n AuditSuccess means this observation was recorded, not that the Linux operation succeeded.\r\n\r\n Operation details\r\n     Linux operation: socket\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Requested protocol number: 0\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n\r\n Windows and distribution\r\n     Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 4\r\n\r\n Requested protocol is not the actual socket protocol. No program path or arguments are collected.\r\n Not available includes uncertain effective-ID zero readings; it does not mean root.\r\n Quoted text uses backslash escapes. Fields without a supported source are not recorded. ",
+      "expected": {
+        "eventId": 62020,
+        "schemaVersion": 4,
+        "eventType": "SocketCreated",
+        "distroGuid": null,
+        "distroName": null,
+        "data": {
+          "cgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "euid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "eventType": "SocketCreated",
+          "family": "network",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "operation": "socket",
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "requestedProtocol": {
+            "status": "present",
+            "value": 0
+          },
+          "result": {
+            "status": "present",
+            "value": "0"
+          },
+          "schemaVersion": 4,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmPid": {
+            "status": "present",
+            "value": 123
+          },
+          "vmTid": {
+            "status": "present",
+            "value": 124
+          }
+        },
+        "wslcSessionId": 41,
+        "wslcSessionName": "build session",
+        "containerId": "container-123",
+        "containerName": "build container"
+      }
+    },
+    {
+      "eventId": 62021,
+      "variant": "known",
+      "fields": [
+        "4",
+        "    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n",
+        "    Linux operation: bind\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Requested bind IP: \"0.0.0.0\"\n    Requested bind port: 0\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62021</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100016</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>4</Data><Data>    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n</Data><Data>    Linux operation: bind\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Requested bind IP: \"0.0.0.0\"\n    Requested bind port: 0\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux SocketBound Security audit (experimental event 62021).\r\n Requested socket binding\r\n AuditSuccess means this observation was recorded, not that the Linux operation succeeded.\r\n\r\n Operation details\r\n     Linux operation: bind\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Requested bind IP: \"0.0.0.0\"\n    Requested bind port: 0\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n\r\n Windows and distribution\r\n     Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 4\r\n\r\n The requested bind endpoint is not proof of the assigned endpoint; requested port zero is valid.\r\n Not available includes uncertain effective-ID zero readings; it does not mean root.\r\n Quoted text uses backslash escapes. Fields without a supported source are not recorded. ",
+      "expected": {
+        "eventId": 62021,
+        "schemaVersion": 4,
+        "eventType": "SocketBound",
+        "distroGuid": null,
+        "distroName": null,
+        "data": {
+          "cgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "euid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "eventType": "SocketBound",
+          "family": "network",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "operation": "bind",
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "requestedIp": {
+            "status": "present",
+            "value": "0.0.0.0"
+          },
+          "requestedPort": {
+            "status": "present",
+            "value": 0
+          },
+          "result": {
+            "status": "present",
+            "value": "0"
+          },
+          "schemaVersion": 4,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmPid": {
+            "status": "present",
+            "value": 123
+          },
+          "vmTid": {
+            "status": "present",
+            "value": 124
+          }
+        },
+        "wslcSessionId": 41,
+        "wslcSessionName": "build session",
+        "containerId": "container-123",
+        "containerName": "build container"
+      }
+    },
+    {
+      "eventId": 62022,
+      "variant": "known",
+      "fields": [
+        "4",
+        "    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n",
+        "    Linux operation: connect\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62022</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100017</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>4</Data><Data>    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n</Data><Data>    Linux operation: connect\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux SocketConnect Security audit (experimental event 62022).\r\n Socket connection attempt\r\n AuditSuccess means this observation was recorded, not that the Linux operation succeeded.\r\n\r\n Operation details\r\n     Linux operation: connect\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n\r\n Windows and distribution\r\n     Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 4\r\n\r\n Pending (-115) is not connection completion or final failure. No later completion or DNS correlation is claimed.\r\n Not available includes uncertain effective-ID zero readings; it does not mean root.\r\n Quoted text uses backslash escapes. Fields without a supported source are not recorded. ",
+      "expected": {
+        "eventId": 62022,
+        "schemaVersion": 4,
+        "eventType": "SocketConnect",
+        "distroGuid": null,
+        "distroName": null,
+        "data": {
+          "cgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "euid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "eventType": "SocketConnect",
+          "family": "network",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "localIp": {
+            "status": "present",
+            "value": "127.0.0.1"
+          },
+          "localPort": {
+            "status": "present",
+            "value": 12345
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "operation": "connect",
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "remoteIp": {
+            "status": "present",
+            "value": "127.0.0.1"
+          },
+          "remotePort": {
+            "status": "present",
+            "value": 80
+          },
+          "result": {
+            "status": "present",
+            "value": "0"
+          },
+          "schemaVersion": 4,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmPid": {
+            "status": "present",
+            "value": 123
+          },
+          "vmTid": {
+            "status": "present",
+            "value": 124
+          }
+        },
+        "wslcSessionId": 41,
+        "wslcSessionName": "build session",
+        "containerId": "container-123",
+        "containerName": "build container"
+      }
+    },
+    {
+      "eventId": 62023,
+      "variant": "known",
+      "fields": [
+        "4",
+        "    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n",
+        "    Linux operation: accept\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62023</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100018</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>4</Data><Data>    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n</Data><Data>    Linux operation: accept\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux SocketAccepted Security audit (experimental event 62023).\r\n Socket accept\r\n AuditSuccess means this observation was recorded, not that the Linux operation succeeded.\r\n\r\n Operation details\r\n     Linux operation: accept\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n\r\n Windows and distribution\r\n     Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 4\r\n\r\n Missing peer data is not fabricated.\r\n Not available includes uncertain effective-ID zero readings; it does not mean root.\r\n Quoted text uses backslash escapes. Fields without a supported source are not recorded. ",
+      "expected": {
+        "eventId": 62023,
+        "schemaVersion": 4,
+        "eventType": "SocketAccepted",
+        "distroGuid": null,
+        "distroName": null,
+        "data": {
+          "cgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "euid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "eventType": "SocketAccepted",
+          "family": "network",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "localIp": {
+            "status": "present",
+            "value": "127.0.0.1"
+          },
+          "localPort": {
+            "status": "present",
+            "value": 12345
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "operation": "accept",
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "remoteIp": {
+            "status": "present",
+            "value": "127.0.0.1"
+          },
+          "remotePort": {
+            "status": "present",
+            "value": 80
+          },
+          "result": {
+            "status": "present",
+            "value": "0"
+          },
+          "schemaVersion": 4,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmPid": {
+            "status": "present",
+            "value": 123
+          },
+          "vmTid": {
+            "status": "present",
+            "value": 124
+          }
+        },
+        "wslcSessionId": 41,
+        "wslcSessionName": "build session",
+        "containerId": "container-123",
+        "containerName": "build container"
+      }
+    },
+    {
+      "eventId": 62024,
+      "variant": "known",
+      "fields": [
+        "4",
+        "    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n",
+        "    Linux operation: accept4\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62024</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100019</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>4</Data><Data>    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n</Data><Data>    Linux operation: accept4\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux SocketAccepted4 Security audit (experimental event 62024).\r\n Socket accept4\r\n AuditSuccess means this observation was recorded, not that the Linux operation succeeded.\r\n\r\n Operation details\r\n     Linux operation: accept4\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n\r\n Windows and distribution\r\n     Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 4\r\n\r\n Missing peer data is not fabricated. Accept4 flags are not recorded.\r\n Not available includes uncertain effective-ID zero readings; it does not mean root.\r\n Quoted text uses backslash escapes. Fields without a supported source are not recorded. ",
+      "expected": {
+        "eventId": 62024,
+        "schemaVersion": 4,
+        "eventType": "SocketAccepted4",
+        "distroGuid": null,
+        "distroName": null,
+        "data": {
+          "cgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "euid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "eventType": "SocketAccepted4",
+          "family": "network",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "localIp": {
+            "status": "present",
+            "value": "127.0.0.1"
+          },
+          "localPort": {
+            "status": "present",
+            "value": 12345
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "operation": "accept4",
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "remoteIp": {
+            "status": "present",
+            "value": "127.0.0.1"
+          },
+          "remotePort": {
+            "status": "present",
+            "value": 80
+          },
+          "result": {
+            "status": "present",
+            "value": "0"
+          },
+          "schemaVersion": 4,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmPid": {
+            "status": "present",
+            "value": 123
+          },
+          "vmTid": {
+            "status": "present",
+            "value": 124
+          }
+        },
+        "wslcSessionId": 41,
+        "wslcSessionName": "build session",
+        "containerId": "container-123",
+        "containerName": "build container"
+      }
+    },
+    {
+      "eventId": 62030,
+      "variant": "known",
+      "fields": [
+        "4",
+        "    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n",
+        "    Linux operation: init_module\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62030</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100020</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>4</Data><Data>    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n</Data><Data>    Linux operation: init_module\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux ModuleLoaded Security audit (experimental event 62030).\r\n Module image load\r\n AuditSuccess describes recording. Linux outcome describes the init_module result.\r\n\r\n Operation details\r\n     Linux operation: init_module\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n\r\n Windows and distribution\r\n     Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 4\r\n\r\n No pointer is interpreted as a module name, path or parameter string. Current policy permits success only.\r\n Not available includes uncertain effective-ID zero readings; it does not mean root.\r\n Module identity, path, parameters, signer and hash are not recorded. The Linux event clock is monotonic, not UTC. ",
+      "expected": {
+        "eventId": 62030,
+        "schemaVersion": 4,
+        "eventType": "ModuleLoaded",
+        "distroGuid": null,
+        "distroName": null,
+        "data": {
+          "cgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "euid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "eventType": "ModuleLoaded",
+          "family": "module-load",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "operation": "init_module",
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "result": {
+            "status": "present",
+            "value": "0"
+          },
+          "schemaVersion": 4,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmPid": {
+            "status": "present",
+            "value": 123
+          },
+          "vmTid": {
+            "status": "present",
+            "value": 124
+          }
+        },
+        "wslcSessionId": 41,
+        "wslcSessionName": "build session",
+        "containerId": "container-123",
+        "containerName": "build container"
+      }
+    },
+    {
+      "eventId": 62031,
+      "variant": "known",
+      "fields": [
+        "4",
+        "    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n",
+        "    Linux operation: finit_module\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62031</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100021</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>4</Data><Data>    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n</Data><Data>    Linux operation: finit_module\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux ModuleLoadedFromFd Security audit (experimental event 62031).\r\n Module load from file descriptor\r\n AuditSuccess describes recording. Linux outcome describes the finit_module result.\r\n\r\n Operation details\r\n     Linux operation: finit_module\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n\r\n Windows and distribution\r\n     Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 4\r\n\r\n No verified module path or signature is available. Current policy permits success only.\r\n Not available includes uncertain effective-ID zero readings; it does not mean root.\r\n Module identity, path, parameters, signer and hash are not recorded. The Linux event clock is monotonic, not UTC. ",
+      "expected": {
+        "eventId": 62031,
+        "schemaVersion": 4,
+        "eventType": "ModuleLoadedFromFd",
+        "distroGuid": null,
+        "distroName": null,
+        "data": {
+          "cgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "euid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "eventType": "ModuleLoadedFromFd",
+          "family": "module-load",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "operation": "finit_module",
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "result": {
+            "status": "present",
+            "value": "0"
+          },
+          "schemaVersion": 4,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmPid": {
+            "status": "present",
+            "value": 123
+          },
+          "vmTid": {
+            "status": "present",
+            "value": 124
+          }
+        },
+        "wslcSessionId": 41,
+        "wslcSessionName": "build session",
+        "containerId": "container-123",
+        "containerName": "build container"
+      }
+    },
+    {
+      "eventId": 62040,
+      "variant": "known",
+      "fields": [
+        "4",
+        "    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n",
+        "    Linux operation: setuid\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Previous group ID (unchanged dimension only): 1001\n    Observed user ID after operation: 1000\n    Observed group ID after operation: 1001\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62040</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100022</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>4</Data><Data>    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n</Data><Data>    Linux operation: setuid\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Previous group ID (unchanged dimension only): 1001\n    Observed user ID after operation: 1000\n    Observed group ID after operation: 1001\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux UserIdChanged Security audit (experimental event 62040).\r\n User identity request\r\n A successful request need not change the numerical ID. Current policy permits success only.\r\n\r\n Operation details\r\n     Linux operation: setuid\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Previous group ID (unchanged dimension only): 1001\n    Observed user ID after operation: 1000\n    Observed group ID after operation: 1001\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n\r\n Windows and distribution\r\n     Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 4\r\n\r\n Only the unchanged group dimension can supply a previous ID; the previous user ID is unsupported.\r\n Not available includes uncertain effective-ID zero readings; it does not mean root.\r\n No complete credential or capability snapshot is claimed. ",
+      "expected": {
+        "eventId": 62040,
+        "schemaVersion": 4,
+        "eventType": "UserIdChanged",
+        "distroGuid": null,
+        "distroName": null,
+        "data": {
+          "cgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "euid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "eventType": "UserIdChanged",
+          "family": "privilege-transition",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "newGid": {
+            "status": "present",
+            "value": 1001
+          },
+          "newUid": {
+            "status": "present",
+            "value": 1000
+          },
+          "oldGid": {
+            "status": "present",
+            "value": 1001
+          },
+          "operation": "setuid",
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "result": {
+            "status": "present",
+            "value": "0"
+          },
+          "schemaVersion": 4,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmPid": {
+            "status": "present",
+            "value": 123
+          },
+          "vmTid": {
+            "status": "present",
+            "value": 124
+          }
+        },
+        "wslcSessionId": 41,
+        "wslcSessionName": "build session",
+        "containerId": "container-123",
+        "containerName": "build container"
+      }
+    },
+    {
+      "eventId": 62041,
+      "variant": "known",
+      "fields": [
+        "4",
+        "    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n",
+        "    Linux operation: setgid\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Previous user ID (unchanged dimension only): 1000\n    Observed user ID after operation: 1000\n    Observed group ID after operation: 1001\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62041</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100023</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>4</Data><Data>    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n</Data><Data>    Linux operation: setgid\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Previous user ID (unchanged dimension only): 1000\n    Observed user ID after operation: 1000\n    Observed group ID after operation: 1001\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux GroupIdChanged Security audit (experimental event 62041).\r\n Group identity request\r\n A successful request need not change the numerical ID. Current policy permits success only.\r\n\r\n Operation details\r\n     Linux operation: setgid\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Previous user ID (unchanged dimension only): 1000\n    Observed user ID after operation: 1000\n    Observed group ID after operation: 1001\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n\r\n Windows and distribution\r\n     Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 4\r\n\r\n Only the unchanged user dimension can supply a previous ID; the previous group ID is unsupported.\r\n Not available includes uncertain effective-ID zero readings; it does not mean root.\r\n No complete credential or capability snapshot is claimed. ",
+      "expected": {
+        "eventId": 62041,
+        "schemaVersion": 4,
+        "eventType": "GroupIdChanged",
+        "distroGuid": null,
+        "distroName": null,
+        "data": {
+          "cgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "euid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "eventType": "GroupIdChanged",
+          "family": "privilege-transition",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "newGid": {
+            "status": "present",
+            "value": 1001
+          },
+          "newUid": {
+            "status": "present",
+            "value": 1000
+          },
+          "oldUid": {
+            "status": "present",
+            "value": 1000
+          },
+          "operation": "setgid",
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "result": {
+            "status": "present",
+            "value": "0"
+          },
+          "schemaVersion": 4,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmPid": {
+            "status": "present",
+            "value": 123
+          },
+          "vmTid": {
+            "status": "present",
+            "value": 124
+          }
+        },
+        "wslcSessionId": 41,
+        "wslcSessionName": "build session",
+        "containerId": "container-123",
+        "containerName": "build container"
+      }
+    },
+    {
+      "eventId": 62042,
+      "variant": "known",
+      "fields": [
+        "4",
+        "    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n",
+        "    Linux operation: setresgid\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Previous user ID (unchanged dimension only): 1000\n    Observed user ID after operation: 1000\n    Observed group ID after operation: 1001\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62042</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100024</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>4</Data><Data>    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n</Data><Data>    Linux operation: setresgid\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Previous user ID (unchanged dimension only): 1000\n    Observed user ID after operation: 1000\n    Observed group ID after operation: 1001\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux GroupIdsChanged Security audit (experimental event 62042).\r\n Real, effective and saved group identity request\r\n A successful request need not change the numerical IDs. Current policy permits success only.\r\n\r\n Operation details\r\n     Linux operation: setresgid\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Previous user ID (unchanged dimension only): 1000\n    Observed user ID after operation: 1000\n    Observed group ID after operation: 1001\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n\r\n Windows and distribution\r\n     Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"build session\"\n    Container ID: \"container-123\"\n    Container name: \"build container\"\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 4\r\n\r\n Only the unchanged user dimension can supply a previous ID. No saved-ID or capability snapshot is claimed.\r\n Not available includes uncertain effective-ID zero readings; it does not mean root.\r\n Requested group-ID arguments are not recorded. ",
+      "expected": {
+        "eventId": 62042,
+        "schemaVersion": 4,
+        "eventType": "GroupIdsChanged",
+        "distroGuid": null,
+        "distroName": null,
+        "data": {
+          "cgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "euid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "eventType": "GroupIdsChanged",
+          "family": "privilege-transition",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "newGid": {
+            "status": "present",
+            "value": 1001
+          },
+          "newUid": {
+            "status": "present",
+            "value": 1000
+          },
+          "oldUid": {
+            "status": "present",
+            "value": 1000
+          },
+          "operation": "setresgid",
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "result": {
+            "status": "present",
+            "value": "0"
+          },
+          "schemaVersion": 4,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmPid": {
+            "status": "present",
+            "value": 123
+          },
+          "vmTid": {
+            "status": "present",
+            "value": 124
+          }
+        },
+        "wslcSessionId": 41,
+        "wslcSessionName": "build session",
+        "containerId": "container-123",
+        "containerName": "build container"
+      }
+    },
+    {
+      "eventId": 62010,
+      "variant": "unknown",
+      "fields": [
+        "5",
+        "    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 0\n    WSLC session name: \"build session\"\n    Container ID: Not available\n    Container name: Not available\n",
+        "    Process ID: 123\n    Thread ID: 124\n    Parent process ID: 42\n    Process ID in PID namespace: 321\n    PID namespace ID: 5678\n    Mount namespace ID: 11\n    Network namespace ID: 12\n    Cgroup ID: 18446744073709551615\n    User ID (UID): 1000\n    Effective user ID (EUID): 1001\n    Group ID (GID): 1002\n    Effective group ID (EGID): 1003\n",
+        "    Executable: \"/usr/bin/printf\"\n    Working directory: \"/workspace\"\n    Arguments (in order): \"printf\",\"argument\\n\\\"<&\\u00251\\\\u0025\"\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62010</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100025</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>5</Data><Data>    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 0\n    WSLC session name: \"build session\"\n    Container ID: Not available\n    Container name: Not available\n</Data><Data>    Process ID: 123\n    Thread ID: 124\n    Parent process ID: 42\n    Process ID in PID namespace: 321\n    PID namespace ID: 5678\n    Mount namespace ID: 11\n    Network namespace ID: 12\n    Cgroup ID: 18446744073709551615\n    User ID (UID): 1000\n    Effective user ID (EUID): 1001\n    Group ID (GID): 1002\n    Effective group ID (EGID): 1003\n</Data><Data>    Executable: \"/usr/bin/printf\"\n    Working directory: \"/workspace\"\n    Arguments (in order): \"printf\",\"argument\\n\\\"&lt;&amp;\\u00251\\\\u0025\"\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux ProcessExecuted Security audit (experimental event 62010).\r\n A Linux program was executed successfully.\r\n This records program execution, not process exit or creation of a new process.\r\n\r\n Operation details\r\n     Executable: \"/usr/bin/printf\"\n    Working directory: \"/workspace\"\n    Arguments (in order): \"printf\",\"argument\\n\\\"<&\\u00251\\\\u0025\"\n\r\n Linux process and observed identity\r\n     Process ID: 123\n    Thread ID: 124\n    Parent process ID: 42\n    Process ID in PID namespace: 321\n    PID namespace ID: 5678\n    Mount namespace ID: 11\n    Network namespace ID: 12\n    Cgroup ID: 18446744073709551615\n    User ID (UID): 1000\n    Effective user ID (EUID): 1001\n    Group ID (GID): 1002\n    Effective group ID (EGID): 1003\n\r\n Windows and distribution\r\n     Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 0\n    WSLC session name: \"build session\"\n    Container ID: Not available\n    Container name: Not available\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 5\r\n\r\n Process and thread IDs are VM IDs; credentials are observed after execution.\r\n Not available means the value was not collected; it does not mean zero.\r\n Quoted text uses backslash escapes. Arguments are separated by commas, not reconstructed as a shell command.\r\n The optional [truncated] suffix describes incomplete recorded text, not an additional field.\r\n The Linux event clock is monotonic, not UTC. ",
+      "expected": {
+        "eventId": 62010,
+        "schemaVersion": 5,
+        "eventType": "ProcessExecuted",
+        "distroGuid": null,
+        "distroName": null,
+        "data": {
+          "argv": {
+            "status": "present",
+            "truncated": false,
+            "value": [
+              "printf",
+              "argument\n\"<&%1\\u0025"
+            ]
+          },
+          "cgroupId": {
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "cwd": {
+            "status": "present",
+            "truncated": false,
+            "value": "/workspace"
+          },
+          "egid": {
+            "status": "present",
+            "value": 1003
+          },
+          "euid": {
+            "status": "present",
+            "value": 1001
+          },
+          "eventType": "ProcessExecuted",
+          "executable": {
+            "status": "present",
+            "truncated": false,
+            "value": "/usr/bin/printf"
+          },
+          "gid": {
+            "status": "present",
+            "value": 1002
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "namespacePid": {
+            "status": "present",
+            "value": 321
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "schemaVersion": 5,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmParentPid": {
+            "status": "present",
+            "value": 42
+          },
+          "vmPid": 123,
+          "vmTid": 124
+        },
+        "wslcSessionId": 0,
+        "wslcSessionName": "build session",
+        "containerId": null,
+        "containerName": null
+      }
+    },
+    {
+      "eventId": 62022,
+      "variant": "unknown",
+      "fields": [
+        "4",
+        "    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 0\n    WSLC session name: \"build session\"\n    Container ID: Not available\n    Container name: Not available\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n",
+        "    Linux operation: connect\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62022</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100026</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>4</Data><Data>    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 0\n    WSLC session name: \"build session\"\n    Container ID: Not available\n    Container name: Not available\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n</Data><Data>    Linux operation: connect\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux SocketConnect Security audit (experimental event 62022).\r\n Socket connection attempt\r\n AuditSuccess means this observation was recorded, not that the Linux operation succeeded.\r\n\r\n Operation details\r\n     Linux operation: connect\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n\r\n Windows and distribution\r\n     Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 0\n    WSLC session name: \"build session\"\n    Container ID: Not available\n    Container name: Not available\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 4\r\n\r\n Pending (-115) is not connection completion or final failure. No later completion or DNS correlation is claimed.\r\n Not available includes uncertain effective-ID zero readings; it does not mean root.\r\n Quoted text uses backslash escapes. Fields without a supported source are not recorded. ",
+      "expected": {
+        "eventId": 62022,
+        "schemaVersion": 4,
+        "eventType": "SocketConnect",
+        "distroGuid": null,
+        "distroName": null,
+        "data": {
+          "cgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "euid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "eventType": "SocketConnect",
+          "family": "network",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "localIp": {
+            "status": "present",
+            "value": "127.0.0.1"
+          },
+          "localPort": {
+            "status": "present",
+            "value": 12345
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "operation": "connect",
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "remoteIp": {
+            "status": "present",
+            "value": "127.0.0.1"
+          },
+          "remotePort": {
+            "status": "present",
+            "value": 80
+          },
+          "result": {
+            "status": "present",
+            "value": "0"
+          },
+          "schemaVersion": 4,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmPid": {
+            "status": "present",
+            "value": 123
+          },
+          "vmTid": {
+            "status": "present",
+            "value": 124
+          }
+        },
+        "wslcSessionId": 0,
+        "wslcSessionName": "build session",
+        "containerId": null,
+        "containerName": null
+      }
+    },
+    {
+      "eventId": 62010,
+      "variant": "escaped",
+      "fields": [
+        "5",
+        "    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 4294967295\n    WSLC session name: \"session 中😀\\r\\n    Container ID: forged\\t\\\"\\\\<&>\\u00251\\u0025\\u0025 \\u0025n \\\\u0025\"\n    Container ID: \"id 中😀\\r\\n    Container ID: forged\\t\\\"\\\\<&>\\u00251\\u0025\\u0025 \\u0025n \\\\u0025\"\n    Container name: \"name 中😀\\r\\n    Container ID: forged\\t\\\"\\\\<&>\\u00251\\u0025\\u0025 \\u0025n \\\\u0025\"\n",
+        "    Process ID: 123\n    Thread ID: 124\n    Parent process ID: 42\n    Process ID in PID namespace: 321\n    PID namespace ID: 5678\n    Mount namespace ID: 11\n    Network namespace ID: 12\n    Cgroup ID: 18446744073709551615\n    User ID (UID): 1000\n    Effective user ID (EUID): 1001\n    Group ID (GID): 1002\n    Effective group ID (EGID): 1003\n",
+        "    Executable: \"/usr/bin/printf\"\n    Working directory: \"/workspace\"\n    Arguments (in order): \"printf\",\"argument\\n\\\"<&\\u00251\\\\u0025\"\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62010</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100027</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>5</Data><Data>    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 4294967295\n    WSLC session name: \"session 中😀\\r\\n    Container ID: forged\\t\\\"\\\\&lt;&amp;&gt;\\u00251\\u0025\\u0025 \\u0025n \\\\u0025\"\n    Container ID: \"id 中😀\\r\\n    Container ID: forged\\t\\\"\\\\&lt;&amp;&gt;\\u00251\\u0025\\u0025 \\u0025n \\\\u0025\"\n    Container name: \"name 中😀\\r\\n    Container ID: forged\\t\\\"\\\\&lt;&amp;&gt;\\u00251\\u0025\\u0025 \\u0025n \\\\u0025\"\n</Data><Data>    Process ID: 123\n    Thread ID: 124\n    Parent process ID: 42\n    Process ID in PID namespace: 321\n    PID namespace ID: 5678\n    Mount namespace ID: 11\n    Network namespace ID: 12\n    Cgroup ID: 18446744073709551615\n    User ID (UID): 1000\n    Effective user ID (EUID): 1001\n    Group ID (GID): 1002\n    Effective group ID (EGID): 1003\n</Data><Data>    Executable: \"/usr/bin/printf\"\n    Working directory: \"/workspace\"\n    Arguments (in order): \"printf\",\"argument\\n\\\"&lt;&amp;\\u00251\\\\u0025\"\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux ProcessExecuted Security audit (experimental event 62010).\r\n A Linux program was executed successfully.\r\n This records program execution, not process exit or creation of a new process.\r\n\r\n Operation details\r\n     Executable: \"/usr/bin/printf\"\n    Working directory: \"/workspace\"\n    Arguments (in order): \"printf\",\"argument\\n\\\"<&\\u00251\\\\u0025\"\n\r\n Linux process and observed identity\r\n     Process ID: 123\n    Thread ID: 124\n    Parent process ID: 42\n    Process ID in PID namespace: 321\n    PID namespace ID: 5678\n    Mount namespace ID: 11\n    Network namespace ID: 12\n    Cgroup ID: 18446744073709551615\n    User ID (UID): 1000\n    Effective user ID (EUID): 1001\n    Group ID (GID): 1002\n    Effective group ID (EGID): 1003\n\r\n Windows and distribution\r\n     Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 4294967295\n    WSLC session name: \"session 中😀\\r\\n    Container ID: forged\\t\\\"\\\\<&>\\u00251\\u0025\\u0025 \\u0025n \\\\u0025\"\n    Container ID: \"id 中😀\\r\\n    Container ID: forged\\t\\\"\\\\<&>\\u00251\\u0025\\u0025 \\u0025n \\\\u0025\"\n    Container name: \"name 中😀\\r\\n    Container ID: forged\\t\\\"\\\\<&>\\u00251\\u0025\\u0025 \\u0025n \\\\u0025\"\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 5\r\n\r\n Process and thread IDs are VM IDs; credentials are observed after execution.\r\n Not available means the value was not collected; it does not mean zero.\r\n Quoted text uses backslash escapes. Arguments are separated by commas, not reconstructed as a shell command.\r\n The optional [truncated] suffix describes incomplete recorded text, not an additional field.\r\n The Linux event clock is monotonic, not UTC. ",
+      "expected": {
+        "eventId": 62010,
+        "schemaVersion": 5,
+        "eventType": "ProcessExecuted",
+        "distroGuid": null,
+        "distroName": null,
+        "data": {
+          "argv": {
+            "status": "present",
+            "truncated": false,
+            "value": [
+              "printf",
+              "argument\n\"<&%1\\u0025"
+            ]
+          },
+          "cgroupId": {
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "cwd": {
+            "status": "present",
+            "truncated": false,
+            "value": "/workspace"
+          },
+          "egid": {
+            "status": "present",
+            "value": 1003
+          },
+          "euid": {
+            "status": "present",
+            "value": 1001
+          },
+          "eventType": "ProcessExecuted",
+          "executable": {
+            "status": "present",
+            "truncated": false,
+            "value": "/usr/bin/printf"
+          },
+          "gid": {
+            "status": "present",
+            "value": 1002
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "namespacePid": {
+            "status": "present",
+            "value": 321
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "schemaVersion": 5,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmParentPid": {
+            "status": "present",
+            "value": 42
+          },
+          "vmPid": 123,
+          "vmTid": 124
+        },
+        "wslcSessionId": 4294967295,
+        "wslcSessionName": "session 中😀\r\n    Container ID: forged\t\"\\<&>%1%% %n \\u0025",
+        "containerId": "id 中😀\r\n    Container ID: forged\t\"\\<&>%1%% %n \\u0025",
+        "containerName": "name 中😀\r\n    Container ID: forged\t\"\\<&>%1%% %n \\u0025"
+      }
+    },
+    {
+      "eventId": 62022,
+      "variant": "escaped",
+      "fields": [
+        "4",
+        "    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 4294967295\n    WSLC session name: \"session 中😀\\r\\n    Container ID: forged\\t\\\"\\\\<&>\\u00251\\u0025\\u0025 \\u0025n \\\\u0025\"\n    Container ID: \"id 中😀\\r\\n    Container ID: forged\\t\\\"\\\\<&>\\u00251\\u0025\\u0025 \\u0025n \\\\u0025\"\n    Container name: \"name 中😀\\r\\n    Container ID: forged\\t\\\"\\\\<&>\\u00251\\u0025\\u0025 \\u0025n \\\\u0025\"\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n",
+        "    Linux operation: connect\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62022</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100028</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>4</Data><Data>    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 4294967295\n    WSLC session name: \"session 中😀\\r\\n    Container ID: forged\\t\\\"\\\\&lt;&amp;&gt;\\u00251\\u0025\\u0025 \\u0025n \\\\u0025\"\n    Container ID: \"id 中😀\\r\\n    Container ID: forged\\t\\\"\\\\&lt;&amp;&gt;\\u00251\\u0025\\u0025 \\u0025n \\\\u0025\"\n    Container name: \"name 中😀\\r\\n    Container ID: forged\\t\\\"\\\\&lt;&amp;&gt;\\u00251\\u0025\\u0025 \\u0025n \\\\u0025\"\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n</Data><Data>    Linux operation: connect\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux SocketConnect Security audit (experimental event 62022).\r\n Socket connection attempt\r\n AuditSuccess means this observation was recorded, not that the Linux operation succeeded.\r\n\r\n Operation details\r\n     Linux operation: connect\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n\r\n Windows and distribution\r\n     Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 4294967295\n    WSLC session name: \"session 中😀\\r\\n    Container ID: forged\\t\\\"\\\\<&>\\u00251\\u0025\\u0025 \\u0025n \\\\u0025\"\n    Container ID: \"id 中😀\\r\\n    Container ID: forged\\t\\\"\\\\<&>\\u00251\\u0025\\u0025 \\u0025n \\\\u0025\"\n    Container name: \"name 中😀\\r\\n    Container ID: forged\\t\\\"\\\\<&>\\u00251\\u0025\\u0025 \\u0025n \\\\u0025\"\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 4\r\n\r\n Pending (-115) is not connection completion or final failure. No later completion or DNS correlation is claimed.\r\n Not available includes uncertain effective-ID zero readings; it does not mean root.\r\n Quoted text uses backslash escapes. Fields without a supported source are not recorded. ",
+      "expected": {
+        "eventId": 62022,
+        "schemaVersion": 4,
+        "eventType": "SocketConnect",
+        "distroGuid": null,
+        "distroName": null,
+        "data": {
+          "cgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "euid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "eventType": "SocketConnect",
+          "family": "network",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "localIp": {
+            "status": "present",
+            "value": "127.0.0.1"
+          },
+          "localPort": {
+            "status": "present",
+            "value": 12345
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "operation": "connect",
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "remoteIp": {
+            "status": "present",
+            "value": "127.0.0.1"
+          },
+          "remotePort": {
+            "status": "present",
+            "value": 80
+          },
+          "result": {
+            "status": "present",
+            "value": "0"
+          },
+          "schemaVersion": 4,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmPid": {
+            "status": "present",
+            "value": 123
+          },
+          "vmTid": {
+            "status": "present",
+            "value": 124
+          }
+        },
+        "wslcSessionId": 4294967295,
+        "wslcSessionName": "session 中😀\r\n    Container ID: forged\t\"\\<&>%1%% %n \\u0025",
+        "containerId": "id 中😀\r\n    Container ID: forged\t\"\\<&>%1%% %n \\u0025",
+        "containerName": "name 中😀\r\n    Container ID: forged\t\"\\<&>%1%% %n \\u0025"
+      }
+    },
+    {
+      "eventId": 62010,
+      "variant": "sentinel-text",
+      "fields": [
+        "5",
+        "    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"Not available\"\n    Container ID: \"Not available\"\n    Container name: \"Not available\"\n",
+        "    Process ID: 123\n    Thread ID: 124\n    Parent process ID: 42\n    Process ID in PID namespace: 321\n    PID namespace ID: 5678\n    Mount namespace ID: 11\n    Network namespace ID: 12\n    Cgroup ID: 18446744073709551615\n    User ID (UID): 1000\n    Effective user ID (EUID): 1001\n    Group ID (GID): 1002\n    Effective group ID (EGID): 1003\n",
+        "    Executable: \"/usr/bin/printf\"\n    Working directory: \"/workspace\"\n    Arguments (in order): \"printf\",\"argument\\n\\\"<&\\u00251\\\\u0025\"\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62010</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100029</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>5</Data><Data>    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"Not available\"\n    Container ID: \"Not available\"\n    Container name: \"Not available\"\n</Data><Data>    Process ID: 123\n    Thread ID: 124\n    Parent process ID: 42\n    Process ID in PID namespace: 321\n    PID namespace ID: 5678\n    Mount namespace ID: 11\n    Network namespace ID: 12\n    Cgroup ID: 18446744073709551615\n    User ID (UID): 1000\n    Effective user ID (EUID): 1001\n    Group ID (GID): 1002\n    Effective group ID (EGID): 1003\n</Data><Data>    Executable: \"/usr/bin/printf\"\n    Working directory: \"/workspace\"\n    Arguments (in order): \"printf\",\"argument\\n\\\"&lt;&amp;\\u00251\\\\u0025\"\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux ProcessExecuted Security audit (experimental event 62010).\r\n A Linux program was executed successfully.\r\n This records program execution, not process exit or creation of a new process.\r\n\r\n Operation details\r\n     Executable: \"/usr/bin/printf\"\n    Working directory: \"/workspace\"\n    Arguments (in order): \"printf\",\"argument\\n\\\"<&\\u00251\\\\u0025\"\n\r\n Linux process and observed identity\r\n     Process ID: 123\n    Thread ID: 124\n    Parent process ID: 42\n    Process ID in PID namespace: 321\n    PID namespace ID: 5678\n    Mount namespace ID: 11\n    Network namespace ID: 12\n    Cgroup ID: 18446744073709551615\n    User ID (UID): 1000\n    Effective user ID (EUID): 1001\n    Group ID (GID): 1002\n    Effective group ID (EGID): 1003\n\r\n Windows and distribution\r\n     Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"Not available\"\n    Container ID: \"Not available\"\n    Container name: \"Not available\"\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 5\r\n\r\n Process and thread IDs are VM IDs; credentials are observed after execution.\r\n Not available means the value was not collected; it does not mean zero.\r\n Quoted text uses backslash escapes. Arguments are separated by commas, not reconstructed as a shell command.\r\n The optional [truncated] suffix describes incomplete recorded text, not an additional field.\r\n The Linux event clock is monotonic, not UTC. ",
+      "expected": {
+        "eventId": 62010,
+        "schemaVersion": 5,
+        "eventType": "ProcessExecuted",
+        "distroGuid": null,
+        "distroName": null,
+        "data": {
+          "argv": {
+            "status": "present",
+            "truncated": false,
+            "value": [
+              "printf",
+              "argument\n\"<&%1\\u0025"
+            ]
+          },
+          "cgroupId": {
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "cwd": {
+            "status": "present",
+            "truncated": false,
+            "value": "/workspace"
+          },
+          "egid": {
+            "status": "present",
+            "value": 1003
+          },
+          "euid": {
+            "status": "present",
+            "value": 1001
+          },
+          "eventType": "ProcessExecuted",
+          "executable": {
+            "status": "present",
+            "truncated": false,
+            "value": "/usr/bin/printf"
+          },
+          "gid": {
+            "status": "present",
+            "value": 1002
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "namespacePid": {
+            "status": "present",
+            "value": 321
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "schemaVersion": 5,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmParentPid": {
+            "status": "present",
+            "value": 42
+          },
+          "vmPid": 123,
+          "vmTid": 124
+        },
+        "wslcSessionId": 41,
+        "wslcSessionName": "Not available",
+        "containerId": "Not available",
+        "containerName": "Not available"
+      }
+    },
+    {
+      "eventId": 62022,
+      "variant": "sentinel-text",
+      "fields": [
+        "4",
+        "    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"Not available\"\n    Container ID: \"Not available\"\n    Container name: \"Not available\"\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n",
+        "    Linux operation: connect\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62022</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100030</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>4</Data><Data>    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"Not available\"\n    Container ID: \"Not available\"\n    Container name: \"Not available\"\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n</Data><Data>    Linux operation: connect\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux SocketConnect Security audit (experimental event 62022).\r\n Socket connection attempt\r\n AuditSuccess means this observation was recorded, not that the Linux operation succeeded.\r\n\r\n Operation details\r\n     Linux operation: connect\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n\r\n Windows and distribution\r\n     Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"Not available\"\n    Container ID: \"Not available\"\n    Container name: \"Not available\"\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 4\r\n\r\n Pending (-115) is not connection completion or final failure. No later completion or DNS correlation is claimed.\r\n Not available includes uncertain effective-ID zero readings; it does not mean root.\r\n Quoted text uses backslash escapes. Fields without a supported source are not recorded. ",
+      "expected": {
+        "eventId": 62022,
+        "schemaVersion": 4,
+        "eventType": "SocketConnect",
+        "distroGuid": null,
+        "distroName": null,
+        "data": {
+          "cgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "euid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "eventType": "SocketConnect",
+          "family": "network",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "localIp": {
+            "status": "present",
+            "value": "127.0.0.1"
+          },
+          "localPort": {
+            "status": "present",
+            "value": 12345
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "operation": "connect",
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "remoteIp": {
+            "status": "present",
+            "value": "127.0.0.1"
+          },
+          "remotePort": {
+            "status": "present",
+            "value": 80
+          },
+          "result": {
+            "status": "present",
+            "value": "0"
+          },
+          "schemaVersion": 4,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmPid": {
+            "status": "present",
+            "value": 123
+          },
+          "vmTid": {
+            "status": "present",
+            "value": 124
+          }
+        },
+        "wslcSessionId": 41,
+        "wslcSessionName": "Not available",
+        "containerId": "Not available",
+        "containerName": "Not available"
+      }
+    },
+    {
+      "eventId": 62010,
+      "variant": "boundary",
+      "fields": [
+        "5",
+        "    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中\"\n    Container ID: \"iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii😀\"\n    Container name: \"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn😀\"\n",
+        "    Process ID: 123\n    Thread ID: 124\n    Parent process ID: 42\n    Process ID in PID namespace: 321\n    PID namespace ID: 5678\n    Mount namespace ID: 11\n    Network namespace ID: 12\n    Cgroup ID: 18446744073709551615\n    User ID (UID): 1000\n    Effective user ID (EUID): 1001\n    Group ID (GID): 1002\n    Effective group ID (EGID): 1003\n",
+        "    Executable: \"/usr/bin/printf\"\n    Working directory: \"/workspace\"\n    Arguments (in order): \"printf\",\"argument\\n\\\"<&\\u00251\\\\u0025\"\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62010</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100031</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>5</Data><Data>    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中\"\n    Container ID: \"iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii😀\"\n    Container name: \"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn😀\"\n</Data><Data>    Process ID: 123\n    Thread ID: 124\n    Parent process ID: 42\n    Process ID in PID namespace: 321\n    PID namespace ID: 5678\n    Mount namespace ID: 11\n    Network namespace ID: 12\n    Cgroup ID: 18446744073709551615\n    User ID (UID): 1000\n    Effective user ID (EUID): 1001\n    Group ID (GID): 1002\n    Effective group ID (EGID): 1003\n</Data><Data>    Executable: \"/usr/bin/printf\"\n    Working directory: \"/workspace\"\n    Arguments (in order): \"printf\",\"argument\\n\\\"&lt;&amp;\\u00251\\\\u0025\"\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux ProcessExecuted Security audit (experimental event 62010).\r\n A Linux program was executed successfully.\r\n This records program execution, not process exit or creation of a new process.\r\n\r\n Operation details\r\n     Executable: \"/usr/bin/printf\"\n    Working directory: \"/workspace\"\n    Arguments (in order): \"printf\",\"argument\\n\\\"<&\\u00251\\\\u0025\"\n\r\n Linux process and observed identity\r\n     Process ID: 123\n    Thread ID: 124\n    Parent process ID: 42\n    Process ID in PID namespace: 321\n    PID namespace ID: 5678\n    Mount namespace ID: 11\n    Network namespace ID: 12\n    Cgroup ID: 18446744073709551615\n    User ID (UID): 1000\n    Effective user ID (EUID): 1001\n    Group ID (GID): 1002\n    Effective group ID (EGID): 1003\n\r\n Windows and distribution\r\n     Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中\"\n    Container ID: \"iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii😀\"\n    Container name: \"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn😀\"\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 5\r\n\r\n Process and thread IDs are VM IDs; credentials are observed after execution.\r\n Not available means the value was not collected; it does not mean zero.\r\n Quoted text uses backslash escapes. Arguments are separated by commas, not reconstructed as a shell command.\r\n The optional [truncated] suffix describes incomplete recorded text, not an additional field.\r\n The Linux event clock is monotonic, not UTC. ",
+      "expected": {
+        "eventId": 62010,
+        "schemaVersion": 5,
+        "eventType": "ProcessExecuted",
+        "distroGuid": null,
+        "distroName": null,
+        "data": {
+          "argv": {
+            "status": "present",
+            "truncated": false,
+            "value": [
+              "printf",
+              "argument\n\"<&%1\\u0025"
+            ]
+          },
+          "cgroupId": {
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "cwd": {
+            "status": "present",
+            "truncated": false,
+            "value": "/workspace"
+          },
+          "egid": {
+            "status": "present",
+            "value": 1003
+          },
+          "euid": {
+            "status": "present",
+            "value": 1001
+          },
+          "eventType": "ProcessExecuted",
+          "executable": {
+            "status": "present",
+            "truncated": false,
+            "value": "/usr/bin/printf"
+          },
+          "gid": {
+            "status": "present",
+            "value": 1002
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "namespacePid": {
+            "status": "present",
+            "value": 321
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "schemaVersion": 5,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmParentPid": {
+            "status": "present",
+            "value": 42
+          },
+          "vmPid": 123,
+          "vmTid": 124
+        },
+        "wslcSessionId": 41,
+        "wslcSessionName": "中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中",
+        "containerId": "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii😀",
+        "containerName": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn😀"
+      }
+    },
+    {
+      "eventId": 62022,
+      "variant": "boundary",
+      "fields": [
+        "4",
+        "    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中\"\n    Container ID: \"iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii😀\"\n    Container name: \"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn😀\"\n",
+        "    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n",
+        "    Linux operation: connect\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n",
+        "",
+        "    Linux event clock (monotonic ns): 18446744073709551615\n"
+      ],
+      "xml": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-WSL-SecurityAudit\" /><EventID Qualifiers=\"0\">62022</EventID><Version>0</Version><Channel>Security</Channel><EventRecordID>100032</EventRecordID><Computer>SYNTHETIC-FIXTURE.invalid</Computer><TimeCreated SystemTime=\"2026-10-22T00:00:00.1234567Z\" /><Execution ProcessID=\"4242\" ThreadID=\"4243\" /><Security UserID=\"S-1-5-18\" /></System><EventData><Data>4</Data><Data>    Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中\"\n    Container ID: \"iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii😀\"\n    Container name: \"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn😀\"\n</Data><Data>    Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n</Data><Data>    Linux operation: connect\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n</Data><Data></Data><Data>    Linux event clock (monotonic ns): 18446744073709551615\n</Data></EventData></Event>",
+      "description": "WSL Linux SocketConnect Security audit (experimental event 62022).\r\n Socket connection attempt\r\n AuditSuccess means this observation was recorded, not that the Linux operation succeeded.\r\n\r\n Operation details\r\n     Linux operation: connect\n    Linux outcome: success\n    Reported return value (not a universal errno): 0\n    Observed local IP: \"127.0.0.1\"\n    Observed local port: 12345\n    Peer or requested destination IP: \"127.0.0.1\"\n    Peer or requested destination port: 80\n\r\n Linux process and observed identity\r\n     Process ID (VM): 123\n    Thread ID (VM): 124\n    PID namespace ID: 5678\n    Observed mount namespace ID: 11\n    Caller network namespace ID: 12\n    Cgroup ID: 13\n    Observed user ID (UID): 1000\n    Observed effective user ID (EUID): Not available\n    Observed group ID (GID): 1001\n    Observed effective group ID (EGID): Not available\n\r\n Windows and distribution\r\n     Distribution name: Not available\n    Distribution ID: Not available\n    WSLC session ID: 41\n    WSLC session name: \"中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中\"\n    Container ID: \"iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii😀\"\n    Container name: \"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn😀\"\n\r\n Timing and collection\r\n     Linux event clock (monotonic ns): 18446744073709551615\n\r\n     Event format version: 4\r\n\r\n Pending (-115) is not connection completion or final failure. No later completion or DNS correlation is claimed.\r\n Not available includes uncertain effective-ID zero readings; it does not mean root.\r\n Quoted text uses backslash escapes. Fields without a supported source are not recorded. ",
+      "expected": {
+        "eventId": 62022,
+        "schemaVersion": 4,
+        "eventType": "SocketConnect",
+        "distroGuid": null,
+        "distroName": null,
+        "data": {
+          "cgroupId": {
+            "status": "present",
+            "value": "13"
+          },
+          "egid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "euid": {
+            "status": "unavailable",
+            "value": null
+          },
+          "eventType": "SocketConnect",
+          "family": "network",
+          "gid": {
+            "status": "present",
+            "value": 1001
+          },
+          "linuxEventNs": {
+            "clock": "monotonic",
+            "status": "present",
+            "value": "18446744073709551615"
+          },
+          "localIp": {
+            "status": "present",
+            "value": "127.0.0.1"
+          },
+          "localPort": {
+            "status": "present",
+            "value": 12345
+          },
+          "mountNamespace": {
+            "status": "present",
+            "value": 11
+          },
+          "networkNamespace": {
+            "status": "present",
+            "value": 12
+          },
+          "operation": "connect",
+          "outcome": "success",
+          "pidNamespace": {
+            "status": "present",
+            "value": 5678
+          },
+          "remoteIp": {
+            "status": "present",
+            "value": "127.0.0.1"
+          },
+          "remotePort": {
+            "status": "present",
+            "value": 80
+          },
+          "result": {
+            "status": "present",
+            "value": "0"
+          },
+          "schemaVersion": 4,
+          "uid": {
+            "status": "present",
+            "value": 1000
+          },
+          "vmPid": {
+            "status": "present",
+            "value": 123
+          },
+          "vmTid": {
+            "status": "present",
+            "value": 124
+          }
+        },
+        "wslcSessionId": 41,
+        "wslcSessionName": "中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中",
+        "containerId": "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii😀",
+        "containerName": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn😀"
+      }
+    }
+  ]
+}

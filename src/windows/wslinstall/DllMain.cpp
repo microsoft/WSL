@@ -20,6 +20,7 @@ Abstract:
 #include <winrt/windows.management.deployment.h>
 #include <Sfc.h>
 #include "defs.h"
+#include "SecuritySource.h"
 
 using unique_msi_handle = wil::unique_any<MSIHANDLE, decltype(MsiCloseHandle), &MsiCloseHandle>;
 
@@ -32,6 +33,48 @@ static constexpr auto c_protocolProgIdSuffix{L".Protocol"};
 static constexpr auto c_wslSettingsInstalledDirectoryPropertyName = L"WSLSETTINGS";
 static constexpr auto c_wslSettingsAppIDPropertyName = L"WSLSETTINGSAPPID";
 static constexpr auto c_wslSettingsProgIDPropertyName = L"WSLSETTINGSPROGID";
+
+extern "C" UINT __stdcall InstallNativeSecurityAuditSource(MSIHANDLE install)
+try
+{
+    DWORD length{};
+    wchar_t empty{};
+    THROW_IF_WIN32_ERROR(MsiGetPropertyW(install, L"CustomActionData", &empty, &length) == ERROR_MORE_DATA ? ERROR_SUCCESS : ERROR_INVALID_DATA);
+    std::wstring path(length + 1, L'\0');
+    ++length;
+    THROW_IF_WIN32_ERROR(MsiGetPropertyW(install, L"CustomActionData", path.data(), &length));
+    path.resize(length);
+    wsl::audit::InstallSecuritySource(path);
+    WriteInstallLog("Native WSL Security audit source registered (experimental event IDs; audit policy unchanged).");
+    return ERROR_SUCCESS;
+}
+catch (...)
+{
+    WriteInstallLog(std::format("Native WSL Security audit source registration failed: 0x{:08x}", wil::ResultFromCaughtException()));
+    LOG_CAUGHT_EXCEPTION();
+    return ERROR_INSTALL_FAILURE;
+}
+
+extern "C" UINT __stdcall UninstallNativeSecurityAuditSource(MSIHANDLE install)
+try
+{
+    DWORD length{};
+    wchar_t empty{};
+    THROW_IF_WIN32_ERROR(MsiGetPropertyW(install, L"CustomActionData", &empty, &length) == ERROR_MORE_DATA ? ERROR_SUCCESS : ERROR_INVALID_DATA);
+    std::wstring path(length + 1, L'\0');
+    ++length;
+    THROW_IF_WIN32_ERROR(MsiGetPropertyW(install, L"CustomActionData", path.data(), &length));
+    path.resize(length);
+    wsl::audit::UninstallSecuritySource(path);
+    WriteInstallLog("Native WSL Security audit source deregistered; historical message resources retained.");
+    return ERROR_SUCCESS;
+}
+catch (...)
+{
+    WriteInstallLog(std::format("Native WSL Security audit source deregistration failed: 0x{:08x}", wil::ResultFromCaughtException()));
+    LOG_CAUGHT_EXCEPTION();
+    return ERROR_INSTALL_FAILURE;
+}
 
 #define IGNORE_MSIX_ERROR_IF_DIRECT_MSI_EXECUTION_SUPPORTED() \
     if (DoesBuildSupportDirectMsiExecution()) \

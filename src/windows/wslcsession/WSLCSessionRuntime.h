@@ -70,6 +70,8 @@ public:
         // handler may call back into the session (e.g. to run setup in the VM). Fired every time a
         // VM is (re)created for the session.
         std::function<void()> OnVmStarted;
+        // Bounded, fail-open gate, outside runtime and notification locks. Never used by audit's own factory.
+        std::function<void(uint64_t generation)> WaitForNativeAuditStartup;
 
         // Fired when a VM is about to be torn down (best-effort), while the VM is still alive. Invoked
         // without the runtime lock held so the handler may call back into the session or into a plugin
@@ -166,6 +168,12 @@ public:
     VmState State() const noexcept;
     VmExitDisposition ExitDisposition() const noexcept;
     bool VmExited() const noexcept;
+    uint64_t VmGeneration() const noexcept
+    {
+        return m_vmGeneration.load();
+    }
+    // Non-waiting acquisition for native sidecars; no idle/activity reference is taken.
+    wil::rwlock_release_shared_scope_exit TryAuditVm(uint64_t Generation);
     void ResetDockerdReady() noexcept;
     void OnProcessLog(const gsl::span<char>& buffer, PCSTR source) noexcept;
     void SetContainerdProcess(ServiceRunningProcess&& process);
@@ -186,7 +194,7 @@ public:
     void StopVmLockHeld();
     _Requires_exclusive_lock_held_(m_lock)
     void TearDownVmLockHeld(bool CaptureTerminationReason = false);
-    void EnsureVmRunning();
+    uint64_t EnsureVmRunning();
     void OnIdleTimer();
     void OnVmExited();
     void InitializeDockerRuntime(const std::filesystem::path& storagePath);

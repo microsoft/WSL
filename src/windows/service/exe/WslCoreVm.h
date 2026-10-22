@@ -30,6 +30,7 @@ Abstract:
 #include "SocketChannel.h"
 #include "DeviceHostProxy.h"
 #include "GuestDeviceManager.h"
+#include "NativeAuditLaunch.h"
 
 #define UTILITY_VM_SHUTDOWN_TIMEOUT (30 * 1000)
 #define UTILITY_VM_TERMINATE_TIMEOUT (30 * 1000)
@@ -82,6 +83,8 @@ public:
     wil::unique_socket CreateListeningSocket() const;
 
     wil::unique_socket CreateRootNamespaceProcess(_In_ LPCSTR Path, _In_ LPCSTR* Arguments);
+
+    wsl::windows::common::NativeAuditLaunch CaptureNativeAuditLaunch();
 
     std::pair<int, LX_MINI_MOUNT_STEP> DetachDisk(_In_opt_ PCWSTR Disk);
 

@@ -16,3 +16,5 @@ EXPORTS
     CalculateWslSettingsProtocolIds
     DisableWslService
     EnableWslService
+    InstallNativeSecurityAuditSource
+    UninstallNativeSecurityAuditSource

@@ -1,13 +1,14 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-# Creates a CPIO newc format initramfs archive containing a single file named "init"
-# with mode 0100755 (rwxr-xr-x), uid 0, gid 0.
+# Creates a CPIO newc initramfs with the existing /init entry and optional trusted audit payload.
 
 [CmdletBinding()]
 param (
     [Parameter(Mandatory)][string]$InputFile,
-    [Parameter(Mandatory)][string]$OutputFile
+    [Parameter(Mandatory)][string]$OutputFile,
+    [string]$AuditPayloadDirectory,
+    [ValidateSet('x86_64', 'aarch64')][string]$Architecture
 )
 
 $ErrorActionPreference = "Stop"
@@ -54,10 +55,32 @@ $data = [System.IO.File]::ReadAllBytes($InputFile)
 $name = [System.Text.Encoding]::ASCII.GetBytes("init`0")
 $mtime = [uint32][System.DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 
+$auditManifest = $null
+if ($AuditPayloadDirectory)
+{
+    if (-not $Architecture) { throw 'Architecture is required for the audit initrd payload.' }
+    $auditManifest = & (Join-Path $PSScriptRoot 'securityaudit\Validate-Payload.ps1') `
+        -PayloadDirectory $AuditPayloadDirectory -Architecture $Architecture -PassThru
+}
+
 $out = [System.IO.File]::Create($OutputFile)
 try
 {
     Write-CpioEntry $out $name $data 0x81ED $mtime  # S_IFREG | 0755
+    if ($auditManifest)
+    {
+        $directory = [Text.Encoding]::ASCII.GetBytes("wsl-security-audit`0")
+        Write-CpioEntry $out $directory ([byte[]]::new(0)) 0x41ED $mtime # S_IFDIR | 0755
+        foreach ($entry in $auditManifest.files.PSObject.Properties | Sort-Object Name)
+        {
+            $entryName = if ($entry.Name -eq 'wsl-audit-collector') { 'wsl-audit-collector' } else { $entry.Name }
+            $entryData = [IO.File]::ReadAllBytes((Join-Path $AuditPayloadDirectory $entry.Name.Replace('/', '\')))
+            $mode = if ($entry.Name -eq 'wsl-audit-collector') { 0x81ED } else { 0x8124 } # 0755 / 0444
+            Write-CpioEntry $out ([Text.Encoding]::ASCII.GetBytes("$entryName`0")) $entryData $mode $mtime
+        }
+        $manifestData = [IO.File]::ReadAllBytes((Join-Path $AuditPayloadDirectory 'audit-payload.json'))
+        Write-CpioEntry $out ([Text.Encoding]::ASCII.GetBytes("wsl-security-audit/provenance.json`0")) $manifestData 0x8124 $mtime
+    }
     $trailer = [System.Text.Encoding]::ASCII.GetBytes("TRAILER!!!`0")
     Write-CpioEntry $out $trailer ([byte[]]::new(0)) 0 0
 }

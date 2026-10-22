@@ -27,6 +27,9 @@ constexpr auto c_dockerdReadyLogLine = "API listen on /var/run/docker.sock";
 // blocked. Purely diagnostic: the wait itself is unbounded (see VmLease).
 constexpr DWORD c_vmStopWaitLogIntervalMs = 30 * 1000;
 
+// Reentrant plugin setup must not wait while its outer lifecycle notification holds m_notifyLock.
+thread_local const WSLCSessionRuntime* g_notifyingRuntime{};
+
 } // namespace
 
 namespace wsl::windows::service::wslc {
@@ -145,6 +148,17 @@ bool WSLCSessionRuntime::VmExited() const noexcept
     return m_vmExited.load();
 }
 
+wil::rwlock_release_shared_scope_exit WSLCSessionRuntime::TryAuditVm(uint64_t Generation)
+{
+    auto lock = m_lock.try_lock_shared();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_BUSY), !lock);
+    THROW_HR_IF(
+        WSLC_E_VM_NOT_RUNNING,
+        Generation == 0 || Generation != m_vmGeneration.load() || m_vmState.load() != VmState::Running ||
+            m_vmStopPending.load() || m_vmExited.load() || m_sessionTerminatingEvent.is_signaled());
+    return lock;
+}
+
 void WSLCSessionRuntime::ResetDockerdReady() noexcept
 {
     m_dockerdReadyEvent.ResetEvent();
@@ -236,20 +250,19 @@ int WSLCSessionRuntime::StopProcess(ServiceRunningProcess& Process, DWORD Termin
     return -1;
 }
 
-void WSLCSessionRuntime::EnsureVmRunning()
+uint64_t WSLCSessionRuntime::EnsureVmRunning()
 {
     // Reject leases once the session is terminating/terminated, including on the running fast path:
     // Shutdown() drops the lock to fire OnVmStopping, and a reentrant lease that finds the VM still
     // Running must fail here rather than run work against a VM being permanently torn down.
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_terminating->load() || m_sessionTerminatedEvent.is_signaled());
 
+    uint64_t generation = 0;
     if (m_vmState.load() == VmState::Running)
     {
-        return;
+        generation = m_vmGeneration.load();
     }
-
-    bool started = false;
-    uint64_t generation = 0;
+    else
     {
         auto lock = m_lock.lock_exclusive();
 
@@ -261,7 +274,6 @@ void WSLCSessionRuntime::EnsureVmRunning()
         if (m_vmState.load() != VmState::Running)
         {
             StartVmLockHeld();
-            started = true;
         }
 
         generation = m_vmGeneration.load();
@@ -272,10 +284,16 @@ void WSLCSessionRuntime::EnsureVmRunning()
     // the exclusive lock), so firing under the lock would deadlock. EnsureVmRunning's only caller
     // (VmLease) holds an activity reference across this call, so idle teardown cannot race the VM
     // down in the gap between releasing the lock and notifying.
-    if (started)
+    NotifyVmStarted(generation);
+    if (g_notifyingRuntime == nullptr && m_hooks.WaitForNativeAuditStartup)
     {
-        NotifyVmStarted(generation);
+        try
+        {
+            m_hooks.WaitForNativeAuditStartup(generation);
+        }
+        CATCH_LOG();
     }
+    return generation;
 }
 
 void WSLCSessionRuntime::NotifyVmStarted(uint64_t Generation)
@@ -293,7 +311,8 @@ void WSLCSessionRuntime::NotifyVmStarted(uint64_t Generation)
     // Drop the notification if this instance is already gone: between releasing the runtime lock and
     // getting here it may have been torn down and replaced, and announcing it now would misattribute
     // the start to whichever instance is running.
-    if (m_terminating->load() || m_vmGeneration.load() != Generation)
+    if (m_terminating->load() || m_vmGeneration.load() != Generation || m_vmStopPending.load() ||
+        m_vmState.load() != VmState::Running || m_notifiedGeneration.load() == Generation)
     {
         return;
     }
@@ -301,6 +320,9 @@ void WSLCSessionRuntime::NotifyVmStarted(uint64_t Generation)
     m_notifiedGeneration.store(Generation);
     if (m_hooks.OnVmStarted)
     {
+        const auto* previous = g_notifyingRuntime;
+        g_notifyingRuntime = this;
+        const auto restore = wil::scope_exit([&] { g_notifyingRuntime = previous; });
         m_hooks.OnVmStarted();
     }
 }
@@ -797,12 +819,23 @@ WSLCSessionRuntime::VmLease::VmLease(WSLCSessionRuntime& Runtime, VmLeasePolicy 
     // Activity increment may race with idle teardown. Retry until we hold the lock with VM running.
     for (;;)
     {
+        uint64_t generation = 0;
         if (Policy == VmLeasePolicy::Acquire)
         {
-            m_runtime->EnsureVmRunning();
+            generation = m_runtime->EnsureVmRunning();
         }
 
         m_lock = m_runtime->m_lock.lock_shared();
+
+        THROW_HR_IF(
+            HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+            Policy == VmLeasePolicy::Acquire && (m_runtime->m_terminating->load() || m_runtime->m_sessionTerminatedEvent.is_signaled()));
+
+        if (Policy == VmLeasePolicy::Acquire && generation != m_runtime->m_vmGeneration.load())
+        {
+            m_lock.reset();
+            continue;
+        }
 
         if (m_runtime->m_vmState.load() == VmState::Running)
         {

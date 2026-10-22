@@ -1156,7 +1156,8 @@ void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProc
         CATCH_LOG();
     }
 
-    auto inspectJson = InspectLockHeld();
+    WSLCNativeAuditContainer auditContext{};
+    auto inspectJson = InspectLockHeld(false, true, &auditContext);
     const auto pluginResult = m_pluginNotifier->OnContainerStarted(inspectJson.c_str());
     if (FAILED(pluginResult))
     {
@@ -1184,6 +1185,8 @@ void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProc
             THROW_HR(pluginResult);
         }
     }
+
+    LOG_IF_FAILED(m_pluginNotifier->OnNativeAuditContainerStarted(m_runtime.VmGeneration(), &auditContext));
 
     transition = StartTransition(TransitionKind::Start, ContainerEvent::Start);
 
@@ -1651,6 +1654,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
     {
         try
         {
+            LOG_IF_FAILED(m_pluginNotifier->OnNativeAuditContainerStopping(m_runtime.VmGeneration(), m_id.c_str()));
             LOG_IF_FAILED(m_pluginNotifier->OnContainerStopping(m_id.c_str()));
         }
         CATCH_LOG();
@@ -2936,13 +2940,39 @@ void WSLCContainerImpl::Inspect(BOOL Size, LPSTR* Output) const
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to inspect container '%hs'", m_id.c_str());
 }
 
-std::string WSLCContainerImpl::InspectLockHeld(bool Size) const
+std::string WSLCContainerImpl::InspectLockHeld(bool Size, bool PluginContext, WSLCNativeAuditContainer* AuditContext) const
 {
     // Get Docker inspect data
     auto dockerInspect = m_runtime.Docker().InspectContainer(m_id, Size);
 
     // Convert to WSLC schema
     auto wslcInspect = BuildInspectContainer(dockerInspect);
+
+    if (AuditContext)
+    {
+        // Preserve plugin JSON while passing independently typed metadata to native auditing.
+        if (m_id.size() < std::size(AuditContext->Id))
+        {
+            strcpy_s(AuditContext->Id, m_id.c_str());
+        }
+        if (wslcInspect.Name.size() < std::size(AuditContext->Name) &&
+            dockerInspect.State.StartedAt.size() < std::size(AuditContext->StartedAt))
+        {
+            strcpy_s(AuditContext->Name, wslcInspect.Name.c_str());
+            strcpy_s(AuditContext->StartedAt, dockerInspect.State.StartedAt.c_str());
+            if (dockerInspect.State.Pid > 0 && dockerInspect.State.Pid <= INT32_MAX)
+            {
+                AuditContext->InitPid = static_cast<ULONG>(dockerInspect.State.Pid);
+            }
+        }
+    }
+
+    if (PluginContext)
+    {
+        nlohmann::json document = wslcInspect;
+        document["WslPluginContext"] = {{"Version", 1}, {"InitPid", dockerInspect.State.Pid}, {"StartedAt", dockerInspect.State.StartedAt}};
+        return document.dump();
+    }
 
     // Serialize WSLC schema to JSON
     return wsl::shared::ToJson(wslcInspect);
