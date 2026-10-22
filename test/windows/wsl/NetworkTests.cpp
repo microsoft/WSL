@@ -6030,6 +6030,30 @@ class ConsommeTests
         NetworkTests::VerifyPortZeroRebindSucceeds();
     }
 
+    WSL2_TEST_METHOD(MappedIpv4Forwarding)
+    {
+        CONSOMME_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        WslKeepAlive keepAlive;
+
+        constexpr uint16_t c_port = 1234;
+        for (const auto* address : {L"::ffff:127.0.0.1", L"::ffff:0.0.0.0"})
+        {
+            {
+                auto [guestProcess, read] =
+                    NetworkTests::BindGuestPort(std::format(L"TCP6-LISTEN:{},bind={},ipv6only=0", c_port, address), true);
+                // Note: expect failure.
+                NetworkTests::BindHostPort(c_port, SOCK_STREAM, IPPROTO_TCP, false, false, true);
+                NetworkTests::ValidateLocalhostRelayTraffic(AF_INET, read.get());
+            }
+
+            NetworkTests::VerifyNotBoundLoopback(c_port, false);
+            auto hostSocket = NetworkTests::BindHostPort(c_port, SOCK_STREAM, IPPROTO_TCP, true, false, false, std::chrono::minutes(2));
+            VERIFY_ARE_EQUAL(listen(hostSocket.get(), SOMAXCONN), 0);
+        }
+    }
+
     WSL2_TEST_METHOD(HttpProxySimple)
     {
         CONSOMME_TEST_ONLY();
