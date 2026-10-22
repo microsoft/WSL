@@ -807,8 +807,8 @@ wsl::windows::common::hcs::unique_hcn_network NatNetworking::CreateNetworkIntern
                     }
                     else
                     {
-                        // Reopen the handle on every attempt so that we can correctly retry if HNS got restarted between attempts.
-                        // If reopening fails, leave network empty so the next attempt can recreate it.
+                        // Reopen the handle on every attempt so that we can correctly retry if HNS got restarted between
+                        // attempts. If reopening fails, leave network empty so the next attempt can recreate it.
                         executionStep = "HcnOpenNetwork";
                         auto previousNetwork = std::move(network);
                         network = wsl::core::networking::OpenNetwork(GetNatNetworkId(config.FirewallConfig.Enabled()));
