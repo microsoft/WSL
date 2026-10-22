@@ -13081,7 +13081,11 @@ class WSLCTests
 
             auto [containers, ports] = ListContainers(session.get());
             VERIFY_ARE_EQUAL(containers.size(), 2u);
-            ExpectCommandResult(session.get(), {"/usr/bin/docker", "volume", "inspect", anonymousVolume}, 1);
+
+            const WSLCFilter volumeFilter{"name", anonymousVolume.c_str()};
+            wil::unique_cotaskmem_ansistring volumes;
+            VERIFY_SUCCEEDED(session->ListVolumes(&volumeFilter, 1, &volumes));
+            VERIFY_IS_TRUE(wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::VolumeListEntry>>(volumes.get()).empty());
 
             auto created = OpenContainer(session.get(), c_createdName);
             created.SetDeleteOnClose(false);
