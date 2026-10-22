@@ -2438,6 +2438,9 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Invalid filter: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerPruneNegativeLabelFilter" xml:space="preserve">
+    <value>Container prune does not support negative label filters because they cannot be combined safely with restart-policy protection.</value>
+  </data>
   <data name = "MessageWslcInvalidName" xml:space = "preserve" >
     <value>Invalid name: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

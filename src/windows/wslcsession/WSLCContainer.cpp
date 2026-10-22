@@ -54,6 +54,7 @@ using wsl::windows::service::wslc::WSLCContainerImpl;
 using wsl::windows::service::wslc::WSLCContainerMetadata;
 using wsl::windows::service::wslc::WSLCContainerMetadataLabel;
 using wsl::windows::service::wslc::WSLCContainerMetadataV1;
+using wsl::windows::service::wslc::WSLCContainerRestartPolicyLabel;
 using wsl::windows::service::wslc::WSLCExecutionContext;
 using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
@@ -539,6 +540,7 @@ std::string SerializeContainerMetadata(const WSLCContainerMetadataV1& metadata)
 std::map<std::string, std::string> StripInternalLabels(std::map<std::string, std::string> labels)
 {
     labels.erase(WSLCContainerMetadataLabel);
+    labels.erase(WSLCContainerRestartPolicyLabel);
     return labels;
 }
 
@@ -3042,6 +3044,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     }
 
     auto requestedLabels = ParseKeyValuePairs(containerOptions.Labels, containerOptions.LabelsCount, WSLCContainerMetadataLabel);
+    THROW_HR_IF_MSG(E_INVALIDARG, requestedLabels.contains(WSLCContainerRestartPolicyLabel), "Key '%hs' is reserved", WSLCContainerRestartPolicyLabel);
 
     // Build WSLC metadata to store in a label for recovery on Open().
     WSLCContainerMetadataV1 metadata;
@@ -3057,6 +3060,11 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     }
 
     request.Labels[WSLCContainerMetadataLabel] = SerializeContainerMetadata(metadata);
+    if (containerOptions.RestartPolicy == WSLCContainerRestartPolicyAlways)
+    {
+        request.Labels[WSLCContainerRestartPolicyLabel] = RestartPolicyName(containerOptions.RestartPolicy);
+    }
+
     request.Labels.insert(requestedLabels.begin(), requestedLabels.end());
 
     // Docker validates structured bind sources during container creation, so their VM paths must exist here.

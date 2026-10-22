@@ -22,6 +22,7 @@ namespace wsl::windows::service::wslc {
 
 // Label key used to store WSLC container metadata in Docker container labels.
 constexpr auto WSLCContainerMetadataLabel = "com.microsoft.wsl.container.metadata";
+constexpr auto WSLCContainerRestartPolicyLabel = "com.microsoft.wsl.container.restart-policy";
 
 struct WSLCPortMapping
 {

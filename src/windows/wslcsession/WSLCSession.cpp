@@ -2948,6 +2948,10 @@ try
 
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
 
+    // Docker negates the combined label match, so additional negative filters can weaken this exclusion.
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcContainerPruneNegativeLabelFilter(), filters.contains("label!"));
+    filters["label!"].push_back(std::format("{}=always", wsl::windows::service::wslc::WSLCContainerRestartPolicyLabel));
+
     auto lock = AcquireLease();
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 

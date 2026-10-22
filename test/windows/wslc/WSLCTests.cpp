@@ -15703,11 +15703,66 @@ class WSLCTests
             // Expect testPrune2 to be selected via key being present.
             expectPrune({testPrune2.Id()}, {{"label", "key"}});
 
-            // Prune by absence of 'anotherKey' label.
-            expectPrune({testPrune4.Id()}, {{"label!", "anotherKey"}});
+            expectPrune({testPrune3.Id(), testPrune4.Id()});
+        }
 
-            // Prune by label inequality.
-            expectPrune({testPrune3.Id()}, {{"label!", "anotherKey=someValue"}});
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-prune-always", {"sleep", "9999999"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            launcher.AddLabel("prune-test", "protected");
+            auto container = launcher.Launch(*m_defaultSession);
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            VERIFY_ARE_EQUAL(WslcContainerStateExited, container.State());
+
+            const auto label = ExpectCommandResult(
+                m_defaultSession.get(),
+                {"/usr/bin/docker",
+                 "inspect",
+                 "-f",
+                 "{{index .Config.Labels \"com.microsoft.wsl.container.restart-policy\"}}",
+                 container.Id()},
+                0);
+            VERIFY_ARE_EQUAL(std::string{"always\n"}, label.Output.at(1));
+            const auto inspect = container.Inspect();
+            VERIFY_IS_FALSE(inspect.Config.Labels.contains("com.microsoft.wsl.container.restart-policy"));
+            VERIFY_IS_FALSE(inspect.Labels.contains("com.microsoft.wsl.container.restart-policy"));
+
+            WSLCContainerLauncher disposableLauncher("debian:latest", "test-prune-disposable", {"echo", "OK"});
+            auto disposable = RunAndWait(disposableLauncher);
+            expectPrune({disposable.Id()});
+            expectPrune({}, {{"label", "prune-test=protected"}});
+
+            for (const auto value : {"anotherKey", "anotherKey=someValue"})
+            {
+                WSLCFilter filter{.Key = "label!", .Value = value};
+                PruneResult result;
+                VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->PruneContainers(&filter, 1, &result.result));
+                ValidateCOMErrorMessage(wsl::shared::Localization::MessageWslcContainerPruneNegativeLabelFilter());
+            }
+
+            wil::com_ptr<IWSLCContainer> reopened;
+            VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(container.Id().c_str(), &reopened));
+            VERIFY_ARE_EQUAL(WslcContainerStateExited, container.State());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
+        }
+
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-prune-backoff", {"sh", "-c", "echo run; exit 1"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+            const auto runs = WaitForContainerRuns(container, 6);
+            WaitForContainerState(container, WslcContainerStateExited);
+
+            expectPrune({});
+            WaitForContainerRuns(container, runs + 1);
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+        }
+
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-prune-reserved-label", {"echo", "OK"});
+            launcher.AddLabel("com.microsoft.wsl.container.restart-policy", "always");
+            const auto [result, container] = launcher.CreateNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(E_INVALIDARG, result);
         }
 
         // Validate that the 'until' filter works.
