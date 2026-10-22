@@ -1024,6 +1024,9 @@ Windows 版本： {}</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>此電腦的原則已停用 WSL 容器。</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>電腦原則已停用 Linux 功能新增。</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>容器映像登錄 '{}' 已由電腦原則封鎖。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3652,6 +3655,12 @@ Windows 版本：{}</value>
   </data>
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>將虛擬化功能公開給容器</value>
+  </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Add Linux capabilities (repeatable)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Drop Linux capabilities (repeatable)</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>傳遞給容器內執行指令的參數</value>
