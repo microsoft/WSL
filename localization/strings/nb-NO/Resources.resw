@@ -1018,6 +1018,9 @@ Faller tilbake til NAT-nettverk.</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>WSL-beholderen er deaktivert av datamaskinpolicyen.</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>Tillegg til Linux-funksjonalitet er deaktivert av datamaskinpolicyen.</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>Beholderbilderegisteret «{}» er blokkert av datamaskinpolicyen.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3646,6 +3649,12 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   </data>
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>Eksponer virtualiseringsfunksjoner for beholderen</value>
+  </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Add Linux capabilities (repeatable)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Drop Linux capabilities (repeatable)</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Argumenter som skal sendes til kommandoen som kjøres inne i beholderen</value>

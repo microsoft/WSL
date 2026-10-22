@@ -1018,6 +1018,9 @@ Terugvallen op NAT-netwerken.</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>WSL-container is uitgeschakeld door het computerbeleid.</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>Toevoegingen van Linux-mogelijkheden zijn uitgeschakeld door het computerbeleid.</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>Het containerinstallatiekopieregister {} wordt geblokkeerd door het computerbeleid.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3646,6 +3649,12 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   </data>
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>Virtualisatiemogelijkheden zichtbaar maken voor de container</value>
+  </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Linux-mogelijkheden toevoegen (herhaalbaar)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Linux-mogelijkheden verwijderen (herhaalbaar)</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Argumenten om door te geven aan de opdracht die binnen de container wordt uitgevoerd</value>

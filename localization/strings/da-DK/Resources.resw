@@ -1018,6 +1018,9 @@ Går tilbage til NAT-netværk.</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>WSL-objektbeholderen er deaktiveret af computerpolitikken.</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>Tilføjelser af Linux-funktioner deaktiveres af computerpolitikken.</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>Registreringsdatabasen for objektbeholderafbildningen '{}' er blokeret af computerpolitikken.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3646,6 +3649,12 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   </data>
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>Fremvis virtualiseringsegenskaber for objektbeholderen</value>
+  </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Add Linux capabilities (repeatable)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Drop Linux capabilities (repeatable)</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Argumenter, der skal overføres til den kommando, der udføres inde i objektbeholderen</value>
