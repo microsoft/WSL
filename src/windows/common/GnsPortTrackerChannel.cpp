@@ -56,7 +56,10 @@ void GnsPortTrackerChannel::Run()
                 const auto* message = gslhelpers::try_get_struct<LX_GNS_TUN_BRIDGE_REQUEST>(range);
                 THROW_HR_IF_MSG(E_UNEXPECTED, !message, "Unexpected message size: %i", header->MessageSize);
 
-                m_interfaceStateCallback(message->InterfaceName, message->InterfaceUp);
+                const auto nameLength = strnlen(message->InterfaceName, sizeof(message->InterfaceName));
+                THROW_HR_IF_MSG(E_UNEXPECTED, nameLength == sizeof(message->InterfaceName), "Unterminated interface name");
+
+                m_interfaceStateCallback(std::string(message->InterfaceName, nameLength), message->InterfaceUp);
                 transaction.SendResultMessage<int32_t>(0);
             }
             break;
