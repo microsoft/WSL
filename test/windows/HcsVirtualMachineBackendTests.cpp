@@ -264,6 +264,17 @@ class HcsVirtualMachineBackendTests
         backend->Terminate();
     }
 
+    TEST_METHOD(RejectsGuestListenersAfterSpontaneousExit)
+    {
+        SKIP_TEST_ARM64();
+        auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        auto guest = StartGuest(*backend);
+
+        wsl::windows::common::hcs::TerminateComputeSystem(backend->GetComputeSystemHandle());
+        VERIFY_IS_TRUE(backend->GetTerminationEvent().wait(30 * 1000));
+        VERIFY_ARE_EQUAL(c_invalidState, OperationResult([&] { backend->CreateGuestListener({12345}); }));
+    }
+
     TEST_METHOD(WritesCrashLogToPrecomputedPath)
     {
         const auto directory = CreateTestDirectory();
@@ -493,9 +504,11 @@ class HcsVirtualMachineBackendTests
         wil::unique_event callbackEvent{wil::EventOptions::ManualReset};
         GUID callbackVmId{};
         HRESULT callbackResult = S_OK;
+        HRESULT reentrantTerminateResult = E_FAIL;
         backend->RegisterTerminationCallback([&](GUID VmId) {
             callbackVmId = VmId;
             callbackResult = OperationResult([&] { backend->ConnectGuest({}); });
+            reentrantTerminateResult = OperationResult([&] { backend->Terminate(); });
             callbackEvent.SetEvent();
         });
 
@@ -503,6 +516,7 @@ class HcsVirtualMachineBackendTests
         VERIFY_IS_TRUE(callbackEvent.wait(30 * 1000));
         VERIFY_IS_TRUE(IsEqualGUID(backend->GetDescription().Identity.VmId, callbackVmId));
         VERIFY_ARE_EQUAL(c_invalidState, callbackResult);
+        VERIFY_ARE_EQUAL(S_OK, reentrantTerminateResult);
 
         auto lateBackend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
         lateBackend->Terminate();
@@ -571,6 +585,8 @@ class HcsVirtualMachineBackendTests
             L"drvfs-admin", VmVirtioFsLayout::Aggregate, VmVirtioFsShareOptions{{}, wil::shared_handle{GetElevatedTestToken().release()}}}});
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Serving, userDevice.State);
         VERIFY_IS_TRUE(userDevice.GuestInstanceId.has_value());
+        VERIFY_IS_FALSE(userDevice.Elevated);
+        VERIFY_IS_TRUE(adminDevice.Elevated);
         VERIFY_ARE_NOT_EQUAL(userDevice.Id.Value, adminDevice.Id.Value);
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Serving, backend->GetFileSystemDeviceStatus(userDevice.Id).State);
 
@@ -656,6 +672,7 @@ class HcsVirtualMachineBackendTests
                     L"drvfs-single-options", VmVirtioFsLayout::SingleShare, VmVirtioFsShareOptions{{{L"dax", L""}}}}});
             }));
         const auto singleShare = backend->AddFileSystemShare(singleShareDevice.Id, request);
+        VERIFY_IS_FALSE(singleShare.Elevated);
         VERIFY_IS_FALSE(std::get<VmVirtioFsShareAddress>(singleShare.GuestAddress).ChildName.has_value());
         VERIFY_ARE_EQUAL(singleShare.Id.Value, backend->AddFileSystemShare(singleShareDevice.Id, request).Id.Value);
         auto singleShareTokenRequest = request;
@@ -678,11 +695,14 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_NOT_EQUAL(singleShare.Id.Value, replacementSingleShare.Id.Value);
         backend->RemoveFileSystemShare(replacementSingleShare.Id);
         const auto tokenShare = backend->AddFileSystemShare(singleShareDevice.Id, singleShareTokenRequest);
+        VERIFY_IS_TRUE(tokenShare.Elevated);
+        VERIFY_IS_TRUE(backend->GetFileSystemDeviceStatus(singleShareDevice.Id).Elevated);
         VERIFY_ARE_EQUAL(tokenShare.Id.Value, backend->AddFileSystemShare(singleShareDevice.Id, singleShareTokenRequest).Id.Value);
         auto equivalentTokenRequest = request;
         equivalentTokenRequest.UserToken = std::get<VmVirtioFsShareOptions>(singleShareTokenRequest.Options).UserToken;
         VERIFY_ARE_EQUAL(tokenShare.Id.Value, backend->AddFileSystemShare(singleShareDevice.Id, equivalentTokenRequest).Id.Value);
         backend->RemoveFileSystemShare(tokenShare.Id);
+        VERIFY_IS_FALSE(backend->GetFileSystemDeviceStatus(singleShareDevice.Id).Elevated);
         backend->RemoveDevice(singleShareDevice.Id);
         VERIFY_ARE_EQUAL(
             HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->GetFileSystemDeviceStatus(singleShareDevice.Id); }));
@@ -692,6 +712,7 @@ class HcsVirtualMachineBackendTests
         // second identity, so a share token is rejected rather than silently ignored.
         const auto adminShare = backend->AddFileSystemShare(adminDevice.Id, request);
         VERIFY_ARE_EQUAL(adminDevice.Id.Value, adminShare.Device.Value);
+        VERIFY_IS_TRUE(adminShare.Elevated);
         VERIFY_ARE_NOT_EQUAL(share.Id.Value, adminShare.Id.Value);
         VERIFY_ARE_EQUAL(std::wstring{L"drvfs-admin"}, std::get<VmVirtioFsShareAddress>(adminShare.GuestAddress).Tag);
         VERIFY_ARE_EQUAL(share.EffectiveHostPath.native(), adminShare.EffectiveHostPath.native());
@@ -713,6 +734,11 @@ class HcsVirtualMachineBackendTests
                          }));
         const auto socketDeviceResult = backend->CreateFileSystemDevice({socketDevice});
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Serving, socketDeviceResult.State);
+        VmFileSystemDeviceRequest elevatedSocketDeviceRequest{};
+        elevatedSocketDeviceRequest.Transport = VmPlan9SocketDevice{GuestServicePort{12346}, createPlan9Server};
+        elevatedSocketDeviceRequest.UserToken = wil::shared_handle{GetElevatedTestToken().release()};
+        const auto elevatedSocketDevice = backend->CreateFileSystemDevice(elevatedSocketDeviceRequest);
+        VERIFY_IS_TRUE(elevatedSocketDevice.Elevated);
         VmFileSystemShareRequest socketRequest;
         socketRequest.HostPath = directory;
         socketRequest.Options = VmPlan9ShareOptions{};
@@ -765,6 +791,13 @@ class HcsVirtualMachineBackendTests
         const auto duplicateSocketShare = backend->AddFileSystemShare(socketDeviceResult.Id, socketRequest);
         VERIFY_ARE_EQUAL(socketShare.Id.Value, duplicateSocketShare.Id.Value);
         verifyPlan9NameCollisions(socketDeviceResult.Id, socketRequest);
+        auto inheritedIdentityRequest = socketRequest;
+        inheritedIdentityRequest.Name = L"inherited-identity";
+        const auto inheritedIdentityShare = backend->AddFileSystemShare(elevatedSocketDevice.Id, inheritedIdentityRequest);
+        VERIFY_IS_TRUE(inheritedIdentityShare.Elevated);
+        VERIFY_ARE_EQUAL(
+            inheritedIdentityShare.Id.Value, backend->AddFileSystemShare(elevatedSocketDevice.Id, inheritedIdentityRequest).Id.Value);
+        backend->RemoveFileSystemShare(inheritedIdentityShare.Id);
 
         // A Plan 9 device keeps serving after one of its shares is removed, so the share can be added again.
         backend->RemoveFileSystemShare(socketShare.Id);

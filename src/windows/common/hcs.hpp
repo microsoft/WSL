@@ -124,7 +124,7 @@ void RegisterCallback(_In_ HCS_SYSTEM ComputeSystem, _In_ HCS_EVENT_CALLBACK Cal
 /// Access is revoked if it was granted, and the disk is brought back online if it was taken offline.
 /// UserToken must match the identity that was used to grant access, or be null if access was granted as the service.
 /// </summary>
-void RemoveDiskWithAccess(
+HRESULT RemoveDiskWithAccess(
     _In_ HCS_SYSTEM ComputeSystem,
     _In_ PCWSTR VmId,
     _In_ PCWSTR Disk,

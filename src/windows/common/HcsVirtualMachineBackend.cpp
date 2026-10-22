@@ -465,33 +465,7 @@ HcsVirtualMachineBackend::HcsVirtualMachineBackend() = default;
 
 HcsVirtualMachineBackend::~HcsVirtualMachineBackend() noexcept
 {
-    std::shared_ptr<GuestDeviceManager> guestDeviceManager;
-    schema::unique_hcs_system system;
-    std::map<std::uint64_t, AttachedDisk> attachedDisks;
-    std::map<std::uint64_t, std::shared_ptr<VmGuestListenerState>> guestListeners;
-    {
-        auto lock = m_lock.lock_exclusive();
-        CloseNetworkAdaptersLocked();
-        guestDeviceManager = std::move(m_guestDeviceManager);
-        CloseGuestDevicesLocked();
-        system = std::move(m_system);
-        attachedDisks = std::move(m_attachedDisks);
-        guestListeners = RemoveGuestListenersLocked(m_configuration.Description.Identity);
-    }
-
-    for (const auto& entry : guestListeners)
-    {
-        entry.second->Close();
-    }
-
-    // Device hosts must be shut down while the compute system and callback context still exist.
-    guestDeviceManager.reset();
-    if (system && !m_exitEvent.is_signaled())
-    {
-        LOG_IF_FAILED(wil::ResultFromException([&] { schema::TerminateComputeSystem(system.get()); }));
-    }
-    system.reset();
-    CleanupAttachedDisks(std::move(attachedDisks));
+    LOG_IF_FAILED(wil::ResultFromException([&] { Shutdown(); }));
 
     try
     {
@@ -611,7 +585,7 @@ HCS_SYSTEM HcsVirtualMachineBackend::GetComputeSystemHandle() const
 std::shared_ptr<GuestDeviceManager> HcsVirtualMachineBackend::GetGuestDeviceManager() const
 {
     auto lock = m_lock.lock_shared();
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system || !m_guestDeviceManager);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system || !m_guestDeviceManager || m_state == VmState::Stopped);
     return m_guestDeviceManager;
 }
 
@@ -704,23 +678,45 @@ void HcsVirtualMachineBackend::Start()
 
 void HcsVirtualMachineBackend::Terminate()
 {
-    // AddPersistentMemory releases m_lock while the device host attaches the device and the caller
-    // waits for it. Serialize termination with that entire lifecycle.
-    auto persistentMemoryLock = m_persistentMemoryLock.lock_exclusive();
+    // An exit callback may re-enter Terminate. Leave resource cleanup to the owner/destructor once
+    // HCS has reported that the system is already gone.
+    if (m_exitEvent.is_signaled())
+    {
+        return;
+    }
+
+    Shutdown();
+}
+
+void HcsVirtualMachineBackend::Shutdown()
+{
+    m_terminatingEvent.SetEvent();
+
     std::shared_ptr<GuestDeviceManager> guestDeviceManager;
     schema::unique_hcs_system system;
     std::map<std::uint64_t, AttachedDisk> attachedDisks;
     std::map<std::uint64_t, std::shared_ptr<VmGuestListenerState>> guestListeners;
     {
         auto lock = m_lock.lock_exclusive();
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
+        if (m_cleanupStarted)
+        {
+            return;
+        }
+
+        m_cleanupStarted = true;
+        m_state = VmState::Stopped;
         CloseNetworkAdaptersLocked();
         guestDeviceManager = std::move(m_guestDeviceManager);
         CloseGuestDevicesLocked();
         system = std::move(m_system);
-        m_state = VmState::Stopped;
         attachedDisks = std::move(m_attachedDisks);
         guestListeners = RemoveGuestListenersLocked(m_configuration.Description.Identity);
+    }
+
+    // AddPersistentMemory may be in a device-host call. The backend is already unavailable and
+    // guest operations have been cancelled before we wait for that call to finish.
+    {
+        auto persistentMemoryLock = m_persistentMemoryLock.lock_exclusive();
     }
 
     for (const auto& entry : guestListeners)
@@ -733,11 +729,13 @@ void HcsVirtualMachineBackend::Terminate()
     auto cleanup = wil::scope_exit([&] {
         system.reset();
         CleanupAttachedDisks(std::move(attachedDisks));
-        m_terminatingEvent.SetEvent();
         NotifyTerminated(m_configuration.Description.Identity);
     });
 
-    schema::TerminateComputeSystem(system.get());
+    if (system && !m_exitEvent.is_signaled())
+    {
+        schema::TerminateComputeSystem(system.get());
+    }
 }
 
 std::shared_ptr<VmGuestListenerState> HcsVirtualMachineBackend::ConfigureGuestListener(const VmGuestListener& Listener)
@@ -752,7 +750,7 @@ std::shared_ptr<VmGuestListenerState> HcsVirtualMachineBackend::ConfigureGuestLi
 VmGuestListener HcsVirtualMachineBackend::CreateGuestListener(GuestServicePort Port)
 {
     auto lock = m_lock.lock_exclusive();
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system || m_state == VmState::Stopped);
     return RegisterGuestListenerLocked(m_configuration.Description.Identity, Port);
 }
 
@@ -910,7 +908,7 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
             return;
         }
 
-        schema::RemoveDiskWithAccess(
+        const auto cleanupResult = schema::RemoveDiskWithAccess(
             m_system.get(),
             m_vmIdString.c_str(),
             found->second.Path.c_str(),
@@ -920,6 +918,7 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
             static_cast<size_t>(found->second.Backend.DeviceTimeout.count()));
 
         m_attachedDisks.erase(found);
+        THROW_IF_FAILED(cleanupResult);
     });
 
     if (existingAttachment.has_value())
@@ -1009,7 +1008,7 @@ void HcsVirtualMachineBackend::DetachDisk(VmDiskId Disk)
     // N.B. Volumes that the guest mounted from this disk must be unmounted by the caller before the
     //      disk is detached, since the guest protocol is not part of the backend.
     auto runAsSelf = wil::run_as_self();
-    schema::RemoveDiskWithAccess(
+    const auto cleanupResult = schema::RemoveDiskWithAccess(
         m_system.get(),
         m_vmIdString.c_str(),
         disk->second.Path.c_str(),
@@ -1027,6 +1026,7 @@ void HcsVirtualMachineBackend::DetachDisk(VmDiskId Disk)
         TraceLoggingValue(disk->second.PassThrough, "passThrough"));
 
     m_attachedDisks.erase(disk);
+    THROW_IF_FAILED(cleanupResult);
 }
 
 _Requires_lock_held_(m_lock)
@@ -1052,8 +1052,7 @@ VmPersistentMemoryDevice HcsVirtualMachineBackend::AddPersistentMemory(const VmP
     THROW_HR_IF(E_INVALIDARG, Request.Path.empty());
 
     // Serialize additions so that the guest enumerates persistent memory devices in the order they
-    // were added. The guest names a device after that order (/dev/pmem<index>) and callers rely on
-    // the name, so the caller's wait for the device runs before the next addition begins.
+    // were added. The guest names a device after that order (/dev/pmem<index>).
     auto persistentMemoryLock = m_persistentMemoryLock.lock_exclusive();
 
     std::shared_ptr<GuestDeviceManager> guestDeviceManager;
@@ -1062,7 +1061,7 @@ VmPersistentMemoryDevice HcsVirtualMachineBackend::AddPersistentMemory(const VmP
     VmPersistentMemoryDevice device{};
     {
         auto lock = m_lock.lock_exclusive();
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system || !m_guestDeviceManager);
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system || !m_guestDeviceManager || m_state == VmState::Stopped);
         THROW_HR_IF(E_BOUNDS, m_nextDeviceId == UINT64_MAX);
         system = m_system.get();
         guestDeviceManager = m_guestDeviceManager;
@@ -1101,20 +1100,6 @@ VmPersistentMemoryDevice HcsVirtualMachineBackend::AddPersistentMemory(const VmP
     }
 
     ++m_nextPersistentMemoryIndex;
-
-    // Give the caller a chance to observe the device in the guest while additions are still
-    // serialized. This runs without m_lock because it blocks on the guest.
-    if (Request.WaitForGuestDevice)
-    {
-        Request.WaitForGuestDevice(device.Index);
-    }
-
-    {
-        auto lock = m_lock.lock_shared();
-        THROW_HR_IF(
-            HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
-            !m_system || m_system.get() != system || m_guestDeviceManager != guestDeviceManager || m_state == VmState::Stopped);
-    }
 
     WSL_LOG(
         "HcsAddPersistentMemoryEnd",
@@ -1173,6 +1158,11 @@ VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFile
     THROW_HR_IF(E_BOUNDS, m_nextDeviceId == UINT64_MAX);
     const auto userToken = Request.UserToken.value_or(m_configuration.Description.Identity.UserToken);
     THROW_HR_IF_MSG(E_UNEXPECTED, !userToken, "UserToken not set for the file system device request");
+    auto servingUserToken = userToken;
+    if (const auto* transport = std::get_if<VmVirtioFsDevice>(&Request.Transport); transport && transport->Layout == VmVirtioFsLayout::Aggregate)
+    {
+        servingUserToken = ResolveUserToken({transport->Options.UserToken, userToken});
+    }
     // Two devices conflict when the guest would reach them the same way: the same Plan9 socket port,
     // or the same tag. A socket device never conflicts with a tagged one.
     //
@@ -1193,7 +1183,7 @@ VmFileSystemDevice HcsVirtualMachineBackend::CreateFileSystemDevice(const VmFile
         VmFileSystemDeviceState::Prepared,
         {},
         Request.Transport,
-        wsl::windows::common::security::IsTokenElevated(userToken.get())};
+        wsl::windows::common::security::IsTokenElevated(servingUserToken.get())};
     std::wstring mountOptions;
     wil::com_ptr<IPlan9FileSystem> plan9Server;
     std::optional<GUID> guestInstanceId;
@@ -1474,7 +1464,7 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
     std::wstring hostPath;
     std::wstring mountOptions;
     std::map<std::wstring, std::wstring> effectiveMountOptions;
-    auto shareUserToken = requestUserToken;
+    auto shareUserToken = userToken;
     std::optional<VmFileSystemShare> reused;
     VmFileSystemShareAddress guestAddress;
     std::visit(
@@ -1503,6 +1493,7 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
                         E_INVALIDARG,
                         !!Request.UserToken || !!options->UserToken,
                         "A share of an aggregate virtio-fs device is served under the identity of the device");
+                    shareUserToken = ResolveUserToken({transport.Options.UserToken, device->second.Backend.UserToken});
                 }
                 else
                 {
@@ -1510,7 +1501,11 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
                         E_INVALIDARG, !Request.Name.empty(), "A single-share virtio-fs device does not accept a share name");
                     if (options->UserToken)
                     {
-                        shareUserToken = options->UserToken;
+                        shareUserToken = ResolveUserToken({options->UserToken, userToken});
+                    }
+                    else
+                    {
+                        shareUserToken = userToken;
                     }
                 }
 
@@ -1539,6 +1534,7 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
                         mountOptions.c_str(),
                         hostPath.c_str(),
                         ResolveUserToken({options->UserToken, userToken}).get());
+                    device->second.Elevated = wsl::windows::common::security::IsTokenElevated(shareUserToken.get());
                 }
 
                 device->second.State = VmFileSystemDeviceState::Serving;
@@ -1588,7 +1584,7 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
     share.GuestAddress = std::move(guestAddress);
     share.EffectiveHostPath = hostPath;
     share.MountOptions = std::move(effectiveMountOptions);
-    share.Elevated = device->second.Elevated;
+    share.Elevated = wsl::windows::common::security::IsTokenElevated(shareUserToken.get());
     share.ReadOnly = Request.ReadOnly;
 
     const auto plan9Flags = std::holds_alternative<VmVirtioFsDevice>(device->second.Transport) ? schema::Plan9ShareFlags::None
@@ -1663,6 +1659,7 @@ void HcsVirtualMachineBackend::RemoveFileSystemShare(VmShareId Share)
                     m_guestDeviceManager->RemoveGuestDevice(device->second.GuestInstanceId.value());
                     device->second.GuestInstanceId.reset();
                     device->second.State = VmFileSystemDeviceState::Prepared;
+                    device->second.Elevated = wsl::windows::common::security::IsTokenElevated(device->second.Backend.UserToken.get());
                 }
             },
             [&](const VmPlan9SocketDevice&) {

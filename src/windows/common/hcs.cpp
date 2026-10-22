@@ -449,7 +449,7 @@ void wsl::windows::common::hcs::RegisterCallback(_In_ HCS_SYSTEM ComputeSystem, 
     THROW_IF_FAILED(::HcsSetComputeSystemCallback(ComputeSystem, HcsEventOptionNone, Context, Callback));
 }
 
-void wsl::windows::common::hcs::RemoveDiskWithAccess(
+HRESULT wsl::windows::common::hcs::RemoveDiskWithAccess(
     _In_ HCS_SYSTEM ComputeSystem,
     _In_ PCWSTR VmId,
     _In_ PCWSTR Disk,
@@ -459,9 +459,11 @@ void wsl::windows::common::hcs::RemoveDiskWithAccess(
     _In_ size_t TimeoutMs)
 {
     RemoveScsiDisk(ComputeSystem, Lun);
+    HRESULT cleanupResult = S_OK;
     if (WI_IsFlagSet(Flags, wsl::windows::common::disk::DiskStateFlags::AccessGranted))
     {
-        RevokeVmAccess(VmId, Disk, UserToken);
+        cleanupResult = wil::ResultFromException([&] { RevokeVmAccess(VmId, Disk, UserToken); });
+        LOG_IF_FAILED(cleanupResult);
     }
 
     // If the disk was online before being attached, revert to that state.
@@ -475,6 +477,8 @@ void wsl::windows::common::hcs::RemoveDiskWithAccess(
         }
         CATCH_LOG()
     }
+
+    return cleanupResult;
 }
 
 void wsl::windows::common::hcs::AddMirroredGpu(_In_ HCS_SYSTEM ComputeSystem, _In_ bool AllowVendorExtension, _In_ bool DisableGdiAcceleration, _In_ bool DisablePresentation)

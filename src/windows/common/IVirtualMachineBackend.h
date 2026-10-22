@@ -584,13 +584,6 @@ struct VmFileSystemShare
 using VmFileSystemDevicePredicate = std::function<bool(const VmFileSystemDevice&)>;
 using VmFileSystemSharePredicate = std::function<bool(const VmFileSystemShare&)>;
 
-// Invoked with the index of a newly added persistent memory device while the backend still
-// serializes persistent memory additions. Callers that name devices after the order in which the
-// guest enumerated them (/dev/pmem<index>) use this to wait for the device to appear before the
-// next one is added. The device is already added and tracked when this runs, so throwing fails
-// AddPersistentMemory without reusing the device's index.
-using VmPersistentMemoryReadyCallback = std::function<void(std::uint32_t DeviceIndex)>;
-
 struct VmPersistentMemoryRequest
 {
     std::filesystem::path Path;
@@ -598,7 +591,6 @@ struct VmPersistentMemoryRequest
     // Token whose identity is used to reach the backing file. The VM identity token is used when
     // this is unset.
     std::optional<wil::shared_handle> UserToken;
-    VmPersistentMemoryReadyCallback WaitForGuestDevice;
 };
 
 struct VmPersistentMemoryDevice
@@ -708,7 +700,8 @@ public:
 
     /// <summary>
     /// Exposes a host file to the guest as a persistent memory device. Additions are serialized so
-    /// that devices are enumerated by the guest in the order they were added.
+    /// that devices are enumerated by the guest in the order they were added. Callers that need to
+    /// wait for guest enumeration must do so after this method returns.
     /// </summary>
     virtual VmPersistentMemoryDevice AddPersistentMemory(const VmPersistentMemoryRequest& Request) = 0;
 

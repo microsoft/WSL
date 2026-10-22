@@ -1851,12 +1851,14 @@ void WslCoreVm::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR Gue
 ULONG
 WslCoreVm::MountFileAsPersistentMemory(_In_ PCWSTR FilePath, _In_ bool ReadOnly)
 {
+    auto persistentMemoryLock = m_persistentMemoryLock.lock_exclusive();
     VmPersistentMemoryRequest request{};
     request.Path = FilePath;
     request.ReadOnly = ReadOnly;
     request.UserToken = m_userToken;
-    request.WaitForGuestDevice = [this](std::uint32_t index) { WaitForPmemDeviceInVm(index); };
-    return m_backend->AddPersistentMemory(request).Index;
+    const auto device = m_backend->AddPersistentMemory(request);
+    WaitForPmemDeviceInVm(device.Index);
+    return device.Index;
 }
 
 void WslCoreVm::WaitForPmemDeviceInVm(_In_ ULONG PmemId)
