@@ -640,8 +640,14 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::Consomme)
             {
-                wsl::core::ConsommeNetworkingFlags flags =
-                    wsl::core::ConsommeNetworkingFlags::Ipv6 | wsl::core::ConsommeNetworkingFlags::LoopbackClientIp;
+                const auto kernelModules = wsl::shared::string::Split(m_vmConfig.KernelModulesList, L',');
+                wsl::core::ConsommeNetworkingFlags flags = wsl::core::ConsommeNetworkingFlags::LoopbackClientIp;
+                // For CONFIG_IPV6=m, the module-list fallback assumes the user does not disable IPv6
+                // while also requesting that the ipv6 module be loaded.
+                WI_SetFlagIf(
+                    flags,
+                    wsl::core::ConsommeNetworkingFlags::Ipv6,
+                    m_ipv6Available || std::find(kernelModules.begin(), kernelModules.end(), L"ipv6") != kernelModules.end());
                 WI_SetFlagIf(flags, wsl::core::ConsommeNetworkingFlags::LocalhostRelay, m_vmConfig.EnableLocalhostRelay);
                 WI_SetFlagIf(flags, wsl::core::ConsommeNetworkingFlags::DnsTunneling, m_vmConfig.EnableDnsTunneling);
                 // NAT may have fallen back to Consomme after the early-config message; drop the unused DNS hvsocket.
@@ -2456,11 +2462,13 @@ void WslCoreVm::ReadGuestCapabilities()
     }
 
     m_seccompAvailable = info.SeccompAvailable;
+    m_ipv6Available = info.Ipv6Available;
     m_hvPciSwiotlbBase = info.HvPciSwiotlbBase;
     m_hvPciSwiotlbSize = info.HvPciSwiotlbSize;
     WSL_LOG(
         "GuestKernelInfo",
         TraceLoggingValue(m_seccompAvailable, "SeccompAvailable"),
+        TraceLoggingValue(m_ipv6Available, "Ipv6Available"),
         TraceLoggingValue(m_hvPciSwiotlbBase, "HvPciSwiotlbBase"),
         TraceLoggingValue(m_hvPciSwiotlbSize, "HvPciSwiotlbSize"),
         TraceLoggingValue(std::get<0>(m_kernelVersion), "Version"),
