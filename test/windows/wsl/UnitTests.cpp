@@ -7603,6 +7603,25 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         }
     }
 
+    WSL2_TEST_METHOD(CustomVhdBackingFileFailure)
+    {
+        const auto vhdPath = std::filesystem::absolute(L"testvhd.vhd").wstring();
+
+        // A directory passes the existence check but cannot be opened as a VHD backing file.
+        VERIFY_IS_TRUE(CreateDirectoryW(vhdPath.c_str(), nullptr));
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { THROW_IF_WIN32_BOOL_FALSE(RemoveDirectoryW(vhdPath.c_str())); });
+
+        WslConfigChange config{LxssGenerateTestConfig({.systemDistro = vhdPath})};
+
+        ValidateOutput(
+            L"echo ok",
+            FormatErrorMessage(
+                wsl::shared::Localization::MessageFailedToAttachDisk(vhdPath, GetSystemErrorString(E_ACCESSDENIED)),
+                L"Wsl/Service/CreateInstance/CreateVm/E_ACCESSDENIED"),
+            L"");
+    }
+
     WSL2_TEST_METHOD(CustomVhdsInUserProfile)
     {
         // Regression: HCS fails with E_ACCESSDENIED when user-supplied kernelModules or
