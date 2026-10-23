@@ -673,7 +673,7 @@ public:
     virtual VmState GetState() const = 0;
     // Returns the cached reason and backend-specific details after exit; fails before the VM has exited.
     virtual VmTerminationInformation GetTerminationReason() const = 0;
-    // Shared events remain valid after the backend is destroyed.
+    // Signals after exit information is available. Shared events remain valid after the backend is destroyed.
     virtual wil::shared_event GetTerminationEvent() const = 0;
     // Signals when the backend has identified a VM crash, which can precede termination.
     virtual wil::shared_event GetCrashEvent() const = 0;

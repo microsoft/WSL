@@ -74,7 +74,10 @@ std::filesystem::path wsl::windows::common::hcs::CreateVmSavedStateFile(const st
     const auto filePath = Folder / std::format(L"saved-state-{}-{}.vmrs", std::time(nullptr), vmId);
     wil::unique_handle file{CreateFileW(filePath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY, nullptr)};
     THROW_LAST_ERROR_IF(!file);
-    auto removeOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { std::filesystem::remove(filePath); });
+    auto removeOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+        file.reset();
+        std::filesystem::remove(filePath);
+    });
     GrantVmAccess(vmId.c_str(), filePath.c_str());
     removeOnFailure.release();
     return filePath;
