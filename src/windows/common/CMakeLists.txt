@@ -71,6 +71,7 @@ set(SOURCES
 set(HEADERS
     ../../../generated/Localization.h
     APICompat.h
+    AsyncExecution.h
     ../inc/docker_schema.h
     ../inc/wslc_schema.h
     ../inc/lxssbusclient.h
@@ -146,6 +147,7 @@ set(HEADERS
     Stringify.h
     SubProcess.h
     svccomm.hpp
+    ThreadPool.h
     timestamp.hpp
     VTSupport.h
     WindowsUpdateIntegration.h
