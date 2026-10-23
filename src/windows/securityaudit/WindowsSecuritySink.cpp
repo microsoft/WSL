@@ -10,26 +10,24 @@
 #include "WindowsSecurityMessages.h"
 
 namespace wsl::audit {
-namespace security_detail {
-    constexpr ULONG PolicySetFlags(ULONG flags)
-    {
-        return flags == 0 ? POLICY_AUDIT_EVENT_NONE : flags;
-    }
-} // namespace security_detail
-
 namespace {
     using Json = nlohmann::json;
     using UniquePolicy = wil::unique_any<PAUDIT_POLICY_INFORMATION, decltype(&::AuditFree), ::AuditFree>;
 
-    static_assert(WSL_SECURITY_PROCESS == c_securityProcessEventId);
+    enum class SecurityHostField : size_t
+    {
+        WindowsUserSid = 1,
+        WslSessionId,
+        WindowsSessionId,
+        Attribution,
+        DistroGuid,
+        DistroName
+    };
+
     static_assert(WSL_PROCESS_EXECUTED == c_processExecutedEventId);
     static_assert(WSL_PROCESS_CREATED == c_processCreatedEventId);
     static_assert(c_observationFieldCount <= c_maxSecurityParameters);
     static_assert(c_processExecutedFieldCount == 6 && c_processCreatedFieldCount == 6 && c_observationFieldCount == 6);
-    static_assert(static_cast<size_t>(SecurityProcessField::PolicySource) + 1 == c_securityFieldCount);
-    static_assert(security_detail::PolicySetFlags(0) == POLICY_AUDIT_EVENT_NONE);
-    static_assert(security_detail::PolicySetFlags(2) == POLICY_AUDIT_EVENT_FAILURE);
-    static_assert(security_detail::PolicySetFlags(3) == (POLICY_AUDIT_EVENT_SUCCESS | POLICY_AUDIT_EVENT_FAILURE));
 
     std::wstring Wide(std::string_view value)
     {
@@ -73,17 +71,6 @@ namespace {
     {
         const auto iterator = message.find(name);
         return iterator == message.end() || iterator->is_null() ? L"unknown" : Number(message, name, UINT32_MAX);
-    }
-
-    std::wstring Boolean(const Json& message, const char* name, std::optional<bool> fallback = {})
-    {
-        const auto iterator = message.find(name);
-        if (iterator == message.end() && fallback)
-        {
-            return *fallback ? L"true" : L"false";
-        }
-        THROW_HR_IF_MSG(E_INVALIDARG, iterator == message.end() || !iterator->is_boolean(), "Invalid Security flag: %hs.", name);
-        return iterator->get<bool>() ? L"true" : L"false";
     }
 
     bool IsGuid(std::string_view text)
@@ -363,48 +350,30 @@ namespace {
     }
 } // namespace
 
-void ValidateSecuritySourceName(std::wstring_view source)
-{
-    if (source == c_securitySourceName)
-    {
-        return;
-    }
-    const std::wstring_view prefix = source.starts_with(c_securityVerifySourcePrefix) ? c_securityVerifySourcePrefix : c_securityTestSourcePrefix;
-    THROW_HR_IF_MSG(
-        E_INVALIDARG,
-        !source.starts_with(prefix) || source.size() != prefix.size() + 32,
-        "Security source must be the native WSL audit source, or its Test-/Verify- source with 32 lowercase hexadecimal digits.");
-    for (const auto character : source.substr(prefix.size()))
-    {
-        THROW_HR_IF(E_INVALIDARG, !((character >= L'0' && character <= L'9') || (character >= L'a' && character <= L'f')));
-    }
-}
-
 static void ProjectHostFields(const Json& message, std::span<std::wstring, 7> fields)
 {
-    auto set = [&](SecurityProcessField field, std::wstring value) { fields[static_cast<size_t>(field)] = std::move(value); };
-    set(SecurityProcessField::SchemaVersion, std::to_wstring(c_securitySchemaVersion));
+    auto set = [&](SecurityHostField field, std::wstring value) { fields[static_cast<size_t>(field)] = std::move(value); };
     const auto sidText = Wide(Text(message, "windowsUserSid", 184));
     THROW_HR_IF_MSG(E_INVALIDARG, !sidText.starts_with(L"S-1-"), "Windows user SID must be a canonical SID, not an SDDL alias.");
     wil::unique_any<PSID, decltype(&::LocalFree), ::LocalFree> sid;
     THROW_HR_IF_MSG(E_INVALIDARG, !ConvertStringSidToSidW(sidText.c_str(), &sid), "Missing or invalid trusted Windows user SID.");
     THROW_HR_IF(E_INVALIDARG, !IsValidSid(sid.get()));
-    set(SecurityProcessField::WindowsUserSid, sidText);
-    set(SecurityProcessField::WslSessionId, OptionalSession(message, "wslSessionId"));
-    set(SecurityProcessField::WindowsSessionId, OptionalSession(message, "windowsSessionId"));
+    set(SecurityHostField::WindowsUserSid, sidText);
+    set(SecurityHostField::WslSessionId, OptionalSession(message, "wslSessionId"));
+    set(SecurityHostField::WindowsSessionId, OptionalSession(message, "windowsSessionId"));
     const auto attribution = Text(message, "attribution", 64);
     const bool known = attribution == "matched";
     const bool unknown = attribution == "unknown";
     THROW_HR_IF_MSG(E_INVALIDARG, !known && !unknown, "Invalid Windows distribution attribution.");
-    set(SecurityProcessField::Attribution, Wide(attribution));
+    set(SecurityHostField::Attribution, Wide(attribution));
     if (known)
     {
         const auto guid = Text(message, "distroId", 38);
         THROW_HR_IF_MSG(E_INVALIDARG, !IsGuid(guid), "Known attribution requires a valid distribution GUID.");
         const auto name = Text(message, "distroName", 256);
         THROW_HR_IF(E_INVALIDARG, name.empty());
-        set(SecurityProcessField::DistroGuid, Wide(guid));
-        set(SecurityProcessField::DistroName, Wide(Json(name).dump()));
+        set(SecurityHostField::DistroGuid, Wide(guid));
+        set(SecurityHostField::DistroName, Wide(Json(name).dump()));
     }
 }
 
@@ -426,93 +395,6 @@ static void SetProcessContext(SecurityEventPayload& result, const Json& message,
     {
         result.fields[5] = result.fields[6] = L"Not available";
     }
-}
-
-std::optional<SecurityProcessPayload> ProjectSecurityProcess(const Json& message, const AuditPolicy& policy)
-{
-    if (!policy.processCreation)
-    {
-        return {};
-    }
-    THROW_HR_IF_MSG(
-        E_INVALIDARG,
-        !message.is_object() || !message.contains("version") || !message["version"].is_number_unsigned() ||
-            message["version"].get<uint64_t>() != c_protocolVersion || !message.contains("kind") || !message["kind"].is_string(),
-        "Invalid Windows Security audit envelope.");
-    const auto kind = message["kind"].get<std::string>();
-    if (kind == "ready" || kind == "stopped" || kind == "windows-status" || kind == "error")
-    {
-        return {};
-    }
-    THROW_HR_IF_MSG(E_INVALIDARG, kind != "process", "Only validated process messages are process audits.");
-    THROW_HR_IF(E_INVALIDARG, policy.source != "windows" && policy.source != "test-override");
-    SecurityProcessPayload result{};
-    ProjectHostFields(message, std::span(result.fields).first<7>());
-    auto set = [&](SecurityProcessField field, std::wstring value) {
-        result.fields.at(static_cast<size_t>(field)) = std::move(value);
-    };
-    for (const auto& [field, name] :
-         {std::pair{SecurityProcessField::Pid, "pid"},
-          {SecurityProcessField::Tid, "tid"},
-          {SecurityProcessField::Ppid, "ppid"},
-          {SecurityProcessField::Uid, "uid"},
-          {SecurityProcessField::Euid, "euid"},
-          {SecurityProcessField::Gid, "gid"},
-          {SecurityProcessField::Egid, "egid"},
-          {SecurityProcessField::PidNamespace, "pidNamespace"}})
-    {
-        set(field, Number(message, name, UINT32_MAX));
-    }
-    set(SecurityProcessField::LinuxEventNs, Number(message, "timestampNs", UINT64_MAX));
-    set(SecurityProcessField::LinuxStartNs, Number(message, "startTimeNs", UINT64_MAX));
-    const auto executable = Text(message, "executable", 4096);
-    const auto cwd = Text(message, "cwd", 4096);
-    set(SecurityProcessField::Executable, Wide(Json(executable).dump()));
-    set(SecurityProcessField::Cwd, Wide(Json(cwd).dump()));
-    const auto executableMissing = Boolean(message, "executableMissing", executable.empty());
-    const auto cwdMissing = Boolean(message, "cwdMissing", cwd.empty());
-    set(SecurityProcessField::ExecutableMissing, executable.empty() ? L"true" : executableMissing);
-    set(SecurityProcessField::CwdMissing, cwd.empty() ? L"true" : cwdMissing);
-    const auto received = Text(message, "receivedUtc", 30);
-    ValidateUtc(received);
-    set(SecurityProcessField::ReceivedUtc, Wide(received));
-    set(SecurityProcessField::CommandLineIncluded, policy.includeCommandLine ? L"true" : L"false");
-    set(SecurityProcessField::CmdlineTruncated, Boolean(message, "cmdlineTruncated"));
-    if (policy.includeCommandLine)
-    {
-        const auto iterator = message.find("argv");
-        if (iterator != message.end())
-        {
-            THROW_HR_IF_MSG(E_INVALIDARG, !iterator->is_array(), "Invalid process argument array.");
-            size_t bytes{};
-            for (const auto& argument : *iterator)
-            {
-                THROW_HR_IF(E_INVALIDARG, !argument.is_string());
-                const auto& value = argument.get_ref<const std::string&>();
-                THROW_HR_IF_MSG(
-                    E_INVALIDARG, value.size() >= 4096 - bytes, "Process arguments exceed the 4096-byte collection limit.");
-                bytes += value.size() + 1;
-                Wide(value);
-            }
-            set(SecurityProcessField::Argv, Wide(iterator->dump()));
-        }
-        set(SecurityProcessField::CmdlineMissing, Boolean(message, "cmdlineMissing", iterator == message.end()));
-    }
-    else
-    {
-        // Do not even validate or serialize guest argv when command-line auditing is disabled.
-        set(SecurityProcessField::CmdlineMissing, L"not-recorded-by-policy");
-    }
-    set(SecurityProcessField::PolicySource, Wide(policy.source));
-    size_t characters{};
-    for (const auto& field : result.fields)
-    {
-        THROW_HR_IF_MSG(E_INVALIDARG, field.size() > c_maxSecurityFieldCharacters, "Security field exceeds its encoded limit.");
-        characters += field.size() + 1;
-    }
-    THROW_HR_IF_MSG(
-        E_INVALIDARG, characters > c_maxSecurityPayloadCharacters, "Security payload exceeds its bounded UTF-16 limit.");
-    return result;
 }
 
 std::optional<SecurityEventPayload> ProjectProcessExecuted(const Json& message, const AuditPolicy& policy)
@@ -578,39 +460,6 @@ std::optional<SecurityEventPayload> ProjectProcessCreated(const Json& message, c
         ProcessGroup(data, {{"vmCreatorPid", L"Creator process ID (VM)"}}),
         ProcessGroup(data, {{"linuxEventNs", L"Linux creation clock (monotonic ns)"}}),
         message);
-}
-
-std::optional<SecurityEventPayload> ProjectSecurityEvent(const Json& message, const AuditPolicy& policy)
-{
-    if (!policy.AnyEnabled())
-    {
-        return {};
-    }
-    THROW_HR_IF(E_INVALIDARG, policy.source != "windows" && policy.source != "test-override");
-    const auto data = SelectSecurityEvent(message);
-    if (!AllowsSecurityEvent(policy, data.at("family").get_ref<const std::string&>(), data.at("outcome").get_ref<const std::string&>()))
-    {
-        return {};
-    }
-    SecurityEventPayload result{};
-    result.eventId = c_securityEventId;
-    ProjectHostFields(message, std::span(result.fields).first<7>());
-    result.fields[7] = Wide(data.at("family").get_ref<const std::string&>());
-    result.fields[8] = Wide(data.at("operation").get_ref<const std::string&>());
-    const auto received = Text(message, "receivedUtc", 30);
-    ValidateUtc(received);
-    result.fields[9] = Wide(received);
-    result.fields[10] = Wide(data.dump());
-    result.fields[11] = Wide(policy.source);
-    size_t characters{};
-    for (const auto& field : result.fields)
-    {
-        THROW_HR_IF_MSG(E_INVALIDARG, field.size() > c_maxSecurityFieldCharacters, "Security field exceeds its encoded limit.");
-        characters += field.size() + 1;
-    }
-    THROW_HR_IF_MSG(
-        E_INVALIDARG, characters > c_maxSecurityPayloadCharacters, "Security payload exceeds its bounded UTF-16 limit.");
-    return result;
 }
 
 std::optional<SecurityEventPayload> ProjectSecurityObservation(const Json& message, const AuditPolicy& policy)
@@ -833,9 +682,9 @@ namespace security_detail {
         return policy.get()->AuditingInformation;
     }
 
-    SourceInfo QuerySource(std::wstring_view source)
+    SourceInfo QuerySource()
     {
-        ValidateSecuritySourceName(source);
+        constexpr std::wstring_view source = c_securitySourceName;
         auto self = wil::run_as_self();
         auto authority = PrimaryAuthority(SE_SECURITY_NAME, false);
         auto impersonation = wil::impersonate_token(authority.get());
@@ -872,14 +721,12 @@ namespace security_detail {
         }
         if (bytes == 0)
         {
-            result.enumerationCount = count;
             return result;
         }
         THROW_HR_IF(E_UNEXPECTED, bytes > 16 * 1024 * 1024);
         std::vector<BYTE> buffer(bytes);
         auto* entries = reinterpret_cast<AUTHZ_SOURCE_SCHEMA_REGISTRATION*>(buffer.data());
         THROW_IF_WIN32_BOOL_FALSE(AuthzEnumerateSecurityEventSources(0, entries, &count, &bytes));
-        result.enumerationCount = count;
         THROW_HR_IF(E_UNEXPECTED, count > buffer.size() / sizeof(AUTHZ_SOURCE_SCHEMA_REGISTRATION));
         for (DWORD index = 0; index < count; ++index)
         {
@@ -887,7 +734,6 @@ namespace security_detail {
             if (entry.szEventSourceName && source == entry.szEventSourceName)
             {
                 result.installed = true;
-                result.flags = entry.dwFlags;
                 result.messageFile = entry.szEventMessageFile ? entry.szEventMessageFile : L"";
                 break;
             }
@@ -923,42 +769,6 @@ namespace security_detail {
         wil::unique_hlocal_string message;
         THROW_LAST_ERROR_IF_MSG(
             !FormatMessageW(
-                FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_HMODULE | FORMAT_MESSAGE_IGNORE_INSERTS,
-                module.get(),
-                c_securityProcessEventId,
-                0,
-                reinterpret_cast<PWSTR>(&message),
-                0,
-                nullptr),
-            "MessageFile does not provide the WSL process event 62001.");
-        const std::wstring_view text(message.get());
-        THROW_HR_IF_MSG(
-            E_INVALIDARG,
-            text.find(L"WSL Linux process Security audit") == std::wstring_view::npos ||
-                text.find(L"SchemaVersion=%1") == std::wstring_view::npos || text.find(L"Argv=%22") == std::wstring_view::npos ||
-                text.find(L"PolicySource=%27") == std::wstring_view::npos,
-            "MessageFile has an unrelated or incompatible event 62001 schema.");
-        message.reset();
-        THROW_LAST_ERROR_IF_MSG(
-            !FormatMessageW(
-                FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_HMODULE | FORMAT_MESSAGE_IGNORE_INSERTS,
-                module.get(),
-                c_securityEventId,
-                0,
-                reinterpret_cast<PWSTR>(&message),
-                0,
-                nullptr),
-            "MessageFile does not provide the WSL security event 62002. Deploy matching plugin and message resources.");
-        const std::wstring_view securityText(message.get());
-        THROW_HR_IF_MSG(
-            E_INVALIDARG,
-            securityText.find(L"WSL Linux security observation") == std::wstring_view::npos ||
-                securityText.find(L"Family=%8") == std::wstring_view::npos || securityText.find(L"Data=%11") == std::wstring_view::npos ||
-                securityText.find(L"PolicySource=%12") == std::wstring_view::npos,
-            "MessageFile has an incompatible event 62002 schema.");
-        message.reset();
-        THROW_LAST_ERROR_IF_MSG(
-            !FormatMessageW(
                 FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_HMODULE | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_MAX_WIDTH_MASK,
                 module.get(),
                 c_processExecutedEventId,
@@ -966,7 +776,7 @@ namespace security_detail {
                 reinterpret_cast<PWSTR>(&message),
                 0,
                 nullptr),
-            "MessageFile lacks ProcessExecuted event 62010. Deploy matching plugin and message resources.");
+            "MessageFile lacks ProcessExecuted event 62010. Deploy matching WSL message resources.");
         const std::wstring_view executedText(message.get());
         THROW_HR_IF_MSG(
             E_INVALIDARG,
@@ -982,7 +792,7 @@ namespace security_detail {
                 reinterpret_cast<PWSTR>(&message),
                 0,
                 nullptr),
-            "MessageFile lacks ProcessCreated event 62011. Deploy matching plugin and message resources.");
+            "MessageFile lacks ProcessCreated event 62011. Deploy matching WSL message resources.");
         const std::wstring_view createdText(message.get());
         THROW_HR_IF_MSG(
             E_INVALIDARG,
@@ -1016,10 +826,8 @@ void WindowsSecuritySink::CloseProvider(AUTHZ_SECURITY_EVENT_PROVIDER_HANDLE pro
     LOG_IF_WIN32_BOOL_FALSE(AuthzUnregisterSecurityEventSource(0, &provider));
 }
 
-WindowsSecuritySink::WindowsSecuritySink(const AuditPolicy& policy, std::wstring source) :
-    m_policy(policy), m_source(std::move(source))
+WindowsSecuritySink::WindowsSecuritySink(const AuditPolicy& policy) : m_policy(policy)
 {
-    ValidateSecuritySourceName(m_source);
     if (!m_policy.AnyEnabled())
     {
         return;
@@ -1028,10 +836,10 @@ WindowsSecuritySink::WindowsSecuritySink(const AuditPolicy& policy, std::wstring
     auto self = wil::run_as_self();
     auto impersonation = wil::impersonate_token(m_authority.get());
     RequireApplicationGeneratedSuccess();
-    const auto installed = security_detail::QuerySource(m_source);
+    const auto installed = security_detail::QuerySource();
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
-        installed.installed && m_source == c_securitySourceName && !IsNativeSecuritySourceOwned(),
+        installed.installed && !IsNativeSecuritySourceOwned(),
         "Native WSL Security audit source is missing its installer ownership marker; refusing to use a conflicting source.");
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND),
@@ -1043,7 +851,7 @@ WindowsSecuritySink::WindowsSecuritySink(const AuditPolicy& policy, std::wstring
         "Installed WSL Security source enumeration and native registry resource metadata do not agree.");
     security_detail::ValidateMessageResource(installed.messageFile);
     THROW_LAST_ERROR_IF_MSG(
-        !AuthzRegisterSecurityEventSource(c_securitySourceRuntimeFlags, m_source.c_str(), &m_provider),
+        !AuthzRegisterSecurityEventSource(c_securitySourceRuntimeFlags, c_securitySourceName, &m_provider),
         "Cannot register the installed WSL Security source under process authority. No file fallback is performed.");
 }
 

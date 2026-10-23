@@ -123,25 +123,6 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCPluginNotifier::WaitForNativeAuditStartup(ULONGLONG Generation)
-try
-{
-    COMServiceExecutionContext context;
-    wsl::audit::NativeAudit::StartupWait startup;
-    {
-        auto lock = m_auditLock.lock_shared();
-        if (Generation == 0 || Generation != m_auditGeneration)
-        {
-            return S_OK;
-        }
-        startup = m_securityAudit.CaptureStartupWait();
-    }
-    // Stop and a replacement generation must remain able to enter while this epoch waits.
-    (void)startup.Wait();
-    return S_OK;
-}
-CATCH_RETURN();
-
 HRESULT WSLCPluginNotifier::OnNativeAuditContainerStarted(ULONGLONG Generation, const WSLCNativeAuditContainer* Container)
 try
 {

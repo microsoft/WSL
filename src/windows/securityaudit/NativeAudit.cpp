@@ -189,7 +189,6 @@ struct NativeAudit::State
         {
             return;
         }
-        startupComplete.SetEvent();
         switch (result)
         {
         case StartupResult::Ready:
@@ -218,7 +217,6 @@ struct NativeAudit::State
     HostIdentity identity;
     NativeAuditServices services;
     wil::unique_event stop{wil::EventOptions::ManualReset};
-    wil::unique_event startupComplete{wil::EventOptions::ManualReset};
     const Clock::time_point startupDeadline;
     std::atomic<StartupResult> startupResult{StartupResult::Pending};
     std::mutex lock;
@@ -273,46 +271,6 @@ void NativeAudit::Stop() noexcept
     {
         state->stop.SetEvent();
         state->CompleteStartup(StartupResult::Cancelled);
-    }
-}
-
-NativeAudit::StartupWait NativeAudit::CaptureStartupWait() const noexcept
-{
-    return StartupWait{m_state.load()};
-}
-
-NativeAudit::StartupResult NativeAudit::StartupWait::Wait() const noexcept
-{
-    if (!m_state)
-    {
-        ReportAuditStatus("startup-unavailable-workload-allowed", E_FAIL);
-        return StartupResult::Failed;
-    }
-    const HANDLE handles[]{m_state->stop.get(), m_state->startupComplete.get()};
-    for (;;)
-    {
-        if (m_state->stop.is_signaled())
-        {
-            return StartupResult::Cancelled;
-        }
-        const auto result = m_state->startupResult.load();
-        if (result != StartupResult::Pending)
-        {
-            return result;
-        }
-        const auto remaining =
-            std::chrono::duration_cast<std::chrono::milliseconds>(m_state->startupDeadline - State::Clock::now()).count();
-        if (remaining <= 0)
-        {
-            m_state->CompleteStartup(StartupResult::TimedOut);
-            continue;
-        }
-        const auto wait = WaitForMultipleObjects(ARRAYSIZE(handles), handles, FALSE, static_cast<DWORD>(remaining));
-        if (wait == WAIT_FAILED)
-        {
-            ReportAuditStatus("startup-wait-failed-workload-allowed", HRESULT_FROM_WIN32(GetLastError()));
-            return StartupResult::Failed;
-        }
     }
 }
 

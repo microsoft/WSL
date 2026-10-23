@@ -134,8 +134,6 @@ typedef HRESULT (*WSLPluginAPI_OnSessionStopping)(const struct WSLCSessionInform
 
 // Called when a container starts. Returning an error prevents the container creation.
 // 'InspectContainer' is a JSON document that follows the wslc_schema::InspectContainer format.
-// Newer hosts add WslPluginContext: {Version: 1, InitPid: <VM PID>, StartedAt: <container start time>}.
-// InitPid may be zero for an already-exited container. This metadata is only present in plugin notifications.
 typedef HRESULT (*WSLPluginAPI_ContainerStarted)(const struct WSLCSessionInformation* Session, LPCSTR InspectContainer);
 
 // Called when a container is about to stop. 'ContainerId' is the container identifier. Errors are ignored.

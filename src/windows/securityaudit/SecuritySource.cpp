@@ -61,7 +61,7 @@ void InstallSecuritySource(std::wstring_view messageFile)
     security_detail::ValidateMessageResource(messageFile);
     auto authority = security_detail::PrimaryAuthority(SE_SECURITY_NAME);
     auto impersonation = wil::impersonate_token(authority.get());
-    auto source = security_detail::QuerySource(c_securitySourceName);
+    auto source = security_detail::QuerySource();
     VerifyOwner(source, messageFile);
     if (!source.installed)
     {
@@ -76,7 +76,7 @@ void InstallSecuritySource(std::wstring_view messageFile)
     }
     THROW_HR_IF_MSG(
         E_UNEXPECTED,
-        !security_detail::SourceReadbackMatches(security_detail::QuerySource(c_securitySourceName), messageFile),
+        !security_detail::SourceReadbackMatches(security_detail::QuerySource(), messageFile),
         "Native WSL Security source registration readback failed.");
 }
 
@@ -84,7 +84,7 @@ void UninstallSecuritySource(std::wstring_view messageFile)
 {
     auto authority = security_detail::PrimaryAuthority(SE_SECURITY_NAME);
     auto impersonation = wil::impersonate_token(authority.get());
-    const auto source = security_detail::QuerySource(c_securitySourceName);
+    const auto source = security_detail::QuerySource();
     VerifyOwner(source, messageFile);
     if (source.installed)
     {
@@ -92,6 +92,6 @@ void UninstallSecuritySource(std::wstring_view messageFile)
         // MSI retains this resource-only DLL. Keep its lookup metadata after deregistration.
         PreserveHistory(messageFile);
     }
-    THROW_HR_IF(E_UNEXPECTED, security_detail::QuerySource(c_securitySourceName).installed);
+    THROW_HR_IF(E_UNEXPECTED, security_detail::QuerySource().installed);
 }
 } // namespace wsl::audit

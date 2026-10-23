@@ -1157,7 +1157,7 @@ void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProc
     }
 
     WSLCNativeAuditContainer auditContext{};
-    auto inspectJson = InspectLockHeld(false, true, &auditContext);
+    auto inspectJson = InspectLockHeld(false, &auditContext);
     const auto pluginResult = m_pluginNotifier->OnContainerStarted(inspectJson.c_str());
     if (FAILED(pluginResult))
     {
@@ -2940,7 +2940,7 @@ void WSLCContainerImpl::Inspect(BOOL Size, LPSTR* Output) const
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to inspect container '%hs'", m_id.c_str());
 }
 
-std::string WSLCContainerImpl::InspectLockHeld(bool Size, bool PluginContext, WSLCNativeAuditContainer* AuditContext) const
+std::string WSLCContainerImpl::InspectLockHeld(bool Size, WSLCNativeAuditContainer* AuditContext) const
 {
     // Get Docker inspect data
     auto dockerInspect = m_runtime.Docker().InspectContainer(m_id, Size);
@@ -2965,13 +2965,6 @@ std::string WSLCContainerImpl::InspectLockHeld(bool Size, bool PluginContext, WS
                 AuditContext->InitPid = static_cast<ULONG>(dockerInspect.State.Pid);
             }
         }
-    }
-
-    if (PluginContext)
-    {
-        nlohmann::json document = wslcInspect;
-        document["WslPluginContext"] = {{"Version", 1}, {"InitPid", dockerInspect.State.Pid}, {"StartedAt", dockerInspect.State.StartedAt}};
-        return document.dump();
     }
 
     // Serialize WSLC schema to JSON

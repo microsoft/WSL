@@ -41,7 +41,6 @@ public:
     IFACEMETHOD(OnNativeAuditStopping)(ULONGLONG Generation) override;
     IFACEMETHOD(OnNativeAuditContainerStarted)(ULONGLONG Generation, const WSLCNativeAuditContainer* Container) override;
     IFACEMETHOD(OnNativeAuditContainerStopping)(ULONGLONG Generation, LPCSTR ContainerId) override;
-    IFACEMETHOD(WaitForNativeAuditStartup)(ULONGLONG Generation) override;
 
 private:
     wsl::windows::service::PluginManager& m_plugins;

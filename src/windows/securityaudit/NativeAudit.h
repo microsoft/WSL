@@ -10,6 +10,7 @@ namespace wsl::audit {
 inline constexpr wchar_t c_legacyPluginName[] = L"WSL-SecurityAudit-Prototype";
 inline constexpr unsigned c_maxCollectorAttempts = 3;
 inline constexpr DWORD c_auditProcessTimeoutMs = 2000;
+// Background collector initialization only; workloads never wait for this budget.
 inline constexpr DWORD c_auditStartupTimeoutMs = 10000;
 
 bool MachineAuditEnabled(std::optional<RegistryPolicyValue> value) noexcept;
@@ -40,15 +41,12 @@ struct NativeAuditServices
     std::function<bool()> enabled = QueryMachineAuditEnabled;
     std::function<AuditPolicy()> policy = QueryPolicy;
     std::function<std::shared_ptr<AuditSink>(const AuditPolicy&)> sink;
-    // Tests may shorten, but never extend, the VM epoch's overall startup budget.
+    // Tests may shorten, but never extend, the collector's overall initialization budget.
     DWORD startupTimeoutMs = c_auditStartupTimeoutMs;
 };
 
 class NativeAudit
 {
-    struct State;
-
-public:
     enum class StartupResult
     {
         Pending,
@@ -59,28 +57,15 @@ public:
         Cancelled
     };
 
-    class StartupWait
-    {
-    public:
-        StartupWait() = default;
-        // Availability first: observes one captured epoch, never joins its worker or throws.
-        StartupResult Wait() const noexcept;
+    struct State;
 
-    private:
-        friend class NativeAudit;
-        explicit StartupWait(std::shared_ptr<State> state) : m_state(std::move(state))
-        {
-        }
-        std::shared_ptr<State> m_state;
-    };
-
+public:
     explicit NativeAudit(NativeAuditServices services = {});
     NativeAudit(const NativeAudit&) = delete;
     NativeAudit& operator=(const NativeAudit&) = delete;
     ~NativeAudit();
 
     void Start(HostIdentity identity, AuditProcessFactory factory) noexcept;
-    StartupWait CaptureStartupWait() const noexcept;
     // Only signals cancellation. In particular, no joins, sends or COM calls under VM locks.
     void Stop() noexcept;
     // Diagnostic/test observation only. Stop and the destructor never wait on this handle.

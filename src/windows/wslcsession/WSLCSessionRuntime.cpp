@@ -27,9 +27,6 @@ constexpr auto c_dockerdReadyLogLine = "API listen on /var/run/docker.sock";
 // blocked. Purely diagnostic: the wait itself is unbounded (see VmLease).
 constexpr DWORD c_vmStopWaitLogIntervalMs = 30 * 1000;
 
-// Reentrant plugin setup must not wait while its outer lifecycle notification holds m_notifyLock.
-thread_local const WSLCSessionRuntime* g_notifyingRuntime{};
-
 } // namespace
 
 namespace wsl::windows::service::wslc {
@@ -285,14 +282,6 @@ uint64_t WSLCSessionRuntime::EnsureVmRunning()
     // (VmLease) holds an activity reference across this call, so idle teardown cannot race the VM
     // down in the gap between releasing the lock and notifying.
     NotifyVmStarted(generation);
-    if (g_notifyingRuntime == nullptr && m_hooks.WaitForNativeAuditStartup)
-    {
-        try
-        {
-            m_hooks.WaitForNativeAuditStartup(generation);
-        }
-        CATCH_LOG();
-    }
     return generation;
 }
 
@@ -320,9 +309,6 @@ void WSLCSessionRuntime::NotifyVmStarted(uint64_t Generation)
     m_notifiedGeneration.store(Generation);
     if (m_hooks.OnVmStarted)
     {
-        const auto* previous = g_notifyingRuntime;
-        g_notifyingRuntime = this;
-        const auto restore = wil::scope_exit([&] { g_notifyingRuntime = previous; });
         m_hooks.OnVmStarted();
     }
 }

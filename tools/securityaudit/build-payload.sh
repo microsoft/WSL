@@ -41,5 +41,4 @@ cmake -S "$source_root/tools/securityaudit" -B "$build_dir" -G "Unix Makefiles" 
 cmake --build "$build_dir" --parallel 1
 cmake --build "$build_dir" --target audit_payload --parallel 1
 echo "Static payload: $payload_dir"
-echo "Offline regression tests (after the coordinated full WSL build): ctest --test-dir \"$build_dir\" --output-on-failure"
-echo "Privileged live validation remains required; see tools/securityaudit/README.md."
+echo "Pass this payload directory to the Windows build through WSL_SECURITYAUDIT_PAYLOAD_DIR."

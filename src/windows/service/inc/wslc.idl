@@ -152,8 +152,6 @@ interface IWSLCPluginNotifier : IUnknown
     HRESULT OnNativeAuditStopping([in] ULONGLONG Generation);
     HRESULT OnNativeAuditContainerStarted([in] ULONGLONG Generation, [in] const WSLCNativeAuditContainer* Container);
     HRESULT OnNativeAuditContainerStopping([in] ULONGLONG Generation, [in, string] LPCSTR ContainerId);
-    // Availability-first startup gate. Called without VM/runtime or lifecycle notification locks.
-    HRESULT WaitForNativeAuditStartup([in] ULONGLONG Generation);
 };
 
 typedef struct _WSLCImageInformation

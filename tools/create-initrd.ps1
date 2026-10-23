@@ -73,10 +73,9 @@ try
         Write-CpioEntry $out $directory ([byte[]]::new(0)) 0x41ED $mtime # S_IFDIR | 0755
         foreach ($entry in $auditManifest.files.PSObject.Properties | Sort-Object Name)
         {
-            $entryName = if ($entry.Name -eq 'wsl-audit-collector') { 'wsl-audit-collector' } else { $entry.Name }
             $entryData = [IO.File]::ReadAllBytes((Join-Path $AuditPayloadDirectory $entry.Name.Replace('/', '\')))
             $mode = if ($entry.Name -eq 'wsl-audit-collector') { 0x81ED } else { 0x8124 } # 0755 / 0444
-            Write-CpioEntry $out ([Text.Encoding]::ASCII.GetBytes("$entryName`0")) $entryData $mode $mtime
+            Write-CpioEntry $out ([Text.Encoding]::ASCII.GetBytes("$($entry.Name)`0")) $entryData $mode $mtime
         }
         $manifestData = [IO.File]::ReadAllBytes((Join-Path $AuditPayloadDirectory 'audit-payload.json'))
         Write-CpioEntry $out ([Text.Encoding]::ASCII.GetBytes("wsl-security-audit/provenance.json`0")) $manifestData 0x8124 $mtime

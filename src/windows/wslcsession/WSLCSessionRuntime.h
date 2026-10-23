@@ -70,8 +70,6 @@ public:
         // handler may call back into the session (e.g. to run setup in the VM). Fired every time a
         // VM is (re)created for the session.
         std::function<void()> OnVmStarted;
-        // Bounded, fail-open gate, outside runtime and notification locks. Never used by audit's own factory.
-        std::function<void(uint64_t generation)> WaitForNativeAuditStartup;
 
         // Fired when a VM is about to be torn down (best-effort), while the VM is still alive. Invoked
         // without the runtime lock held so the handler may call back into the session or into a plugin

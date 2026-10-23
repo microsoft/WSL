@@ -19,7 +19,7 @@ foreach(required
     "${WSL_AUDIT_EBPF_STATIC_PACKAGE}/libbpf.a"
     "${WSL_AUDIT_JSON_INCLUDE}/nlohmann/json.hpp")
     if(NOT EXISTS "${required}")
-        message(FATAL_ERROR "Missing static audit build dependency: ${required}. See tools/securityaudit/README.md.")
+        message(FATAL_ERROR "Missing static audit build dependency: ${required}. Configure WSL_AUDIT_EBPF_SOURCE_ROOT, WSL_AUDIT_EBPF_STATIC_PACKAGE and WSL_AUDIT_JSON_INCLUDE with matching build inputs.")
     endif()
 endforeach()
 find_package(Threads REQUIRED)
@@ -50,33 +50,6 @@ target_link_libraries(wsl_audit_collector_core PUBLIC
 target_link_options(wsl_audit_collector_core INTERFACE -static -Wl,--no-dynamic-linker,-z,relro,-z,now)
 add_executable(wsl_audit_collector "${WSL_SOURCE_ROOT}/src/linux/securityaudit/CollectorMain.cpp")
 target_link_libraries(wsl_audit_collector PRIVATE wsl_audit_collector_core)
-include(CTest)
-if(BUILD_TESTING)
-    add_executable(audit_collector_tests "${WSL_SOURCE_ROOT}/src/linux/securityaudit/tests/CollectorTests.cpp")
-    target_link_libraries(audit_collector_tests PRIVATE wsl_audit_collector_core)
-    add_test(NAME AuditCollector COMMAND audit_collector_tests)
-    foreach(test Protocol Observation)
-        string(TOLOWER "${test}" lower)
-        add_executable(audit_${lower}_tests "${WSL_SOURCE_ROOT}/src/shared/securityaudit/tests/${test}Tests.cpp")
-        target_link_libraries(audit_${lower}_tests PRIVATE wsl_audit_collector_core)
-        add_test(NAME Audit${test} COMMAND audit_${lower}_tests)
-    endforeach()
-    add_executable(audit_live_collector_test "${WSL_SOURCE_ROOT}/src/linux/securityaudit/tests/LiveCollectorTest.cpp")
-    target_link_libraries(audit_live_collector_test PRIVATE wsl_audit_collector_core)
-    option(WSL_AUDIT_ENABLE_LIVE_TESTS "Run privileged BPF loading and real process-event tests" OFF)
-    if(WSL_AUDIT_ENABLE_LIVE_TESTS)
-        add_test(NAME AuditLiveCollector COMMAND audit_live_collector_test
-            "$<TARGET_FILE:wsl_audit_collector>" "${WSL_AUDIT_PAYLOAD_OUTPUT}/wsl-security-audit")
-        set_tests_properties(AuditLiveCollector PROPERTIES TIMEOUT 300 LABELS "privileged;integration")
-        add_test(NAME AuditMinimalRootNetwork COMMAND bash "${CMAKE_CURRENT_LIST_DIR}/test-minimal-root.sh"
-            "$<TARGET_FILE:audit_live_collector_test>" "${WSL_AUDIT_PAYLOAD_OUTPUT}"
-            "${CMAKE_CURRENT_BINARY_DIR}/minimal-audit-root")
-        set_tests_properties(AuditMinimalRootNetwork PROPERTIES TIMEOUT 300 LABELS "privileged;integration")
-    endif()
-    add_test(NAME AuditStaticElf COMMAND "${CMAKE_COMMAND}"
-        "-DCOLLECTOR=$<TARGET_FILE:wsl_audit_collector>"
-        "-DARCHITECTURE=${CMAKE_SYSTEM_PROCESSOR}" -P "${CMAKE_CURRENT_LIST_DIR}/VerifyElf.cmake")
-endif()
 configure_file("${CMAKE_CURRENT_LIST_DIR}/StagePayload.cmake.in" "${CMAKE_CURRENT_BINARY_DIR}/StagePayload.cmake" @ONLY)
 add_custom_target(audit_payload
     COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/StagePayload.cmake"

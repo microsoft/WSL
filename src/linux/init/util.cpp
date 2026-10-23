@@ -3465,7 +3465,13 @@ int ProcessCreateProcessMessage(
 
     // Always return the execution result, since the service expects it
     int execResult = -1;
-    auto sendExecResult = wil::scope_exit([&]() { sendResult(execResult); });
+    auto sendExecResult = wil::scope_exit([&]() {
+        try
+        {
+            sendResult(execResult);
+        }
+        CATCH_LOG()
+    });
 
     const char* Path = wsl::shared::string::FromSpan(Buffer, Message->PathIndex);
     const auto arguments = wsl::shared::string::ArrayFromSpan(Buffer, Message->CommandLineIndex);

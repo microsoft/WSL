@@ -871,9 +871,6 @@ private:
     /// </summary>
     bool m_disableNewInstanceCreation = false;
 
-    _Guarded_by_(m_instanceLock) unsigned int m_pendingInstanceStarts {};
-    _Guarded_by_(m_instanceLock) bool m_notifyingVmStarted {};
-
     /// <summary>
     /// The user's token. Shared with WslCoreVm and plugins.
     /// </summary>

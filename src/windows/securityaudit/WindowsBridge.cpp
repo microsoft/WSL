@@ -103,39 +103,12 @@ std::string ToUtf8(std::wstring_view value)
     return result;
 }
 
-std::wstring ToWide(std::string_view value)
-{
-    if (value.empty())
-    {
-        return {};
-    }
-    THROW_HR_IF(E_INVALIDARG, value.size() > INT_MAX);
-    const auto size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), nullptr, 0);
-    THROW_LAST_ERROR_IF(size == 0);
-    std::wstring result(size, L'\0');
-    THROW_LAST_ERROR_IF(
-        MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), result.data(), size) == 0);
-    return result;
-}
-
 std::string SidString(PSID sid)
 {
     THROW_HR_IF(E_INVALIDARG, !sid || !IsValidSid(sid));
     wil::unique_hlocal_string text;
     THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSidW(sid, text.put()));
     return ToUtf8(text.get());
-}
-
-std::string CurrentUserSid()
-{
-    wil::unique_handle token;
-    THROW_IF_WIN32_BOOL_FALSE(OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, token.put()));
-    DWORD size{};
-    GetTokenInformation(token.get(), TokenUser, nullptr, 0, &size);
-    THROW_LAST_ERROR_IF(GetLastError() != ERROR_INSUFFICIENT_BUFFER);
-    std::vector<BYTE> buffer(size);
-    THROW_IF_WIN32_BOOL_FALSE(GetTokenInformation(token.get(), TokenUser, buffer.data(), size, &size));
-    return SidString(reinterpret_cast<TOKEN_USER*>(buffer.data())->User.Sid);
 }
 
 std::optional<DWORD> QueryTokenSessionId(HANDLE token)
@@ -157,38 +130,6 @@ std::string UtcNow()
     char text[32]{};
     sprintf_s(text, "%04u-%02u-%02uT%02u:%02u:%02u.%03uZ", time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute, time.wSecond, time.wMilliseconds);
     return text;
-}
-
-std::wstring QuoteArgument(std::wstring_view value)
-{
-    if (!value.empty() && value.find_first_of(L" \t\r\n\v\f\"") == std::wstring_view::npos)
-    {
-        return std::wstring(value);
-    }
-
-    std::wstring result = L"\"";
-    size_t slashes{};
-    for (const auto character : value)
-    {
-        if (character == L'\\')
-        {
-            ++slashes;
-            continue;
-        }
-        if (character == L'"')
-        {
-            result.append(slashes * 2 + 1, L'\\');
-        }
-        else
-        {
-            result.append(slashes, L'\\');
-        }
-        slashes = 0;
-        result.push_back(character);
-    }
-    result.append(slashes * 2, L'\\');
-    result.push_back(L'"');
-    return result;
 }
 
 void NdjsonReceiver::Feed(std::string_view bytes, const std::function<void(nlohmann::json)>& callback)
@@ -397,12 +338,6 @@ void EventSession::SetDistributions(std::vector<DistributionIdentity> distributi
     m_distributions = std::move(distributions);
 }
 
-void EventSession::SetHostDistribution(DistributionIdentity distribution)
-{
-    std::lock_guard lock(m_lock);
-    m_hostDistribution = std::move(distribution);
-}
-
 void EventSession::SetContainers(std::vector<ContainerIdentity> containers)
 {
     std::lock_guard lock(m_lock);
@@ -531,11 +466,6 @@ void EventSession::Accept(nlohmann::json message)
         }
         m_ready = true;
         m_rootPidNamespace = message["pidNamespace"].get<uint64_t>();
-        if (m_hostDistribution)
-        {
-            m_hostDistribution->pidNamespace = message["pidNamespace"].get<uint64_t>();
-            m_distributions = {*m_hostDistribution};
-        }
     }
     else if (kind == "process" || kind == "security")
     {
@@ -598,29 +528,6 @@ bool EventSession::Stopped() const
 {
     std::lock_guard lock(m_lock);
     return m_stopped;
-}
-
-void WriteAll(HANDLE handle, std::string_view bytes)
-{
-    while (!bytes.empty())
-    {
-        DWORD written{};
-        THROW_IF_WIN32_BOOL_FALSE(
-            WriteFile(handle, bytes.data(), static_cast<DWORD>(std::min<size_t>(bytes.size(), MAXDWORD)), &written, nullptr));
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_WRITE_FAULT), written == 0);
-        bytes.remove_prefix(written);
-    }
-}
-
-void SendAll(SOCKET socket, std::string_view bytes)
-{
-    while (!bytes.empty())
-    {
-        const auto written = send(socket, bytes.data(), static_cast<int>(std::min<size_t>(bytes.size(), INT_MAX)), 0);
-        THROW_HR_IF(HRESULT_FROM_WIN32(WSAGetLastError()), written == SOCKET_ERROR);
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_WRITE_FAULT), written == 0);
-        bytes.remove_prefix(written);
-    }
 }
 
 } // namespace wsl::audit

@@ -490,13 +490,6 @@ try
         }
     };
 
-    hooks.WaitForNativeAuditStartup = [this](uint64_t generation) {
-        if (m_pluginNotifier)
-        {
-            LOG_IF_FAILED(m_pluginNotifier->WaitForNativeAuditStartup(generation));
-        }
-    };
-
     hooks.OnCrashDump = std::bind(
         &WSLCSession::OnCrashDumpWritten, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5);
 

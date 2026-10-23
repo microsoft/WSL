@@ -33,13 +33,10 @@ AuditPolicy EvaluatePolicy(const WindowsAuditSettings& settings, std::optional<R
 AuditPolicy QueryPolicy();
 nlohmann::json ExpectedCollectorCoverage(const nlohmann::json& ready);
 std::string ToUtf8(std::wstring_view value);
-std::wstring ToWide(std::string_view value);
 std::string SidString(PSID sid);
-std::string CurrentUserSid();
 std::optional<DWORD> QueryTokenSessionId(HANDLE token);
 std::string UtcNow();
 std::string NewCaptureSessionId();
-std::wstring QuoteArgument(std::wstring_view value);
 
 struct DistributionIdentity
 {
@@ -106,7 +103,6 @@ class EventSession
 public:
     EventSession(AuditPolicy policy, HostIdentity host, std::shared_ptr<AuditSink> output);
     void SetDistributions(std::vector<DistributionIdentity> distributions);
-    void SetHostDistribution(DistributionIdentity distribution);
     void SetContainers(std::vector<ContainerIdentity> containers);
     void Accept(nlohmann::json message);
     void Finish() const;
@@ -120,15 +116,12 @@ private:
     const std::string m_captureSessionId;
     mutable std::mutex m_lock;
     std::vector<DistributionIdentity> m_distributions;
-    std::optional<DistributionIdentity> m_hostDistribution;
     std::vector<ContainerIdentity> m_containers;
     uint64_t m_rootPidNamespace{};
     bool m_ready{};
     bool m_stopped{};
 };
 
-void WriteAll(HANDLE handle, std::string_view bytes);
-void SendAll(SOCKET socket, std::string_view bytes);
 using UniqueSocket = wil::unique_socket;
 
 } // namespace wsl::audit
