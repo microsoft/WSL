@@ -204,10 +204,10 @@ public:
 
     // Network management.
     IFACEMETHOD(CreateNetwork)(_In_ const WSLCNetworkOptions* Options, _In_opt_ IWarningCallback* WarningCallback) override;
-    IFACEMETHOD(DeleteNetwork)(_In_ LPCSTR Name) override;
+    IFACEMETHOD(DeleteNetwork)(_In_ LPCSTR NetworkNameOrId) override;
     IFACEMETHOD(ListNetworks)
     (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters, _In_ ULONG FiltersCount, _Out_ LPSTR* Output) override;
-    IFACEMETHOD(InspectNetwork)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
+    IFACEMETHOD(InspectNetwork)(_In_ LPCSTR NetworkNameOrId, _Out_ LPSTR* Output) override;
     IFACEMETHOD(PruneNetworks)
     (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters, _In_ ULONG FiltersCount, _Out_ WSLCNetworkName** Networks, _Out_ ULONG* NetworksCount)
         override;
@@ -314,6 +314,10 @@ public:
     // for the lifetime of a process whose wrapper a client may keep (root-namespace and exec'd
     // processes).
     Microsoft::WRL::ComPtr<IUnknown> CreateActivityToken();
+
+    // Resolves a session-managed network name, full ID, or unique ID prefix. Returns std::nullopt if nothing matches.
+    // Throws E_INVALIDARG if the prefix matches more than one network. Callers must hold a VM lease.
+    std::optional<ResolvedNetwork> TryResolveNetwork(const std::string& NetworkNameOrId);
 
 private:
     ULONG m_id = 0;

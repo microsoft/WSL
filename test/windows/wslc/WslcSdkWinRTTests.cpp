@@ -715,6 +715,53 @@ class WslcSdkWinRtTests
         }
     }
 
+    WSLC_TEST_METHOD(NetworkDeleteById)
+    {
+        constexpr auto c_networkName = "wslc-sdk-winrt-delete-network-by-id";
+        const winrt::hstring networkName = winrt::to_hstring(c_networkName);
+
+        auto comSession = wil::com_query<IWSLCSession>(
+            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->GetSession());
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName));
+
+        auto findNetworkId = [&]() -> std::optional<winrt::hstring> {
+            for (auto const& network : m_defaultSession.GetNetworks())
+            {
+                if (network.Name() == networkName)
+                {
+                    return network.Id();
+                }
+            }
+
+            return std::nullopt;
+        };
+
+        auto createNetwork = [&]() {
+            WSLCNetworkOptions options{};
+            options.Name = c_networkName;
+            options.Driver = "bridge";
+            VERIFY_SUCCEEDED(comSession->CreateNetwork(&options, nullptr));
+            const auto id = findNetworkId();
+            VERIFY_IS_TRUE(id.has_value());
+            return id.value();
+        };
+
+        auto cleanupNetwork = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName)); });
+
+        // Positive: a network can be deleted by its full ID.
+        {
+            m_defaultSession.DeleteNetwork(createNetwork());
+            VERIFY_IS_FALSE(findNetworkId().has_value());
+        }
+
+        // Positive: a network can be deleted by a unique ID prefix.
+        {
+            const std::wstring id{createNetwork()};
+            m_defaultSession.DeleteNetwork(winrt::hstring{id.substr(0, 12)});
+            VERIFY_IS_FALSE(findNetworkId().has_value());
+        }
+    }
+
     WSLC_TEST_METHOD(NetworkCreate)
     {
         constexpr auto c_networkName = "wslc-sdk-winrt-create-network";

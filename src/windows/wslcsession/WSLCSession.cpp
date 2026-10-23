@@ -3387,14 +3387,27 @@ void WSLCSession::CreateNetworkImpl(const WSLCNetworkOptions& Options, LPSTR* Ne
     }
 }
 
-HRESULT WSLCSession::DeleteNetwork(LPCSTR Name)
+std::optional<ResolvedNetwork> WSLCSession::TryResolveNetwork(const std::string& NetworkNameOrId)
+{
+    std::lock_guard networksLock(m_networksLock);
+
+    auto it = FindNetwork(m_networks, NetworkNameOrId);
+    if (it == m_networks.end())
+    {
+        return std::nullopt;
+    }
+
+    return ResolvedNetwork{.Name = it->first, .Id = it->second.Id};
+}
+
+HRESULT WSLCSession::DeleteNetwork(LPCSTR NetworkNameOrId)
 try
 {
     WSLCExecutionContext context(this);
 
-    RETURN_HR_IF_NULL(E_POINTER, Name);
-    std::string name = Name;
-    ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
+    RETURN_HR_IF_NULL(E_POINTER, NetworkNameOrId);
+    std::string nameOrId = NetworkNameOrId;
+    ValidateName(nameOrId.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
 
     auto lock = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
@@ -3402,12 +3415,15 @@ try
 
     std::lock_guard networksLock(m_networksLock);
 
-    auto it = m_networks.find(name);
-    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), it == m_networks.end());
+    auto it = FindNetwork(m_networks, nameOrId);
+    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(nameOrId), it == m_networks.end());
+
+    const auto& name = it->first;
+    const auto& id = it->second.Id;
 
     try
     {
-        m_runtime.Docker().RemoveNetwork(name);
+        m_runtime.Docker().RemoveNetwork(id);
     }
     catch (const DockerHTTPException& e)
     {
@@ -3418,8 +3434,8 @@ try
         THROW_DOCKER_USER_ERROR_MSG(e, "Failed to delete network '%hs'", name.c_str());
     }
 
+    WSL_LOG("NetworkDeleted", TraceLoggingValue(name.c_str(), "NetworkName"), TraceLoggingValue(id.c_str(), "NetworkId"));
     m_networks.erase(it);
-    WSL_LOG("NetworkDeleted", TraceLoggingValue(name.c_str(), "NetworkName"));
 
     return S_OK;
 }
@@ -3461,32 +3477,37 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::InspectNetwork(LPCSTR Name, LPSTR* Output)
+HRESULT WSLCSession::InspectNetwork(LPCSTR NetworkNameOrId, LPSTR* Output)
 try
 {
     WSLCExecutionContext context(this);
 
-    RETURN_HR_IF_NULL(E_POINTER, Name);
+    RETURN_HR_IF_NULL(E_POINTER, NetworkNameOrId);
     RETURN_HR_IF_NULL(E_POINTER, Output);
 
     *Output = nullptr;
 
-    std::string name = Name;
-    ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
+    std::string nameOrId = NetworkNameOrId;
+    ValidateName(nameOrId.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
 
     auto lock = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
+    // Built-in networks (bridge, host, none) are not tracked in m_networks, so unresolved
+    // references are passed through and resolved by the engine.
+    const auto resolved = TryResolveNetwork(nameOrId);
+    const std::string& target = resolved ? resolved->Id : nameOrId;
+
     docker_schema::Network network;
     try
     {
-        network = m_runtime.Docker().InspectNetwork(name);
+        network = m_runtime.Docker().InspectNetwork(target);
     }
     catch (const DockerHTTPException& e)
     {
-        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), e.StatusCode() == 404);
-        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to inspect network '%hs'", name.c_str());
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(nameOrId), e.StatusCode() == 404);
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to inspect network '%hs'", nameOrId.c_str());
     }
 
     wslc_schema::Network result;

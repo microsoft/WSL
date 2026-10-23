@@ -117,7 +117,7 @@ public:
     void Stats(LPSTR* Output) const;
     void GetLabels(WSLCLabelInformation** Labels, ULONG* Count) const;
     void ConnectToNetwork(const WSLCNetworkConnectionOptions* Options);
-    void DisconnectFromNetwork(LPCSTR NetworkName);
+    void DisconnectFromNetwork(LPCSTR NetworkNameOrId);
 
     void CopyTo(IWSLCContainer** Container) const;
 
@@ -349,7 +349,7 @@ public:
     IFACEMETHOD(GetLabels)(_Out_ WSLCLabelInformation** Labels, _Out_ ULONG* Count) override;
     IFACEMETHOD(Stats)(_Out_ LPSTR* Output) override;
     IFACEMETHOD(ConnectToNetwork)(_In_ const WSLCNetworkConnectionOptions* Options) override;
-    IFACEMETHOD(DisconnectFromNetwork)(_In_ LPCSTR NetworkName) override;
+    IFACEMETHOD(DisconnectFromNetwork)(_In_ LPCSTR NetworkNameOrId) override;
 
     // IWSLCCompatContainer.
     IFACEMETHOD(Start)(_In_ WSLCContainerStartFlags Flags) override;

@@ -440,17 +440,17 @@ winrt::Microsoft::WSL::Containers::NetworkInfo Session::CreateNetwork(winrt::Mic
     return winrt::make<implementation::NetworkInfo>(networkInfo);
 }
 
-void Session::DeleteNetwork(hstring const& name)
+void Session::DeleteNetwork(hstring const& nameOrId)
 {
-    if (name.empty())
+    if (nameOrId.empty())
     {
-        throw winrt::hresult_invalid_argument(L"Network name cannot be empty");
+        throw winrt::hresult_invalid_argument(L"Network name or ID cannot be empty");
     }
 
     EnsureStarted();
 
     wil::unique_cotaskmem_string errorMessage;
-    auto hr = WslcDeleteSessionNetwork(ToHandle(), winrt::to_string(name).c_str(), errorMessage.put());
+    auto hr = WslcDeleteSessionNetwork(ToHandle(), winrt::to_string(nameOrId).c_str(), errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
 }
 
