@@ -210,7 +210,7 @@ private:
     VmConfiguration m_configuration;
     std::wstring m_vmIdString;
     wil::shared_event m_terminatingEvent{wil::EventOptions::ManualReset};
-    wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
+    wil::shared_event m_exitEvent{wil::EventOptions::ManualReset};
     wil::shared_event m_vmCrashEvent{wil::EventOptions::ManualReset};
     std::optional<VmCrashCaptureRequest> m_crashCapture;
     // Paths are fixed during initialization, before HCS callbacks are registered.

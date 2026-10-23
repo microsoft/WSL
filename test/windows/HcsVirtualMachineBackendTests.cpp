@@ -220,6 +220,54 @@ class HcsVirtualMachineBackendTests
         VerifyBootsAndTerminates(HcsVirtualMachineBackend::Create(CreateRunnableRequest()));
     }
 
+    TEST_METHOD(SignalsTerminationOnlyAfterVmExit)
+    {
+        SKIP_TEST_ARM64();
+        auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        auto guest = StartGuest(*backend);
+        const auto terminationEvent = backend->GetTerminationEvent();
+        const auto listener = backend->CreateGuestListener({12345});
+        wil::unique_event socketInUse{wil::EventOptions::ManualReset};
+        bool exitSignaledDuringCancellation = true;
+        HRESULT reasonDuringCancellation = S_OK;
+        auto socketUser = std::async(std::launch::async, [&] {
+            return OperationResult([&] {
+                listener.WithSocket([&](SOCKET, HANDLE cancellationEvent) {
+                    socketInUse.SetEvent();
+                    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_TIMEOUT), WaitForSingleObject(cancellationEvent, 30 * 1000) != WAIT_OBJECT_0);
+                    exitSignaledDuringCancellation = terminationEvent.is_signaled();
+                    reasonDuringCancellation = OperationResult([&] { backend->GetTerminationReason(); });
+                });
+            });
+        });
+
+        VERIFY_IS_TRUE(socketInUse.wait(30 * 1000));
+        backend->Terminate();
+        VERIFY_ARE_EQUAL(S_OK, socketUser.get());
+        VERIFY_IS_FALSE(exitSignaledDuringCancellation);
+        VERIFY_ARE_EQUAL(c_invalidState, reasonDuringCancellation);
+        VERIFY_IS_TRUE(terminationEvent.is_signaled());
+        VERIFY_ARE_EQUAL(VmTerminationReason::Shutdown, backend->GetTerminationReason().Reason);
+    }
+
+    TEST_METHOD(CompletesTerminationWithoutExitNotification)
+    {
+        SKIP_TEST_ARM64();
+        auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        const auto terminationEvent = backend->GetTerminationEvent();
+        wsl::windows::common::hcs::RegisterCallback(backend->GetComputeSystemHandle(), [](HCS_EVENT*, void*) {}, nullptr);
+        HRESULT callbackReasonResult = E_FAIL;
+        backend->RegisterTerminationCallback(
+            [&](GUID) { callbackReasonResult = OperationResult([&] { backend->GetTerminationReason(); }); });
+
+        backend->Terminate();
+        VERIFY_IS_TRUE(terminationEvent.is_signaled());
+        VERIFY_ARE_EQUAL(S_OK, callbackReasonResult);
+        VERIFY_ARE_EQUAL(VmTerminationReason::Unknown, backend->GetTerminationReason().Reason);
+        backend.reset();
+        VERIFY_IS_TRUE(terminationEvent.is_signaled());
+    }
+
     TEST_METHOD(ClosesGuestListenersBeforeRebinding)
     {
         SKIP_TEST_ARM64();

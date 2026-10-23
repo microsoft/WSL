@@ -645,7 +645,7 @@ VmTerminationInformation HcsVirtualMachineBackend::GetTerminationReason() const
 
 wil::shared_event HcsVirtualMachineBackend::GetTerminationEvent() const
 {
-    return m_terminatingEvent;
+    return m_exitEvent;
 }
 
 wil::shared_event HcsVirtualMachineBackend::GetCrashEvent() const
@@ -728,6 +728,9 @@ void HcsVirtualMachineBackend::Shutdown()
 
     auto cleanup = wil::scope_exit([&] {
         system.reset();
+        // Closing the system drains exit callbacks. If none arrived, publish completion with
+        // the default Unknown reason rather than leaving termination waiters blocked.
+        m_exitEvent.SetEvent();
         CleanupAttachedDisks(std::move(attachedDisks));
         NotifyTerminated(m_configuration.Description.Identity);
     });
