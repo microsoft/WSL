@@ -75,6 +75,7 @@ RequiredExtraMmioSpaceForPmemFileInMb(_In_ PCWSTR FilePath)
 }
 
 wil::unique_hfile OpenVhdBackingFile(_In_ PCWSTR Path, _In_opt_ HANDLE UserToken)
+try
 {
     // User-owned VHDs may not grant the service identity access.
     wil::unique_token_reverter runAsUser;
@@ -88,6 +89,11 @@ wil::unique_hfile OpenVhdBackingFile(_In_ PCWSTR Path, _In_opt_ HANDLE UserToken
     THROW_LAST_ERROR_IF(!file);
 
     return file;
+}
+catch (...)
+{
+    const auto result = wil::ResultFromCaughtException();
+    THROW_HR_WITH_USER_ERROR(result, Localization::MessageFailedToAttachDisk(Path, wsl::windows::common::wslutil::GetSystemErrorString(result)));
 }
 
 bool IsBackingVolumeMounted(_In_ HANDLE File)
@@ -222,6 +228,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     }
     else
     {
+        const auto runAsUser = wil::impersonate_token(m_userToken.get());
         if (!wsl::windows::common::filesystem::FileExists(m_vmConfig.KernelPath.c_str()))
         {
             THROW_HR_WITH_USER_ERROR(
@@ -234,8 +241,6 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         // copies of the initrd file and private kernel.
         if constexpr (wsl::shared::Arm64)
         {
-            auto impersonate = wil::impersonate_token(m_userToken.get());
-
             m_rootFsPath = m_tempPath / LXSS_ROOTFS_DIRECTORY;
             wil::CreateDirectoryDeep(m_rootFsPath.c_str());
             auto initRdPath = m_installPath / LXSS_TOOLS_DIRECTORY / LXSS_VM_MODE_INITRD_NAME;
@@ -268,6 +273,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     }
     else
     {
+        const auto runAsUser = wil::impersonate_token(m_userToken.get());
         if (!wsl::windows::common::filesystem::FileExists(m_vmConfig.KernelModulesPath.c_str()))
         {
             THROW_HR_WITH_USER_ERROR(
@@ -1366,9 +1372,16 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::DetachDisk(_In_opt_ PCWSTR Disk)
 
         if (disk.Type == DiskType::VHD)
         {
+            if (TargetPath == nullptr)
+            {
+                return true;
+            }
+
+            const auto runAsUser = wil::CoImpersonateClient();
+
             // N.B. std::filesystem::equivalent can throw if the path is malformed so use the noexcept variant.
             std::error_code error{};
-            return TargetPath == nullptr || std::filesystem::equivalent(disk.Path, TargetPath, error);
+            return std::filesystem::equivalent(disk.Path, TargetPath, error);
         }
         else if (disk.Type == DiskType::PassThrough)
         {
@@ -1536,6 +1549,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
     // Ensure the system distro exists and ends with a img or vhd file extension.
     if (privateSystemDistro)
     {
+        const auto runAsUser = wil::impersonate_token(m_userToken.get());
         if (wsl::windows::common::string::IsPathComponentEqual(m_vmConfig.SystemDistroPath.extension().native(), L".img"))
         {
             m_systemDistroDeviceType = LxMiniInitMountDeviceTypePmem;
@@ -1560,6 +1574,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
     // If using pmem for the system distro, add MMIO space for the device.
     if (m_systemDistroDeviceType == LxMiniInitMountDeviceTypePmem)
     {
+        const auto runAsUser = wil::impersonate_token(m_userToken.get());
         highMmioGapInMB += RequiredExtraMmioSpaceForPmemFileInMb(m_vmConfig.SystemDistroPath.c_str());
     }
 
@@ -1812,23 +1827,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
     // inherited ACLs; otherwise StartComputeSystem will surface E_ACCESSDENIED.
     auto attachDisk = [&](PCWSTR path, bool grantVmAccess) {
         auto lun = ReserveLun();
-        wil::unique_hfile backingFile;
-        try
-        {
-            backingFile = OpenVhdBackingFile(path, grantVmAccess ? m_userToken.get() : nullptr);
-        }
-        catch (...)
-        {
-            if (!grantVmAccess || wil::ResultFromCaughtException() != E_ACCESSDENIED)
-            {
-                throw;
-            }
-
-            LOG_CAUGHT_EXCEPTION();
-
-            // Custom VHDs may be accessible only to the service and VMWP.
-            backingFile = OpenVhdBackingFile(path, nullptr);
-        }
+        auto backingFile = OpenVhdBackingFile(path, grantVmAccess ? m_userToken.get() : nullptr);
 
         hcs::Attachment disk{};
         disk.Type = hcs::AttachmentType::VirtualDisk;
@@ -2289,7 +2288,10 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
         sharePath.push_back(L'\\');
     }
 
-    sharePath = wsl::windows::common::filesystem::GetCanonicalPath(sharePath).wstring();
+    {
+        const auto runAsUser = wil::impersonate_token(UserToken);
+        sharePath = wsl::windows::common::filesystem::GetCanonicalPath(sharePath).wstring();
+    }
 
     std::wstring effectiveOptions(Options);
 
