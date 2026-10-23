@@ -2906,6 +2906,23 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     WI_ASSERT(dockerContainer.State != ContainerState::Running);
 
     auto metadata = ParseContainerMetadata(metadataIt->second.c_str());
+
+    // A session that ends while an auto-remove container is running, such as on shutdown or reboot, never sees it
+    // exit, so it's removed here instead. If that fails, the container is recovered so it can still be removed.
+    if ((dockerContainer.State == ContainerState::Exited || dockerContainer.State == ContainerState::Dead) &&
+        WI_IsFlagSet(metadata.Flags, WSLCContainerFlagsRm))
+    {
+        try
+        {
+            DockerClient.DeleteContainer(dockerContainer.Id, true, true);
+            return nullptr;
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION_MSG("Failed to remove container '%hs'", dockerContainer.Id.c_str());
+        }
+    }
+
     auto labels = StripInternalLabels(dockerContainer.Labels);
 
     // Docker treats empty NetworkMode as the default (bridge).

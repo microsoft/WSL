@@ -154,6 +154,7 @@ public:
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         EventStore& eventStore);
 
+    // Returns nullptr if an exited auto-remove container was deleted during recovery.
     static std::shared_ptr<WSLCContainerImpl> Open(
         const common::docker_schema::ContainerInfo& DockerContainer,
         WSLCSession& wslcSession,
