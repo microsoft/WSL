@@ -7610,7 +7610,8 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         // A directory passes the existence check but cannot be opened as a VHD backing file.
         VERIFY_IS_TRUE(CreateDirectoryW(vhdPath.c_str(), nullptr));
 
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { THROW_IF_WIN32_BOOL_FALSE(RemoveDirectoryW(vhdPath.c_str())); });
+        auto cleanup =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { THROW_IF_WIN32_BOOL_FALSE(RemoveDirectoryW(vhdPath.c_str())); });
 
         WslConfigChange config{LxssGenerateTestConfig({.systemDistro = vhdPath})};
 
