@@ -16,6 +16,7 @@ Abstract:
 #include "Common.h"
 #include "registry.hpp"
 #include "PluginTests.h"
+#include "WslPluginApi.h"
 #include "wslc.h"
 #include "WSLCContainerLauncher.h"
 #include "WSLCProcessLauncher.h"
@@ -812,6 +813,46 @@ class PluginTests
             WSLC Session stopping, name=plugin-wslc-pull-test, id=*)";
 
         ValidateLogFile(ExpectedOutput);
+    }
+
+    void VerifyWslcPluginLoadFailure(PluginTestType Mode, HRESULT ExpectedResult, LPCWSTR ExpectedMessage)
+    {
+        ConfigurePlugin(Mode);
+
+        WSLCSessionSettings settings{};
+        settings.DisplayName = L"plugin-wslc-load-failure";
+        settings.CpuCount = 4;
+        settings.MemoryMb = 2048;
+        settings.BootTimeoutMs = 30 * 1000;
+        settings.MaximumStorageSizeMb = 1024 * 20;
+        settings.NetworkingMode = WSLCNetworkingModeNone;
+
+        auto manager = OpenWslcSessionManager();
+        wil::com_ptr<IWSLCSession> session;
+        const auto result = manager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session);
+        ValidateCOMErrorMessageContains(ExpectedMessage);
+        VERIFY_ARE_EQUAL(ExpectedResult, result);
+        VERIFY_IS_NULL(session.get());
+    }
+
+    WSL2_TEST_METHOD(WslcPluginLoadFailure)
+    {
+        VerifyWslcPluginLoadFailure(
+            PluginTestType::FailToLoad, E_UNEXPECTED, L"A fatal error was returned by plugin 'TestPlugin'");
+        ValidateLogFile(
+            LR"(Plugin loaded. TestMode=2
+            OnLoad: E_UNEXPECTED)");
+    }
+
+    WSL2_TEST_METHOD(WslcPluginUpdateRequired)
+    {
+        VerifyWslcPluginLoadFailure(
+            PluginTestType::PluginRequiresUpdate,
+            WSL_E_PLUGIN_REQUIRES_UPDATE,
+            L"The plugin 'TestPlugin' requires a newer version of WSL");
+        ValidateLogFile(
+            LR"(Plugin loaded. TestMode=9
+            OnLoad: WSL_E_PLUGINREQUIRESUPDATE)");
     }
 
     WSL2_TEST_METHOD(WslcSessionRejected)
