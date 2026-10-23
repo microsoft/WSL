@@ -4349,6 +4349,14 @@ class WSLCTests
             // Validate that /dev/dxg is available as a character device with read/write permissions.
             expect({"/bin/sh", "-c", "test -c /dev/dxg && test -r /dev/dxg && test -w /dev/dxg"}, 0);
 
+            // Validate that the VGEM DRM nodes used by VAAPI are available.
+            expect(
+                {"/bin/sh",
+                 "-c",
+                 "test -c /dev/dri/card0 && test -c /dev/dri/renderD128 && test -r /dev/dri/renderD128 && test -w "
+                 "/dev/dri/renderD128"},
+                0);
+
             // Validate that the GPU library directory is mounted and contains libraries.
             expect({"/bin/sh", "-c", "test -d /usr/lib/wsl/lib && ls /usr/lib/wsl/lib | grep -q ."}, 0);
 
