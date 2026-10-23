@@ -12,7 +12,7 @@ STDAPI WslcDeleteSessionNetwork(_In_ WslcSession session, _In_z_ PCSTR nameOrId,
 
 Return value: `HRESULT`.
 
-`nameOrId` is the name, full ID, or unique ID prefix of the network to delete. An exact name match takes precedence over an ID match.
+`nameOrId` is the name, full ID, or unique ID prefix of the network to delete. An exact ID match takes precedence over a name match, and a name match takes precedence over an ID prefix match.
 
 Returns `WSLC_E_NETWORK_NOT_FOUND` if no network matches, `E_INVALIDARG` if an ID prefix matches more than one network, or `HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION)` if a container is connected to the network. Returns [`WSLC_E_RUNTIME_UPDATE_NEEDED`](../error-codes.md) if the installed WSL runtime does not support network management.
 

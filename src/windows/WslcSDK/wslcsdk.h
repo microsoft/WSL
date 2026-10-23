@@ -805,7 +805,8 @@ STDAPI WslcCreateSessionNetwork(
 //       A valid WslcSession handle.
 //
 //   nameOrId
-//       The name, full ID, or unique ID prefix of the network to delete. A name match takes precedence over an ID match.
+//       The name, full ID, or unique ID prefix of the network to delete. A full ID match takes precedence over a name match,
+//       and a name match takes precedence over an ID prefix match.
 //
 //   errorMessage
 //       Optional. On failure, receives a human-readable error message. May be null.
