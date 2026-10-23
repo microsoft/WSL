@@ -3875,6 +3875,8 @@ EOF
 
     WSL2_TEST_METHOD(CompactEncrypted)
     {
+        WSL_TEST_VERSION_REQUIRED(wsl::windows::common::helpers::WindowsBuildNumbers::Nickel_23H2);
+
         constexpr auto name = L"compact-encrypted-test-distro";
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);

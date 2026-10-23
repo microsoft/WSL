@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "WslCoreFilesystem.h"
 #include "WslSecurity.h"
+#include "helpers.hpp"
 
 wil::unique_hfile wsl::core::filesystem::CreateFile(
     _In_ LPCWSTR fileName, _In_ DWORD desiredAccess, _In_ DWORD shareMode, _In_ DWORD creationDisposition, _In_ DWORD flagsAndAttributes, _In_ PSID userSid)
@@ -108,8 +109,16 @@ wil::unique_handle wsl::core::filesystem::OpenVhd(_In_ LPCWSTR Path, _In_ VIRTUA
     storageType.DeviceId = VIRTUAL_STORAGE_TYPE_DEVICE_UNKNOWN;
     storageType.VendorId = VIRTUAL_STORAGE_TYPE_VENDOR_UNKNOWN;
 
+    // Older Windows versions reject the encrypted-file support flag even for unencrypted VHDs.
+    auto flags = OPEN_VIRTUAL_DISK_FLAG_NONE;
+    const auto windowsVersion = windows::common::helpers::GetWindowsVersion();
+    if (windowsVersion.BuildNumber >= windows::common::helpers::WindowsBuildNumbers::Nickel_23H2)
+    {
+        flags = OPEN_VIRTUAL_DISK_FLAG_SUPPORT_ENCRYPTED_FILES;
+    }
+
     wil::unique_handle disk;
-    THROW_IF_WIN32_ERROR(OpenVirtualDisk(&storageType, Path, Mask, OPEN_VIRTUAL_DISK_FLAG_SUPPORT_ENCRYPTED_FILES, nullptr, &disk));
+    THROW_IF_WIN32_ERROR(OpenVirtualDisk(&storageType, Path, Mask, flags, nullptr, &disk));
 
     return disk;
 }
