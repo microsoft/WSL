@@ -3873,6 +3873,38 @@ EOF
         VerifyNoVmAccessToVhd(vhdPath.c_str());
     }
 
+    WSL2_TEST_METHOD(CompactEncrypted)
+    {
+        constexpr auto name = L"compact-encrypted-test-distro";
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
+        auto cleanupName =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
+        WslShutdown();
+
+        const auto distroKey = OpenDistributionKey(name);
+        VERIFY_IS_NOT_NULL(distroKey.get());
+
+        const auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath", L"");
+        const auto vhdFileName =
+            wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"VhdFileName", L"ext4.vhdx");
+        const auto vhdPath = std::filesystem::path(basePath) / vhdFileName;
+
+        if (!EncryptFileW(vhdPath.c_str()))
+        {
+            const auto error = GetLastError();
+            if (error == ERROR_NOT_SUPPORTED || error == ERROR_EFS_DISABLED)
+            {
+                LogSkipped("EFS is unavailable for the test VHDX: %lu", error);
+                return;
+            }
+
+            VERIFY_ARE_EQUAL(ERROR_SUCCESS, error);
+        }
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--manage {} --compact", name)), 0L);
+    }
+
     WSL2_TEST_METHOD(FileOffsets)
     {
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { DeleteFile(L"output.txt"); });
@@ -5354,7 +5386,7 @@ VERSION_ID="Invalid|Format"
                 VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--terminate {}", LXSS_DISTRO_NAME_TEST_L).c_str()), 0L);
 
                 // The original OOBE process should fail.
-                VERIFY_ARE_EQUAL(SubProcess::GetExitCode(oobe->handle.get(), c_timeout), 1);
+                VERIFY_ARE_EQUAL(SubProcess::GetExitCode(oobe->handle.get(), c_timeout), LxsstuVmMode() ? 1 : -1);
 
                 // All processes blocked on OOBE should fail as well.
                 for (auto& waiter : waiters)
@@ -5391,7 +5423,7 @@ VERSION_ID="Invalid|Format"
         VERIFY_ARE_EQUAL(runOOBE.Get(), 0);
     }
 
-    WSL2_TEST_METHOD(OOBEAvanced)
+    TEST_METHOD(OOBEAdvanced)
     {
         ValidateOOBEWait(true, false);
         ValidateOOBEWait(false, false);

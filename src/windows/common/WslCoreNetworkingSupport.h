@@ -2,6 +2,7 @@
 
 #pragma once
 #include <algorithm>
+#include <atomic>
 #include <optional>
 #include <string>
 #include <variant>
@@ -687,8 +688,8 @@ public:
 private:
     const uint32_t m_backoffTimeMs = 5000;
     std::function<void(NLM_CONNECTIVITY, uint32_t)> m_callback;
+    std::atomic<uint32_t> m_telemetryCounter{0};
     wil::unique_threadpool_timer m_telemetryConnectionTimer;
-    uint32_t m_telemetryCounter = 0;
 
     static void __stdcall TelemetryConnectionTimerCallback(_Inout_ PTP_CALLBACK_INSTANCE, _Inout_opt_ PVOID context, _Inout_ PTP_TIMER) noexcept
     try

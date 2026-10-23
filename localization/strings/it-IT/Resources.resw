@@ -1024,6 +1024,9 @@ Fallback alla rete NAT.</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>Il contenitore WSL è disabilitato dai criteri del computer.</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>Le funzionalità aggiuntive di Linux sono disabilitate dai criteri del computer.</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>Il registro immagini del contenitore '{}' è bloccato dai criteri del computer.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3652,6 +3655,12 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
   </data>
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>Esponi le capacità di virtualizzazione al contenitore</value>
+  </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Add Linux capabilities (repeatable)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Drop Linux capabilities (repeatable)</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Argomenti da passare al comando in esecuzione all'interno del container</value>

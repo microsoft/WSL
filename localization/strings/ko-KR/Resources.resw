@@ -1024,6 +1024,9 @@ NAT 네트워킹으로 대체합니다.</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>WSL 컨테이너가 컴퓨터 정책에 의해 비활성화되었습니다.</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>컴퓨터 정책에 따라 Linux 기능 추가를 사용할 수 없습니다.</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>컨테이너 이미지 레지스트리 '{}'이(가) 컴퓨터 정책에 의해 차단되었습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3652,6 +3655,12 @@ Windows 버전: {}</value>
   </data>
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>컨테이너에 가상화 기능 노출</value>
+  </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Linux 기능 추가(반복 가능)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Linux 기능 삭제(반복 가능)</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>컨테이너 내에서 실행 중인 명령에 전달할 인수</value>

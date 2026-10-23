@@ -1018,6 +1018,9 @@ NAT ağ bağlantısına geri dönülüyor.</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>WSL kapsayıcısı bilgisayar ilkesi tarafından devre dışı bırakıldı.</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>Linux capability additions are disabled by the computer policy.</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>'{}' kapsayıcı görüntüsü kayıt defteri bilgisayar ilkesi tarafından engellendi.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3646,6 +3649,12 @@ Windows sürümü: {}</value>
   </data>
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>Kapsayıcının sanallaştırma özelliklerini kullanabilmesini sağla</value>
+  </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Add Linux capabilities (repeatable)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Drop Linux capabilities (repeatable)</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Kapsayıcı içinde yürütülen komuta geçirilecek bağımsız değişkenler</value>

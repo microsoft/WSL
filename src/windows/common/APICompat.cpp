@@ -343,6 +343,13 @@ ContainerOptionsConversion::ContainerOptionsConversion(const WSLCCompatContainer
     m_value.UlimitsCount = Options.UlimitsCount;
 }
 
+ContainerOptionsConversion::ContainerOptionsConversion(const WSLCCompatContainerOptions2& Options) :
+    ContainerOptionsConversion(Options.Base)
+{
+    m_value.CapAdd = Convert(Options.CapAdd);
+    m_value.CapDrop = Convert(Options.CapDrop);
+}
+
 ListImagesOptionsConversion::ListImagesOptionsConversion(const WSLCCompatListImagesOptions& Options)
 {
     m_value.Flags = Options.Flags;
