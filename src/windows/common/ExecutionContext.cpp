@@ -329,7 +329,14 @@ ServiceExecutionContext::ServiceExecutionContext(LXSS_ERROR_INFO* outError) noex
             {
                 if (outError->WarningsPipe != 0)
                 {
-                    m_warningsPipe.reset(wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(outError->WarningsPipe)));
+                    try
+                    {
+                        m_warningsPipe.reset(wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(outError->WarningsPipe)));
+                    }
+                    catch (...)
+                    {
+                        LOG_CAUGHT_EXCEPTION();
+                    }
                 }
 
                 if (!m_warningsPipe)
