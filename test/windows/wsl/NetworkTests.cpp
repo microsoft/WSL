@@ -1313,6 +1313,19 @@ class NetworkTests
 
         SetHttpProxySettings(c_httpProxyString, c_httpProxyBypassString, L"", userScope);
         VerifyHttpProxyEnvVariables(c_httpProxyString, c_httpProxyBypassString, L"");
+
+        const std::vector<std::pair<std::wstring, std::wstring>> cases{
+            {L"127.*", L"127.0.0.0/8"},
+            {L"10.*.*.*", L"10.0.0.0/8"},
+            {L"192.168.*", L"192.168.0.0/16"},
+            {L"172.16.*", L"172.16.0.0/16"},
+            {L"172.31.*", L"172.31.0.0/16"}};
+
+        for (const auto& [input, expected] : cases)
+        {
+            SetHttpProxySettings(c_httpProxyString, input, L"", userScope);
+            VerifyHttpProxyEnvVariables(c_httpProxyString, expected, L"");
+        }
     }
 
     static void VerifyHttpProxyChange(bool userScope = true)
