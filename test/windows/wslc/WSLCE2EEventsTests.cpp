@@ -325,6 +325,101 @@ class WSLCE2EEventsTests
             VERIFY_IS_GREATER_THAN_OR_EQUAL(timeNano, since * 1'000'000'000);
             VERIFY_ARE_EQUAL(timeNano / 1'000'000'000, event.at("time").get<std::int64_t>());
         }
+
+        // A bare 'health_status' matches every health status action by prefix.
+        result = RunWslc(std::format(
+            L"events --since {} --until {} --filter container={} --filter event=health_status --format json", since, EpochSeconds() + 1, containerId));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        std::vector<std::string> healthActions;
+        std::ranges::transform(ParseNdjsonOutput(result), std::back_inserter(healthActions), [](const nlohmann::json& event) {
+            return event.at("Action").get<std::string>();
+        });
+
+        VERIFY_ARE_EQUAL((std::vector<std::string>{"health_status: unhealthy", "health_status: healthy"}), healthActions);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Events_ContainerExec)
+    {
+        const auto since = EpochSeconds();
+        auto result = RunWslc(std::format(L"container create --name {} {} sleep 60", c_eventContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto containerId = result.GetStdoutOneLine();
+
+        RunWslc(std::format(L"container start {}", containerId)).Verify({.Stderr = L"", .ExitCode = 0});
+        RunWslc(std::format(L"container exec {} true", containerId)).Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+        RunWslc(std::format(L"container exec {} sh -c \"exit 7\"", containerId)).Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 7});
+        RunWslc(std::format(L"container kill {}", containerId)).Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Removing the container waits for its destroy event, which Docker reports after the exec events, so they're all
+        // recorded before the query below.
+        RunWslc(std::format(L"container rm {}", containerId)).Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto query = std::format(
+            L"events --since {} --until {} --filter container={} --filter event=exec_create --filter event=exec_start "
+            L"--filter event=exec_die --filter event=destroy",
+            since,
+            EpochSeconds() + 1,
+            containerId);
+
+        result = RunWslc(query + L" --format json");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto events = ParseNdjsonOutput(result);
+        VERIFY_ARE_EQUAL(7u, events.size());
+        VERIFY_ARE_EQUAL(std::string{"destroy"}, events.back().at("Action").get<std::string>());
+
+        std::vector<std::string> execIds;
+        std::map<std::string, std::vector<std::string>> actionsByExec;
+        std::map<std::string, std::string> exitCodeByExec;
+        for (size_t index = 0; index < events.size() - 1; ++index)
+        {
+            const auto& event = events[index];
+            const auto action = event.at("Action").get<std::string>();
+            const auto& attributes = event.at("Actor").at("Attributes");
+
+            VERIFY_ARE_EQUAL(std::string{"container"}, event.at("Type").get<std::string>());
+            VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(containerId), event.at("Actor").at("ID").get<std::string>());
+            VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(c_eventContainerName), attributes.at("name").get<std::string>());
+            VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(DebianImage.NameAndTag()), attributes.at("image").get<std::string>());
+            VERIFY_IS_FALSE(attributes.contains("com.microsoft.wsl.container.metadata"));
+            VERIFY_ARE_EQUAL(action, event.at("status").get<std::string>());
+            VERIFY_ARE_EQUAL(action == "exec_die", attributes.contains("exitCode"));
+
+            const auto execId = attributes.at("execID").get<std::string>();
+            if (!actionsByExec.contains(execId))
+            {
+                execIds.push_back(execId);
+            }
+
+            actionsByExec[execId].push_back(action);
+            if (action == "exec_die")
+            {
+                exitCodeByExec[execId] = attributes.at("exitCode").get<std::string>();
+            }
+        }
+
+        VERIFY_ARE_EQUAL(2u, execIds.size());
+        VERIFY_ARE_EQUAL((std::vector<std::string>{"exec_create: true ", "exec_start: true ", "exec_die"}), actionsByExec.at(execIds[0]));
+        VERIFY_ARE_EQUAL(std::string{"0"}, exitCodeByExec.at(execIds[0]));
+        VERIFY_ARE_EQUAL(
+            (std::vector<std::string>{"exec_create: sh -c exit 7", "exec_start: sh -c exit 7", "exec_die"}), actionsByExec.at(execIds[1]));
+        VERIFY_ARE_EQUAL(std::string{"7"}, exitCodeByExec.at(execIds[1]));
+
+        // The text format keeps the action as reported, including the space ending a command without arguments.
+        result = RunWslc(query);
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto lines = result.GetStdoutLines();
+        VERIFY_ARE_EQUAL(events.size(), lines.size());
+
+        const auto firstExecId = wsl::shared::string::MultiByteToWide(execIds[0]);
+        VerifyEventLine(
+            lines[0],
+            std::format(L" container exec_create: true  {} (execID={}, image={}, name={})", containerId, firstExecId, DebianImage.NameAndTag(), c_eventContainerName));
+        VerifyEventLine(
+            lines[1],
+            std::format(L" container exec_start: true  {} (execID={}, image={}, name={})", containerId, firstExecId, DebianImage.NameAndTag(), c_eventContainerName));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Events_InvalidFormatOption)
