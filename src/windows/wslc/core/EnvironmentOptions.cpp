@@ -43,11 +43,11 @@ try
 
             if (arg.Kind() == Kind::Flag)
             {
-                target.Add(arg.Type(), true);
+                target.Add(arg.Type(), true, Source::Environment);
             }
             else if (arg.Kind() == Kind::Value)
             {
-                target.Add(arg.Type(), std::move(*value));
+                target.Add(arg.Type(), std::move(*value), Source::Environment);
             }
 
             break;
