@@ -179,7 +179,7 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
     if (it == events.end())
     {
         // Docker appends the exec'd command line to exec_create and exec_start.
-        if (action.starts_with("exec_create: ") || action.starts_with("exec_start: ") || action == "exec_detach")
+        if (action.starts_with("exec_create: ") || action.starts_with("exec_start: "))
         {
             OnContainerAction(containerId, action, attributes, eventTimeNano);
         }
