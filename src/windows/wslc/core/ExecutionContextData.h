@@ -13,6 +13,7 @@ Abstract:
 --*/
 #pragma once
 #include "EnumVariantMap.h"
+#include "ComposeModel.h"
 #include "ContainerModel.h"
 #include "ImageModel.h"
 #include "NetworkModel.h"
@@ -37,6 +38,7 @@ namespace wsl::windows::wslc::execution {
 enum class Data : size_t
 {
     Session,
+    ComposeProjects,
     Containers,
     ContainerOptions,
     Images,
@@ -58,6 +60,7 @@ namespace details {
     };
 
     DEFINE_DATA_MAPPING(Session, wsl::windows::wslc::models::Session);
+    DEFINE_DATA_MAPPING(ComposeProjects, std::vector<wsl::windows::wslc::models::ComposeProjectInformation>);
     DEFINE_DATA_MAPPING(Containers, std::vector<wsl::windows::wslc::models::ContainerInformation>);
     DEFINE_DATA_MAPPING(ContainerOptions, wsl::windows::wslc::models::ContainerOptions);
     DEFINE_DATA_MAPPING(Images, std::vector<wsl::windows::wslc::models::ImageInformation>);
