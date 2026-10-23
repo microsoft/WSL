@@ -54,7 +54,6 @@ using wsl::windows::service::wslc::WSLCContainerImpl;
 using wsl::windows::service::wslc::WSLCContainerMetadata;
 using wsl::windows::service::wslc::WSLCContainerMetadataLabel;
 using wsl::windows::service::wslc::WSLCContainerMetadataV1;
-using wsl::windows::service::wslc::WSLCContainerRestartPolicyLabel;
 using wsl::windows::service::wslc::WSLCExecutionContext;
 using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
@@ -540,7 +539,6 @@ std::string SerializeContainerMetadata(const WSLCContainerMetadataV1& metadata)
 std::map<std::string, std::string> StripInternalLabels(std::map<std::string, std::string> labels)
 {
     labels.erase(WSLCContainerMetadataLabel);
-    labels.erase(WSLCContainerRestartPolicyLabel);
     return labels;
 }
 
@@ -2061,7 +2059,31 @@ void WSLCContainerImpl::Delete(WSLCDeleteFlags Flags)
     AttachToTransition(transition);
 }
 
-__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::RequestDeleteExclusiveLockHeld(WSLCDeleteFlags Flags)
+bool WSLCContainerImpl::TryPrune()
+{
+    auto lifecycleLock = m_lifecycleLock.lock_shared();
+    auto lock = m_lock.lock_exclusive();
+
+    if ((m_state != WslcContainerStateCreated && m_state != WslcContainerStateExited) || m_transition || m_restart ||
+        m_policyRestartPending || (PolicyRestartsContainer(m_restartPolicy) && m_exitRequests.HasPendingRequests()))
+    {
+        return false;
+    }
+
+    if (!RequestDeleteExclusiveLockHeld(WSLCDeleteFlagsNone, true))
+    {
+        return false;
+    }
+
+    CancelPolicyRestartLockHeld();
+    auto transition = StartTransition(TransitionKind::Delete, ContainerEvent::Destroy);
+    lock.reset();
+    lifecycleLock.reset();
+    AttachToTransition(transition);
+    return true;
+}
+
+__requires_exclusive_lock_held(m_lock) bool WSLCContainerImpl::RequestDeleteExclusiveLockHeld(WSLCDeleteFlags Flags, bool Prune)
 {
     // Validate that the container is not running or already deleted.
     THROW_HR_WITH_USER_ERROR_IF(
@@ -2073,7 +2095,8 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::RequestDeleteExcl
     THROW_HR_WITH_USER_ERROR_IF(
         WSLC_E_CONTAINER_IS_RUNNING,
         Localization::MessageWslcCannotRemoveRestartingContainer(m_id),
-        (m_policyRestartPending || m_exitRequests.HasPendingRequests()) && WI_IsFlagClear(Flags, WSLCDeleteFlagsForce));
+        (m_policyRestartPending || (PolicyRestartsContainer(m_restartPolicy) && m_exitRequests.HasPendingRequests())) &&
+            WI_IsFlagClear(Flags, WSLCDeleteFlagsForce));
 
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_state == WslcContainerStateDeleted, "Container %hs is already deleted", m_id.c_str());
@@ -2084,7 +2107,19 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::RequestDeleteExcl
     {
         m_runtime.Docker().DeleteContainer(m_id, WI_IsFlagSet(Flags, WSLCDeleteFlagsForce), WI_IsFlagSet(Flags, WSLCDeleteFlagsDeleteVolumes));
     }
-    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to delete container '%hs'", m_id.c_str());
+    catch (const DockerHTTPException& e)
+    {
+        if (Prune && (e.StatusCode() == 404 || e.StatusCode() == 409))
+        {
+            WSL_LOG(
+                "ContainerPruneSkipped", TraceLoggingValue(m_id.c_str(), "Id"), TraceLoggingValue(e.StatusCode(), "StatusCode"));
+            return false;
+        }
+
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to delete container '%hs'", m_id.c_str());
+    }
+
+    return true;
 }
 
 void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
@@ -3044,7 +3079,6 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     }
 
     auto requestedLabels = ParseKeyValuePairs(containerOptions.Labels, containerOptions.LabelsCount, WSLCContainerMetadataLabel);
-    THROW_HR_IF_MSG(E_INVALIDARG, requestedLabels.contains(WSLCContainerRestartPolicyLabel), "Key '%hs' is reserved", WSLCContainerRestartPolicyLabel);
 
     // Build WSLC metadata to store in a label for recovery on Open().
     WSLCContainerMetadataV1 metadata;
@@ -3060,11 +3094,6 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     }
 
     request.Labels[WSLCContainerMetadataLabel] = SerializeContainerMetadata(metadata);
-    if (containerOptions.RestartPolicy == WSLCContainerRestartPolicyAlways)
-    {
-        request.Labels[WSLCContainerRestartPolicyLabel] = RestartPolicyName(containerOptions.RestartPolicy);
-    }
-
     request.Labels.insert(requestedLabels.begin(), requestedLabels.end());
 
     // Docker validates structured bind sources during container creation, so their VM paths must exist here.
@@ -3567,6 +3596,10 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(
         TraceLoggingValue(m_id.c_str(), "ID"));
 
     m_state = State;
+    if (State == WslcContainerStateDeleted)
+    {
+        CancelPolicyRestartLockHeld();
+    }
     m_stateGeneration++;
     m_stateChangedAt = std::chrono::floor<std::chrono::seconds>(std::chrono::nanoseconds{TimeNano}).count();
 
@@ -3600,8 +3633,10 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(
 
 __requires_lock_held(m_lock) void WSLCContainerImpl::UpdateActivityHoldLockHeld() noexcept
 {
-    const bool active = (m_state == WslcContainerStateRunning) || m_policyRestartPending ||
-                        (m_state == WslcContainerStateExited && m_exitRequests.HasPendingRequests());
+    const bool active =
+        m_state != WslcContainerStateDeleted &&
+        ((m_state == WslcContainerStateRunning) || m_policyRestartPending ||
+         (m_state == WslcContainerStateExited && PolicyRestartsContainer(m_restartPolicy) && m_exitRequests.HasPendingRequests()));
     if (active && !m_activityHold)
     {
         m_activityHold = ActivityRef(m_wslcSession.Runtime().IdleStateShared());

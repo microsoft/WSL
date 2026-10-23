@@ -597,27 +597,9 @@ LONGLONG GetTimestampFromString(const std::wstring& value, const std::wstring& a
 {
     std::string narrowValue = wsl::windows::common::string::WideToMultiByte(value);
 
-    // Try integer (Unix epoch seconds) first
-    LONGLONG intValue{};
-    const char* begin = narrowValue.c_str();
-    const char* end = begin + narrowValue.size();
-    auto result = std::from_chars(begin, end, intValue);
-    if (result.ec == std::errc() && result.ptr == end)
-    {
-        return intValue;
-    }
-
-    if (const auto duration = wsl::windows::common::timestamp::TryParseDuration(narrowValue); duration.has_value())
-    {
-        // Apply the duration at full precision and truncate once, so that a sub-second value keeps its sign.
-        const auto target = std::chrono::system_clock::now() - duration.value();
-
-        return std::chrono::floor<std::chrono::seconds>(target.time_since_epoch()).count();
-    }
-
     try
     {
-        return wsl::windows::common::timestamp::Rfc3339ToEpoch(wsl::windows::common::timestamp::ExpandToRfc3339(narrowValue));
+        return wsl::windows::common::timestamp::ParseTimestamp(narrowValue).first;
     }
     // Name the offending argument rather than surfacing the raw parse failure.
     catch (...)

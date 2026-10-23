@@ -8103,6 +8103,26 @@ class WSLCTests
         VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
     }
 
+    WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysExternalDestroyAllowsIdleTermination)
+    {
+        auto restore = ResetTestSession();
+        constexpr auto c_sessionName = L"restart-policy-external-destroy";
+        auto session = CreateSession(GetDefaultSessionSettings(c_sessionName, true));
+        WSLCContainerLauncher launcher("debian:latest", "test-restart-external-destroy", {"sh", "-c", "echo run; exit 1"});
+        launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+        auto container = launcher.Launch(*session, WSLCContainerStartFlagsNone);
+        WaitForContainerRuns(container, 6);
+        WaitForContainerState(container, WslcContainerStateExited);
+
+        ExpectCommandResult(session.get(), {"/usr/bin/docker", "rm", "-f", container.Id()}, 0);
+        WaitForContainerState(container, WslcContainerStateDeleted);
+
+        BOOL wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
+    }
+
     WSLC_TEST_METHOD(EventStream)
     {
         constexpr auto c_containerName = "wslc-test-events";
@@ -15626,6 +15646,21 @@ class WSLCTests
                                const std::source_location& source = std::source_location::current()) {
             PruneResult result;
 
+            ULONGLONG expectedSpace = 0;
+            for (const auto& id : expectedIds)
+            {
+                wil::com_ptr<IWSLCContainer> container;
+                VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(id.c_str(), &container));
+                wil::unique_cotaskmem_ansistring output;
+                VERIFY_SUCCEEDED(container->Inspect(TRUE, &output));
+                const auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(output.get());
+                VERIFY_IS_TRUE(inspect.SizeRw.has_value());
+                if (*inspect.SizeRw > 0)
+                {
+                    expectedSpace += static_cast<ULONGLONG>(*inspect.SizeRw);
+                }
+            }
+
             std::vector<WSLCFilter> filters;
             filters.reserve(filterPairs.size());
             for (const auto& [key, value] : filterPairs)
@@ -15643,6 +15678,7 @@ class WSLCTests
             }
 
             VerifyAreEqualUnordered(expectedIds, prunedContainers, source);
+            VERIFY_ARE_EQUAL(expectedSpace, result.result.SpaceReclaimed);
         };
 
         auto RunAndWait = [&](auto& launcher) {
@@ -15703,7 +15739,9 @@ class WSLCTests
             // Expect testPrune2 to be selected via key being present.
             expectPrune({testPrune2.Id()}, {{"label", "key"}});
 
-            expectPrune({testPrune3.Id(), testPrune4.Id()});
+            expectPrune({testPrune4.Id()}, {{"label!", "anotherKey"}});
+            expectPrune({}, {{"label!", "anotherKey=value"}});
+            expectPrune({testPrune3.Id()}, {{"label!", "anotherKey=someValue"}});
         }
 
         {
@@ -15714,36 +15752,15 @@ class WSLCTests
             VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
             VERIFY_ARE_EQUAL(WslcContainerStateExited, container.State());
 
-            const auto label = ExpectCommandResult(
-                m_defaultSession.get(),
-                {"/usr/bin/docker",
-                 "inspect",
-                 "-f",
-                 "{{index .Config.Labels \"com.microsoft.wsl.container.restart-policy\"}}",
-                 container.Id()},
-                0);
-            VERIFY_ARE_EQUAL(std::string{"always\n"}, label.Output.at(1));
             const auto inspect = container.Inspect();
             VERIFY_IS_FALSE(inspect.Config.Labels.contains("com.microsoft.wsl.container.restart-policy"));
             VERIFY_IS_FALSE(inspect.Labels.contains("com.microsoft.wsl.container.restart-policy"));
 
             WSLCContainerLauncher disposableLauncher("debian:latest", "test-prune-disposable", {"echo", "OK"});
+            disposableLauncher.AddLabel("prune-test", "disposable");
             auto disposable = RunAndWait(disposableLauncher);
-            expectPrune({disposable.Id()});
-            expectPrune({}, {{"label", "prune-test=protected"}});
-
-            for (const auto value : {"anotherKey", "anotherKey=someValue"})
-            {
-                WSLCFilter filter{.Key = "label!", .Value = value};
-                PruneResult result;
-                VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->PruneContainers(&filter, 1, &result.result));
-                ValidateCOMErrorMessage(wsl::shared::Localization::MessageWslcContainerPruneNegativeLabelFilter());
-            }
-
-            wil::com_ptr<IWSLCContainer> reopened;
-            VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(container.Id().c_str(), &reopened));
-            VERIFY_ARE_EQUAL(WslcContainerStateExited, container.State());
-            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
+            expectPrune({disposable.Id()}, {{"label", "prune-test=disposable"}});
+            expectPrune({container.Id()}, {{"label", "prune-test=protected"}});
         }
 
         {
@@ -15754,15 +15771,39 @@ class WSLCTests
             WaitForContainerState(container, WslcContainerStateExited);
 
             expectPrune({});
+            expectPrune({}, {{"label!", "anotherKey"}, {"label!", "anotherKey=someValue"}});
             WaitForContainerRuns(container, runs + 1);
             VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            expectPrune({container.Id()});
         }
 
         {
-            WSLCContainerLauncher launcher("debian:latest", "test-prune-reserved-label", {"echo", "OK"});
+            WSLCContainerLauncher launcher("debian:latest", "test-prune-user-label", {"echo", "OK"});
             launcher.AddLabel("com.microsoft.wsl.container.restart-policy", "always");
-            const auto [result, container] = launcher.CreateNoThrow(*m_defaultSession);
-            VERIFY_ARE_EQUAL(E_INVALIDARG, result);
+            auto container = RunAndWait(launcher);
+            VERIFY_ARE_EQUAL(std::string{"always"}, container.Inspect().Labels.at("com.microsoft.wsl.container.restart-policy"));
+            expectPrune({container.Id()});
+        }
+
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-prune-created-always", {"echo", "OK"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Create(*m_defaultSession);
+            expectPrune({container.Id()});
+        }
+
+        {
+            WSLCContainerLauncher firstLauncher("debian:latest", "test-prune-labels-first", {"echo", "OK"});
+            firstLauncher.AddLabel("one", "1");
+            firstLauncher.AddLabel("two", "2");
+            auto first = RunAndWait(firstLauncher);
+            WSLCContainerLauncher secondLauncher("debian:latest", "test-prune-labels-second", {"echo", "OK"});
+            secondLauncher.AddLabel("one", "1");
+            auto second = RunAndWait(secondLauncher);
+
+            expectPrune({}, {{"label", "one=1"}, {"label", "missing"}});
+            expectPrune({second.Id()}, {{"label", "one"}, {"label!", "one=1"}, {"label!", "two=2"}});
+            expectPrune({first.Id()}, {{"label", "one=1"}, {"label", "two=2"}, {"label!", "two=other"}});
         }
 
         // Validate that the 'until' filter works.
@@ -15774,7 +15815,69 @@ class WSLCTests
             auto now = time(nullptr);
 
             expectPrune({}, {{"until", std::to_string(now - 3600)}});
+            expectPrune({}, {{"until", "1h"}});
+            expectPrune({}, {{"until", "1.5h"}});
+            expectPrune({}, {{"until", "2000-01-01T00:00:00.123456789Z"}});
+            expectPrune({}, {{"until", "0"}});
+            expectPrune({}, {{"until", "1.123456789"}});
             expectPrune({container.Id()}, {{"until", std::to_string(now + 3600)}});
+        }
+
+        {
+            auto result = ExpectCommandResult(
+                m_defaultSession.get(), {"/usr/bin/docker", "create", "--name", "test-prune-external", "debian:latest", "true"}, 0);
+            auto id = result.Output.at(1);
+            id.erase(id.find_last_not_of(" \n\r") + 1);
+            const auto size =
+                ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "inspect", "--size", "-f", "{{.SizeRw}}", id}, 0);
+            PruneResult pruned;
+            VERIFY_SUCCEEDED(m_defaultSession->PruneContainers(nullptr, 0, &pruned.result));
+            VERIFY_ARE_EQUAL(1UL, pruned.result.ContainersCount);
+            VERIFY_ARE_EQUAL(id, std::string{pruned.result.Containers[0]});
+            VERIFY_ARE_EQUAL(std::stoull(size.Output.at(1)), pruned.result.SpaceReclaimed);
+            ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "inspect", id}, 1);
+
+            result = ExpectCommandResult(
+                m_defaultSession.get(),
+                {"/usr/bin/docker", "run", "-d", "--name", "test-prune-external-running", "debian:latest", "sleep", "99999"},
+                0);
+            id = result.Output.at(1);
+            id.erase(id.find_last_not_of(" \n\r") + 1);
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "rm", "-f", id}, 0);
+            });
+            expectPrune({});
+            const auto running =
+                ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "inspect", "-f", "{{.State.Running}}", id}, 0);
+            VERIFY_ARE_EQUAL(std::string{"true\n"}, running.Output.at(1));
+        }
+
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest",
+                "test-prune-writable-layer",
+                {"sh", "-c", "dd if=/dev/zero of=/prune-data bs=4096 count=4 2>/dev/null; echo OK"});
+            auto container = RunAndWait(launcher);
+            wil::unique_cotaskmem_ansistring output;
+            VERIFY_SUCCEEDED(container.Get().Inspect(TRUE, &output));
+            const auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(output.get());
+            VERIFY_IS_TRUE(inspect.SizeRw.has_value());
+            VERIFY_IS_TRUE(*inspect.SizeRw >= 16384);
+            expectPrune({container.Id()});
+        }
+
+        for (const auto until : {"-1h", "2100-01-01", "2100-01-01T00:00", "2100-01-01T00:00:00.123456789+02:00"})
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-prune-until-formats", {"echo", "OK"});
+            auto container = RunAndWait(launcher);
+            expectPrune({container.Id()}, {{"until", until}});
+        }
+
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-prune-until-duplicate", {"echo", "OK"});
+            auto container = RunAndWait(launcher);
+            const auto future = std::to_string(time(nullptr) + 3600);
+            expectPrune({container.Id()}, {{"until", future}, {"until", future}});
         }
 
         // Validate error paths.
@@ -15784,6 +15887,21 @@ class WSLCTests
 
             VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, &result.result), E_POINTER);
             VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
+
+            for (const auto key : {"bogus", "status", "before"})
+            {
+                WSLCFilter invalid{.Key = key, .Value = "x"};
+                VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->PruneContainers(&invalid, 1, &result.result));
+                ValidateCOMErrorMessageContains(wsl::shared::string::MultiByteToWide(std::format("invalid filter '{}'", key)));
+            }
+            for (const auto value : {"", "nonsense", "2026-02-30", "2026-01-01T", "1.2.3", "99999999999999999999"})
+            {
+                WSLCFilter invalid{.Key = "until", .Value = value};
+                VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->PruneContainers(&invalid, 1, &result.result));
+            }
+            const WSLCFilter multiple[]{{.Key = "until", .Value = "1h"}, {.Key = "until", .Value = "2h"}};
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->PruneContainers(multiple, ARRAYSIZE(multiple), &result.result));
+            ValidateCOMErrorMessageContains(L"more than one until filter specified");
         }
     }
 

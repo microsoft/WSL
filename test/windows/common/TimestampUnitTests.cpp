@@ -34,6 +34,21 @@ class WSLCCLIRelativeTimeUnitTests
         return FormatElapsedSeconds(secondsAgo);
     }
 
+    TEST_METHOD(ParseTimestamp_PreservesFractionalSeconds)
+    {
+        for (const auto& value : {"1705314600.123456789", "2024-01-15T10:30:00.123456789Z", "2024-01-15T12:30:00.123456789+02:00"})
+        {
+            const auto parsed = ParseTimestamp(value);
+            VERIFY_ARE_EQUAL(1705314600LL, parsed.first);
+            VERIFY_ARE_EQUAL(123456789LL, parsed.second);
+        }
+        VERIFY_ARE_EQUAL(100000000LL, ParseTimestamp("1.1").second);
+        VERIFY_ARE_EQUAL(123456789LL, ParseTimestamp("1.1234567899").second);
+        VERIFY_ARE_EQUAL(-62135596800LL, ParseTimestamp("0001-01-01T00:00:00Z").first);
+        VERIFY_ARE_EQUAL(253402300799LL, ParseTimestamp("9999-12-31T23:59:59Z").first);
+        VERIFY_ARE_EQUAL(0LL, ParseTimestamp("0").first);
+    }
+
     TEST_METHOD(RelativeTime_ZeroTimestamp_ReturnsEmpty)
     {
         VERIFY_ARE_EQUAL(std::wstring{}, FormatRelativeTime(0));

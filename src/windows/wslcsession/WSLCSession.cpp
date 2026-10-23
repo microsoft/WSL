@@ -2946,62 +2946,79 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Result);
     ZeroMemory(Result, sizeof(*Result));
 
-    auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
-
-    // Docker negates the combined label match, so additional negative filters can weaken this exclusion.
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcContainerPruneNegativeLabelFilter(), filters.contains("label!"));
-    filters["label!"].push_back(std::format("{}=always", wsl::windows::service::wslc::WSLCContainerRestartPolicyLabel));
+    const auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
 
     auto lock = AcquireLease();
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 
-    std::lock_guard containersLock{m_containersLock};
-
-    docker_schema::PruneContainerResult pruneResult;
-
+    std::vector<docker_schema::ContainerInfo> candidates;
     try
     {
-        pruneResult = m_runtime.Docker().PruneContainers(filters);
+        candidates = m_runtime.Docker().ListPruneCandidates(filters);
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to prune containers");
 
-    Result->SpaceReclaimed = pruneResult.SpaceReclaimed;
-
-    if (pruneResult.ContainersDeleted.has_value() && pruneResult.ContainersDeleted->size() > 0)
+    auto deleted = wil::make_unique_cotaskmem<WSLCContainerId[]>(candidates.size());
+    ULONG count = 0;
+    ULONGLONG reclaimed = 0;
+    for (const auto& candidate : candidates)
     {
-        // Remove deleted containers from m_containers.
-        size_t erased = 0;
-        for (const auto& deletedId : pruneResult.ContainersDeleted.value())
+        std::shared_ptr<WSLCContainerImpl> container;
         {
-            erased += m_containers.erase(deletedId);
+            std::lock_guard containersLock{m_containersLock};
+            if (const auto it = m_containers.find(candidate.Id); it != m_containers.end())
+            {
+                container = it->second;
+            }
+            else
+            {
+                // Keep adoption serialized with deletion of containers without a WSLC lifecycle owner.
+                try
+                {
+                    m_runtime.Docker().DeleteContainer(candidate.Id, false);
+                }
+                catch (const DockerHTTPException& e)
+                {
+                    if (e.StatusCode() == 404 || e.StatusCode() == 409)
+                    {
+                        WSL_LOG(
+                            "ContainerPruneSkipped",
+                            TraceLoggingValue(candidate.Id.c_str(), "Id"),
+                            TraceLoggingValue(e.StatusCode(), "StatusCode"));
+                        continue;
+                    }
+                    THROW_DOCKER_USER_ERROR_MSG(e, "Failed to prune container '%hs'", candidate.Id.c_str());
+                }
+            }
         }
 
-        LOG_HR_IF_MSG(
-            E_UNEXPECTED,
-            erased != pruneResult.ContainersDeleted->size(),
-            "Expected to erase %zu containers, but erased %zu",
-            pruneResult.ContainersDeleted->size(),
-            erased);
-
-        auto containers = wil::make_unique_cotaskmem<WSLCContainerId[]>(pruneResult.ContainersDeleted->size());
-
-        for (size_t i = 0; i < pruneResult.ContainersDeleted->size(); ++i)
+        if (container)
         {
-            THROW_HR_IF_MSG(
-                E_UNEXPECTED,
-                strcpy_s(containers[i], pruneResult.ContainersDeleted.value()[i].c_str()) != 0,
-                "Unexpected container name: %hs",
-                pruneResult.ContainersDeleted.value()[i].c_str());
+            if (!container->TryPrune())
+            {
+                continue;
+            }
+
+            std::lock_guard containersLock{m_containersLock};
+            const auto it = m_containers.find(container->ID());
+            if (it != m_containers.end() && it->second == container)
+            {
+                m_containers.erase(it);
+            }
         }
 
-        Result->Containers = containers.release();
-        Result->ContainersCount = static_cast<DWORD>(pruneResult.ContainersDeleted->size());
+        THROW_HR_IF_MSG(
+            E_UNEXPECTED, strcpy_s(deleted[count], candidate.Id.c_str()) != 0, "Unexpected container id: %hs", candidate.Id.c_str());
+        ++count;
+        if (candidate.SizeRw > 0)
+        {
+            reclaimed += static_cast<ULONGLONG>(candidate.SizeRw);
+        }
     }
-    else
-    {
-        Result->Containers = nullptr;
-        Result->ContainersCount = 0;
-    }
+
+    Result->SpaceReclaimed = reclaimed;
+    Result->ContainersCount = count;
+    Result->Containers = count != 0 ? deleted.release() : nullptr;
 
     return S_OK;
 }

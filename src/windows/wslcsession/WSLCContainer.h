@@ -110,6 +110,7 @@ public:
     void Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, bool Kill);
     void Restart(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds);
     void Delete(WSLCDeleteFlags Flags);
+    bool TryPrune();
     void Export(WSLCHandle TarHandle) const;
     void UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize);
     void DownloadArchive(LPCSTR SrcPath, BOOL FollowLink, WSLCHandle OutHandle);
@@ -203,7 +204,7 @@ private:
         wil::unique_event Completed{wil::EventOptions::ManualReset};
     };
 
-    __requires_exclusive_lock_held(m_lock) void RequestDeleteExclusiveLockHeld(WSLCDeleteFlags Flags);
+    __requires_exclusive_lock_held(m_lock) bool RequestDeleteExclusiveLockHeld(WSLCDeleteFlags Flags, bool Prune = false);
 
     void AllocateBridgedModePorts();
     void OnEvent(ContainerEvent event, std::optional<int> exitCode, const std::map<std::string, std::string>& attributes, std::int64_t eventTimeNano) noexcept;
