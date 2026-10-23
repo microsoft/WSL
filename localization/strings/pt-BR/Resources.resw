@@ -3658,10 +3658,10 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Expor funcionalidades de virtualização ao contêiner</value>
   </data>
   <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
-    <value>Add Linux capabilities (repeatable)</value>
+    <value>Adicionar recursos do Linux (pode ser usado várias vezes)</value>
   </data>
   <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
-    <value>Drop Linux capabilities (repeatable)</value>
+    <value>Remover recursos do Linux (pode ser usado várias vezes)</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Argumentos a serem passados para o comando que está sendo executado dentro do contêiner</value>

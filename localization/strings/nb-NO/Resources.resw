@@ -3651,10 +3651,10 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Eksponer virtualiseringsfunksjoner for beholderen</value>
   </data>
   <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
-    <value>Add Linux capabilities (repeatable)</value>
+    <value>Legg til Linux-funksjoner (kan gjentas)</value>
   </data>
   <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
-    <value>Drop Linux capabilities (repeatable)</value>
+    <value>Fjern Linux-funksjoner (kan gjentas)</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Argumenter som skal sendes til kommandoen som kjøres inne i beholderen</value>

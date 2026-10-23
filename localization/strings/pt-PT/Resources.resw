@@ -1019,7 +1019,7 @@ A reverter para a rede NAT.</value>
     <value>O contentor WSL está desativado pela política do computador.</value>
   </data>
   <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
-    <value>Linux capability additions are disabled by the computer policy.</value>
+    <value>As adições de capacidade do Linux são desativadas pela política do computador.</value>
   </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>O registo da imagem do contentor "{}" está bloqueado pela política do computador.</value>
@@ -3651,10 +3651,10 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
     <value>Expor capacidades de virtualização ao contentor</value>
   </data>
   <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
-    <value>Add Linux capabilities (repeatable)</value>
+    <value>Adicionar capacidades do Linux (repetível)</value>
   </data>
   <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
-    <value>Drop Linux capabilities (repeatable)</value>
+    <value>Remover capacidades do Linux (repetível)</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Argumentos para passar para o comando que está a ser executado dentro do contentor</value>

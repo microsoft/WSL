@@ -1019,7 +1019,7 @@ Mer information om Admin Protection finns på https://aka.ms/apdevguide</value>
     <value>WSL-containern är inaktiverad av datorprincipen.</value>
   </data>
   <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
-    <value>Linux capability additions are disabled by the computer policy.</value>
+    <value>Linux-funktionstillägg har inaktiverats av datorprincipen.</value>
   </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>Containeravbildningsregistret {} blockeras av datorprincipen.</value>
@@ -3652,10 +3652,10 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Exponera virtualiseringsfunktioner för containern</value>
   </data>
   <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
-    <value>Add Linux capabilities (repeatable)</value>
+    <value>Lägg till Linux-funktioner (kan anges flera gånger)</value>
   </data>
   <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
-    <value>Drop Linux capabilities (repeatable)</value>
+    <value>Ta bort Linux-funktioner (kan anges flera gånger)</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Argument som skickas till kommandot som körs inuti containern</value>
