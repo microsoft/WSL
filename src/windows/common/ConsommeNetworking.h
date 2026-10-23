@@ -52,15 +52,15 @@ public:
 private:
     static void NETIOAPI_API_ OnNetworkConnectivityChange(PVOID context, NL_NETWORK_CONNECTIVITY_HINT hint);
 
-    uint16_t HandlePortNotification(const SOCKADDR_INET& addr, int protocol, uint16_t guestPort, bool allocate) const;
+    uint16_t HandlePortNotification(SOCKADDR_INET addr, int protocol, uint16_t guestPort, bool allocate) const;
     uint16_t ModifyOpenPorts(
         _In_ PCWSTR tag, _In_ const SOCKADDR_INET& hostAddress, _In_ uint16_t HostPort, _In_ uint16_t GuestPort, _In_ int protocol, _In_ bool isOpen) const;
     void RefreshGuestConnection();
     void SetupHostLoopback();
     void SetupLoopbackDevice();
-    void SendDefaultRoute(const std::wstring& gateway, wsl::shared::hns::ModifyRequestType requestType);
+    void SendDefaultRoute(ADDRESS_FAMILY family, const std::wstring& gateway, wsl::shared::hns::ModifyRequestType requestType);
     void SendIpv6Address(const networking::EndpointIpAddress& ipAddress, wsl::shared::hns::ModifyRequestType requestType);
-    void UpdateDefaultRoute(const std::wstring& gateway);
+    void UpdateDefaultRoute(ADDRESS_FAMILY family, const std::wstring& gateway, std::wstring& trackedGateway);
     void UpdateDnsSettings(const networking::DnsInfo& dns);
     void UpdateIpv4Address(const networking::EndpointIpAddress& ipAddress);
     void UpdateIpv6Address(const networking::EndpointIpAddress& ipAddress);
@@ -84,7 +84,8 @@ private:
     ULONG m_networkMtu = 0;
     networking::EndpointIpAddress m_trackedIpv4Address{};
     networking::EndpointIpAddress m_trackedIpv6Address{};
-    std::wstring m_trackedDefaultRoute;
+    std::wstring m_trackedDefaultRouteIpv4;
+    std::wstring m_trackedDefaultRouteIpv6;
     networking::DnsInfo m_trackedDnsSettings{};
 
     // Note: this field must be destroyed first to stop the callbacks before any other field is destroyed.

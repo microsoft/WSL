@@ -83,7 +83,9 @@ When started, the virtual machine will boot into the provided kernel, and then e
 - An entropy buffer, to seed the virtual machine's entropy
 - Information about the GPU drivers shares to mount, if any
 - Whether [wslg](https://github.com/microsoft/wslg) is enabled
-- Whether to mount the bundled Linux kernel headers and perf tooling (shipped in the kernel artifacts VHD; headers are mounted at `/usr/src/linux-headers-$(uname -r)` with `/lib/modules/$(uname -r)/build` linked to them or bind mounted when it is an existing directory, and perf is mounted at `/usr/lib/linux-tools/$(uname -r)`, added to the default `$PATH` and, when the distribution ships its own `/usr/bin/perf`, bind mounted over it)
+- Whether to mount the bundled Linux kernel headers (shipped in the kernel artifacts VHD; headers are mounted at `/usr/src/linux-headers-$(uname -r)` with `/lib/modules/$(uname -r)/build` linked to them or bind mounted when it is an existing directory)
+
+WSL does not expose bundled perf tooling or modify the distribution's perf installation. Install perf through the distribution's package manager.
 
 After applying all the configuration requested by [wslservice.exe](wslservice.exe.md), the virtual machine is ready to start Linux distributions.
 

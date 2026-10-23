@@ -132,6 +132,7 @@
     "DNS"     — Domain Name System. Do not translate (protocol acronym).
     "proxy"   — Network proxy server. Translate per locale standard networking term.
     "safe mode" — Minimal/diagnostic startup mode. Use standard OS term per locale.
+    "image"   — A container image, as in Docker. Not a picture or photo.
   -->
   <data name="AppName" xml:space="preserve">
     <value>Linuxos Windows-alrendszer</value>
@@ -890,6 +891,10 @@ A Admin Protection kapcsolatos további információért látogasson el a https:
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>A beágyazott virtualizálás nem támogatott ezen a gépen.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>Nem sikerült észlelni a beágyazott virtualizálás támogatását, hiba: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Nem sikerült létrehozni a(z) {} című hálózati végpontot. A hozzárendelt új cím: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -917,6 +922,14 @@ Visszaállás NAT-hálózatkezelésre.</value>
   <data name="MessageMirroredNetworkingNotSupportedIpv6Disabled" xml:space="preserve">
     <value>Az IPv6 nem támogatott módon van letiltva a gazdagépen (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
+  </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>A tükrözött hálózatkezelés kisebb rövid élettartamú porttartományt használ ({} port helyett {}). Ez korlátozhatja az egyidejű kapcsolatok számát.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>A tükrözött hálózatkezelés nem tudta lefoglalni a legalább {} egymást követő TCP- és UDP-portból álló tartományt. Ellenőrizze a Windows porthasználatát és a kizárásokat.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>A Hyper-V tűzfal nem támogatott</value>
@@ -1004,6 +1017,9 @@ Visszaállás NAT-hálózatkezelésre.</value>
   </data>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>A számítógép-házirend letiltotta a WSL-tárolót.</value>
+  </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>A Linux-képességek hozzáadását letiltja a számítógép-házirend.</value>
   </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>A(z) '{}' tárolólemezkép-regisztrációs adatbázis a számítógép-házirend miatt le van tiltva.</value>
@@ -1191,11 +1207,9 @@ Ha ez a hiba váratlanul jelentkezett, kérjük, keressen rá a meglévő probl�
     <value>A Globális biztonságos hozzáférés ügyféllel kapcsolatos jelenlegi kompatibilitási probléma miatt a DNS-alagútképzés le van tiltva.</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
-  <data name="MessageSparseVhdDisabled" xml:space="preserve">
-    <value>A ritka VHD-támogatás jelenleg le van tiltva az adatok esetleges sérülése miatt.
-Ha egy disztribúciót ritka VHD használatára szeretne kényszeríteni, futtassa a következőt:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
+  <data name="MessageSparseVhdUnsafe" xml:space="preserve">
+    <value>A ritka VHD-k jelenleg kísérleti jellegűek. Ha váratlan működést tapasztal, kérjük, jelezze a problémát itt: https://github.com/microsoft/WSL.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale. {Locked="https://github.com/microsoft/WSL"}The URL should not be translated.</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>A(z) {} csatlakoztatása nem sikerült. További részletekért tekintse meg a dmesg fájlt.</value>
@@ -2414,7 +2428,7 @@ További információ a termékről: https://aka.ms/privacy.</value>
   </data>
   <data name="MessageWslcInvalidImage" xml:space="preserve">
     <value>Érvénytelen kép: '{}'</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="MessageWslcInvalidFilter" xml:space="preserve">
     <value>Érvénytelen szűrő: {}</value>
@@ -2451,6 +2465,10 @@ További információ a termékről: https://aka.ms/privacy.</value>
   <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">
     <value>Nem lehet fordítási kimenetet írni a konzolra a(z) {} --output értékhez.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcBuildStdinContextAndDockerfile" xml:space="preserve">
+    <value>Az stdin nem használható egyszerre a buildkörnyezethez és a Dockerfile-hoz.</value>
+    <comment>{Locked="stdin"}{Locked="Dockerfile"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>Hiányzó kötelező opció: '{}'</value>
@@ -2672,14 +2690,6 @@ További információ a termékről: https://aka.ms/privacy.</value>
   <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
     <value>Fájlok másolása egy tároló és a helyi fájlrendszer között.</value>
   </data>
-  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
-    <value>Fájlok másolása egy tároló és a helyi fájlrendszer között.
-Használat: wslc container cp [OPTIONS] SOURCE DEST
-  Helyi tároló: wslc container cp LOCAL_PATH CONTAINER:PATH
-  Tárolóból helyi: wslc container cp CONTAINER:PATH LOCAL_PATH
-  Stdin-ről tárolóba: wslc container cp - CONTAINER:PATH</value>
-    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
-  </data>
   <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
     <value>Forrás: helyi elérési út, CONTAINER:PATH vagy "-" az stdin esetében</value>
     <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
@@ -2707,6 +2717,9 @@ Használat: wslc container cp [OPTIONS] SOURCE DEST
     <value>tar.exe nem található. A helyi fájlmásoláshoz Windows tar szükséges.</value>
     <comment>{Locked="tar.exe"}</comment>
   </data>
+  <data name="WSLCCLI_CpStdoutIsTerminalError" xml:space="preserve">
+    <value>A másolat kimenete nem írható a konzolra.</value>
+  </data>
   <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
     <value>Érvénytelen másolási irány. Forrásként vagy célként használja a CONTAINER:PATH elemet.</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
@@ -2730,7 +2743,11 @@ Példa: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_CpSourceNameNotRepresentableError" xml:space="preserve">
     <value>A(z) „{0}” nem másolható, mert a neve nem használható Windows-fájlnévként.</value>
-    <comment>{0} is the source path. Shown when the container source name holds a character that is not valid in a Windows file name.</comment>
+    <comment>{0} is the file name being copied. Shown when the name cannot be used as a Windows file name.</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceNameTrimmedWarning" xml:space="preserve">
+    <value>A Windows eltávolítja a fájlnevek végéről a szóközöket és pontokat, ezért a(z) „{}” „{}” néven lesz másolva.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Tároló vizsgálata.</value>
@@ -2846,12 +2863,14 @@ Példa: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImageImportDesc" xml:space="preserve">
     <value>Kép importálása egy tarballból.</value>
+    <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
     <value>Egy tarball tartalmát importálja egy fájlrendszerkép létrehozásához. Igény szerint a rendszerképet egy adattár- és címkenévvel is elláthatja.</value>
   </data>
   <data name="WSLCCLI_ImageListAllArgDescription" xml:space="preserve">
     <value>Az összes kép megjelenítése (alapértelmezés szerint a köztes képek rejtve vannak).</value>
+    <comment>"Images" means container images, as in Docker, not pictures or photos.</comment>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>Képek listázása.</value>
@@ -2883,6 +2902,7 @@ Példa: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImagePruneDeletedHeader" xml:space="preserve">
     <value>Törölt képek:</value>
+    <comment>"Images" means container images, as in Docker, not pictures or photos.</comment>
   </data>
   <data name="WSLCCLI_ImagePruneDesc" xml:space="preserve">
     <value>Távolítsa el a nem használt lemezképeket.</value>
@@ -3276,6 +3296,10 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>A(z) {} beállítás nem támogatott.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
+    <value>Érvénytelen mód: '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
     <value>A csatlakoztatási cél megadása kötelező.</value>
   </data>
@@ -3448,7 +3472,8 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>A mentett kép elérési útja</value>
   </data>
   <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
-    <value>A buildkörnyezet könyvtárának elérési útja</value>
+    <value>A buildkörnyezet könyvtárának elérési útja (a "-" használatával olvashatja be a tar archívumot vagy a Dockerfile-t az stdinből)</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
     <value>Port közzététele tárolóból gazdagépre</value>
@@ -3458,6 +3483,7 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   </data>
   <data name="WSLCCLI_PullAllTagsArgDescription" xml:space="preserve">
     <value>A tárban lévő összes címkézett kép letöltése.</value>
+    <comment>"Images" means container images, as in Docker, not pictures or photos.</comment>
   </data>
   <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
     <value>Részletes kimenet elrejtése</value>
@@ -3624,6 +3650,12 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>Virtualizálási képességek közzétehetők a tárolóban</value>
   </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Linux-képességek hozzáadása (megismételhető)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Linux-képességek elvetése (megismételhető)</value>
+  </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>A tárolóban végrehajtott parancsnak átadandó argumentumok</value>
   </data>
@@ -3683,7 +3715,7 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>A(z) {} kép nem található, lekérés</value>
+    <value>A(z) „{}” kép nem található helyben</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">
@@ -3698,11 +3730,11 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   </data>
   <data name="WSLCCLI_ImageLoaded" xml:space="preserve">
     <value>Betöltött kép: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="WSLCCLI_ImageLoadedId" xml:space="preserve">
     <value>Betöltött kép azonosítója: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
     <value>Hálózatok kezelése.</value>
@@ -3852,32 +3884,33 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>A rendszerkép nem írható a terminálba. Használja az -o opciót, vagy irányítsa át a stdout-ot.</value>
   </data>
+  <data name="WSLCCLI_BuildStdinIsTerminalError" xml:space="preserve">
+    <value>A build bemenete nem olvasható a terminálról. Irányítson egy Dockerfile-t vagy tar archívumot az stdinre.</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
     <value>Nem lehet a tárolót a terminálba exportálni. Használja az -o opciót, vagy irányítsa át a stdout-ot.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>Várt formátum: &lt;gazdaelérési út | elnevezett kötet&gt;:&lt;tároló elérési útja&gt;[:mód]</value>
+    <value>Várt formátum: [&lt;gazdaelérési út | elnevezett kötet&gt;:]&lt;tároló elérési útja&gt;[:mód]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
-  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>Érvénytelen kötetspecifikációk: {}. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
+    <value>Érvénytelen kötetspecifikációk: „{}”. {} {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>Érvénytelen kötetspecifikációk: {}. A gazdagép elérési útja nem lehet üres. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
+    <value>A kötetspecifikáció üres.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
-    <value>Érvénytelen kötetspecifikációk: {}. A tároló elérési útja nem lehet üres. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
+    <value>A kötetspecifikáció kettőspontok közötti szakasza üres.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
-    <value>Érvénytelen kötetspecifikációk: '{}'. A tároló elérési útjának abszolút elérési útnak kell lennie (/ karakterrel kezdődik). {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
+    <value>A kötetspecifikáció túl sok kettőspontot tartalmaz.</value>
   </data>
-  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
-    <value>Érvénytelen kötetspecifikációk: {}. A gazdagép {} elérési útja nem érvényes Windows-elérési út.</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
+    <value>A gazdagép {} elérési útja nem érvényes Windows-elérési út.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
     <value>Bármely objektumtípus neve vagy azonosítója</value>
@@ -3909,6 +3942,7 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   </data>
   <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
     <value>KÉP</value>
+    <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="WSLCCLI_TableHeaderCreated" xml:space="preserve">
     <value>LÉTREHOZVA</value>
@@ -3939,6 +3973,30 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderRepository" xml:space="preserve">
+    <value>ADATTÁR</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderTag" xml:space="preserve">
+    <value>CÍMKE</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderDigest" xml:space="preserve">
+    <value>KIVONAT</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderImageId" xml:space="preserve">
+    <value>LEMEZKÉP AZONOSÍTÓJA</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderNetworkId" xml:space="preserve">
+    <value>HÁLÓZATI AZONOSÍTÓ</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderDriver" xml:space="preserve">
+    <value>ILLESZTŐPROGRAM</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderScope" xml:space="preserve">
+    <value>HATÓKÖR</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderVolumeName" xml:space="preserve">
+    <value>KÖTET NEVE</value>
   </data>
   <data name="WSLCCLI_ContainerStateCreated" xml:space="preserve">
     <value>létrehozva</value>
@@ -4072,6 +4130,7 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>Nem sikerült feldolgozni a képimportálás folyamatát</value>
+    <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="MessageWslcVolumeUnmountFailed" xml:space="preserve">
     <value>Nem sikerült leválasztani a(z) {} kötetet: {}</value>

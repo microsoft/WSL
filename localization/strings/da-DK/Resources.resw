@@ -132,6 +132,7 @@
     "DNS"     — Domain Name System. Do not translate (protocol acronym).
     "proxy"   — Network proxy server. Translate per locale standard networking term.
     "safe mode" — Minimal/diagnostic startup mode. Use standard OS term per locale.
+    "image"   — A container image, as in Docker. Not a picture or photo.
   -->
   <data name="AppName" xml:space="preserve">
     <value>Windows-undersystem til Linux</value>
@@ -890,6 +891,10 @@ Du kan få flere oplysninger om Admin Protection ved at besøge https://aka.ms/a
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>Indlejret virtualisering understøttes ikke på denne maskine.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>Understøttelse af indlejret virtualisering blev ikke registreret, fejl: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Der kunne ikke oprettes et netværksslutpunkt med adressen: '{}', tildelt ny adresse: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -917,6 +922,14 @@ Går tilbage til NAT-netværk.</value>
   <data name="MessageMirroredNetworkingNotSupportedIpv6Disabled" xml:space="preserve">
     <value>IPv6 er deaktiveret på værten på en ikke-understøttet måde (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
+  </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>Spejlet netværk bruger et mindre kortvarigt portområde ({} porte i stedet for {}). Dette kan begrænse antallet af samtidige forbindelser.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>Spejlede netværk kunne ikke reservere det mindste sammenhængende område på {} TCP- og UDP-porte. Kontrollér brugen af Windows-porte og udeladelser.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Hyper-V-firewall understøttes ikke</value>
@@ -1004,6 +1017,9 @@ Går tilbage til NAT-netværk.</value>
   </data>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>WSL-objektbeholderen er deaktiveret af computerpolitikken.</value>
+  </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>Tilføjelser af Linux-funktioner deaktiveres af computerpolitikken.</value>
   </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>Registreringsdatabasen for objektbeholderafbildningen '{}' er blokeret af computerpolitikken.</value>
@@ -1191,11 +1207,9 @@ Hvis denne fejl var uventet, kan du overveje at søge efter eksisterende problem
     <value>På grund af et aktuelt kompatibilitetsproblem med Global sikker adgang-klienten er DNS-tunneling deaktiveret.</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
-  <data name="MessageSparseVhdDisabled" xml:space="preserve">
-    <value>Understøttelse af sparse VHD er i øjeblikket deaktiveret på grund af potentiel datakorruption.
-For at tvinge en distribution til at bruge en sparse VHD, skal du køre:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
+  <data name="MessageSparseVhdUnsafe" xml:space="preserve">
+    <value>Sparse VHD'er er i øjeblikket eksperimentelle. Hvis du støder på uventet funktionsmåde, skal du indsende et problem på https://github.com/microsoft/WSL.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale. {Locked="https://github.com/microsoft/WSL"}The URL should not be translated.</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>{} kunne ikke indsættes. Se dmesg for at få flere oplysninger.</value>
@@ -2414,7 +2428,7 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
   </data>
   <data name="MessageWslcInvalidImage" xml:space="preserve">
     <value>Ugyldigt billede: "{}"</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="MessageWslcInvalidFilter" xml:space="preserve">
     <value>Ugyldigt filter: "{}"</value>
@@ -2451,6 +2465,10 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
   <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">
     <value>Build-output kan ikke skrives til konsollen for --output værdi '{}'.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcBuildStdinContextAndDockerfile" xml:space="preserve">
+    <value>Kan ikke bruge stdin til både build-konteksten og Dockerfile.</value>
+    <comment>{Locked="stdin"}{Locked="Dockerfile"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>Manglende obligatorisk indstilling: '{}'</value>
@@ -2672,14 +2690,6 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
   <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
     <value>Kopiér filer mellem en objektbeholder og det lokale filsystem.</value>
   </data>
-  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
-    <value>Kopiér filer mellem en objektbeholder og det lokale filsystem.
-Format: wslc container cp [INDSTILLINGER] KILDEDESTINATION 
-  Lokalt til objektbeholder: wslc container cp LOCAL_PATH CONTAINER:PATH
-  Objektbeholder til lokalt: wslc container cp CONTAINER:PATH LOCAL_PATH
-  Stdin til objektbeholder: wslc container cp - CONTAINER:PATH</value>
-    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
-  </data>
   <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
     <value>Kilde: lokal sti, CONTAINER:PATH eller '-' til stdin</value>
     <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
@@ -2707,6 +2717,9 @@ Format: wslc container cp [INDSTILLINGER] KILDEDESTINATION
     <value>tar.exe blev ikke fundet. Windows tar kræves til lokal filkopiering.</value>
     <comment>{Locked="tar.exe"}</comment>
   </data>
+  <data name="WSLCCLI_CpStdoutIsTerminalError" xml:space="preserve">
+    <value>Kan ikke skrive kopioutput til konsollen.</value>
+  </data>
   <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
     <value>Ugyldig kopieringsretning. Brug CONTAINER:PATH som enten kilde eller destination.</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
@@ -2730,7 +2743,11 @@ Eksempel: tar -cf - filer | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_CpSourceNameNotRepresentableError" xml:space="preserve">
     <value>'{0}' kan ikke kopieres, fordi navnet ikke kan bruges som et Windows-filnavn.</value>
-    <comment>{0} is the source path. Shown when the container source name holds a character that is not valid in a Windows file name.</comment>
+    <comment>{0} is the file name being copied. Shown when the name cannot be used as a Windows file name.</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceNameTrimmedWarning" xml:space="preserve">
+    <value>Windows fjerner efterstillede mellemrum og prikker fra filnavne, så '{}' kopieres som '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Undersøg en objektbeholder.</value>
@@ -2846,12 +2863,14 @@ Eksempel: tar -cf - filer | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImageImportDesc" xml:space="preserve">
     <value>Importér et billede fra en tarball.</value>
+    <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
     <value>Importerer indholdet af en tarball for at oprette en filsystemafbildning. Mærk eventuelt billedet med et lager- og mærkenavn.</value>
   </data>
   <data name="WSLCCLI_ImageListAllArgDescription" xml:space="preserve">
     <value>Vis alle billeder (standard skjuler mellemliggende billeder).</value>
+    <comment>"Images" means container images, as in Docker, not pictures or photos.</comment>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>Angiv billeder.</value>
@@ -2883,6 +2902,7 @@ Eksempel: tar -cf - filer | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImagePruneDeletedHeader" xml:space="preserve">
     <value>Slettede billeder:</value>
+    <comment>"Images" means container images, as in Docker, not pictures or photos.</comment>
   </data>
   <data name="WSLCCLI_ImagePruneDesc" xml:space="preserve">
     <value>Fjern ubenyttede billeder.</value>
@@ -3276,6 +3296,10 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Indstillingen "{}" understøttes ikke.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
+    <value>Ugyldig tilstand "{}".</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
     <value>Monteringsmålet er påkrævet.</value>
   </data>
@@ -3448,7 +3472,8 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Sti til det gemte billede</value>
   </data>
   <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
-    <value>Sti til build-kontekstmappen</value>
+    <value>Sti til buildkontekstmappen (brug "-" til at læse et tar-arkiv eller Dockerfile fra stdin)</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
     <value>Udgiv en port fra en objektbeholder til vært</value>
@@ -3458,6 +3483,7 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   </data>
   <data name="WSLCCLI_PullAllTagsArgDescription" xml:space="preserve">
     <value>Download alle mærkede billeder i laget.</value>
+    <comment>"Images" means container images, as in Docker, not pictures or photos.</comment>
   </data>
   <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
     <value>Undertryk detaljeret output</value>
@@ -3624,6 +3650,12 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>Fremvis virtualiseringsegenskaber for objektbeholderen</value>
   </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Tilføj Linux-funktioner (kan gentages)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Fjern Linux-funktioner (kan gentages)</value>
+  </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Argumenter, der skal overføres til den kommando, der udføres inde i objektbeholderen</value>
   </data>
@@ -3683,7 +3715,7 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>Billedet '{}' blev ikke fundet, henter</value>
+    <value>Billedet '{}' blev ikke fundet lokalt</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">
@@ -3698,11 +3730,11 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   </data>
   <data name="WSLCCLI_ImageLoaded" xml:space="preserve">
     <value>Indlæst billede: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="WSLCCLI_ImageLoadedId" xml:space="preserve">
     <value>Indlæst billed-id: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
     <value>Administrer netværk.</value>
@@ -3852,6 +3884,10 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>Billedet kan ikke skrives til terminalen. Brug indstillingen -o, eller omdiriger stdout.</value>
   </data>
+  <data name="WSLCCLI_BuildStdinIsTerminalError" xml:space="preserve">
+    <value>Kan ikke læse build-input fra terminalen. Send en Dockerfile eller et tar-arkiv til stdin.</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
     <value>Objektbeholderen kan ikke eksporteres til terminalen. Brug indstillingen -o, eller omdiriger stdout.</value>
   </data>
@@ -3859,25 +3895,22 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Forventet format: &lt;værtssti | navngivet diskenhed&gt;:&lt;objektbeholdersti&gt;[:tilstand]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
-  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>Ugyldige diskenhedsspecifikationer: '{}'. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
+    <value>Ugyldige diskenhedsspecifikationer: "{}". {} {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>Ugyldige enhedsspecifikationer: '{}'. Værtsstien må ikke være tom. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
+    <value>Diskenhedsspecifikationen er tom.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
-    <value>Ugyldige enhedsspecifikationer: '{}'. Beholderstien må ikke være tom. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
+    <value>Diskenhedsspecifikationen indeholder en tom sektion mellem kolon.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
-    <value>Ugyldige enhedsspecifikationer: '{}'. Beholderstien skal være en absolut sti (starter med '/'). {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
+    <value>Volumespecifikationen indeholder for mange koloner.</value>
   </data>
-  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
-    <value>Ugyldige enhedsspecifikationer: '{}'. Værtsstien '{}' er ikke en gyldig Windows-sti.</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
+    <value>Værtsstien '{}' er ikke en gyldig Windows-sti.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
     <value>Navn eller id for en objekttype</value>
@@ -3909,6 +3942,7 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   </data>
   <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
     <value>BILLEDE</value>
+    <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="WSLCCLI_TableHeaderCreated" xml:space="preserve">
     <value>OPRETTET</value>
@@ -3939,6 +3973,30 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderRepository" xml:space="preserve">
+    <value>LAGER</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderTag" xml:space="preserve">
+    <value>MÆRKE</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderDigest" xml:space="preserve">
+    <value>OVERSIGT</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderImageId" xml:space="preserve">
+    <value>BILLED-ID</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderNetworkId" xml:space="preserve">
+    <value>NETVÆRKS-ID</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderDriver" xml:space="preserve">
+    <value>DRIVER</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderScope" xml:space="preserve">
+    <value>OMFANG</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderVolumeName" xml:space="preserve">
+    <value>NAVN PÅ ENHED</value>
   </data>
   <data name="WSLCCLI_ContainerStateCreated" xml:space="preserve">
     <value>oprettet</value>
@@ -4072,6 +4130,7 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>Status for import af billeder blev ikke fortolket</value>
+    <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="MessageWslcVolumeUnmountFailed" xml:space="preserve">
     <value>Det mislykkedes at fjerne diskenhed "{}": {}</value>

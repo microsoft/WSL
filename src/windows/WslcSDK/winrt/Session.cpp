@@ -404,6 +404,56 @@ IVectorView<winrt::Microsoft::WSL::Containers::ImageInfo> Session::GetImages()
     return winrt::single_threaded_vector(std::move(images)).GetView();
 }
 
+IVectorView<winrt::Microsoft::WSL::Containers::NetworkInfo> Session::GetNetworks()
+{
+    EnsureStarted();
+
+    wil::unique_cotaskmem_array_ptr<WslcNetworkInfo> networksArray;
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcListSessionNetworks(ToHandle(), networksArray.put(), networksArray.size_address<uint32_t>(), errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
+
+    auto networks = std::vector<winrt::Microsoft::WSL::Containers::NetworkInfo>();
+    networks.reserve(networksArray.size());
+    for (uint32_t i = 0; i < networksArray.size(); i++)
+    {
+        networks.push_back(winrt::make<implementation::NetworkInfo>(networksArray[i]));
+    }
+
+    return winrt::single_threaded_vector(std::move(networks)).GetView();
+}
+
+winrt::Microsoft::WSL::Containers::NetworkInfo Session::CreateNetwork(winrt::Microsoft::WSL::Containers::NetworkSettings const& settings)
+{
+    if (!settings)
+    {
+        throw winrt::hresult_error(E_POINTER, L"Network settings cannot be null");
+    }
+
+    EnsureStarted();
+
+    WslcNetworkInfo networkInfo{};
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcCreateSessionNetwork(ToHandle(), GetStructPointer(settings), &networkInfo, errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
+
+    return winrt::make<implementation::NetworkInfo>(networkInfo);
+}
+
+void Session::DeleteNetwork(hstring const& name)
+{
+    if (name.empty())
+    {
+        throw winrt::hresult_invalid_argument(L"Network name cannot be empty");
+    }
+
+    EnsureStarted();
+
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcDeleteSessionNetwork(ToHandle(), winrt::to_string(name).c_str(), errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
+}
+
 WslcSession Session::ToHandle()
 {
     EnsureStarted();

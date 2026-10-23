@@ -176,13 +176,31 @@ void WslCoreInstance::CreateLxProcess(
 
     // Ensure the instance is still running.
 
-    std::lock_guard lock(m_lock);
+    std::unique_lock lock(m_lock);
     THROW_HR_IF(HCS_E_TERMINATED, (!m_initChannel || !m_consoleManager));
 
-    if (m_oobeCompleteEvent && !m_oobeCompleteEvent.is_signaled())
+    bool warningEmitted = false;
+    while (m_oobeCompleteEvent && !m_oobeCompleteEvent.is_signaled())
     {
-        EMIT_USER_WARNING(wsl::shared::Localization::MessageWaitingForOobe(m_configuration.Name.c_str()));
-        m_oobeCompleteEvent.wait();
+        if (!warningEmitted)
+        {
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageWaitingForOobe(m_configuration.Name));
+            warningEmitted = true;
+        }
+
+        // Keep this attempt's event alive if another caller starts a retry while the lock is released.
+        const auto oobeCompleteEvent = m_oobeCompleteEvent;
+        std::vector<HANDLE> exitHandles{m_destroyingEvent.get()};
+        if (ConsoleData.ClientProcess)
+        {
+            exitHandles.push_back(ConsoleData.ClientProcess.get());
+        }
+
+        lock.unlock();
+        THROW_HR_IF(E_ABORT, !wsl::windows::common::relay::InterruptableWait(oobeCompleteEvent.get(), exitHandles));
+        lock.lock();
+
+        THROW_HR_IF(HCS_E_TERMINATED, (!m_initChannel || !m_consoleManager));
     }
 
     // Initialize the create process message.
@@ -255,7 +273,7 @@ void WslCoreInstance::CreateLxProcess(
     if (WI_IsFlagSet(message->Flags, LxInitCreateProcessFlagAllowOOBE))
     {
         {
-            m_oobeCompleteEvent.create(wil::EventOptions::ManualReset);
+            m_oobeCompleteEvent = wil::shared_event(wil::EventOptions::ManualReset);
 
             auto impersonate = wil::CoImpersonateClient();
             auto registration = wsl::windows::service::DistributionRegistration::Open(
@@ -267,15 +285,16 @@ void WslCoreInstance::CreateLxProcess(
                 m_oobeThread.join();
             }
 
-            m_oobeThread = std::thread([this, socket = std::move(sockets[5]), registration = std::move(registration)]() mutable {
-                try
-                {
-                    ReadOOBEResult(std::move(socket), std::move(registration));
-                }
-                CATCH_LOG()
+            m_oobeThread = std::thread(
+                [this, socket = std::move(sockets[5]), registration = std::move(registration), oobeCompleteEvent = m_oobeCompleteEvent]() mutable {
+                    try
+                    {
+                        ReadOOBEResult(std::move(socket), std::move(registration));
+                    }
+                    CATCH_LOG()
 
-                m_oobeCompleteEvent.SetEvent();
-            });
+                    oobeCompleteEvent.SetEvent();
+                });
         }
     }
 }
@@ -321,9 +340,9 @@ ULONG WslCoreInstance::GetClientId() const
 {
     // Return the system distro ClientId if any so that this distribution is correctly
     // identified if the system distro init process terminates.
-    if (m_systemDistro)
+    if (const auto systemDistro = m_systemDistro.load())
     {
-        return m_systemDistro->GetClientId();
+        return systemDistro->GetClientId();
     }
 
     return m_clientId;
@@ -341,6 +360,7 @@ GUID WslCoreInstance::GetInstanceId() const
 
 std::shared_ptr<LxssPort> WslCoreInstance::GetInitPort()
 {
+    std::lock_guard lock(m_lock);
     THROW_HR_IF(HCS_E_TERMINATED, !m_initChannel);
 
     return m_initChannel;
@@ -348,14 +368,14 @@ std::shared_ptr<LxssPort> WslCoreInstance::GetInitPort()
 
 std::shared_ptr<LxssRunningInstance> WslCoreInstance::GetSystemDistro()
 {
-    return m_systemDistro;
+    return m_systemDistro.load();
 }
 
 void WslCoreInstance::UpdateTimezone()
 {
-    if (m_systemDistro)
+    if (const auto systemDistro = m_systemDistro.load())
     {
-        m_systemDistro->UpdateTimezone();
+        systemDistro->UpdateTimezone();
     }
 
     auto message =
@@ -381,9 +401,9 @@ void WslCoreInstance::Initialize()
     }
 
     // If a system distro was created, initialize it first.
-    if (m_systemDistro)
+    if (const auto systemDistro = m_systemDistro.load())
     {
-        m_systemDistro->Initialize();
+        systemDistro->Initialize();
     }
 
     LX_INIT_DRVFS_MOUNT drvfsMount = LxInitDrvfsMountNone;
@@ -533,7 +553,7 @@ void WslCoreInstance::Stop()
     m_redirectorConnectionTargets.RemoveAll();
 
     // If the instance was terminated, terminate the associated system distro.
-    m_systemDistro.reset();
+    m_systemDistro.store(nullptr);
 
     return;
 }

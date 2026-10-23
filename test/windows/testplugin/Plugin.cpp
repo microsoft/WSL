@@ -749,6 +749,18 @@ CATCH_RETURN();
 HRESULT OnWslcVmStopping(const WSLCSessionInformation* Session)
 try
 {
+    if (g_testType == PluginTestType::WslcVmExitDuringSessionRelease)
+    {
+        wil::unique_event entered;
+        entered.open(c_vmStoppingEnteredEvent, EVENT_MODIFY_STATE);
+        wil::unique_event release;
+        release.open(c_vmStoppingReleaseEvent, SYNCHRONIZE);
+
+        entered.SetEvent();
+        THROW_WIN32_IF(ERROR_TIMEOUT, !release.wait(30000));
+        return S_OK;
+    }
+
     if (g_testType == PluginTestType::WslcVmNeverStarted)
     {
         g_logfile << "WSLC VM stopping, session=" << Session->SessionId << std::endl;
@@ -867,7 +879,10 @@ EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPlugin
         THROW_HR_IF(E_UNEXPECTED, !g_logfile);
 
         g_testType = static_cast<PluginTestType>(ReadDword(key.get(), nullptr, c_testType, static_cast<DWORD>(PluginTestType::Invalid)));
-        THROW_HR_IF(E_INVALIDARG, static_cast<DWORD>(g_testType) <= 0 || static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::MountFolderAccess));
+        THROW_HR_IF(
+            E_INVALIDARG,
+            static_cast<DWORD>(g_testType) <= 0 ||
+                static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::WslcVmExitDuringSessionRelease));
 
         g_logfile << "Plugin loaded. TestMode=" << static_cast<DWORD>(g_testType) << std::endl;
         g_api = Api;

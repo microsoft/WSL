@@ -84,7 +84,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     m_userToken = wil::shared_handle{wsl::windows::common::security::GetUserToken(TokenImpersonation).release()};
     m_crashDumpFolder = GetCrashDumpFolder();
 
-    std::lock_guard lock(m_lock);
+    std::unique_lock lock(m_lock);
 
     THROW_IF_FAILED(CoCreateGuid(&m_vmId));
     m_vmIdString = wsl::shared::string::GuidToString<wchar_t>(m_vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
@@ -122,10 +122,16 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     vmSettings.ComputeTopology.Memory.EnableColdDiscardHint = true;
     vmSettings.ComputeTopology.Processor.Count = Settings->CpuCount;
 
+    const auto windowsVersion = wsl::windows::common::helpers::GetWindowsVersion();
+    if (windowsVersion.BuildNumber >= WindowsBuildNumbers::Germanium)
+    {
+        // Let HCS derive a virtual NUMA topology from the requested resources and the host topology.
+        vmSettings.ComputeTopology.Numa.emplace();
+    }
+
     // Configure backing page size, fault cluster shift size, and page reporting order to favor density (lower vmmem usage).
     //
     // N.B. Page reporting order must be >= fault cluster size shift.
-    const auto windowsVersion = wsl::windows::common::helpers::GetWindowsVersion();
     int pageReportingOrder;
     if (windowsVersion.BuildNumber >= WindowsBuildNumbers::Germanium)
     {
@@ -322,6 +328,13 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
         m_guestDeviceManager = std::make_shared<::GuestDeviceManager>(m_vmIdString, m_vmId);
     }
 
+    // A failed constructor does not run our destructor. Release resources that could cause callbacks before returning.
+    auto unregisterOnFailure = wil::scope_exit([&]() {
+        lock.unlock();
+        m_guestDeviceManager.reset();
+        m_computeSystem.reset();
+    });
+
     hcs::RegisterCallback(m_computeSystem.get(), &HcsVirtualMachine::OnVmExitCallback, this);
 
     // Create a listening socket for mini_init to connect to once the VM is running.
@@ -346,6 +359,8 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
         hcs::ModifyComputeSystem(m_computeSystem.get(), wsl::shared::ToJsonW(gpuRequest).c_str());
     }
+
+    unregisterOnFailure.release();
 }
 
 HcsVirtualMachine::~HcsVirtualMachine()

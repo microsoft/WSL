@@ -17,7 +17,7 @@ Abstract:
 #include "JsonUtils.h"
 #include "SessionService.h"
 #include "SessionTasks.h"
-#include "TableOutput.h"
+#include "TableRenderer.h"
 #include "Task.h"
 #include "WSLCUserSettings.h"
 
@@ -31,23 +31,27 @@ using namespace wsl::windows::wslc::services;
 namespace wsl::windows::wslc::task {
 
 using namespace wsl::windows::wslc::cli;
+using namespace wsl::windows::cli::table;
 
 static void WriteSessionTable(Terminal& terminal, const std::vector<SessionInformation>& sessions)
 {
-    TableOutput<3> table(
-        terminal,
-        {Localization::MessageWslcHeaderId(), Localization::MessageWslcHeaderCreatorPid(), Localization::MessageWslcHeaderDisplayName()});
+    TableData table{std::vector<ColumnDefinition>{
+        {Localization::MessageWslcHeaderId(), {}},
+        {Localization::MessageWslcHeaderCreatorPid(), {}},
+        {Localization::MessageWslcHeaderDisplayName(), {}}}};
+
+    table.Reserve(sessions.size());
 
     for (const auto& session : sessions)
     {
-        table.WriteRow({
+        table.AddRow({
             std::to_wstring(session.SessionId),
             std::to_wstring(session.CreatorPid),
             session.DisplayName,
         });
     }
 
-    table.Complete();
+    RenderTable(terminal, table);
 }
 
 void AttachToSession(CLIExecutionContext& context)

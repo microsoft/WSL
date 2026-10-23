@@ -891,6 +891,10 @@ For more information on Admin Protection, please visit https://aka.ms/apdevguide
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>Nested virtualization is not supported on this machine.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>Failed to detect nested virtualization support, error: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Failed to create network endpoint with address: '{}', assigned new address: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -918,6 +922,14 @@ Falling back to NAT networking.</value>
   <data name="MessageMirroredNetworkingNotSupportedIpv6Disabled" xml:space="preserve">
     <value>IPv6 is disabled on the host in an unsupported way (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
+  </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>Mirrored networking is using a smaller ephemeral port range ({} ports instead of {}). This may limit the number of simultaneous connections.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>Mirrored networking could not reserve the minimum contiguous range of {} TCP and UDP ports. Check Windows port usage and exclusions.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Hyper-V firewall is not supported</value>
@@ -1005,6 +1017,9 @@ Falling back to NAT networking.</value>
   </data>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>WSL container is disabled by the computer policy.</value>
+  </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>Linux capability additions are disabled by the computer policy.</value>
   </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>The container image registry '{}' is blocked by the computer policy.</value>
@@ -2455,6 +2470,10 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Cannot write build output to the console for --output value '{}'.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcBuildStdinContextAndDockerfile" xml:space="preserve">
+    <value>Can't use stdin for both the build context and the Dockerfile.</value>
+    <comment>{Locked="stdin"}{Locked="Dockerfile"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name = "MessageWslcMissingVolumeOption" xml:space = "preserve" >
     <value>Missing required option: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2675,14 +2694,6 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
     <value>Copy files between a container and the local filesystem.</value>
   </data>
-  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
-    <value>Copy files between a container and the local filesystem.
-Usage: wslc container cp [OPTIONS] SOURCE DEST
-  Local to container: wslc container cp LOCAL_PATH CONTAINER:PATH
-  Container to local: wslc container cp CONTAINER:PATH LOCAL_PATH
-  Stdin to container: wslc container cp - CONTAINER:PATH</value>
-    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
-  </data>
   <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
     <value>Source: local path, CONTAINER:PATH, or '-' for stdin</value>
     <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
@@ -2710,6 +2721,9 @@ Usage: wslc container cp [OPTIONS] SOURCE DEST
     <value>tar.exe not found. Windows tar is required for local file copy.</value>
     <comment>{Locked="tar.exe"}</comment>
   </data>
+  <data name="WSLCCLI_CpStdoutIsTerminalError" xml:space="preserve">
+    <value>Cannot write copy output to the console.</value>
+  </data>
   <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
     <value>Invalid copy direction. Use CONTAINER:PATH as either source or destination.</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
@@ -2733,7 +2747,11 @@ Example: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_CpSourceNameNotRepresentableError" xml:space="preserve">
     <value>Cannot copy '{0}' because its name cannot be used as a Windows file name.</value>
-    <comment>{0} is the source path. Shown when the container source name holds a character that is not valid in a Windows file name.</comment>
+    <comment>{0} is the file name being copied. Shown when the name cannot be used as a Windows file name.</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceNameTrimmedWarning" xml:space="preserve">
+    <value>Windows removes trailing spaces and dots from file names, so '{}' is copied as '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Inspect a container.</value>
@@ -3282,6 +3300,10 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Option '{}' is not supported.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
+    <value>Invalid mode '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
     <value>The mount target is required.</value>
   </data>
@@ -3454,7 +3476,8 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Path for the saved image</value>
   </data>
   <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
-    <value>Path to the build context directory</value>
+    <value>Path to the build context directory (use "-" to read a tar archive or Dockerfile from stdin)</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
     <value>Publish a port from a container to host</value>
@@ -3631,6 +3654,12 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>Expose virtualization capabilities to the container</value>
   </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Add Linux capabilities (repeatable)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Drop Linux capabilities (repeatable)</value>
+  </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Arguments to pass to the command being executed inside the container</value>
   </data>
@@ -3690,7 +3719,7 @@ On first run, creates the file with all settings commented out at their defaults
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>Image '{}' not found, pulling</value>
+    <value>Unable to find image '{}' locally</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">
@@ -3859,32 +3888,33 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>Cannot write image to terminal. Use the -o option or redirect stdout.</value>
   </data>
+  <data name="WSLCCLI_BuildStdinIsTerminalError" xml:space="preserve">
+    <value>Cannot read build input from terminal. Pipe a Dockerfile or tar archive to stdin.</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
     <value>Cannot export container to terminal. Use the -o option or redirect stdout.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>Expected format: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
+    <value>Expected format: [&lt;host path | named volume&gt;:]&lt;container path&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
-  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>Invalid volume specifications: '{}'. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
+    <value>Invalid volume specification: '{}'. {} {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>Invalid volume specifications: '{}'. Host path cannot be empty. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
+    <value>The volume specification is empty.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
-    <value>Invalid volume specifications: '{}'. Container path cannot be empty. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
+    <value>The volume specification contains an empty section between colons.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
-    <value>Invalid volume specifications: '{}'. Container path must be an absolute path (starting with '/'). {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
+    <value>The volume specification contains too many colons.</value>
   </data>
-  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
-    <value>Invalid volume specifications: '{}'. Host path '{}' is not a valid Windows path.</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
+    <value>Host path '{}' is not a valid Windows path.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
     <value>Name or Id of any object type</value>
@@ -3947,6 +3977,30 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderRepository" xml:space="preserve">
+    <value>REPOSITORY</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderTag" xml:space="preserve">
+    <value>TAG</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderDigest" xml:space="preserve">
+    <value>DIGEST</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderImageId" xml:space="preserve">
+    <value>IMAGE ID</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderNetworkId" xml:space="preserve">
+    <value>NETWORK ID</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderDriver" xml:space="preserve">
+    <value>DRIVER</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderScope" xml:space="preserve">
+    <value>SCOPE</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderVolumeName" xml:space="preserve">
+    <value>VOLUME NAME</value>
   </data>
   <data name="WSLCCLI_ContainerStateCreated" xml:space="preserve">
     <value>created</value>

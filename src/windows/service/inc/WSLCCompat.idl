@@ -200,6 +200,18 @@ typedef struct _WSLCCompatContainerOptions
     ULONG UlimitsCount;
 } WSLCCompatContainerOptions;
 
+typedef struct _WSLCCompatContainerOptions2
+{
+    WSLCCompatContainerOptions Base;
+    WSLCCompatStringArray CapAdd;
+    WSLCCompatStringArray CapDrop;
+
+    // Endpoint settings for the primary network (Base.ContainerNetwork.NetworkMode).
+    // Duplicate keys are allowed (e.g., multiple "Aliases" entries).
+    [unique, size_is(PrimaryNetworkSettingsCount)] const WSLCCompatKeyValuePair* PrimaryNetworkSettings;
+    ULONG PrimaryNetworkSettingsCount;
+} WSLCCompatContainerOptions2;
+
 typedef char WSLCCompatContainerId[WSLCCompat_CONTAINER_ID_LENGTH + 1];
 
 typedef [system_handle(sh_file)] HANDLE WSLCCompatFileHandle;
@@ -347,6 +359,23 @@ interface IWSLCCompatSession : IUnknown
     HRESULT PushImage([in] LPCSTR Image, [in] LPCSTR RegistryAuthenticationInformation, [in, unique] IWSLCCompatProgressCallback* ProgressCallback, [in, unique] IWSLCCompatWarningCallback* WarningCallback);
 
     HRESULT RegisterCrashDumpCallback([in] IWSLCCompatCrashDumpCallback* Callback, [out] IUnknown** Subscription);
+}
+
+[
+    uuid(EB761F0D-8C17-4D6D-9FF9-84086A81C5A3),
+    pointer_default(unique),
+    object
+]
+interface IWSLCCompatSession2 : IWSLCCompatSession
+{
+    HRESULT CreateContainer2([in] const WSLCCompatContainerOptions2* Options, [in, unique] IWSLCCompatWarningCallback* WarningCallback, [out] IWSLCCompatContainer** Container);
+
+    // Returns a JSON array of wslc_schema::NetworkListEntry.
+    HRESULT ListNetworks([out] LPSTR* Output);
+    HRESULT DeleteNetwork([in] LPCSTR Name);
+
+    // Options is a JSON wslc_schema::CreateNetworkOptions; Network receives a JSON wslc_schema::NetworkListEntry.
+    HRESULT CreateNetwork([in] LPCSTR Options, [in, unique] IWSLCCompatWarningCallback* WarningCallback, [out] LPSTR* Network);
 }
 
 [

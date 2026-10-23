@@ -132,6 +132,7 @@
     "DNS"     — Domain Name System. Do not translate (protocol acronym).
     "proxy"   — Network proxy server. Translate per locale standard networking term.
     "safe mode" — Minimal/diagnostic startup mode. Use standard OS term per locale.
+    "image"   — A container image, as in Docker. Not a picture or photo.
   -->
   <data name="AppName" xml:space="preserve">
     <value>Subsistema do Windows para Linux</value>
@@ -897,6 +898,10 @@ Para obter mais informações sobre Admin Protection, visite https://aka.ms/apde
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>Não há suporte para virtualização aninhada nesta máquina.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>Falha ao detectar suporte à virtualização aninhada, erro: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Falha ao criar o ponto de extremidade de rede com o endereço: '{}', novo endereço atribuído: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -924,6 +929,14 @@ Voltando à rede NAT.</value>
   <data name="MessageMirroredNetworkingNotSupportedIpv6Disabled" xml:space="preserve">
     <value>O IPv6 está desabilitado no host de uma forma sem suporte (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
+  </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>A rede espelhada está usando um intervalo de portas efêmero menor ({} portas em vez de {}). Isso pode limitar o número de conexões simultâneas.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>A rede espelhada não pôde reservar o intervalo contíguo mínimo de {} portas TCP e UDP. Verifique o uso e as exclusões de portas do Windows.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Não há suporte para o firewall do Hyper-V</value>
@@ -1011,6 +1024,9 @@ Voltando à rede NAT.</value>
   </data>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>O contêiner WSL está desabilitado pela política do computador.</value>
+  </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>As adições de recursos do Linux são desabilitadas pela política do computador.</value>
   </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>O registro de imagem de contêiner '{}' está bloqueado pela política do computador.</value>
@@ -1198,11 +1214,9 @@ Se esse erro foi inesperado, considere pesquisar problemas existentes ou registr
     <value>Devido a um problema de compatibilidade atual com o Cliente do Acesso Global Seguro, o Túnel DNS está desabilitado.</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
-  <data name="MessageSparseVhdDisabled" xml:space="preserve">
-    <value>O suporte a VHD esparso está atualmente desativado devido a possível corrupção de dados.
-Para forçar uma distribuição a usar um VHD esparso, execute:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
+  <data name="MessageSparseVhdUnsafe" xml:space="preserve">
+    <value>Os VHDs esparsos ainda são experimentais. Se você encontrar um comportamento inesperado, registre um problema em https://github.com/microsoft/WSL.</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale. {Locked="https://github.com/microsoft/WSL"}The URL should not be translated.</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>Falha ao montar {}, consulte dmesg para obter mais detalhes.</value>
@@ -2421,7 +2435,7 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
   </data>
   <data name="MessageWslcInvalidImage" xml:space="preserve">
     <value>Imagem inválida: '{}'</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="MessageWslcInvalidFilter" xml:space="preserve">
     <value>Filtro inválido: '{}'</value>
@@ -2458,6 +2472,10 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
   <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">
     <value>Não é possível gravar a saída do build no console para --output valor '{}'.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcBuildStdinContextAndDockerfile" xml:space="preserve">
+    <value>Não é possível usar stdin para o contexto de build e o Dockerfile.</value>
+    <comment>{Locked="stdin"}{Locked="Dockerfile"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>Opção obrigatória ausente: '{}'</value>
@@ -2679,14 +2697,6 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
   <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
     <value>Copie arquivos entre um contêiner e o sistema de arquivos local.</value>
   </data>
-  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
-    <value>Copiar arquivos entre um contêiner e o sistema de arquivos local.
-Uso: wslc container cp [OPÇÕES] ORIGEM DESTINO
-  Local para contêiner: wslc container cp LOCAL_PATH CONTAINER:PATH
-  Contêiner para local: wslc container cp CONTAINER:PATH LOCAL_PATH
-  Stdin para contêiner: wslc container cp - CONTAINER:PATH</value>
-    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
-  </data>
   <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
     <value>Fonte: caminho local, CONTAINER:PATH, ou '-' para stdin</value>
     <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
@@ -2714,6 +2724,9 @@ Uso: wslc container cp [OPÇÕES] ORIGEM DESTINO
     <value>tar.exe não encontrado. O tar do Windows é necessário para a cópia do arquivo local.</value>
     <comment>{Locked="tar.exe"}</comment>
   </data>
+  <data name="WSLCCLI_CpStdoutIsTerminalError" xml:space="preserve">
+    <value>Não é possível gravar a saída da cópia no console.</value>
+  </data>
   <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
     <value>Direção de cópia inválida. Use CONTAINER:PATH como origem ou destino.</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
@@ -2737,7 +2750,11 @@ Exemplo: tar -cf - arquivos | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_CpSourceNameNotRepresentableError" xml:space="preserve">
     <value>Não é possível copiar '{0}' porque seu nome não pode ser usado como um nome de arquivo do Windows.</value>
-    <comment>{0} is the source path. Shown when the container source name holds a character that is not valid in a Windows file name.</comment>
+    <comment>{0} is the file name being copied. Shown when the name cannot be used as a Windows file name.</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceNameTrimmedWarning" xml:space="preserve">
+    <value>O Windows remove espaços à direita e pontos de nomes de arquivos, portanto, '{}' é copiado como '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Inspecionar um contêiner.</value>
@@ -2853,12 +2870,14 @@ Exemplo: tar -cf - arquivos | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImageImportDesc" xml:space="preserve">
     <value>Importe uma imagem de um tarball.</value>
+    <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
     <value>Importa o conteúdo de um tarball para criar uma imagem do sistema de arquivos. Opcionalmente, marque a imagem com um repositório e um nome de marca.</value>
   </data>
   <data name="WSLCCLI_ImageListAllArgDescription" xml:space="preserve">
     <value>Mostrar todas as imagens (padrão oculta imagens intermediárias).</value>
+    <comment>"Images" means container images, as in Docker, not pictures or photos.</comment>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>Liste imagens.</value>
@@ -2890,6 +2909,7 @@ Exemplo: tar -cf - arquivos | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImagePruneDeletedHeader" xml:space="preserve">
     <value>Imagens Excluídas:</value>
+    <comment>"Images" means container images, as in Docker, not pictures or photos.</comment>
   </data>
   <data name="WSLCCLI_ImagePruneDesc" xml:space="preserve">
     <value>Remova imagens não utilizadas.</value>
@@ -3283,6 +3303,10 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>A opção '{}' não tem suporte.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
+    <value>Modo inválido '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
     <value>O destino de montagem é obrigatório.</value>
   </data>
@@ -3455,7 +3479,8 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Caminho para a imagem salva</value>
   </data>
   <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
-    <value>Caminho para o diretório de contexto de criação</value>
+    <value>Caminho para o diretório de contexto de compilação (use "-" para ler um arquivo tar ou Dockerfile de stdin)</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
     <value>Publicar uma porta de um contêiner para o host</value>
@@ -3465,6 +3490,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   </data>
   <data name="WSLCCLI_PullAllTagsArgDescription" xml:space="preserve">
     <value>Baixar todas as imagens marcadas no repositório.</value>
+    <comment>"Images" means container images, as in Docker, not pictures or photos.</comment>
   </data>
   <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
     <value>Suprimir saída detalhada</value>
@@ -3631,6 +3657,12 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>Expor funcionalidades de virtualização ao contêiner</value>
   </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Adicionar recursos do Linux (pode ser usado várias vezes)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Remover recursos do Linux (pode ser usado várias vezes)</value>
+  </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Argumentos a serem passados para o comando que está sendo executado dentro do contêiner</value>
   </data>
@@ -3690,7 +3722,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>Imagem '{}' não encontrada, transferindo</value>
+    <value>Não foi possível encontrar a imagem '{}' localmente</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">
@@ -3705,11 +3737,11 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   </data>
   <data name="WSLCCLI_ImageLoaded" xml:space="preserve">
     <value>Imagem carregada: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="WSLCCLI_ImageLoadedId" xml:space="preserve">
     <value>ID da imagem carregada: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
     <value>Gerencie redes.</value>
@@ -3859,32 +3891,33 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>Não é possível gravar imagem no terminal. Use a opção -o ou redirecione stdout.</value>
   </data>
+  <data name="WSLCCLI_BuildStdinIsTerminalError" xml:space="preserve">
+    <value>Não é possível ler a entrada de build do terminal. Redirecione um Dockerfile ou um arquivo tar para stdin.</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
     <value>Não é possível exportar o contêiner para o terminal. Use a opção -o ou redirecione stdout.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>Formato esperado: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
+    <value>Formato esperado: [&lt;host path | named volume&gt;:]&lt;container path&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
-  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>Especificações de volume inválidas: '{}'. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
+    <value>Especificação de volume inválida: '{}'. {} {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>Especificações de volume inválidas: '{}'. O caminho do host não pode ficar vazio. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
+    <value>A especificação do volume está vazia.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
-    <value>Especificações de volume inválidas: '{}'. O caminho do contêiner não pode ficar vazio. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
+    <value>A especificação do volume contém uma seção vazia entre dois-pontos.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
-    <value>Especificações de volume inválidas: '{}'. O caminho do contêiner deve ser um caminho absoluto (começando com '/'). {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
+    <value>A especificação de volume contém muitos dois-pontos.</value>
   </data>
-  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
-    <value>Especificações de volume inválidas: '{}'. O caminho do host '{}' não é um caminho válido do Windows.</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
+    <value>O caminho do host '{}' não é um caminho válido do Windows.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
     <value>Nome ou ID de qualquer tipo de objeto</value>
@@ -3916,6 +3949,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   </data>
   <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
     <value>IMAGEM</value>
+    <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="WSLCCLI_TableHeaderCreated" xml:space="preserve">
     <value>CRIADO</value>
@@ -3946,6 +3980,30 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderRepository" xml:space="preserve">
+    <value>REPOSITÓRIO</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderTag" xml:space="preserve">
+    <value>TAG</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderDigest" xml:space="preserve">
+    <value>RESUMO</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderImageId" xml:space="preserve">
+    <value>ID DA IMAGEM</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderNetworkId" xml:space="preserve">
+    <value>ID DA REDE</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderDriver" xml:space="preserve">
+    <value>DRIVER</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderScope" xml:space="preserve">
+    <value>ESCOPO</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderVolumeName" xml:space="preserve">
+    <value>NOME DO VOLUME</value>
   </data>
   <data name="WSLCCLI_ContainerStateCreated" xml:space="preserve">
     <value>criado</value>
@@ -4079,6 +4137,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>Falha ao analisar o progresso da importação da imagem</value>
+    <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="MessageWslcVolumeUnmountFailed" xml:space="preserve">
     <value>Falha ao desmontar o volume '{}': {}</value>

@@ -303,6 +303,8 @@ COMMAND_LINE_TEST_CASE(L"container export cont1 --output foo", L"export", true)
 COMMAND_LINE_TEST_CASE(L"container export cont1 -o foo", L"export", true)
 
 // Cp command tests
+COMMAND_LINE_TEST_CASE(L"cp - cont1:/path", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"cp -L cont1:/path somefile", L"cp", true)
 COMMAND_LINE_TEST_CASE(L"container cp - cont1:/path", L"cp", true)
 COMMAND_LINE_TEST_CASE(L"container cp - mycontainer:/usr/local/etc", L"cp", true)
 COMMAND_LINE_TEST_CASE(L"container cp - cont1:/", L"cp", true)
@@ -396,6 +398,8 @@ COMMAND_LINE_TEST_CASE(L"image build C:\\context --tag test:latest", L"build", t
 COMMAND_LINE_TEST_CASE(L"image build C:\\context -t test", L"build", true)
 COMMAND_LINE_TEST_CASE(L"image build C:\\context --file Dockerfile.custom", L"build", true)
 COMMAND_LINE_TEST_CASE(L"image build C:\\context -f -", L"build", true)
+COMMAND_LINE_TEST_CASE(L"image build - -t test", L"build", true)
+COMMAND_LINE_TEST_CASE(L"image build - -f sub/Dockerfile", L"build", true)
 COMMAND_LINE_TEST_CASE(L"image build C:\\context -t test:latest -f Dockerfile.other", L"build", true)
 COMMAND_LINE_TEST_CASE(L"image build C:\\context -t tag1 -t tag2", L"build", true)
 COMMAND_LINE_TEST_CASE(L"image build C:\\context --tag tag1 --tag tag2 --tag tag3", L"build", true)

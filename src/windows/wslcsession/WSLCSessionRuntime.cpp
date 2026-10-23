@@ -444,7 +444,7 @@ void WSLCSessionRuntime::InitializeDockerRuntime(const std::filesystem::path& st
     // container subscriptions are preserved across restarts.
     m_eventTracker->Connect(m_dockerClient.value(), *m_ioRelay);
 
-    m_volumes.emplace(m_dockerClient.value(), m_virtualMachine.value(), m_eventTracker.value(), storagePath);
+    m_volumes.emplace(m_dockerClient.value(), m_virtualMachine.value(), m_eventTracker.value(), storagePath, m_hooks.OnVolumeEvent);
 }
 
 void WSLCSessionRuntime::StopVmLockHeld()

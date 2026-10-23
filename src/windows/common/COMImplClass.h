@@ -32,6 +32,8 @@ public:
     {
         std::unique_lock lock(m_lock);
 
+        m_impl = {};
+
         // Only continue if either:
         // - There are no current callers
         // - This thread is the only caller
@@ -39,8 +41,6 @@ public:
         m_cv.wait(lock, [this] {
             return m_callers.empty() || m_callers.size() == 1 && *m_callers.begin() == std::this_thread::get_id();
         });
-
-        m_impl = {};
     }
 
 protected:

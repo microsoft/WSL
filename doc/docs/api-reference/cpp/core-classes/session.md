@@ -178,6 +178,34 @@ for (auto const& image : images)
 }
 ```
 
+## Session::GetNetworks()
+
+Returns a snapshot of networks in the session.
+
+```cpp
+auto networks = session.GetNetworks();
+for (auto const& network : networks)
+{
+    printf("%ws %ws\n", network.Name().c_str(), network.Driver().c_str());
+}
+```
+
+## Session::CreateNetwork(NetworkSettings)
+
+Creates a bridge network in the session and returns it. Throws `HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS)` if a network with the same name exists.
+
+```cpp
+auto network = session.CreateNetwork(NetworkSettings{L"backend"});
+```
+
+## Session::DeleteNetwork(hstring)
+
+Deletes a network from the session. Throws `WSLC_E_NETWORK_NOT_FOUND` if the network does not exist.
+
+```cpp
+session.DeleteNetwork(L"backend");
+```
+
 ## Session::Terminated event
 
 Raised when the session termination event is signaled.

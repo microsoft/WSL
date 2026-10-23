@@ -60,6 +60,7 @@ public:
     DEFAULT_MOVABLE(ContainerOptionsConversion);
 
     explicit ContainerOptionsConversion(const WSLCCompatContainerOptions& Options);
+    explicit ContainerOptionsConversion(const WSLCCompatContainerOptions2& Options);
 
     const WSLCContainerOptions* Get() const noexcept
     {
@@ -68,6 +69,7 @@ public:
 
 private:
     WSLCContainerOptions m_value{};
+    std::vector<KeyValuePair> m_primaryNetworkSettings;
     std::vector<WSLCVolume> m_volumes;
     std::vector<WSLCPortMapping> m_ports;
     std::vector<WSLCLabel> m_labels;
@@ -133,6 +135,11 @@ private:
 };
 
 inline ContainerOptionsConversion Convert(const WSLCCompatContainerOptions& Options)
+{
+    return ContainerOptionsConversion(Options);
+}
+
+inline ContainerOptionsConversion Convert(const WSLCCompatContainerOptions2& Options)
 {
     return ContainerOptionsConversion(Options);
 }

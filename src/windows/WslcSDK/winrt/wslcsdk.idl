@@ -91,6 +91,10 @@ namespace Microsoft.WSL.Containers
 
         IVectorView<ImageInfo> GetImages();
 
+        IVectorView<NetworkInfo> GetNetworks();
+        NetworkInfo CreateNetwork(NetworkSettings settings);
+        void DeleteNetwork(String name);
+
         event SessionTerminationHandler Terminated;
         event ProcessCrashHandler ProcessCrashed;
     };
@@ -137,6 +141,20 @@ namespace Microsoft.WSL.Containers
         Boolean ReadOnly;
     };
 
+    runtimeclass ContainerNetwork
+    {
+        ContainerNetwork(String name);
+
+        String Name;
+        IVector<String> Aliases;
+
+        // Static IPv4 address for the container on this network. User-defined networks only.
+        Windows.Networking.HostName IPv4Address;
+
+        // Static IPv6 address for the container on this network. User-defined networks with IPv6 enabled only.
+        Windows.Networking.HostName IPv6Address;
+    };
+
     enum ContainerState
     {
         Invalid = 0,
@@ -170,6 +188,11 @@ namespace Microsoft.WSL.Containers
         IVector<ContainerPortMapping> PortMappings;
         IVector<ContainerVolume> Volumes;
         IVector<ContainerNamedVolume> NamedVolumes;
+
+        // The first network is the primary network. Cannot be combined with NetworkingMode.
+        IVector<ContainerNetwork> Networks;
+        IVector<String> CapabilityAdditions;
+        IVector<String> CapabilityDrops;
     };
 
     enum Signal
@@ -365,6 +388,51 @@ namespace Microsoft.WSL.Containers
         Windows.Foundation.DateTime CreatedTimestamp { get; };
     };
 
+    // Ensure wslcsdk.h is also updated.
+    [flags]
+    enum NetworkFlags
+    {
+        None = 0,
+        EnableIPv4 = 0x00000001,
+        EnableIPv6 = 0x00000002,
+        Internal = 0x00000004
+    };
+
+    runtimeclass NetworkInfo
+    {
+        String Id { get; };
+        String Name { get; };
+        String Driver { get; };
+        Windows.Foundation.DateTime CreatedTimestamp { get; };
+        NetworkFlags Flags { get; };
+
+        // Null when the network has no subnet or gateway for that address family; prefix lengths are 0 when there is no subnet.
+        Windows.Networking.HostName IPv4Subnet { get; };
+        UInt8 IPv4SubnetPrefixLength { get; };
+        Windows.Networking.HostName IPv4Gateway { get; };
+        Windows.Networking.HostName IPv6Subnet { get; };
+        UInt8 IPv6SubnetPrefixLength { get; };
+        Windows.Networking.HostName IPv6Gateway { get; };
+    };
+
+    runtimeclass NetworkSettings
+    {
+        NetworkSettings(String name);
+
+        String Name;
+
+        // EnableIPv4, EnableIPv6 and Internal are accepted. IPv4 is always enabled; set both EnableIPv4 and EnableIPv6
+        // for a dual-stack network. EnableIPv6 without EnableIPv4 (IPv6 only) fails with E_NOTIMPL.
+        NetworkFlags Flags;
+
+        // Optional. The subnet address family must match the gateway and must be enabled by Flags.
+        // When Subnet is null the session chooses an IPv4 subnet; it has no default IPv6 subnets, so set an IPv6
+        // subnet when EnableIPv6 is set.
+        Windows.Networking.HostName Subnet;
+        UInt8 SubnetPrefixLength;
+        Windows.Networking.HostName Gateway;
+    };
+
     // Ensure wslcsdk.h and wslc.idl are also updated.
     enum Error
     {
@@ -383,5 +451,7 @@ namespace Microsoft.WSL.Containers
         RegistryBlockedByPolicy = 0x8004060D,
         VolumeNotAvailable = 0x8004060E,
         ContainerDeleted = 0x80040613,
+        CapabilityAdditionsDisabled = 0x80040614,
+        RuntimeUpdateNeeded = 0x80040615,
     };
 }

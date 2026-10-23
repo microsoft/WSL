@@ -31,6 +31,8 @@ std::vector<Argument> ContainerRunCommand::GetArguments() const
         Argument::Create(ArgType::ImageId, {.Required = true}),
         Argument::Create(ArgType::Command),
         Argument::Create(ArgType::ForwardArgs),
+        Argument::Create(ArgType::CapAdd, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::CapDrop, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::CIDFile),
         Argument::Create(ArgType::Cpus),
         Argument::Create(ArgType::Detach),
@@ -92,7 +94,7 @@ std::wstring ContainerRunCommand::LongDescription() const
 // clang-format off
 void ContainerRunCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context 
+    context
         << ResolveSession
         << SetContainerOptionsFromArgs
         << RunContainer;

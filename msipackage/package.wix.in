@@ -2,6 +2,7 @@
     <Package Name="Windows Subsystem for Linux" Language="1033" InstallerVersion="500" Version="${PACKAGE_VERSION}" Manufacturer="Microsoft Corporation" UpgradeCode="6D5B792B-1EDC-4DE9-8EAD-201B820F8E82" Scope="perMachine" Compressed="${COMPRESS_PACKAGE}">
         <MajorUpgrade AllowDowngrades="yes"  Disallow="no"  Schedule="afterInstallInitialize" />
         <MediaTemplate EmbedCab="yes" />
+        <Property Id="MsiLogging" Value="iew"/>
 
         <StandardDirectory Id="ProgramFiles64Folder">
             <Directory Id="INSTALLDIR" Name="WSL">
@@ -490,6 +491,14 @@
                 <!-- IWSLCCompatSession-->
                 <RegistryKey Root="HKCR" Key="Interface\{DD7B2EF9-AA01-4F21-8A3A-29D394CBB579}">
                     <RegistryValue Value="IWSLCCompatSession" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLCCompatSession2-->
+                <RegistryKey Root="HKCR" Key="Interface\{EB761F0D-8C17-4D6D-9FF9-84086A81C5A3}">
+                    <RegistryValue Value="IWSLCCompatSession2" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>

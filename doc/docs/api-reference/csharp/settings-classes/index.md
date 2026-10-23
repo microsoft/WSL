@@ -9,5 +9,6 @@
 - [PullImageOptions](pullimageoptions.md)
 - [PushImageOptions](pushimageoptions.md)
 - [TagImageOptions](tagimageoptions.md)
+- [NetworkSettings](networksettings.md)
 - [ContainerSettings](containersettings.md)
 - [ProcessSettings](processsettings.md)

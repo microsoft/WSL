@@ -212,11 +212,12 @@ struct CreateNetwork
     std::string Name;
     std::string Driver;
     bool Internal{};
+    bool EnableIPv6{};
     std::optional<IPAM> IPAM;
     std::optional<std::map<std::string, std::string>> Options;
     std::map<std::string, std::string> Labels;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateNetwork, Name, Driver, Internal, IPAM, Options, Labels);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateNetwork, Name, Driver, Internal, EnableIPv6, IPAM, Options, Labels);
 };
 
 struct Network
@@ -266,6 +267,7 @@ inline void from_json(const nlohmann::json& j, Network& network)
 struct EndpointIPAMConfig
 {
     std::string IPv4Address;
+    std::string IPv6Address;
     std::optional<std::vector<std::string>> LinkLocalIPs;
 };
 
@@ -275,6 +277,10 @@ inline void to_json(nlohmann::json& j, const EndpointIPAMConfig& v)
     if (!v.IPv4Address.empty())
     {
         j["IPv4Address"] = v.IPv4Address;
+    }
+    if (!v.IPv6Address.empty())
+    {
+        j["IPv6Address"] = v.IPv6Address;
     }
     if (v.LinkLocalIPs.has_value() && !v.LinkLocalIPs->empty())
     {
@@ -410,17 +416,20 @@ struct HostConfig
     std::int64_t Memory{};
     std::int64_t NanoCpus{};
     std::optional<std::vector<Ulimit>> Ulimits;
+    std::optional<std::vector<std::string>> CapAdd;
+    std::optional<std::vector<std::string>> CapDrop;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
-        HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, DeviceRequests, ShmSize, Memory, NanoCpus, Ulimits);
+        HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, DeviceRequests, ShmSize, Memory, NanoCpus, Ulimits, CapAdd, CapDrop);
 };
 
 struct InspectEndpointIPAMConfig
 {
     std::string IPv4Address;
+    std::string IPv6Address;
     std::optional<std::vector<std::string>> LinkLocalIPs;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointIPAMConfig, IPv4Address, LinkLocalIPs);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointIPAMConfig, IPv4Address, IPv6Address, LinkLocalIPs);
 };
 
 struct EndpointSettings
@@ -483,13 +492,33 @@ struct CreateContainer
     std::optional<std::vector<std::string>> Entrypoint;
     std::vector<std::string> Env;
     std::map<std::string, EmptyObject> ExposedPorts;
+    std::map<std::string, EmptyObject> Volumes;
     std::map<std::string, std::string> Labels;
     std::optional<HealthConfig> Healthcheck;
     HostConfig HostConfig;
     NetworkingConfig NetworkingConfig;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(
-        CreateContainer, Image, Cmd, Tty, OpenStdin, StdinOnce, Entrypoint, Env, ExposedPorts, HostConfig, StopSignal, StopTimeout, WorkingDir, User, Hostname, Domainname, Labels, Healthcheck, NetworkingConfig);
+        CreateContainer,
+        Image,
+        Cmd,
+        Tty,
+        OpenStdin,
+        StdinOnce,
+        Entrypoint,
+        Env,
+        ExposedPorts,
+        Volumes,
+        HostConfig,
+        StopSignal,
+        StopTimeout,
+        WorkingDir,
+        User,
+        Hostname,
+        Domainname,
+        Labels,
+        Healthcheck,
+        NetworkingConfig);
 };
 
 struct HealthcheckResult

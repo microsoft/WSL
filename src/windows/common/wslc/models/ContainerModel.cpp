@@ -169,7 +169,8 @@ VolumeMount VolumeMount::Parse(const std::wstring& value)
     }
     catch (const mount::MountException& ex)
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, ex.Reason());
+        THROW_HR_WITH_USER_ERROR(
+            E_INVALIDARG, Localization::WSLCCLI_VolumeInvalidSpecError(value, ex.Reason(), Localization::WSLCCLI_VolumeFormatUsage()));
     }
 
     VolumeMount volume;
