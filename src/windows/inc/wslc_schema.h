@@ -120,9 +120,10 @@ struct ContainerConfig
 struct InspectEndpointIPAMConfig
 {
     std::string IPv4Address;
+    std::string IPv6Address;
     std::vector<std::string> LinkLocalIPs;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointIPAMConfig, IPv4Address, LinkLocalIPs);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointIPAMConfig, IPv4Address, IPv6Address, LinkLocalIPs);
 };
 
 struct InspectEndpointSettings
@@ -355,8 +356,21 @@ struct NetworkListEntry
     bool EnableIPv6{};
     bool Internal{};
     std::map<std::string, std::string> Labels;
+    wslc_schema::IPAM IPAM;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkListEntry, Id, Name, Driver, Scope, Created, EnableIPv4, EnableIPv6, Internal, Labels);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkListEntry, Id, Name, Driver, Scope, Created, EnableIPv4, EnableIPv6, Internal, Labels, IPAM);
+};
+
+// The network creation options carried from the SDK to the session. Subnet uses CIDR notation.
+struct CreateNetworkOptions
+{
+    std::string Name;
+    bool Internal{};
+    bool EnableIPv6{};
+    std::optional<std::string> Subnet;
+    std::optional<std::string> Gateway;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateNetworkOptions, Name, Internal, EnableIPv6, Subnet, Gateway);
 };
 
 // The volume properties carried from the session to the CLI for "volume list". Values keep their

@@ -16,6 +16,7 @@
 - [WslcSetContainerSettingsPortMappings](wslcsetcontainersettingsportmappings.md)
 - [WslcSetContainerSettingsVolumes](wslcsetcontainersettingsvolumes.md)
 - [WslcSetContainerSettingsNamedVolumes](wslcsetcontainersettingsnamedvolumes.md)
+- [WslcSetContainerSettingsNetworks](wslcsetcontainersettingsnetworks.md)
 - [WslcSetContainerSettingsCapabilityAdditions](wslcsetcontainersettingscapabilityadditions.md)
 - [WslcSetContainerSettingsCapabilityDrops](wslcsetcontainersettingscapabilitydrops.md)
 - [WslcSetContainerInitProcessIOCallbacks](wslcsetcontainerinitprocessiocallbacks.md)
