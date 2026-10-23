@@ -24,6 +24,13 @@ using namespace wsl::windows::wslc::cli;
 
 struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 {
+    enum class CancellationMode
+    {
+        None,
+        Graceful,
+        GracefulAndForce
+    };
+
     CLIExecutionContext() : wsl::windows::common::ExecutionContext(wsl::windows::common::Context::WslC)
     {
     }
@@ -50,7 +57,7 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 
     std::atomic_ulong CancellationCount{};
 
-    HANDLE CreateCancelEvent();
+    HANDLE CreateCancelEvent(CancellationMode mode = CancellationMode::Graceful);
     HANDLE CreateForceCancelEvent();
     bool RecordCancellationRequest() noexcept;
 
@@ -68,6 +75,7 @@ protected:
     bool CollectUserWarning(const std::wstring& warning) override;
 
 private:
+    std::atomic<CancellationMode> m_cancellationMode{CancellationMode::None};
     std::atomic<HANDLE> m_cancelEventHandle{};
     std::atomic<HANDLE> m_forceCancelEventHandle{};
 };

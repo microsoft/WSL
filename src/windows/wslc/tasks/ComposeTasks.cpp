@@ -163,7 +163,7 @@ void StopCompose(CLIExecutionContext& context)
 
 void UpCompose(CLIExecutionContext& context)
 {
-    const auto cancelEvent = context.CreateCancelEvent();
+    const auto cancelEvent = context.CreateCancelEvent(CLIExecutionContext::CancellationMode::GracefulAndForce);
     const auto forceCancelEvent = context.CreateForceCancelEvent();
     context.ExitCode =
         ComposeService::Up(context.Terminal, context.Data.Get<Data::Session>(), ComposePath(context), cancelEvent, forceCancelEvent);
