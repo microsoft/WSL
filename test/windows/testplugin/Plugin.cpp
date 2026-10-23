@@ -503,6 +503,17 @@ HRESULT OnDistributionUnregistered(const WSLSessionInformation* Session, const W
 HRESULT OnWslcSessionCreated(const WSLCSessionInformation* Session)
 try
 {
+    if (g_testType == PluginTestType::ConcurrentHostFailure)
+    {
+        wil::unique_event entered{OpenEventW(EVENT_MODIFY_STATE, FALSE, c_fatalNotificationEntered)};
+        THROW_LAST_ERROR_IF_NULL(entered);
+        wil::unique_event release{OpenEventW(SYNCHRONIZE, FALSE, c_fatalNotificationRelease)};
+        THROW_LAST_ERROR_IF_NULL(release);
+        entered.SetEvent();
+        THROW_HR_IF(HRESULT_FROM_WIN32(WAIT_TIMEOUT), !release.wait(60000));
+        return S_OK;
+    }
+
     g_logfile << "WSLC Session created, name=" << wsl::shared::string::WideToMultiByte(Session->DisplayName) << ", id=" << Session->SessionId
               << ", pid=" << Session->ApplicationPid << ", token=" << (Session->UserToken != nullptr ? "set" : "null")
               << ", sid=" << (Session->UserSid != nullptr ? "set" : "null") << std::endl;
@@ -1031,12 +1042,19 @@ EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPlugin
     {
         const auto key = OpenTestRegistryKey(KEY_READ);
 
-        const std::wstring outputFile = ReadString(key.get(), nullptr, c_logFile);
+        g_testType = static_cast<PluginTestType>(ReadDword(key.get(), nullptr, c_testType, static_cast<DWORD>(PluginTestType::Invalid)));
+        THROW_HR_IF(E_INVALIDARG, static_cast<DWORD>(g_testType) <= 0 || static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::ConcurrentHostFailure));
+
+        std::wstring outputFile = ReadString(key.get(), nullptr, c_logFile);
+        if (g_testType == PluginTestType::ConcurrentHostFailure &&
+            std::filesystem::path(wil::GetModuleFileNameW<std::wstring>(wil::GetModuleInstanceHandle())).filename() ==
+                L"testplugin-crash.dll")
+        {
+            g_testType = PluginTestType::CrashOnVmStart;
+            outputFile += L"-crash";
+        }
         g_logfile.open(outputFile);
         THROW_HR_IF(E_UNEXPECTED, !g_logfile);
-
-        g_testType = static_cast<PluginTestType>(ReadDword(key.get(), nullptr, c_testType, static_cast<DWORD>(PluginTestType::Invalid)));
-        THROW_HR_IF(E_INVALIDARG, static_cast<DWORD>(g_testType) <= 0 || static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::ConcurrentRegistration));
 
         g_logfile << "Plugin loaded. TestMode=" << static_cast<DWORD>(g_testType) << std::endl;
         const auto writableKey = OpenTestRegistryKey(KEY_SET_VALUE);

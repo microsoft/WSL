@@ -253,7 +253,12 @@ void PluginManager::Notify(const Notification& Work, bool Fatal, std::optional<W
     ExecutionContext context(Context::Plugin);
     for (const auto& plugin : m_plugins)
     {
-        if (!plugin->host || FAILED(plugin->failure.load()))
+        const auto failure = plugin->failure.load();
+        if (Fatal)
+        {
+            ThrowIfPluginError(failure, nullptr, plugin->name.c_str());
+        }
+        if (!plugin->host || FAILED(failure))
         {
             continue;
         }
@@ -339,6 +344,7 @@ HRESULT PluginManager::InvokeCallback(WSLSessionId Session, const std::function<
 
 void PluginManager::RegisterWslcSession(ULONG SessionId, IWSLCSessionReference* Reference)
 {
+    m_initialized.wait();
     auto lock = m_sessionLock.lock_exclusive();
     if (!m_git)
     {

@@ -844,6 +844,81 @@ class PluginTests
         return session;
     }
 
+    WSL2_TEST_METHOD(ConcurrentHostFailureRejectsSession)
+    {
+        wil::unique_event entered;
+        entered.create(wil::EventOptions::ManualReset, c_fatalNotificationEntered);
+        wil::unique_event release;
+        release.create(wil::EventOptions::ManualReset, c_fatalNotificationRelease);
+        ConfigurePlugin(PluginTestType::ConcurrentHostFailure);
+        StopWslService();
+
+        const auto crashDll = std::filesystem::path(pluginDll).parent_path() / L"testplugin-crash.dll";
+        VERIFY_WIN32_BOOL_SUCCEEDED(CopyFileW(pluginDll.c_str(), crashDll.c_str(), TRUE));
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+            StopWslService();
+            THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(crashDll.c_str()));
+            THROW_IF_WIN32_BOOL_FALSE(DeleteFileW((logFile + L"-crash").c_str()));
+        });
+        RegistryKeyChange crashPlugin(
+            HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Lxss\\Plugins", L"TestPlugin-crash", crashDll.wstring());
+
+        const auto plugins = OpenKey(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Lxss\\Plugins", KEY_READ);
+        bool blockerSeen = false;
+        for (const auto& [name, type] : EnumValues(plugins.get()))
+        {
+            if (name == L"TestPlugin")
+            {
+                blockerSeen = true;
+            }
+            else if (name == L"TestPlugin-crash")
+            {
+                VERIFY_IS_TRUE(blockerSeen);
+            }
+        }
+        RestartWslService();
+
+        HRESULT sessionResult = E_PENDING;
+        std::wstring sessionError;
+        bool sessionReturned = false;
+        std::thread createSession([&] {
+            sessionResult = wil::ResultFromException([&] {
+                const auto apartment = wil::CoInitializeEx(COINIT_MULTITHREADED);
+                auto manager = OpenWslcSessionManager();
+                WSLCSessionSettings settings{};
+                settings.DisplayName = L"plugin-concurrent-host-failure";
+                settings.CpuCount = 4;
+                settings.MemoryMb = 2048;
+                settings.BootTimeoutMs = 30000;
+                settings.MaximumStorageSizeMb = 1024 * 20;
+                settings.NetworkingMode = WSLCNetworkingModeNone;
+                wil::com_ptr<IWSLCSession> session;
+                const auto result = manager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session);
+                if (const auto error = wsl::windows::common::wslutil::GetCOMErrorInfo(); error && error->Message)
+                {
+                    sessionError = error->Message.get();
+                }
+                sessionReturned = session != nullptr;
+                THROW_IF_FAILED(result);
+            });
+        });
+        auto join = wil::scope_exit([&] {
+            release.SetEvent();
+            createSession.join();
+        });
+
+        VERIFY_IS_TRUE(entered.wait(30000));
+        const auto [output, error] = LxsstuLaunchWslAndCaptureOutput(L"--exec /bin/true", -1);
+        VERIFY_IS_TRUE(output.find(L"TestPlugin-crash") != std::wstring::npos);
+        release.SetEvent();
+        createSession.join();
+        join.release();
+
+        VERIFY_FAILED(sessionResult);
+        VERIFY_IS_FALSE(sessionReturned);
+        VERIFY_IS_TRUE(sessionError.find(L"TestPlugin-crash") != std::wstring::npos);
+    }
+
     WSL2_TEST_METHOD(WslcSuccess)
     {
         ConfigurePlugin(PluginTestType::WslcSuccess);
