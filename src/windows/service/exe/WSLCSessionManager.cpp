@@ -52,8 +52,38 @@ using wsl::windows::service::wslc::WSLCVirtualMachineFactory;
 namespace wslutil = wsl::windows::common::wslutil;
 namespace apicompat = wsl::windows::common::apicompat;
 namespace settings = wsl::windows::wslc::settings;
+namespace WRL = Microsoft::WRL;
 
 namespace {
+
+class DeferredWarningCallback : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, IWarningCallback, IFastRundown>
+{
+public:
+    HRESULT OnWarning(LPCWSTR Message) override
+    try
+    {
+        RETURN_HR_IF_NULL(E_POINTER, Message);
+        auto lock = m_lock.lock_exclusive();
+        RETURN_HR_IF(RPC_E_DISCONNECTED, m_closed);
+        m_warnings.emplace_back(Message);
+        return S_OK;
+    }
+    CATCH_RETURN();
+
+    std::vector<std::wstring> Close()
+    {
+        auto lock = m_lock.lock_exclusive();
+        m_closed = true;
+        std::vector<std::wstring> warnings;
+        warnings.swap(m_warnings);
+        return warnings;
+    }
+
+private:
+    wil::srwlock m_lock;
+    _Guarded_by_(m_lock) bool m_closed = false;
+    _Guarded_by_(m_lock) std::vector<std::wstring> m_warnings;
+};
 
 // Session settings built server-side from the caller's settings.yaml.
 struct SessionSettings
@@ -61,6 +91,9 @@ struct SessionSettings
     std::wstring DisplayName;
     std::wstring StoragePath;
     std::string HostLoopback;
+    std::string HttpProxy;
+    std::string HttpsProxy;
+    std::string NoProxy;
     WSLCSessionSettings Settings{};
 
     NON_COPYABLE(SessionSettings);
@@ -124,6 +157,18 @@ private:
         Settings.BootTimeoutMs = wsl::windows::wslc::DefaultBootTimeoutMs;
         Settings.IdleTimeoutSec = userSettings.Get<settings::Setting::SessionIdleTimeout>();
         Settings.NetworkingMode = userSettings.Get<settings::Setting::SessionNetworkingMode>();
+
+        // A localhost proxy is only reachable from the VM through the consomme host loopback name.
+        const auto proxyLoopback = Settings.NetworkingMode == WSLCNetworkingModeConsomme ? HostLoopback : std::string{};
+        const auto httpProxy = userSettings.Get<settings::Setting::SessionProxyHttp>();
+        const auto httpsProxy = userSettings.Get<settings::Setting::SessionProxyHttps>();
+        HttpProxy = settings::ResolveProxyUrl(httpProxy, proxyLoopback);
+        HttpsProxy = settings::ResolveProxyUrl(httpsProxy, proxyLoopback);
+
+        NoProxy = userSettings.Get<settings::Setting::SessionProxyNoProxy>();
+        Settings.HttpProxy = HttpProxy.empty() ? nullptr : HttpProxy.c_str();
+        Settings.HttpsProxy = HttpsProxy.empty() ? nullptr : HttpsProxy.c_str();
+        Settings.NoProxy = NoProxy.empty() ? nullptr : NoProxy.c_str();
 
         // TODO: Add a config setting to opt-out of GPU support.
         Settings.FeatureFlags = WslcFeatureFlagsGPU;
@@ -269,7 +314,7 @@ void WSLCSessionManagerImpl::CreateSession(
         resolvedDisplayName = Settings->DisplayName;
     }
 
-    std::lock_guard lock(m_wslcSessionsLock);
+    std::unique_lock lock(m_wslcSessionsLock);
 
     // Check for an existing session first.
     auto result = ForEachSession<HRESULT>([&](auto& entry, const wil::com_ptr<IWSLCSession>& session) noexcept -> std::optional<HRESULT> {
@@ -304,6 +349,7 @@ void WSLCSessionManagerImpl::CreateSession(
     }
 
     std::wstring callerFileName;
+    const auto deferredWarnings = wil::MakeOrThrow<DeferredWarningCallback>();
 
     HRESULT creationResult = wil::ResultFromException([&]() {
         // Get caller info.
@@ -350,8 +396,8 @@ void WSLCSessionManagerImpl::CreateSession(
         const auto sessionSettings = CreateSessionSettings(sessionId, callerFileName.c_str(), Settings, resolvedDisplayName.c_str());
         wil::com_ptr<IWSLCSession> session;
         wil::com_ptr<IWSLCSessionReference> serviceRef;
-        const auto factoryHr =
-            factory->CreateSession(&sessionSettings, vmFactory.Get(), notifier.Get(), WarningCallback, &session, &serviceRef);
+        const auto factoryHr = factory->CreateSession(
+            &sessionSettings, vmFactory.Get(), notifier.Get(), WarningCallback != nullptr ? deferredWarnings.Get() : nullptr, &session, &serviceRef);
         if (FAILED(factoryHr))
         {
             if (auto comError = wslutil::GetCOMErrorInfo(); comError && comError->Message)
@@ -432,6 +478,15 @@ void WSLCSessionManagerImpl::CreateSession(
         TraceLoggingKeyword(MICROSOFT_KEYWORD_CRITICAL_DATA),
         TraceLoggingValue(callerFileName.c_str(), "CallerFileName"),
         TraceLoggingLevel(WINEVENT_LEVEL_INFO));
+
+    const auto warnings = deferredWarnings->Close();
+    lock.unlock();
+
+    // Client callbacks may reenter the manager on another thread.
+    for (const auto& warning : warnings)
+    {
+        LOG_IF_FAILED(WarningCallback->OnWarning(warning.c_str()));
+    }
 
     THROW_IF_FAILED_MSG(creationResult, "Failed to create session: %ls", resolvedDisplayName.c_str());
 }
@@ -544,6 +599,9 @@ WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
     sessionSettings.StorageFlags = Settings->StorageFlags;
     sessionSettings.SwapSizeMb = Settings->MemoryMb;
     sessionSettings.IdleTimeoutSec = Settings->IdleTimeoutSec;
+    sessionSettings.HttpProxy = Settings->HttpProxy;
+    sessionSettings.HttpsProxy = Settings->HttpsProxy;
+    sessionSettings.NoProxy = Settings->NoProxy;
     return sessionSettings;
 }
 

@@ -48,6 +48,9 @@ enum class Setting : size_t
     SessionDefaultBindingAddress,
     SessionStoragePath,
     SessionIdleTimeout,
+    SessionProxyHttp,
+    SessionProxyHttps,
+    SessionProxyNoProxy,
 
     Max
 };
@@ -106,11 +109,18 @@ namespace details {
     DEFINE_SETTING_MAPPING(SessionDefaultBindingAddress, std::string, std::string,     std::string{},                 "session.defaultBindingAddress")
     DEFINE_SETTING_MAPPING(SessionStoragePath,       std::string, std::string,         std::string{},                 "session.storagePath")
     DEFINE_SETTING_MAPPING(SessionIdleTimeout,       uint32_t,    uint32_t,            30,                            "session.idleTimeout")
+    DEFINE_SETTING_MAPPING(SessionProxyHttp,         std::string, std::string,         std::string{},                 "session.proxy.http")
+    DEFINE_SETTING_MAPPING(SessionProxyHttps,        std::string, std::string,         std::string{},                 "session.proxy.https")
+    DEFINE_SETTING_MAPPING(SessionProxyNoProxy,      std::string, std::string,         std::string{},                 "session.proxy.noProxy")
 
-#undef DEFINE_SETTING_MAPPING
+    #undef DEFINE_SETTING_MAPPING
     // clang-format on
 
 } // namespace details
+
+// Replaces a non-HTTPS localhost proxy host with HostLoopback so the VM can reach the Windows host.
+std::string ResolveProxyUrl(const std::string& Url, const std::string& HostLoopback);
+bool IsHttpsLoopbackProxyUrl(const std::string& Url);
 
 // Type-safe enum-indexed map of all settings values, backed by EnumBasedVariantMap.
 struct SettingsMap : wsl::windows::wslc::EnumBasedVariantMap<Setting, details::SettingMapping>
