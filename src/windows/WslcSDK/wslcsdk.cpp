@@ -523,19 +523,39 @@ void ParseNetworkGateway(int Family, const std::string& Gateway, TAddress& Addre
     }
 }
 
-// Only the first subnet of each address family is reported.
-void ConvertNetworkIpamConfig(const wsl::windows::common::wslc_schema::IPAMConfig& Config, WslcNetworkInfo& Network)
+template <typename TAddress>
+void ConvertNetworkSubnet(
+    int Family, uint8_t MaxPrefixLength, const wsl::windows::common::wslc_schema::IPAMConfig& Config, TAddress& Subnet, uint8_t& PrefixLength, TAddress& Gateway)
 {
-    if (Network.ipv4PrefixLength == 0 && ParseNetworkSubnet(AF_INET, 32, Config.Subnet, Network.ipv4Subnet, Network.ipv4PrefixLength))
+    if (PrefixLength != 0)
     {
-        ParseNetworkGateway(AF_INET, Config.Gateway, Network.ipv4Gateway);
         return;
     }
 
-    if (Network.ipv6PrefixLength == 0 && ParseNetworkSubnet(AF_INET6, 128, Config.Subnet, Network.ipv6Subnet, Network.ipv6PrefixLength))
+    if (!ParseNetworkSubnet(Family, MaxPrefixLength, Config.Subnet, Subnet, PrefixLength))
     {
-        ParseNetworkGateway(AF_INET6, Config.Gateway, Network.ipv6Gateway);
+        LOG_HR_MSG(E_UNEXPECTED, "Failed to parse network subnet: %hs", Config.Subnet.c_str());
+        return;
     }
+
+    ParseNetworkGateway(Family, Config.Gateway, Gateway);
+}
+
+// Only the first subnet of each address family is reported.
+void ConvertNetworkIpamConfig(const wsl::windows::common::wslc_schema::IPAMConfig& Config, WslcNetworkInfo& Network)
+{
+    if (Config.Subnet.empty())
+    {
+        return;
+    }
+
+    if (Config.Subnet.find(':') != std::string::npos)
+    {
+        ConvertNetworkSubnet(AF_INET6, 128, Config, Network.ipv6Subnet, Network.ipv6PrefixLength, Network.ipv6Gateway);
+        return;
+    }
+
+    ConvertNetworkSubnet(AF_INET, 32, Config, Network.ipv4Subnet, Network.ipv4PrefixLength, Network.ipv4Gateway);
 }
 
 void ConvertNetworkEntry(const wsl::windows::common::wslc_schema::NetworkListEntry& Entry, WslcNetworkInfo& Network)

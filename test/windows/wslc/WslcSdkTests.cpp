@@ -795,6 +795,56 @@ class WslcSdkTests
             VERIFY_IS_FALSE(additional.IPAddress.empty());
         }
 
+        // Functional: containers on the same network can reach each other by alias and by IP.
+        {
+            const PCSTR serverAliases[] = {"web"};
+            const WslcContainerNetwork serverNetworks[] = {{c_primaryNetwork, serverAliases, ARRAYSIZE(serverAliases), nullptr, nullptr}};
+
+            const char* serverArgv[] = {"python3", "-m", "http.server", "8000"};
+            const char* serverEnv[] = {"PYTHONUNBUFFERED=1"};
+            WslcProcessSettings serverProcSettings;
+            VERIFY_SUCCEEDED(WslcInitProcessSettings(&serverProcSettings));
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&serverProcSettings, serverArgv, ARRAYSIZE(serverArgv)));
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsEnvVariables(&serverProcSettings, serverEnv, ARRAYSIZE(serverEnv)));
+
+            WslcContainerSettings serverSettings;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("python:3.12-alpine", &serverSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&serverSettings, &serverProcSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworks(&serverSettings, serverNetworks, ARRAYSIZE(serverNetworks)));
+
+            UniqueContainer server;
+            VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &serverSettings, &server, nullptr));
+            VERIFY_SUCCEEDED(WslcStartContainer(server.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
+
+            UniqueProcess serverProcess;
+            VERIFY_SUCCEEDED(WslcGetContainerInitProcess(server.get(), &serverProcess));
+            wil::unique_handle serverStdout;
+            VERIFY_SUCCEEDED(WslcGetProcessIOHandle(serverProcess.get(), WSLC_PROCESS_IO_HANDLE_STDOUT, &serverStdout));
+            WaitForOutput(std::move(serverStdout), "Serving HTTP on", 30s);
+
+            const auto serverInspect = inspect(server.get());
+            VERIFY_IS_TRUE(serverInspect.NetworkSettings.Networks.contains(c_primaryNetwork));
+            const auto serverIp = serverInspect.NetworkSettings.Networks.at(c_primaryNetwork).IPAddress;
+            VERIFY_IS_FALSE(serverIp.empty());
+
+            const auto script = std::format(
+                "wget -q -O /dev/null http://web:8000/ && echo alias-ok; wget -q -O /dev/null http://{}:8000/ && echo ip-ok", serverIp);
+            const char* clientArgv[] = {"/bin/sh", "-c", script.c_str()};
+            WslcProcessSettings clientProcSettings;
+            VERIFY_SUCCEEDED(WslcInitProcessSettings(&clientProcSettings));
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&clientProcSettings, clientArgv, ARRAYSIZE(clientArgv)));
+
+            const WslcContainerNetwork clientNetworks[] = {{c_primaryNetwork, nullptr, 0, nullptr, nullptr}};
+            WslcContainerSettings clientSettings;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("python:3.12-alpine", &clientSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&clientSettings, &clientProcSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworks(&clientSettings, clientNetworks, ARRAYSIZE(clientNetworks)));
+
+            const auto output = RunContainerAndCapture(m_defaultSession, clientSettings);
+            VERIFY_IS_TRUE(output.stdoutOutput.find("alias-ok") != std::string::npos);
+            VERIFY_IS_TRUE(output.stdoutOutput.find("ip-ok") != std::string::npos);
+        }
+
         // Positive: each network gets its own static IP.
         {
             IN_ADDR primaryIp{};
