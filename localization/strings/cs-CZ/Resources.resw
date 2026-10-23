@@ -3651,10 +3651,10 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Zpřístupnit kontejneru virtualizační schopnosti</value>
   </data>
   <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
-    <value>Add Linux capabilities (repeatable)</value>
+    <value>Přidat funkce Linuxu (lze opakovat)</value>
   </data>
   <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
-    <value>Drop Linux capabilities (repeatable)</value>
+    <value>Odebrat funkce Linuxu (lze opakovat)</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Argumenty, které se mají předat příkazu spuštěnému uvnitř kontejneru</value>

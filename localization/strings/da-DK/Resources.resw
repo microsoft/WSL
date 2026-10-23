@@ -3651,10 +3651,10 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Fremvis virtualiseringsegenskaber for objektbeholderen</value>
   </data>
   <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
-    <value>Add Linux capabilities (repeatable)</value>
+    <value>Tilføj Linux-funktioner (kan gentages)</value>
   </data>
   <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
-    <value>Drop Linux capabilities (repeatable)</value>
+    <value>Fjern Linux-funktioner (kan gentages)</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Argumenter, der skal overføres til den kommando, der udføres inde i objektbeholderen</value>

@@ -3657,10 +3657,10 @@ Windows 版本：{}</value>
     <value>將虛擬化功能公開給容器</value>
   </data>
   <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
-    <value>Add Linux capabilities (repeatable)</value>
+    <value>新增 Linux 功能 (可重複)</value>
   </data>
   <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
-    <value>Drop Linux capabilities (repeatable)</value>
+    <value>置放 Linux 功能 (可重複)</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>傳遞給容器內執行指令的參數</value>

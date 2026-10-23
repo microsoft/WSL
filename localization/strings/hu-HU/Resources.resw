@@ -1019,7 +1019,7 @@ Visszaállás NAT-hálózatkezelésre.</value>
     <value>A számítógép-házirend letiltotta a WSL-tárolót.</value>
   </data>
   <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
-    <value>Linux capability additions are disabled by the computer policy.</value>
+    <value>A Linux-képességek hozzáadását letiltja a számítógép-házirend.</value>
   </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>A(z) '{}' tárolólemezkép-regisztrációs adatbázis a számítógép-házirend miatt le van tiltva.</value>
@@ -3651,10 +3651,10 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Virtualizálási képességek közzétehetők a tárolóban</value>
   </data>
   <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
-    <value>Add Linux capabilities (repeatable)</value>
+    <value>Linux-képességek hozzáadása (megismételhető)</value>
   </data>
   <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
-    <value>Drop Linux capabilities (repeatable)</value>
+    <value>Linux-képességek elvetése (megismételhető)</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>A tárolóban végrehajtott parancsnak átadandó argumentumok</value>
