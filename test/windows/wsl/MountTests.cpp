@@ -546,6 +546,38 @@ class MountTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount " + symlink.wstring()), (DWORD)0);
     }
 
+    WSL2_TEST_METHOD(MountedVhdRestoresWhenBootDiskCountChanges)
+    {
+        SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
+#ifdef WSL_DEV_INSTALL_PATH
+        const auto kernelPath = std::filesystem::path{WSL_DEV_INSTALL_PATH} / L"kernel";
+#else
+        const auto kernelPath =
+            std::filesystem::path{wsl::windows::common::wslutil::GetMsiPackagePath().value()} / L"tools" / L"kernel";
+#endif
+        WslConfigChange config{LxssGenerateTestConfig({.kernel = kernelPath.native()})};
+        // Mount before starting the distro so the modules disk will displace this LUN on restore.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " + VhdDevice + L" --vhd --bare"), DWORD{0});
+        WslKeepAlive keepAlive;
+        const auto disk = GetBlockDeviceInWsl(c_testDiskSize);
+        VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
+        const auto [originalAddress, originalError] = LxsstuLaunchWslAndCaptureOutput(L"lsblk -dn -o HCTL " + disk);
+        VERIFY_IS_TRUE(originalError.empty());
+        VERIFY_IS_FALSE(originalAddress.empty());
+
+        WaitForVmTimeout(keepAlive);
+        // Change the boot disks without restarting the service, which would clear the saved mounts.
+        LxssWriteWslConfig(LxssGenerateTestConfig());
+
+        const auto restoredDisk = GetBlockDeviceInWsl(c_testDiskSize);
+        VERIFY_IS_TRUE(IsBlockDevicePresent(restoredDisk));
+        const auto [restoredAddress, restoredError] = LxsstuLaunchWslAndCaptureOutput(L"lsblk -dn -o HCTL " + restoredDisk);
+        VERIFY_IS_TRUE(restoredError.empty());
+        VERIFY_IS_FALSE(restoredAddress.empty());
+        VERIFY_ARE_NOT_EQUAL(originalAddress, restoredAddress);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount " + VhdDevice), DWORD{0});
+    }
+
     // Attach a disk, but don't mount it
     WSL2_TEST_METHOD(TestBareMount)
     {

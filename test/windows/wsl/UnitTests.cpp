@@ -7656,6 +7656,30 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_ARE_EQUAL(err, L"");
     }
 
+    WSL2_TEST_METHOD(CustomKernelModulesVhdx)
+    {
+#ifdef WSL_DEV_INSTALL_PATH
+        const std::filesystem::path toolsPath{WSL_DEV_INSTALL_PATH};
+#else
+        const auto toolsPath = std::filesystem::path{wsl::windows::common::wslutil::GetMsiPackagePath().value()} / L"tools";
+#endif
+        GUID id{};
+        THROW_IF_FAILED(CoCreateGuid(&id));
+        const auto directory =
+            std::filesystem::temp_directory_path() /
+            (L"wsl-test-boot-vhdx-" + wsl::shared::string::GuidToString<wchar_t>(id, wsl::shared::string::GuidToStringFlags::None));
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { std::filesystem::remove_all(directory); });
+        std::filesystem::create_directories(directory);
+
+        const auto modulesPath = directory / L"modules.vhdx";
+        LxsstuLaunchPowershellAndCaptureOutput(std::format(
+            L"Convert-VHD -Path '{}' -DestinationPath '{}' -VHDType Dynamic", (toolsPath / L"artifacts.vhd").native(), modulesPath.native()));
+        VERIFY_IS_TRUE(std::filesystem::exists(modulesPath));
+
+        WslConfigChange config{LxssGenerateTestConfig({.kernel = (toolsPath / L"kernel").native(), .kernelModules = modulesPath.native()})};
+        ValidateOutput(L"test -s /lib/modules/$(uname -r)/modules.dep && echo OK", L"OK\n", L"", 0);
+    }
+
     WSL2_TEST_METHOD(CustomVhdsAccessibleViaInheritedAcls)
     {
         // Regression: VHDs reachable to VMWP via inherited ACLs must boot even when the

@@ -61,6 +61,8 @@ set(SOURCES
     WslCoreNetworkingSupport.cpp
     WslInstall.cpp
     WslSecurity.cpp
+    VirtualMachineBackend.cpp
+    HcsVirtualMachineBackend.cpp
     SlowOperationWatcher.cpp
     WslTelemetry.cpp
     wslutil.cpp
@@ -163,6 +165,8 @@ set(HEADERS
     WslCoreNetworkingSupport.h
     WslInstall.h
     WslSecurity.h
+    IVirtualMachineBackend.h
+    HcsVirtualMachineBackend.h
     SlowOperationWatcher.h
     WslTelemetry.h
     wslutil.h
@@ -176,7 +180,9 @@ add_dependencies(common wslserviceidl wsldevicehostidl localization wslservicemc
 
 target_precompile_headers(common PRIVATE precomp.h)
 set_target_properties(common PROPERTIES FOLDER windows)
-target_include_directories(common PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/../service/mc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
+target_include_directories(common PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_BINARY_DIR}/../service/mc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
 
 # common calls into HCS, HNS, the IP helper API, the VHD APIs, MSI, WinTrust and
 # the config file parser, so anything linking common needs those libraries too.
@@ -184,6 +190,12 @@ target_include_directories(common PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/../service/
 # yaml-cpp backs WSLCUserSettings, advapi32 the credential manager APIs used by
 # WinCredStorage, and Crypt32 the data protection APIs used by FileCredStorage.
 target_link_libraries(common PUBLIC ${HCS_LINK_LIBRARIES} ${MSI_LINK_LIBRARIES} VirtDisk.lib configfile yaml-cpp advapi32 Crypt32.lib)
+
+# Keep backend imports out of clients that only use common utilities, such as the MSIX launchers.
+set_source_files_properties(
+    VirtualMachineBackend.cpp
+    HcsVirtualMachineBackend.cpp
+    PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 
 # WSLCUserSettings.cpp uses yaml-cpp headers.
 # The per-source include path and definition below only apply when the file is
