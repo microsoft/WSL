@@ -1790,20 +1790,26 @@ class NetworkTests
 
     static void ResetWslNetwork()
     {
-        // N.B. This must be kept in sync with the network IDs in NatNetworking.cpp.
-        GUID natNetworkId;
-        if (!AreExperimentalNetworkingFeaturesSupported() || !IsHyperVFirewallSupported())
-        {
-            natNetworkId = {0xb95d0c5e, 0x57d4, 0x412b, {0xb5, 0x71, 0x18, 0xa8, 0x1a, 0x16, 0xe0, 0x05}};
-        }
-        else
-        {
-            natNetworkId = {0x790e58b4, 0x7939, 0x4434, {0x93, 0x58, 0x89, 0xae, 0x7d, 0xdb, 0xe8, 0x7e}};
-        }
-
+        const auto natNetworkId =
+            wsl::core::networking::GetNatNetworkId(AreExperimentalNetworkingFeaturesSupported() && IsHyperVFirewallSupported());
         wil::unique_cotaskmem_string error;
         const auto hr = HcnDeleteNetwork(natNetworkId, &error);
         VERIFY_SUCCEEDED(hr, error.get());
+    }
+
+    TEST_METHOD(AcceptableNatNetworkRanges)
+    {
+        for (const auto* range : {L"172.16.0.0/16", L"172.18.0.0/16", L"10.0.0.0/8"})
+        {
+            VERIFY_IS_TRUE(wsl::core::networking::IsAcceptableNetworkRange(range));
+        }
+
+        for (const auto* range : {L"172.17.0.0/16", L"172.17.16.0/20", L"172.16.0.0/12", L"0.0.0.0/0"})
+        {
+            VERIFY_IS_FALSE(wsl::core::networking::IsAcceptableNetworkRange(range));
+        }
+
+        VERIFY_THROWS(wsl::core::networking::IsAcceptableNetworkRange(L"InvalidRange"), wil::ResultException);
     }
 
     WSL2_TEST_METHOD(NatInvalidRange)
