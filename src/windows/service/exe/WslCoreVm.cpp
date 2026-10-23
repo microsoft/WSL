@@ -2939,16 +2939,10 @@ WslCoreVm::VirtioFsShare::VirtioFsShare(PCWSTR Path, PCWSTR Options, bool Admin)
 
         if (!key.empty())
         {
-            this->Options.insert({std::move(key), std::move(value)});
+            // Automount places the default uid/gid before user-specified options. Keep the last value
+            // of a repeated option so that user-specified values win, as they do with Plan9.
+            this->Options.insert_or_assign(std::move(key), std::move(value));
         }
-    }
-
-    if constexpr (wsl::shared::Debug)
-    {
-        const auto originalSet = std::set<std::wstring>(optionsVector.begin(), optionsVector.end());
-        auto newVector = wsl::shared::string::Split(OptionsString(), L';');
-        const auto newSet = std::set<std::wstring>(newVector.begin(), newVector.end());
-        WI_ASSERT_MSG(originalSet == newSet, "mount options do not match");
     }
 }
 
