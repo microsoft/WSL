@@ -5,6 +5,7 @@ set(SOURCES
     AuthenticateResult.cpp
     Container.cpp
     ContainerNamedVolume.cpp
+    ContainerNetwork.cpp
     ContainerPortMapping.cpp
     ContainerSettings.cpp
     ContainerVolume.cpp
@@ -12,6 +13,8 @@ set(SOURCES
     ImageProgress.cpp
     InstallOptions.cpp
     InstallProgress.cpp
+    NetworkInfo.cpp
+    NetworkSettings.cpp
     Process.cpp
     ProcessCrashInformation.cpp
     ProcessSettings.cpp
@@ -30,6 +33,7 @@ set(HEADERS
     AuthenticateResult.h
     Container.h
     ContainerNamedVolume.h
+    ContainerNetwork.h
     ContainerPortMapping.h
     ContainerSettings.h
     ContainerVolume.h
@@ -38,6 +42,8 @@ set(HEADERS
     ImageProgress.h
     InstallOptions.h
     InstallProgress.h
+    NetworkInfo.h
+    NetworkSettings.h
     Process.h
     ProcessCrashInformation.h
     ProcessSettings.h

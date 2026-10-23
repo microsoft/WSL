@@ -632,8 +632,23 @@ std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListPruneCandidates(
         }
     }
 
-    auto containers = ListContainers(true, -1, {}, true);
+    auto containers = ListContainers(true);
     std::erase_if(containers, [&](const auto& container) {
+        switch (container.State)
+        {
+        case docker_schema::ContainerState::Created:
+        case docker_schema::ContainerState::Exited:
+        case docker_schema::ContainerState::Dead:
+            break;
+
+        case docker_schema::ContainerState::Unknown:
+        case docker_schema::ContainerState::Running:
+        case docker_schema::ContainerState::Paused:
+        case docker_schema::ContainerState::Restarting:
+        case docker_schema::ContainerState::Removing:
+            return true;
+        }
+
         if (const auto filter = Filters.find("label"); filter != Filters.end() && !MatchPruneLabels(filter->second, container.Labels))
         {
             return true;
@@ -669,6 +684,28 @@ std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListPruneCandidates(
             return true;
         }
     });
+
+    if (containers.empty())
+    {
+        return containers;
+    }
+
+    std::vector<std::string> ids;
+    ids.reserve(containers.size());
+    std::ranges::transform(containers, std::back_inserter(ids), &docker_schema::ContainerInfo::Id);
+
+    std::map<std::string, std::int64_t> sizes;
+    for (const auto& sized : ListContainers(true, -1, {{"id", std::move(ids)}}, true))
+    {
+        sizes.emplace(sized.Id, sized.SizeRw);
+    }
+
+    for (auto& container : containers)
+    {
+        const auto size = sizes.find(container.Id);
+        container.SizeRw = size != sizes.end() ? size->second : 0;
+    }
+
     return containers;
 }
 

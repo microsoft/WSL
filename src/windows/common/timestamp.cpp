@@ -191,14 +191,26 @@ std::pair<std::int64_t, std::int64_t> wsl::windows::common::timestamp::ParseTime
                 fraction = fraction * 10 + (i < digits.size() ? digits[i] - '0' : 0);
             }
         }
+
+        // Normalize negative values to floor seconds with nonnegative nanoseconds, matching the RFC3339 path.
+        if (value.starts_with('-') && fraction != 0)
+        {
+            THROW_HR_IF(E_INVALIDARG, seconds == std::numeric_limits<std::int64_t>::min());
+            --seconds;
+            fraction = std::nano::den - fraction;
+        }
         return {seconds, fraction};
     }
 
     if (const auto duration = TryParseDuration(value))
     {
-        const auto target = std::chrono::system_clock::now().time_since_epoch() - *duration;
-        const auto whole = std::chrono::floor<std::chrono::seconds>(target);
-        return {whole.count(), std::chrono::duration_cast<std::chrono::nanoseconds>(target - whole).count()};
+        // Subtract whole seconds separately so that large durations cannot overflow the nanosecond representation.
+        const auto now = std::chrono::system_clock::now().time_since_epoch();
+        const auto nowSeconds = std::chrono::floor<std::chrono::seconds>(now);
+        const auto durationSeconds = std::chrono::floor<std::chrono::seconds>(*duration);
+        const auto remainder = std::chrono::duration_cast<std::chrono::nanoseconds>(now - nowSeconds) - (*duration - durationSeconds);
+        const auto carry = std::chrono::floor<std::chrono::seconds>(remainder);
+        return {(nowSeconds - durationSeconds + carry).count(), (remainder - carry).count()};
     }
 
     THROW_HR_IF(E_INVALIDARG, value.ends_with('T'));

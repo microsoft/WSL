@@ -1018,6 +1018,9 @@ Palataan nat-verkkopalveluun.</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>WSL-säilö on poistettu käytöstä tietokoneen käytäntöasetusten vuoksi.</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>Tietokoneen käytäntö on poistanut Linux-ominaisuuksien lisäykset käytöstä.</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>Säilökuvien rekisteri {} on estetty tietokonekäytännön vuoksi.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3646,6 +3649,12 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   </data>
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>Paljasta virtualisointiominaisuudet säilölle</value>
+  </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Lisää Linux-ominaisuuksia (voidaan toistaa)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Poista Linux-ominaisuuksia (voidaan toistaa)</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Argumentit, jotka välitetään säilön sisällä suoritettavalle komennolle</value>

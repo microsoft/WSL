@@ -1025,6 +1025,9 @@
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>Команда wsl.exe --mount отключена политикой компьютера.</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>Добавление возможностей Linux отключено политикой компьютера.</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>Реестр образов контейнера "{}" заблокирован политикой компьютера.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3653,6 +3656,12 @@
   </data>
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>Предоставить контейнеру возможности виртуализации</value>
+  </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Добавить возможности Linux (можно использовать несколько раз)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Удалить возможности Linux (можно использовать несколько раз)</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Аргументы для передачи команде, выполняемой внутри контейнера</value>

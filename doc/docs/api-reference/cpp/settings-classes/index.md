@@ -12,3 +12,4 @@ Settings objects become effectively immutable after the wrapper materializes the
 - [PullImageOptions](pullimageoptions.md)
 - [PushImageOptions](pushimageoptions.md)
 - [TagImageOptions](tagimageoptions.md)
+- [NetworkSettings](networksettings.md)

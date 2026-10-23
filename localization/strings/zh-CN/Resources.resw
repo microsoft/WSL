@@ -1018,6 +1018,9 @@ Windows 版本: {}</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>计算机策略禁用 WSL 容器。</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>计算机策略禁用了 Linux 功能扩展。</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>容器映像注册表 '{}' 被计算机策略阻止。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3645,6 +3648,12 @@ Windows 版本: {}</value>
   </data>
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>向容器公开虚拟化功能</value>
+  </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>添加 Linux 功能(可重复)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>删除 Linux 功能(可重复)</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>传递到容器内正在执行的命令的参数</value>

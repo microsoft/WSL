@@ -1024,6 +1024,9 @@ NAT ネットワークにフォールバックしています。</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>WSL コンテナーは、コンピューター ポリシーによって無効になっています。</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>Linux 機能の追加は、コンピューター ポリシーによって無効になっています。</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>コンテナー イメージ レジストリ '{}' はコンピューター ポリシーによってブロックされています。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3652,6 +3655,12 @@ Windows バージョン: {}</value>
   </data>
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>仮想化機能をコンテナーに公開します</value>
+  </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Linux capabilities を追加 (複数指定可)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Linux capabilities をドロップ (複数指定可)</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>コンテナー内で実行されるコマンドに渡す引数</value>

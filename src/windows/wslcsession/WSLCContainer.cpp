@@ -264,7 +264,7 @@ EndpointConfig ResolveEndpointConfig(const KeyValuePair* settings, ULONG count, 
 
     auto parsed = ParseKeyMultiValuePairs(settings, count);
 
-    static constexpr std::array knownKeys{"Aliases", "IPAddress", "Links", "LinkLocalIPs", "DriverOpts"};
+    static constexpr std::array knownKeys{"Aliases", "IPAddress", "IPv6Address", "Links", "LinkLocalIPs", "DriverOpts"};
     for (const auto& [key, _] : parsed)
     {
         THROW_HR_WITH_USER_ERROR_IF(
@@ -296,9 +296,24 @@ EndpointConfig ResolveEndpointConfig(const KeyValuePair* settings, ULONG count, 
         in_addr parsedAddress{};
         ParseIpv4Address(address.c_str(), parsedAddress);
 
-        EndpointIPAMConfig ipam{};
-        ipam.IPv4Address = address;
-        config.IPAMConfig = std::move(ipam);
+        config.IPAMConfig = EndpointIPAMConfig{};
+        config.IPAMConfig->IPv4Address = address;
+    }
+
+    if (auto it = parsed.find("IPv6Address"); it != parsed.end())
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, Localization::MessageWslcIpAddressSingleValue(std::string{networkName}), it->second.size() != 1);
+
+        const auto& address = it->second.front();
+        in_addr6 parsedAddress{};
+        ParseIpv6Address(address.c_str(), parsedAddress);
+
+        if (!config.IPAMConfig.has_value())
+        {
+            config.IPAMConfig = EndpointIPAMConfig{};
+        }
+        config.IPAMConfig->IPv6Address = address;
     }
 
     if (auto it = parsed.find("Links"); it != parsed.end())
@@ -2674,6 +2689,7 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
         {
             wslc_schema::InspectEndpointIPAMConfig ipam{};
             ipam.IPv4Address = endpoint.IPAMConfig->IPv4Address;
+            ipam.IPv6Address = endpoint.IPAMConfig->IPv6Address;
             ipam.LinkLocalIPs = endpoint.IPAMConfig->LinkLocalIPs.value_or(std::vector<std::string>{});
             wslcEndpoint.IPAMConfig = std::move(ipam);
         }
@@ -3228,6 +3244,23 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     WI_ASSERT(dockerContainer.State != ContainerState::Running);
 
     auto metadata = ParseContainerMetadata(metadataIt->second.c_str());
+
+    // A session that ends while an auto-remove container is running, such as on shutdown or reboot, never sees it
+    // exit, so it's removed here instead. If that fails, the container is recovered so it can still be removed.
+    if ((dockerContainer.State == ContainerState::Exited || dockerContainer.State == ContainerState::Dead) &&
+        WI_IsFlagSet(metadata.Flags, WSLCContainerFlagsRm))
+    {
+        try
+        {
+            DockerClient.DeleteContainer(dockerContainer.Id, true, true);
+            return nullptr;
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION_MSG("Failed to remove container '%hs'", dockerContainer.Id.c_str());
+        }
+    }
+
     auto labels = StripInternalLabels(dockerContainer.Labels);
 
     // Docker treats empty NetworkMode as the default (bridge).

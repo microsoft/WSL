@@ -49,6 +49,34 @@ class WSLCCLIRelativeTimeUnitTests
         VERIFY_ARE_EQUAL(0LL, ParseTimestamp("0").first);
     }
 
+    TEST_METHOD(ParseTimestamp_NormalizesNegativeFractionalSeconds)
+    {
+        using Parsed = std::pair<std::int64_t, std::int64_t>;
+        VERIFY_IS_TRUE((Parsed{-2, 500000000} == ParseTimestamp("-1.5")));
+        VERIFY_IS_TRUE((ParseTimestamp("1969-12-31T23:59:58.5Z") == ParseTimestamp("-1.5")));
+        VERIFY_IS_TRUE((Parsed{-1, 500000000} == ParseTimestamp("-0.5")));
+        VERIFY_IS_TRUE((Parsed{-1, 0} == ParseTimestamp("-1.0")));
+        VERIFY_IS_TRUE(
+            (Parsed{std::numeric_limits<std::int64_t>::min(), 0} == ParseTimestamp(std::to_string(std::numeric_limits<std::int64_t>::min()))));
+        VERIFY_THROWS_SPECIFIC(
+            ParseTimestamp(std::to_string(std::numeric_limits<std::int64_t>::min()) + ".5"),
+            wil::ResultException,
+            [](const wil::ResultException& e) { return e.GetErrorCode() == E_INVALIDARG; });
+    }
+
+    TEST_METHOD(ParseTimestamp_LargeNegativeDurationIsInTheFuture)
+    {
+        const auto before = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        const auto parsed = ParseTimestamp("-2500000h");
+        const auto after = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
+        constexpr std::int64_t c_offset = 2500000LL * 3600;
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(parsed.first, before + c_offset);
+        VERIFY_IS_LESS_THAN_OR_EQUAL(parsed.first, after + c_offset);
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(parsed.second, 0LL);
+        VERIFY_IS_LESS_THAN(parsed.second, 1000000000LL);
+    }
+
     TEST_METHOD(RelativeTime_ZeroTimestamp_ReturnsEmpty)
     {
         VERIFY_ARE_EQUAL(std::wstring{}, FormatRelativeTime(0));
