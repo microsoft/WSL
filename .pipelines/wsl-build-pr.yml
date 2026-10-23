@@ -8,6 +8,9 @@ stages:
 - template: build-stage.yml@self
   parameters:
     isRelease: false
+    # Exercise the opt-in backend on x64 and ARM64 in PR builds. Runtime config
+    # still defaults to disabled, and other pipeline templates keep the option off.
+    enableExperimentalVirtioSound: true
     pool: 'wsl-build'
     vsoOrg: shine-oss
     vsoProject: wsl

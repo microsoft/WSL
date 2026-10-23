@@ -103,13 +103,15 @@ struct Plan9Share
 
 enum class FlexibleIoDeviceHostingModel
 {
-    ExternalRestricted
+    ExternalRestricted,
+    External
 };
 
 NLOHMANN_JSON_SERIALIZE_ENUM(
     FlexibleIoDeviceHostingModel,
     {
         {FlexibleIoDeviceHostingModel::ExternalRestricted, "ExternalRestricted"},
+        {FlexibleIoDeviceHostingModel::External, "External"},
     })
 
 struct FlexibleIoDevice
@@ -512,6 +514,7 @@ struct VirtualPMemController
 
 struct Devices
 {
+    std::map<std::string, FlexibleIoDevice> FlexibleIov;
     std::optional<VirtioSerial> VirtioSerial;
     std::map<std::string, ComPort> ComPorts;
     EmptyObject Plan9;
@@ -530,6 +533,10 @@ inline void to_json(nlohmann::json& j, const Devices& devices)
         {"HvSocket", devices.HvSocket},
         {"Scsi", devices.Scsi}};
 
+    if (!devices.FlexibleIov.empty())
+    {
+        j["FlexibleIov"] = devices.FlexibleIov;
+    }
     OMIT_IF_EMPTY(j, devices, VirtioSerial);
     OMIT_IF_EMPTY(j, devices, VirtualPMem);
 }
