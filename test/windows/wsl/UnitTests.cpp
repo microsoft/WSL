@@ -34,6 +34,7 @@ Abstract:
 #include "WslCoreConfigInterface.h"
 #include "WslCoreFilesystem.h"
 #include "WslSecurity.h"
+#include "hcs.hpp"
 #include "CommandLine.h"
 #include "retryshared.h"
 
@@ -2570,6 +2571,50 @@ Usage:
         auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"nproc --all");
         VERIFY_ARE_EQUAL(L"1\n", output);
         VERIFY_ARE_EQUAL(L"", warnings);
+    }
+
+    static bool IsNestedVirtualizationSupportedTestHost()
+    {
+        try
+        {
+            const auto& processorFeatures = wsl::windows::common::hcs::GetProcessorFeatures();
+            return std::find(processorFeatures.begin(), processorFeatures.end(), "NestedVirt") != processorFeatures.end();
+        }
+        catch (...)
+        {
+            // Windows 10 can lack this HCS capability query. On that platform,
+            // the qualified nightly job explicitly declares the prerequisite.
+            if (wsl::windows::common::helpers::IsWindows11OrAbove())
+            {
+                return false;
+            }
+
+            WEX::Common::String supported;
+            WEX::TestExecution::RuntimeParameters::TryGetValue(L"NestedVirtualizationSupported", supported);
+            if (supported.IsEmpty())
+            {
+                return false;
+            }
+
+            const auto value = static_cast<LPCWSTR>(supported);
+            return ::_wcsicmp(value, L"1") == 0 || ::_wcsicmp(value, L"true") == 0;
+        }
+    }
+
+    WSL2_TEST_METHOD(NestedVirtualization)
+    {
+        SKIP_TEST_ARM64();
+
+        // /dev/kvm is the behavior this regression test validates, not its prerequisite.
+        if (!IsNestedVirtualizationSupportedTestHost())
+        {
+            LogSkipped("Nested virtualization is not supported on this host");
+            return;
+        }
+
+        // The service should honor this explicit setting on every supported x64 Windows version.
+        WslConfigChange configChange(LxssGenerateTestConfig() + L"\nnestedVirtualization=true");
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -c /dev/kvm && grep -Eq 'vmx|svm' /proc/cpuinfo"), 0u);
     }
 
     WSL2_TEST_METHOD(DmesgCollection)
