@@ -94,6 +94,11 @@ void wsl::windows::service::wslc::ClearWslcSessionsAndBlockNewInstances()
 {
     std::lock_guard lock{g_mutex};
 
+    if (g_sessionManagerImpl)
+    {
+        g_sessionManagerImpl->CancelDiagnosticCallbacks();
+    }
+
     // Disconnect the COM instance from its implementation.
     if (g_sessionManager)
     {
