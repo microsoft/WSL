@@ -2944,6 +2944,24 @@ WslCoreVm::VirtioFsShare::VirtioFsShare(PCWSTR Path, PCWSTR Options, bool Admin)
             this->Options.insert_or_assign(std::move(key), std::move(value));
         }
     }
+
+    if constexpr (wsl::shared::Debug)
+    {
+        // Only the last occurrence of each option is kept.
+        std::set<std::wstring> keys;
+        std::set<std::wstring> expectedSet;
+        for (auto option = optionsVector.rbegin(); option != optionsVector.rend(); ++option)
+        {
+            if (keys.insert(option->substr(0, option->find_first_of(L'='))).second)
+            {
+                expectedSet.insert(*option);
+            }
+        }
+
+        auto newVector = wsl::shared::string::Split(OptionsString(), L';');
+        const auto newSet = std::set<std::wstring>(newVector.begin(), newVector.end());
+        WI_ASSERT_MSG(expectedSet == newSet, "mount options do not match");
+    }
 }
 
 std::wstring WslCoreVm::VirtioFsShare::OptionsString() const
