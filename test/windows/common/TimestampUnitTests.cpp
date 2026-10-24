@@ -75,6 +75,16 @@ class WSLCCLIRelativeTimeUnitTests
         VERIFY_IS_LESS_THAN_OR_EQUAL(parsed.first, after + c_offset);
         VERIFY_IS_GREATER_THAN_OR_EQUAL(parsed.second, 0LL);
         VERIFY_IS_LESS_THAN(parsed.second, 1000000000LL);
+
+        constexpr std::int64_t c_limitSeconds = 9223372036LL;
+        const auto limitBefore = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        const auto limit = ParseTimestamp("-9223372036.5s");
+        const auto limitAfter = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(limit.first, limitBefore + c_limitSeconds);
+        VERIFY_IS_LESS_THAN_OR_EQUAL(limit.first, limitAfter + c_limitSeconds + 1);
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(limit.second, 0LL);
+        VERIFY_IS_LESS_THAN(limit.second, 1000000000LL);
     }
 
     TEST_METHOD(RelativeTime_ZeroTimestamp_ReturnsEmpty)

@@ -2972,6 +2972,8 @@ try
             }
             else
             {
+                WSL_LOG("ContainerPruneUnmanaged", TraceLoggingValue(candidate.Id.c_str(), "Id"));
+
                 // Keep adoption serialized with deletion of containers without a WSLC lifecycle owner.
                 try
                 {
