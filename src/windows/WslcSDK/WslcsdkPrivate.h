@@ -87,12 +87,14 @@ typedef struct WslcContainerOptionsInternal
     const WslcContainerNamedVolume* namedVolumes;
     uint32_t namedVolumesCount;
     const WslcContainerProcessOptionsInternal* initProcessOptions;
-    PCSTR networkMode;
+    PCSTR networkMode; // null when not explicitly set
     WslcContainerFlags containerFlags;
     PCSTR const* capabilityAdditions;
     uint32_t capabilityAdditionsCount;
     PCSTR const* capabilityDrops;
     uint32_t capabilityDropsCount;
+    const WslcContainerNetwork* networks;
+    uint32_t networksCount;
 
 } WslcContainerOptionsInternal;
 

@@ -11,7 +11,12 @@ STDAPI WslcCreateContainer(_In_ WslcSession session, _In_ const WslcContainerSet
 | `container` | `WslcContainer*` | out |
 | `errorMessage` | `PWSTR*` | out, optional |
 
-Return value: `HRESULT`.
+Return value: `HRESULT`. Returns `E_INVALIDARG` if:
+
+- Both [WslcSetContainerSettingsNetworkingMode](wslcsetcontainersettingsnetworkingmode.md) and [WslcSetContainerSettingsNetworks](wslcsetcontainersettingsnetworks.md) were called.
+- Aliases or an IP address are set on a network that is not user-defined.
+
+Returns [`WSLC_E_RUNTIME_UPDATE_NEEDED`](../error-codes.md) if the installed WSL runtime does not support the requested settings, such as capabilities, or aliases or an IP address on the primary network.
 
 Example:
 

@@ -7,6 +7,7 @@
 - [DeleteContainerOption](deletecontaineroption.md)
 - [Error](error.md)
 - [ContainerNetworkingMode](containernetworkingmode.md)
+- [NetworkFlags](networkflags.md)
 - [PortProtocol](portprotocol.md)
 - [ContainerState](containerstate.md)
 - [Signal](signal.md)

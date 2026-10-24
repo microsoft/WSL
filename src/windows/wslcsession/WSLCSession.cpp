@@ -3252,28 +3252,71 @@ CATCH_RETURN();
 
 // Network management.
 
+static wslc_schema::NetworkListEntry ToNetworkListEntry(const docker_schema::Network& Network)
+{
+    wslc_schema::NetworkListEntry entry;
+    entry.Id = Network.Id;
+    entry.Name = Network.Name;
+    entry.Driver = Network.Driver;
+    entry.Scope = Network.Scope;
+    entry.Created = Network.Created;
+    entry.EnableIPv4 = Network.EnableIPv4;
+    entry.EnableIPv6 = Network.EnableIPv6;
+    entry.Internal = Network.Internal;
+    entry.Labels = Network.Labels;
+    entry.Labels.erase(WSLCNetworkManagedLabel);
+    entry.IPAM.Driver = Network.IPAM.Driver;
+    entry.IPAM.Options = Network.IPAM.Options;
+    if (Network.IPAM.Config)
+    {
+        auto& configs = entry.IPAM.Config.emplace();
+        for (const auto& cfg : *Network.IPAM.Config)
+        {
+            configs.push_back({.Subnet = cfg.Subnet, .Gateway = cfg.Gateway, .IPRange = cfg.IPRange});
+        }
+    }
+
+    return entry;
+}
+
 HRESULT WSLCSession::CreateNetwork(const WSLCNetworkOptions* Options, IDiagnosticCallback* DiagnosticCallback)
 try
 {
     WSLCExecutionContext context(this, DiagnosticCallback);
 
     RETURN_HR_IF_NULL(E_POINTER, Options);
-    RETURN_HR_IF_NULL(E_POINTER, Options->Name);
 
-    std::string name = Options->Name;
-    std::string driver = Options->Driver != nullptr ? Options->Driver : WSLCBridgeNetworkDriver;
+    wsl::windows::wslc::diagnostics::DiagnosticQueue pending{context.Diagnostics().EnabledLevels()};
+    auto completeDiagnostics = wil::scope_exit([&]() { pending.Complete(context.Diagnostics()); });
+
+    CreateNetworkImpl(*Options, nullptr, &context.Diagnostics(), &pending);
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+void WSLCSession::CreateNetworkImpl(
+    const WSLCNetworkOptions& Options,
+    LPSTR* Network,
+    const wsl::windows::wslc::diagnostics::DiagnosticReporter* Diagnostics,
+    wsl::windows::wslc::diagnostics::DiagnosticQueue* Pending)
+{
+    THROW_HR_IF_NULL(E_POINTER, Options.Name);
+
+    std::string name = Options.Name;
+    std::string driver = Options.Driver != nullptr ? Options.Driver : WSLCBridgeNetworkDriver;
 
     ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
 
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidName(name), IsReservedNetworkName(name));
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidNetworkDriver(driver), driver != WSLCBridgeNetworkDriver);
 
-    auto driverOpts = wslutil::ParseKeyValuePairs(Options->DriverOpts, Options->DriverOptsCount);
-    auto labels = wslutil::ParseKeyValuePairs(Options->Labels, Options->LabelsCount, WSLCNetworkManagedLabel);
-    WSLC_EVENT(context.Diagnostics(), "NetworkCreationStarted", WSLC_DIAG_CODE_NETWORK_CREATION_STARTED, "Name: {}; Driver: {}", name, driver);
-
-    wsl::windows::wslc::diagnostics::DiagnosticQueue pending{context.Diagnostics().EnabledLevels()};
-    auto completeDiagnostics = wil::scope_exit([&]() { pending.Complete(context.Diagnostics()); });
+    auto driverOpts = wslutil::ParseKeyValuePairs(Options.DriverOpts, Options.DriverOptsCount);
+    auto labels = wslutil::ParseKeyValuePairs(Options.Labels, Options.LabelsCount, WSLCNetworkManagedLabel);
+    if (Diagnostics != nullptr)
+    {
+        WSLC_EVENT(*Diagnostics, "NetworkCreationStarted", WSLC_DIAG_CODE_NETWORK_CREATION_STARTED, "Name: {}; Driver: {}", name, driver);
+    }
 
     auto lock = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
@@ -3288,28 +3331,28 @@ try
     request.Labels = labels;
     request.Labels[WSLCNetworkManagedLabel] = "true";
 
-    request.Internal = static_cast<bool>(Options->Internal);
-    request.EnableIPv6 = static_cast<bool>(Options->EnableIPv6);
+    request.Internal = static_cast<bool>(Options.Internal);
+    request.EnableIPv6 = static_cast<bool>(Options.EnableIPv6);
 
     THROW_HR_WITH_USER_ERROR_IF(
-        E_INVALIDARG, Localization::MessageWslcGatewayRequiresSubnet(), Options->Gateway != nullptr && Options->Subnet == nullptr);
+        E_INVALIDARG, Localization::MessageWslcGatewayRequiresSubnet(), Options.Gateway != nullptr && Options.Subnet == nullptr);
 
     THROW_HR_WITH_USER_ERROR_IF(
-        E_INVALIDARG, Localization::MessageWslcIpRangeRequiresSubnet(), Options->IpRange != nullptr && Options->Subnet == nullptr);
+        E_INVALIDARG, Localization::MessageWslcIpRangeRequiresSubnet(), Options.IpRange != nullptr && Options.Subnet == nullptr);
 
-    if (Options->Subnet != nullptr)
+    if (Options.Subnet != nullptr)
     {
         docker_schema::IPAMConfig ipamConfig;
-        ipamConfig.Subnet = Options->Subnet;
+        ipamConfig.Subnet = Options.Subnet;
 
-        if (Options->Gateway != nullptr)
+        if (Options.Gateway != nullptr)
         {
-            ipamConfig.Gateway = Options->Gateway;
+            ipamConfig.Gateway = Options.Gateway;
         }
 
-        if (Options->IpRange != nullptr)
+        if (Options.IpRange != nullptr)
         {
-            ipamConfig.IPRange = Options->IpRange;
+            ipamConfig.IPRange = Options.IpRange;
         }
 
         auto& ipam = request.IPAM.emplace();
@@ -3375,15 +3418,29 @@ try
         }
     }
 
+    // Serialize the result before committing so a failure rolls back this network and nothing else.
+    wil::unique_cotaskmem_ansistring networkJson;
+    if (Network != nullptr)
+    {
+        networkJson = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(wsl::shared::ToJson(ToNetworkListEntry(full)).c_str());
+    }
+
     auto [it, inserted] = m_networks.insert({name, std::move(entry)});
     WI_VERIFY(inserted);
 
-    WSLC_EVENT(pending, "NetworkCreated", WSLC_DIAG_CODE_NETWORK_CREATION_COMPLETED, "Name: {}; Driver: {}; ID: {}", name, driver, full.Id);
+    if (Pending != nullptr)
+    {
+        WSLC_EVENT(*Pending, "NetworkCreated", WSLC_DIAG_CODE_NETWORK_CREATION_COMPLETED, "Name: {}; Driver: {}; ID: {}", name, driver, full.Id);
+    }
+    WSL_LOG("NetworkCreated", TraceLoggingValue(name.c_str(), "NetworkName"), TraceLoggingValue(full.Id.c_str(), "NetworkId"));
 
     removeNetworkCleanup.release();
-    return S_OK;
+
+    if (Network != nullptr)
+    {
+        *Network = networkJson.release();
+    }
 }
-CATCH_RETURN();
 
 HRESULT WSLCSession::DeleteNetwork(LPCSTR Name)
 try
@@ -3449,19 +3506,7 @@ try
     networks.reserve(dockerNetworks.size());
     for (const auto& network : dockerNetworks)
     {
-        wslc_schema::NetworkListEntry entry;
-        entry.Id = network.Id;
-        entry.Name = network.Name;
-        entry.Driver = network.Driver;
-        entry.Scope = network.Scope;
-        entry.Created = network.Created;
-        entry.EnableIPv4 = network.EnableIPv4;
-        entry.EnableIPv6 = network.EnableIPv6;
-        entry.Internal = network.Internal;
-        entry.Labels = network.Labels;
-        entry.Labels.erase(WSLCNetworkManagedLabel);
-
-        networks.push_back(std::move(entry));
+        networks.push_back(ToNetworkListEntry(network));
     }
 
     std::string json = wsl::shared::ToJson(networks);
@@ -4099,6 +4144,36 @@ HRESULT WSLCSession::RegisterCrashDumpCallback(IWSLCCompatCrashDumpCallback* Cal
     return RegisterCrashDumpCallback(callback.Get(), Subscription);
 }
 
+HRESULT WSLCSession::ListNetworks(LPSTR* Output)
+{
+    return ListNetworks(nullptr, 0, Output);
+}
+
+HRESULT WSLCSession::CreateNetwork(LPCSTR Options, IWSLCCompatWarningCallback* WarningCallback, LPSTR* Network)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+    RETURN_HR_IF_NULL(E_POINTER, Network);
+    *Network = nullptr;
+
+    const auto warning = apicompat::Convert(WarningCallback);
+    WSLCExecutionContext context(this, warning.Get());
+
+    const auto createOptions = wsl::shared::FromJson<wslc_schema::CreateNetworkOptions>(Options);
+
+    WSLCNetworkOptions options{};
+    options.Name = createOptions.Name.c_str();
+    options.Internal = createOptions.Internal;
+    options.EnableIPv6 = createOptions.EnableIPv6;
+    options.Subnet = createOptions.Subnet.has_value() ? createOptions.Subnet->c_str() : nullptr;
+    options.Gateway = createOptions.Gateway.has_value() ? createOptions.Gateway->c_str() : nullptr;
+
+    CreateNetworkImpl(options, Network);
+
+    return S_OK;
+}
+CATCH_RETURN();
+
 MultiHandleWait WSLCSession::CreateIOContext(HANDLE CancelHandle)
 {
     io::MultiHandleWait io;
@@ -4283,8 +4358,11 @@ void WSLCSession::RecoverExistingContainers()
             auto container = WSLCContainerImpl::Open(
                 dockerContainer, *this, m_runtime, m_pluginNotifier.get(), std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1), m_eventStore);
 
-            auto [it, inserted] = m_containers.emplace(container->ID(), std::move(container));
-            WI_ASSERT(inserted);
+            if (container)
+            {
+                auto [it, inserted] = m_containers.emplace(container->ID(), std::move(container));
+                WI_ASSERT(inserted);
+            }
         }
         catch (...)
         {

@@ -69,6 +69,7 @@ public:
 
 private:
     WSLCContainerOptions m_value{};
+    std::vector<KeyValuePair> m_primaryNetworkSettings;
     std::vector<WSLCVolume> m_volumes;
     std::vector<WSLCPortMapping> m_ports;
     std::vector<WSLCLabel> m_labels;

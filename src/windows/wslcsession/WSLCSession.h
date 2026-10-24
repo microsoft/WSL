@@ -34,6 +34,11 @@ Abstract:
 #include <optional>
 #include <unordered_map>
 
+namespace wsl::windows::wslc::diagnostics {
+class DiagnosticQueue;
+class DiagnosticReporter;
+} // namespace wsl::windows::wslc::diagnostics
+
 namespace wsl::windows::service::wslc {
 
 class WSLCSession;
@@ -233,8 +238,8 @@ public:
     IFACEMETHOD(SetNetworkFaultsForTest)(_In_ BOOL FailCreateInspect) override;
 
     // IWSLCCompatSession - converts the WSLCCompat types to the wslc.idl types and forwards to the methods above.
-    // Methods that have an identical signature in both interfaces (Terminate, DeleteVolume, Authenticate,
-    // GetTerminationReason) are served by the single existing override and require no additional code here.
+    // Methods that have an identical signature in both interfaces (Terminate, DeleteVolume, DeleteNetwork,
+    // Authenticate, GetTerminationReason) are served by the single existing override and require no additional code here.
     IFACEMETHOD(PullImage)(
         _In_ LPCSTR Image,
         _In_opt_ LPCSTR RegistryAuthenticationInformation,
@@ -273,6 +278,8 @@ public:
         _In_ const WSLCCompatContainerOptions2* Options,
         _In_opt_ IWSLCCompatWarningCallback* WarningCallback,
         _Out_ IWSLCCompatContainer** Container) override;
+    IFACEMETHOD(ListNetworks)(_Out_ LPSTR* Output) override;
+    IFACEMETHOD(CreateNetwork)(_In_ LPCSTR Options, _In_opt_ IWSLCCompatWarningCallback* WarningCallback, _Out_ LPSTR* Network) override;
 
     common::io::MultiHandleWait CreateIOContext(HANDLE CancelHandle = nullptr);
 
@@ -393,6 +400,14 @@ private:
         DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle, IImageLoadCallback* LoadCallback = nullptr);
     void RecoverExistingContainers();
     void RecoverExistingNetworks();
+
+    // Creates a managed network. When Network is set it receives the created network as a serialized
+    // NetworkListEntry, written only once the network is committed.
+    void CreateNetworkImpl(
+        const WSLCNetworkOptions& Options,
+        _Out_opt_ LPSTR* Network,
+        const wsl::windows::wslc::diagnostics::DiagnosticReporter* Diagnostics = nullptr,
+        wsl::windows::wslc::diagnostics::DiagnosticQueue* Pending = nullptr);
 
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent);
     // Returns the manifest digest each pulled tag resolved to, in the order the daemon reported them.

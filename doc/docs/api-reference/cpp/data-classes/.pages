@@ -5,9 +5,11 @@ nav:
   - imageinfo.md
   - imageprogress.md
   - installprogress.md
+  - networkinfo.md
   - processcrashinformation.md
   - serviceversion.md
   - vhdowner.md
   - containerportmapping.md
   - containervolume.md
   - containernamedvolume.md
+  - containernetwork.md
