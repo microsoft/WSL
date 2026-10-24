@@ -101,7 +101,7 @@ std::string wsl::windows::common::timestamp::ExpandToRfc3339(const std::string& 
     return expanded;
 }
 
-std::int64_t wsl::windows::common::timestamp::Rfc3339ToEpoch(const std::string& timestamp)
+static std::pair<std::int64_t, std::int64_t> ParseRfc3339(const std::string& timestamp)
 {
     // Normalize a trailing 'Z' or 'z' to '+00:00' so that %Ez parses every zone uniformly.
     std::string normalized{timestamp};
@@ -111,19 +111,27 @@ std::int64_t wsl::windows::common::timestamp::Rfc3339ToEpoch(const std::string& 
         normalized += "+00:00";
     }
 
-    // Strip any fractional seconds. The value is truncated to whole seconds regardless, and parsing at
-    // second precision keeps timestamps outside the nanosecond range from silently wrapping.
+    // Parse whole seconds separately to preserve dates outside the nanosecond clock's range.
+    std::int64_t fraction = 0;
     const auto separator = normalized.find('.');
     if (separator != std::string::npos)
     {
         auto end = separator + 1;
         while (end < normalized.size() && std::isdigit(static_cast<unsigned char>(normalized[end])) != 0)
         {
+            if (end - separator <= 9)
+            {
+                fraction = fraction * 10 + normalized[end] - '0';
+            }
             ++end;
         }
 
         // A separator with no fractional digits is invalid, but std::chrono::parse otherwise accepts it.
         THROW_HR_IF_MSG(E_INVALIDARG, end == separator + 1, "Failed to parse timestamp '%hs'", timestamp.c_str());
+        for (size_t digits = end - separator - 1; digits < 9; ++digits)
+        {
+            fraction *= 10;
+        }
 
         normalized.erase(separator, end - separator);
     }
@@ -156,7 +164,57 @@ std::int64_t wsl::windows::common::timestamp::Rfc3339ToEpoch(const std::string& 
         "Unexpected trailing characters in timestamp '%hs'",
         timestamp.c_str());
 
-    return parsed.time_since_epoch().count();
+    return {parsed.time_since_epoch().count(), fraction};
+}
+
+std::int64_t wsl::windows::common::timestamp::Rfc3339ToEpoch(const std::string& timestamp)
+{
+    return ParseRfc3339(timestamp).first;
+}
+
+std::pair<std::int64_t, std::int64_t> wsl::windows::common::timestamp::ParseTimestamp(const std::string& value)
+{
+    const auto separator = value.find('.');
+    const auto secondsEnd = value.data() + (separator == std::string::npos ? value.size() : separator);
+    const auto digits = separator == std::string::npos ? std::string_view{} : std::string_view{value}.substr(separator + 1);
+    std::int64_t seconds{};
+    const auto integer = std::from_chars(value.data(), secondsEnd, seconds);
+    if (integer.ec == std::errc{} && integer.ptr == secondsEnd &&
+        (separator == std::string::npos ||
+         (!digits.empty() && std::ranges::all_of(digits, [](char c) { return c >= '0' && c <= '9'; }))))
+    {
+        std::int64_t fraction = 0;
+        if (separator != std::string::npos)
+        {
+            for (size_t i = 0; i < 9; ++i)
+            {
+                fraction = fraction * 10 + (i < digits.size() ? digits[i] - '0' : 0);
+            }
+        }
+
+        // Normalize negative values to floor seconds with nonnegative nanoseconds, matching the RFC3339 path.
+        if (value.starts_with('-') && fraction != 0)
+        {
+            THROW_HR_IF(E_INVALIDARG, seconds == std::numeric_limits<std::int64_t>::min());
+            --seconds;
+            fraction = std::nano::den - fraction;
+        }
+        return {seconds, fraction};
+    }
+
+    if (const auto duration = TryParseDuration(value))
+    {
+        // Subtract whole seconds separately so that large durations cannot overflow the nanosecond representation.
+        const auto now = std::chrono::system_clock::now().time_since_epoch();
+        const auto nowSeconds = std::chrono::floor<std::chrono::seconds>(now);
+        const auto durationSeconds = std::chrono::duration_cast<std::chrono::seconds>(*duration);
+        const auto remainder = std::chrono::duration_cast<std::chrono::nanoseconds>(now - nowSeconds) - (*duration - durationSeconds);
+        const auto carry = std::chrono::floor<std::chrono::seconds>(remainder);
+        return {(nowSeconds - durationSeconds + carry).count(), (remainder - carry).count()};
+    }
+
+    THROW_HR_IF(E_INVALIDARG, value.ends_with('T'));
+    return ParseRfc3339(ExpandToRfc3339(value));
 }
 
 std::optional<std::chrono::nanoseconds> wsl::windows::common::timestamp::TryParseDuration(const std::string& duration)

@@ -22,6 +22,7 @@ Abstract:
 #include "WSLCVolumes.h"
 #include "WSLCSessionRuntime.h"
 #include "WSLCNetworkMetadata.h"
+#include "WSLCRestartScheduler.h"
 #include "DockerEventTracker.h"
 #include "DockerHTTPClient.h"
 #include "EventStore.h"
@@ -308,6 +309,17 @@ public:
         return m_runtime;
     }
 
+    bool IsTerminating() const noexcept
+    {
+        return m_terminating.load();
+    }
+
+    // Runs Callback on the session's restart thread once Delay elapses. Dropped once the session terminates.
+    void ScheduleRestart(std::chrono::milliseconds Delay, std::function<void()>&& Callback)
+    {
+        m_restartScheduler.Schedule(Delay, std::move(Callback));
+    }
+
     // Creates an opaque activity token that holds a reference on this session's activity count for
     // its lifetime, deferring idle teardown of the VM until every outstanding token is released.
     // Used both for transient client operations (BeginContainerOperation) and to keep the VM alive
@@ -483,6 +495,13 @@ private:
     // thread is alive.
     mutable wil::srwlock m_crashDumpLock;
     _Guarded_by_(m_crashDumpLock) CrashDumpCallbackList m_crashDumpCallbacks;
+
+    // Restart policies apply to the containers found by the session's first VM bring-up, the
+    // equivalent of a Docker daemon start. Later bring-ups follow an idle teardown.
+    __guarded_by(m_containersLock) bool m_sessionStartRecoveryDone = false;
+
+    // N.B. Declared last so it is stopped before anything a restart callback touches is destroyed.
+    WSLCRestartScheduler m_restartScheduler;
 
     friend class WSLCSessionRuntime;
 };
