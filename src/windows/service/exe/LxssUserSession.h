@@ -450,6 +450,9 @@ public:
 
     HRESULT MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR GuestPath, _In_ bool ReadOnly, _In_ LPCWSTR Name);
 
+    // Timed acquisition lets plugin callbacks recheck for an in-flight notification pump.
+    bool TryInvokeUnderInstanceLock(std::chrono::milliseconds Timeout, const std::function<HRESULT()>& Work, _Out_ HRESULT& Result);
+
     /// <summary>
     /// Registers a distribution.
     /// </summary>
@@ -682,6 +685,7 @@ private:
     LXSS_VM_MODE_SETUP_CONTEXT
     _RunUtilityVmSetup(_In_ const LXSS_DISTRO_CONFIGURATION& Configuration, _In_ LX_MESSAGE_TYPE MessageType, _In_ ULONG ExportFlags = 0, _In_ bool SetVersion = false);
 
+    _Requires_exclusive_lock_held_(m_instanceLock)
     void _SendDistributionRegisteredEvent(_In_ const LXSS_DISTRO_CONFIGURATION& Configuration) const;
 
     /// <summary>
