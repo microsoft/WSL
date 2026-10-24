@@ -36,6 +36,7 @@ Abstract:
 #include "WslSecurity.h"
 #include "CommandLine.h"
 #include "retryshared.h"
+#include "RingBuffer.h"
 
 #define LXSST_TEST_USERNAME L"kerneltest"
 
@@ -9019,6 +9020,66 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_WIN32_BOOL_SUCCEEDED(CreateHardLinkW(link.c_str(), target.c_str(), nullptr));
         verifyRejected(link);
         VERIFY_ARE_EQUAL(original, ReadFileContent(target.wstring()));
+    }
+
+    TEST_METHOD(RingBufferDelimitedStrings)
+    {
+        const auto verifyLines = [](const RingBuffer& buffer, size_t count, const std::vector<std::string>& expected, char delimiter = '\n') {
+            const auto actual = buffer.GetLastDelimitedStrings(delimiter, count);
+            VERIFY_ARE_EQUAL(expected.size(), actual.size());
+            for (size_t index = 0; index < std::min(expected.size(), actual.size()); ++index)
+            {
+                VERIFY_ARE_EQUAL(expected[index], actual[index]);
+            }
+        };
+
+        const std::vector<std::pair<std::string, std::vector<std::string>>> testCases{
+            {"a\nb\nc\n", {"a", "b", "c"}},
+            {"alpha\nbb\n\nccc\ndddd\npartial", {"alpha", "bb", "", "ccc", "dddd"}},
+            {"\nalpha\n\nbeta\n\n", {"", "alpha", "", "beta", ""}},
+            {"alpha\n", {"alpha"}},
+            {"\n\n", {"", ""}},
+            {"partial", {}}};
+
+        for (const auto& [input, expected] : testCases)
+        {
+            for (size_t offset = 0; offset < input.size(); ++offset)
+            {
+                RingBuffer buffer(input.size());
+                buffer.Insert(std::string(offset, 'x'));
+                buffer.Insert(input);
+
+                VERIFY_ARE_EQUAL(input, buffer.Get());
+                for (size_t count = 0; count <= expected.size() + 1; ++count)
+                {
+                    verifyLines(buffer, count, {expected.end() - std::min(count, expected.size()), expected.end()});
+                }
+            }
+        }
+
+        RingBuffer buffer(64);
+        verifyLines(buffer, 0, {});
+        verifyLines(buffer, 3, {});
+
+        buffer.Insert("a\nb");
+        verifyLines(buffer, 1, {"a"});
+
+        buffer.Insert("\nc\npar");
+        verifyLines(buffer, 2, {"b", "c"});
+
+        buffer.Insert("tial");
+        verifyLines(buffer, 0, {});
+
+        buffer.Insert("\n\nz\n");
+        verifyLines(buffer, 3, {"partial", "", "z"});
+        verifyLines(buffer, 7, {"a", "b", "c", "partial", "", "z"});
+        VERIFY_ARE_EQUAL(std::string("a\nb\nc\npartial\n\nz\n"), buffer.Get());
+
+        RingBuffer overwrittenBuffer(9);
+        overwrittenBuffer.Insert("discard");
+        overwrittenBuffer.Insert("\nalpha\nbeta\n");
+        VERIFY_ARE_EQUAL(std::string("pha\nbeta\n"), overwrittenBuffer.Get());
+        verifyLines(overwrittenBuffer, 3, {"pha", "beta"});
     }
 };
 } // namespace UnitTests
