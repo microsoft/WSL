@@ -388,7 +388,7 @@ void WSLCSessionManagerImpl::CreateSession(
         try
         {
             auto& entry = m_sessions.back();
-            g_pluginManager.RegisterWslcSession(sessionId, entry.Ref.get());
+            g_pluginManager.RegisterWslcSession(sessionId, serviceRef.get());
             WSLCSessionInformation info{};
             info.SessionId = static_cast<WSLCSessionId>(entry.SessionId);
             info.DisplayName = entry.DisplayName.c_str();
