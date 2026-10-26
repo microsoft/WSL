@@ -178,7 +178,13 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
     auto it = events.find(action);
     if (it == events.end())
     {
-        return; // Event is not tracked, dropped.
+        // Docker appends the exec'd command line to exec_create and exec_start.
+        if (action.starts_with("exec_create: ") || action.starts_with("exec_start: "))
+        {
+            OnContainerAction(containerId, action, attributes, eventTimeNano);
+        }
+
+        return; // Other events are not tracked, dropped.
     }
 
     std::optional<int> exitCode;
@@ -212,7 +218,8 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
     const bool handled =
         InvokeCallbacks(callbacks, [&](const ContainerCallback& e) { e.Callback(it->second, exitCode, attributes, eventTimeNano); });
 
-    if (!handled && (it->second == ContainerEvent::Kill || it->second == ContainerEvent::Stop))
+    // The container state callbacks never publish exec_die, so it's published even when they handled it.
+    if (it->second == ContainerEvent::ExecDied || (!handled && (it->second == ContainerEvent::Kill || it->second == ContainerEvent::Stop)))
     {
         OnContainerAction(containerId, action, attributes, eventTimeNano);
     }
