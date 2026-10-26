@@ -53,10 +53,10 @@ public:
     void RemoveGuestDevice(_In_ const GUID& InstanceId);
 
     _Requires_lock_not_held_(m_lock)
-    void AttachUsbDevice(const std::wstring& Path, _In_ HANDLE UserToken);
+    void AttachUsbDevice(const std::wstring& DeviceInstanceId, _In_ HANDLE UserToken);
 
     _Requires_lock_not_held_(m_lock)
-    void DetachUsbDevice(const std::wstring& Path);
+    void DetachUsbDevice(const std::wstring& DeviceInstanceId);
 
 private:
     struct DirectoryObjectLifetime

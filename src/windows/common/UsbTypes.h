@@ -40,7 +40,7 @@ struct DeviceReservation
 {
     GUID Id;
     PortId Port;
-    std::wstring InterfacePath;
+    std::wstring DeviceInstanceId;
 };
 
 } // namespace wsl::windows::common::usb

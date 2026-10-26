@@ -723,18 +723,18 @@ GUID DeviceHostProxy::AddUsbControllerDevice(_In_ HANDLE UserToken)
     return instanceId;
 }
 
-void DeviceHostProxy::AttachUsbDevice(const GUID& ControllerId, const std::wstring& Path)
+void DeviceHostProxy::AttachUsbDevice(const GUID& ControllerId, const std::wstring& DeviceInstanceId)
 {
     std::lock_guard lifecycleLock(m_deviceLifecycleLock);
-    const auto path = wil::make_bstr(Path.c_str());
-    THROW_IF_FAILED(GetUsbControllerDevice(ControllerId)->AttachDevice(path.get()));
+    const auto deviceInstanceId = wil::make_bstr(DeviceInstanceId.c_str());
+    THROW_IF_FAILED(GetUsbControllerDevice(ControllerId)->AttachDevice(deviceInstanceId.get()));
 }
 
-void DeviceHostProxy::DetachUsbDevice(const GUID& ControllerId, const std::wstring& Path)
+void DeviceHostProxy::DetachUsbDevice(const GUID& ControllerId, const std::wstring& DeviceInstanceId)
 {
     std::lock_guard lifecycleLock(m_deviceLifecycleLock);
-    const auto path = wil::make_bstr(Path.c_str());
-    THROW_IF_FAILED(GetUsbControllerDevice(ControllerId)->DetachDevice(path.get()));
+    const auto deviceInstanceId = wil::make_bstr(DeviceInstanceId.c_str());
+    THROW_IF_FAILED(GetUsbControllerDevice(ControllerId)->DetachDevice(deviceInstanceId.get()));
 }
 
 wil::com_ptr<IWslUsbControllerDevice> DeviceHostProxy::GetUsbControllerDevice(const GUID& InstanceId)

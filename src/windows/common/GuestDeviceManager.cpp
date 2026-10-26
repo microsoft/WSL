@@ -169,7 +169,7 @@ void GuestDeviceManager::RemoveGuestDevice(_In_ const GUID& InstanceId)
 }
 
 _Requires_lock_not_held_(m_lock)
-void GuestDeviceManager::AttachUsbDevice(const std::wstring& Path, _In_ HANDLE UserToken)
+void GuestDeviceManager::AttachUsbDevice(const std::wstring& DeviceInstanceId, _In_ HANDLE UserToken)
 {
     auto guestDeviceLock = m_lock.lock_exclusive();
     if (IsEqualGUID(m_usbControllerId, GUID_NULL))
@@ -177,13 +177,13 @@ void GuestDeviceManager::AttachUsbDevice(const std::wstring& Path, _In_ HANDLE U
         m_usbControllerId = m_deviceHostSupport->AddUsbControllerDevice(UserToken);
     }
 
-    m_deviceHostSupport->AttachUsbDevice(m_usbControllerId, Path);
+    m_deviceHostSupport->AttachUsbDevice(m_usbControllerId, DeviceInstanceId);
 }
 
 _Requires_lock_not_held_(m_lock)
-void GuestDeviceManager::DetachUsbDevice(const std::wstring& Path)
+void GuestDeviceManager::DetachUsbDevice(const std::wstring& DeviceInstanceId)
 {
     auto guestDeviceLock = m_lock.lock_exclusive();
     THROW_HR_IF(E_NOT_SET, IsEqualGUID(m_usbControllerId, GUID_NULL));
-    m_deviceHostSupport->DetachUsbDevice(m_usbControllerId, Path);
+    m_deviceHostSupport->DetachUsbDevice(m_usbControllerId, DeviceInstanceId);
 }

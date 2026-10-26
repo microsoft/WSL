@@ -2640,7 +2640,7 @@ HRESULT LxssUserSessionImpl::AttachUsbDevice(_In_ LPCWSTR Port)
 
     try
     {
-        m_utilityVm->AttachUsbDevice(entry->second.Reservation.InterfacePath);
+        m_utilityVm->AttachUsbDevice(entry->second.Reservation.DeviceInstanceId);
         entry->second.Attached = true;
         m_usbManager->Commit(&m_userSid.Sid, reservationId);
         entry->second.Requested = true;
@@ -4524,7 +4524,7 @@ void LxssUserSessionImpl::OnUsbDeviceRemoved(const GUID& ReservationId)
         attachment.Requested = false;
         if (attachment.Attached)
         {
-            m_utilityVm->DetachUsbDevice(attachment.Reservation.InterfacePath);
+            m_utilityVm->DetachUsbDevice(attachment.Reservation.DeviceInstanceId);
         }
 
         m_usbAttachments.erase(entry);
@@ -4541,7 +4541,7 @@ void LxssUserSessionImpl::_ReleaseUsbAttachment(const GUID& ReservationId)
         attachment.Requested = false;
         if (attachment.Attached)
         {
-            m_utilityVm->DetachUsbDevice(attachment.Reservation.InterfacePath);
+            m_utilityVm->DetachUsbDevice(attachment.Reservation.DeviceInstanceId);
             attachment.Attached = false;
         }
     }
@@ -4581,7 +4581,7 @@ void LxssUserSessionImpl::_ReplayUsbAttachments() noexcept
                 continue;
             }
 
-            m_utilityVm->AttachUsbDevice(attachment.Reservation.InterfacePath);
+            m_utilityVm->AttachUsbDevice(attachment.Reservation.DeviceInstanceId);
             attachment.Attached = true;
             m_usbManager->Commit(&m_userSid.Sid, attachment.Reservation.Id);
         }

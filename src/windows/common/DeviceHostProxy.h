@@ -43,9 +43,9 @@ public:
 
     GUID AddUsbControllerDevice(_In_ HANDLE UserToken);
 
-    void AttachUsbDevice(const GUID& ControllerId, const std::wstring& Path);
+    void AttachUsbDevice(const GUID& ControllerId, const std::wstring& DeviceInstanceId);
 
-    void DetachUsbDevice(const GUID& ControllerId, const std::wstring& Path);
+    void DetachUsbDevice(const GUID& ControllerId, const std::wstring& DeviceInstanceId);
 
     //
     // IVmDeviceHostSupport

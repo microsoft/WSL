@@ -3091,14 +3091,20 @@ void WslCoreVm::ValidateNetworkingMode()
         TraceLoggingValue(m_vmConfig.EnableDnsTunneling, "dnsTunneling"));
 }
 
-void WslCoreVm::AttachUsbDevice(const std::wstring& Path)
+void WslCoreVm::AttachUsbDevice(const std::wstring& DeviceInstanceId)
 {
-    m_guestDeviceManager->AttachUsbDevice(Path, m_userToken.get());
-    WSL_LOG("UsbAttachDevice", TraceLoggingGuid(m_runtimeId, "VmId"), TraceLoggingWideString(Path.c_str(), "DevicePath"));
+    m_guestDeviceManager->AttachUsbDevice(DeviceInstanceId, m_userToken.get());
+    WSL_LOG(
+        "UsbAttachDevice",
+        TraceLoggingGuid(m_runtimeId, "VmId"),
+        TraceLoggingWideString(DeviceInstanceId.c_str(), "DeviceInstanceId"));
 }
 
-void WslCoreVm::DetachUsbDevice(const std::wstring& Path)
+void WslCoreVm::DetachUsbDevice(const std::wstring& DeviceInstanceId)
 {
-    m_guestDeviceManager->DetachUsbDevice(Path);
-    WSL_LOG("UsbDetachDevice", TraceLoggingGuid(m_runtimeId, "VmId"), TraceLoggingWideString(Path.c_str(), "DevicePath"));
+    m_guestDeviceManager->DetachUsbDevice(DeviceInstanceId);
+    WSL_LOG(
+        "UsbDetachDevice",
+        TraceLoggingGuid(m_runtimeId, "VmId"),
+        TraceLoggingWideString(DeviceInstanceId.c_str(), "DeviceInstanceId"));
 }

@@ -483,7 +483,7 @@ DeviceReservation Manager::Reserve(PSID UserSid, const PortId& Port, RemovalCall
         const auto redirected = WaitForWinUsbDevice(identity, record->InterfacePath);
         record->InstanceId = redirected.InstanceId;
         GrantDeviceAccess(record->InterfacePath, UserSid);
-        return {identity.Id, Port, record->InterfacePath};
+        return {identity.Id, Port, record->InstanceId};
     }
     catch (...)
     {

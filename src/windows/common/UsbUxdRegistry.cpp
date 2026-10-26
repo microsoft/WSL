@@ -369,8 +369,8 @@ try
         }
 
         wchar_t section[LINE_LEN]{};
-        THROW_IF_WIN32_BOOL_FALSE(SetupDiGetActualSectionToInstallW(
-            inf.get(), details->SectionName, section, ARRAYSIZE(section), nullptr, nullptr));
+        THROW_IF_WIN32_BOOL_FALSE(
+            SetupDiGetActualSectionToInstallW(inf.get(), details->SectionName, section, ARRAYSIZE(section), nullptr, nullptr));
         if (SetupGetLineCountW(inf.get(), section) >= 0)
         {
             return S_OK;
