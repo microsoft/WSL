@@ -952,7 +952,8 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_createdAt(CreatedAt),
     m_initProcessFlags(InitProcessFlags),
     m_containerFlags(ContainerFlags),
-    m_restartPolicy(RestartPolicy)
+    m_restartPolicy(RestartPolicy),
+    m_persistentState(wslcSession.ContainerStateDirectory(), m_id)
 {
     // Acquire the activity hold up front for a container recovered in the running state, so it keeps
     // the VM alive even before any client opens its wrapper. A merely-created (never-started)
@@ -1216,11 +1217,13 @@ wil::com_ptr<IWSLCProcess> WSLCContainerImpl::StartPhase(
     if (PolicyRestartToken.has_value())
     {
         m_policyRestartPending = false;
+        m_persistentState.Update([](auto& state) { state.RestartCount++; });
     }
     else
     {
         CancelPolicyRestartLockHeld();
         m_restartBackoff.Reset();
+        m_persistentState.Update([](auto& state) { state.RestartCount = 0; });
     }
 
     // Acceptance invalidates predecessor responses even if resource preparation fails.
@@ -1536,6 +1539,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
             {
                 CommitState(WslcContainerStateDeleted, eventTimeNano, attributes);
                 comWrapper = ReleaseResources();
+                m_persistentState.Delete();
             }
 
             // Signal init exit after the state transition and resource cleanup so awaiters observe Deleted.
@@ -2513,6 +2517,7 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     wslcInspect.Image = dockerInspect.Image;
     wslcInspect.SizeRw = dockerInspect.SizeRw;
     wslcInspect.SizeRootFs = dockerInspect.SizeRootFs;
+    wslcInspect.RestartCount = m_persistentState.Get().RestartCount;
 
     // Map container state.
     wslcInspect.State.Status = dockerInspect.State.Status;

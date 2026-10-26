@@ -314,6 +314,17 @@ public:
         return m_terminating.load();
     }
 
+    // Directory holding each container's persisted state document, or nullopt for sessions without storage.
+    std::optional<std::filesystem::path> ContainerStateDirectory() const
+    {
+        if (!m_settingsStoragePath.has_value())
+        {
+            return std::nullopt;
+        }
+
+        return std::filesystem::path{m_settingsStoragePath.value()} / L"containers";
+    }
+
     // Runs Callback on the session's restart thread once Delay elapses. Dropped once the session terminates.
     void ScheduleRestart(std::chrono::milliseconds Delay, std::function<void()>&& Callback)
     {
@@ -406,6 +417,8 @@ private:
     std::optional<std::string> ImportImageImpl(
         DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle, IImageLoadCallback* LoadCallback = nullptr);
     void RecoverExistingContainers();
+    // Caller must hold m_containersLock.
+    void DeleteOrphanedContainerState(const std::vector<common::docker_schema::ContainerInfo>& DockerContainers);
     void RecoverExistingNetworks();
 
     // Creates a managed network. When Network is set it receives the created network as a serialized

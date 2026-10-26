@@ -11,6 +11,7 @@ set(SOURCES
     WSLCSession.cpp
     WSLCSessionRuntime.cpp
     WSLCContainer.cpp
+    WSLCContainerStateStore.cpp
     WSLCRestartScheduler.cpp
     WSLCVirtualMachine.cpp
 
@@ -43,6 +44,7 @@ set(HEADERS
     ServiceProcessLauncher.h
     WSLCContainer.h
     WSLCContainerMetadata.h
+    WSLCContainerStateStore.h
     WSLCExitRequestState.h
     WSLCRestartScheduler.h
     WindowsCertStore.h

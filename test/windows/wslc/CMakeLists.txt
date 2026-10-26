@@ -16,6 +16,7 @@ target_sources(wsltests PRIVATE
     ${WSLC_TEST_SOURCES}
     ${WSLC_TEST_HEADERS}
     ${CMAKE_SOURCE_DIR}/src/windows/wslcsession/WSLCRestartScheduler.cpp
+    ${CMAKE_SOURCE_DIR}/src/windows/wslcsession/WSLCContainerStateStore.cpp
 )
 
 # N.B. These sources are compiled into wsltests, which is defined in the parent
