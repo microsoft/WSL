@@ -1600,13 +1600,11 @@ void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds)
     // N.B. Nothing between here and the cleanup below may throw — nothing clears m_restart until it is armed.
     bool succeeded = false;
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, restart, &succeeded]() {
-        // N.B. Signalled last so a waiter cannot observe the restart as complete before the failure
-        // cleanup below has published its delete.
-        auto release = wil::scope_exit([&restart]() { restart->Completed.SetEvent(); });
-
         std::shared_ptr<StateTransition> transition;
 
         {
+            // Release restart waiters after publishing failure cleanup, before AttachToTransition can block in Disconnect().
+            auto release = wil::scope_exit([&restart]() { restart->Completed.SetEvent(); });
             auto lifecycleLock = m_lifecycleLock.lock_shared();
             auto lock = m_lock.lock_exclusive();
 
@@ -3320,6 +3318,12 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(
     if (State == WslcContainerStateRunning)
     {
         // The restart's start phase landed, so a later exit must auto-delete an --rm container again.
+        m_restart.reset();
+    }
+    else if (State == WslcContainerStateDeleted && m_restart)
+    {
+        // A restart can adopt a concurrent delete in its stop phase and disconnect the wrapper before reaching its cleanup.
+        m_restart->Completed.SetEvent();
         m_restart.reset();
     }
 
