@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include "LxssHttpProxy.h"
+#include "ProxyBypass.hpp"
 
 #include <winhttp.h>
 #include <notifications.h>
@@ -129,8 +130,10 @@ HttpProxySettings::HttpProxySettings(const WINHTTP_PROXY_SETTINGS_EX& proxySetti
             ProxyBypassesComma = std::accumulate(
                 std::next(std::cbegin(ProxyBypasses)),
                 std::cend(ProxyBypasses),
-                ProxyBypasses.front(),
-                [](std::string previous, const std::string& proxyBypass) { return std::move(previous) + "," + proxyBypass; });
+                proxy::Ipv4WildcardToCidr(ProxyBypasses.front()),
+                [](std::string previous, const std::string& proxyBypass) {
+                    return std::move(previous) + "," + proxy::Ipv4WildcardToCidr(proxyBypass);
+                });
         }
     }
 
