@@ -3387,17 +3387,11 @@ void WSLCSession::CreateNetworkImpl(const WSLCNetworkOptions& Options, LPSTR* Ne
     }
 }
 
-std::optional<ResolvedNetwork> WSLCSession::TryResolveNetwork(const std::string& NetworkNameOrId)
+ResolvedNetwork WSLCSession::ResolveNetwork(const std::string& NetworkNameOrId)
 {
     std::lock_guard networksLock(m_networksLock);
 
-    auto it = FindNetwork(m_networks, NetworkNameOrId);
-    if (it == m_networks.end())
-    {
-        return std::nullopt;
-    }
-
-    return ResolvedNetwork{.Name = it->first, .Id = it->second.Id};
+    return ResolveNetworkReference(m_networks, NetworkNameOrId, m_runtime.Docker());
 }
 
 HRESULT WSLCSession::DeleteNetwork(LPCSTR NetworkNameOrId)
@@ -3415,9 +3409,11 @@ try
 
     std::lock_guard networksLock(m_networksLock);
 
-    auto it = FindNetwork(m_networks, nameOrId);
-    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(nameOrId), it == m_networks.end());
+    // Only session-managed networks can be deleted.
+    const auto network = ResolveNetworkReference(m_networks, nameOrId, m_runtime.Docker());
+    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(nameOrId), !network.Managed);
 
+    auto it = m_networks.find(network.Name);
     const auto& name = it->first;
     const auto& id = it->second.Id;
 
@@ -3494,15 +3490,12 @@ try
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
-    // Built-in networks (bridge, host, none) are not tracked in m_networks, so unresolved
-    // references are passed through and resolved by the engine.
-    const auto resolved = TryResolveNetwork(nameOrId);
-    const std::string& target = resolved ? resolved->Id : nameOrId;
+    const auto resolved = ResolveNetwork(nameOrId);
 
     docker_schema::Network network;
     try
     {
-        network = m_runtime.Docker().InspectNetwork(target);
+        network = m_runtime.Docker().InspectNetwork(resolved.Id);
     }
     catch (const DockerHTTPException& e)
     {

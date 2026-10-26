@@ -195,9 +195,10 @@ void RejectUnsupportedNetworkModes(std::string_view mode)
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidNetworkMode(std::string{mode}), colon != std::string_view::npos);
 }
 
-// Resolves a network name, ID, or ID prefix to the network name. Built-in networks are not tracked in the
-// session, so references that look like an ID are resolved by the engine and accepted only for built-in networks.
-std::string ResolveNetworkReference(const std::string& requested, const std::unordered_map<std::string, NetworkEntry>& sessionNetworks, DockerHTTPClient& dockerClient)
+// Resolves a network name, ID, or ID prefix to the network name. References that look like an ID are resolved by the
+// engine and accepted only for session-managed and built-in networks. Host mode is only selected by the literal "host"
+// name, so an ID that resolves to the host network is not found.
+std::string ResolveContainerNetwork(const std::string& requested, const std::unordered_map<std::string, NetworkEntry>& sessionNetworks, DockerHTTPClient& dockerClient)
 {
     if (IsReservedNetworkName(requested))
     {
@@ -214,20 +215,18 @@ std::string ResolveNetworkReference(const std::string& requested, const std::uno
                              std::all_of(requested.begin(), requested.end(), [](unsigned char ch) { return std::isxdigit(ch); });
     THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(requested), !looksLikeId);
 
-    std::string name;
-    try
+    auto network = ResolveNetworkReference(sessionNetworks, requested, dockerClient);
+    if (network.Managed)
     {
-        name = dockerClient.InspectNetwork(requested).Name;
-    }
-    catch (const DockerHTTPException& e)
-    {
-        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(requested), e.StatusCode() == 404);
-        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to inspect network '%hs'", requested.c_str());
+        return std::move(network.Name);
     }
 
-    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(requested), !IsReservedNetworkName(name));
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_NETWORK_NOT_FOUND,
+        Localization::MessageWslcNetworkNotFound(requested),
+        !IsReservedNetworkName(network.Name) || network.Name == "host");
 
-    return name;
+    return std::move(network.Name);
 }
 
 std::string ResolveNetworkMode(LPCSTR networkMode, bool hasRequestedPorts, const std::unordered_map<std::string, NetworkEntry>& sessionNetworks, DockerHTTPClient& dockerClient)
@@ -259,7 +258,7 @@ std::string ResolveNetworkMode(LPCSTR networkMode, bool hasRequestedPorts, const
     }
 
     // Canonicalize names, IDs, and ID prefixes to the network name so built-in networks get their mode-specific handling.
-    auto name = ResolveNetworkReference(std::string{mode}, sessionNetworks, dockerClient);
+    auto name = ResolveContainerNetwork(std::string{mode}, sessionNetworks, dockerClient);
     THROW_HR_IF_MSG(E_INVALIDARG, name == "none" && hasRequestedPorts, "Port mappings are not supported without networking");
 
     return name;
@@ -394,18 +393,23 @@ std::map<std::string, EndpointConfig> ResolveEndpoints(
         const char* raw = connections[i].NetworkName;
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), !raw || !*raw);
 
-        // Canonicalize names, IDs, and ID prefixes to the network name so duplicates are detected regardless of form.
+        // Reject aliases on built-in and container modes before the network lookup.
         const std::string requested{raw};
-        const auto name = ResolveNetworkReference(requested, sessionNetworks, dockerClient);
+        auto config = ResolveEndpointConfig(connections[i].Settings, connections[i].SettingsCount, requested);
+        const bool hasAliases = config.Aliases.has_value();
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, Localization::MessageWslcAliasRequiresUserDefinedNetwork(), hasAliases && !NetworkSupportsAliases(requested));
+
+        // Canonicalize names, IDs, and ID prefixes to the network name so duplicates are detected regardless of form.
+        const auto name = ResolveContainerNetwork(requested, sessionNetworks, dockerClient);
 
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcDuplicateNetwork(name), name == resolvedMode);
 
         auto [it, inserted] = resolved.try_emplace(name);
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcDuplicateNetwork(name), !inserted);
 
-        auto config = ResolveEndpointConfig(connections[i].Settings, connections[i].SettingsCount, name);
         THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG, Localization::MessageWslcAliasRequiresUserDefinedNetwork(), config.Aliases.has_value() && !NetworkSupportsAliases(name));
+            E_INVALIDARG, Localization::MessageWslcAliasRequiresUserDefinedNetwork(), hasAliases && !NetworkSupportsAliases(name));
 
         THROW_HR_WITH_USER_ERROR_IF(
             WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(requested), name == "host" || name == "none");
@@ -3729,11 +3733,9 @@ void WSLCContainerImpl::ConnectToNetwork(const WSLCNetworkConnectionOptions* Opt
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), !Options->NetworkName || strlen(Options->NetworkName) == 0);
 
-    // Built-in networks are not tracked by the session, so unresolved references are passed through to the engine.
-    const std::string requested{Options->NetworkName};
-    const auto network = m_wslcSession.TryResolveNetwork(requested);
-    const std::string& target = network ? network->Id : requested;
-    const std::string& name = network ? network->Name : requested;
+    const auto network = m_wslcSession.ResolveNetwork(Options->NetworkName);
+    const std::string& target = network.Id;
+    const std::string& name = network.Name;
 
     auto endpointConfig = ResolveEndpointConfig(Options->Settings, Options->SettingsCount, name);
 
@@ -3767,11 +3769,9 @@ void WSLCContainerImpl::DisconnectFromNetwork(LPCSTR NetworkNameOrId)
     THROW_HR_IF(E_POINTER, NetworkNameOrId == nullptr);
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), strlen(NetworkNameOrId) == 0);
 
-    // Built-in networks are not tracked by the session, so unresolved references are passed through to the engine.
-    const std::string requested{NetworkNameOrId};
-    const auto network = m_wslcSession.TryResolveNetwork(requested);
-    const std::string& target = network ? network->Id : requested;
-    const std::string& name = network ? network->Name : requested;
+    const auto network = m_wslcSession.ResolveNetwork(NetworkNameOrId);
+    const std::string& target = network.Id;
+    const std::string& name = network.Name;
 
     auto lock = m_lock.lock_shared();
 

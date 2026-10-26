@@ -10173,6 +10173,7 @@ class WSLCTests
         };
 
         const auto bridgeId = getNetworkId("bridge");
+        const auto hostId = getNetworkId("host");
         const auto noneId = getNetworkId("none");
 
         // A built-in network's full ID or ID prefix resolves to the built-in network name.
@@ -10239,6 +10240,15 @@ class WSLCTests
             ValidateCOMErrorMessage(std::format(L"Network not found: '{}'", std::wstring(noneId.begin(), noneId.end())).c_str());
         }
 
+        // Host mode is only selected by name, so the host network's ID or ID prefix is not found.
+        for (const auto& reference : {hostId, hostId.substr(0, 12)})
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-builtin-id-host", {"sleep", "99999"}, {}, reference);
+
+            VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, launcher.LaunchNoThrow(*m_defaultSession).first);
+            ValidateCOMErrorMessage(std::format(L"Network not found: '{}'", std::wstring(reference.begin(), reference.end())).c_str());
+        }
+
         // An ID that matches no network is not found.
         {
             const std::string unknownId(64, '0');
@@ -10246,6 +10256,87 @@ class WSLCTests
 
             VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, launcher.LaunchNoThrow(*m_defaultSession).first);
             ValidateCOMErrorMessage(std::format(L"Network not found: '{}'", std::wstring(unknownId.begin(), unknownId.end())).c_str());
+        }
+    }
+
+    WSLC_TEST_METHOD(NetworkPrefixAmbiguousWithBuiltinTest)
+    {
+        auto getNetworkId = [&](LPCSTR name) {
+            wil::unique_cotaskmem_ansistring output;
+            VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(name, &output));
+            return wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get()).Id;
+        };
+
+        std::string builtinFirstChars;
+        for (const auto* name : {"bridge", "host", "none"})
+        {
+            builtinFirstChars += getNetworkId(name)[0];
+        }
+
+        // Recreate a managed network until its ID shares a first character with a built-in network.
+        const std::string networkName = "builtin-prefix-collision";
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        std::string prefix;
+        for (int attempt = 0; prefix.empty(); attempt++)
+        {
+            VERIFY_IS_LESS_THAN(attempt, 100);
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+            WSLCNetworkOptions netOpts{};
+            netOpts.Name = networkName.c_str();
+            netOpts.Driver = "bridge";
+            VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&netOpts, nullptr));
+
+            const auto id = getNetworkId(networkName.c_str());
+            if (builtinFirstChars.find(id[0]) != std::string::npos)
+            {
+                prefix = id.substr(0, 1);
+            }
+        }
+
+        const auto expectedMessage = std::format(
+            L"Multiple networks match '{}'; use a longer ID or the network name.", std::wstring(prefix.begin(), prefix.end()));
+
+        // Inspect and delete.
+        {
+            wil::unique_cotaskmem_ansistring output;
+            VERIFY_ARE_EQUAL(WSLC_E_NETWORK_PREFIX_AMBIGUOUS, m_defaultSession->InspectNetwork(prefix.c_str(), &output));
+            ValidateCOMErrorMessage(expectedMessage.c_str());
+
+            VERIFY_ARE_EQUAL(WSLC_E_NETWORK_PREFIX_AMBIGUOUS, m_defaultSession->DeleteNetwork(prefix.c_str()));
+            ValidateCOMErrorMessage(expectedMessage.c_str());
+        }
+
+        // Container create with the prefix as the primary network.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-prefix-collision-primary", {"sleep", "99999"}, {}, prefix);
+
+            VERIFY_ARE_EQUAL(WSLC_E_NETWORK_PREFIX_AMBIGUOUS, launcher.LaunchNoThrow(*m_defaultSession).first);
+            ValidateCOMErrorMessage(expectedMessage.c_str());
+        }
+
+        // Container create with the prefix as an additional network.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-prefix-collision-additional", {"sleep", "99999"}, {}, "bridge");
+            launcher.AddAdditionalNetwork(prefix);
+
+            VERIFY_ARE_EQUAL(WSLC_E_NETWORK_PREFIX_AMBIGUOUS, launcher.LaunchNoThrow(*m_defaultSession).first);
+            ValidateCOMErrorMessage(expectedMessage.c_str());
+        }
+
+        // Connect and disconnect.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-prefix-collision-connect", {"sleep", "99999"}, {}, "bridge");
+            auto container = launcher.Launch(*m_defaultSession);
+
+            WSLCNetworkConnectionOptions options{};
+            options.NetworkName = prefix.c_str();
+            VERIFY_ARE_EQUAL(WSLC_E_NETWORK_PREFIX_AMBIGUOUS, container.Get().ConnectToNetwork(&options));
+            ValidateCOMErrorMessage(expectedMessage.c_str());
+
+            VERIFY_ARE_EQUAL(WSLC_E_NETWORK_PREFIX_AMBIGUOUS, container.Get().DisconnectFromNetwork(prefix.c_str()));
+            ValidateCOMErrorMessage(expectedMessage.c_str());
         }
     }
 
