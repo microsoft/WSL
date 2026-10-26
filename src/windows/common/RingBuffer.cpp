@@ -69,12 +69,9 @@ std::vector<std::string> RingBuffer::GetLastDelimitedStrings(char Delimiter, siz
             if (endIndex.has_value())
             {
                 results.emplace(results.begin(), &end[i], endIndex.value() - i);
-                endIndex.reset();
             }
-            else
-            {
-                endIndex = i - 1;
-            }
+
+            endIndex = i - 1;
         }
     }
 
@@ -83,7 +80,7 @@ std::vector<std::string> RingBuffer::GetLastDelimitedStrings(char Delimiter, siz
         return results;
     }
 
-    std::string partial;
+    std::optional<std::string> partial;
     if (endIndex.has_value())
     {
         partial = std::string{&end[0], endIndex.value()};
@@ -99,32 +96,29 @@ std::vector<std::string> RingBuffer::GetLastDelimitedStrings(char Delimiter, siz
 
         if (Delimiter == begin[i - 1])
         {
-            if (!partial.empty())
+            if (partial.has_value())
             {
                 // The debug CRT will fastfail if begin[size] is accessed
                 // But in this case it's not a problem because begin.size() - i would be == 0
                 std::string partial_begin{&begin.data()[i], begin.size() - i};
-                results.emplace(results.begin(), partial_begin + partial);
-                partial.clear();
+                results.emplace(results.begin(), partial_begin + partial.value());
+                partial.reset();
             }
             else if (endIndex.has_value())
             {
                 results.emplace(results.begin(), &begin.data()[i], endIndex.value() - i);
-                endIndex.reset();
             }
-            else
-            {
-                endIndex = i - 1;
-            }
+
+            endIndex = i - 1;
         }
     }
 
     if (results.size() < Count)
     {
         // May have lost some data, or this could be the very first line logged.
-        if (!partial.empty())
+        if (partial.has_value())
         {
-            results.emplace(results.begin(), partial);
+            results.emplace(results.begin(), std::string{begin} + partial.value());
         }
         else if (endIndex.has_value())
         {
