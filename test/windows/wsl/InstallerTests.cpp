@@ -1252,6 +1252,9 @@ class InstallerTests
 
         InstallMsix();
 
+        // MsiBeginTransaction returns a transaction ID, not a closable MSI handle.
+        // unique_msi_handle would call MsiCloseHandle, which can close an unrelated handle with the same value.
+        // The rollback guard below ends the transaction via MsiEndTransaction.
         MSIHANDLE transactionId{};
         wil::unique_handle ownerChangedEvent;
         VERIFY_ARE_EQUAL(ERROR_SUCCESS, MsiBeginTransactionW(L"Installer contention test", 0, &transactionId, &ownerChangedEvent));
