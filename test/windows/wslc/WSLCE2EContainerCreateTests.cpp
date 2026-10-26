@@ -1223,6 +1223,18 @@ class WSLCE2EContainerCreateTests
         VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(TestNetworkName), inspect.HostConfig.NetworkMode);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Network_BridgeById)
+    {
+        const auto bridgeId = wsl::shared::string::MultiByteToWide(InspectNetwork(L"bridge").Id);
+
+        auto result = RunWslc(
+            std::format(L"container create --name {} --network {} {} true", WslcContainerName, bridgeId, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_ARE_EQUAL(std::string("bridge"), inspect.HostConfig.NetworkMode);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Network_EmptyValue_Rejected)
     {
         auto result = RunWslc(std::format(L"container create --network \"\" --name {} {}", WslcContainerName, DebianImage.NameAndTag()));

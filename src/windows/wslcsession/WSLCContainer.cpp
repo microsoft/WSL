@@ -43,6 +43,7 @@ using wsl::windows::service::wslc::DockerEventTracker;
 using wsl::windows::service::wslc::DockerHTTPClient;
 using wsl::windows::service::wslc::DockerHTTPException;
 using wsl::windows::service::wslc::IORelay;
+using wsl::windows::service::wslc::IsReservedNetworkName;
 using wsl::windows::service::wslc::IWSLCVolume;
 using wsl::windows::service::wslc::NetworkEntry;
 using wsl::windows::service::wslc::RelayedProcessIO;
@@ -194,6 +195,41 @@ void RejectUnsupportedNetworkModes(std::string_view mode)
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidNetworkMode(std::string{mode}), colon != std::string_view::npos);
 }
 
+// Resolves a network name, ID, or ID prefix to the network name. Built-in networks are not tracked in the
+// session, so references that look like an ID are resolved by the engine and accepted only for built-in networks.
+std::string ResolveNetworkReference(const std::string& requested, const std::unordered_map<std::string, NetworkEntry>& sessionNetworks, DockerHTTPClient& dockerClient)
+{
+    if (IsReservedNetworkName(requested))
+    {
+        return requested;
+    }
+
+    if (const auto network = FindNetwork(sessionNetworks, requested); network != sessionNetworks.end())
+    {
+        return network->first;
+    }
+
+    constexpr size_t c_maxNetworkIdLength = 64;
+    const bool looksLikeId = !requested.empty() && requested.size() <= c_maxNetworkIdLength &&
+                             std::all_of(requested.begin(), requested.end(), [](unsigned char ch) { return std::isxdigit(ch); });
+    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(requested), !looksLikeId);
+
+    std::string name;
+    try
+    {
+        name = dockerClient.InspectNetwork(requested).Name;
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(requested), e.StatusCode() == 404);
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to inspect network '%hs'", requested.c_str());
+    }
+
+    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(requested), !IsReservedNetworkName(name));
+
+    return name;
+}
+
 std::string ResolveNetworkMode(LPCSTR networkMode, bool hasRequestedPorts, const std::unordered_map<std::string, NetworkEntry>& sessionNetworks, DockerHTTPClient& dockerClient)
 {
     const std::string_view mode = (networkMode == nullptr || *networkMode == '\0') ? std::string_view{"bridge"} : networkMode;
@@ -203,17 +239,6 @@ std::string ResolveNetworkMode(LPCSTR networkMode, bool hasRequestedPorts, const
 
     // N.B. Docker validates incompatible combinations (e.g. host/none/container: with additional networks)
     // and returns clear error messages, so we don't duplicate that validation here.
-
-    if (mode == "host")
-    {
-        return "host";
-    }
-
-    if (mode == "none")
-    {
-        THROW_HR_IF_MSG(E_INVALIDARG, hasRequestedPorts, "Port mappings are not supported without networking");
-        return "none";
-    }
 
     if (mode.starts_with(c_containerNetworkPrefix))
     {
@@ -233,19 +258,11 @@ std::string ResolveNetworkMode(LPCSTR networkMode, bool hasRequestedPorts, const
         }
     }
 
-    // User-defined network: bridge is the built-in one and bypasses the session lookup.
-    if (mode == "bridge")
-    {
-        return "bridge";
-    }
+    // Canonicalize names, IDs, and ID prefixes to the network name so built-in networks get their mode-specific handling.
+    auto name = ResolveNetworkReference(std::string{mode}, sessionNetworks, dockerClient);
+    THROW_HR_IF_MSG(E_INVALIDARG, name == "none" && hasRequestedPorts, "Port mappings are not supported without networking");
 
-    // Canonicalize names, IDs, and ID prefixes to the network name.
-    const std::string requested{mode};
-    const auto network = FindNetwork(sessionNetworks, requested);
-    THROW_HR_WITH_USER_ERROR_IF(
-        WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(requested), network == sessionNetworks.end());
-
-    return network->first;
+    return name;
 }
 
 // Unknown Settings keys are rejected rather than silently dropped, so callers get a clear error.
@@ -358,7 +375,11 @@ EndpointConfig ResolveEndpointConfig(const KeyValuePair* settings, ULONG count, 
 }
 
 std::map<std::string, EndpointConfig> ResolveEndpoints(
-    const WSLCNetworkConnection* connections, ULONG count, std::string_view resolvedMode, const std::unordered_map<std::string, NetworkEntry>& sessionNetworks)
+    const WSLCNetworkConnection* connections,
+    ULONG count,
+    std::string_view resolvedMode,
+    const std::unordered_map<std::string, NetworkEntry>& sessionNetworks,
+    DockerHTTPClient& dockerClient)
 {
     std::map<std::string, EndpointConfig> resolved;
     if (count == 0)
@@ -374,14 +395,8 @@ std::map<std::string, EndpointConfig> ResolveEndpoints(
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), !raw || !*raw);
 
         // Canonicalize names, IDs, and ID prefixes to the network name so duplicates are detected regardless of form.
-        std::string name{raw};
-        const bool isBridge = name == "bridge";
-        const auto network = isBridge ? sessionNetworks.end() : FindNetwork(sessionNetworks, name);
-        const bool found = network != sessionNetworks.end();
-        if (found)
-        {
-            name = network->first;
-        }
+        const std::string requested{raw};
+        const auto name = ResolveNetworkReference(requested, sessionNetworks, dockerClient);
 
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcDuplicateNetwork(name), name == resolvedMode);
 
@@ -392,7 +407,8 @@ std::map<std::string, EndpointConfig> ResolveEndpoints(
         THROW_HR_WITH_USER_ERROR_IF(
             E_INVALIDARG, Localization::MessageWslcAliasRequiresUserDefinedNetwork(), config.Aliases.has_value() && !NetworkSupportsAliases(name));
 
-        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), !isBridge && !found);
+        THROW_HR_WITH_USER_ERROR_IF(
+            WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(requested), name == "host" || name == "none");
 
         it->second = std::move(config);
     }
@@ -2738,7 +2754,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     auto networkMode = ResolveNetworkMode(containerOptions.ContainerNetwork.NetworkMode, !ports.empty(), sessionNetworks, DockerClient);
 
     auto endpoints = ResolveEndpoints(
-        containerOptions.ContainerNetwork.Networks, containerOptions.ContainerNetwork.NetworksCount, networkMode, sessionNetworks);
+        containerOptions.ContainerNetwork.Networks, containerOptions.ContainerNetwork.NetworksCount, networkMode, sessionNetworks, DockerClient);
 
     auto primaryConfig =
         ResolveEndpointConfig(containerOptions.ContainerNetwork.Settings, containerOptions.ContainerNetwork.SettingsCount, networkMode);
