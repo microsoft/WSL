@@ -348,6 +348,43 @@ class InstallerTests
         VERIFY_ARE_EQUAL(version, expectedVersion);
         VERIFY_IS_FALSE(GetMsiProductCode().empty());
 
+        constexpr DWORD c_serviceAcgMinBuild = 27841;
+        const auto buildNumber = wsl::windows::common::helpers::GetWindowsVersion().BuildNumber;
+        if (buildNumber >= c_serviceAcgMinBuild)
+        {
+            constexpr DWORD c_acgMitigationFlag = 0x800;
+            const auto mitigationFlags =
+                ReadDword(HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Services\\WSLService", L"MitigationFlags", 0);
+
+            VERIFY_ARE_EQUAL(mitigationFlags & c_acgMitigationFlag, c_acgMitigationFlag);
+
+            const WslKeepAlive keepAlive;
+
+            const wil::unique_schandle service{OpenServiceW(m_scm.get(), L"WSLService", SERVICE_QUERY_STATUS)};
+            VERIFY_IS_NOT_NULL(service);
+            const auto [state, pid] = GetServiceState(service.get());
+
+            VERIFY_ARE_EQUAL(state, static_cast<DWORD>(SERVICE_RUNNING));
+            VERIFY_ARE_NOT_EQUAL(pid, 0u);
+
+            const wil::unique_handle process{OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid)};
+            VERIFY_IS_NOT_NULL(process);
+
+            PROCESS_MITIGATION_DYNAMIC_CODE_POLICY dynamicCodePolicy{};
+
+            VERIFY_WIN32_BOOL_SUCCEEDED(
+                GetProcessMitigationPolicy(process.get(), ProcessDynamicCodePolicy, &dynamicCodePolicy, sizeof(dynamicCodePolicy)));
+
+            VERIFY_IS_TRUE(dynamicCodePolicy.ProhibitDynamicCode);
+            VERIFY_IS_FALSE(dynamicCodePolicy.AllowThreadOptOut);
+            VERIFY_IS_FALSE(dynamicCodePolicy.AllowRemoteDowngrade);
+        }
+        else
+        {
+            VERIFY_ARE_EQUAL(
+                -1, ReadDword(HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Services\\WSLService", L"MitigationFlags", -1));
+        }
+
         // TODO: check wslsupport, wslapi and p9rdr
     }
 
