@@ -20,8 +20,8 @@ Abstract:
 
 #define LXT_NAME "wslpath"
 
-#define WSLPATH_ESCAPE_NAME "wslpath_foo\\:bar"
-#define WSLPATH_ESCAPE_NAME_ESCAPED "wslpath_foo\uf05c\uf03abar"
+#define WSLPATH_ESCAPE_NAME "wslpath_foo\\:：？｜bar"
+#define WSLPATH_ESCAPE_NAME_ESCAPED "wslpath_foo\uf05c\uf03a：？｜bar"
 #define WSLPATH_ESCAPE_DIR "/mnt/c/" WSLPATH_ESCAPE_NAME
 #define WSLPATH_ESCAPE_DIR_ESCAPED "/mnt/c/" WSLPATH_ESCAPE_NAME_ESCAPED
 #define WSLPATH_ESCAPE_DIR_WIN "C:\\" WSLPATH_ESCAPE_NAME_ESCAPED
