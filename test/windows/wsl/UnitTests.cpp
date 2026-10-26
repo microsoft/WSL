@@ -3157,12 +3157,16 @@ Usage:
         const std::wstring wslConfigPath = wsl::windows::common::helpers::GetWslConfigPath();
         const std::wstring nonExistentFile = L"DoesNotExist";
         WslConfigChange configChange(LxssGenerateTestConfig({.kernel = nonExistentFile.c_str()}));
-        ValidateOutput(
-            L"echo ok",
-            FormatErrorMessage(
-                wsl::shared::Localization::MessageCustomKernelNotFound(wslConfigPath, nonExistentFile),
-                L"Wsl/Service/CreateInstance/CreateVm/WSL_E_CUSTOM_KERNEL_NOT_FOUND"),
-            L"");
+        for (const auto& kernelPath : {nonExistentFile, nonExistentFile + L"\\kernel"})
+        {
+            configChange.Update(LxssGenerateTestConfig({.kernel = kernelPath}));
+            ValidateOutput(
+                L"echo ok",
+                FormatErrorMessage(
+                    wsl::shared::Localization::MessageCustomKernelNotFound(wslConfigPath, kernelPath),
+                    L"Wsl/Service/CreateInstance/CreateVm/WSL_E_CUSTOM_KERNEL_NOT_FOUND"),
+                L"");
+        }
 
         configChange.Update(LxssGenerateTestConfig({.kernelModules = nonExistentFile.c_str()}));
         ValidateOutput(
@@ -7622,6 +7626,98 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                 wsl::shared::Localization::MessageFailedToAttachDisk(vhdPath, GetSystemErrorString(E_ACCESSDENIED)),
                 L"Wsl/Service/CreateInstance/CreateVm/E_ACCESSDENIED"),
             L"");
+    }
+
+    WSL2_TEST_METHOD(CustomBootFilesRequireReadAccess)
+    {
+#ifdef WSL_DEV_INSTALL_PATH
+
+        const std::filesystem::path toolsPath = WSL_DEV_INSTALL_PATH;
+
+#else
+        const auto toolsPath = std::filesystem::path(wsl::windows::common::wslutil::GetMsiPackagePath().value()) / L"tools";
+
+#endif
+
+        const auto impersonationToken = GetNonElevatedToken(TokenImpersonation);
+        wil::unique_handle userToken;
+        THROW_IF_WIN32_BOOL_FALSE(
+            DuplicateTokenEx(impersonationToken.get(), TOKEN_ALL_ACCESS, nullptr, SecurityImpersonation, TokenPrimary, &userToken));
+        VERIFY_IS_FALSE(wsl::windows::common::security::IsTokenElevated(userToken.get()));
+
+        const auto tokenUser = wil::get_token_information<TOKEN_USER>(userToken.get());
+        wil::unique_hlocal_string userSid;
+        THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSidW(tokenUser->User.Sid, &userSid));
+
+        const auto testFolder = wsl::windows::common::filesystem::GetCanonicalPath("read-access-test");
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(testFolder); });
+        std::filesystem::create_directories(testFolder);
+
+        for (const bool isKernel : {true, false})
+        {
+            const auto fileName = isKernel ? L"kernel" : L"system.vhd";
+            const auto path = testFolder / fileName;
+            VERIFY_IS_TRUE(CopyFileW((toolsPath / fileName).c_str(), path.c_str(), TRUE));
+
+            WslConfigChange config{
+                isKernel ? LxssGenerateTestConfig({.kernel = path.wstring()}) : LxssGenerateTestConfig({.systemDistro = path.wstring()})};
+
+            for (const bool allowRead : {true, false})
+            {
+                WslShutdown();
+
+                // Keep SYSTEM/VMWP access and attribute queries working, but deny user data access in the second pass.
+                // Administrators own the file so the user cannot grant VMWP access by modifying its DACL.
+                const auto sddl = std::format(
+                    L"O:BAD:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;FA;;;S-1-5-83-0)(A;;0x{:x};;;{})",
+                    allowRead ? FILE_GENERIC_READ : FILE_GENERIC_READ & ~FILE_READ_DATA,
+                    userSid.get());
+
+                wil::unique_hlocal_security_descriptor descriptor;
+                THROW_IF_WIN32_BOOL_FALSE(
+                    ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.c_str(), SDDL_REVISION_1, &descriptor, nullptr));
+
+                THROW_IF_WIN32_BOOL_FALSE(SetFileSecurityW(
+                    path.c_str(),
+                    OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
+                    descriptor.get()));
+
+                {
+                    const auto runAsUser = wil::impersonate_token(impersonationToken.get());
+                    VERIFY_ARE_NOT_EQUAL(INVALID_FILE_ATTRIBUTES, GetFileAttributesW(path.c_str()));
+
+                    wil::unique_hfile file{CreateFileW(
+                        path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+
+                    const auto error = GetLastError();
+                    VERIFY_ARE_EQUAL(allowRead, static_cast<bool>(file));
+
+                    if (!allowRead)
+                    {
+                        VERIFY_ARE_EQUAL(static_cast<DWORD>(ERROR_ACCESS_DENIED), error);
+                    }
+                }
+
+                const auto out = LxsstuLaunchWslAndCaptureOutput(L"echo OK", allowRead ? 0 : -1, nullptr, userToken.get()).first;
+                if (allowRead)
+                {
+                    VERIFY_ARE_EQUAL(out, L"OK\n");
+                }
+                else if (isKernel)
+                {
+                    VERIFY_ARE_NOT_EQUAL(out.find(L"Wsl/Service/CreateInstance/CreateVm/E_ACCESSDENIED"), std::wstring::npos);
+                }
+                else
+                {
+                    VERIFY_ARE_EQUAL(
+                        out,
+                        FormatErrorMessage(
+                            wsl::shared::Localization::MessageFailedToAttachDisk(path.wstring(), GetSystemErrorString(E_ACCESSDENIED)),
+                            L"Wsl/Service/CreateInstance/CreateVm/E_ACCESSDENIED"));
+                }
+            }
+        }
     }
 
     WSL2_TEST_METHOD(CustomVhdsInUserProfile)

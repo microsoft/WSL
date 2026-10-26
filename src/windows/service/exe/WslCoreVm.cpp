@@ -230,12 +230,22 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     else
     {
         const auto runAsUser = wil::impersonate_token(m_userToken.get());
-        if (!wsl::windows::common::filesystem::FileExists(m_vmConfig.KernelPath.c_str()))
+
+        wil::unique_hfile kernel{CreateFileW(
+            m_vmConfig.KernelPath.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+
+        if (!kernel)
         {
-            THROW_HR_WITH_USER_ERROR(
-                WSL_E_CUSTOM_KERNEL_NOT_FOUND,
-                Localization::MessageCustomKernelNotFound(
-                    wsl::windows::common::helpers::GetWslConfigPath(m_userToken.get()), m_vmConfig.KernelPath.c_str()));
+            const auto error = GetLastError();
+            if (error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND)
+            {
+                THROW_HR_WITH_USER_ERROR(
+                    WSL_E_CUSTOM_KERNEL_NOT_FOUND,
+                    Localization::MessageCustomKernelNotFound(
+                        wsl::windows::common::helpers::GetWslConfigPath(m_userToken.get()), m_vmConfig.KernelPath.c_str()));
+            }
+
+            THROW_WIN32_MSG(error, "Failed to open kernel: '%ls'", m_vmConfig.KernelPath.c_str());
         }
 
         // Direct boot is not supported on ARM64. Modify the rootfs directory to be a temporary directory that contains
