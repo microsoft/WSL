@@ -85,6 +85,129 @@ function Collect-WindowsNetworkState {
     try { Get-NetUdpEndpoint | Out-File -FilePath "$Folder/Get-NetUdpEndpoint_$ReproStep.log" -Append } catch {}
 }
 
+function Collect-DistroSparseState {
+    param (
+        $Folder
+    )
+
+    $distributions = @()
+    $collectionError = $null
+    $registryPath = "Registry::HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Lxss"
+
+    try
+    {
+        if (Test-Path -LiteralPath $registryPath -ErrorAction Stop)
+        {
+            if (-not ([System.Management.Automation.PSTypeName]'Wsl.Diagnostics.VhdFileInfo').Type)
+            {
+                Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+
+namespace Wsl.Diagnostics
+{
+    public static class VhdFileInfo
+    {
+        [StructLayout(LayoutKind.Sequential)]
+        public struct StandardInfo
+        {
+            public long AllocationSize;
+            public long EndOfFile;
+            public uint NumberOfLinks;
+            [MarshalAs(UnmanagedType.U1)] public bool DeletePending;
+            [MarshalAs(UnmanagedType.U1)] public bool Directory;
+        }
+
+        [DllImport("kernel32.dll", EntryPoint = "CreateFileW", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern SafeFileHandle CreateFile(
+            string path, uint access, uint sharing, IntPtr securityAttributes, uint creation, uint flags, IntPtr template);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GetFileInformationByHandleEx(
+            SafeFileHandle file, int infoClass, out StandardInfo info, uint size);
+
+        public static StandardInfo GetSizes(string path)
+        {
+            using (var file = CreateFile(path, 0x80, 0x7, IntPtr.Zero, 3, 0x80, IntPtr.Zero))
+            {
+                if (file.IsInvalid)
+                {
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                }
+
+                StandardInfo info;
+                if (!GetFileInformationByHandleEx(file, 1, out info, (uint)Marshal.SizeOf(typeof(StandardInfo))))
+                {
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                }
+
+                return info;
+            }
+        }
+    }
+}
+'@ -ErrorAction Stop
+            }
+
+            foreach ($key in Get-ChildItem -LiteralPath $registryPath -ErrorAction Stop)
+            {
+                $entry = [ordered]@{
+                    DistroId = $key.PSChildName
+                    Name = $null
+                    SparseState = "Unknown"
+                    VhdLogicalBytes = $null
+                    VhdAllocatedBytes = $null
+                    Error = $null
+                }
+
+                try
+                {
+                    $distro = Get-ItemProperty -LiteralPath $key.PSPath -ErrorAction Stop
+                    $name = $distro.PSObject.Properties["DistributionName"]
+                    if ($null -ne $name) { $entry.Name = $name.Value }
+
+                    $flags = $distro.PSObject.Properties["Flags"]
+                    if ($null -eq $flags) { throw "Distribution flags are missing" }
+                    if (([int]$flags.Value -band 0x8) -eq 0) { continue }
+
+                    $basePath = $distro.PSObject.Properties["BasePath"]
+                    if ($null -eq $basePath -or [string]::IsNullOrWhiteSpace($basePath.Value)) { throw "Distribution base path is missing" }
+
+                    $vhdFileName = $distro.PSObject.Properties["VhdFileName"]
+                    $fileName = if ($null -eq $vhdFileName) { "ext4.vhdx" } else { $vhdFileName.Value }
+                    $vhdPath = Join-Path -Path $basePath.Value -ChildPath $fileName
+                    $vhd = Get-Item -LiteralPath $vhdPath -Force -ErrorAction Stop
+                    if ($vhd -isnot [System.IO.FileInfo]) { throw "VHD path is not a file" }
+
+                    $entry.SparseState = if (($vhd.Attributes -band [System.IO.FileAttributes]::SparseFile) -ne 0) { "Sparse" } else { "NonSparse" }
+                    $size = [Wsl.Diagnostics.VhdFileInfo]::GetSizes($vhdPath)
+                    $entry.VhdLogicalBytes = $size.EndOfFile
+                    $entry.VhdAllocatedBytes = $size.AllocationSize
+                }
+                catch
+                {
+                    $entry.Error = $_.Exception.Message
+                }
+
+                $distributions += [pscustomobject]$entry
+            }
+        }
+    }
+    catch
+    {
+        $collectionError = $_.Exception.Message
+        Write-Warning "Unable to enumerate WSL distributions: $collectionError"
+    }
+
+    [pscustomobject]@{
+        Collected = (Get-Date -Format "yyyy-MM-dd HH:mm:ss K")
+        Distributions = $distributions
+        Error = $collectionError
+    } | ConvertTo-Json -Depth 3 | Out-File -FilePath "$Folder/distro-info.json" -Encoding utf8
+}
+
 $folder = "WslLogs-" + (Get-Date -Format "yyyy-MM-dd_HH-mm-ss")
 mkdir -p $folder | Out-Null
 
@@ -181,6 +304,7 @@ if ($LogProfile -eq "networking")
 }
 
 reg.exe export HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Lxss $folder/HKCU.txt 2>&1 | Out-Null
+Collect-DistroSparseState -Folder $folder
 reg.exe export HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Lxss $folder/HKLM.txt 2>&1 | Out-Null
 reg.exe export HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\P9NP $folder/P9NP.txt 2>&1 | Out-Null
 reg.exe export HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\WinSock2 $folder/Winsock2.txt 2>&1 | Out-Null
