@@ -1,0 +1,247 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    HcsVirtualMachineBackend.h
+
+Abstract:
+
+    Implementation of IVirtualMachineBackend - represents a single HCS-based VM instance.
+
+--*/
+
+#pragma once
+
+#include <atomic>
+#include "IVirtualMachineBackend.h"
+#include "GuestDeviceManager.h"
+#include "hcs.hpp"
+
+class HcsVirtualMachineBackend : public IVirtualMachineBackend
+{
+public:
+    ~HcsVirtualMachineBackend() noexcept override;
+
+    static std::unique_ptr<HcsVirtualMachineBackend> Create(const VmCreateRequest& Request);
+    static VmPlatformCapabilities QueryCapabilities();
+
+    // N.B. Transitional escape hatches for WSL networking implementations that still operate
+    // directly on HCS and GuestDeviceManager. The returned HCS handle is valid only while this
+    // backend remains alive and has not been terminated. New backend-independent code must use
+    // IVirtualMachineBackend instead.
+    HCS_SYSTEM GetComputeSystemHandle() const;
+    std::shared_ptr<GuestDeviceManager> GetGuestDeviceManager() const;
+
+    VmPlatformCapabilities GetCapabilities() const override;
+    VmDescription GetDescription() const override;
+    VmState GetState() const override;
+    VmTerminationInformation GetTerminationReason() const override;
+    wil::shared_event GetTerminationEvent() const override;
+    wil::shared_event GetCrashEvent() const override;
+    std::optional<std::filesystem::path> GetCrashLogPath() const override;
+    void Start() override;
+    void Terminate() override;
+
+    VmGuestListener CreateGuestListener(GuestServicePort Port) override;
+    wil::unique_socket ConnectGuest(GuestServicePort Port) override;
+    void CloseGuestListener(VmListenerId Listener) override;
+
+    VmDiskAttachment AttachDisk(const VmDiskRequest& Request) override;
+    std::vector<VmDiskAttachment> GetAttachedDisks() const override;
+    void DetachDisk(VmDiskId Disk) override;
+
+    VmPersistentMemoryDevice AddPersistentMemory(const VmPersistentMemoryRequest& Request) override;
+    VmGpuAttachment AddGpu(const VmGpuRequest& Request) override;
+
+    VmFileSystemDevice CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request) override;
+    std::optional<VmFileSystemDevice> GetFileSystemDevice(const VmFileSystemDevicePredicate& Predicate) const override;
+    VmFileSystemDevice GetFileSystemDeviceStatus(VmDeviceId Device) override;
+    VmFileSystemShare AddFileSystemShare(VmDeviceId Device, const VmFileSystemShareRequest& Request) override;
+    std::optional<VmFileSystemShare> GetFileSystemShare(const VmFileSystemSharePredicate& Predicate) const override;
+    void RemoveFileSystemShare(VmShareId Share) override;
+    VmSharedMemoryDevice AddSharedMemory(const VmSharedMemoryRequest& Request) override;
+    void ConfigureGuestDma(const VmGuestDmaRequest& Request) override;
+    void RemoveDevice(VmDeviceId Device) override;
+
+    VmNetworkAttachment AddNetworkAdapter(const VmNetworkAdapterRequest& Request) override;
+    void UpdateNetworkAdapter(VmDeviceId Device, const VmNetworkConfiguration& Configuration) override;
+    void RemoveNetworkAdapter(VmDeviceId Device) override;
+    VmPortBinding BindPort(VmDeviceId Device, const VmPortBindingRequest& Request) override;
+    void UnbindPort(VmPortBindingId Binding) override;
+    IpAddress CreateVirtualAddress(VmDeviceId Device, const IpAddress& Destination) override;
+    void CreateDnsRecord(VmDeviceId Device, const VmDnsRecord& Record) override;
+
+private:
+    struct HcsDisk
+    {
+        wsl::windows::common::disk::DiskStateFlags Flags{};
+        // Timeout applied when the host disk state changes performed to attach the disk are undone.
+        std::chrono::milliseconds DeviceTimeout{wsl::windows::common::disk::c_defaultDiskTimeoutMs};
+        // Identity used to grant access to a user-owned VHD, retained for cleanup.
+        wil::shared_handle UserToken;
+        wil::unique_hfile BackingFile;
+    };
+
+    using AttachedDisk = VmResource<VmDiskAttachment, HcsDisk>;
+
+    struct VmConfiguration
+    {
+        VmDescription Description;
+        wsl::windows::common::hcs::ComputeSystem Settings;
+        // Disks attached as part of the compute system settings, tracked so that the host state
+        // changes made to attach them are undone when the VM goes away.
+        std::map<std::uint64_t, AttachedDisk> BootDisks;
+        std::uint64_t NextDiskId = 1;
+    };
+
+    struct HcsFileSystemDevice
+    {
+        // Required effective identity, resolved from the request or VM identity at creation.
+        wil::shared_handle UserToken;
+        // Mount options applied when the virtio-fs device is created.
+        std::wstring MountOptions;
+        wil::com_ptr<IPlan9FileSystem> Plan9Server;
+    };
+
+    using FileSystemDevice = VmResource<VmFileSystemDevice, HcsFileSystemDevice>;
+    using FileSystemDeviceMap = std::map<std::uint64_t, FileSystemDevice>;
+
+    struct HcsFileSystemShare
+    {
+        // Effective options used to distinguish equivalent requests from name collisions.
+        std::wstring MountOptions;
+        wsl::windows::common::hcs::Plan9ShareFlags Plan9Flags{};
+        // Token the share was created with, if any. A Plan 9 share is removed under the same identity
+        // that added it. Unset shares fall back to the VM identity token.
+        wil::shared_handle UserToken;
+    };
+
+    using FileSystemShare = VmResource<VmFileSystemShare, HcsFileSystemShare>;
+
+    struct HcsNetworkAdapter
+    {
+        // Resource path the adapter was added at. Set only for host endpoint networks, which are
+        // removed from the compute system at the same path that added them.
+        std::wstring ResourcePath;
+    };
+
+    using NetworkAdapter = VmResource<VmNetworkAttachment, HcsNetworkAdapter>;
+
+    HcsVirtualMachineBackend();
+    void Initialize(const VmCreateRequest& Request);
+    VmConfiguration BuildConfiguration(const VmCreateRequest& Request);
+    static void CALLBACK OnSystemEvent(HCS_EVENT* Event, void* Context) noexcept;
+    void OnCrash(PCWSTR Details);
+    void OnExit(const HCS_EVENT* Event);
+    void CleanupAttachedDisks(std::map<std::uint64_t, AttachedDisk>&& Disks) noexcept;
+    std::shared_ptr<VmGuestListenerState> ConfigureGuestListener(const VmGuestListener& Listener) override;
+
+    _Requires_lock_held_(m_lock)
+    void CloseGuestDevicesLocked() noexcept;
+
+    _Requires_lock_held_(m_lock)
+    std::uint32_t ReserveLunLocked(const std::optional<VmScsiPlacement>& Placement) const;
+
+    _Requires_lock_held_(m_lock)
+    std::map<std::uint64_t, AttachedDisk>::iterator FindAttachedDiskLocked(bool PassThrough, const std::wstring& Path);
+
+    _Requires_lock_held_(m_lock)
+    FileSystemDeviceMap::iterator FindFileSystemDeviceLocked(VmDeviceId Device);
+
+    /// <summary>
+    /// Returns an equivalent virtio-fs share, rejecting conflicting requests for an explicit name.
+    /// </summary>
+    _Requires_lock_held_(m_lock)
+    const FileSystemShare* FindFileSystemShareLocked(
+        VmDeviceId Device, const std::wstring& HostPath, const std::wstring& MountOptions, const VmFileSystemShareRequest& Request, HANDLE UserToken) const;
+
+    /// <summary>
+    /// Returns an equivalent Plan 9 share with Name, rejecting conflicting requests for that name.
+    /// </summary>
+    _Requires_lock_held_(m_lock)
+    std::optional<VmFileSystemShare> FindPlan9ShareByNameLocked(VmDeviceId Device, const VmFileSystemShareRequest& Request, HANDLE UserToken) const;
+
+    /// <summary>
+    /// Resolves the token used to reach a host path, returning the first of Tokens that is set and
+    /// falling back to the identity that created the VM. Callers list Tokens most specific first.
+    /// </summary>
+    wil::shared_handle ResolveUserToken(std::initializer_list<std::reference_wrapper<const wil::shared_handle>> Tokens) const;
+
+    /// <summary>
+    /// Adds a share to a Plan 9 device and returns the name the guest uses to reach it.
+    /// </summary>
+    _Requires_lock_held_(m_lock)
+    std::wstring AddPlan9ShareLocked(
+        const FileSystemDevice& Device, const VmFileSystemShareRequest& Request, HANDLE UserToken, const std::wstring& HostPath) const;
+
+    /// <summary>
+    /// Removes a share from a Plan 9 device by the name the guest uses to reach it.
+    /// </summary>
+    _Requires_lock_held_(m_lock)
+    void RemovePlan9ShareLocked(const FileSystemDevice& Device, const std::wstring& AccessName, HANDLE UserToken) const;
+
+    _Requires_lock_held_(m_lock)
+    std::map<std::uint64_t, NetworkAdapter>::iterator FindNetworkAdapterLocked(VmDeviceId Device);
+
+    /// <summary>
+    /// Returns the virtio-net device that backs a user-mode NAT adapter, failing the call when the
+    /// adapter is served by a host endpoint instead.
+    /// </summary>
+    _Requires_lock_held_(m_lock)
+    wil::com_ptr<IWslVirtioNetDevice> GetUserModeNatDeviceLocked(VmDeviceId Device) const;
+
+    /// <summary>
+    /// Removes the adapter's tracked state, tearing down the resource that serves it. Port bindings
+    /// on the adapter are dropped because the device that tracked them is gone.
+    /// </summary>
+    _Requires_lock_held_(m_lock)
+    void RemoveNetworkAdapterLocked(std::map<std::uint64_t, NetworkAdapter>::iterator Adapter);
+
+    _Requires_lock_held_(m_lock)
+    void CloseNetworkAdaptersLocked() noexcept;
+
+    void Shutdown();
+
+    NON_COPYABLE(HcsVirtualMachineBackend);
+    NON_MOVABLE(HcsVirtualMachineBackend);
+
+    VmConfiguration m_configuration;
+    std::wstring m_vmIdString;
+    wil::shared_event m_terminatingEvent{wil::EventOptions::ManualReset};
+    wil::shared_event m_exitEvent{wil::EventOptions::ManualReset};
+    wil::shared_event m_vmCrashEvent{wil::EventOptions::ManualReset};
+    std::optional<VmCrashCaptureRequest> m_crashCapture;
+    // Paths are fixed during initialization, before HCS callbacks are registered.
+    std::optional<std::filesystem::path> m_vmCrashLogFile;
+    std::optional<std::filesystem::path> m_vmSavedStateFile;
+    std::atomic<bool> m_vmCrashLogCaptured{false};
+    mutable wil::srwlock m_crashInformationLock;
+    _Guarded_by_(m_crashInformationLock) bool m_vmSavedStateCaptured = false;
+    mutable wil::srwlock m_terminationInformationLock;
+    _Guarded_by_(m_terminationInformationLock) VmTerminationInformation m_terminationInformation;
+    // Closing the system drains callbacks before their event and context are destroyed.
+    _Guarded_by_(m_lock) wsl::windows::common::hcs::unique_hcs_system m_system;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, AttachedDisk> m_attachedDisks;
+    _Guarded_by_(m_lock) std::uint64_t m_nextDiskId = 1;
+    _Guarded_by_(m_lock) FileSystemDeviceMap m_fileSystemDevices;
+    _Guarded_by_(m_lock) std::uint64_t m_nextDeviceId = 1;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, VmPersistentMemoryDevice> m_persistentMemoryDevices;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, VmSharedMemoryDevice> m_sharedMemoryDevices;
+    _Guarded_by_(m_lock) std::optional<VmGpuAttachment> m_gpu;
+    _Guarded_by_(m_lock) VmState m_state = VmState::Unknown;
+    _Guarded_by_(m_lock) bool m_cleanupStarted = false;
+    // Serializes persistent memory additions. Termination signals cancellation and releases m_lock
+    // before waiting for an in-flight addition to complete.
+    wil::srwlock m_persistentMemoryLock;
+    _Guarded_by_(m_persistentMemoryLock) std::uint32_t m_nextPersistentMemoryIndex = 0;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, FileSystemShare> m_fileSystemShares;
+    _Guarded_by_(m_lock) std::uint64_t m_nextShareId = 1;
+    _Guarded_by_(m_lock) std::vector<VmNetworkAdapterRequest> m_pendingNetworkAdapters;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, NetworkAdapter> m_networkAdapters;
+    _Guarded_by_(m_lock) std::map<std::uint64_t, VmPortBinding> m_portBindings;
+    _Guarded_by_(m_lock) std::uint64_t m_nextPortBindingId = 1;
+    _Guarded_by_(m_lock) std::shared_ptr<GuestDeviceManager> m_guestDeviceManager;
+    _Guarded_by_(m_lock) GUID m_runtimeId {};
+};
