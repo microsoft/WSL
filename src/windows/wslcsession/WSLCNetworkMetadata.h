@@ -84,7 +84,9 @@ auto FindNetwork(TNetworkMap& networks, const std::string& nameOrId) -> decltype
         }
 
         THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG, wsl::shared::Localization::MessageWslcNetworkPrefixAmbiguous(nameOrId), match != networks.end());
+            WSLC_E_NETWORK_PREFIX_AMBIGUOUS,
+            wsl::shared::Localization::MessageWslcNetworkPrefixAmbiguous(nameOrId),
+            match != networks.end());
         match = it;
     }
 

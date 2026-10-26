@@ -389,6 +389,46 @@ class WSLCE2EInspectTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Inspect_Network_AmbiguousPrefix)
+    {
+        std::vector<std::wstring> names;
+        auto deleteNetworks = wil::scope_exit([&]() {
+            for (const auto& name : names)
+            {
+                EnsureNetworkDoesNotExist(name);
+            }
+        });
+
+        // Create networks until two IDs share their first character.
+        std::vector<wchar_t> firstChars;
+        wchar_t conflictChar = L'\0';
+        while (conflictChar == L'\0')
+        {
+            VERIFY_IS_LESS_THAN(names.size(), 17u);
+
+            const auto& name = names.emplace_back(std::format(L"{}-{}", WslcNetworkName, names.size()));
+            EnsureNetworkDoesNotExist(name);
+
+            auto createResult = RunWslc(std::format(L"network create --driver bridge {}", name));
+            createResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+            const auto firstChar = static_cast<wchar_t>(InspectNetwork(name).Id[0]);
+            if (std::ranges::find(firstChars, firstChar) != firstChars.end())
+            {
+                conflictChar = firstChar;
+            }
+
+            firstChars.push_back(firstChar);
+        }
+
+        const std::wstring prefix(1, conflictChar);
+        auto result = RunWslc(std::format(L"inspect --type network {}", prefix));
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            wsl::shared::Localization::MessageWslcNetworkPrefixAmbiguous(prefix) +
+            L"\r\nError code: WSLC_E_NETWORK_PREFIX_AMBIGUOUS"));
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Inspect_MultipleObjects)
     {
         EnsureContainerDoesNotExist(WslcContainerName);

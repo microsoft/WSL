@@ -19,3 +19,4 @@
 | `ContainerDeleted` | `-2147219949` | `0x80040613` | The container was deleted. |
 | `CapabilityAdditionsDisabled` | `-2147219948` | `0x80040614` | Capability additions are disabled by policy |
 | `RuntimeUpdateNeeded` | `-2147219947` | `0x80040615` | The requested feature requires a newer WSL runtime. |
+| `NetworkPrefixAmbiguous` | `-2147219946` | `0x80040616` | The network ID prefix matches more than one network. |

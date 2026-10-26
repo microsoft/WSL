@@ -316,7 +316,7 @@ public:
     Microsoft::WRL::ComPtr<IUnknown> CreateActivityToken();
 
     // Resolves a session-managed network name, full ID, or unique ID prefix. Returns std::nullopt if nothing matches.
-    // Throws E_INVALIDARG if the prefix matches more than one network. Callers must hold a VM lease.
+    // Throws WSLC_E_NETWORK_PREFIX_AMBIGUOUS if the prefix matches more than one network. Callers must hold a VM lease.
     std::optional<ResolvedNetwork> TryResolveNetwork(const std::string& NetworkNameOrId);
 
 private:

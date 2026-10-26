@@ -649,6 +649,49 @@ class WslcSdkTests
             VERIFY_ARE_EQUAL(WslcDeleteSessionNetwork(m_defaultSession, unknownId.c_str(), errorMessage.put()), WSLC_E_NETWORK_NOT_FOUND);
             VERIFY_IS_NOT_NULL(errorMessage.get());
         }
+
+        // Negative: an ID prefix shared by more than one network is ambiguous.
+        {
+            std::vector<std::string> names;
+            auto cleanupNetworks = wil::scope_exit([&]() {
+                for (const auto& name : names)
+                {
+                    LOG_IF_FAILED(comSession->DeleteNetwork(name.c_str()));
+                }
+            });
+
+            std::vector<char> firstChars;
+            char conflictChar = '\0';
+            while (conflictChar == '\0')
+            {
+                VERIFY_IS_LESS_THAN(names.size(), 17u);
+
+                auto& name = names.emplace_back(std::format("{}-{}", c_networkName, names.size()));
+                LOG_IF_FAILED(comSession->DeleteNetwork(name.c_str()));
+
+                WSLCNetworkOptions options{};
+                options.Name = name.c_str();
+                options.Driver = "bridge";
+                VERIFY_SUCCEEDED(comSession->CreateNetwork(&options, nullptr));
+
+                wil::unique_cotaskmem_array_ptr<WslcNetworkInfo> networks;
+                VERIFY_SUCCEEDED(WslcListSessionNetworks(m_defaultSession, networks.addressof(), networks.size_address<uint32_t>(), nullptr));
+                const auto network = std::ranges::find_if(networks, [&](const auto& network) { return name == network.name; });
+                VERIFY_IS_TRUE(network != networks.end());
+
+                const char firstChar = network->id[0];
+                if (std::ranges::find(firstChars, firstChar) != firstChars.end())
+                {
+                    conflictChar = firstChar;
+                }
+
+                firstChars.push_back(firstChar);
+            }
+
+            wil::unique_cotaskmem_string errorMessage;
+            VERIFY_ARE_EQUAL(WslcDeleteSessionNetwork(m_defaultSession, std::string{conflictChar}.c_str(), errorMessage.put()), WSLC_E_NETWORK_PREFIX_AMBIGUOUS);
+            VERIFY_IS_NOT_NULL(errorMessage.get());
+        }
     }
 
     WSLC_TEST_METHOD(NetworkCreate)

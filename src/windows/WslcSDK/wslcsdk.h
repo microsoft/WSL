@@ -44,7 +44,7 @@ EXTERN_C_START
 #define WSLC_E_CONTAINER_DELETED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 19)             /* 0x80040613 */
 #define WSLC_E_CAPABILITY_ADDITIONS_DISABLED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 20) /* 0x80040614 */
 #define WSLC_E_RUNTIME_UPDATE_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 21)         /* 0x80040615 */
-
+#define WSLC_E_NETWORK_PREFIX_AMBIGUOUS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 22)      /* 0x80040616 */
 // Session values
 #define WSLC_SESSION_OPTIONS_SIZE 72
 #define WSLC_SESSION_OPTIONS_ALIGNMENT 8
@@ -816,7 +816,7 @@ STDAPI WslcCreateSessionNetwork(
 //
 // Notes:
 //   - Returns WSLC_E_NETWORK_NOT_FOUND if no network matches nameOrId.
-//   - Returns E_INVALIDARG if nameOrId is an ID prefix that matches more than one network.
+//   - Returns WSLC_E_NETWORK_PREFIX_AMBIGUOUS if nameOrId is an ID prefix that matches more than one network.
 //   - Returns HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION) if a container is connected to the network.
 //   - Returns WSLC_E_RUNTIME_UPDATE_NEEDED if the installed WSL runtime does not support network management.
 STDAPI WslcDeleteSessionNetwork(_In_ WslcSession session, _In_z_ PCSTR nameOrId, _Outptr_opt_result_z_ PWSTR* errorMessage);
