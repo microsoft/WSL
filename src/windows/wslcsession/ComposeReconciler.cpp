@@ -201,7 +201,7 @@ std::vector<WSLCContainerEntry> ComposeReconciler::Remove(
     {
         WSLCContainerState state{};
         THROW_IF_FAILED(container->GetState(&state));
-        if (state != WslcContainerStateRunning && state != WslcContainerStateDeleted)
+        if (state == WslcContainerStateCreated || state == WslcContainerStateExited)
         {
             stoppedContainers.emplace_back(container);
         }

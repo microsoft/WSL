@@ -2725,6 +2725,10 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeCo
         }
 
         launcher.AddPrimaryNetworkAlias(definition.Name);
+        if (definition.ServiceName != definition.Name)
+        {
+            launcher.AddPrimaryNetworkAlias(definition.ServiceName);
+        }
 
         for (const auto& volume : definition.Volumes)
         {

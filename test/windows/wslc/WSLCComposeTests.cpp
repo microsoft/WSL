@@ -469,7 +469,17 @@ class WSLCComposeTests
 
     TEST_METHOD(ComposeContainerNameHttpRequest)
     {
-        const auto projectPath = std::filesystem::current_path() / std::format("compose-http-{}", GetCurrentProcessId());
+        VerifyComposeHttpRequest(false);
+    }
+
+    TEST_METHOD(ComposeServiceNameHttpRequest)
+    {
+        VerifyComposeHttpRequest(true);
+    }
+
+    void VerifyComposeHttpRequest(bool defaultNames)
+    {
+        const auto projectPath = std::filesystem::current_path() / std::format("compose-http-{}-{}", defaultNames, GetCurrentProcessId());
         const auto composePath = projectPath / "compose.yaml";
         auto cleanup = wil::scope_exit([&] {
             std::error_code error;
@@ -479,17 +489,25 @@ class WSLCComposeTests
         std::filesystem::create_directory(projectPath);
         {
             std::ofstream composeFile(composePath);
+            composeFile << "services:\n"
+                           "  server:\n";
+            if (!defaultNames)
+            {
+                composeFile << "    name: wslc-compose-http-server\n";
+            }
+            composeFile << "    image: python:3.12-alpine\n"
+                           "    command: [\"python3\", \"-m\", \"http.server\", \"8000\"]\n"
+                           "  client:\n";
+            if (!defaultNames)
+            {
+                composeFile << "    name: wslc-compose-http-client\n";
+            }
             composeFile
-                << "services:\n"
-                   "  server:\n"
-                   "    name: wslc-compose-http-server\n"
-                   "    image: python:3.12-alpine\n"
-                   "    command: [\"python3\", \"-m\", \"http.server\", \"8000\"]\n"
-                   "  client:\n"
-                   "    name: wslc-compose-http-client\n"
-                   "    image: python:3.12-alpine\n"
+                << "    image: python:3.12-alpine\n"
                    "    command: [\"python3\", \"-c\", \"import time, urllib.request\\nwhile True:\\n    try:\\n        with "
-                   "urllib.request.urlopen(\\\"http://wslc-compose-http-server:8000/\\\", timeout=10) as response:\\n            "
+                   "urllib.request.urlopen(\\\"http://"
+                << (defaultNames ? "server" : "wslc-compose-http-server")
+                << ":8000/\\\", timeout=10) as response:\\n            "
                    "if response.status == 200:\\n                break\\n    except Exception:\\n        pass\\n    "
                    "time.sleep(1)\"]\n";
         }
@@ -505,8 +523,18 @@ class WSLCComposeTests
             }));
         });
 
+        VERIFY_ARE_EQUAL(2u, upResult.value.AffectedContainersCount);
+        if (defaultNames)
+        {
+            const std::vector<std::string> expectedNames{std::format("{}-client-1", projectKey), std::format("{}-server-1", projectKey)};
+            std::vector<std::string> actualNames{upResult.value.AffectedContainers[0].Name, upResult.value.AffectedContainers[1].Name};
+            std::ranges::sort(actualNames);
+            VERIFY_ARE_EQUAL(expectedNames, actualNames);
+        }
+
         wil::com_ptr<IWSLCContainer> clientContainer;
-        VERIFY_SUCCEEDED(m_defaultSession->OpenContainer("wslc-compose-http-client", &clientContainer));
+        const auto clientName = defaultNames ? std::format("{}-client-1", projectKey) : std::string{"wslc-compose-http-client"};
+        VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(clientName.c_str(), &clientContainer));
         wsl::shared::retry::RetryWithTimeout<void>(
             [&]() {
                 const auto inspect = InspectContainer(clientContainer.get());
