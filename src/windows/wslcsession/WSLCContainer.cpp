@@ -1228,11 +1228,14 @@ wil::com_ptr<IWSLCProcess> WSLCContainerImpl::StartPhase(
     UpdateActivityHoldLockHeld();
 
     auto control = std::make_unique<DockerContainerProcessControl>(*this, m_runtime.Docker());
+    auto* initProcessControl = control.get();
+    auto initProcess = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io), m_initProcessFlags);
 
+    // N.B. Publish only after construction succeeds so m_initProcessControl never points at a freed control object.
     {
         std::lock_guard processesLock{m_processesLock};
-        m_initProcessControl = control.get();
-        m_initProcess = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io), m_initProcessFlags);
+        m_initProcessControl = initProcessControl;
+        m_initProcess = std::move(initProcess);
         m_comWrapper->CacheState(m_state, m_initProcess);
     }
 
