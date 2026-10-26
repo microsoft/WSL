@@ -3598,6 +3598,10 @@ try
     uint32_t SeccompFlag = SECCOMP_RET_USER_NOTIF;
     Message->SeccompAvailable = syscall(__NR_seccomp, SECCOMP_GET_ACTION_AVAIL, 0, &SeccompFlag) == 0;
 
+    wil::unique_fd ipv6Socket{socket(AF_INET6, SOCK_DGRAM | SOCK_CLOEXEC, 0)};
+    // Treat any error as not available.
+    Message->Ipv6Available = !!ipv6Socket;
+
     auto pool = UtilReadHvPciSwiotlbPool();
     Message->HvPciSwiotlbBase = pool.Base;
     Message->HvPciSwiotlbSize = pool.Size;
