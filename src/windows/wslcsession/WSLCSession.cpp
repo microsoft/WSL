@@ -1674,10 +1674,8 @@ try
         RETURN_HR_IF(E_INVALIDARG, strlen(ImageName) > WSLC_MAX_IMAGE_NAME_LENGTH);
 
         auto reference = wslutil::ImageReference::Parse(ImageName);
-        auto tagOrDigest = reference.TagOrDigest();
-        THROW_HR_IF_MSG(E_INVALIDARG, !tagOrDigest.has_value(), "Expected tag for image import: %hs", ImageName);
         repo = reference.Repository.Name;
-        tag = tagOrDigest.value();
+        tag = reference.TagOrDigest().value_or("latest");
     }
 
     auto lock = AcquireLease();

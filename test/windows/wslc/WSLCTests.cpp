@@ -1607,8 +1607,10 @@ class WSLCTests
     {
         SKIP_TEST_SERVER();
 
-        auto cleanup =
-            wil::scope_exit([&]() { LOG_IF_FAILED(DeleteImageNoThrow("my-hello-world:test", WSLCDeleteImageFlagsNone).first); });
+        auto cleanup = wil::scope_exit([&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow("my-hello-world:test", WSLCDeleteImageFlagsNone).first);
+            LOG_IF_FAILED(DeleteImageNoThrow("my-hello-world:latest", WSLCDeleteImageFlagsNone).first);
+        });
 
         std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
         wil::unique_handle imageTarFileHandle{
@@ -1635,11 +1637,16 @@ class WSLCTests
             VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
         }
 
-        // Validate that ImportImage fails if no tag is passed
+        // Validate that ImportImage defaults to the 'latest' tag if no tag is passed.
         {
-            VERIFY_ARE_EQUAL(
-                m_defaultSession->ImportImage(ToCOMInputHandle(imageTarFileHandle.get()), "my-hello-world", fileSize.QuadPart, nullptr, &imageId),
-                E_INVALIDARG);
+            wil::unique_handle untaggedTarFileHandle{
+                CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == untaggedTarFileHandle.get());
+
+            VERIFY_SUCCEEDED(m_defaultSession->ImportImage(
+                ToCOMInputHandle(untaggedTarFileHandle.get()), "my-hello-world", fileSize.QuadPart, nullptr, &imageId));
+
+            ExpectImagePresent(*m_defaultSession, "my-hello-world:latest");
         }
 
         // Validate that invalid tars fail with proper error message and code.
@@ -7842,6 +7849,305 @@ class WSLCTests
         VERIFY_SUCCEEDED(marker.Get().Kill(WSLCSignalSIGKILL));
         const auto events = ReadEvents(stream.get(), 1);
         VERIFY_ARE_EQUAL(markerId, events[0].Actor.ID);
+    }
+
+    // Formats an exec event as DockerExecEvents() reports it.
+    static std::string FormatExecEvent(const wsl::windows::common::wslc_schema::Event& Event)
+    {
+        const auto exitCode = Event.Actor.Attributes.find("exitCode");
+        return std::format(
+            "{}|{}|{}|{}\n",
+            Event.Action,
+            Event.timeNano,
+            Event.Actor.Attributes.at("execID"),
+            exitCode != Event.Actor.Attributes.end() ? exitCode->second : std::string{});
+    }
+
+    // Returns the exec events Docker itself reported for a container within a time window, one per line.
+    std::string DockerExecEvents(const std::string& ContainerId, LONGLONG Since, LONGLONG Until)
+    {
+        return ExpectCommandResult(
+                   m_defaultSession.get(),
+                   {"/usr/bin/docker",
+                    "events",
+                    "--since",
+                    std::to_string(Since),
+                    "--until",
+                    std::to_string(Until),
+                    "--filter",
+                    "container=" + ContainerId,
+                    "--filter",
+                    "event=exec_create",
+                    "--filter",
+                    "event=exec_start",
+                    "--filter",
+                    "event=exec_die",
+                    "--format",
+                    R"({{.Action}}|{{.TimeNano}}|{{index .Actor.Attributes "execID"}}|{{index .Actor.Attributes "exitCode"}})"},
+                   0)
+            .Output.at(1);
+    }
+
+    WSLC_TEST_METHOD(EventStreamRecordsExecEvents)
+    {
+        constexpr auto c_containerName = "wslc-test-event-exec";
+        constexpr auto c_imageName = "debian:latest";
+
+        // Docker appends the exec'd command line to exec_create and exec_start, followed by a space when it has no arguments.
+        const std::string createTrue = "exec_create: true ";
+        const std::string startTrue = "exec_start: true ";
+        const std::string createExit = "exec_create: sh -c exit 7";
+        const std::string startExit = "exec_start: sh -c exit 7";
+
+        std::string id;
+        std::vector<wsl::windows::common::wslc_schema::Event> liveEvents;
+        {
+            WSLCContainerLauncher launcher(c_imageName, c_containerName, {"sleep", "99999"});
+            auto container = launcher.Launch(*m_defaultSession);
+            id = container.Id();
+
+            auto stream = OpenEventStream(
+                {{"container", id.c_str()}, {"event", "exec_create"}, {"event", "exec_start"}, {"event", "exec_die"}});
+
+            for (int i = 0; i < 3; ++i)
+            {
+                VERIFY_ARE_EQUAL(0, WSLCProcessLauncher({}, {"true"}).Launch(container.Get()).Wait());
+            }
+
+            VERIFY_ARE_EQUAL(7, WSLCProcessLauncher({}, {"sh", "-c", "exit 7"}).Launch(container.Get()).Wait());
+
+            liveEvents = ReadEvents(stream.get(), 12);
+        }
+
+        // Each exec is reported against its container, and its own events are correlated by execID.
+        std::vector<std::string> execIds;
+        std::map<std::string, std::vector<std::string>> actionsByExec;
+        std::map<std::string, std::string> exitCodeByExec;
+        for (const auto& event : liveEvents)
+        {
+            VERIFY_ARE_EQUAL(std::string{"container"}, event.Type);
+            VERIFY_ARE_EQUAL(id, event.Actor.ID);
+            VERIFY_ARE_EQUAL(c_containerName, event.Actor.Attributes.at("name"));
+            VERIFY_ARE_EQUAL(c_imageName, event.Actor.Attributes.at("image"));
+            VERIFY_IS_FALSE(event.Actor.Attributes.contains("com.microsoft.wsl.container.metadata"));
+            VERIFY_ARE_EQUAL(event.Action == "exec_die", event.Actor.Attributes.contains("exitCode"));
+
+            const auto& execId = event.Actor.Attributes.at("execID");
+            if (!actionsByExec.contains(execId))
+            {
+                execIds.push_back(execId);
+            }
+
+            actionsByExec[execId].push_back(event.Action);
+            if (event.Action == "exec_die")
+            {
+                exitCodeByExec[execId] = event.Actor.Attributes.at("exitCode");
+            }
+        }
+
+        // Each exec runs to completion before the next starts, and Docker reports each with its command line and exit code.
+        const std::vector<std::pair<std::string, std::string>> expectedExecs{
+            {"true ", "0"}, {"true ", "0"}, {"true ", "0"}, {"sh -c exit 7", "7"}};
+
+        VERIFY_ARE_EQUAL(expectedExecs.size(), execIds.size());
+        for (size_t index = 0; index < execIds.size(); ++index)
+        {
+            const auto& [command, exitCode] = expectedExecs[index];
+            const std::vector<std::string> expectedActions{"exec_create: " + command, "exec_start: " + command, "exec_die"};
+            VERIFY_ARE_EQUAL(expectedActions, actionsByExec.at(execIds[index]));
+            VERIFY_ARE_EQUAL(exitCode, exitCodeByExec.at(execIds[index]));
+        }
+
+        // The container was deleted when it went out of scope. Replaying the same window still returns each event once,
+        // exactly as Docker reported it.
+        const LONGLONG since = liveEvents.front().timeNano / 1'000'000'000;
+        const LONGLONG until = liveEvents.back().timeNano / 1'000'000'000 + 1;
+
+        auto eventsMatching = [&](std::vector<WSLCFilter> filters) {
+            filters.push_back({"container", id.c_str()});
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, filters.data(), static_cast<ULONG>(filters.size()), &stream));
+            return DrainEventStream(stream.get());
+        };
+
+        const auto replayedEvents = eventsMatching({{"event", "exec_create"}, {"event", "exec_start"}, {"event", "exec_die"}});
+        VERIFY_ARE_EQUAL(liveEvents.size(), replayedEvents.size());
+
+        std::string expectedDockerEvents;
+        for (size_t index = 0; index < replayedEvents.size(); ++index)
+        {
+            const auto& event = replayedEvents[index];
+            VERIFY_ARE_EQUAL(liveEvents[index].Action, event.Action);
+            VERIFY_ARE_EQUAL(liveEvents[index].Actor.ID, event.Actor.ID);
+            VERIFY_ARE_EQUAL(liveEvents[index].timeNano, event.timeNano);
+            VERIFY_IS_TRUE(liveEvents[index].Actor.Attributes == event.Actor.Attributes);
+
+            expectedDockerEvents += FormatExecEvent(event);
+        }
+
+        VERIFY_ARE_EQUAL(expectedDockerEvents, DockerExecEvents(id, since, until));
+
+        // Actions match exactly, including trailing whitespace.
+        const auto actionsMatching = [&](std::vector<WSLCFilter> filters) {
+            return EventActions(eventsMatching(std::move(filters)));
+        };
+        const std::vector<std::string> none;
+
+        VERIFY_ARE_EQUAL(
+            (std::vector<std::string>{"exec_die", "exec_die", "exec_die", "exec_die"}), actionsMatching({{"event", "exec_die"}}));
+        VERIFY_ARE_EQUAL((std::vector<std::string>{startTrue, startTrue, startTrue}), actionsMatching({{"event", startTrue.c_str()}}));
+        VERIFY_ARE_EQUAL(std::vector<std::string>{startExit}, actionsMatching({{"event", startExit.c_str()}}));
+        VERIFY_ARE_EQUAL(none, actionsMatching({{"event", "exec_start: true"}}));
+        VERIFY_ARE_EQUAL(none, actionsMatching({{"event", "exec_start: sh"}}));
+        VERIFY_ARE_EQUAL(none, actionsMatching({{"event", "exec"}}));
+
+        // A bare 'exec_create', 'exec_start' or 'health_status' value makes every value match as a prefix.
+        VERIFY_ARE_EQUAL(
+            (std::vector<std::string>{createTrue, createTrue, createTrue, createExit}),
+            actionsMatching({{"event", "exec_create"}}));
+        VERIFY_ARE_EQUAL(
+            (std::vector<std::string>{startTrue, startTrue, startTrue, startExit}), actionsMatching({{"event", "exec_start"}}));
+        VERIFY_ARE_EQUAL(
+            (std::vector<std::string>{createTrue, createTrue, createTrue, createExit, startExit}),
+            actionsMatching({{"event", "exec_create"}, {"event", "exec_start: sh"}}));
+        VERIFY_ARE_EQUAL(
+            (std::vector<std::string>{"exec_die", "exec_die", "exec_die", "exec_die"}),
+            actionsMatching({{"event", "health_status"}, {"event", "exec_d"}}));
+    }
+
+    WSLC_TEST_METHOD(EventStreamRecordsFailedExecEvents)
+    {
+        constexpr auto c_containerName = "wslc-test-event-exec-failure";
+        constexpr auto c_imageName = "debian:latest";
+
+        WSLCContainerLauncher launcher(c_imageName, c_containerName, {"sleep", "99999"});
+        auto container = launcher.Launch(*m_defaultSession);
+        const auto id = container.Id();
+
+        const std::vector<WSLCFilter> filters{
+            {"container", id.c_str()}, {"event", "exec_create"}, {"event", "exec_start"}, {"event", "exec_die"}};
+        auto stream = OpenEventStream(filters);
+
+        // Neither exec gets to run its command. Docker doesn't necessarily report exec_die for them, so their events
+        // are compared with Docker's rather than predicted.
+        {
+            WSLCProcessLauncher missingExecutable({}, {"/not-found"});
+            VERIFY_ARE_EQUAL(126, missingExecutable.Launch(container.Get()).WaitAndCaptureOutput().Code);
+        }
+
+        {
+            WSLCProcessLauncher invalidUser({}, {"/bin/cat"});
+            invalidUser.SetUser("does-not-exist");
+            VERIFY_ARE_EQUAL(126, invalidUser.Launch(container.Get()).WaitAndCaptureOutput().Code);
+        }
+
+        // Docker delivers events in order, so reading through a later exec's exec_die covers both failed execs.
+        VERIFY_ARE_EQUAL(0, WSLCProcessLauncher({}, {"true"}).Launch(container.Get()).Wait());
+
+        std::vector<wsl::windows::common::wslc_schema::Event> liveEvents;
+        std::string markerExecId;
+        do
+        {
+            liveEvents.push_back(ReadEvents(stream.get(), 1)[0]);
+            if (liveEvents.back().Action == "exec_create: true ")
+            {
+                markerExecId = liveEvents.back().Actor.Attributes.at("execID");
+            }
+        } while (liveEvents.back().Action != "exec_die" || liveEvents.back().Actor.Attributes.at("execID") != markerExecId);
+
+        // Replaying the window starts with the same events, and every replayed event is exactly as Docker reported it.
+        // The replay runs to the end of the marker's second, so it can hold more events than were read live.
+        const LONGLONG since = liveEvents.front().timeNano / 1'000'000'000;
+        const LONGLONG until = liveEvents.back().timeNano / 1'000'000'000 + 1;
+
+        wil::com_ptr<IWSLCEventStream> replayStream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, filters.data(), static_cast<ULONG>(filters.size()), &replayStream));
+        const auto replayedEvents = DrainEventStream(replayStream.get());
+        VERIFY_IS_TRUE(replayedEvents.size() >= liveEvents.size());
+
+        std::string expectedDockerEvents;
+        for (size_t index = 0; index < replayedEvents.size(); ++index)
+        {
+            const auto& event = replayedEvents[index];
+            if (index < liveEvents.size())
+            {
+                VERIFY_ARE_EQUAL(FormatExecEvent(liveEvents[index]), FormatExecEvent(event));
+            }
+
+            VERIFY_ARE_EQUAL(std::string{"container"}, event.Type);
+            VERIFY_ARE_EQUAL(id, event.Actor.ID);
+            VERIFY_ARE_EQUAL(c_containerName, event.Actor.Attributes.at("name"));
+            VERIFY_ARE_EQUAL(c_imageName, event.Actor.Attributes.at("image"));
+            VERIFY_IS_FALSE(event.Actor.Attributes.contains("com.microsoft.wsl.container.metadata"));
+
+            expectedDockerEvents += FormatExecEvent(event);
+        }
+
+        VERIFY_ARE_EQUAL(expectedDockerEvents, DockerExecEvents(id, since, until));
+
+        // Both failed execs were reported, so the comparison above covered them.
+        const auto actions = EventActions(replayedEvents);
+        VERIFY_IS_TRUE(std::ranges::find(actions, "exec_create: /not-found ") != actions.end());
+        VERIFY_IS_TRUE(std::ranges::find(actions, "exec_create: /bin/cat ") != actions.end());
+    }
+
+    WSLC_TEST_METHOD(EventStreamIgnoresExecInContainersNotCreatedByWslc)
+    {
+        WSLCContainerLauncher launcher("debian:latest", "wslc-test-event-exec-marker", {"sleep", "99999"});
+        auto marker = launcher.Launch(*m_defaultSession);
+        const auto markerId = marker.Id();
+
+        auto externalId = wsl::shared::string::Trim(
+            ExpectCommandResult(
+                m_defaultSession.get(), {"/usr/bin/docker", "run", "-d", "--rm", "debian:latest", "sleep", "99999"}, 0)
+                .Output.at(1));
+
+        auto cleanup = wil::scope_exit([&]() { RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "rm", "-f", externalId}); });
+
+        auto stream = OpenEventStream(
+            {{"container", externalId.c_str()},
+             {"container", markerId.c_str()},
+             {"event", "exec_create"},
+             {"event", "exec_start"},
+             {"event", "exec_die"}});
+
+        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "exec", externalId, "true"}, 0);
+
+        // Docker delivers events in order, so the marker's exec events can only come first if the external ones were dropped.
+        VERIFY_ARE_EQUAL(0, WSLCProcessLauncher({}, {"true"}).Launch(marker.Get()).Wait());
+        const auto events = ReadEvents(stream.get(), 3);
+        VERIFY_ARE_EQUAL((std::vector<std::string>{"exec_create: true ", "exec_start: true ", "exec_die"}), EventActions(events));
+        for (const auto& event : events)
+        {
+            VERIFY_ARE_EQUAL(markerId, event.Actor.ID);
+        }
+
+        // Docker did report the external container's exec.
+        const auto startedAt = wsl::shared::string::Trim(
+            ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "inspect", "--format", "{{.State.StartedAt}}", externalId}, 0)
+                .Output.at(1));
+
+        const auto dockerEvents = ExpectCommandResult(
+            m_defaultSession.get(),
+            {"/usr/bin/docker",
+             "events",
+             "--since",
+             startedAt,
+             "--until",
+             std::to_string(events.back().timeNano / 1'000'000'000 + 1),
+             "--filter",
+             "container=" + externalId,
+             "--filter",
+             "event=exec_create",
+             "--filter",
+             "event=exec_start",
+             "--filter",
+             "event=exec_die",
+             "--format",
+             "{{.Action}}"},
+            0);
+
+        VERIFY_ARE_EQUAL(std::string{"exec_create: true \nexec_start: true \nexec_die\n"}, dockerEvents.Output.at(1));
     }
 
     WSLC_TEST_METHOD(EventStreamRejectsUnsupportedFilterKeys)

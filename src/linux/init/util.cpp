@@ -323,7 +323,16 @@ Return Value:
     SocketAddress->svm_cid = VMADDR_CID_ANY;
     SocketAddress->svm_port = VMADDR_PORT_ANY;
     SocketAddressSize = sizeof(*SocketAddress);
-    Result = bind(SocketFd, (const struct sockaddr*)SocketAddress, SocketAddressSize);
+
+    //
+    // N.B. With mirrored networking, bind() and listen() are trapped by the port
+    //      tracker's seccomp hook. Until the supervisor picks up the notification
+    //      the caller waits interruptibly, so a signal (e.g. the session leader's
+    //      SIGCHLD, which is installed without SA_RESTART) fails the call with
+    //      EINTR even though it never ran. Retrying is safe.
+    //
+
+    Result = TEMP_FAILURE_RETRY(bind(SocketFd, (const struct sockaddr*)SocketAddress, SocketAddressSize));
 
     if (Result < 0)
     {
@@ -1627,7 +1636,11 @@ Return Value:
         goto ListenVsockAnyPortExit;
     }
 
-    Result = listen(SocketFd, Backlog);
+    //
+    // N.B. See UtilBindVsockAnyPort for why listen() can fail with EINTR.
+    //
+
+    Result = TEMP_FAILURE_RETRY(listen(SocketFd, Backlog));
     if (Result < 0)
     {
         LOG_ERROR("listen failed {}", errno);

@@ -91,7 +91,8 @@ public:
     EventTrackingReference RegisterContainerCreate(ContainerCreateCallback&& Callback) noexcept;
 
     // Invoked for 'kill' and 'stop' when no container state callback handled them, such as after the container
-    // stopped listening for its events.
+    // stopped listening for its events, and for every 'exec_create', 'exec_start' and 'exec_die'.
+    // Runs after the container state callbacks.
     EventTrackingReference RegisterContainerActions(ContainerActionCallback&& Callback) noexcept;
     void UnregisterCallback(size_t Id) noexcept;
 
