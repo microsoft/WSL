@@ -1607,8 +1607,10 @@ class WSLCTests
     {
         SKIP_TEST_SERVER();
 
-        auto cleanup =
-            wil::scope_exit([&]() { LOG_IF_FAILED(DeleteImageNoThrow("my-hello-world:test", WSLCDeleteImageFlagsNone).first); });
+        auto cleanup = wil::scope_exit([&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow("my-hello-world:test", WSLCDeleteImageFlagsNone).first);
+            LOG_IF_FAILED(DeleteImageNoThrow("my-hello-world:latest", WSLCDeleteImageFlagsNone).first);
+        });
 
         std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
         wil::unique_handle imageTarFileHandle{
@@ -1635,11 +1637,16 @@ class WSLCTests
             VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
         }
 
-        // Validate that ImportImage fails if no tag is passed
+        // Validate that ImportImage defaults to the 'latest' tag if no tag is passed.
         {
-            VERIFY_ARE_EQUAL(
-                m_defaultSession->ImportImage(ToCOMInputHandle(imageTarFileHandle.get()), "my-hello-world", fileSize.QuadPart, nullptr, &imageId),
-                E_INVALIDARG);
+            wil::unique_handle untaggedTarFileHandle{
+                CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == untaggedTarFileHandle.get());
+
+            VERIFY_SUCCEEDED(m_defaultSession->ImportImage(
+                ToCOMInputHandle(untaggedTarFileHandle.get()), "my-hello-world", fileSize.QuadPart, nullptr, &imageId));
+
+            ExpectImagePresent(*m_defaultSession, "my-hello-world:latest");
         }
 
         // Validate that invalid tars fail with proper error message and code.
