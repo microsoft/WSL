@@ -106,6 +106,21 @@ namespace {
         });
     }
 
+    // Values match the action exactly. Health status and exec actions carry a suffix, such as ": healthy" or the exec'd
+    // command line, so when any value is a bare "health_status", "exec_create" or "exec_start", every value matches as
+    // a prefix instead.
+    bool MatchesAction(const wsl::windows::common::wslc_schema::Event& event, const std::vector<std::string>& values)
+    {
+        static constexpr std::array c_prefixActions{"health_status", "exec_create", "exec_start"};
+
+        const bool matchPrefix = std::ranges::any_of(
+            values, [](const std::string& value) { return std::ranges::find(c_prefixActions, value) != c_prefixActions.end(); });
+
+        return std::ranges::any_of(values, [&](const std::string& value) {
+            return matchPrefix ? event.Action.starts_with(value) : event.Action == value;
+        });
+    }
+
     // Values sharing a key are OR'd, except label values, which must all match. Distinct keys are AND'd.
     bool EventMatchesFilters(const wsl::windows::common::wslc_schema::Event& event, const std::map<std::string, std::vector<std::string>>& filters)
     {
@@ -120,7 +135,7 @@ namespace {
             }
             else if (key == "event")
             {
-                if (!std::ranges::any_of(values, [&](const std::string& v) { return event.Action == v; }))
+                if (!MatchesAction(event, values))
                 {
                     return false;
                 }

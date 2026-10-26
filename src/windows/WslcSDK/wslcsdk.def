@@ -36,6 +36,9 @@ WslcLoadSessionImage
 WslcLoadSessionImageFromFile
 WslcDeleteSessionImage
 WslcListSessionImages
+WslcListSessionNetworks
+WslcCreateSessionNetwork
+WslcDeleteSessionNetwork
 WslcCreateSessionVhdVolume
 WslcDeleteSessionVhdVolume
 WslcTagSessionImage
@@ -47,6 +50,7 @@ WslcSetContainerSettingsNetworkingMode
 WslcSetContainerSettingsHostName
 WslcSetContainerSettingsVolumes
 WslcSetContainerSettingsNamedVolumes
+WslcSetContainerSettingsNetworks
 WslcSetContainerSettingsInitProcess
 WslcSetContainerSettingsFlags
 WslcSetContainerSettingsPortMappings

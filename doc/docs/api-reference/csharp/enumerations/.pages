@@ -5,6 +5,7 @@ nav:
   - deletecontaineroption.md
   - error.md
   - containernetworkingmode.md
+  - networkflags.md
   - portprotocol.md
   - containerstate.md
   - signal.md

@@ -24,6 +24,7 @@ Abstract:
 #include "wslutil.h"
 #include "APICompat.h"
 #include "WindowsUpdateIntegration.h"
+#include "wslc_schema.h"
 
 using namespace std::string_view_literals;
 using namespace wsl::windows::common::wslutil;
@@ -123,6 +124,114 @@ PCSTR Convert(WslcContainerNetworkingMode mode)
     }
 }
 
+bool SupportsNetworkAliases(std::string_view network) noexcept
+{
+    return network != "bridge" && network != "host" && network != "none" && !network.starts_with("container:");
+}
+
+static HRESULT InetNtopToHresult(int af, const void* src, char* dst, size_t dstCount)
+{
+    if (inet_ntop(af, src, dst, dstCount) == nullptr)
+    {
+        return HRESULT_FROM_WIN32(WSAGetLastError());
+    }
+    return S_OK;
+}
+
+struct NetworkAddressBuffers
+{
+    std::array<char, INET_ADDRSTRLEN> Ipv4;
+    std::array<char, INET6_ADDRSTRLEN> Ipv6;
+};
+
+// Owns the memory referenced by WSLCCompatContainerNetwork; must outlive the CreateContainer call.
+struct ContainerNetworkStorage
+{
+    std::vector<WSLCCompatKeyValuePair> PrimarySettings;
+    std::vector<std::vector<WSLCCompatKeyValuePair>> AdditionalSettings;
+    std::vector<WSLCCompatNetworkConnection> AdditionalNetworks;
+    std::vector<NetworkAddressBuffers> IpAddresses;
+
+    // Primary network settings and IPv6 static addresses are only understood by IWSLCCompatSession2 runtimes.
+    bool RequiresCompatSession2 = false;
+};
+
+// addressBuffers must outlive the returned settings since the IP address entries point into it.
+std::vector<WSLCCompatKeyValuePair> ConvertNetworkSettings(const WslcContainerNetwork& network, NetworkAddressBuffers& addressBuffers)
+{
+    const bool userDefined = SupportsNetworkAliases(network.name);
+    THROW_HR_IF_MSG(E_INVALIDARG, network.aliasCount != 0 && !userDefined, "Network '%hs' does not support aliases", network.name);
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        (network.ipv4Address != nullptr || network.ipv6Address != nullptr) && !userDefined,
+        "Network '%hs' does not support a static IP address",
+        network.name);
+
+    std::vector<WSLCCompatKeyValuePair> settings;
+    settings.reserve(network.aliasCount + 2);
+    for (uint32_t i = 0; i < network.aliasCount; ++i)
+    {
+        settings.push_back({"Aliases", network.aliases[i]});
+    }
+
+    if (network.ipv4Address != nullptr)
+    {
+        THROW_IF_FAILED(InetNtopToHresult(AF_INET, network.ipv4Address, addressBuffers.Ipv4.data(), addressBuffers.Ipv4.size()));
+        settings.push_back({"IPAddress", addressBuffers.Ipv4.data()});
+    }
+
+    if (network.ipv6Address != nullptr)
+    {
+        THROW_IF_FAILED(InetNtopToHresult(AF_INET6, network.ipv6Address, addressBuffers.Ipv6.data(), addressBuffers.Ipv6.size()));
+        settings.push_back({"IPv6Address", addressBuffers.Ipv6.data()});
+    }
+
+    return settings;
+}
+
+void ConvertContainerNetworks(const WslcContainerOptionsInternal& settings, WSLCCompatContainerNetwork& network, ContainerNetworkStorage& storage)
+{
+    if (settings.networksCount == 0)
+    {
+        network.NetworkMode = settings.networkMode != nullptr ? settings.networkMode : "none";
+        return;
+    }
+
+    THROW_HR_IF_MSG(E_INVALIDARG, settings.networkMode != nullptr, "Networking mode and networks are mutually exclusive");
+
+    // Sized up front so the IP address entries keep pointing at stable buffers.
+    storage.IpAddresses.resize(settings.networksCount);
+
+    const auto& primary = settings.networks[0];
+    storage.PrimarySettings = ConvertNetworkSettings(primary, storage.IpAddresses[0]);
+
+    storage.AdditionalSettings.reserve(settings.networksCount - 1);
+    for (uint32_t i = 1; i < settings.networksCount; ++i)
+    {
+        storage.AdditionalSettings.push_back(ConvertNetworkSettings(settings.networks[i], storage.IpAddresses[i]));
+    }
+
+    storage.AdditionalNetworks.reserve(storage.AdditionalSettings.size());
+    for (uint32_t i = 1; i < settings.networksCount; ++i)
+    {
+        const auto& additionalSettings = storage.AdditionalSettings[i - 1];
+        storage.AdditionalNetworks.push_back(
+            {settings.networks[i].name,
+             additionalSettings.empty() ? nullptr : additionalSettings.data(),
+             static_cast<ULONG>(additionalSettings.size())});
+    }
+
+    network.NetworkMode = primary.name;
+    network.Networks = storage.AdditionalNetworks.empty() ? nullptr : storage.AdditionalNetworks.data();
+    network.NetworksCount = static_cast<ULONG>(storage.AdditionalNetworks.size());
+
+    storage.RequiresCompatSession2 =
+        !storage.PrimarySettings.empty() ||
+        std::any_of(settings.networks, settings.networks + settings.networksCount, [](const WslcContainerNetwork& n) {
+            return n.ipv6Address != nullptr;
+        });
+}
+
 void ConvertSHA256Hash(const char* hashString, uint8_t sha256[32])
 {
     static constexpr std::string_view s_sha256Prefix = "sha256:"sv;
@@ -208,14 +317,6 @@ void EnsureAbsolutePath(const std::filesystem::path& path, bool containerPath)
     {
         THROW_HR_IF(E_INVALIDARG, path.is_relative());
     }
-}
-static HRESULT InetNtopToHresult(int af, const void* src, char* dst, size_t dstCount)
-{
-    if (inet_ntop(af, src, dst, dstCount) == nullptr)
-    {
-        return HRESULT_FROM_WIN32(WSAGetLastError());
-    }
-    return S_OK;
 }
 
 bool CopyProcessSettingsToRuntime(WSLCCompatProcessOptions& runtimeOptions, const WslcContainerProcessOptionsInternal* initProcessOptions)
@@ -364,6 +465,131 @@ wil::com_ptr<IWSLCCompatSessionManager> CreateSessionManager()
     wsl::windows::common::security::ConfigureForCOMImpersonation(result.get());
 
     return result;
+}
+
+template <size_t Size>
+void CopyNetworkString(CHAR (&Destination)[Size], const std::string& Source)
+{
+    THROW_HR_IF_MSG(E_UNEXPECTED, Source.size() >= Size, "Unexpected network field length: %hs", Source.c_str());
+    THROW_HR_IF(E_UNEXPECTED, memcpy_s(Destination, Size, Source.c_str(), Source.size() + 1) != 0);
+}
+
+int64_t NetworkCreatedToUnixTime(const std::string& Created) noexcept
+try
+{
+    return Created.empty() ? 0 : wsl::windows::common::timestamp::Rfc3339ToEpoch(Created);
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION_MSG("Failed to parse network creation time: %hs", Created.c_str());
+    return 0;
+}
+
+template <typename TAddress>
+bool ParseNetworkSubnet(int Family, uint8_t MaxPrefixLength, const std::string& Subnet, TAddress& Address, uint8_t& PrefixLength)
+{
+    const auto separator = Subnet.find('/');
+    if (separator == std::string::npos)
+    {
+        return false;
+    }
+
+    TAddress address{};
+    if (inet_pton(Family, Subnet.substr(0, separator).c_str(), &address) != 1)
+    {
+        return false;
+    }
+
+    const std::string_view prefixString = std::string_view{Subnet}.substr(separator + 1);
+    unsigned int prefix{};
+    const auto [end, error] = std::from_chars(prefixString.data(), prefixString.data() + prefixString.size(), prefix);
+    if (error != std::errc{} || end != prefixString.data() + prefixString.size() || prefix == 0 || prefix > MaxPrefixLength)
+    {
+        return false;
+    }
+
+    Address = address;
+    PrefixLength = static_cast<uint8_t>(prefix);
+    return true;
+}
+
+template <typename TAddress>
+void ParseNetworkGateway(int Family, const std::string& Gateway, TAddress& Address)
+{
+    if (!Gateway.empty() && inet_pton(Family, Gateway.c_str(), &Address) != 1)
+    {
+        LOG_HR_MSG(E_UNEXPECTED, "Failed to parse network gateway: %hs", Gateway.c_str());
+        Address = {};
+    }
+}
+
+template <typename TAddress>
+void ConvertNetworkSubnet(
+    int Family, uint8_t MaxPrefixLength, const wsl::windows::common::wslc_schema::IPAMConfig& Config, TAddress& Subnet, uint8_t& PrefixLength, TAddress& Gateway)
+{
+    if (PrefixLength != 0)
+    {
+        return;
+    }
+
+    if (!ParseNetworkSubnet(Family, MaxPrefixLength, Config.Subnet, Subnet, PrefixLength))
+    {
+        LOG_HR_MSG(E_UNEXPECTED, "Failed to parse network subnet: %hs", Config.Subnet.c_str());
+        return;
+    }
+
+    ParseNetworkGateway(Family, Config.Gateway, Gateway);
+}
+
+// Only the first subnet of each address family is reported.
+void ConvertNetworkIpamConfig(const wsl::windows::common::wslc_schema::IPAMConfig& Config, WslcNetworkInfo& Network)
+{
+    if (Config.Subnet.empty())
+    {
+        return;
+    }
+
+    if (Config.Subnet.find(':') != std::string::npos)
+    {
+        ConvertNetworkSubnet(AF_INET6, 128, Config, Network.ipv6Subnet, Network.ipv6PrefixLength, Network.ipv6Gateway);
+        return;
+    }
+
+    ConvertNetworkSubnet(AF_INET, 32, Config, Network.ipv4Subnet, Network.ipv4PrefixLength, Network.ipv4Gateway);
+}
+
+void ConvertNetworkEntry(const wsl::windows::common::wslc_schema::NetworkListEntry& Entry, WslcNetworkInfo& Network)
+{
+    Network = {};
+    CopyNetworkString(Network.id, Entry.Id);
+    CopyNetworkString(Network.name, Entry.Name);
+    CopyNetworkString(Network.driver, Entry.Driver);
+    Network.createdUnixTime = NetworkCreatedToUnixTime(Entry.Created);
+    WI_SetFlagIf(Network.flags, WSLC_NETWORK_FLAG_ENABLE_IPV4, Entry.EnableIPv4);
+    WI_SetFlagIf(Network.flags, WSLC_NETWORK_FLAG_ENABLE_IPV6, Entry.EnableIPv6);
+    WI_SetFlagIf(Network.flags, WSLC_NETWORK_FLAG_INTERNAL, Entry.Internal);
+
+    if (Entry.IPAM.Config)
+    {
+        for (const auto& config : *Entry.IPAM.Config)
+        {
+            ConvertNetworkIpamConfig(config, Network);
+        }
+    }
+}
+
+template <typename TAddress>
+std::string FormatNetworkAddress(int Family, const TAddress& Address)
+{
+    char buffer[INET6_ADDRSTRLEN]{};
+    THROW_IF_FAILED(InetNtopToHresult(Family, &Address, buffer, ARRAYSIZE(buffer)));
+    return buffer;
+}
+
+template <typename TAddress>
+std::string FormatNetworkSubnet(int Family, const TAddress& Address, uint8_t PrefixLength)
+{
+    return std::format("{}/{}", FormatNetworkAddress(Family, Address), static_cast<unsigned int>(PrefixLength));
 }
 
 void ValidateStringArray(PCSTR const* strings, uint32_t count)
@@ -785,8 +1011,6 @@ try
     *internalType = {};
 
     internalType->image = imageName;
-    // Default network configuration to WSLC SDK `0`, which is NONE.
-    internalType->networkMode = "none";
 
     return S_OK;
 }
@@ -922,8 +1146,8 @@ try
         containerOptions.PortsCount = static_cast<ULONG>(internalContainerSettings->portsCount);
     }
 
-    // SDK only exposes the network mode (no additional endpoints today).
-    containerOptions.ContainerNetwork.NetworkMode = internalContainerSettings->networkMode;
+    ContainerNetworkStorage networkStorage; // Must stay in scope for life of containerOptions.
+    ConvertContainerNetworks(*internalContainerSettings, containerOptions.ContainerNetwork, networkStorage);
 
     // TODO: No user access
     // containerOptions.Labels;
@@ -931,13 +1155,18 @@ try
     // containerOptions.StopSignal;
     // containerOptions.ShmSize;
 
+    containerOptions2.CapAdd = {
+        internalContainerSettings->capabilityAdditions, static_cast<ULONG>(internalContainerSettings->capabilityAdditionsCount)};
+    containerOptions2.CapDrop = {internalContainerSettings->capabilityDrops, static_cast<ULONG>(internalContainerSettings->capabilityDropsCount)};
+
+    const auto& primarySettings = networkStorage.PrimarySettings;
+    RETURN_HR_IF(WSLC_E_RUNTIME_UPDATE_NEEDED, compatSession2 == nullptr && networkStorage.RequiresCompatSession2);
+    containerOptions2.PrimaryNetworkSettings = primarySettings.empty() ? nullptr : primarySettings.data();
+    containerOptions2.PrimaryNetworkSettingsCount = static_cast<ULONG>(primarySettings.size());
+
     HRESULT hr;
     if (compatSession2 != nullptr)
     {
-        containerOptions2.CapAdd = {
-            internalContainerSettings->capabilityAdditions, static_cast<ULONG>(internalContainerSettings->capabilityAdditionsCount)};
-        containerOptions2.CapDrop = {internalContainerSettings->capabilityDrops, static_cast<ULONG>(internalContainerSettings->capabilityDropsCount)};
-
         hr = compatSession2->CreateContainer2(&containerOptions2, nullptr, &result->container);
     }
     else
@@ -1154,6 +1383,27 @@ try
 
     internalType->namedVolumes = namedVolumes;
     internalType->namedVolumesCount = namedVolumeCount;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+STDAPI WslcSetContainerSettingsNetworks(
+    _In_ WslcContainerSettings* containerSettings, _In_reads_opt_(networkCount) const WslcContainerNetwork* networks, _In_ uint32_t networkCount)
+try
+{
+    auto internalType = CheckAndGetInternalType(containerSettings);
+    RETURN_HR_IF(E_INVALIDARG, (networks == nullptr && networkCount != 0) || (networks != nullptr && networkCount == 0));
+
+    for (uint32_t i = 0; i < networkCount; ++i)
+    {
+        const auto& network = networks[i];
+        RETURN_HR_IF(E_INVALIDARG, network.name == nullptr || *network.name == '\0');
+        ValidateStringArray(network.aliases, network.aliasCount);
+    }
+
+    internalType->networks = networks;
+    internalType->networksCount = networkCount;
 
     return S_OK;
 }
@@ -1763,6 +2013,136 @@ try
     }
 
     return S_OK;
+}
+CATCH_RETURN();
+
+STDAPI WslcListSessionNetworks(
+    _In_ WslcSession session, _Outptr_result_buffer_maybenull_(*count) WslcNetworkInfo** networks, _Out_ uint32_t* count, _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    static_assert(std::is_trivial_v<WslcNetworkInfo>, "WslcNetworkInfo must be trivial.");
+
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+
+    RETURN_HR_IF_NULL(E_POINTER, networks);
+    *networks = nullptr;
+    RETURN_HR_IF_NULL(E_POINTER, count);
+    *count = 0;
+
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
+    auto* compatSession2 = internalType->GetSession2();
+    RETURN_HR_IF_NULL(WSLC_E_RUNTIME_UPDATE_NEEDED, compatSession2);
+
+    wil::unique_cotaskmem_ansistring output;
+    HRESULT hr = compatSession2->ListNetworks(&output);
+    if (FAILED(hr))
+    {
+        return errorInfoWrapper.CaptureResult(hr);
+    }
+
+    const auto entries = wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::NetworkListEntry>>(output.get());
+    if (entries.empty())
+    {
+        return errorInfoWrapper.CaptureResult(S_OK);
+    }
+
+    auto result = wil::make_unique_cotaskmem<WslcNetworkInfo[]>(entries.size());
+    for (size_t i = 0; i < entries.size(); ++i)
+    {
+        ConvertNetworkEntry(entries[i], result[i]);
+    }
+
+    *networks = result.release();
+    *count = static_cast<uint32_t>(entries.size());
+
+    return errorInfoWrapper.CaptureResult(S_OK);
+}
+CATCH_RETURN();
+
+STDAPI WslcCreateSessionNetwork(
+    _In_ WslcSession session, _In_ const WslcNetworkSettings* settings, _Out_opt_ WslcNetworkInfo* networkInfo, _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
+    RETURN_HR_IF_NULL(E_POINTER, settings);
+    RETURN_HR_IF_NULL(E_POINTER, settings->name);
+
+    if (networkInfo != nullptr)
+    {
+        *networkInfo = {};
+    }
+
+    constexpr auto supportedFlags = WSLC_NETWORK_FLAG_ENABLE_IPV4 | WSLC_NETWORK_FLAG_ENABLE_IPV6 | WSLC_NETWORK_FLAG_INTERNAL;
+    RETURN_HR_IF(E_INVALIDARG, WI_IsAnyFlagSet(settings->flags, ~supportedFlags));
+
+    const bool enableIPv6 = WI_IsFlagSet(settings->flags, WSLC_NETWORK_FLAG_ENABLE_IPV6);
+
+    // The runtime cannot create a network with IPv4 disabled.
+    RETURN_HR_IF(E_NOTIMPL, enableIPv6 && WI_IsFlagClear(settings->flags, WSLC_NETWORK_FLAG_ENABLE_IPV4));
+
+    RETURN_HR_IF(E_INVALIDARG, settings->ipv4PrefixLength != 0 && settings->ipv6PrefixLength != 0);
+    RETURN_HR_IF(E_INVALIDARG, settings->ipv4PrefixLength > 32 || settings->ipv6PrefixLength > 128);
+    RETURN_HR_IF(E_INVALIDARG, settings->ipv6PrefixLength != 0 && !enableIPv6);
+    RETURN_HR_IF(E_INVALIDARG, settings->ipv4Gateway.s_addr != 0 && settings->ipv4PrefixLength == 0);
+    RETURN_HR_IF(E_INVALIDARG, !IN6_IS_ADDR_UNSPECIFIED(&settings->ipv6Gateway) && settings->ipv6PrefixLength == 0);
+
+    wsl::windows::common::wslc_schema::CreateNetworkOptions options;
+    options.Name = settings->name;
+    options.Internal = WI_IsFlagSet(settings->flags, WSLC_NETWORK_FLAG_INTERNAL);
+    options.EnableIPv6 = enableIPv6;
+
+    if (settings->ipv4PrefixLength != 0)
+    {
+        options.Subnet = FormatNetworkSubnet(AF_INET, settings->ipv4Subnet, settings->ipv4PrefixLength);
+        if (settings->ipv4Gateway.s_addr != 0)
+        {
+            options.Gateway = FormatNetworkAddress(AF_INET, settings->ipv4Gateway);
+        }
+    }
+    else if (settings->ipv6PrefixLength != 0)
+    {
+        options.Subnet = FormatNetworkSubnet(AF_INET6, settings->ipv6Subnet, settings->ipv6PrefixLength);
+        if (!IN6_IS_ADDR_UNSPECIFIED(&settings->ipv6Gateway))
+        {
+            options.Gateway = FormatNetworkAddress(AF_INET6, settings->ipv6Gateway);
+        }
+    }
+
+    auto* compatSession2 = internalType->GetSession2();
+    RETURN_HR_IF_NULL(WSLC_E_RUNTIME_UPDATE_NEEDED, compatSession2);
+
+    wil::unique_cotaskmem_ansistring output;
+    HRESULT hr = compatSession2->CreateNetwork(wsl::shared::ToJson(options).c_str(), nullptr, &output);
+    if (FAILED(hr))
+    {
+        return errorInfoWrapper.CaptureResult(hr);
+    }
+
+    if (networkInfo != nullptr)
+    {
+        ConvertNetworkEntry(wsl::shared::FromJson<wsl::windows::common::wslc_schema::NetworkListEntry>(output.get()), *networkInfo);
+    }
+
+    return errorInfoWrapper.CaptureResult(S_OK);
+}
+CATCH_RETURN();
+
+STDAPI WslcDeleteSessionNetwork(_In_ WslcSession session, _In_z_ PCSTR name, _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
+    RETURN_HR_IF_NULL(E_POINTER, name);
+    auto* compatSession2 = internalType->GetSession2();
+    RETURN_HR_IF_NULL(WSLC_E_RUNTIME_UPDATE_NEEDED, compatSession2);
+
+    return errorInfoWrapper.CaptureResult(compatSession2->DeleteNetwork(name));
 }
 CATCH_RETURN();
 

@@ -552,6 +552,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
 
     options.Remove = context.Args.GetValue<ArgType::Remove>();
 
+    if (context.Args.Contains(ArgType::Restart))
+    {
+        options.Restart = context.Args.GetValue<ArgType::Restart>();
+    }
+
     if (context.Args.Contains(ArgType::StopSignal))
     {
         options.StopSignal = context.Args.GetValue<ArgType::StopSignal>();

@@ -22,6 +22,7 @@ Abstract:
 #include "WSLCVolumes.h"
 #include "WSLCSessionRuntime.h"
 #include "WSLCNetworkMetadata.h"
+#include "WSLCRestartScheduler.h"
 #include "DockerEventTracker.h"
 #include "DockerHTTPClient.h"
 #include "EventStore.h"
@@ -232,8 +233,8 @@ public:
     IFACEMETHOD(SetNetworkFaultsForTest)(_In_ BOOL FailCreateInspect) override;
 
     // IWSLCCompatSession - converts the WSLCCompat types to the wslc.idl types and forwards to the methods above.
-    // Methods that have an identical signature in both interfaces (Terminate, DeleteVolume, Authenticate,
-    // GetTerminationReason) are served by the single existing override and require no additional code here.
+    // Methods that have an identical signature in both interfaces (Terminate, DeleteVolume, DeleteNetwork,
+    // Authenticate, GetTerminationReason) are served by the single existing override and require no additional code here.
     IFACEMETHOD(PullImage)(
         _In_ LPCSTR Image,
         _In_opt_ LPCSTR RegistryAuthenticationInformation,
@@ -272,6 +273,8 @@ public:
         _In_ const WSLCCompatContainerOptions2* Options,
         _In_opt_ IWSLCCompatWarningCallback* WarningCallback,
         _Out_ IWSLCCompatContainer** Container) override;
+    IFACEMETHOD(ListNetworks)(_Out_ LPSTR* Output) override;
+    IFACEMETHOD(CreateNetwork)(_In_ LPCSTR Options, _In_opt_ IWSLCCompatWarningCallback* WarningCallback, _Out_ LPSTR* Network) override;
 
     common::io::MultiHandleWait CreateIOContext(HANDLE CancelHandle = nullptr);
 
@@ -304,6 +307,17 @@ public:
     const WSLCSessionRuntime& Runtime() const noexcept
     {
         return m_runtime;
+    }
+
+    bool IsTerminating() const noexcept
+    {
+        return m_terminating.load();
+    }
+
+    // Runs Callback on the session's restart thread once Delay elapses. Dropped once the session terminates.
+    void ScheduleRestart(std::chrono::milliseconds Delay, std::function<void()>&& Callback)
+    {
+        m_restartScheduler.Schedule(Delay, std::move(Callback));
     }
 
     // Creates an opaque activity token that holds a reference on this session's activity count for
@@ -394,6 +408,10 @@ private:
     void RecoverExistingContainers();
     void RecoverExistingNetworks();
 
+    // Creates a managed network. When Network is set it receives the created network as a serialized
+    // NetworkListEntry, written only once the network is committed.
+    void CreateNetworkImpl(const WSLCNetworkOptions& Options, _Out_opt_ LPSTR* Network);
+
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent);
     // Returns the manifest digest each pulled tag resolved to, in the order the daemon reported them.
     std::vector<std::string> StreamImageOperation(
@@ -477,6 +495,13 @@ private:
     // thread is alive.
     mutable wil::srwlock m_crashDumpLock;
     _Guarded_by_(m_crashDumpLock) CrashDumpCallbackList m_crashDumpCallbacks;
+
+    // Restart policies apply to the containers found by the session's first VM bring-up, the
+    // equivalent of a Docker daemon start. Later bring-ups follow an idle teardown.
+    __guarded_by(m_containersLock) bool m_sessionStartRecoveryDone = false;
+
+    // N.B. Declared last so it is stopped before anything a restart callback touches is destroyed.
+    WSLCRestartScheduler m_restartScheduler;
 
     friend class WSLCSessionRuntime;
 };
