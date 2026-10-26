@@ -19,6 +19,10 @@
 - `PortMappings()` / setter
 - `Volumes()` / setter
 - `NamedVolumes()` / setter
+- `Networks()` / setter
+  - The first network is the primary network. Cannot be combined with `NetworkingMode`.
+- `CapabilityAdditions()` / setter
+- `CapabilityDrops()` / setter
 
 **Important notes**
 

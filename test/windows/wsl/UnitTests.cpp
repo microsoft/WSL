@@ -36,6 +36,7 @@ Abstract:
 #include "WslSecurity.h"
 #include "CommandLine.h"
 #include "retryshared.h"
+#include "RingBuffer.h"
 
 #define LXSST_TEST_USERNAME L"kerneltest"
 
@@ -2708,6 +2709,39 @@ Usage:
         validateEnvironment(true);
     }
 
+    WSL2_TEST_METHOD(GuiApplicationsGlobalDisableOverridesDistroOptIn)
+    {
+        auto validateDistroStartup = []() {
+            TerminateDistribution();
+
+            auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"--exec /bin/echo ok");
+            VERIFY_ARE_EQUAL(L"ok\n", output);
+            VERIFY_ARE_EQUAL(L"", warnings);
+
+            std::tie(output, warnings) = LxsstuLaunchWslAndCaptureOutput(L"echo -n \"$DISPLAY$WAYLAND_DISPLAY\"");
+            VERIFY_ARE_EQUAL(L"", output);
+            VERIFY_ARE_EQUAL(L"", warnings);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /run/tmpfiles.d/x11.conf"), 0L);
+        };
+
+        constexpr auto c_distroConfig = "[general]\nguiApplications=true\n";
+        WslConfigChange configChange(LxssGenerateTestConfig({.guiApplications = false}));
+
+        {
+            LogInfo("Validate with systemd disabled.");
+            DistroFileChange wslConf(L"/etc/wsl.conf", false);
+            wslConf.SetContent(wsl::shared::string::MultiByteToWide(c_distroConfig).c_str());
+            validateDistroStartup();
+        }
+
+        {
+            LogInfo("Validate with systemd enabled.");
+            auto revertSystemd = EnableSystemd(c_distroConfig);
+            VERIFY_IS_TRUE(IsSystemdRunning(L"--system"));
+            validateDistroStartup();
+        }
+    }
+
     WSL2_TEST_METHOD(GuiApplicationsSystemd)
     {
         DistroFileChange wslConf(L"/etc/wsl.conf", false);
@@ -3838,6 +3872,40 @@ EOF
 
         WslShutdown();
         VerifyNoVmAccessToVhd(vhdPath.c_str());
+    }
+
+    WSL2_TEST_METHOD(CompactEncrypted)
+    {
+        WSL_TEST_VERSION_REQUIRED(wsl::windows::common::helpers::WindowsBuildNumbers::Nickel_23H2);
+
+        constexpr auto name = L"compact-encrypted-test-distro";
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
+        auto cleanupName =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
+        WslShutdown();
+
+        const auto distroKey = OpenDistributionKey(name);
+        VERIFY_IS_NOT_NULL(distroKey.get());
+
+        const auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath", L"");
+        const auto vhdFileName =
+            wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"VhdFileName", L"ext4.vhdx");
+        const auto vhdPath = std::filesystem::path(basePath) / vhdFileName;
+
+        if (!EncryptFileW(vhdPath.c_str()))
+        {
+            const auto error = GetLastError();
+            if (error == ERROR_NOT_SUPPORTED || error == ERROR_EFS_DISABLED)
+            {
+                LogSkipped("EFS is unavailable for the test VHDX: %lu", error);
+                return;
+            }
+
+            VERIFY_ARE_EQUAL(ERROR_SUCCESS, error);
+        }
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--manage {} --compact", name)), 0L);
     }
 
     WSL2_TEST_METHOD(FileOffsets)
@@ -5321,7 +5389,7 @@ VERSION_ID="Invalid|Format"
                 VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--terminate {}", LXSS_DISTRO_NAME_TEST_L).c_str()), 0L);
 
                 // The original OOBE process should fail.
-                VERIFY_ARE_EQUAL(SubProcess::GetExitCode(oobe->handle.get(), c_timeout), 1);
+                VERIFY_ARE_EQUAL(SubProcess::GetExitCode(oobe->handle.get(), c_timeout), LxsstuVmMode() ? 1 : -1);
 
                 // All processes blocked on OOBE should fail as well.
                 for (auto& waiter : waiters)
@@ -5358,7 +5426,7 @@ VERSION_ID="Invalid|Format"
         VERIFY_ARE_EQUAL(runOOBE.Get(), 0);
     }
 
-    WSL2_TEST_METHOD(OOBEAvanced)
+    TEST_METHOD(OOBEAdvanced)
     {
         ValidateOOBEWait(true, false);
         ValidateOOBEWait(false, false);
@@ -8952,6 +9020,66 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_WIN32_BOOL_SUCCEEDED(CreateHardLinkW(link.c_str(), target.c_str(), nullptr));
         verifyRejected(link);
         VERIFY_ARE_EQUAL(original, ReadFileContent(target.wstring()));
+    }
+
+    TEST_METHOD(RingBufferDelimitedStrings)
+    {
+        const auto verifyLines = [](const RingBuffer& buffer, size_t count, const std::vector<std::string>& expected, char delimiter = '\n') {
+            const auto actual = buffer.GetLastDelimitedStrings(delimiter, count);
+            VERIFY_ARE_EQUAL(expected.size(), actual.size());
+            for (size_t index = 0; index < std::min(expected.size(), actual.size()); ++index)
+            {
+                VERIFY_ARE_EQUAL(expected[index], actual[index]);
+            }
+        };
+
+        const std::vector<std::pair<std::string, std::vector<std::string>>> testCases{
+            {"a\nb\nc\n", {"a", "b", "c"}},
+            {"alpha\nbb\n\nccc\ndddd\npartial", {"alpha", "bb", "", "ccc", "dddd"}},
+            {"\nalpha\n\nbeta\n\n", {"", "alpha", "", "beta", ""}},
+            {"alpha\n", {"alpha"}},
+            {"\n\n", {"", ""}},
+            {"partial", {}}};
+
+        for (const auto& [input, expected] : testCases)
+        {
+            for (size_t offset = 0; offset < input.size(); ++offset)
+            {
+                RingBuffer buffer(input.size());
+                buffer.Insert(std::string(offset, 'x'));
+                buffer.Insert(input);
+
+                VERIFY_ARE_EQUAL(input, buffer.Get());
+                for (size_t count = 0; count <= expected.size() + 1; ++count)
+                {
+                    verifyLines(buffer, count, {expected.end() - std::min(count, expected.size()), expected.end()});
+                }
+            }
+        }
+
+        RingBuffer buffer(64);
+        verifyLines(buffer, 0, {});
+        verifyLines(buffer, 3, {});
+
+        buffer.Insert("a\nb");
+        verifyLines(buffer, 1, {"a"});
+
+        buffer.Insert("\nc\npar");
+        verifyLines(buffer, 2, {"b", "c"});
+
+        buffer.Insert("tial");
+        verifyLines(buffer, 0, {});
+
+        buffer.Insert("\n\nz\n");
+        verifyLines(buffer, 3, {"partial", "", "z"});
+        verifyLines(buffer, 7, {"a", "b", "c", "partial", "", "z"});
+        VERIFY_ARE_EQUAL(std::string("a\nb\nc\npartial\n\nz\n"), buffer.Get());
+
+        RingBuffer overwrittenBuffer(9);
+        overwrittenBuffer.Insert("discard");
+        overwrittenBuffer.Insert("\nalpha\nbeta\n");
+        VERIFY_ARE_EQUAL(std::string("pha\nbeta\n"), overwrittenBuffer.Get());
+        verifyLines(overwrittenBuffer, 3, {"pha", "beta"});
     }
 };
 } // namespace UnitTests

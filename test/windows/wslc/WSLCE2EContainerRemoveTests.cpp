@@ -67,6 +67,27 @@ class WSLCE2EContainerRemoveTests
              .ExitCode = 1});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Remove_Force_NotFound)
+    {
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto result = RunWslc(std::format(L"container remove --force {}", WslcContainerName));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Remove_Force_MixedFoundNotFound)
+    {
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container rm -f {} {}", InvalidContainerName, WslcContainerName));
+        result.Verify({.Stdout = std::format(L"{}\r\n", WslcContainerName), .Stderr = L"", .ExitCode = 0});
+
+        VerifyContainerIsNotListed(WslcContainerName);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Remove_Valid)
     {
         VerifyContainerIsNotListed(WslcContainerName);

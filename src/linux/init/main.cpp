@@ -2267,16 +2267,6 @@ void ProcessLaunchInitMessage(
         auto MiniInitDirectChildPidPath = std::filesystem::read_symlink(PROCFS_PATH "/self");
         pid_t MiniInitDirectChildPid = std::stoul(MiniInitDirectChildPidPath.string());
 
-        bool enableGuiApps = Config.EnableGuiApps;
-        {
-            wil::unique_file File{fopen(DISTRO_PATH ETC_PATH "/wsl.conf", "r")};
-            if (File)
-            {
-                std::vector<ConfigKey> ConfigKeys = {ConfigKey("general.guiApplications", enableGuiApps)};
-                ParseConfigFile(ConfigKeys, File.get(), (CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES), STRING_TO_WSTRING(CONFIG_FILE));
-            }
-        }
-
         //
         // Set up the per-distro cgroup before potentially forking into two inits.
         //
@@ -2315,9 +2305,20 @@ void ProcessLaunchInitMessage(
         //      of GUI app support because WslService is waiting to accept a connection.
         //
 
+        bool enableGuiApps = false;
         if (Message->Flags & LxMiniInitMessageFlagLaunchSystemDistro && Config.EnableGuiApps)
         {
             Step = LxInitCreateInstanceStepLaunchSystemDistro;
+
+            enableGuiApps = true;
+            {
+                wil::unique_file File{fopen(DISTRO_PATH ETC_PATH "/wsl.conf", "r")};
+                if (File)
+                {
+                    std::vector<ConfigKey> ConfigKeys = {ConfigKey("general.guiApplications", enableGuiApps)};
+                    ParseConfigFile(ConfigKeys, File.get(), (CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES), STRING_TO_WSTRING(CONFIG_FILE));
+                }
+            }
 
             //
             // If the distro did not opt-out of GUI applications, continue launching the system distro.
@@ -3596,6 +3597,10 @@ try
     // and the kernel version is >= 5.10, then SECCOMP_USER_NOTIF_FLAG_CONTINUE is available.
     uint32_t SeccompFlag = SECCOMP_RET_USER_NOTIF;
     Message->SeccompAvailable = syscall(__NR_seccomp, SECCOMP_GET_ACTION_AVAIL, 0, &SeccompFlag) == 0;
+
+    wil::unique_fd ipv6Socket{socket(AF_INET6, SOCK_DGRAM | SOCK_CLOEXEC, 0)};
+    // Treat any error as not available.
+    Message->Ipv6Available = !!ipv6Socket;
 
     auto pool = UtilReadHvPciSwiotlbPool();
     Message->HvPciSwiotlbBase = pool.Base;

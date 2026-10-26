@@ -23,25 +23,27 @@ EXTERN_C_START
 // WSLC specific error codes
 // Ensure wslc.idl and wslcsdk.idl are also updated.
 #define WSLC_E_BASE (0x0600)
-#define WSLC_E_IMAGE_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 1)             /* 0x80040601 */
-#define WSLC_E_CONTAINER_PREFIX_AMBIGUOUS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 2)  /* 0x80040602 */
-#define WSLC_E_CONTAINER_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 3)         /* 0x80040603 */
-#define WSLC_E_VOLUME_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 4)            /* 0x80040604 */
-#define WSLC_E_CONTAINER_NOT_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 5)       /* 0x80040605 */
-#define WSLC_E_CONTAINER_IS_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 6)        /* 0x80040606 */
-#define WSLC_E_SESSION_RESERVED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 7)            /* 0x80040607 */
-#define WSLC_E_INVALID_SESSION_NAME MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 8)        /* 0x80040608 */
-#define WSLC_E_NETWORK_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 9)           /* 0x80040609 */
-#define WSLC_E_WU_SEARCH_FAILED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 10)           /* 0x8004060A */
-#define WSLC_E_SDK_UPDATE_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 11)          /* 0x8004060B */
-#define WSLC_E_CONTAINER_DISABLED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 12)         /* 0x8004060C */
-#define WSLC_E_REGISTRY_BLOCKED_BY_POLICY MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 13) /* 0x8004060D */
-#define WSLC_E_VOLUME_NOT_AVAILABLE MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 14)       /* 0x8004060E */
-#define WSLC_E_SESSION_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 15)          /* 0x8004060F */
-#define WSLC_E_VM_NOT_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 16)             /* 0x80040610 */
-#define WSLC_E_EVENTS_LOST MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 17)                /* 0x80040611 */
-#define WSLC_E_EVENT_STREAM_FINISHED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 18)      /* 0x80040612 */
-#define WSLC_E_CONTAINER_DELETED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 19)          /* 0x80040613 */
+#define WSLC_E_IMAGE_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 1)                /* 0x80040601 */
+#define WSLC_E_CONTAINER_PREFIX_AMBIGUOUS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 2)     /* 0x80040602 */
+#define WSLC_E_CONTAINER_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 3)            /* 0x80040603 */
+#define WSLC_E_VOLUME_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 4)               /* 0x80040604 */
+#define WSLC_E_CONTAINER_NOT_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 5)          /* 0x80040605 */
+#define WSLC_E_CONTAINER_IS_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 6)           /* 0x80040606 */
+#define WSLC_E_SESSION_RESERVED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 7)               /* 0x80040607 */
+#define WSLC_E_INVALID_SESSION_NAME MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 8)           /* 0x80040608 */
+#define WSLC_E_NETWORK_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 9)              /* 0x80040609 */
+#define WSLC_E_WU_SEARCH_FAILED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 10)              /* 0x8004060A */
+#define WSLC_E_SDK_UPDATE_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 11)             /* 0x8004060B */
+#define WSLC_E_CONTAINER_DISABLED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 12)            /* 0x8004060C */
+#define WSLC_E_REGISTRY_BLOCKED_BY_POLICY MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 13)    /* 0x8004060D */
+#define WSLC_E_VOLUME_NOT_AVAILABLE MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 14)          /* 0x8004060E */
+#define WSLC_E_SESSION_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 15)             /* 0x8004060F */
+#define WSLC_E_VM_NOT_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 16)                /* 0x80040610 */
+#define WSLC_E_EVENTS_LOST MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 17)                   /* 0x80040611 */
+#define WSLC_E_EVENT_STREAM_FINISHED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 18)         /* 0x80040612 */
+#define WSLC_E_CONTAINER_DELETED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 19)             /* 0x80040613 */
+#define WSLC_E_CAPABILITY_ADDITIONS_DISABLED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 20) /* 0x80040614 */
+#define WSLC_E_RUNTIME_UPDATE_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 21)         /* 0x80040615 */
 
 // Session values
 #define WSLC_SESSION_OPTIONS_SIZE 72
@@ -55,7 +57,7 @@ typedef struct WslcSessionSettings
 DECLARE_HANDLE(WslcSession);
 
 // Container values
-#define WSLC_CONTAINER_OPTIONS_SIZE 104
+#define WSLC_CONTAINER_OPTIONS_SIZE 152
 #define WSLC_CONTAINER_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcContainerSettings
@@ -204,6 +206,15 @@ typedef struct WslcContainerNamedVolume
     _In_ BOOL readOnly;
 } WslcContainerNamedVolume;
 
+typedef struct WslcContainerNetwork
+{
+    _In_z_ PCSTR name; // Network name (e.g. "bridge" or a network created with WslcCreateSessionNetwork)
+    _In_reads_opt_(aliasCount) const PCSTR* aliases; // DNS aliases for the container on this network; user-defined networks only
+    _In_ uint32_t aliasCount;
+    _In_opt_ const IN_ADDR* ipv4Address;  // Static IPv4 address for the container on this network; user-defined networks only
+    _In_opt_ const IN6_ADDR* ipv6Address; // Static IPv6 address for the container on this network; user-defined networks only
+} WslcContainerNetwork;
+
 typedef enum WslcContainerFlags
 {
     WSLC_CONTAINER_FLAG_NONE = 0x00000000,
@@ -226,6 +237,11 @@ DEFINE_ENUM_FLAG_OPERATORS(WslcContainerStartFlags);
 
 STDAPI WslcInitContainerSettings(_In_ PCSTR imageName, _Out_ WslcContainerSettings* containerSettings);
 
+// Notes:
+//   - Returns E_INVALIDARG if both WslcSetContainerSettingsNetworkingMode and WslcSetContainerSettingsNetworks were called,
+//     or if aliases or an IP address are set on a network that is not user-defined.
+//   - Returns WSLC_E_RUNTIME_UPDATE_NEEDED if the installed WSL runtime does not support the requested settings, such as
+//     capabilities, or aliases or an IP address on the primary network.
 STDAPI WslcCreateContainer(_In_ WslcSession session, _In_ const WslcContainerSettings* containerSettings, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // Opens an existing container by name, full ID, or partial ID prefix.
@@ -241,6 +257,8 @@ STDAPI WslcSetContainerSettingsName(_In_ WslcContainerSettings* containerSetting
 
 STDAPI WslcSetContainerSettingsInitProcess(_In_ WslcContainerSettings* containerSettings, _In_ WslcProcessSettings* initProcess);
 
+// Sets the networking mode. Defaults to WSLC_CONTAINER_NETWORKING_MODE_NONE when neither this nor
+// WslcSetContainerSettingsNetworks is called. Cannot be combined with WslcSetContainerSettingsNetworks.
 STDAPI WslcSetContainerSettingsNetworkingMode(_In_ WslcContainerSettings* containerSettings, _In_ WslcContainerNetworkingMode networkingMode);
 
 STDAPI WslcSetContainerSettingsHostName(_In_ WslcContainerSettings* containerSettings, _In_ PCSTR hostName);
@@ -263,6 +281,25 @@ STDAPI WslcSetContainerSettingsNamedVolumes(
     _In_ WslcContainerSettings* containerSettings,
     _In_reads_opt_(namedVolumeCount) const WslcContainerNamedVolume* namedVolumes,
     _In_ uint32_t namedVolumeCount);
+
+// Connects the container to one or more networks. The first network is the primary network.
+// Cannot be combined with WslcSetContainerSettingsNetworkingMode. Pass null and 0 to clear.
+// The networks array and the strings and addresses it references are not copied and must stay valid until
+// WslcCreateContainer returns.
+//
+// Notes:
+//   - Returns E_INVALIDARG if networks and networkCount disagree on being empty, if a network name is null or empty,
+//     or if aliases and aliasCount disagree on being empty or an alias is null.
+STDAPI WslcSetContainerSettingsNetworks(
+    _In_ WslcContainerSettings* containerSettings, _In_reads_opt_(networkCount) const WslcContainerNetwork* networks, _In_ uint32_t networkCount);
+
+// Both setters borrow the array and strings until WslcCreateContainer returns. Pass nullptr/0 to clear.
+// Creation fails with WSLC_E_CAPABILITY_ADDITIONS_DISABLED if computer policy blocks capability additions.
+STDAPI WslcSetContainerSettingsCapabilityAdditions(
+    _In_ WslcContainerSettings* containerSettings, _In_reads_opt_(capabilityCount) PCSTR const* capabilities, _In_ uint32_t capabilityCount);
+
+STDAPI WslcSetContainerSettingsCapabilityDrops(
+    _In_ WslcContainerSettings* containerSettings, _In_reads_opt_(capabilityCount) PCSTR const* capabilities, _In_ uint32_t capabilityCount);
 
 STDAPI WslcCreateContainerProcess(
     _In_ WslcContainer container, _In_ WslcProcessSettings* newProcessSettings, _Out_ WslcProcess* newProcess, _Outptr_opt_result_z_ PWSTR* errorMessage);
@@ -648,6 +685,139 @@ STDAPI WslcSessionAuthenticate(
 //
 
 STDAPI WslcListSessionImages(_In_ WslcSession session, _Outptr_result_buffer_(*count) WslcImageInfo** images, _Out_ uint32_t* count);
+
+// NETWORKS
+
+#define WSLC_NETWORK_ID_LENGTH 65      // 64 chars + null
+#define WSLC_NETWORK_NAME_LENGTH 256   // 255 chars + null
+#define WSLC_NETWORK_DRIVER_LENGTH 256 // 255 chars + null
+
+typedef enum WslcNetworkFlags
+{
+    WSLC_NETWORK_FLAG_NONE = 0x00000000,
+    WSLC_NETWORK_FLAG_ENABLE_IPV4 = 0x00000001,
+    WSLC_NETWORK_FLAG_ENABLE_IPV6 = 0x00000002,
+    WSLC_NETWORK_FLAG_INTERNAL = 0x00000004,
+} WslcNetworkFlags;
+
+DEFINE_ENUM_FLAG_OPERATORS(WslcNetworkFlags);
+
+typedef struct WslcNetworkInfo
+{
+    CHAR id[WSLC_NETWORK_ID_LENGTH];
+    CHAR name[WSLC_NETWORK_NAME_LENGTH];
+    CHAR driver[WSLC_NETWORK_DRIVER_LENGTH];
+    int64_t createdUnixTime; // 0 if unknown.
+    WslcNetworkFlags flags;
+
+    // Subnets and gateways in network byte order. A prefix length of 0 means the network has no
+    // subnet for that address family, and an all-zero gateway means no gateway is configured.
+    uint8_t ipv4PrefixLength;
+    uint8_t ipv6PrefixLength;
+    IN_ADDR ipv4Subnet;
+    IN_ADDR ipv4Gateway;
+    IN6_ADDR ipv6Subnet;
+    IN6_ADDR ipv6Gateway;
+} WslcNetworkInfo;
+
+// Retrieves the list of networks in a session.
+//
+// Parameters:
+//   session
+//       A valid WslcSession handle.
+//
+//   networks
+//       On success, receives a pointer to a contiguous array of WslcNetworkInfo structures
+//       describing the networks, or null if there are none.
+//
+//       The array is allocated using CoTaskMemAlloc. The caller takes ownership of the
+//       memory and must free it by calling CoTaskMemFree when it is no longer needed.
+//
+//   count
+//       On success, receives the number of elements in the networks array.
+//       On failure, *count is set to 0.
+//
+//   errorMessage
+//       Optional. On failure, receives a human-readable error message. May be null.
+//
+// Return Value:
+//   S_OK on success. Otherwise, an HRESULT error code indicating the reason for failure.
+//
+// Notes:
+//   - Returns WSLC_E_RUNTIME_UPDATE_NEEDED if the installed WSL runtime does not support network management.
+STDAPI WslcListSessionNetworks(
+    _In_ WslcSession session,
+    _Outptr_result_buffer_maybenull_(*count) WslcNetworkInfo** networks,
+    _Out_ uint32_t* count,
+    _Outptr_opt_result_z_ PWSTR* errorMessage);
+
+typedef struct WslcNetworkSettings
+{
+    _In_z_ PCSTR name;
+
+    // WSLC_NETWORK_FLAG_ENABLE_IPV4, WSLC_NETWORK_FLAG_ENABLE_IPV6 and WSLC_NETWORK_FLAG_INTERNAL are accepted. IPv4 is
+    // always enabled; set both WSLC_NETWORK_FLAG_ENABLE_IPV4 and WSLC_NETWORK_FLAG_ENABLE_IPV6 for a dual-stack network.
+    // WSLC_NETWORK_FLAG_ENABLE_IPV6 without WSLC_NETWORK_FLAG_ENABLE_IPV4 (IPv6 only) returns E_NOTIMPL.
+    WslcNetworkFlags flags;
+
+    // Optional subnet and gateway in network byte order. Set the prefix length of at most one address family. The
+    // session chooses an IPv4 subnet when none is set, but has no default IPv6 subnets, so set an IPv6 subnet when
+    // IPv6 is enabled. An all-zero gateway lets the session choose the gateway.
+    uint8_t ipv4PrefixLength;
+    uint8_t ipv6PrefixLength;
+    IN_ADDR ipv4Subnet;
+    IN_ADDR ipv4Gateway;
+    IN6_ADDR ipv6Subnet;
+    IN6_ADDR ipv6Gateway;
+} WslcNetworkSettings;
+
+// Creates a bridge network in a session.
+//
+// Parameters:
+//   session
+//       A valid WslcSession handle.
+//
+//   settings
+//       The settings of the network to create.
+//
+//   networkInfo
+//       Optional. On success, receives the properties of the created network. May be null.
+//
+//   errorMessage
+//       Optional. On failure, receives a human-readable error message. May be null.
+//
+// Return Value:
+//   S_OK on success. Otherwise, an HRESULT error code indicating the reason for failure.
+//
+// Notes:
+//   - Returns HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS) if a network with the same name exists.
+//   - Returns E_INVALIDARG if the name is invalid or reserved, if flags contains an unsupported value, if both prefix
+//     lengths are set, if a prefix length is out of range, if a subnet is set for an address family that is not enabled,
+//     or if a gateway is set without a subnet of the same address family.
+//   - Returns WSLC_E_RUNTIME_UPDATE_NEEDED if the installed WSL runtime does not support network management.
+STDAPI WslcCreateSessionNetwork(
+    _In_ WslcSession session, _In_ const WslcNetworkSettings* settings, _Out_opt_ WslcNetworkInfo* networkInfo, _Outptr_opt_result_z_ PWSTR* errorMessage);
+
+// Deletes a network from a session.
+//
+// Parameters:
+//   session
+//       A valid WslcSession handle.
+//
+//   name
+//       The name of the network to delete.
+//
+//   errorMessage
+//       Optional. On failure, receives a human-readable error message. May be null.
+//
+// Return Value:
+//   S_OK on success. Otherwise, an HRESULT error code indicating the reason for failure.
+//
+// Notes:
+//   - Returns WSLC_E_NETWORK_NOT_FOUND if the network does not exist.
+//   - Returns HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION) if a container is connected to the network.
+//   - Returns WSLC_E_RUNTIME_UPDATE_NEEDED if the installed WSL runtime does not support network management.
+STDAPI WslcDeleteSessionNetwork(_In_ WslcSession session, _In_z_ PCSTR name, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // STORAGE
 

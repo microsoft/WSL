@@ -1029,16 +1029,14 @@ Return Value:
         LogError("Failed to create WER report, 0x%x", wil::ResultFromCaughtException());
     }
 
-    if (LxsstuVmMode())
+    // Dump guest processes in WSL1 & WSL2 mode, since some WSL1 tests use a WSL2 VM.
+    try
     {
-        try
-        {
-            DumpGuestProcesses();
-        }
-        catch (...)
-        {
-            LogError("Failed to dump guest processes, 0x%x", wil::ResultFromCaughtException());
-        }
+        DumpGuestProcesses();
+    }
+    catch (...)
+    {
+        LogError("Failed to dump guest processes, 0x%x", wil::ResultFromCaughtException());
     }
 
     try
@@ -1527,7 +1525,7 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         L"\n"
         L"mountDeviceTimeout=120000\n"
         L"kernelBootTimeout=120000\n"
-        L"distributionStartTimeout=120000\n"
+        L"distributionStartTimeout=14400000\n" // 4 hours. This is designed to trigger DumpGuestProcesses() if the tests get stuck.
         L"debugConsoleLogFile=" +
         EscapePath(Default.debugConsoleLogFile.value_or(kernelLogs)) +
         L"\n"

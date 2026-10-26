@@ -1,6 +1,6 @@
 # WSL container API C reference
 
-The WSL container API exposes a C API for creating sessions, creating containers inside those sessions, starting processes, managing images, managing VHD-backed storage, and checking/installing required platform components.
+The WSL container API exposes a C API for creating sessions, creating containers inside those sessions, starting processes, managing images, listing networks, managing VHD-backed storage, and checking/installing required platform components.
 
 > **Header:** `wslcsdk.h`
 >
@@ -16,6 +16,7 @@ The WSL container API exposes a C API for creating sessions, creating containers
 - [Container APIs](container-apis/index.md)
 - [Process APIs](process-apis/index.md)
 - [Image APIs](image-apis/index.md)
+- [Network APIs](network-apis/index.md)
 - [Storage APIs](storage-apis/index.md)
 - [Install and Version APIs](install-and-version-apis/index.md)
 - [Enumerations](enumerations/index.md)

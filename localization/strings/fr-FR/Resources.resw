@@ -1025,6 +1025,9 @@ Retour à la mise en réseau NAT.</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>Le conteneur WSL est désactivé par la stratégie de l’ordinateur.</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>Les ajouts de fonctionnalités Linux sont désactivés par la stratégie de l’ordinateur.</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>Le registre d’images conteneur « {} » est bloqué par la stratégie de l’ordinateur.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3653,6 +3656,12 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   </data>
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>Exposez les capacités de virtualisation au conteneur</value>
+  </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Ajouter des capacités Linux (répétable)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Supprimer les capacités Linux (répétable)</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Arguments à passer à la commande en cours d’exécution dans le conteneur</value>

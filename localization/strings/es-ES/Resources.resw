@@ -1024,6 +1024,9 @@ Revirtiendo a las redes NAT.</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>El contenedor WSL está deshabilitado por la directiva de equipo.</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>Las adiciones de funcionalidad de Linux están deshabilitadas por la directiva de equipo.</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>La directiva de equipo bloquea el registro de imágenes de contenedor "{}".</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3652,6 +3655,12 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   </data>
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>Exposición de las funcionalidades de virtualización al contenedor</value>
+  </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Agregar funcionalidades de Linux (repetibles)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Excluir funcionalidades de Linux (repetibles)</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Argumentos que se pasan al comando que se ejecuta dentro del contenedor</value>

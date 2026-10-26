@@ -34,6 +34,7 @@ Abstract:
 #include "wslc.h"
 #include "WSLCCompat.h"
 #include "COMImplClass.h"
+#include "RuntimeClass.h"
 #include "wslutil.h"
 #include <atomic>
 #include <algorithm>
@@ -52,11 +53,33 @@ struct CallingProcessTokenInfo
     bool Elevated;
 };
 
+class MarshaledSessionReference
+{
+public:
+    NON_COPYABLE(MarshaledSessionReference);
+
+    explicit MarshaledSessionReference(IWSLCSessionReference* Reference);
+    ~MarshaledSessionReference();
+
+    MarshaledSessionReference(MarshaledSessionReference&& Other) noexcept;
+    MarshaledSessionReference& operator=(MarshaledSessionReference&& Other) noexcept;
+
+    HRESULT OpenSession(IWSLCSession** Session) const noexcept;
+    HRESULT Terminate() const noexcept;
+
+private:
+    HRESULT Resolve(IWSLCSessionReference** Reference) const noexcept;
+    void Reset() noexcept;
+
+    wil::com_ptr<IGlobalInterfaceTable> m_git;
+    DWORD m_cookie{};
+};
+
 // Metadata for a tracked session, stored service-side at creation time.
 // Security info is stored here (not queried from the per-user process) to prevent spoofing.
 struct SessionEntry
 {
-    wil::com_ptr<IWSLCSessionReference> Ref;
+    MarshaledSessionReference Ref;
     ULONG SessionId = 0;
     DWORD CreatorPid = 0;
     std::wstring DisplayName;
@@ -124,9 +147,9 @@ private:
         auto each = [&](SessionEntry& entry) {
             // Try to open the session via the service ref.
             // Fails with ERROR_OBJECT_NO_LONGER_EXISTS if released,
-            // ERROR_INVALID_STATE if terminated, or RPC error if per-user process is dead.
+            // ERROR_INVALID_STATE if terminated, or RPC error if the reference is disconnected or the host exited.
             wil::com_ptr<IWSLCSession> lockedSession;
-            if (FAILED_LOG(entry.Ref->OpenSession(&lockedSession)))
+            if (FAILED_LOG(entry.Ref.OpenSession(&lockedSession)))
             {
                 // FindSession is used by plugin callbacks into the API. Defer cleanup in that path so
                 // OnWslcSessionStopping is not nested inside another plugin notification.
@@ -201,7 +224,7 @@ private:
 } // namespace wsl::windows::service::wslc
 
 class DECLSPEC_UUID("a9b7a1b9-0671-405c-95f1-e0612cb4ce8f") WSLCSessionManager
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCSessionManager, IWSLCCompatSessionManager, IFastRundown, ISupportErrorInfo>,
+    : public wsl::windows::common::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCSessionManager, IWSLCCompatSessionManager, IFastRundown, ISupportErrorInfo>,
       public wsl::windows::service::wslc::COMImplClass<wsl::windows::service::wslc::WSLCSessionManagerImpl>
 {
 public:

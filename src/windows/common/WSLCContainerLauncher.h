@@ -31,6 +31,9 @@ public:
 
     WSLCContainerState State();
     ClientRunningWSLCProcess GetInitProcess();
+    // Returns the init process retained by this wrapper's latest successful Start().
+    ClientRunningWSLCProcess GetStartedProcess();
+    HRESULT Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, IWarningCallback* WarningCallback);
     void SetDeleteOnClose(bool deleteOnClose);
     void Reset();
     wslc_schema::InspectContainer Inspect();
@@ -40,6 +43,7 @@ public:
 
 private:
     wil::com_ptr<IWSLCContainer> m_container;
+    wil::com_ptr<IWSLCProcess> m_startedProcess;
     WSLCProcessFlags m_flags;
     bool m_deleteOnClose = true;
 };
@@ -80,6 +84,7 @@ public:
     void SetEntrypoint(std::vector<std::string>&& entrypoint);
     void SetDefaultStopSignal(WSLCSignal Signal);
     void SetStopTimeout(LONG Timeout);
+    void SetRestartPolicy(WSLCContainerRestartPolicy Policy);
     void SetShmSize(int64_t ShmSize);
     void SetHealthCmd(std::string&& HealthCmd);
     void SetHealthInterval(int64_t Nanoseconds);
@@ -96,6 +101,8 @@ public:
     void SetMemoryLimit(std::int64_t Bytes);
     void SetNanoCpus(std::int64_t NanoCpus);
     void AddUlimit(const std::string& Name, std::int64_t Soft, std::int64_t Hard);
+    void SetCapAdd(std::vector<std::string>&& CapAdd);
+    void SetCapDrop(std::vector<std::string>&& CapDrop);
 
     using WSLCProcessLauncher::FormatResult;
     using WSLCProcessLauncher::SetTtySize;
@@ -120,6 +127,7 @@ private:
     std::vector<std::string> m_entrypoint;
     WSLCSignal m_stopSignal = WSLCSignalNone;
     std::optional<LONG> m_stopTimeout;
+    WSLCContainerRestartPolicy m_restartPolicy = WSLCContainerRestartPolicyNo;
     int64_t m_shmSize = 0;
     std::optional<std::string> m_healthCmd;
     std::optional<int64_t> m_healthInterval;
@@ -142,5 +150,7 @@ private:
     std::int64_t m_nanoCpus = 0;
     std::vector<WSLCUlimit> m_ulimits;
     std::deque<std::string> m_ulimitNames;
+    std::vector<std::string> m_capAdd;
+    std::vector<std::string> m_capDrop;
 };
 } // namespace wsl::windows::common

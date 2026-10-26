@@ -1018,6 +1018,9 @@ Powrót do sieci NAT.</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>Kontener WSL jest wyłączony przez zasady komputera.</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>Dodatki funkcji systemu Linux są wyłączone przez zasady komputera.</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>Rejestr obrazów kontenerów „{}” jest zablokowany przez zasady komputera.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3646,6 +3649,12 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   </data>
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>Udostępnij możliwości wirtualizacji kontenerowi</value>
+  </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Dodaj możliwości systemu Linux (można powtarzać)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Usuń uprawnienia systemu Linux (można powtarzać)</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Argumenty do przekazania do polecenia wykonywanego wewnątrz kontenera</value>

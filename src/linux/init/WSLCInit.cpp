@@ -80,6 +80,14 @@ try
     dxg.path = "/dev/dxg";
     dxg.permissions = "rwm";
 
+    wsl::shared::cdi::DeviceNode drmCard{};
+    drmCard.path = "/dev/dri/card0";
+    drmCard.permissions = "rwm";
+
+    wsl::shared::cdi::DeviceNode drmRender{};
+    drmRender.path = "/dev/dri/renderD128";
+    drmRender.permissions = "rwm";
+
     wsl::shared::cdi::Mount libs{};
     libs.hostPath = LXSS_LIB_PATH;
     libs.containerPath = LXSS_LIB_PATH;
@@ -105,6 +113,8 @@ try
     wsl::shared::cdi::Device gpu{};
     gpu.name = "gpu";
     gpu.containerEdits.deviceNodes.push_back(std::move(dxg));
+    gpu.containerEdits.deviceNodes.push_back(std::move(drmCard));
+    gpu.containerEdits.deviceNodes.push_back(std::move(drmRender));
     gpu.containerEdits.mounts.push_back(std::move(libs));
     gpu.containerEdits.mounts.push_back(std::move(drivers));
     gpu.containerEdits.hooks.push_back(std::move(hook));

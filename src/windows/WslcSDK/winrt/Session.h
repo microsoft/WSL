@@ -43,6 +43,9 @@ struct Session : SessionT<Session>
     winrt::Microsoft::WSL::Containers::AuthenticateResult Authenticate(
         winrt::Windows::Foundation::Uri const& serverAddress, hstring const& username, hstring const& password);
     winrt::Windows::Foundation::Collections::IVectorView<winrt::Microsoft::WSL::Containers::ImageInfo> GetImages();
+    winrt::Windows::Foundation::Collections::IVectorView<winrt::Microsoft::WSL::Containers::NetworkInfo> GetNetworks();
+    winrt::Microsoft::WSL::Containers::NetworkInfo CreateNetwork(winrt::Microsoft::WSL::Containers::NetworkSettings const& settings);
+    void DeleteNetwork(hstring const& name);
     winrt::event_token Terminated(winrt::Microsoft::WSL::Containers::SessionTerminationHandler const& handler);
     void Terminated(winrt::event_token const& token) noexcept;
     winrt::event_token ProcessCrashed(winrt::Microsoft::WSL::Containers::ProcessCrashHandler const& handler);
