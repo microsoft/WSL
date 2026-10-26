@@ -338,8 +338,6 @@ void UserCOMCallback::Reset() noexcept
 
         m_session->UnregisterUserCOMCallback(m_threadId);
         m_threadId = 0;
-
-        LOG_IF_FAILED(CoDisableCallCancellation(nullptr));
     }
 }
 
@@ -362,7 +360,7 @@ HRESULT WSLCSession::Initialize(
     _In_ const WSLCSessionInitSettings* Settings,
     _In_ IWSLCVirtualMachineFactory* VmFactory,
     _In_ IWSLCPluginNotifier* PluginNotifier,
-    _In_opt_ IWarningCallback* WarningCallback)
+    _In_opt_ IDiagnosticCallback* DiagnosticCallback)
 try
 {
     RETURN_HR_IF(E_POINTER, Settings == nullptr || VmFactory == nullptr);
@@ -378,7 +376,7 @@ try
 
     // Set up a warning context for the duration of initialization so that non-fatal
     // failures are streamed to the CLI.
-    WSLCExecutionContext warningContext(this, WarningCallback);
+    WSLCExecutionContext diagnosticContext(this, DiagnosticCallback);
 
     // The VM (and storage VHD) is created lazily on the first operation. Validate the storage
     // configuration eagerly here so misconfiguration is reported at session creation rather than
@@ -988,10 +986,10 @@ try
 }
 CATCH_LOG()
 
-HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, BOOL AllTags, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback)
+HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, BOOL AllTags, IProgressCallback* ProgressCallback, IDiagnosticCallback* DiagnosticCallback)
 try
 {
-    WSLCExecutionContext context(this, WarningCallback);
+    WSLCExecutionContext context(this, DiagnosticCallback);
 
     RETURN_HR_IF_NULL(E_POINTER, Image);
 
@@ -1007,6 +1005,7 @@ try
     }
 
     EnforceRegistryAllowlist(repo);
+    WSLC_EVENT(context.Diagnostics(), "ImagePullStarted", WSLC_DIAG_CODE_IMAGE_PULL_STARTED, "Image: {}", Image);
 
     auto runtime = m_runtime.Acquire();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
@@ -1031,6 +1030,7 @@ try
         OnImageCreated(Image);
     }
 
+    WSLC_EVENT(context.Diagnostics(), "ImagePullCompleted", WSLC_DIAG_CODE_IMAGE_PULL_COMPLETED, "Image: {}", Image);
     return S_OK;
 }
 CATCH_RETURN();
@@ -1641,10 +1641,11 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::LoadImage(const WSLCHandle ImageHandle, ULONGLONG ContentSize, IWarningCallback* WarningCallback, IImageLoadCallback* LoadCallback)
+HRESULT WSLCSession::LoadImage(const WSLCHandle ImageHandle, ULONGLONG ContentSize, IDiagnosticCallback* DiagnosticCallback, IImageLoadCallback* LoadCallback)
 try
 {
-    WSLCExecutionContext context(this, WarningCallback);
+    WSLCExecutionContext context(this, DiagnosticCallback);
+    WSLC_EVENT(context.Diagnostics(), "ImageLoadStarted", WSLC_DIAG_CODE_IMAGE_LOAD_STARTED, "Size: {} bytes", ContentSize);
 
     auto lock = AcquireLease();
 
@@ -1654,14 +1655,15 @@ try
 
     std::ignore = ImportImageImpl(*requestContext, ImageHandle, LoadCallback);
 
+    WSLC_EVENT(context.Diagnostics(), "ImageLoadCompleted", WSLC_DIAG_CODE_IMAGE_LOAD_COMPLETED, "Size: {} bytes", ContentSize);
     return S_OK;
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ImportImage(const WSLCHandle ImageHandle, LPCSTR ImageName, ULONGLONG ContentSize, IWarningCallback* WarningCallback, LPSTR* ImageId)
+HRESULT WSLCSession::ImportImage(const WSLCHandle ImageHandle, LPCSTR ImageName, ULONGLONG ContentSize, IDiagnosticCallback* DiagnosticCallback, LPSTR* ImageId)
 try
 {
-    WSLCExecutionContext context(this, WarningCallback);
+    WSLCExecutionContext context(this, DiagnosticCallback);
 
     RETURN_HR_IF_NULL(E_POINTER, ImageId);
     *ImageId = nullptr;
@@ -1679,6 +1681,14 @@ try
         repo = reference.Repository.Name;
         tag = tagOrDigest.value();
     }
+
+    WSLC_EVENT(
+        context.Diagnostics(),
+        "ImageImportStarted",
+        WSLC_DIAG_CODE_IMAGE_IMPORT_STARTED,
+        "Name: {}; Size: {} bytes",
+        ImageName != nullptr && *ImageName != '\0' ? ImageName : "<unnamed>",
+        ContentSize);
 
     auto lock = AcquireLease();
 
@@ -1700,6 +1710,7 @@ try
 
     *ImageId = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(imageId->c_str()).release();
 
+    WSLC_EVENT(context.Diagnostics(), "ImageImportCompleted", WSLC_DIAG_CODE_IMAGE_IMPORT_COMPLETED, "ID: {}", imageId.value());
     return S_OK;
 }
 CATCH_RETURN();
@@ -2233,10 +2244,10 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, BOOL AllTags, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback)
+HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, BOOL AllTags, IProgressCallback* ProgressCallback, IDiagnosticCallback* DiagnosticCallback)
 try
 {
-    WSLCExecutionContext context(this, WarningCallback);
+    WSLCExecutionContext context(this, DiagnosticCallback);
 
     RETURN_HR_IF_NULL(E_POINTER, Image);
     RETURN_HR_IF_NULL(E_POINTER, RegistryAuthenticationInformation);
@@ -2253,6 +2264,7 @@ try
     }
 
     EnforceRegistryAllowlist(repo);
+    WSLC_EVENT(context.Diagnostics(), "ImagePushStarted", WSLC_DIAG_CODE_IMAGE_PUSH_STARTED, "Image: {}", Image);
 
     auto lock = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
@@ -2260,6 +2272,7 @@ try
     auto requestContext = m_runtime.Docker().PushImage(repo.Name, tagOrDigest, RegistryAuthenticationInformation);
     StreamImageOperation(*requestContext, Image, "Push", ProgressCallback);
 
+    WSLC_EVENT(context.Diagnostics(), "ImagePushCompleted", WSLC_DIAG_CODE_IMAGE_PUSH_COMPLETED, "Image: {}", Image);
     return S_OK;
 }
 CATCH_RETURN();
@@ -2398,10 +2411,10 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::CreateContainer(const WSLCContainerOptions* containerOptions, IWarningCallback* WarningCallback, IWSLCContainer** Container)
+HRESULT WSLCSession::CreateContainer(const WSLCContainerOptions* containerOptions, IDiagnosticCallback* DiagnosticCallback, IWSLCContainer** Container)
 try
 {
-    WSLCExecutionContext context(this, WarningCallback);
+    WSLCExecutionContext context(this, DiagnosticCallback);
     THROW_HR_IF_NULL(E_POINTER, containerOptions);
     THROW_HR_IF_NULL(E_POINTER, Container);
     *Container = nullptr;
@@ -2424,6 +2437,14 @@ try
             !wsl::windows::policies::IsFeatureAllowed(
                 wsl::windows::policies::OpenPoliciesKey().get(), wsl::windows::policies::c_allowWSLContainerPrivileged));
 
+    WSLC_EVENT(
+        context.Diagnostics(),
+        "ContainerCreationStarted",
+        WSLC_DIAG_CODE_CONTAINER_CREATION_STARTED,
+        "Image: {}; Name: {}",
+        containerOptions->Image,
+        containerOptions->Name != nullptr && *containerOptions->Name != '\0' ? containerOptions->Name : "<generated>");
+
     auto lock = AcquireLease();
 
     auto result = wil::ResultFromException([&]() { CreateContainerImpl(containerOptions, Container); });
@@ -2438,6 +2459,17 @@ try
         TraceLoggingValue(containerOptions->Image, "Image"),
         TraceLoggingValue(m_displayName.c_str(), "SessionName"),
         TraceLoggingValue(m_creatorProcessName.c_str(), "CreatorProcess"));
+
+    if (SUCCEEDED(result))
+    {
+        WSLC_EVENT(
+            context.Diagnostics(),
+            "ContainerCreationCompleted",
+            WSLC_DIAG_CODE_CONTAINER_CREATION_COMPLETED,
+            "Image: {}; Name: {}",
+            containerOptions->Image,
+            containerOptions->Name != nullptr && *containerOptions->Name != '\0' ? containerOptions->Name : "<generated>");
+    }
 
     return result;
 }
@@ -3164,10 +3196,10 @@ try
 CATCH_RETURN();
 
 HRESULT WSLCSession::PruneVolumes(
-    const WSLCFilter* Filters, ULONG FiltersCount, IWarningCallback* WarningCallback, WSLCVolumeName** Volumes, ULONG* VolumesCount, ULONGLONG* SpaceReclaimed)
+    const WSLCFilter* Filters, ULONG FiltersCount, IDiagnosticCallback* DiagnosticCallback, WSLCVolumeName** Volumes, ULONG* VolumesCount, ULONGLONG* SpaceReclaimed)
 try
 {
-    WSLCExecutionContext context(this, WarningCallback);
+    WSLCExecutionContext context(this, DiagnosticCallback);
 
     RETURN_HR_IF_NULL(E_POINTER, Volumes);
     RETURN_HR_IF_NULL(E_POINTER, VolumesCount);
@@ -3177,6 +3209,7 @@ try
     *SpaceReclaimed = 0;
 
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
+    WSLC_EVENT(context.Diagnostics(), "VolumePruneStarted", WSLC_DIAG_CODE_VOLUME_PRUNE_STARTED, "Filters: {}", FiltersCount);
 
     auto lock = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVolumes());
@@ -3206,6 +3239,13 @@ try
         *VolumesCount = static_cast<ULONG>(pruneResult.Volumes.size());
     }
 
+    WSLC_EVENT(
+        context.Diagnostics(),
+        "VolumePruneCompleted",
+        WSLC_DIAG_CODE_VOLUME_PRUNE_COMPLETED,
+        "Volumes: {}; Reclaimed: {} bytes",
+        pruneResult.Volumes.size(),
+        pruneResult.SpaceReclaimed);
     return S_OK;
 }
 CATCH_RETURN();
@@ -3239,20 +3279,27 @@ static wslc_schema::NetworkListEntry ToNetworkListEntry(const docker_schema::Net
     return entry;
 }
 
-HRESULT WSLCSession::CreateNetwork(const WSLCNetworkOptions* Options, IWarningCallback* WarningCallback)
+HRESULT WSLCSession::CreateNetwork(const WSLCNetworkOptions* Options, IDiagnosticCallback* DiagnosticCallback)
 try
 {
-    WSLCExecutionContext context(this, WarningCallback);
+    WSLCExecutionContext context(this, DiagnosticCallback);
 
     RETURN_HR_IF_NULL(E_POINTER, Options);
 
-    CreateNetworkImpl(*Options, nullptr);
+    wsl::windows::wslc::diagnostics::DiagnosticQueue pending{context.Diagnostics().EnabledLevels()};
+    auto completeDiagnostics = wil::scope_exit([&]() { pending.Complete(context.Diagnostics()); });
+
+    CreateNetworkImpl(*Options, nullptr, &context.Diagnostics(), &pending);
 
     return S_OK;
 }
 CATCH_RETURN();
 
-void WSLCSession::CreateNetworkImpl(const WSLCNetworkOptions& Options, LPSTR* Network)
+void WSLCSession::CreateNetworkImpl(
+    const WSLCNetworkOptions& Options,
+    LPSTR* Network,
+    const wsl::windows::wslc::diagnostics::DiagnosticReporter* Diagnostics,
+    wsl::windows::wslc::diagnostics::DiagnosticQueue* Pending)
 {
     THROW_HR_IF_NULL(E_POINTER, Options.Name);
 
@@ -3266,6 +3313,10 @@ void WSLCSession::CreateNetworkImpl(const WSLCNetworkOptions& Options, LPSTR* Ne
 
     auto driverOpts = wslutil::ParseKeyValuePairs(Options.DriverOpts, Options.DriverOptsCount);
     auto labels = wslutil::ParseKeyValuePairs(Options.Labels, Options.LabelsCount, WSLCNetworkManagedLabel);
+    if (Diagnostics != nullptr)
+    {
+        WSLC_EVENT(*Diagnostics, "NetworkCreationStarted", WSLC_DIAG_CODE_NETWORK_CREATION_STARTED, "Name: {}; Driver: {}", name, driver);
+    }
 
     auto lock = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
@@ -3377,6 +3428,10 @@ void WSLCSession::CreateNetworkImpl(const WSLCNetworkOptions& Options, LPSTR* Ne
     auto [it, inserted] = m_networks.insert({name, std::move(entry)});
     WI_VERIFY(inserted);
 
+    if (Pending != nullptr)
+    {
+        WSLC_EVENT(*Pending, "NetworkCreated", WSLC_DIAG_CODE_NETWORK_CREATION_COMPLETED, "Name: {}; Driver: {}; ID: {}", name, driver, full.Id);
+    }
     WSL_LOG("NetworkCreated", TraceLoggingValue(name.c_str(), "NetworkName"), TraceLoggingValue(full.Id.c_str(), "NetworkId"));
 
     removeNetworkCleanup.release();
@@ -3645,11 +3700,13 @@ try
 
     auto terminationComplete = m_terminationCompleteEvent.SetEvent_scope_exit();
     wil::rwlock_release_exclusive_scope_exit sessionLock;
+    m_userCOMCallbacks.BeginShutdown();
 
     // Because it's not possible to synchronize CancelIoEx() with ReadFile() calls, keep attempting to acquire the session lock while cancelling IO & callbacks.
     // This is required because calling CancelIoEx() between two ReadFile() calls does nothing, and therefore could still allow another thread to get stuck doing synchronous IO.
     bool retrying = false;
-    while (!sessionLock)
+    bool callbacksDrained = false;
+    while (!sessionLock || !callbacksDrained)
     {
         // If this isn't the first iteration, sleep to prevent this loop from burning too much CPU.
         if (retrying)
@@ -3676,15 +3733,12 @@ try
             CancelUserHandleIO();
         }
 
+        // A registered callback can enter COM after an earlier cancellation attempt.
+        callbacksDrained = m_userCOMCallbacks.CancelPending();
+        if (callbacksDrained)
         {
-            std::lock_guard comLock(m_userCOMCallbacksLock);
-
-            // Cancel any pending outgoing COM callback calls (e.g. IProgressCallback::OnProgress)
-            // to unblock operations waiting for cross-process COM responses.
-            CancelUserCOMCallbacks();
+            sessionLock = m_runtime.TryLockExclusive();
         }
-
-        sessionLock = m_runtime.TryLockExclusive();
         retrying = true;
     }
 
@@ -4188,54 +4242,13 @@ void WSLCSession::CancelUserHandleIO()
 
 UserCOMCallback WSLCSession::RegisterUserCOMCallback()
 {
-    std::lock_guard lock(m_userCOMCallbacksLock);
-
-    // Don't allow new COM calls if the session is terminating.
-    // N.B. This check must happen under m_userCOMCallbacksLock to synchronize with Terminate().
-    THROW_HR_IF_MSG(
-        E_ABORT, m_sessionTerminatingEvent.is_signaled(), "Refusing to make a COM callback while the session is terminating.");
-
-    THROW_IF_FAILED(CoEnableCallCancellation(nullptr));
-
-    auto threadId = GetCurrentThreadId();
-    auto it = m_userCOMCallbackThreads.find(threadId);
-    WI_VERIFY(it == m_userCOMCallbackThreads.end() || it->second > 0);
-
-    if (it == m_userCOMCallbackThreads.end())
-    {
-        m_userCOMCallbackThreads.insert({threadId, 1});
-    }
-    else
-    {
-        it->second++;
-    }
-
+    m_userCOMCallbacks.Register();
     return UserCOMCallback{*this};
 }
 
 void WSLCSession::UnregisterUserCOMCallback(DWORD ThreadId)
 {
-    std::lock_guard lock(m_userCOMCallbacksLock);
-
-    auto it = m_userCOMCallbackThreads.find(ThreadId);
-    WI_VERIFY(it != m_userCOMCallbackThreads.end() && it->second > 0);
-
-    if (it->second > 1)
-    {
-        it->second--;
-    }
-    else
-    {
-        m_userCOMCallbackThreads.erase(it);
-    }
-}
-
-void WSLCSession::CancelUserCOMCallbacks()
-{
-    for (auto threadId : std::views::keys(m_userCOMCallbackThreads))
-    {
-        LOG_IF_FAILED(CoCancelCall(threadId, 0));
-    }
+    m_userCOMCallbacks.Unregister(ThreadId);
 }
 
 void WSLCSession::OnContainerDeleted(const WSLCContainerImpl* Container)

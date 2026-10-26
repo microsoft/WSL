@@ -34,6 +34,7 @@ Abstract:
 #include "wslc.h"
 #include "WSLCCompat.h"
 #include "COMImplClass.h"
+#include "COMCallbackTracker.h"
 #include "RuntimeClass.h"
 #include "wslutil.h"
 #include <atomic>
@@ -106,12 +107,14 @@ public:
     WSLCSessionManagerImpl() = default;
     ~WSLCSessionManagerImpl();
 
+    void CancelDiagnosticCallbacks() noexcept;
+
     void CreateSession(
         _In_ const WSLCSessionSettings* WslcSessionSettings,
         _In_ WSLCSessionFlags Flags,
-        _In_opt_ IWarningCallback* WarningCallback,
+        _In_opt_ IDiagnosticCallback* DiagnosticCallback,
         _Out_ IWSLCSession** WslcSession);
-    void EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, _In_opt_ IWarningCallback* WarningCallback, _Out_ IWSLCSession** WslcSession);
+    void EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, _In_opt_ IDiagnosticCallback* DiagnosticCallback, _Out_ IWSLCSession** WslcSession);
     void ListSessions(_Out_ WSLCSessionListEntry** Sessions, _Out_ ULONG* SessionsCount);
     void OpenSession(_In_ ULONG Id, _Out_ IWSLCSession** Session);
     void OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IWSLCSession** Session);
@@ -120,9 +123,8 @@ public:
     wil::com_ptr<IWSLCSession> FindSession(ULONG Id);
 
 private:
-    // Resolves the default session name for a caller: appends the username
-    // from the token SID so different users don't collide.
-    static std::wstring ResolveDefaultSessionName(const CallingProcessTokenInfo& TokenInfo);
+    static std::wstring ResolveUserName(const CallingProcessTokenInfo& TokenInfo);
+    static std::wstring ResolveDefaultSessionName(bool Elevated, std::wstring_view UserName);
 
     // Returns true if the name matches a reserved default session prefix.
     static bool IsReservedSessionName(LPCWSTR Name);
@@ -212,6 +214,7 @@ private:
 
     std::atomic<ULONG> m_nextSessionId{1};
     std::recursive_mutex m_wslcSessionsLock;
+    wsl::windows::common::COMCallbackTracker m_diagnosticCallbacks;
 
     // All sessions tracked via SessionEntry (which holds weak refs and service-side security info).
     // Expired sessions are hidden immediately; entries are erased when a cleanup pass observes host exit.
@@ -235,8 +238,8 @@ public:
 
     IFACEMETHOD(GetVersion)(_Out_ WSLCVersion* Version) override;
     IFACEMETHOD(CreateSession)(
-        const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWarningCallback* WarningCallback, IWSLCSession** WslcSession) override;
-    IFACEMETHOD(EnterSession)(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWarningCallback* WarningCallback, IWSLCSession** WslcSession) override;
+        const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IDiagnosticCallback* DiagnosticCallback, IWSLCSession** WslcSession) override;
+    IFACEMETHOD(EnterSession)(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IDiagnosticCallback* DiagnosticCallback, IWSLCSession** WslcSession) override;
     IFACEMETHOD(ListSessions)(_Out_ WSLCSessionListEntry** Sessions, _Out_ ULONG* SessionsCount) override;
     IFACEMETHOD(OpenSession)(_In_ ULONG Id, _Out_ IWSLCSession** Session) override;
     IFACEMETHOD(OpenSessionByName)(_In_ LPCWSTR DisplayName, _Out_ IWSLCSession** Session) override;

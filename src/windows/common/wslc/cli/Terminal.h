@@ -68,6 +68,7 @@ struct Terminal
     {
         Output,
         Info,
+        Debug,
         Warning,
         Error,
     };
@@ -96,6 +97,14 @@ struct Terminal
     void Info(std::wformat_string<Args...> fmt, Args&&... args)
     {
         EmitFormatted(Level::Info, std::move(fmt), std::forward<Args>(args)...);
+    }
+
+    // Debug output is invariant English support data so logs remain comparable across
+    // machines and correlate directly with source code and diagnostic documentation.
+    template <typename... Args>
+    void Debug(std::wformat_string<Args...> fmt, Args&&... args)
+    {
+        EmitFormatted(Level::Debug, std::move(fmt), std::forward<Args>(args)...);
     }
     template <typename... Args>
     void Warn(std::wformat_string<Args...> fmt, Args&&... args)
@@ -165,6 +174,16 @@ struct Terminal
         m_noColor = noColor;
     }
 
+    bool IsDebugEnabled() const noexcept
+    {
+        return m_debugEnabled;
+    }
+
+    void SetDebugEnabled(bool enabled) noexcept
+    {
+        m_debugEnabled = enabled;
+    }
+
     // Console write width minus one (autowrap guard), or nullopt when redirected.
     std::optional<int> GetConsoleWidth(Level level) const;
 
@@ -180,6 +199,11 @@ private:
     template <typename... Args>
     void EmitFormatted(Level level, std::wformat_string<Args...> fmt, Args&&... args)
     {
+        if (level == Level::Debug && !m_debugEnabled)
+        {
+            return;
+        }
+
         const OutputChannel& channel = ChannelFor(level);
         const bool vtEnabled = channel.IsVTEnabled();
         const bool colorEnabled = vtEnabled && !m_noColor;
@@ -210,6 +234,7 @@ private:
     OutputChannel m_err;
     InputChannel m_in;
     bool m_noColor = false;
+    bool m_debugEnabled = false;
 };
 
 } // namespace wsl::windows::wslc::cli
