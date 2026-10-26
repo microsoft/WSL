@@ -317,7 +317,7 @@ void ClientExecutionContext::EnableInteractiveWarnings()
     });
 }
 
-ServiceExecutionContext::ServiceExecutionContext(LXSS_ERROR_INFO* outError) noexcept : ExecutionContext(Empty)
+ServiceExecutionContext::ServiceExecutionContext(LXSS_ERROR_INFO* outError) : ExecutionContext(Empty)
 {
     if (outError != nullptr)
     {
@@ -329,14 +329,7 @@ ServiceExecutionContext::ServiceExecutionContext(LXSS_ERROR_INFO* outError) noex
             {
                 if (outError->WarningsPipe != 0)
                 {
-                    try
-                    {
-                        m_warningsPipe.reset(wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(outError->WarningsPipe)));
-                    }
-                    catch (...)
-                    {
-                        LOG_CAUGHT_EXCEPTION();
-                    }
+                    m_warningsPipe.reset(wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(outError->WarningsPipe)));
                 }
 
                 if (!m_warningsPipe)
