@@ -117,8 +117,8 @@ class TestComposeProgressCallback
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IComposeProgressCallback, IFastRundown>
 {
 public:
-    explicit TestComposeProgressCallback(bool blockExecuting = false, std::optional<std::string> blockProgress = std::nullopt) :
-        m_blockExecuting(blockExecuting), m_blockProgress(std::move(blockProgress))
+    explicit TestComposeProgressCallback(bool blockExecuting = false, std::optional<std::string> blockProgress = std::nullopt, bool failOnSuccess = false) :
+        m_blockExecuting(blockExecuting), m_blockProgress(std::move(blockProgress)), m_failOnSuccess(failOnSuccess)
     {
         m_blockedEvent.create(wil::EventOptions::ManualReset);
         m_continueEvent.create(wil::EventOptions::ManualReset);
@@ -137,6 +137,7 @@ public:
             {
             case WSLCComposeProgressEventKindStatus:
                 m_statuses.emplace_back(event->Value.Status.Status);
+                RETURN_HR_IF(RPC_E_DISCONNECTED, m_failOnSuccess && event->Value.Status.Status == WSLCComposeStatusSucceeded);
                 block = m_blockExecuting && event->Value.Status.Status == WSLCComposeStatusExecuting;
                 break;
             case WSLCComposeProgressEventKindProgress:
@@ -232,6 +233,7 @@ private:
 
     const bool m_blockExecuting;
     const std::optional<std::string> m_blockProgress;
+    const bool m_failOnSuccess;
     mutable std::mutex m_lock;
     ULONGLONG m_eventCount{};
     std::vector<WSLCComposeStatus> m_statuses;
@@ -342,7 +344,7 @@ class WSLCComposeTests
         }
 
         ComposeRequestStorage createRequest{composePath, WSLCComposeActionCreate};
-        auto progress = Microsoft::WRL::Make<TestComposeProgressCallback>();
+        auto progress = Microsoft::WRL::Make<TestComposeProgressCallback>(false, std::nullopt, true);
         VERIFY_IS_NOT_NULL(progress.Get());
         const auto createResult = ExecuteCompose(*m_defaultSession, createRequest, progress.Get());
         VERIFY_ARE_EQUAL(2u, createResult.value.AffectedContainersCount);

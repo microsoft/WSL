@@ -269,7 +269,7 @@ ComposeExecutionResult WSLCComposeOperation::RunOperation(IComposeProgressCallba
     CheckCancelled();
     if (m_request.Action == WSLCComposeActionValidate)
     {
-        ReportStatus(progressCallback, WSLCComposeStatusSucceeded);
+        ReportStatusNoThrow(progressCallback, WSLCComposeStatusSucceeded);
         return {.ProjectKey = projectKey};
     }
 
@@ -288,7 +288,7 @@ ComposeExecutionResult WSLCComposeOperation::RunOperation(IComposeProgressCallba
 
     auto result = m_session->m_composeReconciler.Execute(
         m_request.Action, desiredProject ? &*desiredProject : nullptr, projectKey, m_request.ActionOptions, m_cancelEvent.get(), progressReporter);
-    ReportStatus(progressCallback, WSLCComposeStatusSucceeded);
+    ReportStatusNoThrow(progressCallback, WSLCComposeStatusSucceeded);
     return result;
 }
 

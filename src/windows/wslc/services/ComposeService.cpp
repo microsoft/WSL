@@ -259,6 +259,9 @@ namespace {
 
     int AttachContainers(models::Session& session, const ComposeOperationResult& result, HANDLE cancelEvent)
     {
+        // Attachment covers running project containers and succeeds when none are running.
+        // TODO: Align standalone attach with Docker Compose service selection and its error when no target is running.
+        // TODO: Align attached up with Docker Compose attachment timing and log fallback for exited containers.
         [[maybe_unused]] auto operation = session.BeginContainerOperation();
         common::io::MultiHandleWait io;
 
@@ -272,6 +275,11 @@ namespace {
         for (ULONG index = 0; index < result.value.AffectedContainersCount; ++index)
         {
             const auto& entry = result.value.AffectedContainers[index];
+            if (entry.State != WslcContainerStateRunning)
+            {
+                continue;
+            }
+
             wil::com_ptr<IWSLCContainer> container;
             THROW_IF_FAILED(session.Get()->OpenContainer(entry.Id, &container));
 
@@ -279,7 +287,12 @@ namespace {
             wsl::windows::common::wslutil::COMOutputHandle stdoutHandle;
             wsl::windows::common::wslutil::COMOutputHandle stderrHandle;
 
-            THROW_IF_FAILED(container->Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle));
+            const HRESULT attachResult = container->Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle);
+            if (attachResult == WSLC_E_CONTAINER_NOT_RUNNING)
+            {
+                continue;
+            }
+            THROW_IF_FAILED(attachResult);
 
             io.AddHandle(std::make_unique<wsl::windows::common::io::RelayHandle<wsl::windows::common::io::ReadHandle>>(
                 stdoutHandle.Release(), GetStdHandle(STD_OUTPUT_HANDLE)));
