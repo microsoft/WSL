@@ -211,7 +211,7 @@ class WSLCTests
         return RunningWSLCContainer(std::move(rawContainer), {});
     }
 
-    RunningWSLCContainer LaunchContainerWithBlockingStopHandler(const std::string& name)
+    RunningWSLCContainer LaunchContainerWithBlockingStopHandler(IWSLCSession& session, const std::string& name)
     {
         WSLCContainerLauncher launcher(
             "debian:latest",
@@ -221,7 +221,7 @@ class WSLCTests
             "host",
             WSLCProcessFlagsStdin);
 
-        return launcher.Launch(*m_defaultSession);
+        return launcher.Launch(session);
     }
 
     struct ListContainersResult
@@ -7248,6 +7248,71 @@ class WSLCTests
         VERIFY_SUCCEEDED(session->Terminate());
     }
 
+    WSLC_TEST_METHOD(ContainerRestartConcurrentStartAndForceDeleteStress)
+    {
+        constexpr unsigned int c_iterations = 50;
+
+        auto session = CreateSession(GetDefaultSessionSettings(L"restart-start-force-delete"));
+        LoadTestImage(*session, "debian:latest");
+
+        for (unsigned int iteration = 0; iteration < c_iterations; ++iteration)
+        {
+            auto container = LaunchContainerWithBlockingStopHandler(*session, std::format("test-restart-start-force-delete-{}", iteration));
+            container.SetDeleteOnClose(false);
+
+            auto initProcess = container.GetInitProcess();
+            auto input = initProcess.GetStdHandle(0);
+            auto outputHandle = initProcess.GetStdHandle(1);
+
+            PartialHandleRead output{outputHandle.Get()};
+            output.ExpectConsume("ready\n");
+
+            wil::unique_event startReady{wil::EventOptions::ManualReset};
+            std::future<HRESULT> restartResult;
+            std::future<HRESULT> startResult;
+            std::future<HRESULT> deleteResult;
+
+            // Cancel before the futures are destroyed, including when deletion is waiting for the other calls.
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                input.Reset();
+                LOG_IF_FAILED(session->Terminate());
+            });
+
+            restartResult = std::async(std::launch::async, [&]() {
+                const auto coInitialize = wil::CoInitializeEx(COINIT_MULTITHREADED);
+                return container.Get().Restart(WSLCSignalSIGTERM, WSLC_STOP_TIMEOUT_NONE, nullptr);
+            });
+
+            output.ExpectConsume("stopping\n");
+
+            startResult = std::async(std::launch::async, [&]() {
+                const auto coInitialize = wil::CoInitializeEx(COINIT_MULTITHREADED);
+                startReady.SetEvent();
+                return container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr);
+            });
+
+            VERIFY_IS_TRUE(startReady.wait(30 * 1000));
+
+            deleteResult = std::async(std::launch::async, [&]() {
+                const auto coInitialize = wil::CoInitializeEx(COINIT_MULTITHREADED);
+                return container.Get().Delete(WSLCDeleteFlagsForce);
+            });
+
+            VERIFY_ARE_EQUAL(deleteResult.wait_for(30s), std::future_status::ready);
+            VERIFY_SUCCEEDED(deleteResult.get());
+            VERIFY_ARE_EQUAL(restartResult.wait_for(30s), std::future_status::ready);
+            VERIFY_ARE_EQUAL(startResult.wait_for(30s), std::future_status::ready);
+            VERIFY_ARE_EQUAL(restartResult.get(), WSLC_E_CONTAINER_DELETED);
+
+            const auto startHr = startResult.get();
+            VERIFY_IS_TRUE(startHr == WSLC_E_CONTAINER_DELETED || startHr == RPC_E_DISCONNECTED);
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateDeleted);
+            cleanup.release();
+        }
+
+        VERIFY_SUCCEEDED(session->Terminate());
+    }
+
     WSLC_TEST_METHOD(ContainerRestart)
     {
         // A running container is stopped and started again, replacing its init process.
@@ -9360,7 +9425,7 @@ class WSLCTests
 
     WSLC_TEST_METHOD(ConcurrentContainerStopAndKill)
     {
-        auto container = LaunchContainerWithBlockingStopHandler("test-concurrent-container-stops");
+        auto container = LaunchContainerWithBlockingStopHandler(*m_defaultSession, "test-concurrent-container-stops");
         auto initProcess = container.GetInitProcess();
         auto input = initProcess.GetStdHandle(0);
         auto outputHandle = initProcess.GetStdHandle(1);
@@ -9484,7 +9549,7 @@ class WSLCTests
 
     WSLC_TEST_METHOD(ConcurrentContainerStopTimeoutOverride)
     {
-        auto container = LaunchContainerWithBlockingStopHandler("test-concurrent-stop-timeout");
+        auto container = LaunchContainerWithBlockingStopHandler(*m_defaultSession, "test-concurrent-stop-timeout");
         auto initProcess = container.GetInitProcess();
         auto input = initProcess.GetStdHandle(0);
         auto outputHandle = initProcess.GetStdHandle(1);
@@ -9532,7 +9597,7 @@ class WSLCTests
 
     WSLC_TEST_METHOD(ConcurrentContainerStopAndStart)
     {
-        auto container = LaunchContainerWithBlockingStopHandler("test-concurrent-stop-start");
+        auto container = LaunchContainerWithBlockingStopHandler(*m_defaultSession, "test-concurrent-stop-start");
         auto initProcess = container.GetInitProcess();
         auto input = initProcess.GetStdHandle(0);
         auto outputHandle = initProcess.GetStdHandle(1);
@@ -9586,7 +9651,7 @@ class WSLCTests
 
     WSLC_TEST_METHOD(ConcurrentContainerStopAndForceDelete)
     {
-        auto container = LaunchContainerWithBlockingStopHandler("test-concurrent-stop-delete");
+        auto container = LaunchContainerWithBlockingStopHandler(*m_defaultSession, "test-concurrent-stop-delete");
         auto initProcess = container.GetInitProcess();
         auto input = initProcess.GetStdHandle(0);
         auto outputHandle = initProcess.GetStdHandle(1);
