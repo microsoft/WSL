@@ -57,6 +57,13 @@ std::optional<WSLCContainerStateV1> LoadState(const std::filesystem::path& Path)
     }
 }
 
+void RemoveStateFile(const std::filesystem::path& Path) noexcept
+{
+    std::error_code error;
+    std::filesystem::remove(Path, error);
+    LOG_HR_IF_MSG(HRESULT_FROM_WIN32(error.value()), !!error, "Failed to delete container state: %ls", Path.c_str());
+}
+
 } // namespace
 
 WSLCContainerStateStore::WSLCContainerStateStore(const std::optional<std::filesystem::path>& Directory, const std::string& ContainerId)
@@ -135,13 +142,20 @@ void WSLCContainerStateStore::Delete() noexcept
         return;
     }
 
-    std::error_code error;
-    std::filesystem::remove(m_path.value(), error);
-    if (error)
-    {
-        LOG_HR_MSG(HRESULT_FROM_WIN32(error.value()), "Failed to delete container state: %ls", m_path->c_str());
-    }
+    RemoveStateFile(m_path.value());
 }
+
+void WSLCContainerStateStore::DeleteFor(const std::optional<std::filesystem::path>& Directory, const std::string& ContainerId) noexcept
+try
+{
+    if (!Directory.has_value())
+    {
+        return;
+    }
+
+    RemoveStateFile(PathFor(Directory.value(), ContainerId));
+}
+CATCH_LOG()
 
 void WSLCContainerStateStore::DeleteOrphans(const std::filesystem::path& Directory, const std::unordered_set<std::string>& KnownContainerIds) noexcept
 try

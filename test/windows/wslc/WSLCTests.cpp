@@ -14104,6 +14104,7 @@ class WSLCTests
         constexpr auto c_createdName = "test-recovery-auto-remove-created";
         constexpr auto c_retainedName = "test-recovery-retained";
         std::string removedId;
+        std::filesystem::path removedStatePath;
         std::string anonymousVolume;
 
         {
@@ -14116,6 +14117,8 @@ class WSLCTests
             auto container = launcher.Launch(*session);
             container.SetDeleteOnClose(false);
             removedId = container.Id();
+            removedStatePath = ContainerStatePath(removedId);
+            VERIFY_IS_TRUE(std::filesystem::exists(removedStatePath));
             const auto inspect = container.Inspect();
             VERIFY_ARE_EQUAL(inspect.Mounts.size(), 1u);
             anonymousVolume = inspect.Mounts[0].Name;
@@ -14145,6 +14148,7 @@ class WSLCTests
             wil::com_ptr<IWSLCContainer> notFound;
             VERIFY_ARE_EQUAL(session->OpenContainer(c_removedName, &notFound), WSLC_E_CONTAINER_NOT_FOUND);
             VERIFY_ARE_EQUAL(session->OpenContainer(removedId.c_str(), &notFound), WSLC_E_CONTAINER_NOT_FOUND);
+            VERIFY_IS_FALSE(std::filesystem::exists(removedStatePath));
 
             auto [containers, ports] = ListContainers(session.get());
             VERIFY_ARE_EQUAL(containers.size(), 2u);

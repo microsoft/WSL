@@ -54,6 +54,7 @@ using wsl::windows::service::wslc::WSLCContainerImpl;
 using wsl::windows::service::wslc::WSLCContainerMetadata;
 using wsl::windows::service::wslc::WSLCContainerMetadataLabel;
 using wsl::windows::service::wslc::WSLCContainerMetadataV1;
+using wsl::windows::service::wslc::WSLCContainerStateStore;
 using wsl::windows::service::wslc::WSLCExecutionContext;
 using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
@@ -3258,6 +3259,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         try
         {
             DockerClient.DeleteContainer(dockerContainer.Id, true, true);
+            WSLCContainerStateStore::DeleteFor(wslcSession.ContainerStateDirectory(), dockerContainer.Id);
             return nullptr;
         }
         catch (...)

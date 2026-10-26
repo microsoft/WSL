@@ -71,6 +71,9 @@ public:
 
     static std::filesystem::path PathFor(const std::filesystem::path& Directory, const std::string& ContainerId);
 
+    // Deletes the document of a container that never had a store instance, such as one removed during recovery.
+    static void DeleteFor(const std::optional<std::filesystem::path>& Directory, const std::string& ContainerId) noexcept;
+
     // Removes documents in Directory whose container ID is not in KnownContainerIds.
     static void DeleteOrphans(const std::filesystem::path& Directory, const std::unordered_set<std::string>& KnownContainerIds) noexcept;
 
