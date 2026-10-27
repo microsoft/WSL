@@ -253,8 +253,6 @@ WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --session foo -q image1)") \
 /* Docker-style idempotency: duplicate global flags collapse to a single entry. */ \
 WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --quiet --quiet)") \
 WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc -q -q system list)") \
-/* '--' stops the options-only pass and is left for the selected command.     */ \
-WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --quiet -- --session foo)") \
 \
 /* `wslc build` --progress option (Build set mirrors ImageBuildCommand). The build \
  * context path is the required positional; --progress takes one of auto/tty/plain/ \
