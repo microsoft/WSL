@@ -10,12 +10,12 @@ set(audit_source_files
     src/shared/securityaudit/ProcessExecuted.h
     src/shared/securityaudit/Protocol.h
     src/shared/securityaudit/SecurityEvents.h
-    tools/securityaudit/CMakeLists.txt
+    src/linux/securityaudit/CMakeLists.txt
+    src/shared/securityaudit/Launch.h
     tools/securityaudit/SourceIdentity.cmake
     tools/securityaudit/GenerateBuildInfo.cmake
-    tools/securityaudit/StagePayload.cmake.in
-    tools/securityaudit/VerifyElf.cmake
-    tools/securityaudit/build-payload.sh)
+    tools/securityaudit/Prepare-StaticPackage.ps1
+    tools/securityaudit/Validate-Payload.ps1)
 list(SORT audit_source_files)
 set(audit_source_identity "")
 set(audit_source_json "{}")

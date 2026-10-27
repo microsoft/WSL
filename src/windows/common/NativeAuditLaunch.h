@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <wil/resource.h>
+#include "../../shared/securityaudit/Launch.h"
 
 namespace wsl::windows::common {
 

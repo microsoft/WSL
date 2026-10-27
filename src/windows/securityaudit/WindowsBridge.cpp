@@ -351,12 +351,17 @@ nlohmann::json ExpectedCollectorCoverage(const nlohmann::json& ready)
     {
         const auto count = ready.find("dnsProbeCount");
         const auto status = ready.find("dnsCoverage");
-        if (count == ready.end() || !count->is_number_unsigned() || count->get<uint64_t>() > UINT32_MAX ||
-            status == ready.end() || *status != (*count == 0 ? "unavailable" : "vm-root-only"))
+        if (count == ready.end() || status == ready.end())
         {
             throw ProtocolError("Invalid DNS coverage diagnostic");
         }
-        if (*count == 0)
+        const bool unverified = count->is_null() && *status == "unverified";
+        if (!unverified && (!count->is_number_unsigned() || count->get<uint64_t>() > UINT32_MAX ||
+                            *status != (*count == 0 ? "unavailable" : "vm-root-only")))
+        {
+            throw ProtocolError("Invalid DNS coverage diagnostic");
+        }
+        if (unverified || *count == 0)
         {
             auto& supported = coverage["network"]["supported"];
             supported.erase(std::remove(supported.begin(), supported.end(), "dns-query"), supported.end());
@@ -403,9 +408,11 @@ static nlohmann::json ValidateControlFields(const nlohmann::json& message, bool 
         const auto coverage = ExpectedCollectorCoverage(message);
         copy("coverage", [&](const auto& value) { return value == coverage; });
         copy("dnsProbeCount", [](const auto& value) {
-            return value.is_number_unsigned() && value.template get<uint64_t>() <= UINT32_MAX;
+            return value.is_null() || (value.is_number_unsigned() && value.template get<uint64_t>() <= UINT32_MAX);
         });
-        copy("dnsCoverage", [](const auto& value) { return value == "unavailable" || value == "vm-root-only"; });
+        copy("dnsCoverage", [](const auto& value) {
+            return value == "unavailable" || value == "vm-root-only" || value == "unverified";
+        });
         copy("initializationDiagnostics", boolean);
         copy("policy", [](const auto& value) { return value.is_object(); });
     }

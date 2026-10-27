@@ -3,6 +3,7 @@
 #pragma once
 
 #include "WindowsBridge.h"
+#include "Launch.h"
 #include <atomic>
 
 namespace wsl::audit {

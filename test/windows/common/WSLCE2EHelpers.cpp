@@ -338,12 +338,13 @@ wslc_schema::Health WaitForContainerHealth(const std::wstring& containerName, co
     {
         const auto inspect = InspectContainer(containerName);
         const std::string actual = inspect.State.Health.has_value() ? inspect.State.Health->Status : "<none>";
-        VERIFY_FAIL(std::format(
-                        L"Container '{}' did not reach health status '{}' (last status: '{}')",
-                        containerName,
-                        wsl::shared::string::MultiByteToWide(std::string(expectedStatus)),
-                        wsl::shared::string::MultiByteToWide(actual))
-                        .c_str());
+        VERIFY_FAIL(
+            std::format(
+                L"Container '{}' did not reach health status '{}' (last status: '{}')",
+                containerName,
+                wsl::shared::string::MultiByteToWide(std::string(expectedStatus)),
+                wsl::shared::string::MultiByteToWide(actual))
+                .c_str());
         throw;
     }
 }
@@ -705,11 +706,12 @@ void WaitForPseudoConsoleOutput(const WSLCInteractiveSession& session, const std
     catch (...)
     {
         const std::string data = session.GetStdoutData();
-        VERIFY_FAIL(std::format(
-                        L"Timed out waiting for \"{}\". Captured pseudoconsole output: \"{}\"",
-                        wsl::shared::string::MultiByteToWide(EscapeString(expected)),
-                        wsl::shared::string::MultiByteToWide(EscapeString(data)))
-                        .c_str());
+        VERIFY_FAIL(
+            std::format(
+                L"Timed out waiting for \"{}\". Captured pseudoconsole output: \"{}\"",
+                wsl::shared::string::MultiByteToWide(EscapeString(expected)),
+                wsl::shared::string::MultiByteToWide(EscapeString(data)))
+                .c_str());
     }
 }
 

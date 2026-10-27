@@ -20,6 +20,7 @@ Release/
 Properties/
 /_deps/
 /.build-securityaudit-*/
+/src/linux/securityaudit/AuditBuildInfo.h
 /package/Strings/en-US/
 /packages/
 CMakeFiles/

@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Protocol.h"
+#include "../../shared/securityaudit/Protocol.h"
 
 #include <chrono>
 #include <span>
@@ -50,6 +50,7 @@ bool PrepareCollectorTracefs();
 bool MatchesContainerCgroup(std::string_view cgroups, std::string_view containerId);
 nlohmann::json InspectProcessNamespaces(uint32_t pid, std::string_view containerId = {});
 int RunCollector(const CollectorOptions& options, int inputFd = 0, int outputFd = 1);
+int CollectorEntryPoint(int argc, char** argv);
 int ReportCollectorFailure(std::string_view message, int outputFd = 1);
 
 } // namespace wsl::audit

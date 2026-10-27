@@ -97,8 +97,8 @@ class WSLCE2ENetworkCreateTests
     {
         auto result = RunWslc(std::format(L"network create --driver invalid_driver {}", TestNetworkName));
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(
-            std::format(L"Unsupported network driver: 'invalid_driver'\r\nError code: E_INVALIDARG")));
+        VERIFY_IS_TRUE(
+            result.StderrContainsSubstring(std::format(L"Unsupported network driver: 'invalid_driver'\r\nError code: E_INVALIDARG")));
 
         VerifyNetworkIsNotListed(TestNetworkName);
     }

@@ -347,8 +347,11 @@ class WSLCE2EImageListTests
             std::set<std::wstring> names;
             for (const auto& image : images)
             {
-                names.insert(std::format(
-                    L"{}:{}", wsl::shared::string::MultiByteToWide(image.Repository), wsl::shared::string::MultiByteToWide(image.Tag)));
+                names.insert(
+                    std::format(
+                        L"{}:{}",
+                        wsl::shared::string::MultiByteToWide(image.Repository),
+                        wsl::shared::string::MultiByteToWide(image.Tag)));
             }
             return names;
         };

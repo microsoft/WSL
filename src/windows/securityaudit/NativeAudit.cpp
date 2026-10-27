@@ -408,7 +408,7 @@ void NativeAudit::Collect(const std::shared_ptr<State>& state, const AuditProces
         return;
     }
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_TIMEOUT), state->StartupExpired());
-    auto transport = factory({"/wsl-audit-collector", "--package", "/wsl-security-audit"});
+    auto transport = factory({c_nativeAuditCollectorName, "--package", "/wsl-security-audit"});
     const auto cleanup = wil::scope_exit([&] { transport.Shutdown(); });
     if (state->stop.is_signaled())
     {
@@ -546,7 +546,8 @@ void NativeAudit::Collect(const std::shared_ptr<State>& state, const AuditProces
 void NativeAudit::ResolveContainer(const std::shared_ptr<State>& state, ContainerIdentity identity, const AuditProcessFactory& factory)
 {
     THROW_HR_IF(E_INVALIDARG, identity.initPid == 0);
-    auto probe = factory({"/wsl-audit-collector", "--inspect-pid", std::to_string(identity.initPid), "--container-id", identity.id});
+    auto probe =
+        factory({c_nativeAuditCollectorName, "--inspect-pid", std::to_string(identity.initPid), "--container-id", identity.id});
     const auto cleanup = wil::scope_exit([&] { probe.Shutdown(); });
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
     std::string output;

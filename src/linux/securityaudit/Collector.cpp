@@ -1216,7 +1216,6 @@ int RunCollector(const CollectorOptions& options, int inputFd, int outputFd)
         int hooksAttachCode = no_error;
         int initializeCode = no_error;
         bool tracefsPrivateMount = false;
-        unsigned int dnsProbeCount = 0;
         bool initializationDiagnostics = false;
         std::array<char, 8192> errorBuffer{};
         if (policy.AnyEnabled())
@@ -1230,7 +1229,7 @@ int RunCollector(const CollectorOptions& options, int inputFd, int outputFd)
             }
             std::fprintf(
                 stderr,
-                "WSL audit: static loader %s, event ABI %d; requires BTF, ring buffer, enrichment, fmap and "
+                "WSL audit: init static loader %s, event ABI %d; requires BTF, ring buffer, enrichment, fmap and "
                 "CAP_BPF/CAP_PERFMON (or CAP_SYS_ADMIN); tracefs setup may require CAP_SYS_ADMIN.\n",
                 WSL_SECURITYAUDIT_LOADER_REVISION,
                 VERSION);
@@ -1294,13 +1293,10 @@ int RunCollector(const CollectorOptions& options, int inputFd, int outputFd)
             }
             if (policy.networkSuccess || policy.networkFailure)
             {
-                dnsProbeCount = ebpf_plugin_get_dns_uprobe_count();
                 std::fprintf(
                     stderr,
-                    "WSL audit: %u DNS uprobes attached in captured root. %s\n",
-                    dnsProbeCount,
-                    dnsProbeCount == 0 ? "DNS collection unavailable; kernel network syscall collection remains enabled."
-                                       : "Distribution/container DNS coverage remains unverified.");
+                    "WSL audit: DNS coverage is not verified for this integration; "
+                    "kernel network syscall collection remains enabled.\n");
             }
             const auto code = ebpf_plugin_start_polling(
                 &delivery, EventCallback, LostCallback, PollErrorCallback, errorBuffer.data(), static_cast<int>(errorBuffer.size()), 64, 8);
@@ -1330,15 +1326,12 @@ int RunCollector(const CollectorOptions& options, int inputFd, int outputFd)
             {"coverage", LibraryCoverage()}};
         if (policy.networkSuccess || policy.networkFailure)
         {
-            ready["dnsProbeCount"] = dnsProbeCount;
-            ready["dnsCoverage"] = dnsProbeCount == 0 ? "unavailable" : "vm-root-only";
-            if (dnsProbeCount == 0)
+            ready["dnsProbeCount"] = nullptr;
+            ready["dnsCoverage"] = "unverified";
+            auto& supported = ready["coverage"]["network"]["supported"];
+            for (auto operation = supported.begin(); operation != supported.end();)
             {
-                auto& supported = ready["coverage"]["network"]["supported"];
-                for (auto operation = supported.begin(); operation != supported.end();)
-                {
-                    operation = *operation == "dns-query" ? supported.erase(operation) : std::next(operation);
-                }
+                operation = *operation == "dns-query" ? supported.erase(operation) : std::next(operation);
             }
         }
         if (!WriteFrame(outputFd, ready))

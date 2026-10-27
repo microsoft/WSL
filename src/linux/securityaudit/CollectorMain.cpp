@@ -7,7 +7,7 @@
 #include <iostream>
 #include <signal.h>
 
-int main(int argc, char** argv)
+int wsl::audit::CollectorEntryPoint(int argc, char** argv)
 {
     signal(SIGPIPE, SIG_IGN);
     try

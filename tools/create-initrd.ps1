@@ -8,7 +8,8 @@ param (
     [Parameter(Mandatory)][string]$InputFile,
     [Parameter(Mandatory)][string]$OutputFile,
     [string]$AuditPayloadDirectory,
-    [ValidateSet('x86_64', 'aarch64')][string]$Architecture
+    [ValidateSet('x86_64', 'aarch64')][string]$Architecture,
+    [switch]$AllowDevelopmentPackage
 )
 
 $ErrorActionPreference = "Stop"
@@ -60,7 +61,8 @@ if ($AuditPayloadDirectory)
 {
     if (-not $Architecture) { throw 'Architecture is required for the audit initrd payload.' }
     $auditManifest = & (Join-Path $PSScriptRoot 'securityaudit\Validate-Payload.ps1') `
-        -PayloadDirectory $AuditPayloadDirectory -Architecture $Architecture -PassThru
+        -PayloadDirectory $AuditPayloadDirectory -Architecture $Architecture -PassThru `
+        -AllowDevelopmentPackage:$AllowDevelopmentPackage
 }
 
 $out = [System.IO.File]::Create($OutputFile)
@@ -74,7 +76,7 @@ try
         foreach ($entry in $auditManifest.files.PSObject.Properties | Sort-Object Name)
         {
             $entryData = [IO.File]::ReadAllBytes((Join-Path $AuditPayloadDirectory $entry.Name.Replace('/', '\')))
-            $mode = if ($entry.Name -eq 'wsl-audit-collector') { 0x81ED } else { 0x8124 } # 0755 / 0444
+            $mode = 0x8124 # 0444: BPF programs and syscall data, not a second userspace executable.
             Write-CpioEntry $out ([Text.Encoding]::ASCII.GetBytes("$($entry.Name)`0")) $entryData $mode $mtime
         }
         $manifestData = [IO.File]::ReadAllBytes((Join-Path $AuditPayloadDirectory 'audit-payload.json'))

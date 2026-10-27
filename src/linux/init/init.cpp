@@ -46,6 +46,8 @@ Abstract:
 #include "message.h"
 #include "configfile.h"
 #include "CommandLine.h"
+#include "../securityaudit/Collector.h"
+#include "Launch.h"
 
 static_assert(EX_NOUSER == LX_INIT_USER_NOT_FOUND);
 static_assert(EUSERS == LX_INIT_TTY_LIMIT);
@@ -192,7 +194,16 @@ int WslEntryPoint(int Argc, char* Argv[])
     }
     else
     {
-        if (strcmp(BaseName, WSLPATH_NAME) == 0)
+        if (strcmp(BaseName, wsl::audit::c_nativeAuditCollectorName) == 0)
+        {
+            if (Pid == 1)
+            {
+                LOG_ERROR("The audit collector must run in a separate child process, not PID 1");
+                return -1;
+            }
+            ExitCode = wsl::audit::CollectorEntryPoint(Argc, Argv);
+        }
+        else if (strcmp(BaseName, WSLPATH_NAME) == 0)
         {
             ExitCode = WslPathEntry(Argc, Argv);
         }

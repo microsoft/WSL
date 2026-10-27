@@ -28,6 +28,7 @@ void ServeRequest(wil::unique_fd socket)
     THROW_ERRNO_IF(EPERM, strcmp(path, wsl::audit::c_nativeAuditCollectorPath) != 0);
     const auto arguments = wsl::shared::string::ArrayFromSpan(buffer, request.CommandLineIndex);
     THROW_ERRNO_IF(EINVAL, arguments.empty() || arguments.size() > 16);
+    THROW_ERRNO_IF(EPERM, arguments.front() != wsl::audit::c_nativeAuditCollectorName);
 
     THROW_LAST_ERROR_IF(ProcessCreateProcessMessage(transaction, buffer, std::nullopt, -1, true) < 0);
 }

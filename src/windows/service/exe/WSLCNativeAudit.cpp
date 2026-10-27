@@ -29,7 +29,8 @@ struct AuditFactory
         }
         ULONG pid{};
         LPCSTR container = nullptr;
-        if (arguments.size() == 5 && arguments[1] == "--inspect-pid" && arguments[3] == "--container-id")
+        if (arguments.size() == 5 && arguments[0] == wsl::audit::c_nativeAuditCollectorName && arguments[1] == "--inspect-pid" &&
+            arguments[3] == "--container-id")
         {
             pid = static_cast<ULONG>(std::stoul(arguments[2]));
             container = arguments[4].c_str();
@@ -37,7 +38,9 @@ struct AuditFactory
         else
         {
             THROW_HR_IF(
-                E_INVALIDARG, arguments != std::vector<std::string>({"/wsl-audit-collector", "--package", "/wsl-security-audit"}));
+                E_INVALIDARG,
+                arguments !=
+                    std::vector<std::string>({wsl::audit::c_nativeAuditCollectorName, "--package", "/wsl-security-audit"}));
         }
 
         // Bound a stalled COM call independently; lifecycle callbacks never join this worker.

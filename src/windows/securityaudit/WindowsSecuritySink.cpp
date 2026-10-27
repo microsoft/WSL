@@ -582,8 +582,10 @@ std::optional<Json> ProjectSecurityDiagnostic(const Json& message, const AuditPo
         copy("tracefsPrivateMount", boolean);
         const auto coverage = ExpectedCollectorCoverage(message);
         copy("coverage", [&](const Json& value) { return value == coverage; });
-        copy("dnsProbeCount", uint32);
-        copy("dnsCoverage", [](const Json& value) { return value == "unavailable" || value == "vm-root-only"; });
+        copy("dnsProbeCount", [&](const Json& value) { return value.is_null() || uint32(value); });
+        copy("dnsCoverage", [](const Json& value) {
+            return value == "unavailable" || value == "vm-root-only" || value == "unverified";
+        });
         copy("initializationDiagnostics", boolean);
         copy("policy", [&](const Json& value) { return value == PolicySettings(policy); });
         // Preserve the useful enrichment fact without echoing an arbitrary guest/library string.

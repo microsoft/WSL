@@ -302,8 +302,9 @@ void NatNetworking::Initialize()
 
         if (!m_config.NatIpAddress.empty())
         {
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageFailedToCreateNetworkEndpoint(
-                m_config.NatIpAddress.c_str(), endpointProperties.IPAddress.c_str()));
+            EMIT_USER_WARNING(
+                wsl::shared::Localization::MessageFailedToCreateNetworkEndpoint(
+                    m_config.NatIpAddress.c_str(), endpointProperties.IPAddress.c_str()));
         }
 
         // Record the new IP address associated to the endpoint.
@@ -671,8 +672,9 @@ wsl::windows::common::hcs::unique_hcn_network NatNetworking::CreateNetwork(wsl::
             // Note that the firewall config is NOT cleared here as we MUST always configure firewall if it has been requested
             natNetwork = CreateNetworkInternal(config);
 
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageFailedToCreateNetwork(
-                previousRange.c_str(), config.NatNetwork.c_str(), wsl::windows::common::wslutil::GetSystemErrorString(error).c_str()));
+            EMIT_USER_WARNING(
+                wsl::shared::Localization::MessageFailedToCreateNetwork(
+                    previousRange.c_str(), config.NatNetwork.c_str(), wsl::windows::common::wslutil::GetSystemErrorString(error).c_str()));
         }
     });
 

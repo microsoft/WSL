@@ -77,7 +77,7 @@ NativeAuditLaunch::NativeAuditLaunch(const GUID& runtimeId, HANDLE terminatingEv
 
 wil::unique_socket NativeAuditLaunch::CreateRootNamespaceProcess(const std::vector<std::string>& arguments, const Connector& connector) const
 {
-    THROW_HR_IF(E_INVALIDARG, arguments.empty() || arguments.front() != "/wsl-audit-collector");
+    THROW_HR_IF(E_INVALIDARG, arguments.empty() || arguments.front() != wsl::audit::c_nativeAuditCollectorName);
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(c_launchTimeoutMs);
     const auto remaining = [&]() {
         CheckCancelled(m_terminatingEvent.get());
@@ -98,7 +98,7 @@ wil::unique_socket NativeAuditLaunch::CreateRootNamespaceProcess(const std::vect
     }
     argv.push_back(nullptr);
     auto process = LxssCreateProcess::CreateLinuxProcess(
-        argv.front(), argv.data(), m_runtimeId, channel, m_terminatingEvent.get(), remaining(), connect);
+        wsl::audit::c_nativeAuditCollectorPath, argv.data(), m_runtimeId, channel, m_terminatingEvent.get(), remaining(), connect);
     CheckCancelled(m_terminatingEvent.get());
     return process;
 }
