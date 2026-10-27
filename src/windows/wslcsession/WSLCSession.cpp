@@ -3490,18 +3490,7 @@ try
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
-    const auto resolved = ResolveNetwork(nameOrId);
-
-    docker_schema::Network network;
-    try
-    {
-        network = m_runtime.Docker().InspectNetwork(resolved.Id);
-    }
-    catch (const DockerHTTPException& e)
-    {
-        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(nameOrId), e.StatusCode() == 404);
-        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to inspect network '%hs'", nameOrId.c_str());
-    }
+    const auto network = InspectNetworkReference(m_runtime.Docker(), nameOrId);
 
     wslc_schema::Network result;
     result.Id = network.Id;

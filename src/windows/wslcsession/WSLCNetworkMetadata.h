@@ -75,21 +75,13 @@ auto FindNetwork(TNetworkMap& networks, const std::string& nameOrId) -> decltype
     return networks.find(nameOrId);
 }
 
-// Resolves a network name, full ID, or unique ID prefix. Exact matches against the session-managed networks are
-// resolved locally. Anything else is resolved by the engine, which tracks every network (including built-in and
-// unmanaged networks) and rejects ID prefixes that match more than one of them.
-template <typename TNetworkMap>
-ResolvedNetwork ResolveNetworkReference(const TNetworkMap& networks, const std::string& nameOrId, DockerHTTPClient& dockerClient)
+// Inspects a network by name, full ID, or unique ID prefix. The engine resolves the reference across every network
+// (including built-in and unmanaged networks) and rejects names or ID prefixes that match more than one of them.
+inline common::docker_schema::Network InspectNetworkReference(DockerHTTPClient& dockerClient, const std::string& nameOrId)
 {
-    if (const auto it = FindNetwork(networks, nameOrId); it != networks.end())
-    {
-        return ResolvedNetwork{.Name = it->first, .Id = it->second.Id, .Managed = true};
-    }
-
-    common::docker_schema::Network network;
     try
     {
-        network = dockerClient.InspectNetwork(nameOrId);
+        return dockerClient.InspectNetwork(nameOrId);
     }
     catch (const DockerHTTPException& e)
     {
@@ -99,6 +91,19 @@ ResolvedNetwork ResolveNetworkReference(const TNetworkMap& networks, const std::
             WSLC_E_NETWORK_PREFIX_AMBIGUOUS, wsl::shared::Localization::MessageWslcNetworkPrefixAmbiguous(nameOrId), e.StatusCode() == 400);
         THROW_DOCKER_USER_ERROR_MSG(e, "Failed to inspect network '%hs'", nameOrId.c_str());
     }
+}
+
+// Resolves a network name, full ID, or unique ID prefix. Exact matches against the session-managed networks are
+// resolved locally. Anything else is resolved by the engine.
+template <typename TNetworkMap>
+ResolvedNetwork ResolveNetworkReference(const TNetworkMap& networks, const std::string& nameOrId, DockerHTTPClient& dockerClient)
+{
+    if (const auto it = FindNetwork(networks, nameOrId); it != networks.end())
+    {
+        return ResolvedNetwork{.Name = it->first, .Id = it->second.Id, .Managed = true};
+    }
+
+    auto network = InspectNetworkReference(dockerClient, nameOrId);
 
     const auto managed = networks.find(network.Name);
     const bool isManaged = managed != networks.end() && managed->second.Id == network.Id;
