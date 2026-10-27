@@ -2217,6 +2217,10 @@ Kullanım:
     <value>'{}' kapsayıcısı çalışıyor ve kaldırılamaz. Kaldırmadan önce kapsayıcıyı durdurun veya zorla kaldırmayı (-f) kullanın.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcCannotRemoveRestartingContainer" xml:space="preserve">
+    <value>'{}' kapsayıcısı yeniden başlatılıyor ve kaldırılamaz. Kaldırmadan önce kapsayıcıyı durdurun veya zorla kaldırmayı (-f) kullanın.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerNotRunning" xml:space="preserve">
     <value>'{}' kapsayıcısı çalışmıyor.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2531,6 +2535,10 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   </data>
   <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
     <value>Geçersiz durdurma zaman aşımı değeri: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidSignal" xml:space="preserve">
+    <value>Invalid signal value: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
@@ -3674,6 +3682,10 @@ Windows sürümü: {}</value>
     <value>Geçersiz {} değeri '{}'. no, always, on-failure[:max-retries] veya unless-stopped değerlerinden biri beklenir.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_UnsupportedRestartPolicyError" xml:space="preserve">
+    <value>'{}' yeniden başlatma ilkesi nodesteklenmiyor. Desteklenen değerler no ve always.</value>
+    <comment>{Locked="no"}{Locked="always"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
     <value>Geçersiz {} değeri: {} tanınan bir ilerleme türü değil. Desteklenen ilerleme türleri: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -4143,6 +4155,9 @@ Windows sürümü: {}</value>
   <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
     <value>Eklenti reddedildikten sonra '{}' kapsayıcısı durdurulamadı</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcRestartPolicyConflictsWithRm" xml:space="preserve">
+    <value>A restart policy cannot be combined with automatic removal of the container.</value>
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>'{}' birimi için ana bilgisayar kaynakları serbest bırakılamadı</value>
