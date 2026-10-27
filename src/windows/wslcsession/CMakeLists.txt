@@ -9,10 +9,12 @@ set(SOURCES
 
     # Session and container implementation
     ComposeNormalizer.cpp
+    ComposeReconciler.cpp
     ComposeSpec.cpp
     ServiceContainerLauncher.cpp
     WSLCSession.cpp
     WSLCSessionRuntime.cpp
+    WSLCComposeOperation.cpp
     WSLCComposeSession.cpp
     WSLCContainer.cpp
     WSLCVirtualMachine.cpp
@@ -39,6 +41,7 @@ set(SOURCES
 
 set(HEADERS
     ComposeNormalizer.h
+    ComposeReconciler.h
     ComposeSpec.h
     DockerEventTracker.h
     DockerHTTPClient.h
@@ -49,6 +52,7 @@ set(HEADERS
     ServiceProcessLauncher.h
     ServiceContainerLauncher.h
     WSLCContainer.h
+    WSLCComposeOperation.h
     WSLCComposeSession.h
     WSLCContainerMetadata.h
     WindowsCertStore.h
