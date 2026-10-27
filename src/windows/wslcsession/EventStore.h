@@ -89,7 +89,8 @@ private:
     std::map<std::string, std::vector<std::string>> m_filters;
 
     wil::unique_event m_readerAvailable{wil::EventOptions::Signaled};
-    _Guarded_by_(m_readerAvailable) std::optional<uint64_t> m_nextSequenceNumber;
+    // Access is serialized by the m_readerAvailable auto-reset event.
+    std::optional<uint64_t> m_nextSequenceNumber;
 };
 
 } // namespace wsl::windows::service::wslc
