@@ -26,7 +26,6 @@ Abstract:
 #include "wslc_schema.h"
 #include "WSLCCompat.h"
 #include "WSLCContainerMetadata.h"
-#include "WSLCNetworkMetadata.h"
 #include "WSLCVhdVolume.h"
 #include <unordered_map>
 
@@ -150,7 +149,6 @@ public:
         WSLCSession& wslcSession,
         WSLCSessionRuntime& runtime,
         IWSLCPluginNotifier* pluginNotifier,
-        const std::unordered_map<std::string, NetworkEntry>& SessionNetworks,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         EventStore& eventStore);
 

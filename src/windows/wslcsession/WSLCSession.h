@@ -319,6 +319,10 @@ public:
     // Throws WSLC_E_NETWORK_NOT_FOUND or WSLC_E_NETWORK_PREFIX_AMBIGUOUS. Callers must hold a VM lease.
     ResolvedNetwork ResolveNetwork(const std::string& NetworkNameOrId);
 
+    // Built-in network names resolve to themselves, and exact names or IDs of session-managed networks resolve locally.
+    // Any other reference must look like an ID or ID prefix and is resolved by the engine.
+    __requires_lock_held(m_networksLock) ResolvedNetwork ResolveNetworkLockHeld(const std::string& NetworkNameOrId);
+
 private:
     ULONG m_id = 0;
     void PersistSettings(const WSLCSessionInitSettings& Settings, PSID UserSid);
@@ -375,6 +379,9 @@ private:
 
     void Ext4Format(const std::string& Device);
     std::string InspectImageLockHeld(const std::string& Id);
+
+    // Inspects a network by name, full ID, or unique ID prefix across every network known to the engine.
+    common::docker_schema::Network InspectNetworkReference(const std::string& NetworkNameOrId);
     void OnContainerDeleted(const WSLCContainerImpl* Container);
 
     void OnCrashDumpWritten(const std::wstring& DumpPath, const std::string& ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp);
