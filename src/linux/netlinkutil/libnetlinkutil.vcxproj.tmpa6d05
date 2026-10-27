@@ -1,0 +1,520 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{CB0F9574-8273-37B7-81F0-C6CE7298EF19}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
+    <Platform>x64</Platform>
+    <ProjectName>libnetlinkutil</ProjectName>
+    <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>C:\repos\WSL\wil\include;C:\repos\WSL\_deps\x64\boost_headers-src;C:\repos\WSL\packages\Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp\build\native\include;C:\repos\WSL\packages\Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp\build\native\include\Windows;C:\repos\WSL\packages\Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp\build\native\include\schemas;C:\repos\WSL\packages\Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp\build\native\include\lxcore;C:\repos\WSL\src\shared\inc;C:\repos\WSL\src\windows\inc;C:\repos\WSL\src\windows\wsldevicehoststub\inc\x64\Debug;C:\repos\WSL\src\windows\service\inc\x64\Debug;C:\repos\WSL\src\windows\wslinstaller\inc\x64\Debug;C:\repos\WSL\src\linux\init\inc;C:\repos\WSL\src\windows\common;C:\repos\WSL\src\windows\common\wslc;C:\repos\WSL\src\windows\common\wslc\cli;C:\repos\WSL\src\windows\common\wslc\models;C:\repos\WSL\src\windows\common\wslc\services;C:\repos\WSL\src\windows\common\wslc\settings;C:\repos\WSL\src\shared\configfile;C:\repos\WSL\localization;C:\repos\WSL\generated;C:\repos\WSL\packages\Microsoft.Windows.ImplementationLibrary.1.0.251108.1\include;C:\repos\WSL\_deps\x64\gsl-src\include;C:\repos\WSL\packages\Microsoft.Taef.10.100.251104001\build\include;C:\repos\WSL\_deps\x64\nlohmannjson-src\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\repos\WSL\src\linux\netlinkutil\Address.cpp">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating x64/Debug/Address.cpp.o</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\repos\WSL\src\linux\netlinkutil
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\x64\bin\clang++.exe" --gcc-toolchain=C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -fpic -BC:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isysroot C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include/c++/v1 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include -isystem C:/repos/WSL/_deps/x64/gsl-src/include -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/lxcore -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/schemas -I C:/repos/WSL/src/linux/inc -I C:/repos/WSL/src/linux/mountutil -I C:/repos/WSL/src/linux/plan9 -I C:/repos/WSL/src/shared/configfile -I C:/repos/WSL/src/shared/inc -I C:/repos/WSL/_deps/x64/nlohmannjson-src/include -I C:/repos/WSL/generated --no-standard-libraries -Werror -Wall -Wpointer-arith -D_POSIX_C_SOURCE=200809L -Dswprintf_s=swprintf -fms-extensions -target x86_64-unknown-linux-musl -D_GNU_SOURCE=1 -D_LARGEFILE64_SOURCE -DWSL_PACKAGE_VERSION=\"3.0.4.46\" -DWSL_PACKAGE_VERSION_MAJOR=3 -DWSL_PACKAGE_VERSION_MINOR=0 -DWSL_PACKAGE_VERSION_REVISION=4 -D_AMD64_ -std=c++20 -I C:/repos/WSL/src/linux/netlinkutil/../init -g3 -fno-inline-functions -DDEBUG -DDBG Address.cpp -c -o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/Address.cpp.o
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\address.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.h;C:\repos\WSL\src\linux\netlinkutil\Fwd.h;C:\repos\WSL\src\linux\netlinkutil\Interface.h;C:\repos\WSL\src\linux\netlinkutil\InterfaceConfiguration.h;C:\repos\WSL\src\linux\netlinkutil\IpNeighborManager.h;C:\repos\WSL\src\linux\netlinkutil\IpRuleManager.h;C:\repos\WSL\src\linux\netlinkutil\Neighbor.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkError.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkParseException.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransaction.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransactionError.h;C:\repos\WSL\src\linux\netlinkutil\Packet.h;C:\repos\WSL\src\linux\netlinkutil\Protocol.h;C:\repos\WSL\src\linux\netlinkutil\Operation.h;C:\repos\WSL\src\linux\netlinkutil\Route.h;C:\repos\WSL\src\linux\netlinkutil\RoutingTable.h;C:\repos\WSL\src\linux\netlinkutil\Rule.h;C:\repos\WSL\src\linux\netlinkutil\RuntimeErrorWithSourceLocation.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.h;C:\repos\WSL\src\linux\netlinkutil\SyscallError.h;C:\repos\WSL\src\linux\netlinkutil\Utils.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.hxx;C:\repos\WSL\src\linux\netlinkutil\NetLinkStrings.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.hxx;C:\repos\WSL\src\linux\netlinkutil\Utils.hxx;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\x64\Debug\Address.cpp.o</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\repos\WSL\src\linux\netlinkutil\Interface.cpp">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating x64/Debug/Interface.cpp.o</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\repos\WSL\src\linux\netlinkutil
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\x64\bin\clang++.exe" --gcc-toolchain=C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -fpic -BC:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isysroot C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include/c++/v1 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include -isystem C:/repos/WSL/_deps/x64/gsl-src/include -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/lxcore -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/schemas -I C:/repos/WSL/src/linux/inc -I C:/repos/WSL/src/linux/mountutil -I C:/repos/WSL/src/linux/plan9 -I C:/repos/WSL/src/shared/configfile -I C:/repos/WSL/src/shared/inc -I C:/repos/WSL/_deps/x64/nlohmannjson-src/include -I C:/repos/WSL/generated --no-standard-libraries -Werror -Wall -Wpointer-arith -D_POSIX_C_SOURCE=200809L -Dswprintf_s=swprintf -fms-extensions -target x86_64-unknown-linux-musl -D_GNU_SOURCE=1 -D_LARGEFILE64_SOURCE -DWSL_PACKAGE_VERSION=\"3.0.4.46\" -DWSL_PACKAGE_VERSION_MAJOR=3 -DWSL_PACKAGE_VERSION_MINOR=0 -DWSL_PACKAGE_VERSION_REVISION=4 -D_AMD64_ -std=c++20 -I C:/repos/WSL/src/linux/netlinkutil/../init -g3 -fno-inline-functions -DDEBUG -DDBG Interface.cpp -c -o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/Interface.cpp.o
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\address.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.h;C:\repos\WSL\src\linux\netlinkutil\Fwd.h;C:\repos\WSL\src\linux\netlinkutil\Interface.h;C:\repos\WSL\src\linux\netlinkutil\InterfaceConfiguration.h;C:\repos\WSL\src\linux\netlinkutil\IpNeighborManager.h;C:\repos\WSL\src\linux\netlinkutil\IpRuleManager.h;C:\repos\WSL\src\linux\netlinkutil\Neighbor.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkError.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkParseException.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransaction.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransactionError.h;C:\repos\WSL\src\linux\netlinkutil\Packet.h;C:\repos\WSL\src\linux\netlinkutil\Protocol.h;C:\repos\WSL\src\linux\netlinkutil\Operation.h;C:\repos\WSL\src\linux\netlinkutil\Route.h;C:\repos\WSL\src\linux\netlinkutil\RoutingTable.h;C:\repos\WSL\src\linux\netlinkutil\Rule.h;C:\repos\WSL\src\linux\netlinkutil\RuntimeErrorWithSourceLocation.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.h;C:\repos\WSL\src\linux\netlinkutil\SyscallError.h;C:\repos\WSL\src\linux\netlinkutil\Utils.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.hxx;C:\repos\WSL\src\linux\netlinkutil\NetLinkStrings.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.hxx;C:\repos\WSL\src\linux\netlinkutil\Utils.hxx;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\x64\Debug\Interface.cpp.o</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\repos\WSL\src\linux\netlinkutil\IpNeighborManager.cpp">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating x64/Debug/IpNeighborManager.cpp.o</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\repos\WSL\src\linux\netlinkutil
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\x64\bin\clang++.exe" --gcc-toolchain=C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -fpic -BC:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isysroot C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include/c++/v1 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include -isystem C:/repos/WSL/_deps/x64/gsl-src/include -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/lxcore -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/schemas -I C:/repos/WSL/src/linux/inc -I C:/repos/WSL/src/linux/mountutil -I C:/repos/WSL/src/linux/plan9 -I C:/repos/WSL/src/shared/configfile -I C:/repos/WSL/src/shared/inc -I C:/repos/WSL/_deps/x64/nlohmannjson-src/include -I C:/repos/WSL/generated --no-standard-libraries -Werror -Wall -Wpointer-arith -D_POSIX_C_SOURCE=200809L -Dswprintf_s=swprintf -fms-extensions -target x86_64-unknown-linux-musl -D_GNU_SOURCE=1 -D_LARGEFILE64_SOURCE -DWSL_PACKAGE_VERSION=\"3.0.4.46\" -DWSL_PACKAGE_VERSION_MAJOR=3 -DWSL_PACKAGE_VERSION_MINOR=0 -DWSL_PACKAGE_VERSION_REVISION=4 -D_AMD64_ -std=c++20 -I C:/repos/WSL/src/linux/netlinkutil/../init -g3 -fno-inline-functions -DDEBUG -DDBG IpNeighborManager.cpp -c -o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/IpNeighborManager.cpp.o
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\address.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.h;C:\repos\WSL\src\linux\netlinkutil\Fwd.h;C:\repos\WSL\src\linux\netlinkutil\Interface.h;C:\repos\WSL\src\linux\netlinkutil\InterfaceConfiguration.h;C:\repos\WSL\src\linux\netlinkutil\IpNeighborManager.h;C:\repos\WSL\src\linux\netlinkutil\IpRuleManager.h;C:\repos\WSL\src\linux\netlinkutil\Neighbor.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkError.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkParseException.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransaction.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransactionError.h;C:\repos\WSL\src\linux\netlinkutil\Packet.h;C:\repos\WSL\src\linux\netlinkutil\Protocol.h;C:\repos\WSL\src\linux\netlinkutil\Operation.h;C:\repos\WSL\src\linux\netlinkutil\Route.h;C:\repos\WSL\src\linux\netlinkutil\RoutingTable.h;C:\repos\WSL\src\linux\netlinkutil\Rule.h;C:\repos\WSL\src\linux\netlinkutil\RuntimeErrorWithSourceLocation.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.h;C:\repos\WSL\src\linux\netlinkutil\SyscallError.h;C:\repos\WSL\src\linux\netlinkutil\Utils.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.hxx;C:\repos\WSL\src\linux\netlinkutil\NetLinkStrings.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.hxx;C:\repos\WSL\src\linux\netlinkutil\Utils.hxx;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\x64\Debug\IpNeighborManager.cpp.o</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\repos\WSL\src\linux\netlinkutil\IpRuleManager.cpp">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating x64/Debug/IpRuleManager.cpp.o</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\repos\WSL\src\linux\netlinkutil
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\x64\bin\clang++.exe" --gcc-toolchain=C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -fpic -BC:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isysroot C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include/c++/v1 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include -isystem C:/repos/WSL/_deps/x64/gsl-src/include -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/lxcore -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/schemas -I C:/repos/WSL/src/linux/inc -I C:/repos/WSL/src/linux/mountutil -I C:/repos/WSL/src/linux/plan9 -I C:/repos/WSL/src/shared/configfile -I C:/repos/WSL/src/shared/inc -I C:/repos/WSL/_deps/x64/nlohmannjson-src/include -I C:/repos/WSL/generated --no-standard-libraries -Werror -Wall -Wpointer-arith -D_POSIX_C_SOURCE=200809L -Dswprintf_s=swprintf -fms-extensions -target x86_64-unknown-linux-musl -D_GNU_SOURCE=1 -D_LARGEFILE64_SOURCE -DWSL_PACKAGE_VERSION=\"3.0.4.46\" -DWSL_PACKAGE_VERSION_MAJOR=3 -DWSL_PACKAGE_VERSION_MINOR=0 -DWSL_PACKAGE_VERSION_REVISION=4 -D_AMD64_ -std=c++20 -I C:/repos/WSL/src/linux/netlinkutil/../init -g3 -fno-inline-functions -DDEBUG -DDBG IpRuleManager.cpp -c -o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/IpRuleManager.cpp.o
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\address.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.h;C:\repos\WSL\src\linux\netlinkutil\Fwd.h;C:\repos\WSL\src\linux\netlinkutil\Interface.h;C:\repos\WSL\src\linux\netlinkutil\InterfaceConfiguration.h;C:\repos\WSL\src\linux\netlinkutil\IpNeighborManager.h;C:\repos\WSL\src\linux\netlinkutil\IpRuleManager.h;C:\repos\WSL\src\linux\netlinkutil\Neighbor.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkError.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkParseException.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransaction.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransactionError.h;C:\repos\WSL\src\linux\netlinkutil\Packet.h;C:\repos\WSL\src\linux\netlinkutil\Protocol.h;C:\repos\WSL\src\linux\netlinkutil\Operation.h;C:\repos\WSL\src\linux\netlinkutil\Route.h;C:\repos\WSL\src\linux\netlinkutil\RoutingTable.h;C:\repos\WSL\src\linux\netlinkutil\Rule.h;C:\repos\WSL\src\linux\netlinkutil\RuntimeErrorWithSourceLocation.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.h;C:\repos\WSL\src\linux\netlinkutil\SyscallError.h;C:\repos\WSL\src\linux\netlinkutil\Utils.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.hxx;C:\repos\WSL\src\linux\netlinkutil\NetLinkStrings.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.hxx;C:\repos\WSL\src\linux\netlinkutil\Utils.hxx;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\x64\Debug\IpRuleManager.cpp.o</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\repos\WSL\src\linux\netlinkutil\Neighbor.cpp">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating x64/Debug/Neighbor.cpp.o</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\repos\WSL\src\linux\netlinkutil
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\x64\bin\clang++.exe" --gcc-toolchain=C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -fpic -BC:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isysroot C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include/c++/v1 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include -isystem C:/repos/WSL/_deps/x64/gsl-src/include -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/lxcore -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/schemas -I C:/repos/WSL/src/linux/inc -I C:/repos/WSL/src/linux/mountutil -I C:/repos/WSL/src/linux/plan9 -I C:/repos/WSL/src/shared/configfile -I C:/repos/WSL/src/shared/inc -I C:/repos/WSL/_deps/x64/nlohmannjson-src/include -I C:/repos/WSL/generated --no-standard-libraries -Werror -Wall -Wpointer-arith -D_POSIX_C_SOURCE=200809L -Dswprintf_s=swprintf -fms-extensions -target x86_64-unknown-linux-musl -D_GNU_SOURCE=1 -D_LARGEFILE64_SOURCE -DWSL_PACKAGE_VERSION=\"3.0.4.46\" -DWSL_PACKAGE_VERSION_MAJOR=3 -DWSL_PACKAGE_VERSION_MINOR=0 -DWSL_PACKAGE_VERSION_REVISION=4 -D_AMD64_ -std=c++20 -I C:/repos/WSL/src/linux/netlinkutil/../init -g3 -fno-inline-functions -DDEBUG -DDBG Neighbor.cpp -c -o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/Neighbor.cpp.o
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\address.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.h;C:\repos\WSL\src\linux\netlinkutil\Fwd.h;C:\repos\WSL\src\linux\netlinkutil\Interface.h;C:\repos\WSL\src\linux\netlinkutil\InterfaceConfiguration.h;C:\repos\WSL\src\linux\netlinkutil\IpNeighborManager.h;C:\repos\WSL\src\linux\netlinkutil\IpRuleManager.h;C:\repos\WSL\src\linux\netlinkutil\Neighbor.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkError.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkParseException.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransaction.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransactionError.h;C:\repos\WSL\src\linux\netlinkutil\Packet.h;C:\repos\WSL\src\linux\netlinkutil\Protocol.h;C:\repos\WSL\src\linux\netlinkutil\Operation.h;C:\repos\WSL\src\linux\netlinkutil\Route.h;C:\repos\WSL\src\linux\netlinkutil\RoutingTable.h;C:\repos\WSL\src\linux\netlinkutil\Rule.h;C:\repos\WSL\src\linux\netlinkutil\RuntimeErrorWithSourceLocation.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.h;C:\repos\WSL\src\linux\netlinkutil\SyscallError.h;C:\repos\WSL\src\linux\netlinkutil\Utils.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.hxx;C:\repos\WSL\src\linux\netlinkutil\NetLinkStrings.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.hxx;C:\repos\WSL\src\linux\netlinkutil\Utils.hxx;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\x64\Debug\Neighbor.cpp.o</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\repos\WSL\src\linux\netlinkutil\NetlinkError.cpp">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating x64/Debug/NetlinkError.cpp.o</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\repos\WSL\src\linux\netlinkutil
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\x64\bin\clang++.exe" --gcc-toolchain=C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -fpic -BC:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isysroot C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include/c++/v1 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include -isystem C:/repos/WSL/_deps/x64/gsl-src/include -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/lxcore -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/schemas -I C:/repos/WSL/src/linux/inc -I C:/repos/WSL/src/linux/mountutil -I C:/repos/WSL/src/linux/plan9 -I C:/repos/WSL/src/shared/configfile -I C:/repos/WSL/src/shared/inc -I C:/repos/WSL/_deps/x64/nlohmannjson-src/include -I C:/repos/WSL/generated --no-standard-libraries -Werror -Wall -Wpointer-arith -D_POSIX_C_SOURCE=200809L -Dswprintf_s=swprintf -fms-extensions -target x86_64-unknown-linux-musl -D_GNU_SOURCE=1 -D_LARGEFILE64_SOURCE -DWSL_PACKAGE_VERSION=\"3.0.4.46\" -DWSL_PACKAGE_VERSION_MAJOR=3 -DWSL_PACKAGE_VERSION_MINOR=0 -DWSL_PACKAGE_VERSION_REVISION=4 -D_AMD64_ -std=c++20 -I C:/repos/WSL/src/linux/netlinkutil/../init -g3 -fno-inline-functions -DDEBUG -DDBG NetlinkError.cpp -c -o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/NetlinkError.cpp.o
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\address.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.h;C:\repos\WSL\src\linux\netlinkutil\Fwd.h;C:\repos\WSL\src\linux\netlinkutil\Interface.h;C:\repos\WSL\src\linux\netlinkutil\InterfaceConfiguration.h;C:\repos\WSL\src\linux\netlinkutil\IpNeighborManager.h;C:\repos\WSL\src\linux\netlinkutil\IpRuleManager.h;C:\repos\WSL\src\linux\netlinkutil\Neighbor.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkError.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkParseException.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransaction.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransactionError.h;C:\repos\WSL\src\linux\netlinkutil\Packet.h;C:\repos\WSL\src\linux\netlinkutil\Protocol.h;C:\repos\WSL\src\linux\netlinkutil\Operation.h;C:\repos\WSL\src\linux\netlinkutil\Route.h;C:\repos\WSL\src\linux\netlinkutil\RoutingTable.h;C:\repos\WSL\src\linux\netlinkutil\Rule.h;C:\repos\WSL\src\linux\netlinkutil\RuntimeErrorWithSourceLocation.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.h;C:\repos\WSL\src\linux\netlinkutil\SyscallError.h;C:\repos\WSL\src\linux\netlinkutil\Utils.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.hxx;C:\repos\WSL\src\linux\netlinkutil\NetLinkStrings.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.hxx;C:\repos\WSL\src\linux\netlinkutil\Utils.hxx;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\x64\Debug\NetlinkError.cpp.o</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\repos\WSL\src\linux\netlinkutil\NetlinkParseException.cpp">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating x64/Debug/NetlinkParseException.cpp.o</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\repos\WSL\src\linux\netlinkutil
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\x64\bin\clang++.exe" --gcc-toolchain=C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -fpic -BC:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isysroot C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include/c++/v1 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include -isystem C:/repos/WSL/_deps/x64/gsl-src/include -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/lxcore -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/schemas -I C:/repos/WSL/src/linux/inc -I C:/repos/WSL/src/linux/mountutil -I C:/repos/WSL/src/linux/plan9 -I C:/repos/WSL/src/shared/configfile -I C:/repos/WSL/src/shared/inc -I C:/repos/WSL/_deps/x64/nlohmannjson-src/include -I C:/repos/WSL/generated --no-standard-libraries -Werror -Wall -Wpointer-arith -D_POSIX_C_SOURCE=200809L -Dswprintf_s=swprintf -fms-extensions -target x86_64-unknown-linux-musl -D_GNU_SOURCE=1 -D_LARGEFILE64_SOURCE -DWSL_PACKAGE_VERSION=\"3.0.4.46\" -DWSL_PACKAGE_VERSION_MAJOR=3 -DWSL_PACKAGE_VERSION_MINOR=0 -DWSL_PACKAGE_VERSION_REVISION=4 -D_AMD64_ -std=c++20 -I C:/repos/WSL/src/linux/netlinkutil/../init -g3 -fno-inline-functions -DDEBUG -DDBG NetlinkParseException.cpp -c -o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/NetlinkParseException.cpp.o
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\address.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.h;C:\repos\WSL\src\linux\netlinkutil\Fwd.h;C:\repos\WSL\src\linux\netlinkutil\Interface.h;C:\repos\WSL\src\linux\netlinkutil\InterfaceConfiguration.h;C:\repos\WSL\src\linux\netlinkutil\IpNeighborManager.h;C:\repos\WSL\src\linux\netlinkutil\IpRuleManager.h;C:\repos\WSL\src\linux\netlinkutil\Neighbor.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkError.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkParseException.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransaction.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransactionError.h;C:\repos\WSL\src\linux\netlinkutil\Packet.h;C:\repos\WSL\src\linux\netlinkutil\Protocol.h;C:\repos\WSL\src\linux\netlinkutil\Operation.h;C:\repos\WSL\src\linux\netlinkutil\Route.h;C:\repos\WSL\src\linux\netlinkutil\RoutingTable.h;C:\repos\WSL\src\linux\netlinkutil\Rule.h;C:\repos\WSL\src\linux\netlinkutil\RuntimeErrorWithSourceLocation.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.h;C:\repos\WSL\src\linux\netlinkutil\SyscallError.h;C:\repos\WSL\src\linux\netlinkutil\Utils.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.hxx;C:\repos\WSL\src\linux\netlinkutil\NetLinkStrings.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.hxx;C:\repos\WSL\src\linux\netlinkutil\Utils.hxx;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\x64\Debug\NetlinkParseException.cpp.o</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.cpp">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating x64/Debug/NetlinkResponse.cpp.o</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\repos\WSL\src\linux\netlinkutil
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\x64\bin\clang++.exe" --gcc-toolchain=C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -fpic -BC:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isysroot C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include/c++/v1 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include -isystem C:/repos/WSL/_deps/x64/gsl-src/include -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/lxcore -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/schemas -I C:/repos/WSL/src/linux/inc -I C:/repos/WSL/src/linux/mountutil -I C:/repos/WSL/src/linux/plan9 -I C:/repos/WSL/src/shared/configfile -I C:/repos/WSL/src/shared/inc -I C:/repos/WSL/_deps/x64/nlohmannjson-src/include -I C:/repos/WSL/generated --no-standard-libraries -Werror -Wall -Wpointer-arith -D_POSIX_C_SOURCE=200809L -Dswprintf_s=swprintf -fms-extensions -target x86_64-unknown-linux-musl -D_GNU_SOURCE=1 -D_LARGEFILE64_SOURCE -DWSL_PACKAGE_VERSION=\"3.0.4.46\" -DWSL_PACKAGE_VERSION_MAJOR=3 -DWSL_PACKAGE_VERSION_MINOR=0 -DWSL_PACKAGE_VERSION_REVISION=4 -D_AMD64_ -std=c++20 -I C:/repos/WSL/src/linux/netlinkutil/../init -g3 -fno-inline-functions -DDEBUG -DDBG NetlinkResponse.cpp -c -o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/NetlinkResponse.cpp.o
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\address.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.h;C:\repos\WSL\src\linux\netlinkutil\Fwd.h;C:\repos\WSL\src\linux\netlinkutil\Interface.h;C:\repos\WSL\src\linux\netlinkutil\InterfaceConfiguration.h;C:\repos\WSL\src\linux\netlinkutil\IpNeighborManager.h;C:\repos\WSL\src\linux\netlinkutil\IpRuleManager.h;C:\repos\WSL\src\linux\netlinkutil\Neighbor.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkError.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkParseException.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransaction.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransactionError.h;C:\repos\WSL\src\linux\netlinkutil\Packet.h;C:\repos\WSL\src\linux\netlinkutil\Protocol.h;C:\repos\WSL\src\linux\netlinkutil\Operation.h;C:\repos\WSL\src\linux\netlinkutil\Route.h;C:\repos\WSL\src\linux\netlinkutil\RoutingTable.h;C:\repos\WSL\src\linux\netlinkutil\Rule.h;C:\repos\WSL\src\linux\netlinkutil\RuntimeErrorWithSourceLocation.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.h;C:\repos\WSL\src\linux\netlinkutil\SyscallError.h;C:\repos\WSL\src\linux\netlinkutil\Utils.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.hxx;C:\repos\WSL\src\linux\netlinkutil\NetLinkStrings.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.hxx;C:\repos\WSL\src\linux\netlinkutil\Utils.hxx;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\x64\Debug\NetlinkResponse.cpp.o</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\repos\WSL\src\linux\netlinkutil\NetlinkTransaction.cpp">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating x64/Debug/NetlinkTransaction.cpp.o</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\repos\WSL\src\linux\netlinkutil
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\x64\bin\clang++.exe" --gcc-toolchain=C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -fpic -BC:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isysroot C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include/c++/v1 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include -isystem C:/repos/WSL/_deps/x64/gsl-src/include -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/lxcore -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/schemas -I C:/repos/WSL/src/linux/inc -I C:/repos/WSL/src/linux/mountutil -I C:/repos/WSL/src/linux/plan9 -I C:/repos/WSL/src/shared/configfile -I C:/repos/WSL/src/shared/inc -I C:/repos/WSL/_deps/x64/nlohmannjson-src/include -I C:/repos/WSL/generated --no-standard-libraries -Werror -Wall -Wpointer-arith -D_POSIX_C_SOURCE=200809L -Dswprintf_s=swprintf -fms-extensions -target x86_64-unknown-linux-musl -D_GNU_SOURCE=1 -D_LARGEFILE64_SOURCE -DWSL_PACKAGE_VERSION=\"3.0.4.46\" -DWSL_PACKAGE_VERSION_MAJOR=3 -DWSL_PACKAGE_VERSION_MINOR=0 -DWSL_PACKAGE_VERSION_REVISION=4 -D_AMD64_ -std=c++20 -I C:/repos/WSL/src/linux/netlinkutil/../init -g3 -fno-inline-functions -DDEBUG -DDBG NetlinkTransaction.cpp -c -o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/NetlinkTransaction.cpp.o
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\address.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.h;C:\repos\WSL\src\linux\netlinkutil\Fwd.h;C:\repos\WSL\src\linux\netlinkutil\Interface.h;C:\repos\WSL\src\linux\netlinkutil\InterfaceConfiguration.h;C:\repos\WSL\src\linux\netlinkutil\IpNeighborManager.h;C:\repos\WSL\src\linux\netlinkutil\IpRuleManager.h;C:\repos\WSL\src\linux\netlinkutil\Neighbor.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkError.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkParseException.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransaction.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransactionError.h;C:\repos\WSL\src\linux\netlinkutil\Packet.h;C:\repos\WSL\src\linux\netlinkutil\Protocol.h;C:\repos\WSL\src\linux\netlinkutil\Operation.h;C:\repos\WSL\src\linux\netlinkutil\Route.h;C:\repos\WSL\src\linux\netlinkutil\RoutingTable.h;C:\repos\WSL\src\linux\netlinkutil\Rule.h;C:\repos\WSL\src\linux\netlinkutil\RuntimeErrorWithSourceLocation.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.h;C:\repos\WSL\src\linux\netlinkutil\SyscallError.h;C:\repos\WSL\src\linux\netlinkutil\Utils.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.hxx;C:\repos\WSL\src\linux\netlinkutil\NetLinkStrings.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.hxx;C:\repos\WSL\src\linux\netlinkutil\Utils.hxx;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\x64\Debug\NetlinkTransaction.cpp.o</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\repos\WSL\src\linux\netlinkutil\NetlinkTransactionError.cpp">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating x64/Debug/NetlinkTransactionError.cpp.o</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\repos\WSL\src\linux\netlinkutil
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\x64\bin\clang++.exe" --gcc-toolchain=C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -fpic -BC:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isysroot C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include/c++/v1 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include -isystem C:/repos/WSL/_deps/x64/gsl-src/include -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/lxcore -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/schemas -I C:/repos/WSL/src/linux/inc -I C:/repos/WSL/src/linux/mountutil -I C:/repos/WSL/src/linux/plan9 -I C:/repos/WSL/src/shared/configfile -I C:/repos/WSL/src/shared/inc -I C:/repos/WSL/_deps/x64/nlohmannjson-src/include -I C:/repos/WSL/generated --no-standard-libraries -Werror -Wall -Wpointer-arith -D_POSIX_C_SOURCE=200809L -Dswprintf_s=swprintf -fms-extensions -target x86_64-unknown-linux-musl -D_GNU_SOURCE=1 -D_LARGEFILE64_SOURCE -DWSL_PACKAGE_VERSION=\"3.0.4.46\" -DWSL_PACKAGE_VERSION_MAJOR=3 -DWSL_PACKAGE_VERSION_MINOR=0 -DWSL_PACKAGE_VERSION_REVISION=4 -D_AMD64_ -std=c++20 -I C:/repos/WSL/src/linux/netlinkutil/../init -g3 -fno-inline-functions -DDEBUG -DDBG NetlinkTransactionError.cpp -c -o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/NetlinkTransactionError.cpp.o
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\address.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.h;C:\repos\WSL\src\linux\netlinkutil\Fwd.h;C:\repos\WSL\src\linux\netlinkutil\Interface.h;C:\repos\WSL\src\linux\netlinkutil\InterfaceConfiguration.h;C:\repos\WSL\src\linux\netlinkutil\IpNeighborManager.h;C:\repos\WSL\src\linux\netlinkutil\IpRuleManager.h;C:\repos\WSL\src\linux\netlinkutil\Neighbor.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkError.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkParseException.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransaction.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransactionError.h;C:\repos\WSL\src\linux\netlinkutil\Packet.h;C:\repos\WSL\src\linux\netlinkutil\Protocol.h;C:\repos\WSL\src\linux\netlinkutil\Operation.h;C:\repos\WSL\src\linux\netlinkutil\Route.h;C:\repos\WSL\src\linux\netlinkutil\RoutingTable.h;C:\repos\WSL\src\linux\netlinkutil\Rule.h;C:\repos\WSL\src\linux\netlinkutil\RuntimeErrorWithSourceLocation.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.h;C:\repos\WSL\src\linux\netlinkutil\SyscallError.h;C:\repos\WSL\src\linux\netlinkutil\Utils.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.hxx;C:\repos\WSL\src\linux\netlinkutil\NetLinkStrings.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.hxx;C:\repos\WSL\src\linux\netlinkutil\Utils.hxx;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\x64\Debug\NetlinkTransactionError.cpp.o</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\repos\WSL\src\linux\netlinkutil\Route.cpp">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating x64/Debug/Route.cpp.o</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\repos\WSL\src\linux\netlinkutil
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\x64\bin\clang++.exe" --gcc-toolchain=C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -fpic -BC:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isysroot C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include/c++/v1 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include -isystem C:/repos/WSL/_deps/x64/gsl-src/include -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/lxcore -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/schemas -I C:/repos/WSL/src/linux/inc -I C:/repos/WSL/src/linux/mountutil -I C:/repos/WSL/src/linux/plan9 -I C:/repos/WSL/src/shared/configfile -I C:/repos/WSL/src/shared/inc -I C:/repos/WSL/_deps/x64/nlohmannjson-src/include -I C:/repos/WSL/generated --no-standard-libraries -Werror -Wall -Wpointer-arith -D_POSIX_C_SOURCE=200809L -Dswprintf_s=swprintf -fms-extensions -target x86_64-unknown-linux-musl -D_GNU_SOURCE=1 -D_LARGEFILE64_SOURCE -DWSL_PACKAGE_VERSION=\"3.0.4.46\" -DWSL_PACKAGE_VERSION_MAJOR=3 -DWSL_PACKAGE_VERSION_MINOR=0 -DWSL_PACKAGE_VERSION_REVISION=4 -D_AMD64_ -std=c++20 -I C:/repos/WSL/src/linux/netlinkutil/../init -g3 -fno-inline-functions -DDEBUG -DDBG Route.cpp -c -o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/Route.cpp.o
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\address.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.h;C:\repos\WSL\src\linux\netlinkutil\Fwd.h;C:\repos\WSL\src\linux\netlinkutil\Interface.h;C:\repos\WSL\src\linux\netlinkutil\InterfaceConfiguration.h;C:\repos\WSL\src\linux\netlinkutil\IpNeighborManager.h;C:\repos\WSL\src\linux\netlinkutil\IpRuleManager.h;C:\repos\WSL\src\linux\netlinkutil\Neighbor.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkError.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkParseException.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransaction.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransactionError.h;C:\repos\WSL\src\linux\netlinkutil\Packet.h;C:\repos\WSL\src\linux\netlinkutil\Protocol.h;C:\repos\WSL\src\linux\netlinkutil\Operation.h;C:\repos\WSL\src\linux\netlinkutil\Route.h;C:\repos\WSL\src\linux\netlinkutil\RoutingTable.h;C:\repos\WSL\src\linux\netlinkutil\Rule.h;C:\repos\WSL\src\linux\netlinkutil\RuntimeErrorWithSourceLocation.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.h;C:\repos\WSL\src\linux\netlinkutil\SyscallError.h;C:\repos\WSL\src\linux\netlinkutil\Utils.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.hxx;C:\repos\WSL\src\linux\netlinkutil\NetLinkStrings.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.hxx;C:\repos\WSL\src\linux\netlinkutil\Utils.hxx;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\x64\Debug\Route.cpp.o</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\repos\WSL\src\linux\netlinkutil\RoutingTable.cpp">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating x64/Debug/RoutingTable.cpp.o</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\repos\WSL\src\linux\netlinkutil
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\x64\bin\clang++.exe" --gcc-toolchain=C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -fpic -BC:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isysroot C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include/c++/v1 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include -isystem C:/repos/WSL/_deps/x64/gsl-src/include -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/lxcore -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/schemas -I C:/repos/WSL/src/linux/inc -I C:/repos/WSL/src/linux/mountutil -I C:/repos/WSL/src/linux/plan9 -I C:/repos/WSL/src/shared/configfile -I C:/repos/WSL/src/shared/inc -I C:/repos/WSL/_deps/x64/nlohmannjson-src/include -I C:/repos/WSL/generated --no-standard-libraries -Werror -Wall -Wpointer-arith -D_POSIX_C_SOURCE=200809L -Dswprintf_s=swprintf -fms-extensions -target x86_64-unknown-linux-musl -D_GNU_SOURCE=1 -D_LARGEFILE64_SOURCE -DWSL_PACKAGE_VERSION=\"3.0.4.46\" -DWSL_PACKAGE_VERSION_MAJOR=3 -DWSL_PACKAGE_VERSION_MINOR=0 -DWSL_PACKAGE_VERSION_REVISION=4 -D_AMD64_ -std=c++20 -I C:/repos/WSL/src/linux/netlinkutil/../init -g3 -fno-inline-functions -DDEBUG -DDBG RoutingTable.cpp -c -o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/RoutingTable.cpp.o
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\address.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.h;C:\repos\WSL\src\linux\netlinkutil\Fwd.h;C:\repos\WSL\src\linux\netlinkutil\Interface.h;C:\repos\WSL\src\linux\netlinkutil\InterfaceConfiguration.h;C:\repos\WSL\src\linux\netlinkutil\IpNeighborManager.h;C:\repos\WSL\src\linux\netlinkutil\IpRuleManager.h;C:\repos\WSL\src\linux\netlinkutil\Neighbor.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkError.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkParseException.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransaction.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransactionError.h;C:\repos\WSL\src\linux\netlinkutil\Packet.h;C:\repos\WSL\src\linux\netlinkutil\Protocol.h;C:\repos\WSL\src\linux\netlinkutil\Operation.h;C:\repos\WSL\src\linux\netlinkutil\Route.h;C:\repos\WSL\src\linux\netlinkutil\RoutingTable.h;C:\repos\WSL\src\linux\netlinkutil\Rule.h;C:\repos\WSL\src\linux\netlinkutil\RuntimeErrorWithSourceLocation.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.h;C:\repos\WSL\src\linux\netlinkutil\SyscallError.h;C:\repos\WSL\src\linux\netlinkutil\Utils.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.hxx;C:\repos\WSL\src\linux\netlinkutil\NetLinkStrings.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.hxx;C:\repos\WSL\src\linux\netlinkutil\Utils.hxx;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\x64\Debug\RoutingTable.cpp.o</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\repos\WSL\src\linux\netlinkutil\Rule.cpp">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating x64/Debug/Rule.cpp.o</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\repos\WSL\src\linux\netlinkutil
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\x64\bin\clang++.exe" --gcc-toolchain=C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -fpic -BC:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isysroot C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include/c++/v1 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include -isystem C:/repos/WSL/_deps/x64/gsl-src/include -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/lxcore -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/schemas -I C:/repos/WSL/src/linux/inc -I C:/repos/WSL/src/linux/mountutil -I C:/repos/WSL/src/linux/plan9 -I C:/repos/WSL/src/shared/configfile -I C:/repos/WSL/src/shared/inc -I C:/repos/WSL/_deps/x64/nlohmannjson-src/include -I C:/repos/WSL/generated --no-standard-libraries -Werror -Wall -Wpointer-arith -D_POSIX_C_SOURCE=200809L -Dswprintf_s=swprintf -fms-extensions -target x86_64-unknown-linux-musl -D_GNU_SOURCE=1 -D_LARGEFILE64_SOURCE -DWSL_PACKAGE_VERSION=\"3.0.4.46\" -DWSL_PACKAGE_VERSION_MAJOR=3 -DWSL_PACKAGE_VERSION_MINOR=0 -DWSL_PACKAGE_VERSION_REVISION=4 -D_AMD64_ -std=c++20 -I C:/repos/WSL/src/linux/netlinkutil/../init -g3 -fno-inline-functions -DDEBUG -DDBG Rule.cpp -c -o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/Rule.cpp.o
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\address.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.h;C:\repos\WSL\src\linux\netlinkutil\Fwd.h;C:\repos\WSL\src\linux\netlinkutil\Interface.h;C:\repos\WSL\src\linux\netlinkutil\InterfaceConfiguration.h;C:\repos\WSL\src\linux\netlinkutil\IpNeighborManager.h;C:\repos\WSL\src\linux\netlinkutil\IpRuleManager.h;C:\repos\WSL\src\linux\netlinkutil\Neighbor.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkError.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkParseException.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransaction.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransactionError.h;C:\repos\WSL\src\linux\netlinkutil\Packet.h;C:\repos\WSL\src\linux\netlinkutil\Protocol.h;C:\repos\WSL\src\linux\netlinkutil\Operation.h;C:\repos\WSL\src\linux\netlinkutil\Route.h;C:\repos\WSL\src\linux\netlinkutil\RoutingTable.h;C:\repos\WSL\src\linux\netlinkutil\Rule.h;C:\repos\WSL\src\linux\netlinkutil\RuntimeErrorWithSourceLocation.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.h;C:\repos\WSL\src\linux\netlinkutil\SyscallError.h;C:\repos\WSL\src\linux\netlinkutil\Utils.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.hxx;C:\repos\WSL\src\linux\netlinkutil\NetLinkStrings.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.hxx;C:\repos\WSL\src\linux\netlinkutil\Utils.hxx;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\x64\Debug\Rule.cpp.o</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\repos\WSL\src\linux\netlinkutil\RuntimeErrorWithSourceLocation.cpp">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating x64/Debug/RuntimeErrorWithSourceLocation.cpp.o</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\repos\WSL\src\linux\netlinkutil
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\x64\bin\clang++.exe" --gcc-toolchain=C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -fpic -BC:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isysroot C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include/c++/v1 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include -isystem C:/repos/WSL/_deps/x64/gsl-src/include -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/lxcore -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/schemas -I C:/repos/WSL/src/linux/inc -I C:/repos/WSL/src/linux/mountutil -I C:/repos/WSL/src/linux/plan9 -I C:/repos/WSL/src/shared/configfile -I C:/repos/WSL/src/shared/inc -I C:/repos/WSL/_deps/x64/nlohmannjson-src/include -I C:/repos/WSL/generated --no-standard-libraries -Werror -Wall -Wpointer-arith -D_POSIX_C_SOURCE=200809L -Dswprintf_s=swprintf -fms-extensions -target x86_64-unknown-linux-musl -D_GNU_SOURCE=1 -D_LARGEFILE64_SOURCE -DWSL_PACKAGE_VERSION=\"3.0.4.46\" -DWSL_PACKAGE_VERSION_MAJOR=3 -DWSL_PACKAGE_VERSION_MINOR=0 -DWSL_PACKAGE_VERSION_REVISION=4 -D_AMD64_ -std=c++20 -I C:/repos/WSL/src/linux/netlinkutil/../init -g3 -fno-inline-functions -DDEBUG -DDBG RuntimeErrorWithSourceLocation.cpp -c -o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/RuntimeErrorWithSourceLocation.cpp.o
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\address.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.h;C:\repos\WSL\src\linux\netlinkutil\Fwd.h;C:\repos\WSL\src\linux\netlinkutil\Interface.h;C:\repos\WSL\src\linux\netlinkutil\InterfaceConfiguration.h;C:\repos\WSL\src\linux\netlinkutil\IpNeighborManager.h;C:\repos\WSL\src\linux\netlinkutil\IpRuleManager.h;C:\repos\WSL\src\linux\netlinkutil\Neighbor.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkError.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkParseException.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransaction.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransactionError.h;C:\repos\WSL\src\linux\netlinkutil\Packet.h;C:\repos\WSL\src\linux\netlinkutil\Protocol.h;C:\repos\WSL\src\linux\netlinkutil\Operation.h;C:\repos\WSL\src\linux\netlinkutil\Route.h;C:\repos\WSL\src\linux\netlinkutil\RoutingTable.h;C:\repos\WSL\src\linux\netlinkutil\Rule.h;C:\repos\WSL\src\linux\netlinkutil\RuntimeErrorWithSourceLocation.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.h;C:\repos\WSL\src\linux\netlinkutil\SyscallError.h;C:\repos\WSL\src\linux\netlinkutil\Utils.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.hxx;C:\repos\WSL\src\linux\netlinkutil\NetLinkStrings.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.hxx;C:\repos\WSL\src\linux\netlinkutil\Utils.hxx;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\x64\Debug\RuntimeErrorWithSourceLocation.cpp.o</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\repos\WSL\src\linux\netlinkutil\SyscallError.cpp">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating x64/Debug/SyscallError.cpp.o</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\repos\WSL\src\linux\netlinkutil
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\x64\bin\clang++.exe" --gcc-toolchain=C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -fpic -BC:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isysroot C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include/c++/v1 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include -isystem C:/repos/WSL/_deps/x64/gsl-src/include -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/lxcore -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/schemas -I C:/repos/WSL/src/linux/inc -I C:/repos/WSL/src/linux/mountutil -I C:/repos/WSL/src/linux/plan9 -I C:/repos/WSL/src/shared/configfile -I C:/repos/WSL/src/shared/inc -I C:/repos/WSL/_deps/x64/nlohmannjson-src/include -I C:/repos/WSL/generated --no-standard-libraries -Werror -Wall -Wpointer-arith -D_POSIX_C_SOURCE=200809L -Dswprintf_s=swprintf -fms-extensions -target x86_64-unknown-linux-musl -D_GNU_SOURCE=1 -D_LARGEFILE64_SOURCE -DWSL_PACKAGE_VERSION=\"3.0.4.46\" -DWSL_PACKAGE_VERSION_MAJOR=3 -DWSL_PACKAGE_VERSION_MINOR=0 -DWSL_PACKAGE_VERSION_REVISION=4 -D_AMD64_ -std=c++20 -I C:/repos/WSL/src/linux/netlinkutil/../init -g3 -fno-inline-functions -DDEBUG -DDBG SyscallError.cpp -c -o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/SyscallError.cpp.o
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\address.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.h;C:\repos\WSL\src\linux\netlinkutil\Fwd.h;C:\repos\WSL\src\linux\netlinkutil\Interface.h;C:\repos\WSL\src\linux\netlinkutil\InterfaceConfiguration.h;C:\repos\WSL\src\linux\netlinkutil\IpNeighborManager.h;C:\repos\WSL\src\linux\netlinkutil\IpRuleManager.h;C:\repos\WSL\src\linux\netlinkutil\Neighbor.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkError.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkParseException.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransaction.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransactionError.h;C:\repos\WSL\src\linux\netlinkutil\Packet.h;C:\repos\WSL\src\linux\netlinkutil\Protocol.h;C:\repos\WSL\src\linux\netlinkutil\Operation.h;C:\repos\WSL\src\linux\netlinkutil\Route.h;C:\repos\WSL\src\linux\netlinkutil\RoutingTable.h;C:\repos\WSL\src\linux\netlinkutil\Rule.h;C:\repos\WSL\src\linux\netlinkutil\RuntimeErrorWithSourceLocation.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.h;C:\repos\WSL\src\linux\netlinkutil\SyscallError.h;C:\repos\WSL\src\linux\netlinkutil\Utils.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.hxx;C:\repos\WSL\src\linux\netlinkutil\NetLinkStrings.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.hxx;C:\repos\WSL\src\linux\netlinkutil\Utils.hxx;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\x64\Debug\SyscallError.cpp.o</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\repos\WSL\src\linux\netlinkutil\Utils.cpp">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating x64/Debug/Utils.cpp.o</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\repos\WSL\src\linux\netlinkutil
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\x64\bin\clang++.exe" --gcc-toolchain=C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -fpic -BC:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isysroot C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include/c++/v1 -isystem C:/repos/WSL/packages/Microsoft.WSL.LinuxSdk.1.23.0//x86_64/include -isystem C:/repos/WSL/_deps/x64/gsl-src/include -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/lxcore -isystem C:/repos/WSL/packages/Microsoft.WSL.Dependencies.amd64fre.10.0.27820.1000-250318-1700.rs-base2-hyp/build/native/include/schemas -I C:/repos/WSL/src/linux/inc -I C:/repos/WSL/src/linux/mountutil -I C:/repos/WSL/src/linux/plan9 -I C:/repos/WSL/src/shared/configfile -I C:/repos/WSL/src/shared/inc -I C:/repos/WSL/_deps/x64/nlohmannjson-src/include -I C:/repos/WSL/generated --no-standard-libraries -Werror -Wall -Wpointer-arith -D_POSIX_C_SOURCE=200809L -Dswprintf_s=swprintf -fms-extensions -target x86_64-unknown-linux-musl -D_GNU_SOURCE=1 -D_LARGEFILE64_SOURCE -DWSL_PACKAGE_VERSION=\"3.0.4.46\" -DWSL_PACKAGE_VERSION_MAJOR=3 -DWSL_PACKAGE_VERSION_MINOR=0 -DWSL_PACKAGE_VERSION_REVISION=4 -D_AMD64_ -std=c++20 -I C:/repos/WSL/src/linux/netlinkutil/../init -g3 -fno-inline-functions -DDEBUG -DDBG Utils.cpp -c -o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/Utils.cpp.o
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\address.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.h;C:\repos\WSL\src\linux\netlinkutil\Fwd.h;C:\repos\WSL\src\linux\netlinkutil\Interface.h;C:\repos\WSL\src\linux\netlinkutil\InterfaceConfiguration.h;C:\repos\WSL\src\linux\netlinkutil\IpNeighborManager.h;C:\repos\WSL\src\linux\netlinkutil\IpRuleManager.h;C:\repos\WSL\src\linux\netlinkutil\Neighbor.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkError.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkParseException.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransaction.h;C:\repos\WSL\src\linux\netlinkutil\NetlinkTransactionError.h;C:\repos\WSL\src\linux\netlinkutil\Packet.h;C:\repos\WSL\src\linux\netlinkutil\Protocol.h;C:\repos\WSL\src\linux\netlinkutil\Operation.h;C:\repos\WSL\src\linux\netlinkutil\Route.h;C:\repos\WSL\src\linux\netlinkutil\RoutingTable.h;C:\repos\WSL\src\linux\netlinkutil\Rule.h;C:\repos\WSL\src\linux\netlinkutil\RuntimeErrorWithSourceLocation.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.h;C:\repos\WSL\src\linux\netlinkutil\SyscallError.h;C:\repos\WSL\src\linux\netlinkutil\Utils.h;C:\repos\WSL\src\linux\netlinkutil\Forwarder.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.hxx;C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.hxx;C:\repos\WSL\src\linux\netlinkutil\NetLinkStrings.h;C:\repos\WSL\src\linux\netlinkutil\Syscall.hxx;C:\repos\WSL\src\linux\netlinkutil\Utils.hxx;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\x64\Debug\Utils.cpp.o</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\repos\WSL\CMakeFiles\6bb444bd3e1512bb4dd4f9b0ab775e8a\libnetlinkutil.a.rule">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating ../../../bin/x64/Debug/libnetlinkutil.a, CmakeFiles/libnetlinkutil</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\repos\WSL\src\linux\netlinkutil
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\x64\bin\llvm-ar.exe" crus C:/repos/WSL/bin/x64/Debug/libnetlinkutil.a C:/repos/WSL/src/linux/netlinkutil/x64/Debug/Address.cpp.o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/Interface.cpp.o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/IpNeighborManager.cpp.o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/IpRuleManager.cpp.o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/Neighbor.cpp.o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/NetlinkError.cpp.o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/NetlinkParseException.cpp.o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/NetlinkResponse.cpp.o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/NetlinkTransaction.cpp.o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/NetlinkTransactionError.cpp.o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/Route.cpp.o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/RoutingTable.cpp.o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/Rule.cpp.o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/RuntimeErrorWithSourceLocation.cpp.o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/SyscallError.cpp.o C:/repos/WSL/src/linux/netlinkutil/x64/Debug/Utils.cpp.o
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/repos/WSL/src/linux/netlinkutil/CmakeFiles/libnetlinkutil
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\x64\Debug\Address.cpp.o;C:\repos\WSL\src\linux\netlinkutil\x64\Debug\Interface.cpp.o;C:\repos\WSL\src\linux\netlinkutil\x64\Debug\IpNeighborManager.cpp.o;C:\repos\WSL\src\linux\netlinkutil\x64\Debug\IpRuleManager.cpp.o;C:\repos\WSL\src\linux\netlinkutil\x64\Debug\Neighbor.cpp.o;C:\repos\WSL\src\linux\netlinkutil\x64\Debug\NetlinkError.cpp.o;C:\repos\WSL\src\linux\netlinkutil\x64\Debug\NetlinkParseException.cpp.o;C:\repos\WSL\src\linux\netlinkutil\x64\Debug\NetlinkResponse.cpp.o;C:\repos\WSL\src\linux\netlinkutil\x64\Debug\NetlinkTransaction.cpp.o;C:\repos\WSL\src\linux\netlinkutil\x64\Debug\NetlinkTransactionError.cpp.o;C:\repos\WSL\src\linux\netlinkutil\x64\Debug\Route.cpp.o;C:\repos\WSL\src\linux\netlinkutil\x64\Debug\RoutingTable.cpp.o;C:\repos\WSL\src\linux\netlinkutil\x64\Debug\Rule.cpp.o;C:\repos\WSL\src\linux\netlinkutil\x64\Debug\RuntimeErrorWithSourceLocation.cpp.o;C:\repos\WSL\src\linux\netlinkutil\x64\Debug\SyscallError.cpp.o;C:\repos\WSL\src\linux\netlinkutil\x64\Debug\Utils.cpp.o;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\bin\x64\Debug\libnetlinkutil.a;C:\repos\WSL\src\linux\netlinkutil\CmakeFiles\libnetlinkutil</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\repos\WSL\CMakeFiles\de99b9a6c67221167896d051a2512b44\libnetlinkutil.rule">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'"></Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\bin\x64\Debug\libnetlinkutil.a;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\CMakeFiles\libnetlinkutil</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <VerifyInputsAndOutputsExist Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</VerifyInputsAndOutputsExist>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\repos\WSL\src\linux\netlinkutil\CMakeLists.txt">
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building Custom Rule C:/repos/WSL/src/linux/netlinkutil/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/repos/WSL -BC:/repos/WSL --check-stamp-file C:/repos/WSL/src/linux/netlinkutil/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\CMakeFiles\cmake.verify_globs;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\repos\WSL\src\linux\netlinkutil\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\address.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\Forwarder.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\Fwd.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\Interface.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\InterfaceConfiguration.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\IpNeighborManager.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\IpRuleManager.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\Neighbor.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\NetlinkError.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\NetlinkParseException.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\NetlinkTransaction.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\NetlinkTransactionError.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\Packet.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\Protocol.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\Operation.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\Route.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\RoutingTable.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\Rule.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\RuntimeErrorWithSourceLocation.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\Syscall.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\SyscallError.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\Utils.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\Forwarder.hxx">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\NetlinkChannel.hxx">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\NetlinkMessage.hxx">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\NetlinkResponse.hxx">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\NetLinkStrings.h">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\Syscall.hxx">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\Utils.hxx">
+    </None>
+    <None Include="C:\repos\WSL\src\linux\netlinkutil\CMakeFiles\libnetlinkutil">
+    </None>
+  </ItemGroup>
+  <ItemGroup />
+  <ItemGroup>
+    <ProjectReference Include="C:\repos\WSL\ZERO_CHECK.vcxproj">
+      <Project>{A95E7D31-6519-325B-9A9B-BD4164704951}</Project>
+      <Name>ZERO_CHECK</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
