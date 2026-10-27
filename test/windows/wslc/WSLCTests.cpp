@@ -9635,15 +9635,21 @@ class WSLCTests
         VERIFY_ARE_EQUAL(id, secondEvent.Actor.ID);
     }
 
+    static auto CreateEventStream(wsl::windows::service::wslc::EventStore& Store, const wil::unique_event& ReaderAvailable)
+    {
+        auto stream = wil::MakeOrThrow<wsl::windows::service::wslc::EventStream>(
+            wil::unique_event{wsl::windows::common::wslutil::DuplicateHandle(ReaderAvailable.get())});
+        VERIFY_SUCCEEDED(stream->RuntimeClassInitialize(nullptr, &Store, 0, 1, {}));
+        return stream;
+    }
+
     WSLC_TEST_METHOD(EventStreamQueuedReaderCancellationAbortsWithoutReleasingGate)
     {
         for (const bool cancelBeforeRead : {false, true})
         {
             wsl::windows::service::wslc::EventStore store;
             wil::unique_event readerAvailable{wil::EventOptions::Signaled};
-            auto stream = wil::MakeOrThrow<wsl::windows::service::wslc::EventStream>(
-                wil::unique_event{wsl::windows::common::wslutil::DuplicateHandle(readerAvailable.get())});
-            VERIFY_SUCCEEDED(stream->RuntimeClassInitialize(nullptr, &store, 0, 1, {}));
+            auto stream = CreateEventStream(store, readerAvailable);
 
             VERIFY_IS_TRUE(readerAvailable.wait(0));
             auto releaseGate = readerAvailable.SetEvent_scope_exit();
@@ -9694,9 +9700,7 @@ class WSLCTests
     {
         wsl::windows::service::wslc::EventStore store;
         wil::unique_event readerAvailable{wil::EventOptions::Signaled};
-        auto stream = wil::MakeOrThrow<wsl::windows::service::wslc::EventStream>(
-            wil::unique_event{wsl::windows::common::wslutil::DuplicateHandle(readerAvailable.get())});
-        VERIFY_SUCCEEDED(stream->RuntimeClassInitialize(nullptr, &store, 0, 1, {}));
+        auto stream = CreateEventStream(store, readerAvailable);
 
         VERIFY_IS_TRUE(readerAvailable.wait(0));
         auto releaseGate = readerAvailable.SetEvent_scope_exit();
@@ -9736,9 +9740,7 @@ class WSLCTests
     {
         wsl::windows::service::wslc::EventStore store;
         wil::unique_event readerAvailable{wil::EventOptions::Signaled};
-        auto stream = wil::MakeOrThrow<wsl::windows::service::wslc::EventStream>(
-            wil::unique_event{wsl::windows::common::wslutil::DuplicateHandle(readerAvailable.get())});
-        VERIFY_SUCCEEDED(stream->RuntimeClassInitialize(nullptr, &store, 0, 1, {}));
+        auto stream = CreateEventStream(store, readerAvailable);
 
         wil::unique_event cancelEvent{wil::EventOptions::ManualReset | wil::EventOptions::Signaled};
         wil::unique_cotaskmem_ansistring eventJson;
