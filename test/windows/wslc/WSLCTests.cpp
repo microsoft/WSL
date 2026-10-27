@@ -211,7 +211,7 @@ class WSLCTests
         return RunningWSLCContainer(std::move(rawContainer), {});
     }
 
-    RunningWSLCContainer LaunchContainerWithBlockingStopHandler(const std::string& name)
+    RunningWSLCContainer LaunchContainerWithBlockingStopHandler(IWSLCSession& session, const std::string& name)
     {
         WSLCContainerLauncher launcher(
             "debian:latest",
@@ -221,7 +221,7 @@ class WSLCTests
             "host",
             WSLCProcessFlagsStdin);
 
-        return launcher.Launch(*m_defaultSession);
+        return launcher.Launch(session);
     }
 
     struct ListContainersResult
@@ -1607,8 +1607,10 @@ class WSLCTests
     {
         SKIP_TEST_SERVER();
 
-        auto cleanup =
-            wil::scope_exit([&]() { LOG_IF_FAILED(DeleteImageNoThrow("my-hello-world:test", WSLCDeleteImageFlagsNone).first); });
+        auto cleanup = wil::scope_exit([&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow("my-hello-world:test", WSLCDeleteImageFlagsNone).first);
+            LOG_IF_FAILED(DeleteImageNoThrow("my-hello-world:latest", WSLCDeleteImageFlagsNone).first);
+        });
 
         std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
         wil::unique_handle imageTarFileHandle{
@@ -1635,11 +1637,16 @@ class WSLCTests
             VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
         }
 
-        // Validate that ImportImage fails if no tag is passed
+        // Validate that ImportImage defaults to the 'latest' tag if no tag is passed.
         {
-            VERIFY_ARE_EQUAL(
-                m_defaultSession->ImportImage(ToCOMInputHandle(imageTarFileHandle.get()), "my-hello-world", fileSize.QuadPart, nullptr, &imageId),
-                E_INVALIDARG);
+            wil::unique_handle untaggedTarFileHandle{
+                CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == untaggedTarFileHandle.get());
+
+            VERIFY_SUCCEEDED(m_defaultSession->ImportImage(
+                ToCOMInputHandle(untaggedTarFileHandle.get()), "my-hello-world", fileSize.QuadPart, nullptr, &imageId));
+
+            ExpectImagePresent(*m_defaultSession, "my-hello-world:latest");
         }
 
         // Validate that invalid tars fail with proper error message and code.
@@ -7171,6 +7178,148 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerFailedRestartConcurrentStartStress)
+    {
+        constexpr unsigned int c_iterations = 50;
+
+        auto session = CreateSession(GetDefaultSessionSettings(L"failed-restart-concurrent-start"));
+        LoadTestImage(*session, "debian:latest");
+
+        for (unsigned int iteration = 0; iteration < c_iterations; ++iteration)
+        {
+            // Remove the running shell's executable from the container so that subsequent starts fail.
+            WSLCContainerLauncher launcher(
+                "debian:latest",
+                std::format("test-failed-restart-concurrent-start-{}", iteration),
+                {"/bin/sh",
+                 "-c",
+                 "trap 'echo stopping; read value; exit 0' TERM; rm /bin/sh || exit 1; echo ready; while true; do sleep 1; done"},
+                {},
+                "host",
+                WSLCProcessFlagsStdin);
+            launcher.SetContainerFlags(WSLCContainerFlagsRm);
+
+            auto container = launcher.Launch(*session);
+            container.SetDeleteOnClose(false);
+
+            auto initProcess = container.GetInitProcess();
+            auto input = initProcess.GetStdHandle(0);
+            auto outputHandle = initProcess.GetStdHandle(1);
+
+            PartialHandleRead output{outputHandle.Get()};
+            output.ExpectConsume("ready\n");
+
+            wil::unique_event startReady{wil::EventOptions::ManualReset};
+            std::future<HRESULT> restartResult;
+            std::future<HRESULT> startResult;
+
+            // Cancel before the futures are destroyed, so a regressed restart cannot block their implicit joins.
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                input.Reset();
+                LOG_IF_FAILED(session->Terminate());
+            });
+
+            restartResult = std::async(std::launch::async, [&]() {
+                const auto coInitialize = wil::CoInitializeEx(COINIT_MULTITHREADED);
+                return container.Get().Restart(WSLCSignalSIGTERM, WSLC_STOP_TIMEOUT_NONE, nullptr);
+            });
+
+            output.ExpectConsume("stopping\n");
+
+            startResult = std::async(std::launch::async, [&]() {
+                const auto coInitialize = wil::CoInitializeEx(COINIT_MULTITHREADED);
+                startReady.SetEvent();
+                return container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr);
+            });
+
+            VERIFY_IS_TRUE(startReady.wait(30 * 1000));
+
+            const char stopInput = '\n';
+            DWORD bytesWritten{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(input.Get(), &stopInput, sizeof(stopInput), &bytesWritten, nullptr));
+            VERIFY_ARE_EQUAL(bytesWritten, static_cast<DWORD>(sizeof(stopInput)));
+            input.Reset();
+
+            VERIFY_ARE_EQUAL(restartResult.wait_for(30s), std::future_status::ready);
+            VERIFY_ARE_EQUAL(startResult.wait_for(30s), std::future_status::ready);
+
+            VERIFY_ARE_EQUAL(restartResult.get(), E_INVALIDARG);
+
+            // Start can reach the service before or after deletion disconnects the wrapper.
+            const auto startHr = startResult.get();
+            VERIFY_IS_TRUE(startHr == WSLC_E_CONTAINER_DELETED || startHr == RPC_E_DISCONNECTED);
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateDeleted);
+            cleanup.release();
+        }
+
+        VERIFY_SUCCEEDED(session->Terminate());
+    }
+
+    WSLC_TEST_METHOD(ContainerRestartConcurrentStartAndForceDeleteStress)
+    {
+        constexpr unsigned int c_iterations = 50;
+
+        auto session = CreateSession(GetDefaultSessionSettings(L"restart-start-force-delete"));
+        LoadTestImage(*session, "debian:latest");
+
+        for (unsigned int iteration = 0; iteration < c_iterations; ++iteration)
+        {
+            auto container = LaunchContainerWithBlockingStopHandler(*session, std::format("test-restart-start-force-delete-{}", iteration));
+            container.SetDeleteOnClose(false);
+
+            auto initProcess = container.GetInitProcess();
+            auto input = initProcess.GetStdHandle(0);
+            auto outputHandle = initProcess.GetStdHandle(1);
+
+            PartialHandleRead output{outputHandle.Get()};
+            output.ExpectConsume("ready\n");
+
+            wil::unique_event startReady{wil::EventOptions::ManualReset};
+            std::future<HRESULT> restartResult;
+            std::future<HRESULT> startResult;
+            std::future<HRESULT> deleteResult;
+
+            // Cancel before the futures are destroyed, including when deletion is waiting for the other calls.
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                input.Reset();
+                LOG_IF_FAILED(session->Terminate());
+            });
+
+            restartResult = std::async(std::launch::async, [&]() {
+                const auto coInitialize = wil::CoInitializeEx(COINIT_MULTITHREADED);
+                return container.Get().Restart(WSLCSignalSIGTERM, WSLC_STOP_TIMEOUT_NONE, nullptr);
+            });
+
+            output.ExpectConsume("stopping\n");
+
+            startResult = std::async(std::launch::async, [&]() {
+                const auto coInitialize = wil::CoInitializeEx(COINIT_MULTITHREADED);
+                startReady.SetEvent();
+                return container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr);
+            });
+
+            VERIFY_IS_TRUE(startReady.wait(30 * 1000));
+
+            deleteResult = std::async(std::launch::async, [&]() {
+                const auto coInitialize = wil::CoInitializeEx(COINIT_MULTITHREADED);
+                return container.Get().Delete(WSLCDeleteFlagsForce);
+            });
+
+            VERIFY_ARE_EQUAL(deleteResult.wait_for(30s), std::future_status::ready);
+            VERIFY_SUCCEEDED(deleteResult.get());
+            VERIFY_ARE_EQUAL(restartResult.wait_for(30s), std::future_status::ready);
+            VERIFY_ARE_EQUAL(startResult.wait_for(30s), std::future_status::ready);
+            VERIFY_ARE_EQUAL(restartResult.get(), WSLC_E_CONTAINER_DELETED);
+
+            const auto startHr = startResult.get();
+            VERIFY_IS_TRUE(startHr == WSLC_E_CONTAINER_DELETED || startHr == RPC_E_DISCONNECTED);
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateDeleted);
+            cleanup.release();
+        }
+
+        VERIFY_SUCCEEDED(session->Terminate());
+    }
+
     WSLC_TEST_METHOD(ContainerRestart)
     {
         // A running container is stopped and started again, replacing its init process.
@@ -7509,6 +7658,628 @@ class WSLCTests
         return actions;
     }
 
+    static size_t CountContainerRuns(RunningWSLCContainer& container, std::string_view marker = "run\n")
+    {
+        COMOutputHandle stdoutLogs{};
+        COMOutputHandle stderrLogs{};
+        VERIFY_SUCCEEDED(container.Get().Logs(WSLCLogsFlagsNone, &stdoutLogs, &stderrLogs, 0, 0, 0));
+
+        const auto output = ReadToString(stdoutLogs.Get());
+        size_t count = 0;
+        for (auto position = output.find(marker); position != std::string::npos; position = output.find(marker, position + marker.size()))
+        {
+            ++count;
+        }
+
+        return count;
+    }
+
+    static size_t WaitForContainerRuns(RunningWSLCContainer& container, size_t minimumRuns, std::chrono::milliseconds timeout = 60s)
+    {
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        auto runs = CountContainerRuns(container);
+        while (runs < minimumRuns && std::chrono::steady_clock::now() < deadline)
+        {
+            std::this_thread::sleep_for(100ms);
+            runs = CountContainerRuns(container);
+        }
+
+        VERIFY_IS_TRUE(runs >= minimumRuns, std::format(L"Expected at least {} runs, observed {}", minimumRuns, runs).c_str());
+        return runs;
+    }
+
+    static void WaitForContainerState(RunningWSLCContainer& container, WSLCContainerState expected, std::chrono::milliseconds timeout = 60s)
+    {
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        auto state = container.State();
+        while (state != expected && std::chrono::steady_clock::now() < deadline)
+        {
+            std::this_thread::sleep_for(100ms);
+            state = container.State();
+        }
+
+        VERIFY_ARE_EQUAL(expected, state);
+    }
+
+    // Verifies that an automatically restarting container stays down after a user-initiated stop. The
+    // observation window exceeds the largest backoff delay the container can have reached.
+    static void VerifyContainerStaysDown(RunningWSLCContainer& container)
+    {
+        const auto runs = CountContainerRuns(container);
+        std::this_thread::sleep_for(3s);
+        VERIFY_ARE_EQUAL(WslcContainerStateExited, container.State());
+        VERIFY_ARE_EQUAL(runs, CountContainerRuns(container));
+    }
+
+    WSLC_TEST_METHOD(ContainerRestartPolicyInspect)
+    {
+        // WSLC reports the requested policy while Docker's own restart policy is always "no".
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-policy-inspect-always", {"sleep", "99999"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Create(*m_defaultSession);
+
+            const auto inspect = container.Inspect();
+            VERIFY_ARE_EQUAL(std::string{"always"}, inspect.HostConfig.RestartPolicy.Name);
+            VERIFY_ARE_EQUAL(0, inspect.HostConfig.RestartPolicy.MaximumRetryCount);
+
+            const auto result = ExpectCommandResult(
+                m_defaultSession.get(), {"/usr/bin/docker", "inspect", "-f", "{{.HostConfig.RestartPolicy.Name}}", inspect.Id}, 0);
+            VERIFY_ARE_EQUAL(std::string{"no\n"}, result.Output.at(1));
+        }
+
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-policy-inspect-no", {"sleep", "99999"});
+            auto container = launcher.Create(*m_defaultSession);
+            VERIFY_ARE_EQUAL(std::string{"no"}, container.Inspect().HostConfig.RestartPolicy.Name);
+        }
+
+        // An automatic restart is incompatible with automatic removal.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-policy-rm", {"sleep", "99999"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            launcher.SetContainerFlags(WSLCContainerFlagsRm);
+            auto [hr, container] = launcher.CreateNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(E_INVALIDARG, hr);
+            ValidateCOMErrorMessage(wsl::shared::Localization::MessageWslcRestartPolicyConflictsWithRm());
+        }
+
+        // Policies that need persisted lifecycle state are not supported.
+        for (const auto policy : {WSLCContainerRestartPolicyOnFailure, WSLCContainerRestartPolicyUnlessStopped})
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-policy-unsupported", {"sleep", "99999"});
+            launcher.SetRestartPolicy(policy);
+            auto [hr, container] = launcher.CreateNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), hr);
+
+            wil::com_ptr<IWSLCContainer> notFound;
+            VERIFY_ARE_EQUAL(WSLC_E_CONTAINER_NOT_FOUND, m_defaultSession->OpenContainer("test-restart-policy-unsupported", &notFound));
+        }
+
+        // Unknown policy values are rejected.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-policy-invalid", {"sleep", "99999"});
+            launcher.SetRestartPolicy(static_cast<WSLCContainerRestartPolicy>(42));
+            auto [hr, container] = launcher.CreateNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(E_INVALIDARG, hr);
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysForegroundHandoff)
+    {
+        for (const bool useLauncher : {false, true})
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest",
+                useLauncher ? "test-restart-handoff-launcher" : "test-restart-handoff-start",
+                {"sh",
+                 "-c",
+                 "if [ ! -e /first-run-complete ]; then touch /first-run-complete; "
+                 "echo run; echo first-output; echo first-error >&2; exit 23; fi; "
+                 "echo run; echo second-output; exec sleep 99999"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = useLauncher ? launcher.Launch(*m_defaultSession) : launcher.Create(*m_defaultSession);
+
+            wil::com_ptr<IWSLCProcess> process;
+            if (!useLauncher)
+            {
+                VERIFY_SUCCEEDED(container.Get().StartWithProcess(WSLCContainerStartFlagsAttach, nullptr, nullptr, &process));
+                VERIFY_IS_NOT_NULL(process.get());
+            }
+
+            // Delay foreground handoff until the next run is producing output.
+            VERIFY_ARE_EQUAL(WaitForContainerRuns(container, 2), 2u);
+            WaitForContainerState(container, WslcContainerStateRunning);
+            auto currentProcess = container.GetInitProcess();
+            VERIFY_ARE_EQUAL(currentProcess.State(), WslcProcessStateRunning);
+
+            auto firstProcess =
+                useLauncher ? container.GetStartedProcess() : ClientRunningWSLCProcess{std::move(process), WSLCProcessFlagsNone};
+            const auto result = firstProcess.WaitAndCaptureOutput(30 * 1000);
+            VERIFY_ARE_EQUAL(result.Code, 23);
+            VERIFY_ARE_EQUAL(result.Output.size(), 2u);
+            VERIFY_ARE_EQUAL(result.Output.at(1), std::string{"run\nfirst-output\n"});
+            VERIFY_ARE_EQUAL(result.Output.at(2), std::string{"first-error\n"});
+            VERIFY_ARE_EQUAL(currentProcess.State(), WslcProcessStateRunning);
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysRestartsOnExit)
+    {
+        // Both successful and failing exits restart the container, and a stop ends the loop.
+        for (const auto* exitCode : {"0", "3"})
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest", std::format("test-restart-always-exit-{}", exitCode), {"sh", "-c", std::format("echo run; exit {}", exitCode)});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+
+            WaitForContainerRuns(container, 3);
+
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            VerifyContainerStaysDown(container);
+
+            // An explicit start re-enables the policy.
+            const auto runs = CountContainerRuns(container);
+            VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+            WaitForContainerRuns(container, runs + 2);
+
+            VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
+            VerifyContainerStaysDown(container);
+        }
+
+        // A container whose process is killed from inside the VM is restarted.
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest", "test-restart-always-process-kill", {"sh", "-c", "echo run; sleep 99999"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+            WaitForContainerRuns(container, 1);
+
+            const auto id = container.Inspect().Id;
+            ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "kill", id}, 0);
+
+            WaitForContainerRuns(container, 2);
+            WaitForContainerState(container, WslcContainerStateRunning);
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysUserStop)
+    {
+        // Stop and kill of a running container leave it down.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-always-stop", {"sleep", "99999"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGTERM, 0));
+            VerifyContainerStaysDown(container);
+
+            VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+            VERIFY_ARE_EQUAL(WslcContainerStateRunning, container.State());
+
+            VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
+            VerifyContainerStaysDown(container);
+        }
+
+        // A kill with a signal the container handles by exiting also leaves it down.
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest",
+                "test-restart-always-usr1",
+                {"sh", "-c", "trap 'exit 0' USR1; echo run; while true; do sleep 1; done"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+            WaitForContainerRuns(container, 1);
+
+            VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGUSR1));
+            WaitForContainerState(container, WslcContainerStateExited);
+            VerifyContainerStaysDown(container);
+        }
+
+        // Every kill counts as a user stop, including a signal other than the configured stop signal. Docker keeps
+        // the restart policy in effect in this case.
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest",
+                "test-restart-always-usr1-stop-signal",
+                {"sh", "-c", "trap 'exit 0' USR1; echo run; while true; do sleep 1; done"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            launcher.SetDefaultStopSignal(WSLCSignalSIGTERM);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+            WaitForContainerRuns(container, 1);
+
+            VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGUSR1));
+            WaitForContainerState(container, WslcContainerStateExited);
+            VerifyContainerStaysDown(container);
+        }
+
+        // A restart of a stopped container starts it and re-enables the policy.
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest", "test-restart-always-restart-stopped", {"sh", "-c", "echo run; sleep 99999"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+            WaitForContainerRuns(container, 1);
+
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            VerifyContainerStaysDown(container);
+
+            VERIFY_SUCCEEDED(container.Get().Restart(WSLCSignalSIGKILL, 0, nullptr));
+            WaitForContainerRuns(container, 2);
+            WaitForContainerState(container, WslcContainerStateRunning);
+
+            ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "kill", container.Inspect().Id}, 0);
+            WaitForContainerRuns(container, 3);
+            WaitForContainerState(container, WslcContainerStateRunning);
+        }
+
+        // A running container is only removed by a forced delete, which does not restart it.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-always-rm-running", {"sleep", "99999"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+
+            VERIFY_ARE_EQUAL(WSLC_E_CONTAINER_IS_RUNNING, container.Get().Delete(WSLCDeleteFlagsNone));
+            VERIFY_ARE_EQUAL(WslcContainerStateRunning, container.State());
+
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsForce));
+            std::this_thread::sleep_for(3s);
+
+            wil::com_ptr<IWSLCContainer> notFound;
+            VERIFY_ARE_EQUAL(WSLC_E_CONTAINER_NOT_FOUND, m_defaultSession->OpenContainer("test-restart-always-rm-running", &notFound));
+        }
+
+        // A restart of a running container keeps the policy active.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-always-restart", {"sh", "-c", "echo run; sleep 99999"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+            WaitForContainerRuns(container, 1);
+
+            VERIFY_SUCCEEDED(container.Get().Restart(WSLCSignalSIGKILL, 0, nullptr));
+            WaitForContainerRuns(container, 2);
+
+            ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "kill", container.Inspect().Id}, 0);
+            WaitForContainerRuns(container, 3);
+            WaitForContainerState(container, WslcContainerStateRunning);
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysFailedKill)
+    {
+        constexpr auto invalidSignal = static_cast<WSLCSignal>(999);
+
+        // A rejected kill cannot establish stop intent or erase an earlier successful kill's intent.
+        for (const bool suppressRestart : {false, true})
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest",
+                std::format("test-restart-failed-kill-{}", suppressRestart),
+                {"sh", "-c", "echo run; sleep 99999"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+            WaitForContainerRuns(container, 1);
+
+            if (suppressRestart)
+            {
+                VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGCONT));
+            }
+
+            VERIFY_FAILED(container.Get().Kill(invalidSignal));
+            VERIFY_ARE_EQUAL(WslcContainerStateRunning, container.State());
+            ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "kill", container.Inspect().Id}, 0);
+
+            if (suppressRestart)
+            {
+                WaitForContainerState(container, WslcContainerStateExited);
+                VerifyContainerStaysDown(container);
+            }
+            else
+            {
+                WaitForContainerRuns(container, 2);
+                WaitForContainerState(container, WslcContainerStateRunning);
+            }
+        }
+
+        // A failed kill cannot remove suppression belonging to a stop that is still awaiting process exit.
+        WSLCContainerLauncher launcher(
+            "debian:latest",
+            "test-restart-overlapping-kill",
+            {"sh", "-c", "trap 'echo stopping' TERM; echo run; while true; do sleep 1; done"});
+        launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+        auto container = launcher.Launch(*m_defaultSession);
+        auto initProcess = container.GetInitProcess();
+        auto stdoutHandle = initProcess.GetStdHandle(1);
+        WaitForOutput(wsl::windows::common::io::HandleWrapper{stdoutHandle.Get()}, "run");
+
+        std::promise<HRESULT> stopResult;
+        std::thread stopThread([&]() { stopResult.set_value(container.Get().Stop(WSLCSignalSIGTERM, 30)); });
+        auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { stopThread.join(); });
+
+        WaitForOutput(wsl::windows::common::io::HandleWrapper{stdoutHandle.Get()}, "stopping");
+        VERIFY_FAILED(container.Get().Kill(invalidSignal));
+        VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGCONT));
+        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "kill", container.Inspect().Id}, 0);
+
+        VERIFY_SUCCEEDED(stopResult.get_future().get());
+        VerifyContainerStaysDown(container);
+    }
+
+    WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysPendingRestart)
+    {
+        // Stop and kill of a container that is waiting for an automatic restart cancel the restart. The
+        // container exits immediately, so it spends most of its time waiting for a restart.
+        for (const bool kill : {false, true})
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest",
+                std::format("test-restart-always-pending-{}", kill ? "kill" : "stop"),
+                {"sh", "-c", "echo run; exit 1"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+            WaitForContainerRuns(container, 2);
+
+            if (kill)
+            {
+                VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
+            }
+            else
+            {
+                VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            }
+
+            VerifyContainerStaysDown(container);
+        }
+
+        // A non-forced delete of a container under an active restart policy is rejected, whether it is running or
+        // waiting for an automatic restart. Once stopped, the same delete succeeds.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-always-pending-rm", {"sh", "-c", "echo run; exit 1"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+            WaitForContainerRuns(container, 2);
+
+            VERIFY_ARE_EQUAL(WSLC_E_CONTAINER_IS_RUNNING, container.Get().Delete(WSLCDeleteFlagsNone));
+
+            wil::com_ptr<IWSLCContainer> stillThere;
+            VERIFY_SUCCEEDED(m_defaultSession->OpenContainer("test-restart-always-pending-rm", &stillThere));
+
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            VerifyContainerStaysDown(container);
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
+        }
+
+        // A forced delete of a container that is waiting for an automatic restart succeeds.
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest", "test-restart-always-pending-delete", {"sh", "-c", "echo run; exit 1"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+            WaitForContainerRuns(container, 2);
+
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsForce));
+            VERIFY_ARE_EQUAL(RPC_E_DISCONNECTED, container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+
+            wil::com_ptr<IWSLCContainer> notFound;
+            VERIFY_ARE_EQUAL(WSLC_E_CONTAINER_NOT_FOUND, m_defaultSession->OpenContainer("test-restart-always-pending-delete", &notFound));
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysInvalidSignalPendingRestart)
+    {
+        WSLCContainerLauncher launcher("debian:latest", "test-restart-invalid-pending", {"sh", "-c", "echo run; exit 1"});
+        launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+        auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+        const auto runs = WaitForContainerRuns(container, 6);
+        WaitForContainerState(container, WslcContainerStateExited);
+
+        for (const int signal : {-1, 32, 33, 65, 999})
+        {
+            VERIFY_ARE_EQUAL(E_INVALIDARG, container.Get().Kill(static_cast<WSLCSignal>(signal)));
+            ValidateCOMErrorMessage(wsl::shared::Localization::MessageWslcInvalidSignal(signal));
+            VERIFY_ARE_EQUAL(E_INVALIDARG, container.Get().Restart(static_cast<WSLCSignal>(signal), 0, nullptr));
+        }
+
+        VERIFY_ARE_EQUAL(E_INVALIDARG, container.Get().Stop(WSLCSignalSIGTERM, -2));
+        ValidateCOMErrorMessage(wsl::shared::Localization::MessageWslcInvalidStopTimeout(-2));
+
+        WaitForContainerRuns(container, runs + 1);
+        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+    }
+
+    WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysRejectedStartPreservesRestart)
+    {
+        WSLCContainerLauncher launcher(
+            "debian:latest", "test-restart-rejected-start", {"sh", "-c", "stty -onlcr && echo run; exit 1"}, {}, {}, WSLCProcessFlagsTty | WSLCProcessFlagsStdin);
+        launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+        auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+        const auto runs = WaitForContainerRuns(container, 6);
+        WaitForContainerState(container, WslcContainerStateExited);
+
+        WSLCProcessStartOptions options{};
+        VERIFY_ARE_EQUAL(E_INVALIDARG, container.Get().Start(WSLCContainerStartFlagsNone, &options, nullptr));
+        options.TtyRows = 24;
+        options.TtyColumns = 80;
+        options.DetachKeys = "invalid";
+        VERIFY_ARE_EQUAL(E_INVALIDARG, container.Get().Start(WSLCContainerStartFlagsAttach, &options, nullptr));
+
+        WaitForContainerRuns(container, runs + 1);
+        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+    }
+
+    WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysTerminateWithPorts)
+    {
+        for (int iteration = 0; iteration < 3; ++iteration)
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(L"restart-policy-terminate", false, WSLCNetworkingModeConsomme));
+            LoadTestImage(*session, "debian:latest");
+            WSLCContainerLauncher launcher(
+                "debian:latest", "test-restart-terminate-ports", {"sh", "-c", "echo run; exit 1"}, {}, "bridge");
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            launcher.AddPort(1253, 8000, AF_INET);
+            auto container = launcher.Launch(*session, WSLCContainerStartFlagsNone);
+            container.SetDeleteOnClose(false);
+            WaitForContainerRuns(container, 2);
+
+            VERIFY_SUCCEEDED(session->Terminate());
+            WSLCSessionState state{};
+            VERIFY_SUCCEEDED(session->GetState(&state));
+            VERIFY_ARE_EQUAL(WSLCSessionStateTerminated, state);
+        }
+    }
+
+    // Repeated automatic restarts must not leak host port allocations.
+    WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysPortsNotLeaked)
+    {
+        constexpr uint16_t hostPort = 1253;
+
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest", "test-restart-always-ports", {"sh", "-c", "echo run; exit 1"}, {}, "bridge");
+            launcher.AddPort(hostPort, 8000, AF_INET);
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+
+            WaitForContainerRuns(container, 6);
+
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
+        }
+
+        // The host port is available to a new container once the restarting container is gone.
+        WSLCContainerLauncher launcher("debian:latest", "test-restart-always-ports-reuse", {"sleep", "99999"}, {}, "bridge");
+        launcher.AddPort(hostPort, 8000, AF_INET);
+        auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+        VERIFY_ARE_EQUAL(WslcContainerStateRunning, container.State());
+    }
+
+    // A session start is the equivalent of a Docker daemon start: containers with the always policy are
+    // started again, unless they were never started. A VM restart inside the same session is not a
+    // session start.
+    WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysSessionStart)
+    {
+        auto restore = ResetTestSession(); // Required to access the storage folder.
+
+        constexpr auto c_sessionName = L"restart-policy-session-test";
+        size_t loopRuns = 0;
+
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(c_sessionName, true));
+
+            WSLCContainerLauncher runningLauncher("debian:latest", "test-restart-session-running", {"sleep", "99999"});
+            runningLauncher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto running = runningLauncher.Launch(*session, WSLCContainerStartFlagsNone);
+            running.SetDeleteOnClose(false);
+
+            WSLCContainerLauncher stoppedLauncher("debian:latest", "test-restart-session-stopped", {"sleep", "99999"});
+            stoppedLauncher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto stopped = stoppedLauncher.Launch(*session, WSLCContainerStartFlagsNone);
+            stopped.SetDeleteOnClose(false);
+            VERIFY_SUCCEEDED(stopped.Get().Stop(WSLCSignalSIGKILL, 0));
+
+            WSLCContainerLauncher createdLauncher("debian:latest", "test-restart-session-created", {"sleep", "99999"});
+            createdLauncher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto created = createdLauncher.Create(*session);
+            created.SetDeleteOnClose(false);
+
+            WSLCContainerLauncher noPolicyLauncher("debian:latest", "test-restart-session-no-policy", {"sleep", "99999"});
+            auto noPolicy = noPolicyLauncher.Launch(*session, WSLCContainerStartFlagsNone);
+            noPolicy.SetDeleteOnClose(false);
+
+            // The session ends while this container is between runs or waiting for its automatic restart.
+            WSLCContainerLauncher loopLauncher("debian:latest", "test-restart-session-loop", {"sh", "-c", "echo run; exit 1"});
+            loopLauncher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto loop = loopLauncher.Launch(*session, WSLCContainerStartFlagsNone);
+            loop.SetDeleteOnClose(false);
+            loopRuns = WaitForContainerRuns(loop, 2);
+        }
+
+        auto session = CreateSession(GetDefaultSessionSettings(c_sessionName, true));
+
+        auto running = OpenContainer(session.get(), "test-restart-session-running");
+        auto stopped = OpenContainer(session.get(), "test-restart-session-stopped");
+        auto created = OpenContainer(session.get(), "test-restart-session-created");
+        auto noPolicy = OpenContainer(session.get(), "test-restart-session-no-policy");
+        auto loop = OpenContainer(session.get(), "test-restart-session-loop");
+
+        WaitForContainerState(running, WslcContainerStateRunning);
+        WaitForContainerState(stopped, WslcContainerStateRunning);
+        VERIFY_ARE_EQUAL(WslcContainerStateCreated, created.State());
+        VERIFY_ARE_EQUAL(WslcContainerStateExited, noPolicy.State());
+        VERIFY_ARE_EQUAL(std::string{"always"}, running.Inspect().HostConfig.RestartPolicy.Name);
+        WaitForContainerRuns(loop, loopRuns + 1);
+
+        // A running or restarting container keeps the VM up.
+        BOOL wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_TRUE(IsVmRunning(c_sessionName));
+
+        // After a stop, idle termination and a VM restart within the same session do not start the container.
+        VERIFY_SUCCEEDED(running.Get().Stop(WSLCSignalSIGKILL, 0));
+        VERIFY_SUCCEEDED(stopped.Get().Stop(WSLCSignalSIGKILL, 0));
+        VERIFY_SUCCEEDED(loop.Get().Stop(WSLCSignalSIGKILL, 0));
+
+        wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
+
+        {
+            WSLCProcessLauncher launcher("/bin/true", {"/bin/true"});
+            auto process = launcher.Launch(*session);
+            VERIFY_ARE_EQUAL(0, process.Wait());
+        }
+
+        std::this_thread::sleep_for(3s);
+        VERIFY_ARE_EQUAL(WslcContainerStateExited, running.State());
+        VERIFY_ARE_EQUAL(WslcContainerStateExited, stopped.State());
+        VERIFY_ARE_EQUAL(WslcContainerStateExited, loop.State());
+    }
+
+    WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysFailedStartAllowsIdleTermination)
+    {
+        auto restore = ResetTestSession();
+        constexpr auto c_sessionName = L"restart-policy-failed-start";
+        auto session = CreateSession(GetDefaultSessionSettings(c_sessionName, true));
+        WSLCContainerLauncher launcher(
+            "debian:latest", "test-restart-failed-start", {"sh", "-c", "rm /bin/sh && echo run; exit 1"});
+        launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+        auto container = launcher.Launch(*session, WSLCContainerStartFlagsNone);
+        WaitForContainerRuns(container, 1);
+        WaitForContainerState(container, WslcContainerStateExited);
+        VerifyContainerStaysDown(container);
+
+        VERIFY_FAILED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+        VERIFY_ARE_EQUAL(WslcContainerStateExited, container.State());
+
+        BOOL wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
+    }
+
+    WSLC_TEST_METHOD(ContainerRestartPolicyAlwaysExternalDestroyAllowsIdleTermination)
+    {
+        auto restore = ResetTestSession();
+        constexpr auto c_sessionName = L"restart-policy-external-destroy";
+        auto session = CreateSession(GetDefaultSessionSettings(c_sessionName, true));
+        WSLCContainerLauncher launcher("debian:latest", "test-restart-external-destroy", {"sh", "-c", "echo run; exit 1"});
+        launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+        auto container = launcher.Launch(*session, WSLCContainerStartFlagsNone);
+        WaitForContainerRuns(container, 6);
+        WaitForContainerState(container, WslcContainerStateExited);
+
+        ExpectCommandResult(session.get(), {"/usr/bin/docker", "rm", "-f", container.Id()}, 0);
+        WaitForContainerState(container, WslcContainerStateDeleted);
+
+        BOOL wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
+    }
+
     WSLC_TEST_METHOD(EventStream)
     {
         constexpr auto c_containerName = "wslc-test-events";
@@ -7842,6 +8613,305 @@ class WSLCTests
         VERIFY_SUCCEEDED(marker.Get().Kill(WSLCSignalSIGKILL));
         const auto events = ReadEvents(stream.get(), 1);
         VERIFY_ARE_EQUAL(markerId, events[0].Actor.ID);
+    }
+
+    // Formats an exec event as DockerExecEvents() reports it.
+    static std::string FormatExecEvent(const wsl::windows::common::wslc_schema::Event& Event)
+    {
+        const auto exitCode = Event.Actor.Attributes.find("exitCode");
+        return std::format(
+            "{}|{}|{}|{}\n",
+            Event.Action,
+            Event.timeNano,
+            Event.Actor.Attributes.at("execID"),
+            exitCode != Event.Actor.Attributes.end() ? exitCode->second : std::string{});
+    }
+
+    // Returns the exec events Docker itself reported for a container within a time window, one per line.
+    std::string DockerExecEvents(const std::string& ContainerId, LONGLONG Since, LONGLONG Until)
+    {
+        return ExpectCommandResult(
+                   m_defaultSession.get(),
+                   {"/usr/bin/docker",
+                    "events",
+                    "--since",
+                    std::to_string(Since),
+                    "--until",
+                    std::to_string(Until),
+                    "--filter",
+                    "container=" + ContainerId,
+                    "--filter",
+                    "event=exec_create",
+                    "--filter",
+                    "event=exec_start",
+                    "--filter",
+                    "event=exec_die",
+                    "--format",
+                    R"({{.Action}}|{{.TimeNano}}|{{index .Actor.Attributes "execID"}}|{{index .Actor.Attributes "exitCode"}})"},
+                   0)
+            .Output.at(1);
+    }
+
+    WSLC_TEST_METHOD(EventStreamRecordsExecEvents)
+    {
+        constexpr auto c_containerName = "wslc-test-event-exec";
+        constexpr auto c_imageName = "debian:latest";
+
+        // Docker appends the exec'd command line to exec_create and exec_start, followed by a space when it has no arguments.
+        const std::string createTrue = "exec_create: true ";
+        const std::string startTrue = "exec_start: true ";
+        const std::string createExit = "exec_create: sh -c exit 7";
+        const std::string startExit = "exec_start: sh -c exit 7";
+
+        std::string id;
+        std::vector<wsl::windows::common::wslc_schema::Event> liveEvents;
+        {
+            WSLCContainerLauncher launcher(c_imageName, c_containerName, {"sleep", "99999"});
+            auto container = launcher.Launch(*m_defaultSession);
+            id = container.Id();
+
+            auto stream = OpenEventStream(
+                {{"container", id.c_str()}, {"event", "exec_create"}, {"event", "exec_start"}, {"event", "exec_die"}});
+
+            for (int i = 0; i < 3; ++i)
+            {
+                VERIFY_ARE_EQUAL(0, WSLCProcessLauncher({}, {"true"}).Launch(container.Get()).Wait());
+            }
+
+            VERIFY_ARE_EQUAL(7, WSLCProcessLauncher({}, {"sh", "-c", "exit 7"}).Launch(container.Get()).Wait());
+
+            liveEvents = ReadEvents(stream.get(), 12);
+        }
+
+        // Each exec is reported against its container, and its own events are correlated by execID.
+        std::vector<std::string> execIds;
+        std::map<std::string, std::vector<std::string>> actionsByExec;
+        std::map<std::string, std::string> exitCodeByExec;
+        for (const auto& event : liveEvents)
+        {
+            VERIFY_ARE_EQUAL(std::string{"container"}, event.Type);
+            VERIFY_ARE_EQUAL(id, event.Actor.ID);
+            VERIFY_ARE_EQUAL(c_containerName, event.Actor.Attributes.at("name"));
+            VERIFY_ARE_EQUAL(c_imageName, event.Actor.Attributes.at("image"));
+            VERIFY_IS_FALSE(event.Actor.Attributes.contains("com.microsoft.wsl.container.metadata"));
+            VERIFY_ARE_EQUAL(event.Action == "exec_die", event.Actor.Attributes.contains("exitCode"));
+
+            const auto& execId = event.Actor.Attributes.at("execID");
+            if (!actionsByExec.contains(execId))
+            {
+                execIds.push_back(execId);
+            }
+
+            actionsByExec[execId].push_back(event.Action);
+            if (event.Action == "exec_die")
+            {
+                exitCodeByExec[execId] = event.Actor.Attributes.at("exitCode");
+            }
+        }
+
+        // Each exec runs to completion before the next starts, and Docker reports each with its command line and exit code.
+        const std::vector<std::pair<std::string, std::string>> expectedExecs{
+            {"true ", "0"}, {"true ", "0"}, {"true ", "0"}, {"sh -c exit 7", "7"}};
+
+        VERIFY_ARE_EQUAL(expectedExecs.size(), execIds.size());
+        for (size_t index = 0; index < execIds.size(); ++index)
+        {
+            const auto& [command, exitCode] = expectedExecs[index];
+            const std::vector<std::string> expectedActions{"exec_create: " + command, "exec_start: " + command, "exec_die"};
+            VERIFY_ARE_EQUAL(expectedActions, actionsByExec.at(execIds[index]));
+            VERIFY_ARE_EQUAL(exitCode, exitCodeByExec.at(execIds[index]));
+        }
+
+        // The container was deleted when it went out of scope. Replaying the same window still returns each event once,
+        // exactly as Docker reported it.
+        const LONGLONG since = liveEvents.front().timeNano / 1'000'000'000;
+        const LONGLONG until = liveEvents.back().timeNano / 1'000'000'000 + 1;
+
+        auto eventsMatching = [&](std::vector<WSLCFilter> filters) {
+            filters.push_back({"container", id.c_str()});
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, filters.data(), static_cast<ULONG>(filters.size()), &stream));
+            return DrainEventStream(stream.get());
+        };
+
+        const auto replayedEvents = eventsMatching({{"event", "exec_create"}, {"event", "exec_start"}, {"event", "exec_die"}});
+        VERIFY_ARE_EQUAL(liveEvents.size(), replayedEvents.size());
+
+        std::string expectedDockerEvents;
+        for (size_t index = 0; index < replayedEvents.size(); ++index)
+        {
+            const auto& event = replayedEvents[index];
+            VERIFY_ARE_EQUAL(liveEvents[index].Action, event.Action);
+            VERIFY_ARE_EQUAL(liveEvents[index].Actor.ID, event.Actor.ID);
+            VERIFY_ARE_EQUAL(liveEvents[index].timeNano, event.timeNano);
+            VERIFY_IS_TRUE(liveEvents[index].Actor.Attributes == event.Actor.Attributes);
+
+            expectedDockerEvents += FormatExecEvent(event);
+        }
+
+        VERIFY_ARE_EQUAL(expectedDockerEvents, DockerExecEvents(id, since, until));
+
+        // Actions match exactly, including trailing whitespace.
+        const auto actionsMatching = [&](std::vector<WSLCFilter> filters) {
+            return EventActions(eventsMatching(std::move(filters)));
+        };
+        const std::vector<std::string> none;
+
+        VERIFY_ARE_EQUAL(
+            (std::vector<std::string>{"exec_die", "exec_die", "exec_die", "exec_die"}), actionsMatching({{"event", "exec_die"}}));
+        VERIFY_ARE_EQUAL((std::vector<std::string>{startTrue, startTrue, startTrue}), actionsMatching({{"event", startTrue.c_str()}}));
+        VERIFY_ARE_EQUAL(std::vector<std::string>{startExit}, actionsMatching({{"event", startExit.c_str()}}));
+        VERIFY_ARE_EQUAL(none, actionsMatching({{"event", "exec_start: true"}}));
+        VERIFY_ARE_EQUAL(none, actionsMatching({{"event", "exec_start: sh"}}));
+        VERIFY_ARE_EQUAL(none, actionsMatching({{"event", "exec"}}));
+
+        // A bare 'exec_create', 'exec_start' or 'health_status' value makes every value match as a prefix.
+        VERIFY_ARE_EQUAL(
+            (std::vector<std::string>{createTrue, createTrue, createTrue, createExit}),
+            actionsMatching({{"event", "exec_create"}}));
+        VERIFY_ARE_EQUAL(
+            (std::vector<std::string>{startTrue, startTrue, startTrue, startExit}), actionsMatching({{"event", "exec_start"}}));
+        VERIFY_ARE_EQUAL(
+            (std::vector<std::string>{createTrue, createTrue, createTrue, createExit, startExit}),
+            actionsMatching({{"event", "exec_create"}, {"event", "exec_start: sh"}}));
+        VERIFY_ARE_EQUAL(
+            (std::vector<std::string>{"exec_die", "exec_die", "exec_die", "exec_die"}),
+            actionsMatching({{"event", "health_status"}, {"event", "exec_d"}}));
+    }
+
+    WSLC_TEST_METHOD(EventStreamRecordsFailedExecEvents)
+    {
+        constexpr auto c_containerName = "wslc-test-event-exec-failure";
+        constexpr auto c_imageName = "debian:latest";
+
+        WSLCContainerLauncher launcher(c_imageName, c_containerName, {"sleep", "99999"});
+        auto container = launcher.Launch(*m_defaultSession);
+        const auto id = container.Id();
+
+        const std::vector<WSLCFilter> filters{
+            {"container", id.c_str()}, {"event", "exec_create"}, {"event", "exec_start"}, {"event", "exec_die"}};
+        auto stream = OpenEventStream(filters);
+
+        // Neither exec gets to run its command. Docker doesn't necessarily report exec_die for them, so their events
+        // are compared with Docker's rather than predicted.
+        {
+            WSLCProcessLauncher missingExecutable({}, {"/not-found"});
+            VERIFY_ARE_EQUAL(126, missingExecutable.Launch(container.Get()).WaitAndCaptureOutput().Code);
+        }
+
+        {
+            WSLCProcessLauncher invalidUser({}, {"/bin/cat"});
+            invalidUser.SetUser("does-not-exist");
+            VERIFY_ARE_EQUAL(126, invalidUser.Launch(container.Get()).WaitAndCaptureOutput().Code);
+        }
+
+        // Docker delivers events in order, so reading through a later exec's exec_die covers both failed execs.
+        VERIFY_ARE_EQUAL(0, WSLCProcessLauncher({}, {"true"}).Launch(container.Get()).Wait());
+
+        std::vector<wsl::windows::common::wslc_schema::Event> liveEvents;
+        std::string markerExecId;
+        do
+        {
+            liveEvents.push_back(ReadEvents(stream.get(), 1)[0]);
+            if (liveEvents.back().Action == "exec_create: true ")
+            {
+                markerExecId = liveEvents.back().Actor.Attributes.at("execID");
+            }
+        } while (liveEvents.back().Action != "exec_die" || liveEvents.back().Actor.Attributes.at("execID") != markerExecId);
+
+        // Replaying the window starts with the same events, and every replayed event is exactly as Docker reported it.
+        // The replay runs to the end of the marker's second, so it can hold more events than were read live.
+        const LONGLONG since = liveEvents.front().timeNano / 1'000'000'000;
+        const LONGLONG until = liveEvents.back().timeNano / 1'000'000'000 + 1;
+
+        wil::com_ptr<IWSLCEventStream> replayStream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, filters.data(), static_cast<ULONG>(filters.size()), &replayStream));
+        const auto replayedEvents = DrainEventStream(replayStream.get());
+        VERIFY_IS_TRUE(replayedEvents.size() >= liveEvents.size());
+
+        std::string expectedDockerEvents;
+        for (size_t index = 0; index < replayedEvents.size(); ++index)
+        {
+            const auto& event = replayedEvents[index];
+            if (index < liveEvents.size())
+            {
+                VERIFY_ARE_EQUAL(FormatExecEvent(liveEvents[index]), FormatExecEvent(event));
+            }
+
+            VERIFY_ARE_EQUAL(std::string{"container"}, event.Type);
+            VERIFY_ARE_EQUAL(id, event.Actor.ID);
+            VERIFY_ARE_EQUAL(c_containerName, event.Actor.Attributes.at("name"));
+            VERIFY_ARE_EQUAL(c_imageName, event.Actor.Attributes.at("image"));
+            VERIFY_IS_FALSE(event.Actor.Attributes.contains("com.microsoft.wsl.container.metadata"));
+
+            expectedDockerEvents += FormatExecEvent(event);
+        }
+
+        VERIFY_ARE_EQUAL(expectedDockerEvents, DockerExecEvents(id, since, until));
+
+        // Both failed execs were reported, so the comparison above covered them.
+        const auto actions = EventActions(replayedEvents);
+        VERIFY_IS_TRUE(std::ranges::find(actions, "exec_create: /not-found ") != actions.end());
+        VERIFY_IS_TRUE(std::ranges::find(actions, "exec_create: /bin/cat ") != actions.end());
+    }
+
+    WSLC_TEST_METHOD(EventStreamIgnoresExecInContainersNotCreatedByWslc)
+    {
+        WSLCContainerLauncher launcher("debian:latest", "wslc-test-event-exec-marker", {"sleep", "99999"});
+        auto marker = launcher.Launch(*m_defaultSession);
+        const auto markerId = marker.Id();
+
+        auto externalId = wsl::shared::string::Trim(
+            ExpectCommandResult(
+                m_defaultSession.get(), {"/usr/bin/docker", "run", "-d", "--rm", "debian:latest", "sleep", "99999"}, 0)
+                .Output.at(1));
+
+        auto cleanup = wil::scope_exit([&]() { RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "rm", "-f", externalId}); });
+
+        auto stream = OpenEventStream(
+            {{"container", externalId.c_str()},
+             {"container", markerId.c_str()},
+             {"event", "exec_create"},
+             {"event", "exec_start"},
+             {"event", "exec_die"}});
+
+        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "exec", externalId, "true"}, 0);
+
+        // Docker delivers events in order, so the marker's exec events can only come first if the external ones were dropped.
+        VERIFY_ARE_EQUAL(0, WSLCProcessLauncher({}, {"true"}).Launch(marker.Get()).Wait());
+        const auto events = ReadEvents(stream.get(), 3);
+        VERIFY_ARE_EQUAL((std::vector<std::string>{"exec_create: true ", "exec_start: true ", "exec_die"}), EventActions(events));
+        for (const auto& event : events)
+        {
+            VERIFY_ARE_EQUAL(markerId, event.Actor.ID);
+        }
+
+        // Docker did report the external container's exec.
+        const auto startedAt = wsl::shared::string::Trim(
+            ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "inspect", "--format", "{{.State.StartedAt}}", externalId}, 0)
+                .Output.at(1));
+
+        const auto dockerEvents = ExpectCommandResult(
+            m_defaultSession.get(),
+            {"/usr/bin/docker",
+             "events",
+             "--since",
+             startedAt,
+             "--until",
+             std::to_string(events.back().timeNano / 1'000'000'000 + 1),
+             "--filter",
+             "container=" + externalId,
+             "--filter",
+             "event=exec_create",
+             "--filter",
+             "event=exec_start",
+             "--filter",
+             "event=exec_die",
+             "--format",
+             "{{.Action}}"},
+            0);
+
+        VERIFY_ARE_EQUAL(std::string{"exec_create: true \nexec_start: true \nexec_die\n"}, dockerEvents.Output.at(1));
     }
 
     WSLC_TEST_METHOD(EventStreamRejectsUnsupportedFilterKeys)
@@ -9283,7 +10353,7 @@ class WSLCTests
 
     WSLC_TEST_METHOD(ConcurrentContainerStopAndKill)
     {
-        auto container = LaunchContainerWithBlockingStopHandler("test-concurrent-container-stops");
+        auto container = LaunchContainerWithBlockingStopHandler(*m_defaultSession, "test-concurrent-container-stops");
         auto initProcess = container.GetInitProcess();
         auto input = initProcess.GetStdHandle(0);
         auto outputHandle = initProcess.GetStdHandle(1);
@@ -9407,7 +10477,7 @@ class WSLCTests
 
     WSLC_TEST_METHOD(ConcurrentContainerStopTimeoutOverride)
     {
-        auto container = LaunchContainerWithBlockingStopHandler("test-concurrent-stop-timeout");
+        auto container = LaunchContainerWithBlockingStopHandler(*m_defaultSession, "test-concurrent-stop-timeout");
         auto initProcess = container.GetInitProcess();
         auto input = initProcess.GetStdHandle(0);
         auto outputHandle = initProcess.GetStdHandle(1);
@@ -9455,7 +10525,7 @@ class WSLCTests
 
     WSLC_TEST_METHOD(ConcurrentContainerStopAndStart)
     {
-        auto container = LaunchContainerWithBlockingStopHandler("test-concurrent-stop-start");
+        auto container = LaunchContainerWithBlockingStopHandler(*m_defaultSession, "test-concurrent-stop-start");
         auto initProcess = container.GetInitProcess();
         auto input = initProcess.GetStdHandle(0);
         auto outputHandle = initProcess.GetStdHandle(1);
@@ -9509,7 +10579,7 @@ class WSLCTests
 
     WSLC_TEST_METHOD(ConcurrentContainerStopAndForceDelete)
     {
-        auto container = LaunchContainerWithBlockingStopHandler("test-concurrent-stop-delete");
+        auto container = LaunchContainerWithBlockingStopHandler(*m_defaultSession, "test-concurrent-stop-delete");
         auto initProcess = container.GetInitProcess();
         auto input = initProcess.GetStdHandle(0);
         auto outputHandle = initProcess.GetStdHandle(1);
@@ -15284,6 +16354,21 @@ class WSLCTests
                                const std::source_location& source = std::source_location::current()) {
             PruneResult result;
 
+            ULONGLONG expectedSpace = 0;
+            for (const auto& id : expectedIds)
+            {
+                wil::com_ptr<IWSLCContainer> container;
+                VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(id.c_str(), &container));
+                wil::unique_cotaskmem_ansistring output;
+                VERIFY_SUCCEEDED(container->Inspect(TRUE, &output));
+                const auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(output.get());
+                VERIFY_IS_TRUE(inspect.SizeRw.has_value());
+                if (*inspect.SizeRw > 0)
+                {
+                    expectedSpace += static_cast<ULONGLONG>(*inspect.SizeRw);
+                }
+            }
+
             std::vector<WSLCFilter> filters;
             filters.reserve(filterPairs.size());
             for (const auto& [key, value] : filterPairs)
@@ -15301,6 +16386,7 @@ class WSLCTests
             }
 
             VerifyAreEqualUnordered(expectedIds, prunedContainers, source);
+            VERIFY_ARE_EQUAL(expectedSpace, result.result.SpaceReclaimed);
         };
 
         auto RunAndWait = [&](auto& launcher) {
@@ -15361,11 +16447,71 @@ class WSLCTests
             // Expect testPrune2 to be selected via key being present.
             expectPrune({testPrune2.Id()}, {{"label", "key"}});
 
-            // Prune by absence of 'anotherKey' label.
             expectPrune({testPrune4.Id()}, {{"label!", "anotherKey"}});
-
-            // Prune by label inequality.
+            expectPrune({}, {{"label!", "anotherKey=value"}});
             expectPrune({testPrune3.Id()}, {{"label!", "anotherKey=someValue"}});
+        }
+
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-prune-always", {"sleep", "9999999"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            launcher.AddLabel("prune-test", "protected");
+            auto container = launcher.Launch(*m_defaultSession);
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            VERIFY_ARE_EQUAL(WslcContainerStateExited, container.State());
+
+            const auto inspect = container.Inspect();
+            VERIFY_IS_FALSE(inspect.Config.Labels.contains("com.microsoft.wsl.container.restart-policy"));
+            VERIFY_IS_FALSE(inspect.Labels.contains("com.microsoft.wsl.container.restart-policy"));
+
+            WSLCContainerLauncher disposableLauncher("debian:latest", "test-prune-disposable", {"echo", "OK"});
+            disposableLauncher.AddLabel("prune-test", "disposable");
+            auto disposable = RunAndWait(disposableLauncher);
+            expectPrune({disposable.Id()}, {{"label", "prune-test=disposable"}});
+            expectPrune({container.Id()}, {{"label", "prune-test=protected"}});
+        }
+
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-prune-backoff", {"sh", "-c", "echo run; exit 1"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+            const auto runs = WaitForContainerRuns(container, 6);
+            WaitForContainerState(container, WslcContainerStateExited);
+
+            expectPrune({});
+            expectPrune({}, {{"label!", "anotherKey"}, {"label!", "anotherKey=someValue"}});
+            WaitForContainerRuns(container, runs + 1);
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            expectPrune({container.Id()});
+        }
+
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-prune-user-label", {"echo", "OK"});
+            launcher.AddLabel("com.microsoft.wsl.container.restart-policy", "always");
+            auto container = RunAndWait(launcher);
+            VERIFY_ARE_EQUAL(std::string{"always"}, container.Inspect().Labels.at("com.microsoft.wsl.container.restart-policy"));
+            expectPrune({container.Id()});
+        }
+
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-prune-created-always", {"echo", "OK"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto container = launcher.Create(*m_defaultSession);
+            expectPrune({container.Id()});
+        }
+
+        {
+            WSLCContainerLauncher firstLauncher("debian:latest", "test-prune-labels-first", {"echo", "OK"});
+            firstLauncher.AddLabel("one", "1");
+            firstLauncher.AddLabel("two", "2");
+            auto first = RunAndWait(firstLauncher);
+            WSLCContainerLauncher secondLauncher("debian:latest", "test-prune-labels-second", {"echo", "OK"});
+            secondLauncher.AddLabel("one", "1");
+            auto second = RunAndWait(secondLauncher);
+
+            expectPrune({}, {{"label", "one=1"}, {"label", "missing"}});
+            expectPrune({second.Id()}, {{"label", "one"}, {"label!", "one=1"}, {"label!", "two=2"}});
+            expectPrune({first.Id()}, {{"label", "one=1"}, {"label", "two=2"}, {"label!", "two=other"}});
         }
 
         // Validate that the 'until' filter works.
@@ -15377,7 +16523,69 @@ class WSLCTests
             auto now = time(nullptr);
 
             expectPrune({}, {{"until", std::to_string(now - 3600)}});
+            expectPrune({}, {{"until", "1h"}});
+            expectPrune({}, {{"until", "1.5h"}});
+            expectPrune({}, {{"until", "2000-01-01T00:00:00.123456789Z"}});
+            expectPrune({}, {{"until", "0"}});
+            expectPrune({}, {{"until", "1.123456789"}});
             expectPrune({container.Id()}, {{"until", std::to_string(now + 3600)}});
+        }
+
+        {
+            auto result = ExpectCommandResult(
+                m_defaultSession.get(), {"/usr/bin/docker", "create", "--name", "test-prune-external", "debian:latest", "true"}, 0);
+            auto id = result.Output.at(1);
+            id.erase(id.find_last_not_of(" \n\r") + 1);
+            const auto size =
+                ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "inspect", "--size", "-f", "{{.SizeRw}}", id}, 0);
+            PruneResult pruned;
+            VERIFY_SUCCEEDED(m_defaultSession->PruneContainers(nullptr, 0, &pruned.result));
+            VERIFY_ARE_EQUAL(1UL, pruned.result.ContainersCount);
+            VERIFY_ARE_EQUAL(id, std::string{pruned.result.Containers[0]});
+            VERIFY_ARE_EQUAL(std::stoull(size.Output.at(1)), pruned.result.SpaceReclaimed);
+            ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "inspect", id}, 1);
+
+            result = ExpectCommandResult(
+                m_defaultSession.get(),
+                {"/usr/bin/docker", "run", "-d", "--name", "test-prune-external-running", "debian:latest", "sleep", "99999"},
+                0);
+            id = result.Output.at(1);
+            id.erase(id.find_last_not_of(" \n\r") + 1);
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "rm", "-f", id}, 0);
+            });
+            expectPrune({});
+            const auto running =
+                ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "inspect", "-f", "{{.State.Running}}", id}, 0);
+            VERIFY_ARE_EQUAL(std::string{"true\n"}, running.Output.at(1));
+        }
+
+        {
+            WSLCContainerLauncher launcher(
+                "debian:latest",
+                "test-prune-writable-layer",
+                {"sh", "-c", "dd if=/dev/zero of=/prune-data bs=4096 count=4 2>/dev/null; echo OK"});
+            auto container = RunAndWait(launcher);
+            wil::unique_cotaskmem_ansistring output;
+            VERIFY_SUCCEEDED(container.Get().Inspect(TRUE, &output));
+            const auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(output.get());
+            VERIFY_IS_TRUE(inspect.SizeRw.has_value());
+            VERIFY_IS_TRUE(*inspect.SizeRw >= 16384);
+            expectPrune({container.Id()});
+        }
+
+        for (const auto until : {"-1h", "2100-01-01", "2100-01-01T00:00", "2100-01-01T00:00:00.123456789+02:00"})
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-prune-until-formats", {"echo", "OK"});
+            auto container = RunAndWait(launcher);
+            expectPrune({container.Id()}, {{"until", until}});
+        }
+
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-prune-until-duplicate", {"echo", "OK"});
+            auto container = RunAndWait(launcher);
+            const auto future = std::to_string(time(nullptr) + 3600);
+            expectPrune({container.Id()}, {{"until", future}, {"until", future}});
         }
 
         // Validate error paths.
@@ -15387,6 +16595,21 @@ class WSLCTests
 
             VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, &result.result), E_POINTER);
             VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
+
+            for (const auto key : {"bogus", "status", "before"})
+            {
+                WSLCFilter invalid{.Key = key, .Value = "x"};
+                VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->PruneContainers(&invalid, 1, &result.result));
+                ValidateCOMErrorMessageContains(wsl::shared::string::MultiByteToWide(std::format("invalid filter '{}'", key)));
+            }
+            for (const auto value : {"", "nonsense", "2026-02-30", "2026-01-01T", "1.2.3", "99999999999999999999"})
+            {
+                WSLCFilter invalid{.Key = "until", .Value = value};
+                VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->PruneContainers(&invalid, 1, &result.result));
+            }
+            const WSLCFilter multiple[]{{.Key = "until", .Value = "1h"}, {.Key = "until", .Value = "2h"}};
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->PruneContainers(multiple, ARRAYSIZE(multiple), &result.result));
+            ValidateCOMErrorMessageContains(L"more than one until filter specified");
         }
     }
 

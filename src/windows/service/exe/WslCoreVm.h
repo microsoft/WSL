@@ -283,7 +283,7 @@ private:
     wil::srwlock m_exitCallbackLock;
     std::wstring m_exitDetails;
     std::wstring m_machineId;
-    GUID m_runtimeId;
+    GUID m_runtimeId{};
     wsl::core::Config m_vmConfig;
     InitializeDrvFsCallback m_initializeDrvFs;
     std::wstring m_comPipe0;
@@ -294,10 +294,10 @@ private:
     std::filesystem::path m_tempPath;
     wil::shared_handle m_userToken;
     wil::unique_handle m_restrictedToken;
-    bool m_swapFileCreated;
-    bool m_localDevicesKeyCreated;
-    bool m_tempDirectoryCreated;
-    bool m_enableInboxGpuLibs;
+    bool m_swapFileCreated = false;
+    bool m_localDevicesKeyCreated = false;
+    bool m_tempDirectoryCreated = false;
+    bool m_enableInboxGpuLibs = false;
     bool m_defaultKernel = true;
     bool m_privateKernelModules = false;
     LX_MINI_INIT_MOUNT_DEVICE_TYPE m_systemDistroDeviceType = LxMiniInitMountDeviceTypeInvalid;
@@ -315,6 +315,7 @@ private:
     std::tuple<std::uint32_t, std::uint32_t, std::uint32_t> m_kernelVersion;
     std::wstring m_kernelVersionString;
     bool m_seccompAvailable;
+    bool m_ipv6Available = false;
     uint64_t m_hvPciSwiotlbBase = 0;
     uint64_t m_hvPciSwiotlbSize = 0;
     std::wstring m_sharedMemoryRoot;

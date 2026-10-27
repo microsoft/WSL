@@ -2217,6 +2217,10 @@ Brug:
     <value>Objektbeholderen '{}' kører og kan ikke fjernes. Stop enten beholderen, før du fjerner den, eller brug tvungen fjernelse (-f).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcCannotRemoveRestartingContainer" xml:space="preserve">
+    <value>Objektbeholderen '{}' genstarter og kan ikke fjernes. Stop enten beholderen, før du fjerner den, eller brug tvungen fjernelse (-f).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerNotRunning" xml:space="preserve">
     <value>Objektbeholderen "{}" kører ikke.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2531,6 +2535,10 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
   </data>
   <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
     <value>Ugyldig værdi for stop-timeout: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidSignal" xml:space="preserve">
+    <value>Invalid signal value: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
@@ -3674,6 +3682,10 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Ugyldig {}-værdi '{}'. Forventede nej, altid, ved fejl[:max-genforsøg] eller medmindre det er stoppet.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_UnsupportedRestartPolicyError" xml:space="preserve">
+    <value>Genstartspolitikken '{}' understøttes noikke. Understøttede værdier er no og always.</value>
+    <comment>{Locked="no"}{Locked="always"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
     <value>Ugyldig {}-værdi: {} er ikke en genkendt statustype. Understøttede statustyper er: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -4143,6 +4155,9 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
     <value>Beholderen '{}' kunne ikke stoppes efter afvisning af plug-in</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcRestartPolicyConflictsWithRm" xml:space="preserve">
+    <value>En genstartspolitik kan ikke kombineres med automatisk fjernelse af objektbeholderen.</value>
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>Værtsressourcer for diskenheden '{}' kunne ikke frigives</value>

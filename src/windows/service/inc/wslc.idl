@@ -267,6 +267,15 @@ typedef enum _WSLCMountSpecFlags
 cpp_quote("#define WSLCMountSpecFlagsValid (WSLCMountSpecFlagsTmpfsSize | WSLCMountSpecFlagsTmpfsMode | WSLCMountSpecFlagsCreateSourceIfMissing | WSLCMountSpecFlagsConfigVolume)")
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCMountSpecFlags);")
 
+// Restart policy applied by WSLC when a container exits. Docker's own restart policy is never set.
+typedef enum _WSLCContainerRestartPolicy
+{
+    WSLCContainerRestartPolicyNo = 0,
+    WSLCContainerRestartPolicyAlways = 1,
+    WSLCContainerRestartPolicyOnFailure = 2,
+    WSLCContainerRestartPolicyUnlessStopped = 3,
+} WSLCContainerRestartPolicy;
+
 typedef struct _WSLCMountSpec
 {
     WSLCMountType Type;
@@ -368,6 +377,7 @@ typedef struct _WSLCContainerOptions
 
     WSLCStringArray CapAdd;
     WSLCStringArray CapDrop;
+    WSLCContainerRestartPolicy RestartPolicy;
 } WSLCContainerOptions;
 
 typedef char WSLCContainerId[WSLC_CONTAINER_ID_LENGTH + 1] ;
@@ -590,6 +600,8 @@ interface IWSLCContainer : IUnknown
     // When FollowLink is set and SrcPath names a symbolic link, the archive is taken from the link's target.
     HRESULT DownloadArchive([in, string] LPCSTR SrcPath, [in] BOOL FollowLink, [in] WSLCHandle OutHandle);
     HRESULT Restart([in] WSLCSignal Signal, [in] LONG TimeoutSeconds, [in, unique] IWarningCallback* WarningCallback);
+    // Process identifies this start's init process, even if the container starts another run before the caller attaches.
+    HRESULT StartWithProcess([in] WSLCContainerStartFlags Flags, [in, unique] const WSLCProcessStartOptions* StartOptions, [in, unique] IWarningCallback* WarningCallback, [out] IWSLCProcess** Process);
 }
 
 typedef struct _WSLCDeletedImageInformation
