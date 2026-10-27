@@ -190,7 +190,7 @@ private:
 class ServiceExecutionContext : public ExecutionContext
 {
 public:
-    ServiceExecutionContext(LXSS_ERROR_INFO* outError) noexcept;
+    ServiceExecutionContext(LXSS_ERROR_INFO* outError);
     ~ServiceExecutionContext() override;
 
     ServiceExecutionContext(const ServiceExecutionContext&) = delete;

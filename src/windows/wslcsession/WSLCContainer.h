@@ -26,6 +26,8 @@ Abstract:
 #include "wslc_schema.h"
 #include "WSLCCompat.h"
 #include "WSLCContainerMetadata.h"
+#include "WSLCExitRequestState.h"
+#include "WSLCRestartBackoff.h"
 #include "WSLCNetworkMetadata.h"
 #include "WSLCVhdVolume.h"
 #include <unordered_map>
@@ -93,17 +95,22 @@ public:
         WSLCContainerState InitialState,
         std::int64_t CreatedAt,
         WSLCProcessFlags InitProcessFlags,
-        WSLCContainerFlags ContainerFlags);
+        WSLCContainerFlags ContainerFlags,
+        WSLCContainerRestartPolicy RestartPolicy);
 
     ~WSLCContainerImpl();
 
     void Initialize();
 
-    void Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions);
+    // Applies the restart policy to a container found when the session starts.
+    void OnSessionStart();
+
+    wil::com_ptr<IWSLCProcess> Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions);
     void Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr) const;
     void Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, bool Kill);
     void Restart(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds);
     void Delete(WSLCDeleteFlags Flags);
+    bool TryPrune();
     void Export(WSLCHandle TarHandle) const;
     void UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize);
     void DownloadArchive(LPCSTR SrcPath, BOOL FollowLink, WSLCHandle OutHandle);
@@ -198,7 +205,7 @@ private:
         wil::unique_event Completed{wil::EventOptions::ManualReset};
     };
 
-    __requires_exclusive_lock_held(m_lock) void RequestDeleteExclusiveLockHeld(WSLCDeleteFlags Flags);
+    __requires_exclusive_lock_held(m_lock) bool RequestDeleteExclusiveLockHeld(WSLCDeleteFlags Flags, bool Prune = false);
 
     void AllocateBridgedModePorts();
     void OnEvent(ContainerEvent event, std::optional<int> exitCode, const std::map<std::string, std::string>& attributes, std::int64_t eventTimeNano) noexcept;
@@ -214,9 +221,20 @@ private:
         bool waitForRestart = true);
 
     // Phases of Restart(). Identical to Start() and Stop() except that they do not stand down for the
-    // restart they are part of.
-    void StartPhase(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, bool RestartPhase);
+    // restart they are part of. PolicyRestartToken identifies a start requested by the restart policy,
+    // which does nothing unless that scheduled restart is still pending.
+    wil::com_ptr<IWSLCProcess> StartPhase(
+        WSLCContainerStartFlags Flags,
+        const WSLCProcessStartOptions* StartOptions,
+        bool RestartPhase,
+        std::optional<std::uint64_t> PolicyRestartToken = std::nullopt);
     void StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill, bool RestartPhase);
+
+    __requires_exclusive_lock_held(m_lock) void SchedulePolicyRestartLockHeld(std::chrono::milliseconds Delay) noexcept;
+    __requires_exclusive_lock_held(m_lock) void CancelPolicyRestartLockHeld() noexcept;
+    __requires_shared_lock_held(m_lock) bool HasPolicyRestartAuthorityLockHeld(std::uint64_t Token) const noexcept;
+    void RunPolicyRestart(std::uint64_t Token) noexcept;
+    void OnPolicyRestartFailed(std::uint64_t Token) noexcept;
 
     // Undoes what the phases left half-done: releases the resources the stop phase held back and
     // requests the auto-delete OnStopped() deferred, returning that delete's transition.
@@ -254,8 +272,8 @@ private:
     void MapPorts();
     void UnmapPorts();
 
-    // Acquires or releases the activity hold so it is held exactly while the container is Running,
-    // keeping the session's VM alive across idle teardown.
+    // Acquires or releases the activity hold so it is held exactly while the container is Running or
+    // has a policy restart pending, keeping the session's VM alive across idle teardown.
     __requires_lock_held(m_lock) void UpdateActivityHoldLockHeld() noexcept;
 
     __requires_shared_lock_held(m_lock) std::string InspectLockHeld(bool Size = false) const;
@@ -276,7 +294,7 @@ private:
 
     _Guarded_by_(m_lock) std::shared_ptr<StateTransition> m_transition;
 
-    // Non-null from before Restart()'s stop phase until its start phase commits Running. Start() and
+    // Non-null from before Restart()'s stop phase until it commits Running, fails, or the container is Deleted. Start() and
     // Stop() stand down for that window, and OnStopped() keeps the container's runtime resources mapped
     // and skips the auto-delete of an --rm container. Delete() does not stand down: a remove that lands
     // between the two phases takes effect, and the restart's start phase fails.
@@ -316,10 +334,30 @@ private:
     EventStore& m_eventStore;
     std::string m_networkMode;
 
-    // Held (non-empty) exactly while the container is Running so the session's VM stays alive even
-    // when no client holds the wrapper (e.g. a detached `run -d` container). Maintained by
-    // UpdateActivityHoldLockHeld(); released automatically when the container is destroyed.
+    // Held (non-empty) while the container is Running, has a policy restart pending, or awaits an exit-request outcome so the
+    // session's VM stays alive even when no client holds the wrapper (e.g. a detached `run -d`
+    // container). Maintained by UpdateActivityHoldLockHeld(); released automatically when the
+    // container is destroyed.
     ActivityRef m_activityHold;
+
+    // Policy admission checks authority under the lifecycle and container locks without transition waits.
+    // Rejected validation and attachment preserve pending work; accepted starts consume or cancel it.
+    // VM leases protect accepted work; pending policy work holds activity and cannot create a VM.
+    // Run duration is captured once at exit and reused for deferred policy decisions.
+    const WSLCContainerRestartPolicy m_restartPolicy;
+
+    // Successful stop or kill requests suppress restart for the run. In-flight requests defer the exit decision.
+    _Guarded_by_(m_lock) WSLCExitRequestState m_exitRequests;
+
+    // Set while a policy restart is scheduled and not yet started. The container is Exited meanwhile.
+    _Guarded_by_(m_lock) bool m_policyRestartPending = false;
+
+    // Bumped by every scheduled policy restart and by every lifecycle request that supersedes one, so a
+    // scheduled restart only runs if nothing else happened since.
+    _Guarded_by_(m_lock) std::uint64_t m_policyRestartToken = 0;
+
+    // Delay before the next policy restart; reset when a run lasts long enough or by an explicit start.
+    _Guarded_by_(m_lock) WSLCRestartBackoff m_restartBackoff;
 };
 
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLCContainer
@@ -342,6 +380,11 @@ public:
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLCProcess** process) override;
     IFACEMETHOD(Exec)(_In_ const WSLCProcessOptions* Options, _In_opt_ const WSLCProcessStartOptions* StartOptions, _Out_ IWSLCProcess** Process) override;
     IFACEMETHOD(Start)(WSLCContainerStartFlags Flags, _In_opt_ const WSLCProcessStartOptions* StartOptions, _In_opt_ IWarningCallback* WarningCallback) override;
+    IFACEMETHOD(StartWithProcess)(
+        WSLCContainerStartFlags Flags,
+        _In_opt_ const WSLCProcessStartOptions* StartOptions,
+        _In_opt_ IWarningCallback* WarningCallback,
+        _Out_ IWSLCProcess** Process) override;
     IFACEMETHOD(Inspect)(_In_ BOOL Size, _Out_ LPSTR* Output) override;
     IFACEMETHOD(Logs)(_In_ WSLCLogsFlags Flags, _Out_ WSLCHandle* Stdout, _Out_ WSLCHandle* Stderr, _In_ LONGLONG Since, _In_ LONGLONG Until, _In_ ULONGLONG Tail) override;
     IFACEMETHOD(GetId)(_Out_ WSLCContainerId Id) override;

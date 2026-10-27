@@ -79,16 +79,25 @@ struct Ulimit
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Ulimit, Name, Soft, Hard);
 };
 
+struct RestartPolicyConfig
+{
+    std::string Name{"no"};
+    std::int64_t MaximumRetryCount{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(RestartPolicyConfig, Name, MaximumRetryCount);
+};
+
 struct InspectHostConfig
 {
     std::string NetworkMode;
     std::int64_t Memory{};
     std::int64_t NanoCpus{};
     std::vector<Ulimit> Ulimits;
+    RestartPolicyConfig RestartPolicy;
     std::vector<std::string> CapAdd;
     std::vector<std::string> CapDrop;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectHostConfig, NetworkMode, Memory, NanoCpus, Ulimits, CapAdd, CapDrop);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectHostConfig, NetworkMode, Memory, NanoCpus, Ulimits, RestartPolicy, CapAdd, CapDrop);
 };
 
 struct HealthConfig

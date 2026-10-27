@@ -31,8 +31,8 @@ namespace {
 
     // Interrupts and joins the stdin-relay worker thread at teardown.
     //
-    // The worker only exists when stdin is not a character device (any non-FILE_TYPE_CHAR handle, e.g. a
-    // redirected pipe), so this no-ops (not joinable) for a console. When stdin is a non-overlapped
+    // The worker only exists when stdin is not a console (e.g. a redirected pipe, file, or NUL), so this
+    // no-ops (not joinable) for a console. When stdin is a non-overlapped
     // (synchronous) pipe the worker blocks in a ReadFile() that neither the exit event nor CancelIoEx() can
     // interrupt, so the join() below would hang until stdin is closed -- the bug this guards against.
     void InterruptAndJoinInputThread(std::thread& inputThread, wil::unique_event& exitEvent)
@@ -97,7 +97,7 @@ bool ConsoleService::RelayInteractiveTty(wsl::windows::common::ConsoleState& Con
 
     auto inputHandle = GetStdHandle(STD_INPUT_HANDLE);
 
-    if (GetFileType(inputHandle) == FILE_TYPE_CHAR)
+    if (wsl::windows::common::wslutil::IsConsoleHandle(inputHandle))
     {
         auto updateTerminal = [&Console, &Process]() {
             const auto windowSize = Console.GetWindowSize();
@@ -150,7 +150,7 @@ void ConsoleService::RelayNonTtyProcess(HandleWrapper&& Stdin, HandleWrapper&& S
     {
         auto input = GetStdHandle(STD_INPUT_HANDLE);
 
-        if (GetFileType(input) == FILE_TYPE_CHAR)
+        if (wsl::windows::common::wslutil::IsConsoleHandle(input))
         {
             io.AddHandle(std::make_unique<RelayHandle<ReadConsoleHandle>>(input, std::move(Stdin)), MultiHandleWait::NeedNotComplete);
         }

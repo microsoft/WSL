@@ -98,6 +98,10 @@ int GetInspectJsonIndentFromString(const std::wstring& input, const std::wstring
 // Parses an image pull policy ("always"/"missing"/"never").
 models::PullPolicy GetPullPolicyFromString(const std::wstring& input, const std::wstring& argName = {});
 
+// Parses a container restart policy ("no"/"always"/"on-failure[:max-retries]"/"unless-stopped"). Policies
+// that parse correctly but are not supported are rejected.
+WSLCContainerRestartPolicy GetRestartPolicyFromString(const std::wstring& input, const std::wstring& argName = {});
+
 // Parses a build progress type ("auto"/"tty"/"plain"/"quiet") into a ProgressMode.
 models::ProgressMode GetProgressModeFromString(const std::wstring& input, const std::wstring& argName = {});
 

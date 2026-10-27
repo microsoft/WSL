@@ -86,7 +86,7 @@ try
 
     // Open the file with read-only access to validate that the user can actually read it.
     wil::unique_hfile file{CreateFileW(
-        Path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        Path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_NO_BUFFERING, nullptr)};
     THROW_LAST_ERROR_IF(!file);
 
     return file;
