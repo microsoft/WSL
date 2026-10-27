@@ -116,6 +116,8 @@ class WSLCCLICommandUnitTests
         VERIFY_IS_TRUE(hasType(ArgType::ClusterEnableGpu));
         VERIFY_IS_TRUE(hasType(ArgType::ClusterDeveloper));
         VERIFY_IS_TRUE(hasType(ArgType::DeveloperAgentDeb));
+        VERIFY_IS_TRUE(hasType(ArgType::DeveloperAksDesktopPath));
+        VERIFY_IS_TRUE(hasType(ArgType::DeveloperAksEdgePath));
         VERIFY_IS_TRUE(hasType(ArgType::DeveloperAgentRepo));
         VERIFY_IS_TRUE(hasType(ArgType::DeveloperCni));
         VERIFY_IS_TRUE(hasType(ArgType::DeveloperKubernetesVersion));

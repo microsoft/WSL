@@ -104,6 +104,9 @@ COMMAND_LINE_TEST_CASE(L"system session enter C:\\storage --notanarg", L"enter",
 COMMAND_LINE_TEST_CASE(L"system session enter --name my-session", L"enter", false)      // Missing required positional before flag
 
 // Cluster command tests
+COMMAND_LINE_TEST_CASE(L"cluster versions --developer --aks-desktop-path sdk.exe", L"versions", true)
+COMMAND_LINE_TEST_CASE(L"cluster versions --developer --aksedge-path sdk.exe", L"versions", true)
+COMMAND_LINE_TEST_CASE(L"cluster versions --developer --aks-desktop-path sdk.exe --aksedge-path old.exe", L"versions", false)
 COMMAND_LINE_TEST_CASE(L"cluster create --subscription sub --resource-group rg --tenant-id tenant", L"create", false)
 COMMAND_LINE_TEST_CASE(L"cluster create --developer --name dev --agent-repo repo --distribution K8s --cni cilium", L"create", true)
 COMMAND_LINE_TEST_CASE(L"cluster create --developer --agent-repo repo", L"create", false)

@@ -56,7 +56,8 @@ _(ContainerId,      "container-id",         NO_ALIAS,         Kind::Positional, 
 _(Cpus,             "cpus",                 NO_ALIAS,         Kind::Value,      int64_t,      Localization::WSLCCLI_CpusArgDescription()) \
 _(DeveloperAgentDeb, "agent-deb",           NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperAgentDebArgDescription()) \
 _(DeveloperAgentRepo, "agent-repo",         NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperAgentRepoArgDescription()) \
-_(DeveloperAksEdgePath, "aksedge-path",     NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperAksEdgePathArgDescription()) \
+_(DeveloperAksDesktopPath, "aks-desktop-path", NO_ALIAS,      Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperAksDesktopPathArgDescription()) \
+_(DeveloperAksEdgePath, "aksedge-path",     NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperAksDesktopPathArgDescription()) \
 _(DeveloperApiPort, "api-port",             NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperApiPortArgDescription()) \
 _(DeveloperCni,     "cni",                  NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperCniArgDescription()) \
 _(DeveloperDiagnosticsOutput, "output",     L"o",             Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperDiagnosticsOutputArgDescription()) \

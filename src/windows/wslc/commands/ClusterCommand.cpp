@@ -23,9 +23,8 @@ std::vector<std::unique_ptr<Command>> ClusterCommand::CreateCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<DeveloperClusterActionCommand>(L"create", FullName(), DeveloperClusterOperation::Create));
-    commands.push_back(
-        std::make_unique<DeveloperClusterActionCommand>(
-            L"delete", FullName(), DeveloperClusterOperation::Delete, std::vector<std::wstring_view>{L"remove", L"rm"}));
+    commands.push_back(std::make_unique<DeveloperClusterActionCommand>(
+        L"delete", FullName(), DeveloperClusterOperation::Delete, std::vector<std::wstring_view>{L"remove", L"rm"}));
     commands.push_back(std::make_unique<DeveloperClusterActionCommand>(L"status", FullName(), DeveloperClusterOperation::Status));
     commands.push_back(std::make_unique<DeveloperClusterActionCommand>(L"kubeconfig", FullName(), DeveloperClusterOperation::Kubeconfig));
     commands.push_back(std::make_unique<DeveloperClusterActionCommand>(L"diagnostics", FullName(), DeveloperClusterOperation::Diagnostics));
@@ -42,7 +41,7 @@ std::wstring ClusterCommand::ShortDescription() const
 
 std::wstring ClusterCommand::LongDescription() const
 {
-    return Localization::WSLCCLI_DeveloperClusterCommandLongDesc();
+    return Localization::WSLCCLI_DeveloperClusterDesktopCommandLongDesc();
 }
 
 void ClusterCommand::ExecuteInternal(CLIExecutionContext& context) const

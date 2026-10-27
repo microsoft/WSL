@@ -12,8 +12,8 @@ included.
 - Branch:
   [`user/ptrivedi/wslc-developer-prototype`](https://github.com/microsoft/WSL/tree/user/ptrivedi/wslc-developer-prototype)
 
-The current implementation still delegates to the external Edge Core SDK
-`aksedge` executable using its WSL driver. It has not yet been converted to
+The current implementation still delegates to the external AKS Desktop SDK
+`aks-desktop.exe` executable using its WSL driver. It has not yet been converted to
 run the agent inside the regular WSLC utility VM.
 
 Clusters are disposable development environments. In-place upgrades and
@@ -51,19 +51,23 @@ These files are intentionally not committed to the WSL repository and must
 be obtained separately:
 
 ```text
-aksedge-windows-amd64.exe
+aks-desktop.exe
 aks-bmagent.deb
 ```
 
 Place them beside `bin\x64\Debug\wslc.exe`, or configure their full paths:
 
 ```powershell
-$env:AKSEDGE_BIN = "C:\path\to\aksedge-windows-amd64.exe"
+$env:AKS_DESKTOP_BIN = "C:\path\to\aks-desktop.exe"
 $env:AKSEDGE_AGENT_DEB = "C:\path\to\aks-bmagent.deb"
 ```
 
-The executable can also be selected with `--aksedge-path`. An agent repository
-can be supplied with `--agent-repo` instead of a local package.
+The executable can also be selected with `--aks-desktop-path`. The legacy
+`--aksedge-path` and `AKSEDGE_BIN` overrides remain accepted. Do not specify
+both path flags. Discovery prefers the path flag, then `AKS_DESKTOP_BIN`,
+then `AKSEDGE_BIN`, then a sibling `aks-desktop.exe`, and finally
+`aks-desktop.exe` on PATH. An invalid explicit path is an error.
+An agent repository can be supplied with `--agent-repo` instead of a local package.
 
 ## Create
 
@@ -98,7 +102,7 @@ Available options:
 --output <kubeconfig-file>
 --merge
 --merge-into <kubeconfig-file>
---aksedge-path <path>
+--aks-desktop-path <path>
 ```
 
 The SDK defaults include distro `aks-edge`, API port `6443`, and pod CIDR
@@ -114,7 +118,7 @@ No Azure subscription, tenant, authentication, or Fleet options are accepted.
 ```
 
 `remove` and `rm` are aliases for `delete`. Optional arguments are `--distro`,
-`--prune-kubeconfig-file`, and `--aksedge-path`.
+`--prune-kubeconfig-file`, and `--aks-desktop-path`.
 
 Deletion requests guest removal and kubeconfig pruning from the SDK.
 Cluster-local data is disposable.
@@ -141,7 +145,7 @@ Cluster-local data is disposable.
 
 Status accepts `--distro`. Kubeconfig and diagnostics also accept `--distro`;
 diagnostics accepts an optional cluster name. All SDK-backed commands accept
-`--aksedge-path`.
+`--aks-desktop-path` (or legacy `--aksedge-path`).
 
 ## Help
 

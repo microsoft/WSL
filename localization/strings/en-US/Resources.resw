@@ -3754,8 +3754,8 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_DeveloperClusterCommandDesc" xml:space="preserve">
     <value>Manage standalone developer clusters on WSL.</value>
   </data>
-  <data name="WSLCCLI_DeveloperClusterCommandLongDesc" xml:space="preserve">
-    <value>Create, inspect, and delete local single-node Kubernetes clusters through the Edge Core SDK.</value>
+  <data name="WSLCCLI_DeveloperClusterDesktopCommandLongDesc" xml:space="preserve">
+    <value>Create, inspect, and delete local single-node Kubernetes clusters through AKS Desktop.</value>
   </data>
   <data name="WSLCCLI_DeveloperClusterCreateDesc" xml:space="preserve">
     <value>Create a standalone developer cluster.</value>
@@ -3790,8 +3790,8 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_DeveloperClusterVersionsDesc" xml:space="preserve">
     <value>List available Kubernetes versions.</value>
   </data>
-  <data name="WSLCCLI_DeveloperClusterVersionsLongDesc" xml:space="preserve">
-    <value>Lists the Kubernetes versions accepted by the installed Edge Core SDK.</value>
+  <data name="WSLCCLI_DeveloperClusterDesktopVersionsLongDesc" xml:space="preserve">
+    <value>Lists the Kubernetes versions accepted by the installed AKS Desktop SDK.</value>
   </data>
   <data name="WSLCCLI_DeveloperClusterDistributionsDesc" xml:space="preserve">
     <value>List available Kubernetes distributions.</value>
@@ -3805,8 +3805,8 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_DeveloperClusterCnisLongDesc" xml:space="preserve">
     <value>Lists the pod-network CNIs accepted by the installed Edge Core SDK.</value>
   </data>
-  <data name="WSLCCLI_DeveloperAksEdgePathArgDescription" xml:space="preserve">
-    <value>Path to aksedge.exe; overrides AKSEDGE_BIN and automatic discovery</value>
+  <data name="WSLCCLI_DeveloperAksDesktopPathArgDescription" xml:space="preserve">
+    <value>Path to aks-desktop.exe; overrides AKS_DESKTOP_BIN, legacy AKSEDGE_BIN, and automatic discovery</value>
   </data>
   <data name="WSLCCLI_DeveloperAgentDebArgDescription" xml:space="preserve">
     <value>Path to the standalone BMAgent Debian package</value>
@@ -3874,9 +3874,9 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_DeveloperRedactArgDescription" xml:space="preserve">
     <value>Omit node IP addresses and network details from diagnostics</value>
   </data>
-  <data name="WSLCCLI_DeveloperClusterAksEdgeNotFound" xml:space="preserve">
-    <value>Could not find aksedge.exe. Install it beside wslc.exe, set AKSEDGE_BIN, add it to PATH, or use --aksedge-path.</value>
-    <comment>{Locked="--aksedge-path."}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_DeveloperClusterAksDesktopNotFound" xml:space="preserve">
+    <value>Could not find aks-desktop.exe. Install it beside wslc.exe, set AKS_DESKTOP_BIN, add it to PATH, or use --aks-desktop-path.</value>
+    <comment>{Locked="--aks-desktop-path."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DeveloperClusterAgentNotFound" xml:space="preserve">
     <value>Could not find the standalone BMAgent package. Install aks-bmagent.deb beside wslc.exe, set AKSEDGE_AGENT_DEB, or specify --agent-deb or --agent-repo.</value>
@@ -3890,8 +3890,12 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Options --agent-deb and --agent-repo cannot be used together.</value>
     <comment>{Locked="--agent-deb "}{Locked="--agent-repo "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_DeveloperClusterCancelCleanup" xml:space="preserve">
-    <value>Cancellation requested. Waiting briefly for aksedge to clean up the current operation.</value>
+  <data name="WSLCCLI_DeveloperClusterExecutableConflict" xml:space="preserve">
+    <value>Options --aks-desktop-path and --aksedge-path cannot be used together.</value>
+    <comment>{Locked="--aks-desktop-path "}{Locked="--aksedge-path "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterDesktopCancelCleanup" xml:space="preserve">
+    <value>Cancellation requested. Waiting briefly for aks-desktop to clean up the current operation.</value>
   </data>
   <data name="WSLCCLI_DeveloperClusterRequiresDeveloper" xml:space="preserve">
     <value>This operation requires --developer.</value>

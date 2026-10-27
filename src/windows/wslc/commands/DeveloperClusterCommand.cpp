@@ -8,7 +8,7 @@ Module Name:
 
 Abstract:
 
-    Standalone developer cluster orchestration through the Edge Core SDK CLI.
+    Standalone developer cluster orchestration through the AKS Desktop SDK CLI.
 
 --*/
 #include "precomp.h"
@@ -26,7 +26,8 @@ using namespace wsl::shared;
 namespace wsl::windows::wslc {
 namespace {
 
-    constexpr auto c_aksEdgeEnvironment = L"AKSEDGE_BIN";
+    constexpr auto c_aksDesktopEnvironment = L"AKS_DESKTOP_BIN";
+    constexpr auto c_legacyAksEdgeEnvironment = L"AKSEDGE_BIN";
     constexpr auto c_agentDebEnvironment = L"AKSEDGE_AGENT_DEB";
 
     std::wstring GetEnvironmentValue(const wchar_t* name)
@@ -82,30 +83,34 @@ namespace {
         return path;
     }
 
-    std::wstring ResolveAksEdge(ArgMap& args)
+    std::wstring ResolveAksDesktop(ArgMap& args)
     {
         std::vector<std::filesystem::path> candidates;
-        if (args.Contains(ArgType::DeveloperAksEdgePath))
+        if (args.Contains(ArgType::DeveloperAksDesktopPath) || args.Contains(ArgType::DeveloperAksEdgePath))
         {
-            const std::filesystem::path configured{args.GetValue<ArgType::DeveloperAksEdgePath>()};
+            const std::filesystem::path configured{
+                args.Contains(ArgType::DeveloperAksDesktopPath) ? args.GetValue<ArgType::DeveloperAksDesktopPath>()
+                                                                : args.GetValue<ArgType::DeveloperAksEdgePath>()};
             std::error_code error;
             if (std::filesystem::is_regular_file(configured, error))
             {
                 return configured.wstring();
             }
 
-            throw ExecutionException(Localization::WSLCCLI_DeveloperClusterAksEdgeNotFound());
+            throw ExecutionException(Localization::WSLCCLI_DeveloperClusterAksDesktopNotFound());
         }
 
-        if (const auto configured = GetEnvironmentValue(c_aksEdgeEnvironment); !configured.empty())
+        if (const auto configured = GetEnvironmentValue(c_aksDesktopEnvironment); !configured.empty())
         {
             candidates.emplace_back(configured);
         }
 
-        const auto executableDirectory = GetExecutableDirectory();
-        candidates.emplace_back(executableDirectory / L"aksedge-windows-amd64.exe");
-        candidates.emplace_back(executableDirectory / L"aksedge.exe");
+        if (const auto configured = GetEnvironmentValue(c_legacyAksEdgeEnvironment); !configured.empty())
+        {
+            candidates.emplace_back(configured);
+        }
 
+        candidates.emplace_back(GetExecutableDirectory() / L"aks-desktop.exe");
         for (const auto& candidate : candidates)
         {
             std::error_code error;
@@ -115,12 +120,12 @@ namespace {
             }
         }
 
-        if (const auto onPath = FindOnPath(L"aksedge.exe"); !onPath.empty())
+        if (const auto onPath = FindOnPath(L"aks-desktop.exe"); !onPath.empty())
         {
             return onPath;
         }
 
-        throw ExecutionException(Localization::WSLCCLI_DeveloperClusterAksEdgeNotFound());
+        throw ExecutionException(Localization::WSLCCLI_DeveloperClusterAksDesktopNotFound());
     }
 
     std::wstring ResolveAgentDeb(ArgMap& args)
@@ -212,7 +217,7 @@ namespace {
         }
     }
 
-    std::wstring BuildAksEdgeCommandLine(const std::vector<std::wstring>& arguments)
+    std::wstring BuildAksDesktopCommandLine(const std::vector<std::wstring>& arguments)
     {
         std::vector<std::wstring_view> views;
         views.reserve(arguments.size());
@@ -224,11 +229,11 @@ namespace {
         return wil::ArgvToCommandLine(views);
     }
 
-    DWORD RunAksEdge(CLIExecutionContext& context, std::vector<std::wstring> arguments)
+    DWORD RunAksDesktop(CLIExecutionContext& context, std::vector<std::wstring> arguments)
     {
-        const auto executable = ResolveAksEdge(context.Args);
+        const auto executable = ResolveAksDesktop(context.Args);
         arguments.insert(arguments.begin(), executable);
-        const auto commandLine = BuildAksEdgeCommandLine(arguments);
+        const auto commandLine = BuildAksDesktopCommandLine(arguments);
 
         wil::unique_handle job{CreateJobObjectW(nullptr, nullptr)};
         THROW_LAST_ERROR_IF(!job);
@@ -244,7 +249,7 @@ namespace {
         const auto wait = WaitForMultipleObjects(ARRAYSIZE(waitHandles), waitHandles, FALSE, INFINITE);
         if (wait == WAIT_OBJECT_0 + 1)
         {
-            context.Terminal.Warn(L"\n{}\n", Localization::WSLCCLI_DeveloperClusterCancelCleanup());
+            context.Terminal.Warn(L"\n{}\n", Localization::WSLCCLI_DeveloperClusterDesktopCancelCleanup());
             if (WaitForSingleObject(processHandle.get(), 10'000) == WAIT_TIMEOUT)
             {
                 THROW_IF_WIN32_BOOL_FALSE(TerminateJobObject(job.get(), ERROR_CANCELLED));
@@ -266,7 +271,8 @@ namespace {
 
 std::vector<Argument> GetDeveloperClusterArguments(DeveloperClusterOperation operation)
 {
-    std::vector<Argument> arguments{Argument::Create(ArgType::ClusterDeveloper), Argument::Create(ArgType::DeveloperAksEdgePath)};
+    std::vector<Argument> arguments{
+        Argument::Create(ArgType::ClusterDeveloper), Argument::Create(ArgType::DeveloperAksDesktopPath), Argument::Create(ArgType::DeveloperAksEdgePath)};
     switch (operation)
     {
     case DeveloperClusterOperation::Create:
@@ -328,6 +334,13 @@ std::vector<Argument> GetDeveloperClusterArguments(DeveloperClusterOperation ope
 
 void ValidateDeveloperClusterArguments(DeveloperClusterOperation operation, ArgMap& args)
 {
+    if (args.Contains(ArgType::DeveloperAksDesktopPath) && args.Contains(ArgType::DeveloperAksEdgePath))
+    {
+        throw ArgumentException(
+            Localization::WSLCCLI_DeveloperClusterExecutableConflict(),
+            {Argument::Create(ArgType::DeveloperAksDesktopPath), Argument::Create(ArgType::DeveloperAksEdgePath)});
+    }
+
     if (!args.GetValue<ArgType::ClusterDeveloper>())
     {
         throw ArgumentException(Localization::WSLCCLI_DeveloperClusterRequiresDeveloper(), Argument::Create(ArgType::ClusterDeveloper));
@@ -428,7 +441,7 @@ void ExecuteDeveloperCluster(DeveloperClusterOperation operation, CLIExecutionCo
         break;
     }
 
-    const auto exitCode = RunAksEdge(context, std::move(command));
+    const auto exitCode = RunAksDesktop(context, std::move(command));
     if (exitCode != 0)
     {
         context.ExitCode = static_cast<int>(exitCode);
@@ -475,7 +488,7 @@ std::wstring DeveloperClusterLongDescription(DeveloperClusterOperation operation
     case DeveloperClusterOperation::Diagnostics:
         return Localization::WSLCCLI_DeveloperClusterDiagnosticsLongDesc();
     case DeveloperClusterOperation::Versions:
-        return Localization::WSLCCLI_DeveloperClusterVersionsLongDesc();
+        return Localization::WSLCCLI_DeveloperClusterDesktopVersionsLongDesc();
     case DeveloperClusterOperation::Distributions:
         return Localization::WSLCCLI_DeveloperClusterDistributionsLongDesc();
     case DeveloperClusterOperation::Cnis:
