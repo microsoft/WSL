@@ -869,6 +869,12 @@ class WSLCCLIExecutionUnitTests
                 dataMap.Add<Data::Session>(std::move(session));
                 handled = true;
             }
+            else if (dataType == Data::ComposeProjects)
+            {
+                std::vector<wsl::windows::wslc::models::ComposeProjectInformation> projects;
+                dataMap.Add<Data::ComposeProjects>(std::move(projects));
+                handled = true;
+            }
             else if (dataType == Data::Containers)
             {
                 std::vector<wsl::windows::wslc::models::ContainerInformation> containers;
@@ -941,6 +947,9 @@ class WSLCCLIExecutionUnitTests
 
         auto& containers = dataMap.Get<Data::Containers>();
         VERIFY_ARE_EQUAL(0u, containers.size());
+
+        auto& projects = dataMap.Get<Data::ComposeProjects>();
+        VERIFY_ARE_EQUAL(0u, projects.size());
 
         auto& confirmMessage = dataMap.Get<Data::ConfirmMessage>();
         VERIFY_ARE_EQUAL(std::wstring{L"message"}, confirmMessage);

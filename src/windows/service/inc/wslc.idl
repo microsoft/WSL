@@ -602,6 +602,7 @@ typedef enum _WSLCComposeAction
     WSLCComposeActionStart,
     WSLCComposeActionAttach,
     WSLCComposeActionStop,
+    WSLCComposeActionRemove,
 } WSLCComposeAction;
 
 typedef enum _WSLCComposeProjectType
@@ -741,6 +742,22 @@ typedef struct _WSLCComposeOperationResult
     [unique, size_is(AffectedContainersCount)] WSLCContainerEntry* AffectedContainers;
     ULONG AffectedContainersCount;
 } WSLCComposeOperationResult;
+
+typedef struct _WSLCComposeProjectListOptions
+{
+    ULONG SchemaVersion;
+    BOOL All;
+} WSLCComposeProjectListOptions;
+
+typedef struct _WSLCComposeProjectSummary
+{
+    ULONG SchemaVersion;
+    WSLCComposeProjectKey ProjectKey;
+    ULONG CreatedContainersCount;
+    ULONG RunningContainersCount;
+    ULONG ExitedContainersCount;
+    ULONG OtherContainersCount;
+} WSLCComposeProjectSummary;
 
 typedef struct _WSLCDeletedImageInformation
 {
@@ -1003,6 +1020,10 @@ interface IWSLCSession : IUnknown
         [in, unique] IComposeProgressCallback* ProgressCallback,
         [in, unique, system_handle(sh_event)] HANDLE CancelEvent,
         [out] WSLCComposeOperationResult* Result);
+    HRESULT ListComposeProjects(
+        [in] const WSLCComposeProjectListOptions* Options,
+        [out, size_is(, *Count)] WSLCComposeProjectSummary** Projects,
+        [out] ULONG* Count);
     // Used only for testing. Fails the next CreateNetwork after dockerd created the network, so the
     // rollback path can be exercised.
     HRESULT SetNetworkFaultsForTest([in] BOOL FailCreateInspect);

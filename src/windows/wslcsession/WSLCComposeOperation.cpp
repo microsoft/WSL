@@ -28,6 +28,7 @@ WSLCComposeOperation::Request WSLCComposeOperation::CaptureRequest(const WSLCCom
     case WSLCComposeActionUp:
     case WSLCComposeActionStart:
     case WSLCComposeActionAttach:
+    case WSLCComposeActionRemove:
         THROW_HR_IF(E_INVALIDARG, request.ActionOptions.Type != WSLCComposeActionOptionsTypeNone);
         break;
     default:

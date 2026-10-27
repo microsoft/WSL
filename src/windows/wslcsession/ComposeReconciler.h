@@ -67,6 +67,11 @@ private:
         const ComposeCancellation& cancellation,
         const ComposeProgressReporter& progressReporter,
         std::optional<wsl::windows::common::Error>& primaryError);
+    static std::vector<WSLCContainerEntry> Remove(
+        const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers,
+        const ComposeCancellation& cancellation,
+        const ComposeProgressReporter& progressReporter);
+
     WSLCSession& m_session;
     std::mutex m_projectLocksLock;
     std::unordered_map<std::string, std::shared_ptr<ProjectLock>> m_projectLocks;
