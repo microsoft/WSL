@@ -76,7 +76,15 @@ class WSLCContainerStateStoreUnitTests
     TEST_METHOD(ContainerStateStore_InvalidDocumentIsReset)
     {
         const auto path = WSLCContainerStateStore::PathFor(m_directory, "container");
-        for (const auto* content : {"{", "[]", "{\"V1\":{\"RestartCount\":\"invalid\"}}"})
+        for (const auto* content :
+             {"{",
+              "[]",
+              "{\"V1\":[]}",
+              "{\"V1\":{\"RestartCount\":\"invalid\"}}",
+              "{\"V1\":{\"RestartCount\":-1}}",
+              "{\"V1\":{\"RestartCount\":4294967296}}",
+              "{\"V1\":{\"RestartCount\":1.5}}",
+              "{\"V1\":{\"RestartCount\":true}}"})
         {
             std::ofstream{path, std::ios::binary | std::ios::trunc} << content;
 

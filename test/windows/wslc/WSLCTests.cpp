@@ -8170,8 +8170,8 @@ class WSLCTests
             "test-persistent-state-restart-count",
             {"sh",
              "-c",
-             "n=$(($(cat /runs 2>/dev/null || echo 0) + 1)); echo run; "
-             "if [ $n -ge 3 ]; then rm -f /runs; exec sleep 99999; fi; echo $n > /runs; exit 1"});
+             "n=$(($(cat /runs 2>/dev/null || echo 0) + 1)); "
+             "if [ $n -ge 3 ]; then rm -f /runs; echo run; exec sleep 99999; fi; echo $n > /runs; echo run; exit 1"});
         launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
         auto container = launcher.Create(*m_defaultSession);
         container.SetDeleteOnClose(false);

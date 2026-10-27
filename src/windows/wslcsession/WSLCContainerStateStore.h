@@ -19,6 +19,7 @@ Abstract:
 #include "JsonUtils.h"
 #include <filesystem>
 #include <functional>
+#include <limits>
 #include <optional>
 #include <string>
 #include <unordered_set>
@@ -32,7 +33,30 @@ struct WSLCContainerStateV1
 
     bool operator==(const WSLCContainerStateV1&) const = default;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCContainerStateV1, RestartCount);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(WSLCContainerStateV1, RestartCount);
+
+    // Rejects negative, fractional and out of range counts so the document is treated as invalid instead of narrowed.
+    friend void from_json(const nlohmann::json& Json, WSLCContainerStateV1& State)
+    {
+        if (!Json.is_object())
+        {
+            throw nlohmann::json::type_error::create(306, "container state must be an object", &Json);
+        }
+
+        State = {};
+        const auto restartCount = Json.find("RestartCount");
+        if (restartCount == Json.end())
+        {
+            return;
+        }
+
+        if (!restartCount->is_number_unsigned() || restartCount->get<std::uint64_t>() > std::numeric_limits<std::uint32_t>::max())
+        {
+            throw nlohmann::json::type_error::create(302, "RestartCount must be an unsigned 32-bit integer", &*restartCount);
+        }
+
+        State.RestartCount = restartCount->get<std::uint32_t>();
+    }
 };
 
 struct WSLCContainerStateDocument
