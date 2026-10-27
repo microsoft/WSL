@@ -17,7 +17,6 @@ Abstract:
 #include "ComposeReconciler.h"
 #include "wslc.h"
 #include "WSLCCompat.h"
-#include "WSLCComposeSession.h"
 #include "WSLCVirtualMachine.h"
 #include "WSLCContainer.h"
 #include "WSLCIdleState.h"
@@ -92,7 +91,6 @@ class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLCSession
     friend class WSLCContainer;
     friend class ComposeReconciler;
     friend class WSLCComposeOperation;
-    friend class WSLCComposeSession;
     friend class ServiceContainerLauncher;
 
 public:
@@ -176,7 +174,6 @@ public:
     IFACEMETHOD(CreateContainer)(_In_ const WSLCContainerOptions* Options, _In_opt_ IWarningCallback* WarningCallback, _Out_ IWSLCContainer** Container) override;
     IFACEMETHOD(OpenContainer)(_In_ LPCSTR Id, _In_ IWSLCContainer** Container) override;
     IFACEMETHOD(BeginContainerOperation)(_Outptr_ IUnknown** Operation) override;
-    IFACEMETHOD(CreateComposeSession)(_In_ LPCWSTR Path, _Out_ IWSLCComposeSession** ComposeSession) override;
     IFACEMETHOD(BeginComposeOperation)(
         _In_ const WSLCComposeOperationRequest* request, _In_opt_ IComposeProgressCallback* progressCallback, _Out_ IComposeOperation** operation) override;
     IFACEMETHOD(ListContainers)(
@@ -404,7 +401,6 @@ private:
     void RecoverExistingContainers();
     void RecoverExistingNetworks();
     std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> DiscoverComposeContainers(std::string_view projectKey);
-    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> CreateComposeContainers(const ComposeSpec& spec);
     std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> CreateComposeContainers(
         const ComposeSpec& spec, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter);
 
@@ -432,8 +428,6 @@ private:
     // WSLCVolumes has its own internal srwlock and does not require the runtime lock.
     std::mutex m_containersLock;
     std::unordered_map<std::string, std::shared_ptr<WSLCContainerImpl>> m_containers;
-    std::mutex m_composeSessionsLock;
-    std::unordered_map<std::wstring, Microsoft::WRL::ComPtr<WSLCComposeSession>> m_composeSessions;
     std::mutex m_networksLock;
     std::unordered_map<std::string, NetworkEntry> m_networks;
     wil::shared_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
