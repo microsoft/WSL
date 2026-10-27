@@ -1263,12 +1263,12 @@ class InstallerTests
 
         auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"--install --no-distribution", -1, nulDevice.get());
         VERIFY_ARE_EQUAL(
-            FormatErrorMessage(L"Update failed (exit code: 1618).", L"Wsl/CallMsi/Install/ERROR_INSTALL_ALREADY_RUNNING"), output);
-        VERIFY_ARE_EQUAL(
-            L"WSL is finishing an upgrade...\r\nwsl: "
-            L"Windows Installer is busy with another installation. "
-            L"Complete that installation before proceeding with this install.\r\n",
-            warnings);
+            FormatErrorMessage(
+                L"WSL installation is blocked because Windows Installer is busy. Wait for other software installations to "
+                L"finish, then retry.",
+                L"Wsl/CallMsi/Install/ERROR_INSTALL_ALREADY_RUNNING"),
+            output);
+        VERIFY_ARE_EQUAL(L"WSL is finishing an upgrade...\r\n", warnings);
         VERIFY_IS_FALSE(IsMsiPackageInstalled());
     }
 };

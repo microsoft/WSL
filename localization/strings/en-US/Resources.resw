@@ -1233,7 +1233,8 @@ See recovery instructions on: https://aka.ms/wsldiskmountrecovery</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageWindowsInstallerBusy" xml:space="preserve">
-    <value>Windows Installer is busy with another installation. Complete that installation before proceeding with this install.</value>
+    <value>WSL installation is blocked because Windows Installer is busy. Wait for other software installations to finish, then retry.</value>
+    <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Something went wrong. Try again later.</value>

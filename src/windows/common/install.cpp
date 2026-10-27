@@ -270,7 +270,7 @@ int wsl::windows::common::install::CallMsiPackage()
             {
                 if (installError == HRESULT_FROM_WIN32(ERROR_INSTALL_ALREADY_RUNNING))
                 {
-                    EMIT_USER_WARNING(wsl::shared::Localization::MessageWindowsInstallerBusy());
+                    THROW_HR_WITH_USER_ERROR(installError, wsl::shared::Localization::MessageWindowsInstallerBusy());
                 }
                 // Offer to directly install the MSI package if the MsixInstaller logic fails
                 // This can trigger a UAC so only do it
