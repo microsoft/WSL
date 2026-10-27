@@ -9683,12 +9683,7 @@ class WSLCTests
                 cancelEvent.SetEvent();
             }
 
-            const bool completed = future.wait_for(10s) == std::future_status::ready;
-            VERIFY_IS_TRUE(completed);
-            if (!completed)
-            {
-                return;
-            }
+            VERIFY_IS_TRUE(future.wait_for(10s) == std::future_status::ready);
 
             VERIFY_ARE_EQUAL(E_ABORT, future.get());
             VERIFY_IS_NULL(eventJson.get());
@@ -9724,12 +9719,7 @@ class WSLCTests
         VERIFY_IS_TRUE(future.wait_for(100ms) == std::future_status::timeout);
         releaseGate.reset();
 
-        const bool completed = future.wait_for(10s) == std::future_status::ready;
-        VERIFY_IS_TRUE(completed);
-        if (!completed)
-        {
-            return;
-        }
+        VERIFY_IS_TRUE(future.wait_for(10s) == std::future_status::ready);
 
         VERIFY_ARE_EQUAL(WSLC_E_EVENT_STREAM_FINISHED, future.get());
         VERIFY_IS_NULL(eventJson.get());
