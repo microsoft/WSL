@@ -743,6 +743,25 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WSLCSessionManager::CreateSession2(
+    const WSLCCompatSessionSettings2* Settings, WSLCSessionFlags Flags, IWSLCCompatWarningCallback* WarningCallback, IWSLCCompatSession** Session)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Session);
+    *Session = nullptr;
+    RETURN_HR_IF_NULL(E_POINTER, Settings);
+
+    const auto warning = apicompat::Convert(WarningCallback);
+    const auto settings = apicompat::Convert(*Settings);
+
+    Microsoft::WRL::ComPtr<IWSLCSession> session;
+    RETURN_IF_FAILED(CreateSession(settings.Get(), Flags, warning.Get(), &session));
+    RETURN_HR_IF_NULL(E_UNEXPECTED, session);
+
+    return session.CopyTo(Session);
+}
+CATCH_RETURN();
+
 namespace wsl::windows::service::wslc {
 
 wil::com_ptr<IWSLCSession> WSLCSessionManagerImpl::FindSession(ULONG Id)

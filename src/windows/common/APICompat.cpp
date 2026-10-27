@@ -395,6 +395,12 @@ SessionSettingsConversion::SessionSettingsConversion(const WSLCCompatSessionSett
     m_value.RootVhdTypeOverride = Settings.RootVhdTypeOverride;
 }
 
+SessionSettingsConversion::SessionSettingsConversion(const WSLCCompatSessionSettings2& Settings) :
+    SessionSettingsConversion(Settings.Base)
+{
+    m_value.HostLoopback = Settings.HostLoopback;
+}
+
 //
 // Callback conversions.
 //

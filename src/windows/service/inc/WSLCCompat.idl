@@ -266,6 +266,14 @@ typedef struct _WSLCCompatSessionSettings {
     [unique] LPCSTR RootVhdTypeOverride;
 } WSLCCompatSessionSettings;
 
+typedef struct _WSLCCompatSessionSettings2
+{
+    WSLCCompatSessionSettings Base;
+
+    // Hostname that resolves to the Windows host loopback interface. Null disables host loopback.
+    [unique] LPCSTR HostLoopback;
+} WSLCCompatSessionSettings2;
+
 [
     uuid(8C3C91FA-D550-41B9-AD9D-23DCBF96F549),
     pointer_default(unique),
@@ -390,4 +398,14 @@ interface IWSLCCompatSessionManager : IUnknown
 
     // Session management.
     HRESULT CreateSession([in, unique] const WSLCCompatSessionSettings* Settings, WSLCSessionFlags Flags, [in, unique] IWSLCCompatWarningCallback* WarningCallback, [out] IWSLCCompatSession** Session);
+}
+
+[
+    uuid(9D80997B-8969-47F3-826C-58E286A59D7E),
+    pointer_default(unique),
+    object
+]
+interface IWSLCCompatSessionManager2 : IWSLCCompatSessionManager
+{
+    HRESULT CreateSession2([in] const WSLCCompatSessionSettings2* Settings, WSLCSessionFlags Flags, [in, unique] IWSLCCompatWarningCallback* WarningCallback, [out] IWSLCCompatSession** Session);
 }

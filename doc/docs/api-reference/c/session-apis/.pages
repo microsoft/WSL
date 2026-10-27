@@ -8,6 +8,7 @@ nav:
   - wslcsetsessionsettingstimeout.md
   - wslcsetsessionsettingsvhd.md
   - wslcsetsessionsettingsfeatureflags.md
+  - wslcsetsessionsettingshostloopback.md
   - wslcgetsessionterminationevent.md
   - wslcgetsessionterminationreason.md
   - wslcregistersessioncrashdumpcallback.md
