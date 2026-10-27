@@ -7632,10 +7632,13 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
     {
 #ifdef WSL_DEV_INSTALL_PATH
 
-        const std::filesystem::path toolsPath = WSL_DEV_INSTALL_PATH;
+        const auto kernelPath = std::filesystem::path(WSL_DEV_INSTALL_PATH) / L"kernel";
+        const auto systemDistroPath = std::filesystem::path(WSL_DEV_INSTALL_PATH) / L"system.vhd";
 
 #else
-        const auto toolsPath = std::filesystem::path(wsl::windows::common::wslutil::GetMsiPackagePath().value()) / L"tools";
+        const auto installPath = std::filesystem::path(wsl::windows::common::wslutil::GetMsiPackagePath().value());
+        const auto kernelPath = installPath / L"tools" / L"kernel";
+        const auto systemDistroPath = installPath / L"system.vhd";
 
 #endif
 
@@ -7658,7 +7661,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         {
             const auto fileName = isKernel ? L"kernel" : L"system.vhd";
             const auto path = testFolder / fileName;
-            VERIFY_IS_TRUE(CopyFileW((toolsPath / fileName).c_str(), path.c_str(), TRUE));
+            VERIFY_IS_TRUE(CopyFileW((isKernel ? kernelPath : systemDistroPath).c_str(), path.c_str(), TRUE));
 
             WslConfigChange config{
                 isKernel ? LxssGenerateTestConfig({.kernel = path.wstring()}) : LxssGenerateTestConfig({.systemDistro = path.wstring()})};
