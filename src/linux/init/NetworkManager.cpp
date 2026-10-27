@@ -285,12 +285,24 @@ void NetworkManager::InitializeLoopbackConfiguration(Interface& gelnic, wsl::sha
 {
     if (WI_IsFlagSet(flags, wsl::shared::hns::CreateDeviceFlags::DisableDAD))
     {
-        gelnic.DisableNetworkSetting("accept_dad", AF_INET6);
-        gelnic.DisableNetworkSetting("dad_transmits", AF_INET6);
+        try
+        {
+            gelnic.DisableNetworkSetting("accept_dad", AF_INET6);
+            gelnic.DisableNetworkSetting("dad_transmits", AF_INET6);
 
-        // Toggle ipv6 to reset our temporary address.
-        gelnic.EnableNetworkSetting("disable_ipv6", AF_INET6);
-        gelnic.DisableNetworkSetting("disable_ipv6", AF_INET6);
+            // Toggle ipv6 to reset our temporary address.
+            gelnic.EnableNetworkSetting("disable_ipv6", AF_INET6);
+            gelnic.DisableNetworkSetting("disable_ipv6", AF_INET6);
+        }
+        catch (const SyscallError& e)
+        {
+            if (e.GetErrno() != ENOENT || std::filesystem::exists("/proc/sys/net/ipv6"))
+            {
+                throw;
+            }
+
+            GNS_LOG_INFO("Ignoring IPv6 loopback configuration error because IPv6 is disabled: {}", e.what());
+        }
     }
 
     // Enable routing of IPv4 loopback on the GELNIC.

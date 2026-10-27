@@ -15,12 +15,13 @@ Abstract:
 #include "ArgumentConvertedTypes.h"
 #include "BuildImageCallback.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "ContainerService.h"
 #include "ImageModel.h"
 #include "ImageService.h"
 #include "ImageTasks.h"
 #include "ImageProgressCallback.h"
-#include "TableOutput.h"
+#include "TableData.h"
 #include "Task.h"
 #include <format>
 #include <unordered_map>
@@ -36,6 +37,9 @@ using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
+
+using namespace wsl::windows::wslc::cli;
+using namespace wsl::windows::cli::table;
 
 namespace {
 
@@ -71,20 +75,23 @@ namespace {
         Terminal& m_terminal;
     };
 
-    // Placeholder for values that are unavailable. wslc does not track image digests or layer sharing.
+    // Placeholder for values that are unavailable. wslc does not track layer sharing.
     constexpr std::string_view c_imageNotAvailable = "N/A";
 
     // Builds the representation of an image, shared by the table and json output so the two cannot
     // drift. Every value is emitted as a string, "<none>" is used for missing repository/tag data,
     // and the id is truncated unless --no-trunc is passed, in which case it keeps the algorithm prefix.
-    ImageOutputInformation ToImageOutput(const ImageInformation& image, bool truncate)
+    // CreatedSince is the only field that varies with the format: docker renders it in invariant
+    // English, so json keeps that while the table is localized.
+    ImageOutputInformation ToImageOutput(const ImageInformation& image, bool truncate, FormatType format)
     {
         ImageOutputInformation entry;
         entry.Containers = image.Containers < 0 ? std::string{c_imageNotAvailable} : std::to_string(image.Containers);
 
         entry.CreatedAt = EpochToLocalDisplayTime(image.Created);
-        entry.CreatedSince = WideToMultiByte(FormatRelativeTime(image.Created));
-        entry.Digest = c_none;
+        entry.CreatedSince =
+            WideToMultiByte(format == FormatType::Json ? FormatInvariantRelativeTime(image.Created) : FormatRelativeTime(image.Created));
+        entry.Digest = image.Digest.empty() ? std::string{c_none} : image.Digest;
         entry.ID = truncate ? TruncateId(image.Id, true) : image.Id;
         entry.Repository = image.Repository.value_or(std::string{c_none});
         entry.SharedSize = c_imageNotAvailable;
@@ -184,71 +191,88 @@ void GetImages(CLIExecutionContext& context)
     const bool containerCounts =
         context.Args.GetValue<ArgType::Format>(FormatType::Table) == FormatType::Json && !context.Args.GetValue<ArgType::Quiet>();
 
-    auto images = ImageService::List(session, filters, containerCounts);
+    auto images = ImageService::List(
+        session, filters, containerCounts, context.Args.GetValue<ArgType::All>(), context.Args.GetValue<ArgType::Digests>());
     context.Data.Add<Data::Images>(std::move(images));
 }
 
-void ListImages(CLIExecutionContext& context)
+void FormatImageOutput(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Images));
     auto& images = context.Data.Get<Data::Images>();
 
+    const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
+    const bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
+
     if (context.Args.GetValue<ArgType::Quiet>())
     {
-        bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
+        wsl::windows::cli::table::TableData table{Localization::WSLCCLI_TableHeaderImageId()};
+        table.ShowHeader = false;
+        table.Reserve(images.size());
+
         for (const auto& image : images)
         {
-            context.Terminal.Output(L"{}\n", trunc ? TruncateId(image.Id, true) : image.Id);
+            table.AddRow({MultiByteToWide(trunc ? TruncateId(image.Id, true) : image.Id)});
         }
 
+        context.Data.Add<Data::Table>(std::move(table));
         return;
     }
-
-    const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
-    bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
 
     switch (format)
     {
     case FormatType::Json:
     {
+        std::vector<std::wstring> json;
+        json.reserve(images.size());
+
         for (const auto& image : images)
         {
-            context.Terminal.Output(L"{}\n", ToJsonW(ToImageOutput(image, trunc), c_jsonCompactIndent));
+            json.push_back(ToJsonW(ToImageOutput(image, trunc, format), c_jsonCompactIndent));
         }
 
+        context.Data.Add<Data::Json>(std::move(json));
         break;
     }
     case FormatType::Table:
     {
         using enum ColumnOverflow;
 
-        // Create table — only IMAGE ID uses fixed width; other columns shrink to fit the console.
+        constexpr ColumnWidthConfig c_shrink{.Overflow = Shrink};
+
+        // Only IMAGE ID uses fixed width; other columns shrink to fit the console.
         // When --no-trunc is passed, IMAGE ID also shows full length via TruncateId().
-        auto table =
-            trunc
-                ? wsl::windows::wslc::TableOutput<5>(
-                      context.Terminal,
-                      {{{L"REPOSITORY", {.Overflow = Shrink}},
-                        {L"TAG", {.Overflow = Shrink}},
-                        {L"IMAGE ID", {.MinWidth = 12, .MaxWidth = 12, .Overflow = Shrink}},
-                        {L"CREATED", {.Overflow = Shrink}},
-                        {L"SIZE", {.Overflow = Shrink}}}},
-                      images.size())
-                : wsl::windows::wslc::TableOutput<5>(context.Terminal, {L"REPOSITORY", L"TAG", L"IMAGE ID", L"CREATED", L"SIZE"});
+        constexpr ColumnWidthConfig c_imageId{.MinWidth = 12, .MaxWidth = 12, .Overflow = Shrink};
+
+        const bool digests = context.Args.GetValue<ArgType::Digests>();
+
+        wsl::windows::cli::table::TableData table;
+        table.Truncate(trunc)
+            .AddColumn(Localization::WSLCCLI_TableHeaderRepository(), c_shrink)
+            .AddColumn(Localization::WSLCCLI_TableHeaderTag(), c_shrink)
+            .AddColumnIf(digests, Localization::WSLCCLI_TableHeaderDigest(), c_shrink)
+            .AddColumn(Localization::WSLCCLI_TableHeaderImageId(), c_imageId)
+            .AddColumn(Localization::WSLCCLI_TableHeaderCreated(), c_shrink)
+            .AddColumn(Localization::WSLCCLI_TableHeaderSize(), c_shrink);
+
+        table.Reserve(images.size());
 
         for (const auto& image : images)
         {
-            const auto entry = ToImageOutput(image, trunc);
-            table.WriteRow({
-                MultiByteToWide(entry.Repository),
-                MultiByteToWide(entry.Tag),
-                MultiByteToWide(entry.ID),
-                MultiByteToWide(entry.CreatedSince),
-                MultiByteToWide(entry.Size),
-            });
+            const auto entry = ToImageOutput(image, trunc, format);
+
+            Row row;
+            row.AddCell(MultiByteToWide(entry.Repository))
+                .AddCell(MultiByteToWide(entry.Tag))
+                .AddCellIf(digests, MultiByteToWide(entry.Digest))
+                .AddCell(MultiByteToWide(entry.ID))
+                .AddCell(MultiByteToWide(entry.CreatedSince))
+                .AddCell(MultiByteToWide(entry.Size));
+
+            table.AddRow(std::move(row));
         }
 
-        table.Complete();
+        context.Data.Add<Data::Table>(std::move(table));
         break;
     }
     default:
@@ -263,11 +287,18 @@ void PullImage(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     const auto image = WideToMultiByte(context.Args.GetValue<ArgType::ImageId>());
     const bool quiet = context.Args.GetValue<ArgType::Quiet>();
+    const bool allTags = context.Args.GetValue<ArgType::AllTags>();
+
+    const auto reference = ImageReference::Parse(image);
+
+    if (allTags && reference.Format != EnumReferenceFormatNone)
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_AllTagsWithTagError());
+    }
 
     // Match `docker pull`: for a name-only reference (no tag or digest) the tag defaults to "latest". Unless quiet,
     // the client reports this on stdout before contacting the registry.
-    const auto reference = ImageReference::Parse(image);
-    if (!quiet && reference.Format == EnumReferenceFormatNone)
+    if (!quiet && !allTags && reference.Format == EnumReferenceFormatNone)
     {
         context.Terminal.Output(L"{}\n", Localization::WSLCCLI_PullUsingDefaultTag(L"latest"));
     }
@@ -281,10 +312,10 @@ void PullImage(CLIExecutionContext& context)
     }
 
     IProgressCallback* progress = callback ? &*callback : nullptr;
-    services::ImageService::Pull(context.Terminal, session, image, progress);
+    services::ImageService::Pull(context.Terminal, session, image, progress, allTags);
 
-    // Match `docker pull`: always print the resolved canonical image reference as the final line.
-    context.Terminal.Output(L"{}\n", MultiByteToWide(reference.GetCanonical()));
+    const auto resolved = allTags ? reference.Repository.GetCanonical() : reference.GetCanonical();
+    context.Terminal.Output(L"{}\n", MultiByteToWide(resolved));
 }
 
 void PushImage(CLIExecutionContext& context)
@@ -292,10 +323,40 @@ void PushImage(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     auto& session = context.Data.Get<Data::Session>();
-    auto& imageId = context.Args.GetValue<ArgType::ImageId>();
+    const auto image = WideToMultiByte(context.Args.GetValue<ArgType::ImageId>());
+    const bool allTags = context.Args.GetValue<ArgType::AllTags>();
+    const bool quiet = context.Args.GetValue<ArgType::Quiet>();
 
-    ImageProgressCallback callback(context.Terminal, Terminal::Level::Output);
-    services::ImageService::Push(context.Terminal, session, WideToMultiByte(imageId), &callback);
+    const auto reference = ImageReference::Parse(image);
+
+    if (allTags && reference.Format != EnumReferenceFormatNone)
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_AllTagsWithTagError());
+    }
+
+    // For a name-only reference the tag defaults to "latest", reported on stdout before contacting the registry.
+    // Quiet mode suppresses that notice, and an --all-tags push has no single tag to resolve.
+    if (!quiet && !allTags && reference.Format == EnumReferenceFormatNone)
+    {
+        context.Terminal.Output(L"{}\n", Localization::WSLCCLI_PullUsingDefaultTag(L"latest"));
+    }
+
+    // In quiet mode, suppress progress output by passing no progress callback. Warnings are unaffected because the
+    // warning callback is built internally by ImageService::Push from the Terminal.
+    std::optional<ImageProgressCallback> callback;
+    if (!quiet)
+    {
+        callback.emplace(context.Terminal, Terminal::Level::Output);
+    }
+
+    IProgressCallback* progress = callback ? &*callback : nullptr;
+    services::ImageService::Push(context.Terminal, session, image, progress, allTags);
+
+    if (quiet)
+    {
+        // An --all-tags push names a repository, so the reference printed carries no tag.
+        context.Terminal.Output(L"{}\n", MultiByteToWide(allTags ? reference.Repository.GetCanonical() : reference.GetCanonical()));
+    }
 }
 
 void DeleteImage(CLIExecutionContext& context)
@@ -423,6 +484,11 @@ void TagImage(CLIExecutionContext& context)
 
 void PruneImages(CLIExecutionContext& context)
 {
+    context.Data.Add<Data::ConfirmWarning>(
+        context.Args.GetValue<ArgType::All>() ? Localization::WSLCCLI_ImagePruneAllConfirm() : Localization::WSLCCLI_ImagePruneConfirm());
+    context.Data.Add<Data::ConfirmMessage>(Localization::WSLCCLI_PruneConfirmPrompt());
+    ConfirmAction(context);
+
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
 

@@ -13,12 +13,11 @@ Abstract:
 --*/
 #pragma once
 
-// Here is where base argument types are defined, with their name, alias, kind, and default description.
-// The description can be overridden by commands if a particular command needs a different description but otherwise the
-// same argument type definition. The ArgType enum and the mapping of ArgType to data type are generated from this X-Macro, so all
-// arguments must be defined here to be used in the system. The arguments defined here are the basis for all commands,
-// but not all arguments need to be used by all commands, and additional properties of the arguments can be set in the command's
-// GetArguments function when creating the Argument with Argument::Create.
+// Here is where base argument types are defined, with their default name, default alias, kind, conversion type, and
+// default description. Commands can override the name, alias, required state, limit, and description. The ArgType enum,
+// kind, and conversion type remain fixed. The ArgType enum and the mapping of ArgType to data type are generated from
+// this X-Macro, so all arguments must be defined here to be used in the system. The arguments defined here are the basis
+// for all commands, but not all arguments need to be used by all commands.
 
 // The Kind determines the data type:
 // - Kind::Flag       -> bool
@@ -36,6 +35,7 @@ Abstract:
 // clang-format off
 #define WSLC_ARGUMENTS(_) \
 _(All,              "all",                  L"a",             Kind::Flag,       NoConversion, Localization::WSLCCLI_AllArgDescription()) \
+_(AllTags,          "all-tags",             L"a",             Kind::Flag,       NoConversion, Localization::WSLCCLI_AllTagsArgDescription()) \
 _(Archive,          "archive",              L"a",             Kind::Flag,       NoConversion, Localization::WSLCCLI_ArchiveArgDescription()) \
 _(Attach,           "attach",               L"a",             Kind::Flag,       NoConversion, Localization::WSLCCLI_AttachArgDescription()) \
 _(BuildArg,         "build-arg",            NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_BuildArgDescription()) \
@@ -43,33 +43,14 @@ _(BuildLabel,       "label",                L"l",             Kind::Value,      
 _(BuildOutput,      "output",               L"o",             Kind::Value,      BuildOutput,  Localization::WSLCCLI_OutputArgDescription()) \
 _(BuildPull,        "pull",                 NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_BuildPullArgDescription()) \
 _(BuildTarget,      "target",               NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_BuildTargetArgDescription()) \
+_(CapAdd,           "cap-add",              NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_CapAddArgDescription()) \
+_(CapDrop,          "cap-drop",             NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_CapDropArgDescription()) \
 _(CIDFile,          "cidfile",              NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_CIDFileArgDescription()) \
-_(ClusterAuthMode,  "auth-mode",             NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_ClusterAuthModeArgDescription()) \
-_(ClusterClientId,  "client-id",             NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_ClusterClientIdArgDescription()) \
-_(ClusterClientSecret, "client-secret",      NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_ClusterClientSecretArgDescription()) \
-_(ClusterCmpName,   "cmp-name",              NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_ClusterCmpNameArgDescription()) \
-_(ClusterCmpResourceGroup, "cmp-resource-group", NO_ALIAS,     Kind::Value,      NoConversion, Localization::WSLCCLI_ClusterCmpResourceGroupArgDescription()) \
-_(ClusterCmpSubscription, "cmp-subscription", NO_ALIAS,        Kind::Value,      NoConversion, Localization::WSLCCLI_ClusterCmpSubscriptionArgDescription()) \
-_(ClusterConfig,    "config",                L"c",             Kind::Value,      NoConversion, Localization::WSLCCLI_ClusterConfigArgDescription()) \
-_(ClusterDeveloper, "developer",             NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_ClusterDeveloperArgDescription()) \
-_(ClusterDistribution, "distribution",       NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_ClusterDistributionArgDescription()) \
-_(ClusterDistro,    "distro",                L"d",             Kind::Value,      NoConversion, Localization::WSLCCLI_ClusterDistroArgDescription()) \
-_(ClusterEnableGpu, "enable-gpu",            NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_ClusterEnableGpuArgDescription()) \
-_(ClusterFleet,     "fleet",                 NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_ClusterFleetArgDescription()) \
-_(ClusterFleetCreate, "create-fleet",        NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_ClusterFleetCreateArgDescription()) \
-_(ClusterFleetLocation, "fleet-location",    NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_ClusterFleetLocationArgDescription()) \
-_(ClusterFleetMemberName, "fleet-member-name", NO_ALIAS,       Kind::Value,      NoConversion, Localization::WSLCCLI_ClusterFleetMemberNameArgDescription()) \
-_(ClusterFleetMove, "move",                  NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_ClusterFleetMoveArgDescription()) \
-_(ClusterFleetResourceGroup, "fleet-resource-group", NO_ALIAS, Kind::Value,      NoConversion, Localization::WSLCCLI_ClusterFleetResourceGroupArgDescription()) \
-_(ClusterFleetSubscription, "fleet-subscription", NO_ALIAS,    Kind::Value,      NoConversion, Localization::WSLCCLI_ClusterFleetSubscriptionArgDescription()) \
-_(ClusterFleetYes,  "yes",                   L"y",             Kind::Flag,       NoConversion, Localization::WSLCCLI_ClusterFleetYesArgDescription()) \
-_(ClusterLocation,  "location",              L"l",             Kind::Value,      NoConversion, Localization::WSLCCLI_ClusterLocationArgDescription()) \
-_(ClusterOutput,    "output",                L"o",             Kind::Value,      NoConversion, Localization::WSLCCLI_ClusterOutputArgDescription()) \
-_(ClusterResourceGroup, "resource-group",    L"g",             Kind::Value,      NoConversion, Localization::WSLCCLI_ClusterResourceGroupArgDescription()) \
-_(ClusterSubscription, "subscription",       L"s",             Kind::Value,      NoConversion, Localization::WSLCCLI_ClusterSubscriptionArgDescription()) \
-_(ClusterTenantId,  "tenant-id",             L"t",             Kind::Value,      NoConversion, Localization::WSLCCLI_ClusterTenantIdArgDescription()) \
-_(ClusterWheel,     "aksarc-wheel",          NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_ClusterWheelArgDescription()) \
-_(ClusterBuildId,   "aksarc-build-id",       NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_ClusterBuildIdArgDescription()) \
+_(ClusterDeveloper, "developer",             NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_DeveloperClusterModeArgDescription()) \
+_(ClusterDistribution, "distribution",       NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperDistributionArgDescription()) \
+_(ClusterDistro,    "distro",                L"d",             Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperDistroArgDescription()) \
+_(ClusterEnableGpu, "enable-gpu",            NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_DeveloperEnableGpuArgDescription()) \
+_(ClusterOutput,    "output",                L"o",             Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperKubeconfigOutputArgDescription()) \
 _(Command,          "command",              NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_CommandArgDescription()) \
 _(ContainerId,      "container-id",         NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_ContainerIdArgDescription()) \
 _(Cpus,             "cpus",                 NO_ALIAS,         Kind::Value,      int64_t,      Localization::WSLCCLI_CpusArgDescription()) \
@@ -94,6 +75,8 @@ _(DeveloperPruneKubeconfigFile, "prune-kubeconfig-file", NO_ALIAS, Kind::Value, 
 _(DeveloperRedact,  "redact",               NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_DeveloperRedactArgDescription()) \
 _(Force,            "force",                L"f",             Kind::Flag,       NoConversion, Localization::WSLCCLI_ForceArgDescription()) \
 _(Detach,           "detach",               L"d",             Kind::Flag,       NoConversion, Localization::WSLCCLI_DetachArgDescription()) \
+_(Details,          "details",              NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_DetailsArgDescription()) \
+_(Digests,          "digests",              NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_DigestsArgDescription()) \
 _(DNS,              "dns",                  NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DNSArgDescription()) \
 /*_(DNSDomain,        "dns-domain",           NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DNSDomainArgDescription())*/ \
 _(DNSOption,        "dns-option",           NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DNSOptionArgDescription()) \
@@ -107,6 +90,7 @@ _(EnvFile,          "env-file",             NO_ALIAS,         Kind::Value,      
 _(File,             "file",                 L"f",             Kind::Value,      NoConversion, Localization::WSLCCLI_FileArgDescription()) \
 _(Filter,           "filter",               L"f",             Kind::Value,      KeyValuePair, Localization::WSLCCLI_FilterArgDescription()) \
 _(Follow,           "follow",               L"f",             Kind::Flag,       NoConversion, Localization::WSLCCLI_FollowArgDescription()) \
+_(FollowLink,       "follow-link",          L"L",             Kind::Flag,       NoConversion, Localization::WSLCCLI_FollowLinkArgDescription()) \
 _(Timestamps,       "timestamps",           L"t",             Kind::Flag,       NoConversion, Localization::WSLCCLI_TimestampsArgDescription()) \
 _(Since,            "since",                NO_ALIAS,         Kind::Value,      LONGLONG,     Localization::WSLCCLI_SinceArgDescription()) \
 _(Until,            "until",                NO_ALIAS,         Kind::Value,      LONGLONG,     Localization::WSLCCLI_UntilArgDescription()) \
@@ -127,9 +111,10 @@ _(ImageId,          "image",                NO_ALIAS,         Kind::Positional, 
 _(ImportFile,       "file",                 NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_ImportFileArgDescription()) \
 _(IidFile,          "iidfile",              NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_IidFileArgDescription()) \
 _(Input,            "input",                L"i",             Kind::Value,      NoConversion, Localization::WSLCCLI_InputArgDescription()) \
-_(InspectFormat,    "format",               NO_ALIAS,         Kind::Value,      JsonIndent,   Localization::WSLCCLI_InspectFormatArgDescription()) \
+_(InspectFormat,    "format",               L"f",             Kind::Value,      JsonIndent,   Localization::WSLCCLI_InspectFormatArgDescription()) \
 _(Interactive,      "interactive",          L"i",             Kind::Flag,       NoConversion, Localization::WSLCCLI_InteractiveArgDescription()) \
 _(Internal,         "internal",             NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_NetworkInternalArgDescription()) \
+_(Ipv6,             "ipv6",                 NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_NetworkIpv6ArgDescription()) \
 _(IpAddress,        "ip",                   NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_IpAddressArgDescription()) \
 _(IpRange,          "ip-range",             NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_NetworkIpRangeArgDescription()) \
 _(Label,            "label",                L"l",             Kind::Value,      KeyValuePair, Localization::WSLCCLI_LabelArgDescription()) \
@@ -161,6 +146,7 @@ _(PublishAll,       "publish-all",          L"P",             Kind::Flag,       
 _(Pull,             "pull",                 NO_ALIAS,         Kind::Value,      PullPolicy,   Localization::WSLCCLI_PullArgDescription()) \
 _(Quiet,            "quiet",                L"q",             Kind::Flag,       NoConversion, Localization::WSLCCLI_QuietArgDescription()) \
 _(Remove,           "rm",                   NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_RemoveArgDescription()) \
+_(Restart,          "restart",              NO_ALIAS,         Kind::Value,      RestartPolicy, Localization::WSLCCLI_RestartArgDescription()) \
 /*_(Scheme,           "scheme",               NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_SchemeArgDescription())*/ \
 _(Secret,           "secret",               NO_ALIAS,         Kind::Value,      BuildSecret,  Localization::WSLCCLI_SecretArgDescription()) \
 _(Server,           "server",               NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_LoginServerArgDescription()) \
@@ -168,6 +154,7 @@ _(Session,          "session",              NO_ALIAS,         Kind::Value,      
 _(ShmSize,          "shm-size",             NO_ALIAS,         Kind::Value,      int64_t,      Localization::WSLCCLI_ShmSizeArgDescription()) \
 _(StoragePath,      "storage-path",         NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_StoragePathArgDescription()) \
 _(Signal,           "signal",               L"s",             Kind::Value,      WSLCSignal,   Localization::WSLCCLI_SignalArgDescription()) \
+_(Size,             "size",                 L"s",             Kind::Flag,       NoConversion, Localization::WSLCCLI_SizeArgDescription()) \
 _(Source,           "source",               NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_SourceArgDescription()) \
 _(StopSignal,       "stop-signal",          NO_ALIAS,         Kind::Value,      WSLCSignal,   Localization::WSLCCLI_StopSignalArgDescription()) \
 _(StopTimeout,      "stop-timeout",         NO_ALIAS,         Kind::Value,      int,          Localization::WSLCCLI_StopTimeoutArgDescription()) \
@@ -176,6 +163,7 @@ _(Tail,             "tail",                 L"n",             Kind::Value,      
 _(Tag,              "tag",                  L"t",             Kind::Value,      NoConversion, Localization::WSLCCLI_TagArgDescription()) \
 _(Target,           "target",               NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_TargetArgDescription()) \
 _(Time,             "time",                 L"t",             Kind::Value,      LONG,         Localization::WSLCCLI_TimeArgDescription()) \
+_(Timeout,          "timeout",              L"t",             Kind::Value,      LONG,         Localization::WSLCCLI_TimeArgDescription()) \
 _(TMPFS,            "tmpfs",                NO_ALIAS,         Kind::Value,      ParsedMount,  Localization::WSLCCLI_TMPFSArgDescription()) \
 _(TTY,              "tty",                  L"t",             Kind::Flag,       NoConversion, Localization::WSLCCLI_TTYArgDescription()) \
 _(Type,             "type",                 L"t",             Kind::Value,      InspectType,  Localization::WSLCCLI_TypeArgDescription()) \

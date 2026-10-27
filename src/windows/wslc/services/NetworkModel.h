@@ -26,6 +26,7 @@ struct CreateNetworkOptions
     std::vector<std::pair<std::string, std::string>> DriverOpts{};
     std::vector<std::pair<std::string, std::string>> Labels{};
     bool Internal{false};
+    bool EnableIPv6{false};
     std::optional<std::string> Subnet;
     std::optional<std::string> Gateway;
     std::optional<std::string> IpRange;

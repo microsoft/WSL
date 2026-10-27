@@ -128,9 +128,37 @@ std::pair<uint16_t, uint16_t> wsl::core::networking::GuestNetworkService::Alloca
 
     // N.B. Use an odd number of ports to avoid Linux kernel warning about preferring different parity for start / end values.
     static constexpr auto c_ephemeralPortRangeSize = 4095;
-    THROW_IF_FAILED(m_allocatePortRange.value()(m_service.get(), c_ephemeralPortRangeSize, &m_reservedPortRange, &port));
+    static constexpr auto c_minEphemeralPortRangeSize = 511;
+    uint16_t portRangeSize = c_ephemeralPortRangeSize;
+    HRESULT result = E_UNEXPECTED;
+    for (; portRangeSize >= c_minEphemeralPortRangeSize; portRangeSize /= 2)
+    {
+        result = m_allocatePortRange.value()(m_service.get(), portRangeSize, &m_reservedPortRange, &port);
+        WSL_LOG(
+            "GuestNetworkService::AllocateEphemeralPortRange [HcnReserveGuestNetworkServicePortRange]",
+            TraceLoggingValue(portRangeSize + 1, "portCount"),
+            TraceLoggingHResult(result, "result"));
+        if (SUCCEEDED(result))
+        {
+            break;
+        }
+    }
 
-    WI_ASSERT(m_reservedPortRange.endingPort - m_reservedPortRange.startingPort == c_ephemeralPortRangeSize);
+    if (FAILED(result))
+    {
+        if (portRangeSize < c_minEphemeralPortRangeSize)
+        {
+            EMIT_USER_WARNING(Localization::MessageMirroredNetworkingPortRangeAllocationFailed(c_minEphemeralPortRangeSize + 1));
+        }
+        THROW_HR(result);
+    }
+
+    WI_ASSERT(m_reservedPortRange.endingPort - m_reservedPortRange.startingPort == portRangeSize);
+
+    if (portRangeSize < c_ephemeralPortRangeSize)
+    {
+        EMIT_USER_WARNING(Localization::MessageMirroredNetworkingReducedPortRange(portRangeSize + 1, c_ephemeralPortRangeSize + 1));
+    }
 
     // Count the overlap of the guest's reserved ephemeral range with the host ephemeral range
     // and seed the in-use counters accordingly.

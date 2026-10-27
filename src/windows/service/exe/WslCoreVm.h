@@ -274,6 +274,7 @@ private:
     _Guarded_by_(m_guestDeviceLock) std::optional<GUID> m_adminVirtioFsDevice;
     _Guarded_by_(m_guestDeviceLock) std::map<UINT32, wil::com_ptr<IPlan9FileSystem>> m_plan9Servers;
     wil::srwlock m_lock;
+    _Guarded_by_(m_lock) wil::com_ptr<IPlan9FileSystem> m_pluginPlan9Server;
     _Guarded_by_(m_lock) wil::unique_event m_terminatingEvent { wil::EventOptions::ManualReset };
     _Guarded_by_(m_lock) wil::unique_event m_vmExitEvent { wil::EventOptions::ManualReset };
     wil::unique_event m_vmCrashEvent{wil::EventOptions::ManualReset};
@@ -314,6 +315,7 @@ private:
     std::tuple<std::uint32_t, std::uint32_t, std::uint32_t> m_kernelVersion;
     std::wstring m_kernelVersionString;
     bool m_seccompAvailable;
+    bool m_ipv6Available = false;
     uint64_t m_hvPciSwiotlbBase = 0;
     uint64_t m_hvPciSwiotlbSize = 0;
     std::wstring m_sharedMemoryRoot;
@@ -323,6 +325,7 @@ private:
     std::shared_ptr<DmesgCollector> m_dmesgCollector;
     std::shared_ptr<GuestTelemetryLogger> m_gnsTelemetryLogger;
     std::wstring m_debugShellPipe;
+    std::thread m_drvfsInitialThread;
     std::thread m_distroExitThread;
     std::thread m_virtioFsThread;
     std::thread m_crashDumpCollectionThread;

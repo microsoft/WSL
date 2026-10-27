@@ -22,16 +22,19 @@ Abstract:
 #include <optional>
 #include <sstream>
 
+static std::string FormatUtcOffset(std::chrono::minutes offset)
+{
+    const auto magnitude = std::abs(offset.count());
+    return std::format("{}{:02}:{:02}", offset.count() < 0 ? '-' : '+', magnitude / 60, magnitude % 60);
+}
+
 static std::string LocalUtcOffset()
 {
     try
     {
         const auto* zone = std::chrono::current_zone();
         const auto offset = zone->get_info(std::chrono::system_clock::now()).offset;
-        const auto minutes = std::chrono::duration_cast<std::chrono::minutes>(offset).count();
-        const auto magnitude = std::abs(minutes);
-
-        return std::format("{}{:02}:{:02}", minutes < 0 ? '-' : '+', magnitude / 60, magnitude % 60);
+        return FormatUtcOffset(std::chrono::duration_cast<std::chrono::minutes>(offset));
     }
     catch (...)
     {
@@ -98,7 +101,7 @@ std::string wsl::windows::common::timestamp::ExpandToRfc3339(const std::string& 
     return expanded;
 }
 
-std::int64_t wsl::windows::common::timestamp::Rfc3339ToEpoch(const std::string& timestamp)
+static std::pair<std::int64_t, std::int64_t> ParseRfc3339(const std::string& timestamp)
 {
     // Normalize a trailing 'Z' or 'z' to '+00:00' so that %Ez parses every zone uniformly.
     std::string normalized{timestamp};
@@ -108,19 +111,27 @@ std::int64_t wsl::windows::common::timestamp::Rfc3339ToEpoch(const std::string& 
         normalized += "+00:00";
     }
 
-    // Strip any fractional seconds. The value is truncated to whole seconds regardless, and parsing at
-    // second precision keeps timestamps outside the nanosecond range from silently wrapping.
+    // Parse whole seconds separately to preserve dates outside the nanosecond clock's range.
+    std::int64_t fraction = 0;
     const auto separator = normalized.find('.');
     if (separator != std::string::npos)
     {
         auto end = separator + 1;
         while (end < normalized.size() && std::isdigit(static_cast<unsigned char>(normalized[end])) != 0)
         {
+            if (end - separator <= 9)
+            {
+                fraction = fraction * 10 + normalized[end] - '0';
+            }
             ++end;
         }
 
         // A separator with no fractional digits is invalid, but std::chrono::parse otherwise accepts it.
         THROW_HR_IF_MSG(E_INVALIDARG, end == separator + 1, "Failed to parse timestamp '%hs'", timestamp.c_str());
+        for (size_t digits = end - separator - 1; digits < 9; ++digits)
+        {
+            fraction *= 10;
+        }
 
         normalized.erase(separator, end - separator);
     }
@@ -153,7 +164,57 @@ std::int64_t wsl::windows::common::timestamp::Rfc3339ToEpoch(const std::string& 
         "Unexpected trailing characters in timestamp '%hs'",
         timestamp.c_str());
 
-    return parsed.time_since_epoch().count();
+    return {parsed.time_since_epoch().count(), fraction};
+}
+
+std::int64_t wsl::windows::common::timestamp::Rfc3339ToEpoch(const std::string& timestamp)
+{
+    return ParseRfc3339(timestamp).first;
+}
+
+std::pair<std::int64_t, std::int64_t> wsl::windows::common::timestamp::ParseTimestamp(const std::string& value)
+{
+    const auto separator = value.find('.');
+    const auto secondsEnd = value.data() + (separator == std::string::npos ? value.size() : separator);
+    const auto digits = separator == std::string::npos ? std::string_view{} : std::string_view{value}.substr(separator + 1);
+    std::int64_t seconds{};
+    const auto integer = std::from_chars(value.data(), secondsEnd, seconds);
+    if (integer.ec == std::errc{} && integer.ptr == secondsEnd &&
+        (separator == std::string::npos ||
+         (!digits.empty() && std::ranges::all_of(digits, [](char c) { return c >= '0' && c <= '9'; }))))
+    {
+        std::int64_t fraction = 0;
+        if (separator != std::string::npos)
+        {
+            for (size_t i = 0; i < 9; ++i)
+            {
+                fraction = fraction * 10 + (i < digits.size() ? digits[i] - '0' : 0);
+            }
+        }
+
+        // Normalize negative values to floor seconds with nonnegative nanoseconds, matching the RFC3339 path.
+        if (value.starts_with('-') && fraction != 0)
+        {
+            THROW_HR_IF(E_INVALIDARG, seconds == std::numeric_limits<std::int64_t>::min());
+            --seconds;
+            fraction = std::nano::den - fraction;
+        }
+        return {seconds, fraction};
+    }
+
+    if (const auto duration = TryParseDuration(value))
+    {
+        // Subtract whole seconds separately so that large durations cannot overflow the nanosecond representation.
+        const auto now = std::chrono::system_clock::now().time_since_epoch();
+        const auto nowSeconds = std::chrono::floor<std::chrono::seconds>(now);
+        const auto durationSeconds = std::chrono::duration_cast<std::chrono::seconds>(*duration);
+        const auto remainder = std::chrono::duration_cast<std::chrono::nanoseconds>(now - nowSeconds) - (*duration - durationSeconds);
+        const auto carry = std::chrono::floor<std::chrono::seconds>(remainder);
+        return {(nowSeconds - durationSeconds + carry).count(), (remainder - carry).count()};
+    }
+
+    THROW_HR_IF(E_INVALIDARG, value.ends_with('T'));
+    return ParseRfc3339(ExpandToRfc3339(value));
 }
 
 std::optional<std::chrono::nanoseconds> wsl::windows::common::timestamp::TryParseDuration(const std::string& duration)
@@ -311,10 +372,74 @@ std::string wsl::windows::common::timestamp::Rfc3339ToUtcDisplayTime(std::string
     return std::format("{:%F %T}{} +0000 UTC", parsed, fraction);
 }
 
-std::wstring wsl::windows::common::timestamp::FormatElapsedSeconds(LONGLONG elapsedSeconds)
+std::string wsl::windows::common::timestamp::EpochToRfc3339Nano(std::int64_t epochNanoseconds, std::chrono::seconds offset)
+{
+    // The offset is applied to whole seconds, since adding it at nanosecond precision can overflow near the int64 limits.
+    const auto seconds = std::chrono::floor<std::chrono::seconds>(std::chrono::nanoseconds{epochNanoseconds});
+    const auto fraction = (epochNanoseconds % 1'000'000'000 + 1'000'000'000) % 1'000'000'000;
+
+    auto output = std::format("{:%FT%T}.{:09}", std::chrono::sys_seconds{seconds} + offset, fraction);
+    if (offset == std::chrono::seconds::zero())
+    {
+        output.push_back('Z');
+    }
+    else
+    {
+        output.append(FormatUtcOffset(std::chrono::duration_cast<std::chrono::minutes>(offset)));
+    }
+
+    return output;
+}
+
+std::string wsl::windows::common::timestamp::EpochToLocalRfc3339Nano(std::int64_t epochNanoseconds)
+{
+    const std::chrono::time_zone* zone;
+    try
+    {
+        zone = std::chrono::current_zone();
+    }
+    catch (const std::runtime_error&)
+    {
+        // The time zone database is unavailable, so report UTC rather than failing the caller.
+        LOG_CAUGHT_EXCEPTION();
+        return EpochToRfc3339Nano(epochNanoseconds, std::chrono::seconds::zero());
+    }
+
+    // Resolved at the event's own time, so replayed history keeps the offset it had across a DST change.
+    const std::chrono::sys_time<std::chrono::nanoseconds> time{std::chrono::nanoseconds{epochNanoseconds}};
+    return EpochToRfc3339Nano(epochNanoseconds, zone->get_info(time).offset);
+}
+
+namespace {
+
+enum class ElapsedUnit
+{
+    LessThanASecond,
+    OneSecond,
+    Seconds,
+    AboutAMinute,
+    Minutes,
+    AboutAnHour,
+    Hours,
+    Days,
+    Weeks,
+    Months,
+    Years,
+};
+
+struct ElapsedDuration
+{
+    ElapsedUnit Unit;
+    LONGLONG Count;
+};
+
+} // namespace
+
+// Buckets an elapsed duration using the thresholds docker applies in go-units HumanDuration. The
+// localized and invariant renderings share this so the two can only differ in wording.
+static ElapsedDuration ClassifyElapsedSeconds(LONGLONG elapsedSeconds)
 {
     using namespace std::chrono_literals;
-    using wsl::shared::Localization;
 
     constexpr LONGLONG SecondsPerMinute = std::chrono::duration_cast<std::chrono::seconds>(1min).count();
     constexpr LONGLONG SecondsPerHour = std::chrono::duration_cast<std::chrono::seconds>(1h).count();
@@ -325,51 +450,117 @@ std::wstring wsl::windows::common::timestamp::FormatElapsedSeconds(LONGLONG elap
 
     if (elapsed < 1)
     {
-        return Localization::WSLCCLI_RelativeTimeLessThanASecond();
+        return {ElapsedUnit::LessThanASecond, 0};
     }
     else if (elapsed == 1)
     {
-        return Localization::WSLCCLI_RelativeTimeOneSecond();
+        return {ElapsedUnit::OneSecond, 1};
     }
     else if (elapsed < SecondsPerMinute)
     {
-        return Localization::WSLCCLI_RelativeTimeSeconds(elapsed);
+        return {ElapsedUnit::Seconds, elapsed};
     }
 
     const auto minutes = elapsed / SecondsPerMinute;
     if (minutes == 1)
     {
-        return Localization::WSLCCLI_RelativeTimeAboutAMinute();
+        return {ElapsedUnit::AboutAMinute, 1};
     }
     else if (minutes < MinutesPerHour)
     {
-        return Localization::WSLCCLI_RelativeTimeMinutes(minutes);
+        return {ElapsedUnit::Minutes, minutes};
     }
 
     // Rounded to the nearest hour rather than truncated.
     const auto hours = (elapsed + (SecondsPerHour / 2)) / SecondsPerHour;
     if (hours == 1)
     {
-        return Localization::WSLCCLI_RelativeTimeAboutAnHour();
+        return {ElapsedUnit::AboutAnHour, 1};
     }
     else if (hours < HoursPerDay * 2)
     {
-        return Localization::WSLCCLI_RelativeTimeHours(hours);
+        return {ElapsedUnit::Hours, hours};
     }
     else if (hours < HoursPerDay * 7 * 2)
     {
-        return Localization::WSLCCLI_RelativeTimeDays(hours / HoursPerDay);
+        return {ElapsedUnit::Days, hours / HoursPerDay};
     }
     else if (hours < HoursPerDay * 30 * 2)
     {
-        return Localization::WSLCCLI_RelativeTimeWeeks(hours / HoursPerDay / 7);
+        return {ElapsedUnit::Weeks, hours / HoursPerDay / 7};
     }
     else if (hours < HoursPerDay * 365 * 2)
     {
-        return Localization::WSLCCLI_RelativeTimeMonths(hours / HoursPerDay / 30);
+        return {ElapsedUnit::Months, hours / HoursPerDay / 30};
     }
 
-    return Localization::WSLCCLI_RelativeTimeYears(elapsed / SecondsPerHour / HoursPerDay / 365);
+    return {ElapsedUnit::Years, elapsed / SecondsPerHour / HoursPerDay / 365};
+}
+
+std::wstring wsl::windows::common::timestamp::FormatElapsedSeconds(LONGLONG elapsedSeconds)
+{
+    using wsl::shared::Localization;
+
+    const auto [unit, count] = ClassifyElapsedSeconds(elapsedSeconds);
+    switch (unit)
+    {
+    case ElapsedUnit::LessThanASecond:
+        return Localization::WSLCCLI_RelativeTimeLessThanASecond();
+    case ElapsedUnit::OneSecond:
+        return Localization::WSLCCLI_RelativeTimeOneSecond();
+    case ElapsedUnit::Seconds:
+        return Localization::WSLCCLI_RelativeTimeSeconds(count);
+    case ElapsedUnit::AboutAMinute:
+        return Localization::WSLCCLI_RelativeTimeAboutAMinute();
+    case ElapsedUnit::Minutes:
+        return Localization::WSLCCLI_RelativeTimeMinutes(count);
+    case ElapsedUnit::AboutAnHour:
+        return Localization::WSLCCLI_RelativeTimeAboutAnHour();
+    case ElapsedUnit::Hours:
+        return Localization::WSLCCLI_RelativeTimeHours(count);
+    case ElapsedUnit::Days:
+        return Localization::WSLCCLI_RelativeTimeDays(count);
+    case ElapsedUnit::Weeks:
+        return Localization::WSLCCLI_RelativeTimeWeeks(count);
+    case ElapsedUnit::Months:
+        return Localization::WSLCCLI_RelativeTimeMonths(count);
+    case ElapsedUnit::Years:
+        return Localization::WSLCCLI_RelativeTimeYears(count);
+    default:
+        THROW_HR(E_UNEXPECTED);
+    }
+}
+
+std::wstring wsl::windows::common::timestamp::FormatInvariantElapsedSeconds(LONGLONG elapsedSeconds)
+{
+    const auto [unit, count] = ClassifyElapsedSeconds(elapsedSeconds);
+    switch (unit)
+    {
+    case ElapsedUnit::LessThanASecond:
+        return L"Less than a second ago";
+    case ElapsedUnit::OneSecond:
+        return L"1 second ago";
+    case ElapsedUnit::Seconds:
+        return std::format(L"{} seconds ago", count);
+    case ElapsedUnit::AboutAMinute:
+        return L"About a minute ago";
+    case ElapsedUnit::Minutes:
+        return std::format(L"{} minutes ago", count);
+    case ElapsedUnit::AboutAnHour:
+        return L"About an hour ago";
+    case ElapsedUnit::Hours:
+        return std::format(L"{} hours ago", count);
+    case ElapsedUnit::Days:
+        return std::format(L"{} days ago", count);
+    case ElapsedUnit::Weeks:
+        return std::format(L"{} weeks ago", count);
+    case ElapsedUnit::Months:
+        return std::format(L"{} months ago", count);
+    case ElapsedUnit::Years:
+        return std::format(L"{} years ago", count);
+    default:
+        THROW_HR(E_UNEXPECTED);
+    }
 }
 
 std::wstring wsl::windows::common::timestamp::FormatRelativeTime(LONGLONG timestamp)
@@ -380,4 +571,14 @@ std::wstring wsl::windows::common::timestamp::FormatRelativeTime(LONGLONG timest
     }
 
     return FormatElapsedSeconds(static_cast<LONGLONG>(std::time(nullptr)) - timestamp);
+}
+
+std::wstring wsl::windows::common::timestamp::FormatInvariantRelativeTime(LONGLONG timestamp)
+{
+    if (timestamp == 0)
+    {
+        return {};
+    }
+
+    return FormatInvariantElapsedSeconds(static_cast<LONGLONG>(std::time(nullptr)) - timestamp);
 }

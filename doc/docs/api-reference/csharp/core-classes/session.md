@@ -13,6 +13,7 @@ public sealed class Session : IDisposable
     public void Start();
     public void Terminate();
     public Container CreateContainer(ContainerSettings containerSettings);
+    public Container OpenContainer(string nameOrId, ProcessOutputMode initProcessOutputMode);
     public void PullImage(PullImageOptions options);
     public IAsyncActionWithProgress<ImageProgress> PullImageAsync(PullImageOptions options);
     public void ImportImage(string path, string imageName);
@@ -25,8 +26,11 @@ public sealed class Session : IDisposable
     public void TagImage(TagImageOptions options);
     public void CreateVhdVolume(VhdOptions options);
     public void DeleteVhdVolume(string name);
-    public string Authenticate(Uri serverAddress, string username, string password);
+    public AuthenticateResult Authenticate(Uri serverAddress, string username, string password);
     public IReadOnlyList<ImageInfo> GetImages();
+    public IReadOnlyList<NetworkInfo> GetNetworks();
+    public NetworkInfo CreateNetwork(NetworkSettings settings);
+    public void DeleteNetwork(string name);
     public void Dispose();
 }
 ```
@@ -59,6 +63,31 @@ Creates a container object owned by the session.
 
 ```csharp
 Container container = session.CreateContainer(containerSettings);
+```
+
+## Session.OpenContainer(string, ProcessOutputMode)
+
+Opens an existing container by name, full ID, or unambiguous partial ID prefix. The output mode
+controls how the opened container's init-process I/O is exposed when it is started.
+
+```csharp
+using Container container = session.OpenContainer(
+    "demo-container",
+    ProcessOutputMode.Event);
+```
+
+The method throws a projected exception whose `HResult` is `Error.ContainerNotFound` if no
+container matches or `Error.ContainerPrefixAmbiguous` if a partial ID is ambiguous.
+
+```csharp
+try
+{
+    using Container container = session.OpenContainer("demo", ProcessOutputMode.Event);
+}
+catch (Exception exception) when (exception.HResult == (int)Error.ContainerNotFound)
+{
+    Console.WriteLine("Container not found.");
+}
 ```
 
 ## Session.PullImage(PullImageOptions)
@@ -175,13 +204,19 @@ session.DeleteVhdVolume("cache");
 
 ## Session.Authenticate(Uri, string, string)
 
-Authenticates to a registry and returns an identity token string.
+Authenticates to a registry and returns registry authentication data suitable for
+`PullImageOptions.RegistryAuth` or `PushImageOptions.RegistryAuth`.
 
 ```csharp
-string token = session.Authenticate(
+AuthenticateResult authentication = session.Authenticate(
     new Uri("https://registry.example.com"),
     "user1",
     "password");
+
+session.PullImage(new PullImageOptions("registry.example.com/demo:latest")
+{
+    RegistryAuth = authentication.IdentityToken
+});
 ```
 
 ## Session.GetImages()
@@ -193,6 +228,33 @@ foreach (var image in session.GetImages())
 {
     Console.WriteLine(image.Name);
 }
+```
+
+## Session.GetNetworks()
+
+Returns a snapshot of networks in the session.
+
+```csharp
+foreach (var network in session.GetNetworks())
+{
+    Console.WriteLine($"{network.Name} ({network.Driver})");
+}
+```
+
+## Session.CreateNetwork(NetworkSettings settings)
+
+Creates a bridge network in the session and returns it. Throws `HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS)` if a network with the same name exists.
+
+```csharp
+var network = session.CreateNetwork(new NetworkSettings("backend"));
+```
+
+## Session.DeleteNetwork(string name)
+
+Deletes a network from the session. Throws `WSLC_E_NETWORK_NOT_FOUND` if the network does not exist.
+
+```csharp
+session.DeleteNetwork("backend");
 ```
 
 ## Session.Terminated event

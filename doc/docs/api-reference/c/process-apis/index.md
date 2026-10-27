@@ -7,6 +7,7 @@
 - [WslcSetProcessSettingsWorkingDirectory](wslcsetprocesssettingsworkingdirectory.md)
 - [WslcSetProcessSettingsCmdLine](wslcsetprocesssettingscmdline.md)
 - [WslcSetProcessSettingsEnvVariables](wslcsetprocesssettingsenvvariables.md)
+- [WslcSetProcessSettingsFlags](wslcsetprocesssettingsflags.md)
 - [WslcSetProcessSettingsCallbacks](wslcsetprocesssettingscallbacks.md)
 - [WslcGetProcessPid](wslcgetprocesspid.md)
 - [WslcGetProcessExitEvent](wslcgetprocessexitevent.md)

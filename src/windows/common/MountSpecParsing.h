@@ -22,6 +22,7 @@ Abstract:
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace wsl::windows::common::mount {
 
@@ -43,6 +44,11 @@ struct Spec
     std::optional<int64_t> TmpfsSizeBytes;
     std::optional<uint32_t> TmpfsMode;
     std::optional<std::string> TmpfsOptions;
+    std::vector<std::wstring> Modes;
+
+    // Anonymous volume declared in the container config instead of as a structured mount.
+    // The target may be relative; it is resolved against the container root.
+    bool ConfigVolume = false;
 };
 
 enum class ValidationError

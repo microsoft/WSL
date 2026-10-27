@@ -28,6 +28,8 @@ Abstract:
 #include <sys/socket.h>
 #include <sys/utsname.h>
 #include <sys/signalfd.h>
+#include <sys/sendfile.h>
+#include <sys/statvfs.h>
 #include <arpa/inet.h>
 
 #include <pty.h>
@@ -78,6 +80,14 @@ try
     dxg.path = "/dev/dxg";
     dxg.permissions = "rwm";
 
+    wsl::shared::cdi::DeviceNode drmCard{};
+    drmCard.path = "/dev/dri/card0";
+    drmCard.permissions = "rwm";
+
+    wsl::shared::cdi::DeviceNode drmRender{};
+    drmRender.path = "/dev/dri/renderD128";
+    drmRender.permissions = "rwm";
+
     wsl::shared::cdi::Mount libs{};
     libs.hostPath = LXSS_LIB_PATH;
     libs.containerPath = LXSS_LIB_PATH;
@@ -88,17 +98,27 @@ try
     drivers.containerPath = LXSS_GPU_DRIVERS_PATH;
     drivers.options = {"ro", "rbind"};
 
+    // Mount setup needs createContainer privileges. Image-provided ldconfig must instead run from
+    // startContainer, after the container's restrictions are installed.
     wsl::shared::cdi::Hook hook{};
     hook.hookName = "createContainer";
     hook.path = "/" LX_INIT_WSLC_GPU_HOOK;
     hook.args = {LX_INIT_WSLC_GPU_HOOK};
 
+    wsl::shared::cdi::Hook startHook{};
+    startHook.hookName = "startContainer";
+    startHook.path = LX_INIT_WSLC_GPU_START_HOOK_PATH;
+    startHook.args = {LX_INIT_WSLC_GPU_START_HOOK};
+
     wsl::shared::cdi::Device gpu{};
     gpu.name = "gpu";
     gpu.containerEdits.deviceNodes.push_back(std::move(dxg));
+    gpu.containerEdits.deviceNodes.push_back(std::move(drmCard));
+    gpu.containerEdits.deviceNodes.push_back(std::move(drmRender));
     gpu.containerEdits.mounts.push_back(std::move(libs));
     gpu.containerEdits.mounts.push_back(std::move(drivers));
     gpu.containerEdits.hooks.push_back(std::move(hook));
+    gpu.containerEdits.hooks.push_back(std::move(startHook));
 
     wsl::shared::cdi::Spec spec{};
     spec.cdiVersion = "0.6.0";
@@ -126,6 +146,128 @@ try
 }
 CATCH_LOG()
 
+// Container policy may suppress setuid; skip cache generation rather than bypassing that policy.
+// Resolve the image's ldconfig only after entering the container's root.
+bool ShouldImageLdconfigRebuildCache(uid_t ContainerUid, bool ReadOnlyRoot)
+{
+    return ContainerUid == 0 && !ReadOnlyRoot && std::filesystem::is_regular_file(LDCONFIG_COMMAND) && access(LDCONFIG_COMMAND, X_OK) == 0;
+}
+
+bool IsRootReadOnly()
+{
+    struct statvfs rootInfo{};
+    THROW_LAST_ERROR_IF(statvfs("/", &rootInfo) < 0);
+    return (rootInfo.f_flag & ST_RDONLY) != 0;
+}
+
+bool HasGpuLibraryDirectory(std::string_view Paths)
+{
+    // musl separates entries with ':' or '\n'. Compare whole entries, not similarly named directories.
+    while (!Paths.empty())
+    {
+        const auto separator = Paths.find_first_of(":\n");
+        const auto directory = Paths.substr(0, separator);
+        if (directory == LXSS_LIB_PATH)
+        {
+            return true;
+        }
+        if (separator == std::string_view::npos)
+        {
+            return false;
+        }
+
+        Paths.remove_prefix(separator + 1);
+    }
+
+    return false;
+}
+
+// musl ignores the glibc cache; its loader reads library directories from an architecture-specific .path file.
+void ConfigureMuslLibraryPath()
+{
+    constexpr auto c_defaultMuslLibraryPaths = "/lib\n/usr/local/lib\n/usr/lib\n";
+    constexpr auto c_architecture = wsl::shared::Arm64 ? "aarch64" : "x86_64";
+
+    const auto muslLoader = std::format("/lib/ld-musl-{}.so.1", c_architecture);
+    if (!std::filesystem::exists(muslLoader))
+    {
+        return;
+    }
+
+    const auto pathFile = std::format("/etc/ld-musl-{}.path", c_architecture);
+    const bool pathFileExists = std::filesystem::exists(pathFile);
+    wil::unique_fd file{open(pathFile.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)};
+    THROW_LAST_ERROR_IF(!file);
+
+    std::string pathsToAppend;
+    if (pathFileExists)
+    {
+        const auto existingPaths = UtilReadFileContent(pathFile);
+
+        // Docker can recreate the runtime task on restart; don't append the same directory each time.
+        if (HasGpuLibraryDirectory(existingPaths))
+        {
+            return;
+        }
+
+        // O_APPEND doesn't insert a separator; without one, the GPU directory would join the last existing path.
+        if (!existingPaths.empty() && existingPaths.back() != '\n' && existingPaths.back() != ':')
+        {
+            pathsToAppend = "\n";
+        }
+    }
+    else
+    {
+        // Without a .path file, musl searches its built-in defaults. With one, it uses the file's contents instead.
+        // Include the defaults so creating the file for GPU discovery doesn't hide normal system libraries.
+        pathsToAppend = c_defaultMuslLibraryPaths;
+    }
+
+    pathsToAppend += LXSS_LIB_PATH "\n";
+    THROW_LAST_ERROR_IF(UtilWriteStringView(file.get(), pathsToAppend) < 0);
+}
+
+[[noreturn]] void ExecImageLdconfig()
+{
+    // Shell-based ldconfig wrappers otherwise drop the setuid helper's effective root identity.
+    THROW_LAST_ERROR_IF(setresuid(0, 0, 0) < 0);
+
+    // Alpine's ldconfig exits with 1 when no folders are given.
+    const char* const arguments[] = {LDCONFIG_COMMAND, LXSS_LIB_PATH, nullptr};
+    execv(LDCONFIG_COMMAND, const_cast<char* const*>(arguments));
+    THROW_LAST_ERROR();
+}
+
+// Start hooks cannot unmount a bind-mounted helper. A copy in tmpfs can unlink itself before running image code,
+// without leaving a reusable setuid executable in the container's filesystem.
+void CopyInitForStartHook(int Init, gid_t ContainerGid)
+{
+    // Root ownership permits cleanup even without CAP_DAC_OVERRIDE. Group write/search lets the container user
+    // remove the helper when no_new_privs prevents elevation.
+    constexpr mode_t c_directoryMode = S_IRWXU | S_IWGRP | S_IXGRP;
+    constexpr mode_t c_executableMode = S_IRUSR | S_IXUSR;
+    THROW_LAST_ERROR_IF(mkdir(LX_INIT_WSLC_GPU_START_HOOK_DIRECTORY, c_directoryMode) < 0 && errno != EEXIST);
+
+    const auto options = std::format("mode={:#o},uid=0,gid={}", c_directoryMode, ContainerGid);
+    THROW_LAST_ERROR_IF(mount("tmpfs", LX_INIT_WSLC_GPU_START_HOOK_DIRECTORY, "tmpfs", MS_NODEV, options.c_str()) < 0);
+
+    wil::unique_fd copy{open(LX_INIT_WSLC_GPU_START_HOOK_PATH, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, c_executableMode)};
+    THROW_LAST_ERROR_IF(!copy);
+
+    ssize_t bytesCopied{};
+    do
+    {
+        bytesCopied = sendfile(copy.get(), Init, nullptr, 1024 * 1024);
+        THROW_LAST_ERROR_IF(bytesCopied < 0);
+    } while (bytesCopied > 0);
+
+    // Elevate only this VM-supplied copy so non-root workloads can rebuild the image's cache.
+    // Apply the mode after chown, which can clear the setuid bit.
+    THROW_LAST_ERROR_IF(fchown(copy.get(), 0, 0) < 0);
+    THROW_LAST_ERROR_IF(fchmod(copy.get(), S_ISUID | c_executableMode | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) < 0);
+}
+
+// createContainer hook. Runs as root before the container's restrictions apply, so it must not run image code.
 int WslcGpuHookEntry()
 try
 {
@@ -146,14 +288,22 @@ try
     rootfsPath = std::filesystem::canonical(rootfsPath);
     THROW_ERRNO_IF(EINVAL, rootfsPath == "/");
 
-    THROW_LAST_ERROR_IF(chroot(rootfsPath.c_str()) < 0);
+    // runc applies the container's user after this hook, so read it from the spec.
+    const gid_t containerGid = spec.at("process").at("user").at("gid").get<gid_t>();
+
+    // Capture the trusted VM binary before chroot makes /init refer to image-controlled content.
+    wil::unique_fd vmInit{open(LX_INIT_PATH, O_RDONLY | O_CLOEXEC)};
+    THROW_LAST_ERROR_IF(!vmInit);
+
+    // chroot alone would leave the working directory outside the new root.
+    THROW_LAST_ERROR_IF(chdir(rootfsPath.c_str()) < 0);
+    THROW_LAST_ERROR_IF(chroot(".") < 0);
+
+    CopyInitForStartHook(vmInit.get(), containerGid);
 
     THROW_LAST_ERROR_IF(UtilMkdirPath("/etc/ld.so.conf.d", 0755) < 0);
     THROW_LAST_ERROR_IF(WriteToFile("/etc/ld.so.conf.d/ld.wsl.conf", LXSS_LIB_PATH "\n", O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC) < 0);
-
-    // Run the container's own ldconfig so it updates /etc/ld.so.cache.
-    const char* const ldArgv[] = {LDCONFIG_COMMAND, nullptr};
-    THROW_LAST_ERROR_IF(UtilCreateProcessAndWait(ldArgv[0], ldArgv) < 0);
+    ConfigureMuslLibraryPath();
 
     constexpr auto c_binPath = "/usr/bin";
     if (std::filesystem::is_directory(LXSS_LIB_PATH))
@@ -172,6 +322,22 @@ try
                 LOG_ERROR("UtilMountFile({}, {}) failed {}", entry.path().c_str(), target, errno);
             }
         }
+    }
+
+    return 0;
+}
+CATCH_RETURN_ERRNO()
+
+// startContainer hook. Setuid elevates to container root unless prohibited by the container's restrictions.
+int WslcGpuStartHookEntry()
+try
+{
+    // Image code must not inherit access to a reusable root helper, so failed cleanup must prevent ldconfig execution.
+    THROW_LAST_ERROR_IF(unlink(LX_INIT_WSLC_GPU_START_HOOK_PATH) < 0);
+
+    if (ShouldImageLdconfigRebuildCache(geteuid(), IsRootReadOnly()))
+    {
+        ExecImageLdconfig();
     }
 
     return 0;

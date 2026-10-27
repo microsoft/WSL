@@ -275,6 +275,8 @@ struct EndpointRoute
     }
 };
 
+SOCKADDR_INET GetFallbackIpv4Gateway(const EndpointIpAddress& address);
+
 struct NetworkSettings
 {
     NetworkSettings() = default;

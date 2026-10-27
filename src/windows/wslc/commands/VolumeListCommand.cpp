@@ -14,6 +14,7 @@ Abstract:
 
 #include "VolumeCommand.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "SessionTasks.h"
 #include "VolumeTasks.h"
 #include "Task.h"
@@ -27,9 +28,9 @@ namespace wsl::windows::wslc {
 std::vector<Argument> VolumeListCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::Filter, false, Limit::Unlimited),
+        Argument::Create(ArgType::Filter, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::Format),
-        Argument::Create(ArgType::Quiet, false, std::nullopt, Localization::WSLCCLI_VolumeListQuietArgDesc()),
+        Argument::Create(ArgType::Quiet, {.Desc = Localization::WSLCCLI_VolumeListQuietArgDesc()}),
     };
 }
 
@@ -45,8 +46,9 @@ std::wstring VolumeListCommand::LongDescription() const
 
 void VolumeListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << ResolveSession //
-            << GetVolumes     //
-            << ListVolumes;
+    context << ResolveSession     //
+            << GetVolumes         //
+            << FormatVolumeOutput //
+            << PrintFormattedOutput;
 }
 } // namespace wsl::windows::wslc

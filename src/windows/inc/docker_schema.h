@@ -55,6 +55,25 @@ struct ErrorResponse
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ErrorResponse, message);
 };
 
+// Payload of the X-Docker-Container-Path-Stat response header on /containers/{id}/archive.
+struct ContainerPathStat
+{
+    std::string name;
+    int64_t size{};
+    uint32_t mode{};
+    std::string mtime;
+    std::string linkTarget;
+
+    static constexpr uint32_t c_modeSymlink = 1u << 27;
+
+    bool IsSymlink() const
+    {
+        return (mode & c_modeSymlink) != 0;
+    }
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerPathStat, name, size, mode, mtime, linkTarget);
+};
+
 struct ImageLoadResult
 {
     std::optional<std::string> stream;
@@ -193,11 +212,12 @@ struct CreateNetwork
     std::string Name;
     std::string Driver;
     bool Internal{};
+    bool EnableIPv6{};
     std::optional<IPAM> IPAM;
     std::optional<std::map<std::string, std::string>> Options;
     std::map<std::string, std::string> Labels;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateNetwork, Name, Driver, Internal, IPAM, Options, Labels);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateNetwork, Name, Driver, Internal, EnableIPv6, IPAM, Options, Labels);
 };
 
 struct Network
@@ -247,6 +267,7 @@ inline void from_json(const nlohmann::json& j, Network& network)
 struct EndpointIPAMConfig
 {
     std::string IPv4Address;
+    std::string IPv6Address;
     std::optional<std::vector<std::string>> LinkLocalIPs;
 };
 
@@ -256,6 +277,10 @@ inline void to_json(nlohmann::json& j, const EndpointIPAMConfig& v)
     if (!v.IPv4Address.empty())
     {
         j["IPv4Address"] = v.IPv4Address;
+    }
+    if (!v.IPv6Address.empty())
+    {
+        j["IPv6Address"] = v.IPv6Address;
     }
     if (v.LinkLocalIPs.has_value() && !v.LinkLocalIPs->empty())
     {
@@ -391,17 +416,20 @@ struct HostConfig
     std::int64_t Memory{};
     std::int64_t NanoCpus{};
     std::optional<std::vector<Ulimit>> Ulimits;
+    std::optional<std::vector<std::string>> CapAdd;
+    std::optional<std::vector<std::string>> CapDrop;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
-        HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, DeviceRequests, ShmSize, Memory, NanoCpus, Ulimits);
+        HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, DeviceRequests, ShmSize, Memory, NanoCpus, Ulimits, CapAdd, CapDrop);
 };
 
 struct InspectEndpointIPAMConfig
 {
     std::string IPv4Address;
+    std::string IPv6Address;
     std::optional<std::vector<std::string>> LinkLocalIPs;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointIPAMConfig, IPv4Address, LinkLocalIPs);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointIPAMConfig, IPv4Address, IPv6Address, LinkLocalIPs);
 };
 
 struct EndpointSettings
@@ -464,13 +492,33 @@ struct CreateContainer
     std::optional<std::vector<std::string>> Entrypoint;
     std::vector<std::string> Env;
     std::map<std::string, EmptyObject> ExposedPorts;
+    std::map<std::string, EmptyObject> Volumes;
     std::map<std::string, std::string> Labels;
     std::optional<HealthConfig> Healthcheck;
     HostConfig HostConfig;
     NetworkingConfig NetworkingConfig;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(
-        CreateContainer, Image, Cmd, Tty, OpenStdin, StdinOnce, Entrypoint, Env, ExposedPorts, HostConfig, StopSignal, StopTimeout, WorkingDir, User, Hostname, Domainname, Labels, Healthcheck, NetworkingConfig);
+        CreateContainer,
+        Image,
+        Cmd,
+        Tty,
+        OpenStdin,
+        StdinOnce,
+        Entrypoint,
+        Env,
+        ExposedPorts,
+        Volumes,
+        HostConfig,
+        StopSignal,
+        StopTimeout,
+        WorkingDir,
+        User,
+        Hostname,
+        Domainname,
+        Labels,
+        Healthcheck,
+        NetworkingConfig);
 };
 
 struct HealthcheckResult
@@ -543,8 +591,11 @@ struct InspectContainer
     HostConfig HostConfig;
     std::vector<InspectMount> Mounts;
     NetworkSettings NetworkSettings;
+    std::optional<int64_t> SizeRw;
+    std::optional<int64_t> SizeRootFs;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, Config, HostConfig, Mounts, NetworkSettings);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
+        InspectContainer, Id, Name, Created, Image, State, Config, HostConfig, Mounts, NetworkSettings, SizeRw, SizeRootFs);
 };
 
 struct InspectExec
@@ -775,15 +826,20 @@ struct ContainerInfo
     std::vector<std::string> Names;
     std::string Image;
     std::string ImageID;
+    std::string Command;
+    std::string Status;
     std::map<std::string, std::string> Labels;
     std::vector<Port> Ports;
     std::vector<Mount> Mounts;
     ContainerState State{ContainerState::Unknown};
     int64_t Created{};
+    int64_t SizeRw{};
+    int64_t SizeRootFs{};
     HostConfig HostConfig;
     NetworkSettings NetworkSettings;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, ImageID, Labels, Ports, Mounts, State, Created, HostConfig, NetworkSettings);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
+        ContainerInfo, Id, Names, Image, ImageID, Command, Status, Labels, Ports, Mounts, State, Created, SizeRw, SizeRootFs, HostConfig, NetworkSettings);
 };
 
 struct BuildKitVertex

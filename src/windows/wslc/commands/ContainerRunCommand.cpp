@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #include "ContainerCommand.h"
+#include "ArgumentConvertedTypes.h"
 #include "CLIExecutionContext.h"
 #include "ContainerTasks.h"
 #include "SessionTasks.h"
@@ -28,20 +29,22 @@ std::vector<Argument> ContainerRunCommand::GetArguments() const
 {
     // clang-format off
     return {
-        Argument::Create(ArgType::ImageId, true),
+        Argument::Create(ArgType::ImageId, {.Required = true}),
         Argument::Create(ArgType::Command),
         Argument::Create(ArgType::ForwardArgs),
+        Argument::Create(ArgType::CapAdd, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::CapDrop, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::CIDFile),
         Argument::Create(ArgType::Cpus),
         Argument::Create(ArgType::Detach),
-        Argument::Create(ArgType::DNS, false, Limit::Unlimited),
+        Argument::Create(ArgType::DNS, {.Limit = Limit::Unlimited}),
         // Argument::Create(ArgType::DNSDomain),
-        Argument::Create(ArgType::DNSOption, false, Limit::Unlimited),
-        Argument::Create(ArgType::DNSSearch, false, Limit::Unlimited),
+        Argument::Create(ArgType::DNSOption, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::DNSSearch, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::Domainname),
         Argument::Create(ArgType::Entrypoint),
-        Argument::Create(ArgType::Env, false, Limit::Unlimited),
-        Argument::Create(ArgType::EnvFile, false, Limit::Unlimited),
+        Argument::Create(ArgType::Env, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::EnvFile, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::Gpus),
         Argument::Create(ArgType::HealthCmd),
         Argument::Create(ArgType::HealthInterval),
@@ -50,29 +53,30 @@ std::vector<Argument> ContainerRunCommand::GetArguments() const
         Argument::Create(ArgType::HealthTimeout),
         Argument::Create(ArgType::Hostname),
         Argument::Create(ArgType::Interactive),
-        Argument::Create(ArgType::IpAddress, false),
-        Argument::Create(ArgType::Label, false, Limit::Unlimited),
+        Argument::Create(ArgType::IpAddress),
+        Argument::Create(ArgType::Label, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::Memory),
-        Argument::Create(ArgType::Mount, false, Limit::Unlimited),
+        Argument::Create(ArgType::Mount, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::Name),
-        Argument::Create(ArgType::Network, false, Limit::Unlimited),
-        Argument::Create(ArgType::NetworkAlias, false, Limit::Unlimited),
+        Argument::Create(ArgType::Network, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::NetworkAlias, {.Limit = Limit::Unlimited}),
         // Argument::Create(ArgType::NoDNS),
         // Argument::Create(ArgType::Progress),
         Argument::Create(ArgType::NoHealthcheck),
-        Argument::Create(ArgType::Publish, false, Limit::Unlimited),
+        Argument::Create(ArgType::Publish, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::PublishAll),
         Argument::Create(ArgType::Pull),
         Argument::Create(ArgType::Remove),
+        Argument::Create(ArgType::Restart),
         // Argument::Create(ArgType::Scheme),
         Argument::Create(ArgType::ShmSize),
         Argument::Create(ArgType::StopSignal),
         Argument::Create(ArgType::StopTimeout),
-        Argument::Create(ArgType::TMPFS, false, Limit::Unlimited),
+        Argument::Create(ArgType::TMPFS, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::TTY),
-        Argument::Create(ArgType::Ulimit, false, Limit::Unlimited),
+        Argument::Create(ArgType::Ulimit, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::User),
-        Argument::Create(ArgType::Volume, false, Limit::Unlimited),
+        Argument::Create(ArgType::Volume, {.Limit = Limit::Unlimited}),
         // Argument::Create(ArgType::Virtual),
         Argument::Create(ArgType::WorkDir),
     };
@@ -89,10 +93,19 @@ std::wstring ContainerRunCommand::LongDescription() const
     return Localization::WSLCCLI_ContainerRunLongDesc();
 }
 
+void ContainerRunCommand::ValidateArgumentsInternal(ArgMap& execArgs) const
+{
+    if (execArgs.GetValue<ArgType::Remove>() && execArgs.Contains(ArgType::Restart) && execArgs.GetValue<ArgType::Restart>() != WSLCContainerRestartPolicyNo)
+    {
+        throw ArgumentException(
+            Localization::WSLCCLI_ConflictingOptionsError(L"--restart", L"--rm"), GetArgumentsForHelp({ArgType::Restart, ArgType::Remove}));
+    }
+}
+
 // clang-format off
 void ContainerRunCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context 
+    context
         << ResolveSession
         << SetContainerOptionsFromArgs
         << RunContainer;

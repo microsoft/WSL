@@ -13,7 +13,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
-#include "windows/Common.h"
+#include "Common.h"
 #include "WSLCCLITestHelpers.h"
 
 #include "Argument.h"
@@ -67,6 +67,40 @@ class WSLCCLIArgumentUnitTests
         const ArgumentException withArgument{L"error", argument};
         VERIFY_ARE_EQUAL(1u, withArgument.Arguments().size());
         VERIFY_ARE_EQUAL(ArgType::Verbose, withArgument.Arguments().front().Type());
+    }
+
+    TEST_METHOD(ArgumentCreate_DefaultsAndOverrides)
+    {
+        const auto defaults = Argument::Create(ArgType::Quiet);
+        VERIFY_ARE_EQUAL(std::wstring{L"quiet"}, defaults.Name());
+        VERIFY_ARE_EQUAL(std::wstring{L"q"}, defaults.Alias());
+
+        const auto noAlias = Argument::Create(ArgType::Quiet, {.Alias = NO_ALIAS});
+        VERIFY_IS_TRUE(noAlias.Alias().empty());
+        VERIFY_ARE_EQUAL(defaults.Description(), noAlias.Description());
+
+        const auto overrides = Argument::Create(
+            ArgType::Filter, {.Name = L"where", .Alias = L"x", .Required = true, .Limit = Limit::Unlimited, .Desc = L"Custom description"});
+        VERIFY_ARE_EQUAL(std::wstring{L"where"}, overrides.Name());
+        VERIFY_ARE_EQUAL(std::wstring{L"x"}, overrides.Alias());
+        VERIFY_IS_TRUE(overrides.Required());
+        VERIFY_ARE_EQUAL(Limit::Unlimited, overrides.Limit());
+        VERIFY_ARE_EQUAL(std::wstring{L"Custom description"}, overrides.Description());
+    }
+
+    TEST_METHOD(ArgumentMatchesOption_RequiresNameOrAliasSpecifier)
+    {
+        const auto argument = Argument::Create(ArgType::Quiet);
+
+        VERIFY_IS_TRUE(argument.MatchesOption(L"--quiet"));
+        VERIFY_IS_TRUE(argument.MatchesOption(L"--quiet=true"));
+        VERIFY_IS_TRUE(argument.MatchesOption(L"-q"));
+        VERIFY_IS_TRUE(argument.MatchesOption(L"-q=true"));
+
+        VERIFY_IS_FALSE(argument.MatchesOption(L"quiet"));
+        VERIFY_IS_FALSE(argument.MatchesOption(L"-"));
+        VERIFY_IS_FALSE(argument.MatchesOption(L"--"));
+        VERIFY_IS_FALSE(argument.MatchesOption(L"---quiet"));
     }
 
     // Test: Verify Argument::Create() successfully creates arguments for all ArgType enum values
@@ -175,6 +209,13 @@ class WSLCCLIArgumentUnitTests
         pullPolicy = validation::GetPullPolicyFromString(L"never");
         VERIFY_ARE_EQUAL(pullPolicy, PullPolicy::Never);
         VERIFY_THROWS(validation::GetPullPolicyFromString(L"invalid"), ArgumentException);
+
+        // Verify container restart policy
+        VERIFY_ARE_EQUAL(validation::GetRestartPolicyFromString(L""), WSLCContainerRestartPolicyNo);
+        VERIFY_ARE_EQUAL(validation::GetRestartPolicyFromString(L"no"), WSLCContainerRestartPolicyNo);
+        VERIFY_ARE_EQUAL(validation::GetRestartPolicyFromString(L"always"), WSLCContainerRestartPolicyAlways);
+        VERIFY_ARE_EQUAL(validation::GetRestartPolicyFromString(L"no:0"), WSLCContainerRestartPolicyNo);
+        VERIFY_ARE_EQUAL(validation::GetRestartPolicyFromString(L"always:+0"), WSLCContainerRestartPolicyAlways);
 
         // Verify build progress mode
         VERIFY_ARE_EQUAL(validation::GetProgressModeFromString(L"auto"), ProgressMode::Auto);
@@ -368,6 +409,16 @@ class WSLCCLIArgumentUnitTests
         return values;
     }
 
+    TEST_METHOD(Filter_RejectsMalformedValues)
+    {
+        ArgMap args;
+        args.Add(ArgType::Filter, std::wstring(L"type"));
+        VERIFY_THROWS_SPECIFIC(Argument::Create(ArgType::Filter).Validate(args), ArgumentException, [](const auto& exception) {
+            return exception.Message() == wsl::shared::Localization::WSLCCLI_InvalidFilterError(L"type");
+        });
+        VERIFY_IS_FALSE(args.ContainsValidated(ArgType::Filter));
+    }
+
     // Test: Every ArgType whose validation converts its raw string into a typed value must cache
     // that value on the ArgMap during Argument::Validate, so execution reads it back without
     // re-converting. This drives the real validation + caching path for each converted ArgType.
@@ -384,6 +435,10 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Pull>(L"always"), PullPolicy::Always);
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Pull>(L"never"), PullPolicy::Never);
 
+        // string -> WSLCContainerRestartPolicy
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Restart>(L"no"), WSLCContainerRestartPolicyNo);
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Restart>(L"always"), WSLCContainerRestartPolicyAlways);
+
         // string -> WSLCSignal (Signal and StopSignal share the converter)
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Signal>(L"SIGTERM"), WSLCSignalSIGTERM);
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::StopSignal>(L"SIGKILL"), WSLCSignalSIGKILL);
@@ -393,8 +448,9 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::HealthRetries>(L"3"), 3);
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Last>(L"5"), 5);
 
-        // string -> LONG
+        // string -> LONG (Time and Timeout share the converter)
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Time>(L"5"), 5L);
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Timeout>(L"5"), 5L);
 
         // string -> ULONGLONG (Tail is a raw integer; Since/Until go through the timestamp parser)
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Tail>(L"10"), 10ULL);
@@ -581,6 +637,49 @@ class WSLCCLIArgumentUnitTests
         noHealthcheck.Add(ArgType::NoHealthcheck, true);
         Argument::Create(ArgType::NoHealthcheck).Validate(noHealthcheck);
         VERIFY_IS_FALSE(noHealthcheck.ContainsValidated(ArgType::NoHealthcheck));
+    }
+
+    // Test: Restart policies that parse correctly but are unsupported report an unsupported error, and
+    // malformed policies report an invalid value error.
+    TEST_METHOD(RestartPolicy_UnsupportedAndInvalidValues)
+    {
+        auto verifyMessage = [](const std::wstring& input, const std::wstring& expected) {
+            try
+            {
+                validation::GetRestartPolicyFromString(input, L"restart");
+                VERIFY_FAIL(std::format(L"Expected ArgumentException for '{}'", input).c_str());
+            }
+            catch (const ArgumentException& e)
+            {
+                VERIFY_ARE_EQUAL(expected, e.Message());
+            }
+        };
+
+        for (const auto* input : {L"on-failure", L"on-failure:3", L"on-failure:+3"})
+        {
+            verifyMessage(input, wsl::shared::Localization::WSLCCLI_UnsupportedRestartPolicyError(L"on-failure"));
+        }
+
+        for (const auto* input : {L"unless-stopped", L"unless-stopped:0"})
+        {
+            verifyMessage(input, wsl::shared::Localization::WSLCCLI_UnsupportedRestartPolicyError(L"unless-stopped"));
+        }
+
+        for (const auto* input :
+             {L"bogus",
+              L"Always",
+              L"always:1",
+              L"no:2",
+              L"unless-stopped:1",
+              L"on-failure:",
+              L"on-failure:-1",
+              L"on-failure:abc",
+              L"on-failure:3x",
+              L"on-failure:1:2",
+              L":3"})
+        {
+            verifyMessage(input, wsl::shared::Localization::WSLCCLI_InvalidRestartPolicyError(L"restart", input));
+        }
     }
 
     // Test: When conversion fails during validation, Validate throws and nothing is cached.

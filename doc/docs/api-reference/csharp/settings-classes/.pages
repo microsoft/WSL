@@ -3,8 +3,10 @@ nav:
   - index.md
   - sessionsettings.md
   - vhdoptions.md
+  - installoptions.md
   - pullimageoptions.md
   - pushimageoptions.md
   - tagimageoptions.md
+  - networksettings.md
   - containersettings.md
   - processsettings.md

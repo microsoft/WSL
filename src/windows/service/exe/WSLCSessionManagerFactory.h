@@ -25,5 +25,8 @@ public:
     STDMETHODIMP CreateInstance(_In_ IUnknown* pUnkOuter, _In_ REFIID riid, _Out_ void** ppCreated) override;
 };
 
+// Keeps the manager alive through lookup; rejects calls once plugin lookup rundown begins.
+wil::com_ptr<IWSLCSession> FindWslcSession(ULONG SessionId);
+
 void ClearWslcSessionsAndBlockNewInstances();
 } // namespace wsl::windows::service::wslc

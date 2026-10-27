@@ -236,20 +236,20 @@ CreateProcessResult CreateProcess(_In_ CreateProcessParsed* Parsed, _In_ HANDLE 
     }
     catch (...)
     {
-        const DWORD LastError = wil::ResultFromCaughtException();
-        switch (LastError)
+        const HRESULT result = wil::ResultFromCaughtException();
+        switch (result)
         {
-        case ERROR_FILE_NOT_FOUND:
+        case HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND):
             Result.Status = -LX_ENOENT;
             break;
 
-        case ERROR_ELEVATION_REQUIRED:
+        case HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED):
             Result.Status = -LX_EACCES;
             break;
 
         default:
             Result.Status = -LX_EINVAL;
-            LOG_IF_WIN32_ERROR_MSG(LastError, "CreateProcessW");
+            LOG_IF_FAILED_MSG(result, "CreateProcessAsUserW");
             break;
         }
     }

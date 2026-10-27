@@ -45,7 +45,6 @@ struct WslDistributionConfig;
 #define CGROUP_MOUNTPOINT "/sys/fs/cgroup"
 #define CGROUP2_DEVICE "cgroup2"
 #define WSL_USER_CGROUP_PATH CGROUP_MOUNTPOINT "/wsl-user"
-#define WSL_USER_SYSTEMD_CGROUP_DIR "/systemd"
 #define WSL_USER_NON_SYSTEMD_CGROUP_DIR "/non-systemd"
 #define WSL_USER_NON_DISTRO_CGROUP_PATH WSL_USER_CGROUP_PATH "/non-distro"
 #define MOUNT_COMMAND "/bin/mount"
@@ -140,10 +139,12 @@ wil::unique_fd UtilConnectVsock(
 // Needs to be declared before UtilCreateChildProcess().
 void UtilSetThreadName(const char* Name);
 
-void UtilTryMoveSelfToDistroCgroup(const std::string& CgroupPath, bool IsSystemd, const std::string& LogSubject);
+int UtilMoveSelfToDistroCgroup(const std::string& CgroupPath, const std::string& LogSubject);
+
+int UtilEnterCgroupNamespace(int NamespaceFd, const std::string& LogSubject);
 
 template <typename TMethod>
-int UtilCreateChildProcess(const char* ChildName, TMethod&& ChildFunction, std::optional<int> CloneFlags = {}, std::optional<std::string> CgroupPath = {})
+int UtilCreateChildProcess(const char* ChildName, TMethod&& ChildFunction, std::optional<int> CloneFlags = {}, int CgroupNamespaceFd = -1)
 
 /*++
 
@@ -160,7 +161,7 @@ Arguments:
     CloneFlags - Supplies an optional value containing flags to use for the clone syscall.
         If no flags are specified, fork is used instead.
 
-    CgroupPath - Supplies an optional value containing the path of the cgroup to try move the child process into.
+    CgroupNamespaceFd - Supplies an optional cgroup namespace to enter after moving the child process.
 
 Return Value:
 
@@ -190,13 +191,14 @@ Return Value:
         return ChildPid;
     }
 
-    if (CgroupPath.has_value())
-    {
-        UtilTryMoveSelfToDistroCgroup(CgroupPath.value(), false, ChildName);
-    }
-
     try
     {
+        if (CgroupNamespaceFd >= 0)
+        {
+            THROW_LAST_ERROR_IF(UtilMoveSelfToDistroCgroup(CGROUP_MOUNTPOINT WSL_USER_NON_SYSTEMD_CGROUP_DIR, ChildName) < 0);
+            THROW_LAST_ERROR_IF(UtilEnterCgroupNamespace(CgroupNamespaceFd, ChildName) < 0);
+        }
+
         UtilSetThreadName(ChildName);
         ChildFunction();
     }
@@ -230,7 +232,7 @@ void UtilCreateWorkerThread(const char* Name, TMethod&& ThreadFunction)
     Promise.get_future().wait();
 }
 
-int UtilExecCommandLine(const char* CommandLine, std::string* Output = nullptr, int ExpectedStatus = 0, bool PrintError = true);
+int UtilExecCommandLine(const char* CommandLine, std::string* Output = nullptr, const std::vector<int>& ExpectedStatuses = {0}, bool PrintError = true);
 
 std::string UtilFindMount(const char* MountInfoFile, const char* Path, bool WinPath, size_t* PrefixLength);
 
@@ -278,7 +280,7 @@ std::string UtilParsePlan9MountSource(std::string_view MountOptions);
 
 std::vector<char> UtilParseWslEnv(char* NtEnvironment);
 
-int UtilProcessChildExitCode(int Status, const char* Name, int ExpectedStatus = 0, bool PrintError = true);
+int UtilProcessChildExitCode(int Status, const char* Name, const std::vector<int>& ExpectedStatuses = {0}, bool PrintError = true);
 
 ssize_t UtilRead(int Fd, void* Buffer, size_t BufferSize, int Timeout = -1);
 
@@ -342,7 +344,8 @@ int WriteToFile(const char* Path, const char* Content, int OpenFlags = O_WRONLY 
 // Starts a background thread that performs memory compaction and optional cache reclaim when the VM is idle.
 void StartMemoryReductionThread(LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode);
 
-int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer, const std::optional<std::string>& DistroCgroupPath);
+int ProcessCreateProcessMessage(
+    wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer, const std::optional<std::string>& DistroCgroupPath, int CgroupNamespaceFd = -1);
 
 std::string UtilGetDistroCgroupPath(pid_t DistroInitPid);
 

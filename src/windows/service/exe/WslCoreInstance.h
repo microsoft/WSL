@@ -15,6 +15,7 @@ Abstract:
 #pragma once
 
 #include "precomp.h"
+#include <atomic>
 #include "hcs.hpp"
 #include "LxssPort.h"
 #include "LxssCreateProcess.h"
@@ -134,11 +135,12 @@ private:
     ULONG64 m_ntClientLifetimeId{};
     wsl::windows::common::redirector::ConnectionTargetManager m_redirectorConnectionTargets;
     ULONG m_plan9Port{LX_INIT_UTILITY_VM_INVALID_PORT};
-    std::shared_ptr<WslCoreInstance> m_systemDistro;
+    // System-distro access must not wait on m_lock, which can be held while waiting for OOBE.
+    std::atomic<std::shared_ptr<WslCoreInstance>> m_systemDistro;
     WSLDistributionInformation m_distributionInfo{};
     DWORD m_socketTimeout{};
     HANDLE m_jobObject{};
     std::thread m_oobeThread;
     wil::unique_event m_destroyingEvent{wil::EventOptions::ManualReset};
-    wil::unique_event m_oobeCompleteEvent;
+    _Guarded_by_(m_lock) wil::shared_event m_oobeCompleteEvent;
 };

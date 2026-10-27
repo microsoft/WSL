@@ -74,8 +74,15 @@ RequiredExtraMmioSpaceForPmemFileInMb(_In_ PCWSTR FilePath)
     return std::max(fileSizeBytes.QuadPart / static_cast<INT64>(_1MB), 1i64);
 }
 
-wil::unique_hfile OpenVhdBackingFile(_In_ PCWSTR Path)
+wil::unique_hfile OpenVhdBackingFile(_In_ PCWSTR Path, _In_opt_ HANDLE UserToken)
 {
+    // User-owned VHDs may not grant the service identity access.
+    wil::unique_token_reverter runAsUser;
+    if (UserToken != nullptr)
+    {
+        runAsUser = wil::impersonate_token(UserToken);
+    }
+
     wil::unique_hfile file{CreateFileW(
         Path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
     THROW_LAST_ERROR_IF(!file);
@@ -470,22 +477,30 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     {
         std::promise<bool> initialResult;
         m_drvfsInitialResult = initialResult.get_future();
-        auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
-        std::thread([this, guestDeviceLock = std::move(guestDeviceLock), initialResult = std::move(initialResult)]() mutable {
+
+        std::promise<void> lockAcquired;
+        auto lockAcquiredFuture = lockAcquired.get_future();
+        m_drvfsInitialThread = std::thread([this, lockAcquired = std::move(lockAcquired), initialResult = std::move(initialResult)]() mutable {
+            auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
             try
             {
+                lockAcquired.set_value();
                 wsl::windows::common::wslutil::SetThreadDescription(L"InitializeDrvfs");
                 initialResult.set_value(InitializeDrvFsLockHeld(m_userToken.get()));
             }
             catch (...)
             {
+                LOG_CAUGHT_EXCEPTION();
+
                 try
                 {
                     initialResult.set_exception(std::current_exception());
                 }
                 CATCH_LOG()
             }
-        }).detach();
+        });
+
+        lockAcquiredFuture.get();
     }
 
     // Mount the system distro.
@@ -625,8 +640,14 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::Consomme)
             {
-                wsl::core::ConsommeNetworkingFlags flags =
-                    wsl::core::ConsommeNetworkingFlags::Ipv6 | wsl::core::ConsommeNetworkingFlags::LoopbackClientIp;
+                const auto kernelModules = wsl::shared::string::Split(m_vmConfig.KernelModulesList, L',');
+                wsl::core::ConsommeNetworkingFlags flags = wsl::core::ConsommeNetworkingFlags::LoopbackClientIp;
+                // For CONFIG_IPV6=m, the module-list fallback assumes the user does not disable IPv6
+                // while also requesting that the ipv6 module be loaded.
+                WI_SetFlagIf(
+                    flags,
+                    wsl::core::ConsommeNetworkingFlags::Ipv6,
+                    m_ipv6Available || std::find(kernelModules.begin(), kernelModules.end(), L"ipv6") != kernelModules.end());
                 WI_SetFlagIf(flags, wsl::core::ConsommeNetworkingFlags::LocalhostRelay, m_vmConfig.EnableLocalhostRelay);
                 WI_SetFlagIf(flags, wsl::core::ConsommeNetworkingFlags::DnsTunneling, m_vmConfig.EnableDnsTunneling);
                 // NAT may have fallen back to Consomme after the early-config message; drop the unused DNS hvsocket.
@@ -725,18 +746,14 @@ WslCoreVm::~WslCoreVm() noexcept
         TelemetryPrivacyDataTag(PDT_ProductAndServicePerformance),
         TraceLoggingValue(m_runtimeId, "vmId"));
 
+    if (m_drvfsInitialThread.joinable())
+    {
+        m_drvfsInitialThread.join();
+    }
+
     m_networkingEngine.reset();
 
     auto lock = m_lock.lock_exclusive();
-
-    if (m_drvfsInitialResult.valid())
-    {
-        try
-        {
-            m_drvfsInitialResult.get();
-        }
-        CATCH_LOG()
-    }
 
     // Clear out the exit callback.
     {
@@ -809,6 +826,12 @@ WslCoreVm::~WslCoreVm() noexcept
     // Close the handle to the VM. This will wait for any outstanding callbacks.
     m_system.reset();
 
+    if (m_pluginPlan9Server)
+    {
+        LOG_IF_FAILED(m_pluginPlan9Server->Teardown());
+        m_pluginPlan9Server.reset();
+    }
+
     // This loops helps against a potential crash in build <= Windows 11 22H2.
     for (const auto& e : m_plan9Servers)
     {
@@ -830,7 +853,8 @@ WslCoreVm::~WslCoreVm() noexcept
         {
             try
             {
-                wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), Entry.first.Path.c_str());
+                wsl::windows::common::hcs::RevokeVmAccess(
+                    m_machineId.c_str(), Entry.first.Path.c_str(), Entry.first.Type == DiskType::VHD ? m_userToken.get() : nullptr);
             }
             CATCH_LOG()
         }
@@ -876,7 +900,8 @@ WslCoreVm::~WslCoreVm() noexcept
 
 wil::unique_socket WslCoreVm::AcceptConnection(_In_ DWORD ReceiveTimeout, _In_ const std::source_location& Location) const
 {
-    auto socket = socket::CancellableAccept(m_listenSocket.get(), m_vmConfig.KernelBootTimeout, m_terminatingEvent.get(), Location);
+    auto socket = wsl::windows::common::socket::CancellableAccept(
+        m_listenSocket.get(), m_vmConfig.KernelBootTimeout, m_terminatingEvent.get(), Location);
     THROW_HR_IF(E_ABORT, !socket.has_value());
 
     if (ReceiveTimeout != 0)
@@ -1013,7 +1038,7 @@ ULONG WslCoreVm::AttachDiskLockHeld(
         FreeLun(Lun.value());
         if (WI_IsFlagSet(diskFlags, DiskStateFlags::AccessGranted))
         {
-            wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), Disk);
+            wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), Disk, Type == DiskType::VHD ? UserToken : nullptr);
         }
 
         if (WI_IsFlagSet(diskFlags, DiskStateFlags::Online))
@@ -1076,14 +1101,14 @@ ULONG WslCoreVm::AttachDiskLockHeld(
                 wsl::windows::common::hcs::RemoveScsiDisk(m_system.get(), staleLun);
                 if (WI_IsFlagSet(found->second.Flags, DiskStateFlags::AccessGranted))
                 {
-                    wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), found->first.Path.c_str());
+                    wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), found->first.Path.c_str(), UserToken);
                 }
 
                 m_attachedDisks.erase(found);
                 FreeLun(staleLun);
             }
 
-            backingFile = OpenVhdBackingFile(Disk);
+            backingFile = OpenVhdBackingFile(Disk, UserToken);
 
             auto grantDiskAccess = [&]() {
                 auto runAsUser = wil::impersonate_token(UserToken);
@@ -1133,7 +1158,7 @@ void WslCoreVm::CollectCrashDumps(wil::unique_socket&& listenSocket) const
     {
         try
         {
-            auto socket = socket::CancellableAccept(listenSocket.get(), INFINITE, m_terminatingEvent.get());
+            auto socket = wsl::windows::common::socket::CancellableAccept(listenSocket.get(), INFINITE, m_terminatingEvent.get());
             if (!socket.has_value())
             {
                 break; // VM is exiting.
@@ -1375,7 +1400,8 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::DetachDisk(_In_opt_ PCWSTR Disk)
             wsl::windows::common::hcs::RemoveScsiDisk(m_system.get(), it->second.Lun);
             if (WI_VERIFY(WI_IsFlagSet(it->second.Flags, DiskStateFlags::AccessGranted)))
             {
-                wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), it->first.Path.c_str());
+                wsl::windows::common::hcs::RevokeVmAccess(
+                    m_machineId.c_str(), it->first.Path.c_str(), it->first.Type == DiskType::VHD ? m_userToken.get() : nullptr);
             }
 
             FreeLun(it->second.Lun);
@@ -1425,7 +1451,7 @@ void WslCoreVm::EjectVhdLockHeld(_In_ PCWSTR VhdPath)
             wsl::windows::common::hcs::RemoveScsiDisk(m_system.get(), search->second.Lun);
             if (WI_IsFlagSet(search->second.Flags, DiskStateFlags::AccessGranted))
             {
-                wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), VhdPath);
+                wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), VhdPath, m_userToken.get());
             }
         }
 
@@ -1561,6 +1587,12 @@ std::wstring WslCoreVm::GenerateConfigJson()
     // Configure the number of processors.
     vmSettings.ComputeTopology.Processor.Count = m_vmConfig.ProcessorCount;
 
+    if (m_windowsVersion.BuildNumber >= WindowsBuildNumbers::Germanium)
+    {
+        // Let HCS derive a virtual NUMA topology from the requested resources and the host topology.
+        vmSettings.ComputeTopology.Numa.emplace();
+    }
+
     // Set the vmmem suffix which will change the process name in task manager.
     if (helpers::IsVmemmSuffixSupported())
     {
@@ -1586,13 +1618,20 @@ std::wstring WslCoreVm::GenerateConfigJson()
                 m_vmConfig.EnableNestedVirtualization = false;
             }
 
-            vmSettings.ComputeTopology.Processor.ExposeVirtualizationExtensions = m_vmConfig.EnableNestedVirtualization;
             if (!m_vmConfig.EnableNestedVirtualization)
             {
                 EMIT_USER_WARNING(wsl::shared::Localization::MessageNestedVirtualizationNotSupported());
             }
         }
-        CATCH_LOG()
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            m_vmConfig.EnableNestedVirtualization = false;
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageNestedVirtualizationDetectionFailed(
+                wsl::windows::common::wslutil::ErrorCodeToString(wil::ResultFromCaughtException())));
+        }
+
+        vmSettings.ComputeTopology.Processor.ExposeVirtualizationExtensions = m_vmConfig.EnableNestedVirtualization;
     }
 
 #ifdef _AMD64_
@@ -1779,7 +1818,24 @@ std::wstring WslCoreVm::GenerateConfigJson()
     // inherited ACLs; otherwise StartComputeSystem will surface E_ACCESSDENIED.
     auto attachDisk = [&](PCWSTR path, bool grantVmAccess) {
         auto lun = ReserveLun();
-        auto backingFile = OpenVhdBackingFile(path);
+        wil::unique_hfile backingFile;
+        try
+        {
+            backingFile = OpenVhdBackingFile(path, grantVmAccess ? m_userToken.get() : nullptr);
+        }
+        catch (...)
+        {
+            if (!grantVmAccess || wil::ResultFromCaughtException() != E_ACCESSDENIED)
+            {
+                throw;
+            }
+
+            LOG_CAUGHT_EXCEPTION();
+
+            // Custom VHDs may be accessible only to the service and VMWP.
+            backingFile = OpenVhdBackingFile(path, nullptr);
+        }
+
         hcs::Attachment disk{};
         disk.Type = hcs::AttachmentType::VirtualDisk;
         disk.Path = path;
@@ -2100,8 +2156,28 @@ void WslCoreVm::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR Gue
     auto lock = m_lock.lock_exclusive();
 
     const auto flags = (ReadOnly ? hcs::Plan9ShareFlags::ReadOnly : hcs::Plan9ShareFlags::None) | hcs::Plan9ShareFlags::AllowOptions;
-    wsl::windows::common::hcs::AddPlan9Share(
-        m_system.get(), Name, Name, HostPath, LX_INIT_UTILITY_VM_PLAN9_PORT, flags, m_userToken.get());
+    wsl::windows::common::security::EnableTokenPrivilege(m_userToken.get(), SE_CREATE_SYMBOLIC_LINK_NAME);
+
+    {
+        auto runAsUser = wil::impersonate_token(m_userToken.get());
+        if (!m_pluginPlan9Server || m_pluginPlan9Server->IsRunning() != S_OK)
+        {
+            // Tear down the previous server so it releases the port before the replacement binds it.
+            if (m_pluginPlan9Server)
+            {
+                LOG_IF_FAILED(m_pluginPlan9Server->Teardown());
+                m_pluginPlan9Server.reset();
+            }
+
+            auto server =
+                wsl::windows::common::wslutil::CreateComServerAsUser<p9fs::Plan9FileSystem, IPlan9FileSystem>(m_userToken.get());
+            THROW_IF_FAILED(server->Init(&m_runtimeId, LX_INIT_UTILITY_VM_PLAN9_PLUGIN_PORT));
+            THROW_IF_FAILED(server->Resume());
+            m_pluginPlan9Server = std::move(server);
+        }
+
+        THROW_IF_FAILED(m_pluginPlan9Server->AddSharePath(Name, HostPath, static_cast<UINT32>(flags)));
+    }
 
     wsl::shared::MessageWriter<LX_MINI_INIT_MOUNT_FOLDER_MESSAGE> message(LxMiniInitMountFolder);
     message.WriteString(message->PathIndex, GuestPath);
@@ -2360,14 +2436,15 @@ void WslCoreVm::OnExit(_In_opt_ PCWSTR ExitDetails)
 
 void WslCoreVm::ReadGuestCapabilities()
 {
-    const auto& info = m_miniInitChannel.ReceiveMessage<LX_INIT_GUEST_CAPABILITIES>();
+    gsl::span<gsl::byte> span;
+    const auto& info = m_miniInitChannel.ReceiveMessage<LX_INIT_GUEST_CAPABILITIES>(&span);
+    const std::string input{wsl::shared::string::FromMessageBuffer<LX_INIT_GUEST_CAPABILITIES>(span)};
 
-    m_kernelVersionString = wsl::shared::string::MultiByteToWide(info.Buffer);
+    m_kernelVersionString = wsl::shared::string::MultiByteToWide(input);
 
     // Parse the version string.
     const std::regex pattern("(\\d+)\\.(\\d+)\\.(\\d+).*");
     std::smatch match;
-    const std::string input = info.Buffer;
     if (!std::regex_match(input, match, pattern) || match.size() != 4)
     {
         THROW_HR_MSG(E_UNEXPECTED, "Failed to parse kernel version: '%hs'", input.c_str());
@@ -2381,15 +2458,17 @@ void WslCoreVm::ReadGuestCapabilities()
     }
     catch (const std::exception& e)
     {
-        THROW_HR_MSG(E_UNEXPECTED, "Failed to parse kernel version: '%hs', %hs", info.Buffer, e.what());
+        THROW_HR_MSG(E_UNEXPECTED, "Failed to parse kernel version: '%hs', %hs", input.c_str(), e.what());
     }
 
     m_seccompAvailable = info.SeccompAvailable;
+    m_ipv6Available = info.Ipv6Available;
     m_hvPciSwiotlbBase = info.HvPciSwiotlbBase;
     m_hvPciSwiotlbSize = info.HvPciSwiotlbSize;
     WSL_LOG(
         "GuestKernelInfo",
         TraceLoggingValue(m_seccompAvailable, "SeccompAvailable"),
+        TraceLoggingValue(m_ipv6Available, "Ipv6Available"),
         TraceLoggingValue(m_hvPciSwiotlbBase, "HvPciSwiotlbBase"),
         TraceLoggingValue(m_hvPciSwiotlbSize, "HvPciSwiotlbSize"),
         TraceLoggingValue(std::get<0>(m_kernelVersion), "Version"),
@@ -2485,11 +2564,7 @@ void WslCoreVm::RegisterCallbacks(_In_ const std::function<void(ULONG)>& DistroE
         }
         else
         {
-            // The VM has already been terminated, invoke the callback on a separate thread.
-            std::thread([terminationCallback = std::move(TerminationCallback), runtimeId = m_runtimeId]() {
-                wsl::windows::common::wslutil::SetThreadDescription(L"TerminationCallback");
-                terminationCallback(runtimeId);
-            }).detach();
+            TerminationCallback(m_runtimeId);
         }
     }
 

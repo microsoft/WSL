@@ -266,9 +266,7 @@ namespace {
 
 std::vector<Argument> GetDeveloperClusterArguments(DeveloperClusterOperation operation)
 {
-    std::vector<Argument> arguments{
-        Argument::Create(ArgType::ClusterDeveloper),
-        Argument::Create(ArgType::DeveloperAksEdgePath)};
+    std::vector<Argument> arguments{Argument::Create(ArgType::ClusterDeveloper), Argument::Create(ArgType::DeveloperAksEdgePath)};
     switch (operation)
     {
     case DeveloperClusterOperation::Create:
@@ -332,9 +330,7 @@ void ValidateDeveloperClusterArguments(DeveloperClusterOperation operation, ArgM
 {
     if (!args.GetValue<ArgType::ClusterDeveloper>())
     {
-        throw ArgumentException(
-            Localization::WSLCCLI_DeveloperClusterRequiresDeveloper(),
-            Argument::Create(ArgType::ClusterDeveloper));
+        throw ArgumentException(Localization::WSLCCLI_DeveloperClusterRequiresDeveloper(), Argument::Create(ArgType::ClusterDeveloper));
     }
 
     if ((operation == DeveloperClusterOperation::Create || operation == DeveloperClusterOperation::Kubeconfig) &&

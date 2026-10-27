@@ -213,11 +213,37 @@ void LxssInstance::CreateLxProcess(
         }
     }
 
-    if (m_oobeCompleteEvent && !m_oobeCompleteEvent.is_signaled())
+    std::unique_lock createProcessLock(m_createProcessLock);
+    std::unique_lock lock(m_stateLock);
+    THROW_HR_IF(E_ABORT, !m_running);
+
+    bool warningEmitted = false;
+    while (m_oobeCompleteEvent && !m_oobeCompleteEvent.is_signaled())
     {
-        EMIT_USER_WARNING(wsl::shared::Localization::MessageWaitingForOobe(m_configuration.Name.c_str()));
-        m_oobeCompleteEvent.wait();
+        if (!warningEmitted)
+        {
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageWaitingForOobe(m_configuration.Name.c_str()));
+            warningEmitted = true;
+        }
+
+        // Keep this attempt's event alive if another caller starts a retry while the lock is released.
+        const auto oobeCompleteEvent = m_oobeCompleteEvent;
+        std::vector<HANDLE> exitHandles{m_destroyingEvent.get()};
+        if (ConsoleData.ClientProcess)
+        {
+            exitHandles.push_back(ConsoleData.ClientProcess.get());
+        }
+
+        lock.unlock();
+        createProcessLock.unlock();
+        THROW_HR_IF(E_ABORT, !wsl::windows::common::relay::InterruptableWait(oobeCompleteEvent.get(), exitHandles));
+        createProcessLock.lock();
+        lock.lock();
+
+        THROW_HR_IF(E_ABORT, !m_running);
     }
+
+    lock.unlock();
 
     // Duplicate the handles from the calling process into the current process.
     std::vector<wil::unique_handle> StdHandlesLocal(3);
@@ -375,6 +401,8 @@ void LxssInstance::Stop()
         return;
     }
 
+    m_destroyingEvent.SetEvent();
+
     // Logs when a distro is stopped
     WSL_LOG_TELEMETRY(
         "StopInstance",
@@ -521,7 +549,7 @@ wil::unique_handle LxssInstance::_CreateLxProcess(
     WI_ASSERT(Message.size() <= ULONG_MAX);
 
     const auto MessageLocal = (PLX_INIT_CREATE_PROCESS)Message.data();
-    const bool AllowOOBE = WI_IsFlagSet(MessageLocal->Common.Flags, LxInitCreateProcessFlagAllowOOBE);
+    const bool AllowOOBE = WI_IsFlagSet(MessageLocal->Flags, LxInitCreateProcessFlagAllowOOBE);
     auto HandleEraser =
         wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { _ReleaseHandlesFromLxProcessMarshalMessage(MessagePort, MessageLocal); });
 
@@ -538,7 +566,10 @@ wil::unique_handle LxssInstance::_CreateLxProcess(
         auto OobeMessagePort = ServerPort->WaitForConnection();
 
         {
-            m_oobeCompleteEvent.create(wil::EventOptions::ManualReset);
+            std::lock_guard stateLock(m_stateLock);
+            THROW_HR_IF(E_ABORT, !m_running);
+
+            auto oobeCompleteEvent = wil::shared_event(wil::EventOptions::ManualReset);
 
             auto impersonate = wil::CoImpersonateClient();
             auto registration = wsl::windows::service::DistributionRegistration::Open(
@@ -550,41 +581,44 @@ wil::unique_handle LxssInstance::_CreateLxProcess(
                 m_oobeThread.join();
             }
 
-            m_oobeThread = std::thread([this, OobeMessagePort = std::move(OobeMessagePort), registration = std::move(registration)]() mutable {
-                try
-                {
-                    // N.B. The LX_INIT_OOBE_RESULT message is only sent once the OOBE process completes, which might be waiting on user input.
-                    // Do no set a timeout here otherwise the OOBE flow will fail if the OOBE process takes longer than expected.
-                    auto Message = OobeMessagePort->Receive(INFINITE);
-                    auto* OobeResult = gslhelpers::try_get_struct<LX_INIT_OOBE_RESULT>(gsl::make_span(Message));
-                    THROW_HR_IF(E_INVALIDARG, !OobeResult || (OobeResult->Header.MessageType != LxInitOobeResult));
-
-                    WSL_LOG(
-                        "OOBEResult",
-                        TraceLoggingValue(OobeResult->Result, "Result"),
-                        TraceLoggingValue(OobeResult->DefaultUid, "DefaultUid"),
-                        TraceLoggingValue(m_configuration.Name.c_str(), "Name"),
-                        TraceLoggingValue(1, "Version"));
-
-                    if (OobeResult->Result == 0)
+            m_oobeThread = std::thread(
+                [this, OobeMessagePort = std::move(OobeMessagePort), registration = std::move(registration), oobeCompleteEvent]() mutable {
+                    try
                     {
-                        // OOBE was successful, don't run it again.
-                        m_configuration.RunOOBE = false;
-                        registration.Write(wsl::windows::service::Property::RunOOBE, 0);
+                        // N.B. The LX_INIT_OOBE_RESULT message is only sent once the OOBE process completes, which might be waiting on user input.
+                        // Do no set a timeout here otherwise the OOBE flow will fail if the OOBE process takes longer than expected.
+                        auto Message = OobeMessagePort->Receive(INFINITE);
+                        auto* OobeResult = gslhelpers::try_get_struct<LX_INIT_OOBE_RESULT>(gsl::make_span(Message));
+                        THROW_HR_IF(E_INVALIDARG, !OobeResult || (OobeResult->Header.MessageType != LxInitOobeResult));
 
-                        if (OobeResult->DefaultUid != -1)
+                        WSL_LOG(
+                            "OOBEResult",
+                            TraceLoggingValue(OobeResult->Result, "Result"),
+                            TraceLoggingValue(OobeResult->DefaultUid, "DefaultUid"),
+                            TraceLoggingValue(m_configuration.Name.c_str(), "Name"),
+                            TraceLoggingValue(1, "Version"));
+
+                        if (OobeResult->Result == 0)
                         {
-                            registration.Write(wsl::windows::service::Property::DefaultUid, static_cast<int>(OobeResult->DefaultUid));
-                            m_defaultUid = static_cast<int>(OobeResult->DefaultUid);
+                            // OOBE was successful, don't run it again.
+                            m_configuration.RunOOBE = false;
+                            registration.Write(wsl::windows::service::Property::RunOOBE, 0);
+
+                            if (OobeResult->DefaultUid != -1)
+                            {
+                                registration.Write(wsl::windows::service::Property::DefaultUid, static_cast<int>(OobeResult->DefaultUid));
+                                m_defaultUid = static_cast<int>(OobeResult->DefaultUid);
+                            }
+
+                            m_redirectorConnectionTargets.UpdateUid(m_defaultUid);
                         }
-
-                        m_redirectorConnectionTargets.UpdateUid(m_defaultUid);
                     }
-                }
-                CATCH_LOG()
+                    CATCH_LOG()
 
-                m_oobeCompleteEvent.SetEvent();
-            });
+                    oobeCompleteEvent.SetEvent();
+                });
+
+            m_oobeCompleteEvent = std::move(oobeCompleteEvent);
         }
     }
 
@@ -624,7 +658,7 @@ std::vector<gsl::byte> LxssInstance::_CreateLxProcessMarshalMessage(
     _In_ ULONG DefaultUid) const
 {
     // Allocate a message and initialize the common parameters.
-    auto Message = LxssCreateProcess::CreateMessage(LxInitMessageCreateProcess, CreateProcessData, DefaultUid);
+    auto Message = LxssCreateProcess::CreateMessage<LX_INIT_CREATE_PROCESS>(CreateProcessData, DefaultUid);
 
     const auto MessageLocal = (PLX_INIT_CREATE_PROCESS)Message.data();
 
@@ -670,7 +704,7 @@ std::vector<gsl::byte> LxssInstance::_CreateLxProcessMarshalMessage(
 
     if (m_configuration.RunOOBE && CreateProcessData.Filename.empty() && CreateProcessData.CommandLine.empty())
     {
-        WI_SetFlag(MessageLocal->Common.Flags, LxInitCreateProcessFlagAllowOOBE);
+        WI_SetFlag(MessageLocal->Flags, LxInitCreateProcessFlagAllowOOBE);
     }
 
     Eraser.release();
@@ -852,7 +886,11 @@ void LxssInstance::_InitializeConfiguration(_In_ const std::filesystem::path& Pl
 
     const auto timezone = wsl::windows::common::helpers::GetLinuxTimezone(m_userToken.get());
     ULONG featureFlags{};
-    WI_SetFlagIf(featureFlags, LxInitFeatureRootfsCompressed, WI_IsFlagSet(GetFileAttributesW(m_configuration.BasePath.c_str()), FILE_ATTRIBUTE_COMPRESSED));
+    {
+        auto runAsUser = wil::impersonate_token(m_userToken.get());
+        WI_SetFlagIf(featureFlags, LxInitFeatureRootfsCompressed, WI_IsFlagSet(GetFileAttributesW(m_configuration.BasePath.c_str()), FILE_ATTRIBUTE_COMPRESSED));
+    }
+
     auto message = wsl::windows::common::helpers::GenerateConfigurationMessage(
         m_configuration.Name, fixedDrives, m_defaultUid, timezone, Plan9SocketPath.wstring(), featureFlags);
 

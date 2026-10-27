@@ -21,6 +21,7 @@ Abstract:
 #include "GuestDeviceManager.h"
 #include "Dmesg.h"
 #include "INetworkingEngine.h"
+#include "RuntimeClass.h"
 #include "WslCoreConfig.h"
 #include <filesystem>
 #include <map>
@@ -32,7 +33,7 @@ Abstract:
 namespace wsl::windows::service::wslc {
 
 class HcsVirtualMachine
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCVirtualMachine, IFastRundown>
+    : public common::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCVirtualMachine, IFastRundown>
 {
 public:
     HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings);
@@ -100,6 +101,7 @@ private:
 
     // Shares: key is ShareId, value is nullopt for Plan9 or the aggregate DeviceInstanceId for VirtioFS.
     std::map<GUID, std::optional<GUID>, wsl::windows::common::helpers::GuidLess> m_shares;
+    wil::com_ptr<IPlan9FileSystem> m_plan9Server;
     std::optional<GUID> m_virtioFsDevice;
 
     std::filesystem::path m_vmSavedStateFile;
@@ -124,7 +126,7 @@ private:
 // was idle-terminated, without the SYSTEM service holding a VM up front.
 //
 class WSLCVirtualMachineFactory
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCVirtualMachineFactory, IFastRundown>
+    : public common::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCVirtualMachineFactory, IFastRundown>
 {
 public:
     explicit WSLCVirtualMachineFactory(_In_ const WSLCSessionSettings* Settings);

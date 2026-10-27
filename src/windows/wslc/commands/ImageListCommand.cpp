@@ -14,6 +14,7 @@ Abstract:
 
 #include "ImageCommand.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "ImageTasks.h"
 #include "SessionTasks.h"
 #include "Task.h"
@@ -28,7 +29,9 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ImageListCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::Filter, false, Limit::Unlimited),
+        Argument::Create(ArgType::All, {.Desc = Localization::WSLCCLI_ImageListAllArgDescription()}),
+        Argument::Create(ArgType::Digests),
+        Argument::Create(ArgType::Filter, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::Format),
         Argument::Create(ArgType::NoTrunc),
         Argument::Create(ArgType::Quiet),
@@ -47,9 +50,10 @@ std::wstring ImageListCommand::LongDescription() const
 
 void ImageListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context               //
-        << ResolveSession //
-        << GetImages      //
-        << ListImages;
+    context                  //
+        << ResolveSession    //
+        << GetImages         //
+        << FormatImageOutput //
+        << PrintFormattedOutput;
 }
 } // namespace wsl::windows::wslc

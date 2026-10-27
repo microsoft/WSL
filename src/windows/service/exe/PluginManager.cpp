@@ -17,11 +17,12 @@ Abstract:
 #include "PluginManager.h"
 #include "WslPluginApi.h"
 #include "LxssUserSessionFactory.h"
-#include "WSLCSessionManager.h"
+#include "WSLCSessionManagerFactory.h"
 
 using wsl::windows::common::Context;
 using wsl::windows::common::ExecutionContext;
 using wsl::windows::service::PluginManager;
+using wsl::windows::service::wslc::FindWslcSession;
 
 constexpr auto c_pluginPath = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Lxss\\Plugins";
 
@@ -133,14 +134,6 @@ struct WslcProcessWrapper
     wil::com_ptr<IWSLCProcess> Process;
 };
 
-wil::com_ptr<IWSLCSession> ResolveWslcSession(WSLCSessionId Session)
-{
-    auto* mgr = wsl::windows::service::wslc::WSLCSessionManagerImpl::Instance();
-    THROW_HR_IF(RPC_E_DISCONNECTED, mgr == nullptr);
-
-    return mgr->FindSession(static_cast<ULONG>(Session));
-}
-
 } // namespace
 
 extern "C" {
@@ -151,7 +144,7 @@ try
     // TODO: Once plugins are out of proc, add logic to validate that the mountpoint isn't in use by another plugin.
     RETURN_HR_IF(E_POINTER, WindowsPath == nullptr || Mountpoint == nullptr);
 
-    auto session = ResolveWslcSession(Session);
+    auto session = FindWslcSession(static_cast<ULONG>(Session));
     auto result = session->MountWindowsFolder(WindowsPath, Mountpoint, ReadOnly, c_pluginAcquireVmLease);
 
     WSL_LOG(
@@ -172,7 +165,7 @@ try
     // TODO: Once plugins are out of proc, add logic to validate that the mountpoint is actually owned by the plugin.
     RETURN_HR_IF(E_POINTER, Mountpoint == nullptr);
 
-    auto session = ResolveWslcSession(Session);
+    auto session = FindWslcSession(static_cast<ULONG>(Session));
 
     auto result = session->UnmountWindowsFolder(Mountpoint, c_pluginAcquireVmLease);
 
@@ -197,7 +190,7 @@ try
         *Errno = 0;
     }
 
-    auto session = ResolveWslcSession(Session);
+    auto session = FindWslcSession(static_cast<ULONG>(Session));
 
     // Count NULL-terminated arrays.
     auto countArray = [](LPCSTR* arr) -> ULONG {
@@ -255,12 +248,12 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCProcessGetFd(WSLCProcessHandle Process, WSLCProcessFd Fd, HANDLE* Handle)
+HRESULT WSLCProcessGetFd(WSLCProcessHandle Process, WSLCProcessFd Fd, SOCKET* Socket)
 try
 {
-    RETURN_HR_IF(E_POINTER, Process == nullptr || Handle == nullptr);
+    RETURN_HR_IF(E_POINTER, Process == nullptr || Socket == nullptr);
 
-    *Handle = nullptr;
+    *Socket = INVALID_SOCKET;
 
     auto* wrapper = static_cast<WslcProcessWrapper*>(Process);
 
@@ -294,7 +287,7 @@ try
     RETURN_IF_FAILED(result);
     WI_ASSERT(handle.Type == WSLCHandleTypeSocket);
 
-    *Handle = handle.Handle.Socket;
+    *Socket = reinterpret_cast<SOCKET>(handle.Handle.Socket);
     return S_OK;
 }
 CATCH_RETURN();
