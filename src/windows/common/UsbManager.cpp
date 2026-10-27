@@ -47,13 +47,13 @@ Manager::Manager() : m_journal(CreateJournalKey())
     // Recover and release reservations left by a previous service run.
     {
         auto lock = m_lock.lock_exclusive();
-        LoadReservationRecords();
+        m_records = LoadReservationRecords(m_journal.get());
 
         for (auto record = m_records.begin(); record != m_records.end();)
         {
             try
             {
-                ReleaseReservation(*record);
+                ReleaseReservation(*record, m_journal.get());
                 record = m_records.erase(record);
             }
             catch (...)
@@ -90,6 +90,27 @@ Manager::~Manager()
     Stop();
 }
 
+void Manager::CleanupReservations() noexcept
+try
+{
+    auto [journal, result] = registry::OpenKeyNoThrow(HKEY_LOCAL_MACHINE, c_journalPath, KEY_READ | KEY_WRITE);
+    if (result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) || result == HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND))
+    {
+        return;
+    }
+    THROW_IF_FAILED(result);
+
+    for (auto& record : LoadReservationRecords(journal.get()))
+    {
+        try
+        {
+            ReleaseReservation(record, journal.get());
+        }
+        CATCH_LOG()
+    }
+}
+CATCH_LOG()
+
 std::wstring Manager::ConvertSidToString(PSID Sid)
 {
     THROW_HR_IF(E_INVALIDARG, Sid == nullptr || !IsValidSid(Sid));
@@ -115,7 +136,7 @@ std::list<Manager::Record>::iterator Manager::FindReservationRecord(const UxdRes
     });
 }
 
-std::optional<Device> Manager::FindDeviceAtPort(const Inventory& Current, const UxdReservationIdentity& Value) const
+std::optional<Device> Manager::FindDeviceAtPort(const Inventory& Current, const UxdReservationIdentity& Value)
 {
     for (const auto& device : Current.Devices)
     {
@@ -203,10 +224,11 @@ Device Manager::WaitForWinUsbDevice(const UxdReservationIdentity& Value, std::ws
     }
 }
 
-void Manager::LoadReservationRecords()
+std::list<Manager::Record> Manager::LoadReservationRecords(HKEY Journal)
 {
     // Restore ownership metadata for cleanup, without reactivating attachments.
-    for (const auto& [name, type] : registry::EnumValues(m_journal.get()))
+    std::list<Record> records;
+    for (const auto& [name, type] : registry::EnumValues(Journal))
     {
         try
         {
@@ -215,15 +237,16 @@ void Manager::LoadReservationRecords()
             THROW_IF_FAILED(CLSIDFromString(name.c_str(), &record.Reservation.Id));
             THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_DATA), IsEqualGUID(record.Reservation.Id, GUID_NULL));
 
-            const auto json = nlohmann::json::parse(WideToMultiByte(registry::ReadString(m_journal.get(), nullptr, name.c_str())));
+            const auto json = nlohmann::json::parse(WideToMultiByte(registry::ReadString(Journal, nullptr, name.c_str())));
             record.Reservation.HubInstanceId = MultiByteToWide(json.at("Hub").get<std::string>());
             record.Reservation.Port = json.at("Port").get<uint32_t>();
             record.OwnerSid = MultiByteToWide(json.at("OwnerSid").get<std::string>());
 
-            m_records.push_back(std::move(record));
+            records.push_back(std::move(record));
         }
         CATCH_LOG()
     }
+    return records;
 }
 
 void Manager::PersistReservationRecord(const Record& Value)
@@ -245,17 +268,18 @@ void Manager::PersistReservationRecord(const Record& Value)
     THROW_IF_WIN32_ERROR(RegFlushKey(m_journal.get()));
 }
 
-void Manager::ReleaseReservation(Record& Value)
+void Manager::ReleaseReservation(Record& Value, HKEY Journal)
 {
     // Stop reporting the reservation as active before restoring Windows ownership.
     Value.Active = false;
 
     // Leave reservations belonging to other owners untouched.
-    const auto reservation = m_registry.ReadReservation(Value.Reservation);
+    UxdRegistry uxdRegistry;
+    const auto reservation = uxdRegistry.ReadReservation(Value.Reservation);
     if (!reservation || OwnsReservation(Value.Reservation.Id, *reservation))
     {
         const auto current = FindDeviceAtPort(Inventory::Enumerate(), Value.Reservation);
-        const bool removed = m_registry.RemoveReservation(Value.Reservation);
+        const bool removed = uxdRegistry.RemoveReservation(Value.Reservation);
         if (current && (removed || current->IsRedirected()))
         {
             CyclePort(Value.Reservation.HubInstanceId, Value.Reservation.Port);
@@ -263,12 +287,12 @@ void Manager::ReleaseReservation(Record& Value)
     }
 
     // Make SYSTEM cleanup durable before deleting the SOFTWARE ownership record.
-    m_registry.RemoveMapping(Value.Reservation);
-    m_registry.Flush();
+    uxdRegistry.RemoveMapping(Value.Reservation);
+    uxdRegistry.Flush();
 
-    const auto error = RegDeleteValueW(m_journal.get(), GetJournalRecordName(Value.Reservation).c_str());
+    const auto error = RegDeleteValueW(Journal, GetJournalRecordName(Value.Reservation).c_str());
     THROW_IF_WIN32_ERROR(error == ERROR_FILE_NOT_FOUND ? ERROR_SUCCESS : error);
-    THROW_IF_WIN32_ERROR(RegFlushKey(m_journal.get()));
+    THROW_IF_WIN32_ERROR(RegFlushKey(Journal));
 }
 
 void Manager::QueueDeviceRemoval(std::wstring Identifier, bool Instance)
@@ -392,7 +416,7 @@ try
                     record->OnRemoval = {};
                     try
                     {
-                        ReleaseReservation(*record);
+                        ReleaseReservation(*record, m_journal.get());
                         m_records.erase(record);
                     }
                     CATCH_LOG()
@@ -423,7 +447,7 @@ try
     {
         try
         {
-            ReleaseReservation(*record);
+            ReleaseReservation(*record, m_journal.get());
             record = m_records.erase(record);
         }
         catch (...)
@@ -492,7 +516,7 @@ DeviceReservation Manager::Reserve(PSID UserSid, const PortId& Port, RemovalCall
         {
             if (persisted)
             {
-                ReleaseReservation(*record);
+                ReleaseReservation(*record, m_journal.get());
             }
             m_records.erase(record);
         }
@@ -526,7 +550,7 @@ void Manager::Release(PSID UserSid, const GUID& ReservationId)
     }
 
     THROW_HR_WITH_USER_ERROR_IF(E_ACCESSDENIED, wsl::shared::Localization::MessageUsbUnavailable(), record->OwnerSid != sid);
-    ReleaseReservation(*record);
+    ReleaseReservation(*record, m_journal.get());
     m_records.erase(record);
 }
 

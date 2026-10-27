@@ -34,6 +34,7 @@ wil::unique_event g_networkingReady{wil::EventOptions::ManualReset};
 
 wsl::windows::service::PluginManager g_pluginManager;
 std::shared_ptr<wsl::windows::common::usb::Manager> g_usbManager;
+bool g_usbDisabledByPolicy{false};
 
 // Declare the LxssUserSession COM class.
 CoCreatableClassWrlCreatorMapInclude(LxssUserSession);
@@ -202,9 +203,14 @@ try
 
     wsl::windows::common::helpers::RegisterWithDcat();
 
+    g_usbDisabledByPolicy = !IsFeatureAllowed(OpenPoliciesKey().get(), c_allowUsb);
     try
     {
-        if (wsl::windows::common::usb::UxdRegistry::IsSupported())
+        if (g_usbDisabledByPolicy)
+        {
+            wsl::windows::common::usb::Manager::CleanupReservations();
+        }
+        else if (wsl::windows::common::usb::UxdRegistry::IsSupported())
         {
             g_usbManager = std::make_shared<wsl::windows::common::usb::Manager>();
         }

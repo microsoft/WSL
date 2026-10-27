@@ -44,6 +44,7 @@ constexpr auto c_shortIconName = L"shortcut.ico";
 #define LXSS_RELAY_BUFFER_SIZE (0x1000000)
 
 extern bool g_lxcoreInitialized;
+extern bool g_usbDisabledByPolicy;
 
 using namespace std::placeholders;
 using namespace Microsoft::WRL;
@@ -579,6 +580,8 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Devices);
     *DeviceCount = 0;
     *Devices = nullptr;
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_ACCESS_DISABLED_BY_POLICY), wsl::shared::Localization::MessageUsbDisabledByPolicy(), g_usbDisabledByPolicy);
     const auto session = m_session.lock();
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
     const auto token = wsl::windows::common::security::GetUserToken(TokenImpersonation);
@@ -593,6 +596,8 @@ try
 {
     ServiceExecutionContext context(Error);
     RETURN_HR_IF_NULL(E_INVALIDARG, Port);
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_ACCESS_DISABLED_BY_POLICY), wsl::shared::Localization::MessageUsbDisabledByPolicy(), g_usbDisabledByPolicy);
     const auto session = m_session.lock();
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
     const auto token = wsl::windows::common::security::GetUserToken(TokenImpersonation);
@@ -611,6 +616,8 @@ try
 {
     ServiceExecutionContext context(Error);
     RETURN_HR_IF_NULL(E_INVALIDARG, Port);
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_ACCESS_DISABLED_BY_POLICY), wsl::shared::Localization::MessageUsbDisabledByPolicy(), g_usbDisabledByPolicy);
     const auto session = m_session.lock();
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
     const auto token = wsl::windows::common::security::GetUserToken(TokenImpersonation);

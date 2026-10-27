@@ -643,7 +643,7 @@ Arguments for managing distributions in Windows Subsystem for Linux:
 "}{Locked="--version,"}{Locked="--export "}{Locked="--format "}{Locked="--import "}{Locked="--version "}{Locked="--vhd
 "}{Locked="--import-in-place "}{Locked="--list,"}{Locked="--all
 "}{Locked="--running
-"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated. {Locked="&lt;port id&gt;"}The USB port ID placeholder should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
+"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated. {Locked="USB"}{Locked="&lt;port id&gt;"}The USB acronym and port ID placeholder should not be translated. {Locked="tar"}"tar" is a file archive format name and should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
   </data>
   <data name="MessagePackageVersions" xml:space="preserve">
     <value>WSL version: {}
@@ -1232,7 +1232,7 @@ See recovery instructions on: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="MessageUsbInvalidPort" xml:space="preserve">
     <value>Invalid USB port '{}'. Use the dot-separated port ID shown by wsl --usb --list.</value>
-    <comment>{FixedPlaceholder="{}"}{Locked="--usb "}{Locked="--list."}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}{Locked="USB"}{Locked="--usb "}{Locked="--list."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageUsbElevationRequired" xml:space="preserve">
     <value>The --usb --attach and --usb --detach commands require administrator privileges.</value>
@@ -1240,18 +1240,27 @@ See recovery instructions on: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="MessageUsbUnavailable" xml:space="preserve">
     <value>This USB device is unavailable to your WSL session.</value>
+    <comment>{Locked="USB"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageUsbAlreadyAttached" xml:space="preserve">
     <value>This USB device is already attached to your WSL session.</value>
+    <comment>{Locked="USB"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageUsbNotAttached" xml:space="preserve">
     <value>This USB device is not attached to your WSL session.</value>
+    <comment>{Locked="USB"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageUsbNotFound" xml:space="preserve">
     <value>No physical USB device was found at this port. Refresh the list and try again.</value>
+    <comment>{Locked="USB"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageUsbWindowsUpdateRequired" xml:space="preserve">
     <value>USB device redirect is not supported on this version of Windows. Please update Windows and try again.</value>
+    <comment>{Locked="USB"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUsbDisabledByPolicy" xml:space="preserve">
+    <value>USB device support is disabled by the computer policy.</value>
+    <comment>{Locked="USB"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Something went wrong. Try again later.</value>

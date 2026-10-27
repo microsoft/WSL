@@ -674,4 +674,18 @@ class PolicyTest
             VERIFY_ARE_EQUAL(size_t{2}, snapshot.Hosts.size());
         }
     }
+
+    WSL2_TEST_METHOD(UsbPolicy)
+    {
+        auto restartService = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [] { RestartWslService(); });
+        auto revert = SetPolicy(c_allowUsb, 0);
+        RestartWslService();
+
+        const auto disabled = FormatErrorMessage(
+            wsl::shared::Localization::MessageUsbDisabledByPolicy(), L"Wsl/Service/ERROR_ACCESS_DISABLED_BY_POLICY");
+        for (const auto* command : {L"--usb --list", L"--usb --attach 1.1", L"--usb --detach 1.1"})
+        {
+            ValidateOutput(command, disabled);
+        }
+    }
 };
