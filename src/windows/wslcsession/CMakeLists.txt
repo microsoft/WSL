@@ -16,7 +16,6 @@ set(SOURCES
     WSLCSession.cpp
     WSLCSessionRuntime.cpp
     WSLCComposeOperation.cpp
-    WSLCComposeSession.cpp
     WSLCContainer.cpp
     WSLCVirtualMachine.cpp
 
@@ -54,7 +53,6 @@ set(HEADERS
     ServiceContainerLauncher.h
     WSLCContainer.h
     WSLCComposeOperation.h
-    WSLCComposeSession.h
     WSLCContainerMetadata.h
     WindowsCertStore.h
     WSLCProcess.h
