@@ -102,6 +102,8 @@ public:
 
     void Initialize();
 
+    void Rundown() noexcept;
+
     // Applies the restart policy to a container found when the session starts.
     void OnSessionStart();
 
@@ -282,6 +284,7 @@ private:
     // N.B. Stop releases it across the docker request, which can block indefinitely, and re-checks m_stateGeneration instead.
     wil::srwlock m_lifecycleLock;
     mutable wil::srwlock m_lock;
+    std::once_flag m_rundown;
     std::string m_name;
     std::string m_image;
     std::string m_id;
