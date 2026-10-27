@@ -492,6 +492,62 @@ class WSLCCLIExecutionUnitTests
         }
     }
 
+    TEST_METHOD(CancellationRequestsWithoutSupport_AreNotHandled)
+    {
+        CLIExecutionContext context;
+
+        VERIFY_IS_FALSE(context.RecordCancellationRequest());
+        VERIFY_IS_FALSE(context.RecordCancellationRequest());
+        VERIFY_ARE_EQUAL(0ul, context.CancellationCount.load());
+    }
+
+    TEST_METHOD(CancellationRequests_GracefulThenTerminate)
+    {
+        CLIExecutionContext context;
+        const auto cancelEvent = context.CreateCancelEvent();
+
+        VERIFY_IS_TRUE(context.RecordCancellationRequest());
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(cancelEvent, 0));
+        VERIFY_IS_FALSE(context.RecordCancellationRequest());
+        VERIFY_IS_FALSE(context.RecordCancellationRequest());
+        VERIFY_ARE_EQUAL(3ul, context.CancellationCount.load());
+    }
+
+    TEST_METHOD(ComposeCancellationRequests_GracefulThenForceThenTerminate)
+    {
+        CLIExecutionContext context;
+        const auto cancelEvent = context.CreateCancelEvent(CLIExecutionContext::CancellationMode::GracefulAndForce);
+        const auto forceCancelEvent = context.CreateForceCancelEvent();
+
+        VERIFY_IS_TRUE(context.RecordCancellationRequest());
+        VERIFY_ARE_EQUAL(1ul, context.CancellationCount.load());
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(cancelEvent, 0));
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(forceCancelEvent, 0));
+
+        VERIFY_IS_TRUE(context.RecordCancellationRequest());
+        VERIFY_ARE_EQUAL(2ul, context.CancellationCount.load());
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(forceCancelEvent, 0));
+
+        VERIFY_IS_FALSE(context.RecordCancellationRequest());
+        VERIFY_ARE_EQUAL(3ul, context.CancellationCount.load());
+    }
+
+    TEST_METHOD(ComposeCancellationRequestsBeforeForceEventCreation_AreReplayed)
+    {
+        CLIExecutionContext context;
+        const auto cancelEvent = context.CreateCancelEvent(CLIExecutionContext::CancellationMode::GracefulAndForce);
+
+        VERIFY_IS_TRUE(context.RecordCancellationRequest());
+        VERIFY_IS_TRUE(context.RecordCancellationRequest());
+
+        const auto forceCancelEvent = context.CreateForceCancelEvent();
+
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(cancelEvent, 0));
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(forceCancelEvent, 0));
+        VERIFY_ARE_EQUAL(2ul, context.CancellationCount.load());
+        VERIFY_IS_FALSE(context.RecordCancellationRequest());
+    }
+
     TEST_METHOD(EnvironmentArguments_RootGlobalAppliedBeforeParsing)
     {
         ScopedEnvVariable noColor{L"NO_COLOR", L""};

@@ -41,10 +41,11 @@ struct ComposeService
 {
     static std::vector<models::ComposeProjectInformation> List(models::Session& session, bool all);
     static void Create(Terminal& terminal, models::Session& session, const std::wstring& path, HANDLE cancelEvent);
-    static int Up(Terminal& terminal, models::Session& session, const std::wstring& path, HANDLE cancelEvent);
+    static int Up(Terminal& terminal, models::Session& session, const std::wstring& path, HANDLE cancelEvent, HANDLE forceCancelEvent);
     static void Start(Terminal& terminal, models::Session& session, const ComposeProjectReference& project, HANDLE cancelEvent);
     static int Attach(Terminal& terminal, models::Session& session, const ComposeProjectReference& project, HANDLE cancelEvent);
     static void Stop(Terminal& terminal, models::Session& session, const ComposeProjectReference& project, ULONG timeout, HANDLE cancelEvent);
+    static void ForceKill(Terminal& terminal, models::Session& session, const std::string& projectKey);
     static void Remove(Terminal& terminal, models::Session& session, const ComposeProjectReference& project, HANDLE cancelEvent);
 };
 
