@@ -3,6 +3,7 @@
 #include "precomp.h"
 #include "Common.h"
 #include "TestImageRegistry.h"
+#include "WSLCE2EComposeHelpers.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
 
@@ -27,7 +28,7 @@ class WSLCE2EComposeLifecycleTests
         return true;
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Compose_Lifecycle_AcceptsFile)
+    WSLC_TEST_METHOD(WSLCE2E_Compose_Lifecycle_AcceptsFileAndProjectKey)
     {
         const auto projectDirectory = std::filesystem::current_path() / ProjectName;
         auto directoryCleanup = SetupTestDirectory(projectDirectory);
@@ -52,6 +53,7 @@ services:
 
         result = RunWslc(std::format(L"compose start \"{}\"", composePath.wstring()));
         VERIFY_ARE_EQUAL(0u, result.ExitCode.value_or(1));
+        VerifyComposeProjectStatus(ProjectName, L"running(1)");
 
         auto attach = RunWslcInteractive(std::format(L"compose attach \"{}\"", composePath.wstring()));
         VERIFY_IS_TRUE(attach.IsRunning());
@@ -60,6 +62,7 @@ services:
         result = RunWslc(std::format(L"compose stop \"{}\"", composePath.wstring()));
         VERIFY_ARE_EQUAL(0u, result.ExitCode.value_or(1));
         VERIFY_ARE_EQUAL(0, attach.Wait());
+        VerifyComposeProjectStatus(ProjectName, L"exited(1)");
 
         auto up = RunWslcInteractive(std::format(L"compose up \"{}\"", composePath.wstring()));
         VERIFY_IS_TRUE(up.IsRunning());
@@ -68,6 +71,22 @@ services:
         result = RunWslc(std::format(L"compose stop \"{}\"", composePath.wstring()));
         VERIFY_ARE_EQUAL(0u, result.ExitCode.value_or(1));
         VERIFY_ARE_EQUAL(0, up.Wait());
+        VerifyComposeProjectStatus(ProjectName, L"exited(1)");
+
+        VERIFY_IS_TRUE(std::filesystem::remove_all(projectDirectory) > 0);
+
+        result = RunWslc(std::format(L"compose start {}", ProjectArgument));
+        VERIFY_ARE_EQUAL(0u, result.ExitCode.value_or(1));
+        VerifyComposeProjectStatus(ProjectName, L"running(1)");
+
+        auto projectAttach = RunWslcInteractive(std::format(L"compose attach {}", ProjectArgument));
+        VERIFY_IS_TRUE(projectAttach.IsRunning());
+        projectAttach.ExpectStdout("compose-lifecycle\n");
+
+        result = RunWslc(std::format(L"compose stop {}", ProjectArgument));
+        VERIFY_ARE_EQUAL(0u, result.ExitCode.value_or(1));
+        VERIFY_ARE_EQUAL(0, projectAttach.Wait());
+        VerifyComposeProjectStatus(ProjectName, L"exited(1)");
     }
 
 private:
@@ -78,6 +97,7 @@ private:
     }
 
     inline static const std::wstring ProjectName = L"wslc-e2e-compose-lifecycle";
+    inline static const std::wstring ProjectArgument = L"WSLC-E2E-COMPOSE-LIFECYCLE";
     inline static const std::wstring ContainerName = L"wslc-compose-lifecycle-owned";
 };
 

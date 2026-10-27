@@ -118,7 +118,7 @@ HRESULT WSLCComposeOperation::InterfaceSupportsErrorInfo(REFIID interfaceId)
 WSLCComposeOperation::Request WSLCComposeOperation::CaptureRequest(const WSLCComposeOperationRequest& request)
 {
     THROW_HR_IF(E_INVALIDARG, request.SchemaVersion != WSLC_COMPOSE_SCHEMA_VERSION);
-    THROW_HR_IF(E_INVALIDARG, request.Action < WSLCComposeActionValidate || request.Action > WSLCComposeActionStop);
+    THROW_HR_IF(E_INVALIDARG, request.Action < WSLCComposeActionValidate || request.Action > WSLCComposeActionRemove);
 
     if (request.Action == WSLCComposeActionStop)
     {
