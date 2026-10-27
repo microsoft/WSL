@@ -15,7 +15,6 @@ class EventStreamUnitTests
 
     TEST_METHOD(QueuedReaderCancellationAbortsWithoutReleasingGate)
     {
-        const auto coInitialize = wil::CoInitializeEx();
         for (const bool cancelBeforeRead : {false, true})
         {
             EventStore store;
@@ -37,7 +36,6 @@ class EventStreamUnitTests
             }
 
             std::thread reader([&]() {
-                const auto initializeReader = wil::CoInitializeEx();
                 readerStarted.SetEvent();
                 result.set_value(stream->GetNext(cancelEvent.get(), &eventJson));
             });
@@ -72,7 +70,6 @@ class EventStreamUnitTests
 
     TEST_METHOD(QueuedReaderWithoutCancellationWaitsForGate)
     {
-        const auto coInitialize = wil::CoInitializeEx();
         EventStore store;
         wil::unique_event readerAvailable{wil::EventOptions::Signaled};
         auto stream =
@@ -86,7 +83,6 @@ class EventStreamUnitTests
         std::promise<HRESULT> result;
         auto future = result.get_future();
         std::thread reader([&]() {
-            const auto initializeReader = wil::CoInitializeEx();
             readerStarted.SetEvent();
             result.set_value(stream->GetNext(nullptr, &eventJson));
         });
@@ -116,7 +112,6 @@ class EventStreamUnitTests
 
     TEST_METHOD(AbortedReadReleasesGate)
     {
-        const auto coInitialize = wil::CoInitializeEx();
         EventStore store;
         wil::unique_event readerAvailable{wil::EventOptions::Signaled};
         auto stream =
