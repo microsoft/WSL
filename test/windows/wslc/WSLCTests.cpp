@@ -14,8 +14,10 @@ Abstract:
 
 #include "precomp.h"
 #include "Common.h"
+#include "EventStore.h"
 #include "wslc.h"
 #include "wslccompat.h"
+#include "WSLCSession.h"
 #include "WSLCProcessLauncher.h"
 #include "WSLCContainerLauncher.h"
 #include "WSLCContainerEntry.h"
@@ -9631,6 +9633,118 @@ class WSLCTests
         VERIFY_ARE_EQUAL(id, firstEvent.Actor.ID);
         VERIFY_ARE_EQUAL("kill", secondEvent.Action);
         VERIFY_ARE_EQUAL(id, secondEvent.Actor.ID);
+    }
+
+    WSLC_TEST_METHOD(EventStreamQueuedReaderCancellationAbortsWithoutReleasingGate)
+    {
+        for (const bool cancelBeforeRead : {false, true})
+        {
+            wsl::windows::service::wslc::EventStore store;
+            wil::unique_event readerAvailable{wil::EventOptions::Signaled};
+            auto stream = wil::MakeOrThrow<wsl::windows::service::wslc::EventStream>(
+                wil::unique_event{wsl::windows::common::wslutil::DuplicateHandle(readerAvailable.get())});
+            VERIFY_SUCCEEDED(stream->RuntimeClassInitialize(nullptr, &store, 0, 1, {}));
+
+            VERIFY_IS_TRUE(readerAvailable.wait(0));
+            auto releaseGate = readerAvailable.SetEvent_scope_exit();
+            wil::unique_event cancelEvent{wil::EventOptions::ManualReset};
+            wil::unique_event readerStarted{wil::EventOptions::ManualReset};
+            wil::unique_cotaskmem_ansistring eventJson;
+            std::promise<HRESULT> result;
+            auto future = result.get_future();
+            if (cancelBeforeRead)
+            {
+                cancelEvent.SetEvent();
+            }
+
+            std::thread reader([&]() {
+                readerStarted.SetEvent();
+                result.set_value(stream->GetNext(cancelEvent.get(), &eventJson));
+            });
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                cancelEvent.SetEvent();
+                releaseGate.reset();
+                FAIL_FAST_IF_MSG(
+                    WaitForSingleObject(reader.native_handle(), 10 * 1000) != WAIT_OBJECT_0,
+                    "event stream reader did not finish after gate release");
+                reader.join();
+            });
+
+            VERIFY_IS_TRUE(readerStarted.wait(10 * 1000));
+            if (!cancelBeforeRead)
+            {
+                VERIFY_IS_TRUE(future.wait_for(100ms) == std::future_status::timeout);
+                cancelEvent.SetEvent();
+            }
+
+            const bool completed = future.wait_for(10s) == std::future_status::ready;
+            VERIFY_IS_TRUE(completed);
+            if (!completed)
+            {
+                return;
+            }
+
+            VERIFY_ARE_EQUAL(E_ABORT, future.get());
+            VERIFY_IS_NULL(eventJson.get());
+            VERIFY_IS_FALSE(readerAvailable.wait(0));
+        }
+    }
+
+    WSLC_TEST_METHOD(EventStreamQueuedReaderWithoutCancellationWaitsForGate)
+    {
+        wsl::windows::service::wslc::EventStore store;
+        wil::unique_event readerAvailable{wil::EventOptions::Signaled};
+        auto stream = wil::MakeOrThrow<wsl::windows::service::wslc::EventStream>(
+            wil::unique_event{wsl::windows::common::wslutil::DuplicateHandle(readerAvailable.get())});
+        VERIFY_SUCCEEDED(stream->RuntimeClassInitialize(nullptr, &store, 0, 1, {}));
+
+        VERIFY_IS_TRUE(readerAvailable.wait(0));
+        auto releaseGate = readerAvailable.SetEvent_scope_exit();
+        wil::unique_event readerStarted{wil::EventOptions::ManualReset};
+        wil::unique_cotaskmem_ansistring eventJson;
+        std::promise<HRESULT> result;
+        auto future = result.get_future();
+        std::thread reader([&]() {
+            readerStarted.SetEvent();
+            result.set_value(stream->GetNext(nullptr, &eventJson));
+        });
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            releaseGate.reset();
+            FAIL_FAST_IF_MSG(
+                WaitForSingleObject(reader.native_handle(), 10 * 1000) != WAIT_OBJECT_0,
+                "event stream reader did not finish after gate release");
+            reader.join();
+        });
+
+        VERIFY_IS_TRUE(readerStarted.wait(10 * 1000));
+        VERIFY_IS_TRUE(future.wait_for(100ms) == std::future_status::timeout);
+        releaseGate.reset();
+
+        const bool completed = future.wait_for(10s) == std::future_status::ready;
+        VERIFY_IS_TRUE(completed);
+        if (!completed)
+        {
+            return;
+        }
+
+        VERIFY_ARE_EQUAL(WSLC_E_EVENT_STREAM_FINISHED, future.get());
+        VERIFY_IS_NULL(eventJson.get());
+        VERIFY_IS_TRUE(readerAvailable.wait(0));
+    }
+
+    WSLC_TEST_METHOD(EventStreamAbortedReadReleasesGate)
+    {
+        wsl::windows::service::wslc::EventStore store;
+        wil::unique_event readerAvailable{wil::EventOptions::Signaled};
+        auto stream = wil::MakeOrThrow<wsl::windows::service::wslc::EventStream>(
+            wil::unique_event{wsl::windows::common::wslutil::DuplicateHandle(readerAvailable.get())});
+        VERIFY_SUCCEEDED(stream->RuntimeClassInitialize(nullptr, &store, 0, 1, {}));
+
+        wil::unique_event cancelEvent{wil::EventOptions::ManualReset | wil::EventOptions::Signaled};
+        wil::unique_cotaskmem_ansistring eventJson;
+        VERIFY_ARE_EQUAL(E_ABORT, stream->GetNext(cancelEvent.get(), &eventJson));
+        VERIFY_IS_NULL(eventJson.get());
+        VERIFY_IS_TRUE(readerAvailable.wait(0));
     }
 
     WSLC_TEST_METHOD(EventStreamSessionTerminationAbortsReader)
