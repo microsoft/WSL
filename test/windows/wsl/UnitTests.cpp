@@ -7687,8 +7687,19 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                     descriptor.get()));
 
                 {
+                    wil::unique_hfile file{CreateFileW(
+                        path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+                    VERIFY_IS_TRUE(static_cast<bool>(file));
+                }
+
+                {
                     const auto runAsUser = wil::impersonate_token(impersonationToken.get());
                     VERIFY_ARE_NOT_EQUAL(INVALID_FILE_ATTRIBUTES, GetFileAttributesW(path.c_str()));
+
+                    // A metadata-only open must not enforce the data-read requirement.
+                    wil::unique_hfile metadataFile{CreateFileW(
+                        path.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+                    VERIFY_IS_TRUE(static_cast<bool>(metadataFile));
 
                     wil::unique_hfile file{CreateFileW(
                         path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
