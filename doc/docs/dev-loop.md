@@ -63,55 +63,6 @@ $env:DOTNET_ROOT_X64 = "C:\Program Files\dotnet\x64"
 
 ## Building WSL
 
-### Native audit NuGet dependencies
-
-The Linux audit collector uses `ebpf.linux-musl-x86_64` and `ebpf.linux-musl-arm64`,
-pinned in [`packages.config`](../../packages.config). CMake selects the matching
-architecture and statically links the package's loader and dependencies into
-`init`; a separate collector executable is not shipped. The package must target
-the same `Microsoft.WSL.LinuxSdk` version as WSL.
-
-The `MDEXplatFeed` source in [`nuget.config`](../../nuget.config) currently points
-to the repository-local `nuget\local` directory, which is ignored by Git.
-Download the `WSL_Static_x86_64` and `WSL_Static_aarch64` artifacts from
-[run 20261026.3](https://dev.azure.com/microsoft/Windows%20Defender/_build/results?buildId=161660474)
-and place their original packages in that directory:
-
-```text
-nuget\local\ebpf.linux-musl-x86_64.0.0.26102026.161660474.nupkg
-nuget\local\ebpf.linux-musl-arm64.0.0.26102026.161660474.nupkg
-```
-
-Then run the normal `cmake .` command; NuGet restore uses the configured local
-source automatically. Build agents also need these files while the local source
-is in use. Do not rebuild or repackage the SDK locally.
-
-Once the packages are published, change only the `MDEXplatFeed` source value to:
-
-```text
-https://pkgs.dev.azure.com/microsoft/Windows%20Defender/_packaging/MDEXplatFeed/nuget/v3/index.json
-```
-
-Feed restores require read access and an authenticated
-[Azure Artifacts Credential Provider](https://github.com/microsoft/artifacts-credprovider).
-An Azure CLI login alone does not authenticate NuGet. Pipeline restores already
-use `NuGetAuthenticate@1`; their build identity also needs feed read access.
-
-CMake checks the package's SDK and target architecture. The initrd contains only
-the three required BPF variants and the architecture-specific syscall table,
-read directly from the restored package. No custom payload manifest or source
-fingerprint is generated. Runtime event validation and policy filtering remain
-unchanged.
-
-This package version does not expose `socket_identity` in its event ABI.
-Network events retain the `socketInode`, `socketFamily` and `socketType` fields
-as `null`; their field state and collector coverage report them as unsupported.
-No socket identity is inferred from syscall arguments or endpoint addresses.
-The remaining event families, policy filtering and Windows Security sink are
-unchanged.
-
-### Configure and build
-
 Once you have cloned the repository, generate the Visual Studio solution by running:
 
 ```
