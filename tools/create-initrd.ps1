@@ -8,8 +8,7 @@ param (
     [Parameter(Mandatory)][string]$InputFile,
     [Parameter(Mandatory)][string]$OutputFile,
     [string]$AuditPayloadDirectory,
-    [ValidateSet('x86_64', 'aarch64')][string]$Architecture,
-    [switch]$AllowDevelopmentPackage
+    [ValidateSet('x86_64', 'aarch64')][string]$Architecture
 )
 
 $ErrorActionPreference = "Stop"
@@ -61,8 +60,7 @@ if ($AuditPayloadDirectory)
 {
     if (-not $Architecture) { throw 'Architecture is required for the audit initrd payload.' }
     $auditManifest = & (Join-Path $PSScriptRoot 'securityaudit\Validate-Payload.ps1') `
-        -PayloadDirectory $AuditPayloadDirectory -Architecture $Architecture -PassThru `
-        -AllowDevelopmentPackage:$AllowDevelopmentPackage
+        -PayloadDirectory $AuditPayloadDirectory -Architecture $Architecture -PassThru
 }
 
 $out = [System.IO.File]::Create($OutputFile)

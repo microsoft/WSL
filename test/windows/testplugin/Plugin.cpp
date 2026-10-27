@@ -457,13 +457,11 @@ void RunWslcSuccessChecks(const WSLCSessionInformation* Session)
             std::string err;
 
             MultiHandleWait io;
-            io.AddHandle(std::make_unique<ReadHandle>(std::move(stdoutSocket), [&out](const auto& span) {
-                out.append(span.begin(), span.end());
-            }));
+            io.AddHandle(std::make_unique<ReadHandle>(
+                std::move(stdoutSocket), [&out](const auto& span) { out.append(span.begin(), span.end()); }));
 
-            io.AddHandle(std::make_unique<ReadHandle>(std::move(stderrSocket), [&err](const auto& span) {
-                err.append(span.begin(), span.end());
-            }));
+            io.AddHandle(std::make_unique<ReadHandle>(
+                std::move(stderrSocket), [&err](const auto& span) { err.append(span.begin(), span.end()); }));
 
             io.AddHandle(std::make_unique<EventHandle>(std::move(exitEvent)));
 

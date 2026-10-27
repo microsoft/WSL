@@ -90,9 +90,8 @@ public:
 
         parser.AddArgument(
             [](auto) {
-                LaunchWsl(
-                    std::format(L"{} {} {}", WSL_INSTALL_ARG, WSL_INSTALL_ARG_NO_DISTRIBUTION_OPTION, WSL_INSTALL_ARG_PROMPT_BEFORE_EXIT_OPTION)
-                        .c_str());
+                LaunchWsl(std::format(L"{} {} {}", WSL_INSTALL_ARG, WSL_INSTALL_ARG_NO_DISTRIBUTION_OPTION, WSL_INSTALL_ARG_PROMPT_BEFORE_EXIT_OPTION)
+                              .c_str());
             },
             wslhost::install_prerequisites_arg);
 
@@ -195,9 +194,8 @@ try
             // Create an event to be signaled when the last COM object is released.
             g_exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
 
-            THROW_IF_FAILED(
-                ::CoRegisterClassObject(
-                    __uuidof(NotificationActivator), winrt::make<NotificationActivatorFactory>().get(), CLSCTX_LOCAL_SERVER, REGCLS_MULTIPLEUSE, &cookie));
+            THROW_IF_FAILED(::CoRegisterClassObject(
+                __uuidof(NotificationActivator), winrt::make<NotificationActivatorFactory>().get(), CLSCTX_LOCAL_SERVER, REGCLS_MULTIPLEUSE, &cookie));
 
             return 0;
         },

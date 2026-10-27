@@ -137,11 +137,13 @@ find_nuget_package(Wix WIX /tools/net6.0/any)
 
 # Architecture-specific nuget packages from the OS repo.
 if (${TARGET_PLATFORM} STREQUAL "x64")
+    find_nuget_package(ebpf.linux-musl-x86_64 SECURITYAUDIT /)
     find_nuget_package(Microsoft.DXCore.Linux.amd64fre DXCORE /build/native)
     find_nuget_package(Microsoft.WSL.Dependencies.amd64fre WSLDEPS /build/native)
 endif()
 
 if (${TARGET_PLATFORM} STREQUAL "arm64")
+    find_nuget_package(ebpf.linux-musl-arm64 SECURITYAUDIT /)
     find_nuget_package(Microsoft.DXCore.Linux.arm64fre DXCORE /build/native)
     find_nuget_package(Microsoft.WSL.Dependencies.arm64fre WSLDEPS /build/native)
 endif()

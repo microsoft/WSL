@@ -661,23 +661,7 @@ namespace {
                     fields["acceptedFd"] = base.return_code;
                 }
             }
-            const auto& identity = record.socket_identity;
-            if (identity.valid & ~(SOCKET_IDENTITY_VALID_INODE | SOCKET_IDENTITY_VALID_FAMILY | SOCKET_IDENTITY_VALID_TYPE))
-            {
-                throw std::invalid_argument("Unknown socket identity validity bits");
-            }
-            if (identity.valid & SOCKET_IDENTITY_VALID_INODE)
-            {
-                fields["socketInode"] = identity.inode;
-            }
-            if (identity.valid & SOCKET_IDENTITY_VALID_FAMILY)
-            {
-                fields["socketFamily"] = identity.family;
-            }
-            if (identity.valid & SOCKET_IDENTITY_VALID_TYPE)
-            {
-                fields["socketType"] = identity.type;
-            }
+            // The pinned musl SDK has no socket identity; those wire fields remain null.
             const auto& endpoint = record.socket_op;
             if (operation != "socket" && !(base.status & (STATUS_VALUE | STATUS_NOARGS)))
             {

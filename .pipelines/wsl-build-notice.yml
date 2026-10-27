@@ -21,6 +21,9 @@ steps:
 - task: NuGetToolInstaller@1
   displayName: Install NuGet
 
+- task: NuGetAuthenticate@1
+  displayName: Authenticate NuGet feeds
+
 - task: NuGetCommand@2
   displayName: Restore packages (for the WSLg NOTICE)
   inputs:

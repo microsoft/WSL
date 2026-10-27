@@ -120,6 +120,9 @@ jobs:
               Write-Host "##vso[task.setvariable variable=WSL_PACKAGE_VERSION;isOutput=true]$([string]('${{ parameters.packageVersion }}' + '.0'))"
               Write-Host "##vso[task.setvariable variable=WSL_NUGET_PACKAGE_VERSION;isOutput=true]$([string]('${{ parameters.packageVersion }}'))"
 
+      - task: NuGetAuthenticate@1
+        displayName: Authenticate NuGet feeds
+
       - task: CMake@1
         displayName: "CMake ${{ parameters.platform }}"
         inputs:

@@ -181,7 +181,8 @@ inline std::string_view ObservationFieldState(const nlohmann::json& message, std
         }
         if (!dns)
         {
-            if (name == "protocol" || name == "socketNetworkNamespace")
+            if (name == "protocol" || name == "socketNetworkNamespace" || name == "socketInode" || name == "socketFamily" ||
+                name == "socketType")
             {
                 return "unsupported";
             }

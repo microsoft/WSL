@@ -116,6 +116,9 @@ stages:
           - script: python tools\devops\validate-line-endings.py .
             displayName: Validate line endings
 
+          - task: NuGetAuthenticate@1
+            displayName: Authenticate NuGet feeds
+
           - task: CMake@1
             displayName: "CMake ."
             inputs:

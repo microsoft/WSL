@@ -63,6 +63,48 @@ $env:DOTNET_ROOT_X64 = "C:\Program Files\dotnet\x64"
 
 ## Building WSL
 
+### Native audit NuGet dependencies
+
+The Linux audit collector uses `ebpf.linux-musl-x86_64` and `ebpf.linux-musl-arm64`,
+pinned in [`packages.config`](../../packages.config). CMake selects the matching
+architecture and statically links the package's loader and dependencies into
+`init`; a separate collector executable is not shipped. The package must target
+the same `Microsoft.WSL.LinuxSdk` version as WSL.
+
+These packages come from the private
+[MDEXplatFeed](https://dev.azure.com/microsoft/Windows%20Defender/_artifacts/feed/MDEXplatFeed).
+Local NuGet restores require feed read access and an authenticated
+[Azure Artifacts Credential Provider](https://github.com/microsoft/artifacts-credprovider).
+An Azure CLI login alone does not authenticate NuGet. Pipeline restores use
+`NuGetAuthenticate@1`; the pipeline build identity also needs read access to the
+Windows Defender feed.
+
+The pinned version `0.0.26102026.161660474` was built by
+[run 20261026.3](https://dev.azure.com/microsoft/Windows%20Defender/_build/results?buildId=161660474),
+with feed publication disabled. Until it is published, download both
+`WSL_Static_x86_64` and `WSL_Static_aarch64` artifacts and put their original
+`.nupkg` files in a local NuGet source directory. Restore before configuring:
+
+```powershell
+nuget restore packages.config -SolutionDirectory . -Source "C:\local-feed;https://pkgs.dev.azure.com/shine-oss/wsl/_packaging/WslDependencies/nuget/v3/index.json" -NonInteractive
+```
+
+Do not rebuild or repackage the SDK locally. The previous
+`WSL_SECURITYAUDIT_LIBRARY_DIR` and `WSL_SECURITYAUDIT_ALLOW_DEVELOPMENT_PACKAGE`
+options are no longer used. Configure/build validates package identity, SDK,
+architecture, event ABI and payload hashes, and stages only the three required
+BPF variants, the architecture-specific syscall table and provenance into the
+initrd.
+
+This package version does not expose `socket_identity` in its event ABI.
+Network events retain the `socketInode`, `socketFamily` and `socketType` fields
+as `null`; their field state and collector coverage report them as unsupported.
+No socket identity is inferred from syscall arguments or endpoint addresses.
+The remaining event families, policy filtering and Windows Security sink are
+unchanged.
+
+### Configure and build
+
 Once you have cloned the repository, generate the Visual Studio solution by running:
 
 ```

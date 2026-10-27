@@ -5,8 +5,8 @@ param(
     [AllowEmptyString()][string]$PayloadDirectory,
     [Parameter(Mandatory)][ValidateSet('x86_64', 'aarch64')][string]$Architecture,
     [string]$SdkVersion,
+    [string]$PackageVersion,
     [switch]$BuildInputs,
-    [switch]$AllowDevelopmentPackage,
     [string]$StageDirectory,
     [switch]$PassThru
 )
@@ -59,70 +59,123 @@ function Assert-StaticArchive([string]$Path, [uint16]$Machine) {
 }
 
 if ([string]::IsNullOrWhiteSpace($PayloadDirectory) -or -not (Test-Path -LiteralPath $PayloadDirectory -PathType Container)) {
-    throw 'Set WSL_SECURITYAUDIT_LIBRARY_DIR to a matching musl static audit package; dynamic collector packages are not supported.'
+    throw 'Audit payload directory is missing. Restore the architecture-specific ebpf.linux-musl NuGet package before building.'
 }
 $root = (Get-Item -LiteralPath $PayloadDirectory).FullName.TrimEnd('\','/')
 $entries = @((Get-Item -LiteralPath $root)) + @(Get-ChildItem -LiteralPath $root -Recurse -Force)
 foreach ($entry in $entries) {
     if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "Package links are forbidden: $($entry.FullName)" }
 }
-$manifest = Get-Content (Join-Path $root 'audit-payload.json') -Raw | ConvertFrom-Json
-if ($manifest.formatVersion -ne 3 -or $manifest.linkage -cne 'static-init' -or
-    $manifest.architecture -cne $Architecture -or $manifest.protocolVersion -ne 2 -or $manifest.eventAbiVersion -ne 1) {
-    throw 'Unsupported init audit package format, architecture or ABI.'
-}
-if ($manifest.developmentOnly -isnot [bool] -or ($manifest.developmentOnly -and -not $AllowDevelopmentPackage)) {
-    throw 'Development audit archives require explicit approval and are not eligible for an official release.'
-}
-if ($SdkVersion -and $manifest.sdkVersion -cne $SdkVersion) { throw 'Audit package and init SDK versions differ.' }
-if ($manifest.developmentOnly) { Write-Warning 'Using locally built musl archives for development, not an approved release artifact.' }
-foreach ($name in 'loaderRevision','libbpfRevision') {
-    if ($manifest.$name -cnotmatch '\A[0-9a-f]{40}\z') { throw "Invalid revision: $name" }
-}
-foreach ($name in 'sdkArchiveSha256','loaderPatchSha256','syscallSourceSha256') {
-    if ($manifest.$name -cnotmatch '\A[0-9a-f]{64}\z') { throw "Invalid source provenance: $name" }
-}
 $syscall = if ($Architecture -eq 'aarch64') { 'syscalls_aarch64.conf' } else { 'syscalls.conf' }
+$packageId = if ($Architecture -eq 'aarch64') { 'ebpf.linux-musl-arm64' } else { 'ebpf.linux-musl-x86_64' }
+$rid = if ($Architecture -eq 'aarch64') { 'arm64' } else { 'x64' }
 $runtime = @(
     'wsl-security-audit/ebpf_wrapper_kern_raw_tp_sub4096_btf_rbuff_enriched_fmap.o',
     'wsl-security-audit/ebpf_wrapper_kern_raw_tp_btf_rbuff_enriched_fmap.o',
     'wsl-security-audit/ebpf_wrapper_kern_raw_tp_args64_krsi_btf_rbuff_enriched_fmap.o',
     "wsl-security-audit/$syscall"
 )
-$build = @('include/event_defs.h','include/ebpf_arch_macros.h','include/ebpf_plugin_loader.h',
-    'lib/libebpf_loader.a','lib/libbpf.a','lib/libelf.a','lib/libeu.a','lib/libz.a')
+$archives = @('ebpf_loader','bpf','elf','eu','z') | ForEach-Object { "runtimes/linux-musl-$rid/native/lib$_.a" }
+$build = @('include/ebpf/event_defs.h','include/ebpf/ebpf_arch_macros.h','include/ebpf/ebpf_plugin_loader.h') + $archives
+$paths = @{}
+$hashes = [ordered]@{}
+$inputs = [ordered]@{}
+if ($BuildInputs) {
+    if (-not $SdkVersion -or -not $PackageVersion) { throw 'SDK and package versions are required when validating NuGet build inputs.' }
+    $metadataPath = Join-Path $root 'metadata\build.json'
+    $metadata = Get-Content -LiteralPath $metadataPath -Raw | ConvertFrom-Json
+    $link = Get-Content -LiteralPath (Join-Path $root 'metadata\link.json') -Raw | ConvertFrom-Json
+    # packages.config restores keep the nupkg, but do not extract its nuspec.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $package = [IO.Compression.ZipFile]::OpenRead((Join-Path $root "$packageId.$PackageVersion.nupkg"))
+    try {
+        $entry = $package.GetEntry("$packageId.nuspec")
+        if (-not $entry) { throw 'Audit NuGet package is missing its nuspec.' }
+        $reader = [IO.StreamReader]::new($entry.Open())
+        try { $nuspec = [xml]$reader.ReadToEnd() }
+        finally { $reader.Dispose() }
+    } finally { $package.Dispose() }
+    if ($nuspec.package.metadata.id -cne $packageId -or $nuspec.package.metadata.version -cne $PackageVersion) {
+        throw 'Audit NuGet package identity or version does not match packages.config.'
+    }
+    if ($metadata.target -cne "$Architecture-unknown-linux-musl" -or $link.target -cne $metadata.target) {
+        throw 'Audit NuGet package target does not match the build architecture.'
+    }
+    if ($metadata.sdk -cne "Microsoft.WSL.LinuxSdk/$SdkVersion" -or $link.sdk -cne $metadata.sdk) {
+        throw 'Audit package and init SDK versions differ.'
+    }
+    if (($link.archives -join ';') -cne ($archives -join ';')) { throw 'Unexpected audit static link dependencies or order.' }
+    foreach ($relative in $runtime) {
+        $source = 'include/ebpf/' + ($relative -split '/')[-1]
+        $paths[$relative] = $source
+        $hashes[$relative] = $metadata.sha256.$source
+        $inputs[$source] = $metadata.sha256.$source
+    }
+    foreach ($relative in $build) {
+        $inputs[$relative] = $metadata.sha256.$relative
+    }
+    $manifest = [pscustomobject]@{
+        formatVersion = 4
+        linkage = 'static-init'
+        architecture = $Architecture
+        protocolVersion = 2
+        eventAbiVersion = 1
+        packageId = $packageId
+        packageVersion = $PackageVersion
+        sdkVersion = $SdkVersion
+        loaderRevision = $metadata.source_commit
+        sdkArchiveSha256 = $metadata.dependencies.sdk.sha256
+        packageBuildSha256 = Get-PayloadFileSha256 $metadataPath
+        files = [pscustomobject]$hashes
+    }
+} else {
+    $manifest = Get-Content -LiteralPath (Join-Path $root 'audit-payload.json') -Raw | ConvertFrom-Json
+    $expected = $runtime + 'audit-payload.json'
+    $actual = @($entries | Where-Object { -not $_.PSIsContainer } |
+        ForEach-Object { $_.FullName.Substring($root.Length+1).Replace('\','/') })
+    if (Compare-Object ($expected | Sort-Object) ($actual | Sort-Object)) {
+        throw 'Unexpected/missing runtime files; no separate collector executable or dynamic runtime is allowed.'
+    }
+    foreach ($relative in $runtime) {
+        $paths[$relative] = $relative
+        $inputs[$relative] = $manifest.files.$relative
+    }
+}
+if ($manifest.formatVersion -ne 4 -or $manifest.linkage -cne 'static-init' -or
+    $manifest.architecture -cne $Architecture -or $manifest.protocolVersion -ne 2 -or $manifest.eventAbiVersion -ne 1) {
+    throw 'Unsupported init audit package format, architecture or ABI.'
+}
+if ($manifest.packageId -cne $packageId -or [string]::IsNullOrWhiteSpace($manifest.packageVersion) -or
+    ($PackageVersion -and $manifest.packageVersion -cne $PackageVersion)) {
+    throw 'Unexpected audit NuGet package identity or version.'
+}
+if ($SdkVersion -and $manifest.sdkVersion -cne $SdkVersion) { throw 'Audit package and init SDK versions differ.' }
+if ($manifest.loaderRevision -cnotmatch '\A[0-9a-f]{40}\z') { throw 'Invalid loader revision.' }
+foreach ($name in 'sdkArchiveSha256','packageBuildSha256') {
+    if ($manifest.$name -cnotmatch '\A[0-9a-f]{64}\z') { throw "Invalid source provenance: $name" }
+}
 if (Compare-Object ($runtime | Sort-Object) (@($manifest.files.PSObject.Properties.Name) | Sort-Object)) {
     throw 'Runtime payload must contain only the three BPF programs and the syscall table.'
 }
-if (Compare-Object ($build | Sort-Object) (@($manifest.buildFiles.PSObject.Properties.Name) | Sort-Object)) {
-    throw 'Static build-input inventory is incomplete or unexpected.'
-}
-$expected = $runtime + 'audit-payload.json'
-if ($BuildInputs) { $expected += $build }
-$actual = @($entries | Where-Object { -not $_.PSIsContainer } |
-    ForEach-Object { $_.FullName.Substring($root.Length+1).Replace('\','/') })
-if (Compare-Object ($expected | Sort-Object) ($actual | Sort-Object)) {
-    throw 'Unexpected/missing files; no separate collector executable or dynamic runtime is allowed.'
-}
-foreach ($relative in $expected | Where-Object { $_ -ne 'audit-payload.json' }) {
-    $hash = if ($relative -cin $runtime) { $manifest.files.$relative } else { $manifest.buildFiles.$relative }
+foreach ($relative in $inputs.Keys) {
+    $hash = $inputs[$relative]
     $path = Join-Path $root $relative.Replace('/','\')
     if ($hash -cnotmatch '\A[0-9a-f]{64}\z' -or (Get-Item -LiteralPath $path).Length -eq 0 -or
         (Get-PayloadFileSha256 $path) -cne $hash) { throw "Package hash/size mismatch: $relative" }
 }
 $machine = if ($Architecture -eq 'aarch64') { 183 } else { 62 }
 if ($BuildInputs) {
-    foreach ($relative in $build | Where-Object { $_.EndsWith('.a') }) {
+    foreach ($relative in $archives) {
         Assert-StaticArchive (Join-Path $root $relative.Replace('/','\')) $machine
     }
-    $abi = @(Select-String -LiteralPath (Join-Path $root 'include\event_defs.h') -Pattern '^#define VERSION 1$')
+    $abi = @(Select-String -LiteralPath (Join-Path $root 'include\ebpf\event_defs.h') -Pattern '^#define VERSION 1$')
     if ($abi.Count -ne 1) { throw 'Unexpected loader header ABI.' }
 }
 foreach ($relative in $runtime | Where-Object { $_.EndsWith('.o') }) {
-    $bytes = [IO.File]::ReadAllBytes((Join-Path $root $relative.Replace('/','\')))
+    $bytes = [IO.File]::ReadAllBytes((Join-Path $root $paths[$relative].Replace('/','\')))
     Assert-RelocatableElf $bytes 0 $bytes.LongLength 247
 }
-$config = Join-Path $root "wsl-security-audit\$syscall"
+$config = Join-Path $root $paths["wsl-security-audit/$syscall"].Replace('/','\')
 if ((Get-Item -LiteralPath $config).Length -gt 1MB) { throw 'Syscall table exceeds its size limit.' }
 $text = [IO.File]::ReadAllText($config,[Text.UTF8Encoding]::new($false,$true))
 if ($text.Contains("`r")) { throw 'Syscall table must use LF, not CRLF.' }
@@ -149,12 +202,14 @@ if ($StageDirectory) {
         }
     }
     $null = New-Item -ItemType Directory -Path (Join-Path $StageDirectory 'wsl-security-audit') -Force
-    foreach ($relative in $runtime + 'audit-payload.json') {
-        Copy-Item -LiteralPath (Join-Path $root $relative.Replace('/','\')) `
+    foreach ($relative in $runtime) {
+        Copy-Item -LiteralPath (Join-Path $root $paths[$relative].Replace('/','\')) `
             -Destination (Join-Path $StageDirectory $relative.Replace('/','\')) -Force
     }
+    [IO.File]::WriteAllText((Join-Path $StageDirectory 'audit-payload.json'),
+        ($manifest | ConvertTo-Json -Depth 5) + "`n", [Text.UTF8Encoding]::new($false))
     & $PSCommandPath -PayloadDirectory $StageDirectory -Architecture $Architecture -SdkVersion $SdkVersion `
-        -AllowDevelopmentPackage:$AllowDevelopmentPackage
+        -PackageVersion $PackageVersion
 }
 Write-Verbose "Validated static init audit package for $Architecture, SDK $($manifest.sdkVersion)."
 if ($PassThru) { $manifest }

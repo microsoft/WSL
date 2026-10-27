@@ -621,8 +621,8 @@ class WSLCE2EGlobalTests
         // name carries the session's unique suffix: "test-cont" on its own is a prefix of the
         // "wslc-test-container" names other tests leave in the default session.
         const auto containerName = std::format(L"wslc-session-cont-{}", guidStr.substr(0, 8));
-        result = RunWslc(
-            std::format(L"--session \"{}\" container create --name {} {}", session.Name(), containerName, DebianTestImage().NameAndTag()));
+        result = RunWslc(std::format(
+            L"--session \"{}\" container create --name {} {}", session.Name(), containerName, DebianTestImage().NameAndTag()));
         result.Dump(); // Dump so it is easier to find any potential issues with the pull in the test output.
         result.Verify({.ExitCode = 0});
 

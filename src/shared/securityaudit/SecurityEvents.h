@@ -78,9 +78,9 @@ inline std::span<const SecurityField> SecurityFields(std::string_view family)
     static constexpr SecurityField network[] = {
         {"socketFd", T::Number},
         {"acceptedFd", T::Number},
-        {"socketInode", T::Number},
-        {"socketFamily", T::Number},
-        {"socketType", T::Number},
+        {"socketInode", T::Unavailable},
+        {"socketFamily", T::Unavailable},
+        {"socketType", T::Unavailable},
         {"requestedProtocol", T::Number},
         {"protocol", T::Unavailable},
         {"socketNetworkNamespace", T::Unavailable},
@@ -184,7 +184,7 @@ inline std::string_view SecurityFamily(std::string_view operation)
 inline nlohmann::json LibraryCoverage()
 {
     return {
-        {"sourceRevision", "d4b79e10f54424040361991cd9033fb7b9311ec4"},
+        {"sourceRevision", "e964b0e378330f9b5b5a2fd74a2c728d938e9167"},
         {"complete", false},
         {"process-execution",
          {{"supported", {"successful-execution"}},
@@ -198,6 +198,9 @@ inline nlohmann::json LibraryCoverage()
            {"listen",
             "sendmsg",
             "async-connect-completion",
+            "socket-inode",
+            "socket-family",
+            "socket-type",
             "actual-protocol",
             "socket-network-namespace",
             "bind-assigned-port",

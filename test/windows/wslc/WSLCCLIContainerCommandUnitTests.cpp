@@ -150,14 +150,12 @@ class WSLCCLIContainerCommandUnitTests
         // Control characters without a dedicated escape use \x, matching strconv.Quote.
         VERIFY_ARE_EQUAL(
             std::wstring{L"\"a\\x1bb\""},
-            Truncated(
-                "a\x1b"
-                "b"));
+            Truncated("a\x1b"
+                      "b"));
         VERIFY_ARE_EQUAL(
             std::wstring{L"\"a\\x7fb\""},
-            Truncated(
-                "a\x7f"
-                "b"));
+            Truncated("a\x7f"
+                      "b"));
     }
 
     TEST_METHOD(FormatCommand_PrintableUnicode_IsNotEscaped)

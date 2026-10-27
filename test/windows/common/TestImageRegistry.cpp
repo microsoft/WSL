@@ -56,11 +56,8 @@ void TestImageRegistry::EnsureSeeded(const std::wstring& sessionName)
     {
         if (image.Repository != wsl::windows::wslc::models::c_none && image.Tag != wsl::windows::wslc::models::c_none)
         {
-            m_loaded.insert(
-                ImageKey{
-                    sessionName,
-                    wsl::shared::string::MultiByteToWide(image.Repository),
-                    wsl::shared::string::MultiByteToWide(image.Tag)});
+            m_loaded.insert(ImageKey{
+                sessionName, wsl::shared::string::MultiByteToWide(image.Repository), wsl::shared::string::MultiByteToWide(image.Tag)});
         }
     }
 

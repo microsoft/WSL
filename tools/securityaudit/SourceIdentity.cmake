@@ -14,7 +14,7 @@ set(audit_source_files
     src/shared/securityaudit/Launch.h
     tools/securityaudit/SourceIdentity.cmake
     tools/securityaudit/GenerateBuildInfo.cmake
-    tools/securityaudit/Prepare-StaticPackage.ps1
+    tools/securityaudit/PayloadHash.ps1
     tools/securityaudit/Validate-Payload.ps1)
 list(SORT audit_source_files)
 set(audit_source_identity "")

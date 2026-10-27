@@ -669,12 +669,10 @@ class WSLCE2EContainerCpTests
 
         // The link target is relative, so it only resolves against the directory holding the link.
         // Read against the container root it would name a path that does not exist.
-        auto execResult = RunWslc(
-            std::format(
-                L"container exec {} sh -c \"mkdir -p /tmp/linkdir; echo relative-link-target > /tmp/linkdir/linktarget.txt; ln "
-                L"-s "
-                L"linktarget.txt /tmp/linkdir/thelink.txt\"",
-                WslcContainerName));
+        auto execResult = RunWslc(std::format(
+            L"container exec {} sh -c \"mkdir -p /tmp/linkdir; echo relative-link-target > /tmp/linkdir/linktarget.txt; ln -s "
+            L"linktarget.txt /tmp/linkdir/thelink.txt\"",
+            WslcContainerName));
         execResult.Verify({.ExitCode = 0});
 
         auto downloadDir = std::filesystem::current_path() / L"wslc-cp-follow-link-relative-test";
@@ -748,9 +746,8 @@ class WSLCE2EContainerCpTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_FromStoppedContainer)
     {
         // Create a container, put a file in it, stop it, then copy out.
-        auto runResult = RunWslc(
-            std::format(
-                L"container run --name {} {} sh -c \"echo stopped-content > /tmp/stopped.txt\"", WslcContainerName, DebianImage.NameAndTag()));
+        auto runResult = RunWslc(std::format(
+            L"container run --name {} {} sh -c \"echo stopped-content > /tmp/stopped.txt\"", WslcContainerName, DebianImage.NameAndTag()));
         runResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Container has exited (ran a one-shot command). Copy from the stopped container.
@@ -790,11 +787,10 @@ class WSLCE2EContainerCpTests
             RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         runResult.Verify({.Stderr = L"", .ExitCode = 0});
 
-        auto execResult = RunWslc(
-            std::format(
-                L"container exec {} sh -c \"echo stdout-dest-test > /tmp/stdoutfile.txt; mkdir -p /tmp/srcdir; echo inner > "
-                L"/tmp/srcdir/inner.txt\"",
-                WslcContainerName));
+        auto execResult = RunWslc(std::format(
+            L"container exec {} sh -c \"echo stdout-dest-test > /tmp/stdoutfile.txt; mkdir -p /tmp/srcdir; echo inner > "
+            L"/tmp/srcdir/inner.txt\"",
+            WslcContainerName));
         execResult.Verify({.ExitCode = 0});
 
         auto workDir = std::filesystem::current_path() / L"wslc-cp-file-dest-behavior";

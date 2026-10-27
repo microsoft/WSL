@@ -67,7 +67,6 @@ add_custom_command(
     COMMAND powershell.exe -ExecutionPolicy Bypass -NoProfile -NonInteractive
         -File "${CMAKE_SOURCE_DIR}/tools/create-initrd.ps1" "${INIT}" "${INITRAMFS}"
         -AuditPayloadDirectory "${WSL_SECURITYAUDIT_STAGED_PAYLOAD}" -Architecture "${LLVM_ARCH}"
-        ${WSL_SECURITYAUDIT_CONFIG_ARGUMENTS}
     COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/CmakeFiles/initramfs"
     VERBATIM)
 add_custom_target(initramfs DEPENDS ${INITRAMFS})
