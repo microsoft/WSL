@@ -18,7 +18,6 @@ Abstract:
 #include "ComposeNormalizer.h"
 #include "ResourceName.h"
 #include "WSLCComposeOperation.h"
-#include "WSLCComposeSession.h"
 #include "WSLCExecutionContext.h"
 #include "WSLCContainer.h"
 #include "WSLCNetworkMetadata.h"
@@ -2408,63 +2407,6 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::CreateComposeSession(LPCWSTR Path, IWSLCComposeSession** ComposeSession)
-try
-{
-    WSLCExecutionContext context(this);
-    RETURN_HR_IF_NULL(E_POINTER, Path);
-    RETURN_HR_IF_NULL(E_POINTER, ComposeSession);
-    *ComposeSession = nullptr;
-
-    std::error_code error;
-    const auto configPath = std::filesystem::canonical(Path, error);
-    THROW_IF_WIN32_ERROR_MSG(error.value(), "Failed to resolve compose path %ls", Path);
-
-    auto key = configPath.wstring();
-    std::ranges::transform(key, key.begin(), [](wchar_t value) { return std::towlower(value); });
-
-    std::lock_guard composeLock(m_composeSessionsLock);
-    if (const auto existing = m_composeSessions.find(key); existing != m_composeSessions.end())
-    {
-        // TODO: Check the state of the compose session before returning.
-        return existing->second.CopyTo(ComposeSession);
-    }
-
-    std::ifstream stream{configPath, std::ios::binary};
-    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_OPEN_FAILED), !stream, "Failed to open compose document %ls", configPath.c_str());
-    const std::string content{std::istreambuf_iterator<char>{stream}, std::istreambuf_iterator<char>{}};
-    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_READ_FAULT), stream.bad(), "Failed to read compose document %ls", configPath.c_str());
-    const auto* begin = reinterpret_cast<const std::byte*>(content.data());
-    const ComposeDocuments documents{
-        .SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION,
-        .WorkingDirectory = std::filesystem::current_path(),
-        .ProjectDirectory = configPath.parent_path(),
-        .Documents = {{
-            .SourcePath = configPath,
-            .BaseDirectory = configPath.parent_path(),
-            .Content = std::vector<std::byte>{begin, begin + content.size()},
-        }},
-    };
-    const auto spec = ComposeNormalizer::Normalize(documents, {});
-
-    // Cached sessions retain their captured definitions; another file for the same project would share their default network.
-    THROW_HR_WITH_USER_ERROR_IF(
-        E_NOTIMPL,
-        Localization::MessageWslcComposeProjectFileSwitchUnsupported(spec.ProjectName.c_str()),
-        std::ranges::any_of(
-            m_composeSessions, [&](const auto& entry) { return entry.second->GetProjectName() == spec.ProjectName; }));
-
-    auto containers = CreateComposeContainers(spec);
-
-    Microsoft::WRL::ComPtr<WSLCComposeSession> composeSession;
-    THROW_IF_FAILED(Microsoft::WRL::MakeAndInitialize<WSLCComposeSession>(&composeSession, this, configPath.wstring(), spec, std::move(containers)));
-    auto [entry, inserted] = m_composeSessions.emplace(std::move(key), std::move(composeSession));
-    WI_ASSERT(inserted);
-
-    return entry->second.CopyTo(ComposeSession);
-}
-CATCH_RETURN();
-
 HRESULT WSLCSession::BeginComposeOperation(const WSLCComposeOperationRequest* request, IComposeProgressCallback* progressCallback, IComposeOperation** operation)
 try
 {
@@ -2576,13 +2518,6 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::DiscoverCompose
     result.reserve(composeContainers.size());
     std::ranges::transform(composeContainers, std::back_inserter(result), [](auto& entry) { return std::move(entry.Container); });
     return result;
-}
-
-std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeContainers(const ComposeSpec& spec)
-{
-    wil::unique_event cancelEvent;
-    cancelEvent.create(wil::EventOptions::ManualReset);
-    return CreateComposeContainers(spec, cancelEvent.get(), {});
 }
 
 std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeContainers(

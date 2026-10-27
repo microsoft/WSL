@@ -2657,10 +2657,10 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Create the containers declared by a compose file.</value>
   </data>
   <data name="WSLCCLI_ComposeUpDesc" xml:space="preserve">
-    <value>Start and attach to a compose session.</value>
+    <value>Destructively recreate, start, and attach to a Compose project.</value>
   </data>
   <data name="WSLCCLI_ComposeUpLongDesc" xml:space="preserve">
-    <value>Start all containers in a compose session, then attach interactively and display their output.</value>
+    <value>Force-remove existing project containers, recreate the default network and containers, then start them and attach interactively to their output. A failure during recreation can leave the project partially or fully absent.</value>
   </data>
   <data name="WSLCCLI_ComposeStartDesc" xml:space="preserve">
     <value>Start a compose session.</value>

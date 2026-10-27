@@ -351,14 +351,6 @@
                     </RegistryKey>
                 </RegistryKey>
 
-                <!-- IWSLCComposeSession-->
-                <RegistryKey Root="HKCR" Key="Interface\{96DFF26B-422A-44F3-B675-23DA2BA32C77}">
-                    <RegistryValue Value="IWSLCComposeSession" Type="string" />
-                    <RegistryKey Key="ProxyStubClsid32">
-                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
-                    </RegistryKey>
-                </RegistryKey>
-
                 <!-- IComposeProgressCallback-->
                 <RegistryKey Root="HKCR" Key="Interface\{308809E7-2EB6-4A48-99D9-C959054FDDA9}">
                     <RegistryValue Value="IComposeProgressCallback" Type="string" />

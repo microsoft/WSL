@@ -518,14 +518,14 @@ class WSLCComposeTests
         VerifyUtf16ComposeDocument(true);
     }
 
-    TEST_METHOD(ComposeSessionFileSwitchRejectedBeforeMutation)
+    TEST_METHOD(ComposeProjectIdentitySharedAcrossFiles)
     {
-        VerifyProjectFileSwitchRejectedBeforeMutation(false);
+        VerifyProjectIdentitySharedAcrossFiles(false);
     }
 
-    TEST_METHOD(ComposeSessionNormalizedProjectCollisionRejectedBeforeMutation)
+    TEST_METHOD(ComposeProjectIdentitySharedAcrossNormalizedDirectories)
     {
-        VerifyProjectFileSwitchRejectedBeforeMutation(true);
+        VerifyProjectIdentitySharedAcrossFiles(true);
     }
 
     TEST_METHOD(ComposeContainerNameHttpRequest)
@@ -1287,8 +1287,9 @@ private:
 
         WriteComposeFile(composePath, content);
 
-        wil::com_ptr<IWSLCComposeSession> composeSession;
-        VERIFY_SUCCEEDED(m_defaultSession->CreateComposeSession(composePath.c_str(), &composeSession));
+        ComposeRequestStorage request{composePath, WSLCComposeActionCreate};
+        const auto result = ExecuteCompose(*m_defaultSession, request);
+        VERIFY_ARE_EQUAL(1u, result.value.AffectedContainersCount);
         wil::com_ptr<IWSLCContainer> container;
         auto resourceCleanup = wil::scope_exit([&] {
             if (container)
@@ -1306,7 +1307,7 @@ private:
         VERIFY_IS_TRUE(std::ranges::find(*inspect.Config.Env, std::string{"ENCODING_TEST=\xc3\xa9"}) != inspect.Config.Env->end());
     }
 
-    void VerifyProjectFileSwitchRejectedBeforeMutation(bool differentDirectory)
+    void VerifyProjectIdentitySharedAcrossFiles(bool differentDirectory)
     {
         const auto projectName = std::format("compose-project-files-{}-{}", differentDirectory, GetCurrentProcessId());
         const auto sourceRoot = std::filesystem::current_path() / (projectName + "-source");
@@ -1315,7 +1316,7 @@ private:
         const auto composePath = projectPath / "compose.yaml";
         const auto alternateComposePath = alternateProjectPath / (differentDirectory ? "compose.yaml" : "alternate.yaml");
         const auto networkName = projectName + "_default";
-        const std::array containerNames{projectName + "-first-1", projectName + "-second-1"};
+        const auto containerName = projectName + "-first-1";
 
         VERIFY_IS_TRUE(std::filesystem::create_directory(sourceRoot));
         auto directoryCleanup = wil::scope_exit([&] {
@@ -1333,63 +1334,48 @@ private:
             VERIFY_IS_TRUE(std::filesystem::create_directory(alternateProjectPath));
         }
 
-        WriteComposeFile(composePath, "services:\n  first:\n    image: alpine:latest\n");
-        WriteComposeFile(alternateComposePath, "services:\n  second:\n    image: alpine:latest\n");
+        constexpr std::string_view c_content = "services:\n  first:\n    image: alpine:latest\n";
+        WriteComposeFile(composePath, c_content);
+        WriteComposeFile(alternateComposePath, c_content);
 
-        wil::com_ptr<IWSLCComposeSession> composeSession;
-        VERIFY_SUCCEEDED(m_defaultSession->CreateComposeSession(composePath.c_str(), &composeSession));
+        ComposeRequestStorage request{composePath, WSLCComposeActionCreate};
+        const auto createResult = ExecuteCompose(*m_defaultSession, request);
+        wil::com_ptr<IWSLCContainer> container;
         auto resourceCleanup = wil::scope_exit([&] {
-            for (const auto& name : containerNames)
+            if (container)
             {
-                wil::com_ptr<IWSLCContainer> container;
-                const auto result = m_defaultSession->OpenContainer(name.c_str(), &container);
-                if (result == WSLC_E_CONTAINER_NOT_FOUND)
-                {
-                    continue;
-                }
-
-                LOG_IF_FAILED(result);
-                if (container)
-                {
-                    LOG_IF_FAILED(container->Delete(WSLCDeleteFlagsForce));
-                }
+                LOG_IF_FAILED(container->Delete(WSLCDeleteFlagsForce));
             }
 
             LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
         });
 
-        wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
-        VERIFY_SUCCEEDED(composeSession->ListContainers(&containers, containers.size_address<ULONG>()));
-        VERIFY_ARE_EQUAL(1u, containers.size());
-        const std::string originalContainerId = containers[0].Id;
-
-        wil::com_ptr<IWSLCComposeSession> reusedSession;
-        VERIFY_SUCCEEDED(m_defaultSession->CreateComposeSession(composePath.c_str(), &reusedSession));
-        containers.reset();
-        VERIFY_SUCCEEDED(reusedSession->ListContainers(&containers, containers.size_address<ULONG>()));
-        VERIFY_ARE_EQUAL(1u, containers.size());
-        VERIFY_ARE_EQUAL(originalContainerId, std::string{containers[0].Id});
+        VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(containerName.c_str(), &container));
+        VERIFY_ARE_EQUAL(projectName, std::string{createResult.value.ProjectKey});
+        VERIFY_ARE_EQUAL(1u, createResult.value.AffectedContainersCount);
+        const std::string originalContainerId = createResult.value.AffectedContainers[0].Id;
+        VERIFY_IS_FALSE(originalContainerId.empty());
 
         wil::unique_cotaskmem_ansistring originalOutput;
         VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &originalOutput));
         const auto originalNetwork = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(originalOutput.get());
         VERIFY_IS_FALSE(originalNetwork.Id.empty());
 
-        wil::com_ptr<IWSLCContainer> firstContainer;
-        VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(containerNames[0].c_str(), &firstContainer));
-        VERIFY_SUCCEEDED(firstContainer->Delete(WSLCDeleteFlagsForce));
+        const auto reusedResult = ExecuteCompose(*m_defaultSession, request);
+        VERIFY_ARE_EQUAL(1u, reusedResult.value.AffectedContainersCount);
+        VERIFY_ARE_EQUAL(originalContainerId, std::string{reusedResult.value.AffectedContainers[0].Id});
 
-        wil::com_ptr<IWSLCComposeSession> otherSession;
-        VERIFY_ARE_EQUAL(E_NOTIMPL, m_defaultSession->CreateComposeSession(alternateComposePath.c_str(), &otherSession));
-        VERIFY_IS_NULL(otherSession.get());
+        ComposeRequestStorage alternateRequest{alternateComposePath, WSLCComposeActionCreate};
+        const auto alternateResult = ExecuteCompose(*m_defaultSession, alternateRequest);
+        VERIFY_ARE_EQUAL(projectName, std::string{alternateResult.value.ProjectKey});
+        VERIFY_ARE_EQUAL(1u, alternateResult.value.AffectedContainersCount);
+        VERIFY_ARE_EQUAL(originalContainerId, std::string{alternateResult.value.AffectedContainers[0].Id});
+        VERIFY_ARE_EQUAL(containerName, std::string{alternateResult.value.AffectedContainers[0].Name});
 
         wil::unique_cotaskmem_ansistring output;
         VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
         const auto network = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
         VERIFY_ARE_EQUAL(originalNetwork.Id, network.Id);
-
-        wil::com_ptr<IWSLCContainer> secondContainer;
-        VERIFY_ARE_EQUAL(WSLC_E_CONTAINER_NOT_FOUND, m_defaultSession->OpenContainer(containerNames[1].c_str(), &secondContainer));
     }
 
     static void WriteComposeFile(const std::filesystem::path& path, std::string_view content)

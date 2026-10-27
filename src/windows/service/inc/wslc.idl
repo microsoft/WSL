@@ -791,20 +791,6 @@ typedef struct _WSLCComposeOperationResult
 } WSLCComposeOperationResult;
 
 [
-    uuid(96DFF26B-422A-44F3-B675-23DA2BA32C77),
-    pointer_default(unique),
-    object
-]
-interface IWSLCComposeSession : IUnknown
-{
-    HRESULT GetConfigPath([out] LPWSTR* Path);
-    HRESULT ListContainers([out, size_is(, *Count)] WSLCContainerEntry** Containers, [out] ULONG* Count);
-    HRESULT Start();
-    HRESULT Attach();
-    HRESULT Stop([in] ULONG Timeout);
-}
-
-[
     uuid(A1CB6BE6-B11D-44D5-A92E-EA3B6ECD74A6),
     pointer_default(unique),
     object
@@ -1064,8 +1050,6 @@ interface IWSLCSession : IUnknown
     // RPC_E_DISCONNECTED. The client holds the returned token for the whole operation; releasing
     // it (or the client exiting) lets the VM idle-terminate again.
     HRESULT BeginContainerOperation([out] IUnknown** Operation);
-
-    HRESULT CreateComposeSession([in] LPCWSTR Path, [out] IWSLCComposeSession** ComposeSession);
 
     HRESULT BeginComposeOperation(
         [in] const WSLCComposeOperationRequest* Request,
