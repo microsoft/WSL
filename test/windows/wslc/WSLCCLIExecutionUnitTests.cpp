@@ -661,19 +661,62 @@ class WSLCCLIExecutionUnitTests
         VERIFY_ARE_EQUAL(0u, traversalCount);
     }
 
-    TEST_METHOD(ScopedGlobalArguments_BareSpecifiersRemainPositional)
+    TEST_METHOD(ScopedGlobalArguments_BareDashRemainsPositional)
     {
-        for (const auto token : {L"-", L"--"})
+        size_t traversalCount = 0;
+        CLIExecutionContext context;
+        CommandInvocation invocation{
+            std::make_unique<PositionalTestRootCommand>(traversalCount), std::vector<std::wstring>{L"show", L"-"}};
+
+        invocation.ParseCommandLine(context);
+
+        VERIFY_ARE_EQUAL(std::wstring{L"-"}, context.Args.GetValue<ArgType::ImageId>());
+        VERIFY_IS_FALSE(context.Args.Contains(ArgType::Session));
+    }
+
+    TEST_METHOD(EndOfOptions_LaterTokensArePositional)
+    {
+        for (const auto token : {L"--session", L"--", L"-?"})
         {
             size_t traversalCount = 0;
             CLIExecutionContext context;
-            CommandInvocation invocation{std::make_unique<PositionalTestRootCommand>(traversalCount), std::vector<std::wstring>{L"show", token}};
+            CommandInvocation invocation{
+                std::make_unique<PositionalTestRootCommand>(traversalCount), std::vector<std::wstring>{L"show", L"--", token}};
 
             invocation.ParseCommandLine(context);
 
             VERIFY_ARE_EQUAL(std::wstring{token}, context.Args.GetValue<ArgType::ImageId>());
             VERIFY_IS_FALSE(context.Args.Contains(ArgType::Session));
+            VERIFY_IS_FALSE(context.Args.Contains(ArgType::Help));
         }
+    }
+
+    TEST_METHOD(EndOfOptions_RunImageAndCommandAfterSeparator)
+    {
+        CLIExecutionContext context;
+        CommandInvocation invocation{
+            std::make_unique<RootCommand>(), std::vector<std::wstring>{L"run", L"--", L"debian", L"--session", L"foo"}};
+
+        invocation.ParseCommandLine(context);
+
+        VERIFY_ARE_EQUAL(std::wstring{L"debian"}, context.Args.GetValue<ArgType::ImageId>());
+        VERIFY_ARE_EQUAL(std::wstring{L"--session"}, context.Args.GetValue<ArgType::Command>());
+        const auto& forwardArguments = context.Args.GetValue<ArgType::ForwardArgs>();
+        VERIFY_ARE_EQUAL(1u, forwardArguments.size());
+        VERIFY_ARE_EQUAL(std::wstring{L"foo"}, forwardArguments[0]);
+        VERIFY_IS_FALSE(context.Args.Contains(ArgType::Session));
+    }
+
+    TEST_METHOD(EndOfOptions_SeparatorCanBeOptionValue)
+    {
+        CLIExecutionContext context;
+        CommandInvocation invocation{
+            std::make_unique<RootCommand>(), std::vector<std::wstring>{L"create", L"--name", L"--", L"debian"}};
+
+        invocation.ParseCommandLine(context);
+
+        VERIFY_ARE_EQUAL(std::wstring{L"--"}, context.Args.GetValue<ArgType::Name>());
+        VERIFY_ARE_EQUAL(std::wstring{L"debian"}, context.Args.GetValue<ArgType::ImageId>());
     }
 
     TEST_METHOD(ScopedGlobalArguments_DetachedSubtreeFormatsChildInvocation)

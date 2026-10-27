@@ -179,6 +179,15 @@ WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc - command)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc --verbose -)") \
 \
+/* End of options ('--'). Later tokens are positional even if they look like options. \
+ * A '--' after the image is the container command and is covered by execution tests. */ \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -- image1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc --verbose -- -image)") \
+WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc --)") \
+WSLC_PARSER_TEST_CASE(List, true, LR"(wslc --)") \
+WSLC_PARSER_TEST_CASE(List, true, LR"(wslc -- --verbose --)") \
+WSLC_PARSER_TEST_CASE(List, true, LR"(wslc cont1 -- --invalidarg)") \
+\
 /* List cases with multiple args and flags that can come after the optional multi-positional. */ \
 WSLC_PARSER_TEST_CASE(List, true, LR"(wslc)") \
 WSLC_PARSER_TEST_CASE(List, true, LR"(wslc cont1)") \
@@ -244,6 +253,8 @@ WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --session foo -q image1)") \
 /* Docker-style idempotency: duplicate global flags collapse to a single entry. */ \
 WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --quiet --quiet)") \
 WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc -q -q system list)") \
+/* '--' stops the options-only pass and is left for the selected command.     */ \
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --quiet -- --session foo)") \
 \
 /* `wslc build` --progress option (Build set mirrors ImageBuildCommand). The build \
  * context path is the required positional; --progress takes one of auto/tty/plain/ \

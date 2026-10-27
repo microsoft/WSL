@@ -185,9 +185,10 @@ void ParseArgumentsStateMachine::AddValue(ArgType type, std::wstring value)
 //     a. Value: '-a=VALUE' / '-ab=VALUE' / '-a VALUE' / '-ab VALUE'
 //     b. Flag:  trailing chars are additional flags; fails if any is non-flag.
 //  2. Token starting with '--' is the full name: '--arg=VALUE' or '--arg VALUE'.
-//  3. A bare '-' or '--' is positional when a positional is available.
-//  4. Anything else is the next positional.
-//  5. Commands with forward arguments treat everything after the first positional as positional or forwarded.
+//  3. A bare '-' is positional when a positional is available.
+//  4. A bare '--' ends option parsing; every later token is positional or forwarded.
+//  5. Anything else is the next positional.
+//  6. Commands with forward arguments treat everything after the first positional as positional or forwarded.
 ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
 {
     auto currArg = std::wstring_view{*m_invocationItr};
@@ -207,6 +208,24 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
     if (m_anchorPositional.has_value() && !m_forwardArgs.empty())
     {
         return ProcessAnchoredPositionals(currArg);
+    }
+
+    if (m_endOfOptions)
+    {
+        return ProcessPositionalArgument(currArg);
+    }
+
+    if (currArg == L"--")
+    {
+        // Options-only passes leave the separator for the selected command's parser so
+        // it also ends subcommand resolution.
+        if (m_optionsOnly)
+        {
+            return BackUpAndStop();
+        }
+
+        m_endOfOptions = true;
+        return {};
     }
 
     if (inheritedGlobalOption != nullptr)
@@ -229,8 +248,8 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
         return ProcessPositionalArgument(currArg);
     }
 
-    // Bare option specifiers may be positional values such as stdin.
-    if (currArg == L"-" || currArg == L"--")
+    // A bare '-' may be a positional value such as stdin.
+    if (currArg == L"-")
     {
         if (HasNextPositional())
         {
@@ -249,8 +268,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
             return BackUpAndStop();
         }
 
-        return currArg.length() == 1 ? ArgumentException(Localization::WSLCCLI_InvalidArgumentSpecifierError(currArg))
-                                     : ArgumentException(Localization::WSLCCLI_MissingArgumentNameError(currArg));
+        return ArgumentException(Localization::WSLCCLI_InvalidArgumentSpecifierError(currArg));
     }
 
     // Single '-' that is 2 characters or more means this must be an alias or collection of alias flags.
@@ -461,22 +479,10 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
     return {};
 }
 
-// Assumes the arg value begins with -- and is at least 2 characters long.
+// Assumes the arg value begins with -- and is more than 2 characters long.
 ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessNamedArgument(const std::wstring_view& currArg)
 {
-    WI_ASSERT(currArg.starts_with(L"--"));
-
-    if (currArg.length() == 2)
-    {
-        // Bare '--': not a name we recognize. In stopOnUnknown mode hand it off
-        // to the next pass; otherwise it's a malformed token at this level.
-        if (m_stopOnUnknown)
-        {
-            return BackUpAndStop();
-        }
-
-        return ArgumentException(Localization::WSLCCLI_MissingArgumentNameError(currArg));
-    }
+    WI_ASSERT(currArg.starts_with(L"--") && currArg.length() > 2);
 
     // This is an arg name, find it and process its value if needed.
     // Skip the double arg identifier chars.
