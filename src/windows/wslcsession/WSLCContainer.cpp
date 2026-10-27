@@ -1228,11 +1228,14 @@ wil::com_ptr<IWSLCProcess> WSLCContainerImpl::StartPhase(
     UpdateActivityHoldLockHeld();
 
     auto control = std::make_unique<DockerContainerProcessControl>(*this, m_runtime.Docker());
+    auto* initProcessControl = control.get();
+    auto initProcess = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io), m_initProcessFlags);
 
+    // N.B. Publish only after construction succeeds so m_initProcessControl never points at a freed control object.
     {
         std::lock_guard processesLock{m_processesLock};
-        m_initProcessControl = control.get();
-        m_initProcess = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io), m_initProcessFlags);
+        m_initProcessControl = initProcessControl;
+        m_initProcess = std::move(initProcess);
         m_comWrapper->CacheState(m_state, m_initProcess);
     }
 
@@ -1759,13 +1762,11 @@ void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds)
     // N.B. Nothing between here and the cleanup below may throw — nothing clears m_restart until it is armed.
     bool succeeded = false;
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, restart, &succeeded]() {
-        // N.B. Signalled last so a waiter cannot observe the restart as complete before the failure
-        // cleanup below has published its delete.
-        auto release = wil::scope_exit([&restart]() { restart->Completed.SetEvent(); });
-
         std::shared_ptr<StateTransition> transition;
 
         {
+            // Release restart waiters after publishing failure cleanup, before AttachToTransition can block in Disconnect().
+            auto release = wil::scope_exit([&restart]() { restart->Completed.SetEvent(); });
             auto lifecycleLock = m_lifecycleLock.lock_shared();
             auto lock = m_lock.lock_exclusive();
 
@@ -3649,6 +3650,12 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(
         // The restart's start phase landed, so a later exit must auto-delete an --rm container again.
         m_restart.reset();
         m_restartBackoff.OnStarted(std::chrono::steady_clock::now());
+    }
+    else if (State == WslcContainerStateDeleted && m_restart)
+    {
+        // A restart can adopt a concurrent delete in its stop phase and disconnect the wrapper before reaching its cleanup.
+        m_restart->Completed.SetEvent();
+        m_restart.reset();
     }
 
     // Keep the VM alive while this container is Running or waiting for a policy restart, and release

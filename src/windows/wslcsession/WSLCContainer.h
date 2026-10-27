@@ -294,7 +294,7 @@ private:
 
     _Guarded_by_(m_lock) std::shared_ptr<StateTransition> m_transition;
 
-    // Non-null from before Restart()'s stop phase until its start phase commits Running. Start() and
+    // Non-null from before Restart()'s stop phase until it commits Running, fails, or the container is Deleted. Start() and
     // Stop() stand down for that window, and OnStopped() keeps the container's runtime resources mapped
     // and skips the auto-delete of an --rm container. Delete() does not stand down: a remove that lands
     // between the two phases takes effect, and the restart's start phase fails.
