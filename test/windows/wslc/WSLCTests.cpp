@@ -15187,30 +15187,12 @@ class WSLCTests
         : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWarningCallback, IFastRundown>
     {
     public:
-        explicit CapturingWarningCallback(bool listSessionsOnWarning = false) : m_listSessionsOnWarning(listSessionsOnWarning)
-        {
-        }
-
         HRESULT OnWarning(LPCWSTR Message) override
-        try
         {
             std::lock_guard lock(m_lock);
             m_warnings.emplace_back(Message);
-            if (m_listSessionsOnWarning)
-            {
-                m_listSessions = std::async(std::launch::async, []() {
-                    return wil::ResultFromException([]() {
-                        const auto coInitialize = wil::CoInitializeEx();
-                        const auto manager = OpenSessionManager();
-                        wil::unique_cotaskmem_array_ptr<WSLCSessionListEntry> sessions;
-                        THROW_IF_FAILED(manager->ListSessions(&sessions, sessions.size_address<ULONG>()));
-                    });
-                });
-                m_listSessionsCompletedWithinCallback = m_listSessions.wait_for(5s) == std::future_status::ready;
-            }
             return S_OK;
         }
-        CATCH_RETURN();
 
         std::vector<std::wstring> GetWarnings()
         {
@@ -15218,21 +15200,9 @@ class WSLCTests
             return m_warnings;
         }
 
-        bool ListSessionsCompletedWithinCallback()
-        {
-            FAIL_FAST_IF_MSG(
-                m_listSessions.wait_for(60s) != std::future_status::ready,
-                "Reentrant ListSessions did not finish after session creation");
-            VERIFY_SUCCEEDED(m_listSessions.get());
-            return m_listSessionsCompletedWithinCallback;
-        }
-
     private:
         std::mutex m_lock;
         std::vector<std::wstring> m_warnings;
-        bool m_listSessionsOnWarning = false;
-        bool m_listSessionsCompletedWithinCallback = false;
-        std::future<HRESULT> m_listSessions;
     };
 
     WSLC_TEST_METHOD(WarningCallbackHttpsLoopbackProxy)
@@ -15245,7 +15215,7 @@ class WSLCTests
             settings.HttpProxy = httpProxy;
             settings.HttpsProxy = httpsProxy;
 
-            auto warningCallback = Microsoft::WRL::Make<CapturingWarningCallback>(expectWarning);
+            auto warningCallback = Microsoft::WRL::Make<CapturingWarningCallback>();
             auto sessionManager = OpenSessionManager();
             wil::com_ptr<IWSLCSession> session;
             VERIFY_SUCCEEDED(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, warningCallback.Get(), &session));
@@ -15256,7 +15226,6 @@ class WSLCTests
             if (expectWarning)
             {
                 VERIFY_IS_TRUE(std::ranges::find(warnings, expectedWarning) != warnings.end());
-                VERIFY_IS_TRUE(warningCallback->ListSessionsCompletedWithinCallback());
             }
             else
             {

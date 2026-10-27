@@ -51,38 +51,8 @@ using wsl::windows::service::wslc::WSLCVirtualMachineFactory;
 namespace wslutil = wsl::windows::common::wslutil;
 namespace apicompat = wsl::windows::common::apicompat;
 namespace settings = wsl::windows::wslc::settings;
-namespace WRL = Microsoft::WRL;
 
 namespace {
-
-class DeferredWarningCallback : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, IWarningCallback, IFastRundown>
-{
-public:
-    HRESULT OnWarning(LPCWSTR Message) override
-    try
-    {
-        RETURN_HR_IF_NULL(E_POINTER, Message);
-        auto lock = m_lock.lock_exclusive();
-        RETURN_HR_IF(RPC_E_DISCONNECTED, m_closed);
-        m_warnings.emplace_back(Message);
-        return S_OK;
-    }
-    CATCH_RETURN();
-
-    std::vector<std::wstring> Close()
-    {
-        auto lock = m_lock.lock_exclusive();
-        m_closed = true;
-        std::vector<std::wstring> warnings;
-        warnings.swap(m_warnings);
-        return warnings;
-    }
-
-private:
-    wil::srwlock m_lock;
-    _Guarded_by_(m_lock) bool m_closed = false;
-    _Guarded_by_(m_lock) std::vector<std::wstring> m_warnings;
-};
 
 // Session settings built server-side from the caller's settings.yaml.
 struct SessionSettings
@@ -255,7 +225,7 @@ void WSLCSessionManagerImpl::CreateSession(
         resolvedDisplayName = Settings->DisplayName;
     }
 
-    std::unique_lock lock(m_wslcSessionsLock);
+    std::lock_guard lock(m_wslcSessionsLock);
 
     // Check for an existing session first.
     auto result = ForEachSession<HRESULT>([&](auto& entry, const wil::com_ptr<IWSLCSession>& session) noexcept -> std::optional<HRESULT> {
@@ -290,7 +260,6 @@ void WSLCSessionManagerImpl::CreateSession(
     }
 
     std::wstring callerFileName;
-    const auto deferredWarnings = wil::MakeOrThrow<DeferredWarningCallback>();
 
     HRESULT creationResult = wil::ResultFromException([&]() {
         // Get caller info.
@@ -337,8 +306,8 @@ void WSLCSessionManagerImpl::CreateSession(
         const auto sessionSettings = CreateSessionSettings(sessionId, callerFileName.c_str(), Settings, resolvedDisplayName.c_str());
         wil::com_ptr<IWSLCSession> session;
         wil::com_ptr<IWSLCSessionReference> serviceRef;
-        const auto factoryHr = factory->CreateSession(
-            &sessionSettings, vmFactory.Get(), notifier.Get(), WarningCallback != nullptr ? deferredWarnings.Get() : nullptr, &session, &serviceRef);
+        const auto factoryHr =
+            factory->CreateSession(&sessionSettings, vmFactory.Get(), notifier.Get(), WarningCallback, &session, &serviceRef);
         if (FAILED(factoryHr))
         {
             if (auto comError = wslutil::GetCOMErrorInfo(); comError && comError->Message)
@@ -419,15 +388,6 @@ void WSLCSessionManagerImpl::CreateSession(
         TraceLoggingKeyword(MICROSOFT_KEYWORD_CRITICAL_DATA),
         TraceLoggingValue(callerFileName.c_str(), "CallerFileName"),
         TraceLoggingLevel(WINEVENT_LEVEL_INFO));
-
-    const auto warnings = deferredWarnings->Close();
-    lock.unlock();
-
-    // Client callbacks may reenter the manager on another thread.
-    for (const auto& warning : warnings)
-    {
-        LOG_IF_FAILED(WarningCallback->OnWarning(warning.c_str()));
-    }
 
     THROW_IF_FAILED_MSG(creationResult, "Failed to create session: %ls", resolvedDisplayName.c_str());
 }
