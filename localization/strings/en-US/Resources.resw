@@ -2669,6 +2669,48 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   <data name="WSLCCLI_ComposeUpLongDesc" xml:space="preserve">
     <value>Force-remove existing project containers, recreate the default network and containers, then start them and attach interactively to their output. A failure during recreation can leave the project partially or fully absent.</value>
   </data>
+  <data name="WSLCCLI_ComposeGracefullyStopping" xml:space="preserve">
+    <value>Gracefully stopping... Press Ctrl+C again to force termination.</value>
+    <comment>{Locked="Ctrl+C"}Key combination should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ComposeStopAfterCancellationFailed" xml:space="preserve">
+    <value>Failed to stop the Compose project after cancellation. Project containers may still be running.</value>
+  </data>
+  <data name="WSLCCLI_ComposeProgressStopping" xml:space="preserve">
+    <value>Stopping</value>
+  </data>
+  <data name="WSLCCLI_ComposeProgressCreating" xml:space="preserve">
+    <value>Creating</value>
+  </data>
+  <data name="WSLCCLI_ComposeProgressRemoving" xml:space="preserve">
+    <value>Removing</value>
+  </data>
+  <data name="WSLCCLI_ComposeProgressPulling" xml:space="preserve">
+    <value>Pulling</value>
+  </data>
+  <data name="WSLCCLI_ComposeProgressKilling" xml:space="preserve">
+    <value>Killing</value>
+  </data>
+  <data name="WSLCCLI_ComposeProgressStarting" xml:space="preserve">
+    <value>Starting</value>
+  </data>
+  <data name="WSLCCLI_ComposeResourceContainer" xml:space="preserve">
+    <value>Container</value>
+  </data>
+  <data name="WSLCCLI_ComposeResourceNetwork" xml:space="preserve">
+    <value>Network</value>
+  </data>
+  <data name="WSLCCLI_ComposeResourceImage" xml:space="preserve">
+    <value>Image</value>
+  </data>
+  <data name="MessageWslcComposeResource" xml:space="preserve">
+    <value>{0} {1}</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}Resource type and resource name should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeProgress" xml:space="preserve">
+    <value>{0} {1} ({2}/{3})</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}{Locked="{2}"}{Locked="{3}"}Progress operation, resource name, current count, and total count should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ComposeStartDesc" xml:space="preserve">
     <value>Start a Compose project.</value>
   </data>

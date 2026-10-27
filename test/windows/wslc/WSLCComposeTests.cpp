@@ -18,6 +18,7 @@ Abstract:
 #include "wslc_schema.h"
 #include "wslutil.h"
 #include "WSLCContainerLauncher.h"
+#include "ComposeService.h"
 
 using wsl::test::CreateSession;
 using wsl::test::GetDefaultWSLCSessionSettings;
@@ -982,6 +983,89 @@ services:
             VERIFY_ARE_EQUAL(WSLCComposeOperationStatusFailed, result.value.Status);
             VERIFY_IS_TRUE(statuses == expectedFailureStatuses);
         }
+    }
+
+    TEST_METHOD(ComposeForceKillDiscoversProjectContainersByLabel)
+    {
+        const auto targetPath = std::filesystem::current_path() / std::format("compose-force-kill-{}", GetCurrentProcessId());
+        const auto otherPath = std::filesystem::current_path() / std::format("compose-force-kill-other-{}", GetCurrentProcessId());
+        const auto targetKey = targetPath.filename().string();
+        const auto otherKey = otherPath.filename().string();
+        const auto targetContainerName = std::format("{}-stubborn-1", targetKey);
+        const auto otherContainerName = std::format("{}-stubborn-1", otherKey);
+        auto cleanup = wil::scope_exit([&] {
+            for (const auto& name : {targetContainerName, otherContainerName})
+            {
+                wil::com_ptr<IWSLCContainer> container;
+                if (SUCCEEDED(m_defaultSession->OpenContainer(name.c_str(), &container)))
+                {
+                    LOG_IF_FAILED(container->Delete(WSLCDeleteFlagsForce));
+                }
+            }
+
+            for (const auto& key : {targetKey, otherKey})
+            {
+                LOG_IF_FAILED(m_defaultSession->DeleteNetwork(std::format("{}_default", key).c_str()));
+            }
+
+            for (const auto& path : {targetPath, otherPath})
+            {
+                std::error_code error;
+                std::filesystem::remove_all(path, error);
+            }
+        });
+
+        for (const auto& path : {targetPath, otherPath})
+        {
+            std::filesystem::create_directory(path);
+            std::ofstream(path / "compose.yaml") << R"(
+services:
+  stubborn:
+    image: alpine:latest
+    command: ["/bin/sh", "-c", "trap '' TERM; while true; do sleep 1; done"]
+)";
+
+            ComposeRequestStorage upRequest{path / "compose.yaml", WSLCComposeActionUp};
+            const auto upResult = ExecuteCompose(*m_defaultSession, upRequest);
+            VERIFY_ARE_EQUAL(1u, upResult.value.AffectedContainersCount);
+            VERIFY_ARE_EQUAL(WslcContainerStateRunning, upResult.value.AffectedContainers[0].State);
+        }
+
+        WSLCContainerLauncher unsupportedLauncher(
+            "alpine:latest",
+            std::format("{}-unsupported", targetKey),
+            {"/bin/sh", "-c", "trap '' TERM; while true; do sleep 1; done"});
+        unsupportedLauncher.AddLabel("com.docker.compose.project", targetKey);
+        unsupportedLauncher.AddLabel("com.docker.compose.service", "unsupported");
+        unsupportedLauncher.AddLabel("com.docker.compose.container-number", "1");
+        unsupportedLauncher.AddLabel("com.docker.compose.oneoff", "False");
+        unsupportedLauncher.AddLabel("com.microsoft.wslc.compose.managed", "true");
+        unsupportedLauncher.AddLabel("com.microsoft.wslc.compose.metadata-version", "2");
+        auto unsupportedContainer = unsupportedLauncher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+        VERIFY_ARE_EQUAL(WslcContainerStateRunning, unsupportedContainer.State());
+
+        wil::unique_file output;
+        VERIFY_ARE_EQUAL(0, tmpfile_s(&output));
+        wsl::windows::wslc::cli::Terminal terminal{output.get(), false, output.get(), false};
+        wsl::windows::wslc::models::Session session{m_defaultSession};
+        wsl::windows::wslc::services::ComposeService::ForceKill(terminal, session, targetKey);
+
+        const auto containerState = [&](const std::string& name) {
+            wil::com_ptr<IWSLCContainer> container;
+            THROW_IF_FAILED(m_defaultSession->OpenContainer(name.c_str(), &container));
+            WSLCContainerState state{};
+            THROW_IF_FAILED(container->GetState(&state));
+            return state;
+        };
+
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_RETRY), containerState(targetContainerName) != WslcContainerStateExited);
+            },
+            100ms,
+            30s);
+        VERIFY_ARE_EQUAL(WslcContainerStateRunning, containerState(otherContainerName));
+        VERIFY_ARE_EQUAL(WslcContainerStateRunning, unsupportedContainer.State());
     }
 
     TEST_METHOD(ComposeLifecycleDiscoversManagedContainersByLabel)
