@@ -19,8 +19,7 @@ Debug/
 Release/
 Properties/
 /_deps/
-/.build-securityaudit-*/
-/src/linux/securityaudit/AuditBuildInfo.h
+/nuget/local/
 /package/Strings/en-US/
 /packages/
 CMakeFiles/

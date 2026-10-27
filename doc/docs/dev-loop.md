@@ -71,30 +71,37 @@ architecture and statically links the package's loader and dependencies into
 `init`; a separate collector executable is not shipped. The package must target
 the same `Microsoft.WSL.LinuxSdk` version as WSL.
 
-These packages come from the private
-[MDEXplatFeed](https://dev.azure.com/microsoft/Windows%20Defender/_artifacts/feed/MDEXplatFeed).
-Local NuGet restores require feed read access and an authenticated
-[Azure Artifacts Credential Provider](https://github.com/microsoft/artifacts-credprovider).
-An Azure CLI login alone does not authenticate NuGet. Pipeline restores use
-`NuGetAuthenticate@1`; the pipeline build identity also needs read access to the
-Windows Defender feed.
+The `MDEXplatFeed` source in [`nuget.config`](../../nuget.config) currently points
+to the repository-local `nuget\local` directory, which is ignored by Git.
+Download the `WSL_Static_x86_64` and `WSL_Static_aarch64` artifacts from
+[run 20261026.3](https://dev.azure.com/microsoft/Windows%20Defender/_build/results?buildId=161660474)
+and place their original packages in that directory:
 
-The pinned version `0.0.26102026.161660474` was built by
-[run 20261026.3](https://dev.azure.com/microsoft/Windows%20Defender/_build/results?buildId=161660474),
-with feed publication disabled. Until it is published, download both
-`WSL_Static_x86_64` and `WSL_Static_aarch64` artifacts and put their original
-`.nupkg` files in a local NuGet source directory. Restore before configuring:
-
-```powershell
-nuget restore packages.config -SolutionDirectory . -Source "C:\local-feed;https://pkgs.dev.azure.com/shine-oss/wsl/_packaging/WslDependencies/nuget/v3/index.json" -NonInteractive
+```text
+nuget\local\ebpf.linux-musl-x86_64.0.0.26102026.161660474.nupkg
+nuget\local\ebpf.linux-musl-arm64.0.0.26102026.161660474.nupkg
 ```
 
-Do not rebuild or repackage the SDK locally. The previous
-`WSL_SECURITYAUDIT_LIBRARY_DIR` and `WSL_SECURITYAUDIT_ALLOW_DEVELOPMENT_PACKAGE`
-options are no longer used. Configure/build validates package identity, SDK,
-architecture, event ABI and payload hashes, and stages only the three required
-BPF variants, the architecture-specific syscall table and provenance into the
-initrd.
+Then run the normal `cmake .` command; NuGet restore uses the configured local
+source automatically. Build agents also need these files while the local source
+is in use. Do not rebuild or repackage the SDK locally.
+
+Once the packages are published, change only the `MDEXplatFeed` source value to:
+
+```text
+https://pkgs.dev.azure.com/microsoft/Windows%20Defender/_packaging/MDEXplatFeed/nuget/v3/index.json
+```
+
+Feed restores require read access and an authenticated
+[Azure Artifacts Credential Provider](https://github.com/microsoft/artifacts-credprovider).
+An Azure CLI login alone does not authenticate NuGet. Pipeline restores already
+use `NuGetAuthenticate@1`; their build identity also needs feed read access.
+
+CMake checks the package's SDK and target architecture. The initrd contains only
+the three required BPF variants and the architecture-specific syscall table,
+read directly from the restored package. No custom payload manifest or source
+fingerprint is generated. Runtime event validation and policy filtering remain
+unchanged.
 
 This package version does not expose `socket_identity` in its event ABI.
 Network events retain the `socketInode`, `socketFamily` and `socketType` fields

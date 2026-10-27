@@ -2,7 +2,6 @@
 
 #include "Collector.h"
 #include "SecurityEvents.h"
-#include "AuditBuildInfo.h"
 
 #include <algorithm>
 #include <array>
@@ -1213,9 +1212,8 @@ int RunCollector(const CollectorOptions& options, int inputFd, int outputFd)
             }
             std::fprintf(
                 stderr,
-                "WSL audit: init static loader %s, event ABI %d; requires BTF, ring buffer, enrichment, fmap and "
+                "WSL audit: init static loader, event ABI %d; requires BTF, ring buffer, enrichment, fmap and "
                 "CAP_BPF/CAP_PERFMON (or CAP_SYS_ADMIN); tracefs setup may require CAP_SYS_ADMIN.\n",
-                WSL_SECURITYAUDIT_LOADER_REVISION,
                 VERSION);
             if (policy.networkSuccess || policy.networkFailure)
             {
@@ -1302,8 +1300,6 @@ int RunCollector(const CollectorOptions& options, int inputFd, int outputFd)
             {"hooksAttachCode", hooksAttachCode},
             {"initializeCode", initializeCode},
             {"tracefsPrivateMount", tracefsPrivateMount},
-            {"loaderRevision", WSL_SECURITYAUDIT_LOADER_REVISION},
-            {"sourceDigest", WSL_SECURITYAUDIT_SOURCE_DIGEST},
             {"eventAbiVersion", VERSION},
             {"staticLoader", true},
             {"initializationDiagnostics", initializationDiagnostics},

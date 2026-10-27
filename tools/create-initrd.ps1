@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-# Creates a CPIO newc initramfs with the existing /init entry and optional trusted audit payload.
+# Creates a CPIO newc initramfs with /init and optional audit resources from a restored NuGet package.
 
 [CmdletBinding()]
 param (
@@ -55,30 +55,34 @@ $data = [System.IO.File]::ReadAllBytes($InputFile)
 $name = [System.Text.Encoding]::ASCII.GetBytes("init`0")
 $mtime = [uint32][System.DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 
-$auditManifest = $null
+$auditFiles = @{}
 if ($AuditPayloadDirectory)
 {
     if (-not $Architecture) { throw 'Architecture is required for the audit initrd payload.' }
-    $auditManifest = & (Join-Path $PSScriptRoot 'securityaudit\Validate-Payload.ps1') `
-        -PayloadDirectory $AuditPayloadDirectory -Architecture $Architecture -PassThru
+    $syscall = if ($Architecture -eq 'aarch64') { 'syscalls_aarch64.conf' } else { 'syscalls.conf' }
+    foreach ($file in @(
+        'ebpf_wrapper_kern_raw_tp_sub4096_btf_rbuff_enriched_fmap.o',
+        'ebpf_wrapper_kern_raw_tp_btf_rbuff_enriched_fmap.o',
+        'ebpf_wrapper_kern_raw_tp_args64_krsi_btf_rbuff_enriched_fmap.o',
+        $syscall))
+    {
+        $auditFiles[$file] = [IO.File]::ReadAllBytes((Join-Path $AuditPayloadDirectory $file))
+    }
 }
 
 $out = [System.IO.File]::Create($OutputFile)
 try
 {
     Write-CpioEntry $out $name $data 0x81ED $mtime  # S_IFREG | 0755
-    if ($auditManifest)
+    if ($auditFiles.Count -gt 0)
     {
         $directory = [Text.Encoding]::ASCII.GetBytes("wsl-security-audit`0")
         Write-CpioEntry $out $directory ([byte[]]::new(0)) 0x41ED $mtime # S_IFDIR | 0755
-        foreach ($entry in $auditManifest.files.PSObject.Properties | Sort-Object Name)
+        foreach ($entry in $auditFiles.GetEnumerator() | Sort-Object Key)
         {
-            $entryData = [IO.File]::ReadAllBytes((Join-Path $AuditPayloadDirectory $entry.Name.Replace('/', '\')))
             $mode = 0x8124 # 0444: BPF programs and syscall data, not a second userspace executable.
-            Write-CpioEntry $out ([Text.Encoding]::ASCII.GetBytes("$($entry.Name)`0")) $entryData $mode $mtime
+            Write-CpioEntry $out ([Text.Encoding]::ASCII.GetBytes("wsl-security-audit/$($entry.Key)`0")) $entry.Value $mode $mtime
         }
-        $manifestData = [IO.File]::ReadAllBytes((Join-Path $AuditPayloadDirectory 'audit-payload.json'))
-        Write-CpioEntry $out ([Text.Encoding]::ASCII.GetBytes("wsl-security-audit/provenance.json`0")) $manifestData 0x8124 $mtime
     }
     $trailer = [System.Text.Encoding]::ASCII.GetBytes("TRAILER!!!`0")
     Write-CpioEntry $out $trailer ([byte[]]::new(0)) 0 0

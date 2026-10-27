@@ -58,15 +58,15 @@ set_target_properties(init PROPERTIES FOLDER linux)
 
 set(INITRAMFS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/initrd.img)
 set(INIT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/init)
+set(AUDIT_PAYLOAD_DIRECTORY "${SECURITYAUDIT_SOURCE_DIR}/include/ebpf")
+file(GLOB AUDIT_PAYLOAD_FILES CONFIGURE_DEPENDS "${AUDIT_PAYLOAD_DIRECTORY}/*.o" "${AUDIT_PAYLOAD_DIRECTORY}/*.conf")
 add_custom_command(
     OUTPUT ${INITRAMFS} "${CMAKE_CURRENT_BINARY_DIR}/CmakeFiles/initramfs"
-    DEPENDS init ${INIT} wsl_audit_payload
-        "${WSL_SECURITYAUDIT_STAGED_PAYLOAD}/audit-payload.json"
+    DEPENDS init ${INIT} ${AUDIT_PAYLOAD_FILES}
         "${CMAKE_SOURCE_DIR}/tools/create-initrd.ps1"
-        "${CMAKE_SOURCE_DIR}/tools/securityaudit/Validate-Payload.ps1"
     COMMAND powershell.exe -ExecutionPolicy Bypass -NoProfile -NonInteractive
         -File "${CMAKE_SOURCE_DIR}/tools/create-initrd.ps1" "${INIT}" "${INITRAMFS}"
-        -AuditPayloadDirectory "${WSL_SECURITYAUDIT_STAGED_PAYLOAD}" -Architecture "${LLVM_ARCH}"
+        -AuditPayloadDirectory "${AUDIT_PAYLOAD_DIRECTORY}" -Architecture "${LLVM_ARCH}"
     COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/CmakeFiles/initramfs"
     VERBATIM)
 add_custom_target(initramfs DEPENDS ${INITRAMFS})
