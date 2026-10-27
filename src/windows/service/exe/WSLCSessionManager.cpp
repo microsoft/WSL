@@ -701,7 +701,9 @@ HRESULT WSLCSessionManager::OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IW
 
 HRESULT WSLCSessionManager::InterfaceSupportsErrorInfo(_In_ REFIID riid)
 {
-    return riid == __uuidof(IWSLCSessionManager) ? S_OK : S_FALSE;
+    return riid == __uuidof(IWSLCSessionManager) || riid == __uuidof(IWSLCCompatSessionManager) || riid == __uuidof(IWSLCCompatSessionManager2)
+               ? S_OK
+               : S_FALSE;
 }
 
 HRESULT WSLCSessionManager::GetVersion(_Out_ WSLCCompatVersion* Version)
