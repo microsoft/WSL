@@ -3738,7 +3738,6 @@ class WSLCTests
         VERIFY_ARE_NOT_EQUAL(firstAddress, secondAddress);
 
         auto verifyIsolation = [this](IWSLCSession* session, const std::string& ownAddress, const std::string& peerAddress) {
-            // Verify ping works and NAT DNS is reachable without requiring host-to-guest ICMP.
             VERIFY_ARE_EQUAL(0, ExpectCommandResult(session, {"/usr/bin/ping", "-n", "-c", "1", "-W", "2", ownAddress}, 0, 30000).Code);
 
             VERIFY_ARE_EQUAL(
