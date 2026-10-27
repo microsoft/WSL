@@ -122,6 +122,33 @@ class WSLCRestartRequestUnitTests
         VERIFY_IS_FALSE(state.SuppressesRestart());
     }
 
+    TEST_METHOD(RestartRequests_IdleEventTracksPendingRequests)
+    {
+        const auto isIdle = [](const WSLCExitRequestState& state) {
+            return WaitForSingleObject(state.IdleEvent(), 0) == WAIT_OBJECT_0;
+        };
+
+        WSLCExitRequestState state;
+        VERIFY_IS_TRUE(isIdle(state));
+        state.BeginRun();
+        VERIFY_IS_TRUE(isIdle(state));
+
+        const auto first = state.BeginRequest();
+        const auto second = state.BeginRequest();
+        VERIFY_IS_FALSE(isIdle(state));
+        VERIFY_IS_TRUE(state.CompleteRequest(first, true));
+        VERIFY_IS_FALSE(isIdle(state));
+        VERIFY_IS_TRUE(state.CompleteRequest(second, false));
+        VERIFY_IS_TRUE(isIdle(state));
+
+        const auto stale = state.BeginRequest();
+        VERIFY_IS_FALSE(isIdle(state));
+        state.BeginRun();
+        VERIFY_IS_TRUE(isIdle(state));
+        VERIFY_IS_FALSE(state.CompleteRequest(stale, false));
+        VERIFY_IS_TRUE(isIdle(state));
+    }
+
     TEST_METHOD(RestartRequests_FailurePreservesSuccessfulIntent)
     {
         WSLCExitRequestState state;

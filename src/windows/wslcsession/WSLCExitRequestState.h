@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <wil/resource.h>
 
 namespace wsl::windows::service::wslc {
 
@@ -16,11 +17,16 @@ public:
         ++m_iteration;
         m_pending = 0;
         m_requested = false;
+        m_idle.SetEvent();
     }
 
     std::uint64_t BeginRequest() noexcept
     {
-        ++m_pending;
+        if (m_pending++ == 0)
+        {
+            m_idle.ResetEvent();
+        }
+
         return m_iteration;
     }
 
@@ -31,7 +37,11 @@ public:
             return false;
         }
 
-        --m_pending;
+        if (--m_pending == 0)
+        {
+            m_idle.SetEvent();
+        }
+
         m_requested = m_requested || Succeeded;
         return true;
     }
@@ -56,10 +66,17 @@ public:
         return m_pending != 0;
     }
 
+    // Signaled while no request is pending. Can be waited on without holding the container lock.
+    HANDLE IdleEvent() const noexcept
+    {
+        return m_idle.get();
+    }
+
 private:
     std::uint64_t m_iteration = 0;
     size_t m_pending = 0;
     bool m_requested = false;
+    wil::unique_event m_idle{wil::EventOptions::ManualReset | wil::EventOptions::Signaled};
 };
 
 } // namespace wsl::windows::service::wslc

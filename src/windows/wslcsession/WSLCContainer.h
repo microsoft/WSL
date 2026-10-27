@@ -214,13 +214,15 @@ private:
 
     __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> StartTransition(TransitionKind kind, ContainerEvent expectedEvent);
 
-    // Returns with both locks held when no transition is active (or it matches kind) and, if waitForRestart,
-    // no restart is in flight either. Both conditions are re-checked every time the locks come back.
+    // Returns with both locks held when no transition is active (or it matches kind), if waitForRestart, no restart
+    // is in flight, and, if waitForExitRequests, no stop or kill request is in flight against an exited run. All
+    // conditions are re-checked every time the locks come back.
     void WaitForConflictingTransitionToComplete(
         wil::rwlock_release_exclusive_scope_exit& lock,
         wil::rwlock_release_shared_scope_exit& lifecycleLock,
         std::optional<TransitionKind> kind = std::nullopt,
-        bool waitForRestart = true);
+        bool waitForRestart = true,
+        bool waitForExitRequests = false);
 
     // Phases of Restart(). Identical to Start() and Stop() except that they do not stand down for the
     // restart they are part of. PolicyRestartToken identifies a start requested by the restart policy,
