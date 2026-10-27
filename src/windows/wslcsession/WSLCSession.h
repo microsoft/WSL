@@ -176,6 +176,7 @@ public:
     IFACEMETHOD(BeginContainerOperation)(_Outptr_ IUnknown** Operation) override;
     IFACEMETHOD(BeginComposeOperation)(
         _In_ const WSLCComposeOperationRequest* request, _In_opt_ IComposeProgressCallback* progressCallback, _Out_ IComposeOperation** operation) override;
+    IFACEMETHOD(ListComposeProjects)(_In_ const WSLCComposeProjectListOptions* options, _Out_ WSLCComposeProjectSummary** projects, _Out_ ULONG* count) override;
     IFACEMETHOD(ListContainers)(
         _In_opt_ const WSLCListContainersOptions* Options,
         _Out_ WSLCContainerEntry** Containers,

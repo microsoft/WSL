@@ -24,6 +24,8 @@ std::vector<std::unique_ptr<Command>> ComposeCommand::CreateCommands() const
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<ComposeAttachCommand>(FullName()));
     commands.push_back(std::make_unique<ComposeCreateCommand>(FullName()));
+    commands.push_back(std::make_unique<ComposeListCommand>(FullName()));
+    commands.push_back(std::make_unique<ComposeRemoveCommand>(FullName()));
     commands.push_back(std::make_unique<ComposeStartCommand>(FullName()));
     commands.push_back(std::make_unique<ComposeStopCommand>(FullName()));
     commands.push_back(std::make_unique<ComposeUpCommand>(FullName()));

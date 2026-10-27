@@ -59,6 +59,8 @@ private:
         HANDLE cancelEvent,
         const ComposeProgressReporter& progressReporter,
         std::optional<wsl::windows::common::Error>& primaryError);
+    static std::vector<WSLCContainerEntry> Remove(
+        const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter);
     static void CheckCancelled(HANDLE cancelEvent);
 
     WSLCSession& m_session;
