@@ -3723,6 +3723,32 @@ class WSLCTests
         ValidateNetworking(WSLCNetworkingModeNAT);
     }
 
+    TEST_METHOD(NATNetworkingIsolation)
+    {
+        auto firstSession = CreateSession(GetDefaultSessionSettings(L"nat-isolation-1", false, WSLCNetworkingModeNAT));
+        auto secondSession = CreateSession(GetDefaultSessionSettings(L"nat-isolation-2", false, WSLCNetworkingModeNAT));
+
+        auto getAddress = [](IWSLCSession* session) {
+            const auto result = ExpectCommandResult(session, {"/bin/sh", "-c", "ip -j -4 address show dev eth0"}, 0);
+            return nlohmann::json::parse(result.Output.at(1)).at(0).at("addr_info").at(0).at("local").get<std::string>();
+        };
+
+        const auto firstAddress = getAddress(firstSession.get());
+        const auto secondAddress = getAddress(secondSession.get());
+        VERIFY_ARE_NOT_EQUAL(firstAddress, secondAddress);
+
+        auto verifyIsolation = [this](IWSLCSession* session, const std::string& ownAddress, const std::string& peerAddress) {
+            // Verify ping works and NAT DNS is reachable without requiring host-to-guest ICMP.
+            VERIFY_ARE_EQUAL(0, ExpectCommandResult(session, {"/usr/bin/ping", "-n", "-c", "1", "-W", "2", ownAddress}, 0, 30000).Code);
+
+            VERIFY_ARE_EQUAL(
+                1, ExpectCommandResult(session, {"/usr/bin/ping", "-n", "-c", "1", "-W", "2", "-w", "5", peerAddress}, 1, 30000).Code);
+        };
+
+        verifyIsolation(firstSession.get(), firstAddress, secondAddress);
+        verifyIsolation(secondSession.get(), secondAddress, firstAddress);
+    }
+
     TEST_METHOD(NATNetworkingWithDnsTunneling)
     {
         WINDOWS_11_TEST_ONLY();
