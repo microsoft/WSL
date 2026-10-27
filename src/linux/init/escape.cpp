@@ -321,8 +321,8 @@ Return:
     for (Current = Path; *Current != '\0'; Current += 1)
     {
         //
-        // If the current character is a utf-8 sequence that can be unescaped,
-        // replace the character and shift down the remainder of the string.
+        // Unescape code point U+F000 to U+F07F, matching the escaped range.
+        // Replace the character and shift down the remainder of the string.
         //
 
         if ((Current[0] == UtilEscapeCharBase[0]) && ((Current[1] & 0xfe) == static_cast<unsigned char>(UtilEscapeCharBase[1])) &&
