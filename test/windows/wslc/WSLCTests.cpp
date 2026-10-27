@@ -15205,11 +15205,11 @@ class WSLCTests
         std::vector<std::wstring> m_warnings;
     };
 
-    WSLC_TEST_METHOD(WarningCallbackHttpsLoopbackProxy)
+    WSLC_TEST_METHOD(WarningCallbackLoopbackProxy)
     {
         SKIP_TEST_SERVER();
 
-        const auto expectedWarning = std::format(L"wsl: {}\n", wsl::shared::Localization::WSLCHttpsProxyLoopbackNotReachable());
+        const auto expectedWarning = std::format(L"wsl: {}\n", wsl::shared::Localization::WSLCProxyLoopbackNotReachable());
         const auto verifyWarning = [&](LPCWSTR name, LPCSTR httpProxy, LPCSTR httpsProxy, WSLCNetworkingMode networkingMode, bool expectWarning) {
             auto settings = GetDefaultSessionSettings(name, false, networkingMode);
             settings.HttpProxy = httpProxy;
@@ -15238,6 +15238,7 @@ class WSLCTests
 
         verifyWarning(L"warning-https-loopback-http-proxy", "https://localhost:3128", nullptr, WSLCNetworkingModeConsomme, true);
         verifyWarning(L"warning-https-loopback-https-proxy", nullptr, "https://127.0.0.1:3128", WSLCNetworkingModeConsomme, true);
+        verifyWarning(L"warning-ipv6-loopback-proxy", "http://[::1]:3128", nullptr, WSLCNetworkingModeConsomme, true);
         verifyWarning(L"warning-https-loopback-nat", "https://localhost:3128", nullptr, WSLCNetworkingModeNAT, false);
     }
 

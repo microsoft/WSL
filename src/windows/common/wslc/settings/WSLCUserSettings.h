@@ -120,7 +120,7 @@ namespace details {
 
 // Replaces a non-HTTPS localhost proxy host with HostLoopback so the VM can reach the Windows host.
 std::string ResolveProxyUrl(const std::string& Url, const std::string& HostLoopback);
-bool IsHttpsLoopbackProxyUrl(const std::string& Url);
+bool IsLoopbackProxyUrl(const std::string& Url);
 
 // Type-safe enum-indexed map of all settings values, backed by EnumBasedVariantMap.
 struct SettingsMap : wsl::windows::wslc::EnumBasedVariantMap<Setting, details::SettingMapping>

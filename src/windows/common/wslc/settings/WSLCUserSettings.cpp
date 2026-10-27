@@ -13,6 +13,7 @@ Abstract:
 --*/
 #include "precomp.h"
 #include "WSLCUserSettings.h"
+#include "WslCoreNetworkingSupport.h"
 #include "filesystem.hpp"
 #include "string.hpp"
 #include "wslutil.h"
@@ -67,8 +68,8 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  # idleTimeout: default\n"
     "\n"
     "  # Proxy used by the container engine for registry access, such as pull, push and build base images.\n"
-    "  # Changes apply after the session restarts. HTTP localhost proxies use hostLoopback.\n"
-    "  # HTTPS localhost proxies are not rewritten; use the hostLoopback name and a certificate valid for it.\n"
+    "  # Changes apply after the session restarts. Non-HTTPS localhost and 127.0.0.1 proxies use hostLoopback.\n"
+    "  # For other loopback proxies, use the hostLoopback name; HTTPS proxies also need a certificate valid for it.\n"
     "  # proxy:\n"
     "  #   http: http://proxy.example.com:3128\n"
     "  #   https: http://proxy.example.com:3128\n"
@@ -188,7 +189,7 @@ std::string ResolveProxyUrl(const std::string& Url, const std::string& HostLoopb
     return resolved;
 }
 
-bool IsHttpsLoopbackProxyUrl(const std::string& Url)
+bool IsLoopbackProxyUrl(const std::string& Url)
 {
     const auto host = FindProxyHost(Url);
     if (!host)
@@ -196,14 +197,22 @@ bool IsHttpsLoopbackProxyUrl(const std::string& Url)
         return false;
     }
 
-    const auto scheme = std::string_view{Url}.substr(0, Url.find("://"));
-    if (!wsl::shared::string::IsEqual(scheme, "https", true))
+    const auto name = Url.substr(host->first, host->second);
+    if (wsl::shared::string::IsEqual(name, "localhost", true))
     {
-        return false;
+        return true;
     }
 
-    const auto name = std::string_view{Url}.substr(host->first, host->second);
-    return wsl::shared::string::IsEqual(name, "localhost", true) || name == "127.0.0.1" || name == "[::1]";
+    SOCKADDR_INET address{};
+    if (name.front() == '[')
+    {
+        address.si_family = AF_INET6;
+        return inet_pton(AF_INET6, name.substr(1, name.size() - 2).c_str(), &address.Ipv6.sin6_addr) == 1 &&
+               wsl::core::networking::IsLoopbackIpAddress(address);
+    }
+
+    address.si_family = AF_INET;
+    return inet_pton(AF_INET, name.c_str(), &address.Ipv4.sin_addr) == 1 && wsl::core::networking::IsLoopbackIpAddress(address);
 }
 
 namespace details {

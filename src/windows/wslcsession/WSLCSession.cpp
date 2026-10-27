@@ -398,11 +398,11 @@ try
     // failures are streamed to the CLI.
     WSLCExecutionContext warningContext(this, WarningCallback);
 
-    const auto isHttpsLoopbackProxy = [](LPCSTR proxy) { return proxy != nullptr && settings::IsHttpsLoopbackProxyUrl(proxy); };
+    const auto isLoopbackProxy = [](LPCSTR proxy) { return proxy != nullptr && settings::IsLoopbackProxyUrl(proxy); };
     if (Settings->NetworkingMode == WSLCNetworkingModeConsomme &&
-        (isHttpsLoopbackProxy(Settings->HttpProxy) || isHttpsLoopbackProxy(Settings->HttpsProxy)))
+        (isLoopbackProxy(Settings->HttpProxy) || isLoopbackProxy(Settings->HttpsProxy)))
     {
-        EMIT_USER_WARNING(Localization::WSLCHttpsProxyLoopbackNotReachable());
+        EMIT_USER_WARNING(Localization::WSLCProxyLoopbackNotReachable());
     }
 
     // The VM (and storage VHD) is created lazily on the first operation. Validate the storage

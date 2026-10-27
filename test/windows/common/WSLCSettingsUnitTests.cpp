@@ -703,16 +703,22 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(std::string("http://u:p@host.wslc.internal"), ResolveProxyUrl("http://u:p@127.0.0.1", loopback));
         VERIFY_ARE_EQUAL(std::string("https://localhost:3128"), ResolveProxyUrl("https://localhost:3128", loopback));
         VERIFY_ARE_EQUAL(std::string("HTTPS://127.0.0.1:3128"), ResolveProxyUrl("HTTPS://127.0.0.1:3128", loopback));
-        VERIFY_ARE_EQUAL(std::string("socks5://[::1]:1080"), ResolveProxyUrl("socks5://[::1]:1080", loopback));
         VERIFY_ARE_EQUAL(std::string("http://proxy.example.com:3128"), ResolveProxyUrl("http://proxy.example.com:3128", loopback));
         VERIFY_ARE_EQUAL(std::string("http://localhost.example.com"), ResolveProxyUrl("http://localhost.example.com", loopback));
         VERIFY_ARE_EQUAL(std::string("http://localhost:3128"), ResolveProxyUrl("http://localhost:3128", ""));
 
-        VERIFY_IS_TRUE(IsHttpsLoopbackProxyUrl("https://localhost:3128"));
-        VERIFY_IS_TRUE(IsHttpsLoopbackProxyUrl("https://127.0.0.1:3128"));
-        VERIFY_IS_TRUE(IsHttpsLoopbackProxyUrl("https://[::1]:3128"));
-        VERIFY_IS_FALSE(IsHttpsLoopbackProxyUrl("http://localhost:3128"));
-        VERIFY_IS_FALSE(IsHttpsLoopbackProxyUrl("https://proxy.example.com:3128"));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("socks5://[::1]:1080", loopback)));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("http://[::1]:3128", loopback)));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("http://[0:0:0:0:0:0:0:1]:3128", loopback)));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("http://127.0.0.2:3128", loopback)));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("https://localhost:3128", loopback)));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("HTTPS://127.0.0.1:3128", loopback)));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("http://localhost:3128", "")));
+        VERIFY_IS_FALSE(IsLoopbackProxyUrl(ResolveProxyUrl("http://localhost:3128", loopback)));
+        VERIFY_IS_FALSE(IsLoopbackProxyUrl(ResolveProxyUrl("http://127.0.0.1:3128", loopback)));
+        VERIFY_IS_FALSE(IsLoopbackProxyUrl("http://proxy.example.com:3128"));
+        VERIFY_IS_FALSE(IsLoopbackProxyUrl("http://localhost.example.com"));
+        VERIFY_IS_FALSE(IsLoopbackProxyUrl("http://[2001:db8::1]:3128"));
     }
 
     // -----------------------------------------------------------------------
