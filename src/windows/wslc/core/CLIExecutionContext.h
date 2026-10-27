@@ -15,6 +15,7 @@ Abstract:
 #include "ArgMap.h"
 #include "ExecutionContextData.h"
 #include "Terminal.h"
+#include <atomic>
 #include <optional>
 
 namespace wsl::windows::wslc::execution {
@@ -23,6 +24,13 @@ using namespace wsl::windows::wslc::cli;
 
 struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 {
+    enum class CancellationMode
+    {
+        None,
+        Graceful,
+        GracefulAndForce
+    };
+
     CLIExecutionContext() : wsl::windows::common::ExecutionContext(wsl::windows::common::Context::WslC)
     {
     }
@@ -45,8 +53,13 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 
     // Event signaled when the user presses Ctrl-C.
     wil::unique_event CancelEvent;
+    wil::unique_event ForceCancelEvent;
 
-    HANDLE CreateCancelEvent();
+    std::atomic_ulong CancellationCount{};
+
+    HANDLE CreateCancelEvent(CancellationMode mode = CancellationMode::Graceful);
+    HANDLE CreateForceCancelEvent();
+    bool RecordCancellationRequest() noexcept;
 
     // Applies terminal configuration from parsed arguments and freezes those values for the invocation.
     void ApplyTerminalOptions();
@@ -60,6 +73,11 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 protected:
     // Writes in-process warnings to the terminal, matching those raised through WarningCallback.
     bool CollectUserWarning(const std::wstring& warning) override;
+
+private:
+    std::atomic<CancellationMode> m_cancellationMode{CancellationMode::None};
+    std::atomic<HANDLE> m_cancelEventHandle{};
+    std::atomic<HANDLE> m_forceCancelEventHandle{};
 };
 
 } // namespace wsl::windows::wslc::execution
