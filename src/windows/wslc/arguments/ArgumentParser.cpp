@@ -217,8 +217,8 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
 
     if (currArg == L"--")
     {
-        // Options-only passes leave the separator for the selected command's parser so
-        // it also ends subcommand resolution.
+        // Options-only passes leave the separator for the caller, which decides whether it
+        // ends subcommand resolution.
         if (m_optionsOnly)
         {
             return BackUpAndStop();

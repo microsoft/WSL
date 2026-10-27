@@ -719,6 +719,36 @@ class WSLCCLIExecutionUnitTests
         VERIFY_ARE_EQUAL(std::wstring{L"debian"}, context.Args.GetValue<ArgType::ImageId>());
     }
 
+    TEST_METHOD(EndOfOptions_RootSeparatorKeepsResolvingCommand)
+    {
+        CLIExecutionContext context;
+        CommandInvocation invocation{
+            std::make_unique<RootCommand>(), std::vector<std::wstring>{L"--", L"--session", L"foo", L"container", L"list", L"-a"}};
+
+        invocation.ParseCommandLine(context);
+
+        VERIFY_ARE_EQUAL(std::wstring_view{L"list"}, invocation.Selected().Name());
+        VERIFY_ARE_EQUAL(std::wstring{L"foo"}, context.Args.GetValue<ArgType::Session>());
+        VERIFY_IS_TRUE(context.Args.GetValue<ArgType::All>());
+    }
+
+    TEST_METHOD(EndOfOptions_SecondRootSeparatorEndsOptions)
+    {
+        CLIExecutionContext context;
+        CommandInvocation invocation{
+            std::make_unique<RootCommand>(), std::vector<std::wstring>{L"--", L"--", L"container", L"list"}};
+
+        try
+        {
+            invocation.ParseCommandLine(context);
+            VERIFY_FAIL(L"Expected ArgumentException");
+        }
+        catch (const ArgumentException& exception)
+        {
+            VERIFY_ARE_EQUAL(wsl::shared::Localization::WSLCCLI_ExtraPositionalError(L"container"), exception.Message());
+        }
+    }
+
     TEST_METHOD(ScopedGlobalArguments_DetachedSubtreeFormatsChildInvocation)
     {
         const TestComposeCommand command{L"root"};
