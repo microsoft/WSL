@@ -207,9 +207,7 @@ private:
         return invoked;
     }
 
-    ULONG m_sessionId;
-    // An expired weak process reference can still be running its destructor during session teardown.
-    // Keep only the registry alive until its last tracking reference has finished unregistering.
+    ULONG m_sessionId{};
     std::shared_ptr<RegistryState> m_state = std::make_shared<RegistryState>();
 };
 } // namespace wsl::windows::service::wslc
