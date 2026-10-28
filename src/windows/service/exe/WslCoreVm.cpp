@@ -1299,6 +1299,7 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
     message->MountDeviceType = LxMiniInitMountDeviceTypeLun;
     message->DeviceId = lun;
     message->Flags = flags;
+    message->InstanceId = InstanceId;
     message.WriteString(message->FsTypeOffset, "ext4");
     message.WriteString(message->MountOptionsOffset, "discard,errors=remount-ro,data=ordered");
     message.WriteString(message->VmIdOffset, m_machineId);
@@ -2518,7 +2519,8 @@ try
 }
 CATCH_LOG()
 
-void WslCoreVm::RegisterCallbacks(_In_ const std::function<void(ULONG)>& DistroExitCallback, _In_ const std::function<void(GUID)>& TerminationCallback)
+void WslCoreVm::RegisterCallbacks(
+    _In_ const std::function<void(const LX_MINI_INIT_CHILD_EXIT_MESSAGE&)>& DistroExitCallback, _In_ const std::function<void(GUID)>& TerminationCallback)
 {
     WSL_LOG(
         "WslCoreVm::RegisterCallbacks",
@@ -2552,8 +2554,11 @@ void WslCoreVm::RegisterCallbacks(_In_ const std::function<void(ULONG)>& DistroE
                         const auto* exitMessage = gslhelpers::try_get_struct<LX_MINI_INIT_CHILD_EXIT_MESSAGE>(message);
                         if (exitMessage)
                         {
-                            WSL_LOG("ProcessExited", TraceLoggingValue(exitMessage->ChildPid, "pid"));
-                            exitCallback(exitMessage->ChildPid);
+                            WSL_LOG(
+                                "ProcessExited",
+                                TraceLoggingValue(exitMessage->ChildPid, "pid"),
+                                TraceLoggingValue(exitMessage->InstanceId, "instanceId"));
+                            exitCallback(*exitMessage);
                         }
                     }
                     else
