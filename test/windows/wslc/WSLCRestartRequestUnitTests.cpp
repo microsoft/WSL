@@ -4,14 +4,62 @@
 #include "Common.h"
 #include "../../../src/windows/wslcsession/WSLCExitRequestState.h"
 #include "../../../src/windows/wslcsession/WSLCRestartBackoff.h"
+#include "../../../src/windows/wslcsession/WSLCRestartTransaction.h"
 
 namespace WSLCRestartRequests {
 
 using wsl::windows::service::wslc::WSLCExitRequestState;
+using wsl::windows::service::wslc::WSLCRestartTransaction;
 
 class WSLCRestartRequestUnitTests
 {
     WSLC_TEST_CLASS(WSLCRestartRequestUnitTests)
+
+    TEST_METHOD(RestartCleanup_CancelledRestartCannotCleanUpReplacement)
+    {
+        auto cancelled = std::make_shared<WSLCRestartTransaction>();
+        auto owner = cancelled;
+
+        // A's start commits before its cancelled wait unwinds; B acquires the stopped interval.
+        owner.reset();
+        auto replacement = std::make_shared<WSLCRestartTransaction>();
+        owner = replacement;
+
+        unsigned cleanupCalls = 0;
+        cancelled->CleanupIfOwned(owner, false, [&]() { ++cleanupCalls; });
+        VERIFY_ARE_EQUAL(0u, cleanupCalls);
+        VERIFY_IS_TRUE(owner == replacement);
+
+        replacement->CleanupIfOwned(owner, false, [&]() {
+            VERIFY_IS_FALSE(static_cast<bool>(owner));
+            ++cleanupCalls;
+        });
+        VERIFY_ARE_EQUAL(1u, cleanupCalls);
+        VERIFY_IS_FALSE(static_cast<bool>(owner));
+    }
+
+    TEST_METHOD(RestartCleanup_CancelledWaitAfterStartCommitDoesNotCleanUp)
+    {
+        auto restart = std::make_shared<WSLCRestartTransaction>();
+        auto owner = restart;
+        owner.reset();
+
+        unsigned cleanupCalls = 0;
+        restart->CleanupIfOwned(owner, false, [&]() { ++cleanupCalls; });
+        VERIFY_ARE_EQUAL(0u, cleanupCalls);
+        VERIFY_IS_FALSE(static_cast<bool>(owner));
+    }
+
+    TEST_METHOD(RestartCleanup_SuccessReleasesOwnershipWithoutFailureCleanup)
+    {
+        auto restart = std::make_shared<WSLCRestartTransaction>();
+        auto owner = restart;
+
+        unsigned cleanupCalls = 0;
+        restart->CleanupIfOwned(owner, true, [&]() { ++cleanupCalls; });
+        VERIFY_ARE_EQUAL(0u, cleanupCalls);
+        VERIFY_IS_FALSE(static_cast<bool>(owner));
+    }
 
     TEST_METHOD(RestartBackoff_CapturesEachRunDuration)
     {

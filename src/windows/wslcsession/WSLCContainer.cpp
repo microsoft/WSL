@@ -1761,7 +1761,7 @@ void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds)
     ValidateSignal(Signal);
 
     bool wasRunning{};
-    auto restart = std::make_shared<RestartTransaction>();
+    auto restart = std::make_shared<WSLCRestartTransaction>();
 
     {
         auto lifecycleLock = m_lifecycleLock.lock_shared();
@@ -1791,15 +1791,7 @@ void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds)
             auto lock = m_lock.lock_exclusive();
 
             // CommitState() clears this once the start phase lands, so a later restart may already own it.
-            if (m_restart == restart)
-            {
-                m_restart.reset();
-            }
-
-            if (!succeeded)
-            {
-                transition = OnFailedRestartExclusiveLockHeld();
-            }
+            restart->CleanupIfOwned(m_restart, succeeded, [&]() { transition = OnFailedRestartExclusiveLockHeld(); });
         }
 
         if (transition)
