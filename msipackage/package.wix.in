@@ -570,10 +570,10 @@
 
 
         <?if "${WSL_BUILD_WSL_SETTINGS}" = "true" ?>
-            <ComponentGroup Id="wslsettings" Directory="WSLSETTINGS" Source="${BIN}/wslsettings">
+            <ComponentGroup Id="wslsettings" Directory="WSLSETTINGS" Source="${BIN}/wslsettings-publish">
                 <Component Id="wslsettingsnonserver" Guid="AB166073-8855-492B-95C8-C6E5939B66A5" Bitness="always64" DisableRegistryReflection="yes" UninstallWhenSuperseded="yes" Condition="MsiNTProductType = 1">
                     <RemoveFile Id="CleanUpWSLSettingsShortCutNonServer" Directory="ProgramMenuFolder" Name="WSLSettings" On="uninstall"/>
-                    <File Id="wslsettings.exe_nonserver" Source="${PACKAGE_INPUT_DIR}/wslsettings/wslsettings.exe" KeyPath="yes" ShortName="kyk8fs6a.exe">
+                    <File Id="wslsettings.exe_nonserver" Source="${PACKAGE_INPUT_DIR}/wslsettings-publish/wslsettings.exe" KeyPath="yes" ShortName="kyk8fs6a.exe">
                         <Shortcut Id="WSLSettingsShortcutNonServer" Name="WSL Settings" Description="Windows Subsystem for Linux Settings" Directory="ProgramMenuFolder" Icon="wsl.ico"/>
                     </File>
                     <!-- Protocol registration -->
@@ -602,7 +602,7 @@
                 </Component>
                 <Component Id="wslsettingsserver" Guid="EE2D69A0-4F55-4EC5-9576-4FAD70BC798E" Bitness="always64" DisableRegistryReflection="yes" UninstallWhenSuperseded="yes" Condition="MsiNTProductType &gt; 1">
                     <RemoveFile Id="CleanUpWSLSettingsShortCutServer" Directory="ProgramMenuFolder" Name="WSLSettings" On="uninstall"/>
-                    <File Id="wslsettings.exe_server" Source="${PACKAGE_INPUT_DIR}/wslsettings/wslsettings.exe" KeyPath="yes" ShortName="kyk8fs6b.exe">
+                    <File Id="wslsettings.exe_server" Source="${PACKAGE_INPUT_DIR}/wslsettings-publish/wslsettings.exe" KeyPath="yes" ShortName="kyk8fs6b.exe">
                         <Shortcut Id="WSLSettingsShortcutServer" Name="WSL Settings" Description="Windows Subsystem for Linux Settings" Directory="ProgramMenuFolder" Icon="wsl.ico"/>
                     </File>
                     <!-- Protocol registration -->
@@ -629,10 +629,7 @@
                         </RegistryKey>
                     </RegistryKey>
                 </Component>
-                <File Id="wslsettings.dll" Source="${PACKAGE_INPUT_DIR}/wslsettings/wslsettings.dll"/>
-                <Files Include="*.dll">
-                    <Exclude Files="wslsettings.dll" />
-                </Files>
+                <Files Include="*.dll"/>
                 <Files Include="*.exe">
                     <Exclude Files="wslsettings.exe" />
                 </Files>

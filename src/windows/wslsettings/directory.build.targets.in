@@ -1,10 +1,34 @@
 <Project>
+  <PropertyGroup>
+    <PublishAot Condition="'$(Configuration)' == 'Release'">true</PublishAot>
+    <PublishAot Condition="'$(Configuration)' != 'Release'">false</PublishAot>
+  </PropertyGroup>
   <ItemGroup>
-    <FrameworkReference Update="Microsoft.Windows.SDK.NET.Ref" RuntimeFrameworkVersion="${WINDOWS_SDK_DOTNET_VERSION}" TargetingPackVersion="${WINDOWS_SDK_DOTNET_VERSION}" />
+    <FrameworkReference Update="Microsoft.NETCore.App" RuntimeFrameworkVersion="${DOTNET_RUNTIME_VERSION}" />
+    <FrameworkReference Update="Microsoft.Windows.SDK.NET.Ref.Windows" RuntimeFrameworkVersion="${WINDOWS_SDK_DOTNET_VERSION}" TargetingPackVersion="${WINDOWS_SDK_DOTNET_VERSION}" />
+    <Content Include="${BIN}/wslsettings/Assets/*" Link="Assets/%(Filename)%(Extension)" CopyToPublishDirectory="PreserveNewest" />
     <!-- The below can be removed when the OneBranch pipeline container image is updated to use a newer version of the dotnet SDK -->
     <WindowsSdkSupportedTargetPlatformVersion Include="10.0.26100.0" Exclude="@(WindowsSdkSupportedTargetPlatformVersion)" WindowsSdkPackageVersion="10.0.26100.0" MinimumNETVersion="6.0" />
     <SdkSupportedTargetPlatformVersion Include="10.0.26100.0" Exclude="@(SdkSupportedTargetPlatformVersion)"/>
   </ItemGroup>
+  <Target Name="ConfigureNativeAotRuntime"
+          BeforeTargets="ProcessFrameworkReferences"
+          Condition="'$(PublishAot)' == 'true'">
+    <ItemGroup>
+      <KnownILCompilerPack Update="Microsoft.DotNet.ILCompiler" ILCompilerPackVersion="${DOTNET_RUNTIME_VERSION}" />
+    </ItemGroup>
+  </Target>
+  <Target Name="PublishWinUiResources" AfterTargets="Publish">
+    <ItemGroup>
+      <_SettingsCompiledXaml Include="$(TargetDir)**/*.xbf" />
+    </ItemGroup>
+    <Copy SourceFiles="$(TargetDir)$(TargetName).pri"
+          DestinationFolder="$(PublishDir)"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_SettingsCompiledXaml)"
+          DestinationFiles="@(_SettingsCompiledXaml->'$(PublishDir)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
   <!-- CodeQL forces all compiler-generated files to be written to disk (instead of compiled in memory)
        for static analysis. Some files are generated in the XamlPreCompile target, which does not have a
        dependency on CreateCompilerGeneratedFilesOutputPath. This can cause failures if the output folder

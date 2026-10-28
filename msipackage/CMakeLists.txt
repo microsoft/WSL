@@ -19,7 +19,7 @@ set(PACKAGE_WIX ${BIN}/package.wix)
 set(CAB_CACHE ${BIN}/cab)
 set(WINDOWS_BINARIES wsl.exe;wslg.exe;wslhost.exe;wslrelay.exe;wslservice.exe;wslserviceproxystub.dll;wsldevicehostproxystub.dll;wslinstall.dll;wslc.exe;wslcsession.exe)
 if (WSL_BUILD_WSL_SETTINGS)
-    list(APPEND WINDOWS_BINARIES "wslsettings/wslsettings.dll;wslsettings/wslsettings.exe;libwsl.dll")
+    list(APPEND WINDOWS_BINARIES "wslsettings-publish/wslsettings.exe;libwsl.dll")
 endif()
 
 set(BINARIES_DEPENDENCIES)
@@ -60,7 +60,7 @@ set_target_properties(msipackage PROPERTIES EXCLUDE_FROM_ALL FALSE SOURCES ${PAC
 add_dependencies(msipackage wsl wslg wslservice wslhost wslrelay wslserviceproxystub wsldevicehostproxystub init initramfs wslinstall msixgluepackage wslc wslcsession)
 
 if (WSL_BUILD_WSL_SETTINGS)
-    add_dependencies(msipackage wslsettings libwsl)
+    add_dependencies(msipackage wslsettings_publish libwsl)
 endif()
 
 set_source_files_properties(${OUTPUT_PACKAGE} PROPERTIES GENERATED TRUE)

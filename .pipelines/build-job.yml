@@ -92,6 +92,12 @@ jobs:
           inputs:
             packageType: "sdk"
 
+      - task: UseDotNet@2
+        displayName: Install .NET 10 SDK for WSL Settings
+        inputs:
+          packageType: "sdk"
+          version: "10.0.403"
+
       - task: PowerShell@2
         displayName: Set trace logging configuration
         condition: ne('${{ parameters.traceLoggingConfig }}', '')
@@ -184,7 +190,7 @@ jobs:
                       $pattern = '${{ target.pattern }}'
                       $inputDir = "bin\$arch\Release"
                       $outputDir = "$(packageStagingDir)\$arch"
-                      New-Item -ItemType Directory -Path "$outputDir\wslsettings" -Force
+                      New-Item -ItemType Directory -Path "$outputDir\wslsettings-publish" -Force
                       foreach ($file in $pattern.Split(',')) {
                           $sourcePath = Join-Path $inputDir $file
                           if (Test-Path $sourcePath) {

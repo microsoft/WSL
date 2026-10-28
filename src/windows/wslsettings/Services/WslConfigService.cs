@@ -5,7 +5,7 @@ using static WslSettings.Contracts.Services.IWslConfigService;
 
 namespace WslSettings.Services;
 
-public class WslConfigService : IWslConfigService, IDisposable
+public partial class WslConfigService : IWslConfigService, IDisposable
 {
     private WslConfig? _wslConfig { get; set; }
     private WslConfig? _wslConfigDefaults { get; init; }

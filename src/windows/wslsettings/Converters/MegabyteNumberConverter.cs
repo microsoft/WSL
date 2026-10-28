@@ -2,7 +2,7 @@
 
 namespace WslSettings.Converters
 {
-    public sealed class MegabyteNumberConverter : Microsoft.UI.Xaml.Data.IValueConverter
+    public sealed partial class MegabyteNumberConverter : Microsoft.UI.Xaml.Data.IValueConverter
     {
         public object? Convert(object value, Type targetType, object parameter, string language)
         {
