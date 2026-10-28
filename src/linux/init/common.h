@@ -71,7 +71,7 @@ extern int g_LogFd;
 extern int g_TelemetryFd;
 extern struct sigaction g_SavedSignalActions[_NSIG];
 
-// Fails if the current process has more that one thread.
+// Fails if the current process has more than one thread.
 // This is in place to avoid calling clone() in a multi-threaded process,
 // which can cause deadlocks in the child, since global locks could be inherited in a locked state in the child.
 inline void AssertSingleThreaded()
