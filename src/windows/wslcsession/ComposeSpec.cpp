@@ -125,6 +125,7 @@ namespace {
             value.resize(value.size() - 3);
         }
 
+        // The final colon separates the Linux destination; Windows source paths can contain a drive colon.
         const auto separator = value.rfind(':');
         if (separator == std::string::npos || separator == 0 || separator + 1 == value.size())
         {
@@ -236,6 +237,7 @@ namespace {
                     ThrowInvalidComposeFile(path, L"the top-level 'version' property must be a scalar value");
                 }
 
+                // The version field is informational metadata.
                 continue;
             }
 

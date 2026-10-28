@@ -3,6 +3,7 @@
 #include "precomp.h"
 #include "ComposeNormalizer.h"
 #include "ResourceName.h"
+#include <set>
 
 namespace wsl::windows::service::wslc {
 
@@ -38,9 +39,8 @@ ComposeSpec ComposeNormalizer::Normalize(const ComposeDocuments& documents, cons
     THROW_HR_IF(E_INVALIDARG, document.BaseDirectory.empty());
     THROW_HR_IF(E_INVALIDARG, document.Content.empty());
 
-    std::string content(reinterpret_cast<const char*>(document.Content.data()), document.Content.size());
-    THROW_HR_IF(E_INVALIDARG, content.find('\0') != std::string::npos);
-
+    // yaml-cpp detects the document encoding from the original bytes and any byte-order mark.
+    const std::string content(reinterpret_cast<const char*>(document.Content.data()), document.Content.size());
     auto spec = ComposeSpec::Parse(document.SourcePath, content);
 
     std::string projectName;
@@ -61,10 +61,14 @@ ComposeSpec ComposeNormalizer::Normalize(const ComposeDocuments& documents, cons
 
     spec.ProjectName = std::move(projectName);
     ValidateName(DefaultNetworkName(spec.ProjectName).c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
+    std::set<std::string> containerNames;
     for (auto& container : spec.Containers)
     {
+        // Each service name is registered as a network alias, including when its container name is explicit.
         THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG, wsl::shared::Localization::MessageWslcInvalidName(container.ServiceName.c_str()), container.ServiceName.empty());
+            E_INVALIDARG,
+            wsl::shared::Localization::MessageWslcInvalidName(container.ServiceName.c_str()),
+            std::ranges::all_of(container.ServiceName, [](unsigned char value) { return std::isspace(value); }));
 
         if (container.Name.empty())
         {
@@ -72,6 +76,10 @@ ComposeSpec ComposeNormalizer::Normalize(const ComposeDocuments& documents, cons
         }
 
         ValidateName(container.Name.c_str(), WSLC_MAX_CONTAINER_NAME_LENGTH);
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG,
+            wsl::shared::Localization::MessageWslcComposeDuplicateContainerName(container.Name.c_str()),
+            !containerNames.insert(container.Name).second);
     }
 
     return spec;

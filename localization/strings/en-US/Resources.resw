@@ -2687,6 +2687,14 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>The compose file '{0}' is invalid: {1}.</value>
     <comment>{Locked="{0}"}{Locked="{1}"}File paths, property names, and error details should not be translated</comment>
   </data>
+  <data name="MessageWslcComposeDuplicateContainerName" xml:space="preserve">
+    <value>The Compose container name '{0}' is used by more than one service.</value>
+    <comment>{Locked="{0}"}Container names should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeProjectFileSwitchUnsupported" xml:space="preserve">
+    <value>Using a different Compose file for the existing project '{0}' is not supported by this session API.</value>
+    <comment>{Locked="{0}"}Project names should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ContainerAttachDesc" xml:space="preserve">
     <value>Attach to a container.</value>
   </data>

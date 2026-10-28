@@ -2445,6 +2445,14 @@ try
         }},
     };
     const auto spec = ComposeNormalizer::Normalize(documents, {});
+
+    // Cached sessions retain their captured definitions; another file for the same project would share their default network.
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_NOTIMPL,
+        Localization::MessageWslcComposeProjectFileSwitchUnsupported(spec.ProjectName.c_str()),
+        std::ranges::any_of(
+            m_composeSessions, [&](const auto& entry) { return entry.second->GetProjectName() == spec.ProjectName; }));
+
     auto containers = CreateComposeContainers(spec);
 
     Microsoft::WRL::ComPtr<WSLCComposeSession> composeSession;
