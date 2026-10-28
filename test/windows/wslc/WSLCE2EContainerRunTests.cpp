@@ -984,6 +984,20 @@ class WSLCE2EContainerRunTests
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Network_HostById_Rejected)
+    {
+        const auto hostId = wsl::shared::string::MultiByteToWide(InspectNetwork(L"host").Id);
+
+        for (const auto& reference : {hostId, hostId.substr(0, 12)})
+        {
+            auto result = RunWslc(
+                std::format(L"container run --name {} --network {} {} true", WslcContainerName, reference, DebianImage.NameAndTag()));
+            result.Verify(
+                {.Stderr = FormatErrorMessage(std::format(L"Network not found: '{}'", reference), L"WSLC_E_NETWORK_NOT_FOUND"), .ExitCode = 1});
+            VerifyContainerIsNotListed(WslcContainerName);
+        }
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Network_UserDefinedNetwork)
     {
         auto result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName));

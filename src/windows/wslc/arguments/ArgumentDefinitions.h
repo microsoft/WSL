@@ -104,6 +104,7 @@ _(Name,             "name",                NO_ALIAS,         Kind::Value,      N
 _(Network,          "network",              NO_ALIAS,         Kind::Value,      ParsedNetworkArgument, Localization::WSLCCLI_NetworkArgDescription()) \
 _(NetworkAlias,     "network-alias",        NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_NetworkAliasArgDescription()) \
 _(NetworkName,      "network-name",         NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_NetworkNameArgDescription()) \
+_(NetworkNameOrId,  "network",              NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_NetworkNameOrIdArgDescription()) \
 /*_(NoDNS,            "no-dns",               NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_NoDNSArgDescription())*/ \
 _(NoCache,          "no-cache",             NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_NoCacheArgDescription()) \
 _(NoColor,          "no-color",             NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_NoColorArgDescription()) \

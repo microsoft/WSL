@@ -28,7 +28,6 @@ Abstract:
 #include "WSLCContainerMetadata.h"
 #include "WSLCExitRequestState.h"
 #include "WSLCRestartBackoff.h"
-#include "WSLCNetworkMetadata.h"
 #include "WSLCVhdVolume.h"
 #include <unordered_map>
 
@@ -126,7 +125,7 @@ public:
     void Stats(LPSTR* Output) const;
     void GetLabels(WSLCLabelInformation** Labels, ULONG* Count) const;
     void ConnectToNetwork(const WSLCNetworkConnectionOptions* Options);
-    void DisconnectFromNetwork(LPCSTR NetworkName);
+    void DisconnectFromNetwork(LPCSTR NetworkNameOrId);
 
     void CopyTo(IWSLCContainer** Container) const;
 
@@ -159,7 +158,6 @@ public:
         WSLCSession& wslcSession,
         WSLCSessionRuntime& runtime,
         IWSLCPluginNotifier* pluginNotifier,
-        const std::unordered_map<std::string, NetworkEntry>& SessionNetworks,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         EventStore& eventStore);
 
@@ -395,7 +393,7 @@ public:
     IFACEMETHOD(GetLabels)(_Out_ WSLCLabelInformation** Labels, _Out_ ULONG* Count) override;
     IFACEMETHOD(Stats)(_Out_ LPSTR* Output) override;
     IFACEMETHOD(ConnectToNetwork)(_In_ const WSLCNetworkConnectionOptions* Options) override;
-    IFACEMETHOD(DisconnectFromNetwork)(_In_ LPCSTR NetworkName) override;
+    IFACEMETHOD(DisconnectFromNetwork)(_In_ LPCSTR NetworkNameOrId) override;
 
     // IWSLCCompatContainer.
     IFACEMETHOD(Start)(_In_ WSLCContainerStartFlags Flags) override;

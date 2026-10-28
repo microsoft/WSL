@@ -25,12 +25,12 @@ using namespace wsl::windows::wslc::cli;
 struct NetworkService
 {
     static void Create(Terminal& terminal, models::Session& session, const models::CreateNetworkOptions& createOptions);
-    static void Delete(models::Session& session, const std::string& name);
+    static void Delete(models::Session& session, const std::string& nameOrId);
     static std::vector<wsl::windows::common::wslc_schema::NetworkListEntry> List(
         models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters = {});
-    static wsl::windows::common::wslc_schema::Network Inspect(models::Session& session, const std::string& name);
+    static wsl::windows::common::wslc_schema::Network Inspect(models::Session& session, const std::string& nameOrId);
     static models::PruneNetworksResult Prune(models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters = {});
     static void Connect(models::Session& session, const models::ConnectNetworkOptions& connectOptions);
-    static void Disconnect(models::Session& session, const std::string& networkName, const std::string& containerId);
+    static void Disconnect(models::Session& session, const std::string& networkNameOrId, const std::string& containerId);
 };
 } // namespace wsl::windows::wslc::services

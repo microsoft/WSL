@@ -61,9 +61,9 @@ static bool TryInspectContainer(
     return TryInspect([&]() { result = services::ContainerService::Inspect(session, containerId, size); }, WSLC_E_CONTAINER_NOT_FOUND);
 }
 
-static bool TryInspectNetwork(wsl::windows::wslc::models::Session& session, const std::string& networkName, std::optional<wslc_schema::Network>& result)
+static bool TryInspectNetwork(wsl::windows::wslc::models::Session& session, const std::string& networkNameOrId, std::optional<wslc_schema::Network>& result)
 {
-    return TryInspect([&]() { result = services::NetworkService::Inspect(session, networkName); }, WSLC_E_NETWORK_NOT_FOUND);
+    return TryInspect([&]() { result = services::NetworkService::Inspect(session, networkNameOrId); }, WSLC_E_NETWORK_NOT_FOUND);
 }
 
 static bool TryInspectVolume(wsl::windows::wslc::models::Session& session, const std::string& volumeId, std::optional<wslc_schema::InspectVolume>& result)

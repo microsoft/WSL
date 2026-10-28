@@ -2131,18 +2131,18 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcDeleteSessionNetwork(_In_ WslcSession session, _In_z_ PCSTR name, _Outptr_opt_result_z_ PWSTR* errorMessage)
+STDAPI WslcDeleteSessionNetwork(_In_ WslcSession session, _In_z_ PCSTR nameOrId, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
 
     auto internalType = CheckAndGetInternalType(session);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
-    RETURN_HR_IF_NULL(E_POINTER, name);
+    RETURN_HR_IF_NULL(E_POINTER, nameOrId);
     auto* compatSession2 = internalType->GetSession2();
     RETURN_HR_IF_NULL(WSLC_E_RUNTIME_UPDATE_NEEDED, compatSession2);
 
-    return errorInfoWrapper.CaptureResult(compatSession2->DeleteNetwork(name));
+    return errorInfoWrapper.CaptureResult(compatSession2->DeleteNetwork(nameOrId));
 }
 CATCH_RETURN();
 
