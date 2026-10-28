@@ -8,6 +8,7 @@
             <Directory Id="INSTALLDIR" Name="WSL">
                 <Directory Id="TOOLSFOLDER" Name="tools" />
                 <Directory Id="LIBFOLDER" Name="lib" />
+                ${SECURITYAUDIT_DIRECTORY}
                 <?if "${WSL_BUILD_WSL_SETTINGS}" = "true" ?>
                     <Directory Id="WSLSETTINGS" Name="wslsettings"/>
                 <?endif?>
@@ -18,6 +19,19 @@
         <Property Id="ARPPRODUCTICON" Value="wsl.ico"/>
 
         <DirectoryRef Id="INSTALLDIR">
+            <?if "${WSL_BUILD_SECURITY_AUDIT}" = "ON" ?>
+            <Component Id="securityauditplugin" Guid="81B81A73-75A1-46EA-B776-18457E068F98" Bitness="always64">
+                <File Id="wslsecurityauditplugin.dll" Source="${PACKAGE_INPUT_DIR}/wslsecurityauditplugin.dll" KeyPath="yes" />
+                <RegistryValue Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Lxss\Plugins"
+                    Name="WSL-SecurityAudit" Value="[INSTALLDIR]wslsecurityauditplugin.dll" Type="string" />
+                <RegistryValue Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Lxss\SecurityAudit"
+                    Name="PayloadFolder" Value="[SECURITYAUDITFOLDER]" Type="string" />
+            </Component>
+            <!-- Preserve rendering of historical Security records after uninstall. -->
+            <Component Id="securityauditmessages" Guid="98498D55-537B-4A41-BC9C-C7B0D55E74CF" Permanent="yes" Bitness="always64">
+                <File Id="wslsecurityauditmessages.dll" Source="${PACKAGE_INPUT_DIR}/wslsecurityauditmessages.dll" KeyPath="yes" />
+            </Component>
+            <?endif?>
             <Component Id="wsl" Guid="F0C8D6BA-1502-41E7-BF72-D93DFA134730" UninstallWhenSuperseded="yes" DisableRegistryReflection="yes" Bitness="always64">
                 <RemoveFile Id="CleanUpWSLShortCut" Directory="ProgramMenuFolder" Name="WSL" On="uninstall"/>
                 <File Id="wsl.exe" Name="wsl.exe" Source="${PACKAGE_INPUT_DIR}/wsl.exe" KeyPath="yes">
@@ -650,6 +664,11 @@
         <Feature Id="WSL" Title="Windows Subsystem for Linux" Level="1">
             <ComponentRef Id="wsl" />
             <ComponentRef Id="wslservice" />
+            <?if "${WSL_BUILD_SECURITY_AUDIT}" = "ON" ?>
+            <ComponentRef Id="securityauditplugin" />
+            <ComponentRef Id="securityauditmessages" />
+            ${SECURITYAUDIT_COMPONENT_REFS}
+            <?endif?>
             <ComponentRef Id="wslg" />
             <ComponentRef Id="tools" />
             <ComponentRef Id="explorershell" />
@@ -787,7 +806,29 @@
         <?endif?>
 
         <!-- See https://learn.microsoft.com/en-us/windows/win32/msi/examples-of-conditional-statement-syntax -->
+        <?if "${WSL_BUILD_SECURITY_AUDIT}" = "ON" ?>
+        <CustomAction Id="PrepareSecurityAuditSource" BinaryRef="wslinstall.dll" DllEntry="PrepareSecurityAuditSource" Execute="immediate" Return="check" />
+        <CustomAction Id="InstallSecurityAuditSource.SetProperty" Property="InstallSecurityAuditSource" Value="[INSTALLDIR]wslsecurityauditmessages.dll" />
+        <CustomAction Id="RollbackSecurityAuditInstall.SetProperty" Property="RollbackSecurityAuditInstall" Value="[INSTALLDIR]wslsecurityauditmessages.dll" />
+        <CustomAction Id="UninstallSecurityAuditSource.SetProperty" Property="UninstallSecurityAuditSource" Value="[INSTALLDIR]wslsecurityauditmessages.dll" />
+        <CustomAction Id="RollbackSecurityAuditUninstall.SetProperty" Property="RollbackSecurityAuditUninstall" Value="[INSTALLDIR]wslsecurityauditmessages.dll" />
+        <CustomAction Id="InstallSecurityAuditSource" BinaryRef="wslinstall.dll" DllEntry="InstallSecurityAuditSource" Execute="deferred" Impersonate="no" Return="check" />
+        <CustomAction Id="RollbackSecurityAuditInstall" BinaryRef="wslinstall.dll" DllEntry="UninstallSecurityAuditSource" Execute="rollback" Impersonate="no" Return="check" />
+        <CustomAction Id="UninstallSecurityAuditSource" BinaryRef="wslinstall.dll" DllEntry="UninstallSecurityAuditSource" Execute="deferred" Impersonate="no" Return="check" />
+        <CustomAction Id="RollbackSecurityAuditUninstall" BinaryRef="wslinstall.dll" DllEntry="InstallSecurityAuditSource" Execute="rollback" Impersonate="no" Return="check" />
+        <?endif?>
         <InstallExecuteSequence>
+            <?if "${WSL_BUILD_SECURITY_AUDIT}" = "ON" ?>
+            <Custom Action="PrepareSecurityAuditSource" After="InstallInitialize" Condition='NOT UPGRADINGPRODUCTCODE' />
+            <Custom Action="InstallSecurityAuditSource.SetProperty" Before="RollbackSecurityAuditInstall.SetProperty" Condition='NOT REMOVE~="ALL"' />
+            <Custom Action="RollbackSecurityAuditInstall.SetProperty" Before="RollbackSecurityAuditInstall" Condition='NOT REMOVE~="ALL"' />
+            <Custom Action="RollbackSecurityAuditInstall" Before="InstallSecurityAuditSource" Condition='NOT REMOVE~="ALL" AND WSL_AUDIT_SOURCE_INSTALLED &lt;&gt; "1"' />
+            <Custom Action="InstallSecurityAuditSource" After="WriteRegistryValues" Condition='NOT REMOVE~="ALL"' />
+            <Custom Action="UninstallSecurityAuditSource.SetProperty" Before="RollbackSecurityAuditUninstall.SetProperty" Condition='REMOVE~="ALL" AND NOT UPGRADINGPRODUCTCODE' />
+            <Custom Action="RollbackSecurityAuditUninstall.SetProperty" Before="RollbackSecurityAuditUninstall" Condition='REMOVE~="ALL" AND NOT UPGRADINGPRODUCTCODE' />
+            <Custom Action="RollbackSecurityAuditUninstall" Before="UninstallSecurityAuditSource" Condition='REMOVE~="ALL" AND NOT UPGRADINGPRODUCTCODE AND WSL_AUDIT_SOURCE_INSTALLED = "1"' />
+            <Custom Action="UninstallSecurityAuditSource" Before="RemoveFiles" Condition='REMOVE~="ALL" AND NOT UPGRADINGPRODUCTCODE' />
+            <?endif?>
             <Custom Action="ValidateInstall" After="InstallInitialize" Condition="(not INSTALLED) and (not SKIPVALIDATION = 1)" />
 
             <!-- Must run before InstallServices or else we'll fail if wslservice already exists.

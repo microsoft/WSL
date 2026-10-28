@@ -9,6 +9,7 @@ tmp
 *.slnx
 *.user
 *.csproj
+!/tools/securityaudit/Restore.csproj
 *.vcxproj
 *.filters
 *.pdb

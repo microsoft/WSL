@@ -446,8 +446,9 @@ void UnmountVolumes(std::vector<WSLCVolumeMount>& volumes, WSLCVirtualMachine& p
             else
             {
                 LOG_HR(result);
-                EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcVolumeUnmountFailed(
-                    volume.HostPath, wsl::windows::common::wslutil::GetErrorString(result)));
+                EMIT_USER_WARNING(
+                    wsl::shared::Localization::MessageWslcVolumeUnmountFailed(
+                        volume.HostPath, wsl::windows::common::wslutil::GetErrorString(result)));
             }
         }
     }
@@ -1141,11 +1142,12 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
     // This is required for docker to know when stdin is closed.
     auto onInputComplete = [ioHandle]() { LOG_LAST_ERROR_IF(shutdown(ioHandle.get(), SD_SEND) == SOCKET_ERROR); };
 
-    handles.emplace_back(std::make_unique<RelayHandle<ReadHandle>>(
-        HandleWrapper{std::move(stdinRead), std::move(onInputComplete)}, HandleWrapper{ioHandle}));
+    handles.emplace_back(
+        std::make_unique<RelayHandle<ReadHandle>>(HandleWrapper{std::move(stdinRead), std::move(onInputComplete)}, HandleWrapper{ioHandle}));
 
-    handles.emplace_back(std::make_unique<DockerIORelayHandle>(
-        HandleWrapper{ioHandle}, std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+    handles.emplace_back(
+        std::make_unique<DockerIORelayHandle>(
+            HandleWrapper{ioHandle}, std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
 
     m_runtime.Relay()->AddHandles(std::move(handles));
 
@@ -1315,7 +1317,7 @@ wil::com_ptr<IWSLCProcess> WSLCContainerImpl::StartPhase(
         CATCH_LOG();
     }
 
-    auto inspectJson = InspectLockHeld();
+    auto inspectJson = InspectLockHeld(false, true);
     const auto pluginResult = m_pluginNotifier->OnContainerStarted(inspectJson.c_str());
     if (FAILED(pluginResult))
     {
@@ -1334,8 +1336,8 @@ wil::com_ptr<IWSLCProcess> WSLCContainerImpl::StartPhase(
         catch (...)
         {
             LOG_CAUGHT_EXCEPTION();
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcContainerStopAfterPluginRejectionFailed(
-                wsl::shared::string::MultiByteToWide(m_id)));
+            EMIT_USER_WARNING(
+                wsl::shared::Localization::MessageWslcContainerStopAfterPluginRejectionFailed(wsl::shared::string::MultiByteToWide(m_id)));
         }
 
         if (comError.has_value() && comError->Message)
@@ -2184,8 +2186,8 @@ void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
     }
     else
     {
-        io.AddHandle(std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(
-            HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()));
+        io.AddHandle(
+            std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()));
     }
 
     // Release the lock so the container can still be interacted with while the export is in progress.
@@ -2277,8 +2279,9 @@ void WSLCContainerImpl::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULO
         LOG_LAST_ERROR_IF(shutdown(socket, SD_SEND) == SOCKET_ERROR);
     };
 
-    io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(
-        HandleWrapper{userHandle.Get(), std::move(onInputComplete)}, HandleWrapper{requestContext->stream.native_handle()}));
+    io.AddHandle(
+        std::make_unique<RelayHandle<ReadHandle>>(
+            HandleWrapper{userHandle.Get(), std::move(onInputComplete)}, HandleWrapper{requestContext->stream.native_handle()}));
 
     io.AddHandle(
         std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(*requestContext, std::move(onHttpResponse), std::move(onProgress)),
@@ -3110,8 +3113,8 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         auto hostPort = e.VmMapping.VmPort ? e.VmMapping.VmPort->Port() : e.VmMapping.HostPort();
 
         // Use catch-all binding address based on the address family. :: binds all ipv6 interfaces, and 0:0:0:0 binds all ipv4 interfaces.
-        portEntry.emplace_back(common::docker_schema::PortMapping{
-            .HostIp = e.VmMapping.IsIPv6() ? "::" : "0.0.0.0", .HostPort = std::to_string(hostPort)});
+        portEntry.emplace_back(
+            common::docker_schema::PortMapping{.HostIp = e.VmMapping.IsIPv6() ? "::" : "0.0.0.0", .HostPort = std::to_string(hostPort)});
     }
 
     auto requestedLabels = ParseKeyValuePairs(containerOptions.Labels, containerOptions.LabelsCount, WSLCContainerMetadataLabel);
@@ -3361,8 +3364,9 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     catch (...)
     {
         LOG_CAUGHT_EXCEPTION();
-        EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcContainerTimestampRecoveryFailed(
-            wsl::shared::string::MultiByteToWide(dockerContainer.Id)));
+        EMIT_USER_WARNING(
+            wsl::shared::Localization::MessageWslcContainerTimestampRecoveryFailed(
+                wsl::shared::string::MultiByteToWide(dockerContainer.Id)));
     }
 
     return container;
@@ -3384,13 +3388,22 @@ void WSLCContainerImpl::Inspect(BOOL Size, LPSTR* Output) const
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to inspect container '%hs'", m_id.c_str());
 }
 
-std::string WSLCContainerImpl::InspectLockHeld(bool Size) const
+std::string WSLCContainerImpl::InspectLockHeld(bool Size, bool IncludePluginContext) const
 {
     // Get Docker inspect data
     auto dockerInspect = m_runtime.Docker().InspectContainer(m_id, Size);
 
     // Convert to WSLC schema
     auto wslcInspect = BuildInspectContainer(dockerInspect);
+
+    if (IncludePluginContext)
+    {
+        THROW_HR_IF_MSG(E_UNEXPECTED, dockerInspect.State.Pid < 0, "Docker returned a negative container init PID.");
+        nlohmann::json notification = wslcInspect;
+        notification["WslPluginContext"] = {
+            {"Version", 1U}, {"InitPid", static_cast<uint32_t>(dockerInspect.State.Pid)}, {"StartedAt", dockerInspect.State.StartedAt}};
+        return notification.dump();
+    }
 
     // Serialize WSLC schema to JSON
     return wsl::shared::ToJson(wslcInspect);
@@ -3464,8 +3477,8 @@ std::unique_ptr<RelayedProcessIO> WSLCContainerImpl::CreateRelayedProcessIO(wil:
     if (WI_IsFlagSet(flags, WSLCProcessFlagsStdin))
     {
         auto [stdinRead, stdinWrite] = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
-        ioHandles.emplace_back(std::make_unique<RelayHandle<ReadHandle>>(
-            HandleWrapper{std::move(stdinRead), std::move(closeStdin)}, HandleWrapper{stream}));
+        ioHandles.emplace_back(
+            std::make_unique<RelayHandle<ReadHandle>>(HandleWrapper{std::move(stdinRead), std::move(closeStdin)}, HandleWrapper{stream}));
 
         fds.emplace(WSLCFDStdin, TypedHandle{wil::unique_handle{stdinWrite.release()}, WSLCHandleTypePipe});
     }
@@ -3481,8 +3494,9 @@ std::unique_ptr<RelayedProcessIO> WSLCContainerImpl::CreateRelayedProcessIO(wil:
     fds.emplace(WSLCFDStdout, TypedHandle{wil::unique_handle{stdoutRead.release()}, WSLCHandleTypePipe});
     fds.emplace(WSLCFDStderr, TypedHandle{wil::unique_handle{stderrRead.release()}, WSLCHandleTypePipe});
 
-    ioHandles.emplace_back(std::make_unique<DockerIORelayHandle>(
-        HandleWrapper{stream}, std::move(stdoutWrite), std::move(stderrWrite), common::io::DockerIORelayHandle::Format::Raw));
+    ioHandles.emplace_back(
+        std::make_unique<DockerIORelayHandle>(
+            HandleWrapper{stream}, std::move(stdoutWrite), std::move(stderrWrite), common::io::DockerIORelayHandle::Format::Raw));
 
     m_runtime.Relay()->AddHandles(std::move(ioHandles));
 

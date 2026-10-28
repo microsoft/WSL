@@ -20,6 +20,7 @@ Abstract:
 #include <winrt/windows.management.deployment.h>
 #include <Sfc.h>
 #include "defs.h"
+#include "SecuritySource.h"
 
 using unique_msi_handle = wil::unique_any<MSIHANDLE, decltype(MsiCloseHandle), &MsiCloseHandle>;
 
@@ -131,6 +132,51 @@ std::wstring GetMsiProperty(MSIHANDLE install, LPCWSTR name)
 std::wstring GetInstallTarget(MSIHANDLE install)
 {
     return GetMsiProperty(install, L"CustomActionData");
+}
+
+extern "C" UINT __stdcall PrepareSecurityAuditSource(MSIHANDLE install)
+try
+{
+    THROW_IF_WIN32_ERROR(MsiSetPropertyW(install, L"WSL_AUDIT_SOURCE_INSTALLED", wsl::audit::IsSecuritySourceInstalled() ? L"1" : L"0"));
+    return ERROR_SUCCESS;
+}
+catch (...)
+{
+    WriteInstallLog(std::format("Security audit source query failed: 0x{:08x}", wil::ResultFromCaughtException()));
+    LOG_CAUGHT_EXCEPTION();
+    return ERROR_INSTALL_FAILURE;
+}
+
+extern "C" UINT __stdcall InstallSecurityAuditSource(MSIHANDLE install)
+try
+{
+    const auto path = GetInstallTarget(install);
+    THROW_HR_IF(E_INVALIDARG, path.empty());
+    wsl::audit::InstallSecuritySource(path);
+    WriteInstallLog("Security audit source registered; audit policy was not changed.");
+    return ERROR_SUCCESS;
+}
+catch (...)
+{
+    WriteInstallLog(std::format("Security audit source registration failed: 0x{:08x}", wil::ResultFromCaughtException()));
+    LOG_CAUGHT_EXCEPTION();
+    return ERROR_INSTALL_FAILURE;
+}
+
+extern "C" UINT __stdcall UninstallSecurityAuditSource(MSIHANDLE install)
+try
+{
+    const auto path = GetInstallTarget(install);
+    THROW_HR_IF(E_INVALIDARG, path.empty());
+    wsl::audit::UninstallSecuritySource(path);
+    WriteInstallLog("Security audit source deregistered; historical message resources retained.");
+    return ERROR_SUCCESS;
+}
+catch (...)
+{
+    WriteInstallLog(std::format("Security audit source deregistration failed: 0x{:08x}", wil::ResultFromCaughtException()));
+    LOG_CAUGHT_EXCEPTION();
+    return ERROR_INSTALL_FAILURE;
 }
 
 void DisplayError(MSIHANDLE install, LPCWSTR message)

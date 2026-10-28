@@ -544,12 +544,13 @@ struct ContainerInspectState
 {
     std::string Status;
     bool Running{};
+    int Pid{};
     int ExitCode{};
     std::string StartedAt;
     std::string FinishedAt;
     std::optional<Health> Health;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInspectState, Status, Running, ExitCode, StartedAt, FinishedAt, Health);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInspectState, Status, Running, Pid, ExitCode, StartedAt, FinishedAt, Health);
 };
 
 struct ContainerConfig

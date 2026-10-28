@@ -1,0 +1,12 @@
+<!-- Copyright (C) Microsoft Corporation. All rights reserved. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The build script supplies the exact id/version from the root packages.config. -->
+    <PackageDownload Include="$(MdePackageId)" Version="[$(MdePackageVersion)]" />
+  </ItemGroup>
+</Project>

@@ -1,3 +1,8 @@
+parameters:
+  - name: mdeFeedServiceConnection
+    type: string
+    default: ''
+
 trigger:
   branches:
     include:
@@ -29,6 +34,8 @@ steps:
     feedsToUse: config
     nugetConfigPath: NuGet.Config
     restoreDirectory: $(Build.SourcesDirectory)/packages
+    ${{ if ne(parameters.mdeFeedServiceConnection, '') }}:
+      externalFeedCredentials: '${{ parameters.mdeFeedServiceConnection }}'
 
 - powershell: |
     $version = ([xml](Get-Content packages.config)).packages.package |

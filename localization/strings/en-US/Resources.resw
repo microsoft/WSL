@@ -1005,6 +1005,9 @@ Falling back to NAT networking.</value>
     <value>The plugin '{}' requires a newer version of WSL. Please run: wsl.exe --update</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--update"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageSecurityAuditStartFailed" xml:space="preserve">
+    <value>WSL Security auditing could not start. Check the audit payload, Security event source registration, Application Generated success auditing, and service privileges. Startup was blocked because required auditing is unavailable.</value>
+  </data>
   <data name="MessageSettingOverriddenByPolicy" xml:space="preserve">
     <value>The .wslconfig setting '{}' is disabled by the computer policy.</value>
     <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>

@@ -1,3 +1,8 @@
+parameters:
+  - name: mdeFeedServiceConnection
+    type: string
+    default: ''
+
 trigger:
   branches:
     include:
@@ -5,6 +10,7 @@ trigger:
     - release/*
 
 variables:
+  LinuxContainerImage: "mcr.microsoft.com/mirror/docker/library/ubuntu:24.04"
   WindowsContainerImage: "onebranch.azurecr.io/windows/ltsc2022/vse2022:latest"
   WindowsHostVersion: '1ESWindows2022'
 
@@ -46,6 +52,9 @@ extends:
     - template: build-stage.yml@self
       parameters:
         isRelease: false
+        vsoOrg: microsoft
+        vsoProject: Microsoft.WSL
+        mdeFeedServiceConnection: ${{ parameters.mdeFeedServiceConnection }}
 
     - template: test-stage.yml@self
       parameters:

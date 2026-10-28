@@ -1,3 +1,8 @@
+parameters:
+  - name: mdeFeedServiceConnection
+    type: string
+    default: ''
+
 trigger:
   branches:
     include:
@@ -11,6 +16,7 @@ stages:
     pool: 'wsl-build'
     vsoOrg: shine-oss
     vsoProject: wsl
+    mdeFeedServiceConnection: ${{ parameters.mdeFeedServiceConnection }}
 
 - template: test-stage.yml@self
   parameters:

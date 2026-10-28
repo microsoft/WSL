@@ -276,7 +276,7 @@ private:
     // has a policy restart pending, keeping the session's VM alive across idle teardown.
     __requires_lock_held(m_lock) void UpdateActivityHoldLockHeld() noexcept;
 
-    __requires_shared_lock_held(m_lock) std::string InspectLockHeld(bool Size = false) const;
+    __requires_shared_lock_held(m_lock) std::string InspectLockHeld(bool Size = false, bool IncludePluginContext = false) const;
 
     // Lifecycle requests hold this shared until their transitions are published; event delivery holds it exclusively.
     // N.B. Stop releases it across the docker request, which can block indefinitely, and re-checks m_stateGeneration instead.

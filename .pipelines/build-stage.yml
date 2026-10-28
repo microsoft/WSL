@@ -19,6 +19,10 @@ parameters:
     type: string
     default: ''
 
+  - name: mdeFeedServiceConnection
+    type: string
+    default: ''
+
   - name: nugetPackages
     type: object
     default:
@@ -32,8 +36,8 @@ parameters:
   - name: targets
     type: object
     default:
-      - target: "wsl;libwsl;wslg;wslservice;wslhost;wslrelay;wslinstaller;wslinstall;initramfs;wslserviceproxystub;wsldevicehostproxystub;wslsettings;wslinstallerproxystub;testplugin;wslcsession;wslc;wsltests;wslcsdk"
-        pattern: "wsl.exe,libwsl.dll,wslg.exe,wslservice.exe,wslhost.exe,wslrelay.exe,wslinstaller.exe,wslinstall.dll,wslserviceproxystub.dll,wsldevicehostproxystub.dll,wslsettings/wslsettings.dll,wslsettings/wslsettings.exe,wslinstallerproxystub.dll,WSLDVCPlugin.dll,testplugin.dll,wsldeps.dll,wslcsession.exe,wslc.exe,wslcsdk.dll"
+      - target: "wsl;libwsl;wslg;wslservice;wslhost;wslrelay;wslinstaller;wslinstall;initramfs;wslserviceproxystub;wsldevicehostproxystub;wslsettings;wslinstallerproxystub;testplugin;wslcsession;wslc;wsltests;wslcsdk;wslsecurityauditplugin;wslsecurityauditmessages"
+        pattern: "wsl.exe,libwsl.dll,wslg.exe,wslservice.exe,wslhost.exe,wslrelay.exe,wslinstaller.exe,wslinstall.dll,wslserviceproxystub.dll,wsldevicehostproxystub.dll,wslsettings/wslsettings.dll,wslsettings/wslsettings.exe,wslinstallerproxystub.dll,WSLDVCPlugin.dll,testplugin.dll,wsldeps.dll,wslcsession.exe,wslc.exe,wslcsdk.dll,wslsecurityauditplugin.dll,wslsecurityauditmessages.dll"
       - target: "msixgluepackage"
         pattern: "gluepackage.msix"
       - target: "msipackage;wslcsdkcs"
@@ -65,10 +69,14 @@ parameters:
       EsrpClientId: $(EsrpClientId)
 
 stages:
+  - template: security-audit-stage.yml
+    parameters:
+      pool: ${{ parameters.pool }}
+      mdeFeedServiceConnection: ${{ parameters.mdeFeedServiceConnection }}
   # ── x64 build stage ──────────────────────────────────────────────────
   # Runs in parallel with build_arm64. Tests depend on this stage.
   - stage: build_x64
-    dependsOn: []
+    dependsOn: [security_audit]
     jobs:
       - template: build-job.yml
         parameters:
@@ -84,11 +92,12 @@ stages:
           vsoProject: ${{ parameters.vsoProject }}
           esrp: ${{ parameters.esrp }}
           includeTestArtifacts: true
+          mdeFeedServiceConnection: ${{ parameters.mdeFeedServiceConnection }}
 
   # ── arm64 build stage (runs in parallel with build_x64) ──────────────
   # Includes formatting/localization checks as a first job, then arm64 build.
   - stage: build_arm64
-    dependsOn: []
+    dependsOn: [security_audit]
     jobs:
       - job: checks
         displayName: "Formatting & localization checks"
@@ -104,6 +113,10 @@ stages:
           pool: ${{ parameters.pool }}
 
         steps:
+          - task: NuGetAuthenticate@1
+            inputs:
+              ${{ if ne(parameters.mdeFeedServiceConnection, '') }}:
+                nuGetServiceConnections: '${{ parameters.mdeFeedServiceConnection }}'
           - script: python tools/devops/validate-localization.py
             displayName: Validate localization resources
 
@@ -120,7 +133,7 @@ stages:
             displayName: "CMake ."
             inputs:
               workingDirectory: "."
-              cmakeArgs: .
+              cmakeArgs: . -DWSL_BUILD_SECURITY_AUDIT=OFF
 
           - task: PowerShell@2
             inputs:
@@ -144,6 +157,7 @@ stages:
           vsoProject: ${{ parameters.vsoProject }}
           esrp: ${{ parameters.esrp }}
           includeCodeQL: true
+          mdeFeedServiceConnection: ${{ parameters.mdeFeedServiceConnection }}
 
   # ── package stage (release and nightly only) ─────────────────────────
   # Creates msixbundle, appxupload, and NuGet packages from both platform artifacts.
