@@ -910,6 +910,10 @@ Pour plus d’informations sur Admin Protection, veuillez consulter https://aka.
     <value>Échec de la création du réseau virtuel avec la plage d’adresses : « {} », réseau créé avec la plage « {} », {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
+    <value>Le réseau NAT de WSL ({}) est en conflit avec le réseau par défaut de Docker</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
     <value>MODE SANS ÉCHEC ACTIVÉ - De nombreuses fonctionnalités seront désactivées</value>
     <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
@@ -1095,6 +1099,10 @@ Retour à la mise en réseau NAT.</value>
     <value>L'opération n'a pas pu être effectuée car le VHD est actuellement utilisé. Pour forcer l'arrêt de WSL, utilisez : wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
+  <data name="MessageDistributionTerminationTimeout" xml:space="preserve">
+    <value>Expiration du délai d’attente de l’arrêt du processus de distribution {} après {} ms. Poursuite sans confirmation de l’arrêt de la distribution.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
     <value>La compaction n’est prise en charge que sur les fichiers .vhdx.</value>
     <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
@@ -1238,6 +1246,10 @@ Voir les instructions de récupération sur : https://aka.ms/wsldiskmountrecover
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
     <value>Cgroup v1 n’est pas compatible avec l’isolation de cgroup par distribution. Utilisation de cgroup v2 à la place. Pour utiliser cgroup v1, définissez isolateDistroCgroup=false sous [wsl2] dans .wslconfig, puis exécutez wsl --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
+  <data name="MessageWindowsInstallerBusy" xml:space="preserve">
+    <value>L’installation de WSL est bloquée, car Windows Installer est occupé. Attendez la fin de l’installation des autres logiciels, puis réessayez.</value>
+    <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Un problème s’est produit. Réessayez ultérieurement.</value>
@@ -2507,6 +2519,10 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
   </data>
   <data name="MessageWslcNetworkNotFound" xml:space="preserve">
     <value>Réseau introuvable : '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcNetworkPrefixAmbiguous" xml:space="preserve">
+    <value>Plusieurs réseaux correspondent à '{}' ; utilisez un ID plus long ou le nom du réseau.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
@@ -3814,6 +3830,9 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
     <value>Nom du réseau</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
+    <value>Nom ou ID du réseau</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Afficher uniquement les ID réseau</value>
