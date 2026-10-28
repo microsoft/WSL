@@ -63,6 +63,9 @@ ComposeSpec ComposeNormalizer::Normalize(const ComposeDocuments& documents, cons
     ValidateName(DefaultNetworkName(spec.ProjectName).c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
     for (auto& container : spec.Containers)
     {
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, wsl::shared::Localization::MessageWslcInvalidName(container.ServiceName.c_str()), container.ServiceName.empty());
+
         if (container.Name.empty())
         {
             container.Name = std::format("{}-{}-1", spec.ProjectName, container.ServiceName);

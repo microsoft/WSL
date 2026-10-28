@@ -173,6 +173,16 @@ class WSLCComposeTests
         VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->DeleteNetwork((projectPath.filename().string() + "_default").c_str()));
     }
 
+    TEST_METHOD(ComposeEmptyServiceNameValidatedBeforeMutation)
+    {
+        VerifyEmptyServiceNameValidatedBeforeMutation(false);
+    }
+
+    TEST_METHOD(ComposeEmptyServiceNameWithExplicitContainerNameValidatedBeforeMutation)
+    {
+        VerifyEmptyServiceNameValidatedBeforeMutation(true);
+    }
+
     TEST_METHOD(ComposeContainerNameHttpRequest)
     {
         VerifyComposeHttpRequest(false);
@@ -251,6 +261,57 @@ class WSLCComposeTests
     }
 
 private:
+    void VerifyEmptyServiceNameValidatedBeforeMutation(bool explicitName)
+    {
+        const auto projectPath =
+            std::filesystem::current_path() / std::format("compose-empty-service-{}-{}", explicitName, GetCurrentProcessId());
+        const auto composePath = projectPath / "compose.yaml";
+        const auto networkName = projectPath.filename().string() + "_default";
+
+        VERIFY_IS_TRUE(std::filesystem::create_directory(projectPath));
+        auto directoryCleanup = wil::scope_exit([&] {
+            std::error_code error;
+            std::filesystem::remove_all(projectPath, error);
+            if (error)
+            {
+                LogError("Failed to cleanup project path %ws: %hs", projectPath.c_str(), error.message().c_str());
+            }
+        });
+
+        {
+            std::ofstream composeFile(composePath);
+            composeFile << "services:\n"
+                           "  \"\":\n"
+                           "    image: alpine:latest\n";
+            if (explicitName)
+            {
+                composeFile << "    container_name: " << projectPath.filename().string() << "-container\n";
+            }
+
+            composeFile.close();
+            VERIFY_IS_TRUE(composeFile.good());
+        }
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
+        auto networkCleanup = wil::scope_exit([&] { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        wil::unique_cotaskmem_ansistring originalOutput;
+        VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &originalOutput));
+        const auto originalNetwork = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(originalOutput.get());
+        VERIFY_IS_FALSE(originalNetwork.Id.empty());
+
+        wil::com_ptr<IWSLCComposeSession> composeSession;
+        VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateComposeSession(composePath.c_str(), &composeSession));
+        VERIFY_IS_NULL(composeSession.get());
+
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
+        const auto network = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
+        VERIFY_ARE_EQUAL(originalNetwork.Id, network.Id);
+    }
+
     static wsl::windows::common::wslc_schema::InspectContainer InspectContainer(IWSLCContainer* container)
     {
         wil::unique_cotaskmem_ansistring inspectJson;
