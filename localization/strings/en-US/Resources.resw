@@ -3808,9 +3808,6 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_DeveloperAksDesktopPathArgDescription" xml:space="preserve">
     <value>Path to aks-desktop.exe; overrides AKS_DESKTOP_BIN, legacy AKSEDGE_BIN, and automatic discovery</value>
   </data>
-  <data name="WSLCCLI_DeveloperAgentDebArgDescription" xml:space="preserve">
-    <value>Path to the standalone BMAgent Debian package</value>
-  </data>
   <data name="WSLCCLI_DeveloperAgentRepoArgDescription" xml:space="preserve">
     <value>APT source line for the repository serving the BMAgent package</value>
   </data>
@@ -3878,17 +3875,9 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Could not find aks-desktop.exe. Install it beside wslc.exe, set AKS_DESKTOP_BIN, add it to PATH, or use --aks-desktop-path.</value>
     <comment>{Locked="--aks-desktop-path."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_DeveloperClusterAgentNotFound" xml:space="preserve">
-    <value>Could not find the standalone BMAgent package. Install aks-bmagent.deb beside wslc.exe, set AKSEDGE_AGENT_DEB, or specify --agent-deb or --agent-repo.</value>
-    <comment>{Locked="--agent-deb "}{Locked="--agent-repo."}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_DeveloperClusterMergeConflict" xml:space="preserve">
     <value>Options --merge and --merge-into cannot be used together.</value>
     <comment>{Locked="--merge "}{Locked="--merge-into "}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_DeveloperClusterAgentConflict" xml:space="preserve">
-    <value>Options --agent-deb and --agent-repo cannot be used together.</value>
-    <comment>{Locked="--agent-deb "}{Locked="--agent-repo "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DeveloperClusterExecutableConflict" xml:space="preserve">
     <value>Options --aks-desktop-path and --aksedge-path cannot be used together.</value>

@@ -28,7 +28,6 @@ namespace {
 
     constexpr auto c_aksDesktopEnvironment = L"AKS_DESKTOP_BIN";
     constexpr auto c_legacyAksEdgeEnvironment = L"AKSEDGE_BIN";
-    constexpr auto c_agentDebEnvironment = L"AKSEDGE_AGENT_DEB";
 
     std::wstring GetEnvironmentValue(const wchar_t* name)
     {
@@ -126,34 +125,6 @@ namespace {
         }
 
         throw ExecutionException(Localization::WSLCCLI_DeveloperClusterAksDesktopNotFound());
-    }
-
-    std::wstring ResolveAgentDeb(ArgMap& args)
-    {
-        std::vector<std::filesystem::path> candidates;
-        if (args.Contains(ArgType::DeveloperAgentDeb))
-        {
-            const std::filesystem::path configured{args.GetValue<ArgType::DeveloperAgentDeb>()};
-            std::error_code error;
-            return std::filesystem::is_regular_file(configured, error) ? configured.wstring() : std::wstring{};
-        }
-
-        if (const auto configured = GetEnvironmentValue(c_agentDebEnvironment); !configured.empty())
-        {
-            candidates.emplace_back(configured);
-        }
-
-        candidates.emplace_back(GetExecutableDirectory() / L"aks-bmagent.deb");
-        for (const auto& candidate : candidates)
-        {
-            std::error_code error;
-            if (std::filesystem::is_regular_file(candidate, error))
-            {
-                return candidate.wstring();
-            }
-        }
-
-        return {};
     }
 
     void AddValue(std::vector<std::wstring>& command, ArgMap& args, ArgType type, std::wstring_view option)
@@ -283,7 +254,6 @@ std::vector<Argument> GetDeveloperClusterArguments(DeveloperClusterOperation ope
              Argument::Create(ArgType::DeveloperHostName),
              Argument::Create(ArgType::DeveloperNodeName),
              Argument::Create(ArgType::DeveloperNodeIp),
-             Argument::Create(ArgType::DeveloperAgentDeb),
              Argument::Create(ArgType::DeveloperAgentRepo),
              Argument::Create(ArgType::DeveloperApiPort),
              Argument::Create(ArgType::DeveloperKubernetesVersion),
@@ -360,20 +330,6 @@ void ValidateDeveloperClusterArguments(DeveloperClusterOperation operation, ArgM
             Localization::WSLCCLI_DeveloperClusterMergeConflict(),
             {Argument::Create(ArgType::DeveloperMerge), Argument::Create(ArgType::DeveloperMergeInto)});
     }
-
-    if (operation == DeveloperClusterOperation::Create && args.Contains(ArgType::DeveloperAgentDeb) && args.Contains(ArgType::DeveloperAgentRepo))
-    {
-        throw ArgumentException(
-            Localization::WSLCCLI_DeveloperClusterAgentConflict(),
-            {Argument::Create(ArgType::DeveloperAgentDeb), Argument::Create(ArgType::DeveloperAgentRepo)});
-    }
-
-    if (operation == DeveloperClusterOperation::Create && !args.Contains(ArgType::DeveloperAgentRepo) && ResolveAgentDeb(args).empty())
-    {
-        throw ArgumentException(
-            Localization::WSLCCLI_DeveloperClusterAgentNotFound(),
-            {Argument::Create(ArgType::DeveloperAgentDeb), Argument::Create(ArgType::DeveloperAgentRepo)});
-    }
 }
 
 void ExecuteDeveloperCluster(DeveloperClusterOperation operation, CLIExecutionContext& context)
@@ -383,7 +339,7 @@ void ExecuteDeveloperCluster(DeveloperClusterOperation operation, CLIExecutionCo
     {
     case DeveloperClusterOperation::Create:
     {
-        command = {L"create", L"--driver", L"wsl"};
+        command = {L"cluster", L"create", L"--driver", L"wsl", L"--json"};
         AddTargetArguments(command, context.Args);
         AddValue(command, context.Args, ArgType::DeveloperHostName, L"--host-name");
         AddValue(command, context.Args, ArgType::DeveloperNodeName, L"--node-name");
@@ -400,15 +356,10 @@ void ExecuteDeveloperCluster(DeveloperClusterOperation operation, CLIExecutionCo
         AddFlag(command, context.Args, ArgType::ClusterEnableGpu, L"--enable-gpu");
         AddFlag(command, context.Args, ArgType::DeveloperMerge, L"--merge");
         AddValue(command, context.Args, ArgType::DeveloperAgentRepo, L"--agent-repo");
-        if (!context.Args.Contains(ArgType::DeveloperAgentRepo))
-        {
-            command.emplace_back(L"--agent-deb");
-            command.emplace_back(ResolveAgentDeb(context.Args));
-        }
         break;
     }
     case DeveloperClusterOperation::Delete:
-        command = {L"delete", L"--driver", L"wsl", L"--purge", L"--prune-kubeconfig"};
+        command = {L"cluster", L"delete", L"--driver", L"wsl", L"--json", L"--purge", L"--prune-kubeconfig"};
         AddTargetArguments(command, context.Args);
         AddValue(command, context.Args, ArgType::DeveloperPruneKubeconfigFile, L"--prune-kubeconfig-file");
         break;

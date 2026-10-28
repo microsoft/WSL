@@ -47,19 +47,17 @@ $wslc = "$PWD\bin\x64\Debug\wslc.exe"
 
 ## External runtime assets
 
-These files are intentionally not committed to the WSL repository and must
-be obtained separately:
+The SDK executable is intentionally not committed to the WSL repository and
+must be obtained separately:
 
 ```text
 aks-desktop.exe
-aks-bmagent.deb
 ```
 
-Place them beside `bin\x64\Debug\wslc.exe`, or configure their full paths:
+Place it beside `bin\x64\Debug\wslc.exe`, or configure its full path:
 
 ```powershell
 $env:AKS_DESKTOP_BIN = "C:\path\to\aks-desktop.exe"
-$env:AKSEDGE_AGENT_DEB = "C:\path\to\aks-bmagent.deb"
 ```
 
 The executable can also be selected with `--aks-desktop-path`. The legacy
@@ -67,7 +65,9 @@ The executable can also be selected with `--aks-desktop-path`. The legacy
 both path flags. Discovery prefers the path flag, then `AKS_DESKTOP_BIN`,
 then `AKSEDGE_BIN`, then a sibling `aks-desktop.exe`, and finally
 `aks-desktop.exe` on PATH. An invalid explicit path is an error.
-An agent repository can be supplied with `--agent-repo` instead of a local package.
+AKS Desktop downloads and installs BMAgent from its default public package
+repository. No local `.deb` is required. Use `--agent-repo` to override the
+repository; the old `--agent-deb` option is no longer supported.
 
 ## Create
 
@@ -75,6 +75,7 @@ An agent repository can be supplied with `--agent-repo` instead of a local packa
 & $wslc cluster create `
   --developer `
   --name dev-cluster `
+  --distro Ubuntu-24.04 `
   --distribution K8s `
   --cni cilium `
   --k8s-version <version> `
@@ -89,7 +90,6 @@ Available options:
 --host-name <host-name>
 --node-name <node-name>
 --node-ip <ip-address>
---agent-deb <path>
 --agent-repo <apt-source>
 --api-port <port>
 --k8s-version <version>
@@ -105,9 +105,12 @@ Available options:
 --aks-desktop-path <path>
 ```
 
-The SDK defaults include distro `aks-edge`, API port `6443`, and pod CIDR
-`10.244.0.0/16`. Use either `--agent-deb` or `--agent-repo`, not both.
+This SDK's WSL driver requires `Ubuntu-24.04`; the distro is disposable.
+The SDK defaults include API port `6443` and pod CIDR `10.244.0.0/16`.
 Use either `--merge` or `--merge-into`, not both.
+
+Create and delete stream the SDK's raw JSON-lines progress events directly
+to the terminal.
 
 No Azure subscription, tenant, authentication, or Fleet options are accepted.
 

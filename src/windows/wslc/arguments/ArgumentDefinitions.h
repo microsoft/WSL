@@ -54,7 +54,6 @@ _(ClusterOutput,    "output",                L"o",             Kind::Value,     
 _(Command,          "command",              NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_CommandArgDescription()) \
 _(ContainerId,      "container-id",         NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_ContainerIdArgDescription()) \
 _(Cpus,             "cpus",                 NO_ALIAS,         Kind::Value,      int64_t,      Localization::WSLCCLI_CpusArgDescription()) \
-_(DeveloperAgentDeb, "agent-deb",           NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperAgentDebArgDescription()) \
 _(DeveloperAgentRepo, "agent-repo",         NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperAgentRepoArgDescription()) \
 _(DeveloperAksDesktopPath, "aks-desktop-path", NO_ALIAS,      Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperAksDesktopPathArgDescription()) \
 _(DeveloperAksEdgePath, "aksedge-path",     NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperAksDesktopPathArgDescription()) \

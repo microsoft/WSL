@@ -21,6 +21,7 @@ Abstract:
 
 #include "Command.h"
 #include "ClusterCommand.h"
+#include "DeveloperClusterCommand.h"
 #include "RootCommand.h"
 #include "ContainerCommand.h"
 #include "ImageCommand.h"
@@ -115,7 +116,6 @@ class WSLCCLICommandUnitTests
 
         VERIFY_IS_TRUE(hasType(ArgType::ClusterEnableGpu));
         VERIFY_IS_TRUE(hasType(ArgType::ClusterDeveloper));
-        VERIFY_IS_TRUE(hasType(ArgType::DeveloperAgentDeb));
         VERIFY_IS_TRUE(hasType(ArgType::DeveloperAksDesktopPath));
         VERIFY_IS_TRUE(hasType(ArgType::DeveloperAksEdgePath));
         VERIFY_IS_TRUE(hasType(ArgType::DeveloperAgentRepo));
@@ -131,6 +131,14 @@ class WSLCCLICommandUnitTests
         VERIFY_ARE_EQUAL(first.front().get(), second.front().get());
         VERIFY_IS_TRUE(first.front()->Parent().has_value());
         VERIFY_ARE_EQUAL(&cluster, &first.front()->Parent()->get());
+    }
+
+    TEST_METHOD(DeveloperCluster_CreateUsesDefaultAgentRepository)
+    {
+        argument::ArgMap args;
+        args.Add<ArgType::ClusterDeveloper>(true);
+        args.Add<ArgType::DeveloperName>(std::wstring{L"dev"});
+        ValidateDeveloperClusterArguments(DeveloperClusterOperation::Create, args);
     }
 
     TEST_METHOD(RootCommand_ContainsEventsCommand)
