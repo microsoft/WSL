@@ -53,6 +53,7 @@ Abstract:
 #include <unistd.h>
 #include <utmp.h>
 #include <assert.h>
+#include <iostream>
 #include "configfile.h"
 #include "lxfsshares.h"
 #include "common.h"
@@ -125,6 +126,34 @@ struct VmConfiguration
 int g_LogFd = STDERR_FILENO;
 int g_TelemetryFd = -1;
 std::optional<bool> g_EnableSocketLogging;
+static std::set<pid_t> g_WorkerProcesses;
+
+void StartWorkerProcess(const char* Name, const std::function<void()>& Worker, std::set<int> InheritedFds = {STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO, g_LogFd})
+{
+    // Keep mini_init single-threaded: raw namespace clones cannot safely inherit libc locks held by another thread.
+    const auto pid = UtilCreateChildProcess(Name, [&Worker, &InheritedFds]() {
+        g_LogFd = InheritedFds.contains(g_LogFd) ? g_LogFd : -1;
+        g_TelemetryFd = InheritedFds.contains(g_TelemetryFd) ? g_TelemetryFd : -1;
+
+        unsigned int firstFd = 0;
+        for (const int fd : InheritedFds)
+        {
+            if (firstFd < static_cast<unsigned int>(fd))
+            {
+                THROW_LAST_ERROR_IF(syscall(SYS_close_range, firstFd, static_cast<unsigned int>(fd) - 1, 0) < 0);
+            }
+
+            firstFd = static_cast<unsigned int>(fd) + 1;
+        }
+
+        THROW_LAST_ERROR_IF(syscall(SYS_close_range, firstFd, UINT_MAX, 0) < 0);
+        THROW_LAST_ERROR_IF(UtilRestoreBlockedSignals() < 0);
+        Worker();
+    });
+
+    THROW_LAST_ERROR_IF(pid < 0);
+    g_WorkerProcesses.insert(pid);
+}
 
 int Chroot(const char* Target);
 
@@ -3175,12 +3204,6 @@ try
         }
 
         //
-        // Configure memory reclamation.
-        //
-
-        StartMemoryReductionThread(EarlyConfig->MemoryReclaimMode);
-
-        //
         // Initialize system distro if supported.
         //
 
@@ -3329,6 +3352,16 @@ try
         if (StartGuestNetworkService(SocketFd.get(), std::move(DnsTunnelingSocketFd), EarlyConfig->DnsTunnelingIpAddress) < 0)
         {
             return -1;
+        }
+
+        // Start after the system-distro chroot so the worker uses the final procfs and cgroup mounts.
+        if (EarlyConfig->MemoryReclaimMode != LxMiniInitMemoryReclaimModeDisabled)
+        {
+            try
+            {
+                StartWorkerProcess("MemoryReclaim", [mode = EarlyConfig->MemoryReclaimMode]() { RunMemoryReduction(mode); });
+            }
+            CATCH_LOG()
         }
 
         return 0;
@@ -3842,27 +3875,30 @@ void EnableDebugMode(const std::string& Mode)
             WriteToFile(e, "1");
         }
 
+        // Open before forking: mini_init can move sysfs into the system distro before the worker runs.
+        constexpr auto path = "/sys/kernel/debug/tracing/trace_pipe";
+        wil::unique_fd tracePipe{open(path, O_RDONLY | O_CLOEXEC)};
+        if (!tracePipe)
+        {
+            LOG_ERROR("Failed to open {}, {}", path, errno);
+            return;
+        }
+
         // Relay logs to the host.
-        std::thread relayThread{[]() {
-            constexpr auto path = "/sys/kernel/debug/tracing/trace_pipe";
-            std::ifstream file(path);
+        StartWorkerProcess(
+            "TracePipe",
+            [path, traceFd = tracePipe.get()]() {
+                THROW_LAST_ERROR_IF(dup2(traceFd, STDIN_FILENO) < 0);
 
-            if (!file)
-            {
-                LOG_ERROR("Failed to open {}, {}", path, errno);
-                return;
-            }
+                std::string line;
+                while (std::getline(std::cin, line))
+                {
+                    LOG_INFO("{}", line);
+                }
 
-            std::string line;
-            while (std::getline(file, line))
-            {
-                LOG_INFO("{}", line);
-            }
-
-            LOG_ERROR("{}: closed", path);
-        }};
-
-        relayThread.detach();
+                LOG_ERROR("{}: closed", path);
+            },
+            {STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO, g_LogFd, tracePipe.get()});
     }
     else
     {
@@ -4323,6 +4359,12 @@ int main(int Argc, char* Argv[])
                 }
                 else if (Result > 0)
                 {
+                    if (g_WorkerProcesses.erase(Result) != 0)
+                    {
+                        LOG_WARNING("Background process {} exited with status {}", Result, Status);
+                        continue;
+                    }
+
                     //
                     // Perform a sync to flush all writes.
                     //
