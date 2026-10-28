@@ -9,7 +9,7 @@ source /etc/os-release
 }
 privilege=()
 if (( EUID != 0 )); then privilege=(sudo); fi
-packages=(cmake g++ binutils libelf-dev zlib1g-dev
+packages=(cmake make g++ binutils libelf-dev zlib1g-dev
     libicu74 libssl3t64 libkrb5-3 ca-certificates curl git)
 case "$architecture" in
     x64) packages+=(libc++1-18 libc++abi1-18 libunwind-18) ;;
