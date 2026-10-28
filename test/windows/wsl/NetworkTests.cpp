@@ -1734,6 +1734,46 @@ class NetworkTests
         VERIFY_IS_TRUE(std::regex_match(out, pattern));
     }
 
+    WSL2_TEST_METHOD(NatEndpointIsolation)
+    {
+        WslConfigChange config(LxssGenerateTestConfig({.firewall = false}));
+        WslKeepAlive keepAlive;
+        const auto macAddress = wsl::shared::string::ParseMacAddress(GetMacAddress());
+
+        wil::unique_cotaskmem_string endpoints;
+        wil::unique_cotaskmem_string error;
+        VERIFY_SUCCEEDED(HcnEnumerateEndpoints(nullptr, &endpoints, &error), error.get());
+
+        for (const auto& id : wsl::shared::FromJson<std::vector<GUID>>(endpoints.get()))
+        {
+            wsl::windows::common::hcs::unique_hcn_endpoint endpoint;
+            VERIFY_SUCCEEDED(HcnOpenEndpoint(id, &endpoint, &error), error.get());
+            const auto properties = wsl::windows::common::hcs::GetEndpointProperties(endpoint.get());
+            if (wsl::shared::string::ParseMacAddress(properties.MacAddress) != macAddress)
+            {
+                continue;
+            }
+
+            wil::unique_cotaskmem_string propertiesString;
+            VERIFY_SUCCEEDED(
+                HcnQueryEndpointProperties(endpoint.get(), LR"({"SchemaVersion":{"Major":2,"Minor":0}})", &propertiesString, &error),
+                error.get());
+
+            const auto policies =
+                nlohmann::json::parse(wsl::shared::string::WideToMultiByte(propertiesString.get())).at("Policies");
+
+            const auto vlanPolicy = std::ranges::find_if(policies, [](const auto& policy) { return policy.at("Type") == "VLAN"; });
+            VERIFY_IS_TRUE(vlanPolicy != policies.end());
+
+            const auto vlanId = vlanPolicy->at("Settings").at("IsolationId").get<uint32_t>();
+            VERIFY_IS_TRUE(vlanId > 0 && vlanId < 4095);
+
+            return;
+        }
+
+        VERIFY_FAIL(L"NAT endpoint not found");
+    }
+
     static void WriteNatConfiguration(const std::wstring& network, const std::wstring& gateway, const std::wstring& ipAddress)
     {
         using namespace wsl::windows::common;

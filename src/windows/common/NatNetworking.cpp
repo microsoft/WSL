@@ -25,6 +25,9 @@ using wsl::windows::common::hcs::unique_hcn_endpoint;
 static wil::srwlock g_endpointsInUseLock;
 static std::vector<GUID> g_endpointsInUse;
 
+static wil::srwlock g_vlanBitmapLock;
+_Guarded_by_(g_vlanBitmapLock) static std::bitset<4094> g_vlanBitmap;
+
 NatNetworking::NatNetworking(
     HCS_SYSTEM system,
     wsl::windows::common::hcs::unique_hcn_network&& network,
@@ -32,7 +35,12 @@ NatNetworking::NatNetworking(
     Config& config,
     wil::unique_socket&& dnsHvsocket,
     LPCWSTR dnsOptions) :
-    m_system(system), m_config(config), m_network(std::move(network)), m_dnsOptions(dnsOptions), m_gnsChannel(std::move(gnsChannel))
+    m_system(system),
+    m_config(config),
+    m_network(std::move(network)),
+    m_dnsOptions(dnsOptions),
+    m_gnsChannel(std::move(gnsChannel)),
+    m_vlanId(AllocateVlanId())
 {
     m_connectivityTelemetryEnabled = config.EnableTelemetry && !WslTraceLoggingShouldDisableTelemetry();
 
@@ -160,11 +168,39 @@ bool NatNetworking::IsHyperVFirewallSupported(const wsl::core::Config& vmConfig)
     }
 }
 
+uint32_t NatNetworking::AllocateVlanId()
+{
+    const auto lock = g_vlanBitmapLock.lock_exclusive();
+    for (uint32_t index = 0; index < g_vlanBitmap.size(); ++index)
+    {
+        if (!g_vlanBitmap[index])
+        {
+            g_vlanBitmap[index] = true;
+            return index + 1;
+        }
+    }
+
+    THROW_HR(HRESULT_FROM_WIN32(ERROR_NO_SYSTEM_RESOURCES));
+}
+
+void NatNetworking::FreeVlanId(uint32_t vlanId) noexcept
+{
+    const auto lock = g_vlanBitmapLock.lock_exclusive();
+    WI_ASSERT(vlanId > 0 && vlanId <= g_vlanBitmap.size());
+    WI_ASSERT(g_vlanBitmap[vlanId - 1]);
+    g_vlanBitmap[vlanId - 1] = false;
+}
+
 std::pair<wsl::core::networking::EphemeralHcnEndpoint, wsl::shared::hns::HNSEndpoint> NatNetworking::CreateEndpoint(const std::wstring& IpAddress) const
 {
     hns::HostComputeEndpoint hnsEndpoint{};
     hnsEndpoint.SchemaVersion.Major = 2;
     hnsEndpoint.SchemaVersion.Minor = 16;
+
+    hns::EndpointPolicy<hns::VlanEndpointPolicySetting> endpointVlanPolicy{};
+    endpointVlanPolicy.Type = hns::EndpointPolicyType::Vlan;
+    endpointVlanPolicy.Settings.IsolationId = m_vlanId.get();
+    hnsEndpoint.Policies.emplace_back(std::move(endpointVlanPolicy));
 
     // Network Id
     hnsEndpoint.HostComputeNetwork = GetNatNetworkId(m_config.FirewallConfig.Enabled());

@@ -58,6 +58,7 @@ struct Version
 enum class EndpointPolicyType
 {
     PortName = 9,
+    Vlan = 13,
     Firewall = 18
 };
 
@@ -65,6 +66,7 @@ NLOHMANN_JSON_SERIALIZE_ENUM(
     EndpointPolicyType,
     {
         {EndpointPolicyType::PortName, "PortName"},
+        {EndpointPolicyType::Vlan, "VLAN"},
         {EndpointPolicyType::Firewall, "Firewall"},
     })
 
@@ -73,6 +75,13 @@ struct PortnameEndpointPolicySetting
     std::wstring Name;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(PortnameEndpointPolicySetting, Name);
+};
+
+struct VlanEndpointPolicySetting
+{
+    uint32_t IsolationId{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(VlanEndpointPolicySetting, IsolationId);
 };
 
 enum class FirewallPolicyFlags
@@ -117,7 +126,7 @@ inline void to_json(nlohmann::json& j, const std::variant<Args...>& variant)
 
 struct HostComputeEndpoint
 {
-    std::vector<std::variant<EndpointPolicy<PortnameEndpointPolicySetting>, EndpointPolicy<FirewallPolicySetting>>> Policies;
+    std::vector<std::variant<EndpointPolicy<PortnameEndpointPolicySetting>, EndpointPolicy<VlanEndpointPolicySetting>, EndpointPolicy<FirewallPolicySetting>>> Policies;
     std::vector<IpConfig> IpConfigurations;
     Version SchemaVersion{};
     GUID HostComputeNetwork{};

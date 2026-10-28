@@ -42,6 +42,8 @@ public:
     static bool IsHyperVFirewallSupported(const wsl::core::Config& vmConfig) noexcept;
 
 private:
+    static uint32_t AllocateVlanId();
+    static void FreeVlanId(uint32_t vlanId) noexcept;
     static void NETIOAPI_API_ OnNetworkConnectivityChange(PVOID context, NL_NETWORK_CONNECTIVITY_HINT hint);
     static std::optional<ULONGLONG> FindNatInterfaceLuid(const SOCKADDR_INET& natAddress, const NL_NETWORK_CONNECTIVITY_HINT& currentConnectivityHint);
     std::pair<networking::EphemeralHcnEndpoint, wsl::shared::hns::HNSEndpoint> CreateEndpoint(const std::wstring& IpAddress) const;
@@ -84,6 +86,7 @@ private:
 
     GnsChannel m_gnsChannel;
     std::shared_ptr<networking::NetworkSettings> m_networkSettings;
+    wil::unique_any<uint32_t, decltype(&FreeVlanId), FreeVlanId> m_vlanId;
     networking::EphemeralHcnEndpoint m_endpoint;
     ULONG m_networkMtu = 0;
 
