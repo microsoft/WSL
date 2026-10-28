@@ -3,4 +3,3 @@
 # checked out as CRLF regardless of the committer's core.autocrlf setting.
 # tools/devops/validate-line-endings.py requires CRLF in the working tree.
 *.resw text eol=crlf
-tools/securityaudit/*.sh text eol=lf

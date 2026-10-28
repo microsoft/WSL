@@ -130,17 +130,11 @@ jobs:
           ${{ if ne(parameters.mdeFeedServiceConnection, '') }}:
             nuGetServiceConnections: '${{ parameters.mdeFeedServiceConnection }}'
 
-      - task: DownloadPipelineArtifact@2
-        displayName: Download verified Linux audit payload
-        inputs:
-          artifact: drop_audit_${{ parameters.platform }}
-          path: $(Pipeline.Workspace)\audit-${{ parameters.platform }}
-
       - task: CMake@1
         displayName: "CMake ${{ parameters.platform }}"
         inputs:
           workingDirectory: "."
-          cmakeArgs: . --fresh -A ${{ parameters.platform }} -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_VERSION=10.0.26100.0 -DPACKAGE_VERSION=$(version.WSL_PACKAGE_VERSION) -DWSL_NUGET_PACKAGE_VERSION=$(version.WSL_NUGET_PACKAGE_VERSION) -DSKIP_PACKAGE_SIGNING=${{ parameters.isRelease }} -DOFFICIAL_BUILD=${{ parameters.isRelease }} -DINCLUDE_PACKAGE_STAGE=${{ or(parameters.isRelease, parameters.isNightly) }} -DPIPELINE_BUILD_ID=$(Build.BuildId) -DVSO_ORG=${{ parameters.vsoOrg }} -DVSO_PROJECT=${{ parameters.vsoProject }} -DWSL_BUILD_WSL_SETTINGS=true -DWSL_INCLUDE_SDK_CSHARP=true -DWSL_UNITY_BATCH_SIZE=4 -DWSL_BUILD_SECURITY_AUDIT=ON -DSECURITYAUDIT_PAYLOAD_DIR=$(Pipeline.Workspace)\audit-${{ parameters.platform }} $(packageInputDirArg)\${{ parameters.platform }}
+          cmakeArgs: . --fresh -A ${{ parameters.platform }} -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_VERSION=10.0.26100.0 -DPACKAGE_VERSION=$(version.WSL_PACKAGE_VERSION) -DWSL_NUGET_PACKAGE_VERSION=$(version.WSL_NUGET_PACKAGE_VERSION) -DSKIP_PACKAGE_SIGNING=${{ parameters.isRelease }} -DOFFICIAL_BUILD=${{ parameters.isRelease }} -DINCLUDE_PACKAGE_STAGE=${{ or(parameters.isRelease, parameters.isNightly) }} -DPIPELINE_BUILD_ID=$(Build.BuildId) -DVSO_ORG=${{ parameters.vsoOrg }} -DVSO_PROJECT=${{ parameters.vsoProject }} -DWSL_BUILD_WSL_SETTINGS=true -DWSL_INCLUDE_SDK_CSHARP=true -DWSL_UNITY_BATCH_SIZE=4 -DWSL_BUILD_SECURITY_AUDIT=ON $(packageInputDirArg)\${{ parameters.platform }}
 
       # Workaround for WSL Settings NuGet restore authentication issue
       - script: _deps\nuget.exe restore -NonInteractive

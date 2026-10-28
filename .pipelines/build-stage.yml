@@ -69,14 +69,10 @@ parameters:
       EsrpClientId: $(EsrpClientId)
 
 stages:
-  - template: security-audit-stage.yml
-    parameters:
-      pool: ${{ parameters.pool }}
-      mdeFeedServiceConnection: ${{ parameters.mdeFeedServiceConnection }}
   # ── x64 build stage ──────────────────────────────────────────────────
   # Runs in parallel with build_arm64. Tests depend on this stage.
   - stage: build_x64
-    dependsOn: [security_audit]
+    dependsOn: []
     jobs:
       - template: build-job.yml
         parameters:
@@ -97,7 +93,7 @@ stages:
   # ── arm64 build stage (runs in parallel with build_x64) ──────────────
   # Includes formatting/localization checks as a first job, then arm64 build.
   - stage: build_arm64
-    dependsOn: [security_audit]
+    dependsOn: []
     jobs:
       - job: checks
         displayName: "Formatting & localization checks"

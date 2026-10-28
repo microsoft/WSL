@@ -1,0 +1,23 @@
+// Copyright (C) Microsoft Corporation. All rights reserved.
+
+#include <sys/syscall.h>
+#include "ebpf_arch_macros.h"
+
+// Preprocess using the target headers; no Linux executable runs during the build.
+WSL_AUDIT_SYSCALL(__NR_execve, execve, 3)
+WSL_AUDIT_SYSCALL(__NR_execveat, execveat, 5)
+WSL_AUDIT_SYSCALL(__NR_fork, fork, 0)
+WSL_AUDIT_SYSCALL(__NR_clone, clone, 5)
+WSL_AUDIT_SYSCALL(__NR_clone3, clone3, 2)
+WSL_AUDIT_SYSCALL(__NR_exit, exit, 1)
+WSL_AUDIT_SYSCALL(__NR_exit_group, exit_group, 1)
+WSL_AUDIT_SYSCALL(__NR_socket, socket, 3)
+WSL_AUDIT_SYSCALL(__NR_bind, bind, 3)
+WSL_AUDIT_SYSCALL(__NR_connect, connect, 3)
+WSL_AUDIT_SYSCALL(__NR_accept, accept, 3)
+WSL_AUDIT_SYSCALL(__NR_accept4, accept4, 4)
+WSL_AUDIT_SYSCALL(__NR_init_module, init_module, 3)
+WSL_AUDIT_SYSCALL(__NR_finit_module, finit_module, 3)
+WSL_AUDIT_SYSCALL(__NR_setuid, setuid, 1)
+WSL_AUDIT_SYSCALL(__NR_setgid, setgid, 1)
+WSL_AUDIT_SYSCALL(__NR_setresgid, setresgid, 3)
