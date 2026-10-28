@@ -215,7 +215,8 @@ set_property(
 CommunityToolkit.WinUI.Animations_${CTK_ANIMATIONS_VERSION};\
 CommunityToolkit.WinUI.Controls.SettingsControls_${CTK_STTNGS_CTRLS_VERSION};\
 Microsoft.Extensions.Hosting_${EXTS_HOSTING_VERSION};\
-Microsoft.WindowsAppSDK_${WIN_APP_SDK_VERSION};\
+Microsoft.WindowsAppSDK.Foundation_${WIN_APP_SDK_FOUNDATION_VERSION};\
+Microsoft.WindowsAppSDK.WinUI_${WIN_APP_SDK_WINUI_VERSION};\
 Microsoft.Xaml.Behaviors.WinUI.Managed_${XAML_BEHAVIORS_VERSION};\
 WinUIEx_${WINUIEX_VERSION}"
 )
