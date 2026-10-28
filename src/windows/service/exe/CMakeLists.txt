@@ -7,6 +7,7 @@ set(SOURCES
     LxssHttpProxy.cpp
     LxssInstance.cpp
     PluginManager.cpp
+    PluginCallPump.cpp
     ServiceMain.cpp
     BridgedNetworking.cpp
     GnsRpcServer.cpp
@@ -37,6 +38,7 @@ set(HEADERS
     LxssIptables.h
     LxssHttpProxy.h
     PluginManager.h
+    PluginCallPump.h
     LxssInstance.h
     BridgedNetworking.h
     GnsRpcServer.h

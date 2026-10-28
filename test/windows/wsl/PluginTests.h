@@ -46,12 +46,29 @@ enum class PluginTestType
     WslcVmStopCommitted,
     WslcVmNeverStarted,
     MountFolderAccess,
-    WslcVmExitDuringSessionRelease
+    WslcVmExitDuringSessionRelease,
+    CrashOnLoad,
+    CrashOnVmStart,
+    CrashOnDistributionStart,
+    CrashOnVmStop,
+    ConcurrentCallbacks,
+    AsyncCallback,
+    WslcCrossApartmentProcess,
+    ConcurrentRegistration,
+    ConcurrentHostFailure
 };
 
 constexpr auto c_testType = L"TestType";
 constexpr auto c_logFile = L"LogFile";
 constexpr auto c_mountFolder = L"MountFolder";
+constexpr auto c_hostPid = L"HostPid";
+constexpr auto c_callbackResult = L"CallbackResult";
+constexpr auto c_asyncCallbackStart = L"Global\\WslPluginAsyncCallback-start";
+constexpr auto c_asyncCallbackDone = L"Global\\WslPluginAsyncCallback-done";
+constexpr auto c_registrationEntered = L"Global\\WslPluginRegistration-entered";
+constexpr auto c_registrationRelease = L"Global\\WslPluginRegistration-release";
+constexpr auto c_fatalNotificationEntered = L"Global\\WslPluginFatalNotification-entered";
+constexpr auto c_fatalNotificationRelease = L"Global\\WslPluginFatalNotification-release";
 constexpr auto c_vmStoppingEnteredEvent = L"Global\\WslcVmExitDuringSessionRelease-entered";
 constexpr auto c_vmStoppingReleaseEvent = L"Global\\WslcVmExitDuringSessionRelease-release";
 

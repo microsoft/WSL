@@ -120,6 +120,7 @@ using namespace std::chrono_literals;
     TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"WslServiceProxyStub.dll") \
     TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslhost.exe") \
     TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslrelay.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslpluginhost.exe") \
     TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslconfig.exe") \
     TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wsl.exe") \
     TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslg.exe") \

@@ -54,6 +54,7 @@ $VerifierTargets = @(
     "wslc.exe",
     "wslhost.exe",
     "wslrelay.exe",
+    "wslpluginhost.exe",
     "wslservice.exe",
     "wslg.exe",
     "wslcsession.exe",
