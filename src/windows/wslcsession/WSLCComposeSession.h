@@ -29,6 +29,11 @@ class DECLSPEC_UUID("A8AA75A3-5B41-45AE-A847-1DF6CF35EAA0") WSLCComposeSession
 public:
     HRESULT RuntimeClassInitialize(WSLCSession* Session, std::wstring ConfigPath, ComposeSpec Spec, std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> Containers);
 
+    const std::string& GetProjectName() const noexcept
+    {
+        return m_spec.ProjectName;
+    }
+
     IFACEMETHOD(GetConfigPath)(_Out_ LPWSTR* Path) override;
     IFACEMETHOD(ListContainers)(_Out_ WSLCContainerEntry** Containers, _Out_ ULONG* Count) override;
     IFACEMETHOD(Start()) override;

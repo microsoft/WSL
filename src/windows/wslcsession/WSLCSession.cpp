@@ -13,7 +13,9 @@ Abstract:
 --*/
 
 #include "precomp.h"
-#include "ComposeSpec.h"
+#include "ComposeLabels.h"
+#include "ComposeNormalizer.h"
+#include "ResourceName.h"
 #include "WSLCSession.h"
 #include "WSLCComposeSession.h"
 #include "WSLCExecutionContext.h"
@@ -121,22 +123,6 @@ std::string IndentLines(const std::string& input, const std::string& prefix, boo
     }
 
     return result;
-}
-
-void ValidateName(LPCSTR Name, size_t maxLength)
-{
-    const auto& locale = std::locale::classic();
-    size_t i = 0;
-
-    for (; Name[i] != '\0'; i++)
-    {
-        if (!std::isalnum(Name[i], locale) && Name[i] != '_' && Name[i] != '-' && Name[i] != '.')
-        {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidName(Name));
-        }
-    }
-
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidName(Name), i == 0 || i > maxLength);
 }
 
 wslc_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage& dockerInspect)
@@ -2443,7 +2429,30 @@ try
         return existing->second.CopyTo(ComposeSession);
     }
 
-    const auto spec = ComposeSpec::Parse(configPath);
+    std::ifstream stream{configPath, std::ios::binary};
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_OPEN_FAILED), !stream, "Failed to open compose document %ls", configPath.c_str());
+    const std::string content{std::istreambuf_iterator<char>{stream}, std::istreambuf_iterator<char>{}};
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_READ_FAULT), stream.bad(), "Failed to read compose document %ls", configPath.c_str());
+    const auto* begin = reinterpret_cast<const std::byte*>(content.data());
+    const ComposeDocuments documents{
+        .SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION,
+        .WorkingDirectory = std::filesystem::current_path(),
+        .ProjectDirectory = configPath.parent_path(),
+        .Documents = {{
+            .SourcePath = configPath,
+            .BaseDirectory = configPath.parent_path(),
+            .Content = std::vector<std::byte>{begin, begin + content.size()},
+        }},
+    };
+    const auto spec = ComposeNormalizer::Normalize(documents, {});
+
+    // Cached sessions retain their captured definitions; another file for the same project would share their default network.
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_NOTIMPL,
+        Localization::MessageWslcComposeProjectFileSwitchUnsupported(spec.ProjectName.c_str()),
+        std::ranges::any_of(
+            m_composeSessions, [&](const auto& entry) { return entry.second->GetProjectName() == spec.ProjectName; }));
+
     auto containers = CreateComposeContainers(spec);
 
     Microsoft::WRL::ComPtr<WSLCComposeSession> composeSession;
@@ -2458,7 +2467,7 @@ CATCH_RETURN();
 std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeContainers(const ComposeSpec& Spec)
 {
     std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> containers;
-    std::string networkName = Spec.ProjectName + "_default"; // TODO: Implement this properly.
+    const std::string networkName = ComposeNormalizer::DefaultNetworkName(Spec.ProjectName);
 
     // Create a network for the compose session.
     // TODO: open an existing network instead of deleting.
@@ -2472,6 +2481,14 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeCo
 
     WSLCNetworkOptions networkOptions{};
     networkOptions.Name = networkName.c_str();
+    const std::array networkLabels{
+        WSLCLabel{.Key = compose::label::c_project, .Value = Spec.ProjectName.c_str()},
+        WSLCLabel{.Key = compose::label::c_network, .Value = "default"},
+        WSLCLabel{.Key = compose::label::c_managed, .Value = compose::label::c_managedValue},
+        WSLCLabel{.Key = compose::label::c_metadataVersion, .Value = compose::label::c_metadataVersionValue},
+    };
+    networkOptions.Labels = networkLabels.data();
+    networkOptions.LabelsCount = static_cast<ULONG>(networkLabels.size());
     THROW_IF_FAILED(CreateNetworkImpl(&networkOptions));
 
     auto cleanup = wil::scope_exit([&] {
@@ -2488,6 +2505,12 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeCo
     {
         ServiceContainerLauncher launcher(
             definition.Image, definition.Name, definition.Command, definition.Environment, networkName, WSLCProcessFlagsStdin);
+        launcher.AddLabel(compose::label::c_project, Spec.ProjectName);
+        launcher.AddLabel(compose::label::c_service, definition.ServiceName);
+        launcher.AddLabel(compose::label::c_containerNumber, "1");
+        launcher.AddLabel(compose::label::c_oneoff, "False");
+        launcher.AddLabel(compose::label::c_managed, compose::label::c_managedValue);
+        launcher.AddLabel(compose::label::c_metadataVersion, compose::label::c_metadataVersionValue);
         if (!definition.WorkingDirectory.empty())
         {
             launcher.SetWorkingDirectory(std::string{definition.WorkingDirectory});
@@ -2499,6 +2522,10 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeCo
         }
 
         launcher.AddPrimaryNetworkAlias(definition.Name);
+        if (definition.ServiceName != definition.Name)
+        {
+            launcher.AddPrimaryNetworkAlias(definition.ServiceName);
+        }
 
         for (const auto& volume : definition.Volumes)
         {
