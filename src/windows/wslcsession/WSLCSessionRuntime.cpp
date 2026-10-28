@@ -56,7 +56,7 @@ void WSLCSessionRuntime::Initialize(
     m_idleState->Initialize(idleGrace, [this]() { OnIdleTimer(); });
 
     // Session-scoped: subscriptions must survive VM restarts. Rebound per-VM in InitializeDockerRuntime.
-    m_eventTracker.emplace(*m_session);
+    m_eventTracker.emplace(m_id);
 
     m_initialized = true;
 }
