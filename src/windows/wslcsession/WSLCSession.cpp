@@ -477,7 +477,6 @@ try
     hooks.OnVmStarted = [this]() {
         if (m_pluginNotifier)
         {
-            LOG_IF_FAILED(m_pluginNotifier->OnNativeAuditStarted(m_runtime.VmGeneration(), this));
             LOG_IF_FAILED(m_pluginNotifier->OnVmStarted());
         }
     };
@@ -485,7 +484,6 @@ try
     hooks.OnVmStopping = [this]() {
         if (m_pluginNotifier)
         {
-            LOG_IF_FAILED(m_pluginNotifier->OnNativeAuditStopping(m_runtime.VmGeneration()));
             LOG_IF_FAILED(m_pluginNotifier->OnVmStopping());
         }
     };
@@ -3001,47 +2999,6 @@ try
 
     THROW_IF_FAILED(process.CopyTo(Process));
 
-    return S_OK;
-}
-CATCH_RETURN();
-
-HRESULT WSLCSession::CreateAuditProcess(ULONGLONG Generation, ULONG InitPid, LPCSTR ContainerId, WSLCHandle* Input, WSLCHandle* Output, WSLCHandle* Error)
-try
-{
-    WSLCExecutionContext context(this);
-    RETURN_HR_IF(E_POINTER, !Input || !Output || !Error);
-    *Input = {};
-    *Output = {};
-    *Error = {};
-    const auto launch = [&] {
-        auto lock = m_runtime.TryAuditVm(Generation);
-        return m_runtime.Vm().CaptureNativeAuditLaunch();
-    }();
-    // No runtime/VM lock or VM-owning reference survives the capture above.
-    std::vector<std::string> arguments{wsl::audit::c_nativeAuditCollectorName};
-    std::string pid;
-    if (InitPid != 0)
-    {
-        THROW_HR_IF(E_INVALIDARG, !ContainerId || strlen(ContainerId) != WSLC_CONTAINER_ID_LENGTH || InitPid > INT32_MAX);
-        pid = std::to_string(InitPid);
-        arguments.insert(arguments.end(), {"--inspect-pid", pid, "--container-id", ContainerId});
-    }
-    else
-    {
-        THROW_HR_IF(E_INVALIDARG, ContainerId != nullptr);
-        arguments.insert(arguments.end(), {"--package", "/wsl-security-audit"});
-    }
-    auto process = launch.CreateRootNamespaceProcess(arguments);
-    // Only native sockets cross COM. No remote process proxy can delay audit cleanup.
-    const auto duplicate = [](HANDLE handle, DWORD access) {
-        return wil::unique_socket(
-            reinterpret_cast<SOCKET>(common::wslutil::ToCOMOutputHandle(handle, access | SYNCHRONIZE, WSLCHandleTypeSocket).Handle.Socket));
-    };
-    auto inputSocket = duplicate(reinterpret_cast<HANDLE>(process.get()), GENERIC_WRITE);
-    auto outputSocket = duplicate(reinterpret_cast<HANDLE>(process.get()), GENERIC_READ);
-    Input->Type = Output->Type = WSLCHandleTypeSocket;
-    Input->Handle.Socket = reinterpret_cast<HANDLE>(inputSocket.release());
-    Output->Handle.Socket = reinterpret_cast<HANDLE>(outputSocket.release());
     return S_OK;
 }
 CATCH_RETURN();

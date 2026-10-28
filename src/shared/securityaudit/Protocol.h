@@ -136,6 +136,45 @@ inline AuditPolicy ParseConfiguration(std::string_view text)
     return policy;
 }
 
+inline void ValidateContainerInspection(const nlohmann::json& message, bool response)
+{
+    if (message.at("version") != c_protocolVersion || !message.at("version").is_number_unsigned() ||
+        message.at("kind") != (response ? "container-context" : "inspect-container"))
+    {
+        throw std::invalid_argument("Invalid container inspection envelope");
+    }
+    const auto& id = message.at("containerId").get_ref<const std::string&>();
+    const auto& started = message.at("startedAt").get_ref<const std::string&>();
+    if (id.size() != 64 || id.find_first_not_of("0123456789abcdef") != std::string::npos || started.empty() || started.size() > 128 ||
+        !message.at("pid").is_number_unsigned() || message.at("pid") == 0 || message.at("pid").get<uint64_t>() > INT32_MAX)
+    {
+        throw std::invalid_argument("Invalid container inspection identity");
+    }
+    if (!response)
+    {
+        if (message.size() != 5)
+        {
+            throw std::invalid_argument("Unexpected container inspection request fields");
+        }
+        return;
+    }
+    if (!message.at("found").is_boolean() || message.size() != (message.at("found").get<bool>() ? 9U : 6U))
+    {
+        throw std::invalid_argument("Invalid container inspection result");
+    }
+    if (message.at("found").get<bool>())
+    {
+        for (const auto* name : {"pidNamespace", "mountNamespace", "observedAfterNs"})
+        {
+            const auto& value = message.at(name);
+            if (!value.is_number_unsigned() || value == 0 || (std::string_view(name) != "observedAfterNs" && value.get<uint64_t>() > UINT32_MAX))
+            {
+                throw std::invalid_argument("Invalid container inspection context");
+            }
+        }
+    }
+}
+
 inline void ValidateProcessEvent(const nlohmann::json& message)
 {
     if (!message.is_object() || !message.contains("version") || !message["version"].is_number_unsigned() ||

@@ -145,17 +145,6 @@ bool WSLCSessionRuntime::VmExited() const noexcept
     return m_vmExited.load();
 }
 
-wil::rwlock_release_shared_scope_exit WSLCSessionRuntime::TryAuditVm(uint64_t Generation)
-{
-    auto lock = m_lock.try_lock_shared();
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_BUSY), !lock);
-    THROW_HR_IF(
-        WSLC_E_VM_NOT_RUNNING,
-        Generation == 0 || Generation != m_vmGeneration.load() || m_vmState.load() != VmState::Running ||
-            m_vmStopPending.load() || m_vmExited.load() || m_sessionTerminatingEvent.is_signaled());
-    return lock;
-}
-
 void WSLCSessionRuntime::ResetDockerdReady() noexcept
 {
     m_dockerdReadyEvent.ResetEvent();

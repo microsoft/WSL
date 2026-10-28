@@ -1186,7 +1186,7 @@ void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProc
         }
     }
 
-    LOG_IF_FAILED(m_pluginNotifier->OnNativeAuditContainerStarted(m_runtime.VmGeneration(), &auditContext));
+    m_runtime.Vm().AuditContainerStarted(auditContext);
 
     transition = StartTransition(TransitionKind::Start, ContainerEvent::Start);
 
@@ -1654,7 +1654,10 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
     {
         try
         {
-            LOG_IF_FAILED(m_pluginNotifier->OnNativeAuditContainerStopping(m_runtime.VmGeneration(), m_id.c_str()));
+            if (m_runtime.HasVm() && !m_runtime.VmExited())
+            {
+                m_runtime.Vm().AuditContainerStopping(m_id.c_str());
+            }
             LOG_IF_FAILED(m_pluginNotifier->OnContainerStopping(m_id.c_str()));
         }
         CATCH_LOG();

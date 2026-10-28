@@ -2738,7 +2738,7 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
                     try
                     {
                         const auto& info = *instance->DistributionInformation();
-                        m_securityAudit.DistributionStarted(
+                        m_utilityVm->SecurityAudit().DistributionStarted(
                             {wsl::audit::ToUtf8(info.Name), wsl::shared::string::GuidToString<char>(info.Id), info.PidNamespace});
                     }
                     CATCH_LOG();
@@ -2995,7 +2995,14 @@ void LxssUserSessionImpl::_CreateVm()
         };
 
         // Create the utility VM and register for callbacks.
-        m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId, std::move(initializeDrvFs));
+        wsl::audit::HostIdentity auditIdentity;
+        try
+        {
+            auditIdentity = {
+                wsl::audit::SidString(m_session.UserSid), m_session.SessionId, wsl::audit::QueryTokenSessionId(m_userToken.get())};
+        }
+        CATCH_LOG();
+        m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId, std::move(initializeDrvFs), std::move(auditIdentity));
 
         if (m_httpProxyStateTracker)
         {
@@ -3018,22 +3025,6 @@ void LxssUserSessionImpl::_CreateVm()
                 auto socket = m_utilityVm->CreateRootNamespaceProcess(LX_INIT_PATH, Arguments);
                 m_telemetryThread = std::thread(&LxssUserSessionImpl::TelemetryWorker, this, std::move(socket));
             }
-
-            // Native auditing starts in the background and is not a workload startup prerequisite.
-            try
-            {
-                wsl::audit::HostIdentity identity{
-                    wsl::audit::SidString(m_session.UserSid), m_session.SessionId, wsl::audit::QueryTokenSessionId(m_userToken.get())};
-                const auto launch = m_utilityVm->CaptureNativeAuditLaunch();
-                m_securityAudit.Start(std::move(identity), [launch](const std::vector<std::string>& arguments) {
-                    // Capture happened under the owning lock, but this worker needs no session/VM reference.
-                    // In particular, a slow distro startup cannot consume the retry budget by holding that lock.
-                    wsl::audit::AuditTransport transport;
-                    transport.output = launch.CreateRootNamespaceProcess(arguments);
-                    return transport;
-                });
-            }
-            CATCH_LOG();
 
             m_pluginManager.OnVmStarted(&m_session, &userSettings);
         }
@@ -3766,8 +3757,11 @@ bool LxssUserSessionImpl::_TerminateInstanceInternal(_In_ LPCGUID DistroGuid, _I
                     m_pluginManager.OnDistributionStopping(&m_session, wslcoreInstance->DistributionInformation());
                     try
                     {
-                        m_securityAudit.DistributionStopping(
-                            wsl::shared::string::GuidToString<char>(wslcoreInstance->DistributionInformation()->Id));
+                        if (m_utilityVm)
+                        {
+                            m_utilityVm->SecurityAudit().DistributionStopping(
+                                wsl::shared::string::GuidToString<char>(wslcoreInstance->DistributionInformation()->Id));
+                        }
                     }
                     CATCH_LOG();
                 }
@@ -4056,7 +4050,6 @@ bool LxssUserSessionImpl::_VmIsIdle()
 _Requires_exclusive_lock_held_(m_instanceLock)
 void LxssUserSessionImpl::_VmTerminate()
 {
-    m_securityAudit.Stop();
     // Cancel any pending termination timers and terminate the system distro and VM.
     SetThreadpoolTimer(m_vmTerminationTimer.get(), nullptr, 0, 0);
 

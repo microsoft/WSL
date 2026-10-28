@@ -76,7 +76,9 @@ std::wstring SanitizeHostingProcessNameSuffix(std::wstring_view name)
 
 } // namespace
 
-HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
+HcsVirtualMachine::HcsVirtualMachine(
+    _In_ const WSLCSessionSettings* Settings, wsl::audit::HostIdentity AuditIdentity) :
+    m_securityAudit(std::move(AuditIdentity))
 {
     THROW_HR_IF(E_POINTER, Settings == nullptr);
 
@@ -173,6 +175,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     // Initialize kernel command line.
     std::wstring kernelCmdLine = L"initrd=\\" LXSS_VM_MODE_INITRD_NAME L" " TEXT(WSLC_ROOT_INIT_ENV) L"=1 panic=-1";
     helpers::AppendCommonKernelCommandLine(kernelCmdLine, pageReportingOrder, swiotlbSizeBytes, Settings->CpuCount);
+    kernelCmdLine += m_securityAudit.Enabled() ? L" " TEXT(WSL_SECURITY_AUDIT_ENV) L"=1" : L" " TEXT(WSL_SECURITY_AUDIT_ENV) L"=0";
 
     // Setup dmesg collector with optional DmesgOutput handle.
     // TODO: move dmesg collector to user session process.
@@ -333,6 +336,15 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     // Create a listening socket for mini_init to connect to once the VM is running.
     m_listenSocket = wsl::windows::common::hvsocket::Listen(m_vmId, LX_INIT_UTILITY_VM_INIT_PORT);
 
+    if (m_securityAudit.Enabled())
+    {
+        try
+        {
+            m_securityAudit.Start(wsl::windows::common::hvsocket::Listen(m_vmId, wsl::audit::c_nativeAuditPort), m_bootTimeoutMs);
+        }
+        CATCH_LOG();
+    }
+
     // Start the virtual machine
     hcs::StartComputeSystem(m_computeSystem.get(), json.c_str());
 
@@ -356,6 +368,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
 HcsVirtualMachine::~HcsVirtualMachine()
 {
+    m_securityAudit.Stop();
     // Do not hold m_lock: waiting on m_vmExitEvent and closing the compute system below both block
     // on in-flight HCS exit/crash callbacks, which may themselves need m_lock. OnExit() is lock-free,
     // and closing the compute system drains all callbacks, so the rest of teardown needs no lock.
@@ -416,6 +429,34 @@ bool HcsVirtualMachine::FeatureEnabled(WSLCFeatureFlags Value) const
 {
     return static_cast<ULONG>(m_featureFlags) & static_cast<ULONG>(Value);
 }
+
+HRESULT HcsVirtualMachine::OnAuditContainerStarted(_In_ const WSLCNativeAuditContainer* Container)
+try
+{
+    RETURN_HR_IF(E_POINTER, !Container);
+    const auto text = [](const auto& value) {
+        const auto length = strnlen(value, std::size(value));
+        THROW_HR_IF(E_INVALIDARG, length == 0 || length == std::size(value));
+        return std::string(value, length);
+    };
+    wsl::audit::ContainerIdentity identity;
+    identity.id = text(Container->Id);
+    identity.name = text(Container->Name);
+    identity.startedAt = text(Container->StartedAt);
+    identity.initPid = Container->InitPid;
+    m_securityAudit.ContainerStarted(std::move(identity));
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT HcsVirtualMachine::OnAuditContainerStopping(_In_ LPCSTR ContainerId)
+try
+{
+    RETURN_HR_IF(E_POINTER, !ContainerId);
+    m_securityAudit.ContainerStopping(ContainerId);
+    return S_OK;
+}
+CATCH_RETURN()
 
 HRESULT HcsVirtualMachine::GetId(_Out_ GUID* VmId)
 try
@@ -943,7 +984,9 @@ void HcsVirtualMachine::FreeLun(ULONG Lun)
 
 namespace wsl::windows::service::wslc {
 
-WSLCVirtualMachineFactory::WSLCVirtualMachineFactory(_In_ const WSLCSessionSettings* Settings)
+WSLCVirtualMachineFactory::WSLCVirtualMachineFactory(
+    _In_ const WSLCSessionSettings* Settings, wsl::audit::HostIdentity AuditIdentity) :
+    m_auditIdentity(std::move(AuditIdentity))
 {
     THROW_HR_IF(E_POINTER, Settings == nullptr);
 
@@ -1007,7 +1050,7 @@ try
     *Vm = nullptr;
 
     const auto settings = BuildSettings();
-    auto vm = Microsoft::WRL::Make<HcsVirtualMachine>(&settings);
+    auto vm = Microsoft::WRL::Make<HcsVirtualMachine>(&settings, m_auditIdentity);
     THROW_IF_NULL_ALLOC(vm);
 
     *Vm = vm.Detach();

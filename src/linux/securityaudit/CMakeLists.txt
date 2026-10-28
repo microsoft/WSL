@@ -11,7 +11,7 @@ if(NOT auditTarget STREQUAL "${LLVM_ARCH}-unknown-linux-musl")
     message(FATAL_ERROR "Audit target ${auditTarget} does not match ${LLVM_ARCH}-unknown-linux-musl.")
 endif()
 
-set(SOURCES Collector.cpp CollectorMain.cpp)
+set(SOURCES Collector.cpp)
 set(HEADERS Collector.h)
 foreach(header event_defs.h ebpf_arch_macros.h ebpf_plugin_loader.h)
     list(APPEND HEADERS "${SECURITYAUDIT_SOURCE_DIR}/include/ebpf/${header}")

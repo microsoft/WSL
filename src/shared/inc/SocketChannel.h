@@ -111,8 +111,6 @@ public:
 #ifdef WIN32
         m_exitEvents = std::move(other.m_exitEvents);
         m_pendingBytes = std::move(other.m_pendingBytes);
-#else
-        m_maximumMessageSize = other.m_maximumMessageSize;
 #endif
         m_ignore_sequence = other.m_ignore_sequence;
         m_sent_non_transaction_messages = other.m_sent_non_transaction_messages;
@@ -143,13 +141,6 @@ public:
     const std::vector<HANDLE>& GetExitEvents() const
     {
         return m_exitEvents;
-    }
-
-#else
-
-    SocketChannel(TSocket&& socket, std::string&& name, size_t maximumMessageSize) :
-        m_socket(std::move(socket)), m_maximumMessageSize(maximumMessageSize), m_name(std::move(name))
-    {
     }
 
 #endif
@@ -658,7 +649,7 @@ private:
 
     gsl::span<gsl::byte> ReceiveImpl(TTimeout timeout)
     {
-        return wsl::shared::socket::RecvMessage(m_socket.get(), m_buffer, timeout, m_maximumMessageSize);
+        return wsl::shared::socket::RecvMessage(m_socket.get(), m_buffer, timeout);
     }
 
 #endif
@@ -728,10 +719,6 @@ private:
 
     TSocket m_socket{};
     std::vector<gsl::byte> m_buffer;
-
-#ifndef WIN32
-    size_t m_maximumMessageSize = wsl::shared::socket::c_maxMessageSize;
-#endif
 
 #ifdef WIN32
 

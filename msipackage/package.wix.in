@@ -453,14 +453,6 @@
                     </RegistryKey>
                 </RegistryKey>
 
-                <!-- IWSLCNativeAuditProcessFactory-->
-                <RegistryKey Root="HKCR" Key="Interface\{62D4A9C5-B632-413D-A4DB-EBAB88E9C623}">
-                    <RegistryValue Value="IWSLCNativeAuditProcessFactory" Type="string" />
-                    <RegistryKey Key="ProxyStubClsid32">
-                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
-                    </RegistryKey>
-                </RegistryKey>
-
                 <!-- IWSLCCompatCrashDumpCallback-->
                 <RegistryKey Root="HKCR" Key="Interface\{EAA15E20-7FCC-485B-B798-ED4095DBACA5}">
                     <RegistryValue Value="IWSLCCompatCrashDumpCallback" Type="string" />

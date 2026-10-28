@@ -3445,8 +3445,7 @@ Return Value:
     return 0;
 }
 
-int ProcessCreateProcessMessage(
-    wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer, const std::optional<std::string>& DistroCgroupPath, int CgroupNamespaceFd, bool HostOnly)
+int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer, const std::optional<std::string>& DistroCgroupPath, int CgroupNamespaceFd)
 {
     auto* Message = gslhelpers::try_get_struct<CREATE_PROCESS_MESSAGE>(Buffer);
     if (!Message)
@@ -3499,22 +3498,8 @@ int ProcessCreateProcessMessage(
                 THROW_LAST_ERROR_IF(UtilEnterCgroupNamespace(CgroupNamespaceFd, "CreateChildProcess") < 0);
             }
 
-            wil::unique_fd ProcessSocket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, HostOnly ? 5000 : SESSION_LEADER_ACCEPT_TIMEOUT_MS)};
+            wil::unique_fd ProcessSocket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS)};
             THROW_LAST_ERROR_IF(!ProcessSocket);
-            if (HostOnly)
-            {
-                sockaddr_vm peer{};
-                socklen_t peerSize = sizeof(peer);
-                THROW_LAST_ERROR_IF(getpeername(ProcessSocket.get(), reinterpret_cast<sockaddr*>(&peer), &peerSize) < 0);
-                THROW_ERRNO_IF(EPERM, peerSize != sizeof(peer) || peer.svm_family != AF_VSOCK || peer.svm_cid != VMADDR_CID_HOST);
-                ListenSocket.reset();
-                THROW_LAST_ERROR_IF(dup2(g_LogFd, STDERR_FILENO) < 0);
-                THROW_LAST_ERROR_IF(fcntl(STDERR_FILENO, F_SETFD, 0) < 0);
-                struct sigaction action{};
-                action.sa_handler = SIG_DFL;
-                sigemptyset(&action.sa_mask);
-                THROW_LAST_ERROR_IF(sigaction(SIGCHLD, &action, nullptr) < 0);
-            }
 
             THROW_LAST_ERROR_IF(dup2(ProcessSocket.get(), STDIN_FILENO) < 0);
             THROW_LAST_ERROR_IF(dup2(ProcessSocket.get(), STDOUT_FILENO) < 0);

@@ -20,7 +20,6 @@ Abstract:
 #include "hcs.hpp"
 #include "WSLCProcess.h"
 #include "WSLCContainerMetadata.h"
-#include "NativeAuditLaunch.h"
 #include <thread>
 #include <filesystem>
 #include <optional>
@@ -195,9 +194,14 @@ public:
     wil::unique_socket ConnectUnixSocket(_In_ const char* Path);
     std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(enum WSLC_FORK::ForkType Type);
 
-    common::NativeAuditLaunch CaptureNativeAuditLaunch() const
+    void AuditContainerStarted(const WSLCNativeAuditContainer& container)
     {
-        return {m_vmId, m_vmTerminatingEvent.get()};
+        LOG_IF_FAILED(m_vm->OnAuditContainerStarted(&container));
+    }
+
+    void AuditContainerStopping(LPCSTR containerId)
+    {
+        LOG_IF_FAILED(m_vm->OnAuditContainerStopping(containerId));
     }
 
     // Returns an event that is signaled when the VM is being terminated.

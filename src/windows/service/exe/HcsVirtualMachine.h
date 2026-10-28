@@ -22,6 +22,7 @@ Abstract:
 #include "Dmesg.h"
 #include "INetworkingEngine.h"
 #include "WslCoreConfig.h"
+#include "NativeAudit.h"
 #include <filesystem>
 #include <map>
 #include <optional>
@@ -35,7 +36,7 @@ class HcsVirtualMachine
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCVirtualMachine, IFastRundown>
 {
 public:
-    HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings);
+    HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings, wsl::audit::HostIdentity AuditIdentity);
     ~HcsVirtualMachine();
 
     // IWSLCVirtualMachine implementation
@@ -53,6 +54,8 @@ public:
     IFACEMETHOD(UnmapVirtioNetPort)
     (_In_ USHORT HostPort, _In_ USHORT GuestPort, _In_ int Protocol, _In_ LPCSTR ListenAddress) override;
     IFACEMETHOD(GetTerminationReason)(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details) override;
+    IFACEMETHOD(OnAuditContainerStarted)(_In_ const WSLCNativeAuditContainer* Container) override;
+    IFACEMETHOD(OnAuditContainerStopping)(_In_ LPCSTR ContainerId) override;
 
 private:
     struct DiskInfo
@@ -75,6 +78,7 @@ private:
     void FreeLun(ULONG Lun);
 
     std::recursive_mutex m_lock;
+    wsl::audit::NativeAudit m_securityAudit;
 
     wsl::windows::common::hcs::unique_hcs_system m_computeSystem;
     GUID m_vmId{};
@@ -128,7 +132,7 @@ class WSLCVirtualMachineFactory
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCVirtualMachineFactory, IFastRundown>
 {
 public:
-    explicit WSLCVirtualMachineFactory(_In_ const WSLCSessionSettings* Settings);
+    WSLCVirtualMachineFactory(_In_ const WSLCSessionSettings* Settings, wsl::audit::HostIdentity AuditIdentity);
 
     IFACEMETHOD(CreateVirtualMachine)(_Out_ IWSLCVirtualMachine** Vm) override;
 
@@ -137,6 +141,7 @@ private:
     // The returned struct is only valid while this factory is alive.
     WSLCSessionSettings BuildSettings();
 
+    const wsl::audit::HostIdentity m_auditIdentity;
     std::wstring m_displayName;
     std::wstring m_storagePath;
     std::optional<std::wstring> m_rootVhdOverride;

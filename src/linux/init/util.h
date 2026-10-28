@@ -348,8 +348,7 @@ int ProcessCreateProcessMessage(
     wsl::shared::Transaction& Transaction,
     gsl::span<gsl::byte> Buffer,
     const std::optional<std::string>& DistroCgroupPath,
-    int CgroupNamespaceFd = -1,
-    bool HostOnly = false);
+    int CgroupNamespaceFd = -1);
 
 std::string UtilGetDistroCgroupPath(pid_t DistroInitPid);
 

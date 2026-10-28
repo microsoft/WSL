@@ -24,7 +24,6 @@ set(SOURCES
     WSLCSessionManager.cpp
     WSLCSessionManagerFactory.cpp
     WSLCPluginNotifier.cpp
-    WSLCNativeAudit.cpp
     main.rc
     ${CMAKE_CURRENT_BINARY_DIR}/../mc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE}/wsleventschema.rc
     application.manifest)

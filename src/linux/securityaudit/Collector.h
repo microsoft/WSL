@@ -4,7 +4,6 @@
 
 #include "../../shared/securityaudit/Protocol.h"
 
-#include <chrono>
 #include <span>
 #include <vector>
 
@@ -25,12 +24,6 @@ struct DecodedRecord
     std::string error;
 };
 
-struct CollectorOptions
-{
-    std::string package{"/wsl-security-audit"};
-    std::chrono::seconds duration{};
-};
-
 struct CollectorSyscall
 {
     int number;
@@ -49,8 +42,6 @@ DecodedRecord DecodeRecord(std::span<const std::byte> data, bool includeCommandL
 bool PrepareCollectorTracefs();
 bool MatchesContainerCgroup(std::string_view cgroups, std::string_view containerId);
 nlohmann::json InspectProcessNamespaces(uint32_t pid, std::string_view containerId = {});
-int RunCollector(const CollectorOptions& options, int inputFd = 0, int outputFd = 1);
-int CollectorEntryPoint(int argc, char** argv);
-int ReportCollectorFailure(std::string_view message, int outputFd = 1);
+int RunCollector(int inputFd, int outputFd);
 
 } // namespace wsl::audit

@@ -97,8 +97,12 @@ bool IsBackingVolumeMounted(_In_ HANDLE File)
 }
 } // namespace
 
-WslCoreVm::WslCoreVm(_In_ wsl::core::Config&& VmConfig, _In_ InitializeDrvFsCallback InitializeDrvFs) :
-    m_vmConfig(std::move(VmConfig)), m_initializeDrvFs(std::move(InitializeDrvFs)), m_traceClient(m_vmConfig.EnableTelemetry)
+WslCoreVm::WslCoreVm(
+    _In_ wsl::core::Config&& VmConfig, _In_ InitializeDrvFsCallback InitializeDrvFs, wsl::audit::HostIdentity AuditIdentity) :
+    m_vmConfig(std::move(VmConfig)),
+    m_initializeDrvFs(std::move(InitializeDrvFs)),
+    m_traceClient(m_vmConfig.EnableTelemetry),
+    m_securityAudit(std::move(AuditIdentity))
 {
     // Create a job object that will terminate child processes (wslhost.exe, wslrelay.exe)
     // when the VM is destroyed.
@@ -106,11 +110,13 @@ WslCoreVm::WslCoreVm(_In_ wsl::core::Config&& VmConfig, _In_ InitializeDrvFsCall
 }
 
 std::unique_ptr<WslCoreVm> WslCoreVm::Create(
-    _In_ const wil::shared_handle& UserToken, _In_ wsl::core::Config&& VmConfig, _In_ const GUID& VmId, _In_ InitializeDrvFsCallback InitializeDrvFs)
+    _In_ const wil::shared_handle& UserToken, _In_ wsl::core::Config&& VmConfig, _In_ const GUID& VmId,
+    _In_ InitializeDrvFsCallback InitializeDrvFs, wsl::audit::HostIdentity AuditIdentity)
 {
     THROW_HR_IF(E_INVALIDARG, !InitializeDrvFs);
 
-    auto newInstance = std::unique_ptr<WslCoreVm>{new WslCoreVm{std::move(VmConfig), std::move(InitializeDrvFs)}};
+    auto newInstance = std::unique_ptr<WslCoreVm>{
+        new WslCoreVm{std::move(VmConfig), std::move(InitializeDrvFs), std::move(AuditIdentity)}};
     try
     {
         const auto startTimeMs = GetTickCount64();
@@ -361,6 +367,16 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
     // Create a socket listening for connections from mini_init.
     m_listenSocket = wsl::windows::common::hvsocket::Listen(m_runtimeId, LX_INIT_UTILITY_VM_INIT_PORT);
+
+    if (m_securityAudit.Enabled())
+    {
+        try
+        {
+            m_securityAudit.Start(
+                wsl::windows::common::hvsocket::Listen(m_runtimeId, wsl::audit::c_nativeAuditPort), m_vmConfig.KernelBootTimeout);
+        }
+        CATCH_LOG();
+    }
 
     if (m_vmConfig.MaxCrashDumpCount >= 0)
     {
@@ -725,6 +741,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
 WslCoreVm::~WslCoreVm() noexcept
 {
+    m_securityAudit.Stop();
     TraceLoggingActivity<g_hTraceLoggingProvider, MICROSOFT_KEYWORD_MEASURES> activity;
     TraceLoggingWriteStart(
         activity,
@@ -1763,12 +1780,13 @@ std::wstring WslCoreVm::GenerateConfigJson()
         kernelCmdLine += L" " WSL_ENABLE_CRASH_DUMP_ENV L"=1";
     }
 
-    // Add user-specified kernel command line options at the end.
+    // Append user options before the service-owned audit setting.
     if (!m_vmConfig.KernelCommandLine.empty())
     {
         kernelCmdLine += L" ";
         kernelCmdLine += m_vmConfig.KernelCommandLine;
     }
+    kernelCmdLine += m_securityAudit.Enabled() ? L" " TEXT(WSL_SECURITY_AUDIT_ENV) L"=1" : L" " TEXT(WSL_SECURITY_AUDIT_ENV) L"=0";
 
     // Set up boot params.
     //
@@ -2132,13 +2150,6 @@ wil::unique_socket WslCoreVm::CreateRootNamespaceProcess(_In_ LPCSTR Path, _In_ 
 
     return LxssCreateProcess::CreateLinuxProcess(
         Path, Arguments, m_runtimeId, m_miniInitChannel, m_terminatingEvent.get(), m_vmConfig.DistributionStartTimeout);
-}
-
-wsl::windows::common::NativeAuditLaunch WslCoreVm::CaptureNativeAuditLaunch()
-{
-    auto lock = m_lock.try_lock_exclusive();
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_BUSY), !lock);
-    return {m_runtimeId, m_terminatingEvent.get()};
 }
 
 void WslCoreVm::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR GuestPath, _In_ bool ReadOnly, _In_ LPCWSTR Name)

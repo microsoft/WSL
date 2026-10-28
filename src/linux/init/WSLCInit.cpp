@@ -1329,7 +1329,7 @@ int WSLCEntryPoint(int Argc, char* Argv[])
     // Establish the message channel with the service via hvsocket.
     //
 
-    StartSecurityAuditListener();
+    StartSecurityAuditCollector();
 
     wsl::shared::SocketChannel channel = {UtilConnectVsock(LX_INIT_UTILITY_VM_INIT_PORT, true), "mini_init"};
     if (channel.Socket() < 0)

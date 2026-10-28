@@ -17,19 +17,13 @@ Abstract:
 
 namespace wsl::shared::socket {
 
-inline constexpr size_t c_maxMessageSize = 16 * 1024 * 1024;
-
 #if defined(_MSC_VER)
 inline gsl::span<gsl::byte> RecvMessage(SOCKET Socket, std::vector<gsl::byte>& Buffer, std::optional<HANDLE> ExitHandle = {}, DWORD Timeout = INFINITE)
 #elif defined(__GNUC__)
-inline gsl::span<gsl::byte> RecvMessage(int Socket, std::vector<gsl::byte>& Buffer, const timeval* Timeout = nullptr, size_t MaximumMessageSize = c_maxMessageSize)
+inline gsl::span<gsl::byte> RecvMessage(int Socket, std::vector<gsl::byte>& Buffer, const timeval* Timeout = nullptr)
 #endif
 try
 {
-#if defined(_MSC_VER)
-    constexpr size_t MaximumMessageSize = c_maxMessageSize;
-#endif
-
     auto MessageSize = sizeof(MESSAGE_HEADER);
     if (Buffer.size() < MessageSize)
     {
@@ -70,7 +64,7 @@ try
 #endif
     }
 
-    if (MessageSize > c_maxMessageSize || MessageSize > MaximumMessageSize)
+    if (MessageSize > 16 * 1024 * 1024) // 16 MiB
     {
 #if defined(_MSC_VER)
         THROW_HR_MSG(E_UNEXPECTED, "Message size too large: %llu", MessageSize);

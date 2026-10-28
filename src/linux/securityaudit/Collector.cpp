@@ -2,6 +2,7 @@
 
 #include "Collector.h"
 #include "SecurityEvents.h"
+#include "Launch.h"
 
 #include <algorithm>
 #include <array>
@@ -9,6 +10,7 @@
 #include <atomic>
 #include <cerrno>
 #include <charconv>
+#include <chrono>
 #include <condition_variable>
 #include <cstdio>
 #include <cstring>
@@ -35,6 +37,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <vector>
+#include <variant>
 
 // The supplied shared C ABI uses C11 assertions even in its C++ header.
 #if !defined(__clang__)
@@ -61,37 +64,6 @@ namespace {
     constexpr auto c_writeTimeout = std::chrono::seconds(2);
     constexpr auto c_drainTimeout = std::chrono::seconds(5);
     using Clock = std::chrono::steady_clock;
-
-    class CollectorLock
-    {
-    public:
-        CollectorLock()
-        {
-            m_fd = open("/run/wsl-security-audit.lock", O_CREAT | O_RDWR | O_CLOEXEC | O_NOFOLLOW, 0600);
-            if (m_fd < 0)
-            {
-                throw std::system_error(errno, std::generic_category(), "Cannot open VM audit collector lock");
-            }
-            if (flock(m_fd, LOCK_EX | LOCK_NB) < 0)
-            {
-                const auto error = errno;
-                close(m_fd);
-                m_fd = -1;
-                throw std::system_error(error, std::generic_category(), "Another VM audit collector is still active");
-            }
-        }
-
-        ~CollectorLock()
-        {
-            close(m_fd);
-        }
-
-        CollectorLock(const CollectorLock&) = delete;
-        CollectorLock& operator=(const CollectorLock&) = delete;
-
-    private:
-        int m_fd{-1};
-    };
 
     void IsolateMountNamespace()
     {
@@ -304,9 +276,10 @@ namespace {
 
     struct Delivery
     {
+        using Record = std::variant<std::vector<std::byte>, nlohmann::json>;
         std::mutex lock;
         std::condition_variable available;
-        std::deque<std::vector<std::byte>> records;
+        std::deque<Record> records;
         bool closing{};
         Clock::time_point drainDeadline{};
         std::atomic<uint64_t> queueDropped{};
@@ -341,7 +314,7 @@ namespace {
             if (!delivery.closing)
             {
                 const auto* bytes = static_cast<const std::byte*>(data);
-                delivery.records.emplace_back(bytes, bytes + size);
+                delivery.records.emplace_back(std::in_place_type<std::vector<std::byte>>, bytes, bytes + size);
                 delivery.available.notify_one();
             }
         }
@@ -367,7 +340,7 @@ namespace {
         {
             for (;;)
             {
-                std::vector<std::byte> record;
+                Delivery::Record record;
                 {
                     std::unique_lock lock(delivery.lock);
                     delivery.available.wait(lock, [&] { return delivery.closing || !delivery.records.empty(); });
@@ -384,7 +357,17 @@ namespace {
                     record = std::move(delivery.records.front());
                     delivery.records.pop_front();
                 }
-                const auto decoded = DecodeRecord(record, policy.processCreation && policy.includeCommandLine);
+                if (const auto* response = std::get_if<nlohmann::json>(&record))
+                {
+                    if (!WriteFrame(outputFd, *response))
+                    {
+                        delivery.outputFailed = true;
+                        break;
+                    }
+                    continue;
+                }
+                const auto decoded =
+                    DecodeRecord(std::get<std::vector<std::byte>>(record), policy.processCreation && policy.includeCommandLine);
                 if (decoded.status == DecodeStatus::Invalid)
                 {
                     ++delivery.invalidRecords;
@@ -912,12 +895,6 @@ nlohmann::json InspectProcessNamespaces(uint32_t pid, std::string_view container
     {
         throw std::invalid_argument("Namespace inspection requires a positive Linux PID");
     }
-    // The inspection helper uses the same native-root launch path, but does not need sysfs or tracing.
-    if (!HasFilesystem("/proc", c_procfsMagic))
-    {
-        IsolateMountNamespace();
-        EnsureKernelFilesystem("/proc", "proc", c_procfsMagic);
-    }
     const auto path = "/proc/" + std::to_string(pid);
     const auto cleanup = [](DIR* directory) {
         if (closedir(directory) < 0)
@@ -1158,21 +1135,12 @@ bool PrepareCollectorTracefs()
     return PrepareTracefs();
 }
 
-int ReportCollectorFailure(std::string_view message, int outputFd)
-{
-    std::fprintf(stderr, "Audit collector: %.*s\n", static_cast<int>(message.size()), message.data());
-    WriteFrame(outputFd, {{"version", c_protocolVersion}, {"kind", "error"}, {"message", message}});
-    WriteFrame(outputFd, {{"version", c_protocolVersion}, {"kind", "stopped"}, {"exitCode", 1u}, {"reason", "error"}});
-    return 1;
-}
-
-int RunCollector(const CollectorOptions& options, int inputFd, int outputFd)
+int RunCollector(int inputFd, int outputFd)
 {
     signal(SIGPIPE, SIG_IGN);
     OutputMode outputMode(outputFd);
     InputFrames input(inputFd);
     Delivery delivery;
-    std::unique_ptr<CollectorLock> collectorLock;
     std::unique_ptr<Loader> loader;
     std::thread writer;
     std::string failure;
@@ -1180,10 +1148,6 @@ int RunCollector(const CollectorOptions& options, int inputFd, int outputFd)
     std::array<uint64_t, drop_reason__count> kernelDrops{};
     try
     {
-        if (options.package.empty() || options.duration.count() < 0 || options.duration > std::chrono::hours(24))
-        {
-            throw std::invalid_argument("Invalid collector package or duration");
-        }
         std::optional<std::string> configuration;
         const auto configurationDeadline = Clock::now() + std::chrono::seconds(30);
         while (!configuration && !input.Eof() && Clock::now() < configurationDeadline)
@@ -1203,7 +1167,6 @@ int RunCollector(const CollectorOptions& options, int inputFd, int outputFd)
         std::array<char, 8192> errorBuffer{};
         if (policy.AnyEnabled())
         {
-            collectorLock = std::make_unique<CollectorLock>();
             tracefsPrivateMount = PrepareCollectorTracefs();
             if (access("/sys/kernel/btf/vmlinux", R_OK) < 0)
             {
@@ -1231,7 +1194,7 @@ int RunCollector(const CollectorOptions& options, int inputFd, int outputFd)
             }
             loader->MarkStarted();
             const auto info = ebpf_plugin_start(
-                options.package.c_str(),
+                c_nativeAuditPackagePath,
                 plan.features,
                 plan.runtimeFlags,
                 configuration.data(),
@@ -1324,7 +1287,6 @@ int RunCollector(const CollectorOptions& options, int inputFd, int outputFd)
                 stderr, "WSL audit: partial library coverage; inspect READY coverage for unsupported operations and fields.\n");
         }
         writer = std::thread(Writer, std::ref(delivery), outputFd, policy);
-        const auto deadline = options.duration.count() == 0 ? Clock::time_point::max() : Clock::now() + options.duration;
         auto nextHealth = Clock::now() + std::chrono::seconds(1);
         for (;;)
         {
@@ -1340,20 +1302,37 @@ int RunCollector(const CollectorOptions& options, int inputFd, int outputFd)
             {
                 throw std::runtime_error("Invalid eBPF records or event callback failure");
             }
-            if (Clock::now() >= deadline)
-            {
-                reason = "duration";
-                break;
-            }
             const auto frame = input.Next(100);
             if (frame)
             {
-                const auto message = ParseMessage(*frame);
-                if (message["kind"] != "stop")
+                auto message = ParseMessage(*frame);
+                if (message["kind"] == "stop")
                 {
-                    throw std::invalid_argument("Expected audit stop frame");
+                    break;
                 }
-                break;
+                ValidateContainerInspection(message, false);
+                message["kind"] = "container-context";
+                try
+                {
+                    message.update(InspectProcessNamespaces(
+                        message.at("pid").get<uint32_t>(), message.at("containerId").get_ref<const std::string&>()));
+                    message["found"] = true;
+                }
+                catch (const std::exception& error)
+                {
+                    std::fprintf(stderr, "Container namespace inspection failed: %s\n", error.what());
+                    message["found"] = false;
+                }
+                ValidateContainerInspection(message, true);
+                {
+                    std::lock_guard lock(delivery.lock);
+                    if (delivery.records.size() >= c_queueCapacity)
+                    {
+                        throw std::runtime_error("Audit output queue is full during container inspection");
+                    }
+                    delivery.records.emplace_back(std::move(message));
+                    delivery.available.notify_one();
+                }
             }
             if (input.Eof())
             {

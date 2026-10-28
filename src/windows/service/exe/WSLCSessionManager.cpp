@@ -289,7 +289,16 @@ void WSLCSessionManagerImpl::CreateSession(
 
         // Create the VM factory in the SYSTEM service (privileged). The per-user session
         // uses it to create VMs on demand and recreate them after idle-termination.
-        auto vmFactory = Microsoft::WRL::Make<WSLCVirtualMachineFactory>(Settings);
+        wsl::audit::HostIdentity auditIdentity;
+        try
+        {
+            auditIdentity.sid = wsl::audit::SidString(tokenInfo.TokenInfo->User.Sid);
+            auditIdentity.windowsSessionId = wsl::audit::QueryTokenSessionId(sharedToken.get());
+            auditIdentity.wslcSessionId = sessionId;
+            auditIdentity.wslcSessionName = wsl::audit::ToUtf8(resolvedDisplayName);
+        }
+        CATCH_LOG();
+        auto vmFactory = Microsoft::WRL::Make<WSLCVirtualMachineFactory>(Settings, std::move(auditIdentity));
 
         // Launch per-user COM server factory and add it to a fresh per-session job object for crash cleanup.
         auto factory = wslutil::CreateComServerAsUser<IWSLCSessionFactory>(__uuidof(WSLCSessionFactory), userToken.get());

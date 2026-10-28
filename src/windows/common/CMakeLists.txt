@@ -37,7 +37,6 @@ set(SOURCES
     LxssServerPort.cpp
     MountSpecParsing.cpp
     NatNetworking.cpp
-    NativeAuditLaunch.cpp
     notifications.cpp
     Redirector.cpp
     registry.cpp

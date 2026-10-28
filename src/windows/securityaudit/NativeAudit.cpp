@@ -1,9 +1,16 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
 #include "precomp.h"
+#pragma warning(push)
+#pragma warning(disable : 4875)
+#include <gsl/span>
+#pragma warning(pop)
+#include <source_location>
+
 #include "NativeAudit.h"
 #include "WindowsSecuritySink.h"
 #include "WslTelemetry.h"
+#include "socket.hpp"
 #include <wil/token_helpers.h>
 
 namespace wsl::audit {
@@ -24,8 +31,7 @@ namespace {
         }
         catch (...)
         {
-            // Guest protocol/JSON exceptions must not trigger WIL's debug fail-fast policy
-            // or expose their potentially sensitive input in diagnostic exception strings.
+            // Guest protocol exceptions must not expose their input or trigger WIL's debug fail-fast policy.
             return HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
         }
     }
@@ -39,7 +45,7 @@ namespace {
     void SendControl(SOCKET socket, const nlohmann::json& message)
     {
         const auto bytes = EncodeMessage(message);
-        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(c_auditProcessTimeoutMs);
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(c_auditIoTimeoutMs);
         size_t offset{};
         while (offset != bytes.size())
         {
@@ -65,33 +71,18 @@ namespace {
         }
     }
 
-    bool Read(AuditTransport& transport, bool& stderrOpen, const std::function<void(std::string_view)>& consume)
+    bool Read(SOCKET socket, const std::function<void(std::string_view)>& consume)
     {
         fd_set readable{};
         FD_ZERO(&readable);
-        FD_SET(transport.output.get(), &readable);
-        if (stderrOpen && transport.error)
-        {
-            FD_SET(transport.error.get(), &readable);
-        }
+        FD_SET(socket, &readable);
         timeval timeout{0, 200000};
         const auto ready = select(0, &readable, nullptr, nullptr, &timeout);
         THROW_HR_IF(HRESULT_FROM_WIN32(WSAGetLastError()), ready == SOCKET_ERROR);
-        std::array<char, 8192> bytes{};
-        if (stderrOpen && transport.error && FD_ISSET(transport.error.get(), &readable))
+        if (ready != 0)
         {
-            const auto count = recv(transport.error.get(), bytes.data(), static_cast<int>(bytes.size()), 0);
-            THROW_HR_IF(HRESULT_FROM_WIN32(WSAGetLastError()), count == SOCKET_ERROR);
-            stderrOpen = count != 0;
-            if (count > 0)
-            {
-                // Guest stderr may include arguments or paths: record only its presence.
-                ReportAuditStatus("collector-stderr", S_OK);
-            }
-        }
-        if (FD_ISSET(transport.output.get(), &readable))
-        {
-            const auto count = recv(transport.output.get(), bytes.data(), static_cast<int>(bytes.size()), 0);
+            std::array<char, 8192> bytes{};
+            const auto count = recv(socket, bytes.data(), static_cast<int>(bytes.size()), 0);
             THROW_HR_IF(HRESULT_FROM_WIN32(WSAGetLastError()), count == SOCKET_ERROR);
             if (count == 0)
             {
@@ -103,17 +94,13 @@ namespace {
     }
 } // namespace
 
-void ReportAuditStatus(PCSTR stage, HRESULT result, unsigned attempt) noexcept
+void ReportAuditStatus(PCSTR stage, HRESULT result) noexcept
 {
     if (g_hTraceLoggingProvider)
     {
-        WSL_LOG(
-            "NativeAuditStatus",
-            TraceLoggingString(stage, "Stage"),
-            TraceLoggingHResult(result, "Result"),
-            TraceLoggingUInt32(attempt, "Attempt"));
+        WSL_LOG("NativeAuditStatus", TraceLoggingString(stage, "Stage"), TraceLoggingHResult(result, "Result"));
     }
-    LOG_IF_FAILED_MSG(result, "Native WSL Security audit: %hs (attempt %u). Workload startup remains available.", stage, attempt);
+    LOG_IF_FAILED_MSG(result, "Native WSL Security audit: %hs. Workload startup remains available.", stage);
 }
 
 void ReportAuditDiagnostic(const nlohmann::json& diagnostic)
@@ -161,82 +148,42 @@ bool QueryMachineAuditEnabled()
     return MachineAuditEnabled(value);
 }
 
-void AuditTransport::Shutdown() const noexcept
-{
-    for (const auto socket : {input.get(), output.get(), error.get()})
-    {
-        if (socket != INVALID_SOCKET)
-        {
-            shutdown(socket, SD_BOTH);
-        }
-    }
-}
-
 struct NativeAudit::State
 {
-    using Clock = std::chrono::steady_clock;
-
-    explicit State(const NativeAuditServices& source) :
-        services(source),
-        startupDeadline(Clock::now() + std::chrono::milliseconds(std::min(source.startupTimeoutMs, c_auditStartupTimeoutMs)))
+    State(HostIdentity host, AuditPolicy configuration) : identity(std::move(host)), policy(std::move(configuration))
     {
     }
 
-    void CompleteStartup(StartupResult result) noexcept
-    {
-        auto expected = StartupResult::Pending;
-        if (!startupResult.compare_exchange_strong(expected, result))
-        {
-            return;
-        }
-        switch (result)
-        {
-        case StartupResult::Ready:
-            ReportAuditStatus("startup-ready", S_OK);
-            break;
-        case StartupResult::Disabled:
-            ReportAuditStatus("startup-disabled", S_OK);
-            break;
-        case StartupResult::TimedOut:
-            ReportAuditStatus("startup-timeout-workload-allowed", HRESULT_FROM_WIN32(ERROR_TIMEOUT));
-            break;
-        case StartupResult::Cancelled:
-            ReportAuditStatus("startup-cancelled", HRESULT_FROM_WIN32(ERROR_CANCELLED));
-            break;
-        default:
-            ReportAuditStatus("startup-failed-workload-allowed", E_FAIL);
-            break;
-        }
-    }
-
-    bool StartupExpired() const noexcept
-    {
-        return startupResult.load() != StartupResult::Ready && Clock::now() >= startupDeadline;
-    }
-
-    HostIdentity identity;
-    NativeAuditServices services;
+    const HostIdentity identity;
+    const AuditPolicy policy;
+    UniqueSocket listener;
+    DWORD bootTimeoutMs{};
     wil::unique_event stop{wil::EventOptions::ManualReset};
-    const Clock::time_point startupDeadline;
-    std::atomic<StartupResult> startupResult{StartupResult::Pending};
+    std::atomic<bool> started{};
     std::mutex lock;
     std::map<std::string, DistributionIdentity> distributions;
     std::map<std::string, ContainerIdentity> containers;
     std::map<std::string, ContainerIdentity> pendingContainers;
-    bool inspectionRunning{};
 };
 
-struct NativeAudit::Work
+NativeAudit::NativeAudit(HostIdentity identity) noexcept
 {
-    std::shared_ptr<State> state;
-    AuditProcessFactory factory;
-};
-
-NativeAudit::NativeAudit(NativeAuditServices services) : m_services(std::move(services))
-{
-    if (!m_services.sink)
+    try
     {
-        m_services.sink = [](const AuditPolicy& policy) { return std::make_shared<WindowsSecuritySink>(policy); };
+        auto self = wil::run_as_self();
+        const auto policy = QueryMachineAuditEnabled() ? QueryPolicy() : AuditPolicy{};
+        if (!policy.AnyEnabled())
+        {
+            ReportAuditStatus("disabled-for-vm", S_OK);
+            return;
+        }
+        THROW_HR_IF(E_INVALIDARG, identity.sid.empty());
+        m_state = std::make_shared<State>(std::move(identity), policy);
+        ReportAuditStatus("configured-for-vm", S_OK);
+    }
+    catch (...)
+    {
+        ReportAuditStatus("configure-vm", CurrentAuditFailure());
     }
 }
 
@@ -245,42 +192,42 @@ NativeAudit::~NativeAudit()
     Stop();
 }
 
-void NativeAudit::Start(HostIdentity identity, AuditProcessFactory factory) noexcept
+void NativeAudit::Start(UniqueSocket listener, DWORD bootTimeoutMs) noexcept
 try
 {
-    Stop();
-    m_worker.reset();
-    auto state = std::make_shared<State>(m_services);
-    state->identity = std::move(identity);
-    auto argument = std::make_unique<Work>(Work{state, std::move(factory)});
-    m_state.store(state);
+    if (!m_state)
+    {
+        return;
+    }
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_state->started.exchange(true));
+    THROW_HR_IF(E_HANDLE, !listener);
+    m_state->listener = std::move(listener);
+    m_state->bootTimeoutMs = bootTimeoutMs;
+    auto argument = std::make_unique<std::shared_ptr<State>>(m_state);
     wil::unique_handle thread(CreateThread(nullptr, 0, Run, argument.get(), 0, nullptr));
     THROW_LAST_ERROR_IF(!thread);
     argument.release();
-    m_worker = std::move(thread);
 }
 catch (...)
 {
-    Stop();
     ReportAuditStatus("start-worker", CurrentAuditFailure());
 }
 
 void NativeAudit::Stop() noexcept
 {
-    if (const auto state = m_state.exchange(nullptr))
+    if (m_state)
     {
-        state->stop.SetEvent();
-        state->CompleteStartup(StartupResult::Cancelled);
+        m_state->stop.SetEvent();
     }
 }
 
 void NativeAudit::DistributionStarted(DistributionIdentity identity) noexcept
 try
 {
-    if (const auto state = m_state.load())
+    if (m_state)
     {
-        std::lock_guard lock(state->lock);
-        state->distributions[identity.guid] = std::move(identity);
+        std::lock_guard lock(m_state->lock);
+        m_state->distributions[identity.guid] = std::move(identity);
     }
 }
 CATCH_LOG();
@@ -288,10 +235,10 @@ CATCH_LOG();
 void NativeAudit::DistributionStopping(std::string_view guid) noexcept
 try
 {
-    if (const auto state = m_state.load())
+    if (m_state)
     {
-        std::lock_guard lock(state->lock);
-        state->distributions.erase(std::string(guid));
+        std::lock_guard lock(m_state->lock);
+        m_state->distributions.erase(std::string(guid));
     }
 }
 CATCH_LOG();
@@ -299,132 +246,87 @@ CATCH_LOG();
 void NativeAudit::ContainerStarted(ContainerIdentity identity) noexcept
 try
 {
-    if (const auto state = m_state.load())
+    if (m_state)
     {
-        std::lock_guard lock(state->lock);
-        state->containers[identity.id] = identity;
-        state->pendingContainers[identity.id] = std::move(identity);
+        ValidateContainerInspection(
+            {{"version", c_protocolVersion},
+             {"kind", "inspect-container"},
+             {"containerId", identity.id},
+             {"startedAt", identity.startedAt},
+             {"pid", identity.initPid}},
+            false);
+        std::lock_guard lock(m_state->lock);
+        m_state->containers[identity.id] = identity;
+        m_state->pendingContainers[identity.id] = std::move(identity);
     }
 }
-CATCH_LOG();
+catch (...)
+{
+    ReportAuditStatus("container-attribution-unknown", CurrentAuditFailure());
+}
 
 void NativeAudit::ContainerStopping(std::string_view id) noexcept
 try
 {
-    if (const auto state = m_state.load())
+    if (m_state)
     {
-        std::lock_guard lock(state->lock);
-        state->containers.erase(std::string(id));
-        state->pendingContainers.erase(std::string(id));
+        std::lock_guard lock(m_state->lock);
+        m_state->containers.erase(std::string(id));
+        m_state->pendingContainers.erase(std::string(id));
     }
 }
 CATCH_LOG();
 
 DWORD WINAPI NativeAudit::Run(void* parameter) noexcept
 {
-    std::unique_ptr<Work> reference(static_cast<Work*>(parameter));
-    const auto state = reference->state;
-    const auto startupFinished = wil::scope_exit(
-        [&] { state->CompleteStartup(state->stop.is_signaled() ? StartupResult::Cancelled : StartupResult::Failed); });
+    std::unique_ptr<std::shared_ptr<State>> reference(static_cast<std::shared_ptr<State>*>(parameter));
+    const auto state = *reference;
     try
     {
         auto self = wil::run_as_self();
-        THROW_IF_FAILED(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
-        const auto uninitialize = wil::scope_exit([] { CoUninitialize(); });
-        // In WSLC this owns a COM factory. Release it on this worker, before COM uninitializes,
-        // even if policy disables collection; never leave proxy cleanup to Stop under a VM lock.
-        const auto releaseFactory = wil::scope_exit([&] { reference->factory = {}; });
         WSADATA data{};
         THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &data));
         const auto winsock = wil::scope_exit([] { WSACleanup(); });
-        for (unsigned attempt = 1; attempt <= c_maxCollectorAttempts && !state->stop.is_signaled(); ++attempt)
+        const auto closeListener = wil::scope_exit([&] { state->listener.reset(); });
+        auto socket = wsl::windows::common::socket::CancellableAccept(state->listener.get(), state->bootTimeoutMs, state->stop.get());
+        state->listener.reset();
+        if (socket)
         {
-            if (state->StartupExpired())
-            {
-                state->CompleteStartup(StartupResult::TimedOut);
-                return 0;
-            }
-            try
-            {
-                Collect(state, reference->factory);
-                return 0;
-            }
-            catch (...)
-            {
-                if (state->stop.is_signaled())
-                {
-                    return 0;
-                }
-                ReportAuditStatus("collector-unavailable", CurrentAuditFailure(), attempt);
-                DWORD retryDelay = attempt * 1000;
-                if (state->startupResult.load() != StartupResult::Ready)
-                {
-                    const auto remaining =
-                        std::chrono::duration_cast<std::chrono::milliseconds>(state->startupDeadline - State::Clock::now()).count();
-                    if (remaining <= 0)
-                    {
-                        state->CompleteStartup(StartupResult::TimedOut);
-                        return 0;
-                    }
-                    retryDelay = std::min(retryDelay, static_cast<DWORD>(remaining));
-                }
-                if (attempt < c_maxCollectorAttempts && state->stop.wait(retryDelay))
-                {
-                    return 0;
-                }
-            }
-        }
-        if (!state->stop.is_signaled())
-        {
-            ReportAuditStatus("retry-budget-exhausted", HRESULT_FROM_WIN32(ERROR_RETRY), c_maxCollectorAttempts);
+            Collect(state, std::move(*socket));
         }
     }
     catch (...)
     {
-        ReportAuditStatus("worker-initialization", CurrentAuditFailure());
+        if (!state->stop.is_signaled())
+        {
+            ReportAuditStatus("collector-failed-until-next-vm", CurrentAuditFailure());
+        }
     }
     return 0;
 }
 
-void NativeAudit::Collect(const std::shared_ptr<State>& state, const AuditProcessFactory& factory)
+void NativeAudit::Collect(const std::shared_ptr<State>& state, UniqueSocket socket)
 {
-    if (!state->services.enabled())
+    const auto shutdown = wil::scope_exit([&] { ::shutdown(socket.get(), SD_BOTH); });
+    if (state->stop.is_signaled())
     {
-        state->CompleteStartup(StartupResult::Disabled);
-        ReportAuditStatus("administrator-disabled", S_OK);
         return;
     }
-    const auto policy = state->services.policy();
-    if (!policy.AnyEnabled())
-    {
-        state->CompleteStartup(StartupResult::Disabled);
-        ReportAuditStatus("audit-subcategories-disabled", S_OK);
-        return;
-    }
-    auto output = state->services.sink(policy);
+    const auto& policy = state->policy;
+    auto output = std::make_shared<WindowsSecuritySink>(policy);
     EventSession events(policy, state->identity, output);
-    if (state->stop.is_signaled())
-    {
-        return;
-    }
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_TIMEOUT), state->StartupExpired());
-    auto transport = factory({c_nativeAuditCollectorName, "--package", "/wsl-security-audit"});
-    const auto cleanup = wil::scope_exit([&] { transport.Shutdown(); });
-    if (state->stop.is_signaled())
-    {
-        return;
-    }
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_TIMEOUT), state->StartupExpired());
-    THROW_HR_IF(E_HANDLE, !transport.output);
-    ConfigureSocket(transport.Input());
-    SendControl(transport.Input(), Configuration(policy));
-    const auto deadline = state->startupResult.load() == StartupResult::Ready
-                              ? State::Clock::now() + std::chrono::milliseconds(c_auditStartupTimeoutMs)
-                              : state->startupDeadline;
+    ConfigureSocket(socket.get());
+    SendControl(socket.get(), Configuration(policy));
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(c_auditStartupTimeoutMs);
     NdjsonReceiver receiver;
-    bool stderrOpen = true;
     const auto acceptBytes = [&](std::string_view bytes) {
         receiver.Feed(bytes, [&](nlohmann::json message) {
+            if (message.at("kind") == "container-context")
+            {
+                THROW_HR_IF(E_INVALIDARG, !events.Ready() || events.Stopped());
+                ApplyContainerInspection(*state, message);
+                return;
+            }
             std::vector<DistributionIdentity> distributions;
             std::vector<ContainerIdentity> containers;
             {
@@ -440,102 +342,57 @@ void NativeAudit::Collect(const std::shared_ptr<State>& state, const AuditProces
             }
             events.SetDistributions(std::move(distributions));
             events.SetContainers(std::move(containers));
+            const bool ready = message.at("kind") == "ready";
             events.Accept(std::move(message));
-            if (events.Ready())
+            if (ready)
             {
-                state->CompleteStartup(State::Clock::now() < state->startupDeadline ? StartupResult::Ready : StartupResult::TimedOut);
+                ReportAuditStatus("startup-ready", S_OK);
             }
         });
     };
     while (!state->stop.is_signaled())
     {
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_TIMEOUT), !events.Ready() && std::chrono::steady_clock::now() >= deadline);
-        const bool connected = Read(transport, stderrOpen, acceptBytes);
-        if (!connected || events.Stopped())
+        if (!Read(socket.get(), acceptBytes) || events.Stopped())
         {
             receiver.Finish();
             events.Finish();
-            // STOPPED is valid framing, but unexpected while this VM epoch remains active.
             THROW_HR(HRESULT_FROM_WIN32(ERROR_PROCESS_ABORTED));
         }
         std::optional<ContainerIdentity> pending;
         {
             std::lock_guard lock(state->lock);
-            if (!state->pendingContainers.empty() && !state->inspectionRunning)
+            if (events.Ready() && !state->pendingContainers.empty())
             {
                 pending = std::move(state->pendingContainers.begin()->second);
                 state->pendingContainers.erase(state->pendingContainers.begin());
-                state->inspectionRunning = true;
             }
         }
         if (pending)
         {
-            try
-            {
-                // Namespace probes must not stall the collector's bounded event queue.
-                // At most one probe is in flight per epoch, without a VM lifetime token.
-                struct Probe
-                {
-                    std::shared_ptr<State> state;
-                    ContainerIdentity identity;
-                    AuditProcessFactory factory;
-                };
-                auto probe = std::make_unique<Probe>(Probe{state, std::move(*pending), factory});
-                THROW_IF_WIN32_BOOL_FALSE(TrySubmitThreadpoolCallback(
-                    [](PTP_CALLBACK_INSTANCE, void* raw) {
-                        std::unique_ptr<Probe> probe(static_cast<Probe*>(raw));
-                        const auto completed = wil::scope_exit([&] {
-                            std::lock_guard lock(probe->state->lock);
-                            probe->state->inspectionRunning = false;
-                        });
-                        try
-                        {
-                            auto self = wil::run_as_self();
-                            THROW_IF_FAILED(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
-                            const auto uninitialize = wil::scope_exit([] { CoUninitialize(); });
-                            const auto releaseFactory = wil::scope_exit([&] { probe->factory = {}; });
-                            WSADATA data{};
-                            THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &data));
-                            const auto winsock = wil::scope_exit([] { WSACleanup(); });
-                            if (!probe->state->stop.is_signaled())
-                            {
-                                ResolveContainer(probe->state, std::move(probe->identity), probe->factory);
-                            }
-                        }
-                        catch (...)
-                        {
-                            ReportAuditStatus("container-attribution-unknown", CurrentAuditFailure());
-                        }
-                    },
-                    probe.get(),
-                    nullptr));
-                probe.release();
-            }
-            catch (...)
-            {
-                {
-                    std::lock_guard lock(state->lock);
-                    state->inspectionRunning = false;
-                }
-                ReportAuditStatus("container-attribution-unknown", CurrentAuditFailure());
-            }
+            SendControl(
+                socket.get(),
+                {{"version", c_protocolVersion},
+                 {"kind", "inspect-container"},
+                 {"containerId", pending->id},
+                 {"startedAt", pending->startedAt},
+                 {"pid", pending->initPid}});
         }
     }
-    // This bounded drain runs only on the worker, never on a VM lifecycle callback.
     try
     {
-        SendControl(transport.Input(), {{"version", c_protocolVersion}, {"kind", "stop"}});
+        SendControl(socket.get(), {{"version", c_protocolVersion}, {"kind", "stop"}});
         const auto stopDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
         while (!events.Stopped() && std::chrono::steady_clock::now() < stopDeadline)
         {
-            if (!Read(transport, stderrOpen, acceptBytes))
+            if (!Read(socket.get(), acceptBytes))
             {
                 break;
             }
         }
         receiver.Finish();
         events.Finish();
-        ReportAuditStatus("vm-epoch-stopped", S_OK);
+        ReportAuditStatus("vm-stopped", S_OK);
     }
     catch (...)
     {
@@ -543,48 +400,24 @@ void NativeAudit::Collect(const std::shared_ptr<State>& state, const AuditProces
     }
 }
 
-void NativeAudit::ResolveContainer(const std::shared_ptr<State>& state, ContainerIdentity identity, const AuditProcessFactory& factory)
+void NativeAudit::ApplyContainerInspection(State& state, const nlohmann::json& message)
 {
-    THROW_HR_IF(E_INVALIDARG, identity.initPid == 0);
-    auto probe =
-        factory({c_nativeAuditCollectorName, "--inspect-pid", std::to_string(identity.initPid), "--container-id", identity.id});
-    const auto cleanup = wil::scope_exit([&] { probe.Shutdown(); });
-    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-    std::string output;
-    bool stderrOpen = true;
-    while (!state->stop.is_signaled())
+    ValidateContainerInspection(message, true);
+    std::lock_guard lock(state.lock);
+    const auto found = state.containers.find(message.at("containerId").get_ref<const std::string&>());
+    if (found == state.containers.end() || found->second.initPid != message.at("pid").get<uint32_t>() ||
+        found->second.startedAt != message.at("startedAt").get_ref<const std::string&>())
     {
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_TIMEOUT), std::chrono::steady_clock::now() >= deadline);
-        if (!Read(probe, stderrOpen, [&](std::string_view bytes) {
-                THROW_HR_IF(E_INVALIDARG, output.size() + bytes.size() > 4096);
-                output.append(bytes);
-            }))
-        {
-            break;
-        }
+        return;
     }
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_CANCELLED), state->stop.is_signaled());
-    const auto document = nlohmann::json::parse(output);
-    THROW_HR_IF(
-        E_INVALIDARG,
-        !document.is_object() || document.size() != 4 || !document.at("pid").is_number_unsigned() ||
-            document.at("pid") != identity.initPid);
-    const auto readNamespace = [&](const char* name) {
-        const auto& value = document.at(name);
-        THROW_HR_IF(E_INVALIDARG, !value.is_number_unsigned() || value == 0 || value.get<uint64_t>() > UINT32_MAX);
-        return value.get<uint64_t>();
-    };
-    identity.pidNamespace = readNamespace("pidNamespace");
-    identity.mountNamespace = readNamespace("mountNamespace");
-    const auto& observed = document.at("observedAfterNs");
-    THROW_HR_IF(E_INVALIDARG, !observed.is_number_unsigned() || observed == 0);
-    identity.observedAfterNs = observed.get<uint64_t>();
-    std::lock_guard lock(state->lock);
-    const auto found = state->containers.find(identity.id);
-    if (found != state->containers.end() && found->second.initPid == identity.initPid && found->second.startedAt == identity.startedAt)
+    if (!message.at("found").get<bool>())
     {
-        found->second = std::move(identity);
+        ReportAuditStatus("container-attribution-unknown", HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        return;
     }
+    found->second.pidNamespace = message.at("pidNamespace").get<uint64_t>();
+    found->second.mountNamespace = message.at("mountNamespace").get<uint64_t>();
+    found->second.observedAfterNs = message.at("observedAfterNs").get<uint64_t>();
 }
 
 } // namespace wsl::audit

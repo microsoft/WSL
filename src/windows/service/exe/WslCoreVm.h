@@ -30,7 +30,7 @@ Abstract:
 #include "SocketChannel.h"
 #include "DeviceHostProxy.h"
 #include "GuestDeviceManager.h"
-#include "NativeAuditLaunch.h"
+#include "NativeAudit.h"
 
 #define UTILITY_VM_SHUTDOWN_TIMEOUT (30 * 1000)
 #define UTILITY_VM_TERMINATE_TIMEOUT (30 * 1000)
@@ -55,7 +55,8 @@ public:
     using InitializeDrvFsCallback = std::function<LX_INIT_DRVFS_MOUNT(HANDLE)>;
 
     static std::unique_ptr<WslCoreVm> Create(
-        _In_ const wil::shared_handle& UserToken, _In_ wsl::core::Config&& VmConfig, _In_ const GUID& VmId, _In_ InitializeDrvFsCallback InitializeDrvFs);
+        _In_ const wil::shared_handle& UserToken, _In_ wsl::core::Config&& VmConfig, _In_ const GUID& VmId,
+        _In_ InitializeDrvFsCallback InitializeDrvFs, wsl::audit::HostIdentity AuditIdentity);
 
     ~WslCoreVm() noexcept;
 
@@ -84,7 +85,10 @@ public:
 
     wil::unique_socket CreateRootNamespaceProcess(_In_ LPCSTR Path, _In_ LPCSTR* Arguments);
 
-    wsl::windows::common::NativeAuditLaunch CaptureNativeAuditLaunch();
+    wsl::audit::NativeAudit& SecurityAudit() noexcept
+    {
+        return m_securityAudit;
+    }
 
     std::pair<int, LX_MINI_MOUNT_STEP> DetachDisk(_In_opt_ PCWSTR Disk);
 
@@ -183,7 +187,7 @@ private:
         bool operator==(const VirtioFsShare& other) const;
     };
 
-    WslCoreVm(_In_ wsl::core::Config&& VmConfig, _In_ InitializeDrvFsCallback InitializeDrvFs);
+    WslCoreVm(_In_ wsl::core::Config&& VmConfig, _In_ InitializeDrvFsCallback InitializeDrvFs, wsl::audit::HostIdentity AuditIdentity);
 
     _Requires_lock_held_(m_guestDeviceLock)
     void AddDrvFsShare(_In_ bool Admin, _In_ HANDLE UserToken);
@@ -293,6 +297,7 @@ private:
     std::wstring m_comPipe1;
     int m_pageReportingOrder;
     WslTraceLoggingClient m_traceClient;
+    wsl::audit::NativeAudit m_securityAudit;
     std::filesystem::path m_rootFsPath;
     std::filesystem::path m_tempPath;
     wil::shared_handle m_userToken;
