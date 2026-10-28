@@ -3429,6 +3429,64 @@ EOF
             validateDistro();
             VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\ext4.vhdx", absolutePath)));
         }
+
+        {
+            const auto volumeVhdPath = std::filesystem::current_path() / L"move-test-volume.vhdx";
+            auto deleteVolume =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(volumeVhdPath.c_str())); });
+
+            const auto volumeSize = std::filesystem::file_size(std::filesystem::path(absolutePath) / L"ext4.vhdx") + _1GB;
+            LxsstuLaunchPowershellAndCaptureOutput(std::format(
+                L"$ErrorActionPreference = 'Stop'; New-VHD -Path '{}' -Dynamic -SizeBytes {} | Out-Null", volumeVhdPath.wstring(), volumeSize));
+
+            auto unmountVolume = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                LxsstuLaunchPowershellAndCaptureOutput(std::format(
+                    L"$ErrorActionPreference = 'Stop'; if ((Get-VHD -Path '{0}').Attached) {{ Dismount-VHD -Path '{0}' }}",
+                    volumeVhdPath.wstring()));
+            });
+
+            auto [driveLetter, _] = LxsstuLaunchPowershellAndCaptureOutput(std::format(
+                L"$ErrorActionPreference = 'Stop'; Mount-VHD -Path '{}' -PassThru | Get-Disk | "
+                L"Initialize-Disk -PartitionStyle GPT -PassThru | New-Partition -UseMaximumSize -AssignDriveLetter | "
+                L"Format-Volume -FileSystem NTFS -Confirm:$false -Force | Select-Object -ExpandProperty DriveLetter",
+                volumeVhdPath.wstring()));
+            Trim(driveLetter);
+            VERIFY_ARE_EQUAL(size_t{1}, driveLetter.size());
+
+            GUID runId;
+            VERIFY_SUCCEEDED(CoCreateGuid(&runId));
+            const auto destinationName = std::format(
+                L"move-test-{}", wsl::shared::string::GuidToString<wchar_t>(runId, wsl::shared::string::GuidToStringFlags::None));
+            const std::filesystem::path clientDriveRoot = driveLetter + L":\\";
+            const auto destination = clientDriveRoot / destinationName;
+            const auto wrongDestination = std::filesystem::path(wil::GetSystemDirectoryW<std::wstring>()).root_path() / destinationName;
+            const auto exportPath = std::filesystem::current_path() / L"move-test-export";
+            auto cleanupDirectories = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                for (const auto& path : {exportPath, destination, wrongDestination})
+                {
+                    std::error_code error;
+                    std::filesystem::remove_all(path, error);
+                    LOG_IF_WIN32_ERROR(error.value());
+                }
+            });
+
+            // Use a disposable copy so it can be unregistered before the temporary drive is unmounted
+            // without moving or unregistering the shared test distro.
+            constexpr auto copyName = L"move-test-copy";
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(std::format(L"--import {} \"{}\" \"{}\" --version 2", copyName, exportPath.wstring(), g_testDistroPath)), 0L);
+            auto unregisterDistro =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"--unregister {}", copyName)); });
+
+            WslShutdown();
+            wsl::windows::common::SubProcess process(
+                nullptr,
+                LxssGenerateWslCommandLine(std::format(L"--manage {} --move \"\\{}\"", copyName, destinationName).c_str()).c_str());
+            process.SetWorkingDirectory(clientDriveRoot.c_str());
+            VERIFY_ARE_EQUAL(process.Run(), 0L);
+
+            VERIFY_IS_TRUE(std::filesystem::exists(destination / L"ext4.vhdx"));
+        }
     }
 
     TEST_METHOD(CreateVhdPermissions)
