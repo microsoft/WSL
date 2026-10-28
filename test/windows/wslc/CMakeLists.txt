@@ -15,6 +15,9 @@ file(GLOB_RECURSE WSLC_TEST_HEADERS CONFIGURE_DEPENDS
 target_sources(wsltests PRIVATE
     ${WSLC_TEST_SOURCES}
     ${WSLC_TEST_HEADERS}
+    ${CMAKE_SOURCE_DIR}/src/windows/wslcsession/DockerEventTracker.cpp
+    ${CMAKE_SOURCE_DIR}/src/windows/wslcsession/DockerHTTPClient.cpp
+    ${CMAKE_SOURCE_DIR}/src/windows/wslcsession/IORelay.cpp
     ${CMAKE_SOURCE_DIR}/src/windows/wslcsession/WSLCRestartScheduler.cpp
 )
 

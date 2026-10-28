@@ -19,9 +19,6 @@ Abstract:
 
 namespace wsl::windows::service::wslc {
 
-class WSLCSession;
-class WSLCVirtualMachine;
-
 enum class ContainerEvent
 {
     Create,
@@ -44,6 +41,8 @@ enum class VolumeEvent
 
 class DockerEventTracker
 {
+    struct CallbackRegistry;
+
 public:
     NON_COPYABLE(DockerEventTracker);
     NON_MOVABLE(DockerEventTracker);
@@ -53,7 +52,7 @@ public:
         NON_COPYABLE(EventTrackingReference);
 
         EventTrackingReference() = default;
-        EventTrackingReference(DockerEventTracker* tracker, size_t id) noexcept;
+        EventTrackingReference(std::shared_ptr<CallbackRegistry> registry, size_t id) noexcept;
         EventTrackingReference(EventTrackingReference&& other) noexcept;
         ~EventTrackingReference() noexcept;
 
@@ -61,8 +60,9 @@ public:
 
         void Reset() noexcept;
 
-        size_t m_id;
-        DockerEventTracker* m_tracker = nullptr;
+    private:
+        size_t m_id{};
+        std::shared_ptr<CallbackRegistry> m_registry;
     };
 
     using ContainerStateChangeCallback =
@@ -75,11 +75,12 @@ public:
     using ContainerActionCallback =
         std::function<void(const std::string& ContainerId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t TimeNano)>;
 
-    explicit DockerEventTracker(WSLCSession& session);
-    ~DockerEventTracker();
+    explicit DockerEventTracker(ULONG SessionId);
 
     // Rebinds the tracker on VM start without replacing callback registrations.
     void Connect(DockerHTTPClient& dockerClient, IORelay& relay);
+
+    void OnEvent(const std::string_view& event);
 
     EventTrackingReference RegisterContainerStateUpdates(const std::string& ContainerId, ContainerStateChangeCallback&& Callback) noexcept;
     EventTrackingReference RegisterExecStateUpdates(const std::string& ContainerId, const std::string& ExecId, ContainerStateChangeCallback&& Callback) noexcept;
@@ -94,10 +95,8 @@ public:
     // stopped listening for its events, and for every 'exec_create', 'exec_start' and 'exec_die'.
     // Runs after the container state callbacks.
     EventTrackingReference RegisterContainerActions(ContainerActionCallback&& Callback) noexcept;
-    void UnregisterCallback(size_t Id) noexcept;
 
 private:
-    void OnEvent(const std::string_view& event);
     void OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano);
     void OnContainerAction(const std::string& containerId, const std::string& action, const std::map<std::string, std::string>& attributes, std::int64_t eventTimeNano);
     void OnContainerCreated(const nlohmann::json& parsed, std::int64_t eventTimeNano);
@@ -108,8 +107,7 @@ private:
     static std::pair<std::string, std::map<std::string, std::string>> ParseResourceActor(
         const nlohmann::json& parsed, const std::string& action, const char* type);
 
-    // Callbacks are invoked without holding m_lock so that a callback can register or unregister callbacks, and so
-    // that a callback taking its own lock can't invert with a thread that registers a callback under that same lock.
+    // Invoke outside the registry lock so callbacks can change registrations or acquire their own locks.
     struct CallbackRegistration
     {
         NON_COPYABLE(CallbackRegistration);
@@ -121,8 +119,7 @@ private:
 
         const size_t CallbackId;
 
-        // Held while the callback runs so it can't be invoked once UnregisterCallback() returned for it.
-        // N.B. Recursive so a running callback can unregister itself.
+        // Drain callbacks during unregister; recursion allows a callback to unregister itself.
         std::recursive_mutex InvokeLock;
         _Guarded_by_(InvokeLock) bool Unregistered = false;
     };
@@ -177,14 +174,30 @@ private:
         const ContainerActionCallback Callback;
     };
 
-    _Guarded_by_(m_lock) std::vector<std::shared_ptr<ContainerCallback>> m_containerCallbacks;
-    _Guarded_by_(m_lock) std::vector<std::shared_ptr<VolumeCallback>> m_volumeCallbacks;
-    _Guarded_by_(m_lock) std::vector<std::shared_ptr<NetworkCallback>> m_networkCallbacks;
-    _Guarded_by_(m_lock) std::vector<std::shared_ptr<ContainerCreateCallbackEntry>> m_containerCreateCallbacks;
-    _Guarded_by_(m_lock) std::vector<std::shared_ptr<ContainerActionCallbackEntry>> m_containerActionCallbacks;
+    // Tokens can outlive the session, so their registry must not retain the tracker or session.
+    struct CallbackRegistry
+    {
+        ~CallbackRegistry()
+        {
+            WI_ASSERT(ContainerCallbacks.empty());
+            WI_ASSERT(VolumeCallbacks.empty());
+            WI_ASSERT(NetworkCallbacks.empty());
+            WI_ASSERT(ContainerCreateCallbacks.empty());
+            WI_ASSERT(ContainerActionCallbacks.empty());
+        }
 
-    // Invokes a snapshot of callbacks taken under m_lock, skipping registrations that have since been unregistered.
-    // Returns whether any callback ran.
+        void UnregisterCallback(size_t Id) noexcept;
+
+        std::mutex Lock;
+        std::atomic<size_t> CallbackId{0};
+        _Guarded_by_(Lock) std::vector<std::shared_ptr<ContainerCallback>> ContainerCallbacks;
+        _Guarded_by_(Lock) std::vector<std::shared_ptr<VolumeCallback>> VolumeCallbacks;
+        _Guarded_by_(Lock) std::vector<std::shared_ptr<NetworkCallback>> NetworkCallbacks;
+        _Guarded_by_(Lock) std::vector<std::shared_ptr<ContainerCreateCallbackEntry>> ContainerCreateCallbacks;
+        _Guarded_by_(Lock) std::vector<std::shared_ptr<ContainerActionCallbackEntry>> ContainerActionCallbacks;
+    };
+
+    // Invoke a snapshot, skipping unregistered entries, and report whether any callback ran.
     template <typename TCallback, typename TInvoke>
     static bool InvokeCallbacks(const std::vector<std::shared_ptr<TCallback>>& Callbacks, const TInvoke& Invoke)
     {
@@ -202,8 +215,7 @@ private:
         return invoked;
     }
 
-    WSLCSession& m_session;
-    std::mutex m_lock;
-    std::atomic<size_t> m_callbackId{0};
+    const ULONG m_sessionId;
+    const std::shared_ptr<CallbackRegistry> m_registry = std::make_shared<CallbackRegistry>();
 };
 } // namespace wsl::windows::service::wslc

@@ -13,47 +13,40 @@ Abstract:
 --*/
 #include "precomp.h"
 #include "DockerEventTracker.h"
-#include "WSLCSession.h"
-#include "WSLCVirtualMachine.h"
 #include <nlohmann/json.hpp>
 
 using wsl::windows::service::wslc::DockerEventTracker;
 using wsl::windows::service::wslc::DockerHTTPClient;
-using wsl::windows::service::wslc::WSLCSession;
-using wsl::windows::service::wslc::WSLCVirtualMachine;
 
-DockerEventTracker::EventTrackingReference::EventTrackingReference(DockerEventTracker* tracker, size_t id) noexcept :
-    m_tracker(tracker), m_id(id)
+DockerEventTracker::EventTrackingReference::EventTrackingReference(std::shared_ptr<CallbackRegistry> registry, size_t id) noexcept :
+    m_id(id), m_registry(std::move(registry))
 {
 }
 
 DockerEventTracker::EventTrackingReference& DockerEventTracker::EventTrackingReference::operator=(DockerEventTracker::EventTrackingReference&& other) noexcept
 {
-    Reset();
-    m_id = other.m_id;
-    m_tracker = other.m_tracker;
-
-    other.m_tracker = nullptr;
-    other.m_id = {};
+    if (this != &other)
+    {
+        Reset();
+        m_id = std::exchange(other.m_id, {});
+        m_registry = std::move(other.m_registry);
+    }
 
     return *this;
 }
 
 void DockerEventTracker::EventTrackingReference::Reset() noexcept
 {
-    if (m_tracker != nullptr)
+    if (auto registry = std::move(m_registry))
     {
-        m_tracker->UnregisterCallback(m_id);
-        m_tracker = nullptr;
+        registry->UnregisterCallback(m_id);
         m_id = {};
     }
 }
 
 DockerEventTracker::EventTrackingReference::EventTrackingReference(EventTrackingReference&& other) noexcept :
-    m_id(other.m_id), m_tracker(other.m_tracker)
+    m_id(std::exchange(other.m_id, {})), m_registry(std::move(other.m_registry))
 {
-    other.m_tracker = nullptr;
-    other.m_id = {};
 }
 
 DockerEventTracker::EventTrackingReference::~EventTrackingReference() noexcept
@@ -61,7 +54,7 @@ DockerEventTracker::EventTrackingReference::~EventTrackingReference() noexcept
     Reset();
 }
 
-DockerEventTracker::DockerEventTracker(WSLCSession& session) : m_session(session)
+DockerEventTracker::DockerEventTracker(ULONG SessionId) : m_sessionId(SessionId)
 {
 }
 
@@ -81,7 +74,7 @@ void DockerEventTracker::Connect(DockerHTTPClient& dockerClient, IORelay& relay)
                     TraceLoggingCountedString(
                         buffer.data(), static_cast<UINT16>(std::min(buffer.size(), static_cast<size_t>(USHRT_MAX))), "Data"),
                     TraceLoggingValue(wil::ResultFromCaughtException(), "Error"),
-                    TraceLoggingValue(m_session.Id(), "SessionId"));
+                    TraceLoggingValue(m_sessionId, "SessionId"));
             }
         }
     };
@@ -91,23 +84,13 @@ void DockerEventTracker::Connect(DockerHTTPClient& dockerClient, IORelay& relay)
     relay.AddHandle(std::make_unique<common::io::HTTPChunkBasedReadHandle>(std::move(socket), std::move(onChunk)));
 }
 
-DockerEventTracker::~DockerEventTracker()
-{
-    // N.B. No callback should be left when the tracker is destroyed.
-    WI_ASSERT(m_containerCallbacks.empty());
-    WI_ASSERT(m_volumeCallbacks.empty());
-    WI_ASSERT(m_networkCallbacks.empty());
-    WI_ASSERT(m_containerCreateCallbacks.empty());
-    WI_ASSERT(m_containerActionCallbacks.empty());
-}
-
 void DockerEventTracker::OnEvent(const std::string_view& event)
 {
     WSL_LOG(
         "DockerEvent",
         TraceLoggingCountedString(
             event.data(), static_cast<UINT16>(std::min(event.size(), static_cast<size_t>(USHRT_MAX))), "Data"),
-        TraceLoggingValue(m_session.Id(), "SessionId"));
+        TraceLoggingValue(m_sessionId, "SessionId"));
 
     auto parsed = nlohmann::json::parse(event);
 
@@ -199,14 +182,12 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
         execId = execIdEntry->second;
     }
 
-    // Snapshot the matching callbacks so that they can be invoked without holding m_lock. Callbacks can register and
-    // unregister callbacks (a container that stops releases its exec processes), which would otherwise mutate the
-    // vector being iterated.
+    // Snapshot under the registry lock so callbacks can safely change registrations.
     std::vector<std::shared_ptr<ContainerCallback>> callbacks;
     {
-        std::lock_guard lock{m_lock};
+        std::lock_guard lock{m_registry->Lock};
 
-        for (const auto& e : m_containerCallbacks)
+        for (const auto& e : m_registry->ContainerCallbacks)
         {
             if (e->ContainerId == containerId && (!e->ExecId.has_value() || e->ExecId == execId))
             {
@@ -230,8 +211,8 @@ void DockerEventTracker::OnContainerAction(
 {
     std::vector<std::shared_ptr<ContainerActionCallbackEntry>> callbacks;
     {
-        std::lock_guard lock{m_lock};
-        callbacks = m_containerActionCallbacks;
+        std::lock_guard lock{m_registry->Lock};
+        callbacks = m_registry->ContainerActionCallbacks;
     }
 
     InvokeCallbacks(
@@ -244,8 +225,8 @@ void DockerEventTracker::OnVolumeEvent(const nlohmann::json& parsed, const std::
 
     std::vector<std::shared_ptr<VolumeCallback>> callbacks;
     {
-        std::lock_guard lock{m_lock};
-        callbacks = m_volumeCallbacks;
+        std::lock_guard lock{m_registry->Lock};
+        callbacks = m_registry->VolumeCallbacks;
     }
 
     InvokeCallbacks(callbacks, [&](const VolumeCallback& e) { e.Callback(volumeName, action, attributes, eventTimeNano); });
@@ -257,8 +238,8 @@ void DockerEventTracker::OnNetworkEvent(const nlohmann::json& parsed, const std:
 
     std::vector<std::shared_ptr<NetworkCallback>> callbacks;
     {
-        std::lock_guard lock{m_lock};
-        callbacks = m_networkCallbacks;
+        std::lock_guard lock{m_registry->Lock};
+        callbacks = m_registry->NetworkCallbacks;
     }
 
     InvokeCallbacks(
@@ -302,8 +283,8 @@ void DockerEventTracker::OnContainerCreated(const nlohmann::json& parsed, std::i
 
     std::vector<std::shared_ptr<ContainerCreateCallbackEntry>> callbacks;
     {
-        std::lock_guard lock{m_lock};
-        callbacks = m_containerCreateCallbacks;
+        std::lock_guard lock{m_registry->Lock};
+        callbacks = m_registry->ContainerCreateCallbacks;
     }
 
     InvokeCallbacks(callbacks, [&](const ContainerCreateCallbackEntry& e) { e.Callback(containerId, eventTimeNano); });
@@ -312,77 +293,77 @@ void DockerEventTracker::OnContainerCreated(const nlohmann::json& parsed, std::i
 DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterContainerStateUpdates(
     const std::string& ContainerId, ContainerStateChangeCallback&& Callback) noexcept
 {
-    auto id = m_callbackId++;
+    auto id = m_registry->CallbackId++;
     auto entry = std::make_shared<ContainerCallback>(id, std::string{ContainerId}, std::optional<std::string>{}, std::move(Callback));
 
-    std::lock_guard lock{m_lock};
-    m_containerCallbacks.emplace_back(std::move(entry));
+    std::lock_guard lock{m_registry->Lock};
+    m_registry->ContainerCallbacks.emplace_back(std::move(entry));
 
-    return EventTrackingReference{this, id};
+    return EventTrackingReference{m_registry, id};
 }
 
 DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterExecStateUpdates(
     const std::string& ContainerId, const std::string& ExecId, ContainerStateChangeCallback&& Callback) noexcept
 {
-    auto id = m_callbackId++;
+    auto id = m_registry->CallbackId++;
     auto entry = std::make_shared<ContainerCallback>(id, std::string{ContainerId}, std::optional<std::string>{ExecId}, std::move(Callback));
 
-    std::lock_guard lock{m_lock};
-    m_containerCallbacks.emplace_back(std::move(entry));
+    std::lock_guard lock{m_registry->Lock};
+    m_registry->ContainerCallbacks.emplace_back(std::move(entry));
 
-    return EventTrackingReference{this, id};
+    return EventTrackingReference{m_registry, id};
 }
 
 DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterVolumeUpdates(VolumeEventCallback&& Callback) noexcept
 {
-    auto id = m_callbackId++;
+    auto id = m_registry->CallbackId++;
     auto entry = std::make_shared<VolumeCallback>(id, std::move(Callback));
 
-    std::lock_guard lock{m_lock};
-    m_volumeCallbacks.emplace_back(std::move(entry));
+    std::lock_guard lock{m_registry->Lock};
+    m_registry->VolumeCallbacks.emplace_back(std::move(entry));
 
-    return EventTrackingReference{this, id};
+    return EventTrackingReference{m_registry, id};
 }
 
 DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterNetworkUpdates(NetworkEventCallback&& Callback) noexcept
 {
-    auto id = m_callbackId++;
+    auto id = m_registry->CallbackId++;
     auto entry = std::make_shared<NetworkCallback>(id, std::move(Callback));
 
-    std::lock_guard lock{m_lock};
-    m_networkCallbacks.emplace_back(std::move(entry));
+    std::lock_guard lock{m_registry->Lock};
+    m_registry->NetworkCallbacks.emplace_back(std::move(entry));
 
-    return EventTrackingReference{this, id};
+    return EventTrackingReference{m_registry, id};
 }
 
 DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterContainerCreate(ContainerCreateCallback&& Callback) noexcept
 {
-    auto id = m_callbackId++;
+    auto id = m_registry->CallbackId++;
     auto entry = std::make_shared<ContainerCreateCallbackEntry>(id, std::move(Callback));
 
-    std::lock_guard lock{m_lock};
-    m_containerCreateCallbacks.emplace_back(std::move(entry));
+    std::lock_guard lock{m_registry->Lock};
+    m_registry->ContainerCreateCallbacks.emplace_back(std::move(entry));
 
-    return EventTrackingReference{this, id};
+    return EventTrackingReference{m_registry, id};
 }
 
 DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterContainerActions(ContainerActionCallback&& Callback) noexcept
 {
-    auto id = m_callbackId++;
+    auto id = m_registry->CallbackId++;
     auto entry = std::make_shared<ContainerActionCallbackEntry>(id, std::move(Callback));
 
-    std::lock_guard lock{m_lock};
-    m_containerActionCallbacks.emplace_back(std::move(entry));
+    std::lock_guard lock{m_registry->Lock};
+    m_registry->ContainerActionCallbacks.emplace_back(std::move(entry));
 
-    return EventTrackingReference{this, id};
+    return EventTrackingReference{m_registry, id};
 }
 
-void DockerEventTracker::UnregisterCallback(size_t Id) noexcept
+void DockerEventTracker::CallbackRegistry::UnregisterCallback(size_t Id) noexcept
 {
     std::shared_ptr<CallbackRegistration> registration;
 
     {
-        std::lock_guard lock{m_lock};
+        std::lock_guard lock{Lock};
 
         auto matches = [Id](const auto& e) { return e->CallbackId == Id; };
 
@@ -398,8 +379,8 @@ void DockerEventTracker::UnregisterCallback(size_t Id) noexcept
             return true;
         };
 
-        if (!take(m_containerCallbacks) && !take(m_volumeCallbacks) && !take(m_networkCallbacks) &&
-            !take(m_containerCreateCallbacks) && !take(m_containerActionCallbacks))
+        if (!take(ContainerCallbacks) && !take(VolumeCallbacks) && !take(NetworkCallbacks) && !take(ContainerCreateCallbacks) &&
+            !take(ContainerActionCallbacks))
         {
             WI_ASSERT(false);
         }
