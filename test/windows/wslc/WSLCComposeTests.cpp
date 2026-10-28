@@ -1240,9 +1240,11 @@ private:
         const auto originalNetwork = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(originalOutput.get());
         VERIFY_IS_FALSE(originalNetwork.Id.empty());
 
-        wil::com_ptr<IWSLCComposeSession> composeSession;
-        VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateComposeSession(composePath.c_str(), &composeSession));
-        VERIFY_IS_NULL(composeSession.get());
+        ComposeRequestStorage request{composePath, WSLCComposeActionCreate};
+        const auto result = WaitForCompose(*m_defaultSession, request);
+        VERIFY_ARE_EQUAL(E_INVALIDARG, result.value.Result);
+        VERIFY_ARE_EQUAL(WSLCComposeOperationStatusFailed, result.value.Status);
+        VERIFY_ARE_EQUAL(0u, result.value.AffectedContainersCount);
 
         wil::unique_cotaskmem_ansistring output;
         VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
