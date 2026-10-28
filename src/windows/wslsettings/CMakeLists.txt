@@ -246,7 +246,7 @@ set_target_properties(
 
 configure_file(
   "${CMAKE_CURRENT_LIST_DIR}/directory.build.targets.in"
-  "${CMAKE_CURRENT_LIST_DIR}/directory.build.targets"
+  "${CMAKE_CURRENT_BINARY_DIR}/directory.build.targets"
 )
 
 configure_file(
