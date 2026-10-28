@@ -300,13 +300,13 @@ jobs:
           mkdir $pdbFolder
           foreach ($filter in @("*.pdb", "*.debug"))
           {
-            foreach ($symbolFile in (Get-ChildItem -Recurse -File -Path $binFolder -Filter $filter))
-            {
-              $relativePath = $symbolFile.FullName.Substring($binFolder.Length + 1)
-              $destination = Join-Path $pdbFolder $relativePath
-              New-Item -ItemType Directory -Path (Split-Path -Path $destination) -Force | Out-Null
-              Move-Item -LiteralPath $symbolFile.FullName -Destination $destination
-            }
+              foreach ($symbolFile in (Get-ChildItem -Recurse -File -Path $binFolder -Filter $filter))
+              {
+                  $relativePath = $symbolFile.FullName.Substring($binFolder.Length + 1)
+                  $destination = Join-Path $pdbFolder $relativePath
+                  New-Item -ItemType Directory -Path (Split-Path -Path $destination) -Force | Out-Null
+                  Move-Item -LiteralPath $symbolFile.FullName -Destination $destination
+              }
           }
         displayName: Collect symbols (${{ parameters.platform }})
 
