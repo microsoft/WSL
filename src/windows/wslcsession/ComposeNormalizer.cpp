@@ -68,13 +68,17 @@ ComposeSpec ComposeNormalizer::Normalize(const ComposeDocuments& documents, cons
         THROW_HR_WITH_USER_ERROR_IF(
             E_INVALIDARG,
             wsl::shared::Localization::MessageWslcInvalidName(container.ServiceName.c_str()),
-            std::ranges::all_of(container.ServiceName, [](unsigned char value) { return std::isspace(value); }));
+            container.ServiceName.find('\0') != std::string::npos ||
+                std::ranges::all_of(container.ServiceName, [](unsigned char value) { return std::isspace(value); }));
 
         if (container.Name.empty())
         {
             container.Name = std::format("{}-{}-1", spec.ProjectName, container.ServiceName);
         }
 
+        // Container APIs consume null-terminated names.
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, wsl::shared::Localization::MessageWslcInvalidName(container.Name.c_str()), container.Name.find('\0') != std::string::npos);
         ValidateName(container.Name.c_str(), WSLC_MAX_CONTAINER_NAME_LENGTH);
         THROW_HR_WITH_USER_ERROR_IF(
             E_INVALIDARG,

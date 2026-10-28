@@ -188,6 +188,18 @@ class WSLCComposeTests
         VerifyInvalidServiceNameValidatedBeforeMutation(" \t\r\n ", true);
     }
 
+    TEST_METHOD(ComposeLeadingNulServiceNameValidatedBeforeMutation)
+    {
+        constexpr char c_serviceName[] = "\0service";
+        VerifyInvalidServiceNameValidatedBeforeMutation({c_serviceName, std::size(c_serviceName) - 1}, true);
+    }
+
+    TEST_METHOD(ComposeEmbeddedNulServiceNameValidatedBeforeMutation)
+    {
+        constexpr char c_serviceName[] = "service\0suffix";
+        VerifyInvalidServiceNameValidatedBeforeMutation({c_serviceName, std::size(c_serviceName) - 1}, true);
+    }
+
     TEST_METHOD(ComposeDuplicateResolvedContainerNamesValidatedBeforeMutation)
     {
         const auto projectName = std::format("compose-resolved-names-{}", GetCurrentProcessId());
@@ -213,6 +225,21 @@ class WSLCComposeTests
             "  second:\n"
             "    image: alpine:latest\n"
             "    container_name: {0}-shared\n",
+            projectName);
+        VerifyComposeRejectedBeforeMutation(projectName, content);
+    }
+
+    TEST_METHOD(ComposeNulContainerNamesValidatedBeforeMutation)
+    {
+        const auto projectName = std::format("compose-nul-names-{}", GetCurrentProcessId());
+        const auto content = std::format(
+            "services:\n"
+            "  first:\n"
+            "    image: alpine:latest\n"
+            "    container_name: \"{0}-shared\\0a\"\n"
+            "  second:\n"
+            "    image: alpine:latest\n"
+            "    container_name: \"{0}-shared\\0b\"\n",
             projectName);
         VerifyComposeRejectedBeforeMutation(projectName, content);
     }
