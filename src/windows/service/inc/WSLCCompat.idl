@@ -372,7 +372,7 @@ interface IWSLCCompatSession2 : IWSLCCompatSession
 
     // Returns a JSON array of wslc_schema::NetworkListEntry.
     HRESULT ListNetworks([out] LPSTR* Output);
-    HRESULT DeleteNetwork([in] LPCSTR Name);
+    HRESULT DeleteNetwork([in] LPCSTR NetworkNameOrId);
 
     // Options is a JSON wslc_schema::CreateNetworkOptions; Network receives a JSON wslc_schema::NetworkListEntry.
     HRESULT CreateNetwork([in] LPCSTR Options, [in, unique] IWSLCCompatWarningCallback* WarningCallback, [out] LPSTR* Network);

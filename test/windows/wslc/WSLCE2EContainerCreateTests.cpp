@@ -1209,6 +1209,25 @@ class WSLCE2EContainerCreateTests
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Network_HostById_Rejected)
+    {
+        const auto hostId = wsl::shared::string::MultiByteToWide(InspectNetwork(L"host").Id);
+
+        for (const auto& reference : {hostId, hostId.substr(0, 12)})
+        {
+            auto result = RunWslc(std::format(
+                L"container create --name {} --network {} {} true", WslcContainerName, reference, DebianImage.NameAndTag()));
+            result.Verify(
+                {.Stderr = FormatErrorMessage(std::format(L"Network not found: '{}'", reference), L"WSLC_E_NETWORK_NOT_FOUND"), .ExitCode = 1});
+            VerifyContainerIsNotListed(WslcContainerName);
+        }
+
+        auto result = RunWslc(std::format(
+            L"container create --name {} --network bridge --network {} {} true", WslcContainerName, hostId, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = FormatErrorMessage(std::format(L"Network not found: '{}'", hostId), L"WSLC_E_NETWORK_NOT_FOUND"), .ExitCode = 1});
+        VerifyContainerIsNotListed(WslcContainerName);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Network_UserDefinedNetwork)
     {
         auto result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName));
@@ -1221,6 +1240,18 @@ class WSLCE2EContainerCreateTests
 
         const auto inspect = InspectContainer(WslcContainerName);
         VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(TestNetworkName), inspect.HostConfig.NetworkMode);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Network_BridgeById)
+    {
+        const auto bridgeId = wsl::shared::string::MultiByteToWide(InspectNetwork(L"bridge").Id);
+
+        auto result = RunWslc(
+            std::format(L"container create --name {} --network {} {} true", WslcContainerName, bridgeId, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_ARE_EQUAL(std::string("bridge"), inspect.HostConfig.NetworkMode);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Network_EmptyValue_Rejected)

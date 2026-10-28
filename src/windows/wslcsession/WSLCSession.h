@@ -205,10 +205,10 @@ public:
 
     // Network management.
     IFACEMETHOD(CreateNetwork)(_In_ const WSLCNetworkOptions* Options, _In_opt_ IWarningCallback* WarningCallback) override;
-    IFACEMETHOD(DeleteNetwork)(_In_ LPCSTR Name) override;
+    IFACEMETHOD(DeleteNetwork)(_In_ LPCSTR NetworkNameOrId) override;
     IFACEMETHOD(ListNetworks)
     (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters, _In_ ULONG FiltersCount, _Out_ LPSTR* Output) override;
-    IFACEMETHOD(InspectNetwork)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
+    IFACEMETHOD(InspectNetwork)(_In_ LPCSTR NetworkNameOrId, _Out_ LPSTR* Output) override;
     IFACEMETHOD(PruneNetworks)
     (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters, _In_ ULONG FiltersCount, _Out_ WSLCNetworkName** Networks, _Out_ ULONG* NetworksCount)
         override;
@@ -327,6 +327,14 @@ public:
     // processes).
     Microsoft::WRL::ComPtr<IUnknown> CreateActivityToken();
 
+    // Resolves a network name, full ID, or unique ID prefix across all networks known to the engine.
+    // Throws WSLC_E_NETWORK_NOT_FOUND or WSLC_E_NETWORK_PREFIX_AMBIGUOUS. Callers must hold a VM lease.
+    ResolvedNetwork ResolveNetwork(const std::string& NetworkNameOrId);
+
+    // Built-in network names resolve to themselves, and exact names or IDs of session-managed networks resolve locally.
+    // Any other reference must look like an ID or ID prefix and is resolved by the engine.
+    __requires_lock_held(m_networksLock) ResolvedNetwork ResolveNetworkLockHeld(const std::string& NetworkNameOrId);
+
 private:
     ULONG m_id = 0;
     void PersistSettings(const WSLCSessionInitSettings& Settings, PSID UserSid);
@@ -383,6 +391,9 @@ private:
 
     void Ext4Format(const std::string& Device);
     std::string InspectImageLockHeld(const std::string& Id);
+
+    // Inspects a network by name, full ID, or unique ID prefix across every network known to the engine.
+    common::docker_schema::Network InspectNetworkReference(const std::string& NetworkNameOrId);
     void OnContainerDeleted(const WSLCContainerImpl* Container);
 
     void OnCrashDumpWritten(const std::wstring& DumpPath, const std::string& ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp);

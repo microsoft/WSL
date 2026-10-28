@@ -118,7 +118,9 @@ public:
 
     void MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR GuestPath, _In_ bool ReadOnly, _In_ LPCWSTR Name);
 
-    void RegisterCallbacks(_In_ const std::function<void(ULONG)>& DistroExitCallback = {}, _In_ const std::function<void(GUID)>& TerminationCallback = {});
+    void RegisterCallbacks(
+        _In_ const std::function<void(const LX_MINI_INIT_CHILD_EXIT_MESSAGE&)>& DistroExitCallback = {},
+        _In_ const std::function<void(GUID)>& TerminationCallback = {});
 
     void ResizeDistribution(_In_ ULONG Lun, _In_ HANDLE OutputHandle, _In_ ULONG64 NewSize);
 
@@ -283,7 +285,7 @@ private:
     wil::srwlock m_exitCallbackLock;
     std::wstring m_exitDetails;
     std::wstring m_machineId;
-    GUID m_runtimeId;
+    GUID m_runtimeId{};
     wsl::core::Config m_vmConfig;
     InitializeDrvFsCallback m_initializeDrvFs;
     std::wstring m_comPipe0;
@@ -294,10 +296,10 @@ private:
     std::filesystem::path m_tempPath;
     wil::shared_handle m_userToken;
     wil::unique_handle m_restrictedToken;
-    bool m_swapFileCreated;
-    bool m_localDevicesKeyCreated;
-    bool m_tempDirectoryCreated;
-    bool m_enableInboxGpuLibs;
+    bool m_swapFileCreated = false;
+    bool m_localDevicesKeyCreated = false;
+    bool m_tempDirectoryCreated = false;
+    bool m_enableInboxGpuLibs = false;
     bool m_defaultKernel = true;
     bool m_privateKernelModules = false;
     LX_MINI_INIT_MOUNT_DEVICE_TYPE m_systemDistroDeviceType = LxMiniInitMountDeviceTypeInvalid;

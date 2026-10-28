@@ -742,6 +742,22 @@ class WSLCE2EGlobalTests
         }
     }
 
+    // RunWslc redirects stdin to NUL, which is a character device but not a console.
+    WSLC_TEST_METHOD(WSLCE2E_Session_Run_NulStdin)
+    {
+        // A command that outlives its stdout / stderr must not fail on the stdin relay.
+        {
+            auto result = RunWslc(L"system session run sleep 1");
+            result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+        }
+
+        // A command that reads stdin must observe EOF.
+        {
+            auto result = RunWslc(L"system session run cat");
+            result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+        }
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Session_List_Verbose)
     {
         auto result = RunWslc(L"container list");

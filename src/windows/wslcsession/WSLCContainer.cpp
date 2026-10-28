@@ -43,8 +43,8 @@ using wsl::windows::service::wslc::DockerEventTracker;
 using wsl::windows::service::wslc::DockerHTTPClient;
 using wsl::windows::service::wslc::DockerHTTPException;
 using wsl::windows::service::wslc::IORelay;
+using wsl::windows::service::wslc::IsReservedNetworkName;
 using wsl::windows::service::wslc::IWSLCVolume;
-using wsl::windows::service::wslc::NetworkEntry;
 using wsl::windows::service::wslc::RelayedProcessIO;
 using wsl::windows::service::wslc::TypedHandle;
 using wsl::windows::service::wslc::unique_com_disconnect;
@@ -203,7 +203,25 @@ void RejectUnsupportedNetworkModes(std::string_view mode)
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidNetworkMode(std::string{mode}), colon != std::string_view::npos);
 }
 
-std::string ResolveNetworkMode(LPCSTR networkMode, bool hasRequestedPorts, const std::unordered_map<std::string, NetworkEntry>& sessionNetworks, DockerHTTPClient& dockerClient)
+// Resolves a network name, ID, or ID prefix to the network name. Only session-managed and built-in networks are accepted.
+// Host mode is only selected by the literal "host" name, so an ID that resolves to the host network is not found.
+std::string ResolveContainerNetwork(const std::string& requested, WSLCSession& session)
+{
+    auto network = session.ResolveNetworkLockHeld(requested);
+    if (network.Managed || IsReservedNetworkName(requested))
+    {
+        return std::move(network.Name);
+    }
+
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_NETWORK_NOT_FOUND,
+        Localization::MessageWslcNetworkNotFound(requested),
+        !IsReservedNetworkName(network.Name) || network.Name == "host");
+
+    return std::move(network.Name);
+}
+
+std::string ResolveNetworkMode(LPCSTR networkMode, bool hasRequestedPorts, WSLCSession& session, DockerHTTPClient& dockerClient)
 {
     const std::string_view mode = (networkMode == nullptr || *networkMode == '\0') ? std::string_view{"bridge"} : networkMode;
 
@@ -212,17 +230,6 @@ std::string ResolveNetworkMode(LPCSTR networkMode, bool hasRequestedPorts, const
 
     // N.B. Docker validates incompatible combinations (e.g. host/none/container: with additional networks)
     // and returns clear error messages, so we don't duplicate that validation here.
-
-    if (mode == "host")
-    {
-        return "host";
-    }
-
-    if (mode == "none")
-    {
-        THROW_HR_IF_MSG(E_INVALIDARG, hasRequestedPorts, "Port mappings are not supported without networking");
-        return "none";
-    }
 
     if (mode.starts_with(c_containerNetworkPrefix))
     {
@@ -242,13 +249,11 @@ std::string ResolveNetworkMode(LPCSTR networkMode, bool hasRequestedPorts, const
         }
     }
 
-    // User-defined network: bridge is the built-in one and bypasses the session lookup.
-    if (mode != "bridge")
-    {
-        THROW_HR_WITH_USER_ERROR_IF(
-            WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(std::string{mode}), !sessionNetworks.contains(std::string{mode}));
-    }
-    return std::string{mode};
+    // Canonicalize names, IDs, and ID prefixes to the network name so built-in networks get their mode-specific handling.
+    auto name = ResolveContainerNetwork(std::string{mode}, session);
+    THROW_HR_IF_MSG(E_INVALIDARG, name == "none" && hasRequestedPorts, "Port mappings are not supported without networking");
+
+    return name;
 }
 
 // Unknown Settings keys are rejected rather than silently dropped, so callers get a clear error.
@@ -360,8 +365,7 @@ EndpointConfig ResolveEndpointConfig(const KeyValuePair* settings, ULONG count, 
     return config;
 }
 
-std::map<std::string, EndpointConfig> ResolveEndpoints(
-    const WSLCNetworkConnection* connections, ULONG count, std::string_view resolvedMode, const std::unordered_map<std::string, NetworkEntry>& sessionNetworks)
+std::map<std::string, EndpointConfig> ResolveEndpoints(const WSLCNetworkConnection* connections, ULONG count, std::string_view resolvedMode, WSLCSession& session)
 {
     std::map<std::string, EndpointConfig> resolved;
     if (count == 0)
@@ -376,21 +380,26 @@ std::map<std::string, EndpointConfig> ResolveEndpoints(
         const char* raw = connections[i].NetworkName;
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), !raw || !*raw);
 
-        std::string name{raw};
+        // Reject aliases on built-in and container modes before the network lookup.
+        const std::string requested{raw};
+        auto config = ResolveEndpointConfig(connections[i].Settings, connections[i].SettingsCount, requested);
+        const bool hasAliases = config.Aliases.has_value();
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, Localization::MessageWslcAliasRequiresUserDefinedNetwork(), hasAliases && !NetworkSupportsAliases(requested));
+
+        // Canonicalize names, IDs, and ID prefixes to the network name so duplicates are detected regardless of form.
+        const auto name = ResolveContainerNetwork(requested, session);
+
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcDuplicateNetwork(name), name == resolvedMode);
 
         auto [it, inserted] = resolved.try_emplace(name);
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcDuplicateNetwork(name), !inserted);
 
-        auto config = ResolveEndpointConfig(connections[i].Settings, connections[i].SettingsCount, name);
         THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG, Localization::MessageWslcAliasRequiresUserDefinedNetwork(), config.Aliases.has_value() && !NetworkSupportsAliases(name));
+            E_INVALIDARG, Localization::MessageWslcAliasRequiresUserDefinedNetwork(), hasAliases && !NetworkSupportsAliases(name));
 
-        if (name != "bridge")
-        {
-            THROW_HR_WITH_USER_ERROR_IF(
-                WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), !sessionNetworks.contains(name));
-        }
+        THROW_HR_WITH_USER_ERROR_IF(
+            WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(requested), name == "host" || name == "none");
 
         it->second = std::move(config);
     }
@@ -945,8 +954,6 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_mappedPorts(std::move(ports)),
     m_labels(std::move(labels)),
     m_comWrapper(wil::MakeOrThrow<WSLCContainer>(wslcSession, m_id, m_name, InitialState, std::move(onDeleted))),
-    m_containerEvents(runtime.Events().RegisterContainerStateUpdates(
-        m_id, std::bind(&WSLCContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4))),
     m_eventStore(eventStore),
     m_state(InitialState),
     m_createdAt(CreatedAt),
@@ -965,15 +972,15 @@ WSLCContainerImpl::WSLCContainerImpl(
 
 WSLCContainerImpl::~WSLCContainerImpl()
 {
-    // Destructors are implicitly noexcept, so any escaping exception terminates the session host.
-    // Everything below touches VM-scoped state that may already be gone.
-    try
-    {
-        WSL_LOG(
-            "~WSLCContainerImpl",
-            TraceLoggingValue(m_name.c_str(), "Name"),
-            TraceLoggingValue(m_id.c_str(), "Id"),
-            TraceLoggingValue((int)m_state, "State"));
+    Rundown();
+}
+
+void WSLCContainerImpl::Rundown() noexcept
+{
+    std::call_once(m_rundown, [this]() {
+        WSL_LOG("ContainerRundown", TraceLoggingValue(m_name.c_str(), "Name"), TraceLoggingValue(m_id.c_str(), "Id"));
+
+        m_containerEvents.Reset();
 
         // Snapshot and clear process references under the lock.
         // Callbacks are then invoked without holding m_lock.
@@ -1000,24 +1007,37 @@ WSLCContainerImpl::~WSLCContainerImpl()
             }
         }
 
-        m_containerEvents.Reset();
-
         // Release resources under m_lock, but extract the COM wrapper so Disconnect()
         // can be called without holding m_lock. Calling Disconnect() under m_lock can
         // deadlock if an in-flight COM caller is waiting for m_lock.
         unique_com_disconnect wrapper;
         {
             auto lock = m_lock.lock_exclusive();
-            wrapper = ReleaseResources();
+            wrapper = PrepareDisconnectComWrapper();
+
+            try
+            {
+                ReleaseRuntimeResources();
+            }
+            CATCH_LOG()
+
+            // Explicitely clean resources so that a subsequent call to Rundown() is a no-op.
+            // This is required because the destructor can be called after the VM has been destroyed.
+            m_mappedPorts.clear();
+            m_mountedVolumes.clear();
+            m_activityHold.reset();
         }
-    }
-    CATCH_LOG()
+    });
 }
 
 void WSLCContainerImpl::Initialize()
 {
     // N.B. this must be done here because weak_from_this() is only valid after the constructor returns.
     m_comWrapper->Initialize(weak_from_this());
+
+    // N.B. This must be registered after all the fields are initialized, since callbacks can be invoked immediately after registration.
+    m_containerEvents = m_runtime.Events().RegisterContainerStateUpdates(
+        m_id, std::bind(&WSLCContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 }
 
 void WSLCContainerImpl::SetExitCode(int ExitCode) noexcept
@@ -1228,11 +1248,14 @@ wil::com_ptr<IWSLCProcess> WSLCContainerImpl::StartPhase(
     UpdateActivityHoldLockHeld();
 
     auto control = std::make_unique<DockerContainerProcessControl>(*this, m_runtime.Docker());
+    auto* initProcessControl = control.get();
+    auto initProcess = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io), m_initProcessFlags);
 
+    // N.B. Publish only after construction succeeds so m_initProcessControl never points at a freed control object.
     {
         std::lock_guard processesLock{m_processesLock};
-        m_initProcessControl = control.get();
-        m_initProcess = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io), m_initProcessFlags);
+        m_initProcessControl = initProcessControl;
+        m_initProcess = std::move(initProcess);
         m_comWrapper->CacheState(m_state, m_initProcess);
     }
 
@@ -2695,7 +2718,6 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     WSLCSession& wslcSession,
     WSLCSessionRuntime& runtime,
     IWSLCPluginNotifier* pluginNotifier,
-    const std::unordered_map<std::string, NetworkEntry>& sessionNetworks,
     std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
     EventStore& eventStore)
 {
@@ -3034,10 +3056,10 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         }
     }
 
-    auto networkMode = ResolveNetworkMode(containerOptions.ContainerNetwork.NetworkMode, !ports.empty(), sessionNetworks, DockerClient);
+    auto networkMode = ResolveNetworkMode(containerOptions.ContainerNetwork.NetworkMode, !ports.empty(), wslcSession, DockerClient);
 
     auto endpoints = ResolveEndpoints(
-        containerOptions.ContainerNetwork.Networks, containerOptions.ContainerNetwork.NetworksCount, networkMode, sessionNetworks);
+        containerOptions.ContainerNetwork.Networks, containerOptions.ContainerNetwork.NetworksCount, networkMode, wslcSession);
 
     auto primaryConfig =
         ResolveEndpointConfig(containerOptions.ContainerNetwork.Settings, containerOptions.ContainerNetwork.SettingsCount, networkMode);
@@ -4043,7 +4065,11 @@ void WSLCContainerImpl::ConnectToNetwork(const WSLCNetworkConnectionOptions* Opt
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), !Options->NetworkName || strlen(Options->NetworkName) == 0);
 
-    auto endpointConfig = ResolveEndpointConfig(Options->Settings, Options->SettingsCount, Options->NetworkName);
+    const auto network = m_wslcSession.ResolveNetwork(Options->NetworkName);
+    const std::string& target = network.Id;
+    const std::string& name = network.Name;
+
+    auto endpointConfig = ResolveEndpointConfig(Options->Settings, Options->SettingsCount, name);
 
     auto lock = m_lock.lock_shared();
 
@@ -4056,25 +4082,28 @@ void WSLCContainerImpl::ConnectToNetwork(const WSLCNetworkConnectionOptions* Opt
 
     try
     {
-        m_runtime.Docker().ConnectContainerToNetwork(Options->NetworkName, request);
+        m_runtime.Docker().ConnectContainerToNetwork(target, request);
     }
     catch (const DockerHTTPException& e)
     {
-        THROW_HR_WITH_USER_ERROR_IF(
-            WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(Options->NetworkName), e.StatusCode() == 404);
-        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to connect container '%hs' to network '%hs'", m_id.c_str(), Options->NetworkName);
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), e.StatusCode() == 404);
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to connect container '%hs' to network '%hs'", m_id.c_str(), name.c_str());
     }
 
     WSL_LOG(
         "ContainerConnectedToNetwork",
         TraceLoggingValue(m_id.c_str(), "ContainerId"),
-        TraceLoggingValue(Options->NetworkName, "NetworkName"));
+        TraceLoggingValue(name.c_str(), "NetworkName"));
 }
 
-void WSLCContainerImpl::DisconnectFromNetwork(LPCSTR NetworkName)
+void WSLCContainerImpl::DisconnectFromNetwork(LPCSTR NetworkNameOrId)
 {
-    THROW_HR_IF(E_POINTER, NetworkName == nullptr);
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), strlen(NetworkName) == 0);
+    THROW_HR_IF(E_POINTER, NetworkNameOrId == nullptr);
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), strlen(NetworkNameOrId) == 0);
+
+    const auto network = m_wslcSession.ResolveNetwork(NetworkNameOrId);
+    const std::string& target = network.Id;
+    const std::string& name = network.Name;
 
     auto lock = m_lock.lock_shared();
 
@@ -4086,18 +4115,18 @@ void WSLCContainerImpl::DisconnectFromNetwork(LPCSTR NetworkName)
 
     try
     {
-        m_runtime.Docker().DisconnectContainerFromNetwork(NetworkName, request);
+        m_runtime.Docker().DisconnectContainerFromNetwork(target, request);
     }
     catch (const DockerHTTPException& e)
     {
-        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(NetworkName), e.StatusCode() == 404);
-        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to disconnect container '%hs' from network '%hs'", m_id.c_str(), NetworkName);
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), e.StatusCode() == 404);
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to disconnect container '%hs' from network '%hs'", m_id.c_str(), name.c_str());
     }
 
     WSL_LOG(
         "ContainerDisconnectedFromNetwork",
         TraceLoggingValue(m_id.c_str(), "ContainerId"),
-        TraceLoggingValue(NetworkName, "NetworkName"));
+        TraceLoggingValue(name.c_str(), "NetworkName"));
 }
 
 HRESULT WSLCContainer::GetLabels(WSLCLabelInformation** Labels, ULONG* Count)
@@ -4125,14 +4154,14 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCContainer::DisconnectFromNetwork(LPCSTR NetworkName)
+HRESULT WSLCContainer::DisconnectFromNetwork(LPCSTR NetworkNameOrId)
 try
 {
     auto sessionLifetime = ResolveSession();
     COMServiceExecutionContext context;
 
     auto vmLease = m_session.Runtime().AcquireVmLease();
-    return CallImpl(&WSLCContainerImpl::DisconnectFromNetwork, NetworkName);
+    return CallImpl(&WSLCContainerImpl::DisconnectFromNetwork, NetworkNameOrId);
 }
 CATCH_RETURN();
 

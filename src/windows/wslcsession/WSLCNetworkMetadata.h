@@ -51,4 +51,11 @@ struct NetworkEntry
     NetworkIPAM IPAM;
 };
 
+struct ResolvedNetwork
+{
+    std::string Name;
+    std::string Id;
+    bool Managed{false};
+};
+
 } // namespace wsl::windows::service::wslc
