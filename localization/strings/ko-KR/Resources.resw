@@ -909,6 +909,10 @@ Admin Protection에 대해 자세히 알아보려면 https://aka.ms/apdevguide�
     <value>주소 범위가 '{}'인 가상 네트워크를 만들지 못했습니다. 범위가 '{}', {}인 새 네트워크를 만들었습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
+    <value>WSL의 NAT 네트워크({})가 Docker의 기본 네트워크와 충돌합니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
     <value>안전 모드 사용 - 많은 기능을 사용할 수 없습니다.</value>
     <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
@@ -1094,6 +1098,10 @@ NAT 네트워킹으로 대체합니다.</value>
     <value>VHD가 현재 사용 중이므로 작업을 완료할 수 없습니다. WSL을 강제로 사용 중지하려면: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
+  <data name="MessageDistributionTerminationTimeout" xml:space="preserve">
+    <value>배포 프로세스 {}이(가) {}밀리초 후에 종료되기를 기다리는 동안 시간이 초과되었습니다. 배포가 중지되었는지 확인하지 않고 계속합니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
     <value>압축은 .vhdx 파일에서만 지원됩니다.</value>
     <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
@@ -1237,6 +1245,10 @@ NAT 네트워킹으로 대체합니다.</value>
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
     <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. Using cgroup v2 instead. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
+  <data name="MessageWindowsInstallerBusy" xml:space="preserve">
+    <value>Windows Installer가 사용 중이므로 WSL 설치가 차단되었습니다. 다른 소프트웨어 설치가 완료될 때까지 기다린 후 다시 시도하십시오.</value>
+    <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>오류가 발생했습니다. 나중에 다시 시도하세요.</value>
@@ -2224,7 +2236,7 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcCannotRemoveRestartingContainer" xml:space="preserve">
-    <value>Container '{}' is restarting and cannot be removed. Either stop the container before removing or use forced remove (-f).</value>
+    <value>컨테이너 '{}'이(가) 다시 시작 중이어서 제거할 수 없습니다. 제거하기 전에 컨테이너를 중지하거나 강제 제거(-f)를 사용하세요.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotRunning" xml:space="preserve">
@@ -2508,6 +2520,10 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>네트워크를 찾을 수 없음: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcNetworkPrefixAmbiguous" xml:space="preserve">
+    <value>Multiple networks match '{}'; use a longer ID or the network name.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>지원되지 않는 네트워크 드라이버: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2544,7 +2560,7 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidSignal" xml:space="preserve">
-    <value>Invalid signal value: {}</value>
+    <value>잘못된 신호 값: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
@@ -3813,6 +3829,9 @@ Windows 버전: {}</value>
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
     <value>네트워크 이름</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
+    <value>Network name or ID</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>네트워크 ID만 표시</value>

@@ -903,6 +903,10 @@ Więcej informacji na temat Admin Protection można znaleźć na stronie https:/
     <value>Nie można utworzyć sieci wirtualnej z zakresem adresów: „{}”. Utworzono nową sieć z zakresem: „{}”, {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
+    <value>Sieć NAT podsystemu WSL ({}) koliduje z domyślną siecią platformy Docker</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
     <value>TRYB AWARYJNY WŁĄCZONY — wiele funkcji zostanie wyłączonych</value>
     <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
@@ -1088,6 +1092,10 @@ Powrót do sieci NAT.</value>
     <value>Nie można ukończyć operacji, ponieważ dysk VHD jest obecnie używany. Aby wymusić zatrzymanie używania protokołu WSL:  wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
+  <data name="MessageDistributionTerminationTimeout" xml:space="preserve">
+    <value>Przekroczono limit czasu oczekiwania na zakończenie procesu dystrybucji {} po {} ms. Kontynuowanie bez potwierdzania, że dystrybucja została zatrzymana.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
     <value>Kompaktowanie jest obsługiwane tylko w przypadku plików .vhdx.</value>
     <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
@@ -1231,6 +1239,10 @@ Zobacz instrukcje odzyskiwania: https://aka.ms/wsldiskmountrecovery</value>
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
     <value>Cgroup v1 jest niezgodna z izolacją cgroup dla poszczególnych dystrybucji. Zamiast tego używana jest cgroup v2. Aby używać cgroup v1, ustaw wartość isolateDistroCgroup=false w sekcji [wsl2] w pliku .wslconfig, a następnie uruchom polecenie wsl --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
+  <data name="MessageWindowsInstallerBusy" xml:space="preserve">
+    <value>WSL instalacja jest zablokowana, ponieważ Instalator Windows jest zajęty. Poczekaj na zakończenie instalacji innego oprogramowania, a następnie ponów próbę.</value>
+    <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Wystąpił problem. Spróbuj ponownie później.</value>
@@ -2502,6 +2514,10 @@ Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stron�
     <value>Nie znaleziono sieci: „{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcNetworkPrefixAmbiguous" xml:space="preserve">
+    <value>Multiple networks match '{}'; use a longer ID or the network name.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>Nieobsługiwany sterownik sieci: „{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2538,7 +2554,7 @@ Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stron�
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidSignal" xml:space="preserve">
-    <value>Invalid signal value: {}</value>
+    <value>Nieprawidłowa wartość sygnału: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
@@ -3683,7 +3699,7 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_UnsupportedRestartPolicyError" xml:space="preserve">
-    <value>Restart policy '{}' is not supported. Supported values are no and always.</value>
+    <value>Zasady ponownego uruchamiania „{}” nie są obsługiwane. Obsługiwane wartości to: no i always.</value>
     <comment>{Locked="no"}{Locked="always"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
@@ -3807,6 +3823,9 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
     <value>Nazwa sieci</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
+    <value>Network name or ID</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Wyświetlaj tylko identyfikatory sieci</value>
@@ -4157,7 +4176,7 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcRestartPolicyConflictsWithRm" xml:space="preserve">
-    <value>A restart policy cannot be combined with automatic removal of the container.</value>
+    <value>Zasad ponownego uruchamiania nie można łączyć z automatycznym usuwaniem kontenera.</value>
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>Nie można zwolnić zasobów hosta dla woluminu '{}'</value>

@@ -909,6 +909,10 @@ Admin Protection の詳細については、https://aka.ms/apdevguide をご覧�
     <value>アドレス範囲 '{}' を使用して仮想ネットワークを作成できませんでした。範囲 '{}'、{} を使用して新しいネットワークを作成しました</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
+    <value>WSL の NAT ネットワーク ({}) が Docker の既定のネットワークと競合しています</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
     <value>セーフ モードが有効 - 多くの機能が無効になります</value>
     <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
@@ -1094,6 +1098,10 @@ NAT ネットワークにフォールバックしています。</value>
     <value>VHD が現在使用中のため、操作を完了できませんでした。WSL の使用を強制的に停止するには: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
+  <data name="MessageDistributionTerminationTimeout" xml:space="preserve">
+    <value>ディストリビューション プロセス {} の終了を待機して {} ミリ秒後にタイムアウトしました。配布が停止したことを確認せずに続行します。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
     <value>圧縮は .vhdx ファイルでのみサポートされています。</value>
     <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
@@ -1237,6 +1245,10 @@ WSL を修復するには任意のキーを押すか、取り消すには CTRL-C
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
     <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. Using cgroup v2 instead. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
+  <data name="MessageWindowsInstallerBusy" xml:space="preserve">
+    <value>Windows インストーラーがビジー状態のため、WSL のインストールがブロックされています。他のソフトウェアのインストールが完了するまで待ってから、もう一度お試しください。</value>
+    <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>問題が発生しました。後でやり直してください。</value>
@@ -2508,6 +2520,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>ネットワークが見つかりません: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcNetworkPrefixAmbiguous" xml:space="preserve">
+    <value>複数のネットワークが '{}' と一致します。長い ID またはネットワーク名を使用します。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>サポートされていないネットワーク ドライバー: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2544,7 +2560,7 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidSignal" xml:space="preserve">
-    <value>Invalid signal value: {}</value>
+    <value>無効なシグナル値: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
@@ -3813,6 +3829,9 @@ Windows バージョン: {}</value>
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
     <value>ネットワーク名</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
+    <value>ネットワーク名または ID</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>ネットワーク ID のみを表示</value>

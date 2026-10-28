@@ -903,6 +903,10 @@ Ga voor meer informatie over Admin Protection naar https://aka.ms/apdevguide</va
     <value>Kan geen virtueel netwerk maken met adresbereik: {}, nieuw netwerk gemaakt met bereik: {}, {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
+    <value>WSL's NAT network ({}) conflicts with docker's default network</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
     <value>VEILIGE MODUS INGESCHAKELD - veel functies worden uitgeschakeld</value>
     <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
@@ -1088,6 +1092,10 @@ Terugvallen op NAT-netwerken.</value>
     <value>De bewerking kan niet worden voltooid omdat de VHD momenteel in gebruik is. Stoppen van WSL forceren: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
+  <data name="MessageDistributionTerminationTimeout" xml:space="preserve">
+    <value>Er is een time-out opgetreden tijdens het wachten op het afsluiten van het distributieproces {} na {} ms. Doorgaan zonder te bevestigen dat de distributie is gestopt.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
     <value>Compactie wordt alleen ondersteund op .vhdx-bestanden.</value>
     <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
@@ -1231,6 +1239,10 @@ Zie de herstelinstructies voor: https://aka.ms/wsldiskmountrecovery</value>
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
     <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. Using cgroup v2 instead. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
+  <data name="MessageWindowsInstallerBusy" xml:space="preserve">
+    <value>WSL installatie is geblokkeerd omdat Windows Installer bezig is. Wacht totdat andere software-installaties zijn voltooid en probeer het opnieuw.</value>
+    <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Er is iets foutgegaan. Probeer het later opnieuw.</value>
@@ -2502,6 +2514,10 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
     <value>Netwerk niet gevonden: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcNetworkPrefixAmbiguous" xml:space="preserve">
+    <value>Meerdere netwerken komen overeen met {}; gebruik een langere id of de netwerknaam.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>Niet-ondersteund netwerkstuurprogramma: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2538,7 +2554,7 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidSignal" xml:space="preserve">
-    <value>Invalid signal value: {}</value>
+    <value>Ongeldige signaalwaarde: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
@@ -3807,6 +3823,9 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
     <value>Netwerknaam</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
+    <value>Network name or ID</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Toon alleen netwerk-id's</value>
