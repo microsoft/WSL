@@ -722,6 +722,8 @@ LxssUserSessionImpl::~LxssUserSessionImpl()
 
     // Ensure that if there are no running instances.
     WI_ASSERT(m_runningInstances.empty());
+
+    m_pluginManager.RemoveSession(m_session.SessionId);
 }
 
 HRESULT LxssUserSessionImpl::AttachDisk(_In_ LPCWSTR Disk, _In_ ULONG Flags)
@@ -3971,14 +3973,14 @@ HRESULT LxssUserSessionImpl::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In
     return S_OK;
 }
 
-HRESULT LxssUserSessionImpl::CreateLinuxProcess(_In_opt_ const GUID* Distro, _In_ LPCSTR Path, _In_ LPCSTR* Arguments, _Out_ SOCKET* Socket)
+HRESULT LxssUserSessionImpl::CreateLinuxProcess(_In_opt_ const GUID* Distro, _In_ LPCSTR Path, _In_ LPCSTR* Arguments, _Out_ SOCKET* Socket, uint64_t PluginId)
 {
     std::lock_guard lock(m_instanceLock);
     RETURN_HR_IF(E_NOT_VALID_STATE, !m_utilityVm);
 
     if (Distro == nullptr)
     {
-        *Socket = m_utilityVm->CreateRootNamespaceProcess(Path, Arguments).release();
+        *Socket = m_utilityVm->CreateRootNamespaceProcess(Path, Arguments, PluginId).release();
     }
     else
     {

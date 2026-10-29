@@ -371,7 +371,7 @@ public:
     /// <summary>
     /// Start a process in the root namespace or in a user distribution.
     /// </summary>
-    HRESULT CreateLinuxProcess(_In_opt_ const GUID* Distro, _In_ LPCSTR Path, _In_ LPCSTR* Arguments, _Out_ SOCKET* socket);
+    HRESULT CreateLinuxProcess(_In_opt_ const GUID* Distro, _In_ LPCSTR Path, _In_ LPCSTR* Arguments, _Out_ SOCKET* socket, uint64_t PluginId = 0);
 
     /// <summary>
     /// Enumerates registered distributions, optionally including ones that are

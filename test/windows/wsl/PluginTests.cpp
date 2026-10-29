@@ -1106,6 +1106,54 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
+    WSL2_TEST_METHOD(CgroupIsolation)
+    {
+        WslConfigChange isolatedConfig(LxssGenerateTestConfig({.vmIdleTimeout = -1, .isolateDistroCgroup = true}));
+        StopWslService();
+
+        const auto secondPlugin = std::filesystem::path(pluginDll).parent_path() / L"testplugin-isolation.dll";
+        std::filesystem::copy_file(pluginDll, secondPlugin, std::filesystem::copy_options::overwrite_existing);
+        const auto key =
+            CreateKey(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Lxss\\Plugins", KEY_SET_VALUE, nullptr, 0);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            StopWslService();
+            DeleteValue(key.get(), L"TestPlugin-Isolated");
+            std::filesystem::remove(secondPlugin);
+        });
+        WriteString(key.get(), nullptr, L"TestPlugin-Isolated", secondPlugin.c_str());
+
+        ConfigurePlugin(PluginTestType::CgroupIsolation);
+        StartWsl(0);
+
+        constexpr char script[] = R"sh(
+{
+    sh -ec '
+        previous=
+        for plugin in testplugin testplugin-isolation; do
+            set -- $(pgrep -f "^$plugin[.]dll 3600$")
+            test "$#" -eq 2
+            cgroup=$(cat "/proc/$1/cgroup")
+            test "$cgroup" = "$(cat "/proc/$2/cgroup")"
+            printf "%s\n" "$cgroup" | grep -Eq "^0::/wsl-user/plugin-[0-9]+$"
+            test "$cgroup" != "$previous"
+            previous=$cgroup
+        done
+    ' && printf '\n%s%s\n' CGROUP_ PASS
+    busybox poweroff -f
+}
+)sh";
+
+        auto [inputRead, inputWrite] = CreateSubprocessPipe(true, false);
+        VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(inputWrite.get(), script, static_cast<DWORD>(sizeof(script) - 1), nullptr, nullptr));
+        inputWrite.reset();
+
+        auto commandLine = LxssGenerateWslCommandLine(L"--debug-shell");
+        const auto [output, error, exitCode] = LxsstuLaunchCommandAndCaptureOutputWithResult(commandLine.data(), inputRead.get());
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown --force"), 0L);
+        LogInfo("Debug shell output: %ls\n%ls", output.c_str(), error.c_str());
+        VERIFY_IS_TRUE(output.find(L"CGROUP_PASS") != std::wstring::npos);
+    }
+
     // This test must run last so it doesn't break test cases that depends on plugin signature.
     WSL2_TEST_METHOD(InvalidPluginSignature)
     {
