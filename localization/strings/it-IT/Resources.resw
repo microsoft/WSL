@@ -909,6 +909,10 @@ Per ulteriori informazioni su Admin Protection, visitare https://aka.ms/apdevgui
     <value>Non è stato possibile creare la rete virtuale con l'intervallo di indirizzi: '{}', è stata creata una nuova rete con intervallo: '{}', {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
+    <value>La rete NAT di WSL ({}) è in conflitto con la rete predefinita di Docker</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
     <value>MODALITÀ PROVVISORIA ABILITATA - Molte funzionalità verranno disabilitate</value>
     <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
@@ -1094,6 +1098,10 @@ Fallback alla rete NAT.</value>
     <value>Non è stato possibile completare l'operazione perché il VHD è in uso. Per forzare l'arresto di WSL, usa: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
+  <data name="MessageDistributionTerminationTimeout" xml:space="preserve">
+    <value>Timeout durante l'attesa della chiusura del processo di distribuzione {} dopo {} ms. L'operazione continua senza confermare che la distribuzione è stata arrestata.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
     <value>La compattazione è supportata solo per i file .vhdx.</value>
     <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
@@ -1237,6 +1245,10 @@ Vedere le istruzioni per il ripristino in: https://aka.ms/wsldiskmountrecovery</
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
     <value>Cgroup v1 non è compatibile con l'isolamento cgroup per distribuzione. Verrà usato invece cgroup v2. Per usare cgroup v1, imposta isolateDistroCgroup=false in [wsl2] in .wslconfig, quindi esegui wsl --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
+  <data name="MessageWindowsInstallerBusy" xml:space="preserve">
+    <value>WSL'installazione è bloccata perché Windows Installer è occupato. Attendere il completamento delle altre installazioni software, quindi riprovare.</value>
+    <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>C'è un problema. Riprova più tardi.</value>
@@ -2508,6 +2520,10 @@ Per informazioni sulla privacy di questo prodotto, visita https://aka.ms/privacy
     <value>Rete non trovata: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcNetworkPrefixAmbiguous" xml:space="preserve">
+    <value>Più reti corrispondono a '{}'; utilizzare un ID più lungo o il nome di rete.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>Rete driver non supportata: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2544,7 +2560,7 @@ Per informazioni sulla privacy di questo prodotto, visita https://aka.ms/privacy
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidSignal" xml:space="preserve">
-    <value>Invalid signal value: {}</value>
+    <value>Valore del segnale non valido: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
@@ -3689,7 +3705,7 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_UnsupportedRestartPolicyError" xml:space="preserve">
-    <value>I criteri di riavvio '{}' nosono supportati. I valori supportati sono no e always.</value>
+    <value>Il criterio di riavvio '{}' non è supportato. I valori supportati sono no e always.</value>
     <comment>{Locked="no"}{Locked="always"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
@@ -3813,6 +3829,9 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
     <value>Nome di rete</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
+    <value>Network name or ID</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Visualizza solo gli ID di rete</value>

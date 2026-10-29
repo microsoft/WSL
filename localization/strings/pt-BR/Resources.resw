@@ -910,6 +910,10 @@ Para obter mais informações sobre Admin Protection, visite https://aka.ms/apde
     <value>Falha ao criar rede virtual com intervalo de endereços: '{}', nova rede criada com intervalo: '{}', {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
+    <value>A rede NAT do WSL ({}) está em conflito com a rede padrão do docker</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
     <value>MODO DE SEGURANÇA HABILITADO - muitos recursos serão desabilitados</value>
     <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
@@ -1095,6 +1099,10 @@ Voltando à rede NAT.</value>
     <value>Não foi possível concluir a operação porque o VHD está em uso no momento. Para forçar o WSL a interromper o uso: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
+  <data name="MessageDistributionTerminationTimeout" xml:space="preserve">
+    <value>Tempo limite atingido ao aguardar o processo de distribuição {} sair após {} ms. Continuando sem confirmar que a distribuição foi interrompida.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
     <value>A compactação só é compatível com arquivos .vhdx.</value>
     <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
@@ -1238,6 +1246,10 @@ Consulte as instruções de recuperação em: https://aka.ms/wsldiskmountrecover
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
     <value>O Cgroup v1 é incompatível com o isolamento de cgroup por distribuição. Usando o cgroup v2 em vez disso. Para usar o cgroup v1, defina isolateDistroCgroup=false em [wsl2] em .wslconfig e execute wsl --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
+  <data name="MessageWindowsInstallerBusy" xml:space="preserve">
+    <value>WSL instalação está bloqueada porque o Windows Installer está ocupado. Aguarde a conclusão de outras instalações de software e tente novamente.</value>
+    <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Algo não deu certo. Tente novamente mais tarde.</value>
@@ -2509,6 +2521,10 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
     <value>Rede não encontrada: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcNetworkPrefixAmbiguous" xml:space="preserve">
+    <value>Várias redes correspondem a '{}'; use uma ID mais longa ou o nome da rede.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>Driver de rede sem suporte: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2545,7 +2561,7 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidSignal" xml:space="preserve">
-    <value>Invalid signal value: {}</value>
+    <value>Valor de sinal inválido: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
@@ -3814,6 +3830,9 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
     <value>Nome da rede</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
+    <value>Network name or ID</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Exibir apenas IDs de rede</value>

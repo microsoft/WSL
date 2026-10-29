@@ -41,7 +41,7 @@ enum class VolumeEvent
 
 class DockerEventTracker
 {
-    struct CallbackRegistry;
+    struct RegistryState;
 
 public:
     NON_COPYABLE(DockerEventTracker);
@@ -52,7 +52,7 @@ public:
         NON_COPYABLE(EventTrackingReference);
 
         EventTrackingReference() = default;
-        EventTrackingReference(std::shared_ptr<CallbackRegistry> registry, size_t id) noexcept;
+        EventTrackingReference(std::shared_ptr<RegistryState> state, size_t id) noexcept;
         EventTrackingReference(EventTrackingReference&& other) noexcept;
         ~EventTrackingReference() noexcept;
 
@@ -62,7 +62,7 @@ public:
 
     private:
         size_t m_id{};
-        std::shared_ptr<CallbackRegistry> m_registry;
+        std::shared_ptr<RegistryState> m_state;
     };
 
     using ContainerStateChangeCallback =
@@ -107,7 +107,8 @@ private:
     static std::pair<std::string, std::map<std::string, std::string>> ParseResourceActor(
         const nlohmann::json& parsed, const std::string& action, const char* type);
 
-    // Invoke outside the registry lock so callbacks can change registrations or acquire their own locks.
+    // Callbacks are invoked without holding the registry lock so that a callback can register or unregister callbacks, and so
+    // that a callback taking its own lock can't invert with a thread that registers a callback under that same lock.
     struct CallbackRegistration
     {
         NON_COPYABLE(CallbackRegistration);
@@ -174,30 +175,22 @@ private:
         const ContainerActionCallback Callback;
     };
 
-    // Tokens can outlive the session, so their registry must not retain the tracker or session.
-    struct CallbackRegistry
+    struct RegistryState
     {
-        ~CallbackRegistry()
-        {
-            WI_ASSERT(ContainerCallbacks.empty());
-            WI_ASSERT(VolumeCallbacks.empty());
-            WI_ASSERT(NetworkCallbacks.empty());
-            WI_ASSERT(ContainerCreateCallbacks.empty());
-            WI_ASSERT(ContainerActionCallbacks.empty());
-        }
-
+        ~RegistryState();
         void UnregisterCallback(size_t Id) noexcept;
 
-        std::mutex Lock;
-        std::atomic<size_t> CallbackId{0};
-        _Guarded_by_(Lock) std::vector<std::shared_ptr<ContainerCallback>> ContainerCallbacks;
-        _Guarded_by_(Lock) std::vector<std::shared_ptr<VolumeCallback>> VolumeCallbacks;
-        _Guarded_by_(Lock) std::vector<std::shared_ptr<NetworkCallback>> NetworkCallbacks;
-        _Guarded_by_(Lock) std::vector<std::shared_ptr<ContainerCreateCallbackEntry>> ContainerCreateCallbacks;
-        _Guarded_by_(Lock) std::vector<std::shared_ptr<ContainerActionCallbackEntry>> ContainerActionCallbacks;
+        std::mutex m_lock;
+        std::atomic<size_t> m_callbackId{0};
+        _Guarded_by_(m_lock) std::vector<std::shared_ptr<ContainerCallback>> m_containerCallbacks;
+        _Guarded_by_(m_lock) std::vector<std::shared_ptr<VolumeCallback>> m_volumeCallbacks;
+        _Guarded_by_(m_lock) std::vector<std::shared_ptr<NetworkCallback>> m_networkCallbacks;
+        _Guarded_by_(m_lock) std::vector<std::shared_ptr<ContainerCreateCallbackEntry>> m_containerCreateCallbacks;
+        _Guarded_by_(m_lock) std::vector<std::shared_ptr<ContainerActionCallbackEntry>> m_containerActionCallbacks;
     };
 
-    // Invoke a snapshot, skipping unregistered entries, and report whether any callback ran.
+    // Invokes a snapshot of callbacks taken under the registry lock, skipping registrations that have since been unregistered.
+    // Returns whether any callback ran.
     template <typename TCallback, typename TInvoke>
     static bool InvokeCallbacks(const std::vector<std::shared_ptr<TCallback>>& Callbacks, const TInvoke& Invoke)
     {
@@ -215,7 +208,7 @@ private:
         return invoked;
     }
 
-    const ULONG m_sessionId;
-    const std::shared_ptr<CallbackRegistry> m_registry = std::make_shared<CallbackRegistry>();
+    ULONG m_sessionId{};
+    std::shared_ptr<RegistryState> m_state = std::make_shared<RegistryState>();
 };
 } // namespace wsl::windows::service::wslc

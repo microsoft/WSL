@@ -954,8 +954,6 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_mappedPorts(std::move(ports)),
     m_labels(std::move(labels)),
     m_comWrapper(wil::MakeOrThrow<WSLCContainer>(wslcSession, m_id, m_name, InitialState, std::move(onDeleted))),
-    m_containerEvents(runtime.Events().RegisterContainerStateUpdates(
-        m_id, std::bind(&WSLCContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4))),
     m_eventStore(eventStore),
     m_state(InitialState),
     m_createdAt(CreatedAt),
@@ -1036,6 +1034,10 @@ void WSLCContainerImpl::Initialize()
 {
     // N.B. this must be done here because weak_from_this() is only valid after the constructor returns.
     m_comWrapper->Initialize(weak_from_this());
+
+    // N.B. This must be registered after all the fields are initialized, since callbacks can be invoked immediately after registration.
+    m_containerEvents = m_runtime.Events().RegisterContainerStateUpdates(
+        m_id, std::bind(&WSLCContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 }
 
 void WSLCContainerImpl::SetExitCode(int ExitCode) noexcept
@@ -1759,7 +1761,7 @@ void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds)
     ValidateSignal(Signal);
 
     bool wasRunning{};
-    auto restart = std::make_shared<RestartTransaction>();
+    auto restart = std::make_shared<WSLCRestartTransaction>();
 
     {
         auto lifecycleLock = m_lifecycleLock.lock_shared();
@@ -1789,15 +1791,7 @@ void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds)
             auto lock = m_lock.lock_exclusive();
 
             // CommitState() clears this once the start phase lands, so a later restart may already own it.
-            if (m_restart == restart)
-            {
-                m_restart.reset();
-            }
-
-            if (!succeeded)
-            {
-                transition = OnFailedRestartExclusiveLockHeld();
-            }
+            restart->CleanupIfOwned(m_restart, succeeded, [&]() { transition = OnFailedRestartExclusiveLockHeld(); });
         }
 
         if (transition)

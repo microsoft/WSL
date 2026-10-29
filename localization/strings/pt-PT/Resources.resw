@@ -903,6 +903,10 @@ Para mais informações sobre Admin Protection, visite https://aka.ms/apdevguide
     <value>Falha ao criar a rede virtual com o intervalo de endereços: "{}", criou uma nova rede com o intervalo: "{}", {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
+    <value>WSL's NAT network ({}) conflicts with docker's default network</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
     <value>MODO DE SEGURANÇA ATIVADO - muitas funcionalidades serão desativadas</value>
     <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
@@ -1088,6 +1092,10 @@ A reverter para a rede NAT.</value>
     <value>Não foi possível concluir a operação porque o VHD está atualmente a ser utilizado. Para forçar o WSL a parar, utilize: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
+  <data name="MessageDistributionTerminationTimeout" xml:space="preserve">
+    <value>Timed out waiting for distribution process {} to exit after {} ms. Continuing without confirming that the distribution has stopped.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
     <value>A compactação só é suportada em ficheiros .vhdx.</value>
     <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
@@ -1231,6 +1239,10 @@ Ver instruções de recuperação em: https://aka.ms/wsldiskmountrecovery</value
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
     <value>O Cgroup v1 é incompatível com o isolamento de cgroup por distribuição. Em vez disso, utilizar cgroup v2. Para utilizar o cgroup v1, defina isolateDistroCgroup=false em [wsl2] no .wslconfig e, em seguida, execute wsl --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
+  <data name="MessageWindowsInstallerBusy" xml:space="preserve">
+    <value>WSL installation is blocked because Windows Installer is busy. Wait for other software installations to finish, then retry.</value>
+    <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Algo correu mal. Tente novamente mais tarde.</value>
@@ -2218,7 +2230,7 @@ Utilização:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcCannotRemoveRestartingContainer" xml:space="preserve">
-    <value>Container '{}' is restarting and cannot be removed. Either stop the container before removing or use forced remove (-f).</value>
+    <value>O contentor '{}' está a reiniciar e não pode ser removido. Pare o contentor antes de o remover ou utilize a remoção forçada (-f).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotRunning" xml:space="preserve">
@@ -2502,6 +2514,10 @@ Para obter informações de privacidade sobre este produto, visite https://aka.m
     <value>Rede não encontrada: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcNetworkPrefixAmbiguous" xml:space="preserve">
+    <value>Multiple networks match '{}'; use a longer ID or the network name.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>Controlador de rede não suportado: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2538,7 +2554,7 @@ Para obter informações de privacidade sobre este produto, visite https://aka.m
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidSignal" xml:space="preserve">
-    <value>Invalid signal value: {}</value>
+    <value>Valor de sinal inválido: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
@@ -3808,6 +3824,9 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
     <value>Nome de rede</value>
   </data>
+  <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
+    <value>Network name or ID</value>
+  </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Mostrar apenas IDs de rede</value>
   </data>
@@ -4157,7 +4176,7 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcRestartPolicyConflictsWithRm" xml:space="preserve">
-    <value>A restart policy cannot be combined with automatic removal of the container.</value>
+    <value>Uma política de reinício não pode ser combinada com a remoção automática do contentor.</value>
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>Falha ao libertar recursos de anfitrião para o volume "{}"</value>
