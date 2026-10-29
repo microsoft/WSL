@@ -24,12 +24,8 @@ class MemoryBackingPagesTests
     TEST_METHOD(DefaultPages)
     {
         const auto windowsVersion = wsl::windows::common::helpers::GetWindowsVersion();
-        using wsl::windows::common::helpers::WindowsBuildNumbers;
         const bool smallPagesSupported =
-            (windowsVersion.BuildNumber >= WindowsBuildNumbers::Germanium) ||
-            (windowsVersion.BuildNumber >= WindowsBuildNumbers::Cobalt && windowsVersion.UpdateBuildRevision >= 2360) ||
-            (windowsVersion.BuildNumber >= WindowsBuildNumbers::Iron && windowsVersion.UpdateBuildRevision >= 1970) ||
-            (windowsVersion.BuildNumber >= WindowsBuildNumbers::Vibranium_22H2 && windowsVersion.UpdateBuildRevision >= 3393);
+            wsl::windows::common::hcs::IsSmallMemoryBackingPagesSupported(windowsVersion.BuildNumber, windowsVersion.UpdateBuildRevision);
 
         wsl::windows::common::hcs::Memory memory{};
         VERIFY_ARE_EQUAL(smallPagesSupported ? 5 : 9, wsl::windows::common::hcs::ConfigureMemoryBackingPages(memory, false));
@@ -46,6 +42,41 @@ class MemoryBackingPagesTests
             VERIFY_IS_FALSE(settings.contains("BackingPageSize"));
             VERIFY_IS_FALSE(settings.contains("FaultClusterSizeShift"));
             VERIFY_IS_FALSE(settings.contains("DirectMapFaultClusterSizeShift"));
+        }
+    }
+
+    TEST_METHOD(SmallPageSupportBoundaries)
+    {
+        const struct
+        {
+            ULONG buildNumber;
+            DWORD updateBuildRevision;
+            bool supported;
+        } cases[] = {
+            {19044, MAXDWORD, false},
+            {19045, 3392, false},
+            {19045, 3393, true},
+            {20348, 1969, false},
+            {20348, 1970, true},
+            {22000, 1969, false},
+            {22000, 1970, false},
+            {22000, 2000, false},
+            {22000, 2359, false},
+            {22000, 2360, true},
+            {22621, 1970, false},
+            {22621, 2360, true},
+            {25398, 0, false},
+            {25398, 2360, true},
+            {26099, 2359, false},
+            {26099, 2360, true},
+            {26100, 0, true},
+            {26101, 0, true},
+        };
+
+        for (const auto& test : cases)
+        {
+            LogInfo("Windows build %lu.%lu", test.buildNumber, test.updateBuildRevision);
+            VERIFY_ARE_EQUAL(test.supported, wsl::windows::common::hcs::IsSmallMemoryBackingPagesSupported(test.buildNumber, test.updateBuildRevision));
         }
     }
 
