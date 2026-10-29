@@ -31,6 +31,9 @@ Abstract:
 
 #define LXT_AF_UNIX_SOCKET_PATH "af_unix_socket"
 
+// Must match the port in ConsommeTests::DualStackBindFromThreadIsReachableOverIpv4.
+#define LXT_DUAL_STACK_THREAD_PORT 1234
+
 #define FD_STDOUT 1
 //
 // Function declarations.
@@ -76,6 +79,12 @@ int SocketServerPortZeroFromThread(PLXT_ARGS Args);
 
 void* SocketServerPortZeroFromThreadWorker(void* Context);
 
+int SocketServerDualStackFromThread(PLXT_ARGS Args);
+
+void* SocketServerDualStackFromThreadWorker(void* Context);
+
+int SocketServerFromThread(void* (*Worker)(void*));
+
 //
 // Global constants.
 //
@@ -105,7 +114,8 @@ static const LXT_VARIATION g_LxtServerVariations[] = {
     {"Socket Server - accept multiple Ipv6", SocketServerAcceptMultipleIpv6},
     {"Socket Server - accept (MSG_WAITALL)", SocketServerAcceptWithFlags},
     {"Socket Server - SOCK_DGRAM", SocketServerDgram},
-    {"Socket Server - port zero bind from thread", SocketServerPortZeroFromThread}};
+    {"Socket Server - port zero bind from thread", SocketServerPortZeroFromThread},
+    {"Socket Server - dual-stack bind from thread", SocketServerDualStackFromThread}};
 
 //
 // Function definitions.
@@ -1119,12 +1129,24 @@ int SocketServerUnix(PLXT_ARGS Args)
 
 int SocketServerPortZeroFromThread(PLXT_ARGS Args)
 {
+
+    return SocketServerFromThread(SocketServerPortZeroFromThreadWorker);
+}
+
+int SocketServerDualStackFromThread(PLXT_ARGS Args)
+{
+
+    return SocketServerFromThread(SocketServerDualStackFromThreadWorker);
+}
+
+int SocketServerFromThread(void* (*Worker)(void*))
+{
     int Error;
     int Result = LXT_RESULT_FAILURE;
     int ThreadError = 0;
     pthread_t Thread;
 
-    Error = pthread_create(&Thread, NULL, SocketServerPortZeroFromThreadWorker, &ThreadError);
+    Error = pthread_create(&Thread, NULL, Worker, &ThreadError);
     if (Error != 0)
     {
         LxtLogError("pthread_create - %s", strerror(Error));
@@ -1140,7 +1162,7 @@ int SocketServerPortZeroFromThread(PLXT_ARGS Args)
 
     if (ThreadError != 0)
     {
-        LxtLogError("Threaded port-zero server failed - %s", strerror(ThreadError));
+        LxtLogError("Threaded server failed - %s", strerror(ThreadError));
         goto ErrorExit;
     }
 
@@ -1187,6 +1209,67 @@ void* SocketServerPortZeroFromThreadWorker(void* Context)
     }
 
     printf("PORT_ZERO_THREAD_LISTENER_PORT=%u\n", ntohs(ServerAddress.sin_port));
+    fflush(stdout);
+
+    AcceptedSocket = accept(ServerSocket, NULL, NULL);
+    if (AcceptedSocket < 0)
+    {
+        Error = errno;
+    }
+
+ErrorExit:
+    *ThreadError = Error;
+    if (AcceptedSocket >= 0)
+    {
+        close(AcceptedSocket);
+    }
+
+    if (ServerSocket >= 0)
+    {
+        close(ServerSocket);
+    }
+
+    return NULL;
+}
+
+void* SocketServerDualStackFromThreadWorker(void* Context)
+{
+    int* ThreadError = Context;
+    int AcceptedSocket = -1;
+    int Ipv6Only = 0;
+    struct sockaddr_in6 ServerAddress = {0};
+    int ServerSocket = -1;
+    int Error = 0;
+
+    ServerSocket = socket(AF_INET6, SOCK_STREAM, 0);
+    if (ServerSocket < 0)
+    {
+        Error = errno;
+        goto ErrorExit;
+    }
+
+    if (setsockopt(ServerSocket, IPPROTO_IPV6, IPV6_V6ONLY, &Ipv6Only, sizeof(Ipv6Only)) < 0)
+    {
+        Error = errno;
+        goto ErrorExit;
+    }
+
+    ServerAddress.sin6_family = AF_INET6;
+    ServerAddress.sin6_addr = in6addr_any;
+    ServerAddress.sin6_port = htons(LXT_DUAL_STACK_THREAD_PORT);
+    if (bind(ServerSocket, (struct sockaddr*)&ServerAddress, sizeof(ServerAddress)) < 0)
+    {
+        Error = errno;
+        goto ErrorExit;
+    }
+
+    if (listen(ServerSocket, 1) < 0)
+    {
+        Error = errno;
+        goto ErrorExit;
+    }
+
+    printf("DUAL_STACK_THREAD_LISTENER_READY\n");
     fflush(stdout);
 
     AcceptedSocket = accept(ServerSocket, NULL, NULL);
