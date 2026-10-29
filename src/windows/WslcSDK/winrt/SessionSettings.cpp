@@ -183,6 +183,21 @@ void SessionSettings::EnableGpu(bool value)
     WI_UpdateFlag(m_featureFlags, WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU, value);
 }
 
+hstring SessionSettings::HostLoopback()
+{
+    return winrt::to_hstring(m_hostLoopback);
+}
+
+void SessionSettings::HostLoopback(hstring const& value)
+{
+    if (m_sessionSettings)
+    {
+        throw hresult_illegal_state_change(L"Cannot change host loopback after session has been initialized");
+    }
+
+    m_hostLoopback = winrt::to_string(value);
+}
+
 WslcSessionSettings* SessionSettings::ToStructPointer()
 {
     if (m_sessionSettings)
@@ -215,6 +230,11 @@ WslcSessionSettings* SessionSettings::ToStructPointer()
     }
 
     winrt::check_hresult(WslcSetSessionSettingsFeatureFlags(m_sessionSettings.get(), m_featureFlags));
+
+    if (!m_hostLoopback.empty())
+    {
+        winrt::check_hresult(WslcSetSessionSettingsHostLoopback(m_sessionSettings.get(), m_hostLoopback.c_str()));
+    }
 
     return m_sessionSettings.get();
 }

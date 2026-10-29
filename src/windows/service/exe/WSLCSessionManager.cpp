@@ -701,7 +701,9 @@ HRESULT WSLCSessionManager::OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IW
 
 HRESULT WSLCSessionManager::InterfaceSupportsErrorInfo(_In_ REFIID riid)
 {
-    return riid == __uuidof(IWSLCSessionManager) ? S_OK : S_FALSE;
+    return riid == __uuidof(IWSLCSessionManager) || riid == __uuidof(IWSLCCompatSessionManager) || riid == __uuidof(IWSLCCompatSessionManager2)
+               ? S_OK
+               : S_FALSE;
 }
 
 HRESULT WSLCSessionManager::GetVersion(_Out_ WSLCCompatVersion* Version)
@@ -737,6 +739,25 @@ try
         RETURN_IF_FAILED(CreateSession(settings.Get(), Flags, warning.Get(), &session));
     }
 
+    RETURN_HR_IF_NULL(E_UNEXPECTED, session);
+
+    return session.CopyTo(Session);
+}
+CATCH_RETURN();
+
+HRESULT WSLCSessionManager::CreateSession2(
+    const WSLCCompatSessionSettings2* Settings, WSLCSessionFlags Flags, IWSLCCompatWarningCallback* WarningCallback, IWSLCCompatSession** Session)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Session);
+    *Session = nullptr;
+    RETURN_HR_IF_NULL(E_POINTER, Settings);
+
+    const auto warning = apicompat::Convert(WarningCallback);
+    const auto settings = apicompat::Convert(*Settings);
+
+    Microsoft::WRL::ComPtr<IWSLCSession> session;
+    RETURN_IF_FAILED(CreateSession(settings.Get(), Flags, warning.Get(), &session));
     RETURN_HR_IF_NULL(E_UNEXPECTED, session);
 
     return session.CopyTo(Session);

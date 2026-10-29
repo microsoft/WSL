@@ -673,7 +673,8 @@ try
     wil::com_ptr<IWSLCCompatSessionManager> sessionManager = CreateSessionManager();
 
     auto result = std::make_unique<WslcSessionImpl>();
-    WSLCCompatSessionSettings runtimeSettings{};
+    WSLCCompatSessionSettings2 runtimeSettings2{};
+    auto& runtimeSettings = runtimeSettings2.Base;
     runtimeSettings.DisplayName = internalType->displayName;
     runtimeSettings.StoragePath = internalType->storagePath;
     runtimeSettings.MaximumStorageSizeMb = internalType->vhdRequirements.sizeBytes / _1MB;
@@ -686,7 +687,26 @@ try
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsDnsTunneling);
 
     wil::com_ptr<IWSLCCompatSession> compatSession;
-    if (SUCCEEDED(errorInfoWrapper.CaptureResult(sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, nullptr, &compatSession))))
+    HRESULT createResult{};
+    if (internalType->hostLoopback == nullptr)
+    {
+        createResult = sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, nullptr, &compatSession);
+    }
+    else
+    {
+        // Host loopback is only understood by IWSLCCompatSessionManager2 runtimes.
+        wil::com_ptr<IWSLCCompatSessionManager2> sessionManager2;
+        const auto queryResult = sessionManager->QueryInterface(IID_PPV_ARGS(sessionManager2.put()));
+        RETURN_HR_IF(WSLC_E_RUNTIME_UPDATE_NEEDED, queryResult == E_NOINTERFACE);
+        RETURN_IF_FAILED(queryResult);
+
+        wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager2.get());
+
+        runtimeSettings2.HostLoopback = internalType->hostLoopback;
+        createResult = sessionManager2->CreateSession2(&runtimeSettings2, WSLCSessionFlagsNone, nullptr, &compatSession);
+    }
+
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(createResult)))
     {
         wil::com_ptr<IWSLCCompatSession2> compatSession2;
         const auto queryResult = compatSession->QueryInterface(IID_PPV_ARGS(compatSession2.put()));
@@ -835,6 +855,17 @@ try
     auto internalType = CheckAndGetInternalType(sessionSettings);
 
     internalType->featureFlags = flags;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+STDAPI WslcSetSessionSettingsHostLoopback(_In_ WslcSessionSettings* sessionSettings, _In_opt_z_ PCSTR hostName)
+try
+{
+    auto internalType = CheckAndGetInternalType(sessionSettings);
+
+    internalType->hostLoopback = hostName;
 
     return S_OK;
 }
