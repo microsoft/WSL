@@ -904,7 +904,7 @@ Ga voor meer informatie over Admin Protection naar https://aka.ms/apdevguide</va
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
-    <value>WSL's NAT network ({}) conflicts with docker's default network</value>
+    <value>Het NAT-netwerk van WSL ({}) conflicteert met het standaardnetwerk van Docker</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
@@ -3825,7 +3825,7 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Netwerknaam</value>
   </data>
   <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
-    <value>Network name or ID</value>
+    <value>Netwerknaam of -id</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Toon alleen netwerk-id's</value>

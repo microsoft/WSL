@@ -904,7 +904,7 @@ Admin Protection hakkında daha fazla bilgi için lütfen https://aka.ms/apdevgu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
-    <value>WSL's NAT network ({}) conflicts with docker's default network</value>
+    <value>WSL'nin NAT ağı ({}) Docker'ın varsayılan ağıyla çakışıyor</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
@@ -1093,7 +1093,7 @@ NAT ağ bağlantısına geri dönülüyor.</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageDistributionTerminationTimeout" xml:space="preserve">
-    <value>Timed out waiting for distribution process {} to exit after {} ms. Continuing without confirming that the distribution has stopped.</value>
+    <value>{} dağıtım işleminden {} ms sonra çıkılması beklenirken zaman aşımı oluştu. Dağıtımın durdurulduğu onaylanmadan devam ediliyor.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
@@ -3825,7 +3825,7 @@ Windows sürümü: {}</value>
     <value>Ağ adı</value>
   </data>
   <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
-    <value>Network name or ID</value>
+    <value>Ağ adı veya kimliği</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Yalnızca ağ kimliklerini görüntüle</value>

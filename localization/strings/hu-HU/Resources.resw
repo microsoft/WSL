@@ -904,7 +904,7 @@ A Admin Protection kapcsolatos további információért látogasson el a https:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
-    <value>WSL's NAT network ({}) conflicts with docker's default network</value>
+    <value>A WSL NAT-hálózata ({}) ütközik a docker alapértelmezett hálózatával</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
@@ -1093,7 +1093,7 @@ Visszaállás NAT-hálózatkezelésre.</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageDistributionTerminationTimeout" xml:space="preserve">
-    <value>Timed out waiting for distribution process {} to exit after {} ms. Continuing without confirming that the distribution has stopped.</value>
+    <value>Időtúllépés történt, miközben arra vártunk, hogy a(z) {} elosztási folyamat {} ms elteltével kilépjen. Folytatás annak megerősítése nélkül, hogy az elosztás leállt.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
@@ -1241,7 +1241,7 @@ Helyreállítási utasítások megtekintése a következőn: https://aka.ms/wsld
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageWindowsInstallerBusy" xml:space="preserve">
-    <value>WSL installation is blocked because Windows Installer is busy. Wait for other software installations to finish, then retry.</value>
+    <value>A WSL telepítése nem folytatható, mert a Windows Installer foglalt. Várja meg, amíg a többi szoftver telepítése befejeződik, majd próbálja újra.</value>
     <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
