@@ -4005,16 +4005,6 @@ try
 }
 CATCH_LOG()
 
-void StartMemoryReductionThread(LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode)
-try
-{
-    if (Mode != LxMiniInitMemoryReclaimModeDisabled)
-    {
-        std::thread([Mode]() { RunMemoryReduction(Mode); }).detach();
-    }
-}
-CATCH_LOG()
-
 std::string UtilGetDistroCgroupPath(pid_t DistroInitPid)
 {
     return std::format("{}/distro-{}", WSL_USER_CGROUP_PATH, DistroInitPid);
