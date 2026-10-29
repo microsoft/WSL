@@ -97,6 +97,8 @@ bool Run(const char* name, const std::vector<Query>& queries, const std::vector<
     int netlink[2];
     THROW_LAST_ERROR_IF(socketpair(AF_UNIX, SOCK_STREAM, 0, control) < 0);
     THROW_LAST_ERROR_IF(socketpair(AF_UNIX, SOCK_DGRAM, 0, netlink) < 0);
+    const timeval receiveTimeout{5, 0};
+    THROW_LAST_ERROR_IF(setsockopt(netlink[1], SOL_SOCKET, SO_RCVTIMEO, &receiveTimeout, sizeof(receiveTimeout)) < 0);
     guestFd = control[0];
     fakeNetlink = netlink[0];
     std::thread kernel([&] {
