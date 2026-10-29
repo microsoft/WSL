@@ -16,3 +16,4 @@ set(LINUX_LDFLAGS ${LINUX_LDFLAGS} -Wl,--gc-sections -Wl,--wrap=socket,--wrap=bi
 
 add_linux_executable(localhost_start_tests "${SOURCES}" "${PRODUCTION_HEADERS};${GENERATED_DIR}/Localization.h;${CMAKE_CURRENT_SOURCE_DIR}/../../../src/linux/init/localhost.cpp" "netlinkutil")
 add_dependencies(localhost_start_tests localization)
+add_dependencies(wsltests localhost_start_tests)

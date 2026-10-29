@@ -216,7 +216,7 @@ bool Run(const char* name, const std::vector<Query>& queries, const std::vector<
     return passed;
 }
 
-bool CheckHostResult(int family, int hostResult)
+bool CheckHostResult(int family, int hostResult, int expected)
 {
     int sockets[2];
     THROW_LAST_ERROR_IF(socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) < 0);
@@ -257,7 +257,7 @@ bool CheckHostResult(int family, int hostResult)
     }
     const int result = StartHostListener(guest, address);
     host.join();
-    const bool passed = validRequest && result == -hostResult;
+    const bool passed = validRequest && result == expected;
     std::cout << "family=" << family << " host=" << hostResult << " guest=" << result << ": " << (passed ? "PASS" : "FAIL") << '\n';
     return passed;
 }
@@ -267,9 +267,11 @@ int main()
     bool passed = true;
     for (int family : {AF_INET, AF_INET6})
     {
-        for (int result : {0, EADDRINUSE, EINVAL})
+        const std::pair<int, int> replies[] = {
+            {0, 0}, {EADDRINUSE, -EADDRINUSE}, {EINVAL, -EINVAL}, {-EADDRINUSE, -EADDRINUSE}, {-EINVAL, -EINVAL}};
+        for (const auto& [result, expected] : replies)
         {
-            passed = CheckHostResult(family, result) && passed;
+            passed = CheckHostResult(family, result, expected) && passed;
         }
     }
     passed = Run("bind conflict recovers without duplicate starts",
@@ -284,7 +286,7 @@ int main()
                   {AF_INET, {}},
                   {AF_INET6, {}}},
                  {1, 2, 3, 3, 4},
-                 {EADDRINUSE, EADDRINUSE, 0}) &&
+                 {EADDRINUSE, -EADDRINUSE, 0}) &&
              passed;
     passed = Run("failed bind disappears before retry", {{AF_INET, {18765}}, {AF_INET6, {}}, {AF_INET, {}}, {AF_INET6, {}}}, {1, 1}, {EADDRINUSE}) &&
              passed;

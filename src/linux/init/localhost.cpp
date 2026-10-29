@@ -157,8 +157,9 @@ try
     static_assert(sizeof(message.Address32) == sizeof(relay.Address));
     memcpy(message.Address32, relay.Address, sizeof(message.Address32));
 
-    // The port-mapping reply reports positive errno values.
-    return -channel.Transaction(message).Result;
+    // Normalize positive errno replies while preserving already-negative errors.
+    const int result = channel.Transaction(message).Result;
+    return result > 0 ? -result : result;
 }
 CATCH_RETURN_ERRNO();
 
