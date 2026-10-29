@@ -30,6 +30,7 @@ int fakeNetlink = -1;
 int monitorFd = -1;
 size_t barriers = 0;
 size_t scanLimit = 0;
+bool ipv4Only = false;
 constexpr auto Barrier = LxGnsMessageSetPortListener;
 
 extern "C" int __real_socket(int, int, int);
@@ -41,6 +42,18 @@ extern "C" int __wrap_socket(int family, int type, int protocol)
     {
         monitorFd = dup(fakeNetlink);
         return monitorFd;
+    }
+    if (family == AF_INET6)
+    {
+        if (fakeNetlink >= 0)
+        {
+            return __real_socket(AF_UNIX, type, 0);
+        }
+        if (ipv4Only)
+        {
+            errno = EAFNOSUPPORT;
+            return -1;
+        }
     }
     return __real_socket(family, type, protocol);
 }
@@ -97,6 +110,8 @@ bool Run(const char* name, const std::vector<Query>& queries, const std::vector<
     int netlink[2];
     THROW_LAST_ERROR_IF(socketpair(AF_UNIX, SOCK_STREAM, 0, control) < 0);
     THROW_LAST_ERROR_IF(socketpair(AF_UNIX, SOCK_DGRAM, 0, netlink) < 0);
+    const timeval receiveTimeout{5, 0};
+    THROW_LAST_ERROR_IF(setsockopt(netlink[1], SOL_SOCKET, SO_RCVTIMEO, &receiveTimeout, sizeof(receiveTimeout)) < 0);
     guestFd = control[0];
     fakeNetlink = netlink[0];
     std::thread kernel([&] {
@@ -214,9 +229,33 @@ bool Run(const char* name, const std::vector<Query>& queries, const std::vector<
     return passed;
 }
 
-int main()
+bool CheckIpv4OnlySnapshot()
 {
-    bool passed = true;
+    const bool previous = ipv4Only;
+    ipv4Only = true;
+    auto restore = wil::scope_exit([&] { ipv4Only = previous; });
+    wil::unique_fd listener{socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0)};
+    THROW_LAST_ERROR_IF(!listener);
+    sockaddr_in address{};
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    THROW_LAST_ERROR_IF(bind(listener.get(), reinterpret_cast<sockaddr*>(&address), sizeof(address)) < 0);
+    THROW_LAST_ERROR_IF(listen(listener.get(), 1) < 0);
+    socklen_t length = sizeof(address);
+    THROW_LAST_ERROR_IF(getsockname(listener.get(), reinterpret_cast<sockaddr*>(&address), &length) < 0);
+    NetlinkChannel channel(SOCK_RAW, NETLINK_SOCK_DIAG);
+    const auto snapshot = QueryListeningSockets(channel);
+    const bool passed = snapshot && std::any_of(snapshot->begin(), snapshot->end(), [&](const auto& entry) {
+                            return entry.ss_family == AF_INET && reinterpret_cast<const sockaddr_in*>(&entry)->sin_port == address.sin_port;
+                        });
+    std::cout << "IPv4-only snapshot with unavailable IPv6: " << (passed ? "PASS" : "FAIL") << '\n';
+    return passed;
+}
+
+int main(int argc, char** argv)
+{
+    ipv4Only = argc > 1 && std::string_view(argv[1]) == "--ipv4-only";
+    bool passed = CheckIpv4OnlySnapshot();
     const std::vector<Query> seed{{AF_INET, {18765}}, {AF_INET6, {18766}}};
     for (const auto& failure : std::vector<std::vector<Query>>{
              {{AF_INET, {}, -EBUSY}}, {{AF_INET, {18765}}, {AF_INET6, {}, -EBUSY}}, {{AF_INET, {18765}, -EBUSY}}})
