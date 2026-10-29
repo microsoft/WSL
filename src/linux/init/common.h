@@ -82,7 +82,7 @@ inline void AssertSingleThreaded()
         wil::unique_dir tasks{opendir("/proc/self/task")};
         WI_ASSERT(tasks);
 
-        size_t threadCount = 0;
+        [[maybe_unused]] size_t threadCount = 0;
         errno = 0;
         while (auto* entry = readdir(tasks.get()))
         {
