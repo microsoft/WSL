@@ -71,6 +71,34 @@ extern int g_LogFd;
 extern int g_TelemetryFd;
 extern struct sigaction g_SavedSignalActions[_NSIG];
 
+// Fails if the current process has more than one thread.
+// This is in place to avoid calling clone() in a multi-threaded process,
+// which can cause deadlocks in the child, since global locks could be inherited in a locked state in the child.
+inline void AssertSingleThreaded()
+{
+    if constexpr (wsl::shared::Debug)
+    {
+        const int savedErrno = errno;
+        wil::unique_dir tasks{opendir("/proc/self/task")};
+        WI_ASSERT(tasks);
+
+        [[maybe_unused]] size_t threadCount = 0;
+        errno = 0;
+        while (auto* entry = readdir(tasks.get()))
+        {
+            if (entry->d_name[0] != '.')
+            {
+                ++threadCount;
+            }
+        }
+
+        WI_ASSERT(errno == 0);
+        WI_ASSERT(threadCount == 1 && "CLONE requires a single-threaded process");
+
+        errno = savedErrno;
+    }
+}
+
 //
 // N.B. The clone syscall is used directly instead of the libc wrapper, because
 //      it allows execution to continue at the point of the call with a
@@ -82,9 +110,9 @@ extern struct sigaction g_SavedSignalActions[_NSIG];
 //
 
 #if defined(__i386__) || defined(__arm__) || defined(__aarch64__)
-#define CLONE(_flags) syscall(SYS_clone, (_flags), NULL, NULL, NULL, NULL);
+#define CLONE(_flags) (AssertSingleThreaded(), syscall(SYS_clone, (_flags), NULL, NULL, NULL, NULL));
 #elif defined(__x86_64__)
-#define CLONE(_flags) syscall(SYS_clone, (_flags), NULL, NULL, NULL, NULL);
+#define CLONE(_flags) (AssertSingleThreaded(), syscall(SYS_clone, (_flags), NULL, NULL, NULL, NULL));
 #else
 #error CLONE function signature is architecture-specific.
 #endif

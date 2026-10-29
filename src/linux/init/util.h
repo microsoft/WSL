@@ -341,8 +341,8 @@ uint16_t UtilWinAfToLinuxAf(uint16_t AddressFamily);
 
 int WriteToFile(const char* Path, const char* Content, int OpenFlags = O_WRONLY | O_CLOEXEC | O_CREAT, int Permissions = 0644);
 
-// Starts a background thread that performs memory compaction and optional cache reclaim when the VM is idle.
-void StartMemoryReductionThread(LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode);
+// Performs memory compaction and optional cache reclaim when the VM is idle.
+void RunMemoryReduction(LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode);
 
 int ProcessCreateProcessMessage(
     wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer, const std::optional<std::string>& DistroCgroupPath, int CgroupNamespaceFd = -1);
