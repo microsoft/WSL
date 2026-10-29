@@ -865,7 +865,7 @@ try
 {
     auto internalType = CheckAndGetInternalType(sessionSettings);
 
-    internalType->hostLoopback = (hostName != nullptr && hostName[0] != '\0') ? hostName : nullptr;
+    internalType->hostLoopback = hostName;
 
     return S_OK;
 }

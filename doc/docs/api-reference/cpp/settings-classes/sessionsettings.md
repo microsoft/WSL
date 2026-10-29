@@ -33,7 +33,7 @@ Do not put credentials or other sensitive information in the session's name.
   - hostname that containers can use to reach services listening on the Windows host loopback interface
   - disabled by default (empty string); only enable when needed, since services listening only on the Windows loopback interface may not expect connections from container workloads
   - containers must also have networking enabled, for example `ContainerSettings::NetworkingMode(ContainerNetworkingMode::Bridged)`
-  - session creation fails with `WSLC_E_RUNTIME_UPDATE_NEEDED` if the installed WSL runtime does not support it
+  - requires WSL 3.0.5 or later; session creation fails with `WSLC_E_RUNTIME_UPDATE_NEEDED` on older runtimes
 
 ```cpp
 SessionSettings settings{ L"demo", L"C:\\WSLC\\demo" };

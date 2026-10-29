@@ -13,11 +13,11 @@ Return value: `HRESULT`.
 
 Allows containers in the session to reach services listening on the Windows host loopback interface (for example, `localhost`) through `hostName`.
 
-Host loopback is disabled by default. Passing `NULL` or an empty string disables it. Services listening only on the Windows loopback interface may not expect connections from container workloads, so only enable this when needed.
+Host loopback is disabled by default. Passing `NULL` disables it. Services listening only on the Windows loopback interface may not expect connections from container workloads, so only enable this when needed.
+
+Requires WSL 3.0.5 or later.
 
 Containers must also have networking enabled to reach the host, for example with [`WslcSetContainerSettingsNetworkingMode`](../container-apis/wslcsetcontainersettingsnetworkingmode.md) and `WSLC_CONTAINER_NETWORKING_MODE_BRIDGED`.
-
-`hostName` is not copied and must remain valid until [`WslcCreateSession`](wslccreatesession.md) returns.
 
 Example:
 

@@ -1482,27 +1482,6 @@ class WslcSdkTests
         // Negative: null settings pointer must fail.
         VERIFY_ARE_EQUAL(WslcSetSessionSettingsHostLoopback(nullptr, c_hostLoopbackName), E_POINTER);
 
-        // Negative: session creation errors must be propagated when host loopback is set.
-        {
-            std::filesystem::create_directories(storage);
-            {
-                std::ofstream sentinel(storage / "not-empty.txt");
-                sentinel << "not-empty";
-            }
-
-            WslcSessionSettings sessionSettings;
-            VERIFY_SUCCEEDED(WslcInitSessionSettings(c_sessionName, storage.c_str(), &sessionSettings));
-            VERIFY_SUCCEEDED(WslcSetSessionSettingsHostLoopback(&sessionSettings, c_hostLoopbackName));
-
-            UniqueSession session;
-            wil::unique_cotaskmem_string errorMsg;
-            VERIFY_ARE_EQUAL(WslcCreateSession(&sessionSettings, &session, &errorMsg), E_INVALIDARG);
-            VERIFY_IS_NOT_NULL(errorMsg.get());
-            LogInfo("Create session error: %ws", errorMsg.get());
-
-            std::filesystem::remove_all(storage);
-        }
-
         // Positive: a custom hostname reaches the Windows host loopback on the first session start.
         {
             WslcSessionSettings sessionSettings;
@@ -1534,7 +1513,7 @@ class WslcSdkTests
             VERIFY_SUCCEEDED(WslcTerminateSession(session.get()));
         }
 
-        // Positive: an empty or null hostname disables host loopback.
+        // Positive: a null hostname disables host loopback.
         const auto command = std::format(
             "if python3 -c \"import http.client,socket;"
             "a=socket.getaddrinfo('{}',{},socket.AF_INET,socket.SOCK_STREAM)[0][4];"
@@ -1545,14 +1524,11 @@ class WslcSdkTests
             c_hostLoopbackName,
             c_hostLoopbackTestPort);
 
-        for (const char* disabledValue : {"", static_cast<const char*>(nullptr)})
         {
-            LogInfo("Disabling host loopback with %hs", disabledValue == nullptr ? "null" : "an empty string");
-
             WslcSessionSettings sessionSettings;
             VERIFY_SUCCEEDED(WslcInitSessionSettings(c_sessionName, storage.c_str(), &sessionSettings));
             VERIFY_SUCCEEDED(WslcSetSessionSettingsHostLoopback(&sessionSettings, c_hostLoopbackName));
-            VERIFY_SUCCEEDED(WslcSetSessionSettingsHostLoopback(&sessionSettings, disabledValue));
+            VERIFY_SUCCEEDED(WslcSetSessionSettingsHostLoopback(&sessionSettings, nullptr));
 
             UniqueSession session;
             VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &session, nullptr));

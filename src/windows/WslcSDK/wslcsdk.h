@@ -156,7 +156,8 @@ STDAPI WslcSetSessionSettingsVhd(_In_ WslcSessionSettings* sessionSettings, _In_
 STDAPI WslcSetSessionSettingsFeatureFlags(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionFeatureFlags flags);
 
 // Allows containers to reach services listening on the Windows host loopback interface through the given hostname.
-// Disabled by default; pass null or an empty string to disable. hostName must remain valid until WslcCreateSession returns.
+// Disabled by default; pass null to disable. Requires WSL 3.0.5 or later.
+// hostName is not copied and must stay valid until WslcCreateSession returns.
 STDAPI WslcSetSessionSettingsHostLoopback(_In_ WslcSessionSettings* sessionSettings, _In_opt_z_ PCSTR hostName);
 
 STDAPI WslcGetSessionTerminationEvent(_In_ WslcSession session, _Out_ HANDLE* terminationEvent);
