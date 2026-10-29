@@ -80,6 +80,28 @@ void wsl::windows::common::hcs::AddPassThroughDisk(_In_ HCS_SYSTEM ComputeSystem
     ModifyComputeSystem(ComputeSystem, wsl::shared::ToJsonW(request).c_str());
 }
 
+bool wsl::windows::common::hcs::IsSmallMemoryBackingPagesSupported(_In_ ULONG buildNumber, _In_ DWORD updateBuildRevision)
+{
+    using helpers::WindowsBuildNumbers;
+    if (buildNumber >= WindowsBuildNumbers::Germanium)
+    {
+        return true;
+    }
+
+    // Revision numbers are only comparable within the same release range.
+    if (buildNumber >= WindowsBuildNumbers::Cobalt)
+    {
+        return updateBuildRevision >= 2360;
+    }
+
+    if (buildNumber >= WindowsBuildNumbers::Iron)
+    {
+        return updateBuildRevision >= 1970;
+    }
+
+    return buildNumber >= WindowsBuildNumbers::Vibranium_22H2 && updateBuildRevision >= 3393;
+}
+
 int wsl::windows::common::hcs::ConfigureMemoryBackingPages(_Inout_ Memory& memory, _In_ bool largeMemoryBackingPages)
 {
     // Page reporting order must be >= fault cluster size shift.
@@ -91,11 +113,7 @@ int wsl::windows::common::hcs::ConfigureMemoryBackingPages(_Inout_ Memory& memor
 
     // Small backing pages require the fix for the VID deadlock on partition teardown.
     const auto windowsVersion = helpers::GetWindowsVersion();
-    using helpers::WindowsBuildNumbers;
-    if ((windowsVersion.BuildNumber >= WindowsBuildNumbers::Germanium) ||
-        (windowsVersion.BuildNumber >= WindowsBuildNumbers::Cobalt && windowsVersion.UpdateBuildRevision >= 2360) ||
-        (windowsVersion.BuildNumber >= WindowsBuildNumbers::Iron && windowsVersion.UpdateBuildRevision >= 1970) ||
-        (windowsVersion.BuildNumber >= WindowsBuildNumbers::Vibranium_22H2 && windowsVersion.UpdateBuildRevision >= 3393))
+    if (IsSmallMemoryBackingPagesSupported(windowsVersion.BuildNumber, windowsVersion.UpdateBuildRevision))
     {
         memory.BackingPageSize = MemoryBackingPageSize::Small;
         memory.FaultClusterSizeShift = 4;          // 64k

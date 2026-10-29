@@ -15837,12 +15837,8 @@ class WSLCTests
         // Determine expected page reporting order based on Windows version.
         // Small backing pages require the VID partition teardown deadlock fix.
         const auto windowsVersion = wsl::windows::common::helpers::GetWindowsVersion();
-        using wsl::windows::common::helpers::WindowsBuildNumbers;
         const bool smallPagesSupported =
-            (windowsVersion.BuildNumber >= WindowsBuildNumbers::Germanium) ||
-            (windowsVersion.BuildNumber >= WindowsBuildNumbers::Cobalt && windowsVersion.UpdateBuildRevision >= 2360) ||
-            (windowsVersion.BuildNumber >= WindowsBuildNumbers::Iron && windowsVersion.UpdateBuildRevision >= 1970) ||
-            (windowsVersion.BuildNumber >= WindowsBuildNumbers::Vibranium_22H2 && windowsVersion.UpdateBuildRevision >= 3393);
+            wsl::windows::common::hcs::IsSmallMemoryBackingPagesSupported(windowsVersion.BuildNumber, windowsVersion.UpdateBuildRevision);
         const int expectedOrder = smallPagesSupported ? 5 : 9;
 
         // Read the actual value from sysfs and verify it matches.
