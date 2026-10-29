@@ -844,7 +844,7 @@ private:
     static LRESULT CALLBACK s_TimezoneWindowProc(HWND windowHandle, UINT messageCode, WPARAM wParameter, LPARAM lParameter);
 
     _Requires_lock_held_(m_instanceLock)
-    void _ReleaseUsbAttachment(const GUID& ReservationId);
+    void _ReleaseUsbAttachment(const GUID& ReservationId, bool WaitForReappearance = false);
 
     _Requires_lock_held_(m_instanceLock)
     void _ReleaseUsbAttachments() noexcept;

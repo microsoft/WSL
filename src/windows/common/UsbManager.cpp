@@ -16,6 +16,7 @@ namespace {
 
     constexpr wchar_t c_journalPath[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Lxss\\Usb";
     constexpr DWORD c_readyTimeoutMs = 30000;
+    constexpr DWORD c_reappearanceTimeoutMs = 5000;
 
     std::wstring GetJournalRecordName(const UxdReservationIdentity& Value)
     {
@@ -224,6 +225,35 @@ Device Manager::WaitForWinUsbDevice(const UxdReservationIdentity& Value, std::ws
     }
 }
 
+void Manager::WaitForDeviceReappearance(const UxdReservationIdentity& Value) noexcept
+try
+{
+    const auto deadline = GetTickCount64() + c_reappearanceTimeoutMs;
+    while (!m_stopping.load())
+    {
+        const auto current = FindDeviceAtPort(Inventory::Enumerate(), Value);
+        if (current && !current->IsRedirected())
+        {
+            return;
+        }
+
+        const auto now = GetTickCount64();
+        if (now >= deadline)
+        {
+            return;
+        }
+
+        const HANDLE events[] = {m_stop.get(), m_changed.get()};
+        const auto wait = WaitForMultipleObjects(ARRAYSIZE(events), events, FALSE, gsl::narrow_cast<DWORD>(deadline - now));
+        THROW_LAST_ERROR_IF(wait == WAIT_FAILED);
+        if (wait != WAIT_OBJECT_0 + 1)
+        {
+            return;
+        }
+    }
+}
+CATCH_LOG()
+
 std::list<Manager::Record> Manager::LoadReservationRecords(HKEY Journal)
 {
     // Restore ownership metadata for cleanup, without reactivating attachments.
@@ -268,12 +298,13 @@ void Manager::PersistReservationRecord(const Record& Value)
     THROW_IF_WIN32_ERROR(RegFlushKey(m_journal.get()));
 }
 
-void Manager::ReleaseReservation(Record& Value, HKEY Journal)
+bool Manager::ReleaseReservation(Record& Value, HKEY Journal)
 {
     // Stop reporting the reservation as active before restoring Windows ownership.
     Value.Active = false;
 
     // Leave reservations belonging to other owners untouched.
+    bool cycled = false;
     UxdRegistry uxdRegistry;
     const auto reservation = uxdRegistry.ReadReservation(Value.Reservation);
     if (!reservation || OwnsReservation(Value.Reservation.Id, *reservation))
@@ -283,6 +314,7 @@ void Manager::ReleaseReservation(Record& Value, HKEY Journal)
         if (current && (removed || current->IsRedirected()))
         {
             CyclePort(Value.Reservation.HubInstanceId, Value.Reservation.Port);
+            cycled = true;
         }
     }
 
@@ -293,6 +325,7 @@ void Manager::ReleaseReservation(Record& Value, HKEY Journal)
     const auto error = RegDeleteValueW(Journal, GetJournalRecordName(Value.Reservation).c_str());
     THROW_IF_WIN32_ERROR(error == ERROR_FILE_NOT_FOUND ? ERROR_SUCCESS : error);
     THROW_IF_WIN32_ERROR(RegFlushKey(Journal));
+    return cycled;
 }
 
 void Manager::QueueDeviceRemoval(std::wstring Identifier, bool Instance)
@@ -539,7 +572,7 @@ void Manager::Commit(PSID UserSid, const GUID& ReservationId)
     record->Active = true;
 }
 
-void Manager::Release(PSID UserSid, const GUID& ReservationId)
+void Manager::Release(PSID UserSid, const GUID& ReservationId, bool WaitForReappearance)
 {
     const auto sid = ConvertSidToString(UserSid);
     auto lock = m_lock.lock_exclusive();
@@ -550,8 +583,13 @@ void Manager::Release(PSID UserSid, const GUID& ReservationId)
     }
 
     THROW_HR_WITH_USER_ERROR_IF(E_ACCESSDENIED, wsl::shared::Localization::MessageUsbUnavailable(), record->OwnerSid != sid);
-    ReleaseReservation(*record, m_journal.get());
+    const bool cycled = ReleaseReservation(*record, m_journal.get());
+    const auto reservation = std::move(record->Reservation);
     m_records.erase(record);
+    if (WaitForReappearance && cycled)
+    {
+        WaitForDeviceReappearance(reservation);
+    }
 }
 
 GUID Manager::GetReservationId(PSID UserSid, const PortId& Port)

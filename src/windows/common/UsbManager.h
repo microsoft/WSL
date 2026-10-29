@@ -31,7 +31,7 @@ public:
 
     DeviceReservation Reserve(PSID UserSid, const PortId& Port, RemovalCallback OnRemoval);
     void Commit(PSID UserSid, const GUID& ReservationId);
-    void Release(PSID UserSid, const GUID& ReservationId);
+    void Release(PSID UserSid, const GUID& ReservationId, bool WaitForReappearance = false);
     GUID GetReservationId(PSID UserSid, const PortId& Port);
     bool IsValid(PSID UserSid, const GUID& ReservationId);
     void Cancel() noexcept;
@@ -62,12 +62,13 @@ private:
     static std::wstring ConvertSidToString(PSID Sid);
     static std::optional<Device> FindDeviceAtPort(const Inventory& Current, const UxdReservationIdentity& Value);
     static std::list<Record> LoadReservationRecords(HKEY Journal);
-    static void ReleaseReservation(Record& Value, HKEY Journal);
+    static bool ReleaseReservation(Record& Value, HKEY Journal);
 
     UxdReservationIdentity ResolvePortId(const Inventory& Current, const PortId& Port) const;
     std::list<Record>::iterator FindReservationRecord(const UxdReservationIdentity& Value);
     bool MatchesRecordedReservation(const Record& Value) const;
     Device WaitForWinUsbDevice(const UxdReservationIdentity& Value, std::wstring& Path);
+    void WaitForDeviceReappearance(const UxdReservationIdentity& Value) noexcept;
     void PersistReservationRecord(const Record& Value);
     void QueueDeviceRemoval(std::wstring Identifier, bool Instance);
     void ProcessDeviceRemovals();

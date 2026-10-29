@@ -2680,7 +2680,7 @@ HRESULT LxssUserSessionImpl::DetachUsbDevice(_In_ LPCWSTR Port)
         std::ranges::find_if(m_usbAttachments, [&](const auto& entry) { return entry.second.Reservation.Port == port; });
     const auto reservationId =
         attachment == m_usbAttachments.end() ? m_usbManager->GetReservationId(&m_userSid.Sid, port) : attachment->first;
-    _ReleaseUsbAttachment(reservationId);
+    _ReleaseUsbAttachment(reservationId, true);
     return S_OK;
 }
 
@@ -4539,7 +4539,7 @@ void LxssUserSessionImpl::OnUsbDeviceRemoved(const GUID& ReservationId)
 }
 
 _Requires_lock_held_(m_instanceLock)
-void LxssUserSessionImpl::_ReleaseUsbAttachment(const GUID& ReservationId)
+void LxssUserSessionImpl::_ReleaseUsbAttachment(const GUID& ReservationId, bool WaitForReappearance)
 {
     const auto entry = m_usbAttachments.find(ReservationId);
     if (entry != m_usbAttachments.end())
@@ -4553,7 +4553,7 @@ void LxssUserSessionImpl::_ReleaseUsbAttachment(const GUID& ReservationId)
         }
     }
 
-    m_usbManager->Release(&m_userSid.Sid, ReservationId);
+    m_usbManager->Release(&m_userSid.Sid, ReservationId, WaitForReappearance);
     if (entry != m_usbAttachments.end())
     {
         m_usbAttachments.erase(entry);
