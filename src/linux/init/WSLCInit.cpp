@@ -967,7 +967,13 @@ void HandleMountMessage(
 
             // Start the memory reduction thread now that procfs is in its final location.
             static std::once_flag memoryReductionFlag;
-            std::call_once(memoryReductionFlag, [] { StartMemoryReductionThread(LxMiniInitMemoryReclaimModeDropCache); });
+            std::call_once(memoryReductionFlag, [] {
+                try
+                {
+                    std::thread([] { RunMemoryReduction(LxMiniInitMemoryReclaimModeDropCache); }).detach();
+                }
+                CATCH_LOG()
+            });
         }
 
         response.Result = 0;

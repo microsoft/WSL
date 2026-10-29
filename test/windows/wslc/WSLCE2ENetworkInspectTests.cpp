@@ -49,7 +49,7 @@ class WSLCE2ENetworkInspectTests
     {
         auto result = RunWslc(L"network inspect");
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'network-name'"));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'network'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Inspect_Success)
@@ -123,6 +123,24 @@ class WSLCE2ENetworkInspectTests
         auto inspect2 = inspectData[1];
         VERIFY_ARE_EQUAL(WideToMultiByte(TestNetworkName2), inspect2.Name);
         VERIFY_ARE_EQUAL("bridge", inspect2.Driver);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Network_Inspect_ById)
+    {
+        auto result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName1));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto id = InspectNetwork(TestNetworkName1).Id;
+        for (const auto& reference : {id, id.substr(0, 12)})
+        {
+            result = RunWslc(std::format(L"network inspect {}", MultiByteToWide(reference)));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+            auto inspectData =
+                wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::Network>>(result.Stdout.value().c_str());
+            VERIFY_ARE_EQUAL(1u, inspectData.size());
+            VERIFY_ARE_EQUAL(WideToMultiByte(TestNetworkName1), inspectData[0].Name);
+            VERIFY_ARE_EQUAL(id, inspectData[0].Id);
+        }
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Inspect_NotFound)

@@ -1,13 +1,16 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
 #pragma once
+#include <algorithm>
 #include <atomic>
 #include <optional>
+#include <string>
 #include <variant>
 #include <vector>
 
 #include <windows.h>
 #include <ComputeNetwork.h>
+#include <iphlpapi.h>
 #include <mstcpip.h>
 #include <netioapi.h>
 #include <netlistmgr.h>
@@ -148,6 +151,9 @@ inline HRESULT GetGnsCallbackResult(LX_MESSAGE_TYPE messageType, HRESULT transpo
 }
 
 inline constexpr GUID c_wslFirewallVmCreatorId = {0x40E0AC32, 0x46A5, 0x438A, {0xA0, 0xB2, 0x2B, 0x47, 0x9E, 0x8F, 0x2E, 0x90}};
+
+inline constexpr GUID c_natNetworkId = {0xb95d0c5e, 0x57d4, 0x412b, {0xb5, 0x71, 0x18, 0xa8, 0x1a, 0x16, 0xe0, 0x05}};
+inline constexpr GUID c_natNetworkWithFirewallId = {0x790e58b4, 0x7939, 0x4434, {0x93, 0x58, 0x89, 0xae, 0x7d, 0xdb, 0xe8, 0x7e}};
 
 inline constexpr auto c_networkAdapterPrefix = L"VirtualMachine/Devices/NetworkAdapters/";
 inline constexpr auto c_interfaceConstraintKey = L"ExternalInterfaceConstraint";
@@ -374,6 +380,28 @@ struct CurrentInterfaceInformation
     std::optional<NET_LUID> m_interfaceLuid{std::nullopt};
     bool m_metered{false};
 };
+
+inline GUID GetNatNetworkId(bool enableFirewall) noexcept
+{
+    return enableFirewall ? c_natNetworkWithFirewallId : c_natNetworkId;
+}
+
+inline LPCWSTR GetNatNetworkName(bool enableFirewall) noexcept
+{
+    return enableFirewall ? L"WSL (Hyper-V firewall)" : L"WSL";
+}
+
+inline bool IsAcceptableNetworkRange(const std::wstring& networkRange)
+{
+    NET_ADDRESS_INFO address{};
+    BYTE prefixLength{};
+    THROW_IF_WIN32_ERROR(ParseNetworkString(networkRange.c_str(), NET_STRING_IPV4_NETWORK, &address, nullptr, &prefixLength));
+
+    // Compare the common prefix to detect overlap with Docker's default 172.17.0.0/16 subnet.
+    ULONG mask{};
+    THROW_IF_WIN32_ERROR(ConvertLengthToIpv4Mask(std::min<ULONG>(prefixLength, 16), &mask));
+    return (address.Ipv4Address.sin_addr.s_addr & mask) != (htonl(0xac110000) & mask);
+}
 
 inline std::vector<GUID> EnumerateNetworks(std::optional<wsl::shared::hns::NetworkFlags> queryFlags = {})
 {

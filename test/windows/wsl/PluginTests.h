@@ -46,6 +46,7 @@ enum class PluginTestType
     WslcVmStopCommitted,
     WslcVmNeverStarted,
     MountFolderAccess,
+    CgroupIsolation,
     WslcVmExitDuringSessionRelease
 };
 

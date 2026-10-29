@@ -53,6 +53,7 @@ Abstract:
 #include <unistd.h>
 #include <utmp.h>
 #include <assert.h>
+#include <iostream>
 #include "configfile.h"
 #include "lxfsshares.h"
 #include "common.h"
@@ -125,6 +126,34 @@ struct VmConfiguration
 int g_LogFd = STDERR_FILENO;
 int g_TelemetryFd = -1;
 std::optional<bool> g_EnableSocketLogging;
+static std::set<pid_t> g_WorkerProcesses;
+
+void StartWorkerProcess(const char* Name, const std::function<void()>& Worker, std::set<int> InheritedFds = {STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO, g_LogFd})
+{
+    // Keep mini_init single-threaded: raw namespace clones cannot safely inherit libc locks held by another thread.
+    const auto pid = UtilCreateChildProcess(Name, [&Worker, &InheritedFds]() {
+        g_LogFd = InheritedFds.contains(g_LogFd) ? g_LogFd : -1;
+        g_TelemetryFd = InheritedFds.contains(g_TelemetryFd) ? g_TelemetryFd : -1;
+
+        unsigned int firstFd = 0;
+        for (const int fd : InheritedFds)
+        {
+            if (firstFd < static_cast<unsigned int>(fd))
+            {
+                THROW_LAST_ERROR_IF(syscall(SYS_close_range, firstFd, static_cast<unsigned int>(fd) - 1, 0) < 0);
+            }
+
+            firstFd = static_cast<unsigned int>(fd) + 1;
+        }
+
+        THROW_LAST_ERROR_IF(syscall(SYS_close_range, firstFd, UINT_MAX, 0) < 0);
+        THROW_LAST_ERROR_IF(UtilRestoreBlockedSignals() < 0);
+        Worker();
+    });
+
+    THROW_LAST_ERROR_IF(pid < 0);
+    g_WorkerProcesses.insert(pid);
+}
 
 int Chroot(const char* Target);
 
@@ -197,7 +226,8 @@ int MountInit(const char* Target);
 
 int MountPlan9(const char* Name, const char* Target, bool ReadOnly, unsigned int HostPort = LX_INIT_UTILITY_VM_PLAN9_PORT, std::optional<int> BufferSize = {});
 
-int ProcessMessage(wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config);
+int ProcessMessage(
+    wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config, std::map<pid_t, GUID>& DistroInstances);
 
 wil::unique_fd RegisterSeccompHook();
 
@@ -3024,7 +3054,7 @@ try
 }
 CATCH_RETURN_ERRNO();
 
-int ProcessMessage(wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config)
+int ProcessMessage(wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config, std::map<pid_t, GUID>& DistroInstances)
 
 /*++
 
@@ -3039,6 +3069,8 @@ Arguments:
     Buffer - Supplies the message.
 
     Config - Supplies the VM configuration.
+
+    DistroInstances - Maps unreaped distribution processes to their launch identities.
 
 Return Value:
 
@@ -3100,6 +3132,11 @@ try
                     }
                 },
                 (CLONE_NEWIPC | CLONE_NEWNS | CLONE_NEWPID | CLONE_NEWUTS | SIGCHLD));
+
+            if (ChildPid > 0)
+            {
+                DistroInstances.emplace(ChildPid, Message->InstanceId);
+            }
 
             return (ChildPid < 0) ? -1 : 0;
         }
@@ -3165,12 +3202,6 @@ try
                 return -1;
             }
         }
-
-        //
-        // Configure memory reclamation.
-        //
-
-        StartMemoryReductionThread(EarlyConfig->MemoryReclaimMode);
 
         //
         // Initialize system distro if supported.
@@ -3323,6 +3354,16 @@ try
             return -1;
         }
 
+        // Start after the system-distro chroot so the worker uses the final procfs and cgroup mounts.
+        if (EarlyConfig->MemoryReclaimMode != LxMiniInitMemoryReclaimModeDisabled)
+        {
+            try
+            {
+                StartWorkerProcess("MemoryReclaim", [mode = EarlyConfig->MemoryReclaimMode]() { RunMemoryReduction(mode); });
+            }
+            CATCH_LOG()
+        }
+
         return 0;
     }
 
@@ -3403,14 +3444,15 @@ try
         return ProcessMountFolderMessage(Transaction, Buffer);
 
     case LxInitCreateProcess:
-        if (access(WSL_USER_NON_DISTRO_CGROUP_PATH, F_OK) == 0)
+    {
+        std::optional<std::string> CgroupPath;
+        if (access(WSL_USER_INTERNAL_CGROUP_PATH, F_OK) == 0)
         {
-            return ProcessCreateProcessMessage(Transaction, Buffer, WSL_USER_NON_DISTRO_CGROUP_PATH);
+            CgroupPath = WSL_USER_INTERNAL_CGROUP_PATH;
         }
-        else
-        {
-            return ProcessCreateProcessMessage(Transaction, Buffer, std::nullopt);
-        }
+
+        return ProcessCreateProcessMessage(Transaction, Buffer, CgroupPath);
+    }
 
     case LxMiniInitMessageWaitForPmemDevice:
     {
@@ -3834,27 +3876,30 @@ void EnableDebugMode(const std::string& Mode)
             WriteToFile(e, "1");
         }
 
+        // Open before forking: mini_init can move sysfs into the system distro before the worker runs.
+        constexpr auto path = "/sys/kernel/debug/tracing/trace_pipe";
+        wil::unique_fd tracePipe{open(path, O_RDONLY | O_CLOEXEC)};
+        if (!tracePipe)
+        {
+            LOG_ERROR("Failed to open {}, {}", path, errno);
+            return;
+        }
+
         // Relay logs to the host.
-        std::thread relayThread{[]() {
-            constexpr auto path = "/sys/kernel/debug/tracing/trace_pipe";
-            std::ifstream file(path);
+        StartWorkerProcess(
+            "TracePipe",
+            [path, traceFd = tracePipe.get()]() {
+                THROW_LAST_ERROR_IF(dup2(traceFd, STDIN_FILENO) < 0);
 
-            if (!file)
-            {
-                LOG_ERROR("Failed to open {}, {}", path, errno);
-                return;
-            }
+                std::string line;
+                while (std::getline(std::cin, line))
+                {
+                    LOG_INFO("{}", line);
+                }
 
-            std::string line;
-            while (std::getline(file, line))
-            {
-                LOG_INFO("{}", line);
-            }
-
-            LOG_ERROR("{}: closed", path);
-        }};
-
-        relayThread.detach();
+                LOG_ERROR("{}: closed", path);
+            },
+            {STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO, g_LogFd, tracePipe.get()});
     }
     else
     {
@@ -3925,9 +3970,9 @@ Return Value:
         return;
     }
 
-    if (UtilMkdir(WSL_USER_NON_DISTRO_CGROUP_PATH, 0755) < 0)
+    if (UtilMkdir(WSL_USER_INTERNAL_CGROUP_PATH, 0755) < 0)
     {
-        LOG_ERROR("Failed to create wsl-user non-distro cgroup directory {}", errno);
+        LOG_ERROR("Failed to create wsl-user internal cgroup directory {}", errno);
         return;
     }
 
@@ -3981,7 +4026,7 @@ wil::unique_fd CreateDistroCgroupNamespace(const std::string& CgroupPath)
         }
     });
 
-    THROW_LAST_ERROR_IF(UtilMoveSelfToDistroCgroup(CgroupPath, "cgroup namespace") < 0);
+    THROW_LAST_ERROR_IF(UtilMoveSelfToCgroup(CgroupPath, "cgroup namespace") < 0);
     RestoreCgroup = true;
 
     THROW_LAST_ERROR_IF(unshare(CLONE_NEWCGROUP) < 0);
@@ -4006,6 +4051,7 @@ int main(int Argc, char* Argv[])
     std::vector<gsl::byte> Buffer;
     ssize_t BytesRead;
     VmConfiguration Config{};
+    std::map<pid_t, GUID> DistroInstances;
     wil::unique_fd ConsoleFd{};
     wsl::shared::SocketChannel channel;
     wil::unique_fd NotifyFd{};
@@ -4273,7 +4319,7 @@ int main(int Argc, char* Argv[])
                 break; // Socket was closed, exit
             }
 
-            Result = ProcessMessage(transaction, Message->MessageType, Range, Config);
+            Result = ProcessMessage(transaction, Message->MessageType, Range, Config, DistroInstances);
             if (Result < 0)
             {
                 goto ErrorExit;
@@ -4314,6 +4360,12 @@ int main(int Argc, char* Argv[])
                 }
                 else if (Result > 0)
                 {
+                    if (g_WorkerProcesses.erase(Result) != 0)
+                    {
+                        LOG_WARNING("Background process {} exited with status {}", Result, Status);
+                        continue;
+                    }
+
                     //
                     // Perform a sync to flush all writes.
                     //
@@ -4367,6 +4419,12 @@ int main(int Argc, char* Argv[])
                     Message.Header.MessageType = LxMiniInitMessageChildExit;
                     Message.Header.MessageSize = sizeof(Message);
                     Message.ChildPid = Result;
+                    // Preserve the launch identity even if this PID is reused before the host processes the notification.
+                    if (const auto instance = DistroInstances.extract(Result); !instance.empty())
+                    {
+                        Message.InstanceId = instance.mapped();
+                    }
+
                     Result = UtilWriteBuffer(NotifyFd.get(), gslhelpers::struct_as_bytes(Message));
                     if (Result < 0)
                     {

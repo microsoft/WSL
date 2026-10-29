@@ -28,7 +28,7 @@ Abstract:
 #include "WSLCContainerMetadata.h"
 #include "WSLCExitRequestState.h"
 #include "WSLCRestartBackoff.h"
-#include "WSLCNetworkMetadata.h"
+#include "WSLCRestartTransaction.h"
 #include "WSLCVhdVolume.h"
 #include <unordered_map>
 
@@ -126,7 +126,7 @@ public:
     void Stats(LPSTR* Output) const;
     void GetLabels(WSLCLabelInformation** Labels, ULONG* Count) const;
     void ConnectToNetwork(const WSLCNetworkConnectionOptions* Options);
-    void DisconnectFromNetwork(LPCSTR NetworkName);
+    void DisconnectFromNetwork(LPCSTR NetworkNameOrId);
 
     void CopyTo(IWSLCContainer** Container) const;
 
@@ -159,7 +159,6 @@ public:
         WSLCSession& wslcSession,
         WSLCSessionRuntime& runtime,
         IWSLCPluginNotifier* pluginNotifier,
-        const std::unordered_map<std::string, NetworkEntry>& SessionNetworks,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         EventStore& eventStore);
 
@@ -198,13 +197,6 @@ private:
         // Access under WSLCContainerImpl::m_lock.
         ContainerEvent ExpectedEvent;
         unique_com_disconnect Wrapper;
-    };
-
-    // Restart() runs a stop phase followed by a start phase. This marks the pair as one transaction so
-    // that Start() and Stop() cannot land in between.
-    struct RestartTransaction
-    {
-        wil::unique_event Completed{wil::EventOptions::ManualReset};
     };
 
     __requires_exclusive_lock_held(m_lock) bool RequestDeleteExclusiveLockHeld(WSLCDeleteFlags Flags, bool Prune = false);
@@ -297,11 +289,10 @@ private:
 
     _Guarded_by_(m_lock) std::shared_ptr<StateTransition> m_transition;
 
-    // Non-null from before Restart()'s stop phase until it commits Running, fails, or the container is Deleted. Start() and
-    // Stop() stand down for that window, and OnStopped() keeps the container's runtime resources mapped
-    // and skips the auto-delete of an --rm container. Delete() does not stand down: a remove that lands
-    // between the two phases takes effect, and the restart's start phase fails.
-    _Guarded_by_(m_lock) std::shared_ptr<RestartTransaction> m_restart;
+    // Owns the stop/start pair until Running commits, its owner completes cleanup, or the container is Deleted.
+    // Start() and Stop() stand down for that window, and OnStopped() retains runtime resources and suppresses
+    // auto-removal of an --rm container. Delete() can take effect between the phases, causing the start phase to fail.
+    _Guarded_by_(m_lock) std::shared_ptr<WSLCRestartTransaction> m_restart;
 
     // True between a successful StartPhase() and the release of the container's ports and mounts. A
     // restart leaves this set across the two phases, which is what tells the start phase they are still
@@ -395,7 +386,7 @@ public:
     IFACEMETHOD(GetLabels)(_Out_ WSLCLabelInformation** Labels, _Out_ ULONG* Count) override;
     IFACEMETHOD(Stats)(_Out_ LPSTR* Output) override;
     IFACEMETHOD(ConnectToNetwork)(_In_ const WSLCNetworkConnectionOptions* Options) override;
-    IFACEMETHOD(DisconnectFromNetwork)(_In_ LPCSTR NetworkName) override;
+    IFACEMETHOD(DisconnectFromNetwork)(_In_ LPCSTR NetworkNameOrId) override;
 
     // IWSLCCompatContainer.
     IFACEMETHOD(Start)(_In_ WSLCContainerStartFlags Flags) override;
