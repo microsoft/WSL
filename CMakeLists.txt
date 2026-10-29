@@ -613,6 +613,7 @@ add_subdirectory(src/linux/init)
 add_subdirectory(localization)
 
 add_subdirectory(test/windows)
+add_subdirectory(test/linux/localhost_start)
 
 if (DEFINED PIPELINE_BUILD_ID)
     add_subdirectory(cloudtest)

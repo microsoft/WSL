@@ -146,12 +146,19 @@ LX_GNS_PORT_LISTENER_RELAY SockToRelayMessage(const sockaddr_storage& sock)
 int StartHostListener(wsl::shared::SocketChannel& channel, const sockaddr_storage& sock)
 try
 {
-    auto message = SockToRelayMessage(sock);
-    message.Header.MessageType = LxGnsMessagePortListenerRelayStart;
-    auto transaction = channel.StartTransaction();
-    transaction.Send(message);
+    const auto relay = SockToRelayMessage(sock);
+    LX_GNS_PORT_ALLOCATION_REQUEST message{};
+    message.Header.MessageType = LxGnsMessagePortMappingRequest;
+    message.Header.MessageSize = sizeof(message);
+    message.Af = relay.Family;
+    message.Protocol = IPPROTO_TCP;
+    message.Port = relay.Port;
+    message.Allocate = true;
+    static_assert(sizeof(message.Address32) == sizeof(relay.Address));
+    memcpy(message.Address32, relay.Address, sizeof(message.Address32));
 
-    return 0;
+    // The port-mapping reply reports positive errno values.
+    return -channel.Transaction(message).Result;
 }
 CATCH_RETURN_ERRNO();
 
@@ -226,7 +233,13 @@ int MonitorListeningSockets(wsl::shared::SocketChannel& channel)
 
             if (found == relays.end())
             {
-                if (StartHostListener(channel, socket) < 0)
+                const int startResult = StartHostListener(channel, socket);
+                if (startResult == -EADDRINUSE)
+                {
+                    // Retry on the next scan while the guest socket is still listening.
+                    return;
+                }
+                if (startResult < 0)
                 {
                     result = -1;
                 }
