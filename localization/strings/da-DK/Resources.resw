@@ -3825,7 +3825,7 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Netværksnavn</value>
   </data>
   <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
-    <value>Network name or ID</value>
+    <value>Netværksnavn eller -id</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Vis kun netværks-id'er</value>

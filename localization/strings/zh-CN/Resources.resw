@@ -2515,7 +2515,7 @@ Windows 版本: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkPrefixAmbiguous" xml:space="preserve">
-    <value>多个网络与 '{}' 匹配;使用较长的 ID 或网络名称。</value>
+    <value>多个网络与 "{}" 匹配；请使用更长的 ID 或网络名称。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">

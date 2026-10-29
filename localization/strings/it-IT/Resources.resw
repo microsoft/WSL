@@ -1247,7 +1247,7 @@ Vedere le istruzioni per il ripristino in: https://aka.ms/wsldiskmountrecovery</
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageWindowsInstallerBusy" xml:space="preserve">
-    <value>WSL'installazione è bloccata perché Windows Installer è occupato. Attendere il completamento delle altre installazioni software, quindi riprovare.</value>
+    <value>L'installazione di WSL è bloccata perché Windows Installer è occupato. Attendi il completamento delle altre installazioni software, quindi riprova.</value>
     <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
@@ -3831,7 +3831,7 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Nome di rete</value>
   </data>
   <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
-    <value>Network name or ID</value>
+    <value>Nome o ID rete</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Visualizza solo gli ID di rete</value>

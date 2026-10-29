@@ -3825,7 +3825,7 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Nettverksnavn</value>
   </data>
   <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
-    <value>Network name or ID</value>
+    <value>Nettverksnavn eller ID</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Bare vis nettverks-ID-er</value>

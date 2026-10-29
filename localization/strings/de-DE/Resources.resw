@@ -3831,7 +3831,7 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Netzwerkname</value>
   </data>
   <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
-    <value>Network name or ID</value>
+    <value>Netzwerkname oder -ID</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Nur Netzwerk-IDs anzeigen</value>

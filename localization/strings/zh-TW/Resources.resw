@@ -1247,7 +1247,7 @@ Windows 版本： {}</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageWindowsInstallerBusy" xml:space="preserve">
-    <value>由於 Windows Installer 很忙碌，WSL 安裝已遭封鎖。請等候其他軟體安裝完成後再重試。</value>
+    <value>由於 Windows Installer 忙碌中，WSL 安裝已封鎖。請等候其他軟體安裝完成，之後再重試。</value>
     <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
