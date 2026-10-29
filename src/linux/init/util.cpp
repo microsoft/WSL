@@ -3510,6 +3510,13 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
 
             THROW_LAST_ERROR_IF(dup2(ProcessSocket.get(), STDIN_FILENO) < 0);
             THROW_LAST_ERROR_IF(dup2(ProcessSocket.get(), STDOUT_FILENO) < 0);
+
+            THROW_LAST_ERROR_IF(UtilSetSignalHandlers(g_SavedSignalActions, false) < 0);
+
+            sigset_t SignalMask;
+            sigemptyset(&SignalMask);
+            THROW_LAST_ERROR_IF(sigprocmask(SIG_SETMASK, &SignalMask, nullptr) < 0);
+
             execv(Path, (char* const*)(ArgumentArray.data()));
 
             // If this point is reached, an error needs to be reported back since execv() failed.
