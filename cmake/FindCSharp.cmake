@@ -1,4 +1,4 @@
-function(configure_csharp_target TARGET)
+function(configure_csharp_target TARGET FRAMEWORK)
     set(TARGET_PLATFORM_MIN_VERSION "10.0.19041.0")
 
     target_compile_options(
@@ -15,6 +15,6 @@ function(configure_csharp_target TARGET)
         VS_GLOBAL_AppendRuntimeIdentifierToOutputPath false
         VS_GLOBAL_TargetLatestRuntimePatch false
         DOTNET_SDK "Microsoft.NET.Sdk"
-        DOTNET_TARGET_FRAMEWORK "net8.0-windows${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}"
+        DOTNET_TARGET_FRAMEWORK "${FRAMEWORK}-windows${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}"
     )
 endfunction()

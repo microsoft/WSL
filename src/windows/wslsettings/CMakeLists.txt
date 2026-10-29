@@ -190,7 +190,7 @@ csharp_set_xaml_cs_properties(
   Views/Settings/ShellPage.xaml.cs
 )
 
-configure_csharp_target(${TargetApp})
+configure_csharp_target(${TargetApp} net10.0)
 
 set_property(
   SOURCE App.xaml
@@ -215,7 +215,8 @@ set_property(
 CommunityToolkit.WinUI.Animations_${CTK_ANIMATIONS_VERSION};\
 CommunityToolkit.WinUI.Controls.SettingsControls_${CTK_STTNGS_CTRLS_VERSION};\
 Microsoft.Extensions.Hosting_${EXTS_HOSTING_VERSION};\
-Microsoft.WindowsAppSDK_${WIN_APP_SDK_VERSION};\
+Microsoft.WindowsAppSDK.Foundation_${WIN_APP_SDK_FOUNDATION_VERSION};\
+Microsoft.WindowsAppSDK.WinUI_${WIN_APP_SDK_WINUI_VERSION};\
 Microsoft.Xaml.Behaviors.WinUI.Managed_${XAML_BEHAVIORS_VERSION};\
 WinUIEx_${WINUIEX_VERSION}"
 )
@@ -229,6 +230,7 @@ set_target_properties(
   VS_GLOBAL_UseWinUI true
   VS_GLOBAL_WindowsPackageType None
   VS_GLOBAL_SelfContained true
+  VS_GLOBAL_AllowUnsafeBlocks true
   VS_GLOBAL_WindowsAppSDKSelfContained true
   VS_GLOBAL_ApplicationIcon "${CMAKE_SOURCE_DIR}/images/wsl.ico"
   VS_GLOBAL_ApplicationManifest "${CMAKE_CURRENT_SOURCE_DIR}/app.manifest"
@@ -244,7 +246,7 @@ set_target_properties(
 
 configure_file(
   "${CMAKE_CURRENT_LIST_DIR}/directory.build.targets.in"
-  "${CMAKE_CURRENT_LIST_DIR}/directory.build.targets"
+  "${CMAKE_CURRENT_BINARY_DIR}/directory.build.targets"
 )
 
 configure_file(
@@ -253,4 +255,53 @@ configure_file(
 )
 
 add_dependencies(wslsettings libwsl)
-set_target_properties(wslsettings PROPERTIES FOLDER windows)
+set_target_properties(wslsettings PROPERTIES FOLDER windows EXCLUDE_FROM_ALL TRUE)
+
+find_program(WSL_DOTNET_EXECUTABLE dotnet HINTS "$ENV{DOTNET_ROOT}" REQUIRED)
+
+string(REGEX MATCH "^Visual Studio ([0-9]+)" VS_GENERATOR_VERSION "${CMAKE_GENERATOR}")
+find_path(
+  WSL_VC_TARGETS_PATH Microsoft.Cpp.Default.props
+  PATHS "${CMAKE_GENERATOR_INSTANCE}/MSBuild/Microsoft/VC/v${CMAKE_MATCH_1}0"
+  NO_DEFAULT_PATH
+  REQUIRED
+)
+
+get_target_property(WSL_SETTINGS_SOURCES wslsettings SOURCES)
+file(GLOB WSL_SETTINGS_ASSETS "${BIN}/wslsettings/Assets/*")
+set(WSL_SETTINGS_PUBLISHED_EXE "${BIN}/wslsettings-publish/wslsettings.exe")
+
+add_custom_command(
+  OUTPUT "${WSL_SETTINGS_PUBLISHED_EXE}"
+  COMMAND "${CMAKE_COMMAND}" -E rm -rf "${BIN}/wslsettings-publish"
+  COMMAND "${WSL_DOTNET_EXECUTABLE}" publish "${CMAKE_CURRENT_BINARY_DIR}/${TargetApp}.csproj"
+    --configuration "${CMAKE_BUILD_TYPE}"
+    --runtime "win-${TARGET_PLATFORM}"
+    --output "${BIN}/wslsettings-publish"
+    "-p:Platform=${TARGET_PLATFORM}"
+    "-p:BuildProjectReferences=false"
+    "-p:RestoreRecursive=false"
+    "-p:NuGetInteractive=false"
+    "-p:VCTargetsPath=${WSL_VC_TARGETS_PATH}/"
+    "-p:WarningsAsErrors=CsWinRT1028"
+    "-p:ILLinkTreatWarningsAsErrors=true"
+    "-p:IlcTreatWarningsAsErrors=true"
+    --tl:off
+  DEPENDS
+    ${WSL_SETTINGS_SOURCES}
+    ${WSL_SETTINGS_ASSETS}
+    "${CMAKE_CURRENT_LIST_FILE}"
+    "${CMAKE_CURRENT_BINARY_DIR}/${TargetApp}.csproj"
+    "${CMAKE_CURRENT_BINARY_DIR}/directory.build.targets"
+    "${CMAKE_SOURCE_DIR}/packages.config"
+  USES_TERMINAL
+  VERBATIM
+)
+add_custom_target(wslsettings_publish ALL DEPENDS "${WSL_SETTINGS_PUBLISHED_EXE}")
+add_dependencies(wslsettings_publish libwsl)
+set_target_properties(
+  wslsettings_publish PROPERTIES
+  FOLDER windows
+  VS_GLOBAL_ResolveNuGetPackages false
+  VS_GLOBAL_ImportDirectoryBuildTargets false
+)

@@ -183,10 +183,25 @@ stages:
           - powershell: |
               $version = "$(version.WSL_PACKAGE_VERSION)"
 
+              Add-Type -AssemblyName System.IO.Compression.FileSystem
               mkdir appxsym
               foreach ($arch in @("x64", "ARM64"))
               {
-                  Get-ChildItem -Path $(ob_outputDirectory)\pdb\$arch\release\*.pdb -Exclude wsltests.pdb | Compress-Archive -DestinationPath appxsym/Microsoft.WSL_${version}_$arch.zip
+                  $pdbFolder = (Resolve-Path "$(ob_outputDirectory)\pdb\$arch\release").Path
+                  $archivePath = Join-Path (Resolve-Path appxsym).Path "Microsoft.WSL_${version}_$arch.zip"
+                  $archive = [System.IO.Compression.ZipFile]::Open($archivePath, [System.IO.Compression.ZipArchiveMode]::Create)
+                  try
+                  {
+                      foreach ($symbolFile in (Get-ChildItem -Recurse -File -Path $pdbFolder -Filter *.pdb -Exclude wsltests.pdb))
+                      {
+                          $relativePath = $symbolFile.FullName.Substring($pdbFolder.Length + 1).Replace('\', '/')
+                          [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $symbolFile.FullName, $relativePath) | Out-Null
+                      }
+                  }
+                  finally
+                  {
+                      $archive.Dispose()
+                  }
                   Copy-Item -Path appxsym/Microsoft.WSL_${version}_$arch.zip -Destination appxsym/Microsoft.WSL_${version}_$arch.appxsym
               }
               mkdir $(ob_outputDirectory)/appxupload

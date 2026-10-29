@@ -5,7 +5,7 @@ using Microsoft.UI.Xaml;
 
 namespace WslSettings.Converters
 {
-    public sealed class BooleanToVisibilityConverter : IValueConverter
+    public sealed partial class BooleanToVisibilityConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, string language)
         {
