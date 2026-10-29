@@ -304,7 +304,8 @@ try
     THROW_LAST_ERROR_IF(fcntl(parentSocket.get(), F_SETFD, FD_CLOEXEC) < 0);
 
     // Set the umask to the default.
-    umask(Config.Umask);
+    const auto previousUmask = umask(Config.Umask);
+    auto restoreUmask = wil::scope_exit([previousUmask]() { umask(previousUmask); });
 
     std::string translatedSocketPath;
     wil::unique_fd server;
