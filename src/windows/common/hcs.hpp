@@ -55,6 +55,9 @@ unique_hcs_system CreateComputeSystem(_In_ PCWSTR Id, _In_ PCWSTR Configuration)
 
 unique_hcs_operation CreateOperation();
 
+// Configures backing pages and fault clusters, returning the matching guest page reporting order.
+int ConfigureMemoryBackingPages(_Inout_ Memory& memory, _In_ bool largeMemoryBackingPages);
+
 wsl::shared::hns::HNSEndpoint GetEndpointProperties(HCN_ENDPOINT endpoint);
 
 const std::vector<std::string>& GetProcessorFeatures();

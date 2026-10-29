@@ -2573,6 +2573,34 @@ Usage:
         VERIFY_ARE_EQUAL(L"", warnings);
     }
 
+    WSL2_TEST_METHOD(LargeMemoryBackingPages)
+    {
+        const auto windowsVersion = wsl::windows::common::helpers::GetWindowsVersion();
+        using wsl::windows::common::helpers::WindowsBuildNumbers;
+        const bool smallPagesSupported =
+            (windowsVersion.BuildNumber >= WindowsBuildNumbers::Germanium) ||
+            (windowsVersion.BuildNumber >= WindowsBuildNumbers::Cobalt && windowsVersion.UpdateBuildRevision >= 2360) ||
+            (windowsVersion.BuildNumber >= WindowsBuildNumbers::Iron && windowsVersion.UpdateBuildRevision >= 1970) ||
+            (windowsVersion.BuildNumber >= WindowsBuildNumbers::Vibranium_22H2 && windowsVersion.UpdateBuildRevision >= 3393);
+
+        for (const auto& setting :
+             {L"", L"largeMemoryBackingPages=true", L"largeMemoryBackingPages=false", L"largeMemoryBackingPages=invalid"})
+        {
+            WslConfigChange config(LxssGenerateTestConfig() + L"\n[experimental]\n" + setting);
+            const auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/cmdline");
+            const int expectedOrder = std::wstring_view(setting) == L"largeMemoryBackingPages=true" || !smallPagesSupported ? 9 : 5;
+            VERIFY_IS_TRUE(output.find(std::format(L"page_reporting.page_reporting_order={}", expectedOrder)) != std::wstring::npos);
+            if (std::wstring_view(setting) == L"largeMemoryBackingPages=invalid")
+            {
+                VERIFY_IS_TRUE(warnings.find(L"largeMemoryBackingPages") != std::wstring::npos);
+            }
+            else
+            {
+                VERIFY_ARE_EQUAL(L"", warnings);
+            }
+        }
+    }
+
     WSL2_TEST_METHOD(DmesgCollection)
     {
         const auto dmesgLogFile = std::filesystem::current_path() / L"test-dmesg.txt";

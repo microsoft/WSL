@@ -282,13 +282,15 @@ struct Properties
 
 enum class MemoryBackingPageSize
 {
-    Small = 0
+    Small = 0,
+    Large = 1
 };
 
 NLOHMANN_JSON_SERIALIZE_ENUM(
     MemoryBackingPageSize,
     {
         {MemoryBackingPageSize::Small, "Small"},
+        {MemoryBackingPageSize::Large, "Large"},
     })
 
 struct Memory

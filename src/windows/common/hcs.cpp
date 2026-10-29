@@ -15,6 +15,7 @@ Abstract:
 
 #include "precomp.h"
 #include "hcs.hpp"
+#include "helpers.hpp"
 #include <ComputeCore.h>
 
 #pragma hdrstop
@@ -77,6 +78,32 @@ void wsl::windows::common::hcs::AddPassThroughDisk(_In_ HCS_SYSTEM ComputeSystem
     request.Settings.Type = AttachmentType::PassThru;
 
     ModifyComputeSystem(ComputeSystem, wsl::shared::ToJsonW(request).c_str());
+}
+
+int wsl::windows::common::hcs::ConfigureMemoryBackingPages(_Inout_ Memory& memory, _In_ bool largeMemoryBackingPages)
+{
+    // Page reporting order must be >= fault cluster size shift.
+    if (largeMemoryBackingPages)
+    {
+        memory.BackingPageSize = MemoryBackingPageSize::Large;
+        return 9; // 2MB
+    }
+
+    // Small backing pages require the fix for the VID deadlock on partition teardown.
+    const auto windowsVersion = helpers::GetWindowsVersion();
+    using helpers::WindowsBuildNumbers;
+    if ((windowsVersion.BuildNumber >= WindowsBuildNumbers::Germanium) ||
+        (windowsVersion.BuildNumber >= WindowsBuildNumbers::Cobalt && windowsVersion.UpdateBuildRevision >= 2360) ||
+        (windowsVersion.BuildNumber >= WindowsBuildNumbers::Iron && windowsVersion.UpdateBuildRevision >= 1970) ||
+        (windowsVersion.BuildNumber >= WindowsBuildNumbers::Vibranium_22H2 && windowsVersion.UpdateBuildRevision >= 3393))
+    {
+        memory.BackingPageSize = MemoryBackingPageSize::Small;
+        memory.FaultClusterSizeShift = 4;          // 64k
+        memory.DirectMapFaultClusterSizeShift = 4; // 64k
+        return 5;                                  // 128k
+    }
+
+    return 9; // 2MB
 }
 
 wsl::windows::common::hcs::unique_hcs_operation wsl::windows::common::hcs::CreateOperation()

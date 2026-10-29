@@ -551,7 +551,7 @@ class WSLCTests
         // Reject invalid feature flags.
         {
             auto settings = GetDefaultSessionSettings(L"invalid-feature-flags");
-            settings.FeatureFlags = static_cast<WSLCFeatureFlags>(0x40);
+            settings.FeatureFlags = static_cast<WSLCFeatureFlags>(0x80);
             wil::com_ptr<IWSLCSession> session;
             VERIFY_ARE_EQUAL(E_INVALIDARG, sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session));
         }
@@ -15835,15 +15835,31 @@ class WSLCTests
         SKIP_TEST_ARM64();
 
         // Determine expected page reporting order based on Windows version.
-        // On Germanium or later: 5 (128k), otherwise: 9 (2MB).
+        // Small backing pages require the VID partition teardown deadlock fix.
         const auto windowsVersion = wsl::windows::common::helpers::GetWindowsVersion();
-        int expectedOrder = (windowsVersion.BuildNumber >= wsl::windows::common::helpers::WindowsBuildNumbers::Germanium) ? 5 : 9;
+        using wsl::windows::common::helpers::WindowsBuildNumbers;
+        const bool smallPagesSupported =
+            (windowsVersion.BuildNumber >= WindowsBuildNumbers::Germanium) ||
+            (windowsVersion.BuildNumber >= WindowsBuildNumbers::Cobalt && windowsVersion.UpdateBuildRevision >= 2360) ||
+            (windowsVersion.BuildNumber >= WindowsBuildNumbers::Iron && windowsVersion.UpdateBuildRevision >= 1970) ||
+            (windowsVersion.BuildNumber >= WindowsBuildNumbers::Vibranium_22H2 && windowsVersion.UpdateBuildRevision >= 3393);
+        const int expectedOrder = smallPagesSupported ? 5 : 9;
 
         // Read the actual value from sysfs and verify it matches.
         auto result =
             ExpectCommandResult(m_defaultSession.get(), {"/bin/cat", "/sys/module/page_reporting/parameters/page_reporting_order"}, 0);
 
         VERIFY_ARE_EQUAL(result.Output[1], std::format("{}\n", expectedOrder));
+    }
+
+    WSLC_TEST_METHOD(LargeMemoryBackingPages)
+    {
+        auto settings = GetDefaultSessionSettings(L"large-memory-backing-pages");
+        settings.FeatureFlags = WslcFeatureFlagsLargeMemoryBackingPages;
+        const auto session = CreateSession(settings);
+
+        const auto result = ExpectCommandResult(session.get(), {"/bin/cat", "/proc/cmdline"}, 0);
+        VERIFY_IS_TRUE(result.Output.at(1).find("page_reporting.page_reporting_order=9") != std::string::npos);
     }
 
     WSLC_TEST_METHOD(SwapConfigured)
