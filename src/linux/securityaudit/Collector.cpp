@@ -968,6 +968,7 @@ CollectionPlan BuildCollectionPlan(const AuditPolicy& policy)
     plan.runtimeFlags = FEATURE_CONTAINER_RUNTIME_METADATA | FEATURE_SYSCALL_EXTENDED_DATA;
     if (policy.processCreation)
     {
+        // The SDK's execve selector enables sched_process_exec for both execve and execveat.
         plan.syscalls.push_back({__NR_execve, true});
         plan.syscalls.push_back({__NR_fork, true});
         plan.runtimeFlags |= FEATURE_SCHED_PROCESS_FORK;
@@ -1046,8 +1047,8 @@ DecodedRecord DecodeRecord(std::span<const std::byte> data, bool includeCommandL
     }
     event_exec_process_s event{};
     std::memcpy(&event, data.data(), sizeof(event));
-    if (event.base.enriched != 1 || event.base.syscall_id != __NR_execve || event.base.return_code != 0 ||
-        event.argsize >= MAX_CMDLINE_ARRAY_SIZE || event.argcount < 0 || event.argcount > MAX_CMDLINE_ARGS)
+    // Exec notifications report completed execution, not a syscall return value.
+    if (event.base.enriched != 1 || event.argsize >= MAX_CMDLINE_ARRAY_SIZE || event.argcount < 0 || event.argcount > MAX_CMDLINE_ARGS)
     {
         return {DecodeStatus::Invalid, {}, "Invalid or non-enriched exec record"};
     }
