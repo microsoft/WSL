@@ -25,11 +25,11 @@ Abstract:
         T_VALUE(c, EnableDebugShell), T_VALUE(c, EnableDhcp), T_VALUE(c, EnableDnsProxy), T_VALUE(c, EnableDnsTunneling), \
         T_VALUE(c, EnableGpuSupport), T_VALUE(c, EnableGuiApps), T_VALUE(c, EnableHardwarePerformanceCounters), \
         T_VALUE(c, EnableHostAddressLoopback), T_VALUE(c, EnableHostFileSystemAccess), T_VALUE(c, EnableIpv6), \
-        T_VALUE(c, EnableLocalhostRelay), T_VALUE(c, EnableNestedVirtualization), T_VALUE(c, EnableSafeMode), \
-        T_VALUE(c, EnableSparseVhd), T_VALUE(c, EnableVirtio), T_VALUE(c, EnableVirtio9p), T_VALUE(c, EnableVirtioFs), \
-        T_VALUE(c, EnableVirtioFsAggregateShares), T_ENUM(c, FirewallConfigPresence), T_VALUE(c, IsolateDistroCgroup), \
-        T_VALUE(c, KernelBootTimeout), T_SET(c, KernelCommandLine), T_VALUE(c, KernelDebugPort), T_STRING(c, KernelModulesList), \
-        T_SET(c, KernelModulesPath), T_SET(c, KernelPath), T_VALUE(c, LoadDefaultKernelModules), \
+        T_VALUE(c, EnableLargeMemoryBackingPages), T_VALUE(c, EnableLocalhostRelay), T_VALUE(c, EnableNestedVirtualization), \
+        T_VALUE(c, EnableSafeMode), T_VALUE(c, EnableSparseVhd), T_VALUE(c, EnableVirtio), T_VALUE(c, EnableVirtio9p), \
+        T_VALUE(c, EnableVirtioFs), T_VALUE(c, EnableVirtioFsAggregateShares), T_ENUM(c, FirewallConfigPresence), \
+        T_VALUE(c, IsolateDistroCgroup), T_VALUE(c, KernelBootTimeout), T_SET(c, KernelCommandLine), T_VALUE(c, KernelDebugPort), \
+        T_STRING(c, KernelModulesList), T_SET(c, KernelModulesPath), T_SET(c, KernelPath), T_VALUE(c, LoadDefaultKernelModules), \
         T_PRESENT(c, LoadKernelModulesPresence), T_VALUE(c, MaximumMemorySizeBytes), T_VALUE(c, MaximumProcessorCount), \
         T_ENUM(c, MemoryReclaim), T_VALUE(c, MemorySizeBytes), T_VALUE(c, MountDeviceTimeout), T_ENUM(c, NetworkingMode), \
         T_VALUE(c, ProcessorCount), T_SET(c, SwapFilePath), T_VALUE(c, SwapSizeBytes), T_VALUE(c, SwiotlbSizeBytes), \
@@ -283,6 +283,7 @@ namespace ConfigSetting {
     namespace Experimental {
         static constexpr auto NetworkingMode = "experimental.networkingMode";
         static constexpr auto AutoMemoryReclaim = "experimental.autoMemoryReclaim";
+        static constexpr auto LargeMemoryBackingPages = "experimental.largeMemoryBackingPages";
         static constexpr auto SparseVhd = "experimental.sparseVhd";
         static constexpr auto DnsTunneling = "experimental.dnsTunneling";
         static constexpr auto BestEffortDnsParsing = "experimental.bestEffortDnsParsing";
@@ -368,6 +369,7 @@ struct Config
     bool EnableAutoProxy = true;
     int InitialAutoProxyTimeout = 1000;
     MemoryReclaimMode MemoryReclaim = MemoryReclaimMode::DropCache;
+    bool EnableLargeMemoryBackingPages = false;
     bool EnableSparseVhd = false;
     UINT64 VhdSizeBytes = 0x10000000000; // 1TB
 

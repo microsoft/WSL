@@ -159,9 +159,10 @@ typedef enum _WSLCFeatureFlags
     WslcFeatureFlagsVirtioFs = 8,
     WslcFeatureFlagsDebug = 16,
     WslcFeatureFlagsPortRelayWslRelay = 32, // Use the wslrelay-based localhost port relay in Consomme networking mode.
+    WslcFeatureFlagsLargeMemoryBackingPages = 64, // Use 2MB backing pages, trading memory density for performance.
 } WSLCFeatureFlags;
 
-cpp_quote("#define WSLCFeatureFlagsValid (WslcFeatureFlagsDnsTunneling | WslcFeatureFlagsEarlyBootDmesg | WslcFeatureFlagsGPU | WslcFeatureFlagsVirtioFs | WslcFeatureFlagsDebug | WslcFeatureFlagsPortRelayWslRelay)")
+cpp_quote("#define WSLCFeatureFlagsValid (WslcFeatureFlagsDnsTunneling | WslcFeatureFlagsEarlyBootDmesg | WslcFeatureFlagsGPU | WslcFeatureFlagsVirtioFs | WslcFeatureFlagsDebug | WslcFeatureFlagsPortRelayWslRelay | WslcFeatureFlagsLargeMemoryBackingPages)")
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCFeatureFlags);")
 
