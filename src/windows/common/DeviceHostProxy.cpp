@@ -397,6 +397,14 @@ void DeviceHostProxy::Shutdown()
         auto lock = m_devicesLock.lock_exclusive();
         m_devices.clear();
     }
+
+    // Release the device host VMs. The device host holds this object as its callback, so keeping
+    // these references until destruction would keep both objects, and the device host process, alive.
+    {
+        auto lock = m_lock.lock_exclusive();
+        m_wslVm.reset();
+        m_adminWslVm.reset();
+    }
 }
 
 wil::com_ptr<IWslVm> DeviceHostProxy::GetWslVm(_In_ HANDLE UserToken)
