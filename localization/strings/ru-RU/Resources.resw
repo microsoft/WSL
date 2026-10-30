@@ -910,6 +910,10 @@
     <value>Не удалось создать виртуальную сеть с диапазоном адресов "{}", создана новая сеть с диапазоном: "{}", {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
+    <value>Сеть NAT WSL ({}) конфликтует с сетью Docker по умолчанию</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
     <value>БЕЗОПАСНЫЙ РЕЖИМ ВКЛЮЧЕН — многие функции будут отключены</value>
     <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
@@ -1025,6 +1029,9 @@
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>Команда wsl.exe --mount отключена политикой компьютера.</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>Добавление возможностей Linux отключено политикой компьютера.</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>Реестр образов контейнера "{}" заблокирован политикой компьютера.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -1091,6 +1098,10 @@
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>Не удалось завершить операцию, так как VHD сейчас используется. Чтобы принудительно остановить использование WSL, выполните команду wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageDistributionTerminationTimeout" xml:space="preserve">
+    <value>Истекло время ожидания завершения процесса распределения {} после {} мс. Продолжение без подтверждения остановки распределения.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
     <value>Сжатие поддерживается только для файлов .vhdx.</value>
@@ -1235,6 +1246,10 @@
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
     <value>Cgroup v1 несовместим с изоляцией cgroup для каждого дистрибутива. Вместо этого используется cgroup v2. Для использования cgroup v1 установите параметр isolateDistroCgroup=false в разделе [wsl2] файла .wslconfig, затем выполните команду wsl --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
+  <data name="MessageWindowsInstallerBusy" xml:space="preserve">
+    <value>Установка WSL заблокирована, так как установщик Windows занят. Дождитесь завершения установки другого программного обеспечения и повторите попытку.</value>
+    <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Произошла ошибка. Повторите попытку позже.</value>
@@ -2221,6 +2236,10 @@
     <value>Контейнер "{}" запущен и не может быть удален. Остановите контейнер перед удалением или используйте принудительное удаление (-f).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcCannotRemoveRestartingContainer" xml:space="preserve">
+    <value>Контейнер '{}' перезапускается и не может быть удален. Остановите контейнер перед удалением или используйте принудительное удаление (-f).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerNotRunning" xml:space="preserve">
     <value>Контейнер "{}" не запущен.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2502,6 +2521,10 @@
     <value>Сеть не найдена: "{}".</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcNetworkPrefixAmbiguous" xml:space="preserve">
+    <value>Несколько сетей соответствуют '{}'; используйте более длинный идентификатор или имя сети.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>Неподдерживаемый сетевой драйвер: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2535,6 +2558,10 @@
   </data>
   <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
     <value>Недопустимое значение времени остановки: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidSignal" xml:space="preserve">
+    <value>Недопустимое значение сигнала: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
@@ -3654,6 +3681,12 @@
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>Предоставить контейнеру возможности виртуализации</value>
   </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Добавить возможности Linux (можно использовать несколько раз)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Удалить возможности Linux (можно использовать несколько раз)</value>
+  </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Аргументы для передачи команде, выполняемой внутри контейнера</value>
   </data>
@@ -3671,6 +3704,10 @@
   <data name="WSLCCLI_InvalidRestartPolicyError" xml:space="preserve">
     <value>Недопустимое значение {} "{}". Ожидается no, always, on-failure[:max-retries] или unless-stopped.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UnsupportedRestartPolicyError" xml:space="preserve">
+    <value>Restart policy '{}' is not supported. Supported values are no and always.</value>
+    <comment>{Locked="no"}{Locked="always"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
     <value>Недопустимое значение {}: {} не является распознаваемым типом хода выполнения. Поддерживаемые типы хода выполнения: {}.</value>
@@ -3793,6 +3830,9 @@
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
     <value>Сетевое имя</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
+    <value>Имя или идентификатор сети</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Показывать только сетевые идентификаторы</value>
@@ -4141,6 +4181,9 @@
   <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
     <value>Не удалось остановить контейнер '{}' после отклонения подключаемого модуля</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcRestartPolicyConflictsWithRm" xml:space="preserve">
+    <value>Политику перезапуска нельзя использовать вместе с автоматическим удалением контейнера.</value>
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>Не удалось освободить ресурсы узла для тома "{}"</value>

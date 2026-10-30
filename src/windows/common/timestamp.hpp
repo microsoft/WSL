@@ -17,6 +17,7 @@ Abstract:
 #include <chrono>
 #include <optional>
 #include <string>
+#include <utility>
 
 namespace wsl::windows::common::timestamp {
 
@@ -31,6 +32,10 @@ std::string ExpandToRfc3339(const std::string& timestamp);
 // to a negative value. Throws E_INVALIDARG if the timestamp is malformed, names an invalid date, or
 // has trailing characters.
 std::int64_t Rfc3339ToEpoch(const std::string& timestamp);
+
+// Parses Unix seconds, a relative Go duration, or a partial RFC 3339 timestamp.
+// Returns whole seconds since the epoch and the nonnegative fractional nanoseconds.
+std::pair<std::int64_t, std::int64_t> ParseTimestamp(const std::string& value);
 
 // Parses a Go duration such as "1h30m", "-1.5h" or "300ms": an optional sign followed by one or more
 // decimal values that each carry a unit of ns, us, ms, s, m or h. Returns nothing if the value does

@@ -206,6 +206,30 @@ class WSLCE2EContainerRunTests
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
+    // A foreground run returns at the first exit while the restart policy keeps restarting the container.
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_RestartAlways_Foreground)
+    {
+        auto result = RunWslc(std::format(
+            LR"(container run --restart always --name {} {} sh -c "echo run; sleep 2; exit 3")", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"run\n", .Stderr = L"", .ExitCode = 3});
+
+        VERIFY_ARE_EQUAL(std::string{"always"}, InspectContainer(WslcContainerName).HostConfig.RestartPolicy.Name);
+
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+        bool running = InspectContainer(WslcContainerName).State.Running;
+        while (!running && std::chrono::steady_clock::now() < deadline)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            running = InspectContainer(WslcContainerName).State.Running;
+        }
+
+        VERIFY_IS_TRUE(running);
+
+        result = RunWslc(std::format(L"container stop {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(InspectContainer(WslcContainerName).State.Running);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvOption)
     {
         VerifyContainerIsNotListed(WslcContainerName);
@@ -958,6 +982,20 @@ class WSLCE2EContainerRunTests
             RunWslc(std::format(L"container run --name {} --network host {} true", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"", .Stderr = wsl::shared::Localization::WSLCCLI_NetworkHostModeNotSupportedError() + L"\r\n", .ExitCode = 1});
         VerifyContainerIsNotListed(WslcContainerName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Network_HostById_Rejected)
+    {
+        const auto hostId = wsl::shared::string::MultiByteToWide(InspectNetwork(L"host").Id);
+
+        for (const auto& reference : {hostId, hostId.substr(0, 12)})
+        {
+            auto result = RunWslc(
+                std::format(L"container run --name {} --network {} {} true", WslcContainerName, reference, DebianImage.NameAndTag()));
+            result.Verify(
+                {.Stderr = FormatErrorMessage(std::format(L"Network not found: '{}'", reference), L"WSLC_E_NETWORK_NOT_FOUND"), .ExitCode = 1});
+            VerifyContainerIsNotListed(WslcContainerName);
+        }
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Network_UserDefinedNetwork)

@@ -502,24 +502,6 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
     }
 }
 
-GUID wsl::core::Config::NatNetworkId() const noexcept
-{
-    // Identifier for the WSL virtual network: {b95d0c5e-57d4-412b-b571-18a81a16e005}
-    static constexpr GUID c_networkId = {0xb95d0c5e, 0x57d4, 0x412b, {0xb5, 0x71, 0x18, 0xa8, 0x1a, 0x16, 0xe0, 0x05}};
-
-    // Identifier for the WSL virtual network with Hyper-v firewall enabled: {790e58b4-7939-4434-9358-89ae7ddbe87e}
-    static constexpr GUID c_networkWithFirewallId = {0x790e58b4, 0x7939, 0x4434, {0x93, 0x58, 0x89, 0xae, 0x7d, 0xdb, 0xe8, 0x7e}};
-
-    return FirewallConfig.Enabled() ? c_networkWithFirewallId : c_networkId;
-}
-
-LPCWSTR wsl::core::Config::NatNetworkName() const noexcept
-{
-    static constexpr auto c_networkName = L"WSL";
-    static constexpr auto c_networkWithFirewallName = L"WSL (Hyper-V firewall)";
-    return FirewallConfig.Enabled() ? c_networkWithFirewallName : c_networkName;
-}
-
 void wsl::core::FirewallConfiguration::Enable() noexcept
 {
     VmCreatorId = wsl::core::networking::c_wslFirewallVmCreatorId;

@@ -903,6 +903,10 @@ Windows 版本: {}</value>
     <value>无法创建地址范围为“{}”的虚拟网络，已创建具有以下范围的新网络:“{}”，{}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
+    <value>WSL 的 NAT 网络 ({}) 与 docker 的默认网络冲突</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
     <value>安全模式已启用 - 许多功能都将被禁用</value>
     <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
@@ -1018,6 +1022,9 @@ Windows 版本: {}</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>计算机策略禁用 WSL 容器。</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>计算机策略禁用了 Linux 功能扩展。</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>容器映像注册表 '{}' 被计算机策略阻止。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -1084,6 +1091,10 @@ Windows 版本: {}</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>无法完成该操作，因为 VHD 当前正在使用中。强制 WSL 停止使用: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageDistributionTerminationTimeout" xml:space="preserve">
+    <value>等待分发进程 {} 在 {} 毫秒后退出时超时。继续而不确认分发是否已停止。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
     <value>仅支持对 .vhdx 文件进行压缩。</value>
@@ -1228,6 +1239,10 @@ Windows 版本: {}</value>
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
     <value>Cgroup v1 与按分布 cgroup 隔离不兼容。改为使用 cgroup v2。要使用 cgroup v1，请在 .wslconfig 中的 [wsl2] 下设置 isolateDistroCgroup=false，然后运行 --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
+  <data name="MessageWindowsInstallerBusy" xml:space="preserve">
+    <value>WSL 安装被阻止，因为 Windows Installer 正忙。等待其他软件安装完成，然后重试。</value>
+    <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>出现错误。请稍后再试。</value>
@@ -2214,6 +2229,10 @@ Windows 版本: {}</value>
     <value>容器 '{}' 正在运行，无法删除。在删除容器之前停止容器或使用强制删除 (-f)。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcCannotRemoveRestartingContainer" xml:space="preserve">
+    <value>容器 '{}' 正在重启，无法删除。在删除容器之前停止容器或使用强制删除 (-f)。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerNotRunning" xml:space="preserve">
     <value>容器“{}”未运行。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2495,6 +2514,10 @@ Windows 版本: {}</value>
     <value>找不到网络: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcNetworkPrefixAmbiguous" xml:space="preserve">
+    <value>多个网络与 "{}" 匹配；请使用更长的 ID 或网络名称。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>不支持的网络驱动程序: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2528,6 +2551,10 @@ Windows 版本: {}</value>
   </data>
   <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
     <value>停止超时值无效: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidSignal" xml:space="preserve">
+    <value>信号值无效: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
@@ -3646,6 +3673,12 @@ Windows 版本: {}</value>
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>向容器公开虚拟化功能</value>
   </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>添加 Linux 功能(可重复)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>删除 Linux 功能(可重复)</value>
+  </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>传递到容器内正在执行的命令的参数</value>
   </data>
@@ -3663,6 +3696,10 @@ Windows 版本: {}</value>
   <data name="WSLCCLI_InvalidRestartPolicyError" xml:space="preserve">
     <value>无效 {} 值 '{}'。预期为 no、always、on-failure[:max-retries] 或 unless-stopped。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UnsupportedRestartPolicyError" xml:space="preserve">
+    <value>Restart policy '{}' is not supported. Supported values are no and always.</value>
+    <comment>{Locked="no"}{Locked="always"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
     <value>无效的 {} 值: {} 不是可识别的进度类型。支持的进度类型为: {}。</value>
@@ -3785,6 +3822,9 @@ Windows 版本: {}</value>
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
     <value>网络名称</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
+    <value>网络名称或 ID</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>仅显示网络 ID</value>
@@ -4133,6 +4173,9 @@ Windows 版本: {}</value>
   <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
     <value>插件被拒绝后未能停止容器 '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcRestartPolicyConflictsWithRm" xml:space="preserve">
+    <value>重启策略不能与容器的自动删除相结合。</value>
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>无法释放卷“{}”的主机资源</value>

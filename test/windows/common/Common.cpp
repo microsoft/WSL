@@ -1029,16 +1029,14 @@ Return Value:
         LogError("Failed to create WER report, 0x%x", wil::ResultFromCaughtException());
     }
 
-    if (LxsstuVmMode())
+    // Dump guest processes in WSL1 & WSL2 mode, since some WSL1 tests use a WSL2 VM.
+    try
     {
-        try
-        {
-            DumpGuestProcesses();
-        }
-        catch (...)
-        {
-            LogError("Failed to dump guest processes, 0x%x", wil::ResultFromCaughtException());
-        }
+        DumpGuestProcesses();
+    }
+    catch (...)
+    {
+        LogError("Failed to dump guest processes, 0x%x", wil::ResultFromCaughtException());
     }
 
     try

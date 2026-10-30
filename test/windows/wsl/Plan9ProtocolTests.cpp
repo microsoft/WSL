@@ -112,8 +112,8 @@ namespace {
         THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(logWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
 
         // TRACE_LEVEL_VERBOSE == 5
-        auto commandLine =
-            LxssGenerateWslCommandLine(std::format(L"/plan9 --bind {} --log-file /dev/stderr --log-level {}", c_plan9Port, 5).c_str());
+        auto commandLine = LxssGenerateWslCommandLine(
+            std::format(L"-u root /plan9 --bind {} --log-file /dev/stderr --log-level {}", c_plan9Port, 5).c_str());
 
         Plan9Server server;
         server.process = LxsstuStartProcess(commandLine.data(), stdinRead.get(), stdoutWrite.get(), logWrite.get());
@@ -179,12 +179,13 @@ namespace {
         return message;
     }
 
-    void SendMessageAndExpectResponse(SOCKET socket, const std::vector<uint8_t>& request, Plan9MessageType responseType)
+    std::vector<uint8_t> SendMessageAndExpectResponse(SOCKET socket, std::span<const uint8_t> request, Plan9MessageType responseType)
     {
         SendAll(socket, request);
-        const auto response = ReceivePlan9Message(socket);
+        auto response = ReceivePlan9Message(socket);
         VERIFY_IS_GREATER_THAN_OR_EQUAL(response.size(), static_cast<size_t>(5));
         VERIFY_ARE_EQUAL(static_cast<uint8_t>(responseType), response[4]);
+        return response;
     }
 
     Plan9Server ConnectToOpenedServer()
@@ -228,6 +229,7 @@ class Plan9ProtocolTests
         if (LxsstuVmMode())
         {
             m_config.emplace(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"-u root ln -sf /init /plan9"), 0u);
         }
 
         return true;
@@ -235,6 +237,11 @@ class Plan9ProtocolTests
 
     TEST_CLASS_CLEANUP(TestClassCleanup)
     {
+        if (m_config)
+        {
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"-u root rm -f /plan9"), 0u);
+        }
+
         m_config.reset();
         VERIFY_NO_THROW(LxsstuUninitialize(FALSE));
         return true;
@@ -243,58 +250,175 @@ class Plan9ProtocolTests
     // Smoke test
     WSL2_TEST_METHOD(QueryVersion)
     {
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ln -sf /init /plan9"), 0u);
-
         auto server = ConnectToServer();
 
-        SendAll(server.client.get(), c_versionRequest);
-
-        const auto response = ReceivePlan9Message(server.client.get());
+        const auto response = SendMessageAndExpectResponse(server.client.get(), c_versionRequest, Plan9MessageType::Rversion);
         VERIFY_IS_TRUE(std::ranges::equal(c_versionResponse, response));
+    }
+
+    WSL2_TEST_METHOD(XattrCommitsUseAttachedCredentials)
+    {
+        ULONG uid{};
+        ULONG gid{};
+        CreateUser(L"plan9testuser", &uid, &gid);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"-u root rm -f /tmp/plan9-xattr-test"), 0u);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"-u root userdel plan9testuser"), 0u);
+        });
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"-u root install -m 644 /dev/null /tmp/plan9-xattr-test"), 0u);
+
+        auto server = ConnectToServer();
+        const auto socket = server.client.get();
+        SendMessageAndExpectResponse(socket, c_versionRequest, Plan9MessageType::Rversion);
+
+        constexpr uint32_t c_rootFid = 1;
+        constexpr uint32_t c_userFid = 2;
+        constexpr uint32_t c_xattrFid = 3;
+        constexpr uint32_t c_attachFid = 4;
+        constexpr uint32_t c_xattrCreate = 1;
+        constexpr uint32_t c_xattrReplace = 2;
+        constexpr std::string_view c_attribute = "user.plan9-test";
+
+        const auto attachFile = [&](uint32_t fid, uint32_t attachUid) {
+            std::vector<uint8_t> payload;
+            AppendU32(payload, c_attachFid);
+            AppendU32(payload, UINT32_MAX);
+            AppendString(payload, "");
+            AppendString(payload, "");
+            AppendU32(payload, attachUid);
+            SendMessageAndExpectResponse(socket, MakePlan9Message(Plan9MessageType::Tattach, std::move(payload)), Plan9MessageType::Rattach);
+
+            payload.clear();
+            AppendU32(payload, c_attachFid);
+            AppendU32(payload, fid);
+            AppendU16(payload, 2);
+            AppendString(payload, "tmp");
+            AppendString(payload, "plan9-xattr-test");
+            SendMessageAndExpectResponse(socket, MakePlan9Message(Plan9MessageType::Twalk, std::move(payload)), Plan9MessageType::Rwalk);
+
+            payload.clear();
+            AppendU32(payload, c_attachFid);
+            SendMessageAndExpectResponse(socket, MakePlan9Message(Plan9MessageType::Tclunk, std::move(payload)), Plan9MessageType::Rclunk);
+        };
+
+        attachFile(c_rootFid, 0);
+        attachFile(c_userFid, uid);
+
+        const auto mutateAttribute = [&](uint32_t fid, std::string_view value, uint32_t flags, bool allowed) {
+            std::vector<uint8_t> payload;
+            AppendU32(payload, fid);
+            AppendU32(payload, c_xattrFid);
+            AppendU16(payload, 0);
+            SendMessageAndExpectResponse(socket, MakePlan9Message(Plan9MessageType::Twalk, std::move(payload)), Plan9MessageType::Rwalk);
+
+            payload.clear();
+            AppendU32(payload, c_xattrFid);
+            AppendString(payload, c_attribute);
+            AppendU64(payload, value.size());
+            AppendU32(payload, flags);
+            SendMessageAndExpectResponse(socket, MakePlan9Message(Plan9MessageType::Txattrcreate, std::move(payload)), Plan9MessageType::Rxattrcreate);
+
+            if (!value.empty())
+            {
+                payload.clear();
+                AppendU32(payload, c_xattrFid);
+                AppendU64(payload, 0);
+                AppendU32(payload, gsl::narrow<uint32_t>(value.size()));
+                payload.insert(payload.end(), value.begin(), value.end());
+                SendMessageAndExpectResponse(socket, MakePlan9Message(Plan9MessageType::Twrite, std::move(payload)), Plan9MessageType::Rwrite);
+            }
+
+            payload.clear();
+            AppendU32(payload, c_xattrFid);
+            const auto responseType = allowed ? Plan9MessageType::Rclunk : Plan9MessageType::Rlerror;
+            const auto response =
+                SendMessageAndExpectResponse(socket, MakePlan9Message(Plan9MessageType::Tclunk, std::move(payload)), responseType);
+
+            std::vector<uint8_t> expectedPayload;
+            if (!allowed)
+            {
+                AppendU32(expectedPayload, EACCES);
+            }
+
+            const auto expected = MakePlan9Message(responseType, std::move(expectedPayload));
+            VERIFY_IS_TRUE(std::ranges::equal(expected, response));
+        };
+
+        // Authorization is enforced at clunk, not xattrcreate.
+        mutateAttribute(c_userFid, "denied", c_xattrCreate, false);
+        mutateAttribute(c_rootFid, "original", c_xattrCreate, true);
+        mutateAttribute(c_userFid, "denied", c_xattrReplace, false);
+        mutateAttribute(c_userFid, "", 0, false);
+
+        // Validate that the attribute value is still 'original'.
+        {
+            std::vector<uint8_t> payload;
+            AppendU32(payload, c_rootFid);
+            AppendU32(payload, c_xattrFid);
+            AppendString(payload, c_attribute);
+            SendMessageAndExpectResponse(socket, MakePlan9Message(Plan9MessageType::Txattrwalk, std::move(payload)), Plan9MessageType::Rxattrwalk);
+
+            payload.clear();
+
+            AppendU32(payload, c_xattrFid);
+            AppendU64(payload, 0);
+            AppendU32(payload, 8);
+            const auto response =
+                SendMessageAndExpectResponse(socket, MakePlan9Message(Plan9MessageType::Tread, std::move(payload)), Plan9MessageType::Rread);
+
+            payload.clear();
+
+            AppendU32(payload, 8);
+            constexpr std::string_view c_original = "original";
+            payload.insert(payload.end(), c_original.begin(), c_original.end());
+            VERIFY_IS_TRUE(std::ranges::equal(MakePlan9Message(Plan9MessageType::Rread, std::move(payload)), response));
+
+            payload.clear();
+            AppendU32(payload, c_xattrFid);
+            SendMessageAndExpectResponse(socket, MakePlan9Message(Plan9MessageType::Tclunk, std::move(payload)), Plan9MessageType::Rclunk);
+            mutateAttribute(c_rootFid, "", 0, true);
+        }
+
+        // Validate that the xattr can be modified when the user has write access to it.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-u root chown {}:{} /tmp/plan9-xattr-test", uid, gid)), 0u);
+        mutateAttribute(c_userFid, "created", c_xattrCreate, true);
+        mutateAttribute(c_userFid, "replaced", c_xattrReplace, true);
+        mutateAttribute(c_userFid, "", 0, true);
+        mutateAttribute(c_rootFid, "restored", c_xattrCreate, true);
+        mutateAttribute(c_rootFid, "", 0, true);
     }
 
     // Send a truncated tread and validate that the server returns EINVAL.
     WSL2_TEST_METHOD(ReadRejectsTruncatedRequest)
     {
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ln -sf /init /plan9"), 0u);
-
         auto server = ConnectToServer();
 
-        SendAll(server.client.get(), MakePlan9Message(Plan9MessageType::Tread, {}));
-
-        const auto response = ReceivePlan9Message(server.client.get());
+        const auto response =
+            SendMessageAndExpectResponse(server.client.get(), MakePlan9Message(Plan9MessageType::Tread, {}), Plan9MessageType::Rlerror);
         VERIFY_IS_TRUE(std::ranges::equal(c_invalidArgumentResponse, response));
     }
 
     // Validate that logging and processing a string that extends past the end of the message returns EINVAL.
     WSL2_TEST_METHOD(VersionRejectsTruncatedString)
     {
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ln -sf /init /plan9"), 0u);
-
         auto server = ConnectToServer();
 
         std::vector<uint8_t> payload;
         AppendU32(payload, 8192);
         AppendU16(payload, 1);
-        SendAll(server.client.get(), MakePlan9Message(Plan9MessageType::Tversion, std::move(payload)));
 
-        auto response = ReceivePlan9Message(server.client.get());
+        auto response = SendMessageAndExpectResponse(
+            server.client.get(), MakePlan9Message(Plan9MessageType::Tversion, std::move(payload)), Plan9MessageType::Rlerror);
         VERIFY_IS_TRUE(std::ranges::equal(c_invalidArgumentResponse, response));
 
-        SendAll(server.client.get(), c_versionRequest);
-        response = ReceivePlan9Message(server.client.get());
+        response = SendMessageAndExpectResponse(server.client.get(), c_versionRequest, Plan9MessageType::Rversion);
         VERIFY_IS_TRUE(std::ranges::equal(c_versionResponse, response));
     }
 
     // Validate that the lock handlers reject client ids that extend past the end of the message.
     WSL2_TEST_METHOD(LockRequestsRejectTruncatedClientId)
     {
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ln -sf /init /plan9"), 0u);
-
         auto server = ConnectToOpenedServer();
 
         std::vector<uint8_t> payload;
@@ -304,9 +428,9 @@ class Plan9ProtocolTests
         AppendU64(payload, 0);
         AppendU32(payload, 0);
         AppendU16(payload, 1);
-        SendAll(server.client.get(), MakePlan9Message(Plan9MessageType::Tgetlock, std::move(payload)));
 
-        const auto response = ReceivePlan9Message(server.client.get());
+        const auto response = SendMessageAndExpectResponse(
+            server.client.get(), MakePlan9Message(Plan9MessageType::Tgetlock, std::move(payload)), Plan9MessageType::Rlerror);
         VERIFY_IS_TRUE(std::ranges::equal(c_invalidArgumentResponse, response));
 
         payload.clear();
@@ -317,9 +441,9 @@ class Plan9ProtocolTests
         AppendU64(payload, 0);
         AppendU32(payload, 0);
         AppendU16(payload, 1);
-        SendAll(server.client.get(), MakePlan9Message(Plan9MessageType::Tlock, std::move(payload)));
 
-        const auto lockResponse = ReceivePlan9Message(server.client.get());
+        const auto lockResponse = SendMessageAndExpectResponse(
+            server.client.get(), MakePlan9Message(Plan9MessageType::Tlock, std::move(payload)), Plan9MessageType::Rlerror);
         VERIFY_IS_TRUE(std::ranges::equal(c_invalidArgumentResponse, lockResponse));
     }
 };

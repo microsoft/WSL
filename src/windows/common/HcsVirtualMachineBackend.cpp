@@ -384,23 +384,7 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
             }
         });
 
-        wil::unique_hfile backingFile;
-        try
-        {
-            backingFile = wsl::windows::common::disk::OpenVhdBackingFile(path.c_str(), bootDisk.GrantHostAccess ? userToken : nullptr);
-        }
-        catch (...)
-        {
-            if (!bootDisk.GrantHostAccess || wil::ResultFromCaughtException() != E_ACCESSDENIED)
-            {
-                throw;
-            }
-
-            LOG_CAUGHT_EXCEPTION();
-
-            // Custom VHDs may be accessible only to the service and the VM worker process.
-            backingFile = wsl::windows::common::disk::OpenVhdBackingFile(path.c_str());
-        }
+        auto backingFile = wsl::windows::common::disk::OpenVhdBackingFile(path.c_str(), bootDisk.GrantHostAccess ? userToken : nullptr);
 
         schema::Attachment attachment{};
         attachment.Type = schema::AttachmentType::VirtualDisk;
@@ -1476,8 +1460,6 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
                 const auto* options = std::get_if<VmVirtioFsShareOptions>(&Request.Options);
                 THROW_HR_IF_MSG(E_INVALIDARG, !options, "A virtio-fs device requires virtio-fs share options");
 
-                hostPath = NormalizeSharePath(Request.HostPath);
-
                 auto shareOptions = options->MountOptions;
                 if (Request.ReadOnly)
                 {
@@ -1510,6 +1492,11 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
                     {
                         shareUserToken = userToken;
                     }
+                }
+
+                {
+                    const auto runAsUser = wil::impersonate_token(shareUserToken.get());
+                    hostPath = NormalizeSharePath(Request.HostPath);
                 }
 
                 // Repeating a request for the same path and options reuses the existing share so that

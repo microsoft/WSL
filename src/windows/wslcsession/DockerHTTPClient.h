@@ -146,7 +146,7 @@ public:
     std::unique_ptr<HTTPRequestContext> PutArchive(const std::string& ContainerID, const std::string& Path, std::optional<uint64_t> ContentLength);
     std::tuple<uint32_t, wil::unique_socket, bool> GetArchive(const std::string& ContainerID, const std::string& Path);
     std::optional<common::docker_schema::ContainerPathStat> StatArchivePath(const std::string& ContainerID, const std::string& Path);
-    common::docker_schema::PruneContainerResult PruneContainers(const std::map<std::string, std::vector<std::string>>& filters = {});
+    std::vector<common::docker_schema::ContainerInfo> ListPruneCandidates(const std::map<std::string, std::vector<std::string>>& Filters);
 
     // Volume management.
     common::docker_schema::Volume CreateVolume(const common::docker_schema::CreateVolume& Request);

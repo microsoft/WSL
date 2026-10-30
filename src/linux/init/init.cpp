@@ -2446,7 +2446,7 @@ Return Value:
 
             if (Config.CgroupNamespace)
             {
-                THROW_LAST_ERROR_IF(UtilMoveSelfToDistroCgroup(CGROUP_MOUNTPOINT, "systemd") < 0);
+                THROW_LAST_ERROR_IF(UtilMoveSelfToCgroup(CGROUP_MOUNTPOINT, "systemd") < 0);
                 THROW_LAST_ERROR_IF(UtilEnterCgroupNamespace(Config.CgroupNamespace.get(), "systemd") < 0);
             }
 
@@ -3211,6 +3211,13 @@ Return Value:
     pid_t child;
     int status;
 
+    //
+    // N.B. This can run after a failed call has set errno but before the caller
+    //      reads it (e.g. in TEMP_FAILURE_RETRY), and the final waitpid() sets
+    //      errno to ECHILD when no children remain, so preserve it.
+    //
+
+    const int savedErrno = errno;
     while ((child = waitpid(-1, &status, WNOHANG)) > 0)
     {
         if (child == g_SessionGroup)
@@ -3219,6 +3226,7 @@ Return Value:
         }
     }
 
+    errno = savedErrno;
     return;
 }
 

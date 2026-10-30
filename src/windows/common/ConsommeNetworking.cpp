@@ -230,8 +230,19 @@ try
 }
 CATCH_LOG()
 
-uint16_t ConsommeNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int protocol, uint16_t guestPort, bool allocate) const
+uint16_t ConsommeNetworking::HandlePortNotification(SOCKADDR_INET addr, int protocol, uint16_t guestPort, bool allocate) const
 {
+    if (addr.si_family == AF_INET6 && IN6_IS_ADDR_V4MAPPED(&addr.Ipv6.sin6_addr))
+    {
+        SOCKADDR_IN ipv4Address{};
+        ipv4Address.sin_family = AF_INET;
+        ipv4Address.sin_port = addr.Ipv6.sin6_port;
+        // IPv4-mapped IPv6 addresses have a 96-bit prefix, with the IPv4 address in bytes 12-15.
+        memcpy(&ipv4Address.sin_addr, &addr.Ipv6.sin6_addr.u.Byte[12], sizeof(ipv4Address.sin_addr));
+        addr = {};
+        addr.Ipv4 = ipv4Address;
+    }
+
     if (addr.si_family == AF_INET6 && WI_IsFlagClear(m_flags, ConsommeNetworkingFlags::Ipv6))
     {
         return 0;

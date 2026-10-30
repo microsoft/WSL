@@ -86,7 +86,7 @@ class WSLCE2ENetworkTests
     {
         auto result = RunWslc(L"network connect");
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'network-name'"));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'network'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Connect_MissingContainerId)
@@ -100,7 +100,7 @@ class WSLCE2ENetworkTests
     {
         auto result = RunWslc(L"network disconnect");
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'network-name'"));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'network'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Disconnect_MissingContainerId)
@@ -119,6 +119,22 @@ class WSLCE2ENetworkTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"network connect {} {}", TestNetworkName, WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(string::WideToMultiByte(TestNetworkName)));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Network_Connect_ById)
+    {
+        auto result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto prefix = string::MultiByteToWide(InspectNetwork(TestNetworkName).Id.substr(0, 12));
+        result = RunWslc(std::format(L"network connect {} {}", prefix, WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto inspect = InspectContainer(WslcContainerName);
@@ -302,6 +318,28 @@ class WSLCE2ENetworkTests
         }
 
         result = RunWslc(std::format(L"network disconnect {} {}", TestNetworkName, WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_IS_FALSE(inspect.NetworkSettings.Networks.contains(string::WideToMultiByte(TestNetworkName)));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Network_RunAndDisconnect_ById)
+    {
+        auto result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto id = string::MultiByteToWide(InspectNetwork(TestNetworkName).Id);
+        result = RunWslc(std::format(
+            L"container run -d --network {} --name {} {} sleep infinity", id, WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        {
+            const auto inspect = InspectContainer(WslcContainerName);
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(string::WideToMultiByte(TestNetworkName)));
+        }
+
+        result = RunWslc(std::format(L"network disconnect {} {}", id, WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto inspect = InspectContainer(WslcContainerName);

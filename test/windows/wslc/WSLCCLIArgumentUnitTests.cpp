@@ -210,6 +210,13 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(pullPolicy, PullPolicy::Never);
         VERIFY_THROWS(validation::GetPullPolicyFromString(L"invalid"), ArgumentException);
 
+        // Verify container restart policy
+        VERIFY_ARE_EQUAL(validation::GetRestartPolicyFromString(L""), WSLCContainerRestartPolicyNo);
+        VERIFY_ARE_EQUAL(validation::GetRestartPolicyFromString(L"no"), WSLCContainerRestartPolicyNo);
+        VERIFY_ARE_EQUAL(validation::GetRestartPolicyFromString(L"always"), WSLCContainerRestartPolicyAlways);
+        VERIFY_ARE_EQUAL(validation::GetRestartPolicyFromString(L"no:0"), WSLCContainerRestartPolicyNo);
+        VERIFY_ARE_EQUAL(validation::GetRestartPolicyFromString(L"always:+0"), WSLCContainerRestartPolicyAlways);
+
         // Verify build progress mode
         VERIFY_ARE_EQUAL(validation::GetProgressModeFromString(L"auto"), ProgressMode::Auto);
         VERIFY_ARE_EQUAL(validation::GetProgressModeFromString(L"tty"), ProgressMode::Tty);
@@ -428,6 +435,10 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Pull>(L"always"), PullPolicy::Always);
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Pull>(L"never"), PullPolicy::Never);
 
+        // string -> WSLCContainerRestartPolicy
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Restart>(L"no"), WSLCContainerRestartPolicyNo);
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Restart>(L"always"), WSLCContainerRestartPolicyAlways);
+
         // string -> WSLCSignal (Signal and StopSignal share the converter)
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Signal>(L"SIGTERM"), WSLCSignalSIGTERM);
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::StopSignal>(L"SIGKILL"), WSLCSignalSIGKILL);
@@ -626,6 +637,49 @@ class WSLCCLIArgumentUnitTests
         noHealthcheck.Add(ArgType::NoHealthcheck, true);
         Argument::Create(ArgType::NoHealthcheck).Validate(noHealthcheck);
         VERIFY_IS_FALSE(noHealthcheck.ContainsValidated(ArgType::NoHealthcheck));
+    }
+
+    // Test: Restart policies that parse correctly but are unsupported report an unsupported error, and
+    // malformed policies report an invalid value error.
+    TEST_METHOD(RestartPolicy_UnsupportedAndInvalidValues)
+    {
+        auto verifyMessage = [](const std::wstring& input, const std::wstring& expected) {
+            try
+            {
+                validation::GetRestartPolicyFromString(input, L"restart");
+                VERIFY_FAIL(std::format(L"Expected ArgumentException for '{}'", input).c_str());
+            }
+            catch (const ArgumentException& e)
+            {
+                VERIFY_ARE_EQUAL(expected, e.Message());
+            }
+        };
+
+        for (const auto* input : {L"on-failure", L"on-failure:3", L"on-failure:+3"})
+        {
+            verifyMessage(input, wsl::shared::Localization::WSLCCLI_UnsupportedRestartPolicyError(L"on-failure"));
+        }
+
+        for (const auto* input : {L"unless-stopped", L"unless-stopped:0"})
+        {
+            verifyMessage(input, wsl::shared::Localization::WSLCCLI_UnsupportedRestartPolicyError(L"unless-stopped"));
+        }
+
+        for (const auto* input :
+             {L"bogus",
+              L"Always",
+              L"always:1",
+              L"no:2",
+              L"unless-stopped:1",
+              L"on-failure:",
+              L"on-failure:-1",
+              L"on-failure:abc",
+              L"on-failure:3x",
+              L"on-failure:1:2",
+              L":3"})
+        {
+            verifyMessage(input, wsl::shared::Localization::WSLCCLI_InvalidRestartPolicyError(L"restart", input));
+        }
     }
 
     // Test: When conversion fails during validation, Validate throws and nothing is cached.

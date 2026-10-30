@@ -903,6 +903,10 @@ Další informace o Admin Protection najdete na https://aka.ms/apdevguide</value
     <value>Nepovedlo se vytvořit virtuální síť s rozsahem adres '{}', vytvořila se nová síť s rozsahem: '{}', {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
+    <value>Síť NAT WSL ({}) koliduje s výchozí sítí Dockeru</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
     <value>NOUZOVÝ REŽIM POVOLEN – mnoho funkcí bude zakázáno.</value>
     <comment>"safe mode" refers to a minimal/diagnostic startup mode. Use the standard OS term for safe mode in your locale.</comment>
@@ -1018,6 +1022,9 @@ Návrat k sítím NAT.</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>Zásady počítače zakazují kontejner WSL.</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>Přidávání funkcí pro Linux je zakázané zásadami počítače.</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>Zásady počítače zablokovaly registr imagí kontejneru {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -1084,6 +1091,10 @@ Návrat k sítím NAT.</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>Operaci nešlo dokončit, protože se VHD právě používá. Vynucení ukončení používání WSL: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageDistributionTerminationTimeout" xml:space="preserve">
+    <value>Časový limit čekání na ukončení distribučního procesu {} vypršel po {} ms. Pokračuje se bez potvrzení, že se distribuce zastavila.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
     <value>Komprimace je podporována pouze v souborech .vhdx.</value>
@@ -1228,6 +1239,10 @@ Zobrazit pokyny pro obnovení: https://aka.ms/wsldiskmountrecovery</value>
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
     <value>Cgroup v1 není kompatibilní s izolací cgroup pro jednotlivé distribuce. Místo toho se používá cgroup v2. Pokud chcete použít cgroup v1, nastavte isolateDistroCgroup=false v části [wsl2] v .wslconfig a pak spusťte wsl --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
+  <data name="MessageWindowsInstallerBusy" xml:space="preserve">
+    <value>Instalaci WSL nelze provést, protože Windows Installer je zaneprázdněný. Počkejte, až se dokončí instalace dalšího softwaru, a potom to zkuste znovu.</value>
+    <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Něco se nepovedlo. Zkuste to znovu později.</value>
@@ -2214,6 +2229,10 @@ Využití:
     <value>Kontejner {} je spuštěný a nedá se odebrat. Před odebráním buď zastavte kontejner, nebo použijte vynucené odebrání (-f).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcCannotRemoveRestartingContainer" xml:space="preserve">
+    <value>Kontejner {} se restartuje a nedá se odebrat. Před odebráním buď zastavte kontejner, nebo použijte vynucené odebrání (-f).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerNotRunning" xml:space="preserve">
     <value>Kontejner {} není spuštěný.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2495,6 +2514,10 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
     <value>Síť nebyla nalezena: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcNetworkPrefixAmbiguous" xml:space="preserve">
+    <value>Více sítí odpovídá „{}“; použijte delší ID nebo název sítě.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>Nepodporovaný síťový ovladač: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2528,6 +2551,10 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
   </data>
   <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
     <value>Neplatná hodnota časového limitu zastavení: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidSignal" xml:space="preserve">
+    <value>Neplatná hodnota signálu: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
@@ -3647,6 +3674,12 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>Zpřístupnit kontejneru virtualizační schopnosti</value>
   </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Přidat funkce Linuxu (lze opakovat)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Odebrat funkce Linuxu (lze opakovat)</value>
+  </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Argumenty, které se mají předat příkazu spuštěnému uvnitř kontejneru</value>
   </data>
@@ -3664,6 +3697,10 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   <data name="WSLCCLI_InvalidRestartPolicyError" xml:space="preserve">
     <value>Neplatná hodnota {}: {}. Očekává se no, always, on-failure[:max-retries] nebo unless-stopped.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UnsupportedRestartPolicyError" xml:space="preserve">
+    <value>Zásada restartování {} není podporovaná. Podporované hodnoty jsou no a always.</value>
+    <comment>{Locked="no"}{Locked="always"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
     <value>Neplatná hodnota {}: {} není rozpoznaný typ průběhu. Podporované typy průběhu: {}</value>
@@ -3786,6 +3823,9 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
     <value>Název sítě</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
+    <value>Název sítě nebo ID</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Zobrazit pouze ID sítě</value>
@@ -4134,6 +4174,9 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
     <value>Nepodařilo se zastavit kontejner '{}' po odmítnutí zásuvného modulu</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcRestartPolicyConflictsWithRm" xml:space="preserve">
+    <value>Zásadu restartování nelze kombinovat s automatickým odebráním kontejneru.</value>
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>Nepodařilo se uvolnit prostředky hostitele pro svazek '{}'</value>

@@ -48,6 +48,7 @@ bool wsl::windows::common::disk::IsDiskOnline(_In_ HANDLE Disk)
 }
 
 wil::unique_hfile wsl::windows::common::disk::OpenVhdBackingFile(_In_ LPCWSTR Path, _In_opt_ HANDLE UserToken)
+try
 {
     // User-owned VHDs may not grant the service identity access.
     wil::unique_token_reverter runAsUser;
@@ -56,11 +57,18 @@ wil::unique_hfile wsl::windows::common::disk::OpenVhdBackingFile(_In_ LPCWSTR Pa
         runAsUser = wil::impersonate_token(UserToken);
     }
 
+    // Open the file with read-only access to validate that the user can actually read it.
     wil::unique_hfile file{CreateFileW(
-        Path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        Path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_NO_BUFFERING, nullptr)};
     THROW_LAST_ERROR_IF(!file);
 
     return file;
+}
+catch (...)
+{
+    const auto result = wil::ResultFromCaughtException();
+    THROW_HR_WITH_USER_ERROR(
+        result, wsl::shared::Localization::MessageFailedToAttachDisk(Path, wsl::windows::common::wslutil::GetSystemErrorString(result)));
 }
 
 bool wsl::windows::common::disk::IsBackingVolumeMounted(_In_ HANDLE File)

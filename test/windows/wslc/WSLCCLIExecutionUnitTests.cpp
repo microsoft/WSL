@@ -1136,6 +1136,68 @@ class WSLCCLIExecutionUnitTests
             command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto&) { return true; });
     }
 
+    template <typename TCommand>
+    static WSLCContainerRestartPolicy ParseRestartPolicy(const std::wstring& commandLine)
+    {
+        auto invocation = CreateInvocationFromCommandLine(commandLine);
+
+        TCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+        return context.Data.Get<Data::ContainerOptions>().Restart;
+    }
+
+    template <typename TCommand>
+    static void VerifyRestartPolicyRejected(const std::wstring& commandLine, const std::wstring& expectedMessage)
+    {
+        auto invocation = CreateInvocationFromCommandLine(commandLine);
+
+        TCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [&](const auto& exception) {
+            return exception.Message() == expectedMessage;
+        });
+    }
+
+    TEST_METHOD(ContainerCommands_RestartPolicy_SetsOption)
+    {
+        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyNo, ParseRestartPolicy<ContainerRunCommand>(L"wslc ubuntu sh"));
+        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyNo, ParseRestartPolicy<ContainerRunCommand>(L"wslc --restart no ubuntu sh"));
+        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyAlways, ParseRestartPolicy<ContainerRunCommand>(L"wslc --restart always ubuntu sh"));
+        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyAlways, ParseRestartPolicy<ContainerRunCommand>(L"wslc --restart=always -d ubuntu sh"));
+        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyNo, ParseRestartPolicy<ContainerRunCommand>(L"wslc --rm --restart no ubuntu sh"));
+
+        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyNo, ParseRestartPolicy<ContainerCreateCommand>(L"wslc ubuntu sh"));
+        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyAlways, ParseRestartPolicy<ContainerCreateCommand>(L"wslc --restart always ubuntu sh"));
+        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyNo, ParseRestartPolicy<ContainerCreateCommand>(L"wslc --rm --restart no ubuntu sh"));
+    }
+
+    TEST_METHOD(ContainerCommands_RestartPolicy_RejectsUnsupportedInvalidAndConflicting)
+    {
+        const auto unsupportedOnFailure = wsl::shared::Localization::WSLCCLI_UnsupportedRestartPolicyError(L"on-failure");
+        const auto unsupportedUnlessStopped = wsl::shared::Localization::WSLCCLI_UnsupportedRestartPolicyError(L"unless-stopped");
+        const auto conflict = wsl::shared::Localization::WSLCCLI_ConflictingOptionsError(L"--restart", L"--rm");
+
+        VerifyRestartPolicyRejected<ContainerRunCommand>(L"wslc --restart on-failure ubuntu sh", unsupportedOnFailure);
+        VerifyRestartPolicyRejected<ContainerRunCommand>(L"wslc --restart on-failure:3 ubuntu sh", unsupportedOnFailure);
+        VerifyRestartPolicyRejected<ContainerRunCommand>(L"wslc --restart unless-stopped ubuntu sh", unsupportedUnlessStopped);
+        VerifyRestartPolicyRejected<ContainerRunCommand>(
+            L"wslc --restart bogus ubuntu sh", wsl::shared::Localization::WSLCCLI_InvalidRestartPolicyError(L"restart", L"bogus"));
+        VerifyRestartPolicyRejected<ContainerRunCommand>(L"wslc --rm --restart always ubuntu sh", conflict);
+
+        VerifyRestartPolicyRejected<ContainerCreateCommand>(L"wslc --restart on-failure:3 ubuntu sh", unsupportedOnFailure);
+        VerifyRestartPolicyRejected<ContainerCreateCommand>(L"wslc --restart unless-stopped ubuntu sh", unsupportedUnlessStopped);
+        VerifyRestartPolicyRejected<ContainerCreateCommand>(
+            L"wslc --restart always:1 ubuntu sh",
+            wsl::shared::Localization::WSLCCLI_InvalidRestartPolicyError(L"restart", L"always:1"));
+        VerifyRestartPolicyRejected<ContainerCreateCommand>(L"wslc --restart always --rm ubuntu sh", conflict);
+    }
+
     TEST_METHOD(CreateCommand_ParseGpusAll_SetsGpuOption)
     {
         auto invocation = CreateInvocationFromCommandLine(L"wslc --gpus all ubuntu sh");
