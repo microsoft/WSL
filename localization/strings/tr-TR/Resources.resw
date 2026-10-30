@@ -3699,7 +3699,7 @@ Windows sürümü: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_UnsupportedRestartPolicyError" xml:space="preserve">
-    <value>'{}' yeniden başlatma ilkesi nodesteklenmiyor. Desteklenen değerler no ve always.</value>
+    <value>Restart policy '{}' is not supported. Supported values are no and always.</value>
     <comment>{Locked="no"}{Locked="always"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
