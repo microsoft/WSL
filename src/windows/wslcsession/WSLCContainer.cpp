@@ -1389,7 +1389,7 @@ void WSLCContainerImpl::WaitForConflictingTransitionToComplete(
             const auto idle = m_exitRequests.IdleEvent();
             lock.reset();
             lifecycleLock.reset();
-            WaitForCompletionEvent(idle);
+            WaitForCompletionEvent(idle.get());
         }
         else
         {

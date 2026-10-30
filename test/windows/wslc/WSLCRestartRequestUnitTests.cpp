@@ -124,29 +124,34 @@ class WSLCRestartRequestUnitTests
 
     TEST_METHOD(RestartRequests_IdleEventTracksPendingRequests)
     {
-        const auto isIdle = [](const WSLCExitRequestState& state) {
-            return WaitForSingleObject(state.IdleEvent(), 0) == WAIT_OBJECT_0;
-        };
-
         WSLCExitRequestState state;
-        VERIFY_IS_TRUE(isIdle(state));
+        VERIFY_IS_FALSE(static_cast<bool>(state.IdleEvent()));
         state.BeginRun();
-        VERIFY_IS_TRUE(isIdle(state));
+        VERIFY_IS_FALSE(static_cast<bool>(state.IdleEvent()));
 
         const auto first = state.BeginRequest();
         const auto second = state.BeginRequest();
-        VERIFY_IS_FALSE(isIdle(state));
+        const auto batch = state.IdleEvent();
+        VERIFY_IS_TRUE(static_cast<bool>(batch));
+        VERIFY_IS_FALSE(batch.is_signaled());
         VERIFY_IS_TRUE(state.CompleteRequest(first, true));
-        VERIFY_IS_FALSE(isIdle(state));
+        VERIFY_IS_FALSE(batch.is_signaled());
         VERIFY_IS_TRUE(state.CompleteRequest(second, false));
-        VERIFY_IS_TRUE(isIdle(state));
+        VERIFY_IS_TRUE(batch.is_signaled());
+        VERIFY_IS_FALSE(static_cast<bool>(state.IdleEvent()));
 
+        // A later batch must not reset an event captured from an earlier one.
         const auto stale = state.BeginRequest();
-        VERIFY_IS_FALSE(isIdle(state));
+        const auto staleBatch = state.IdleEvent();
+        VERIFY_ARE_NOT_EQUAL(batch.get(), staleBatch.get());
+        VERIFY_IS_TRUE(batch.is_signaled());
+        VERIFY_IS_FALSE(staleBatch.is_signaled());
+
         state.BeginRun();
-        VERIFY_IS_TRUE(isIdle(state));
+        VERIFY_IS_TRUE(staleBatch.is_signaled());
+        VERIFY_IS_FALSE(static_cast<bool>(state.IdleEvent()));
         VERIFY_IS_FALSE(state.CompleteRequest(stale, false));
-        VERIFY_IS_TRUE(isIdle(state));
+        VERIFY_IS_FALSE(static_cast<bool>(state.IdleEvent()));
     }
 
     TEST_METHOD(RestartRequests_FailurePreservesSuccessfulIntent)

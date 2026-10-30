@@ -17,16 +17,17 @@ public:
         ++m_iteration;
         m_pending = 0;
         m_requested = false;
-        m_idle.SetEvent();
+        SignalIdle();
     }
 
-    std::uint64_t BeginRequest() noexcept
+    std::uint64_t BeginRequest()
     {
-        if (m_pending++ == 0)
+        if (m_pending == 0)
         {
-            m_idle.ResetEvent();
+            m_idle = wil::shared_event{wil::EventOptions::ManualReset};
         }
 
+        ++m_pending;
         return m_iteration;
     }
 
@@ -39,7 +40,7 @@ public:
 
         if (--m_pending == 0)
         {
-            m_idle.SetEvent();
+            SignalIdle();
         }
 
         m_requested = m_requested || Succeeded;
@@ -66,17 +67,27 @@ public:
         return m_pending != 0;
     }
 
-    // Signaled while no request is pending. Can be waited on without holding the container lock.
-    HANDLE IdleEvent() const noexcept
+    // Signaled once the current batch of pending requests completes, and never reset. Each batch gets its own event, so
+    // a copy can be waited on without holding the container lock. Empty while no request is pending.
+    wil::shared_event IdleEvent() const noexcept
     {
-        return m_idle.get();
+        return m_idle;
     }
 
 private:
+    void SignalIdle() noexcept
+    {
+        if (m_idle)
+        {
+            m_idle.SetEvent();
+            m_idle.reset();
+        }
+    }
+
     std::uint64_t m_iteration = 0;
     size_t m_pending = 0;
     bool m_requested = false;
-    wil::unique_event m_idle{wil::EventOptions::ManualReset | wil::EventOptions::Signaled};
+    wil::shared_event m_idle;
 };
 
 } // namespace wsl::windows::service::wslc
