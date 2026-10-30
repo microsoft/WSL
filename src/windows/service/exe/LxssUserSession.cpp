@@ -2109,7 +2109,13 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
 
             // Create a utility VM to create the tar file and output it via a
             // socket.
-            auto vmContext = _RunUtilityVmSetup(configuration, LxMiniInitMessageExport, 0, true);
+            LXSS_VM_MODE_SETUP_CONTEXT vmContext{};
+            bool setVersionDebug{};
+            {
+                std::lock_guard lock(m_instanceLock);
+                vmContext = _RunUtilityVmSetup(configuration, LxMiniInitMessageExport, 0, true);
+                setVersionDebug = m_utilityVm->GetConfig().SetVersionDebug;
+            }
 
             auto wsl1Pipe = wsl::windows::common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
 
@@ -2119,7 +2125,7 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
             // Add mounts for the rootfs and tools.
             auto mounts = _CreateSetupMounts(configuration);
 
-            if (m_utilityVm->GetConfig().SetVersionDebug)
+            if (setVersionDebug)
             {
                 commandLine += " -vv --totals";
             }
@@ -2155,26 +2161,32 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
         }
         else
         {
+            UINT64 vhdSizeBytes{};
+            bool enableSparseVhd{};
             {
                 std::lock_guard lock(m_instanceLock);
                 _CreateVm();
+                const auto& vmConfig = m_utilityVm->GetConfig();
+                vhdSizeBytes = vmConfig.VhdSizeBytes;
+                enableSparseVhd = vmConfig.EnableSparseVhd;
             }
 
             // Create a vhd to store the root filesystem.
             {
                 auto runAsUser = wil::impersonate_token(userToken.get());
-                wsl::core::filesystem::CreateVhd(
-                    configuration.VhdFilePath.c_str(),
-                    m_utilityVm->GetConfig().VhdSizeBytes,
-                    GetUserSid(),
-                    m_utilityVm->GetConfig().EnableSparseVhd,
-                    false);
+                wsl::core::filesystem::CreateVhd(configuration.VhdFilePath.c_str(), vhdSizeBytes, GetUserSid(), enableSparseVhd, false);
 
                 deleteFlags = LXSS_DELETE_DISTRO_FLAGS_VHD;
             }
 
             // Create a process in the utility VM to expand the tar file from a socket.
-            auto vmContext = _RunUtilityVmSetup(configuration, LxMiniInitMessageImport, 0, true);
+            LXSS_VM_MODE_SETUP_CONTEXT vmContext{};
+            bool setVersionDebug{};
+            {
+                std::lock_guard lock(m_instanceLock);
+                vmContext = _RunUtilityVmSetup(configuration, LxMiniInitMessageImport, 0, true);
+                setVersionDebug = m_utilityVm->GetConfig().SetVersionDebug;
+            }
 
             auto wsl1Pipe = wsl::windows::common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
 
@@ -2184,7 +2196,7 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
             // Add mounts for the rootfs and tools.
             auto mounts = _CreateSetupMounts(configuration);
 
-            if (m_utilityVm->GetConfig().SetVersionDebug)
+            if (setVersionDebug)
             {
                 commandLine += " -vv --totals";
             }
