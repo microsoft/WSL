@@ -1266,6 +1266,10 @@ See recovery instructions on: https://aka.ms/wsldiskmountrecovery</value>
   <data name="Settings_AutoMemoryReclaim.Header" xml:space="preserve">
     <value>Auto memory reclaim</value>
   </data>
+  <data name="Settings_LargeMemoryBackingPages.Description" xml:space="preserve">
+    <value>Use 2 MiB backing pages for the virtual machine. Enabling experimental.largeMemoryBackingPages may improve performance at the cost of increased host memory usage.</value>
+    <comment>{Locked="experimental.largeMemoryBackingPages"}</comment>
+  </data>
   <data name="Settings_AutoMemoryReclaim.Description" xml:space="preserve">
     <value>Automatically releases cached memory after detecting idle CPU usage. Set to gradual for slow release, and dropcache for instant release of cached memory.</value>
   </data>
@@ -2496,6 +2500,10 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   </data>
   <data name = "MessageWslcUnknownVolumeOption" xml:space = "preserve" >
     <value>Unknown option: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOperationRequiresWslVersion" xml:space="preserve">
+    <value>The installed WSL version ({}) does not support the requested operation. WSL {} or later is required.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name = "MessageWslcInvalidVolumeType" xml:space = "preserve" >

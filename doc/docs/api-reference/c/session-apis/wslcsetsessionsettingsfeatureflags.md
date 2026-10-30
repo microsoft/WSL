@@ -11,6 +11,9 @@ STDAPI WslcSetSessionSettingsFeatureFlags(_In_ WslcSessionSettings* sessionSetti
 
 Return value: `HRESULT`.
 
+`WSLC_SESSION_FEATURE_FLAG_LARGE_MEMORY_BACKING_PAGES` requires WSL 3.1.0 or later.
+The runtime version is checked by `WslcCreateSession`, not by this settings setter.
+
 Example:
 
 ```c

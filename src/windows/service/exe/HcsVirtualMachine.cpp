@@ -129,21 +129,8 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
         vmSettings.ComputeTopology.Numa.emplace();
     }
 
-    // Configure backing page size, fault cluster shift size, and page reporting order to favor density (lower vmmem usage).
-    //
-    // N.B. Page reporting order must be >= fault cluster size shift.
-    int pageReportingOrder;
-    if (windowsVersion.BuildNumber >= WindowsBuildNumbers::Germanium)
-    {
-        vmSettings.ComputeTopology.Memory.BackingPageSize = hcs::MemoryBackingPageSize::Small;
-        vmSettings.ComputeTopology.Memory.FaultClusterSizeShift = 4;
-        vmSettings.ComputeTopology.Memory.DirectMapFaultClusterSizeShift = 4;
-        pageReportingOrder = 5; // 128k
-    }
-    else
-    {
-        pageReportingOrder = 9; // 2MB
-    }
+    const int pageReportingOrder =
+        hcs::ConfigureMemoryBackingPages(vmSettings.ComputeTopology.Memory, FeatureEnabled(WslcFeatureFlagsLargeMemoryBackingPages));
 
     if (helpers::IsVmemmSuffixSupported() && Settings->DisplayName)
     {

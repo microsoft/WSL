@@ -1522,25 +1522,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
     vmSettings.ComputeTopology.Memory.EnableDeferredCommit = true;
     vmSettings.ComputeTopology.Memory.EnableColdDiscardHint = true;
 
-    // Configure backing page size, fault cluster shift size, and page reporting order to favor density (lower vmmem usage).
-    //
-    // N.B. Page reporting order must be >= fault cluster size shift.
-    //
-    // N.B. This is only done on builds that have the fix for the VID deadlock on partition teardown.
-    if ((m_windowsVersion.BuildNumber >= WindowsBuildNumbers::Germanium) ||
-        (m_windowsVersion.BuildNumber >= WindowsBuildNumbers::Cobalt && m_windowsVersion.UpdateBuildRevision >= 2360) ||
-        (m_windowsVersion.BuildNumber >= WindowsBuildNumbers::Iron && m_windowsVersion.UpdateBuildRevision >= 1970) ||
-        (m_windowsVersion.BuildNumber >= WindowsBuildNumbers::Vibranium_22H2 && m_windowsVersion.UpdateBuildRevision >= 3393))
-    {
-        vmSettings.ComputeTopology.Memory.BackingPageSize = hcs::MemoryBackingPageSize::Small;
-        vmSettings.ComputeTopology.Memory.FaultClusterSizeShift = 4;          // 64k
-        vmSettings.ComputeTopology.Memory.DirectMapFaultClusterSizeShift = 4; // 64k
-        m_pageReportingOrder = 5;                                             // 128k
-    }
-    else
-    {
-        m_pageReportingOrder = 9; // 2MB
-    }
+    m_pageReportingOrder = hcs::ConfigureMemoryBackingPages(vmSettings.ComputeTopology.Memory, m_vmConfig.EnableLargeMemoryBackingPages);
 
     // May need more MMIO than the default 16GB. WSL uses a vpci device per Plan9 share, WSLg adds a GPU device,
     // and a pmem device, and each shared memory virtiofs device needs more than 8GB of MMIO.

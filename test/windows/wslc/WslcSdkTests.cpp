@@ -3522,6 +3522,27 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, &pullOptions, nullptr), E_INVALIDARG);
     }
 
+    WSLC_TEST_METHOD(LargeMemoryBackingPages)
+    {
+        const auto storagePath = m_storagePath / "large-memory-backing-pages";
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code error;
+            std::filesystem::remove_all(storagePath, error);
+        });
+
+        WslcSessionSettings settings;
+        VERIFY_SUCCEEDED(WslcInitSessionSettings(L"sdk-large-memory-backing-pages", storagePath.c_str(), &settings));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsFeatureFlags(&settings, WSLC_SESSION_FEATURE_FLAG_LARGE_MEMORY_BACKING_PAGES));
+
+        UniqueSession session;
+        VERIFY_SUCCEEDED(WslcCreateSession(&settings, &session, nullptr));
+        VERIFY_SUCCEEDED(WslcLoadSessionImageFromFile(session.get(), GetTestImagePath("debian:latest").c_str(), nullptr, nullptr));
+
+        const auto output = RunContainerAndCapture(session.get(), "debian:latest", {"/bin/cat", "/proc/cmdline"});
+        VERIFY_IS_TRUE(output.stdoutOutput.find("page_reporting.page_reporting_order=9") != std::string::npos);
+        VERIFY_ARE_EQUAL(std::string{}, output.stderrOutput);
+    }
+
     WSLC_TEST_METHOD(ContainerGpu)
     {
         // Validate that creating a GPU container on a session without GPU support fails.

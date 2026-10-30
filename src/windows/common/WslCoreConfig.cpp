@@ -120,6 +120,7 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
 
         // Experimental features.
         ConfigKey(ConfigSetting::Experimental::AutoMemoryReclaim, wsl::core::MemoryReclaimModes, MemoryReclaim),
+        ConfigKey(ConfigSetting::Experimental::LargeMemoryBackingPages, EnableLargeMemoryBackingPages),
         ConfigKey(ConfigSetting::Experimental::SparseVhd, EnableSparseVhd),
         ConfigKey(ConfigSetting::Experimental::BestEffortDnsParsing, BestEffortDnsParsing),
         ConfigKey(ConfigSetting::Experimental::DnsTunnelingIpAddress, std::move(parseDnsTunnelingIp)),

@@ -44,8 +44,9 @@ template <>
 struct FlagsTraits<WslcSessionFeatureFlags>
 {
     using WslcType = WSLCFeatureFlags;
-    constexpr static WslcSessionFeatureFlags Mask = WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU;
+    constexpr static WslcSessionFeatureFlags Mask = WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU | WSLC_SESSION_FEATURE_FLAG_LARGE_MEMORY_BACKING_PAGES;
     WSLC_FLAG_VALUE_ASSERT(WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU, WslcFeatureFlagsGPU);
+    WSLC_FLAG_VALUE_ASSERT(WSLC_SESSION_FEATURE_FLAG_LARGE_MEMORY_BACKING_PAGES, WslcFeatureFlagsLargeMemoryBackingPages);
 };
 
 template <>
@@ -671,6 +672,13 @@ try
     auto internalType = CheckAndGetInternalType(sessionSettings);
 
     wil::com_ptr<IWSLCCompatSessionManager> sessionManager = CreateSessionManager();
+
+    if (WI_IsFlagSet(internalType->featureFlags, WSLC_SESSION_FEATURE_FLAG_LARGE_MEMORY_BACKING_PAGES))
+    {
+        WSLCCompatVersion runtimeVersion{};
+        RETURN_IF_FAILED(sessionManager->GetVersion(&runtimeVersion));
+        RETURN_IF_FAILED(CheckWslRuntimeVersionSupport(runtimeVersion, c_wslcFeatureMinimumVersion, errorMessage));
+    }
 
     auto result = std::make_unique<WslcSessionImpl>();
     WSLCCompatSessionSettings2 runtimeSettings2{};
