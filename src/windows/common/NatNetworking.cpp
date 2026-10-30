@@ -59,11 +59,11 @@ NatNetworking::NatNetworking(
 
 NatNetworking::~NatNetworking()
 {
-    // Stop DNS suffix change notifications first, as those can call into the GNS channel.
-    m_dnsSuffixRegistryWatcher.reset();
-
-    // Unblock guest communications before draining network notification and telemetry callbacks.
+    // Unblock guest communications before draining any callbacks that use the GNS channel.
     m_gnsChannel.Stop();
+
+    // Stop and drain DNS suffix change notifications.
+    m_dnsSuffixRegistryWatcher.reset();
 
     // Drain network notifications before destroying the telemetry timer they can rearm.
     m_networkNotifyHandle.reset();
