@@ -141,6 +141,7 @@ class WSLCCLISettingsUnitTests
             "  cpuCount: 8\n"
             "  memorySize: 4GB\n"
             "  maxStorageSize: 20000MB\n"
+            "  storageType: sparse\n"
             "credentialStore: file\n");
 
         UserSettingsTest s{dir};
@@ -150,7 +151,36 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(8u, s.Get<Setting::SessionCpuCount>());
         VERIFY_ARE_EQUAL(4096u, s.Get<Setting::SessionMemoryMb>());
         VERIFY_ARE_EQUAL(20000u, s.Get<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(static_cast<int>(StorageType::Sparse), static_cast<int>(s.Get<Setting::SessionStorageType>()));
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::File), static_cast<int>(s.Get<Setting::CredentialStore>()));
+    }
+
+    TEST_METHOD(Validation_StorageType_ValuesAreValidated)
+    {
+        struct TestCase
+        {
+            std::string_view Value;
+            StorageType Expected;
+            bool IsValid;
+        };
+
+        constexpr TestCase testCases[] = {
+            {"default", StorageType::Default, true},
+            {"dynamic", StorageType::Dynamic, true},
+            {"sparse", StorageType::Sparse, true},
+            {"fixed", StorageType::Default, false},
+        };
+
+        for (const auto& testCase : testCases)
+        {
+            auto dir = UniqueTempDir();
+            WriteFile(dir / L"settings.yaml", std::format("session:\n  storageType: {}\n", testCase.Value));
+
+            UserSettingsTest settings{dir};
+
+            VERIFY_ARE_EQUAL(static_cast<int>(testCase.Expected), static_cast<int>(settings.Get<Setting::SessionStorageType>()));
+            VERIFY_ARE_EQUAL(testCase.IsValid ? 0u : 1u, settings.GetWarnings().size());
+        }
     }
 
     TEST_METHOD(LoadSettings_StorageSizeFormats_YieldExpectedValues)

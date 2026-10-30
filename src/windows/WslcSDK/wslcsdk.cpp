@@ -270,7 +270,7 @@ struct ErrorInfoWrapper
 
     void GetErrorInfoFromCOM()
     {
-        if (m_errorMessage)
+        if (m_errorMessage && !*m_errorMessage)
         {
             auto errorInfo = wsl::windows::common::wslutil::GetCOMErrorInfo();
             if (errorInfo)
@@ -443,7 +443,7 @@ std::pair<wil::com_ptr<IWSLCCompatSessionManager>, HRESULT> CreateSessionManager
     return {result, hr};
 }
 
-wil::com_ptr<IWSLCCompatSessionManager> CreateSessionManager()
+std::pair<wil::com_ptr<IWSLCCompatSessionManager>, WSLCCompatVersion> CreateSessionManager()
 {
     auto [result, hr] = CreateSessionManagerRaw();
 
@@ -464,7 +464,10 @@ wil::com_ptr<IWSLCCompatSessionManager> CreateSessionManager()
 
     wsl::windows::common::security::ConfigureForCOMImpersonation(result.get());
 
-    return result;
+    WSLCCompatVersion version{};
+    THROW_IF_FAILED(result->GetVersion(&version));
+
+    return {std::move(result), version};
 }
 
 template <size_t Size>
@@ -670,9 +673,13 @@ try
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
     auto internalType = CheckAndGetInternalType(sessionSettings);
 
-    wil::com_ptr<IWSLCCompatSessionManager> sessionManager = CreateSessionManager();
+    auto [sessionManager, runtimeVersion] = CreateSessionManager();
+    if (internalType->vhdRequirements.type == WSLC_VHD_TYPE_SPARSE)
+    {
+        RETURN_IF_FAILED(CheckWslRuntimeVersionSupport(runtimeVersion, c_wslcFeatureMinimumVersion, errorMessage));
+    }
 
-    auto result = std::make_unique<WslcSessionImpl>();
+    auto result = std::make_unique<WslcSessionImpl>(runtimeVersion);
     WSLCCompatSessionSettings2 runtimeSettings2{};
     auto& runtimeSettings = runtimeSettings2.Base;
     runtimeSettings.DisplayName = internalType->displayName;
@@ -685,6 +692,7 @@ try
     runtimeSettings.FeatureFlags = ConvertFlags(internalType->featureFlags);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsDnsTunneling);
+    WI_SetFlagIf(runtimeSettings.StorageFlags, WSLCSessionStorageFlagsSparse, internalType->vhdRequirements.type == WSLC_VHD_TYPE_SPARSE);
 
     wil::com_ptr<IWSLCCompatSession> compatSession;
     HRESULT createResult{};
@@ -782,13 +790,22 @@ try
     std::vector<WSLCCompatDriverOption> driverOpts;
     driverOpts.push_back({"SizeBytes", sizeStr.c_str()});
 
-    if (options->type == WSLC_VHD_TYPE_FIXED)
+    switch (options->type)
     {
+    case WSLC_VHD_TYPE_DYNAMIC:
+        break;
+
+    case WSLC_VHD_TYPE_FIXED:
         driverOpts.push_back({"Fixed", "true"});
-    }
-    else
-    {
-        RETURN_HR_IF(E_INVALIDARG, options->type != WSLC_VHD_TYPE_DYNAMIC);
+        break;
+
+    case WSLC_VHD_TYPE_SPARSE:
+        RETURN_IF_FAILED(CheckWslRuntimeVersionSupport(internalType->runtimeVersion, c_wslcFeatureMinimumVersion, errorMessage));
+        driverOpts.push_back({"Sparse", "true"});
+        break;
+
+    default:
+        RETURN_HR(E_INVALIDARG);
     }
 
     if (WI_IsFlagSet(options->flags, WSLC_VHD_REQ_FLAG_OWNER))
@@ -831,7 +848,7 @@ try
     if (vhdRequirements)
     {
         RETURN_HR_IF(E_INVALIDARG, vhdRequirements->sizeBytes == 0);
-        RETURN_HR_IF(E_NOTIMPL, vhdRequirements->type != WSLC_VHD_TYPE_DYNAMIC);
+        RETURN_HR_IF(E_NOTIMPL, vhdRequirements->type != WSLC_VHD_TYPE_DYNAMIC && vhdRequirements->type != WSLC_VHD_TYPE_SPARSE);
 
         // Owner is only honored on named volumes; reject here so callers can't
         // mistakenly believe it applied to the session rootfs VHD.
@@ -2220,10 +2237,7 @@ try
     static_assert(std::is_trivial_v<WslcVersion>, "WslcVersion must be trivial");
     *version = {};
 
-    wil::com_ptr<IWSLCCompatSessionManager> sessionManager = CreateSessionManager();
-
-    WSLCCompatVersion runtimeVersion{};
-    RETURN_IF_FAILED(sessionManager->GetVersion(&runtimeVersion));
+    const auto [sessionManager, runtimeVersion] = CreateSessionManager();
 
     version->major = runtimeVersion.Major;
     version->minor = runtimeVersion.Minor;

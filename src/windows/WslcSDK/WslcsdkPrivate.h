@@ -16,7 +16,9 @@ Abstract:
 #include "wslcsdk.h"
 #include "WSLCCompat.h"
 #include "IOCallback.h"
+#include "Localization.h"
 #include <stdint.h>
+#include <tuple>
 #include <utility>
 #include <wil/com.h> // COM helpers
 // #include <wil/resource.h> // handle wrappers
@@ -113,6 +115,10 @@ const WslcContainerOptionsInternal* GetInternalType(const WslcContainerSettings*
 // Use to allocate the actual objects on the heap to keep it alive.
 struct WslcSessionImpl
 {
+    explicit WslcSessionImpl(const WSLCCompatVersion& version) : runtimeVersion(version)
+    {
+    }
+
     void SetSession(wil::com_ptr<IWSLCCompatSession>&& input)
     {
         m_session2 = nullptr;
@@ -134,6 +140,8 @@ struct WslcSessionImpl
     {
         return m_session2;
     }
+
+    WSLCCompatVersion runtimeVersion;
 
 private:
     wil::com_ptr<IWSLCCompatSession> m_session;
@@ -183,4 +191,32 @@ auto CheckAndGetInternalTypeUniquePointer(T* value)
 {
     THROW_HR_IF_NULL(E_POINTER, value);
     return std::unique_ptr<std::remove_pointer_t<decltype(GetInternalType(value))>>{GetInternalType(value)};
+}
+
+inline constexpr std::tuple<uint32_t, uint32_t, uint32_t> c_wslcFeatureMinimumVersion{3, 1, 0};
+
+inline HRESULT CheckWslRuntimeVersionSupport(const WSLCCompatVersion& version, const std::tuple<uint32_t, uint32_t, uint32_t>& minimumVersion, PWSTR* errorMessage)
+{
+    if (errorMessage)
+    {
+        *errorMessage = nullptr;
+    }
+
+    const std::tuple<uint32_t, uint32_t, uint32_t> currentVersion{version.Major, version.Minor, version.Revision};
+    // Allow lockstep development builds before the feature's release version.
+    const std::tuple<uint32_t, uint32_t, uint32_t> clientVersion{WSL_PACKAGE_VERSION_MAJOR, WSL_PACKAGE_VERSION_MINOR, WSL_PACKAGE_VERSION_REVISION};
+    if (currentVersion < minimumVersion && currentVersion != clientVersion)
+    {
+        if (errorMessage)
+        {
+            const auto message = wsl::shared::Localization::MessageWslcOperationRequiresWslVersion(
+                std::format("{}.{}.{}", version.Major, version.Minor, version.Revision),
+                std::format("{}.{}.{}", std::get<0>(minimumVersion), std::get<1>(minimumVersion), std::get<2>(minimumVersion)));
+            *errorMessage = wil::make_unique_string<wil::unique_cotaskmem_string>(message.c_str()).release();
+        }
+
+        return WSLC_E_RUNTIME_UPDATE_NEEDED;
+    }
+
+    return S_OK;
 }
