@@ -634,6 +634,7 @@ class PluginTests
                 Process created
                 Failed process launch returned:  -2147467259
                 Invalid distro launch returned:  -2147220717
+                Process terminated by SIGTERM
                 Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
                 VM Stopping)";
 
