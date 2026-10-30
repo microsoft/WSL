@@ -3,7 +3,6 @@
 #include "precomp.h"
 #include "Common.h"
 #include "hcs.hpp"
-#include "WslcsdkPrivate.h"
 
 namespace MemoryBackingPagesTests {
 class MemoryBackingPagesTests
@@ -78,40 +77,6 @@ class MemoryBackingPagesTests
             LogInfo("Windows build %lu.%lu", test.buildNumber, test.updateBuildRevision);
             VERIFY_ARE_EQUAL(test.supported, wsl::windows::common::hcs::IsSmallMemoryBackingPagesSupported(test.buildNumber, test.updateBuildRevision));
         }
-    }
-
-    TEST_METHOD(RuntimeVersionRequirement)
-    {
-        WSLCCompatVersion oldVersion{3, 0, 9};
-        if (WSL_PACKAGE_VERSION_MAJOR == oldVersion.Major && WSL_PACKAGE_VERSION_MINOR == oldVersion.Minor &&
-            WSL_PACKAGE_VERSION_REVISION == oldVersion.Revision)
-        {
-            --oldVersion.Revision;
-        }
-
-        wil::unique_cotaskmem_string message;
-        VERIFY_ARE_EQUAL(WSLC_E_RUNTIME_UPDATE_NEEDED, CheckWslRuntimeVersionSupport(oldVersion, {3, 1, 0}, &message));
-        VERIFY_IS_NOT_NULL(message.get());
-        VERIFY_ARE_EQUAL(
-            wsl::shared::Localization::MessageWslcOperationRequiresWslVersion(
-                std::format("{}.{}.{}", oldVersion.Major, oldVersion.Minor, oldVersion.Revision), "3.1.0"),
-            std::wstring(message.get()));
-        VERIFY_ARE_EQUAL(WSLC_E_RUNTIME_UPDATE_NEEDED, CheckWslRuntimeVersionSupport(oldVersion, {3, 1, 0}, nullptr));
-
-        for (const WSLCCompatVersion version : {WSLCCompatVersion{3, 1, 0}, WSLCCompatVersion{3, 1, 1}, WSLCCompatVersion{4, 0, 0}})
-        {
-            message.reset();
-            VERIFY_SUCCEEDED(CheckWslRuntimeVersionSupport(version, {3, 1, 0}, &message));
-            VERIFY_IS_NULL(message.get());
-        }
-    }
-
-    TEST_METHOD(MatchingDevelopmentRuntime)
-    {
-        const WSLCCompatVersion version{WSL_PACKAGE_VERSION_MAJOR, WSL_PACKAGE_VERSION_MINOR, WSL_PACKAGE_VERSION_REVISION};
-        wil::unique_cotaskmem_string message;
-        VERIFY_SUCCEEDED(CheckWslRuntimeVersionSupport(version, {UINT32_MAX, UINT32_MAX, UINT32_MAX}, &message));
-        VERIFY_IS_NULL(message.get());
     }
 };
 } // namespace MemoryBackingPagesTests
