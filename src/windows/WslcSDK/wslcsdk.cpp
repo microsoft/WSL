@@ -674,6 +674,13 @@ try
 
     wil::com_ptr<IWSLCCompatSessionManager> sessionManager = CreateSessionManager();
 
+    if (WI_IsFlagSet(internalType->featureFlags, WSLC_SESSION_FEATURE_FLAG_NESTED_VIRTUALIZATION))
+    {
+        WSLCCompatVersion runtimeVersion{};
+        RETURN_IF_FAILED(sessionManager->GetVersion(&runtimeVersion));
+        RETURN_IF_FAILED(CheckWslRuntimeVersionSupport(runtimeVersion, c_wslcFeatureMinimumVersion, errorMessage));
+    }
+
     auto result = std::make_unique<WslcSessionImpl>();
     WSLCCompatSessionSettings2 runtimeSettings2{};
     auto& runtimeSettings = runtimeSettings2.Base;
