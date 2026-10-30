@@ -274,7 +274,8 @@ void DockerEventTracker::OnImageEvent(const nlohmann::json& parsed, const std::s
         callbacks = m_state->m_imageCallbacks;
     }
 
-    InvokeCallbacks(callbacks, [&](const ImageCallback& callback) { callback.Callback(imageId, action, attributes, eventTimeNano); });
+    InvokeCallbacks(
+        callbacks, [&](const ImageCallback& callback) { callback.Callback(imageId, action, attributes, eventTimeNano); });
 }
 
 std::pair<std::string, std::map<std::string, std::string>> DockerEventTracker::ParseResourceActor(

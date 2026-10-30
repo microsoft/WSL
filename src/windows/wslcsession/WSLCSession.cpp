@@ -2637,8 +2637,7 @@ try
 }
 CATCH_LOG()
 
-void WSLCSession::OnImageEvent(
-    const std::string& ImageId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t TimeNano) noexcept
+void WSLCSession::OnImageEvent(const std::string& ImageId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t TimeNano) noexcept
 try
 {
     m_eventStore.Record("image", std::string{Action}, ImageId, Attributes, TimeNano);

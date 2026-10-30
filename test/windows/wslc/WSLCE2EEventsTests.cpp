@@ -603,7 +603,8 @@ class WSLCE2EEventsTests
 
         // Docker records the events asynchronously, so retry until this test's tag, untag and prune are visible in order.
         const auto queryEvents = [&]() {
-            const auto query = RunWslc(std::format(L"events --since {} --until {} --filter type=image --format json", since, EpochSeconds() + 1));
+            const auto query =
+                RunWslc(std::format(L"events --since {} --until {} --filter type=image --format json", since, EpochSeconds() + 1));
             THROW_HR_IF(E_FAIL, query.ExitCode != 0u);
 
             events = ParseNdjsonOutput(query);
@@ -648,8 +649,7 @@ class WSLCE2EEventsTests
         result = RunWslc(std::format(L"events --since {} --until {} --filter event=tag --filter image={}", since, EpochSeconds() + 1, image));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VerifyEventLines(
-            result.GetStdoutLines(),
-            {std::format(L" image tag {} (name={})", wsl::shared::string::MultiByteToWide(imageId), image)});
+            result.GetStdoutLines(), {std::format(L" image tag {} (name={})", wsl::shared::string::MultiByteToWide(imageId), image)});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Events_VolumeLifecycle)

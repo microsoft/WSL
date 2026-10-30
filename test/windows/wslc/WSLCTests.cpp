@@ -9601,7 +9601,8 @@ class WSLCTests
 
     WSLC_TEST_METHOD(ImageArchiveEventStream)
     {
-        const auto imageTar = std::filesystem::current_path() / std::format("{}.tar", GenerateNetworkEventTestName("wslc-test-image-archive"));
+        const auto imageTar =
+            std::filesystem::current_path() / std::format("{}.tar", GenerateNetworkEventTestName("wslc-test-image-archive"));
         auto cleanup = wil::scope_exit([&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTar.c_str())); });
 
         auto stream = OpenEventStream({{"type", "network"}, {"type", "image"}});
