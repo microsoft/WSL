@@ -17,6 +17,17 @@ class slim_registry_watcher
 public:
     slim_registry_watcher() noexcept = default;
 
+    ~slim_registry_watcher() noexcept
+    {
+        {
+            const auto lock = m_lock.lock_exclusive();
+            m_stopping = true;
+        }
+
+        // Don't wait while holding the lock, since a callback could be waiting on it.
+        m_threadPoolWait.reset();
+    }
+
     // Pass a root key, sub key pair or use an empty string to use rootKey as the key to watch.
     HRESULT create(HKEY rootKey, _In_ PCWSTR subKey, bool isRecursive, std::function<void(::wil::RegistryChangeKind)>&& callback) noexcept
     {
@@ -35,7 +46,9 @@ public:
     }
 
 private:
-    // using the default d'tor, destruction must occur in this order
+    wil::srwlock m_lock;
+    _Guarded_by_(m_lock) bool m_stopping = false;
+
     std::function<void(::wil::RegistryChangeKind)> m_callback;
     ::wil::unique_hkey m_keyToWatch;
     ::wil::unique_event_nothrow m_eventHandle;
@@ -55,10 +68,16 @@ private:
         {
         case ERROR_SUCCESS:
         case ERROR_ACCESS_DENIED:
+        {
             // Normal modification: send RegistryChangeKind::Modify and re-arm.
             this_ptr->m_callback(::wil::RegistryChangeKind::Modify);
-            ::SetThreadpoolWait(this_ptr->m_threadPoolWait.get(), this_ptr->m_eventHandle.get(), nullptr);
+            const auto lock = this_ptr->m_lock.lock_exclusive();
+            if (!this_ptr->m_stopping)
+            {
+                ::SetThreadpoolWait(this_ptr->m_threadPoolWait.get(), this_ptr->m_eventHandle.get(), nullptr);
+            }
             break;
+        }
 
         case ERROR_KEY_DELETED:
             // Key deleted: send RegistryChangeKind::Delete but do not re-arm.
