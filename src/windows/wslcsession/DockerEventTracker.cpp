@@ -91,6 +91,7 @@ DockerEventTracker::RegistryState::~RegistryState()
     WI_ASSERT(m_containerCallbacks.empty());
     WI_ASSERT(m_volumeCallbacks.empty());
     WI_ASSERT(m_networkCallbacks.empty());
+    WI_ASSERT(m_imageCallbacks.empty());
     WI_ASSERT(m_containerCreateCallbacks.empty());
     WI_ASSERT(m_containerActionCallbacks.empty());
 }
@@ -119,7 +120,7 @@ void DockerEventTracker::OnEvent(const std::string_view& event)
 
     auto actionStr = action->get<std::string>();
 
-    // Route events by Type field. Docker uses "container", "volume", "network", etc.
+    // Route events by Type field. Docker uses "container", "volume", "network", "image", etc.
     auto type = parsed.find("Type");
     std::string typeStr = (type != parsed.end()) ? type->get<std::string>() : "container";
 
@@ -139,6 +140,10 @@ void DockerEventTracker::OnEvent(const std::string_view& event)
     else if (typeStr == "network")
     {
         OnNetworkEvent(parsed, actionStr, eventTimeNano);
+    }
+    else if (typeStr == "image")
+    {
+        OnImageEvent(parsed, actionStr, eventTimeNano);
     }
 }
 
@@ -259,6 +264,20 @@ void DockerEventTracker::OnNetworkEvent(const nlohmann::json& parsed, const std:
         callbacks, [&](const NetworkCallback& callback) { callback.Callback(networkId, action, attributes, eventTimeNano); });
 }
 
+void DockerEventTracker::OnImageEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano)
+{
+    const auto [imageId, attributes] = ParseResourceActor(parsed, action, "image");
+
+    std::vector<std::shared_ptr<ImageCallback>> callbacks;
+    {
+        std::lock_guard lock{m_state->m_lock};
+        callbacks = m_state->m_imageCallbacks;
+    }
+
+    InvokeCallbacks(
+        callbacks, [&](const ImageCallback& callback) { callback.Callback(imageId, action, attributes, eventTimeNano); });
+}
+
 std::pair<std::string, std::map<std::string, std::string>> DockerEventTracker::ParseResourceActor(
     const nlohmann::json& parsed, const std::string& action, const char* type)
 {
@@ -349,6 +368,17 @@ DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterNetworkUp
     return EventTrackingReference{m_state, id};
 }
 
+DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterImageUpdates(ImageEventCallback&& Callback) noexcept
+{
+    auto id = m_state->m_callbackId++;
+    auto entry = std::make_shared<ImageCallback>(id, std::move(Callback));
+
+    std::lock_guard lock{m_state->m_lock};
+    m_state->m_imageCallbacks.emplace_back(std::move(entry));
+
+    return EventTrackingReference{m_state, id};
+}
+
 DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterContainerCreate(ContainerCreateCallback&& Callback) noexcept
 {
     auto id = m_state->m_callbackId++;
@@ -392,7 +422,7 @@ void DockerEventTracker::RegistryState::UnregisterCallback(size_t Id) noexcept
             return true;
         };
 
-        if (!take(m_containerCallbacks) && !take(m_volumeCallbacks) && !take(m_networkCallbacks) &&
+        if (!take(m_containerCallbacks) && !take(m_volumeCallbacks) && !take(m_networkCallbacks) && !take(m_imageCallbacks) &&
             !take(m_containerCreateCallbacks) && !take(m_containerActionCallbacks))
         {
             WI_ASSERT(false);

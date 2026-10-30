@@ -68,12 +68,18 @@ namespace {
             {"time", std::chrono::floor<std::chrono::seconds>(std::chrono::nanoseconds{event.timeNano}).count()},
             {"timeNano", event.timeNano}};
 
-        // Docker still reports these deprecated fields for container events.
-        if (event.Type == "container")
+        // Docker still reports these deprecated fields for container and image events.
+        if (event.Type == "container" || event.Type == "image")
         {
             output["status"] = event.Action;
-            output["id"] = event.Actor.ID;
+            if (!event.Actor.ID.empty())
+            {
+                output["id"] = event.Actor.ID;
+            }
+        }
 
+        if (event.Type == "container")
+        {
             if (const auto image = event.Actor.Attributes.find("image"); image != event.Actor.Attributes.end())
             {
                 output["from"] = image->second;

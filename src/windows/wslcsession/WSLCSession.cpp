@@ -515,6 +515,9 @@ try
     m_networkEventTracking = m_runtime.Events().RegisterNetworkUpdates(std::bind(
         &WSLCSession::OnNetworkEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 
+    m_imageEventTracking = m_runtime.Events().RegisterImageUpdates(std::bind(
+        &WSLCSession::OnImageEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
+
     m_containerActionTracking = m_runtime.Events().RegisterContainerActions(std::bind(
         &WSLCSession::OnContainerAction, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 
@@ -2631,6 +2634,13 @@ void WSLCSession::OnNetworkEvent(
 try
 {
     m_eventStore.Record("network", std::string{Action}, NetworkId, Attributes, TimeNano);
+}
+CATCH_LOG()
+
+void WSLCSession::OnImageEvent(const std::string& ImageId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t TimeNano) noexcept
+try
+{
+    m_eventStore.Record("image", std::string{Action}, ImageId, Attributes, TimeNano);
 }
 CATCH_LOG()
 
