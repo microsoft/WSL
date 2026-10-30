@@ -26,7 +26,7 @@ Notes:
 - `CpuCount`, `MemorySizeInMB`, and `Timeout` are optional nullable values.
 - `Timeout` must be positive and must fit in a `uint32` millisecond count.
 - `VhdRequirements` is optional.
-- `EnableNestedVirtualization` requires WSL 3.1.0 or later; session creation fails with `RuntimeUpdateNeeded` on older runtimes.
+- `EnableNestedVirtualization` requires Windows 11 or later, host support for virtualization extensions, and WSL 3.1.0 or later; session creation fails with `RuntimeUpdateNeeded` on older runtimes.
 - `HostLoopback` is a hostname that containers can use to reach services listening on the Windows host loopback interface. It is disabled by default (empty string). Services listening only on the Windows loopback interface may not expect connections from container workloads, so only enable this when needed. Containers must also have networking enabled, for example with `ContainerSettings.NetworkingMode = ContainerNetworkingMode.Bridged`. Requires WSL 3.0.5 or later; session creation fails with `RuntimeUpdateNeeded` on older runtimes.
 
 Session names serve both as display names and as machine-wide keys used to identify sessions. If a session with the same name already exists, session creation will fail with `ERROR_ALREADY_EXISTS`.

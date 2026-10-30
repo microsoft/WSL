@@ -11,7 +11,8 @@ STDAPI WslcSetSessionSettingsFeatureFlags(_In_ WslcSessionSettings* sessionSetti
 
 Return value: `HRESULT`.
 
-The nested virtualization flag requires WSL 3.1.0 or later. Runtime support is checked by
+The nested virtualization flag requires Windows 11 or later, host support for virtualization extensions,
+and WSL 3.1.0 or later. Runtime support is checked by
 `WslcCreateSession`, not when storing these settings.
 
 Example:

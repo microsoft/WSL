@@ -348,7 +348,13 @@ void WSLCVirtualMachine::Initialize()
 
     m_initChannel = wsl::shared::SocketChannel{std::move(socket), "mini_init", {m_vmTerminatingEvent.get(), m_sessionTerminatingEvent}};
 
-    // Create a thread to watch for exited processes.
+    // Mount VHDs
+    const auto rootDevice = GetVhdDevicePath(0);
+    Mount(m_initChannel, rootDevice.c_str(), "/mnt", m_rootVhdType.c_str(), "ro", WSLC_MOUNT::Chroot | WSLC_MOUNT::OverlayFs);
+    const auto modulesDevice = GetVhdDevicePath(1);
+    MountModules(m_initChannel, modulesDevice.c_str(), FeatureEnabled(WslcFeatureFlagsNestedVirtualization));
+
+    // Start the exit watcher after synchronous module loading so it cannot reap modprobe.
     auto [__, ___, childChannel] = Fork(WSLC_FORK::Thread);
     childChannel.SetExitEvents({m_vmTerminatingEvent.get()});
 
@@ -359,12 +365,6 @@ void WSLCVirtualMachine::Initialize()
     THROW_HR_IF(E_FAIL, watchTransaction.Receive<RESULT_MESSAGE<uint32_t>>().Result != 0);
 
     m_processExitThread = std::thread(std::bind(&WSLCVirtualMachine::WatchForExitedProcesses, this, std::move(childChannel)));
-
-    // Mount VHDs
-    const auto rootDevice = GetVhdDevicePath(0);
-    Mount(m_initChannel, rootDevice.c_str(), "/mnt", m_rootVhdType.c_str(), "ro", WSLC_MOUNT::Chroot | WSLC_MOUNT::OverlayFs);
-    const auto modulesDevice = GetVhdDevicePath(1);
-    MountModules(m_initChannel, modulesDevice.c_str(), FeatureEnabled(WslcFeatureFlagsNestedVirtualization));
 
     // Discover the per-VM guest capabilities (currently the hv_pci swiotlb pool) and forward them
     // to the service before virtiofs shares or Consomme networking devices are created.

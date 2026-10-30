@@ -35,6 +35,7 @@ Do not put credentials or other sensitive information in the session's name.
   - containers must also have networking enabled, for example `ContainerSettings::NetworkingMode(ContainerNetworkingMode::Bridged)`
   - requires WSL 3.0.5 or later; session creation fails with `WSLC_E_RUNTIME_UPDATE_NEEDED` on older runtimes
 - `EnableNestedVirtualization()` / setter
+  - requires Windows 11 or later and host support for virtualization extensions
   - requires WSL 3.1.0 or later; session creation fails with `WSLC_E_RUNTIME_UPDATE_NEEDED` on older runtimes
 
 ```cpp
