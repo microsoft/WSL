@@ -15,8 +15,8 @@ Return value: `HRESULT`.
 
 
 - `WSLC_VHD_TYPE_FIXED` is only honored by `WslcCreateSessionVhdVolume`.
-- `WSLC_VHD_TYPE_SPARSE` creates a dynamically expanding sparse VHD. This feature is currently experimental and requires WSL 3.0.2 or later.
-- `WSLC_VHD_TYPE_SPARSE` returns `WSLC_E_WSL_UPDATE_NEEDED` on an older WSL version.
+- `WSLC_VHD_TYPE_SPARSE` creates a dynamically expanding sparse VHD. This feature is currently experimental and requires WSL 3.1.0 or later.
+- `WSLC_VHD_TYPE_SPARSE` returns `WSLC_E_RUNTIME_UPDATE_NEEDED` on an older WSL version.
 - `uid` and `gid` are honored iff `flags & WSLC_VHD_REQ_FLAG_OWNER`.
 
 Example:

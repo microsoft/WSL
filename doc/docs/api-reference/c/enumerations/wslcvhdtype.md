@@ -16,4 +16,4 @@ typedef enum WslcVhdType
 | `WSLC_VHD_TYPE_SPARSE` | `2` |
 
 `WSLC_VHD_TYPE_SPARSE` creates a dynamically expanding VHD backed by a sparse host file. This feature is currently experimental and
-requires WSL 3.0.2 or later.
+requires WSL 3.1.0 or later.

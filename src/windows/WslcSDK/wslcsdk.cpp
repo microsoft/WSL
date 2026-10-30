@@ -290,16 +290,6 @@ struct ErrorInfoWrapper
         return m_hr.value();
     }
 
-    HRESULT CaptureResult(HRESULT hr, const std::wstring& errorMessage)
-    {
-        m_hr = hr;
-        if (FAILED_LOG(m_hr.value()) && m_errorMessage && !*m_errorMessage)
-        {
-            *m_errorMessage = wil::make_unique_string<wil::unique_cotaskmem_string>(errorMessage.c_str()).release();
-        }
-        return m_hr.value();
-    }
-
     operator HRESULT() const
     {
         THROW_HR_IF(E_UNEXPECTED, !m_hr);
@@ -406,25 +396,6 @@ bool DoesWslRuntimeVersionSupportWslc(const std::optional<std::tuple<uint32_t, u
 {
     constexpr auto minimalPackageVersion = std::tuple<uint32_t, uint32_t, uint32_t>{WSLC_API_MIN_VERSION_SUPPORTED};
     return version.has_value() && version >= minimalPackageVersion;
-}
-
-constexpr std::tuple<uint32_t, uint32_t, uint32_t> c_sparseVhdMinimumVersion{3, 0, 2};
-
-HRESULT CheckWslRuntimeVersionSupport(const WSLCCompatVersion& version, const std::tuple<uint32_t, uint32_t, uint32_t>& minimumVersion, ErrorInfoWrapper& errorInfoWrapper)
-{
-    const std::tuple<uint32_t, uint32_t, uint32_t> currentVersion{version.Major, version.Minor, version.Revision};
-    // Allow lockstep development builds before the feature's release version is assigned.
-    const std::tuple<uint32_t, uint32_t, uint32_t> clientVersion{WSL_PACKAGE_VERSION_MAJOR, WSL_PACKAGE_VERSION_MINOR, WSL_PACKAGE_VERSION_REVISION};
-    if (currentVersion < minimumVersion && currentVersion != clientVersion)
-    {
-        return errorInfoWrapper.CaptureResult(
-            WSLC_E_WSL_UPDATE_NEEDED,
-            wsl::shared::Localization::MessageWslcOperationRequiresWslVersion(
-                std::format("{}.{}.{}", version.Major, version.Minor, version.Revision),
-                std::format("{}.{}.{}", std::get<0>(minimumVersion), std::get<1>(minimumVersion), std::get<2>(minimumVersion))));
-    }
-
-    return S_OK;
 }
 
 enum class WslRuntimeState
@@ -705,7 +676,7 @@ try
     auto [sessionManager, runtimeVersion] = CreateSessionManager();
     if (internalType->vhdRequirements.type == WSLC_VHD_TYPE_SPARSE)
     {
-        RETURN_IF_FAILED(CheckWslRuntimeVersionSupport(runtimeVersion, c_sparseVhdMinimumVersion, errorInfoWrapper));
+        RETURN_IF_FAILED(CheckWslRuntimeVersionSupport(runtimeVersion, c_wslcFeatureMinimumVersion, errorMessage));
     }
 
     auto result = std::make_unique<WslcSessionImpl>(runtimeVersion);
@@ -829,7 +800,7 @@ try
         break;
 
     case WSLC_VHD_TYPE_SPARSE:
-        RETURN_IF_FAILED(CheckWslRuntimeVersionSupport(internalType->runtimeVersion, c_sparseVhdMinimumVersion, errorInfoWrapper));
+        RETURN_IF_FAILED(CheckWslRuntimeVersionSupport(internalType->runtimeVersion, c_wslcFeatureMinimumVersion, errorMessage));
         driverOpts.push_back({"Sparse", "true"});
         break;
 
