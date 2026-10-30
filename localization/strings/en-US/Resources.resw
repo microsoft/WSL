@@ -1025,6 +1025,9 @@ Falling back to NAT networking.</value>
   <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
     <value>Linux capability additions are disabled by the computer policy.</value>
   </data>
+  <data name="MessageWSLContainerNestedVirtualizationDisabled" xml:space="preserve">
+    <value>Nested virtualization for WSL containers is disabled by the computer policy.</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>The container image registry '{}' is blocked by the computer policy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2496,6 +2499,10 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   </data>
   <data name = "MessageWslcUnknownVolumeOption" xml:space = "preserve" >
     <value>Unknown option: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOperationRequiresWslVersion" xml:space="preserve">
+    <value>The installed WSL version ({}) does not support the requested operation. WSL {} or later is required.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name = "MessageWslcInvalidVolumeType" xml:space = "preserve" >

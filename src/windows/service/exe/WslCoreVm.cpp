@@ -1634,17 +1634,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
     {
         try
         {
-            if (wsl::windows::common::helpers::IsWindows11OrAbove())
-            {
-                const auto& processorFeatures = wsl::windows::common::hcs::GetProcessorFeatures();
-                auto feature = std::find(processorFeatures.begin(), processorFeatures.end(), "NestedVirt");
-                m_vmConfig.EnableNestedVirtualization = (feature != processorFeatures.end());
-            }
-            else
-            {
-                m_vmConfig.EnableNestedVirtualization = false;
-            }
-
+            m_vmConfig.EnableNestedVirtualization = wsl::windows::common::hcs::IsNestedVirtualizationSupported();
             if (!m_vmConfig.EnableNestedVirtualization)
             {
                 EMIT_USER_WARNING(wsl::shared::Localization::MessageNestedVirtualizationNotSupported());

@@ -198,6 +198,21 @@ void SessionSettings::HostLoopback(hstring const& value)
     m_hostLoopback = winrt::to_string(value);
 }
 
+bool SessionSettings::EnableNestedVirtualization()
+{
+    return WI_IsFlagSet(m_featureFlags, WSLC_SESSION_FEATURE_FLAG_NESTED_VIRTUALIZATION);
+}
+
+void SessionSettings::EnableNestedVirtualization(bool value)
+{
+    if (m_sessionSettings)
+    {
+        throw hresult_illegal_state_change(L"Cannot change nested virtualization setting after session has been initialized");
+    }
+
+    WI_UpdateFlag(m_featureFlags, WSLC_SESSION_FEATURE_FLAG_NESTED_VIRTUALIZATION, value);
+}
+
 WslcSessionSettings* SessionSettings::ToStructPointer()
 {
     if (m_sessionSettings)

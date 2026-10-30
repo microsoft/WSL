@@ -35,6 +35,7 @@ inline constexpr auto c_allowCustomFirewallUserSetting = L"AllowFirewallUserSett
 inline constexpr auto c_defaultNetworkingMode = L"DefaultNetworkingMode";
 inline constexpr auto c_allowWSLContainer = L"AllowWSLContainer";
 inline constexpr auto c_allowWSLContainerPrivileged = L"AllowWSLContainerPrivileged";
+inline constexpr auto c_allowWSLContainerNestedVirtualization = L"AllowWSLContainerNestedVirtualization";
 inline constexpr auto c_wslContainerRegistryAllowlist = L"WSLContainerRegistryAllowlist";
 
 inline std::optional<DWORD> GetPolicyValue(HKEY key, LPCWSTR name)
@@ -96,6 +97,15 @@ inline wil::unique_hkey OpenPoliciesKey()
 
     LOG_IF_WIN32_ERROR(result);
     return key;
+}
+
+inline void EnsureWslContainerNestedVirtualizationAllowed()
+{
+    const auto policiesKey = OpenPoliciesKey();
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_ACCESS_DISABLED_BY_POLICY),
+        wsl::shared::Localization::MessageWSLContainerNestedVirtualizationDisabled(),
+        !IsFeatureAllowed(policiesKey.get(), c_allowWSLContainerNestedVirtualization));
 }
 
 // Opens the WSLContainerRegistryAllowlist sub-key under the supplied policies key for

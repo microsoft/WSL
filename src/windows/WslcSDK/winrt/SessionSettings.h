@@ -39,6 +39,8 @@ struct SessionSettings : SessionSettingsT<SessionSettings>
     void EnableGpu(bool value);
     hstring HostLoopback();
     void HostLoopback(hstring const& value);
+    bool EnableNestedVirtualization();
+    void EnableNestedVirtualization(bool value);
 
     WslcSessionSettings* ToStructPointer();
 
