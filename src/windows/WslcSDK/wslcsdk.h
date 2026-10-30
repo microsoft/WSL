@@ -46,7 +46,7 @@ EXTERN_C_START
 #define WSLC_E_RUNTIME_UPDATE_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 21)         /* 0x80040615 */
 #define WSLC_E_NETWORK_PREFIX_AMBIGUOUS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 22)      /* 0x80040616 */
 // Session values
-#define WSLC_SESSION_OPTIONS_SIZE 72
+#define WSLC_SESSION_OPTIONS_SIZE 80
 #define WSLC_SESSION_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcSessionSettings
@@ -154,6 +154,11 @@ STDAPI WslcSetSessionSettingsTimeout(_In_ WslcSessionSettings* sessionSettings, 
 STDAPI WslcSetSessionSettingsVhd(_In_ WslcSessionSettings* sessionSettings, _In_opt_ const WslcVhdRequirements* vhdRequirements);
 
 STDAPI WslcSetSessionSettingsFeatureFlags(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionFeatureFlags flags);
+
+// Allows containers to reach services listening on the Windows host loopback interface through the given hostname.
+// Disabled by default; pass null to disable. Requires WSL 3.0.5 or later.
+// hostName is not copied and must stay valid until WslcCreateSession returns.
+STDAPI WslcSetSessionSettingsHostLoopback(_In_ WslcSessionSettings* sessionSettings, _In_opt_z_ PCSTR hostName);
 
 STDAPI WslcGetSessionTerminationEvent(_In_ WslcSession session, _Out_ HANDLE* terminationEvent);
 STDAPI WslcGetSessionTerminationReason(_In_ WslcSession session, _Out_ WslcSessionTerminationReason* reason);

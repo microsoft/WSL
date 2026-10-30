@@ -10,6 +10,7 @@
 - [WslcSetSessionSettingsTimeout](wslcsetsessionsettingstimeout.md)
 - [WslcSetSessionSettingsVhd](wslcsetsessionsettingsvhd.md)
 - [WslcSetSessionSettingsFeatureFlags](wslcsetsessionsettingsfeatureflags.md)
+- [WslcSetSessionSettingsHostLoopback](wslcsetsessionsettingshostloopback.md)
 - [WslcGetSessionTerminationEvent](wslcgetsessionterminationevent.md)
 - [WslcGetSessionTerminationReason](wslcgetsessionterminationreason.md)
 - [WslcRegisterSessionCrashDumpCallback](wslcregistersessioncrashdumpcallback.md)
