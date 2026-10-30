@@ -70,6 +70,8 @@ public:
         std::function<void(const std::string&, const std::string&, const std::map<std::string, std::string>&, std::int64_t)>;
     using NetworkEventCallback =
         std::function<void(const std::string&, const std::string&, const std::map<std::string, std::string>&, std::int64_t)>;
+    using ImageEventCallback =
+        std::function<void(const std::string&, const std::string&, const std::map<std::string, std::string>&, std::int64_t)>;
     using ContainerCreateCallback = std::function<void(const std::string& ContainerId, std::int64_t TimeNano)>;
     using ContainerActionCallback =
         std::function<void(const std::string& ContainerId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t TimeNano)>;
@@ -83,6 +85,7 @@ public:
     EventTrackingReference RegisterExecStateUpdates(const std::string& ContainerId, const std::string& ExecId, ContainerStateChangeCallback&& Callback) noexcept;
     EventTrackingReference RegisterVolumeUpdates(VolumeEventCallback&& Callback) noexcept;
     EventTrackingReference RegisterNetworkUpdates(NetworkEventCallback&& Callback) noexcept;
+    EventTrackingReference RegisterImageUpdates(ImageEventCallback&& Callback) noexcept;
 
     // Invoked for every container create event, after the per-container state callbacks. Unlike those,
     // this isn't keyed by container id, because the id isn't known until Docker assigns it.
@@ -100,8 +103,9 @@ private:
     void OnContainerCreated(const nlohmann::json& parsed, std::int64_t eventTimeNano);
     void OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano);
     void OnNetworkEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano);
+    void OnImageEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano);
 
-    // Volume and network events identify their resource by Actor.ID, except Docker's aggregate prune event, which reports none.
+    // Volume, network and image events identify their resource by Actor.ID, except Docker's aggregate prune event, which reports none.
     static std::pair<std::string, std::map<std::string, std::string>> ParseResourceActor(
         const nlohmann::json& parsed, const std::string& action, const char* type);
 
@@ -154,6 +158,15 @@ private:
         const NetworkEventCallback Callback;
     };
 
+    struct ImageCallback : CallbackRegistration
+    {
+        ImageCallback(size_t Id, ImageEventCallback&& Callback) : CallbackRegistration(Id), Callback(std::move(Callback))
+        {
+        }
+
+        const ImageEventCallback Callback;
+    };
+
     struct ContainerCreateCallbackEntry : CallbackRegistration
     {
         ContainerCreateCallbackEntry(size_t Id, ContainerCreateCallback&& Callback) :
@@ -184,6 +197,7 @@ private:
         _Guarded_by_(m_lock) std::vector<std::shared_ptr<ContainerCallback>> m_containerCallbacks;
         _Guarded_by_(m_lock) std::vector<std::shared_ptr<VolumeCallback>> m_volumeCallbacks;
         _Guarded_by_(m_lock) std::vector<std::shared_ptr<NetworkCallback>> m_networkCallbacks;
+        _Guarded_by_(m_lock) std::vector<std::shared_ptr<ImageCallback>> m_imageCallbacks;
         _Guarded_by_(m_lock) std::vector<std::shared_ptr<ContainerCreateCallbackEntry>> m_containerCreateCallbacks;
         _Guarded_by_(m_lock) std::vector<std::shared_ptr<ContainerActionCallbackEntry>> m_containerActionCallbacks;
     };
