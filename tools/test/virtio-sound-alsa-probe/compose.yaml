@@ -1,0 +1,34 @@
+services:
+  capture-probe:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: "${PROBE_UID:-1000}:${PROBE_GID:-1000}"
+    group_add:
+      - "${AUDIO_GID:?Set AUDIO_GID to the host audio-device group ID}"
+    devices:
+      - "/dev/snd:/dev/snd:rw"
+    read_only: true
+    network_mode: none
+    cap_drop:
+      - ALL
+    privileged: false
+    pids_limit: 32
+    mem_limit: 128m
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - type: bind
+        source: ./alsa_capture_probe.py
+        target: /app/alsa_capture_probe.py
+        read_only: true
+        bind:
+          create_host_path: false
+    command:
+      - --device
+      - "${ALSA_DEVICE:?Set ALSA_DEVICE explicitly, for example hw:0,0}"
+      - --duration
+      - "${DURATION_SECONDS:-1}"
+      - --acknowledge-microphone-access

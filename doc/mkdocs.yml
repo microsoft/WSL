@@ -27,6 +27,7 @@ nav:
        - 'Interop': technical-documentation/interop.md
        - 'Drvfs & Plan9': technical-documentation/drvfs.md
        - 'Systemd': technical-documentation/systemd.md
+       - 'Experimental virtio-sound': technical-documentation/virtio-sound.md
     # The API reference tree (docs/api-reference) is appended here; its
     # navigation is driven by the per-folder .pages files (awesome-pages plugin).
     - '...'

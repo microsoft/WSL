@@ -22,6 +22,12 @@ if (WSL_BUILD_WSL_SETTINGS)
     list(APPEND WINDOWS_BINARIES "wslsettings/wslsettings.dll;wslsettings/wslsettings.exe;libwsl.dll")
 endif()
 
+set(WSL_SOUND_WORKER_PACKAGE "false")
+if (WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+    set(WSL_SOUND_WORKER_PACKAGE "true")
+    list(APPEND WINDOWS_BINARIES "wsl-audio-worker.exe")
+endif()
+
 set(BINARIES_DEPENDENCIES)
 foreach(binary ${WINDOWS_BINARIES})
     list(APPEND BINARIES_DEPENDENCIES "${PACKAGE_INPUT_DIR}/${binary}")
@@ -61,6 +67,10 @@ add_dependencies(msipackage wsl wslg wslservice wslhost wslrelay wslserviceproxy
 
 if (WSL_BUILD_WSL_SETTINGS)
     add_dependencies(msipackage wslsettings libwsl)
+endif()
+
+if (WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+    add_dependencies(msipackage wsl-audio-worker)
 endif()
 
 set_source_files_properties(${OUTPUT_PACKAGE} PROPERTIES GENERATED TRUE)

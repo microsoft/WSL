@@ -110,6 +110,15 @@
                     "hash": "sha1:48c2c76de06fde8cf36faf039509b38b3ae90b5b"
                 }
             }
+        },
+        {
+            "component": {
+                "type": "git",
+                "git": {
+                    "repositoryUrl": "https://github.com/microsoft/wil",
+                    "commitHash": "b6ec76a2d9a609897f25a7fa0a0bdf4238e94e35"
+                }
+            }
         }
     ]
 }
