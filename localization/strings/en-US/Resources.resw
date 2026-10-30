@@ -2498,6 +2498,10 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Unknown option: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcOperationRequiresWslVersion" xml:space="preserve">
+    <value>The installed WSL version ({}) does not support the requested operation. WSL {} or later is required.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name = "MessageWslcInvalidVolumeType" xml:space = "preserve" >
     <value>Unsupported volume type: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
