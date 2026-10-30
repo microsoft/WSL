@@ -34,6 +34,7 @@ using wsl::shared::Localization;
 using wsl::windows::common::string::FormatHumanReadableSize;
 using wsl::windows::service::wslc::UserCOMCallback;
 using wsl::windows::service::wslc::UserHandle;
+using wsl::windows::service::wslc::WSLCContainerStateStore;
 using wsl::windows::service::wslc::WSLCExecutionContext;
 using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
@@ -4414,6 +4415,11 @@ void WSLCSession::RecoverExistingContainers()
         std::lock_guard containersLock(m_containersLock);
         const bool sessionStart = !std::exchange(m_sessionStartRecoveryDone, true);
 
+        if (sessionStart)
+        {
+            DeleteOrphanedContainerState(containers);
+        }
+
         for (const auto& dockerContainer : containers)
         {
             // Keep existing wrappers and their client COM references in place, then re-register their
@@ -4471,6 +4477,28 @@ void WSLCSession::RecoverExistingContainers()
     {
         container->OnSessionStart();
     }
+}
+
+void WSLCSession::DeleteOrphanedContainerState(const std::vector<docker_schema::ContainerInfo>& DockerContainers)
+{
+    const auto directory = ContainerStateDirectory();
+    if (!directory.has_value())
+    {
+        return;
+    }
+
+    std::unordered_set<std::string> knownIds;
+    for (const auto& container : DockerContainers)
+    {
+        knownIds.insert(container.Id);
+    }
+
+    for (const auto& [id, _] : m_containers)
+    {
+        knownIds.insert(id);
+    }
+
+    WSLCContainerStateStore::DeleteOrphans(directory.value(), knownIds);
 }
 
 void WSLCSession::RecoverExistingNetworks()
