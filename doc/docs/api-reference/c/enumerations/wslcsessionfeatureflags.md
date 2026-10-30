@@ -5,7 +5,7 @@ typedef enum WslcSessionFeatureFlags
 {
     WSLC_SESSION_FEATURE_FLAG_NONE = 0x00000000,
     WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU = 0x00000004,
-    WSLC_SESSION_FEATURE_FLAG_LARGE_MEMORY_BACKING_PAGES = 0x00000040
+    WSLC_SESSION_FEATURE_FLAG_LARGE_MEMORY_BACKING_PAGES = 0x00000080
 } WslcSessionFeatureFlags;
 ```
 
@@ -13,7 +13,7 @@ typedef enum WslcSessionFeatureFlags
 |---|---|
 | `WSLC_SESSION_FEATURE_FLAG_NONE` | `0x00000000` |
 | `WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU` | `0x00000004` |
-| `WSLC_SESSION_FEATURE_FLAG_LARGE_MEMORY_BACKING_PAGES` | `0x00000040` |
+| `WSLC_SESSION_FEATURE_FLAG_LARGE_MEMORY_BACKING_PAGES` | `0x00000080` |
 
 `WSLC_SESSION_FEATURE_FLAG_LARGE_MEMORY_BACKING_PAGES` opts the session VM in to 2 MiB host backing pages.
 This may improve performance for memory-intensive workloads at the cost of increased host memory usage and allocation latency.

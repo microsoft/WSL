@@ -677,7 +677,7 @@ try
     {
         WSLCCompatVersion runtimeVersion{};
         RETURN_IF_FAILED(sessionManager->GetVersion(&runtimeVersion));
-        RETURN_IF_FAILED(CheckWslRuntimeVersionSupport(runtimeVersion, {3, 1, 0}, errorMessage));
+        RETURN_IF_FAILED(CheckWslRuntimeVersionSupport(runtimeVersion, c_wslcFeatureMinimumVersion, errorMessage));
     }
 
     auto result = std::make_unique<WslcSessionImpl>();
