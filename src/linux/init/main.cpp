@@ -3726,7 +3726,42 @@ try
     //      https://tldp.org/HOWTO/Linux+IPv6-HOWTO/ch11s03.html.
     //
 
-    return WriteToFile("/proc/sys/net/ipv4/ip_local_port_range", Content.c_str());
+    if (WriteToFile("/proc/sys/net/ipv4/ip_local_port_range", Content.c_str()) < 0)
+    {
+        return -1;
+    }
+
+    // Mirrored networking reserves this exact range on the Windows host. Keep ports outside the range out of Linux
+    // autobind selection even if a distro later widens ip_local_port_range. Explicit bind() calls are unaffected.
+    constexpr auto c_reservedPortsPath = "/proc/sys/net/ipv4/ip_local_reserved_ports";
+    std::string ReservedPorts;
+    {
+        std::ifstream ExistingReservedPorts{c_reservedPortsPath};
+        std::getline(ExistingReservedPorts, ReservedPorts);
+    }
+
+    if (Start > 1)
+    {
+        if (!ReservedPorts.empty())
+        {
+            ReservedPorts += ',';
+        }
+        ReservedPorts += std::format("1-{}", Start - 1);
+    }
+
+    if (End < USHRT_MAX)
+    {
+        if (!ReservedPorts.empty())
+        {
+            ReservedPorts += ',';
+        }
+        ReservedPorts += std::format("{}-{}", End + 1, USHRT_MAX);
+    }
+
+    // N.B. The host range is already applied above; the reservation only guards against the range being widened later,
+    //      so a failure here is logged by WriteToFile but does not fail boot.
+    WriteToFile(c_reservedPortsPath, ReservedPorts.c_str());
+    return 0;
 }
 CATCH_RETURN_ERRNO()
 
