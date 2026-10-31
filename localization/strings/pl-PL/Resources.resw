@@ -2853,11 +2853,11 @@ Przykład: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Sygnał do wysłania (domyślnie: skonfigurowany dla kontenera sygnał STOPSIGNAL lub sygnał SIGTERM, jeśli żadnego nie skonfigurowano)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>Monitoruj zdarzenia kontenera.</value>
+  <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
+    <value>Monitor events.</value>
   </data>
-  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>Monitoruj zdarzenia z kontenerów w czasie rzeczywistym.</value>
+  <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
+    <value>Monitoruj zdarzenia w czasie rzeczywistym z kontenerów, obrazów, sieci i woluminów.</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
     <value>Pokaż wszystkie zdarzenia utworzone od sygnatury czasowej</value>

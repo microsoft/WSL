@@ -2860,11 +2860,11 @@ Exemplo: tar -cf - arquivos | wslc container cp - CONTAINER:/path</value>
     <value>Sinal a ser enviado (padrão: a STOPSIGNAL configurada do contêiner ou SIGTERM se nenhum estiver configurado)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>Monitore os eventos de contêiner.</value>
+  <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
+    <value>Monitor events.</value>
   </data>
-  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>Monitore eventos em tempo real a partir de contêineres.</value>
+  <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
+    <value>Monitore eventos em tempo real de contêineres, imagens, redes e volumes.</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
     <value>Mostrar todos os eventos criados desde o carimbo de data/hora</value>
@@ -3706,7 +3706,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_UnsupportedRestartPolicyError" xml:space="preserve">
-    <value>Não há suporte para a política de reinicialização '{}' no. Os valores com suporte são no e always.</value>
+    <value>Restart policy '{}' is not supported. Supported values are no and always.</value>
     <comment>{Locked="no"}{Locked="always"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
