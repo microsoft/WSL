@@ -258,11 +258,18 @@ void wsl::windows::common::hcs::RemoveScsiDisk(_In_ HCS_SYSTEM ComputeSystem, _I
     ModifyComputeSystem(ComputeSystem, wsl::shared::ToJsonW(request).c_str());
 }
 
-void wsl::windows::common::hcs::RevokeVmAccess(_In_ PCWSTR VmId, _In_ PCWSTR FilePath)
+void wsl::windows::common::hcs::RevokeVmAccess(_In_ PCWSTR VmId, _In_ PCWSTR FilePath, _In_opt_ HANDLE UserToken)
 {
     WSL_LOG_DEBUG("HcsRevokeVmAccess", TraceLoggingValue(VmId, "vmId"), TraceLoggingValue(FilePath, "filePath"));
 
     ExecutionContext context(Context::HCS);
+
+    // Match the identity used to grant access to user-owned VHDs.
+    wil::unique_token_reverter runAsUser;
+    if (UserToken != nullptr)
+    {
+        runAsUser = wil::impersonate_token(UserToken);
+    }
 
     THROW_IF_FAILED_MSG(::HcsRevokeVmAccess(VmId, FilePath), "HcsRevokeVmAccess(%ls, %ls)", VmId, FilePath);
 }

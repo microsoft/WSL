@@ -53,7 +53,8 @@ public:
     TypedHandle OpenFd(ULONG Fd) override;
 
 private:
-    std::map<ULONG, TypedHandle> m_relayedHandles;
+    wil::srwlock m_lock;
+    _Guarded_by_(m_lock) std::map<ULONG, TypedHandle> m_relayedHandles;
 };
 
 class TTYProcessIO : public WSLCProcessIO
@@ -64,7 +65,8 @@ public:
     TypedHandle OpenFd(ULONG Fd) override;
 
 private:
-    TypedHandle m_ioStream;
+    wil::srwlock m_lock;
+    _Guarded_by_(m_lock) TypedHandle m_ioStream;
 };
 
 class VMProcessIO : public WSLCProcessIO
@@ -74,7 +76,8 @@ public:
     TypedHandle OpenFd(ULONG Fd) override;
 
 private:
-    std::map<ULONG, TypedHandle> m_handles;
+    wil::srwlock m_lock;
+    _Guarded_by_(m_lock) std::map<ULONG, TypedHandle> m_handles;
 };
 
 } // namespace wsl::windows::service::wslc

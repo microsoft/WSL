@@ -21,6 +21,7 @@
 - `Start()` cannot be called on the init process.
 - `Start()` requires a non-empty `ProcessSettings::CommandLine()`.
 - `GetOutputStream()` requires `ProcessOutputMode::Stream`.
+- `GetInputStream()` requires `ProcessSettings::EnableStandardInput(true)`.
 - `OutputReceived` and `ErrorReceived` require `ProcessOutputMode::Event`.
 - `Exited` is raised by the exit callback in event mode, and by waiting on the process exit event in stream/discard mode.
 

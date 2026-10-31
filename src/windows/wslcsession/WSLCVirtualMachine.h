@@ -50,6 +50,14 @@ struct WSLCProcessFd
 
 class WSLCVirtualMachine;
 
+// This structure is used to keep track of tracked processes.
+// It cannot be stored inside WSLCVirtualMachine because process references can outlive the VM.
+struct VMProcessRegistry
+{
+    std::mutex Mutex;
+    std::vector<std::weak_ptr<VMProcessControl>> Processes;
+};
+
 // Owns the set of in-use VM-side port numbers for a single VM instance. Held by shared_ptr from the
 // VM (sole owner) and referenced weakly by each VmPortAllocation, so a VM teardown drops every
 // reservation and any surviving allocation self-neuters instead of dangling into a freed VM.
@@ -170,7 +178,6 @@ public:
 
     void Signal(_In_ LONG Pid, _In_ int Signal);
 
-    void OnProcessReleased(int Pid);
     void OnSessionTerminated();
 
     std::shared_ptr<VmPortAllocation> TryAllocatePort(uint16_t Port, int Family, int Protocol);
@@ -291,8 +298,7 @@ private:
 
     GUID m_vmId{};
 
-    std::mutex m_trackedProcessesLock;
-    std::vector<std::weak_ptr<VMProcessControl>> m_trackedProcesses;
+    std::shared_ptr<VMProcessRegistry> m_processRegistry = std::make_shared<VMProcessRegistry>();
 
     wil::unique_event m_vmTerminatingEvent{wil::EventOptions::ManualReset};
     HANDLE m_sessionTerminatingEvent{};

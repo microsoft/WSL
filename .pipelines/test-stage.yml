@@ -23,6 +23,13 @@ parameters:
     default:
       - name: rs_prerelease
         image: rs_prerelease-2025-01-30
+      - name: rs_base2
+        image: rs_base2-2026-10-05
+      - name: ge_current
+        image: ge_current-2026-09-28
+      - name: ge_release
+        image: 2025-datacenter-g2-2026-09-29
+        server: true
       - name: ni_release
         image: win11-23h2-ent-2024-11-18
       - name: fe_release
@@ -30,8 +37,6 @@ parameters:
         server: true
       - name: vb_release
         image: win10-22h2-ent-g2-2024-09-10
-
-      # TODO: ge_release
 
 stages:
 - stage: test
@@ -47,6 +52,7 @@ stages:
               branch: "${{ image.name }}"
               version: ${{ version }}
               image: "${{ image.image }}"
+              server: ${{ eq(image.server, true) }}
               # Skip the WSLC suite on Server images: it triggers a Hyper-V VMBus
               # PowerOff hang during VM teardown that times out the job.
               run: ${{ and(or(not(parameters.rs_prerelease_only), eq(image.name, 'rs_prerelease')), or(ne(version, 'wslc'), ne(image.server, true))) }}

@@ -25,7 +25,7 @@ namespace wsl::windows::wslc::models {
 
 namespace mount = wsl::windows::common::mount;
 
-// Valid formats for container list output.
+// Valid output formats for commands that support --format.
 enum class FormatType
 {
     Table,
@@ -63,6 +63,7 @@ struct ContainerOptions
     bool Interactive = false;
     std::string Name;
     bool Remove = false;
+    WSLCContainerRestartPolicy Restart = WSLCContainerRestartPolicyNo;
     bool TTY = false;
     bool PublishAll = false;
     WSLCSignal StopSignal = WSLCSignalNone;
@@ -95,6 +96,8 @@ struct ContainerOptions
     std::optional<int64_t> NanoCpus{};
     std::vector<std::tuple<std::string, int64_t, int64_t>> Ulimits;
     PullPolicy Pull = PullPolicy::Missing;
+    std::vector<std::string> CapAdd;
+    std::vector<std::string> CapDrop;
 };
 
 struct CreateContainerResult

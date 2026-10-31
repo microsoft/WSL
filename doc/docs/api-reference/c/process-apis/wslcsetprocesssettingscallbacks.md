@@ -12,7 +12,10 @@ STDAPI WslcSetProcessSettingsCallbacks(_In_ WslcProcessSettings* processSettings
 
 Return value: `HRESULT`.
 
-Header note: using callbacks consumes the process I/O handles and prevents later acquisition through `WslcGetProcessIOHandle`.
+Using any callback consumes both process I/O handles, so neither can subsequently be acquired with
+`WslcGetProcessIOHandle`. If registered, `onExit` runs after buffered I/O has been delivered and the
+I/O callbacks have returned. The caller owns `context` and must keep it valid until all registered
+callbacks have returned.
 
 Example:
 

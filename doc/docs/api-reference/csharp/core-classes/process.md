@@ -62,7 +62,7 @@ Console.WriteLine(text);
 
 ## Process.GetInputStream()
 
-Gets stdin as a WinRT output stream.
+Gets stdin as a WinRT output stream. Requires `ProcessSettings.EnableStandardInput = true`.
 
 ```csharp
 using Windows.Storage.Streams;

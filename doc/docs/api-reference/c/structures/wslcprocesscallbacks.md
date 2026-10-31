@@ -9,8 +9,8 @@ typedef struct WslcProcessCallbacks
 } WslcProcessCallbacks;
 ```
 
-| Field | Type |
-|---|---|
-| `onStdOut` | `WslcStdIOCallback` |
-| `onStdErr` | `WslcStdIOCallback` |
-| `onExit` | `WslcProcessExitCallback` |
+| Field | Type | Description |
+|---|---|---|
+| `onStdOut` | [`WslcStdIOCallback`](../callback-types/wslcstdiocallback.md) | Receives data written to standard output. |
+| `onStdErr` | [`WslcStdIOCallback`](../callback-types/wslcstdiocallback.md) | Receives data written to standard error. |
+| `onExit` | [`WslcProcessExitCallback`](../callback-types/wslcprocessexitcallback.md) | Receives the process exit code after buffered I/O has been delivered and the I/O callbacks have returned. |

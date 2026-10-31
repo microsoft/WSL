@@ -350,6 +350,9 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Z7 -DDEBUG -DDBG")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi /guard:cf /Qspectre")
 
 # Linker flags
+
+# Increase the committed stack size to 64KB (default is 4KB). This avoids crashing executables with stack overflows when the machine is under memory pressure.
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /STACK:1048576,65536")
 set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /debug:full /debugtype:cv,fixup /guard:cf /DYNAMICBASE")
 set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /debug:full /debugtype:cv,fixup /guard:cf /DYNAMICBASE")
 if (DEFINED SOURCELINK_JSON)

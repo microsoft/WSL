@@ -8,6 +8,7 @@ For enums that are directly `static_cast` to/from the C API, the numeric values 
 - [DeleteContainerOption](deletecontaineroption.md)
 - [Error](error.md)
 - [ContainerNetworkingMode](containernetworkingmode.md)
+- [NetworkFlags](networkflags.md)
 - [PortProtocol](portprotocol.md)
 - [ContainerState](containerstate.md)
 - [Signal](signal.md)
@@ -16,4 +17,5 @@ For enums that are directly `static_cast` to/from the C API, the numeric values 
 - [ProcessState](processstate.md)
 - [VhdType](vhdtype.md)
 - [ImageProgressStatus](imageprogressstatus.md)
+- [IdentityTokenType](identitytokentype.md)
 - [SessionTerminationReason](sessionterminationreason.md)

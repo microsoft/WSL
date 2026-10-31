@@ -56,7 +56,7 @@ void WSLCSessionRuntime::Initialize(
     m_idleState->Initialize(idleGrace, [this]() { OnIdleTimer(); });
 
     // Session-scoped: subscriptions must survive VM restarts. Rebound per-VM in InitializeDockerRuntime.
-    m_eventTracker.emplace(*m_session);
+    m_eventTracker.emplace(m_id);
 
     m_initialized = true;
 }
@@ -444,7 +444,7 @@ void WSLCSessionRuntime::InitializeDockerRuntime(const std::filesystem::path& st
     // container subscriptions are preserved across restarts.
     m_eventTracker->Connect(m_dockerClient.value(), *m_ioRelay);
 
-    m_volumes.emplace(m_dockerClient.value(), m_virtualMachine.value(), m_eventTracker.value(), storagePath);
+    m_volumes.emplace(m_dockerClient.value(), m_virtualMachine.value(), m_eventTracker.value(), storagePath, m_hooks.OnVolumeEvent);
 }
 
 void WSLCSessionRuntime::StopVmLockHeld()

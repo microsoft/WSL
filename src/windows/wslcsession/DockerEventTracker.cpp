@@ -13,17 +13,13 @@ Abstract:
 --*/
 #include "precomp.h"
 #include "DockerEventTracker.h"
-#include "WSLCSession.h"
-#include "WSLCVirtualMachine.h"
 #include <nlohmann/json.hpp>
 
 using wsl::windows::service::wslc::DockerEventTracker;
 using wsl::windows::service::wslc::DockerHTTPClient;
-using wsl::windows::service::wslc::WSLCSession;
-using wsl::windows::service::wslc::WSLCVirtualMachine;
 
-DockerEventTracker::EventTrackingReference::EventTrackingReference(DockerEventTracker* tracker, size_t id) noexcept :
-    m_tracker(tracker), m_id(id)
+DockerEventTracker::EventTrackingReference::EventTrackingReference(std::shared_ptr<RegistryState> state, size_t id) noexcept :
+    m_id(id), m_state(std::move(state))
 {
 }
 
@@ -31,9 +27,8 @@ DockerEventTracker::EventTrackingReference& DockerEventTracker::EventTrackingRef
 {
     Reset();
     m_id = other.m_id;
-    m_tracker = other.m_tracker;
+    m_state = std::move(other.m_state);
 
-    other.m_tracker = nullptr;
     other.m_id = {};
 
     return *this;
@@ -41,18 +36,17 @@ DockerEventTracker::EventTrackingReference& DockerEventTracker::EventTrackingRef
 
 void DockerEventTracker::EventTrackingReference::Reset() noexcept
 {
-    if (m_tracker != nullptr)
+    if (m_state)
     {
-        m_tracker->UnregisterCallback(m_id);
-        m_tracker = nullptr;
+        m_state->UnregisterCallback(m_id);
+        m_state.reset();
         m_id = {};
     }
 }
 
 DockerEventTracker::EventTrackingReference::EventTrackingReference(EventTrackingReference&& other) noexcept :
-    m_id(other.m_id), m_tracker(other.m_tracker)
+    m_id(other.m_id), m_state(std::move(other.m_state))
 {
-    other.m_tracker = nullptr;
     other.m_id = {};
 }
 
@@ -61,7 +55,7 @@ DockerEventTracker::EventTrackingReference::~EventTrackingReference() noexcept
     Reset();
 }
 
-DockerEventTracker::DockerEventTracker(WSLCSession& session) : m_session(session)
+DockerEventTracker::DockerEventTracker(ULONG SessionId) : m_sessionId(SessionId)
 {
 }
 
@@ -81,7 +75,7 @@ void DockerEventTracker::Connect(DockerHTTPClient& dockerClient, IORelay& relay)
                     TraceLoggingCountedString(
                         buffer.data(), static_cast<UINT16>(std::min(buffer.size(), static_cast<size_t>(USHRT_MAX))), "Data"),
                     TraceLoggingValue(wil::ResultFromCaughtException(), "Error"),
-                    TraceLoggingValue(m_session.Id(), "SessionId"));
+                    TraceLoggingValue(m_sessionId, "SessionId"));
             }
         }
     };
@@ -91,13 +85,15 @@ void DockerEventTracker::Connect(DockerHTTPClient& dockerClient, IORelay& relay)
     relay.AddHandle(std::make_unique<common::io::HTTPChunkBasedReadHandle>(std::move(socket), std::move(onChunk)));
 }
 
-DockerEventTracker::~DockerEventTracker()
+DockerEventTracker::RegistryState::~RegistryState()
 {
-    // N.B. No callback should be left when the tracker is destroyed.
+    // Tracking references may outlive the tracker, but must unregister before releasing the registry.
     WI_ASSERT(m_containerCallbacks.empty());
     WI_ASSERT(m_volumeCallbacks.empty());
     WI_ASSERT(m_networkCallbacks.empty());
+    WI_ASSERT(m_imageCallbacks.empty());
     WI_ASSERT(m_containerCreateCallbacks.empty());
+    WI_ASSERT(m_containerActionCallbacks.empty());
 }
 
 void DockerEventTracker::OnEvent(const std::string_view& event)
@@ -106,52 +102,63 @@ void DockerEventTracker::OnEvent(const std::string_view& event)
         "DockerEvent",
         TraceLoggingCountedString(
             event.data(), static_cast<UINT16>(std::min(event.size(), static_cast<size_t>(USHRT_MAX))), "Data"),
-        TraceLoggingValue(m_session.Id(), "SessionId"));
+        TraceLoggingValue(m_sessionId, "SessionId"));
 
     auto parsed = nlohmann::json::parse(event);
 
     auto action = parsed.find("Action");
     THROW_HR_IF_MSG(E_INVALIDARG, action == parsed.end(), "Failed to parse json: %.*hs", static_cast<int>(event.size()), event.data());
 
-    auto timeEntry = parsed.find("time");
+    auto timeNanoEntry = parsed.find("timeNano");
     THROW_HR_IF_MSG(
-        E_INVALIDARG, timeEntry == parsed.end(), "Failed to parse time from event: %.*hs", static_cast<int>(event.size()), event.data());
-    std::int64_t eventTime = timeEntry->get<std::int64_t>();
+        E_INVALIDARG,
+        timeNanoEntry == parsed.end(),
+        "Failed to parse timeNano from event: %.*hs",
+        static_cast<int>(event.size()),
+        event.data());
+    std::int64_t eventTimeNano = timeNanoEntry->get<std::int64_t>();
 
     auto actionStr = action->get<std::string>();
 
-    // Route events by Type field. Docker uses "container", "volume", "network", etc.
+    // Route events by Type field. Docker uses "container", "volume", "network", "image", etc.
     auto type = parsed.find("Type");
     std::string typeStr = (type != parsed.end()) ? type->get<std::string>() : "container";
 
     if (typeStr == "container")
     {
-        OnContainerEvent(parsed, actionStr, eventTime);
+        OnContainerEvent(parsed, actionStr, eventTimeNano);
 
         if (actionStr == "create")
         {
-            OnContainerCreated(parsed, eventTime);
+            OnContainerCreated(parsed, eventTimeNano);
         }
     }
     else if (typeStr == "volume")
     {
-        OnVolumeEvent(parsed, actionStr, eventTime);
+        OnVolumeEvent(parsed, actionStr, eventTimeNano);
     }
     else if (typeStr == "network")
     {
-        OnNetworkEvent(parsed, actionStr, eventTime);
+        OnNetworkEvent(parsed, actionStr, eventTimeNano);
+    }
+    else if (typeStr == "image")
+    {
+        OnImageEvent(parsed, actionStr, eventTimeNano);
     }
 }
 
-void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime)
+void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano)
 {
     static std::map<std::string, ContainerEvent> events{
         {"start", ContainerEvent::Start},
-        {"die", ContainerEvent::Stop},
-        {"kill", ContainerEvent::Kill},
+        {"die", ContainerEvent::Exit},
         {"destroy", ContainerEvent::Destroy},
         {"exec_die", ContainerEvent::ExecDied},
-        {"restart", ContainerEvent::Restart}};
+        {"restart", ContainerEvent::Restart},
+        {"health_status: healthy", ContainerEvent::HealthHealthy},
+        {"health_status: unhealthy", ContainerEvent::HealthUnhealthy},
+        {"kill", ContainerEvent::Kill},
+        {"stop", ContainerEvent::Stop}};
 
     auto actor = parsed.find("Actor");
     THROW_HR_IF_MSG(E_INVALIDARG, actor == parsed.end(), "Missing Actor in container event");
@@ -161,38 +168,44 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
 
     auto containerId = id->get<std::string>();
 
+    std::map<std::string, std::string> attributes;
+    if (const auto attributesEntry = actor->find("Attributes"); attributesEntry != actor->end())
+    {
+        attributes = attributesEntry->get<std::map<std::string, std::string>>();
+    }
+
     auto it = events.find(action);
     if (it == events.end())
     {
-        return; // Event is not tracked, dropped.
+        // Docker appends the exec'd command line to exec_create and exec_start.
+        if (action.starts_with("exec_create: ") || action.starts_with("exec_start: "))
+        {
+            OnContainerAction(containerId, action, attributes, eventTimeNano);
+        }
+
+        return; // Other events are not tracked, dropped.
     }
 
     std::optional<int> exitCode;
-    std::optional<std::string> execId;
-    auto attributes = actor->find("Attributes");
-    if (attributes != actor->end())
+    if (const auto exitCodeEntry = attributes.find("exitCode"); exitCodeEntry != attributes.end())
     {
-        auto exitCodeEntry = attributes->find("exitCode");
-        if (exitCodeEntry != attributes->end())
-        {
-            exitCode = std::stoi(exitCodeEntry->get<std::string>());
-        }
-
-        auto execIdEntry = attributes->find("execID");
-        if (execIdEntry != attributes->end())
-        {
-            execId = execIdEntry->get<std::string>();
-        }
+        exitCode = std::stoi(exitCodeEntry->second);
     }
 
-    // Snapshot the matching callbacks so that they can be invoked without holding m_lock. Callbacks can register and
+    std::optional<std::string> execId;
+    if (const auto execIdEntry = attributes.find("execID"); execIdEntry != attributes.end())
+    {
+        execId = execIdEntry->second;
+    }
+
+    // Snapshot the matching callbacks so that they can be invoked without holding the registry lock. Callbacks can register and
     // unregister callbacks (a container that stops releases its exec processes), which would otherwise mutate the
     // vector being iterated.
     std::vector<std::shared_ptr<ContainerCallback>> callbacks;
     {
-        std::lock_guard lock{m_lock};
+        std::lock_guard lock{m_state->m_lock};
 
-        for (const auto& e : m_containerCallbacks)
+        for (const auto& e : m_state->m_containerCallbacks)
         {
             if (e->ContainerId == containerId && (!e->ExecId.has_value() || e->ExecId == execId))
             {
@@ -201,71 +214,96 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
         }
     }
 
-    InvokeCallbacks(callbacks, [&](const ContainerCallback& e) { e.Callback(it->second, exitCode, eventTime); });
+    const bool handled =
+        InvokeCallbacks(callbacks, [&](const ContainerCallback& e) { e.Callback(it->second, exitCode, attributes, eventTimeNano); });
+
+    // The container state callbacks never publish exec_die, so it's published even when they handled it.
+    if (it->second == ContainerEvent::ExecDied || (!handled && (it->second == ContainerEvent::Kill || it->second == ContainerEvent::Stop)))
+    {
+        OnContainerAction(containerId, action, attributes, eventTimeNano);
+    }
 }
 
-void DockerEventTracker::OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime)
+void DockerEventTracker::OnContainerAction(
+    const std::string& containerId, const std::string& action, const std::map<std::string, std::string>& attributes, std::int64_t eventTimeNano)
 {
-    static std::map<std::string, VolumeEvent> events{{"create", VolumeEvent::Create}, {"destroy", VolumeEvent::Destroy}};
-
-    auto it = events.find(action);
-    if (it == events.end())
+    std::vector<std::shared_ptr<ContainerActionCallbackEntry>> callbacks;
     {
-        return; // Event is not tracked, dropped.
+        std::lock_guard lock{m_state->m_lock};
+        callbacks = m_state->m_containerActionCallbacks;
     }
 
-    auto actor = parsed.find("Actor");
-    THROW_HR_IF_MSG(E_INVALIDARG, actor == parsed.end(), "Missing Actor in volume event");
+    InvokeCallbacks(
+        callbacks, [&](const ContainerActionCallbackEntry& e) { e.Callback(containerId, action, attributes, eventTimeNano); });
+}
 
-    auto id = actor->find("ID");
-    THROW_HR_IF_MSG(E_INVALIDARG, id == actor->end(), "Missing Actor.ID in volume event");
-
-    auto volumeName = id->get<std::string>();
+void DockerEventTracker::OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano)
+{
+    const auto [volumeName, attributes] = ParseResourceActor(parsed, action, "volume");
 
     std::vector<std::shared_ptr<VolumeCallback>> callbacks;
     {
-        std::lock_guard lock{m_lock};
-        callbacks = m_volumeCallbacks;
+        std::lock_guard lock{m_state->m_lock};
+        callbacks = m_state->m_volumeCallbacks;
     }
 
-    InvokeCallbacks(callbacks, [&](const VolumeCallback& e) { e.Callback(volumeName, it->second, eventTime); });
+    InvokeCallbacks(callbacks, [&](const VolumeCallback& e) { e.Callback(volumeName, action, attributes, eventTimeNano); });
 }
 
-void DockerEventTracker::OnNetworkEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime)
+void DockerEventTracker::OnNetworkEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano)
+{
+    const auto [networkId, attributes] = ParseResourceActor(parsed, action, "network");
+
+    std::vector<std::shared_ptr<NetworkCallback>> callbacks;
+    {
+        std::lock_guard lock{m_state->m_lock};
+        callbacks = m_state->m_networkCallbacks;
+    }
+
+    InvokeCallbacks(
+        callbacks, [&](const NetworkCallback& callback) { callback.Callback(networkId, action, attributes, eventTimeNano); });
+}
+
+void DockerEventTracker::OnImageEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano)
+{
+    const auto [imageId, attributes] = ParseResourceActor(parsed, action, "image");
+
+    std::vector<std::shared_ptr<ImageCallback>> callbacks;
+    {
+        std::lock_guard lock{m_state->m_lock};
+        callbacks = m_state->m_imageCallbacks;
+    }
+
+    InvokeCallbacks(
+        callbacks, [&](const ImageCallback& callback) { callback.Callback(imageId, action, attributes, eventTimeNano); });
+}
+
+std::pair<std::string, std::map<std::string, std::string>> DockerEventTracker::ParseResourceActor(
+    const nlohmann::json& parsed, const std::string& action, const char* type)
 {
     auto actor = parsed.find("Actor");
-    THROW_HR_IF_MSG(E_INVALIDARG, actor == parsed.end(), "Missing Actor in network event");
+    THROW_HR_IF_MSG(E_INVALIDARG, actor == parsed.end(), "Missing Actor in %hs event", type);
 
-    std::string networkId;
-    auto id = actor->find("ID");
-    if (id != actor->end())
+    std::string id;
+    if (const auto idEntry = actor->find("ID"); idEntry != actor->end())
     {
-        networkId = id->get<std::string>();
+        id = idEntry->get<std::string>();
     }
     else
     {
-        // Docker's aggregate prune event reports no network.
-        THROW_HR_IF_MSG(E_INVALIDARG, action != "prune", "Missing Actor.ID in network event");
+        THROW_HR_IF_MSG(E_INVALIDARG, action != "prune", "Missing Actor.ID in %hs event", type);
     }
 
     std::map<std::string, std::string> attributes;
-    auto attributesEntry = actor->find("Attributes");
-    if (attributesEntry != actor->end())
+    if (const auto attributesEntry = actor->find("Attributes"); attributesEntry != actor->end())
     {
         attributes = attributesEntry->get<std::map<std::string, std::string>>();
     }
 
-    std::vector<std::shared_ptr<NetworkCallback>> callbacks;
-    {
-        std::lock_guard lock{m_lock};
-        callbacks = m_networkCallbacks;
-    }
-
-    InvokeCallbacks(
-        callbacks, [&](const NetworkCallback& callback) { callback.Callback(networkId, action, attributes, eventTime); });
+    return {std::move(id), std::move(attributes)};
 }
 
-void DockerEventTracker::OnContainerCreated(const nlohmann::json& parsed, std::int64_t eventTime)
+void DockerEventTracker::OnContainerCreated(const nlohmann::json& parsed, std::int64_t eventTimeNano)
 {
     auto actor = parsed.find("Actor");
     THROW_HR_IF_MSG(E_INVALIDARG, actor == parsed.end(), "Missing Actor in container event");
@@ -277,71 +315,93 @@ void DockerEventTracker::OnContainerCreated(const nlohmann::json& parsed, std::i
 
     std::vector<std::shared_ptr<ContainerCreateCallbackEntry>> callbacks;
     {
-        std::lock_guard lock{m_lock};
-        callbacks = m_containerCreateCallbacks;
+        std::lock_guard lock{m_state->m_lock};
+        callbacks = m_state->m_containerCreateCallbacks;
     }
 
-    InvokeCallbacks(callbacks, [&](const ContainerCreateCallbackEntry& e) { e.Callback(containerId, eventTime); });
+    InvokeCallbacks(callbacks, [&](const ContainerCreateCallbackEntry& e) { e.Callback(containerId, eventTimeNano); });
 }
 
 DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterContainerStateUpdates(
     const std::string& ContainerId, ContainerStateChangeCallback&& Callback) noexcept
 {
-    auto id = m_callbackId++;
+    auto id = m_state->m_callbackId++;
     auto entry = std::make_shared<ContainerCallback>(id, std::string{ContainerId}, std::optional<std::string>{}, std::move(Callback));
 
-    std::lock_guard lock{m_lock};
-    m_containerCallbacks.emplace_back(std::move(entry));
+    std::lock_guard lock{m_state->m_lock};
+    m_state->m_containerCallbacks.emplace_back(std::move(entry));
 
-    return EventTrackingReference{this, id};
+    return EventTrackingReference{m_state, id};
 }
 
 DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterExecStateUpdates(
     const std::string& ContainerId, const std::string& ExecId, ContainerStateChangeCallback&& Callback) noexcept
 {
-    auto id = m_callbackId++;
+    auto id = m_state->m_callbackId++;
     auto entry = std::make_shared<ContainerCallback>(id, std::string{ContainerId}, std::optional<std::string>{ExecId}, std::move(Callback));
 
-    std::lock_guard lock{m_lock};
-    m_containerCallbacks.emplace_back(std::move(entry));
+    std::lock_guard lock{m_state->m_lock};
+    m_state->m_containerCallbacks.emplace_back(std::move(entry));
 
-    return EventTrackingReference{this, id};
+    return EventTrackingReference{m_state, id};
 }
 
 DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterVolumeUpdates(VolumeEventCallback&& Callback) noexcept
 {
-    auto id = m_callbackId++;
+    auto id = m_state->m_callbackId++;
     auto entry = std::make_shared<VolumeCallback>(id, std::move(Callback));
 
-    std::lock_guard lock{m_lock};
-    m_volumeCallbacks.emplace_back(std::move(entry));
+    std::lock_guard lock{m_state->m_lock};
+    m_state->m_volumeCallbacks.emplace_back(std::move(entry));
 
-    return EventTrackingReference{this, id};
+    return EventTrackingReference{m_state, id};
 }
 
 DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterNetworkUpdates(NetworkEventCallback&& Callback) noexcept
 {
-    auto id = m_callbackId++;
+    auto id = m_state->m_callbackId++;
     auto entry = std::make_shared<NetworkCallback>(id, std::move(Callback));
 
-    std::lock_guard lock{m_lock};
-    m_networkCallbacks.emplace_back(std::move(entry));
+    std::lock_guard lock{m_state->m_lock};
+    m_state->m_networkCallbacks.emplace_back(std::move(entry));
 
-    return EventTrackingReference{this, id};
+    return EventTrackingReference{m_state, id};
+}
+
+DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterImageUpdates(ImageEventCallback&& Callback) noexcept
+{
+    auto id = m_state->m_callbackId++;
+    auto entry = std::make_shared<ImageCallback>(id, std::move(Callback));
+
+    std::lock_guard lock{m_state->m_lock};
+    m_state->m_imageCallbacks.emplace_back(std::move(entry));
+
+    return EventTrackingReference{m_state, id};
 }
 
 DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterContainerCreate(ContainerCreateCallback&& Callback) noexcept
 {
-    auto id = m_callbackId++;
+    auto id = m_state->m_callbackId++;
     auto entry = std::make_shared<ContainerCreateCallbackEntry>(id, std::move(Callback));
 
-    std::lock_guard lock{m_lock};
-    m_containerCreateCallbacks.emplace_back(std::move(entry));
+    std::lock_guard lock{m_state->m_lock};
+    m_state->m_containerCreateCallbacks.emplace_back(std::move(entry));
 
-    return EventTrackingReference{this, id};
+    return EventTrackingReference{m_state, id};
 }
 
-void DockerEventTracker::UnregisterCallback(size_t Id) noexcept
+DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterContainerActions(ContainerActionCallback&& Callback) noexcept
+{
+    auto id = m_state->m_callbackId++;
+    auto entry = std::make_shared<ContainerActionCallbackEntry>(id, std::move(Callback));
+
+    std::lock_guard lock{m_state->m_lock};
+    m_state->m_containerActionCallbacks.emplace_back(std::move(entry));
+
+    return EventTrackingReference{m_state, id};
+}
+
+void DockerEventTracker::RegistryState::UnregisterCallback(size_t Id) noexcept
 {
     std::shared_ptr<CallbackRegistration> registration;
 
@@ -362,7 +422,8 @@ void DockerEventTracker::UnregisterCallback(size_t Id) noexcept
             return true;
         };
 
-        if (!take(m_containerCallbacks) && !take(m_volumeCallbacks) && !take(m_networkCallbacks) && !take(m_containerCreateCallbacks))
+        if (!take(m_containerCallbacks) && !take(m_volumeCallbacks) && !take(m_networkCallbacks) && !take(m_imageCallbacks) &&
+            !take(m_containerCreateCallbacks) && !take(m_containerActionCallbacks))
         {
             WI_ASSERT(false);
         }

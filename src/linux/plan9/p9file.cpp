@@ -376,7 +376,7 @@ LX_INT File::SetAttr(UINT32 valid, const StatResult& stat)
     {
         // Open the file to truncate because truncate will always follow symlinks and there is no
         // ftruncateat.
-        auto file = OpenFile(O_WRONLY);
+        auto file = m_File ? util::Reopen(m_File.get(), O_WRONLY) : OpenFile(O_WRONLY);
         if (!file)
         {
             return file.Error();

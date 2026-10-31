@@ -7,6 +7,7 @@
 - [DeleteContainerOption](deletecontaineroption.md)
 - [Error](error.md)
 - [ContainerNetworkingMode](containernetworkingmode.md)
+- [NetworkFlags](networkflags.md)
 - [PortProtocol](portprotocol.md)
 - [ContainerState](containerstate.md)
 - [Signal](signal.md)
@@ -15,4 +16,5 @@
 - [ProcessState](processstate.md)
 - [VhdType](vhdtype.md)
 - [ImageProgressStatus](imageprogressstatus.md)
+- [IdentityTokenType](identitytokentype.md)
 - [SessionTerminationReason](sessionterminationreason.md)

@@ -259,5 +259,21 @@ configuration:
       - addLabel:
           label: needs-author-feedback
       description:
+    - if:
+      - payloadType: Issue_Comment
+      - commentContains:
+          pattern: '\/hyperv'
+          isRegex: True
+      - or:
+        - activitySenderHasPermission:
+            permission: Admin
+        - activitySenderHasPermission:
+            permission: Write
+      then:
+      - addReply:
+          reply: >-
+            Thank you for reporting this issue. Since this issue is specific to Hyper-V and not WSL, could you please report it in Feedback Hub? Go to "Report a problem" and then choose Apps > Hyper-V.
+      - closeIssue
+      description:
 onFailure: 
 onSuccess: 

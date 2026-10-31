@@ -132,6 +132,7 @@
     "DNS"     — Domain Name System. Do not translate (protocol acronym).
     "proxy"   — Network proxy server. Translate per locale standard networking term.
     "safe mode" — Minimal/diagnostic startup mode. Use standard OS term per locale.
+    "image"   — A container image, as in Docker. Not a picture or photo.
   -->
   <data name="AppName" xml:space="preserve">
     <value>Linux 用 Windows サブシステム</value>
@@ -896,12 +897,20 @@ Admin Protection の詳細については、https://aka.ms/apdevguide をご覧�
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>ネスト化された仮想化はこのマシンではサポートされていません。</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>入れ子型仮想化のサポートを検出できませんでした。エラー: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>アドレス '{}'、割り当てられた新しいアドレス '{}' のネットワーク エンドポイントを作成できませんでした</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToCreateNetwork" xml:space="preserve">
     <value>アドレス範囲 '{}' を使用して仮想ネットワークを作成できませんでした。範囲 '{}'、{} を使用して新しいネットワークを作成しました</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
+    <value>WSL の NAT ネットワーク ({}) が Docker の既定のネットワークと競合しています</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
@@ -923,6 +932,14 @@ NAT ネットワークにフォールバックしています。</value>
   <data name="MessageMirroredNetworkingNotSupportedIpv6Disabled" xml:space="preserve">
     <value>IPv6 が、サポートされていない方法でホスト上で無効になっています (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
+  </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>ミラー化されたネットワークでは、より小さなエフェメラル ポート範囲 ({} ではなく {} ポート) が使用されています。これにより、同時接続の数が制限される可能性があります。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>ミラー化されたネットワークでは、{} 個の TCP ポートと UDP ポートの最小連続範囲を予約できませんでした。Windows ポートの使用状況と除外を確認します。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Hyper-V ファイアウォールはサポートされていません</value>
@@ -1011,6 +1028,9 @@ NAT ネットワークにフォールバックしています。</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>WSL コンテナーは、コンピューター ポリシーによって無効になっています。</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>Linux 機能の追加は、コンピューター ポリシーによって無効になっています。</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>コンテナー イメージ レジストリ '{}' はコンピューター ポリシーによってブロックされています。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -1077,6 +1097,10 @@ NAT ネットワークにフォールバックしています。</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>VHD が現在使用中のため、操作を完了できませんでした。WSL の使用を強制的に停止するには: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageDistributionTerminationTimeout" xml:space="preserve">
+    <value>ディストリビューション プロセス {} の終了を待機して {} ミリ秒後にタイムアウトしました。配布が停止したことを確認せずに続行します。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
     <value>圧縮は .vhdx ファイルでのみサポートされています。</value>
@@ -1197,11 +1221,9 @@ WSL を修復するには任意のキーを押すか、取り消すには CTRL-C
     <value>グローバル セキュア アクセス クライアントとの互換性に関する現在の問題により、DNS トンネリングは無効です。</value>
     <comment>{Locked="DNS"}"DNS" (Domain Name System) should not be translated.</comment>
   </data>
-  <data name="MessageSparseVhdDisabled" xml:space="preserve">
-    <value>スパース VHD のサポートは、データの破損の可能性があるため、現在無効になっています。
-ディストリビューションでスパース VHD を強制的に使用するには、次を実行してください。
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale.</comment>
+  <data name="MessageSparseVhdUnsafe" xml:space="preserve">
+    <value>スパース VHD は現在試験段階です。予期しない動作が発生した場合は、https://github.com/microsoft/WSL で問題を報告してください。</value>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "sparse" is a technical storage term meaning the file only uses disk space for written data. Use the technical term in your locale. {Locked="https://github.com/microsoft/WSL"}The URL should not be translated.</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>{} をマウントできませんでした。詳細については dmesg を参照してください。</value>
@@ -1223,6 +1245,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
     <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. Using cgroup v2 instead. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
+  <data name="MessageWindowsInstallerBusy" xml:space="preserve">
+    <value>Windows インストーラーがビジー状態のため、WSL のインストールがブロックされています。他のソフトウェアのインストールが完了するまで待ってから、もう一度お試しください。</value>
+    <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>問題が発生しました。後でやり直してください。</value>
@@ -2209,6 +2235,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>コンテナー '{}' は実行中のため、削除できません。削除する前にコンテナーを停止するか、強制削除 (-f) を使用してください。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcCannotRemoveRestartingContainer" xml:space="preserve">
+    <value>コンテナー '{}' は再起動中のため、削除できません。削除する前にコンテナーを停止するか、強制削除 (-f) を使用してください。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerNotRunning" xml:space="preserve">
     <value>コンテナー '{}' が実行されていません。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2419,8 +2449,8 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
      <comment>Copyright notice and privacy link</comment>
   </data>
   <data name="MessageWslcInvalidImage" xml:space="preserve">
-    <value>無効な画像: '{}'</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>無効なイメージ: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="MessageWslcInvalidFilter" xml:space="preserve">
     <value>無効なフィルター: '{}'</value>
@@ -2458,6 +2488,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>--output 値 '{}' のビルド出力をコンソールに書き込むことはできません。</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcBuildStdinContextAndDockerfile" xml:space="preserve">
+    <value>ビルド コンテキストと Dockerfile の両方に対し stdin を使用できません。</value>
+    <comment>{Locked="stdin"}{Locked="Dockerfile"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>必須のオプションがありません: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2484,6 +2518,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   </data>
   <data name="MessageWslcNetworkNotFound" xml:space="preserve">
     <value>ネットワークが見つかりません: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcNetworkPrefixAmbiguous" xml:space="preserve">
+    <value>複数のネットワークが '{}' と一致します。長い ID またはネットワーク名を使用します。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
@@ -2519,6 +2557,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   </data>
   <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
     <value>無効な停止タイムアウト値: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidSignal" xml:space="preserve">
+    <value>無効なシグナル値: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
@@ -2678,14 +2720,6 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
     <value>コンテナーとローカル ファイル システムの間でファイルをコピーします。</value>
   </data>
-  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
-    <value>コンテナーとローカル ファイルシステムの間でファイルをコピーします。
-使用法: wslc container cp [OPTIONS] SOURCE DEST
-  ローカルからコンテナーへ: wslc container cp LOCAL_PATH CONTAINER:PATH
-  コンテナーからローカルへ: wslc container cp CONTAINER:PATH LOCAL_PATH
-  Stdin からコンテナーへ: wslc container cp - CONTAINER:PATH</value>
-    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
-  </data>
   <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
     <value>ソース: ローカル パス、CONTAINER:PATH、または '-' で stdin</value>
     <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
@@ -2713,6 +2747,9 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>tar.exe 見つかりません。ローカル ファイルのコピーには Windows tar が必要です。</value>
     <comment>{Locked="tar.exe"}</comment>
   </data>
+  <data name="WSLCCLI_CpStdoutIsTerminalError" xml:space="preserve">
+    <value>コピー出力をコンソールに書き込めません。</value>
+  </data>
   <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
     <value>コピーの方向が無効です。ソースまたは宛先のいずれかに CONTAINER:PATH を使用してください。</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
@@ -2736,7 +2773,11 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   </data>
   <data name="WSLCCLI_CpSourceNameNotRepresentableError" xml:space="preserve">
     <value>名前を Windows ファイル名として使用できないため、'{0}' をコピーできません。</value>
-    <comment>{0} is the source path. Shown when the container source name holds a character that is not valid in a Windows file name.</comment>
+    <comment>{0} is the file name being copied. Shown when the name cannot be used as a Windows file name.</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceNameTrimmedWarning" xml:space="preserve">
+    <value>Windows ではファイル名の末尾のスペースとドットが削除されるため、'{}' は '{}' としてコピーされます。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>コンテナーを検査します。</value>
@@ -2851,13 +2892,15 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>イメージを検査します。</value>
   </data>
   <data name="WSLCCLI_ImageImportDesc" xml:space="preserve">
-    <value>tarball から画像をインポートします。</value>
+    <value>tarball からイメージをインポートします。</value>
+    <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
     <value>tarball の内容をインポートして、ファイルシステム イメージを作成します。必要に応じて、イメージにリポジトリとタグ名のタグを付けます。</value>
   </data>
   <data name="WSLCCLI_ImageListAllArgDescription" xml:space="preserve">
-    <value>すべての画像を表示します (既定では中間画像は非表示です)。</value>
+    <value>すべてのイメージを表示します (既定では中間画像は非表示です)。</value>
+    <comment>"Images" means container images, as in Docker, not pictures or photos.</comment>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>イメージを一覧表示します。</value>
@@ -2888,7 +2931,8 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneDeletedHeader" xml:space="preserve">
-    <value>削除された画像:</value>
+    <value>削除されたイメージ:</value>
+    <comment>"Images" means container images, as in Docker, not pictures or photos.</comment>
   </data>
   <data name="WSLCCLI_ImagePruneDesc" xml:space="preserve">
     <value>未使用のイメージを削除します。</value>
@@ -3282,6 +3326,10 @@ Windows バージョン: {}</value>
     <value>オプション '{}' はサポートされていません。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
+    <value>モード '{}' が無効です。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
     <value>マウント ターゲットが必要です。</value>
   </data>
@@ -3454,7 +3502,8 @@ Windows バージョン: {}</value>
     <value>保存されたイメージのパス</value>
   </data>
   <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
-    <value>ビルド コンテキスト ディレクトリへのパス</value>
+    <value>ビルド コンテキスト ディレクトリへのパスです (stdin から tar アーカイブまたは Dockerfile を読み取るには "-" を使用します)</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
     <value>コンテナーからホストへのポートを公開します</value>
@@ -3463,7 +3512,8 @@ Windows バージョン: {}</value>
     <value>公開されているすべてのポートをランダム ホスト ポートに発行する</value>
   </data>
   <data name="WSLCCLI_PullAllTagsArgDescription" xml:space="preserve">
-    <value>リポジトリ内のすべてのタグ付き画像をダウンロードします。</value>
+    <value>リポジトリ内のすべてのタグ付きイメージをダウンロードします。</value>
+    <comment>"Images" means container images, as in Docker, not pictures or photos.</comment>
   </data>
   <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
     <value>詳細出力を抑制する</value>
@@ -3630,6 +3680,12 @@ Windows バージョン: {}</value>
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>仮想化機能をコンテナーに公開します</value>
   </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Linux capabilities を追加 (複数指定可)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Linux capabilities をドロップ (複数指定可)</value>
+  </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>コンテナー内で実行されるコマンドに渡す引数</value>
   </data>
@@ -3647,6 +3703,10 @@ Windows バージョン: {}</value>
   <data name="WSLCCLI_InvalidRestartPolicyError" xml:space="preserve">
     <value>無効な {} 値 '{}'。no、always、on-failure[:max-retries]、または unless-stopped が必要です。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UnsupportedRestartPolicyError" xml:space="preserve">
+    <value>Restart policy '{}' is not supported. Supported values are no and always.</value>
+    <comment>{Locked="no"}{Locked="always"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
     <value>無効な {} 値: {} は認識された進行状況の種類ではありません。サポートされている進行状況の種類: {}。</value>
@@ -3689,7 +3749,7 @@ Windows バージョン: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>イメージ '{}' が見つかりません。プルしています</value>
+    <value>イメージ '{}' がローカルに見つかりません</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">
@@ -3703,12 +3763,12 @@ Windows バージョン: {}</value>
     <value>読み込みが要求されましたが、入力が指定されていません。</value>
   </data>
   <data name="WSLCCLI_ImageLoaded" xml:space="preserve">
-    <value>読み込まれた画像: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>読み込まれたイメージ: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="WSLCCLI_ImageLoadedId" xml:space="preserve">
-    <value>読み込まれた画像 ID: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>読み込まれたイメージ ID: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. "Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
     <value>ネットワークを管理します。</value>
@@ -3769,6 +3829,9 @@ Windows バージョン: {}</value>
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
     <value>ネットワーク名</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
+    <value>ネットワーク名または ID</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>ネットワーク ID のみを表示</value>
@@ -3858,32 +3921,33 @@ Windows バージョン: {}</value>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>イメージをターミナルに書き込めません。-o オプションを使用するか、stdout をリダイレクトします。</value>
   </data>
+  <data name="WSLCCLI_BuildStdinIsTerminalError" xml:space="preserve">
+    <value>ターミナルからビルド入力を読み取れません。Dockerfile または tar アーカイブを stdin にパイプしてください。</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
     <value>コンテナーをターミナルにエクスポートできません。-o オプションを使用するか、stdout をリダイレクトします。</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>必要な形式: &lt;ホスト パス | 名前付きボリューム&gt;:&lt;コンテナー パス&gt;[:モード]</value>
+    <value>必要な形式: [&lt;ホスト パス | 名前付きボリューム&gt;:]&lt;コンテナー パス&gt;[:モード]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
-  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>ボリュームの指定が無効です: '{}'。{}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
+    <value>ボリュームの指定が無効です: '{}'。{} {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>ボリュームの指定が無効です: '{}'。ホスト パスを空にすることはできません。{}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
+    <value>ボリューム指定が空です。</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
-    <value>ボリュームの指定が無効です: '{}'。コンテナパスは空にできません。{}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
+    <value>ボリューム指定に、コロンで区切られた空のセクションがあります。</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
-    <value>ボリュームの指定が無効です: '{}'。コンテナー パスは絶対パス ('/' で始まる) である必要があります。{}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
+    <value>ボリューム指定に含まれているコロンが多すぎます。</value>
   </data>
-  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
-    <value>ボリュームの指定が無効です: '{}'。ホスト パス '{}' は有効な Windows パスではありません。</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
+    <value>ホスト パス '{}' は有効な Windows パスではありません。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
     <value>任意のオブジェクトの種類の名前または ID</value>
@@ -3914,7 +3978,8 @@ Windows バージョン: {}</value>
     <value>コマンド</value>
   </data>
   <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
-    <value>画像</value>
+    <value>イメージ</value>
+    <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="WSLCCLI_TableHeaderCreated" xml:space="preserve">
     <value>作成済み</value>
@@ -3945,6 +4010,30 @@ Windows バージョン: {}</value>
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderRepository" xml:space="preserve">
+    <value>リポジトリ</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderTag" xml:space="preserve">
+    <value>タグ</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderDigest" xml:space="preserve">
+    <value>ダイジェスト</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderImageId" xml:space="preserve">
+    <value>画像 ID</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderNetworkId" xml:space="preserve">
+    <value>ネットワーク ID</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderDriver" xml:space="preserve">
+    <value>ドライバー</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderScope" xml:space="preserve">
+    <value>スコープ</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderVolumeName" xml:space="preserve">
+    <value>ボリューム名</value>
   </data>
   <data name="WSLCCLI_ContainerStateCreated" xml:space="preserve">
     <value>作成しました</value>
@@ -4077,7 +4166,8 @@ Windows バージョン: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
-    <value>画像のインポート進行状況の解析に失敗しました</value>
+    <value>イメージのインポート進行状況の解析に失敗しました</value>
+    <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
   </data>
   <data name="MessageWslcVolumeUnmountFailed" xml:space="preserve">
     <value>ボリューム '{}' のマウントを解除できませんでした: {}</value>
@@ -4090,6 +4180,9 @@ Windows バージョン: {}</value>
   <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
     <value>プラグインの拒否後にコンテナー '{}' を停止できませんでした</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcRestartPolicyConflictsWithRm" xml:space="preserve">
+    <value>再起動ポリシーをコンテナーの自動削除と組み合わせることはできません。</value>
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>ボリューム '{}' のホスト リソースを解放できませんでした</value>

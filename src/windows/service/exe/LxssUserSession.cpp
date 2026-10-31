@@ -574,36 +574,39 @@ LxssUserSessionImpl::LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId
 {
     THROW_IF_WIN32_BOOL_FALSE(::CopySid(sizeof(m_userSid), &m_userSid.Sid, userSid));
 
+    wil::unique_hkey lxssKey;
+    wil::unique_handle userToken;
+    {
+        userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+        lxssKey = s_OpenLxssUserKey(userToken.get());
+    }
+
+    static std::atomic<DWORD> sessionCookie;
+
+    m_session = {sessionCookie++, nullptr, &m_userSid.Sid};
+
+    // Detect existing legacy installs and convert them to the new format.
+    const DWORD state =
+        wsl::windows::common::registry::ReadDword(lxssKey.get(), nullptr, LXSS_LEGACY_INSTALL_VALUE, LxssDistributionStateInvalid);
+
+    if (state == LxssDistributionStateInstalled)
+    {
+        // Create a registration for legacy installs and delete legacy
+        // installed state.
+        std::lock_guard lock(m_instanceLock);
+        _CreateLegacyRegistration(lxssKey.get(), userToken.get());
+        wsl::windows::common::registry::DeleteKeyValue(lxssKey.get(), LXSS_LEGACY_INSTALL_VALUE);
+    }
+
+    // Create a threadpool timer to terminate a Linux utility VM that is idle.
+    m_vmTerminationTimer.reset(CreateThreadpoolTimer(s_VmIdleTerminate, this, nullptr));
+    THROW_IF_NULL_ALLOC(m_vmTerminationTimer);
+
+    m_vmExitWork.reset(CreateThreadpoolWork(s_ProcessVmExit, this, nullptr));
+    THROW_LAST_ERROR_IF(!m_vmExitWork);
+
     try
     {
-        wil::unique_hkey lxssKey;
-        wil::unique_handle userToken;
-        {
-            userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
-            lxssKey = s_OpenLxssUserKey(userToken.get());
-        }
-
-        static std::atomic<DWORD> sessionCookie;
-
-        m_session = {sessionCookie++, nullptr, &m_userSid.Sid};
-
-        // Detect existing legacy installs and convert them to the new format.
-        const DWORD state =
-            wsl::windows::common::registry::ReadDword(lxssKey.get(), nullptr, LXSS_LEGACY_INSTALL_VALUE, LxssDistributionStateInvalid);
-
-        if (state == LxssDistributionStateInstalled)
-        {
-            // Create a registration for legacy installs and delete legacy
-            // installed state.
-            std::lock_guard lock(m_instanceLock);
-            _CreateLegacyRegistration(lxssKey.get(), userToken.get());
-            wsl::windows::common::registry::DeleteKeyValue(lxssKey.get(), LXSS_LEGACY_INSTALL_VALUE);
-        }
-
-        // Create a threadpool timer to terminate a Linux utility VM that is idle.
-        m_vmTerminationTimer.reset(CreateThreadpoolTimer(s_VmIdleTerminate, this, nullptr));
-        THROW_IF_NULL_ALLOC(m_vmTerminationTimer);
-
         // Register for timezone update notifications.
 
         auto listenForTimeZoneChanges = [this] {
@@ -634,11 +637,30 @@ LxssUserSessionImpl::LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId
                 THROW_LAST_ERROR_IF(!windowHandle);
                 SetWindowLongPtr(windowHandle.get(), GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 
-                MSG windowMessage{};
-                while (GetMessageW(&windowMessage, nullptr, 0, 0))
+                const HANDLE stopEvent = m_timezoneStopEvent.get();
+                for (;;)
                 {
-                    TranslateMessage(&windowMessage);
-                    DispatchMessage(&windowMessage);
+                    const auto result = MsgWaitForMultipleObjectsEx(1, &stopEvent, INFINITE, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+                    THROW_LAST_ERROR_IF(result == WAIT_FAILED);
+
+                    if (result == WAIT_OBJECT_0)
+                    {
+                        break;
+                    }
+
+                    THROW_HR_IF_MSG(E_UNEXPECTED, result != WAIT_OBJECT_0 + 1, "Unexpected timezone wait result: %lu", result);
+
+                    MSG windowMessage{};
+                    if (PeekMessageW(&windowMessage, nullptr, 0, 0, PM_REMOVE))
+                    {
+                        if (windowMessage.message == WM_QUIT)
+                        {
+                            break;
+                        }
+
+                        TranslateMessage(&windowMessage);
+                        DispatchMessage(&windowMessage);
+                    }
                 }
             }
             CATCH_LOG();
@@ -679,9 +701,20 @@ LxssUserSessionImpl::LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId
 
 LxssUserSessionImpl::~LxssUserSessionImpl()
 {
+    // Stop any remaining notification source before continuing.
+    {
+        std::lock_guard lock(m_instanceLock);
+        if (m_utilityVm)
+        {
+            _VmTerminate();
+        }
+    }
+
+    m_vmExitWork.reset();
+
     if (m_timezoneThread.joinable())
     {
-        LOG_IF_WIN32_BOOL_FALSE(PostThreadMessage(GetThreadId(m_timezoneThread.native_handle()), WM_QUIT, 0, 0));
+        m_timezoneStopEvent.SetEvent();
         m_timezoneThread.join();
     }
 
@@ -689,6 +722,8 @@ LxssUserSessionImpl::~LxssUserSessionImpl()
 
     // Ensure that if there are no running instances.
     WI_ASSERT(m_runningInstances.empty());
+
+    m_pluginManager.RemoveSession(m_session.SessionId);
 }
 
 HRESULT LxssUserSessionImpl::AttachDisk(_In_ LPCWSTR Disk, _In_ ULONG Flags)
@@ -1066,6 +1101,7 @@ HRESULT LxssUserSessionImpl::ExportDistribution(_In_opt_ LPCGUID DistroGuid, _In
     RETURN_HR_IF(E_INVALIDARG, (WI_IsAnyFlagSet(Flags, ~LXSS_EXPORT_DISTRO_FLAGS_ALL)));
 
     LXSS_DISTRO_CONFIGURATION configuration;
+    std::vector<PidTermination> pidTerminations;
     wil::unique_hkey distroKey;
     try
     {
@@ -1086,12 +1122,13 @@ HRESULT LxssUserSessionImpl::ExportDistribution(_In_opt_ LPCGUID DistroGuid, _In
         RETURN_HR_IF(WSL_E_WSL1_NOT_SUPPORTED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE) && !g_lxcoreInitialized);
 
         // Add the distribution to the list of converting distributions.
-        _ConversionBegin(configuration.DistroId, LxssDistributionStateExporting);
+        pidTerminations = _ConversionBegin(configuration.DistroId, LxssDistributionStateExporting);
     }
     CATCH_RETURN()
 
     // Set up a scope exit member to remove the distribution from the converting list.
     auto exportComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { _ConversionComplete(configuration.DistroId); });
+    RETURN_IF_FAILED(_WaitForPidTerminations(pidTerminations));
 
     // Log telemetry to track how long exporting the distribution takes.
     WSL_LOG_TELEMETRY(
@@ -1472,12 +1509,13 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
 
         DistributionRegistration registration;
         LXSS_DISTRO_CONFIGURATION configuration;
+        std::vector<PidTermination> pidTerminations;
         std::filesystem::path distributionPath;
+
+        std::unique_lock instanceLock(m_instanceLock);
         auto config = _GetResultantConfig(userToken.get());
 
         {
-            std::lock_guard lock(m_instanceLock);
-
             // Create a registration for the distribution and determine which version should be used.
             ULONG flags = LXSS_DISTRO_FLAGS_DEFAULT;
             WI_SetFlagIf(flags, LXSS_DISTRO_FLAGS_VM_MODE, (Version == LXSS_WSL_VERSION_2));
@@ -1498,10 +1536,12 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
 
             _ValidateDistributionNameAndPathNotInUse(lxssKey.get(), distributionPath.c_str(), DistributionName);
 
-            if (!std::filesystem::exists(distributionPath))
             {
                 auto impersonate = wil::CoImpersonateClient();
-                wil::CreateDirectoryDeep(distributionPath.c_str());
+                if (!std::filesystem::exists(distributionPath))
+                {
+                    wil::CreateDirectoryDeep(distributionPath.c_str());
+                }
             }
 
             // If importing a vhd, determine if it is a .vhd or .vhdx.
@@ -1537,11 +1577,14 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
             configuration = s_GetDistributionConfiguration(registration, DistributionName == nullptr);
 
             // Add the distribution to the list of converting distributions.
-            _ConversionBegin(configuration.DistroId, LxssDistributionStateInstalling);
+            pidTerminations = _ConversionBegin(configuration.DistroId, LxssDistributionStateInstalling);
         }
+
+        instanceLock.unlock();
 
         // Set up a scope exit member to remove the distribution from the converting list.
         auto installComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { _ConversionComplete(configuration.DistroId); });
+        THROW_IF_FAILED(_WaitForPidTerminations(pidTerminations));
 
         // Declare a scope exit variable to clean up on failure.
         ULONG deleteFlags = 0;
@@ -1582,8 +1625,9 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
                         VhdSize = config.VhdSizeBytes;
                     }
 
+                    const bool fixed = WI_IsFlagSet(Flags, LXSS_IMPORT_DISTRO_FLAGS_FIXED_VHD);
                     wsl::core::filesystem::CreateVhd(
-                        configuration.VhdFilePath.c_str(), VhdSize, GetUserSid(), config.EnableSparseVhd, WI_IsFlagSet(Flags, LXSS_IMPORT_DISTRO_FLAGS_FIXED_VHD));
+                        configuration.VhdFilePath.c_str(), VhdSize, GetUserSid(), config.EnableSparseVhd && !fixed, fixed);
 
                     deleteFlags = LXSS_DELETE_DISTRO_FLAGS_VHD;
                 }
@@ -1759,6 +1803,8 @@ CATCH_RETURN()
 HRESULT LxssUserSessionImpl::SetSparse(_In_ LPCGUID DistroGuid, _In_ BOOLEAN Sparse, _In_ BOOLEAN AllowUnsafe)
 try
 {
+    UNREFERENCED_PARAMETER(AllowUnsafe);
+
     const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     const wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
     auto runAsUser = wil::impersonate_token(userToken.get());
@@ -1771,12 +1817,6 @@ try
     if (WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE))
     {
         THROW_HR_WITH_USER_ERROR(WSL_E_VM_MODE_INVALID_STATE, wsl::shared::Localization::MessageSparseVhdWsl2Only());
-    }
-
-    // Allow disabling sparse mode but not enabling until the data corruption issue has been resolved.
-    if (Sparse && !AllowUnsafe)
-    {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageSparseVhdDisabled());
     }
 
     // Don't attempt if running
@@ -1801,6 +1841,11 @@ try
         .SetSparse = Sparse,
     };
     THROW_IF_WIN32_BOOL_FALSE(::DeviceIoControl(vhd.get(), FSCTL_SET_SPARSE, &buffer, sizeof(buffer), nullptr, 0, nullptr, nullptr));
+
+    if (Sparse)
+    {
+        EMIT_USER_WARNING(wsl::shared::Localization::MessageSparseVhdUnsafe());
+    }
 
     return S_OK;
 }
@@ -1869,13 +1914,13 @@ CATCH_RETURN()
 HRESULT LxssUserSessionImpl::CompactDistribution(_In_ LPCGUID DistroGuid)
 try
 {
-    auto runAsUser = wil::CoImpersonateClient();
     std::filesystem::path vhdPath;
     LXSS_DISTRO_CONFIGURATION configuration{};
+    std::vector<PidTermination> pidTerminations;
+    const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
 
     {
         std::lock_guard lock(m_instanceLock);
-        const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
         const wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
         const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
         configuration = s_GetDistributionConfiguration(registration);
@@ -1887,8 +1932,14 @@ try
             THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), wsl::shared::Localization::MessageCompactVhdNotSupported());
         }
 
-        _ConversionBegin(configuration.DistroId, LxssDistributionStateCompacting);
+        pidTerminations = _ConversionBegin(configuration.DistroId, LxssDistributionStateCompacting);
+    }
 
+    auto compactionComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { _ConversionComplete(configuration.DistroId); });
+    THROW_IF_FAILED(_WaitForPidTerminations(pidTerminations));
+
+    {
+        std::lock_guard lock(m_instanceLock);
         // Trim the filesystem before compaction so the host can reclaim the freed blocks.
         //
         // WSL2 does not mount ext4 with 'discard' and does not run fsck at boot, so blocks freed
@@ -1908,8 +1959,7 @@ try
         CATCH_LOG();
     }
 
-    auto compactionComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { _ConversionComplete(configuration.DistroId); });
-
+    auto runAsUser = wil::CoImpersonateClient();
     THROW_IF_FAILED_MSG(
         wil::ResultFromException([&] { wsl::core::filesystem::CompactVhd(vhdPath.c_str()); }),
         "Failed to compact VHD: %ls",
@@ -1924,6 +1974,7 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
 
     DistributionRegistration registration;
     LXSS_DISTRO_CONFIGURATION configuration;
+    std::vector<PidTermination> pidTerminations;
     const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
     try
@@ -1953,7 +2004,7 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
         RETURN_HR_IF(WSL_E_WSL1_NOT_SUPPORTED, !g_lxcoreInitialized);
 
         // Add the distribution to the list of converting distributions.
-        _ConversionBegin(configuration.DistroId, LxssDistributionStateConverting);
+        pidTerminations = _ConversionBegin(configuration.DistroId, LxssDistributionStateConverting);
 
         // Remove the distribution ID from m_updatedInitDistros so init is updated on the next launch (in the case of a conversion to WSL1).
         m_updatedInitDistros.erase(
@@ -1963,6 +2014,7 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
 
     // Set up a scope exit member to remove the distribution from the converting list.
     auto conversionComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { _ConversionComplete(configuration.DistroId); });
+    RETURN_IF_FAILED(_WaitForPidTerminations(pidTerminations));
 
     // Log telemetry to track how long enabling VM mode takes.
     WSL_LOG_TELEMETRY(
@@ -2252,6 +2304,11 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, ShutdownBeh
                 locked = true;
             }
 
+            WI_ASSERT(!PreventNewInstances || !m_disableNewInstanceCreation);
+
+            // Once permanent shutdown starts, no caller may recreate the VM or its notification sources.
+            m_disableNewInstanceCreation |= PreventNewInstances;
+
             // Stop each instance with the lock held.
             while (!m_runningInstances.empty())
             {
@@ -2271,19 +2328,15 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, ShutdownBeh
             // has timed out (and so the disks states would have been written in the registry)
             const auto key = wsl::windows::common::registry::OpenOrCreateLxssDiskMountsKey(&m_userSid.Sid);
             wsl::windows::common::registry::ClearSubkeys(key.get());
-
-            WI_ASSERT(!PreventNewInstances || !m_disableNewInstanceCreation);
-
-            // This is used when the session is being deleted.
-            // This is in place to prevent a CreateInstance() call from succeeding
-            // after the session is shut down since this would mean that the destructor,
-            // which could run on that thread (if the session already dropped its LxssUserSessionImpl reference)
-            // would have to do all the cleanup work.
-            m_disableNewInstanceCreation = PreventNewInstances;
         }
 
-        auto lock = m_terminatedInstanceLock.lock_exclusive();
-        m_terminatedInstances.clear();
+        if (PreventNewInstances)
+        {
+            // Wait for all pending callbacks to complete.
+            WaitForThreadpoolWorkCallbacks(m_vmExitWork.get(), TRUE);
+        }
+
+        _ClearTerminatedInstances();
     }
     CATCH_LOG()
 
@@ -2441,6 +2494,12 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid)
         // when the function exits.
         auto removedDistroString = wsl::shared::string::GuidToString<wchar_t>(*DistroGuid);
         bool removeDistro = false;
+        auto unregisterComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+            if (removeDistro)
+            {
+                _ConversionComplete(*DistroGuid);
+            }
+        });
         auto deleteDistroKey = wil::scope_exit([&] {
             if (removeDistro)
             {
@@ -2448,6 +2507,7 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid)
             }
         });
 
+        std::vector<PidTermination> pidTerminations;
         {
             std::lock_guard lock(m_instanceLock);
 
@@ -2459,14 +2519,13 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid)
             WSL_LOG_TELEMETRY(
                 "UnregisterDistributionBegin", PDT_ProductAndServiceUsage, TraceLoggingValue(configuration.Name.c_str(), "name"));
 
-            // Ensure that a filesystem export is not in progress.
-            _EnsureNotLocked(DistroGuid);
+            // Terminate the distribution and prevent concurrent operations while waiting for init to exit.
+            pidTerminations = _ConversionBegin(*DistroGuid, LxssDistributionStateUninstalling);
 
             // After this point the distribution registry key should be deleted.
             removeDistro = true;
 
-            // Terminate the distribution and mark it as uninstalling.
-            _TerminateInstanceInternal(DistroGuid);
+            // Mark the distribution as uninstalling.
             registration.Write(Property::State, LxssDistributionStateUninstalling);
 
             // If the default distribution has been unregistered, search for another
@@ -2486,7 +2545,12 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid)
                     DistributionRegistration::SetDefault(lxssKey.get(), distributions[0]);
                 }
             }
+        }
 
+        THROW_IF_FAILED(_WaitForPidTerminations(pidTerminations));
+
+        {
+            std::lock_guard lock(m_instanceLock);
             {
                 auto runAsUser = wil::CoImpersonateClient();
                 _DeleteDistributionLockHeld(configuration);
@@ -2512,12 +2576,41 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid)
     return result;
 }
 
+_Requires_lock_not_held_(m_instanceLock)
+_Requires_lock_not_held_(m_terminatedInstanceLock)
+void LxssUserSessionImpl::_ClearTerminatedInstances()
+{
+    std::list<std::shared_ptr<LxssRunningInstance>> terminatedInstances;
+    {
+        auto lock = m_terminatedInstanceLock.lock_exclusive();
+        terminatedInstances.splice(terminatedInstances.end(), m_terminatedInstances);
+    }
+}
+
 _Requires_lock_held_(m_instanceLock)
-void LxssUserSessionImpl::_ConversionBegin(_In_ GUID DistroGuid, _In_ LxssDistributionState State)
+std::vector<LxssUserSessionImpl::PidTermination> LxssUserSessionImpl::_ConversionBegin(_In_ GUID DistroGuid, _In_ LxssDistributionState State)
 {
     _EnsureNotLocked(&DistroGuid);
     _TerminateInstanceInternal(&DistroGuid);
+
+    auto pidTerminations = _GetPidTerminations(DistroGuid);
     m_lockedDistributions.emplace_back(DistroGuid, State);
+    return pidTerminations;
+}
+
+_Requires_lock_held_(m_instanceLock)
+std::vector<LxssUserSessionImpl::PidTermination> LxssUserSessionImpl::_GetPidTerminations(_In_ const GUID& DistroGuid) const
+{
+    std::vector<PidTermination> pidTerminations;
+    for (const auto& termination : m_pidTerminations)
+    {
+        if (IsEqualGUID(termination.second.DistroId, DistroGuid) && !termination.second.TimedOut)
+        {
+            pidTerminations.push_back(termination.second);
+        }
+    }
+
+    return pidTerminations;
 }
 
 _Requires_lock_not_held_(m_instanceLock)
@@ -2528,6 +2621,41 @@ void LxssUserSessionImpl::_ConversionComplete(_In_ GUID DistroGuid)
 
     _VmCheckIdle();
 }
+
+_Requires_lock_not_held_(m_instanceLock)
+HRESULT LxssUserSessionImpl::_WaitForPidTerminations(_In_ const std::vector<PidTermination>& PidTerminations)
+try
+{
+    SlowOperationWatcher slowOperation{"WaitForPidTermination"};
+    const auto startTime = GetTickCount64();
+    for (const auto& termination : PidTerminations)
+    {
+        const auto elapsed = GetTickCount64() - startTime;
+        const auto timeout = termination.Timeout == INFINITE  ? INFINITE
+                             : elapsed >= termination.Timeout ? 0
+                                                              : termination.Timeout - gsl::narrow_cast<DWORD>(elapsed);
+        if (!termination.Event.wait(timeout))
+        {
+            {
+                std::lock_guard lock(m_instanceLock);
+                if (const auto pending = m_pidTerminations.find(termination.InstanceId); pending != m_pidTerminations.end())
+                {
+                    // Keep the launch identity for a late exit, but do not wait for it again.
+                    pending->second.TimedOut = true;
+                }
+            }
+
+            WSL_LOG(
+                "PidTerminationTimeout",
+                TraceLoggingValue(termination.ClientId, "pid"),
+                TraceLoggingValue(termination.Timeout, "timeout"));
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageDistributionTerminationTimeout(termination.ClientId, termination.Timeout));
+        }
+    }
+
+    return S_OK;
+}
+CATCH_RETURN()
 
 _Requires_exclusive_lock_held_(m_instanceLock)
 void LxssUserSessionImpl::_CreateLegacyRegistration(_In_ HKEY LxssKey, _In_ HANDLE UserToken)
@@ -2582,12 +2710,7 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
     // Validate flags.
     THROW_HR_IF(E_INVALIDARG, (WI_IsAnyFlagSet(Flags, ~LXSS_CREATE_INSTANCE_FLAGS_ALL)));
 
-    // Clear the list of terminated instances before acquiring the instance
-    // list lock.
-    {
-        auto lock = m_terminatedInstanceLock.lock_exclusive();
-        m_terminatedInstances.clear();
-    }
+    _ClearTerminatedInstances();
 
     wil::unique_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
@@ -2595,7 +2718,7 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
 
     std::shared_ptr<LxssRunningInstance> instance;
     {
-        std::lock_guard lock(m_instanceLock);
+        std::unique_lock lock(m_instanceLock);
 
         // m_disableNewInstanceCreation is set when the session is being deleted.
         // In that code path, don't create a new session.
@@ -2603,13 +2726,44 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
 
         registration = DistributionRegistration::OpenOrDefault(lxssKey.get(), DistroGuid);
 
-        // Check if an instance is already running for this distribution, if
-        // not create one.
-        instance = _RunningInstance(&registration.Id());
-        if (!instance)
+        // Retain event ownership so neither PID nor event-handle reuse can match a previous wait.
+        std::vector<PidTermination> waitedTerminations;
+        while (true)
         {
+            instance = _RunningInstance(&registration.Id());
+            if (instance)
+            {
+                break;
+            }
+
             THROW_HR_IF(E_NOT_SET, WI_IsFlagSet(Flags, LXSS_CREATE_INSTANCE_FLAGS_OPEN_EXISTING));
 
+            auto pidTerminations = _GetPidTerminations(registration.Id());
+            std::erase_if(pidTerminations, [&](const auto& termination) {
+                return std::any_of(waitedTerminations.begin(), waitedTerminations.end(), [&](const auto& waited) {
+                    return waited.Event.get() == termination.Event.get();
+                });
+            });
+
+            if (pidTerminations.empty())
+            {
+                break;
+            }
+
+            waitedTerminations.insert(waitedTerminations.end(), pidTerminations.begin(), pidTerminations.end());
+
+            lock.unlock();
+            THROW_IF_FAILED(_WaitForPidTerminations(pidTerminations));
+            lock.lock();
+
+            THROW_HR_IF(RPC_E_DISCONNECTED, m_disableNewInstanceCreation);
+            registration = DistributionRegistration::OpenOrDefault(lxssKey.get(), DistroGuid);
+        }
+
+        // Check if an instance is already running for this distribution, if
+        // not create one.
+        if (!instance)
+        {
             // Query information about the distribution.
             auto configuration = s_GetDistributionConfiguration(registration);
             auto defaultUid = registration.Read(Property::DefaultUid);
@@ -2666,7 +2820,7 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
                         configuration,
                         defaultUid,
                         clientKey,
-                        std::bind(s_TerminateInstance, this, registration.Id(), false),
+                        std::bind(s_TerminateInstance, this, registration.Id(), clientKey, false),
                         std::bind(s_UpdateInit, this, configuration),
                         Flags,
                         _GetResultantConfig(userToken.get()).InstanceIdleTimeout);
@@ -2780,11 +2934,9 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
             currentProcess = wsl::windows::common::wslutil::OpenCallingProcess(GENERIC_READ | SYNCHRONIZE);
         }
 
+        const auto clientKey = instance->GetLifetimeManagerId();
         m_lifetimeManager.RegisterCallback(
-            instance->GetLifetimeManagerId(),
-            std::bind(s_TerminateInstance, this, registration.Id(), true),
-            currentProcess.get(),
-            instance->GetIdleTimeout());
+            clientKey, std::bind(s_TerminateInstance, this, registration.Id(), clientKey, true), currentProcess.get(), instance->GetIdleTimeout());
     }
 
     // If the system distro flag was specified, return the system distro for the instance.
@@ -2950,6 +3102,10 @@ _Requires_exclusive_lock_held_(m_instanceLock)
 void LxssUserSessionImpl::_CreateVm()
 {
     ExecutionContext context(Context::CreateVm);
+    THROW_HR_IF(RPC_E_DISCONNECTED, m_disableNewInstanceCreation);
+
+    // An operation may resume after session shutdown while waiting for a distribution to exit.
+    THROW_HR_IF(RPC_E_DISCONNECTED, m_disableNewInstanceCreation);
 
     if (!m_utilityVm)
     {
@@ -2986,10 +3142,10 @@ void LxssUserSessionImpl::_CreateVm()
         // Create the utility VM and register for callbacks.
         m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId, std::move(initializeDrvFs));
 
-        if (m_httpProxyStateTracker)
+        if (const auto tracker = m_httpProxyStateTracker)
         {
             // this needs to be done after the VM has finished in case we fell back to NAT mode
-            m_httpProxyStateTracker->ConfigureNetworkingMode(m_utilityVm->GetConfig().NetworkingMode);
+            tracker->ConfigureNetworkingMode(m_utilityVm->GetConfig().NetworkingMode);
         }
 
         try
@@ -3018,7 +3174,7 @@ void LxssUserSessionImpl::_CreateVm()
             throw;
         }
 
-        auto callback = [this](auto Pid) {
+        auto callback = [this](const LX_MINI_INIT_CHILD_EXIT_MESSAGE& ExitMessage) {
             // If the vm is currently being destroyed, the instance lock might be held
             // while WslCoreVm's destructor is waiting on this thread.
             // Cancel the call if the vm destruction is signaled.
@@ -3037,12 +3193,25 @@ void LxssUserSessionImpl::_CreateVm()
             }
 
             auto unlock = wil::scope_exit([&]() { m_instanceLock.unlock(); });
-            TerminateByClientIdLockHeld(Pid);
-        };
+            const auto instance = std::find_if(m_runningInstances.begin(), m_runningInstances.end(), [&](const auto& entry) {
+                const auto* wslcoreInstance = dynamic_cast<WslCoreInstance*>(entry.second.get());
+                return wslcoreInstance && ExitMessage.ChildPid == wslcoreInstance->GetClientId() &&
+                       ExitMessage.InstanceId != GUID{} && ExitMessage.InstanceId == wslcoreInstance->GetInstanceId();
+            });
+            if (instance != m_runningInstances.end())
+            {
+                const auto distroId = instance->first;
+                _TerminateInstanceInternal(&distroId, false);
+            }
 
-        // N.B. The callbacks must be registered outside of the above try/catch.
-        // Otherwise if an exception is thrown, calling _VmTerminate() will trigger the 's_VmTerminated' termination callback
-        // Which can deadlock since this thread holds the instance lock and HCS can block until the VM termination callback returns before deleting the VM.
+            if (const auto termination = m_pidTerminations.find(ExitMessage.InstanceId);
+                termination != m_pidTerminations.end() && ExitMessage.ChildPid == termination->second.ClientId &&
+                ExitMessage.InstanceId != GUID{} && ExitMessage.InstanceId == termination->second.InstanceId)
+            {
+                termination->second.Event.SetEvent();
+                m_pidTerminations.erase(termination);
+            }
+        };
 
         m_utilityVm->RegisterCallbacks(std::bind(callback, _1), std::bind(s_VmTerminated, this, _1));
     }
@@ -3306,6 +3475,7 @@ LONG LxssUserSessionImpl::_GetElfExitStatus(_In_ const LXSS_RUN_ELF_CONTEXT& Con
     return exitStatus;
 }
 
+_Requires_exclusive_lock_held_(m_instanceLock)
 wsl::core::Config LxssUserSessionImpl::_GetResultantConfig(_In_ const HANDLE userToken)
 {
     const auto configFilePath = wsl::windows::common::helpers::GetWslConfigPath(userToken);
@@ -3390,6 +3560,7 @@ try
 }
 CATCH_LOG()
 
+_Requires_exclusive_lock_held_(m_instanceLock)
 void LxssUserSessionImpl::_LoadNetworkingSettings(_Inout_ wsl::core::Config& config, _In_ HANDLE userToken)
 try
 {
@@ -3457,6 +3628,8 @@ void LxssUserSessionImpl::_ProcessImportResultMessage(
 
         // Validate that name is valid, and doesn't conflict with existing distributions.
         s_ValidateDistroName(distributionName.c_str());
+
+        std::lock_guard lock(m_instanceLock);
         _ValidateDistributionNameAndPathNotInUse(LxssKey, nullptr, distributionName.c_str(), Registration.Id());
 
         Configuration.Name = std::move(distributionName);
@@ -3700,9 +3873,17 @@ void LxssUserSessionImpl::_SetDistributionInstalled(_In_ HKEY LxssKey, _In_ cons
 }
 
 _Requires_lock_not_held_(m_instanceLock)
-bool LxssUserSessionImpl::_TerminateInstance(_In_ LPCGUID DistroGuid, _In_ bool CheckForClients)
+bool LxssUserSessionImpl::_TerminateInstance(_In_ LPCGUID DistroGuid, _In_ ULONG64 ClientLifetimeId, _In_ bool CheckForClients)
 {
     std::lock_guard lock(m_instanceLock);
+
+    // A terminated instance's callback can finish after another instance of the same distribution starts.
+    const auto instance = m_runningInstances.find(*DistroGuid);
+    if (instance == m_runningInstances.end() || instance->second->GetLifetimeManagerId() != ClientLifetimeId)
+    {
+        return true;
+    }
+
     return _TerminateInstanceInternal(DistroGuid, CheckForClients);
 }
 
@@ -3736,6 +3917,14 @@ bool LxssUserSessionImpl::_TerminateInstanceInternal(_In_ LPCGUID DistroGuid, _I
             {
                 if (const auto* wslcoreInstance = dynamic_cast<WslCoreInstance*>(instance->second.get()); wslcoreInstance != nullptr)
                 {
+                    // Stop releases the system distro, so capture its PID while it is still available.
+                    PidTermination termination;
+                    termination.DistroId = *DistroGuid;
+                    termination.InstanceId = wslcoreInstance->GetInstanceId();
+                    termination.ClientId = wslcoreInstance->GetClientId();
+                    termination.Timeout = gsl::narrow_cast<DWORD>(m_utilityVm->GetConfig().DistributionStartTimeout);
+                    m_pidTerminations.try_emplace(termination.InstanceId, std::move(termination));
+
                     m_pluginManager.OnDistributionStopping(&m_session, wslcoreInstance->DistributionInformation());
                 }
 
@@ -3784,14 +3973,14 @@ HRESULT LxssUserSessionImpl::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In
     return S_OK;
 }
 
-HRESULT LxssUserSessionImpl::CreateLinuxProcess(_In_opt_ const GUID* Distro, _In_ LPCSTR Path, _In_ LPCSTR* Arguments, _Out_ SOCKET* Socket)
+HRESULT LxssUserSessionImpl::CreateLinuxProcess(_In_opt_ const GUID* Distro, _In_ LPCSTR Path, _In_ LPCSTR* Arguments, _Out_ SOCKET* Socket, uint64_t PluginId)
 {
     std::lock_guard lock(m_instanceLock);
     RETURN_HR_IF(E_NOT_VALID_STATE, !m_utilityVm);
 
     if (Distro == nullptr)
     {
-        *Socket = m_utilityVm->CreateRootNamespaceProcess(Path, Arguments).release();
+        *Socket = m_utilityVm->CreateRootNamespaceProcess(Path, Arguments, PluginId).release();
     }
     else
     {
@@ -3899,6 +4088,7 @@ bool LxssUserSessionImpl::_ValidateDistro(_In_ HKEY LxssKey, _In_ LPCGUID Distro
     return isValid;
 }
 
+_Requires_lock_held_(m_instanceLock)
 void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
     _In_ HKEY LxssKey, _In_opt_ LPCWSTR Path, _In_opt_ LPCWSTR Name, const std::optional<GUID>& Exclude)
 {
@@ -3915,6 +4105,7 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
 
     if (Path != nullptr)
     {
+        auto impersonate = wil::CoImpersonateClient();
         canonicalPath = wsl::windows::common::filesystem::GetCanonicalPath(Path, error);
         if (error)
         {
@@ -3959,6 +4150,7 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
 
         if (Path != nullptr)
         {
+            auto impersonate = wil::CoImpersonateClient();
             auto canonicalDistroPath = wsl::windows::common::filesystem::GetCanonicalPath(configuration.BasePath, error);
             if (error)
             {
@@ -4038,6 +4230,13 @@ void LxssUserSessionImpl::_VmTerminate()
     m_utilityVm.reset();
     m_vmId.store(GUID_NULL);
 
+    // VM teardown cancels exit callbacks, so complete any remaining waiters after the VM has released its resources.
+    for (const auto& termination : m_pidTerminations)
+    {
+        termination.second.Event.SetEvent();
+    }
+    m_pidTerminations.clear();
+
     // Reset the user's token since its lifetime is tied to the VM.
     m_userToken.reset();
     m_session.UserToken = nullptr;
@@ -4051,11 +4250,15 @@ void LxssUserSessionImpl::_VmTerminate()
     m_vmTerminating.ResetEvent();
 }
 
-void LxssUserSessionImpl::_SetHttpProxyInfo(std::vector<std::string>& environment) const noexcept
+void LxssUserSessionImpl::_SetHttpProxyInfo(std::vector<std::string>& environment) noexcept
 try
 {
-    // Copy guarantees a ref is held on the original instance, or it's null.
-    const auto localTracker = m_httpProxyStateTracker;
+    std::shared_ptr<HttpProxyStateTracker> localTracker;
+    {
+        std::lock_guard lock(m_instanceLock);
+        localTracker = m_httpProxyStateTracker;
+    }
+
     if (localTracker)
     {
         WSL_LOG("_SetHttpProxyInfo: Attempting to set proxy info");
@@ -4266,12 +4469,12 @@ LX_INIT_DRVFS_MOUNT LxssUserSessionImpl::s_InitializeDrvFs(_In_ const std::weak_
     }
 }
 
-bool LxssUserSessionImpl::s_TerminateInstance(_Inout_ LxssUserSessionImpl* UserSession, _In_ GUID DistroGuid, _In_ bool CheckForClients)
+bool LxssUserSessionImpl::s_TerminateInstance(_Inout_ LxssUserSessionImpl* UserSession, _In_ GUID DistroGuid, _In_ ULONG64 ClientLifetimeId, _In_ bool CheckForClients)
 {
     bool success = true;
     try
     {
-        success = UserSession->_TerminateInstance(&DistroGuid, CheckForClients);
+        success = UserSession->_TerminateInstance(&DistroGuid, ClientLifetimeId, CheckForClients);
     }
     CATCH_LOG()
 
@@ -4325,16 +4528,26 @@ VOID CALLBACK LxssUserSessionImpl::s_VmIdleTerminate(_Inout_ PTP_CALLBACK_INSTAN
 }
 
 void LxssUserSessionImpl::s_VmTerminated(_Inout_ LxssUserSessionImpl* UserSession, _In_ const GUID& VmId)
+{
+    // s_ProcessVmExit needs m_instanceLock, which cannot be held while in an HCS callback, since that could deadlock
+    // with WslCoreVm's destructor, which wait for the HCS callback to complete while releasing the VM handle.
+    UserSession->m_exitedVmId.store(VmId);
+    SubmitThreadpoolWork(UserSession->m_vmExitWork.get());
+}
+
+VOID CALLBACK LxssUserSessionImpl::s_ProcessVmExit(_Inout_ PTP_CALLBACK_INSTANCE, _Inout_opt_ PVOID Context, _Inout_ PTP_WORK)
 try
 {
-    UNREFERENCED_PARAMETER(VmId);
+    const auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
+    const auto session = static_cast<LxssUserSessionImpl*>(Context);
 
-    if (UserSession->m_suppressVmTerminationCallback.load())
+    std::lock_guard lock(session->m_instanceLock);
+    const auto vmId = session->m_exitedVmId.exchange(GUID_NULL);
+    if (session->m_suppressVmTerminationCallback.load() || !session->m_utilityVm || !IsEqualGUID(session->m_utilityVm->GetRuntimeId(), vmId))
     {
         return;
     }
 
-    UserSession->TerminateByClientId(LXSS_CLIENT_ID_WILDCARD);
-    return;
+    session->TerminateByClientIdLockHeld(LXSS_CLIENT_ID_WILDCARD);
 }
 CATCH_LOG()

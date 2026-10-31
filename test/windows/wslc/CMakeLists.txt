@@ -1,4 +1,6 @@
-# WSLC CLI Unit Tests
+# WSLC Tests
+#
+# Shared fixtures and helpers live in ../common/.
 
 file(GLOB_RECURSE WSLC_TEST_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
@@ -10,7 +12,11 @@ file(GLOB_RECURSE WSLC_TEST_HEADERS CONFIGURE_DEPENDS
 
 # Add the sources to the parent wsltests target.
 # This ensures they're compiled into the main test binary.
-target_sources(wsltests PRIVATE ${WSLC_TEST_SOURCES} ${WSLC_TEST_HEADERS})
+target_sources(wsltests PRIVATE
+    ${WSLC_TEST_SOURCES}
+    ${WSLC_TEST_HEADERS}
+    ${CMAKE_SOURCE_DIR}/src/windows/wslcsession/WSLCRestartScheduler.cpp
+)
 
 # N.B. These sources are compiled into wsltests, which is defined in the parent
 # directory. Source file properties are scoped to the directory that sets them,
@@ -21,6 +27,7 @@ target_sources(wsltests PRIVATE ${WSLC_TEST_SOURCES} ${WSLC_TEST_HEADERS})
 target_include_directories(wsltests PRIVATE
     ${CMAKE_SOURCE_DIR}/test
     ${CMAKE_SOURCE_DIR}/test/windows
+    ${CMAKE_SOURCE_DIR}/test/windows/common
     ${CMAKE_SOURCE_DIR}/test/windows/wslc
     ${CMAKE_SOURCE_DIR}/src/windows/wslc/core
     ${CMAKE_SOURCE_DIR}/src/windows/wslc/commands

@@ -17,6 +17,7 @@ Abstract:
 #include <chrono>
 #include <optional>
 #include <string>
+#include <utility>
 
 namespace wsl::windows::common::timestamp {
 
@@ -32,6 +33,10 @@ std::string ExpandToRfc3339(const std::string& timestamp);
 // has trailing characters.
 std::int64_t Rfc3339ToEpoch(const std::string& timestamp);
 
+// Parses Unix seconds, a relative Go duration, or a partial RFC 3339 timestamp.
+// Returns whole seconds since the epoch and the nonnegative fractional nanoseconds.
+std::pair<std::int64_t, std::int64_t> ParseTimestamp(const std::string& value);
+
 // Parses a Go duration such as "1h30m", "-1.5h" or "300ms": an optional sign followed by one or more
 // decimal values that each carry a unit of ns, us, ms, s, m or h. Returns nothing if the value does
 // not match that grammar or overflows.
@@ -44,6 +49,13 @@ std::string EpochToLocalDisplayTime(LONGLONG timestamp);
 // Renders an RFC 3339 timestamp in the same layout, but as UTC and with its fractional seconds
 // preserved. An empty input returns an empty string; anything else that cannot be parsed throws.
 std::string Rfc3339ToUtcDisplayTime(std::string_view timestamp);
+
+// Renders nanoseconds since the unix epoch in docker's fixed layout "2006-01-02T15:04:05.000000000Z07:00",
+// shifted by offset, with 'Z' for a zero offset.
+std::string EpochToRfc3339Nano(std::int64_t epochNanoseconds, std::chrono::seconds offset);
+
+// Renders the same layout in the local time zone. Falls back to UTC when the time zone database is unavailable.
+std::string EpochToLocalRfc3339Nano(std::int64_t epochNanoseconds);
 
 // Renders an elapsed number of seconds as a coarse, localized description such as "About a minute"
 // or "3 weeks". Negative values are treated as zero.

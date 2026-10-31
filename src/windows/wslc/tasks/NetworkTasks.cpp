@@ -18,7 +18,7 @@ Abstract:
 #include "NetworkModel.h"
 #include "NetworkService.h"
 #include "NetworkTasks.h"
-#include "TableOutput.h"
+#include "TableData.h"
 #include <wslc_schema.h>
 
 using namespace wsl::shared;
@@ -33,6 +33,7 @@ using namespace wsl::windows::wslc::services;
 namespace wsl::windows::wslc::task {
 
 using namespace wsl::windows::wslc::cli;
+using namespace wsl::windows::cli::table;
 
 namespace {
 
@@ -130,6 +131,7 @@ void CreateNetwork(CLIExecutionContext& context)
     }
 
     options.Internal = context.Args.GetValue<ArgType::Internal>();
+    options.EnableIPv6 = context.Args.GetValue<ArgType::Ipv6>();
 
     if (context.Args.Contains(ArgType::Subnet))
     {
@@ -154,13 +156,13 @@ void DeleteNetworks(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    auto networkNames = context.Args.GetAllValues<ArgType::NetworkName>();
+    auto networks = context.Args.GetAllValues<ArgType::NetworkNameOrId>();
     const bool force = context.Args.GetValue<ArgType::Force>();
-    for (const auto& name : networkNames)
+    for (const auto& nameOrId : networks)
     {
-        if (TryDeleteNetwork(context.Terminal, session, WideToMultiByte(name), force))
+        if (TryDeleteNetwork(context.Terminal, session, WideToMultiByte(nameOrId), force))
         {
-            context.Terminal.Output(L"{}\n", name);
+            context.Terminal.Output(L"{}\n", nameOrId);
         }
         else if (!force)
         {
@@ -182,12 +184,12 @@ void InspectNetworks(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    auto networkNames = context.Args.GetAllValues<ArgType::NetworkName>();
+    auto networks = context.Args.GetAllValues<ArgType::NetworkNameOrId>();
     std::vector<wsl::windows::common::wslc_schema::Network> result;
-    for (const auto& name : networkNames)
+    for (const auto& nameOrId : networks)
     {
         std::optional<wslc_schema::Network> inspectData;
-        if (TryInspectNetwork(context.Terminal, session, WideToMultiByte(name), inspectData))
+        if (TryInspectNetwork(context.Terminal, session, WideToMultiByte(nameOrId), inspectData))
         {
             result.push_back(*inspectData);
         }
@@ -201,7 +203,7 @@ void InspectNetworks(CLIExecutionContext& context)
     context.Terminal.Output(L"{}\n", MultiByteToWide(json));
 }
 
-void ListNetworks(CLIExecutionContext& context)
+void FormatNetworkOutput(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Networks));
     auto& networks = context.Data.Get<Data::Networks>();
@@ -212,13 +214,19 @@ void ListNetworks(CLIExecutionContext& context)
     const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
     const bool quiet = context.Args.GetValue<ArgType::Quiet>();
     const bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
+
     if (format == FormatType::Table && quiet)
     {
+        wsl::windows::cli::table::TableData table{Localization::WSLCCLI_TableHeaderNetworkId()};
+        table.ShowHeader = false;
+        table.Reserve(networks.size());
+
         for (const auto& network : networks)
         {
-            context.Terminal.Output(L"{}\n", MultiByteToWide(TruncateId(network.Id, trunc)));
+            table.AddRow({MultiByteToWide(TruncateId(network.Id, trunc))});
         }
 
+        context.Data.Add<Data::Table>(std::move(table));
         return;
     }
 
@@ -226,28 +234,30 @@ void ListNetworks(CLIExecutionContext& context)
     {
     case FormatType::Json:
     {
+        std::vector<std::wstring> json;
+        json.reserve(networks.size());
+
         for (const auto& network : networks)
         {
-            context.Terminal.Output(L"{}\n", ToJsonW(ToNetworkOutput(network, trunc), c_jsonCompactIndent));
+            json.push_back(ToJsonW(ToNetworkOutput(network, trunc), c_jsonCompactIndent));
         }
 
+        context.Data.Add<Data::Json>(std::move(json));
         break;
     }
     case FormatType::Table:
     {
-        // Every column has a minimum total width of ten characters, including the padding that follows it.
-        constexpr size_t c_minimumColumnWidth = 7;
-        auto table = wsl::windows::wslc::cli::TableOutput<4>(
-            context.Terminal,
-            {L"NETWORK ID", L"NAME", L"DRIVER", L"SCOPE"},
-            {ColumnWidthConfig{.MinWidth = c_minimumColumnWidth},
-             ColumnWidthConfig{.MinWidth = c_minimumColumnWidth},
-             ColumnWidthConfig{.MinWidth = c_minimumColumnWidth},
-             ColumnWidthConfig{.MinWidth = c_minimumColumnWidth}});
+        wsl::windows::cli::table::TableData table{
+            Localization::WSLCCLI_TableHeaderNetworkId(),
+            Localization::WSLCCLI_TableHeaderName(),
+            Localization::WSLCCLI_TableHeaderDriver(),
+            Localization::WSLCCLI_TableHeaderScope()};
+        table.Reserve(networks.size());
+
         for (const auto& network : networks)
         {
             const auto entry = ToNetworkOutput(network, trunc);
-            table.WriteRow({
+            table.AddRow({
                 MultiByteToWide(entry.ID),
                 MultiByteToWide(entry.Name),
                 MultiByteToWide(entry.Driver),
@@ -255,7 +265,7 @@ void ListNetworks(CLIExecutionContext& context)
             });
         }
 
-        table.Complete();
+        context.Data.Add<Data::Table>(std::move(table));
         break;
     }
     default:
@@ -295,12 +305,12 @@ void ConnectNetwork(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Data.Contains(Data::NetworkEndpointOptions));
-    WI_ASSERT(context.Args.Contains(ArgType::NetworkName));
+    WI_ASSERT(context.Args.Contains(ArgType::NetworkNameOrId));
     WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
 
     const auto& endpoint = context.Data.Get<Data::NetworkEndpointOptions>();
     models::ConnectNetworkOptions options{};
-    options.NetworkName = WideToMultiByte(context.Args.GetValue<ArgType::NetworkName>());
+    options.NetworkName = WideToMultiByte(context.Args.GetValue<ArgType::NetworkNameOrId>());
     options.ContainerId = WideToMultiByte(context.Args.GetValue<ArgType::ContainerId>());
     options.Aliases = endpoint.Aliases;
     options.IpAddress = endpoint.IpAddress;
@@ -314,12 +324,12 @@ void ConnectNetwork(CLIExecutionContext& context)
 void DisconnectNetwork(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
-    WI_ASSERT(context.Args.Contains(ArgType::NetworkName));
+    WI_ASSERT(context.Args.Contains(ArgType::NetworkNameOrId));
     WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
 
-    const auto networkName = WideToMultiByte(context.Args.GetValue<ArgType::NetworkName>());
+    const auto networkNameOrId = WideToMultiByte(context.Args.GetValue<ArgType::NetworkNameOrId>());
     const auto containerId = WideToMultiByte(context.Args.GetValue<ArgType::ContainerId>());
-    NetworkService::Disconnect(context.Data.Get<Data::Session>(), networkName, containerId);
+    NetworkService::Disconnect(context.Data.Get<Data::Session>(), networkNameOrId, containerId);
 }
 
 void SetNetworkEndpointOptionsFromArgs(CLIExecutionContext& context)
