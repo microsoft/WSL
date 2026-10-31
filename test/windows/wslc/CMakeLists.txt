@@ -15,6 +15,7 @@ file(GLOB_RECURSE WSLC_TEST_HEADERS CONFIGURE_DEPENDS
 target_sources(wsltests PRIVATE
     ${WSLC_TEST_SOURCES}
     ${WSLC_TEST_HEADERS}
+    ${CMAKE_SOURCE_DIR}/src/windows/wslcsession/EventStore.cpp
     ${CMAKE_SOURCE_DIR}/src/windows/wslcsession/WSLCRestartScheduler.cpp
 )
 
@@ -29,6 +30,7 @@ target_include_directories(wsltests PRIVATE
     ${CMAKE_SOURCE_DIR}/test/windows
     ${CMAKE_SOURCE_DIR}/test/windows/common
     ${CMAKE_SOURCE_DIR}/test/windows/wslc
+    ${CMAKE_SOURCE_DIR}/src/windows/wslcsession
     ${CMAKE_SOURCE_DIR}/src/windows/wslc/core
     ${CMAKE_SOURCE_DIR}/src/windows/wslc/commands
     ${CMAKE_SOURCE_DIR}/src/windows/wslc/arguments
