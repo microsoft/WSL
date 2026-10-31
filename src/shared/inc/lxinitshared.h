@@ -1794,7 +1794,7 @@ struct WSLC_EXEC
         STRING_FIELD(CurrentDirectoryIndex),
         FIELD(FdIndex),
         STRING_ARRAY_FIELD(CommandLineIndex),
-        STRING_ARRAY_FIELD(EnvironmentIndex));
+        ENVIRONMENT_ARRAY_FIELD(EnvironmentIndex));
 };
 struct WSLC_FORK_RESULT
 {

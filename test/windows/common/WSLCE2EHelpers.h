@@ -164,7 +164,7 @@ void VerifyNetworkIsNotListed(const std::wstring& networkName);
 
 std::string GetHashId(const std::string& id, bool fullId = false);
 wsl::windows::common::wslc_schema::InspectContainer InspectContainer(const std::wstring& containerName);
-wsl::windows::common::wslc_schema::InspectImage InspectImage(const std::wstring& imageName);
+wsl::windows::common::wslc_schema::InspectImage InspectImage(const std::wstring& imageName, const std::wstring& sessionName = L"");
 wsl::windows::common::wslc_schema::InspectVolume InspectVolume(const std::wstring& volumeName);
 wsl::windows::common::wslc_schema::Network InspectNetwork(const std::wstring& networkName);
 std::vector<wsl::windows::wslc::models::ContainerOutputInformation> ListAllContainers();
@@ -256,14 +256,14 @@ void VerifyPseudoConsoleTtySize(WSLCInteractiveSession& session, SHORT columns, 
 void WaitForPseudoConsoleOutput(
     const WSLCInteractiveSession& session, const std::string& expected, std::chrono::seconds timeout = std::chrono::seconds(60));
 
-// Starts a local registry container using the COM API and returns the running container (holds it
-// alive) plus the registry address. Host network for plain http, bridge network for tls enabled.
+// Returns the registry container and its address; TLS uses bridge networking with optional Windows loopback publication.
 std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(
     IWSLCSession& session,
     const std::string& username = "",
     const std::string& password = "",
     USHORT port = 5000,
-    const std::wstring& tlsCertDir = L"");
+    const std::wstring& tlsCertDir = L"",
+    bool publishToHost = false);
 
 // Tags an image for a registry and returns the full registry image reference (e.g. "127.0.0.1:PORT/debian:latest").
 std::wstring TagImageForRegistry(const std::wstring& imageName, const std::wstring& registryAddress);

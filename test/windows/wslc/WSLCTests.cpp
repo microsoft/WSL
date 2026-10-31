@@ -17645,6 +17645,43 @@ class WSLCTests
         std::vector<std::wstring> m_warnings;
     };
 
+    WSLC_TEST_METHOD(WarningCallbackLoopbackProxy)
+    {
+        SKIP_TEST_SERVER();
+
+        const auto expectedWarning = std::format(L"wsl: {}\n", wsl::shared::Localization::WSLCProxyLoopbackNotReachable());
+        const auto verifyWarning = [&](LPCWSTR name, LPCSTR httpProxy, LPCSTR httpsProxy, WSLCNetworkingMode networkingMode, bool expectWarning) {
+            auto settings = GetDefaultSessionSettings(name, false, networkingMode);
+            settings.HttpProxy = httpProxy;
+            settings.HttpsProxy = httpsProxy;
+
+            auto warningCallback = Microsoft::WRL::Make<CapturingWarningCallback>();
+            auto sessionManager = OpenSessionManager();
+            wil::com_ptr<IWSLCSession> session;
+            VERIFY_SUCCEEDED(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, warningCallback.Get(), &session));
+            wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+            auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(session->Terminate()); });
+
+            const auto warnings = warningCallback->GetWarnings();
+            if (expectWarning)
+            {
+                VERIFY_IS_TRUE(std::ranges::find(warnings, expectedWarning) != warnings.end());
+            }
+            else
+            {
+                VERIFY_IS_TRUE(warnings.empty());
+            }
+
+            VERIFY_SUCCEEDED(session->Terminate());
+            cleanup.release();
+        };
+
+        verifyWarning(L"warning-https-loopback-http-proxy", "https://localhost:3128", nullptr, WSLCNetworkingModeConsomme, true);
+        verifyWarning(L"warning-https-loopback-https-proxy", nullptr, "https://127.0.0.1:3128", WSLCNetworkingModeConsomme, true);
+        verifyWarning(L"warning-ipv6-loopback-proxy", "http://[::1]:3128", nullptr, WSLCNetworkingModeConsomme, true);
+        verifyWarning(L"warning-https-loopback-nat", "https://localhost:3128", nullptr, WSLCNetworkingModeNAT, false);
+    }
+
     WSLC_TEST_METHOD(WarningCallbackContainerRecovery)
     {
         SKIP_TEST_SERVER();

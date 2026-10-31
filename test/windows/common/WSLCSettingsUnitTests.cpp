@@ -627,6 +627,101 @@ class WSLCCLISettingsUnitTests
     }
 
     // -----------------------------------------------------------------------
+    // session.proxy
+    // -----------------------------------------------------------------------
+
+    TEST_METHOD(Validation_Proxy_ValidValues)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  proxy:\n"
+            "    http: http://user:pass@proxy.example.com:3128\n"
+            "    https: socks5h://[::1]:1080\n"
+            "    noProxy: localhost,.example.com\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::string("http://user:pass@proxy.example.com:3128"), s.Get<Setting::SessionProxyHttp>());
+        VERIFY_ARE_EQUAL(std::string("socks5h://[::1]:1080"), s.Get<Setting::SessionProxyHttps>());
+        VERIFY_ARE_EQUAL(std::string("localhost,.example.com"), s.Get<Setting::SessionProxyNoProxy>());
+    }
+
+    TEST_METHOD(Validation_Proxy_InvalidValues_UseDefaultAndWarn)
+    {
+        for (const auto* value :
+             {"proxy.example.com:3128",
+              "ftp://proxy.example.com",
+              "http://",
+              "http://user@:3128",
+              "http://proxy example.com",
+              "http://proxy.example.com:not-a-port",
+              "http://proxy.example.com:65536",
+              "http://proxy.example.com:0",
+              "http://proxy.example.com:",
+              "http://proxy.example.com:-1",
+              "http://proxy.example.com:3128:80",
+              "http://[::1]garbage",
+              "http://[::1]:invalid",
+              "https://[::1]:65536"})
+        {
+            auto dir = UniqueTempDir();
+            WriteFile(dir / L"settings.yaml", std::format("session:\n  proxy:\n    http: '{0}'\n    https: '{0}'\n", value));
+
+            UserSettingsTest s{dir};
+
+            VERIFY_ARE_EQUAL(2u, s.GetWarnings().size());
+            VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionProxyHttp>());
+            VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionProxyHttps>());
+        }
+    }
+
+    TEST_METHOD(Validation_Proxy_PortBoundaries)
+    {
+        for (const auto* value :
+             {"http://proxy.example.com", "http://proxy.example.com:1", "http://[::1]:65535/", "https://proxy.example.com:65535"})
+        {
+            auto dir = UniqueTempDir();
+            WriteFile(dir / L"settings.yaml", std::format("session:\n  proxy:\n    http: {0}\n    https: {0}\n", value));
+
+            UserSettingsTest s{dir};
+
+            VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+            VERIFY_ARE_EQUAL(std::string(value), s.Get<Setting::SessionProxyHttp>());
+            VERIFY_ARE_EQUAL(std::string(value), s.Get<Setting::SessionProxyHttps>());
+        }
+    }
+
+    TEST_METHOD(ResolveProxyUrl_RewritesOnlyLocalhost)
+    {
+        constexpr auto loopback = "host.wslc.internal";
+
+        VERIFY_ARE_EQUAL(std::string("http://host.wslc.internal:3128"), ResolveProxyUrl("http://localhost:3128", loopback));
+        VERIFY_ARE_EQUAL(std::string("http://host.wslc.internal:3128/"), ResolveProxyUrl("http://LocalHost:3128/", loopback));
+        VERIFY_ARE_EQUAL(std::string("http://u:p@host.wslc.internal"), ResolveProxyUrl("http://u:p@127.0.0.1", loopback));
+        VERIFY_ARE_EQUAL(std::string("https://localhost:3128"), ResolveProxyUrl("https://localhost:3128", loopback));
+        VERIFY_ARE_EQUAL(std::string("HTTPS://127.0.0.1:3128"), ResolveProxyUrl("HTTPS://127.0.0.1:3128", loopback));
+        VERIFY_ARE_EQUAL(std::string("http://proxy.example.com:3128"), ResolveProxyUrl("http://proxy.example.com:3128", loopback));
+        VERIFY_ARE_EQUAL(std::string("http://localhost.example.com"), ResolveProxyUrl("http://localhost.example.com", loopback));
+        VERIFY_ARE_EQUAL(std::string("http://localhost:3128"), ResolveProxyUrl("http://localhost:3128", ""));
+
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("socks5://[::1]:1080", loopback)));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("http://[::1]:3128", loopback)));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("http://[0:0:0:0:0:0:0:1]:3128", loopback)));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("http://127.0.0.2:3128", loopback)));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("https://localhost:3128", loopback)));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("HTTPS://127.0.0.1:3128", loopback)));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("http://localhost:3128", "")));
+        VERIFY_IS_FALSE(IsLoopbackProxyUrl(ResolveProxyUrl("http://localhost:3128", loopback)));
+        VERIFY_IS_FALSE(IsLoopbackProxyUrl(ResolveProxyUrl("http://127.0.0.1:3128", loopback)));
+        VERIFY_IS_FALSE(IsLoopbackProxyUrl("http://proxy.example.com:3128"));
+        VERIFY_IS_FALSE(IsLoopbackProxyUrl("http://localhost.example.com"));
+        VERIFY_IS_FALSE(IsLoopbackProxyUrl("http://[2001:db8::1]:3128"));
+    }
+
+    // -----------------------------------------------------------------------
     // session.defaultBindingAddress
     // -----------------------------------------------------------------------
 

@@ -9112,8 +9112,51 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_ARE_EQUAL(baselineCodePage, GetConsoleOutputCP(), L"Destruction restores the code page saved on the first call");
     }
 
+    TEST_METHOD(PrettyPrintWslcExecRedactsProxyValues)
+    {
+        wsl::shared::MessageWriter<WSLC_EXEC> message;
+        message.WriteString(message->ExecutableIndex, "/usr/bin/dockerd");
+        const char* arguments[]{"/usr/bin/dockerd", "--debug", "HTTP_PROXY=argument-value"};
+        message.WriteStringArray(message->CommandLineIndex, arguments, std::size(arguments));
+        const char* environment[]{
+            "PATH=/usr/bin:/bin",
+            "HTTP_PROXY=http://synthetic-user:synthetic-password@proxy.example.com:3128",
+            "HTTPS_PROXY=https://synthetic-user:synthetic-password@proxy.example.com:3128",
+            "NO_PROXY=.private.example",
+            "http_proxy=socks5://synthetic-user:synthetic-password@proxy.example.com:3128",
+            "https_proxy=malformed-synthetic-password",
+            "no_proxy=private.example",
+            "HtTp_PrOxY=synthetic-mixed-case",
+            "HTTP_PROXY_EXTRA=visible",
+            "HTTPS_PROXY=",
+            "HTTP_PROXY"};
+        message.WriteStringArray(message->EnvironmentIndex, environment, std::size(environment));
+        const auto originalMessage = std::vector(message.Span().begin(), message.Span().end());
+
+        const auto output = message->PrettyPrint();
+        VERIFY_ARE_NOT_EQUAL(std::string::npos, output.find("ExecutableIndex = /usr/bin/dockerd\n"));
+        VERIFY_ARE_NOT_EQUAL(std::string::npos, output.find("CommandLineIndex = /usr/bin/dockerd,--debug,HTTP_PROXY=argument-value\n"));
+        VERIFY_ARE_NOT_EQUAL(
+            std::string::npos,
+            output.find("EnvironmentIndex = PATH=/usr/bin:/bin,HTTP_PROXY=<redacted>,HTTPS_PROXY=<redacted>,NO_PROXY=<redacted>,"
+                        "http_proxy=<redacted>,https_proxy=<redacted>,no_proxy=<redacted>,HtTp_PrOxY=<redacted>,"
+                        "HTTP_PROXY_EXTRA=visible,HTTPS_PROXY=,HTTP_PROXY\n"));
+        VERIFY_ARE_EQUAL(std::string::npos, output.find("synthetic-"));
+        VERIFY_ARE_EQUAL(std::string::npos, output.find("private.example"));
+        VERIFY_IS_TRUE(std::ranges::equal(originalMessage, message.Span()));
+    }
+
     TEST_METHOD(PrettyPrintOutOfBoundsFields)
     {
+        {
+            wsl::shared::MessageWriter<WSLC_EXEC> message;
+            message->EnvironmentIndex = message->Header.MessageSize;
+            VERIFY_ARE_NOT_EQUAL(std::string::npos, message->PrettyPrint().find("EnvironmentIndex = <out-of-bounds>\n"));
+
+            message->EnvironmentIndex = 0;
+            VERIFY_ARE_NOT_EQUAL(std::string::npos, message->PrettyPrint().find("EnvironmentIndex = <empty>\n"));
+        }
+
         {
             alignas(LX_INIT_NETWORK_INFORMATION) std::array<char, offsetof(LX_INIT_NETWORK_INFORMATION, Buffer) + 1> storage{};
             auto* message = reinterpret_cast<LX_INIT_NETWORK_INFORMATION*>(storage.data());
