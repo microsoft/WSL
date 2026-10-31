@@ -175,5 +175,8 @@ private:
 
     // Set when parsing reaches a configured stopping boundary or a true help flag.
     bool m_stopped = false;
+
+    // Set after a bare '--'; every later token is positional or forwarded.
+    bool m_endOfOptions = false;
 };
 } // namespace wsl::windows::wslc

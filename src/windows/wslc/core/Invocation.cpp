@@ -95,13 +95,29 @@ namespace {
     {
         ApplyEnvironmentOptions(context.Args, command.GetScopedArguments(Scope::Global));
 
-        auto globalArguments = command.GetScopedArguments(Scope::Global, Flags::None);
-        command.ParseArguments(
-            invocation,
-            context.Args,
-            globalArguments,
-            /*optionsOnly*/ true,
-            /*stopOnUnknown*/ true);
+        const auto parseGlobalArguments = [&] {
+            command.ParseArguments(
+                invocation,
+                context.Args,
+                command.GetScopedArguments(Scope::Global, Flags::None),
+                /*optionsOnly*/ true,
+                /*stopOnUnknown*/ true);
+        };
+
+        parseGlobalArguments();
+
+        // A single '--' after the root's options only ends that pass. Later tokens still select
+        // and configure a subcommand, so 'wslc -- container list -a' keeps '-a' as an option.
+        if (!command.Parent().has_value())
+        {
+            const auto separator = invocation.begin();
+            if (separator != invocation.end() && *separator == L"--")
+            {
+                invocation.AdvancePast(separator);
+                parseGlobalArguments();
+            }
+        }
+
         command.ValidateArguments(context.Args, command.GetScopedArguments(Scope::Global));
 
         auto subcommand = command.FindSubCommand(invocation);
