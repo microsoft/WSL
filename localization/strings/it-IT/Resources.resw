@@ -2859,11 +2859,11 @@ Esempio: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Segnale da inviare (impostazione predefinita: il contenitore è configurato STOPSIGNAL o SIGTERM se non è configurato alcun contenitore)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>Monitora gli eventi del contenitore.</value>
+  <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
+    <value>Monitor events.</value>
   </data>
-  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>Monitora gli eventi in tempo reale dai contenitori.</value>
+  <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
+    <value>Monitora gli eventi in tempo reale da contenitori, immagini, reti e volumi.</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
     <value>Visualizza tutti gli eventi creati dal timestamp</value>

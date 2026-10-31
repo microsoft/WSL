@@ -2859,11 +2859,11 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>보낼 신호(기본값: 컨테이너의 구성된 STOPSIGNAL 또는 구성되지 않은 경우 SIGTERM)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>컨테이너 이벤트를 모니터링하세요.</value>
+  <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
+    <value>Monitor events.</value>
   </data>
-  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>컨테이너에서 실시간 이벤트를 모니터링합니다.</value>
+  <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
+    <value>컨테이너, 이미지, 네트워크 및 볼륨에서 실시간 이벤트를 모니터링합니다.</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
     <value>타임스탬프 이후 생성된 모든 이벤트 표시</value>

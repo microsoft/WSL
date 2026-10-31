@@ -2859,11 +2859,11 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>送信するシグナル (既定値: コンテナーに構成された STOPSIGNAL、または構成されていない場合は SIGTERM)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>コンテナー イベントを監視します。</value>
+  <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
+    <value>Monitor events.</value>
   </data>
-  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>コンテナーのリアルタイム イベントを監視します。</value>
+  <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
+    <value>コンテナー、イメージ、ネットワーク、ボリュームからのリアルタイム イベントを監視します。</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
     <value>タイムスタンプ以降に作成されたすべてのイベントを表示する</value>

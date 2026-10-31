@@ -2859,11 +2859,11 @@ Windows 版本： {}</value>
     <value>要傳送的信號 (預設: 容器所設定的 STOPSIGNAL，或若未設定則為 SIGTERM)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>監視容器事件。</value>
+  <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
+    <value>Monitor events.</value>
   </data>
-  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>監視容器中的即時事件。</value>
+  <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
+    <value>監視來自容器、映像、網路和磁碟區的即時事件。</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
     <value>顯示自該時間戳記以來建立的所有事件</value>

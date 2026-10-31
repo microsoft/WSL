@@ -2860,11 +2860,11 @@ Exemple : tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Signal à envoyer (par défaut : STOPSIGNAL configuré du conteneur, ou SIGTERM si aucun n’est configuré)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>Surveiller les événements des conteneurs.</value>
+  <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
+    <value>Monitor events.</value>
   </data>
-  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>Surveiller les événements en temps réel des conteneurs.</value>
+  <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
+    <value>Surveillez les événements en temps réel à partir de conteneurs, d’images, de réseaux et de volumes.</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
     <value>Afficher tous les événements créés depuis l’horodatage</value>
