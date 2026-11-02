@@ -1480,10 +1480,19 @@ std::optional<std::map<std::string, std::string>> WSLCContainerImpl::GetEventAtt
 
 void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode, const std::map<std::string, std::string>& attributes, std::int64_t eventTimeNano) noexcept
 {
+    // Declared before the COM wrapper owners so the document is deleted after the wrapper is disconnected.
+    // Recovery removes the document if this fails.
+    bool deleted = false;
+    auto deleteState = wil::scope_exit([&]() {
+        if (deleted)
+        {
+            LOG_IF_FAILED_MSG(m_persistentState.Delete(), "Failed to delete the persisted state of container '%hs'", m_id.c_str());
+        }
+    });
+
     // Either owner may disconnect the COM wrapper, so both must outlive m_lock.
     unique_com_disconnect comWrapper;
     std::shared_ptr<StateTransition> transition;
-    bool deleted = false;
 
     switch (event)
     {
@@ -1568,12 +1577,6 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
             TraceLoggingValue(m_name.c_str(), "Name"),
             TraceLoggingValue(m_id.c_str(), "Id"),
             TraceLoggingValue((int)event, "Event"));
-    }
-
-    // Recovery removes the document if this fails.
-    if (deleted)
-    {
-        LOG_IF_FAILED_MSG(m_persistentState.Delete(), "Failed to delete the persisted state of container '%hs'", m_id.c_str());
     }
 }
 
