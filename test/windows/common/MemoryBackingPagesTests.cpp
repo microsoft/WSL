@@ -9,6 +9,31 @@ class MemoryBackingPagesTests
 {
     WSL_TEST_CLASS(MemoryBackingPagesTests)
 
+    TEST_METHOD(MemoryProfile)
+    {
+        const struct
+        {
+            std::string_view setting;
+            bool largePages;
+        } cases[] = {
+            {"", false},
+            {"memoryProfile=density", false},
+            {"memoryProfile=performance", true},
+            {"memoryProfile=invalid", false},
+            {"memoryProfile=true", false},
+        };
+
+        for (const auto& test : cases)
+        {
+            LogInfo("Setting: %hs", test.setting.data());
+            const auto content = std::format("[experimental]\n{}\n", test.setting);
+            auto file = wsl::windows::common::filesystem::TempFile(GENERIC_WRITE, FILE_SHARE_READ, OPEN_EXISTING);
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(file.Handle.get(), content.data(), static_cast<DWORD>(content.size()), nullptr, nullptr));
+            const wsl::core::Config config(file.Path.c_str());
+            VERIFY_ARE_EQUAL(test.largePages, config.EnableLargeMemoryBackingPages);
+        }
+    }
+
     TEST_METHOD(LargePages)
     {
         wsl::windows::common::hcs::Memory memory{};
