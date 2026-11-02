@@ -20,14 +20,21 @@ using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 ParseArgumentsStateMachine::ParseArgumentsStateMachine(
-    InvocationCursor& invocation, ArgMap& execArgs, std::vector<Argument> arguments, bool optionsOnly, bool stopOnUnknown, std::vector<Argument> inheritedGlobalArguments) :
+    InvocationCursor& invocation,
+    ArgMap& execArgs,
+    std::vector<Argument> arguments,
+    bool optionsOnly,
+    bool stopOnUnknown,
+    std::vector<Argument> inheritedGlobalArguments,
+    bool endOfOptions) :
     m_invocation(invocation),
     m_executionArgs(execArgs),
     m_arguments(std::move(arguments)),
     m_inheritedGlobalArguments(std::move(inheritedGlobalArguments)),
     m_invocationItr(m_invocation.begin()),
     m_optionsOnly(optionsOnly),
-    m_stopOnUnknown(stopOnUnknown)
+    m_stopOnUnknown(stopOnUnknown),
+    m_endOfOptions(endOfOptions)
 {
     for (const auto& arg : m_arguments)
     {
@@ -217,14 +224,9 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
 
     if (currArg == L"--")
     {
-        // Options-only passes leave the separator for the caller, which decides whether it
-        // ends subcommand resolution.
-        if (m_optionsOnly)
-        {
-            return BackUpAndStop();
-        }
-
+        // Options-only passes stop after the separator so the caller can resolve a subcommand.
         m_endOfOptions = true;
+        m_stopped = m_optionsOnly;
         return {};
     }
 

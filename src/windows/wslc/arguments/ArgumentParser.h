@@ -28,16 +28,18 @@ namespace wsl::windows::wslc {
 // and inspect the in-progress state of the word being completed.
 struct ParseArgumentsStateMachine
 {
-    // optionsOnly:          stop before the first positional token.
+    // optionsOnly:          stop before the first positional token, or just after a '--'.
     // stopOnUnknown:        stop before the first unknown option
     //                       token instead of throwing.
+    // endOfOptions:         start as if a '--' was already consumed.
     ParseArgumentsStateMachine(
         InvocationCursor& invocation,
         ArgMap& execArgs,
         std::vector<Argument> arguments,
         bool optionsOnly = false,
         bool stopOnUnknown = false,
-        std::vector<Argument> inheritedGlobalArguments = {});
+        std::vector<Argument> inheritedGlobalArguments = {},
+        bool endOfOptions = false);
 
     ParseArgumentsStateMachine(const ParseArgumentsStateMachine&) = delete;
     ParseArgumentsStateMachine& operator=(const ParseArgumentsStateMachine&) = delete;
@@ -102,6 +104,11 @@ struct ParseArgumentsStateMachine
     InvocationCursor::iterator Position() const
     {
         return m_invocationItr;
+    }
+
+    bool EndOfOptions() const
+    {
+        return m_endOfOptions;
     }
 
 private:
