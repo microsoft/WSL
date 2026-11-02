@@ -112,7 +112,8 @@ namespace HcsVirtualMachineBackendTests {
 
 class HcsVirtualMachineBackendTests
 {
-    WSL_TEST_CLASS(HcsVirtualMachineBackendTests)
+    // Device-host COM proxies can remain loaded until process exit; isolate them from installer tests.
+    WSL_TEST_CLASS_WITH_PROPERTIES(HcsVirtualMachineBackendTests, TEST_CLASS_PROPERTY(L"IsolationLevel", L"Class"))
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
@@ -123,15 +124,7 @@ class HcsVirtualMachineBackendTests
 
     TEST_CLASS_CLEANUP(TestClassCleanup)
     {
-        const auto module = GetModuleHandleW(L"wsldevicehostproxystub.dll");
-        if (module)
-        {
-            const auto canUnload = reinterpret_cast<HRESULT(STDAPICALLTYPE*)()>(GetProcAddress(module, "DllCanUnloadNow"));
-            VERIFY_IS_NOT_NULL(canUnload);
-            LogInfo("Device-host proxy unload status before COM cleanup: 0x%08x", canUnload());
-        }
         CoFreeUnusedLibrariesEx(0, 0);
-        VERIFY_IS_NULL(GetModuleHandleW(L"wsldevicehostproxystub.dll"));
         VERIFY_ARE_EQUAL(0, WSACleanup());
         return true;
     }
