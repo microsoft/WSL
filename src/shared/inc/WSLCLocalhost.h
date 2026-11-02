@@ -3,8 +3,10 @@
 #pragma once
 
 #include "stringshared.h"
+#include <array>
+#include <cerrno>
+#include <cstdio>
 #include <filesystem>
-#include <fstream>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -121,39 +123,85 @@ inline std::string ConfigureLocalhostNameService(std::string_view Contents)
 }
 
 template <typename Configure>
-inline void ConfigureLocalhostFile(const std::filesystem::path& Path, Configure&& ConfigureContents)
+[[nodiscard]] inline int ConfigureLocalhostFile(const std::filesystem::path& Path, Configure&& ConfigureContents)
 {
-    const bool exists = std::filesystem::exists(Path);
+    std::error_code error;
+    const bool exists = std::filesystem::exists(Path, error);
+    if (error)
+    {
+        return error.value();
+    }
+
     std::string contents;
     if (exists)
     {
-        std::ifstream input;
-        input.exceptions(std::ios::badbit | std::ios::failbit);
-        input.open(Path, std::ios::binary | std::ios::ate);
-        contents.resize(static_cast<size_t>(input.tellg()));
-        input.seekg(0);
-        input.read(contents.data(), static_cast<std::streamsize>(contents.size()));
-        input.close();
+#ifdef WIN32
+        wil::unique_file input{_wfopen(Path.c_str(), L"rb")};
+#else
+        wil::unique_file input{std::fopen(Path.c_str(), "rb")};
+#endif
+        if (!input)
+        {
+            return errno;
+        }
+
+        std::array<char, 4096> buffer;
+        while (!std::feof(input.get()))
+        {
+            const auto count = std::fread(buffer.data(), 1, buffer.size(), input.get());
+            const int readError = errno;
+            if (std::ferror(input.get()))
+            {
+                return readError;
+            }
+            contents.append(buffer.data(), count);
+        }
+
+        if (std::fclose(input.release()) != 0)
+        {
+            return errno;
+        }
     }
 
     const auto configured = ConfigureContents(contents);
     if (exists && configured == contents)
     {
-        return;
+        return 0;
     }
 
-    std::ofstream output;
-    output.exceptions(std::ios::badbit | std::ios::failbit);
-    output.open(Path, std::ios::binary | std::ios::trunc);
+#ifdef WIN32
+    wil::unique_file output{_wfopen(Path.c_str(), L"wb")};
+#else
+    wil::unique_file output{std::fopen(Path.c_str(), "wb")};
+#endif
+    if (!output)
+    {
+        return errno;
+    }
+
     if (!exists)
     {
         std::filesystem::permissions(
             Path,
             std::filesystem::perms::owner_read | std::filesystem::perms::owner_write | std::filesystem::perms::group_read |
-                std::filesystem::perms::others_read);
+                std::filesystem::perms::others_read,
+            error);
+        if (error)
+        {
+            return error.value();
+        }
     }
-    output.write(configured.data(), static_cast<std::streamsize>(configured.size()));
-    output.close();
+
+    if (std::fwrite(configured.data(), 1, configured.size(), output.get()) != configured.size())
+    {
+        return errno;
+    }
+    if (std::fclose(output.release()) != 0)
+    {
+        return errno;
+    }
+
+    return 0;
 }
 
 } // namespace wsl::shared::wslc

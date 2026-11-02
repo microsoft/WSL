@@ -68,8 +68,8 @@ class WSLCLocalhostUnitTests
         const auto hosts = directory / "hosts";
         const auto nsswitch = directory / "nsswitch.conf";
         WriteFile(nsswitch, {});
-        ConfigureLocalhostFile(hosts, ConfigureLocalhostHosts);
-        ConfigureLocalhostFile(nsswitch, ConfigureLocalhostNameService);
+        VERIFY_ARE_EQUAL(0, ConfigureLocalhostFile(hosts, ConfigureLocalhostHosts));
+        VERIFY_ARE_EQUAL(0, ConfigureLocalhostFile(nsswitch, ConfigureLocalhostNameService));
         VERIFY_ARE_EQUAL(
             "127.0.0.1\tlocalhost\n::1\tlocalhost ip6-localhost ip6-loopback\n", wsl::shared::string::ReadFile<char>(hosts.c_str()));
         VERIFY_ARE_EQUAL("hosts: files dns\n", wsl::shared::string::ReadFile<char>(nsswitch.c_str()));
@@ -84,8 +84,7 @@ class WSLCLocalhostUnitTests
 
         wil::unique_hfile locked{CreateFileW(hosts.c_str(), GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
         VERIFY_IS_TRUE(static_cast<bool>(locked));
-        VERIFY_THROWS_SPECIFIC(
-            ConfigureLocalhostFile(hosts, ConfigureLocalhostHosts), std::ios_base::failure, [](const auto&) { return true; });
+        VERIFY_ARE_EQUAL(EACCES, ConfigureLocalhostFile(hosts, ConfigureLocalhostHosts));
         locked.reset();
         VERIFY_ARE_EQUAL(c_original, wsl::shared::string::ReadFile<char>(hosts.c_str()));
     }
@@ -100,8 +99,7 @@ class WSLCLocalhostUnitTests
         auto resetAttributes =
             wil::scope_exit([&]() { LOG_LAST_ERROR_IF(!SetFileAttributesW(hosts.c_str(), FILE_ATTRIBUTE_NORMAL)); });
 
-        VERIFY_THROWS_SPECIFIC(
-            ConfigureLocalhostFile(hosts, ConfigureLocalhostHosts), std::ios_base::failure, [](const auto&) { return true; });
+        VERIFY_ARE_EQUAL(EACCES, ConfigureLocalhostFile(hosts, ConfigureLocalhostHosts));
         VERIFY_ARE_EQUAL(c_original, wsl::shared::string::ReadFile<char>(hosts.c_str()));
     }
 
@@ -115,7 +113,7 @@ class WSLCLocalhostUnitTests
         auto resetAttributes =
             wil::scope_exit([&]() { LOG_LAST_ERROR_IF(!SetFileAttributesW(hosts.c_str(), FILE_ATTRIBUTE_NORMAL)); });
 
-        ConfigureLocalhostFile(hosts, ConfigureLocalhostHosts);
+        VERIFY_ARE_EQUAL(0, ConfigureLocalhostFile(hosts, ConfigureLocalhostHosts));
         VERIFY_ARE_EQUAL(configured, wsl::shared::string::ReadFile<char>(hosts.c_str()));
     }
 

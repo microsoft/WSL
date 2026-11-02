@@ -960,9 +960,12 @@ void HandleMountMessage(
             THROW_LAST_ERROR_IF(Chroot(target) < 0);
 
             response.LocalhostFailure = WSLC_MOUNT_RESULT::LocalhostConfigurationFailure::Hosts;
-            wsl::shared::wslc::ConfigureLocalhostFile("/etc/hosts", wsl::shared::wslc::ConfigureLocalhostHosts);
+            response.Result = wsl::shared::wslc::ConfigureLocalhostFile("/etc/hosts", wsl::shared::wslc::ConfigureLocalhostHosts);
+            THROW_ERRNO_IF(response.Result, response.Result != 0);
             response.LocalhostFailure = WSLC_MOUNT_RESULT::LocalhostConfigurationFailure::NameServiceSwitch;
-            wsl::shared::wslc::ConfigureLocalhostFile("/etc/nsswitch.conf", wsl::shared::wslc::ConfigureLocalhostNameService);
+            response.Result =
+                wsl::shared::wslc::ConfigureLocalhostFile("/etc/nsswitch.conf", wsl::shared::wslc::ConfigureLocalhostNameService);
+            THROW_ERRNO_IF(response.Result, response.Result != 0);
             response.LocalhostFailure = WSLC_MOUNT_RESULT::LocalhostConfigurationFailure::None;
 
             // Recreate the /init symlinks inside the new root.
