@@ -276,6 +276,17 @@
                     "Sha256": "f94e0c44be51550478100ea150b80535f955bf87487d1b964f4636d97478c05d"
                 }
             }
+        ],
+        "cachyos": [
+            {
+                "Name": "cachyos",
+                "FriendlyName": "CachyOS",
+                "Default": true,
+                "Amd64Url": {
+                    "Url": "https://github.com/CachyOS/cachyos-wsl/releases/download/2026.11.02.3/cachyos-2026.11.02.3.wsl",
+                    "Sha256": "40e460eb53aaa67c23beace1e54629a388c4f9a80c588a69597bc8246934b9da"
+                }
+            }
         ]
     },
     "Default": "Ubuntu",
