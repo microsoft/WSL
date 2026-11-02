@@ -417,7 +417,7 @@ private:
     std::optional<std::string> ImportImageImpl(
         DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle, IImageLoadCallback* LoadCallback = nullptr);
     void RecoverExistingContainers();
-    // Caller must hold m_containersLock.
+    // Must not run while a container can be created.
     void DeleteOrphanedContainerState(const std::vector<common::docker_schema::ContainerInfo>& DockerContainers);
     void RecoverExistingNetworks();
 

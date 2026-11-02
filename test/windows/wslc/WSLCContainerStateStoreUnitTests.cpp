@@ -6,6 +6,12 @@
 
 namespace WSLCContainerStateStoreTests {
 
+using wsl::windows::service::wslc::ContainerStatePath;
+using wsl::windows::service::wslc::DeleteOrphanedContainerStates;
+using wsl::windows::service::wslc::LoadContainerState;
+using wsl::windows::service::wslc::WriteContainerState;
+using wsl::windows::service::wslc::WSLCContainerStateLoadStatus;
+using wsl::windows::service::wslc::WSLCContainerStateStorage;
 using wsl::windows::service::wslc::WSLCContainerStateStore;
 
 class WSLCContainerStateStoreUnitTests
@@ -13,12 +19,13 @@ class WSLCContainerStateStoreUnitTests
     WSLC_TEST_CLASS(WSLCContainerStateStoreUnitTests)
 
     std::filesystem::path m_directory;
+    std::filesystem::path m_path;
 
     TEST_METHOD_SETUP(MethodSetup)
     {
         m_directory = std::filesystem::temp_directory_path() / std::format(L"wslc-state-store-{}", GetCurrentProcessId());
         std::filesystem::remove_all(m_directory);
-        std::filesystem::create_directories(m_directory);
+        m_path = ContainerStatePath(m_directory, "container");
         return true;
     }
 
@@ -29,116 +36,201 @@ class WSLCContainerStateStoreUnitTests
         return true;
     }
 
-    static std::string ReadFile(const std::filesystem::path& Path)
+    static std::string ReadDocument(const std::filesystem::path& Path)
     {
         std::ifstream file(Path, std::ios::binary);
         VERIFY_IS_TRUE(file.good(), Path.c_str());
         return {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
     }
 
+    static void WriteDocument(const std::filesystem::path& Path, const std::string& Content)
+    {
+        std::filesystem::create_directories(Path.parent_path());
+        std::ofstream file(Path, std::ios::binary | std::ios::trunc);
+        file << Content;
+        VERIFY_IS_TRUE(file.good(), Path.c_str());
+    }
+
     static std::uint32_t ReadRestartCount(const std::filesystem::path& Path)
     {
-        return nlohmann::json::parse(ReadFile(Path)).at("V1").at("RestartCount").get<std::uint32_t>();
+        return nlohmann::json::parse(ReadDocument(Path)).at("RestartCount").get<std::uint32_t>();
     }
 
-    TEST_METHOD(ContainerStateStore_CreatesAndPersistsDocument)
+    void VerifyCorrupt(const std::string& Content)
     {
-        const auto path = WSLCContainerStateStore::PathFor(m_directory / L"containers", "container");
+        WriteDocument(m_path, Content);
+        const auto result = LoadContainerState(m_path);
+        VERIFY_ARE_EQUAL(WSLCContainerStateLoadStatus::Corrupt, result.Status);
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_FILE_CORRUPT), result.Error);
+    }
 
+    TEST_METHOD(ContainerStateStore_LoadDistinguishesStatus)
+    {
+        VERIFY_ARE_EQUAL(WSLCContainerStateLoadStatus::Missing, LoadContainerState(m_path).Status);
+
+        WriteDocument(m_path, R"({"RestartCount":7})");
+        const auto loaded = LoadContainerState(m_path);
+        VERIFY_ARE_EQUAL(WSLCContainerStateLoadStatus::Loaded, loaded.Status);
+        VERIFY_ARE_EQUAL(7u, loaded.State.RestartCount);
+
+        VerifyCorrupt("{");
+        VerifyCorrupt("[]");
+        VerifyCorrupt(R"({"RestartCount":-1})");
+        VerifyCorrupt(R"({"RestartCount":1.5})");
+        VerifyCorrupt(R"({"RestartCount":4294967296})");
+        VerifyCorrupt(std::string(65 * 1024, ' '));
+
+        WriteDocument(m_path, "{}");
+        wil::unique_hfile exclusive{CreateFileW(m_path.c_str(), GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        VERIFY_IS_TRUE(!!exclusive);
+        const auto unreadable = LoadContainerState(m_path);
+        VERIFY_ARE_EQUAL(WSLCContainerStateLoadStatus::Unreadable, unreadable.Status);
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), unreadable.Error);
+    }
+
+    TEST_METHOD(ContainerStateStore_NewContainerPersistsAndReloads)
+    {
         {
-            WSLCContainerStateStore store(m_directory / L"containers", "container");
-            VERIFY_IS_TRUE(path == store.Path().value());
-            VERIFY_ARE_EQUAL(0u, store.Get().RestartCount);
-            VERIFY_ARE_EQUAL(0u, ReadRestartCount(path));
+            WSLCContainerStateStore store(WSLCContainerStateStore::ForNewContainer(m_directory, "container"));
+            VERIFY_SUCCEEDED(store.Flush());
+            VERIFY_ARE_EQUAL(0u, ReadRestartCount(m_path));
 
-            store.Update([](auto& state) { state.RestartCount = 3; });
-            VERIFY_ARE_EQUAL(3u, store.Get().RestartCount);
-            VERIFY_ARE_EQUAL(3u, ReadRestartCount(path));
+            store.Mutate([](auto& state) { state.RestartCount = 3; });
+            VERIFY_SUCCEEDED(store.Flush());
+            VERIFY_ARE_EQUAL(3u, ReadRestartCount(m_path));
         }
 
-        WSLCContainerStateStore store(m_directory / L"containers", "container");
+        auto initial = WSLCContainerStateStore::ForExistingContainer(m_directory, "container", WSLCContainerStateStorage::HostFileV1);
+        VERIFY_SUCCEEDED(initial.LoadError);
+        WSLCContainerStateStore store(std::move(initial));
         VERIFY_ARE_EQUAL(3u, store.Get().RestartCount);
-
-        store.Delete();
-        VERIFY_IS_FALSE(std::filesystem::exists(path));
     }
 
-    TEST_METHOD(ContainerStateStore_UnchangedUpdateDoesNotWrite)
+    TEST_METHOD(ContainerStateStore_NewContainerDoesNotOverwriteExistingDocument)
     {
-        const auto path = WSLCContainerStateStore::PathFor(m_directory, "container");
-        WSLCContainerStateStore store(m_directory, "container");
-        std::filesystem::remove(path);
+        WriteDocument(m_path, R"({"RestartCount":9})");
 
-        store.Update([](auto&) {});
-        VERIFY_IS_FALSE(std::filesystem::exists(path));
+        WSLCContainerStateStore store(WSLCContainerStateStore::ForNewContainer(m_directory, "container"));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), store.Flush());
+        VERIFY_ARE_EQUAL(9u, ReadRestartCount(m_path));
     }
 
-    TEST_METHOD(ContainerStateStore_InvalidDocumentIsReset)
+    TEST_METHOD(ContainerStateStore_MissingDocumentWithoutStorageUsesDefaults)
     {
-        const auto path = WSLCContainerStateStore::PathFor(m_directory, "container");
-        for (const auto* content :
-             {"{",
-              "[]",
-              "{\"V1\":[]}",
-              "{\"V1\":{\"RestartCount\":\"invalid\"}}",
-              "{\"V1\":{\"RestartCount\":-1}}",
-              "{\"V1\":{\"RestartCount\":4294967296}}",
-              "{\"V1\":{\"RestartCount\":1.5}}",
-              "{\"V1\":{\"RestartCount\":true}}"})
-        {
-            std::ofstream{path, std::ios::binary | std::ios::trunc} << content;
+        auto initial = WSLCContainerStateStore::ForExistingContainer(m_directory, "container", WSLCContainerStateStorage::None);
+        VERIFY_SUCCEEDED(initial.LoadError);
 
-            WSLCContainerStateStore store(m_directory, "container");
-            VERIFY_ARE_EQUAL(0u, store.Get().RestartCount);
-            VERIFY_ARE_EQUAL(0u, ReadRestartCount(path));
-        }
+        WSLCContainerStateStore store(std::move(initial));
+        VERIFY_ARE_EQUAL(0u, store.Get().RestartCount);
+        VERIFY_SUCCEEDED(store.Flush());
+        VERIFY_IS_FALSE(std::filesystem::exists(m_path));
+
+        store.Mutate([](auto& state) { state.RestartCount = 2; });
+        VERIFY_SUCCEEDED(store.Flush());
+        VERIFY_ARE_EQUAL(2u, ReadRestartCount(m_path));
     }
 
-    TEST_METHOD(ContainerStateStore_MissingFieldsUseDefaults)
+    TEST_METHOD(ContainerStateStore_MissingExpectedDocumentBlocksWrites)
     {
-        const auto path = WSLCContainerStateStore::PathFor(m_directory, "container");
-        const std::pair<const char*, std::uint32_t> cases[] = {
-            {"{}", 0}, {"{\"V1\":{}}", 0}, {"{\"V1\":{\"RestartCount\":4,\"Unknown\":1},\"V2\":{}}", 4}};
+        std::filesystem::create_directories(m_directory);
+        auto initial = WSLCContainerStateStore::ForExistingContainer(m_directory, "container", WSLCContainerStateStorage::HostFileV1);
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), initial.LoadError);
 
-        for (const auto& [content, expected] : cases)
-        {
-            std::ofstream{path, std::ios::binary | std::ios::trunc} << content;
-
-            WSLCContainerStateStore store(m_directory, "container");
-            VERIFY_ARE_EQUAL(expected, store.Get().RestartCount);
-        }
+        WSLCContainerStateStore store(std::move(initial));
+        store.Mutate([](auto& state) { state.RestartCount = 1; });
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), store.Flush());
+        VERIFY_IS_FALSE(std::filesystem::exists(m_path));
     }
 
-    TEST_METHOD(ContainerStateStore_NoDirectoryKeepsStateInMemory)
+    TEST_METHOD(ContainerStateStore_UnknownStorageBlocksWrites)
     {
-        WSLCContainerStateStore store(std::nullopt, "container");
-        VERIFY_IS_FALSE(store.Path().has_value());
+        WriteDocument(m_path, R"({"RestartCount":4})");
 
-        store.Update([](auto& state) { state.RestartCount++; });
-        VERIFY_ARE_EQUAL(1u, store.Get().RestartCount);
-        store.Delete();
+        auto initial =
+            WSLCContainerStateStore::ForExistingContainer(m_directory, "container", static_cast<WSLCContainerStateStorage>(99));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_UNSUPPORTED_TYPE), initial.LoadError);
+
+        WSLCContainerStateStore store(std::move(initial));
+        store.Mutate([](auto& state) { state.RestartCount = 1; });
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_UNSUPPORTED_TYPE), store.Flush());
+        VERIFY_ARE_EQUAL(4u, ReadRestartCount(m_path));
     }
 
-    TEST_METHOD(ContainerStateStore_DeleteOrphans)
+    TEST_METHOD(ContainerStateStore_CorruptDocumentIsPreservedUntilDelete)
     {
-        const auto known = WSLCContainerStateStore::PathFor(m_directory, "known");
-        const auto orphan = WSLCContainerStateStore::PathFor(m_directory, "orphan");
-        const auto knownTemp = m_directory / L"known.json.tmp";
-        const auto unrelated = m_directory / L"notes.txt";
-        for (const auto& path : {known, orphan, knownTemp, unrelated})
-        {
-            std::ofstream{path} << "{}";
-        }
+        const std::string corrupt = "not json";
+        WriteDocument(m_path, corrupt);
 
-        WSLCContainerStateStore::DeleteOrphans(m_directory, {"known"});
+        auto initial = WSLCContainerStateStore::ForExistingContainer(m_directory, "container", WSLCContainerStateStorage::HostFileV1);
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_FILE_CORRUPT), initial.LoadError);
 
-        VERIFY_IS_TRUE(std::filesystem::exists(known));
-        VERIFY_IS_FALSE(std::filesystem::exists(orphan));
-        VERIFY_IS_FALSE(std::filesystem::exists(knownTemp));
-        VERIFY_IS_TRUE(std::filesystem::exists(unrelated));
+        WSLCContainerStateStore store(std::move(initial));
+        VERIFY_ARE_EQUAL(0u, store.Get().RestartCount);
 
-        // A missing directory is not an error.
-        WSLCContainerStateStore::DeleteOrphans(m_directory / L"missing", {});
+        store.Mutate([](auto& state) { state.RestartCount = 1; });
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_FILE_CORRUPT), store.Flush());
+        VERIFY_ARE_EQUAL(corrupt, ReadDocument(m_path));
+
+        VERIFY_SUCCEEDED(store.Delete());
+        VERIFY_IS_FALSE(std::filesystem::exists(m_path));
+    }
+
+    TEST_METHOD(ContainerStateStore_FailedWriteRemainsPending)
+    {
+        // A file in place of the directory makes every write fail.
+        WriteDocument(m_directory, "");
+
+        WSLCContainerStateStore store(WSLCContainerStateStore::ForNewContainer(m_directory, "container"));
+        store.Mutate([](auto& state) { state.RestartCount = 5; });
+        VERIFY_FAILED(store.Flush());
+
+        store.Mutate([](auto& state) { state.RestartCount = 5; });
+        std::filesystem::remove(m_directory);
+
+        VERIFY_SUCCEEDED(store.Flush());
+        VERIFY_ARE_EQUAL(5u, ReadRestartCount(m_path));
+    }
+
+    TEST_METHOD(ContainerStateStore_DeleteIsFinal)
+    {
+        WSLCContainerStateStore store(WSLCContainerStateStore::ForNewContainer(m_directory, "container"));
+        VERIFY_SUCCEEDED(store.Flush());
+        VERIFY_IS_TRUE(std::filesystem::exists(m_path));
+
+        VERIFY_SUCCEEDED(store.Delete());
+        VERIFY_IS_FALSE(std::filesystem::exists(m_path));
+
+        store.Mutate([](auto& state) { state.RestartCount = 1; });
+        VERIFY_SUCCEEDED(store.Flush());
+        VERIFY_IS_FALSE(std::filesystem::exists(m_path));
+        VERIFY_SUCCEEDED(store.Delete());
+    }
+
+    TEST_METHOD(ContainerStateStore_WithoutDirectoryKeepsStateInMemory)
+    {
+        WSLCContainerStateStore store(WSLCContainerStateStore::ForNewContainer(std::nullopt, "container"));
+        store.Mutate([](auto& state) { state.RestartCount = 6; });
+        VERIFY_SUCCEEDED(store.Flush());
+        VERIFY_ARE_EQUAL(6u, store.Get().RestartCount);
+        VERIFY_SUCCEEDED(store.Delete());
+        VERIFY_IS_FALSE(std::filesystem::exists(m_directory));
+    }
+
+    TEST_METHOD(ContainerStateStore_DeletesOrphanedDocuments)
+    {
+        VERIFY_SUCCEEDED(WriteContainerState(ContainerStatePath(m_directory, "known"), {.RestartCount = 1}, false));
+        VERIFY_SUCCEEDED(WriteContainerState(ContainerStatePath(m_directory, "orphan"), {}, false));
+        WriteDocument(m_directory / L"known.json.tmp", "");
+        WriteDocument(m_directory / L"unrelated.txt", "");
+
+        DeleteOrphanedContainerStates(m_directory, {"known"});
+
+        VERIFY_ARE_EQUAL(1u, ReadRestartCount(ContainerStatePath(m_directory, "known")));
+        VERIFY_IS_FALSE(std::filesystem::exists(ContainerStatePath(m_directory, "orphan")));
+        VERIFY_IS_FALSE(std::filesystem::exists(m_directory / L"known.json.tmp"));
+        VERIFY_IS_TRUE(std::filesystem::exists(m_directory / L"unrelated.txt"));
+
+        DeleteOrphanedContainerStates(m_directory / L"missing", {});
     }
 };
 

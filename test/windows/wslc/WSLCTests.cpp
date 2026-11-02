@@ -8143,12 +8143,29 @@ class WSLCTests
         return m_storagePath / L"containers" / (ContainerId + ".json");
     }
 
-    static std::uint32_t ReadPersistedRestartCount(const std::filesystem::path& Path)
+    static std::optional<std::uint32_t> TryReadPersistedRestartCount(const std::filesystem::path& Path)
     {
         std::ifstream file(Path, std::ios::binary);
-        VERIFY_IS_TRUE(file.good(), Path.c_str());
+        if (!file.good())
+        {
+            return std::nullopt;
+        }
 
-        return nlohmann::json::parse(file).at("V1").at("RestartCount").get<std::uint32_t>();
+        return nlohmann::json::parse(file).at("RestartCount").get<std::uint32_t>();
+    }
+
+    // Policy restarts save the count after the restart completes, so it may land shortly after the container runs.
+    static void WaitForPersistedRestartCount(const std::filesystem::path& Path, std::uint32_t Expected, std::chrono::milliseconds timeout = 30s)
+    {
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        while (TryReadPersistedRestartCount(Path) != Expected && std::chrono::steady_clock::now() < deadline)
+        {
+            std::this_thread::sleep_for(100ms);
+        }
+
+        const auto actual = TryReadPersistedRestartCount(Path);
+        VERIFY_IS_TRUE(actual.has_value(), Path.c_str());
+        VERIFY_ARE_EQUAL(Expected, actual.value());
     }
 
     static void WaitForPathRemoved(const std::filesystem::path& Path, std::chrono::milliseconds timeout = 30s)
@@ -8178,7 +8195,7 @@ class WSLCTests
 
         // The state document is created with the container.
         const auto statePath = ContainerStatePath(container.Id());
-        VERIFY_ARE_EQUAL(0u, ReadPersistedRestartCount(statePath));
+        WaitForPersistedRestartCount(statePath, 0u);
         VERIFY_ARE_EQUAL(0u, container.Inspect().RestartCount);
 
         // Each policy restart increments the count.
@@ -8186,7 +8203,7 @@ class WSLCTests
         WaitForContainerRuns(container, 3);
         WaitForContainerState(container, WslcContainerStateRunning);
         VERIFY_ARE_EQUAL(2u, container.Inspect().RestartCount);
-        VERIFY_ARE_EQUAL(2u, ReadPersistedRestartCount(statePath));
+        WaitForPersistedRestartCount(statePath, 2u);
 
         // An explicit restart resets the count before the next cycle's policy restarts.
         VERIFY_SUCCEEDED(container.Get().Restart(WSLCSignalSIGKILL, 0, nullptr));
@@ -8197,14 +8214,14 @@ class WSLCTests
         // A stop keeps the count.
         VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
         VERIFY_ARE_EQUAL(2u, container.Inspect().RestartCount);
-        VERIFY_ARE_EQUAL(2u, ReadPersistedRestartCount(statePath));
+        WaitForPersistedRestartCount(statePath, 2u);
 
         // An explicit start resets the count.
         VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
         WaitForContainerRuns(container, 9);
         WaitForContainerState(container, WslcContainerStateRunning);
         VERIFY_ARE_EQUAL(2u, container.Inspect().RestartCount);
-        VERIFY_ARE_EQUAL(2u, ReadPersistedRestartCount(statePath));
+        WaitForPersistedRestartCount(statePath, 2u);
 
         // Deleting the container removes its document.
         VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
@@ -8218,6 +8235,7 @@ class WSLCTests
 
         constexpr auto c_sessionName = L"persistent-state-session-test";
         std::filesystem::path createdStatePath;
+        std::filesystem::path corruptStatePath;
         std::filesystem::path runningStatePath;
 
         {
@@ -8228,6 +8246,11 @@ class WSLCTests
             created.SetDeleteOnClose(false);
             createdStatePath = ContainerStatePath(created.Id());
 
+            WSLCContainerLauncher corruptLauncher("debian:latest", "test-persistent-state-corrupt", {"sleep", "99999"});
+            auto corrupt = corruptLauncher.Create(*session);
+            corrupt.SetDeleteOnClose(false);
+            corruptStatePath = ContainerStatePath(corrupt.Id());
+
             WSLCContainerLauncher runningLauncher("debian:latest", "test-persistent-state-running", {"sleep", "99999"});
             runningLauncher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
             auto running = runningLauncher.Launch(*session, WSLCContainerStartFlagsNone);
@@ -8236,8 +8259,10 @@ class WSLCTests
             VERIFY_ARE_EQUAL(0u, running.Inspect().RestartCount);
         }
 
-        // Simulate state recorded by an earlier session, and documents that have no matching container.
-        std::ofstream{createdStatePath, std::ios::binary | std::ios::trunc} << nlohmann::json{{"V1", {{"RestartCount", 5}}}}.dump();
+        // Simulate state recorded by an earlier session, a damaged document, and documents that have no matching container.
+        std::ofstream{createdStatePath, std::ios::binary | std::ios::trunc} << nlohmann::json{{"RestartCount", 5}}.dump();
+        const std::string corruptContent = "{\"RestartCount\":";
+        std::ofstream{corruptStatePath, std::ios::binary | std::ios::trunc} << corruptContent;
         const auto orphanPath = ContainerStatePath("orphaned-container");
         std::ofstream{orphanPath} << "{}";
         const auto tempPath = m_storagePath / L"containers" / L"interrupted-write.json.tmp";
@@ -8245,14 +8270,25 @@ class WSLCTests
 
         auto session = CreateSession(GetDefaultSessionSettings(c_sessionName, true));
         auto created = OpenContainer(session.get(), "test-persistent-state-created");
+        auto corrupt = OpenContainer(session.get(), "test-persistent-state-corrupt");
         auto running = OpenContainer(session.get(), "test-persistent-state-running");
 
         VERIFY_ARE_EQUAL(5u, created.Inspect().RestartCount);
 
+        // A damaged document does not block the container, and is kept until the container is deleted.
+        VERIFY_ARE_EQUAL(0u, corrupt.Inspect().RestartCount);
+        VERIFY_SUCCEEDED(corrupt.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+        VERIFY_SUCCEEDED(corrupt.Get().Stop(WSLCSignalSIGKILL, 0));
+        {
+            std::ifstream file(corruptStatePath, std::ios::binary);
+            const std::string content{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+            VERIFY_ARE_EQUAL(corruptContent, content);
+        }
+
         // The policy start performed when the session starts counts as a restart.
         WaitForContainerState(running, WslcContainerStateRunning);
         VERIFY_ARE_EQUAL(1u, running.Inspect().RestartCount);
-        VERIFY_ARE_EQUAL(1u, ReadPersistedRestartCount(runningStatePath));
+        WaitForPersistedRestartCount(runningStatePath, 1u);
 
         VERIFY_IS_FALSE(std::filesystem::exists(orphanPath));
         VERIFY_IS_FALSE(std::filesystem::exists(tempPath));
@@ -8260,6 +8296,10 @@ class WSLCTests
         created.SetDeleteOnClose(false);
         VERIFY_SUCCEEDED(created.Get().Delete(WSLCDeleteFlagsNone));
         WaitForPathRemoved(createdStatePath);
+
+        corrupt.SetDeleteOnClose(false);
+        VERIFY_SUCCEEDED(corrupt.Get().Delete(WSLCDeleteFlagsNone));
+        WaitForPathRemoved(corruptStatePath);
     }
 
     WSLC_TEST_METHOD(EventStream)

@@ -32,9 +32,9 @@ using io::OverlappedIOHandle;
 using io::WriteHandle;
 using wsl::shared::Localization;
 using wsl::windows::common::string::FormatHumanReadableSize;
+using wsl::windows::service::wslc::DeleteOrphanedContainerStates;
 using wsl::windows::service::wslc::UserCOMCallback;
 using wsl::windows::service::wslc::UserHandle;
-using wsl::windows::service::wslc::WSLCContainerStateStore;
 using wsl::windows::service::wslc::WSLCExecutionContext;
 using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
@@ -4356,15 +4356,21 @@ void WSLCSession::RecoverExistingContainers()
     auto containers = m_runtime.Docker().ListContainers(true); // all=true to include stopped containers
 
     std::vector<std::shared_ptr<WSLCContainerImpl>> sessionStartContainers;
+    bool sessionStart{};
 
     {
         std::lock_guard containersLock(m_containersLock);
-        const bool sessionStart = !std::exchange(m_sessionStartRecoveryDone, true);
+        sessionStart = !std::exchange(m_sessionStartRecoveryDone, true);
+    }
 
-        if (sessionStart)
-        {
-            DeleteOrphanedContainerState(containers);
-        }
+    // Runs before the VM is reported as running, so no container can be created concurrently.
+    if (sessionStart)
+    {
+        DeleteOrphanedContainerState(containers);
+    }
+
+    {
+        std::lock_guard containersLock(m_containersLock);
 
         for (const auto& dockerContainer : containers)
         {
@@ -4439,12 +4445,7 @@ void WSLCSession::DeleteOrphanedContainerState(const std::vector<docker_schema::
         knownIds.insert(container.Id);
     }
 
-    for (const auto& [id, _] : m_containers)
-    {
-        knownIds.insert(id);
-    }
-
-    WSLCContainerStateStore::DeleteOrphans(directory.value(), knownIds);
+    DeleteOrphanedContainerStates(directory.value(), knownIds);
 }
 
 void WSLCSession::RecoverExistingNetworks()

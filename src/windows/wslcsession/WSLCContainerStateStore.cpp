@@ -14,150 +14,143 @@ Abstract:
 
 #include "precomp.h"
 #include "WSLCContainerStateStore.h"
-#include <fstream>
 
-using wsl::windows::service::wslc::WSLCContainerStateDocument;
+using wsl::windows::service::wslc::WSLCContainerStateLoadResult;
+using wsl::windows::service::wslc::WSLCContainerStateLoadStatus;
+using wsl::windows::service::wslc::WSLCContainerStateStorage;
 using wsl::windows::service::wslc::WSLCContainerStateStore;
-using wsl::windows::service::wslc::WSLCContainerStateV1;
+using wsl::windows::service::wslc::WSLCPersistedContainerState;
 
 namespace {
 
-constexpr auto c_stateFileExtension = L".json";
-constexpr auto c_tempFileExtension = L".json.tmp";
-constexpr auto c_tempExtension = L".tmp";
+constexpr auto c_documentExtension = L".json";
+constexpr auto c_tempSuffix = L".tmp";
 
-std::optional<WSLCContainerStateV1> LoadState(const std::filesystem::path& Path)
+// Documents hold a handful of counters, so anything larger is not one of ours.
+constexpr LONGLONG c_maxDocumentSize = 64 * 1024;
+
+bool IsNotFound(DWORD Error) noexcept
 {
-    std::ifstream file(Path, std::ios::binary);
-    if (!file)
-    {
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED), std::filesystem::exists(Path));
-        return {};
-    }
-
-    const std::string content{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
-
-    // N.B. Parse without exceptions so a corrupt document does not surface a user-facing error.
-    // Corrupt documents are reported as missing so they get rewritten with default state.
-    auto json = nlohmann::json::parse(content, nullptr, false);
-    if (json.is_discarded())
-    {
-        WSL_LOG("ContainerStateCorrupt", TraceLoggingValue(Path.c_str(), "Path"));
-        return {};
-    }
-
-    try
-    {
-        return json.get<WSLCContainerStateDocument>().V1.value_or(WSLCContainerStateV1{});
-    }
-    catch (const nlohmann::json::exception& e)
-    {
-        WSL_LOG("ContainerStateCorrupt", TraceLoggingValue(Path.c_str(), "Path"), TraceLoggingValue(e.what(), "Error"));
-        return {};
-    }
+    return Error == ERROR_FILE_NOT_FOUND || Error == ERROR_PATH_NOT_FOUND;
 }
 
-void RemoveStateFile(const std::filesystem::path& Path) noexcept
+WSLCContainerStateLoadResult LoadFailure(WSLCContainerStateLoadStatus Status, HRESULT Error) noexcept
 {
-    std::error_code error;
-    std::filesystem::remove(Path, error);
-    LOG_HR_IF_MSG(HRESULT_FROM_WIN32(error.value()), !!error, "Failed to delete container state: %ls", Path.c_str());
+    return {.Status = Status, .Error = Error};
 }
 
 } // namespace
 
-WSLCContainerStateStore::WSLCContainerStateStore(const std::optional<std::filesystem::path>& Directory, const std::string& ContainerId)
+std::filesystem::path wsl::windows::service::wslc::ContainerStatePath(const std::filesystem::path& Directory, const std::string& ContainerId)
 {
-    if (!Directory.has_value())
+    return Directory / (wsl::shared::string::MultiByteToWide(ContainerId) + c_documentExtension);
+}
+
+WSLCContainerStateLoadResult wsl::windows::service::wslc::LoadContainerState(const std::filesystem::path& Path) noexcept
+try
+{
+    wil::unique_hfile file{CreateFileW(
+        Path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+    if (!file)
     {
-        return;
+        const auto error = GetLastError();
+        return LoadFailure(
+            IsNotFound(error) ? WSLCContainerStateLoadStatus::Missing : WSLCContainerStateLoadStatus::Unreadable, HRESULT_FROM_WIN32(error));
     }
 
-    m_path = PathFor(Directory.value(), ContainerId);
+    LARGE_INTEGER size{};
+    if (!GetFileSizeEx(file.get(), &size))
+    {
+        return LoadFailure(WSLCContainerStateLoadStatus::Unreadable, HRESULT_FROM_WIN32(GetLastError()));
+    }
+
+    if (size.QuadPart > c_maxDocumentSize)
+    {
+        WSL_LOG("ContainerStateCorrupt", TraceLoggingValue(Path.c_str(), "Path"), TraceLoggingValue(size.QuadPart, "Size"));
+        return LoadFailure(WSLCContainerStateLoadStatus::Corrupt, HRESULT_FROM_WIN32(ERROR_FILE_CORRUPT));
+    }
+
+    std::string content(gsl::narrow_cast<size_t>(size.QuadPart), '\0');
+    DWORD read{};
+    if (!ReadFile(file.get(), content.data(), gsl::narrow_cast<DWORD>(content.size()), &read, nullptr))
+    {
+        return LoadFailure(WSLCContainerStateLoadStatus::Unreadable, HRESULT_FROM_WIN32(GetLastError()));
+    }
+
+    content.resize(read);
+
+    auto json = nlohmann::json::parse(content, nullptr, false);
+    if (json.is_discarded())
+    {
+        WSL_LOG("ContainerStateCorrupt", TraceLoggingValue(Path.c_str(), "Path"));
+        return LoadFailure(WSLCContainerStateLoadStatus::Corrupt, HRESULT_FROM_WIN32(ERROR_FILE_CORRUPT));
+    }
 
     try
     {
-        if (auto state = LoadState(m_path.value()))
-        {
-            m_state = state.value();
-            return;
-        }
-
-        Save();
+        return {.Status = WSLCContainerStateLoadStatus::Loaded, .State = json.get<WSLCPersistedContainerState>()};
     }
-    CATCH_LOG_MSG("Failed to load state for container '%hs'", ContainerId.c_str());
+    catch (const nlohmann::json::exception& e)
+    {
+        WSL_LOG("ContainerStateCorrupt", TraceLoggingValue(Path.c_str(), "Path"), TraceLoggingValue(e.what(), "Error"));
+        return LoadFailure(WSLCContainerStateLoadStatus::Corrupt, HRESULT_FROM_WIN32(ERROR_FILE_CORRUPT));
+    }
 }
-
-std::filesystem::path WSLCContainerStateStore::PathFor(const std::filesystem::path& Directory, const std::string& ContainerId)
+catch (...)
 {
-    return Directory / (wsl::shared::string::MultiByteToWide(ContainerId) + c_stateFileExtension);
+    return LoadFailure(WSLCContainerStateLoadStatus::Unreadable, wil::ResultFromCaughtException());
 }
 
-void WSLCContainerStateStore::Update(const std::function<void(WSLCContainerStateV1&)>& Mutate) noexcept
+HRESULT wsl::windows::service::wslc::WriteContainerState(const std::filesystem::path& Path, const WSLCPersistedContainerState& State, bool ReplaceExisting) noexcept
 try
 {
-    auto state = m_state;
-    Mutate(state);
-    if (state == m_state)
-    {
-        return;
-    }
+    std::error_code error;
+    std::filesystem::create_directories(Path.parent_path(), error);
+    RETURN_IF_WIN32_ERROR(error.value());
 
-    m_state = state;
-    Save();
-}
-CATCH_LOG()
+    const auto content = wsl::shared::ToJson(State);
+    auto tempPath = Path;
+    tempPath += c_tempSuffix;
 
-void WSLCContainerStateStore::Save() const
-{
-    if (!m_path.has_value())
-    {
-        return;
-    }
-
-    std::filesystem::create_directories(m_path->parent_path());
-
-    const auto content = wsl::shared::ToJson(WSLCContainerStateDocument{.V1 = m_state});
-    auto tempPath = m_path.value();
-    tempPath.replace_extension(c_tempFileExtension);
+    auto removeTemp = wil::scope_exit([&tempPath]() { DeleteFileW(tempPath.c_str()); });
 
     {
         wil::unique_hfile file{CreateFileW(tempPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
-        THROW_LAST_ERROR_IF(!file);
+        RETURN_LAST_ERROR_IF(!file);
 
         DWORD written{};
-        THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.get(), content.data(), gsl::narrow_cast<DWORD>(content.size()), &written, nullptr));
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_WRITE_FAULT), written != content.size());
-        THROW_IF_WIN32_BOOL_FALSE(FlushFileBuffers(file.get()));
+        RETURN_IF_WIN32_BOOL_FALSE(WriteFile(file.get(), content.data(), gsl::narrow_cast<DWORD>(content.size()), &written, nullptr));
+        RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_WRITE_FAULT), written != content.size());
+        RETURN_IF_WIN32_BOOL_FALSE(FlushFileBuffers(file.get()));
     }
 
-    // Replace atomically so an interrupted write never leaves a truncated document behind.
-    THROW_IF_WIN32_BOOL_FALSE(MoveFileExW(tempPath.c_str(), m_path->c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH));
-}
+    // The rename is atomic, so an interrupted write never leaves a truncated document behind.
+    DWORD flags = MOVEFILE_WRITE_THROUGH;
+    WI_SetFlagIf(flags, MOVEFILE_REPLACE_EXISTING, ReplaceExisting);
+    RETURN_IF_WIN32_BOOL_FALSE(MoveFileExW(tempPath.c_str(), Path.c_str(), flags));
 
-void WSLCContainerStateStore::Delete() noexcept
+    removeTemp.release();
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT wsl::windows::service::wslc::DeleteContainerState(const std::filesystem::path& Path) noexcept
 {
-    if (!m_path.has_value())
+    if (DeleteFileW(Path.c_str()))
     {
-        return;
+        return S_OK;
     }
 
-    RemoveStateFile(m_path.value());
-}
-
-void WSLCContainerStateStore::DeleteFor(const std::optional<std::filesystem::path>& Directory, const std::string& ContainerId) noexcept
-try
-{
-    if (!Directory.has_value())
+    const auto error = GetLastError();
+    if (IsNotFound(error))
     {
-        return;
+        return S_OK;
     }
 
-    RemoveStateFile(PathFor(Directory.value(), ContainerId));
+    RETURN_WIN32(error);
 }
-CATCH_LOG()
 
-void WSLCContainerStateStore::DeleteOrphans(const std::filesystem::path& Directory, const std::unordered_set<std::string>& KnownContainerIds) noexcept
+void wsl::windows::service::wslc::DeleteOrphanedContainerStates(const std::filesystem::path& Directory, const std::unordered_set<std::string>& KnownContainerIds) noexcept
 try
 {
     std::error_code error;
@@ -168,24 +161,141 @@ try
             continue;
         }
 
-        // Leftover temporary files come from writes interrupted before the atomic replace.
+        // Temporary files are only left behind by writes that were interrupted before their rename.
         const auto extension = entry.path().extension();
-        if (extension != c_stateFileExtension && extension != c_tempExtension)
+        const bool isTemp = extension == c_tempSuffix;
+        if (!isTemp && extension != c_documentExtension)
         {
             continue;
         }
 
-        const auto containerId = wsl::shared::string::WideToMultiByte(entry.path().stem().wstring());
-        if (extension == c_stateFileExtension && KnownContainerIds.contains(containerId))
+        if (!isTemp && KnownContainerIds.contains(wsl::shared::string::WideToMultiByte(entry.path().stem().wstring())))
         {
             continue;
         }
 
         WSL_LOG("DeleteOrphanedContainerState", TraceLoggingValue(entry.path().c_str(), "Path"));
-
-        std::error_code removeError;
-        std::filesystem::remove(entry.path(), removeError);
-        LOG_HR_IF_MSG(HRESULT_FROM_WIN32(removeError.value()), !!removeError, "Failed to delete %ls", entry.path().c_str());
+        LOG_IF_FAILED(DeleteContainerState(entry.path()));
     }
+
+    LOG_IF_WIN32_ERROR_MSG(IsNotFound(error.value()) ? ERROR_SUCCESS : error.value(), "Failed to enumerate %ls", Directory.c_str());
 }
 CATCH_LOG()
+
+WSLCContainerStateStore::Initial WSLCContainerStateStore::ForNewContainer(const std::optional<std::filesystem::path>& Directory, const std::string& ContainerId)
+{
+    if (!Directory.has_value())
+    {
+        return {};
+    }
+
+    return {.Path = ContainerStatePath(Directory.value(), ContainerId), .Pending = true};
+}
+
+WSLCContainerStateStore::Initial WSLCContainerStateStore::ForExistingContainer(
+    const std::optional<std::filesystem::path>& Directory, const std::string& ContainerId, WSLCContainerStateStorage Storage)
+{
+    if (!Directory.has_value())
+    {
+        return {};
+    }
+
+    auto path = ContainerStatePath(Directory.value(), ContainerId);
+
+    bool missingMeansDefault{};
+    switch (Storage)
+    {
+    case WSLCContainerStateStorage::None:
+        missingMeansDefault = true;
+        break;
+
+    case WSLCContainerStateStorage::HostFileV1:
+        missingMeansDefault = false;
+        break;
+
+    default:
+        return {.Path = std::move(path), .LoadError = HRESULT_FROM_WIN32(ERROR_UNSUPPORTED_TYPE)};
+    }
+
+    const auto result = LoadContainerState(path);
+    if (result.Status == WSLCContainerStateLoadStatus::Loaded)
+    {
+        return {.Path = std::move(path), .State = result.State, .DocumentExists = true};
+    }
+
+    if (result.Status == WSLCContainerStateLoadStatus::Missing && missingMeansDefault)
+    {
+        return {.Path = std::move(path)};
+    }
+
+    return {.Path = std::move(path), .LoadError = result.Error};
+}
+
+WSLCContainerStateStore::WSLCContainerStateStore(Initial&& InitialState) :
+    m_path(std::move(InitialState.Path)),
+    m_loadError(InitialState.LoadError),
+    m_state(InitialState.State),
+    m_generation(InitialState.Pending ? 1 : 0),
+    m_documentExists(InitialState.DocumentExists)
+{
+}
+
+WSLCPersistedContainerState WSLCContainerStateStore::Get() const
+{
+    std::lock_guard lock{m_stateLock};
+    return m_state;
+}
+
+HRESULT WSLCContainerStateStore::Flush() noexcept
+try
+{
+    std::lock_guard ioLock{m_ioLock};
+
+    WSLCPersistedContainerState state;
+    std::uint64_t generation{};
+    bool replaceExisting{};
+
+    {
+        std::lock_guard lock{m_stateLock};
+        if (!m_path.has_value() || m_deleted || m_generation == m_persistedGeneration)
+        {
+            return S_OK;
+        }
+
+        if (FAILED(m_loadError))
+        {
+            return m_loadError;
+        }
+
+        state = m_state;
+        generation = m_generation;
+        replaceExisting = m_documentExists;
+    }
+
+    RETURN_IF_FAILED(WriteContainerState(m_path.value(), state, replaceExisting));
+
+    std::lock_guard lock{m_stateLock};
+    m_documentExists = true;
+    m_persistedGeneration = generation;
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT WSLCContainerStateStore::Delete() noexcept
+try
+{
+    std::lock_guard ioLock{m_ioLock};
+
+    {
+        std::lock_guard lock{m_stateLock};
+        m_deleted = true;
+    }
+
+    if (!m_path.has_value())
+    {
+        return S_OK;
+    }
+
+    return DeleteContainerState(m_path.value());
+}
+CATCH_RETURN()

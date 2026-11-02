@@ -39,6 +39,8 @@ using wsl::windows::common::io::ReadHandle;
 using wsl::windows::common::io::RelayHandle;
 using wsl::windows::service::wslc::CleanContainerName;
 using wsl::windows::service::wslc::ContainerPortMapping;
+using wsl::windows::service::wslc::ContainerStatePath;
+using wsl::windows::service::wslc::DeleteContainerState;
 using wsl::windows::service::wslc::DockerEventTracker;
 using wsl::windows::service::wslc::DockerHTTPClient;
 using wsl::windows::service::wslc::DockerHTTPException;
@@ -54,6 +56,7 @@ using wsl::windows::service::wslc::WSLCContainerImpl;
 using wsl::windows::service::wslc::WSLCContainerMetadata;
 using wsl::windows::service::wslc::WSLCContainerMetadataLabel;
 using wsl::windows::service::wslc::WSLCContainerMetadataV1;
+using wsl::windows::service::wslc::WSLCContainerStateStorage;
 using wsl::windows::service::wslc::WSLCContainerStateStore;
 using wsl::windows::service::wslc::WSLCExecutionContext;
 using wsl::windows::service::wslc::WSLCSession;
@@ -933,7 +936,8 @@ WSLCContainerImpl::WSLCContainerImpl(
     std::int64_t CreatedAt,
     WSLCProcessFlags InitProcessFlags,
     WSLCContainerFlags ContainerFlags,
-    WSLCContainerRestartPolicy RestartPolicy) :
+    WSLCContainerRestartPolicy RestartPolicy,
+    WSLCContainerStateStore::Initial&& PersistentState) :
     m_wslcSession(wslcSession),
     m_pluginNotifier(pluginNotifier),
     m_runtime(runtime),
@@ -954,7 +958,7 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_initProcessFlags(InitProcessFlags),
     m_containerFlags(ContainerFlags),
     m_restartPolicy(RestartPolicy),
-    m_persistentState(wslcSession.ContainerStateDirectory(), m_id)
+    m_persistentState(std::move(PersistentState))
 {
     // Acquire the activity hold up front for a container recovered in the running state, so it keeps
     // the VM alive even before any client opens its wrapper. A merely-created (never-started)
@@ -1140,6 +1144,7 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
 
 wil::com_ptr<IWSLCProcess> WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions)
 {
+    auto persist = wil::scope_exit([this]() { PersistState(); });
     return StartPhase(Flags, StartOptions, false);
 }
 
@@ -1218,13 +1223,13 @@ wil::com_ptr<IWSLCProcess> WSLCContainerImpl::StartPhase(
     if (PolicyRestartToken.has_value())
     {
         m_policyRestartPending = false;
-        m_persistentState.Update([](auto& state) { state.RestartCount++; });
+        m_persistentState.Mutate([](auto& state) { state.RestartCount++; });
     }
     else
     {
         CancelPolicyRestartLockHeld();
         m_restartBackoff.Reset();
-        m_persistentState.Update([](auto& state) { state.RestartCount = 0; });
+        m_persistentState.Mutate([](auto& state) { state.RestartCount = 0; });
     }
 
     // Acceptance invalidates predecessor responses even if resource preparation fails.
@@ -1478,6 +1483,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     // Either owner may disconnect the COM wrapper, so both must outlive m_lock.
     unique_com_disconnect comWrapper;
     std::shared_ptr<StateTransition> transition;
+    bool deleted = false;
 
     switch (event)
     {
@@ -1540,7 +1546,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
             {
                 CommitState(WslcContainerStateDeleted, eventTimeNano, attributes);
                 comWrapper = ReleaseResources();
-                m_persistentState.Delete();
+                deleted = true;
             }
 
             // Signal init exit after the state transition and resource cleanup so awaiters observe Deleted.
@@ -1562,6 +1568,12 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
             TraceLoggingValue(m_name.c_str(), "Name"),
             TraceLoggingValue(m_id.c_str(), "Id"),
             TraceLoggingValue((int)event, "Event"));
+    }
+
+    // Recovery removes the document if this fails.
+    if (deleted)
+    {
+        LOG_IF_FAILED_MSG(m_persistentState.Delete(), "Failed to delete the persisted state of container '%hs'", m_id.c_str());
     }
 }
 
@@ -1792,6 +1804,8 @@ void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds)
         }
     });
 
+    auto persist = wil::scope_exit([this]() { PersistState(); });
+
     if (wasRunning)
     {
         StopPhase(Signal, TimeoutSeconds, false, true);
@@ -2001,6 +2015,7 @@ try
 
     WSL_LOG("ContainerPolicyRestart", TraceLoggingValue(m_id.c_str(), "Id"), TraceLoggingValue(Token, "Token"));
 
+    auto persist = wil::scope_exit([this]() { PersistState(); });
     StartPhase(WSLCContainerStartFlagsNone, nullptr, false, Token);
 }
 catch (...)
@@ -3110,6 +3125,9 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     metadata.Volumes = volumes;
     metadata.RestartPolicy = containerOptions.RestartPolicy;
 
+    const auto stateDirectory = wslcSession.ContainerStateDirectory();
+    metadata.StateStorage = stateDirectory.has_value() ? WSLCContainerStateStorage::HostFileV1 : WSLCContainerStateStorage::None;
+
     for (const auto& e : mappedPorts)
     {
         metadata.Ports.emplace_back(e.Serialize());
@@ -3188,6 +3206,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     auto mergedLabels = StripInternalLabels(std::move(inspectData.Config.Labels));
     const auto createdAt = wsl::windows::common::timestamp::Rfc3339ToEpoch(inspectData.Created);
+    auto persistentState = WSLCContainerStateStore::ForNewContainer(stateDirectory, result.Id);
 
     auto container = std::make_shared<WSLCContainerImpl>(
         wslcSession,
@@ -3207,7 +3226,12 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         createdAt,
         containerOptions.InitProcessOptions.Flags,
         containerOptions.Flags,
-        containerOptions.RestartPolicy);
+        containerOptions.RestartPolicy,
+        std::move(persistentState));
+
+    // The metadata label records that the document exists, so the container is not created without it.
+    THROW_IF_FAILED_MSG(
+        container->m_persistentState.Flush(), "Failed to save the persisted state of container '%hs'", container->m_id.c_str());
 
     container->Initialize();
 
@@ -3259,7 +3283,16 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         try
         {
             DockerClient.DeleteContainer(dockerContainer.Id, true, true);
-            WSLCContainerStateStore::DeleteFor(wslcSession.ContainerStateDirectory(), dockerContainer.Id);
+
+            // Recovery removes the document on the next session start if this fails.
+            if (const auto stateDirectory = wslcSession.ContainerStateDirectory())
+            {
+                LOG_IF_FAILED_MSG(
+                    DeleteContainerState(ContainerStatePath(stateDirectory.value(), dockerContainer.Id)),
+                    "Failed to delete the persisted state of container '%hs'",
+                    dockerContainer.Id.c_str());
+            }
+
             return nullptr;
         }
         catch (...)
@@ -3301,6 +3334,15 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     // Containers created before the image was persisted fall back to what Docker reports.
     std::string image = metadata.Image.empty() ? dockerContainer.Image : std::move(metadata.Image);
 
+    auto persistentState =
+        WSLCContainerStateStore::ForExistingContainer(wslcSession.ContainerStateDirectory(), dockerContainer.Id, metadata.StateStorage);
+    if (FAILED(persistentState.LoadError))
+    {
+        LOG_HR_MSG(persistentState.LoadError, "Failed to load the persisted state of container '%hs'", dockerContainer.Id.c_str());
+        EMIT_USER_WARNING(
+            wsl::shared::Localization::MessageWslcContainerStateLoadFailed(wsl::shared::string::MultiByteToWide(dockerContainer.Id)));
+    }
+
     auto container = std::make_shared<WSLCContainerImpl>(
         wslcSession,
         runtime,
@@ -3319,7 +3361,8 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         dockerContainer.Created,
         metadata.InitProcessFlags,
         metadata.Flags,
-        RestartPolicyFromMetadata(metadata.RestartPolicy, dockerContainer.Id));
+        RestartPolicyFromMetadata(metadata.RestartPolicy, dockerContainer.Id),
+        std::move(persistentState));
 
     container->Initialize();
 
@@ -3359,6 +3402,20 @@ const std::string& WSLCContainerImpl::ID() const noexcept
 {
     return m_id;
 }
+
+void WSLCContainerImpl::PersistState() noexcept
+try
+{
+    const auto result = m_persistentState.Flush();
+    if (SUCCEEDED(result))
+    {
+        return;
+    }
+
+    LOG_HR_MSG(result, "Failed to save the persisted state of container '%hs'", m_id.c_str());
+    EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcContainerStateSaveFailed(wsl::shared::string::MultiByteToWide(m_id)));
+}
+CATCH_LOG()
 
 void WSLCContainerImpl::Inspect(BOOL Size, LPSTR* Output) const
 {
