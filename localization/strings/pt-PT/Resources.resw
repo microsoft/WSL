@@ -2854,7 +2854,7 @@ Exemplo: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
-    <value>Monitor events.</value>
+    <value>Monitorize eventos.</value>
   </data>
   <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
     <value>Monitorize eventos em tempo real a partir de contentores, imagens, redes e volumes.</value>
