@@ -8,6 +8,7 @@ set(SOURCES
     WSLCSessionReference.cpp
 
     # Session and container implementation
+    ComposeNormalizer.cpp
     ComposeSpec.cpp
     ServiceContainerLauncher.cpp
     WSLCSession.cpp
@@ -37,6 +38,7 @@ set(SOURCES
     )
 
 set(HEADERS
+    ComposeNormalizer.h
     ComposeSpec.h
     DockerEventTracker.h
     DockerHTTPClient.h
