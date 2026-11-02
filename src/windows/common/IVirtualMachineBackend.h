@@ -56,8 +56,6 @@ struct VmInstanceId
     wil::shared_handle UserToken{};
 };
 
-struct VmGuestListenerState;
-
 template <typename Tag>
 struct VmResourceId
 {
@@ -68,13 +66,11 @@ struct VmResourceId
 struct VmDiskTag;
 struct VmDeviceTag;
 struct VmShareTag;
-struct VmListenerTag;
 struct VmPortBindingTag;
 
 using VmDiskId = VmResourceId<VmDiskTag>;
 using VmDeviceId = VmResourceId<VmDeviceTag>;
 using VmShareId = VmResourceId<VmShareTag>;
-using VmListenerId = VmResourceId<VmListenerTag>;
 using VmPortBindingId = VmResourceId<VmPortBindingTag>;
 
 // Backends own the extended resource; API methods return only its description by value.
@@ -146,26 +142,15 @@ struct GuestServicePort
     std::uint32_t Value = 0;
 };
 
+// Cancel and finish socket users before replacing or destroying the listener.
 struct VmGuestListener
 {
-    VmListenerId Id;
-    GuestServicePort Port;
-    std::shared_ptr<VmGuestListenerState> State;
+    VmGuestListener() = default;
+    explicit VmGuestListener(wil::unique_socket ListenerSocket) noexcept;
+    NON_COPYABLE(VmGuestListener);
+    DEFAULT_MOVABLE(VmGuestListener);
 
-    wil::unique_socket Accept(DWORD Timeout = INFINITE, const std::source_location& Location = std::source_location::current()) const;
-    // The callback must stop using the socket when the cancellation event is signaled.
-    // CloseGuestListener waits for the callback to return before closing the socket.
-    void WithSocket(const std::function<void(SOCKET, HANDLE)>& Callback) const;
-};
-
-struct VmGuestListenerState
-{
-    VmGuestListener Listener;
-    wil::srwlock Lock;
-    _Guarded_by_(Lock) wil::unique_socket Socket;
-    wil::unique_event CancellationEvent{wil::EventOptions::ManualReset};
-
-    void Close() noexcept;
+    wil::unique_socket Socket;
 };
 
 struct VmProcessorRequest
@@ -685,8 +670,6 @@ public:
 
     virtual VmGuestListener CreateGuestListener(GuestServicePort Port) = 0;
     virtual wil::unique_socket ConnectGuest(GuestServicePort Port) = 0;
-    // Cancel and drain listener users, then release the socket even if descriptors are retained.
-    virtual void CloseGuestListener(VmListenerId Listener) = 0;
 
     virtual VmDiskAttachment AttachDisk(const VmDiskRequest& Request) = 0;
     virtual std::vector<VmDiskAttachment> GetAttachedDisks() const = 0;
@@ -723,30 +706,12 @@ public:
     virtual void CreateDnsRecord(VmDeviceId Device, const VmDnsRecord& Record) = 0;
 
 protected:
-    // Protects all mutable backend state, including the base listener registry. Callers must
-    // release it before performing blocking I/O or waiting for a callback.
+    // Protects mutable backend state. Release it before blocking I/O or waiting for callbacks.
     mutable wil::srwlock m_lock;
 
-    // These helpers require m_lock to be held exclusively. ConfigureGuestListener runs while
-    // m_lock is held and must not re-enter another listener helper.
-    VmGuestListener RegisterGuestListenerLocked(const VmInstanceId& Identity, GuestServicePort Port);
-    // Returned states must be closed after releasing m_lock so that listener users can finish.
-    std::shared_ptr<VmGuestListenerState> RemoveGuestListenerLocked(VmListenerId Listener, const VmInstanceId& Identity);
-    std::map<std::uint64_t, std::shared_ptr<VmGuestListenerState>> RemoveGuestListenersLocked(const VmInstanceId& Identity) noexcept;
     void NotifyTerminated(const VmInstanceId& Identity) noexcept;
 
-    /// <summary>
-    /// Cancels pending accepts without dropping the listeners. Backends call this when the VM exits
-    /// without a termination request, so that callers blocked on the guest do not wait forever.
-    /// </summary>
-    /// <remarks>Acquires m_lock, so it must not be called while the lock is held.</remarks>
-    void CancelGuestListeners() noexcept;
-
 private:
-    virtual std::shared_ptr<VmGuestListenerState> ConfigureGuestListener(const VmGuestListener& Listener) = 0;
-
-    _Guarded_by_(m_lock) std::map<std::uint64_t, std::shared_ptr<VmGuestListenerState>> m_guestListeners;
-    _Guarded_by_(m_lock) std::uint64_t m_nextListenerId = 1;
     wil::srwlock m_terminationCallbackLock;
     _Guarded_by_(m_terminationCallbackLock) bool m_terminated = false;
     _Guarded_by_(m_terminationCallbackLock) GUID m_terminatedVmId {};

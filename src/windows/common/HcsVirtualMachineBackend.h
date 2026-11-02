@@ -46,7 +46,6 @@ public:
 
     VmGuestListener CreateGuestListener(GuestServicePort Port) override;
     wil::unique_socket ConnectGuest(GuestServicePort Port) override;
-    void CloseGuestListener(VmListenerId Listener) override;
 
     VmDiskAttachment AttachDisk(const VmDiskRequest& Request) override;
     std::vector<VmDiskAttachment> GetAttachedDisks() const override;
@@ -136,7 +135,6 @@ private:
     void OnCrash(PCWSTR Details);
     void OnExit(const HCS_EVENT* Event);
     void CleanupAttachedDisks(std::map<std::uint64_t, AttachedDisk>&& Disks) noexcept;
-    std::shared_ptr<VmGuestListenerState> ConfigureGuestListener(const VmGuestListener& Listener) override;
 
     _Requires_lock_held_(m_lock)
     void CloseGuestDevicesLocked() noexcept;
@@ -167,7 +165,7 @@ private:
     /// Resolves the token used to reach a host path, returning the first of Tokens that is set and
     /// falling back to the identity that created the VM. Callers list Tokens most specific first.
     /// </summary>
-    wil::shared_handle ResolveUserToken(std::initializer_list<std::reference_wrapper<const wil::shared_handle>> Tokens) const;
+    wil::shared_handle ResolveUserToken(const std::vector<wil::shared_handle>& Tokens) const;
 
     /// <summary>
     /// Adds a share to a Plan 9 device and returns the name the guest uses to reach it.

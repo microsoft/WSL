@@ -7,6 +7,7 @@
 #include "VirtualMachineBackendTestHelpers.h"
 
 using namespace VirtualMachineBackendTestHelpers;
+using wsl::windows::common::socket::CancellableAccept;
 
 namespace {
 
@@ -227,25 +228,16 @@ class HcsVirtualMachineBackendTests
         auto guest = StartGuest(*backend);
         const auto terminationEvent = backend->GetTerminationEvent();
         const auto listener = backend->CreateGuestListener({12345});
-        wil::unique_event socketInUse{wil::EventOptions::ManualReset};
-        bool exitSignaledDuringCancellation = true;
-        HRESULT reasonDuringCancellation = S_OK;
         auto socketUser = std::async(std::launch::async, [&] {
-            return OperationResult([&] {
-                listener.WithSocket([&](SOCKET, HANDLE cancellationEvent) {
-                    socketInUse.SetEvent();
-                    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_TIMEOUT), WaitForSingleObject(cancellationEvent, 30 * 1000) != WAIT_OBJECT_0);
-                    exitSignaledDuringCancellation = terminationEvent.is_signaled();
-                    reasonDuringCancellation = OperationResult([&] { backend->GetTerminationReason(); });
-                });
-            });
+            const auto accepted = CancellableAccept(listener.Socket.get(), INFINITE, terminationEvent.get());
+            THROW_HR_IF(E_UNEXPECTED, accepted.has_value());
+            return backend->GetTerminationReason();
         });
+        auto stopBackend = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { backend->Terminate(); });
 
-        VERIFY_IS_TRUE(socketInUse.wait(30 * 1000));
+        VERIFY_IS_TRUE(socketUser.wait_for(100ms) == std::future_status::timeout);
         backend->Terminate();
-        VERIFY_ARE_EQUAL(S_OK, socketUser.get());
-        VERIFY_IS_FALSE(exitSignaledDuringCancellation);
-        VERIFY_ARE_EQUAL(c_invalidState, reasonDuringCancellation);
+        VERIFY_ARE_EQUAL(VmTerminationReason::Shutdown, socketUser.get().Reason);
         VERIFY_IS_TRUE(terminationEvent.is_signaled());
         VERIFY_ARE_EQUAL(VmTerminationReason::Shutdown, backend->GetTerminationReason().Reason);
     }
@@ -268,54 +260,61 @@ class HcsVirtualMachineBackendTests
         VERIFY_IS_TRUE(terminationEvent.is_signaled());
     }
 
-    TEST_METHOD(ClosesGuestListenersBeforeRebinding)
+    TEST_METHOD(DestroysGuestListenersBeforeRebinding)
     {
         SKIP_TEST_ARM64();
         auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
-        const auto listener = backend->CreateGuestListener({LX_INIT_UTILITY_VM_INIT_PORT});
-        const auto retainedListener = listener;
-        backend->CloseGuestListener(listener.Id);
+        {
+            const auto listener = backend->CreateGuestListener({LX_INIT_UTILITY_VM_INIT_PORT});
+        }
 
-        const auto replacement = backend->CreateGuestListener(listener.Port);
-        VERIFY_ARE_NOT_EQUAL(listener.Id.Value, replacement.Id.Value);
-        VERIFY_ARE_EQUAL(E_ABORT, OperationResult([&] { retainedListener.Accept(0); }));
-        backend->CloseGuestListener(replacement.Id);
+        {
+            const auto replacement = backend->CreateGuestListener({LX_INIT_UTILITY_VM_INIT_PORT});
+        }
 
         auto guest = StartGuest(*backend);
         backend->Terminate();
     }
 
-    TEST_METHOD(CancelsGuestListenerUsersBeforeClosing)
+    TEST_METHOD(TransfersGuestListenerOwnership)
     {
         SKIP_TEST_ARM64();
         auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
-        const auto listener = backend->CreateGuestListener({LX_INIT_UTILITY_VM_INIT_PORT});
-        wil::unique_event socketInUse{wil::EventOptions::ManualReset};
-        auto socketUser = std::async(std::launch::async, [&] {
-            return OperationResult([&] {
-                listener.WithSocket([&](SOCKET socket, HANDLE cancellationEvent) {
-                    socketInUse.SetEvent();
-                    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_TIMEOUT), WaitForSingleObject(cancellationEvent, 30 * 1000) != WAIT_OBJECT_0);
-                    int accepting{};
-                    int size = sizeof(accepting);
-                    THROW_LAST_ERROR_IF(getsockopt(socket, SOL_SOCKET, SO_ACCEPTCONN, reinterpret_cast<char*>(&accepting), &size) == SOCKET_ERROR);
-                    backend->GetDescription();
-                });
-            });
-        });
-        auto accept = std::async(std::launch::async, [&] { return OperationResult([&] { listener.Accept(); }); });
-        auto closeListener = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { backend->CloseGuestListener(listener.Id); });
+        VmGuestListener owner;
+        {
+            auto listener = backend->CreateGuestListener({12345});
+            auto movedListener = std::move(listener);
+            owner = std::move(movedListener);
+        }
 
-        VERIFY_IS_TRUE(socketInUse.wait(30 * 1000));
+        int accepting{};
+        int size = sizeof(accepting);
+        VERIFY_ARE_EQUAL(0, getsockopt(owner.Socket.get(), SOL_SOCKET, SO_ACCEPTCONN, reinterpret_cast<char*>(&accepting), &size));
+        VERIFY_ARE_EQUAL(1, accepting);
+        owner = backend->CreateGuestListener({12346});
+        const auto replacement = backend->CreateGuestListener({12345});
+    }
+
+    TEST_METHOD(CancelsGuestAcceptBeforeDestroyingListener)
+    {
+        SKIP_TEST_ARM64();
+        auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        wil::unique_event cancellationEvent{wil::EventOptions::ManualReset};
+        auto listener = backend->CreateGuestListener({LX_INIT_UTILITY_VM_INIT_PORT});
+        auto accept = std::async(
+            std::launch::async, [&] { return CancellableAccept(listener.Socket.get(), INFINITE, cancellationEvent.get()); });
+        auto cancelAccept = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { cancellationEvent.SetEvent(); });
+
         VERIFY_IS_TRUE(accept.wait_for(100ms) == std::future_status::timeout);
-        backend->CloseGuestListener(listener.Id);
-        closeListener.release();
-        VERIFY_ARE_EQUAL(S_OK, socketUser.get());
-        VERIFY_ARE_EQUAL(E_ABORT, accept.get());
+        cancellationEvent.SetEvent();
+        VERIFY_IS_FALSE(accept.get().has_value());
+        int accepting{};
+        int size = sizeof(accepting);
+        VERIFY_ARE_EQUAL(0, getsockopt(listener.Socket.get(), SOL_SOCKET, SO_ACCEPTCONN, reinterpret_cast<char*>(&accepting), &size));
+        VERIFY_ARE_EQUAL(1, accepting);
+        listener = VmGuestListener{};
 
-        const auto replacement = backend->CreateGuestListener(listener.Port);
-        backend->CloseGuestListener(replacement.Id);
-        backend->Terminate();
+        const auto replacement = backend->CreateGuestListener({LX_INIT_UTILITY_VM_INIT_PORT});
     }
 
     TEST_METHOD(RejectsGuestListenersAfterSpontaneousExit)
@@ -323,9 +322,16 @@ class HcsVirtualMachineBackendTests
         SKIP_TEST_ARM64();
         auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
         auto guest = StartGuest(*backend);
+        const auto terminationEvent = backend->GetTerminationEvent();
+        const auto listener = backend->CreateGuestListener({12345});
+        auto accept = std::async(
+            std::launch::async, [&] { return CancellableAccept(listener.Socket.get(), INFINITE, terminationEvent.get()); });
+        auto stopBackend = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { backend->Terminate(); });
 
+        VERIFY_IS_TRUE(accept.wait_for(100ms) == std::future_status::timeout);
         wsl::windows::common::hcs::TerminateComputeSystem(backend->GetComputeSystemHandle());
-        VERIFY_IS_TRUE(backend->GetTerminationEvent().wait(30 * 1000));
+        VERIFY_IS_TRUE(terminationEvent.wait(30 * 1000));
+        VERIFY_IS_FALSE(accept.get().has_value());
         VERIFY_ARE_EQUAL(c_invalidState, OperationResult([&] { backend->CreateGuestListener({12345}); }));
     }
 
@@ -504,7 +510,7 @@ class HcsVirtualMachineBackendTests
         backend->Terminate();
     }
 
-    TEST_METHOD(ReusesDuplicateNetworkAdapterRequests)
+    TEST_METHOD(RejectsDuplicateNetworkAdapterRequests)
     {
         SKIP_TEST_ARM64();
         auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
@@ -512,16 +518,16 @@ class HcsVirtualMachineBackendTests
 
         const auto request = CreateNetworkRequest();
         const auto first = backend->AddNetworkAdapter(request);
-        const auto duplicate = backend->AddNetworkAdapter(request);
-        VERIFY_ARE_EQUAL(first.Id.Value, duplicate.Id.Value);
-        VERIFY_ARE_EQUAL(first.Tag, duplicate.Tag);
-        VERIFY_IS_TRUE(first.GuestInstanceId == duplicate.GuestInstanceId);
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddNetworkAdapter(request); }));
+        auto conflictingRequest = request;
+        std::get<VmUserModeNatNetwork>(conflictingRequest.Configuration).Configuration.clientIp.value = htonl(0x0a000003);
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddNetworkAdapter(conflictingRequest); }));
         const auto description = backend->GetDescription();
         VERIFY_ARE_EQUAL(size_t{1}, description.NetworkAdapters.size());
         VERIFY_ARE_EQUAL(first.Id.Value, description.NetworkAdapters.at(request.Tag).Id.Value);
 
         backend->RemoveNetworkAdapter(first.Id);
-        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->RemoveNetworkAdapter(duplicate.Id); }));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->RemoveNetworkAdapter(first.Id); }));
         VERIFY_IS_TRUE(backend->GetDescription().NetworkAdapters.empty());
         backend->Terminate();
     }
