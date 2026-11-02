@@ -5,6 +5,7 @@
 #include "Common.h"
 #include "IVirtualMachineBackend.h"
 #include "SocketChannel.h"
+#include "socket.hpp"
 
 namespace VirtualMachineBackendTestHelpers {
 
@@ -26,9 +27,13 @@ inline VmCreateRequest CreateRequest()
 inline VmCreateRequest CreateRunnableRequest()
 {
     auto request = CreateRequest();
-    const auto basePath = wsl::windows::common::wslutil::GetBasePath();
-    request.Boot.KernelPath = basePath / L"kernel";
-    request.Boot.InitrdPath = basePath / LXSS_VM_MODE_INITRD_NAME;
+    const auto toolsPath = std::filesystem::path{wsl::windows::common::wslutil::GetMsiPackagePath().value()} / L"tools";
+#ifdef WSL_DEV_INSTALL_PATH
+    request.Boot.KernelPath = std::filesystem::path{WSL_DEV_INSTALL_PATH} / L"kernel";
+#else
+    request.Boot.KernelPath = toolsPath / L"kernel";
+#endif
+    request.Boot.InitrdPath = toolsPath / LXSS_VM_MODE_INITRD_NAME;
     request.Boot.KernelCommandLine = TEXT(WSL_ROOT_INIT_ENV) L"=1 panic=-1";
     return request;
 }
@@ -36,14 +41,17 @@ inline VmCreateRequest CreateRunnableRequest()
 inline std::pair<wsl::shared::SocketChannel, wil::unique_socket> StartGuest(IVirtualMachineBackend& Backend)
 {
     const auto listener = Backend.CreateGuestListener({LX_INIT_UTILITY_VM_INIT_PORT});
-    auto closeListener = wil::scope_exit([&] { Backend.CloseGuestListener(listener.Id); });
+    const auto terminationEvent = Backend.GetTerminationEvent();
     Backend.Start();
 
     // Keep both channels open so mini_init can wait for configuration instead of exiting.
-    wsl::shared::SocketChannel channel{listener.Accept(30 * 1000), "BackendTest"};
+    auto socket = wsl::windows::common::socket::CancellableAccept(listener.Socket.get(), 30 * 1000, terminationEvent.get());
+    THROW_HR_IF(E_ABORT, !socket);
+    wsl::shared::SocketChannel channel{std::move(*socket), "BackendTest"};
     channel.ReceiveMessage<LX_INIT_GUEST_CAPABILITIES>(nullptr, 30 * 1000);
-    auto notifications = listener.Accept(30 * 1000);
-    return {std::move(channel), std::move(notifications)};
+    auto notifications = wsl::windows::common::socket::CancellableAccept(listener.Socket.get(), 30 * 1000, terminationEvent.get());
+    THROW_HR_IF(E_ABORT, !notifications);
+    return {std::move(channel), std::move(*notifications)};
 }
 
 template <typename Callback>

@@ -695,7 +695,6 @@ void HcsVirtualMachineBackend::Shutdown()
     std::shared_ptr<GuestDeviceManager> guestDeviceManager;
     schema::unique_hcs_system system;
     std::map<std::uint64_t, AttachedDisk> attachedDisks;
-    std::map<std::uint64_t, std::shared_ptr<VmGuestListenerState>> guestListeners;
     {
         auto lock = m_lock.lock_exclusive();
         if (m_cleanupStarted)
@@ -710,18 +709,12 @@ void HcsVirtualMachineBackend::Shutdown()
         CloseGuestDevicesLocked();
         system = std::move(m_system);
         attachedDisks = std::move(m_attachedDisks);
-        guestListeners = RemoveGuestListenersLocked(m_configuration.Description.Identity);
     }
 
     // AddPersistentMemory may be in a device-host call. The backend is already unavailable and
     // guest operations have been cancelled before we wait for that call to finish.
     {
         auto persistentMemoryLock = m_persistentMemoryLock.lock_exclusive();
-    }
-
-    for (const auto& entry : guestListeners)
-    {
-        entry.second->Close();
     }
 
     guestDeviceManager.reset();
@@ -741,20 +734,11 @@ void HcsVirtualMachineBackend::Shutdown()
     }
 }
 
-std::shared_ptr<VmGuestListenerState> HcsVirtualMachineBackend::ConfigureGuestListener(const VmGuestListener& Listener)
-{
-    auto state = std::make_shared<VmGuestListenerState>();
-    state->Listener = Listener;
-    auto lock = state->Lock.lock_exclusive();
-    state->Socket = wsl::windows::common::hvsocket::Listen(Listener.Id.Owner.VmId, Listener.Port.Value);
-    return state;
-}
-
 VmGuestListener HcsVirtualMachineBackend::CreateGuestListener(GuestServicePort Port)
 {
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system || m_state == VmState::Stopped);
-    return RegisterGuestListenerLocked(m_configuration.Description.Identity, Port);
+    return VmGuestListener{wsl::windows::common::hvsocket::Listen(m_configuration.Description.Identity.VmId, Port.Value)};
 }
 
 wil::unique_socket HcsVirtualMachineBackend::ConnectGuest(GuestServicePort Port)
@@ -762,17 +746,6 @@ wil::unique_socket HcsVirtualMachineBackend::ConnectGuest(GuestServicePort Port)
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
     return wsl::windows::common::hvsocket::Connect(m_configuration.Description.Identity.VmId, Port.Value);
-}
-
-void HcsVirtualMachineBackend::CloseGuestListener(VmListenerId Listener)
-{
-    std::shared_ptr<VmGuestListenerState> state;
-    {
-        auto lock = m_lock.lock_exclusive();
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
-        state = RemoveGuestListenerLocked(Listener, m_configuration.Description.Identity);
-    }
-    state->Close();
 }
 
 std::uint32_t HcsVirtualMachineBackend::ReserveLunLocked(const std::optional<VmScsiPlacement>& Placement) const
@@ -1384,13 +1357,13 @@ std::optional<VmFileSystemShare> HcsVirtualMachineBackend::FindPlan9ShareByNameL
     return std::nullopt;
 }
 
-wil::shared_handle HcsVirtualMachineBackend::ResolveUserToken(std::initializer_list<std::reference_wrapper<const wil::shared_handle>> Tokens) const
+wil::shared_handle HcsVirtualMachineBackend::ResolveUserToken(const std::vector<wil::shared_handle>& Tokens) const
 {
     for (const auto& token : Tokens)
     {
-        if (token.get())
+        if (token)
         {
-            return token.get();
+            return token;
         }
     }
 
@@ -1842,7 +1815,6 @@ VmNetworkAttachment HcsVirtualMachineBackend::AddNetworkAdapter(const VmNetworkA
         THROW_HR_IF(E_INVALIDARG, IsEqualGUID(requestedHostEndpoint->EndpointId, GUID_NULL) || IsEqualGUID(requestedHostEndpoint->InstanceId, GUID_NULL));
     }
 
-    const VmNetworkAttachment* existingAttachment = nullptr;
     for (const auto& [_, adapter] : m_networkAdapters)
     {
         bool duplicate = adapter.Tag == Request.Tag;
@@ -1854,28 +1826,7 @@ VmNetworkAttachment HcsVirtualMachineBackend::AddNetworkAdapter(const VmNetworkA
                                        IsEqualGUID(existingHostEndpoint->InstanceId, requestedHostEndpoint->InstanceId)));
         }
 
-        if (!duplicate)
-        {
-            continue;
-        }
-
-        THROW_HR_IF_MSG(
-            E_INVALIDARG,
-            existingAttachment != nullptr && existingAttachment->Id.Value != adapter.Id.Value,
-            "The network adapter request identifies more than one existing adapter");
-        existingAttachment = &adapter;
-    }
-
-    if (existingAttachment != nullptr)
-    {
-        WSL_LOG(
-            "HcsAddNetworkAdapterEnd",
-            TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
-            TraceLoggingValue(existingAttachment->Tag.c_str(), "tag"),
-            TraceLoggingValue(existingAttachment->Id.Value, "deviceId"),
-            TraceLoggingValue(false, "created"));
-
-        return *existingAttachment;
+        THROW_HR_IF_MSG(E_INVALIDARG, duplicate, "A network adapter with this tag, endpoint ID, or instance ID already exists");
     }
 
     THROW_HR_IF(E_BOUNDS, m_nextDeviceId == std::numeric_limits<std::uint64_t>::max());
@@ -2273,9 +2224,6 @@ void HcsVirtualMachineBackend::OnExit(const HCS_EVENT* Event)
     }
 
     m_exitEvent.SetEvent();
-
-    // Callers blocked on the guest must not wait forever when the VM exits on its own.
-    CancelGuestListeners();
 
     if (!m_terminatingEvent.is_signaled())
     {

@@ -251,8 +251,6 @@ private:
     ULONG m_kernelModulesDeviceId = ULONG_MAX;
     std::unique_ptr<IVirtualMachineBackend> m_backend;
     VmGuestListener m_guestListener;
-    std::optional<VmGuestListener> m_crashDumpListener;
-    std::optional<VmGuestListener> m_virtioFsListener;
     std::function<void(GUID)> m_onExit;
     wsl::shared::SocketChannel m_miniInitChannel;
     wil::unique_socket m_notifyChannel;

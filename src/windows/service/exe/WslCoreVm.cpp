@@ -364,8 +364,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
     if (m_vmConfig.MaxCrashDumpCount >= 0)
     {
-        m_crashDumpListener = m_backend->CreateGuestListener(GuestServicePort{LX_INIT_UTILITY_VM_CRASH_DUMP_PORT});
-        m_crashDumpCollectionThread = std::thread{&WslCoreVm::CollectCrashDumps, this, m_crashDumpListener.value()};
+        auto listener = m_backend->CreateGuestListener(GuestServicePort{LX_INIT_UTILITY_VM_CRASH_DUMP_PORT});
+        m_crashDumpCollectionThread = std::thread{&WslCoreVm::CollectCrashDumps, this, std::move(listener)};
     }
 
     // Register before starting so an early exit cannot be missed.
@@ -775,22 +775,6 @@ WslCoreVm::~WslCoreVm() noexcept
 
     if (m_backend)
     {
-        auto closeListener = [&](const VmGuestListener& listener) {
-            if (listener.Id.Value != 0)
-            {
-                LOG_IF_FAILED(wil::ResultFromException([&] { m_backend->CloseGuestListener(listener.Id); }));
-            }
-        };
-        closeListener(m_guestListener);
-        if (m_crashDumpListener)
-        {
-            closeListener(m_crashDumpListener.value());
-        }
-        if (m_virtioFsListener)
-        {
-            closeListener(m_virtioFsListener.value());
-        }
-
         bool unexpectedTerminate = m_vmExitEvent.is_signaled();
         bool forcedTerminate = false;
 
@@ -855,6 +839,8 @@ WslCoreVm::~WslCoreVm() noexcept
         m_crashDumpCollectionThread.join();
     }
 
+    m_guestListener = VmGuestListener{};
+
     if (m_pluginPlan9Server)
     {
         LOG_IF_FAILED(m_pluginPlan9Server->Teardown());
@@ -905,7 +891,10 @@ WslCoreVm::~WslCoreVm() noexcept
 
 wil::unique_socket WslCoreVm::AcceptConnection(_In_ DWORD ReceiveTimeout, _In_ const std::source_location& Location) const
 {
-    auto socket = m_guestListener.Accept(m_vmConfig.KernelBootTimeout, Location);
+    auto socket = wsl::windows::common::socket::CancellableAccept(
+                      m_guestListener.Socket.get(), m_vmConfig.KernelBootTimeout, m_terminatingEvent.get(), Location)
+                      .value_or(wil::unique_socket{});
+    THROW_HR_IF(E_ABORT, !socket);
 
     if (ReceiveTimeout != 0)
     {
@@ -1082,7 +1071,12 @@ void WslCoreVm::CollectCrashDumps(VmGuestListener Listener) const
     {
         try
         {
-            auto socket = Listener.Accept();
+            auto socket =
+                wsl::windows::common::socket::CancellableAccept(Listener.Socket.get(), INFINITE, m_terminatingEvent.get()).value_or(wil::unique_socket{});
+            if (!socket)
+            {
+                break;
+            }
 
             DWORD receiveTimeout = m_vmConfig.KernelBootTimeout;
             THROW_LAST_ERROR_IF(setsockopt(socket.get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&receiveTimeout, sizeof(receiveTimeout)) == SOCKET_ERROR);
@@ -2116,8 +2110,8 @@ void WslCoreVm::RegisterCallbacks(_In_ const std::function<void(ULONG)>& DistroE
     if (m_vmConfig.EnableHostFileSystemAccess && m_vmConfig.EnableVirtioFs)
     {
         // Create a thread listening for handling virtiofs requests.
-        m_virtioFsListener = m_backend->CreateGuestListener(GuestServicePort{LX_INIT_UTILITY_VM_VIRTIOFS_PORT});
-        m_virtioFsThread = std::thread(&WslCoreVm::VirtioFsWorker, this, m_virtioFsListener.value());
+        auto listener = m_backend->CreateGuestListener(GuestServicePort{LX_INIT_UTILITY_VM_VIRTIOFS_PORT});
+        m_virtioFsThread = std::thread(&WslCoreVm::VirtioFsWorker, this, std::move(listener));
     }
 }
 
@@ -2293,44 +2287,41 @@ try
 {
     wsl::windows::common::wslutil::SetThreadDescription(L"VirtioFs - Worker");
 
-    Listener.WithSocket([&](SOCKET listenSocket, HANDLE cancellationEvent) {
-        io::MultiHandleWait io;
-        io.AddHandle(std::make_unique<io::AcceptHandle>(listenSocket, false, [this, &io](wil::unique_socket&& socket) {
-            auto channel = std::make_shared<wsl::shared::SocketChannel>(std::move(socket), "VirtioFs");
-            auto buffer = std::make_shared<std::vector<gsl::byte>>();
-            auto pendingBytes = std::make_shared<std::vector<gsl::byte>>();
+    io::MultiHandleWait io;
+    io.AddHandle(std::make_unique<io::AcceptHandle>(Listener.Socket.get(), false, [this, &io](wil::unique_socket&& socket) {
+        auto channel = std::make_shared<wsl::shared::SocketChannel>(std::move(socket), "VirtioFs");
+        auto buffer = std::make_shared<std::vector<gsl::byte>>();
+        auto pendingBytes = std::make_shared<std::vector<gsl::byte>>();
 
-            io.AddHandle(
-                std::make_unique<io::ReadSocketMessageHandle>(
-                    io::HandleWrapper(channel->Socket()),
-                    *buffer,
-                    *pendingBytes,
-                    [this, &io, channel, buffer, pendingBytes](const gsl::span<gsl::byte>& message) {
-                        if (message.empty())
-                        {
-                            return; // Channel closed, exit.
-                        }
+        io.AddHandle(
+            std::make_unique<io::ReadSocketMessageHandle>(
+                io::HandleWrapper(channel->Socket()),
+                *buffer,
+                *pendingBytes,
+                [this, &io, channel, buffer, pendingBytes](const gsl::span<gsl::byte>& message) {
+                    if (message.empty())
+                    {
+                        return; // Channel closed, exit.
+                    }
 
-                        THROW_HR_IF_MSG(
-                            E_UNEXPECTED, !pendingBytes->empty(), "Received message with additional bytes: %zu", pendingBytes->size());
+                    THROW_HR_IF_MSG(
+                        E_UNEXPECTED, !pendingBytes->empty(), "Received message with additional bytes: %zu", pendingBytes->size());
 
-                        try
-                        {
-                            auto response = ProcessVirtioFsRequest(message);
+                    try
+                    {
+                        auto response = ProcessVirtioFsRequest(message);
 
-                            // Move the socket out of the channel into the WriteHandle so it is closed once the reply is sent.
-                            io.AddHandle(std::make_unique<io::WriteHandle>(channel->Release(), response), io::MultiHandleWait::IgnoreErrors);
-                        }
-                        CATCH_LOG();
-                    }),
-                io::MultiHandleWait::IgnoreErrors);
-        }));
+                        // Move the socket out of the channel into the WriteHandle so it is closed once the reply is sent.
+                        io.AddHandle(std::make_unique<io::WriteHandle>(channel->Release(), response), io::MultiHandleWait::IgnoreErrors);
+                    }
+                    CATCH_LOG();
+                }),
+            io::MultiHandleWait::IgnoreErrors);
+    }));
 
-        io.AddHandle(std::make_unique<io::EventHandle>(m_terminatingEvent.get()), io::MultiHandleWait::CancelOnCompleted);
-        io.AddHandle(std::make_unique<io::EventHandle>(cancellationEvent), io::MultiHandleWait::CancelOnCompleted);
+    io.AddHandle(std::make_unique<io::EventHandle>(m_terminatingEvent.get()), io::MultiHandleWait::CancelOnCompleted);
 
-        io.Run({});
-    });
+    io.Run({});
 }
 CATCH_LOG()
 
