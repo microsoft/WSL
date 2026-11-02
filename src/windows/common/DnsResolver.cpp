@@ -173,6 +173,12 @@ try
     // We are only waiting for existing requests to finish.
     m_allRequestsFinished.wait();
 
+    // The last query signals m_allRequestsFinished while m_dnsLock is held. Wait for that lock to be released before continuing.
+    // Otherwise ProcessDnsRequest() could release that lock after it's destroyed.
+    {
+        const std::lock_guard lock(m_dnsLock);
+    }
+
     // Stop the response queue first as it can make calls in m_dnsChannel
     m_dnsResponseQueue.cancel();
 
