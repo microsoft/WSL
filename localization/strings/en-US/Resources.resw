@@ -1266,9 +1266,9 @@ See recovery instructions on: https://aka.ms/wsldiskmountrecovery</value>
   <data name="Settings_AutoMemoryReclaim.Header" xml:space="preserve">
     <value>Auto memory reclaim</value>
   </data>
-  <data name="Settings_LargeMemoryBackingPages.Description" xml:space="preserve">
-    <value>Use 2 MiB backing pages for the virtual machine. Enabling experimental.largeMemoryBackingPages may improve performance at the cost of increased host memory usage.</value>
-    <comment>{Locked="experimental.largeMemoryBackingPages"}</comment>
+  <data name="Settings_MemoryProfile.Description" xml:space="preserve">
+    <value>Choose the virtual machine memory profile. The default density profile optimizes memory usage. Setting experimental.memoryProfile to performance uses 2 MiB backing pages and may improve performance at the cost of increased host memory usage and allocation latency.</value>
+    <comment>{Locked="density"}{Locked="experimental.memoryProfile"}{Locked="performance"}</comment>
   </data>
   <data name="Settings_AutoMemoryReclaim.Description" xml:space="preserve">
     <value>Automatically releases cached memory after detecting idle CPU usage. Set to gradual for slow release, and dropcache for instant release of cached memory.</value>
