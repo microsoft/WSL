@@ -362,6 +362,8 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
             THROW_HR_IF(WSL_E_TOO_MANY_DISKS_ATTACHED, lun == c_maximumDisks);
         }
 
+        auto backingFile = wsl::windows::common::disk::OpenVhdBackingFile(path.c_str(), bootDisk.GrantHostAccess ? userToken : nullptr);
+
         // Best effort: failures (for instance no WRITE_DAC on a SYSTEM-owned VHD) are swallowed
         // since the VM worker process may already have access via inherited ACLs; otherwise
         // starting the VM surfaces E_ACCESSDENIED.
@@ -383,24 +385,6 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
                 LOG_IF_FAILED(wil::ResultFromException([&] { schema::RevokeVmAccess(vmIdString.c_str(), path.c_str(), userToken); }));
             }
         });
-
-        wil::unique_hfile backingFile;
-        try
-        {
-            backingFile = wsl::windows::common::disk::OpenVhdBackingFile(path.c_str(), bootDisk.GrantHostAccess ? userToken : nullptr);
-        }
-        catch (...)
-        {
-            if (!bootDisk.GrantHostAccess || wil::ResultFromCaughtException() != E_ACCESSDENIED)
-            {
-                throw;
-            }
-
-            LOG_CAUGHT_EXCEPTION();
-
-            // Custom VHDs may be accessible only to the service and the VM worker process.
-            backingFile = wsl::windows::common::disk::OpenVhdBackingFile(path.c_str());
-        }
 
         schema::Attachment attachment{};
         attachment.Type = schema::AttachmentType::VirtualDisk;
