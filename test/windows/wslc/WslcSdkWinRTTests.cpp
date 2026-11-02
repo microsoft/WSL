@@ -378,6 +378,56 @@ class WslcSdkWinRtTests
         }
     }
 
+    WSLC_TEST_METHOD(SessionHostLoopback)
+    {
+        constexpr uint16_t c_hostLoopbackTestPort = 1239;
+        constexpr auto c_hostLoopbackName = L"wslc-winrt-loopback.internal";
+        const auto endpoint = std::format(L"http://127.0.0.1:{}/", c_hostLoopbackTestPort);
+        UniqueWebServer server(endpoint.c_str(), L"winrt-host-loopback-ok");
+        ExpectHttpResponse(endpoint.c_str(), HTTP_STATUS_OK, true);
+
+        const std::filesystem::path storage = m_storagePath / "wslc-winrt-host-loopback-storage";
+        auto cleanupStorage = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { std::filesystem::remove_all(storage); });
+
+        auto settings = WSLCSDK::SessionSettings(L"wslc-winrt-host-loopback-test", storage.wstring());
+
+        // Host loopback is disabled by default.
+        VERIFY_ARE_EQUAL(settings.HostLoopback(), winrt::hstring{});
+
+        // The settings keep their own copy of the hostname, so a temporary string can be passed.
+        settings.HostLoopback(winrt::hstring{c_hostLoopbackName});
+        VERIFY_ARE_EQUAL(settings.HostLoopback(), winrt::hstring{c_hostLoopbackName});
+
+        auto session = WSLCSDK::Session(settings);
+        session.Start();
+
+        // Negative: the hostname cannot be changed once the session has started.
+        VERIFY_THROWS_HR(settings.HostLoopback(L""), E_ILLEGAL_STATE_CHANGE);
+
+        session.LoadImageAsync(GetTestImagePath("python:3.12-alpine").wstring()).get();
+
+        // Positive: the hostname reaches the Windows host loopback on the first session start.
+        {
+            const auto url = std::format(L"http://{}:{}/", c_hostLoopbackName, c_hostLoopbackTestPort);
+            const std::wstring_view commandLine[] = {L"wget", L"-q", L"-T", L"60", L"-O", L"-", url};
+
+            auto containerSettings = WSLCSDK::ContainerSettings(L"python:3.12-alpine");
+            containerSettings.InitProcess(MakeProcessSettings(commandLine));
+            containerSettings.NetworkingMode(WSLCSDK::ContainerNetworkingMode::Bridged);
+
+            auto container = session.CreateContainer(containerSettings);
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+            StartContainerAndWaitForInitProcessExit(container);
+            auto output = GetProcessOutput(container.InitProcess());
+
+            VERIFY_ARE_EQUAL(output.ExitCode, 0u);
+            VERIFY_ARE_EQUAL(output.StandardOutput, L"winrt-host-loopback-ok");
+        }
+
+        session.Terminate();
+    }
+
     WSLC_TEST_METHOD(TerminationHandler)
     {
         // Positive: Terminating the session must trigger a graceful shutdown and fire the event
@@ -713,6 +763,53 @@ class WslcSdkWinRtTests
         // Negative: invalid arguments.
         {
             VERIFY_THROWS_HR(m_defaultSession.DeleteNetwork(L""), E_INVALIDARG);
+        }
+    }
+
+    WSLC_TEST_METHOD(NetworkDeleteById)
+    {
+        constexpr auto c_networkName = "wslc-sdk-winrt-delete-network-by-id";
+        const winrt::hstring networkName = winrt::to_hstring(c_networkName);
+
+        auto comSession = wil::com_query<IWSLCSession>(
+            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->GetSession());
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName));
+
+        auto findNetworkId = [&]() -> std::optional<winrt::hstring> {
+            for (auto const& network : m_defaultSession.GetNetworks())
+            {
+                if (network.Name() == networkName)
+                {
+                    return network.Id();
+                }
+            }
+
+            return std::nullopt;
+        };
+
+        auto createNetwork = [&]() {
+            WSLCNetworkOptions options{};
+            options.Name = c_networkName;
+            options.Driver = "bridge";
+            VERIFY_SUCCEEDED(comSession->CreateNetwork(&options, nullptr));
+            const auto id = findNetworkId();
+            VERIFY_IS_TRUE(id.has_value());
+            return id.value();
+        };
+
+        auto cleanupNetwork = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName)); });
+
+        // Positive: a network can be deleted by its full ID.
+        {
+            m_defaultSession.DeleteNetwork(createNetwork());
+            VERIFY_IS_FALSE(findNetworkId().has_value());
+        }
+
+        // Positive: a network can be deleted by a unique ID prefix.
+        {
+            const std::wstring id{createNetwork()};
+            m_defaultSession.DeleteNetwork(winrt::hstring{id.substr(0, 12)});
+            VERIFY_IS_FALSE(findNetworkId().has_value());
         }
     }
 

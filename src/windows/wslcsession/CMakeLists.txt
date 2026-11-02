@@ -45,6 +45,7 @@ set(HEADERS
     WSLCContainerMetadata.h
     WSLCExitRequestState.h
     WSLCRestartScheduler.h
+    WSLCRestartTransaction.h
     WindowsCertStore.h
     WSLCProcess.h
     WSLCProcessControl.h

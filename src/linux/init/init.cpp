@@ -2446,7 +2446,7 @@ Return Value:
 
             if (Config.CgroupNamespace)
             {
-                THROW_LAST_ERROR_IF(UtilMoveSelfToDistroCgroup(CGROUP_MOUNTPOINT, "systemd") < 0);
+                THROW_LAST_ERROR_IF(UtilMoveSelfToCgroup(CGROUP_MOUNTPOINT, "systemd") < 0);
                 THROW_LAST_ERROR_IF(UtilEnterCgroupNamespace(Config.CgroupNamespace.get(), "systemd") < 0);
             }
 

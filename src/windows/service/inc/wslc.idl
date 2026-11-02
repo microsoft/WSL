@@ -595,7 +595,7 @@ interface IWSLCContainer : IUnknown
     HRESULT Kill([in] WSLCSignal Signal);
     HRESULT Stats([out] LPSTR* Output);
     HRESULT ConnectToNetwork([in] const WSLCNetworkConnectionOptions* Options);
-    HRESULT DisconnectFromNetwork([in] LPCSTR NetworkName);
+    HRESULT DisconnectFromNetwork([in] LPCSTR NetworkNameOrId);
     HRESULT UploadArchive([in] WSLCHandle TarHandle, [in, string] LPCSTR DestPath, [in] ULONGLONG ContentSize);
     // When FollowLink is set and SrcPath names a symbolic link, the archive is taken from the link's target.
     HRESULT DownloadArchive([in, string] LPCSTR SrcPath, [in] BOOL FollowLink, [in] WSLCHandle OutHandle);
@@ -832,10 +832,10 @@ interface IWSLCSession : IUnknown
 
     // Network management.
     HRESULT CreateNetwork([in] const WSLCNetworkOptions* Options, [in, unique] IWarningCallback* WarningCallback);
-    HRESULT DeleteNetwork([in] LPCSTR Name);
+    HRESULT DeleteNetwork([in] LPCSTR NetworkNameOrId);
     // Returns a JSON array of wslc_schema::NetworkListEntry objects describing the session's networks.
     HRESULT ListNetworks([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out] LPSTR* Output);
-    HRESULT InspectNetwork([in] LPCSTR Name, [out] LPSTR* Output);
+    HRESULT InspectNetwork([in] LPCSTR NetworkNameOrId, [out] LPSTR* Output);
     HRESULT PruneNetworks([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out, size_is(, *NetworksCount)] WSLCNetworkName** Networks, [out] ULONG* NetworksCount);
 
     HRESULT RegisterCrashDumpCallback([in] ICrashDumpCallback* Callback, [out] IUnknown** Subscription);
@@ -952,3 +952,4 @@ cpp_quote("#define WSLC_E_EVENT_STREAM_FINISHED MAKE_HRESULT(SEVERITY_ERROR, FAC
 cpp_quote("#define WSLC_E_CONTAINER_DELETED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 19) /* 0x80040613 */")
 cpp_quote("#define WSLC_E_CAPABILITY_ADDITIONS_DISABLED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 20) /* 0x80040614 */")
 cpp_quote("#define WSLC_E_RUNTIME_UPDATE_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 21) /* 0x80040615 */")
+cpp_quote("#define WSLC_E_NETWORK_PREFIX_AMBIGUOUS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 22) /* 0x80040616 */")

@@ -512,6 +512,14 @@
                     </RegistryKey>
                 </RegistryKey>
 
+                <!-- IWSLCCompatSessionManager2-->
+                <RegistryKey Root="HKCR" Key="Interface\{9D80997B-8969-47F3-826C-58E286A59D7E}">
+                    <RegistryValue Value="IWSLCCompatSessionManager2" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
                 <File Id="wslcsession.exe" Source="${BIN}/wslcsession.exe" />
             </Component>
             <Component Id="wslg" Guid="F0C8D6BA-1502-41E7-BF72-D93DFA134731" UninstallWhenSuperseded="yes" DisableRegistryReflection="yes" Bitness="always64">

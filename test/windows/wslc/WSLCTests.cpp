@@ -7653,6 +7653,15 @@ class WSLCTests
         return stream;
     }
 
+    std::vector<wsl::windows::common::wslc_schema::Event> ReadImageEventsThroughMarker(IWSLCEventStream* Stream)
+    {
+        std::vector<wsl::windows::common::wslc_schema::Event> events;
+        std::ranges::copy_if(ReadNetworkEventsThroughMarker(Stream), std::back_inserter(events), [](const auto& Event) {
+            return Event.Type == "image";
+        });
+        return events;
+    }
+
     static std::vector<std::string> EventActions(const std::vector<wsl::windows::common::wslc_schema::Event>& Events)
     {
         std::vector<std::string> actions;
@@ -8331,6 +8340,8 @@ class WSLCTests
 
         // Run a container through its create/start/kill/die lifecycle inside a bounded time window.
         const LONGLONG since = now();
+        const auto imageTagRepository = GenerateNetworkEventTestName("wslc-test-event-image");
+        const auto imageTag = imageTagRepository + ":v1";
         std::string id;
         {
             WSLCContainerLauncher launcher(c_imageName, c_containerName, {"sleep", "99999"});
@@ -8343,6 +8354,12 @@ class WSLCTests
             // Kill (rather than Stop) so Docker emits a 'kill' event ahead of the 'die' that stops it.
             VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
             VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
+        }
+
+        {
+            WSLCTagImageOptions tagOptions{.Image = c_imageName, .Repo = imageTagRepository.c_str(), .Tag = "v1"};
+            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
+            DeleteImage(imageTag, WSLCDeleteImageFlagsNoPrune);
         }
 
         const LONGLONG until = now() + 1;
@@ -8441,14 +8458,17 @@ class WSLCTests
             verifyEvents(DrainEventStream(stream.get()), id, {"create", "destroy"});
         }
 
-        // Image events are not recorded yet, so a 'type=image' filter excludes the container's
-        // events and leaves the stream empty.
+        // A 'type=image' filter includes image events and excludes the container's events.
         {
-            WSLCFilter filter{"type", "image"};
+            WSLCFilter filters[]{{"type", "image"}, {"image", imageTag.c_str()}};
             wil::com_ptr<IWSLCEventStream> stream;
-            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, &filter, 1, &stream));
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, filters, ARRAYSIZE(filters), &stream));
 
-            VERIFY_IS_TRUE(DrainEventStream(stream.get()).empty());
+            const auto events = DrainEventStream(stream.get());
+            VERIFY_ARE_EQUAL(static_cast<size_t>(1), events.size());
+            VERIFY_ARE_EQUAL("image", events[0].Type);
+            VERIFY_ARE_EQUAL("tag", events[0].Action);
+            VERIFY_ARE_EQUAL(imageTag, events[0].Actor.Attributes.at("name"));
         }
 
         // An unmatched container id yields an empty stream, and GetNext validates its out-pointer.
@@ -9511,6 +9531,295 @@ class WSLCTests
         wil::com_ptr<IWSLCEventStream> replayStream;
         VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, destroyEvents[0].timeNano / 1'000'000'000 + 1, &filter, 1, &replayStream));
         VERIFY_ARE_EQUAL((std::vector<std::string>{"create", "destroy"}), EventActions(DrainEventStream(replayStream.get())));
+    }
+
+    WSLC_TEST_METHOD(ImageEventStream)
+    {
+        const auto repository = GenerateNetworkEventTestName("wslc-test-image-events");
+        const auto image = repository + ":v1";
+        const auto aliasRepository = repository + "-alias";
+        const auto alias = aliasRepository + ":v1";
+
+        auto cleanup = wil::scope_exit([&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow(alias, WSLCDeleteImageFlagsNone).first);
+            LOG_IF_FAILED(DeleteImageNoThrow(image, WSLCDeleteImageFlagsNone).first);
+        });
+
+        auto stream = OpenEventStream({{"type", "network"}, {"type", "image"}});
+        ReadImageEventsThroughMarker(stream.get());
+
+        wil::unique_cotaskmem_ansistring imageId;
+        {
+            const auto imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
+            wil::unique_handle imageTarFileHandle{
+                CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+
+            LARGE_INTEGER fileSize{};
+            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+            VERIFY_SUCCEEDED(m_defaultSession->ImportImage(
+                ToCOMInputHandle(imageTarFileHandle.get()), image.c_str(), fileSize.QuadPart, nullptr, &imageId));
+        }
+
+        WSLCTagImageOptions tagOptions{.Image = image.c_str(), .Repo = aliasRepository.c_str(), .Tag = "v1"};
+        VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
+        DeleteImage(alias, WSLCDeleteImageFlagsNone);
+        DeleteImage(image, WSLCDeleteImageFlagsNone);
+        cleanup.release();
+
+        const auto events = ReadImageEventsThroughMarker(stream.get());
+        const std::vector<std::string> expectedActions{"tag", "import", "tag", "untag", "untag", "delete"};
+        VERIFY_ARE_EQUAL(expectedActions, EventActions(events));
+
+        const std::vector<std::string> expectedNames{image, imageId.get(), alias, imageId.get(), imageId.get(), imageId.get()};
+        for (size_t index = 0; index < events.size(); ++index)
+        {
+            VERIFY_ARE_EQUAL("image", events[index].Type);
+            VERIFY_ARE_EQUAL(std::string{imageId.get()}, events[index].Actor.ID);
+            VERIFY_ARE_EQUAL(expectedNames[index], events[index].Actor.Attributes.at("name"));
+        }
+
+        const auto since = events.front().timeNano / 1'000'000'000;
+        const auto until = events.back().timeNano / 1'000'000'000 + 1;
+        const auto matchingEvents = [&](const std::vector<WSLCFilter>& Filters) {
+            wil::com_ptr<IWSLCEventStream> replayStream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, Filters.data(), static_cast<ULONG>(Filters.size()), &replayStream));
+            return DrainEventStream(replayStream.get());
+        };
+
+        // The recorded events remain readable after the image is deleted.
+        VERIFY_ARE_EQUAL(expectedActions, EventActions(matchingEvents({{"image", imageId.get()}})));
+
+        const auto taggedEvents = matchingEvents({{"type", "image"}, {"image", image.c_str()}});
+        VERIFY_ARE_EQUAL(std::vector<std::string>{"tag"}, EventActions(taggedEvents));
+        VERIFY_ARE_EQUAL(image, taggedEvents[0].Actor.Attributes.at("name"));
+
+        VERIFY_ARE_EQUAL(std::vector<std::string>{"tag"}, EventActions(matchingEvents({{"image", repository.c_str()}})));
+        VERIFY_ARE_EQUAL(
+            (std::vector<std::string>{"untag", "untag"}),
+            EventActions(matchingEvents({{"image", imageId.get()}, {"event", "untag"}})));
+        VERIFY_IS_TRUE(matchingEvents({{"image", imageId.get()}, {"type", "container"}}).empty());
+    }
+
+    WSLC_TEST_METHOD(ImageArchiveEventStream)
+    {
+        const auto imageTar =
+            std::filesystem::current_path() / std::format("{}.tar", GenerateNetworkEventTestName("wslc-test-image-archive"));
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTar.c_str())); });
+
+        auto stream = OpenEventStream({{"type", "network"}, {"type", "image"}});
+        ReadImageEventsThroughMarker(stream.get());
+
+        {
+            wil::unique_handle imageTarFileHandle{
+                CreateFileW(imageTar.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+            VERIFY_SUCCEEDED(m_defaultSession->SaveImage(ToCOMInputHandle(imageTarFileHandle.get()), "hello-world:latest", nullptr, nullptr));
+        }
+
+        {
+            wil::unique_handle imageTarFileHandle{
+                CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+
+            LARGE_INTEGER fileSize{};
+            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(ToCOMInputHandle(imageTarFileHandle.get()), fileSize.QuadPart, nullptr, nullptr));
+        }
+
+        const auto events = ReadImageEventsThroughMarker(stream.get());
+        VERIFY_ARE_EQUAL((std::vector<std::string>{"save", "load"}), EventActions(events));
+        VERIFY_ARE_EQUAL(events[0].Actor.ID, events[1].Actor.ID);
+
+        for (const auto& event : events)
+        {
+            VERIFY_ARE_EQUAL(event.Actor.ID, event.Actor.Attributes.at("name"));
+        }
+    }
+
+    WSLC_TEST_METHOD(ImageRegistryEventStream)
+    {
+        auto [registryContainer, registryAddress] = StartLocalRegistry(*m_defaultSession);
+        auto auth = BuildRegistryAuthHeader("", "");
+
+        auto stream = OpenEventStream({{"type", "network"}, {"type", "image"}});
+        ReadImageEventsThroughMarker(stream.get());
+
+        const auto registryImage = PushImageToRegistry("hello-world:latest", registryAddress, auth);
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(DeleteImageNoThrow(registryImage, WSLCDeleteImageFlagsForce).first); });
+
+        VERIFY_SUCCEEDED(m_defaultSession->PullImage(registryImage.c_str(), nullptr, FALSE, nullptr, nullptr));
+        DeleteImage(registryImage, WSLCDeleteImageFlagsForce);
+        cleanup.release();
+
+        const auto events = ReadImageEventsThroughMarker(stream.get());
+        VERIFY_ARE_EQUAL((std::vector<std::string>{"tag", "push", "untag", "pull", "untag"}), EventActions(events));
+
+        const auto registryRepository = registryImage.substr(0, registryImage.rfind(':'));
+        VERIFY_ARE_EQUAL(registryImage, events[0].Actor.Attributes.at("name"));
+        VERIFY_ARE_EQUAL(events[0].Actor.ID, events[2].Actor.ID);
+        VERIFY_ARE_EQUAL(events[0].Actor.ID, events[4].Actor.ID);
+
+        for (const auto index : {1, 3})
+        {
+            VERIFY_ARE_EQUAL(registryImage, events[index].Actor.ID);
+            VERIFY_ARE_EQUAL(registryRepository, events[index].Actor.Attributes.at("name"));
+        }
+    }
+
+    WSLC_TEST_METHOD(ImagePruneEventStream)
+    {
+        const auto label = GenerateNetworkEventTestName("wslc-test-image-prune");
+        const auto image = label + ":latest";
+        const auto contextDir = std::filesystem::current_path() / label;
+
+        std::filesystem::create_directories(contextDir);
+        auto contextCleanup = wil::scope_exit([&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM hello-world:latest\n";
+            dockerfile << "LABEL " << label << "=yes\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, image.c_str()));
+        auto imageCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(DeleteImageNoThrow(image, WSLCDeleteImageFlagsForce).first); });
+
+        wil::unique_cotaskmem_ansistring inspectOutput;
+        VERIFY_SUCCEEDED(m_defaultSession->InspectImage(image.c_str(), &inspectOutput));
+        const auto imageId = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectImage>(inspectOutput.get()).Id;
+
+        auto stream = OpenEventStream({{"type", "network"}, {"type", "image"}});
+        ReadImageEventsThroughMarker(stream.get());
+
+        const auto pruneImages = [&](const std::vector<WSLCFilter>& Filters) {
+            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+            ULONGLONG spaceReclaimed = 0;
+            VERIFY_SUCCEEDED(m_defaultSession->PruneImages(
+                Filters.data(), static_cast<ULONG>(Filters.size()), deletedImages.addressof(), deletedImages.size_address<ULONG>(), &spaceReclaimed));
+            return std::make_pair(std::move(deletedImages), spaceReclaimed);
+        };
+
+        const auto noopLabel = std::format("{}=no", label);
+        auto [noopDeleted, noopReclaimed] = pruneImages({{"label", noopLabel.c_str()}, {"dangling", "false"}});
+        VERIFY_ARE_EQUAL(static_cast<size_t>(0), noopDeleted.size());
+        VERIFY_ARE_EQUAL(0ull, noopReclaimed);
+
+        const auto pruneLabel = std::format("{}=yes", label);
+        auto [deletedImages, spaceReclaimed] = pruneImages({{"label", pruneLabel.c_str()}, {"dangling", "false"}});
+        VERIFY_IS_TRUE(std::ranges::any_of(deletedImages, [&](const auto& DeletedImage) {
+            return DeletedImage.Type == WSLCDeletedImageTypeDeleted && DeletedImage.Image == imageId;
+        }));
+        ExpectImagePresent(*m_defaultSession, image.c_str(), false);
+        imageCleanup.release();
+
+        const auto events = ReadImageEventsThroughMarker(stream.get());
+        VERIFY_ARE_EQUAL((std::vector<std::string>{"prune", "untag", "delete", "prune"}), EventActions(events));
+
+        VERIFY_IS_TRUE(events[0].Actor.ID.empty());
+        VERIFY_ARE_EQUAL("0", events[0].Actor.Attributes.at("reclaimed"));
+
+        VERIFY_ARE_EQUAL(imageId, events[1].Actor.ID);
+        VERIFY_ARE_EQUAL(imageId, events[2].Actor.ID);
+
+        VERIFY_IS_TRUE(events[3].Actor.ID.empty());
+        VERIFY_ARE_EQUAL(std::to_string(spaceReclaimed), events[3].Actor.Attributes.at("reclaimed"));
+
+        // Each image event keeps the exact actor and time Docker reported for it.
+        const auto dockerOutput = ExpectCommandResult(
+                                      m_defaultSession.get(),
+                                      {"/usr/bin/docker",
+                                       "events",
+                                       "--since",
+                                       std::to_string(events[1].timeNano / 1'000'000'000),
+                                       "--until",
+                                       std::to_string(events[2].timeNano / 1'000'000'000 + 1),
+                                       "--filter",
+                                       "type=image",
+                                       "--filter",
+                                       "image=" + imageId,
+                                       "--filter",
+                                       "event=untag",
+                                       "--filter",
+                                       "event=delete",
+                                       "--format",
+                                       "{{json .}}"},
+                                      0)
+                                      .Output.at(1);
+
+        std::vector<std::string> dockerEvents;
+        for (const auto& line : wsl::shared::string::Split(dockerOutput, '\n'))
+        {
+            dockerEvents.push_back(wsl::shared::ToJson(wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(line.c_str())));
+        }
+
+        const std::vector<std::string> recordedEvents{wsl::shared::ToJson(events[1]), wsl::shared::ToJson(events[2])};
+        VERIFY_ARE_EQUAL(dockerEvents, recordedEvents);
+
+        // A label filter selects the events whose attributes carry the image label.
+        std::vector<std::string> labeledActions;
+        for (const auto& event : events)
+        {
+            if (event.Actor.Attributes.contains(label))
+            {
+                VERIFY_ARE_EQUAL("yes", event.Actor.Attributes.at(label));
+                labeledActions.push_back(event.Action);
+            }
+        }
+
+        VERIFY_IS_FALSE(labeledActions.empty());
+
+        wil::com_ptr<IWSLCEventStream> labelStream;
+        const WSLCFilter labelFilters[]{{"type", "image"}, {"label", pruneLabel.c_str()}, {"event", "untag"}, {"event", "delete"}};
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(
+            events[1].timeNano / 1'000'000'000, events[2].timeNano / 1'000'000'000 + 1, labelFilters, ARRAYSIZE(labelFilters), &labelStream));
+        VERIFY_ARE_EQUAL(labeledActions, EventActions(DrainEventStream(labelStream.get())));
+    }
+
+    WSLC_TEST_METHOD(ImageEventsSurviveVmRestart)
+    {
+        const auto repository = GenerateNetworkEventTestName("wslc-test-image-reconnect");
+        const auto image = repository + ":v1";
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(DeleteImageNoThrow(image, WSLCDeleteImageFlagsNoPrune).first); });
+
+        auto stream = OpenEventStream({{"type", "network"}, {"type", "image"}});
+        ReadImageEventsThroughMarker(stream.get());
+
+        WSLCTagImageOptions tagOptions{.Image = "debian:latest", .Repo = repository.c_str(), .Tag = "v1"};
+        VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
+
+        // Teardown stops the relay that delivers events, so the tag must land before the restart.
+        const auto tagEvents = ReadImageEventsThroughMarker(stream.get());
+        VERIFY_ARE_EQUAL(static_cast<size_t>(1), tagEvents.size());
+        VERIFY_ARE_EQUAL("tag", tagEvents[0].Action);
+        VERIFY_ARE_EQUAL(image, tagEvents[0].Actor.Attributes.at("name"));
+
+        BOOL wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(m_defaultSession->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_testSessionName));
+
+        // Listing restarts the VM.
+        ExpectImagePresent(*m_defaultSession, image.c_str());
+        VERIFY_IS_TRUE(IsVmRunning(c_testSessionName));
+
+        DeleteImage(image, WSLCDeleteImageFlagsNoPrune);
+        cleanup.release();
+
+        const auto untagEvents = ReadImageEventsThroughMarker(stream.get());
+        VERIFY_ARE_EQUAL(static_cast<size_t>(1), untagEvents.size());
+        VERIFY_ARE_EQUAL("untag", untagEvents[0].Action);
+        VERIFY_ARE_EQUAL(tagEvents[0].Actor.ID, untagEvents[0].Actor.ID);
+
+        WSLCFilter filter{"image", tagEvents[0].Actor.ID.c_str()};
+        wil::com_ptr<IWSLCEventStream> replayStream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(
+            tagEvents[0].timeNano / 1'000'000'000, untagEvents[0].timeNano / 1'000'000'000 + 1, &filter, 1, &replayStream));
+        VERIFY_ARE_EQUAL((std::vector<std::string>{"tag", "untag"}), EventActions(DrainEventStream(replayStream.get())));
     }
 
     WSLC_TEST_METHOD(EventStreamReportsLostEvents)
@@ -11338,6 +11647,182 @@ class WSLCTests
         auto retVal = launcher.LaunchNoThrow(*m_defaultSession);
         VERIFY_ARE_EQUAL(E_INVALIDARG, retVal.first);
         ValidateCOMErrorMessage(L"Duplicate network: 'bridge'");
+    }
+
+    WSLC_TEST_METHOD(ContainerBuiltinNetworkByIdTest)
+    {
+        auto getNetworkId = [&](LPCSTR name) {
+            wil::unique_cotaskmem_ansistring output;
+            VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(name, &output));
+            return wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get()).Id;
+        };
+
+        const auto bridgeId = getNetworkId("bridge");
+        const auto hostId = getNetworkId("host");
+        const auto noneId = getNetworkId("none");
+
+        // A built-in network's full ID or ID prefix resolves to the built-in network name.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-builtin-id-full", {"sleep", "99999"}, {}, bridgeId);
+            auto container = launcher.Launch(*m_defaultSession);
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+            VERIFY_ARE_EQUAL(container.Inspect().HostConfig.NetworkMode, "bridge");
+        }
+
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-builtin-id-prefix", {"sleep", "99999"}, {}, bridgeId.substr(0, 12));
+            auto container = launcher.Launch(*m_defaultSession);
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+            VERIFY_ARE_EQUAL(container.Inspect().HostConfig.NetworkMode, "bridge");
+        }
+
+        // A built-in network ID is accepted as an additional network.
+        {
+            const std::string primaryNetwork = "builtin-id-primary";
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(primaryNetwork.c_str()));
+
+            WSLCNetworkOptions netOpts{};
+            netOpts.Name = primaryNetwork.c_str();
+            netOpts.Driver = "bridge";
+            netOpts.Subnet = "172.68.0.0/16";
+            VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&netOpts, nullptr));
+            auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(primaryNetwork.c_str())); });
+
+            WSLCContainerLauncher launcher("debian:latest", "test-builtin-id-additional", {"sleep", "99999"}, {}, primaryNetwork);
+            launcher.AddAdditionalNetwork(bridgeId);
+
+            auto container = launcher.Launch(*m_defaultSession);
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(primaryNetwork));
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains("bridge"));
+        }
+
+        // The same built-in network referenced by name and by ID is a duplicate.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-builtin-id-dup", {"sleep", "99999"}, {}, "bridge");
+            launcher.AddAdditionalNetwork(bridgeId);
+
+            VERIFY_ARE_EQUAL(E_INVALIDARG, launcher.LaunchNoThrow(*m_defaultSession).first);
+            ValidateCOMErrorMessage(L"Duplicate network: 'bridge'");
+        }
+
+        // The none network referenced by ID rejects port mappings.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-builtin-id-none-ports", {"sleep", "99999"}, {}, noneId);
+            launcher.AddPort(1234, 8000, AF_INET);
+
+            VERIFY_ARE_EQUAL(E_INVALIDARG, launcher.LaunchNoThrow(*m_defaultSession).first);
+        }
+
+        // The none network referenced by ID is rejected as an additional network.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-builtin-id-none-additional", {"sleep", "99999"}, {}, "bridge");
+            launcher.AddAdditionalNetwork(noneId);
+
+            VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, launcher.LaunchNoThrow(*m_defaultSession).first);
+            ValidateCOMErrorMessage(std::format(L"Network not found: '{}'", std::wstring(noneId.begin(), noneId.end())).c_str());
+        }
+
+        // Host mode is only selected by name, so the host network's ID or ID prefix is not found.
+        for (const auto& reference : {hostId, hostId.substr(0, 12)})
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-builtin-id-host", {"sleep", "99999"}, {}, reference);
+
+            VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, launcher.LaunchNoThrow(*m_defaultSession).first);
+            ValidateCOMErrorMessage(std::format(L"Network not found: '{}'", std::wstring(reference.begin(), reference.end())).c_str());
+        }
+
+        // An ID that matches no network is not found.
+        {
+            const std::string unknownId(64, '0');
+            WSLCContainerLauncher launcher("debian:latest", "test-builtin-id-unknown", {"sleep", "99999"}, {}, unknownId);
+
+            VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, launcher.LaunchNoThrow(*m_defaultSession).first);
+            ValidateCOMErrorMessage(std::format(L"Network not found: '{}'", std::wstring(unknownId.begin(), unknownId.end())).c_str());
+        }
+    }
+
+    WSLC_TEST_METHOD(NetworkPrefixAmbiguousWithBuiltinTest)
+    {
+        auto getNetworkId = [&](LPCSTR name) {
+            wil::unique_cotaskmem_ansistring output;
+            VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(name, &output));
+            return wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get()).Id;
+        };
+
+        std::string builtinFirstChars;
+        for (const auto* name : {"bridge", "host", "none"})
+        {
+            builtinFirstChars += getNetworkId(name)[0];
+        }
+
+        // Recreate a managed network until its ID shares a first character with a built-in network.
+        const std::string networkName = "builtin-prefix-collision";
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        std::string prefix;
+        for (int attempt = 0; prefix.empty(); attempt++)
+        {
+            VERIFY_IS_LESS_THAN(attempt, 100);
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+            WSLCNetworkOptions netOpts{};
+            netOpts.Name = networkName.c_str();
+            netOpts.Driver = "bridge";
+            VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&netOpts, nullptr));
+
+            const auto id = getNetworkId(networkName.c_str());
+            if (builtinFirstChars.find(id[0]) != std::string::npos)
+            {
+                prefix = id.substr(0, 1);
+            }
+        }
+
+        const auto expectedMessage = std::format(
+            L"Multiple networks match '{}'; use a longer ID or the network name.", std::wstring(prefix.begin(), prefix.end()));
+
+        // Inspect and delete.
+        {
+            wil::unique_cotaskmem_ansistring output;
+            VERIFY_ARE_EQUAL(WSLC_E_NETWORK_PREFIX_AMBIGUOUS, m_defaultSession->InspectNetwork(prefix.c_str(), &output));
+            ValidateCOMErrorMessage(expectedMessage.c_str());
+
+            VERIFY_ARE_EQUAL(WSLC_E_NETWORK_PREFIX_AMBIGUOUS, m_defaultSession->DeleteNetwork(prefix.c_str()));
+            ValidateCOMErrorMessage(expectedMessage.c_str());
+        }
+
+        // Container create with the prefix as the primary network.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-prefix-collision-primary", {"sleep", "99999"}, {}, prefix);
+
+            VERIFY_ARE_EQUAL(WSLC_E_NETWORK_PREFIX_AMBIGUOUS, launcher.LaunchNoThrow(*m_defaultSession).first);
+            ValidateCOMErrorMessage(expectedMessage.c_str());
+        }
+
+        // Container create with the prefix as an additional network.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-prefix-collision-additional", {"sleep", "99999"}, {}, "bridge");
+            launcher.AddAdditionalNetwork(prefix);
+
+            VERIFY_ARE_EQUAL(WSLC_E_NETWORK_PREFIX_AMBIGUOUS, launcher.LaunchNoThrow(*m_defaultSession).first);
+            ValidateCOMErrorMessage(expectedMessage.c_str());
+        }
+
+        // Connect and disconnect.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-prefix-collision-connect", {"sleep", "99999"}, {}, "bridge");
+            auto container = launcher.Launch(*m_defaultSession);
+
+            WSLCNetworkConnectionOptions options{};
+            options.NetworkName = prefix.c_str();
+            VERIFY_ARE_EQUAL(WSLC_E_NETWORK_PREFIX_AMBIGUOUS, container.Get().ConnectToNetwork(&options));
+            ValidateCOMErrorMessage(expectedMessage.c_str());
+
+            VERIFY_ARE_EQUAL(WSLC_E_NETWORK_PREFIX_AMBIGUOUS, container.Get().DisconnectFromNetwork(prefix.c_str()));
+            ValidateCOMErrorMessage(expectedMessage.c_str());
+        }
     }
 
     WSLC_TEST_METHOD(ContainerAdditionalNetworkMalformedNameTest)
