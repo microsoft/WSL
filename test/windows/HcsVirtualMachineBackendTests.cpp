@@ -260,6 +260,48 @@ class HcsVirtualMachineBackendTests
         VERIFY_IS_TRUE(terminationEvent.is_signaled());
     }
 
+    TEST_METHOD(TerminatesBeforeDrainingBackendOperations)
+    {
+        SKIP_TEST_ARM64();
+        const auto request = CreateRunnableRequest();
+        auto backend = HcsVirtualMachineBackend::Create(request);
+        auto guest = StartGuest(*backend);
+        backend->CreateFileSystemDevice({VmVirtioFsDevice{L"shutdown-test", VmVirtioFsLayout::SingleShare}});
+
+        wil::unique_event vmExited{wil::EventOptions::ManualReset};
+        wil::unique_event operationStarted{wil::EventOptions::ManualReset};
+        wil::unique_event releaseOperation{wil::EventOptions::ManualReset};
+        const auto vmId = wsl::shared::string::GuidToString<wchar_t>(request.Identity.VmId, wsl::shared::string::GuidToStringFlags::None);
+        auto monitor = wsl::windows::common::hcs::OpenComputeSystem(vmId.c_str(), GENERIC_ALL);
+        wsl::windows::common::hcs::RegisterCallback(
+            monitor.get(),
+            [](HCS_EVENT* event, void* context) {
+                if (event->Type == HcsEventSystemExited)
+                {
+                    LOG_IF_WIN32_BOOL_FALSE(SetEvent(context));
+                }
+            },
+            vmExited.get());
+
+        std::future<void> termination;
+        auto operation = std::async(std::launch::async, [&] {
+            backend->GetFileSystemDevice([&](const VmFileSystemDevice&) {
+                operationStarted.SetEvent();
+                releaseOperation.wait();
+                return true;
+            });
+        });
+        auto releaseOnExit = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { releaseOperation.SetEvent(); });
+
+        VERIFY_IS_TRUE(operationStarted.wait(30 * 1000));
+        termination = std::async(std::launch::async, [&] { backend->Terminate(); });
+        VERIFY_IS_TRUE(vmExited.wait(30 * 1000));
+        releaseOperation.SetEvent();
+        operation.get();
+        termination.get();
+        VERIFY_IS_TRUE(backend->GetTerminationEvent().is_signaled());
+    }
+
     TEST_METHOD(DestroysGuestListenersBeforeRebinding)
     {
         SKIP_TEST_ARM64();

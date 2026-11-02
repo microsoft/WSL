@@ -546,7 +546,8 @@ void HcsVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     // to attach them are undone even if creation fails.
     m_attachedDisks = std::move(bootDisks);
     m_nextDiskId = nextDiskId;
-    m_system = schema::CreateComputeSystem(id.c_str(), settings.c_str());
+    m_terminationSystem = schema::CreateComputeSystem(id.c_str(), settings.c_str());
+    m_system = schema::OpenComputeSystem(id.c_str(), GENERIC_ALL);
     m_state = VmState::Created;
     m_runtimeId = wsl::windows::common::hcs::GetRuntimeId(m_system.get());
     m_guestDeviceManager = std::make_shared<GuestDeviceManager>(id, m_runtimeId, Request.EnableTelemetry);
@@ -676,6 +677,14 @@ void HcsVirtualMachineBackend::Shutdown()
 {
     m_terminatingEvent.SetEvent();
 
+    // Device-host operations can hold m_lock until HCS exits. Stop the VM before waiting for them.
+    const auto terminationResult = wil::ResultFromException([&] {
+        if (m_terminationSystem && !m_exitEvent.is_signaled())
+        {
+            schema::TerminateComputeSystem(m_terminationSystem.get());
+        }
+    });
+
     std::shared_ptr<GuestDeviceManager> guestDeviceManager;
     schema::unique_hcs_system system;
     std::map<std::uint64_t, AttachedDisk> attachedDisks;
@@ -695,8 +704,7 @@ void HcsVirtualMachineBackend::Shutdown()
         attachedDisks = std::move(m_attachedDisks);
     }
 
-    // AddPersistentMemory may be in a device-host call. The backend is already unavailable and
-    // guest operations have been cancelled before we wait for that call to finish.
+    // AddPersistentMemory may still be unwinding a device-host call after HCS termination.
     {
         auto persistentMemoryLock = m_persistentMemoryLock.lock_exclusive();
     }
@@ -712,10 +720,7 @@ void HcsVirtualMachineBackend::Shutdown()
         NotifyTerminated(m_configuration.Description.Identity);
     });
 
-    if (system && !m_exitEvent.is_signaled())
-    {
-        schema::TerminateComputeSystem(system.get());
-    }
+    THROW_IF_FAILED(terminationResult);
 }
 
 VmGuestListener HcsVirtualMachineBackend::CreateGuestListener(GuestServicePort Port)
