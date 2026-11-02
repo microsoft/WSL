@@ -113,10 +113,6 @@ class WSLCComposeTests
         wil::com_ptr<IWSLCContainer> basicContainer;
         VERIFY_SUCCEEDED(m_defaultSession->OpenContainer("wslc-compose-basic", &basicContainer));
         const auto inspect = InspectContainer(basicContainer.get());
-        VERIFY_ARE_EQUAL(projectPath.filename().string(), inspect.Config.Labels.at("com.docker.compose.project"));
-        VERIFY_ARE_EQUAL(std::string{"basic"}, inspect.Config.Labels.at("com.docker.compose.service"));
-        VERIFY_ARE_EQUAL(std::string{"1"}, inspect.Config.Labels.at("com.docker.compose.container-number"));
-        VERIFY_ARE_EQUAL(std::string{"False"}, inspect.Config.Labels.at("com.docker.compose.oneoff"));
         VERIFY_ARE_EQUAL(std::string{"true"}, inspect.Config.Labels.at("com.microsoft.wslc.compose.managed"));
         VERIFY_ARE_EQUAL(std::string{"1"}, inspect.Config.Labels.at("com.microsoft.wslc.compose.metadata-version"));
         VERIFY_ARE_EQUAL(std::string("/work"), inspect.Config.WorkingDir);
@@ -131,6 +127,16 @@ class WSLCComposeTests
         VERIFY_IS_TRUE(inspect.Ports.contains("8080/tcp"));
         VERIFY_ARE_EQUAL(1u, inspect.Ports.at("8080/tcp").size());
         VERIFY_ARE_EQUAL(std::string("127.0.0.1"), inspect.Ports.at("8080/tcp")[0].HostIp);
+        VERIFY_ARE_EQUAL(projectPath.filename().string(), inspect.Config.Labels.at("com.microsoft.wslc.compose.project"));
+        VERIFY_ARE_EQUAL(std::string{"basic"}, inspect.Config.Labels.at("com.microsoft.wslc.compose.service"));
+        VERIFY_ARE_EQUAL(std::string{"1"}, inspect.Config.Labels.at("com.microsoft.wslc.compose.container-number"));
+        VERIFY_ARE_EQUAL(std::string{"False"}, inspect.Config.Labels.at("com.microsoft.wslc.compose.oneoff"));
+
+        wil::unique_cotaskmem_ansistring networkOutput;
+        VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(std::format("{}_default", projectPath.filename().string()).c_str(), &networkOutput));
+        const auto network = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(networkOutput.get());
+        VERIFY_ARE_EQUAL(projectPath.filename().string(), network.Labels.at("com.microsoft.wslc.compose.project"));
+        VERIFY_ARE_EQUAL(std::string{"default"}, network.Labels.at("com.microsoft.wslc.compose.network"));
 
         const std::string basicContainerId = containers[0].Id;
         const std::string secondaryContainerId = containers[1].Id;
@@ -441,7 +447,7 @@ private:
 
         VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(containerName.c_str(), &container));
         const auto inspect = InspectContainer(container.get());
-        VERIFY_ARE_EQUAL(std::string{"encoded"}, inspect.Config.Labels.at("com.docker.compose.service"));
+        VERIFY_ARE_EQUAL(std::string{"encoded"}, inspect.Config.Labels.at("com.microsoft.wslc.compose.service"));
         VERIFY_IS_TRUE(inspect.Config.Env.has_value());
         VERIFY_IS_TRUE(std::ranges::find(*inspect.Config.Env, std::string{"ENCODING_TEST=\xc3\xa9"}) != inspect.Config.Env->end());
     }
