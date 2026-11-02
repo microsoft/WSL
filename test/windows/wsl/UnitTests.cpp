@@ -8014,7 +8014,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         }
     }
 
-    TEST_METHOD(EnumerateDistributionWithLongName)
+    TEST_METHOD(InvalidDistroRegistrationName)
     {
         const auto distroId = GetDistributionId(LXSS_DISTRO_NAME_TEST_L);
         VERIFY_IS_TRUE(distroId.has_value());
@@ -8048,7 +8048,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                 VERIFY_ARE_EQUAL(
                     error,
                     std::format(
-                        L"wsl: Ignoring invalid distribution registration '{}': E_INVALIDARG.\r\n",
+                        L"wsl: Found invalid distribution registration '{}', E_INVALIDARG.\r\n",
                         wsl::shared::string::GuidToString<wchar_t>(distroId.value())));
             }
         }
