@@ -2853,11 +2853,11 @@ Příklad: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Signál, který se má odeslat (výchozí: nakonfigurovaný STOPSIGNAL kontejneru, nebo SIGTERM, pokud není nakonfigurovaný žádný)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>Monitorovat události kontejnerů.</value>
+  <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
+    <value>Monitorujte události.</value>
   </data>
-  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>Monitorovat události kontejnerů v reálném čase.</value>
+  <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
+    <value>Monitorujte události z kontejnerů, imagí, sítí a svazků v reálném čase.</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
     <value>Zobrazit všechny události vytvořené od časového razítka</value>
