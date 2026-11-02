@@ -16,6 +16,7 @@ Abstract:
 #include "WSLCSessionRuntime.h"
 #include "WSLCSession.h"
 #include "WSLCSessionDefaults.h"
+#include "WSLCStartup.h"
 
 using wsl::windows::service::wslc::WSLCSessionRuntime;
 
@@ -432,9 +433,10 @@ void WSLCSessionRuntime::StartVmLockHeld()
 
 void WSLCSessionRuntime::InitializeDockerRuntime(const std::filesystem::path& storagePath)
 {
-    // Wait for dockerd to be ready before starting the event tracker.
-    THROW_WIN32_IF_MSG(
-        ERROR_TIMEOUT, !m_dockerdReadyEvent.wait(m_settings->BootTimeoutMs), "Timed out waiting for dockerd to start");
+    const auto exited = m_dockerdProcess->GetExitEvent();
+    WaitForDockerStartup(m_dockerdReadyEvent.get(), exited.get(), m_sessionTerminatingEvent.get(), m_settings->BootTimeoutMs, [&]() {
+        return m_dockerdProcess->GetExitCode();
+    });
 
     [[maybe_unused]] auto [pid, ptyMaster, channel] = m_virtualMachine->Fork(WSLC_FORK::Thread);
 

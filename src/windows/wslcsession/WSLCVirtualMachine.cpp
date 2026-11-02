@@ -17,6 +17,7 @@ Abstract:
 
 #include "precomp.h"
 #include "WSLCVirtualMachine.h"
+#include "WSLCStartup.h"
 #include <format>
 #include <filesystem>
 #include <nlohmann/json.hpp>
@@ -990,7 +991,7 @@ void WSLCVirtualMachine::Mount(shared::SocketChannel& Channel, LPCSTR Source, LP
         TraceLoggingValue(Flags, "Flags"),
         TraceLoggingValue(response.Result, "Result"));
 
-    THROW_HR_IF(E_FAIL, response.Result != 0);
+    CheckGuestMountResult(response);
 }
 
 void WSLCVirtualMachine::MountModules(shared::SocketChannel& Channel, LPCSTR Source)
@@ -1002,7 +1003,7 @@ void WSLCVirtualMachine::MountModules(shared::SocketChannel& Channel, LPCSTR Sou
 
     WSL_LOG("WSLCMountModules", TraceLoggingValue(Source, "Source"), TraceLoggingValue(response.Result, "Result"));
 
-    THROW_HR_IF(E_FAIL, response.Result != 0);
+    CheckGuestMountResult(response);
 }
 
 void WSLCVirtualMachine::MountVirtioFsChild(shared::SocketChannel& Channel, LPCSTR Source, LPCSTR ChildName, LPCSTR Target, LPCSTR Options, ULONG Flags)
@@ -1026,7 +1027,7 @@ void WSLCVirtualMachine::MountVirtioFsChild(shared::SocketChannel& Channel, LPCS
         TraceLoggingValue(Flags, "Flags"),
         TraceLoggingValue(response.Result, "Result"));
 
-    THROW_HR_IF(E_FAIL, response.Result != 0);
+    CheckGuestMountResult(response);
 }
 
 int32_t WSLCVirtualMachine::ExpectClosedChannelOrError(wsl::shared::SocketChannel& Channel)

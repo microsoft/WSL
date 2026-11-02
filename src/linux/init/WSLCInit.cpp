@@ -38,6 +38,7 @@ Abstract:
 #include <filesystem>
 #include <iostream>
 #include "JsonUtils.h"
+#include "WSLCLocalhost.h"
 #include "cdi_schema.h"
 #include "lxfsshares.h"
 
@@ -957,6 +958,12 @@ void HandleMountMessage(
         if (WI_IsFlagSet(Message.Flags, WSLC_MOUNT::Chroot))
         {
             THROW_LAST_ERROR_IF(Chroot(target) < 0);
+
+            response.LocalhostFailure = WSLC_MOUNT_RESULT::LocalhostConfigurationFailure::Hosts;
+            wsl::shared::wslc::ConfigureLocalhostFile("/etc/hosts", wsl::shared::wslc::ConfigureLocalhostHosts);
+            response.LocalhostFailure = WSLC_MOUNT_RESULT::LocalhostConfigurationFailure::NameServiceSwitch;
+            wsl::shared::wslc::ConfigureLocalhostFile("/etc/nsswitch.conf", wsl::shared::wslc::ConfigureLocalhostNameService);
+            response.LocalhostFailure = WSLC_MOUNT_RESULT::LocalhostConfigurationFailure::None;
 
             // Recreate the /init symlinks inside the new root.
             THROW_LAST_ERROR_IF(symlink("/init", "/" LX_INIT_WSL_CAPTURE_CRASH) < 0 && errno != EEXIST);
