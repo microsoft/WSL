@@ -27,7 +27,7 @@ inline VmCreateRequest CreateRequest()
 inline VmCreateRequest CreateRunnableRequest()
 {
     auto request = CreateRequest();
-    const auto toolsPath = std::filesystem::path{wsl::windows::common::wslutil::GetMsiPackagePath().value()} / L"tools";
+    const auto toolsPath = GetInstalledWslToolsPath();
 #ifdef WSL_DEV_INSTALL_PATH
     request.Boot.KernelPath = std::filesystem::path{WSL_DEV_INSTALL_PATH} / L"kernel";
 #else
