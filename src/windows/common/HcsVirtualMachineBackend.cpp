@@ -678,12 +678,11 @@ void HcsVirtualMachineBackend::Shutdown()
     m_terminatingEvent.SetEvent();
 
     // Device-host operations can hold m_lock until HCS exits. Stop the VM before waiting for them.
-    const auto terminationResult = wil::ResultFromException([&] {
-        if (m_terminationSystem && !m_exitEvent.is_signaled())
-        {
-            schema::TerminateComputeSystem(m_terminationSystem.get());
-        }
-    });
+    // Failed termination must leave resources and host disk state intact for a retry.
+    if (m_terminationSystem && !m_exitEvent.is_signaled())
+    {
+        schema::TerminateComputeSystem(m_terminationSystem.get());
+    }
 
     std::shared_ptr<GuestDeviceManager> guestDeviceManager;
     schema::unique_hcs_system system;
@@ -711,16 +710,12 @@ void HcsVirtualMachineBackend::Shutdown()
 
     guestDeviceManager.reset();
 
-    auto cleanup = wil::scope_exit([&] {
-        system.reset();
-        // Closing the system drains exit callbacks. If none arrived, publish completion with
-        // the default Unknown reason rather than leaving termination waiters blocked.
-        m_exitEvent.SetEvent();
-        CleanupAttachedDisks(std::move(attachedDisks));
-        NotifyTerminated(m_configuration.Description.Identity);
-    });
-
-    THROW_IF_FAILED(terminationResult);
+    system.reset();
+    // Closing the system drains exit callbacks. If none arrived, publish completion with
+    // the default Unknown reason rather than leaving termination waiters blocked.
+    m_exitEvent.SetEvent();
+    CleanupAttachedDisks(std::move(attachedDisks));
+    NotifyTerminated(m_configuration.Description.Identity);
 }
 
 VmGuestListener HcsVirtualMachineBackend::CreateGuestListener(GuestServicePort Port)
