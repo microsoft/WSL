@@ -132,6 +132,12 @@ using namespace std::chrono_literals;
         WSL_TEST_CLASS_PROPERTIES \
     END_TEST_CLASS()
 
+#define WSL_TEST_CLASS_WITH_PROPERTIES(_name, _properties) \
+    BEGIN_TEST_CLASS(_name) \
+        WSL_TEST_CLASS_PROPERTIES \
+        _properties \
+    END_TEST_CLASS()
+
 #define WSLC_TEST_CLASS(_name) \
     BEGIN_TEST_CLASS(_name) \
         WSL_TEST_CLASS_PROPERTIES \

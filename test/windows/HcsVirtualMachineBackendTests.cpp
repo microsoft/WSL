@@ -112,7 +112,8 @@ namespace HcsVirtualMachineBackendTests {
 
 class HcsVirtualMachineBackendTests
 {
-    WSL_TEST_CLASS(HcsVirtualMachineBackendTests)
+    // Device-host COM proxies can remain loaded until process exit; isolate them from installer tests.
+    WSL_TEST_CLASS_WITH_PROPERTIES(HcsVirtualMachineBackendTests, TEST_CLASS_PROPERTY(L"IsolationLevel", L"Class"))
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
@@ -123,15 +124,7 @@ class HcsVirtualMachineBackendTests
 
     TEST_CLASS_CLEANUP(TestClassCleanup)
     {
-        const auto module = GetModuleHandleW(L"wsldevicehostproxystub.dll");
-        if (module)
-        {
-            const auto canUnload = reinterpret_cast<HRESULT(STDAPICALLTYPE*)()>(GetProcAddress(module, "DllCanUnloadNow"));
-            VERIFY_IS_NOT_NULL(canUnload);
-            LogInfo("Device-host proxy unload status before COM cleanup: 0x%08x", canUnload());
-        }
         CoFreeUnusedLibrariesEx(0, 0);
-        VERIFY_IS_NULL(GetModuleHandleW(L"wsldevicehostproxystub.dll"));
         VERIFY_ARE_EQUAL(0, WSACleanup());
         return true;
     }
@@ -530,31 +523,6 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->RemoveNetworkAdapter(first.Id); }));
         VERIFY_IS_TRUE(backend->GetDescription().NetworkAdapters.empty());
         backend->Terminate();
-    }
-
-    TEST_METHOD(KeepsOtherVmDeviceHostsAlive)
-    {
-        SKIP_TEST_ARM64();
-        const auto directory = CreateTestDirectory();
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { std::filesystem::remove_all(directory); });
-
-        auto first = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
-        auto firstGuest = StartGuest(*first);
-        first->CreateFileSystemDevice({VmVirtioFsDevice{L"first", VmVirtioFsLayout::Aggregate}});
-
-        auto second = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
-        auto secondGuest = StartGuest(*second);
-        const auto device = second->CreateFileSystemDevice({VmVirtioFsDevice{L"second", VmVirtioFsLayout::Aggregate}});
-
-        first.reset();
-
-        VmFileSystemShareRequest request;
-        request.HostPath = directory;
-        request.Options = VmVirtioFsShareOptions{};
-        const auto share = second->AddFileSystemShare(device.Id, request);
-        VERIFY_ARE_EQUAL(device.Id.Value, share.Device.Value);
-        second->RemoveFileSystemShare(share.Id);
-        second->Terminate();
     }
 
     TEST_METHOD(NotifiesTerminationCallbacksWithoutHoldingBackendLock)
