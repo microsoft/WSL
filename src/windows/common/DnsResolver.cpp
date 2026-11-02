@@ -63,6 +63,9 @@ DnsResolver::DnsResolver(wil::unique_socket&& dnsHvsocket, DnsResolverFlags flag
     // Initialize as signaled, as there are no requests yet
     m_allRequestsFinished.SetEvent();
 
+    // Manually stop in case the constructor throws.
+    auto stopOnFailure = wil::scope_exit([this] { Stop(); });
+
     // Read external interface constraint regkey
     const auto lxssKey = windows::common::registry::OpenLxssMachineKey(KEY_READ);
     m_externalInterfaceConstraintName =
@@ -80,6 +83,9 @@ DnsResolver::DnsResolver(wil::unique_socket&& dnsHvsocket, DnsResolverFlags flag
         // Register for interface change notifications. Notifications are used to determine if the external interface constraint setting is applicable.
         THROW_IF_WIN32_ERROR(NotifyIpInterfaceChange(AF_UNSPEC, &DnsResolver::InterfaceChangeCallback, this, FALSE, &m_interfaceNotificationHandle));
     }
+
+    m_dnsChannel.Start();
+    stopOnFailure.release();
 }
 
 DnsResolver::~DnsResolver() noexcept
