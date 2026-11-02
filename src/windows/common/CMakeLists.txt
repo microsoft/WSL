@@ -76,6 +76,7 @@ set(HEADERS
     ../inc/lxssbusclient.h
     ../inc/lxssclient.h
     ../inc/LxssDynamicFunction.h
+    ../inc/RegistryWatcher.h
     ../inc/traceloggingconfig.h
     ../inc/wdk.h
     ../inc/wsl.h
