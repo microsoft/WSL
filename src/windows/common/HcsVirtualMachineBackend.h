@@ -219,6 +219,8 @@ private:
     _Guarded_by_(m_crashInformationLock) bool m_vmSavedStateCaptured = false;
     mutable wil::srwlock m_terminationInformationLock;
     _Guarded_by_(m_terminationInformationLock) VmTerminationInformation m_terminationInformation;
+    // Fixed during initialization and retained until destruction so termination never needs m_lock.
+    wsl::windows::common::hcs::unique_hcs_system m_terminationSystem;
     // Closing the system drains callbacks before their event and context are destroyed.
     _Guarded_by_(m_lock) wsl::windows::common::hcs::unique_hcs_system m_system;
     _Guarded_by_(m_lock) std::map<std::uint64_t, AttachedDisk> m_attachedDisks;
@@ -230,8 +232,8 @@ private:
     _Guarded_by_(m_lock) std::optional<VmGpuAttachment> m_gpu;
     _Guarded_by_(m_lock) VmState m_state = VmState::Unknown;
     _Guarded_by_(m_lock) bool m_cleanupStarted = false;
-    // Serializes persistent memory additions. Termination signals cancellation and releases m_lock
-    // before waiting for an in-flight addition to complete.
+    // Serializes persistent memory additions. Shutdown terminates HCS before waiting for an
+    // in-flight addition to complete.
     wil::srwlock m_persistentMemoryLock;
     _Guarded_by_(m_persistentMemoryLock) std::uint32_t m_nextPersistentMemoryIndex = 0;
     _Guarded_by_(m_lock) std::map<std::uint64_t, FileSystemShare> m_fileSystemShares;
