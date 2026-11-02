@@ -2687,6 +2687,118 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>The compose file '{0}' is invalid: {1}.</value>
     <comment>{Locked="{0}"}{Locked="{1}"}File paths, property names, and error details should not be translated</comment>
   </data>
+  <data name="MessageWslcComposePathResolveFailed" xml:space="preserve">
+    <value>Failed to resolve the Compose file path '{0}'.</value>
+    <comment>{Locked="{0}"}File paths should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeFileOpenFailed" xml:space="preserve">
+    <value>Failed to open the Compose file '{0}'.</value>
+    <comment>{Locked="{0}"}File paths should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeFileReadFailed" xml:space="preserve">
+    <value>Failed to read the Compose file '{0}'.</value>
+    <comment>{Locked="{0}"}File paths should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeProjectNameInvalid" xml:space="preserve">
+    <value>The Compose project name '{0}' must normalize to a non-empty name of at most {1} characters.</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}Project names and maximum lengths should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeServiceNameInvalid" xml:space="preserve">
+    <value>The Compose service name '{0}' must be non-empty and contain only ASCII letters, digits, periods, underscores, or hyphens.</value>
+    <comment>{Locked="{0}"}Service names should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeNetworkConflict" xml:space="preserve">
+    <value>The network '{0}' already exists with missing, conflicting, or unsupported WSLC Compose labels.</value>
+    <comment>{Locked="{0}"}Network names should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeStringOrListExpected" xml:space="preserve">
+    <value>The Compose file '{0}' is invalid: the '{1}' property for service '{2}' must be a string or list.</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}{Locked="{2}"}File paths, property names, and service names should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeStringListExpected" xml:space="preserve">
+    <value>The Compose file '{0}' is invalid: the '{1}' property for service '{2}' must contain only strings.</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}{Locked="{2}"}File paths, property names, and service names should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeEnvironmentMapOrListExpected" xml:space="preserve">
+    <value>The Compose file '{0}' is invalid: the 'environment' property for service '{1}' must be a map or list.</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}{Locked="environment"}File paths, service names, and the property name should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeEnvironmentScalarsExpected" xml:space="preserve">
+    <value>The Compose file '{0}' is invalid: the 'environment' property for service '{1}' must contain scalar values.</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}{Locked="environment"}File paths, service names, and the property name should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeVolumeShortSyntaxExpected" xml:space="preserve">
+    <value>The Compose file '{0}' is invalid: the 'volumes' property for service '{1}' must contain only short-syntax strings.</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}{Locked="volumes"}File paths, service names, and the property name should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeVolumeFormatInvalid" xml:space="preserve">
+    <value>The Compose file '{0}' is invalid: the '{1}' volume for service '{2}' must use source:destination[:ro|rw] syntax.</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}{Locked="{2}"}{Locked="source:destination[:ro|rw]"}File paths, volume specifications, service names, and the volume syntax should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeVolumeDestinationInvalid" xml:space="preserve">
+    <value>The Compose file '{0}' is invalid: the '{1}' volume destination for service '{2}' must be an absolute Linux path.</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}{Locked="{2}"}File paths, volume destinations, and service names should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposePortsShortSyntaxExpected" xml:space="preserve">
+    <value>The Compose file '{0}' is invalid: the 'ports' property for service '{1}' must contain only host:container strings.</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}{Locked="ports"}{Locked="host:container"}File paths, service names, the property name, and the port syntax should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposePortFormatInvalid" xml:space="preserve">
+    <value>The Compose file '{0}' is invalid: the '{1}' port for service '{2}' must use host:container syntax.</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}{Locked="{2}"}{Locked="host:container"}File paths, port specifications, service names, and the port syntax should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposePortNumberInvalid" xml:space="preserve">
+    <value>The Compose file '{0}' is invalid: the '{1}' port for service '{2}' contains an invalid port number.</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}{Locked="{2}"}File paths, port specifications, and service names should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeMapExpected" xml:space="preserve">
+    <value>The Compose file '{0}' is invalid: it must contain a map.</value>
+    <comment>{Locked="{0}"}File paths should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposePropertyNameInvalid" xml:space="preserve">
+    <value>The Compose file '{0}' is invalid: each top-level property name must be a string.</value>
+    <comment>{Locked="{0}"}File paths should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeVersionScalarExpected" xml:space="preserve">
+    <value>The Compose file '{0}' is invalid: the top-level 'version' property must be a scalar value.</value>
+    <comment>{Locked="{0}"}{Locked="version"}File paths and the property name should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposePropertyUnsupported" xml:space="preserve">
+    <value>The Compose file '{0}' is invalid: the '{1}' property is not supported.</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}File paths and property names should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeServicesMapExpected" xml:space="preserve">
+    <value>The Compose file '{0}' is invalid: it must contain a non-empty services map.</value>
+    <comment>{Locked="{0}"}{Locked="services"}File paths and the property name should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeServiceMapExpected" xml:space="preserve">
+    <value>The Compose file '{0}' is invalid: each service must be a map.</value>
+    <comment>{Locked="{0}"}File paths should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeServiceImageRequired" xml:space="preserve">
+    <value>The Compose file '{0}' is invalid: the '{1}' service must specify an image.</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}File paths and service names should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeServiceNameEmpty" xml:space="preserve">
+    <value>The Compose file '{0}' is invalid: the '{1}' service has an empty container name.</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}File paths and service names should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeServiceImageEmpty" xml:space="preserve">
+    <value>The Compose file '{0}' is invalid: the '{1}' service has an empty image.</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}File paths and service names should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeWorkingDirectoryInvalid" xml:space="preserve">
+    <value>The Compose file '{0}' is invalid: the 'working_dir' property for service '{1}' must be an absolute Linux path string.</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}{Locked="working_dir"}File paths, service names, and the property name should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeVolumesListExpected" xml:space="preserve">
+    <value>The Compose file '{0}' is invalid: the 'volumes' property for service '{1}' must be a list.</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}{Locked="volumes"}File paths, service names, and the property name should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposePortsListExpected" xml:space="preserve">
+    <value>The Compose file '{0}' is invalid: the 'ports' property for service '{1}' must be a list.</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}{Locked="ports"}File paths, service names, and the property name should not be translated</comment>
+  </data>
   <data name="MessageWslcComposeDuplicateContainerName" xml:space="preserve">
     <value>The Compose container name '{0}' is used by more than one service.</value>
     <comment>{Locked="{0}"}Container names should not be translated</comment>

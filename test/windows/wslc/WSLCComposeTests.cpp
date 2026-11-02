@@ -113,7 +113,8 @@ class WSLCComposeTests
         wil::com_ptr<IWSLCContainer> basicContainer;
         VERIFY_SUCCEEDED(m_defaultSession->OpenContainer("wslc-compose-basic", &basicContainer));
         const auto inspect = InspectContainer(basicContainer.get());
-        VERIFY_ARE_EQUAL(std::string{"true"}, inspect.Config.Labels.at("com.microsoft.wslc.compose.managed"));
+        VERIFY_IS_FALSE(inspect.Config.Labels.contains("com.microsoft.wslc.compose.managed"));
+        VERIFY_IS_FALSE(inspect.Config.Labels.contains("com.microsoft.wslc.compose.oneoff"));
         VERIFY_ARE_EQUAL(std::string{"1"}, inspect.Config.Labels.at("com.microsoft.wslc.compose.metadata-version"));
         VERIFY_ARE_EQUAL(std::string("/work"), inspect.Config.WorkingDir);
         VERIFY_IS_TRUE(inspect.Config.Cmd.has_value());
@@ -130,13 +131,13 @@ class WSLCComposeTests
         VERIFY_ARE_EQUAL(projectPath.filename().string(), inspect.Config.Labels.at("com.microsoft.wslc.compose.project"));
         VERIFY_ARE_EQUAL(std::string{"basic"}, inspect.Config.Labels.at("com.microsoft.wslc.compose.service"));
         VERIFY_ARE_EQUAL(std::string{"1"}, inspect.Config.Labels.at("com.microsoft.wslc.compose.container-number"));
-        VERIFY_ARE_EQUAL(std::string{"False"}, inspect.Config.Labels.at("com.microsoft.wslc.compose.oneoff"));
 
         wil::unique_cotaskmem_ansistring networkOutput;
         VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(std::format("{}_default", projectPath.filename().string()).c_str(), &networkOutput));
         const auto network = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(networkOutput.get());
         VERIFY_ARE_EQUAL(projectPath.filename().string(), network.Labels.at("com.microsoft.wslc.compose.project"));
         VERIFY_ARE_EQUAL(std::string{"default"}, network.Labels.at("com.microsoft.wslc.compose.network"));
+        VERIFY_IS_FALSE(network.Labels.contains("com.microsoft.wslc.compose.managed"));
 
         const std::string basicContainerId = containers[0].Id;
         const std::string secondaryContainerId = containers[1].Id;
@@ -179,6 +180,69 @@ class WSLCComposeTests
         VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->DeleteNetwork((projectPath.filename().string() + "_default").c_str()));
     }
 
+    TEST_METHOD(ComposeNetworkCollisionRejectedBeforeMutation)
+    {
+        const auto projectName = std::format("compose-network-collision-{}", GetCurrentProcessId());
+        const auto projectPath = std::filesystem::current_path() / projectName;
+        const auto composePath = projectPath / "compose.yaml";
+        const auto networkName = projectName + "_default";
+        const auto containerName = projectName + "-service-1";
+        VERIFY_IS_TRUE(std::filesystem::create_directory(projectPath));
+        auto directoryCleanup = wil::scope_exit([&] {
+            std::error_code error;
+            std::filesystem::remove_all(projectPath, error);
+        });
+        WriteComposeFile(composePath, "services:\n  service:\n    image: alpine:latest\n");
+
+        const std::vector<std::map<std::string, std::string>> labelSets{
+            {},
+            {{"com.docker.compose.project", projectName}, {"com.docker.compose.network", "default"}},
+            {{"com.microsoft.wslc.compose.project", "another-project"},
+             {"com.microsoft.wslc.compose.network", "default"},
+             {"com.microsoft.wslc.compose.metadata-version", "1"}},
+            {{"com.microsoft.wslc.compose.project", projectName},
+             {"com.microsoft.wslc.compose.network", "another-network"},
+             {"com.microsoft.wslc.compose.metadata-version", "1"}},
+            {{"com.microsoft.wslc.compose.project", projectName}, {"com.microsoft.wslc.compose.network", "default"}},
+            {{"com.microsoft.wslc.compose.project", projectName},
+             {"com.microsoft.wslc.compose.network", "default"},
+             {"com.microsoft.wslc.compose.metadata-version", "2"}}};
+
+        for (const auto& labelSet : labelSets)
+        {
+            std::vector<WSLCLabel> labels;
+            for (const auto& [key, value] : labelSet)
+            {
+                labels.push_back({key.c_str(), value.c_str()});
+            }
+
+            WSLCNetworkOptions options{};
+            options.Name = networkName.c_str();
+            options.Labels = labels.data();
+            options.LabelsCount = gsl::narrow<ULONG>(labels.size());
+            VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
+            auto networkCleanup = wil::scope_exit([&] { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+            wil::unique_cotaskmem_ansistring originalOutput;
+            VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &originalOutput));
+            const auto originalNetwork = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(originalOutput.get());
+            VERIFY_IS_FALSE(originalNetwork.Id.empty());
+
+            wil::com_ptr<IWSLCComposeSession> composeSession;
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_defaultSession->CreateComposeSession(composePath.c_str(), &composeSession));
+            VERIFY_IS_NULL(composeSession.get());
+
+            wil::unique_cotaskmem_ansistring output;
+            VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
+            const auto network = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
+            VERIFY_ARE_EQUAL(originalNetwork.Id, network.Id);
+            VERIFY_IS_TRUE(originalNetwork.Labels == network.Labels);
+
+            wil::com_ptr<IWSLCContainer> container;
+            VERIFY_ARE_EQUAL(WSLC_E_CONTAINER_NOT_FOUND, m_defaultSession->OpenContainer(containerName.c_str(), &container));
+        }
+    }
+
     TEST_METHOD(ComposeEmptyServiceNameValidatedBeforeMutation)
     {
         VerifyInvalidServiceNameValidatedBeforeMutation("", false);
@@ -192,6 +256,45 @@ class WSLCComposeTests
     TEST_METHOD(ComposeWhitespaceServiceNameValidatedBeforeMutation)
     {
         VerifyInvalidServiceNameValidatedBeforeMutation(" \t\r\n ", true);
+    }
+
+    TEST_METHOD(ComposeInvalidServiceCharactersValidatedBeforeMutation)
+    {
+        for (const std::string_view serviceName :
+             {"service/name", "service name", "service:name", "service@name", "service\xc3\xa9"})
+        {
+            VerifyInvalidServiceNameValidatedBeforeMutation(serviceName, true);
+        }
+    }
+
+    TEST_METHOD(ComposeServiceNameAllowsSpecCharacters)
+    {
+        const auto projectName = std::format("compose-service-characters-{}", GetCurrentProcessId());
+        const auto projectPath = std::filesystem::current_path() / projectName;
+        const auto composePath = projectPath / "compose.yaml";
+        const auto containerName = projectName + "-Web_09.api-v1-1";
+        const auto networkName = projectName + "_default";
+        VERIFY_IS_TRUE(std::filesystem::create_directory(projectPath));
+        auto directoryCleanup = wil::scope_exit([&] {
+            std::error_code error;
+            std::filesystem::remove_all(projectPath, error);
+        });
+        WriteComposeFile(composePath, "services:\n  Web_09.api-v1:\n    image: alpine:latest\n");
+
+        wil::com_ptr<IWSLCContainer> container;
+        auto resourceCleanup = wil::scope_exit([&] {
+            if (container)
+            {
+                LOG_IF_FAILED(container->Delete(WSLCDeleteFlagsForce));
+            }
+
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+        });
+        wil::com_ptr<IWSLCComposeSession> composeSession;
+        VERIFY_SUCCEEDED(m_defaultSession->CreateComposeSession(composePath.c_str(), &composeSession));
+        VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(containerName.c_str(), &container));
+        const auto inspect = InspectContainer(container.get());
+        VERIFY_ARE_EQUAL(std::string{"Web_09.api-v1"}, inspect.Config.Labels.at("com.microsoft.wslc.compose.service"));
     }
 
     TEST_METHOD(ComposeLeadingNulServiceNameValidatedBeforeMutation)

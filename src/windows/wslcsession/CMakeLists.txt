@@ -45,7 +45,6 @@ set(HEADERS
     EventStore.h
     IORelay.h
     OptionParser.h
-    ResourceName.h
     ServiceProcessLauncher.h
     ServiceContainerLauncher.h
     WSLCContainer.h

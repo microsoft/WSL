@@ -22,9 +22,9 @@ namespace wsl::windows::service::wslc {
 
 namespace {
 
-    [[noreturn]] void ThrowInvalidComposeFile(const std::filesystem::path& path, std::wstring_view details)
+    [[noreturn]] void ThrowInvalidComposeFile(std::wstring_view message)
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcComposeFileInvalid(path.wstring(), details));
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, message);
     }
 
     std::vector<std::string> ParseComposeStringList(
@@ -42,12 +42,7 @@ namespace {
 
         if (!node.IsSequence())
         {
-            ThrowInvalidComposeFile(
-                path,
-                std::format(
-                    L"the '{}' property for service '{}' must be a string or list",
-                    wsl::shared::string::MultiByteToWide(std::string(property)),
-                    wsl::shared::string::MultiByteToWide(serviceName)));
+            ThrowInvalidComposeFile(Localization::MessageWslcComposeStringOrListExpected(path.wstring(), std::string{property}, serviceName));
         }
 
         std::vector<std::string> result;
@@ -56,12 +51,7 @@ namespace {
         {
             if (!value.IsScalar())
             {
-                ThrowInvalidComposeFile(
-                    path,
-                    std::format(
-                        L"the '{}' property for service '{}' must contain only strings",
-                        wsl::shared::string::MultiByteToWide(std::string(property)),
-                        wsl::shared::string::MultiByteToWide(serviceName)));
+                ThrowInvalidComposeFile(Localization::MessageWslcComposeStringListExpected(path.wstring(), std::string{property}, serviceName));
             }
 
             result.emplace_back(value.as<std::string>());
@@ -84,8 +74,7 @@ namespace {
 
         if (!node.IsMap())
         {
-            ThrowInvalidComposeFile(
-                path, std::format(L"the 'environment' property for service '{}' must be a map or list", wsl::shared::string::MultiByteToWide(serviceName)));
+            ThrowInvalidComposeFile(Localization::MessageWslcComposeEnvironmentMapOrListExpected(path.wstring(), serviceName));
         }
 
         std::vector<std::string> result;
@@ -94,8 +83,7 @@ namespace {
         {
             if (!entry.first.IsScalar() || (!entry.second.IsScalar() && !entry.second.IsNull()))
             {
-                ThrowInvalidComposeFile(
-                    path, std::format(L"the 'environment' property for service '{}' must contain scalar values", wsl::shared::string::MultiByteToWide(serviceName)));
+                ThrowInvalidComposeFile(Localization::MessageWslcComposeEnvironmentScalarsExpected(path.wstring(), serviceName));
             }
 
             const auto name = entry.first.as<std::string>();
@@ -110,11 +98,7 @@ namespace {
     {
         if (!node.IsScalar())
         {
-            ThrowInvalidComposeFile(
-                path,
-                std::format(
-                    L"the 'volumes' property for service '{}' must contain only short-syntax strings",
-                    wsl::shared::string::MultiByteToWide(serviceName)));
+            ThrowInvalidComposeFile(Localization::MessageWslcComposeVolumeShortSyntaxExpected(path.wstring(), serviceName));
         }
 
         auto value = node.as<std::string>();
@@ -129,24 +113,14 @@ namespace {
         const auto separator = value.rfind(':');
         if (separator == std::string::npos || separator == 0 || separator + 1 == value.size())
         {
-            ThrowInvalidComposeFile(
-                path,
-                std::format(
-                    L"the '{}' volume for service '{}' must use source:destination[:ro|rw] syntax",
-                    wsl::shared::string::MultiByteToWide(value),
-                    wsl::shared::string::MultiByteToWide(serviceName)));
+            ThrowInvalidComposeFile(Localization::MessageWslcComposeVolumeFormatInvalid(path.wstring(), value, serviceName));
         }
 
         auto source = value.substr(0, separator);
         auto destination = value.substr(separator + 1);
         if (!destination.starts_with('/'))
         {
-            ThrowInvalidComposeFile(
-                path,
-                std::format(
-                    L"the '{}' volume destination for service '{}' must be an absolute Linux path",
-                    wsl::shared::string::MultiByteToWide(destination),
-                    wsl::shared::string::MultiByteToWide(serviceName)));
+            ThrowInvalidComposeFile(Localization::MessageWslcComposeVolumeDestinationInvalid(path.wstring(), destination, serviceName));
         }
 
         const std::filesystem::path sourcePath = wsl::shared::string::MultiByteToWide(source);
@@ -173,23 +147,14 @@ namespace {
     {
         if (!node.IsScalar())
         {
-            ThrowInvalidComposeFile(
-                path,
-                std::format(
-                    L"the 'ports' property for service '{}' must contain only host:container strings",
-                    wsl::shared::string::MultiByteToWide(serviceName)));
+            ThrowInvalidComposeFile(Localization::MessageWslcComposePortsShortSyntaxExpected(path.wstring(), serviceName));
         }
 
         const auto value = node.as<std::string>();
         const auto separator = value.find(':');
         if (separator == std::string::npos || separator == 0 || separator + 1 == value.size() || separator != value.rfind(':'))
         {
-            ThrowInvalidComposeFile(
-                path,
-                std::format(
-                    L"the '{}' port for service '{}' must use host:container syntax",
-                    wsl::shared::string::MultiByteToWide(value),
-                    wsl::shared::string::MultiByteToWide(serviceName)));
+            ThrowInvalidComposeFile(Localization::MessageWslcComposePortFormatInvalid(path.wstring(), value, serviceName));
         }
 
         const auto parsePort = [&](std::string_view text, bool allowZero) {
@@ -197,12 +162,7 @@ namespace {
             const auto result = std::from_chars(text.data(), text.data() + text.size(), port);
             if (result.ec != std::errc{} || result.ptr != text.data() + text.size() || (!allowZero && port == 0))
             {
-                ThrowInvalidComposeFile(
-                    path,
-                    std::format(
-                        L"the '{}' port for service '{}' contains an invalid port number",
-                        wsl::shared::string::MultiByteToWide(value),
-                        wsl::shared::string::MultiByteToWide(serviceName)));
+                ThrowInvalidComposeFile(Localization::MessageWslcComposePortNumberInvalid(path.wstring(), value, serviceName));
             }
 
             return port;
@@ -219,14 +179,14 @@ namespace {
         const auto root = YAML::Load(content);
         if (!root.IsMap())
         {
-            ThrowInvalidComposeFile(path, L"the file must contain a map");
+            ThrowInvalidComposeFile(Localization::MessageWslcComposeMapExpected(path.wstring()));
         }
 
         for (const auto& property : root)
         {
             if (!property.first.IsScalar())
             {
-                ThrowInvalidComposeFile(path, L"each top-level property name must be a string");
+                ThrowInvalidComposeFile(Localization::MessageWslcComposePropertyNameInvalid(path.wstring()));
             }
 
             const auto key = property.first.as<std::string>();
@@ -234,7 +194,7 @@ namespace {
             {
                 if (!property.second.IsScalar())
                 {
-                    ThrowInvalidComposeFile(path, L"the top-level 'version' property must be a scalar value");
+                    ThrowInvalidComposeFile(Localization::MessageWslcComposeVersionScalarExpected(path.wstring()));
                 }
 
                 // The version field is informational metadata.
@@ -243,15 +203,14 @@ namespace {
 
             if (key != "services")
             {
-                ThrowInvalidComposeFile(
-                    path, std::format(L"the top-level '{}' property is not supported", wsl::shared::string::MultiByteToWide(key)));
+                ThrowInvalidComposeFile(Localization::MessageWslcComposePropertyUnsupported(path.wstring(), key));
             }
         }
 
         const auto services = root["services"];
         if (!services || !services.IsMap() || services.size() == 0)
         {
-            ThrowInvalidComposeFile(path, L"the file must contain a non-empty services map");
+            ThrowInvalidComposeFile(Localization::MessageWslcComposeServicesMapExpected(path.wstring()));
         }
 
         ComposeSpec spec;
@@ -261,7 +220,7 @@ namespace {
         {
             if (!service.first.IsScalar() || !service.second.IsMap())
             {
-                ThrowInvalidComposeFile(path, L"each service must be a map");
+                ThrowInvalidComposeFile(Localization::MessageWslcComposeServiceMapExpected(path.wstring()));
             }
 
             const auto serviceName = service.first.as<std::string>();
@@ -272,31 +231,27 @@ namespace {
                 if (key != "name" && key != "container_name" && key != "image" && key != "environment" && key != "working_dir" &&
                     key != "command" && key != "volumes" && key != "ports")
                 {
-                    ThrowInvalidComposeFile(
-                        path, std::format(L"the '{}' property is not supported", wsl::shared::string::MultiByteToWide(key)));
+                    ThrowInvalidComposeFile(Localization::MessageWslcComposePropertyUnsupported(path.wstring(), key));
                 }
             }
 
             const auto image = settings["image"];
             if (!image || !image.IsScalar())
             {
-                ThrowInvalidComposeFile(
-                    path, std::format(L"the '{}' service must specify an image", wsl::shared::string::MultiByteToWide(serviceName)));
+                ThrowInvalidComposeFile(Localization::MessageWslcComposeServiceImageRequired(path.wstring(), serviceName));
             }
 
             const auto nameNode = settings["name"] ? settings["name"] : settings["container_name"];
             const auto name = nameNode ? nameNode.as<std::string>() : std::string{};
             if (nameNode && name.empty())
             {
-                ThrowInvalidComposeFile(
-                    path, std::format(L"the '{}' service has an empty name", wsl::shared::string::MultiByteToWide(serviceName)));
+                ThrowInvalidComposeFile(Localization::MessageWslcComposeServiceNameEmpty(path.wstring(), serviceName));
             }
 
             const auto imageName = image.as<std::string>();
             if (imageName.empty())
             {
-                ThrowInvalidComposeFile(
-                    path, std::format(L"the '{}' service has an empty image", wsl::shared::string::MultiByteToWide(serviceName)));
+                ThrowInvalidComposeFile(Localization::MessageWslcComposeServiceImageEmpty(path.wstring(), serviceName));
             }
 
             ComposeContainerDefinition definition{
@@ -322,18 +277,13 @@ namespace {
             {
                 if (!workingDirectory.IsScalar())
                 {
-                    ThrowInvalidComposeFile(
-                        path, std::format(L"the 'working_dir' property for service '{}' must be a string", wsl::shared::string::MultiByteToWide(serviceName)));
+                    ThrowInvalidComposeFile(Localization::MessageWslcComposeWorkingDirectoryInvalid(path.wstring(), serviceName));
                 }
 
                 definition.WorkingDirectory = workingDirectory.as<std::string>();
                 if (!definition.WorkingDirectory.starts_with('/'))
                 {
-                    ThrowInvalidComposeFile(
-                        path,
-                        std::format(
-                            L"the working directory for service '{}' must be an absolute Linux path",
-                            wsl::shared::string::MultiByteToWide(serviceName)));
+                    ThrowInvalidComposeFile(Localization::MessageWslcComposeWorkingDirectoryInvalid(path.wstring(), serviceName));
                 }
             }
 
@@ -342,8 +292,7 @@ namespace {
             {
                 if (!volumes.IsSequence())
                 {
-                    ThrowInvalidComposeFile(
-                        path, std::format(L"the 'volumes' property for service '{}' must be a list", wsl::shared::string::MultiByteToWide(serviceName)));
+                    ThrowInvalidComposeFile(Localization::MessageWslcComposeVolumesListExpected(path.wstring(), serviceName));
                 }
 
                 definition.Volumes.reserve(volumes.size());
@@ -358,8 +307,7 @@ namespace {
             {
                 if (!ports.IsSequence())
                 {
-                    ThrowInvalidComposeFile(
-                        path, std::format(L"the 'ports' property for service '{}' must be a list", wsl::shared::string::MultiByteToWide(serviceName)));
+                    ThrowInvalidComposeFile(Localization::MessageWslcComposePortsListExpected(path.wstring(), serviceName));
                 }
 
                 definition.Ports.reserve(ports.size());
@@ -385,7 +333,8 @@ ComposeSpec ComposeSpec::Parse(const std::filesystem::path& path, const std::str
     }
     catch (const YAML::Exception& exception)
     {
-        ThrowInvalidComposeFile(path, wsl::shared::string::MultiByteToWide(exception.what()));
+        ThrowInvalidComposeFile(
+            Localization::MessageWslcComposeFileInvalid(path.wstring(), wsl::shared::string::MultiByteToWide(exception.what())));
     }
 }
 

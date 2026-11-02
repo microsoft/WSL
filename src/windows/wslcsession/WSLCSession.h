@@ -333,7 +333,7 @@ private:
 
     void CreateContainerImpl(const WSLCContainerOptions* Options, IWSLCContainer** Container);
     HRESULT CreateNetworkImpl(const WSLCNetworkOptions* Options);
-    HRESULT DeleteNetworkImpl(LPCSTR Name);
+    HRESULT DeleteNetworkImpl(LPCSTR Name, std::optional<std::string_view> ExpectedComposeProject = std::nullopt);
 
     // A create RPC hands the container off to the Docker event stream thread here and waits, so the
     // container is committed and its create event recorded from that thread. Recording it from the RPC

@@ -15,7 +15,6 @@ Abstract:
 #include "precomp.h"
 #include "ComposeLabels.h"
 #include "ComposeNormalizer.h"
-#include "ResourceName.h"
 #include "WSLCSession.h"
 #include "WSLCComposeSession.h"
 #include "WSLCExecutionContext.h"
@@ -37,6 +36,7 @@ using io::OverlappedIOHandle;
 using io::WriteHandle;
 using wsl::shared::Localization;
 using wsl::windows::common::string::FormatHumanReadableSize;
+using wsl::windows::common::wslutil::ValidateName;
 using wsl::windows::service::wslc::UserCOMCallback;
 using wsl::windows::service::wslc::UserHandle;
 using wsl::windows::service::wslc::WSLCExecutionContext;
@@ -2417,7 +2417,8 @@ try
 
     std::error_code error;
     const auto configPath = std::filesystem::canonical(Path, error);
-    THROW_IF_WIN32_ERROR_MSG(error.value(), "Failed to resolve compose path %ls", Path);
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(error.value()), Localization::MessageWslcComposePathResolveFailed(Path), static_cast<bool>(error));
 
     auto key = configPath.wstring();
     std::ranges::transform(key, key.begin(), [](wchar_t value) { return std::towlower(value); });
@@ -2429,14 +2430,15 @@ try
         return existing->second.CopyTo(ComposeSession);
     }
 
+    // Capture document bytes and source context as the input snapshot for interpretation.
     std::ifstream stream{configPath, std::ios::binary};
-    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_OPEN_FAILED), !stream, "Failed to open compose document %ls", configPath.c_str());
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_OPEN_FAILED), Localization::MessageWslcComposeFileOpenFailed(configPath.wstring()), !stream);
     const std::string content{std::istreambuf_iterator<char>{stream}, std::istreambuf_iterator<char>{}};
-    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_READ_FAULT), stream.bad(), "Failed to read compose document %ls", configPath.c_str());
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_READ_FAULT), Localization::MessageWslcComposeFileReadFailed(configPath.wstring()), stream.bad());
     const auto* begin = reinterpret_cast<const std::byte*>(content.data());
     const ComposeDocuments documents{
-        .SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION,
-        .WorkingDirectory = std::filesystem::current_path(),
         .ProjectDirectory = configPath.parent_path(),
         .Documents = {{
             .SourcePath = configPath,
@@ -2472,7 +2474,7 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeCo
     // Create a network for the compose session.
     // TODO: open an existing network instead of deleting.
 
-    auto networkCleanup = DeleteNetworkImpl(networkName.c_str());
+    auto networkCleanup = DeleteNetworkImpl(networkName.c_str(), Spec.ProjectName);
     THROW_HR_IF_MSG(
         networkCleanup,
         FAILED(networkCleanup) && networkCleanup != WSLC_E_NETWORK_NOT_FOUND,
@@ -2484,7 +2486,6 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeCo
     const std::array networkLabels{
         WSLCLabel{.Key = compose::label::c_project, .Value = Spec.ProjectName.c_str()},
         WSLCLabel{.Key = compose::label::c_network, .Value = "default"},
-        WSLCLabel{.Key = compose::label::c_managed, .Value = compose::label::c_managedValue},
         WSLCLabel{.Key = compose::label::c_metadataVersion, .Value = compose::label::c_metadataVersionValue},
     };
     networkOptions.Labels = networkLabels.data();
@@ -2497,7 +2498,7 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeCo
             LOG_IF_FAILED(container->Delete(WSLCDeleteFlagsForce));
         }
 
-        LOG_IF_FAILED(DeleteNetworkImpl(networkName.c_str()));
+        LOG_IF_FAILED(DeleteNetworkImpl(networkName.c_str(), Spec.ProjectName));
     });
 
     auto lease = AcquireLease();
@@ -2508,8 +2509,6 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeCo
         launcher.AddLabel(compose::label::c_project, Spec.ProjectName);
         launcher.AddLabel(compose::label::c_service, definition.ServiceName);
         launcher.AddLabel(compose::label::c_containerNumber, "1");
-        launcher.AddLabel(compose::label::c_oneoff, "False");
-        launcher.AddLabel(compose::label::c_managed, compose::label::c_managedValue);
         launcher.AddLabel(compose::label::c_metadataVersion, compose::label::c_metadataVersionValue);
         if (!definition.WorkingDirectory.empty())
         {
@@ -3469,7 +3468,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::DeleteNetworkImpl(LPCSTR Name)
+HRESULT WSLCSession::DeleteNetworkImpl(LPCSTR Name, std::optional<std::string_view> ExpectedComposeProject)
 try
 {
     RETURN_HR_IF_NULL(E_POINTER, Name);
@@ -3485,9 +3484,24 @@ try
     auto it = m_networks.find(name);
     THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), it == m_networks.end());
 
+    if (ExpectedComposeProject.has_value())
+    {
+        const auto& labels = it->second.Labels;
+        const auto hasLabel = [&](const std::string& key, std::string_view expected) {
+            const auto label = labels.find(key);
+            return label != labels.end() && label->second == expected;
+        };
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
+            Localization::MessageWslcComposeNetworkConflict(name),
+            !hasLabel(compose::label::c_project, *ExpectedComposeProject) || !hasLabel(compose::label::c_network, "default") ||
+                !hasLabel(compose::label::c_metadataVersion, compose::label::c_metadataVersionValue));
+    }
+
     try
     {
-        m_runtime.Docker().RemoveNetwork(name);
+        // Compose ownership applies to the validated network ID.
+        m_runtime.Docker().RemoveNetwork(ExpectedComposeProject.has_value() ? it->second.Id : name);
     }
     catch (const DockerHTTPException& e)
     {

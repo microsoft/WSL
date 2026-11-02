@@ -1722,6 +1722,22 @@ std::string wsl::windows::common::wslutil::BuildRegistryAuthHeader(const std::st
     return Base64Encode(authJson.dump());
 }
 
+void wsl::windows::common::wslutil::ValidateName(LPCSTR Name, size_t maxLength)
+{
+    const auto& locale = std::locale::classic();
+    size_t i = 0;
+
+    for (; Name[i] != '\0'; i++)
+    {
+        if (!std::isalnum(Name[i], locale) && Name[i] != '_' && Name[i] != '-' && Name[i] != '.')
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidName(Name));
+        }
+    }
+
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidName(Name), i == 0 || i > maxLength);
+}
+
 std::map<std::string, std::string> wsl::windows::common::wslutil::ParseKeyValuePairs(const KeyValuePair* pairs, ULONG count, LPCSTR reservedKey)
 {
     THROW_HR_IF(E_POINTER, count > 0 && pairs == nullptr);

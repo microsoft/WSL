@@ -2,8 +2,11 @@
 
 #include "precomp.h"
 #include "ComposeNormalizer.h"
-#include "ResourceName.h"
+#include "wslutil.h"
 #include <set>
+
+using wsl::shared::Localization;
+using wsl::windows::common::wslutil::ValidateName;
 
 namespace wsl::windows::service::wslc {
 
@@ -19,8 +22,10 @@ namespace {
             result.erase(result.begin());
         }
 
-        THROW_HR_IF(E_INVALIDARG, result.empty());
-        THROW_HR_IF(E_INVALIDARG, result.size() > WSLC_MAX_COMPOSE_PROJECT_NAME_LENGTH);
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG,
+            Localization::MessageWslcComposeProjectNameInvalid(std::string{name}, WSLC_MAX_COMPOSE_PROJECT_NAME_LENGTH),
+            result.empty() || result.size() > WSLC_MAX_COMPOSE_PROJECT_NAME_LENGTH);
         return result;
     }
 
@@ -28,8 +33,6 @@ namespace {
 
 ComposeSpec ComposeNormalizer::Normalize(const ComposeDocuments& documents, const ComposeProjectSelection& selection)
 {
-    THROW_HR_IF(E_INVALIDARG, documents.SchemaVersion != WSLC_COMPOSE_SCHEMA_VERSION);
-    THROW_HR_IF(E_INVALIDARG, documents.WorkingDirectory.empty());
     THROW_HR_IF(E_INVALIDARG, documents.ProjectDirectory.empty());
     THROW_HR_IF(E_INVALIDARG, documents.Documents.size() != 1);
     ValidateSelection(selection);
@@ -39,6 +42,7 @@ ComposeSpec ComposeNormalizer::Normalize(const ComposeDocuments& documents, cons
     THROW_HR_IF(E_INVALIDARG, document.BaseDirectory.empty());
     THROW_HR_IF(E_INVALIDARG, document.Content.empty());
 
+    // Interpretation consumes the captured snapshot; source paths provide document context.
     // yaml-cpp detects the document encoding from the original bytes and any byte-order mark.
     const std::string content(reinterpret_cast<const char*>(document.Content.data()), document.Content.size());
     auto spec = ComposeSpec::Parse(document.SourcePath, content);
@@ -67,9 +71,11 @@ ComposeSpec ComposeNormalizer::Normalize(const ComposeDocuments& documents, cons
         // Each service name is registered as a network alias, including when its container name is explicit.
         THROW_HR_WITH_USER_ERROR_IF(
             E_INVALIDARG,
-            wsl::shared::Localization::MessageWslcInvalidName(container.ServiceName.c_str()),
-            container.ServiceName.find('\0') != std::string::npos ||
-                std::ranges::all_of(container.ServiceName, [](unsigned char value) { return std::isspace(value); }));
+            Localization::MessageWslcComposeServiceNameInvalid(container.ServiceName),
+            container.ServiceName.empty() || !std::ranges::all_of(container.ServiceName, [](unsigned char value) {
+                return (value >= 'a' && value <= 'z') || (value >= 'A' && value <= 'Z') || (value >= '0' && value <= '9') ||
+                       value == '.' || value == '_' || value == '-';
+            }));
 
         if (container.Name.empty())
         {
@@ -97,25 +103,6 @@ std::string ComposeNormalizer::DefaultNetworkName(std::string_view projectName)
 void ComposeNormalizer::ValidateSelection(const ComposeProjectSelection& selection)
 {
     THROW_HR_IF(E_NOTIMPL, !selection.Profiles.empty() || !selection.Services.empty() || selection.IncludeDependencies);
-}
-
-std::string ComposeNormalizer::ValidateProjectKey(std::string_view projectKey)
-{
-    THROW_HR_IF(E_INVALIDARG, !IsValidProjectKey(projectKey));
-    return std::string{projectKey};
-}
-
-bool ComposeNormalizer::IsValidProjectKey(std::string_view projectKey) noexcept
-{
-    if (projectKey.empty() || projectKey.size() > WSLC_MAX_COMPOSE_PROJECT_NAME_LENGTH ||
-        !std::isalnum(static_cast<unsigned char>(projectKey.front())))
-    {
-        return false;
-    }
-
-    return std::ranges::all_of(projectKey, [](unsigned char value) {
-        return std::isdigit(value) || std::islower(value) || value == '-' || value == '_';
-    });
 }
 
 } // namespace wsl::windows::service::wslc
