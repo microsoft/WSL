@@ -413,7 +413,7 @@ void wsl::windows::common::hcs::ModifyNetworkAdapter(
             TraceLoggingHResult(attemptResult, "result"));
 
         ++retryCount;
-        return attemptResult;
+        return RequestType == ModifyRequestType::Add && attemptResult == HCN_E_ENDPOINT_ALREADY_ATTACHED ? S_OK : attemptResult;
     };
 
     const auto result = Retry && RequestType == ModifyRequestType::Add ? wsl::shared::retry::RetryWithTimeout<HRESULT>(
@@ -422,11 +422,6 @@ void wsl::windows::common::hcs::ModifyNetworkAdapter(
                                                                              wsl::core::networking::AddEndpointRetryTimeout,
                                                                              wsl::core::networking::AddEndpointRetryPredicate)
                                                                        : attempt();
-
-    if (RequestType == ModifyRequestType::Add && result == HCN_E_ENDPOINT_ALREADY_ATTACHED)
-    {
-        return;
-    }
 
     THROW_IF_FAILED(result);
 }

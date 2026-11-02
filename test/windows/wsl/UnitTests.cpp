@@ -7659,7 +7659,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
 #ifdef WSL_DEV_INSTALL_PATH
         const std::filesystem::path toolsPath{WSL_DEV_INSTALL_PATH};
 #else
-        const auto toolsPath = std::filesystem::path{wsl::windows::common::wslutil::GetMsiPackagePath().value()} / L"tools";
+        const auto toolsPath = GetInstalledWslToolsPath();
 #endif
         GUID id{};
         THROW_IF_FAILED(CoCreateGuid(&id));

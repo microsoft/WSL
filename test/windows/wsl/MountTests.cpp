@@ -552,8 +552,7 @@ class MountTests
 #ifdef WSL_DEV_INSTALL_PATH
         const auto kernelPath = std::filesystem::path{WSL_DEV_INSTALL_PATH} / L"kernel";
 #else
-        const auto kernelPath =
-            std::filesystem::path{wsl::windows::common::wslutil::GetMsiPackagePath().value()} / L"tools" / L"kernel";
+        const auto kernelPath = GetInstalledWslToolsPath() / L"kernel";
 #endif
         WslConfigChange config{LxssGenerateTestConfig({.kernel = kernelPath.native()})};
         // Mount before starting the distro so the modules disk will displace this LUN on restore.

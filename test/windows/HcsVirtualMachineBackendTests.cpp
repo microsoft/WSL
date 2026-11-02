@@ -155,7 +155,7 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(std::wstring{L"C:\\images\\modules.img"}, wsl::windows::common::vm::validation::ValidateDiskSource(request));
     }
 
-    TEST_METHOD(PreservesCallerIdentityAndBootInputs)
+    WSL2_TEST_METHOD(PreservesCallerIdentityAndBootInputs)
     {
         SKIP_TEST_ARM64();
         auto request = CreateRunnableRequest();
@@ -208,13 +208,13 @@ class HcsVirtualMachineBackendTests
         backend->Terminate();
     }
 
-    TEST_METHOD(BootsAndTerminates)
+    WSL2_TEST_METHOD(BootsAndTerminates)
     {
         SKIP_TEST_ARM64();
         VerifyBootsAndTerminates(HcsVirtualMachineBackend::Create(CreateRunnableRequest()));
     }
 
-    TEST_METHOD(SignalsTerminationOnlyAfterVmExit)
+    WSL2_TEST_METHOD(SignalsTerminationOnlyAfterVmExit)
     {
         SKIP_TEST_ARM64();
         auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
@@ -235,7 +235,7 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(VmTerminationReason::Shutdown, backend->GetTerminationReason().Reason);
     }
 
-    TEST_METHOD(CompletesTerminationWithoutExitNotification)
+    WSL2_TEST_METHOD(CompletesTerminationWithoutExitNotification)
     {
         SKIP_TEST_ARM64();
         auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
@@ -253,7 +253,7 @@ class HcsVirtualMachineBackendTests
         VERIFY_IS_TRUE(terminationEvent.is_signaled());
     }
 
-    TEST_METHOD(TerminatesBeforeDrainingBackendOperations)
+    WSL2_TEST_METHOD(TerminatesBeforeDrainingBackendOperations)
     {
         SKIP_TEST_ARM64();
         const auto request = CreateRunnableRequest();
@@ -295,7 +295,7 @@ class HcsVirtualMachineBackendTests
         VERIFY_IS_TRUE(backend->GetTerminationEvent().is_signaled());
     }
 
-    TEST_METHOD(DestroysGuestListenersBeforeRebinding)
+    WSL2_TEST_METHOD(DestroysGuestListenersBeforeRebinding)
     {
         SKIP_TEST_ARM64();
         auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
@@ -311,7 +311,7 @@ class HcsVirtualMachineBackendTests
         backend->Terminate();
     }
 
-    TEST_METHOD(TransfersGuestListenerOwnership)
+    WSL2_TEST_METHOD(TransfersGuestListenerOwnership)
     {
         SKIP_TEST_ARM64();
         auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
@@ -330,7 +330,7 @@ class HcsVirtualMachineBackendTests
         const auto replacement = backend->CreateGuestListener({12345});
     }
 
-    TEST_METHOD(CancelsGuestAcceptBeforeDestroyingListener)
+    WSL2_TEST_METHOD(CancelsGuestAcceptBeforeDestroyingListener)
     {
         SKIP_TEST_ARM64();
         auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
@@ -352,7 +352,7 @@ class HcsVirtualMachineBackendTests
         const auto replacement = backend->CreateGuestListener({LX_INIT_UTILITY_VM_INIT_PORT});
     }
 
-    TEST_METHOD(RejectsGuestListenersAfterSpontaneousExit)
+    WSL2_TEST_METHOD(RejectsGuestListenersAfterSpontaneousExit)
     {
         SKIP_TEST_ARM64();
         auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
@@ -390,7 +390,7 @@ class HcsVirtualMachineBackendTests
         VERIFY_IS_TRUE(WI_IsFlagSet(GetFileAttributesW(path.c_str()), FILE_ATTRIBUTE_TEMPORARY));
     }
 
-    TEST_METHOD(AllocatesFirstFreeBootDiskLun)
+    WSL2_TEST_METHOD(AllocatesFirstFreeBootDiskLun)
     {
         SKIP_TEST_ARM64();
         const auto directory = CreateTestDirectory();
@@ -424,7 +424,8 @@ class HcsVirtualMachineBackendTests
         CreateVhd(firstPath);
 
         const auto firstDaclAces = GetDaclAces(firstPath);
-        auto request = CreateRunnableRequest();
+        auto request = CreateRequest();
+        request.Boot.InitrdPath.clear();
         request.Identity.UserToken = wil::shared_handle{GetElevatedTestToken().release()};
         VmBootDiskRequest first;
         first.Key = L"first";
@@ -436,11 +437,12 @@ class HcsVirtualMachineBackendTests
         invalid.GrantHostAccess = true;
         request.BootDisks = {std::move(first), std::move(invalid)};
 
-        VERIFY_ARE_NOT_EQUAL(S_OK, OperationResult([&] { HcsVirtualMachineBackend::Create(request); }));
+        VERIFY_ARE_EQUAL(
+            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] { HcsVirtualMachineBackend::Create(request); }));
         VERIFY_ARE_EQUAL(firstDaclAces, GetDaclAces(firstPath));
     }
 
-    TEST_METHOD(ManagesDiskPlacementsAndLifetime)
+    WSL2_TEST_METHOD(ManagesDiskPlacementsAndLifetime)
     {
         SKIP_TEST_ARM64();
         const auto directory = CreateTestDirectory();
@@ -495,7 +497,7 @@ class HcsVirtualMachineBackendTests
         backend->Terminate();
     }
 
-    TEST_METHOD(KeepsDiskIdsVmScopedAndEnforcesPlacementBounds)
+    WSL2_TEST_METHOD(KeepsDiskIdsVmScopedAndEnforcesPlacementBounds)
     {
         SKIP_TEST_ARM64();
         const auto directory = CreateTestDirectory();
@@ -529,12 +531,12 @@ class HcsVirtualMachineBackendTests
 
     TEST_METHOD(RejectsInvalidIdentity)
     {
-        auto request = CreateRunnableRequest();
+        auto request = CreateRequest();
         request.Identity.VmId = GUID_NULL;
         VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { HcsVirtualMachineBackend::Create(request); }));
     }
 
-    TEST_METHOD(DefersNetworkAdapterCreationUntilVmStarts)
+    WSL2_TEST_METHOD(DefersNetworkAdapterCreationUntilVmStarts)
     {
         SKIP_TEST_ARM64();
         auto request = CreateRunnableRequest();
@@ -545,7 +547,7 @@ class HcsVirtualMachineBackendTests
         backend->Terminate();
     }
 
-    TEST_METHOD(RejectsDuplicateNetworkAdapterRequests)
+    WSL2_TEST_METHOD(RejectsDuplicateNetworkAdapterRequests)
     {
         SKIP_TEST_ARM64();
         auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
@@ -567,7 +569,7 @@ class HcsVirtualMachineBackendTests
         backend->Terminate();
     }
 
-    TEST_METHOD(KeepsOtherVmDeviceHostsAlive)
+    WSL2_TEST_METHOD(KeepsOtherVmDeviceHostsAlive)
     {
         SKIP_TEST_ARM64();
         const auto directory = CreateTestDirectory();
@@ -592,7 +594,7 @@ class HcsVirtualMachineBackendTests
         second->Terminate();
     }
 
-    TEST_METHOD(NotifiesTerminationCallbacksWithoutHoldingBackendLock)
+    WSL2_TEST_METHOD(NotifiesTerminationCallbacksWithoutHoldingBackendLock)
     {
         SKIP_TEST_ARM64();
         auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
@@ -626,7 +628,7 @@ class HcsVirtualMachineBackendTests
         VERIFY_IS_TRUE(IsEqualGUID(lateBackend->GetDescription().Identity.VmId, lateCallbackVmId));
     }
 
-    TEST_METHOD(RejectsUnsupportedResourceOperations)
+    WSL2_TEST_METHOD(RejectsUnsupportedResourceOperations)
     {
         SKIP_TEST_ARM64();
         auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
@@ -663,7 +665,7 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), OperationResult([&] { backend->GetGuestDeviceManager(); }));
     }
 
-    TEST_METHOD(SharesHostDirectoriesPerElevationLevel)
+    WSL2_TEST_METHOD(SharesHostDirectoriesPerElevationLevel)
     {
         SKIP_TEST_ARM64();
         const auto directory = CreateTestDirectory();
