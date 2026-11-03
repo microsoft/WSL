@@ -357,7 +357,7 @@ private:
 };
 
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLCContainer
-    : public common::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCContainer, IWSLCCompatContainer, IFastRundown, ISupportErrorInfo>,
+    : public common::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCContainer, Microsoft::WRL::ChainInterfaces<IWSLCCompatContainer2, IWSLCCompatContainer>, IFastRundown, ISupportErrorInfo>,
       public COMImplClass<WSLCContainerImpl, std::weak_ptr<WSLCContainerImpl>>
 {
 
@@ -395,6 +395,10 @@ public:
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLCCompatProcess** Process) override;
     IFACEMETHOD(Exec)(_In_ const WSLCCompatProcessOptions* Options, _Out_ IWSLCCompatProcess** Process) override;
     IFACEMETHOD(Inspect)(_Out_ LPSTR* Output) override;
+
+    // IWSLCCompatContainer2.
+    IFACEMETHOD(ConnectNetwork)(_In_ const WSLCCompatNetworkConnection* Network) override;
+    IFACEMETHOD(DisconnectNetwork)(_In_ LPCSTR NetworkNameOrId) override;
 
     IFACEMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);
 

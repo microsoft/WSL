@@ -212,6 +212,10 @@ namespace Microsoft.WSL.Containers
         void Stop(Signal signal, Windows.Foundation.TimeSpan timeout);
         void Delete(DeleteContainerOption flags);
 
+        // Network may be referenced by name, full ID, or unique ID prefix.
+        void ConnectNetwork(ContainerNetwork network);
+        void DisconnectNetwork(String nameOrId);
+
         Process CreateProcess(ProcessSettings newProcessSettings);
 
         // JSON response schema at: https://docs.docker.com/reference/api/engine/version/v1.53/#tag/Container/operation/ContainerInspect
