@@ -11,7 +11,6 @@ namespace wsl::windows::service::wslc {
 struct ComposeDocument
 {
     std::filesystem::path SourcePath;
-    std::filesystem::path BaseDirectory;
     // Original encoded bytes define the snapshot interpreted by parsing and normalization.
     std::vector<std::byte> Content;
 };
@@ -24,20 +23,12 @@ struct ComposeDocuments
     std::vector<ComposeDocument> Documents;
 };
 
-struct ComposeProjectSelection
-{
-    std::vector<std::string> Profiles;
-    std::vector<std::string> Services;
-    bool IncludeDependencies{};
-};
-
 struct ComposeNormalizer
 {
-    static ComposeSpec Normalize(const ComposeDocuments& documents, const ComposeProjectSelection& selection);
+    static ComposeSpec Normalize(const ComposeDocuments& documents);
     static std::string DefaultNetworkName(std::string_view projectName);
     static bool IsValidProjectKey(std::string_view projectKey) noexcept;
     static std::string ValidateProjectKey(std::string_view projectKey);
-    static void ValidateSelection(const ComposeProjectSelection& selection);
 };
 
 } // namespace wsl::windows::service::wslc

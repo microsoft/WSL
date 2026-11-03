@@ -28,21 +28,29 @@ mutation, and final observation.
    Callback delivery can start before the call returns.
 3. Call `IComposeOperation::GetCompletionEvent` and own the returned handle with
    normal handle RAII. It is a `SYNCHRONIZE`-only duplicate of a manual-reset event.
-4. Wait for completion. To request cancellation, call `Cancel` and continue
-   waiting for the same completion event.
+4. Obtain the session's process handle with `IWSLCSession::GetProcessHandle`,
+   which includes `SYNCHRONIZE` access. Wait for either completion or process
+   exit. To request cancellation, call `Cancel` and continue waiting on both
+   handles.
 5. After completion, call `GetResult`. Check both the method's HRESULT and
    `WSLCComposeOperationResult::Result`; successful retrieval can return a failed
-   or cancelled operation. Free the returned `AffectedContainers` allocation
-   with `CoTaskMemFree`, including on repeated result retrieval.
+   or cancelled operation. `ErrorMessage` carries an optional localized failure
+   description. Free both `ErrorMessage` and `AffectedContainers` with
+   `CoTaskMemFree`, including on repeated result retrieval.
 
 `BeginComposeOperation` reports invalid request envelopes synchronously.
-Document interpretation, unsupported selections, resource discovery, and
-execution failures are reported through the operation result.
+Document interpretation, resource discovery, and execution failures are
+reported through the operation result.
+
+The duplicated completion event can remain unsignaled after the session process
+exits. Process exit or a failed result-retrieval RPC means the execution outcome
+is unknown; it does not establish cancellation or rollback. Callers must not
+wait indefinitely on completion alone or automatically retry the operation.
 
 `GetResult` is nonblocking and returns
 `HRESULT_FROM_WIN32(ERROR_IO_INCOMPLETE)` before completion. After completion,
 each successful retrieval copies the same stored result into caller-owned
-storage, allocating a fresh container array when the result contains containers.
+storage, allocating fresh message and container storage when present.
 The completion event signals after result publication and callback teardown.
 
 The service worker retains both the native operation and its owning session through execution.
@@ -56,10 +64,7 @@ it does not reopen the Compose source file.
 
 `SourcePath` supplies diagnostic context, and its parent directory resolves
 relative bind mounts. Callers should supply absolute source paths so resolution
-is independent of the session process's working directory. `BaseDirectory` is
-required and copied as document context; the parser uses `SourcePath` for relative
-bind resolution. `WorkingDirectory` is required and checked for nonemptiness,
-but is not used for path resolution.
+is independent of the session process's working directory.
 
 `ProjectDirectory` supplies the default project name. `ExplicitProjectName`
 overrides that default. Interpretation normalizes the chosen name and validates
@@ -69,9 +74,7 @@ A project key is the exact normalized project name within the owning WSLC
 session. Key-backed requests validate that name without normalizing it again.
 Different session processes have independent project namespaces.
 
-The supported document input contains exactly one document. Selection requires
-empty `Profiles` and `Services` arrays and `IncludeDependencies = FALSE`;
-unsupported selections fail with `E_NOTIMPL`.
+The supported document input contains exactly one document.
 
 ## Actions and execution
 
@@ -87,8 +90,9 @@ unsupported selections fail with `E_NOTIMPL`.
 `Stop` requires `WSLCComposeActionOptionsTypeStop` and a timeout no greater than
 `LONG_MAX`. All other actions require `WSLCComposeActionOptionsTypeNone`.
 `Start`, `Attach`, and `Stop` fail with `ERROR_NOT_FOUND` when no containers match.
-Stop attempts the remaining containers after a container stop failure and returns
-the first such failure; cancellation or a callback failure can interrupt the loop.
+Stop attempts the remaining containers after a container stop failure and retains
+the first such failure and its error details; cancellation or a callback failure
+can interrupt the loop.
 
 Execution holds a per-project lock from discovery through final observation.
 Lock acquisition polls for cancellation. Interpretation happens before acquiring
@@ -148,12 +152,13 @@ resource operation completed or measure image-download bytes.
 
 A callback failure during active work aborts execution with that HRESULT.
 Terminal status delivery is best effort; its failure is logged and preserves
-the execution outcome. The native completion event signals after callback
-teardown and result publication.
+the execution outcome. Best effort applies to returned errors, not callback
+duration. A stalled resource callback holds the project lock and delays
+cancellation checkpoints; a stalled terminal callback delays completion. The
+native completion event signals after callback teardown and result publication.
 
-The diagnostic event and `OnStreamsReady` contracts are declared, but this
-engine emits status and resource-progress events only. `Attach` returns a
-container snapshot for caller-side attachment. Stream delivery is not implemented.
+The engine emits status and resource-progress events. `Attach` returns a
+container snapshot for caller-side attachment.
 
 ## Cancellation and partial state
 
@@ -177,11 +182,16 @@ execution. It is not a mutation journal or an inventory of partial changes after
 failure or cancellation. The project key can also be empty if interpretation
 failed. Callers must rediscover resources before making recovery decisions.
 
+`ErrorMessage` preserves the worker's localized failure description across the
+asynchronous boundary, including when no progress callback is supplied or a
+terminal callback fails. It is independent of the caller thread's COM error
+information.
+
 ## Regression coverage
 
 `test\windows\wslc\WSLCComposeTests.cpp` covers request validation, discovery,
-resource ordering, cancellation checkpoints, late cancellation, and partial
-state.
+resource ordering, error details, session-process exit, project concurrency,
+cancellation checkpoints, late cancellation, and partial state.
 `WSLCE2EComposeLifecycleTests.cpp` covers the CLI lifecycle.
 
 Build the full Windows project before running the focused suite:

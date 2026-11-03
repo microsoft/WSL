@@ -342,7 +342,7 @@ try
 {
     RETURN_HR_IF_NULL(E_POINTER, ProcessHandle);
 
-    *ProcessHandle = wslutil::DuplicateHandle(GetCurrentProcess(), PROCESS_SET_QUOTA | PROCESS_TERMINATE);
+    *ProcessHandle = wslutil::DuplicateHandle(GetCurrentProcess(), PROCESS_SET_QUOTA | PROCESS_TERMINATE | SYNCHRONIZE);
     return S_OK;
 }
 CATCH_RETURN();
@@ -2443,11 +2443,10 @@ try
         .ProjectDirectory = configPath.parent_path(),
         .Documents = {{
             .SourcePath = configPath,
-            .BaseDirectory = configPath.parent_path(),
             .Content = std::vector<std::byte>{begin, begin + content.size()},
         }},
     };
-    const auto spec = ComposeNormalizer::Normalize(documents, {});
+    const auto spec = ComposeNormalizer::Normalize(documents);
 
     // Cached sessions retain their captured definitions; another file for the same project would share their default network.
     THROW_HR_WITH_USER_ERROR_IF(
@@ -2650,7 +2649,7 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeCo
     }
     THROW_IF_FAILED(CreateNetworkImpl(&networkOptions));
 
-    // Cancellation leaves completed resources in place; they remain discoverable through their Compose labels.
+    // Docker Compose can leave partial resources after interruption; labels support rediscovery on the next invocation.
     auto cleanup = wil::scope_exit([&] {
         if (cancellationObserved)
         {

@@ -615,7 +615,6 @@ typedef struct _WSLCComposeDocument
     // SourcePath supplies diagnostic context and its parent resolves relative bind mounts.
     // Content contains the original document bytes, including any encoding marker.
     [string] LPCWSTR SourcePath;
-    [string] LPCWSTR BaseDirectory;
     [unique, size_is(ContentSize)] const byte* Content;
     ULONG ContentSize;
 } WSLCComposeDocument;
@@ -623,8 +622,6 @@ typedef struct _WSLCComposeDocument
 typedef struct _WSLCComposeDocuments
 {
     ULONG SchemaVersion;
-    // Required nonempty caller context; the parser resolves relative bind mounts through SourcePath.
-    [string] LPCWSTR WorkingDirectory;
     // Supplies the default project name when ExplicitProjectName is absent.
     [string] LPCWSTR ProjectDirectory;
     [unique, string] LPCSTR ExplicitProjectName;
@@ -648,14 +645,6 @@ typedef struct _WSLCComposeProject
         [default];
     } Value;
 } WSLCComposeProject;
-
-typedef struct _WSLCComposeProjectSelection
-{
-    // Supported requests have empty Profiles and Services arrays and IncludeDependencies = FALSE.
-    WSLCStringArray Profiles;
-    WSLCStringArray Services;
-    BOOL IncludeDependencies;
-} WSLCComposeProjectSelection;
 
 typedef enum _WSLCComposeActionOptionsType
 {
@@ -689,7 +678,6 @@ typedef struct _WSLCComposeOperationRequest
     ULONG SchemaVersion;
     WSLCComposeAction Action;
     WSLCComposeProject Project;
-    WSLCComposeProjectSelection Selection;
     WSLCComposeActionOptions ActionOptions;
 } WSLCComposeOperationRequest;
 
@@ -697,7 +685,6 @@ typedef enum _WSLCComposeProgressEventKind
 {
     WSLCComposeProgressEventKindStatus,
     WSLCComposeProgressEventKindProgress,
-    WSLCComposeProgressEventKindDiagnostic,
 } WSLCComposeProgressEventKind;
 
 typedef enum _WSLCComposeStatus
@@ -710,17 +697,9 @@ typedef enum _WSLCComposeStatus
     WSLCComposeStatusCancelled,
 } WSLCComposeStatus;
 
-typedef enum _WSLCComposeDiagnosticSeverity
-{
-    WSLCComposeDiagnosticSeverityInfo,
-    WSLCComposeDiagnosticSeverityWarning,
-    WSLCComposeDiagnosticSeverityError,
-} WSLCComposeDiagnosticSeverity;
-
 typedef struct _WSLCComposeStatusEvent
 {
     WSLCComposeStatus Status;
-    [unique, string] LPCSTR ResourceKey;
 } WSLCComposeStatusEvent;
 
 typedef struct _WSLCComposeResourceProgressEvent
@@ -731,17 +710,6 @@ typedef struct _WSLCComposeResourceProgressEvent
     ULONGLONG Total;
     [unique, string] LPCSTR Unit;
 } WSLCComposeResourceProgressEvent;
-
-typedef struct _WSLCComposeDiagnosticEvent
-{
-    WSLCComposeDiagnosticSeverity Severity;
-    [string] LPCSTR Code;
-    WSLCStringArray Arguments;
-    [unique, string] LPCWSTR PropertyPath;
-    [unique, string] LPCWSTR SourcePath;
-    ULONG Line;
-    ULONG Column;
-} WSLCComposeDiagnosticEvent;
 
 typedef struct _WSLCComposeProgressEvent
 {
@@ -756,19 +724,9 @@ typedef struct _WSLCComposeProgressEvent
         WSLCComposeStatusEvent Status;
         [case(WSLCComposeProgressEventKindProgress)]
         WSLCComposeResourceProgressEvent Progress;
-        [case(WSLCComposeProgressEventKindDiagnostic)]
-        WSLCComposeDiagnosticEvent Diagnostic;
         [default];
     } Value;
 } WSLCComposeProgressEvent;
-
-typedef struct _WSLCComposeStreams
-{
-    BOOL Tty;
-    WSLCHandle Stdin;
-    WSLCHandle Stdout;
-    WSLCHandle Stderr;
-} WSLCComposeStreams;
 
 [
     uuid(308809E7-2EB6-4A48-99D9-C959054FDDA9),
@@ -781,8 +739,6 @@ interface IComposeProgressCallback : IUnknown
     // Event data is borrowed for this call. Return promptly; resource callbacks can hold the project lock.
     // A failing HRESULT aborts active work; failures delivering terminal status are logged.
     HRESULT OnProgress([in] const WSLCComposeProgressEvent* Event);
-    // Reserved for stream delivery; Attach returns container identities through the operation result.
-    HRESULT OnStreamsReady([in] const WSLCComposeStreams* Streams);
 }
 
 typedef enum _WSLCComposeOperationStatus
@@ -799,6 +755,8 @@ typedef struct _WSLCComposeOperationResult
     ULONG SchemaVersion;
     WSLCComposeOperationStatus Status;
     HRESULT Result;
+    // Optional localized failure description captured on the worker.
+    [unique, string] LPWSTR ErrorMessage;
     WSLCComposeProjectKey ProjectKey;
     // Observed containers from successful execution. Failed or cancelled operations require resource rediscovery.
     [unique, size_is(AffectedContainersCount)] WSLCContainerEntry* AffectedContainers;
@@ -828,13 +786,14 @@ interface IComposeOperation : IUnknown
 {
     // Returns a caller-owned, SYNCHRONIZE-only duplicate of the manual-reset completion event.
     // The event signals after the result is finalized and callback delivery has finished.
+    // Also wait on the session process handle; process exit can leave this event unsignaled.
     HRESULT GetCompletionEvent([out, system_handle(sh_event)] HANDLE* Event);
     // Requests idempotent cooperative cancellation and returns without waiting for completion.
     // Checkpoints observe cancellation; completed mutations remain visible and late requests can leave the operation successful.
     HRESULT Cancel();
     // Returns HRESULT_FROM_WIN32(ERROR_IO_INCOMPLETE) until completion, then S_OK on successful retrieval.
-    // Result->Result carries the operation HRESULT. Each call allocates a fresh AffectedContainers array
-    // that the caller frees with CoTaskMemFree.
+    // Result->Result carries the operation HRESULT. Each call allocates fresh ErrorMessage and
+    // AffectedContainers storage that the caller frees with CoTaskMemFree.
     HRESULT GetResult([out] WSLCComposeOperationResult* Result);
 }
 
@@ -1042,10 +1001,10 @@ interface IWSLCSession : IUnknown
     HRESULT MapVmPort([in] int Family, [in] unsigned short WindowsPort, [in] unsigned short LinuxPort);
     HRESULT UnmapVmPort([in] int Family, [in] unsigned short WindowsPort, [in] unsigned short LinuxPort);
 
-    // Session initialization - called by SYSTEM service after launching per-user process.
-    // Returns a handle to this COM server process (used to add to job object).
+    // Returns a caller-owned process handle for job assignment and session-lifetime waits (SYNCHRONIZE).
     HRESULT GetProcessHandle([out, system_handle(sh_process)] HANDLE* ProcessHandle);
 
+    // Session initialization - called by SYSTEM service after launching per-user process.
     // Initializes the session with a VM factory. VMs are created through the factory.
     HRESULT Initialize(
         [in] const WSLCSessionInitSettings* Settings,

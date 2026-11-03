@@ -3,6 +3,7 @@
 #pragma once
 
 #include "ComposeSpec.h"
+#include "ExecutionContext.h"
 #include "wslc.h"
 #include <functional>
 #include <memory>
@@ -15,7 +16,6 @@ class WSLCSession;
 
 struct ComposeExecutionResult
 {
-    std::string ProjectKey;
     std::vector<WSLCContainerEntry> AffectedContainers;
 };
 
@@ -35,7 +35,8 @@ public:
         std::string_view projectKey,
         const WSLCComposeActionOptions& actionOptions,
         HANDLE cancelEvent,
-        const ComposeProgressReporter& progressReporter);
+        const ComposeProgressReporter& progressReporter,
+        std::optional<wsl::windows::common::Error>& primaryError);
 
 private:
     struct ProjectLock
@@ -52,7 +53,12 @@ private:
         HANDLE cancelEvent,
         const ComposeProgressReporter& progressReporter);
     static void Start(const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter);
-    static void Stop(const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers, ULONG timeout, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter);
+    static void Stop(
+        const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers,
+        ULONG timeout,
+        HANDLE cancelEvent,
+        const ComposeProgressReporter& progressReporter,
+        std::optional<wsl::windows::common::Error>& primaryError);
     static void CheckCancelled(HANDLE cancelEvent);
 
     WSLCSession& m_session;

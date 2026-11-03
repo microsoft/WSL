@@ -31,15 +31,13 @@ namespace {
 
 } // namespace
 
-ComposeSpec ComposeNormalizer::Normalize(const ComposeDocuments& documents, const ComposeProjectSelection& selection)
+ComposeSpec ComposeNormalizer::Normalize(const ComposeDocuments& documents)
 {
     THROW_HR_IF(E_INVALIDARG, documents.ProjectDirectory.empty());
     THROW_HR_IF(E_INVALIDARG, documents.Documents.size() != 1);
-    ValidateSelection(selection);
 
     const auto& document = documents.Documents.front();
     THROW_HR_IF(E_INVALIDARG, document.SourcePath.empty());
-    THROW_HR_IF(E_INVALIDARG, document.BaseDirectory.empty());
     THROW_HR_IF(E_INVALIDARG, document.Content.empty());
 
     // Interpretation consumes the captured snapshot; source paths provide document context.
@@ -98,11 +96,6 @@ ComposeSpec ComposeNormalizer::Normalize(const ComposeDocuments& documents, cons
 std::string ComposeNormalizer::DefaultNetworkName(std::string_view projectName)
 {
     return std::format("{}_default", projectName);
-}
-
-void ComposeNormalizer::ValidateSelection(const ComposeProjectSelection& selection)
-{
-    THROW_HR_IF(E_NOTIMPL, !selection.Profiles.empty() || !selection.Services.empty() || selection.IncludeDependencies);
 }
 
 std::string ComposeNormalizer::ValidateProjectKey(std::string_view projectKey)

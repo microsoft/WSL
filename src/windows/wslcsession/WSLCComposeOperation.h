@@ -3,6 +3,7 @@
 #pragma once
 
 #include "ComposeNormalizer.h"
+#include "ExecutionContext.h"
 #include "wslc.h"
 #include <mutex>
 #include <thread>
@@ -34,14 +35,14 @@ private:
         WSLCComposeProjectType ProjectType{};
         std::optional<ComposeDocuments> Documents;
         std::string ProjectKey;
-        ComposeProjectSelection Selection;
         WSLCComposeActionOptions ActionOptions{};
     };
 
     static Request CaptureRequest(const WSLCComposeOperationRequest& request);
-    static std::vector<std::string> CaptureStrings(const WSLCStringArray& values);
     void Run() noexcept;
-    ComposeExecutionResult RunOperation(IComposeProgressCallback* progressCallback, std::string& projectKey);
+    void RunInitialized();
+    ComposeExecutionResult RunOperation(
+        IComposeProgressCallback* progressCallback, std::string& projectKey, std::optional<wsl::windows::common::Error>& primaryError);
     void CheckCancelled() const;
     void ReportStatus(IComposeProgressCallback* progressCallback, WSLCComposeStatus status);
     void ReportStatusNoThrow(IComposeProgressCallback* progressCallback, WSLCComposeStatus status) noexcept;
@@ -66,6 +67,7 @@ private:
 
     std::mutex m_resultLock;
     HRESULT m_resultCode{E_PENDING};
+    std::optional<std::wstring> m_errorMessage;
     WSLCComposeOperationStatus m_status{WSLCComposeOperationStatusFailed};
     std::string m_projectKey;
     std::vector<WSLCContainerEntry> m_affectedContainers;

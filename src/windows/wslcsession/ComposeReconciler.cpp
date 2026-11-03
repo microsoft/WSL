@@ -16,7 +16,8 @@ ComposeExecutionResult ComposeReconciler::Execute(
     std::string_view projectKey,
     const WSLCComposeActionOptions& actionOptions,
     HANDLE cancelEvent,
-    const ComposeProgressReporter& progressReporter)
+    const ComposeProgressReporter& progressReporter,
+    std::optional<wsl::windows::common::Error>& primaryError)
 {
     CheckCancelled(cancelEvent);
     auto projectLockEntry = ResolveProjectLock(projectKey);
@@ -58,7 +59,7 @@ ComposeExecutionResult ComposeReconciler::Execute(
 
     case WSLCComposeActionStop:
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), containers.empty());
-        Stop(containers, actionOptions.Value.Stop.TimeoutSeconds, cancelEvent, progressReporter);
+        Stop(containers, actionOptions.Value.Stop.TimeoutSeconds, cancelEvent, progressReporter, primaryError);
         break;
 
     default:
@@ -66,7 +67,6 @@ ComposeExecutionResult ComposeReconciler::Execute(
     }
 
     return {
-        .ProjectKey = std::string{projectKey},
         .AffectedContainers = ObserveContainers(containers),
     };
 }
@@ -160,11 +160,17 @@ void ComposeReconciler::Start(const std::vector<Microsoft::WRL::ComPtr<IWSLCCont
         }
 
         const HRESULT result = container->Start(WSLCContainerStartFlagsNone, nullptr, nullptr);
+        // Docker Compose start accepts containers that are already running.
         THROW_IF_FAILED_EXCEPT(result, WSLC_E_CONTAINER_IS_RUNNING);
     }
 }
 
-void ComposeReconciler::Stop(const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers, ULONG timeout, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter)
+void ComposeReconciler::Stop(
+    const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers,
+    ULONG timeout,
+    HANDLE cancelEvent,
+    const ComposeProgressReporter& progressReporter,
+    std::optional<wsl::windows::common::Error>& primaryError)
 {
     THROW_HR_IF(E_INVALIDARG, timeout > LONG_MAX);
 
@@ -183,9 +189,16 @@ void ComposeReconciler::Stop(const std::vector<Microsoft::WRL::ComPtr<IWSLCConta
         }
 
         const HRESULT result = container->Stop(WSLCSignalSIGTERM, static_cast<LONG>(timeout));
+        // Docker Compose stop accepts containers that are already stopped.
         if (FAILED(result) && result != WSLC_E_CONTAINER_NOT_RUNNING && SUCCEEDED(firstFailure))
         {
             firstFailure = result;
+            const auto* context = wsl::windows::common::ExecutionContext::Current();
+            if (context != nullptr && context->ReportedError().has_value() && context->ReportedError()->Code == result)
+            {
+                // Later stops can update the thread's error context; retain the first failure's details.
+                LOG_IF_FAILED(wil::ResultFromException([&]() { primaryError = context->ReportedError(); }));
+            }
         }
     }
 

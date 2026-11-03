@@ -31,6 +31,7 @@ target_link_libraries(wsltests
                       ${HCS_LINK_LIBRARIES}
                       yaml-cpp
                       ${SERVICE_LINK_LIBRARIES}
+                      OneCore.lib
                       VirtDisk.lib
                       Wer.lib
                       Dbghelp.lib
