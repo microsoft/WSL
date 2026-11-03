@@ -17,6 +17,7 @@ WSLCComposeOperation::~WSLCComposeOperation()
     {
         if (m_worker.get_id() == std::this_thread::get_id())
         {
+            // Releasing the worker's final reference can run destruction on the worker itself.
             m_worker.detach();
         }
         else
@@ -38,11 +39,13 @@ try
     RETURN_HR_IF_NULL(E_INVALIDARG, session);
     RETURN_HR_IF_NULL(E_POINTER, request);
 
+    // The worker owns its input snapshot after the incoming COM call releases its request buffers.
     m_request = CaptureRequest(*request);
     m_session = session;
     m_sessionLifetime = session;
     if (progressCallback != nullptr)
     {
+        // The global interface table marshals the callback into the worker's COM apartment.
         m_git = session->m_git;
         THROW_IF_FAILED(m_git->RegisterInterfaceInGlobal(progressCallback.Get(), __uuidof(IComposeProgressCallback), &m_progressCallbackGitCookie));
     }
@@ -50,6 +53,7 @@ try
     m_cancelEvent.create(wil::EventOptions::ManualReset);
     m_completionEvent.create(wil::EventOptions::ManualReset);
 
+    // The worker holds a reference through Run even if the client releases its operation interface.
     AddRef();
     try
     {
@@ -211,6 +215,7 @@ std::vector<std::string> WSLCComposeOperation::CaptureStrings(const WSLCStringAr
 void WSLCComposeOperation::Run() noexcept
 {
     const auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
+    // Declare completion cleanup first so result publication and callback teardown finish before waiters are released.
     auto signalCompletion = wil::scope_exit([&]() { m_completionEvent.SetEvent(); });
 
     wil::com_ptr<IComposeProgressCallback> progressCallback;
@@ -233,6 +238,7 @@ void WSLCComposeOperation::Run() noexcept
 
         executionResult = RunOperation(progressCallback.get(), projectKey);
     });
+    // The execution outcome determines cancellation; a request after the final checkpoint can leave successful work.
     const bool cancelled = result == HRESULT_FROM_WIN32(ERROR_CANCELLED);
 
     if (FAILED(result))
@@ -316,6 +322,7 @@ void WSLCComposeOperation::ReportStatus(IComposeProgressCallback* progressCallba
 
 void WSLCComposeOperation::ReportStatusNoThrow(IComposeProgressCallback* progressCallback, WSLCComposeStatus status) noexcept
 {
+    // Terminal notification failures preserve the execution outcome and allow completion to be signaled.
     LOG_IF_FAILED(wil::ResultFromException([&]() { ReportStatus(progressCallback, status); }));
 }
 

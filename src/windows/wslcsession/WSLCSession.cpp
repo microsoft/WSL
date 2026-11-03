@@ -2514,6 +2514,7 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::DiscoverCompose
 
     std::lock_guard containersLock{m_containersLock};
     std::erase_if(m_containers, [](const auto& entry) { return entry.second->State() == WslcContainerStateDeleted; });
+    // Every project-label match must have supported WSLC metadata and an unambiguous resource identity.
     for (const auto& dockerContainer : dockerContainers)
     {
         const auto metadataVersion = dockerContainer.Labels.find(compose::label::c_metadataVersion);
@@ -2559,6 +2560,7 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::DiscoverCompose
         composeContainers.emplace_back(service->second, parsedContainerNumber, std::move(container));
     }
 
+    // Resource identity gives lifecycle execution and results a stable order across Docker enumerations.
     const auto compareResourceIdentity = [](const ComposeContainer& left, const ComposeContainer& right) {
         return std::tie(left.Service, left.ContainerNumber) < std::tie(right.Service, right.ContainerNumber);
     };
@@ -2589,6 +2591,7 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeCo
 std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeContainers(
     const ComposeSpec& spec, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter)
 {
+    // Record cancellation at checkpoints so cleanup follows the operation's failure cause.
     bool cancellationObserved = false;
     const auto checkCancelled = [&]() {
         THROW_HR_IF_NULL(E_POINTER, cancelEvent);
@@ -4362,7 +4365,7 @@ MultiHandleWait WSLCSession::CreateIOContext(HANDLE CancelHandle)
             m_sessionTerminatingEvent.get(), [this]() { THROW_HR_MSG(E_ABORT, "Session %lu is terminating", m_id); }),
         io::MultiHandleWait::NeedNotComplete);
 
-    // Cancel with E_ABORT if the client process exits.
+    // Monitor caller exit for incoming COM requests. Service workers have no incoming caller context.
     auto callingProcess = wslutil::OpenCallingProcess(SYNCHRONIZE);
     if (callingProcess)
     {

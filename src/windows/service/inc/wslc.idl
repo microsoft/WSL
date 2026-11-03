@@ -592,6 +592,8 @@ interface IWSLCContainer : IUnknown
     HRESULT Restart([in] WSLCSignal Signal, [in] LONG TimeoutSeconds, [in, unique] IWarningCallback* WarningCallback);
 }
 
+// Transient Compose operation API within one WSLC session.
+// See doc\docs\technical-documentation\wslc-compose-operations.md for the lifecycle and supported behavior.
 typedef enum _WSLCComposeAction
 {
     WSLCComposeActionValidate,
@@ -610,6 +612,8 @@ typedef enum _WSLCComposeProjectType
 
 typedef struct _WSLCComposeDocument
 {
+    // SourcePath supplies diagnostic context and its parent resolves relative bind mounts.
+    // Content contains the original document bytes, including any encoding marker.
     [string] LPCWSTR SourcePath;
     [string] LPCWSTR BaseDirectory;
     [unique, size_is(ContentSize)] const byte* Content;
@@ -619,7 +623,9 @@ typedef struct _WSLCComposeDocument
 typedef struct _WSLCComposeDocuments
 {
     ULONG SchemaVersion;
+    // Required nonempty caller context; the parser resolves relative bind mounts through SourcePath.
     [string] LPCWSTR WorkingDirectory;
+    // Supplies the default project name when ExplicitProjectName is absent.
     [string] LPCWSTR ProjectDirectory;
     [unique, string] LPCSTR ExplicitProjectName;
     [unique, size_is(DocumentCount)] const WSLCComposeDocument* Documents;
@@ -628,6 +634,8 @@ typedef struct _WSLCComposeDocuments
 
 typedef struct _WSLCComposeProject
 {
+    // Documents supports every action; ProjectKey supports Start, Attach, and Stop.
+    // ProjectKey is the exact normalized project name within the owning WSLC session.
     WSLCComposeProjectType Type;
 
     [switch_type(WSLCComposeProjectType), switch_is(Type)]
@@ -643,6 +651,7 @@ typedef struct _WSLCComposeProject
 
 typedef struct _WSLCComposeProjectSelection
 {
+    // Supported requests have empty Profiles and Services arrays and IncludeDependencies = FALSE.
     WSLCStringArray Profiles;
     WSLCStringArray Services;
     BOOL IncludeDependencies;
@@ -661,6 +670,7 @@ typedef struct _WSLCComposeStopOptions
 
 typedef struct _WSLCComposeActionOptions
 {
+    // Stop requires the Stop variant; every other action requires None.
     WSLCComposeActionOptionsType Type;
 
     [switch_type(WSLCComposeActionOptionsType), switch_is(Type)]
@@ -767,7 +777,11 @@ typedef struct _WSLCComposeStreams
 ]
 interface IComposeProgressCallback : IUnknown
 {
+    // Called synchronously on the operation worker, with sequence numbers starting at one.
+    // Event data is borrowed for this call. Return promptly; resource callbacks can hold the project lock.
+    // A failing HRESULT aborts active work; failures delivering terminal status are logged.
     HRESULT OnProgress([in] const WSLCComposeProgressEvent* Event);
+    // Reserved for stream delivery; Attach returns container identities through the operation result.
     HRESULT OnStreamsReady([in] const WSLCComposeStreams* Streams);
 }
 
@@ -786,6 +800,7 @@ typedef struct _WSLCComposeOperationResult
     WSLCComposeOperationStatus Status;
     HRESULT Result;
     WSLCComposeProjectKey ProjectKey;
+    // Observed containers from successful execution. Failed or cancelled operations require resource rediscovery.
     [unique, size_is(AffectedContainersCount)] WSLCContainerEntry* AffectedContainers;
     ULONG AffectedContainersCount;
 } WSLCComposeOperationResult;
@@ -811,8 +826,15 @@ interface IWSLCComposeSession : IUnknown
 ]
 interface IComposeOperation : IUnknown
 {
+    // Returns a caller-owned, SYNCHRONIZE-only duplicate of the manual-reset completion event.
+    // The event signals after the result is finalized and callback delivery has finished.
     HRESULT GetCompletionEvent([out, system_handle(sh_event)] HANDLE* Event);
+    // Requests idempotent cooperative cancellation and returns without waiting for completion.
+    // Checkpoints observe cancellation; completed mutations remain visible and late requests can leave the operation successful.
     HRESULT Cancel();
+    // Returns HRESULT_FROM_WIN32(ERROR_IO_INCOMPLETE) until completion, then S_OK on successful retrieval.
+    // Result->Result carries the operation HRESULT. Each call allocates a fresh AffectedContainers array
+    // that the caller frees with CoTaskMemFree.
     HRESULT GetResult([out] WSLCComposeOperationResult* Result);
 }
 
@@ -1067,6 +1089,10 @@ interface IWSLCSession : IUnknown
 
     HRESULT CreateComposeSession([in] LPCWSTR Path, [out] IWSLCComposeSession** ComposeSession);
 
+    // Captures request buffers before returning; the caller can then release them.
+    // Envelope errors fail this call. Interpretation and execution errors are retrieved through GetResult.
+    // The worker retains the operation and session through completion. Cancellation is requested through Cancel.
+    // ProgressCallback is optional, and callbacks can begin before this method returns.
     HRESULT BeginComposeOperation(
         [in] const WSLCComposeOperationRequest* Request,
         [in, unique] IComposeProgressCallback* ProgressCallback,

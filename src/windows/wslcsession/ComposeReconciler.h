@@ -19,6 +19,7 @@ struct ComposeExecutionResult
     std::vector<WSLCContainerEntry> AffectedContainers;
 };
 
+// Invoked before resource work; Current identifies the resource's ordinal within its operation group.
 using ComposeProgressReporter =
     std::function<void(std::string_view operation, std::string_view resourceKey, ULONGLONG current, ULONGLONG total, std::string_view unit)>;
 
@@ -27,6 +28,7 @@ class ComposeReconciler
 public:
     explicit ComposeReconciler(WSLCSession& session) noexcept;
 
+    // projectKey is normalized within the owning session; Create and Up require desiredProject.
     ComposeExecutionResult Execute(
         WSLCComposeAction action,
         const ComposeSpec* desiredProject,

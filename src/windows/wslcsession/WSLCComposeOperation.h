@@ -27,6 +27,7 @@ public:
     IFACEMETHOD(InterfaceSupportsErrorInfo)(_In_ REFIID interfaceId) override;
 
 private:
+    // Owning snapshot retained for the worker's lifetime.
     struct Request
     {
         WSLCComposeAction Action{};
@@ -52,6 +53,7 @@ private:
         ULONGLONG total,
         std::string_view unit);
 
+    // m_sessionLifetime keeps the concrete session valid throughout the operation's lifetime.
     WSLCSession* m_session{};
     Microsoft::WRL::ComPtr<IWSLCSession> m_sessionLifetime;
     wil::com_ptr<IGlobalInterfaceTable> m_git;

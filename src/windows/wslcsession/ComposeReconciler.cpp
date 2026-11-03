@@ -20,6 +20,7 @@ ComposeExecutionResult ComposeReconciler::Execute(
 {
     CheckCancelled(cancelEvent);
     auto projectLockEntry = ResolveProjectLock(projectKey);
+    // Serialize discovery, mutation, and final observation; timed waits keep lock acquisition cancellable.
     std::unique_lock projectLock(projectLockEntry->Lock, std::defer_lock);
     while (!projectLock.try_lock_for(std::chrono::milliseconds{100}))
     {
@@ -33,6 +34,7 @@ ComposeExecutionResult ComposeReconciler::Execute(
     {
     case WSLCComposeActionCreate:
         THROW_HR_IF_NULL(E_INVALIDARG, desiredProject);
+        // Create reuses a nonempty discovered set as the project's existing resources.
         if (containers.empty())
         {
             containers = Create(*desiredProject, cancelEvent, progressReporter);
@@ -50,6 +52,7 @@ ComposeExecutionResult ComposeReconciler::Execute(
         break;
 
     case WSLCComposeActionAttach:
+        // The caller uses the observed container identities to establish attachment.
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), containers.empty());
         break;
 
@@ -71,6 +74,7 @@ ComposeExecutionResult ComposeReconciler::Execute(
 std::shared_ptr<ComposeReconciler::ProjectLock> ComposeReconciler::ResolveProjectLock(std::string_view projectKey)
 {
     std::lock_guard projectLocksLock(m_projectLocksLock);
+    // Holders and waiters retain the same entry; map-only entries are idle and reclaimable.
     std::erase_if(m_projectLocks, [](const auto& entry) { return entry.second.use_count() == 1; });
 
     const auto existing = m_projectLocks.find(std::string{projectKey});
@@ -164,6 +168,7 @@ void ComposeReconciler::Stop(const std::vector<Microsoft::WRL::ComPtr<IWSLCConta
 {
     THROW_HR_IF(E_INVALIDARG, timeout > LONG_MAX);
 
+    // Attempt the remaining stops while retaining the first container failure.
     HRESULT firstFailure = S_OK;
     for (size_t index = 0; index < containers.size(); ++index)
     {
