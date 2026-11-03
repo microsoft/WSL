@@ -1292,6 +1292,7 @@ typedef struct _LX_MINI_INIT_MESSAGE
     unsigned int UserProfileOffset;
     unsigned int Flags;
     unsigned int ConnectPort;
+    GUID InstanceId;
     char Buffer[];
 
     PRETTY_PRINT(
@@ -1305,7 +1306,8 @@ typedef struct _LX_MINI_INIT_MESSAGE
         STRING_FIELD(InstallPathOffset),
         STRING_FIELD(UserProfileOffset),
         FIELD(Flags),
-        FIELD(ConnectPort));
+        FIELD(ConnectPort),
+        FIELD(InstanceId));
 
 } LX_MINI_INIT_MESSAGE, *PLX_MINI_INIT_MESSAGE;
 
@@ -1530,8 +1532,9 @@ typedef struct _LX_MINI_INIT_CHILD_EXIT_MESSAGE
 
     MESSAGE_HEADER Header;
     unsigned int ChildPid;
+    GUID InstanceId;
 
-    PRETTY_PRINT(FIELD(Header), FIELD(ChildPid));
+    PRETTY_PRINT(FIELD(Header), FIELD(ChildPid), FIELD(InstanceId));
 } LX_MINI_INIT_CHILD_EXIT_MESSAGE, *PLX_MINI_INIT_CHILD_EXIT_MESSAGE;
 
 typedef struct _LX_MINI_INIT_MOUNT_FOLDER_MESSAGE
@@ -1594,11 +1597,12 @@ struct CREATE_PROCESS_MESSAGE
     static inline auto Type = LxInitCreateProcess;
 
     MESSAGE_HEADER Header;
+    uint64_t PluginId;
     unsigned int PathIndex;
     unsigned int CommandLineIndex;
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), STRING_FIELD(PathIndex), STRING_ARRAY_FIELD(CommandLineIndex));
+    PRETTY_PRINT(FIELD(Header), FIELD(PluginId), STRING_FIELD(PathIndex), STRING_ARRAY_FIELD(CommandLineIndex));
 };
 
 struct EJECT_VHD_MESSAGE

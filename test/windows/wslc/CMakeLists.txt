@@ -15,7 +15,6 @@ file(GLOB_RECURSE WSLC_TEST_HEADERS CONFIGURE_DEPENDS
 target_sources(wsltests PRIVATE
     ${WSLC_TEST_SOURCES}
     ${WSLC_TEST_HEADERS}
-    ${CMAKE_SOURCE_DIR}/src/windows/wslcsession/WSLCRestartScheduler.cpp
     ${CMAKE_SOURCE_DIR}/src/windows/wslcsession/WSLCContainerStateStore.cpp
 )
 

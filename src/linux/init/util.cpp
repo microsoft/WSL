@@ -3458,7 +3458,7 @@ Return Value:
     return 0;
 }
 
-int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer, const std::optional<std::string>& DistroCgroupPath, int CgroupNamespaceFd)
+int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer, const std::optional<std::string>& CgroupPath, int CgroupNamespaceFd)
 {
     auto* Message = gslhelpers::try_get_struct<CREATE_PROCESS_MESSAGE>(Buffer);
     if (!Message)
@@ -3495,18 +3495,30 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
     const int ChildPid = UtilCreateChildProcess("CreateChildProcess", [&]() {
         try
         {
-            if (DistroCgroupPath.has_value())
-            {
-                THROW_LAST_ERROR_IF(UtilMoveSelfToDistroCgroup(DistroCgroupPath.value(), "CreateChildProcess") < 0);
-            }
-
-            if (CgroupNamespaceFd >= 0)
-            {
-                THROW_LAST_ERROR_IF(UtilEnterCgroupNamespace(CgroupNamespaceFd, "CreateChildProcess") < 0);
-            }
-
             wil::unique_fd ProcessSocket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS)};
             THROW_LAST_ERROR_IF(!ProcessSocket);
+
+            if (Message->PluginId != 0)
+            {
+                if (access(WSL_USER_CGROUP_PATH, F_OK) == 0)
+                {
+                    const auto PluginCgroupPath = std::format("{}/plugin-{}", WSL_USER_CGROUP_PATH, Message->PluginId);
+                    THROW_LAST_ERROR_IF(UtilMkdir(PluginCgroupPath.c_str(), 0755) < 0);
+                    THROW_LAST_ERROR_IF(UtilMoveSelfToCgroup(PluginCgroupPath, "CreateChildProcess") < 0);
+                }
+            }
+            else
+            {
+                if (CgroupPath.has_value())
+                {
+                    THROW_LAST_ERROR_IF(UtilMoveSelfToCgroup(CgroupPath.value(), "CreateChildProcess") < 0);
+                }
+
+                if (CgroupNamespaceFd >= 0)
+                {
+                    THROW_LAST_ERROR_IF(UtilEnterCgroupNamespace(CgroupNamespaceFd, "CreateChildProcess") < 0);
+                }
+            }
 
             THROW_LAST_ERROR_IF(dup2(ProcessSocket.get(), STDIN_FILENO) < 0);
             THROW_LAST_ERROR_IF(dup2(ProcessSocket.get(), STDOUT_FILENO) < 0);
@@ -3802,13 +3814,13 @@ Return Value:
     return false;
 }
 
-void StartMemoryReductionThread(LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode)
+void RunMemoryReduction(LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode)
 
 /*++
 
 Routine Description:
 
-    This routine starts a background thread that reclaims cold page cache and compacts free pages while
+    This routine reclaims cold page cache and compacts free pages while
     the VM is idle, so the maximum number of pages can be discarded back to the host.
 
     Reclaim is gated on CPU idle using a rolling window of all non-idle CPU time, not just user time.
@@ -3833,181 +3845,175 @@ try
         return;
     }
 
-    std::thread([Mode]() {
-        try
+    //
+    // Run at idle scheduling priority so reclaim never competes with real work.
+    //
+
+    sched_param parameter{};
+    parameter.sched_priority = 0;
+    const int result = pthread_setschedparam(pthread_self(), SCHED_IDLE, &parameter);
+    THROW_ERRNO_IF(result, result != 0);
+
+    //
+    // Gradual mode uses cgroup memory.reclaim and falls back to drop_caches when unavailable.
+    //
+
+    bool useReclaim = Mode != LxMiniInitMemoryReclaimModeDropCache;
+    if (useReclaim && access(RECLAIM_PATH, W_OK) < 0)
+    {
+        LOG_WARNING("access({}, W_OK) failed {}, falling back to drop_caches", RECLAIM_PATH, errno);
+        useReclaim = false;
+    }
+
+    constexpr auto c_pollInterval = std::chrono::seconds(10);
+
+    // Reclaimable cache below this floor is always retained to protect a minimal working set.
+    constexpr long long c_floorBytes = 128ll * 1024 * 1024;
+
+    // Scale reclaim requests with the VM size while keeping individual operations bounded.
+    constexpr long long c_minReclaimBytes = 256ll * 1024 * 1024;
+    constexpr long long c_maxReclaimBytes = 1024ll * 1024 * 1024;
+
+    struct sysinfo info = {};
+    THROW_LAST_ERROR_IF(sysinfo(&info) < 0);
+
+    long long reclaimStepBytes = (static_cast<long long>(info.totalram) * info.mem_unit) / 32;
+    if (reclaimStepBytes < c_minReclaimBytes)
+    {
+        reclaimStepBytes = c_minReclaimBytes;
+    }
+    else if (reclaimStepBytes > c_maxReclaimBytes)
+    {
+        reclaimStepBytes = c_maxReclaimBytes;
+    }
+
+    unsigned long long previousBusy = 0;
+    unsigned long long previousIdle = 0;
+    bool havePreviousSample = false;
+
+    CpuIdleTracker idleTracker;
+
+    bool droppedThisIdlePeriod = false;
+    bool compactedThisIdlePeriod = false;
+
+    for (;;)
+    {
+        std::this_thread::sleep_for(c_pollInterval);
+
+        unsigned long long busy = 0;
+        unsigned long long idle = 0;
+        if (!ReadCpuBusyIdle(busy, idle))
         {
-            //
-            // Run at idle scheduling priority so reclaim never competes with real work.
-            //
+            continue;
+        }
 
-            sched_param parameter{};
-            parameter.sched_priority = 0;
-            const int result = pthread_setschedparam(pthread_self(), SCHED_IDLE, &parameter);
-            THROW_ERRNO_IF(result, result != 0);
+        if (!havePreviousSample)
+        {
+            previousBusy = busy;
+            previousIdle = idle;
+            havePreviousSample = true;
+            continue;
+        }
 
-            //
-            // Gradual mode uses cgroup memory.reclaim and falls back to drop_caches when unavailable.
-            //
+        //
+        // Guard against non-monotonic counters (should not happen, but resample if it does).
+        //
 
-            bool useReclaim = Mode != LxMiniInitMemoryReclaimModeDropCache;
-            if (useReclaim && access(RECLAIM_PATH, W_OK) < 0)
+        if (busy < previousBusy || idle < previousIdle)
+        {
+            previousBusy = busy;
+            previousIdle = idle;
+            idleTracker.Reset();
+            droppedThisIdlePeriod = false;
+            compactedThisIdlePeriod = false;
+            continue;
+        }
+
+        const unsigned long long busyDelta = busy - previousBusy;
+        const unsigned long long totalDelta = busyDelta + (idle - previousIdle);
+        previousBusy = busy;
+        previousIdle = idle;
+
+        const auto idleState = idleTracker.AddSample(busyDelta, totalDelta);
+        if (!idleState.WindowIdle)
+        {
+            droppedThisIdlePeriod = false;
+            compactedThisIdlePeriod = false;
+            continue;
+        }
+
+        //
+        // A short burst blocks this tick but does not discard the preceding idle history.
+        //
+
+        if (!idleState.IntervalIdle)
+        {
+            continue;
+        }
+
+        //
+        // The VM is idle: reclaim cold cache and compact.
+        //
+
+        bool reclaimed = false;
+        if (useReclaim)
+        {
+            const long long cache = GetReclaimableCacheBytes();
+            if (cache > c_floorBytes)
             {
-                LOG_WARNING("access({}, W_OK) failed {}, falling back to drop_caches", RECLAIM_PATH, errno);
-                useReclaim = false;
-            }
-
-            constexpr auto c_pollInterval = std::chrono::seconds(10);
-
-            // Reclaimable cache below this floor is always retained to protect a minimal working set.
-            constexpr long long c_floorBytes = 128ll * 1024 * 1024;
-
-            // Scale reclaim requests with the VM size while keeping individual operations bounded.
-            constexpr long long c_minReclaimBytes = 256ll * 1024 * 1024;
-            constexpr long long c_maxReclaimBytes = 1024ll * 1024 * 1024;
-
-            struct sysinfo info = {};
-            THROW_LAST_ERROR_IF(sysinfo(&info) < 0);
-
-            long long reclaimStepBytes = (static_cast<long long>(info.totalram) * info.mem_unit) / 32;
-            if (reclaimStepBytes < c_minReclaimBytes)
-            {
-                reclaimStepBytes = c_minReclaimBytes;
-            }
-            else if (reclaimStepBytes > c_maxReclaimBytes)
-            {
-                reclaimStepBytes = c_maxReclaimBytes;
-            }
-
-            unsigned long long previousBusy = 0;
-            unsigned long long previousIdle = 0;
-            bool havePreviousSample = false;
-
-            CpuIdleTracker idleTracker;
-
-            bool droppedThisIdlePeriod = false;
-            bool compactedThisIdlePeriod = false;
-
-            for (;;)
-            {
-                std::this_thread::sleep_for(c_pollInterval);
-
-                unsigned long long busy = 0;
-                unsigned long long idle = 0;
-                if (!ReadCpuBusyIdle(busy, idle))
+                long long bytes = cache - c_floorBytes;
+                if (bytes > reclaimStepBytes)
                 {
-                    continue;
+                    bytes = reclaimStepBytes;
                 }
 
-                if (!havePreviousSample)
-                {
-                    previousBusy = busy;
-                    previousIdle = idle;
-                    havePreviousSample = true;
-                    continue;
-                }
-
-                //
-                // Guard against non-monotonic counters (should not happen, but resample if it does).
-                //
-
-                if (busy < previousBusy || idle < previousIdle)
-                {
-                    previousBusy = busy;
-                    previousIdle = idle;
-                    idleTracker.Reset();
-                    droppedThisIdlePeriod = false;
-                    compactedThisIdlePeriod = false;
-                    continue;
-                }
-
-                const unsigned long long busyDelta = busy - previousBusy;
-                const unsigned long long totalDelta = busyDelta + (idle - previousIdle);
-                previousBusy = busy;
-                previousIdle = idle;
-
-                const auto idleState = idleTracker.AddSample(busyDelta, totalDelta);
-                if (!idleState.WindowIdle)
-                {
-                    droppedThisIdlePeriod = false;
-                    compactedThisIdlePeriod = false;
-                    continue;
-                }
-
-                //
-                // A short burst blocks this tick but does not discard the preceding idle history.
-                //
-
-                if (!idleState.IntervalIdle)
-                {
-                    continue;
-                }
-
-                //
-                // The VM is idle: reclaim cold cache and compact.
-                //
-
-                bool reclaimed = false;
-                if (useReclaim)
-                {
-                    const long long cache = GetReclaimableCacheBytes();
-                    if (cache > c_floorBytes)
-                    {
-                        long long bytes = cache - c_floorBytes;
-                        if (bytes > reclaimStepBytes)
-                        {
-                            bytes = reclaimStepBytes;
-                        }
-
-                        reclaimed = RequestReclaim(bytes);
-                    }
-                }
-                else if (!droppedThisIdlePeriod)
-                {
-                    //
-                    // drop_caches=3 frees the page cache along with reclaimable slab (dentries and
-                    // inodes), matching the SReclaimable slab counted by GetReclaimableCacheBytes.
-                    //
-
-                    if (WriteToFile("/proc/sys/vm/drop_caches", "3\n") == 0)
-                    {
-                        droppedThisIdlePeriod = true;
-                        reclaimed = true;
-                    }
-                }
-
-                //
-                // Coalesce freed pages into larger blocks for efficient page reporting.
-                //
-
-                bool memoryOperation = reclaimed;
-                if (!compactedThisIdlePeriod || reclaimed)
-                {
-                    if (WriteToFile("/proc/sys/vm/compact_memory", "1\n") == 0)
-                    {
-                        compactedThisIdlePeriod = true;
-                        memoryOperation = true;
-                    }
-                }
-
-                //
-                // Exclude the reclaim/compaction work from the next utilization interval so it does not
-                // restart the grace period itself.
-                //
-
-                if (memoryOperation)
-                {
-                    if (!ReadCpuBusyIdle(previousBusy, previousIdle))
-                    {
-                        havePreviousSample = false;
-                        idleTracker.Reset();
-                        droppedThisIdlePeriod = false;
-                        compactedThisIdlePeriod = false;
-                    }
-                }
+                reclaimed = RequestReclaim(bytes);
             }
         }
-        CATCH_LOG()
-    }).detach();
+        else if (!droppedThisIdlePeriod)
+        {
+            //
+            // drop_caches=3 frees the page cache along with reclaimable slab (dentries and
+            // inodes), matching the SReclaimable slab counted by GetReclaimableCacheBytes.
+            //
+
+            if (WriteToFile("/proc/sys/vm/drop_caches", "3\n") == 0)
+            {
+                droppedThisIdlePeriod = true;
+                reclaimed = true;
+            }
+        }
+
+        //
+        // Coalesce freed pages into larger blocks for efficient page reporting.
+        //
+
+        bool memoryOperation = reclaimed;
+        if (!compactedThisIdlePeriod || reclaimed)
+        {
+            if (WriteToFile("/proc/sys/vm/compact_memory", "1\n") == 0)
+            {
+                compactedThisIdlePeriod = true;
+                memoryOperation = true;
+            }
+        }
+
+        //
+        // Exclude the reclaim/compaction work from the next utilization interval so it does not
+        // restart the grace period itself.
+        //
+
+        if (memoryOperation)
+        {
+            if (!ReadCpuBusyIdle(previousBusy, previousIdle))
+            {
+                havePreviousSample = false;
+                idleTracker.Reset();
+                droppedThisIdlePeriod = false;
+                compactedThisIdlePeriod = false;
+            }
+        }
+    }
 }
 CATCH_LOG()
 
@@ -4056,7 +4062,7 @@ int UtilEnableAllCgroupControllers(const std::string& CgroupPath)
     return 0;
 }
 
-int UtilMoveSelfToDistroCgroup(const std::string& CgroupPath, const std::string& LogSubject)
+int UtilMoveSelfToCgroup(const std::string& CgroupPath, const std::string& LogSubject)
 try
 {
     const auto ProcsFile = CgroupPath + "/cgroup.procs";

@@ -59,6 +59,7 @@ namespace Microsoft.WSL.Containers
         Windows.Foundation.IReference<Windows.Foundation.TimeSpan> Timeout;
         VhdOptions VhdRequirements;
         Boolean EnableGpu;
+        String HostLoopback;
     };
 
     runtimeclass Session : Windows.Foundation.IClosable
@@ -93,7 +94,7 @@ namespace Microsoft.WSL.Containers
 
         IVectorView<NetworkInfo> GetNetworks();
         NetworkInfo CreateNetwork(NetworkSettings settings);
-        void DeleteNetwork(String name);
+        void DeleteNetwork(String nameOrId);
 
         event SessionTerminationHandler Terminated;
         event ProcessCrashHandler ProcessCrashed;
@@ -453,5 +454,6 @@ namespace Microsoft.WSL.Containers
         ContainerDeleted = 0x80040613,
         CapabilityAdditionsDisabled = 0x80040614,
         RuntimeUpdateNeeded = 0x80040615,
+        NetworkPrefixAmbiguous = 0x80040616,
     };
 }

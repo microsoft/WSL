@@ -1238,4 +1238,37 @@ class InstallerTests
         SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
         VerifyWslSettingsProtocolAssociationExistsWithRetry();
     }
+
+    TEST_METHOD(MsixUpgradeFailsWhenWindowsInstallerIsBusy)
+    {
+        RegistryKeyChange<DWORD> change(
+            HKEY_LOCAL_MACHINE, L"Software\\Microsoft\\Windows\\CurrentVersion\\Lxss\\MSI", L"AutoUpgradeViaMsix", static_cast<DWORD>(0));
+
+        UninstallMsi();
+        VERIFY_IS_FALSE(IsMsiPackageInstalled());
+        VERIFY_IS_FALSE(IsMsixInstalled());
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { InstallMsi(); });
+
+        InstallMsix();
+
+        // MsiBeginTransaction returns a transaction ID, not a closable MSI handle.
+        // unique_msi_handle would call MsiCloseHandle, which can close an unrelated handle with the same value.
+        // The rollback guard below ends the transaction via MsiEndTransaction.
+        MSIHANDLE transactionId{};
+        wil::unique_handle ownerChangedEvent;
+        VERIFY_ARE_EQUAL(ERROR_SUCCESS, MsiBeginTransactionW(L"Installer contention test", 0, &transactionId, &ownerChangedEvent));
+        auto rollback =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LOG_IF_WIN32_ERROR(MsiEndTransaction(MSITRANSACTIONSTATE_ROLLBACK)); });
+
+        auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"--install --no-distribution", -1, nulDevice.get());
+        VERIFY_ARE_EQUAL(
+            FormatErrorMessage(
+                L"WSL installation is blocked because Windows Installer is busy. Wait for other software installations to "
+                L"finish, then retry.",
+                L"Wsl/CallMsi/Install/ERROR_INSTALL_ALREADY_RUNNING"),
+            output);
+        VERIFY_ARE_EQUAL(L"WSL is finishing an upgrade...\r\n", warnings);
+        VERIFY_IS_FALSE(IsMsiPackageInstalled());
+    }
 };

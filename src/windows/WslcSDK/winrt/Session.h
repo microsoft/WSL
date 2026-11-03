@@ -45,7 +45,7 @@ struct Session : SessionT<Session>
     winrt::Windows::Foundation::Collections::IVectorView<winrt::Microsoft::WSL::Containers::ImageInfo> GetImages();
     winrt::Windows::Foundation::Collections::IVectorView<winrt::Microsoft::WSL::Containers::NetworkInfo> GetNetworks();
     winrt::Microsoft::WSL::Containers::NetworkInfo CreateNetwork(winrt::Microsoft::WSL::Containers::NetworkSettings const& settings);
-    void DeleteNetwork(hstring const& name);
+    void DeleteNetwork(hstring const& nameOrId);
     winrt::event_token Terminated(winrt::Microsoft::WSL::Containers::SessionTerminationHandler const& handler);
     void Terminated(winrt::event_token const& token) noexcept;
     winrt::event_token ProcessCrashed(winrt::Microsoft::WSL::Containers::ProcessCrashHandler const& handler);
