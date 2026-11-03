@@ -615,6 +615,7 @@ typedef struct _WSLCComposeDocument
     // SourcePath supplies diagnostic context and its parent resolves relative bind mounts.
     // Content contains the original document bytes, including any encoding marker.
     [string] LPCWSTR SourcePath;
+    [string] LPCWSTR BaseDirectory;
     [unique, size_is(ContentSize)] const byte* Content;
     ULONG ContentSize;
 } WSLCComposeDocument;
@@ -1001,10 +1002,12 @@ interface IWSLCSession : IUnknown
     HRESULT MapVmPort([in] int Family, [in] unsigned short WindowsPort, [in] unsigned short LinuxPort);
     HRESULT UnmapVmPort([in] int Family, [in] unsigned short WindowsPort, [in] unsigned short LinuxPort);
 
-    // Returns a caller-owned process handle for job assignment and session-lifetime waits (SYNCHRONIZE).
+    // Session initialization - called by SYSTEM service after launching per-user process.
+
+    // Returns a handle to this COM server process (used to add to job object).
+    // The caller owns the handle and can also wait for process exit (SYNCHRONIZE).
     HRESULT GetProcessHandle([out, system_handle(sh_process)] HANDLE* ProcessHandle);
 
-    // Session initialization - called by SYSTEM service after launching per-user process.
     // Initializes the session with a VM factory. VMs are created through the factory.
     HRESULT Initialize(
         [in] const WSLCSessionInitSettings* Settings,

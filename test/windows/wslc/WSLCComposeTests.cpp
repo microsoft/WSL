@@ -40,6 +40,7 @@ struct ComposeRequestStorage
         content.assign(std::istreambuf_iterator<char>{stream}, std::istreambuf_iterator<char>{});
 
         document.SourcePath = sourcePath.c_str();
+        document.BaseDirectory = projectDirectory.c_str();
         document.Content = reinterpret_cast<const byte*>(content.data());
         document.ContentSize = gsl::narrow<ULONG>(content.size());
 
@@ -1520,6 +1521,16 @@ secrets:
         request.document.ContentSize = 0;
         VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->BeginComposeOperation(&request.request, nullptr, &operation));
         VERIFY_IS_NULL(operation.get());
+
+        request.document.ContentSize = gsl::narrow<ULONG>(request.content.size());
+        request.document.BaseDirectory = nullptr;
+        VERIFY_ARE_EQUAL(E_POINTER, m_defaultSession->BeginComposeOperation(&request.request, nullptr, &operation));
+        VERIFY_IS_NULL(operation.get());
+
+        request.document.BaseDirectory = L"";
+        const auto result = WaitForCompose(*m_defaultSession, request);
+        VERIFY_ARE_EQUAL(E_INVALIDARG, result.value.Result);
+        VERIFY_ARE_EQUAL(WSLCComposeOperationStatusFailed, result.value.Status);
     }
 
 private:

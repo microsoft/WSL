@@ -170,11 +170,13 @@ WSLCComposeOperation::Request WSLCComposeOperation::CaptureRequest(const WSLCCom
         {
             const auto& document = source.Documents[index];
             THROW_HR_IF_NULL(E_POINTER, document.SourcePath);
+            THROW_HR_IF_NULL(E_POINTER, document.BaseDirectory);
             THROW_HR_IF(E_INVALIDARG, document.ContentSize == 0);
             THROW_HR_IF_NULL(E_POINTER, document.Content);
 
             ComposeDocument captured{
                 .SourcePath = document.SourcePath,
+                .BaseDirectory = document.BaseDirectory,
             };
             const auto* begin = reinterpret_cast<const std::byte*>(document.Content);
             captured.Content.assign(begin, begin + document.ContentSize);
@@ -272,7 +274,7 @@ ComposeExecutionResult WSLCComposeOperation::RunOperation(
     std::optional<ComposeSpec> desiredProject;
     if (m_request.ProjectType == WSLCComposeProjectTypeDocuments)
     {
-        desiredProject = ComposeNormalizer::Normalize(*m_request.Documents);
+        desiredProject = ComposeNormalizer::Normalize(*m_request.Documents, {});
         projectKey = desiredProject->ProjectName;
     }
     else

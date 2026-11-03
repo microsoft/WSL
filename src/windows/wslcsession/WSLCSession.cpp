@@ -2443,10 +2443,11 @@ try
         .ProjectDirectory = configPath.parent_path(),
         .Documents = {{
             .SourcePath = configPath,
+            .BaseDirectory = configPath.parent_path(),
             .Content = std::vector<std::byte>{begin, begin + content.size()},
         }},
     };
-    const auto spec = ComposeNormalizer::Normalize(documents);
+    const auto spec = ComposeNormalizer::Normalize(documents, {});
 
     // Cached sessions retain their captured definitions; another file for the same project would share their default network.
     THROW_HR_WITH_USER_ERROR_IF(

@@ -66,6 +66,8 @@ it does not reopen the Compose source file.
 relative bind mounts. Callers should supply absolute source paths so resolution
 is independent of the session process's working directory.
 
+Each document must also supply a nonempty `BaseDirectory`.
+
 `ProjectDirectory` supplies the default project name. `ExplicitProjectName`
 overrides that default. Interpretation normalizes the chosen name and validates
 derived resource names before entering the reconciler.
