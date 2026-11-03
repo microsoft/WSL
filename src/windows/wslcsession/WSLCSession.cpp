@@ -2512,7 +2512,9 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::DiscoverCompose
     std::vector<ComposeContainer> composeContainers;
     composeContainers.reserve(dockerContainers.size());
 
-    std::lock_guard containersLock{m_containersLock};
+    std::unique_lock containersLock{m_containersLock};
+    // Create-event publication retains the implementation backing the creator's COM wrapper.
+    WaitForConflictingCreateToComplete(containersLock);
     std::erase_if(m_containers, [](const auto& entry) { return entry.second->State() == WslcContainerStateDeleted; });
     // Every project-label match must have supported WSLC metadata and an unambiguous resource identity.
     for (const auto& dockerContainer : dockerContainers)
