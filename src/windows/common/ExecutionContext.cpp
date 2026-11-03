@@ -30,7 +30,8 @@ void wsl::windows::common::EnableContextualizedErrors(bool service, bool useComE
 ExecutionContext::ExecutionContext(Context context, FILE* warningsFile) noexcept :
     m_warningsFile(warningsFile), m_parent(g_currentContext), m_context(context)
 {
-    WI_ASSERT(g_currentContext == nullptr || g_currentContext->m_context < m_context);
+    // Empty scopes add no context flag and can wrap internal COM calls.
+    WI_ASSERT(m_context == Empty || g_currentContext == nullptr || g_currentContext->m_context < m_context);
 
     if (!g_enabled)
     {

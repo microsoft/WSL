@@ -92,6 +92,7 @@ ComposeSpec ComposeNormalizer::Normalize(const ComposeDocuments& documents, cons
             !containerNames.insert(container.Name).second);
     }
 
+    std::ranges::sort(spec.Containers, {}, &ComposeContainerDefinition::ServiceName);
     return spec;
 }
 
@@ -103,6 +104,25 @@ std::string ComposeNormalizer::DefaultNetworkName(std::string_view projectName)
 void ComposeNormalizer::ValidateSelection(const ComposeProjectSelection& selection)
 {
     THROW_HR_IF(E_NOTIMPL, !selection.Profiles.empty() || !selection.Services.empty() || selection.IncludeDependencies);
+}
+
+std::string ComposeNormalizer::ValidateProjectKey(std::string_view projectKey)
+{
+    THROW_HR_IF(E_INVALIDARG, !IsValidProjectKey(projectKey));
+    return std::string{projectKey};
+}
+
+bool ComposeNormalizer::IsValidProjectKey(std::string_view projectKey) noexcept
+{
+    if (projectKey.empty() || projectKey.size() > WSLC_MAX_COMPOSE_PROJECT_NAME_LENGTH ||
+        !std::isalnum(static_cast<unsigned char>(projectKey.front())))
+    {
+        return false;
+    }
+
+    return std::ranges::all_of(projectKey, [](unsigned char value) {
+        return std::isdigit(value) || std::islower(value) || value == '-' || value == '_';
+    });
 }
 
 } // namespace wsl::windows::service::wslc

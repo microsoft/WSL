@@ -14,6 +14,7 @@ Abstract:
 
 #pragma once
 
+#include "ComposeReconciler.h"
 #include "wslc.h"
 #include "WSLCCompat.h"
 #include "WSLCComposeSession.h"
@@ -36,6 +37,7 @@ Abstract:
 namespace wsl::windows::service::wslc {
 
 class WSLCSession;
+class WSLCComposeOperation;
 class ServiceContainerLauncher;
 
 class UserHandle
@@ -88,11 +90,13 @@ class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLCSession
     // WSLCContainer::Delete acquires a VmLease to keep the VM alive (and block idle
     // teardown) for the duration of a container deletion.
     friend class WSLCContainer;
+    friend class ComposeReconciler;
+    friend class WSLCComposeOperation;
     friend class WSLCComposeSession;
     friend class ServiceContainerLauncher;
 
 public:
-    WSLCSession() : m_runtime(*this)
+    WSLCSession() : m_runtime(*this), m_composeReconciler(*this)
     {
     }
 
@@ -173,6 +177,8 @@ public:
     IFACEMETHOD(OpenContainer)(_In_ LPCSTR Id, _In_ IWSLCContainer** Container) override;
     IFACEMETHOD(BeginContainerOperation)(_Outptr_ IUnknown** Operation) override;
     IFACEMETHOD(CreateComposeSession)(_In_ LPCWSTR Path, _Out_ IWSLCComposeSession** ComposeSession) override;
+    IFACEMETHOD(BeginComposeOperation)(
+        _In_ const WSLCComposeOperationRequest* request, _In_opt_ IComposeProgressCallback* progressCallback, _Out_ IComposeOperation** operation) override;
     IFACEMETHOD(ListContainers)(
         _In_opt_ const WSLCListContainersOptions* Options,
         _Out_ WSLCContainerEntry** Containers,
@@ -397,7 +403,10 @@ private:
         DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle, IImageLoadCallback* LoadCallback = nullptr);
     void RecoverExistingContainers();
     void RecoverExistingNetworks();
-    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> CreateComposeContainers(const ComposeSpec& Spec);
+    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> DiscoverComposeContainers(std::string_view projectKey);
+    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> CreateComposeContainers(const ComposeSpec& spec);
+    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> CreateComposeContainers(
+        const ComposeSpec& spec, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter);
 
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent);
     // Returns the manifest digest each pulled tag resolved to, in the order the daemon reported them.
@@ -412,6 +421,7 @@ private:
     DWORD m_vmFactoryGitCookie{};
 
     WSLCSessionRuntime m_runtime;
+    ComposeReconciler m_composeReconciler;
     std::wstring m_displayName;
     std::wstring m_creatorProcessName;
     std::filesystem::path m_storageVhdPath;
