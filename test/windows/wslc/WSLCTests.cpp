@@ -25,6 +25,7 @@ Abstract:
 #include "WSLCE2EHelpers.h"
 #include "HttpHeaderEndDetector.h"
 #include "WSLCSessionDefaults.h"
+#include "../../../src/windows/wslcsession/WSLCContainerStateStore.h"
 #include <nlohmann/json.hpp>
 
 using namespace std::chrono;
@@ -8143,15 +8144,16 @@ class WSLCTests
         return m_storagePath / L"containers" / (ContainerId + ".json");
     }
 
+    // Reads through the store so polling shares delete access and cannot block the service's rename.
     static std::optional<std::uint32_t> TryReadPersistedRestartCount(const std::filesystem::path& Path)
     {
-        std::ifstream file(Path, std::ios::binary);
-        if (!file.good())
+        const auto result = wsl::windows::service::wslc::LoadContainerState(Path);
+        if (result.Status != wsl::windows::service::wslc::WSLCContainerStateLoadStatus::Loaded)
         {
             return std::nullopt;
         }
 
-        return nlohmann::json::parse(file).at("RestartCount").get<std::uint32_t>();
+        return result.State.RestartCount;
     }
 
     // Policy restarts save the count after the restart completes, so it may land shortly after the container runs.
