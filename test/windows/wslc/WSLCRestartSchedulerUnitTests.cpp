@@ -2,7 +2,7 @@
 
 #include "precomp.h"
 #include "Common.h"
-#include "../../../src/windows/wslcsession/WSLCRestartScheduler.h"
+#include "WSLCRestartScheduler.h"
 
 namespace WSLCRestartScheduling {
 

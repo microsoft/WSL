@@ -17,7 +17,6 @@ Abstract:
 #include "EventStore.h"
 #include "wslc.h"
 #include "wslccompat.h"
-#include "WSLCSession.h"
 #include "WSLCProcessLauncher.h"
 #include "WSLCContainerLauncher.h"
 #include "WSLCContainerEntry.h"
