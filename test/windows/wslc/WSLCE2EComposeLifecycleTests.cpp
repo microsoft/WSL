@@ -37,8 +37,11 @@ class WSLCE2EComposeLifecycleTests
 
         const auto result = RunWslc(std::format(L"compose create \"{}\"", composePath.wstring()));
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(
-            result.StderrContainsSubstring(wsl::shared::Localization::MessageWslcComposeServiceNameInvalid("bad name")));
+        const auto message = wsl::shared::Localization::MessageWslcComposeServiceNameInvalid("bad name");
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(message));
+        VERIFY_IS_FALSE(result.StderrContainsSubstring(wsl::shared::string::MultiByteToWide(WSLC_COMPOSE_DIAGNOSTIC_OPERATION_FAILED)));
+        const auto position = result.Stderr->find(message);
+        VERIFY_ARE_EQUAL(std::wstring::npos, result.Stderr->find(message, position + message.size()));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Compose_Lifecycle_AcceptsFileAndProjectKey)

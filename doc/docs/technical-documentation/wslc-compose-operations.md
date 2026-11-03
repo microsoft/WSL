@@ -78,8 +78,9 @@ The supported document input contains exactly one document.
 | `Create` | Documents | Return a nonempty discovered container set; otherwise create the default network and containers. Existing definitions are not compared. |
 | `Up` | Documents | Remove discovered containers, replace the default network, create containers, and start them. |
 | `Start` | Documents or project key | Start discovered containers, accepting containers that are already running. |
-| `Attach` | Documents or project key | Return discovered container identities. The operation does not establish terminal streams. |
+| `Attach` | Documents or project key | Return discovered container identities and hand off running containers' output streams when a callback is supplied. |
 | `Stop` | Documents or project key | Stop discovered containers with their configured default signal and the supplied per-container timeout, accepting containers that are already stopped. |
+| `Remove` | Documents or project key | Remove stopped project containers, retaining running containers. |
 
 `Stop` requires `WSLCComposeActionOptionsTypeStop` and a timeout no greater than
 `LONG_MAX`. All other actions require `WSLCComposeActionOptionsTypeNone`.
@@ -147,7 +148,7 @@ An STA client must also dispatch incoming COM calls while waiting. A blocking
 wait that prevents callback delivery can stall even a single operation.
 
 Every `WSLCComposeProgressEvent` carries the whole invocation's current `Status`
-and an optional `Progress` payload. `Status` describes the invocation's phase or
+and optional `Progress` and `Diagnostic` payloads. `Status` describes the invocation's phase or
 outcome. `Progress` provides granular detail where applicable, such as creating
 a network or starting a container, and is null when no granular details apply.
 Multiple progress notifications can carry the same status without reporting a
@@ -173,14 +174,42 @@ resource's one-based ordinal within an operation group, and `Total` is that
 group's resource count. A `1/1` event announces work; it does not certify that the
 resource operation completed or measure image-download bytes.
 
-Callback HRESULT failures and caught callback exceptions are logged and do not
+`OnProgress` HRESULT failures and caught callback exceptions are logged and do not
 abort execution or replace its outcome. Clients request cancellation through the
 cancellation event, not through the callback's return value. Best effort applies to returned errors, not callback
 duration. A stalled resource callback holds the project lock and delays
 cancellation checkpoints; a stalled terminal callback delays completion. The
 native call returns after callback delivery and result construction.
 
-`Attach` returns a container snapshot for caller-side attachment.
+Non-cancellation execution failures include an `operation_failed` error
+diagnostic in the `Failed` notification when a callback is available.
+Its arguments contain the HRESULT in
+hexadecimal and the localized failure message as UTF-8, which can be empty.
+The source path is supplied for document-backed requests. Property paths and
+line/column locations are not populated. The final result remains authoritative;
+the CLI renders this failure through the result so it appears once.
+
+## Stream handoff
+
+After reconciliation releases the project lock, `Up` and `Attach` open output
+streams for each running container and call `OnStreamsReady`. Attachment accepts
+a container that stops during handoff by skipping its streams. These are
+read-only stdout/stderr streams; interactive stdin and TTY are not supplied.
+Without a callback, the operation returns container identities without opening
+streams.
+
+Stream-handoff failures fail the operation. The callback must duplicate any handles
+it retains and return promptly. The
+incoming handles expire when the callback returns. The CLI retains owned pipe
+or socket duplicates and relays all delivered streams concurrently after
+operation completion, with its cancellation event in the relay wait set.
+Completion waits for stream handoff, not for container output to reach EOF.
+Signaling the native cancellation event after the call returns does not cancel
+client-side relaying.
+
+The CLI keeps the VM active while relaying. Cancelling standalone attachment
+ends relaying; cancelling attached `Up` also requests graceful project stop,
+with force-kill escalation on the second interrupt.
 
 ## Cancellation and partial state
 
@@ -218,6 +247,13 @@ information.
 
 ## Interactive callers and future SDK projection
 
+The CLI runs native execution on a COM-initialized thread while its coordinator
+waits on local completion and interrupt events. It forwards cancellation through
+a manual-reset event and can force-kill project containers during a pending
+graceful Stop. It joins the execution thread before releasing request, result,
+or callback storage. The completion event is client-local; native RPC failure
+also completes that worker.
+
 The service owns command policy and its terminal outcome regardless of the
 client's threading model. A future attached-command implementation can keep the
 native call pending while handing off streams incrementally. The client must
@@ -226,18 +262,19 @@ to its I/O coordinator. A stream callback must return promptly and must not run
 the relay itself. Service completion and client output draining are separate
 milestones, and project mutation locks must not span indefinite attachment.
 
-`Attach` only returns container identities. The engine does not implement
-full attached-command lifetime, force-cancellation escalation, or parallel
-resource scheduling. These capabilities are independent of whether the native
-entry point is synchronous. A future public SDK can project the call through
-standard WinRT async interfaces with explicit cancellation bridging.
+The operation returns after handing off output streams. Full service-owned
+attached-command lifetime and parallel resource scheduling are not implemented.
+These capabilities are independent of whether the native entry point is
+synchronous. A future public SDK can project the call through standard WinRT
+async interfaces with explicit cancellation bridging.
 
 ## Regression coverage
 
 `test\windows\wslc\WSLCComposeTests.cpp` covers request validation, discovery,
-resource ordering, error details, session-process exit, project concurrency,
-cancellation checkpoints, late cancellation, partial state, nonfatal observer failures, callback shutdown,
-deletion during Up, and auto-remove Stop.
+resource ordering, error details and diagnostic delivery, stream handoff,
+session-process exit, project concurrency, cancellation checkpoints, late
+cancellation, partial state, nonfatal observer failures, callback shutdown, deletion during Up, and
+auto-remove Stop.
 `WSLCE2EComposeLifecycleTests.cpp` covers the CLI lifecycle.
 
 Build the full Windows project before running the focused suite:

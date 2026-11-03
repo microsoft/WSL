@@ -150,6 +150,25 @@ public:
                 block = m_blockExecuting && event->Status == m_blockedStatus;
             }
 
+            if (event->Diagnostic != nullptr)
+            {
+                const auto& source = *event->Diagnostic;
+                RETURN_HR_IF_NULL(E_POINTER, source.Code);
+                RETURN_HR_IF(E_POINTER, source.Arguments.Count != 0 && source.Arguments.Values == nullptr);
+                Diagnostic diagnostic{
+                    .Status = event->Status,
+                    .Severity = source.Severity,
+                    .Code = source.Code,
+                    .SourcePath = source.SourcePath != nullptr ? source.SourcePath : L"",
+                };
+                for (ULONG index = 0; index < source.Arguments.Count; ++index)
+                {
+                    RETURN_HR_IF_NULL(E_POINTER, source.Arguments.Values[index]);
+                    diagnostic.Arguments.emplace_back(source.Arguments.Values[index]);
+                }
+                m_diagnostics.emplace_back(std::move(diagnostic));
+            }
+
             RETURN_HR_IF(
                 RPC_E_DISCONNECTED,
                 m_failOnTerminal && (event->Status == WSLCComposeStatusSucceeded || event->Status == WSLCComposeStatusFailed ||
@@ -170,6 +189,38 @@ public:
     {
         std::lock_guard lock(m_lock);
         m_result = result;
+    }
+
+    HRESULT OnStreamsReady(const WSLCComposeStreams* streams) override
+    try
+    {
+        RETURN_HR_IF_NULL(E_POINTER, streams);
+        RETURN_HR_IF(E_UNEXPECTED, streams->Stdout.Type == WSLCHandleTypeUnknown || streams->Stderr.Type == WSLCHandleTypeUnknown);
+        std::lock_guard lock(m_lock);
+        ++m_streamCount;
+        return S_OK;
+    }
+    CATCH_RETURN();
+
+    struct Diagnostic
+    {
+        WSLCComposeStatus Status;
+        WSLCComposeDiagnosticSeverity Severity;
+        std::string Code;
+        std::wstring SourcePath;
+        std::vector<std::string> Arguments;
+    };
+
+    std::vector<Diagnostic> Diagnostics() const
+    {
+        std::lock_guard lock(m_lock);
+        return m_diagnostics;
+    }
+
+    size_t StreamCount() const
+    {
+        std::lock_guard lock(m_lock);
+        return m_streamCount;
     }
 
     std::vector<WSLCComposeStatus> Statuses() const
@@ -241,6 +292,8 @@ private:
     ULONGLONG m_eventCount{};
     std::vector<WSLCComposeStatus> m_statuses;
     std::vector<Progress> m_progress;
+    std::vector<Diagnostic> m_diagnostics;
+    size_t m_streamCount{};
     bool m_orderValid{true};
     HRESULT m_result{S_OK};
     wil::unique_event m_blockedEvent;
@@ -1299,9 +1352,13 @@ services:
         VERIFY_ARE_EQUAL(WslcContainerStateRunning, startResult.value.AffectedContainers[0].State);
 
         ComposeRequestStorage attachRequest{projectKey, WSLCComposeActionAttach};
-        const auto attachResult = ExecuteCompose(*m_defaultSession, attachRequest);
+        auto attachProgress = Microsoft::WRL::Make<TestComposeProgressCallback>();
+        VERIFY_IS_NOT_NULL(attachProgress.Get());
+        const auto attachResult = ExecuteCompose(*m_defaultSession, attachRequest, attachProgress.Get());
         VERIFY_ARE_EQUAL(1u, attachResult.value.AffectedContainersCount);
         VERIFY_ARE_EQUAL(existingId, std::string{attachResult.value.AffectedContainers[0].Id});
+        VERIFY_ARE_EQUAL(size_t{1}, attachProgress->StreamCount());
+        VERIFY_IS_TRUE(attachProgress->OrderValid());
 
         ComposeRequestStorage stopRequest{projectKey, WSLCComposeActionStop};
         stopRequest.SetStopTimeout(0);
@@ -1515,6 +1572,16 @@ secrets:
                 VERIFY_IS_TRUE(progress->OrderValid());
                 VERIFY_ARE_EQUAL(std::vector<WSLCComposeStatus>({WSLCComposeStatusValidating, WSLCComposeStatusFailed}), progress->Statuses());
                 VERIFY_IS_TRUE(progress->ProgressEvents().empty());
+                const auto diagnostics = progress->Diagnostics();
+                VERIFY_ARE_EQUAL(size_t{1}, diagnostics.size());
+                VERIFY_ARE_EQUAL(WSLCComposeStatusFailed, diagnostics[0].Status);
+                VERIFY_ARE_EQUAL(WSLCComposeDiagnosticSeverityError, diagnostics[0].Severity);
+                VERIFY_ARE_EQUAL(std::string{WSLC_COMPOSE_DIAGNOSTIC_OPERATION_FAILED}, diagnostics[0].Code);
+                VERIFY_ARE_EQUAL(composePath.wstring(), diagnostics[0].SourcePath);
+                VERIFY_ARE_EQUAL(
+                    std::vector<std::string>(
+                        {std::format("0x{:08X}", static_cast<ULONG>(E_INVALIDARG)), wsl::shared::string::WideToMultiByte(expectedMessage)}),
+                    diagnostics[0].Arguments);
             }
         }
     }

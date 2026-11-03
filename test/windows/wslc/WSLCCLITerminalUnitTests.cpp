@@ -253,10 +253,8 @@ class WSLCCLITerminalUnitTests
         VERIFY_IS_NOT_NULL(callback.Get());
 
         WSLCComposeProgressEvent event{};
-        event.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
         event.SequenceNumber = 1;
-        event.Kind = WSLCComposeProgressEventKindStatus;
-        event.Value.Status.Status = WSLCComposeStatusExecuting;
+        event.Status = WSLCComposeStatusExecuting;
 
         VERIFY_SUCCEEDED(callback->OnProgress(&event));
         VERIFY_ARE_EQUAL(std::wstring{}, cap.outPipe.captured());
@@ -269,15 +267,17 @@ class WSLCCLITerminalUnitTests
         auto callback = Microsoft::WRL::Make<services::ComposeProgressCallback>(cap.terminal, WSLCComposeActionStop);
         VERIFY_IS_NOT_NULL(callback.Get());
 
+        const WSLCComposeResourceProgressEvent progress{
+            .Operation = "stop",
+            .ResourceKey = "project-web-1",
+            .Current = 1,
+            .Total = 2,
+            .Unit = "container",
+        };
         WSLCComposeProgressEvent event{};
-        event.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
         event.SequenceNumber = 1;
-        event.Kind = WSLCComposeProgressEventKindProgress;
-        event.Value.Progress.Operation = "stop";
-        event.Value.Progress.ResourceKey = "project-web-1";
-        event.Value.Progress.Current = 1;
-        event.Value.Progress.Total = 2;
-        event.Value.Progress.Unit = "container";
+        event.Status = WSLCComposeStatusExecuting;
+        event.Progress = &progress;
 
         VERIFY_SUCCEEDED(callback->OnProgress(&event));
         VERIFY_ARE_EQUAL(std::wstring{}, cap.outPipe.captured());
@@ -290,15 +290,17 @@ class WSLCCLITerminalUnitTests
         auto callback = Microsoft::WRL::Make<services::ComposeProgressCallback>(cap.terminal, WSLCComposeActionStart);
         VERIFY_IS_NOT_NULL(callback.Get());
 
+        const WSLCComposeResourceProgressEvent progress{
+            .Operation = "start",
+            .ResourceKey = "project-web-1",
+            .Current = 1,
+            .Total = 2,
+            .Unit = "container",
+        };
         WSLCComposeProgressEvent event{};
-        event.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
         event.SequenceNumber = 1;
-        event.Kind = WSLCComposeProgressEventKindProgress;
-        event.Value.Progress.Operation = "start";
-        event.Value.Progress.ResourceKey = "project-web-1";
-        event.Value.Progress.Current = 1;
-        event.Value.Progress.Total = 2;
-        event.Value.Progress.Unit = "container";
+        event.Status = WSLCComposeStatusExecuting;
+        event.Progress = &progress;
 
         VERIFY_SUCCEEDED(callback->OnProgress(&event));
         VERIFY_ARE_EQUAL(std::wstring{}, cap.outPipe.captured());
@@ -311,22 +313,24 @@ class WSLCCLITerminalUnitTests
         auto callback = Microsoft::WRL::Make<services::ComposeProgressCallback>(cap.terminal, WSLCComposeActionUp);
         VERIFY_IS_NOT_NULL(callback.Get());
 
+        WSLCComposeResourceProgressEvent progress{
+            .Operation = "create",
+            .ResourceKey = "project_default",
+            .Current = 1,
+            .Total = 1,
+            .Unit = "network",
+        };
         WSLCComposeProgressEvent event{};
-        event.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
         event.SequenceNumber = 1;
-        event.Kind = WSLCComposeProgressEventKindProgress;
-        event.Value.Progress.Operation = "create";
-        event.Value.Progress.ResourceKey = "project_default";
-        event.Value.Progress.Current = 1;
-        event.Value.Progress.Total = 1;
-        event.Value.Progress.Unit = "network";
+        event.Status = WSLCComposeStatusExecuting;
+        event.Progress = &progress;
 
         VERIFY_SUCCEEDED(callback->OnProgress(&event));
 
         event.SequenceNumber = 2;
-        event.Value.Progress.Operation = "pull";
-        event.Value.Progress.ResourceKey = "python:3.12-alpine";
-        event.Value.Progress.Unit = "image";
+        progress.Operation = "pull";
+        progress.ResourceKey = "python:3.12-alpine";
+        progress.Unit = "image";
         VERIFY_SUCCEEDED(callback->OnProgress(&event));
 
         VERIFY_ARE_EQUAL(std::wstring{}, cap.outPipe.captured());
@@ -341,10 +345,8 @@ class WSLCCLITerminalUnitTests
         VERIFY_IS_NOT_NULL(callback.Get());
 
         WSLCComposeProgressEvent event{};
-        event.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
         event.SequenceNumber = 1;
-        event.Kind = WSLCComposeProgressEventKindStatus;
-        event.Value.Status.Status = WSLCComposeStatusSucceeded;
+        event.Status = WSLCComposeStatusSucceeded;
 
         VERIFY_SUCCEEDED(callback->OnProgress(&event));
         VERIFY_ARE_EQUAL(std::wstring{}, cap.outPipe.captured());
@@ -357,24 +359,77 @@ class WSLCCLITerminalUnitTests
         auto callback = Microsoft::WRL::Make<services::ComposeProgressCallback>(cap.terminal, WSLCComposeActionRemove);
         VERIFY_IS_NOT_NULL(callback.Get());
 
+        const WSLCComposeResourceProgressEvent progress{
+            .Operation = "remove",
+            .ResourceKey = "project-web-1",
+            .Current = 1,
+            .Total = 1,
+            .Unit = "container",
+        };
         WSLCComposeProgressEvent event{};
-        event.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
         event.SequenceNumber = 1;
-        event.Kind = WSLCComposeProgressEventKindProgress;
-        event.Value.Progress.Operation = "remove";
-        event.Value.Progress.ResourceKey = "project-web-1";
-        event.Value.Progress.Current = 1;
-        event.Value.Progress.Total = 1;
-        event.Value.Progress.Unit = "container";
+        event.Status = WSLCComposeStatusExecuting;
+        event.Progress = &progress;
         VERIFY_SUCCEEDED(callback->OnProgress(&event));
 
         event.SequenceNumber = 2;
-        event.Kind = WSLCComposeProgressEventKindStatus;
-        event.Value.Status.Status = WSLCComposeStatusSucceeded;
+        event.Status = WSLCComposeStatusSucceeded;
+        event.Progress = nullptr;
         VERIFY_SUCCEEDED(callback->OnProgress(&event));
 
         VERIFY_ARE_EQUAL(std::wstring{}, cap.outPipe.captured());
         VERIFY_ARE_EQUAL(std::wstring{L"Removing Container project-web-1 (1/1)\n"}, cap.errPipe.captured());
+    }
+
+    TEST_METHOD(ComposeProgressCallback_DiagnosticSeveritiesUseErrorChannel)
+    {
+        SplitCaptureTerminal cap;
+        auto callback = Microsoft::WRL::Make<services::ComposeProgressCallback>(cap.terminal, WSLCComposeActionValidate);
+        VERIFY_IS_NOT_NULL(callback.Get());
+
+        WSLCComposeDiagnosticEvent diagnostic{};
+        diagnostic.Code = "diagnostic";
+        WSLCComposeProgressEvent event{};
+        event.Status = WSLCComposeStatusValidating;
+        event.Diagnostic = &diagnostic;
+        for (const auto severity : {WSLCComposeDiagnosticSeverityInfo, WSLCComposeDiagnosticSeverityWarning, WSLCComposeDiagnosticSeverityError})
+        {
+            ++event.SequenceNumber;
+            diagnostic.Severity = severity;
+            VERIFY_SUCCEEDED(callback->OnProgress(&event));
+        }
+
+        VERIFY_ARE_EQUAL(std::wstring{}, cap.outPipe.captured());
+        VERIFY_ARE_EQUAL(std::wstring{L"diagnostic\ndiagnostic\ndiagnostic\n"}, cap.errPipe.captured());
+    }
+
+    TEST_METHOD(ComposeProgressCallback_CombinedNotificationRendersAllDetails)
+    {
+        SplitCaptureTerminal cap;
+        auto callback = Microsoft::WRL::Make<services::ComposeProgressCallback>(cap.terminal, WSLCComposeActionRemove);
+        VERIFY_IS_NOT_NULL(callback.Get());
+
+        const WSLCComposeResourceProgressEvent progress{
+            .Operation = "remove",
+            .ResourceKey = "project-web-1",
+            .Current = 1,
+            .Total = 1,
+            .Unit = "container",
+        };
+        const WSLCComposeDiagnosticEvent diagnostic{
+            .Severity = WSLCComposeDiagnosticSeverityInfo,
+            .Code = "diagnostic",
+        };
+        const WSLCComposeProgressEvent event{
+            .SequenceNumber = 1,
+            .Status = WSLCComposeStatusSucceeded,
+            .Progress = &progress,
+            .Diagnostic = &diagnostic,
+        };
+
+        VERIFY_SUCCEEDED(callback->OnProgress(&event));
+        VERIFY_ARE_EQUAL(std::wstring{}, cap.outPipe.captured());
+        VERIFY_ARE_EQUAL(std::wstring{L"Removing Container project-web-1 (1/1)\ndiagnostic\n"}, cap.errPipe.captured());
     }
 
     TEST_METHOD(ComposeProgressCallback_StreamsReadyBorrowsPipeHandle)
@@ -416,6 +471,7 @@ class WSLCCLITerminalUnitTests
         int socketType{};
         int socketTypeSize = sizeof(socketType);
         VERIFY_ARE_EQUAL(0, getsockopt(stream.get(), SOL_SOCKET, SO_TYPE, reinterpret_cast<char*>(&socketType), &socketTypeSize));
+        callback.Reset();
     }
 
     TEST_METHOD(Terminal_SetNoColorTogglesIsNoColor)
