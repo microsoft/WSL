@@ -854,6 +854,10 @@ Para obtener más información sobre Admin Protection, visite https://aka.ms/apd
     <value>Nombre de distribución no válido: "{}".</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageInvalidDistribution" xml:space="preserve">
+    <value>Found invalid distribution registration '{}', {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholders are the distribution's registry GUID and the error code.</comment>
+  </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>Usando registro de distribución heredado. Considere la posibilidad de usar una distribución basada en tar en su lugar.</value>
     <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
