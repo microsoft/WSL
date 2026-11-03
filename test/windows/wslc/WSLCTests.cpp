@@ -3477,6 +3477,51 @@ class WSLCTests
         VERIFY_ARE_EQUAL(reason, WSLCVirtualMachineTerminationReasonShutdown);
     }
 
+    // Validate that a VM being terminated due the HCS service stopping is correctly reported to the caller.
+    WSLC_TEST_METHOD(HcsServiceDisconnect)
+    {
+        auto restoreSession = ResetTestSession();
+
+        const wil::unique_schandle manager{OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT)};
+        VERIFY_IS_NOT_NULL(manager);
+
+        const wil::unique_schandle service{OpenService(manager.get(), L"vmcompute", SERVICE_STOP | SERVICE_QUERY_STATUS | SERVICE_START)};
+        VERIFY_IS_NOT_NULL(service);
+
+        auto session = CreateSession(GetDefaultSessionSettings(L"hcs-service-disconnect-test"));
+        ExpectCommandResult(session.get(), {"/bin/true"}, 0);
+
+        wil::unique_handle terminationEvent;
+        VERIFY_SUCCEEDED(session->GetTerminationEvent(&terminationEvent));
+        VERIFY_ARE_EQUAL(WaitForSingleObject(terminationEvent.get(), 0), static_cast<DWORD>(WAIT_TIMEOUT));
+
+        const auto servicePid = GetServiceState(service.get()).second;
+        SERVICE_STATUS status{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(ControlService(service.get(), SERVICE_CONTROL_STOP, &status));
+        VERIFY_IS_TRUE(WaitForServiceState(service.get(), SERVICE_STOPPED, servicePid));
+
+        VERIFY_ARE_EQUAL(WaitForSingleObject(terminationEvent.get(), 60 * 1000), static_cast<DWORD>(WAIT_OBJECT_0));
+
+        WSLCVirtualMachineTerminationReason reason{};
+        wil::unique_cotaskmem_string details;
+        VERIFY_SUCCEEDED(session->GetTerminationReason(&reason, &details));
+        VERIFY_ARE_EQUAL(reason, WSLCVirtualMachineTerminationReasonUnknown);
+
+        WSLCSessionState state{};
+        VERIFY_SUCCEEDED(session->GetState(&state));
+        VERIFY_ARE_EQUAL(state, WSLCSessionStateTerminated);
+
+        if (!StartService(service.get(), 0, nullptr))
+        {
+            THROW_LAST_ERROR_IF(GetLastError() != ERROR_SERVICE_ALREADY_RUNNING);
+        }
+
+        VERIFY_IS_TRUE(WaitForServiceState(service.get(), SERVICE_RUNNING, 0));
+
+        auto recoveredSession = CreateSession(GetDefaultSessionSettings(L"hcs-service-recovery-test"));
+        ExpectCommandResult(recoveredSession.get(), {"/bin/true"}, 0);
+    }
+
     WSLC_TEST_METHOD(CrashDumpCallback)
     {
         struct Invocation
