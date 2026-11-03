@@ -60,6 +60,7 @@ namespace Microsoft.WSL.Containers
         VhdOptions VhdRequirements;
         Boolean EnableGpu;
         String HostLoopback;
+        Boolean EnableNestedVirtualization;
     };
 
     runtimeclass Session : Windows.Foundation.IClosable
