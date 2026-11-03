@@ -273,7 +273,7 @@ void WslCoreInstance::CreateLxProcess(
     if (WI_IsFlagSet(message->Flags, LxInitCreateProcessFlagAllowOOBE))
     {
         {
-            m_oobeCompleteEvent = wil::shared_event(wil::EventOptions::ManualReset);
+            auto oobeCompleteEvent = wil::shared_event(wil::EventOptions::ManualReset);
 
             auto impersonate = wil::CoImpersonateClient();
             auto registration = wsl::windows::service::DistributionRegistration::Open(
@@ -285,8 +285,8 @@ void WslCoreInstance::CreateLxProcess(
                 m_oobeThread.join();
             }
 
-            m_oobeThread = std::thread(
-                [this, socket = std::move(sockets[5]), registration = std::move(registration), oobeCompleteEvent = m_oobeCompleteEvent]() mutable {
+            m_oobeThread =
+                std::thread([this, socket = std::move(sockets[5]), registration = std::move(registration), oobeCompleteEvent]() mutable {
                     try
                     {
                         ReadOOBEResult(std::move(socket), std::move(registration));
@@ -295,6 +295,8 @@ void WslCoreInstance::CreateLxProcess(
 
                     oobeCompleteEvent.SetEvent();
                 });
+
+            m_oobeCompleteEvent = std::move(oobeCompleteEvent);
         }
     }
 }
