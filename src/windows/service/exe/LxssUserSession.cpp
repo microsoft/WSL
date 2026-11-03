@@ -1056,10 +1056,25 @@ HRESULT LxssUserSessionImpl::EnumerateDistributions(_Out_ PULONG DistributionCou
     auto userDistributions(wil::make_unique_cotaskmem<LXSS_ENUMERATE_INFO[]>(numberOfDistributions));
 
     // Fill in information about each distribution.
+    ULONG validDistributionCount = 0;
     for (ULONG index = 0; index < numberOfDistributions; index += 1)
     {
+        LXSS_DISTRO_CONFIGURATION configuration{};
+        try
+        {
+            configuration = s_GetDistributionConfiguration(distributions[index]);
+            THROW_HR_IF(E_INVALIDARG, configuration.Name.size() > LX_INIT_DISTRO_NAME_MAX);
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
 
-        auto configuration = s_GetDistributionConfiguration(distributions[index]);
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageInvalidDistribution(
+                distributions[index].Id(), wsl::windows::common::wslutil::ErrorCodeToString(wil::ResultFromCaughtException())));
+
+            continue;
+        }
+
         auto state = static_cast<LxssDistributionState>(configuration.State);
 
         if (m_runningInstances.contains(distributions[index].Id()))
@@ -1078,7 +1093,7 @@ HRESULT LxssUserSessionImpl::EnumerateDistributions(_Out_ PULONG DistributionCou
             }
         }
 
-        const auto current = &userDistributions.get()[index];
+        const auto current = &userDistributions.get()[validDistributionCount];
         current->DistroGuid = distributions[index].Id();
         current->State = state;
         current->Version = WI_IsFlagSet(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE) ? LXSS_WSL_VERSION_2 : LXSS_WSL_VERSION_1;
@@ -1089,9 +1104,10 @@ HRESULT LxssUserSessionImpl::EnumerateDistributions(_Out_ PULONG DistributionCou
 
         memset(current->DistroName, 0, sizeof(current->DistroName));
         wcscpy_s(current->DistroName, RTL_NUMBER_OF(current->DistroName), configuration.Name.c_str());
+        validDistributionCount += 1;
     }
 
-    *DistributionCount = numberOfDistributions;
+    *DistributionCount = validDistributionCount;
     *Distributions = userDistributions.release();
     return S_OK;
 }
