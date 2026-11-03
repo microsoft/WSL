@@ -31,9 +31,7 @@ namespace {
             sourcePath = std::filesystem::absolute(path, error).lexically_normal();
             THROW_HR_WITH_USER_ERROR_IF(
                 HRESULT_FROM_WIN32(error.value()), wsl::shared::Localization::MessageWslcComposePathResolveFailed(path), static_cast<bool>(error));
-            baseDirectory = sourcePath.parent_path();
-            projectDirectory = baseDirectory;
-            workingDirectory = std::filesystem::current_path();
+            projectDirectory = sourcePath.parent_path();
 
             // Capture document bytes and source context as the input snapshot for interpretation.
             std::ifstream stream{sourcePath, std::ios::binary | std::ios::ate};
@@ -70,21 +68,18 @@ namespace {
                 stream.gcount() != 0);
 
             document.SourcePath = sourcePath.c_str();
-            document.BaseDirectory = baseDirectory.c_str();
+            document.BaseDirectory = projectDirectory.c_str();
             document.Content = reinterpret_cast<const byte*>(content.data());
             document.ContentSize = contentSize;
 
             documents.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
-            documents.WorkingDirectory = workingDirectory.c_str();
             documents.ProjectDirectory = projectDirectory.c_str();
             documents.Documents = &document;
             documents.DocumentCount = 1;
         }
 
         std::filesystem::path sourcePath;
-        std::filesystem::path baseDirectory;
         std::filesystem::path projectDirectory;
-        std::filesystem::path workingDirectory;
         std::vector<char> content;
         WSLCComposeDocument document{};
         WSLCComposeDocuments documents{};
@@ -98,12 +93,12 @@ namespace {
 
         ComposeOperationResult(ComposeOperationResult&& other) noexcept : value(other.value)
         {
-            other.value.AffectedContainers = nullptr;
-            other.value.AffectedContainersCount = 0;
+            other.value = {};
         }
 
         ~ComposeOperationResult()
         {
+            CoTaskMemFree(value.ErrorMessage);
             CoTaskMemFree(value.AffectedContainers);
         }
 
@@ -143,31 +138,42 @@ namespace {
             request.ActionOptions.Type = WSLCComposeActionOptionsTypeNone;
         }
 
+        wil::unique_handle sessionProcess;
+        THROW_IF_FAILED(session.Get()->GetProcessHandle(&sessionProcess));
+
         wil::com_ptr<IComposeOperation> operation;
         THROW_IF_FAILED(session.Get()->BeginComposeOperation(&request, nullptr, &operation));
 
         wil::unique_handle completionEvent;
         THROW_IF_FAILED(operation->GetCompletionEvent(&completionEvent));
 
-        std::array<HANDLE, 2> handles{completionEvent.get()};
-        DWORD handleCount = 1;
-        std::optional<DWORD> cancelIndex;
-        if (cancelEvent != nullptr)
+        const std::array<HANDLE, 3> handles{completionEvent.get(), sessionProcess.get(), cancelEvent};
+        DWORD handleCount = cancelEvent != nullptr ? 3 : 2;
+        bool completed = false;
+        while (!completed)
         {
-            cancelIndex = handleCount;
-            handles[handleCount++] = cancelEvent;
-        }
-        const DWORD waitResult = WaitForMultipleObjects(handleCount, handles.data(), FALSE, INFINITE);
-        THROW_LAST_ERROR_IF(waitResult == WAIT_FAILED);
-        THROW_HR_IF(E_UNEXPECTED, waitResult < WAIT_OBJECT_0 || waitResult >= WAIT_OBJECT_0 + handleCount);
-        const DWORD signaledIndex = waitResult - WAIT_OBJECT_0;
-        if (cancelIndex.has_value() && signaledIndex == *cancelIndex)
-        {
-            THROW_IF_FAILED(operation->Cancel());
-            THROW_LAST_ERROR_IF(WaitForSingleObject(completionEvent.get(), INFINITE) == WAIT_FAILED);
+            const DWORD waitResult = WaitForMultipleObjects(handleCount, handles.data(), FALSE, INFINITE);
+            THROW_LAST_ERROR_IF(waitResult == WAIT_FAILED);
+            THROW_HR_IF(E_UNEXPECTED, waitResult < WAIT_OBJECT_0 || waitResult >= WAIT_OBJECT_0 + handleCount);
+            switch (waitResult - WAIT_OBJECT_0)
+            {
+            case 0:
+                completed = true;
+                break;
+            case 1:
+                THROW_HR(RPC_E_DISCONNECTED);
+            case 2:
+                THROW_IF_FAILED(operation->Cancel());
+                handleCount = 2;
+                break;
+            default:
+                THROW_HR(E_UNEXPECTED);
+            }
         }
         ComposeOperationResult result;
         THROW_IF_FAILED(operation->GetResult(&result.value));
+        THROW_HR_WITH_USER_ERROR_IF(
+            result.value.Result, result.value.ErrorMessage, FAILED(result.value.Result) && result.value.ErrorMessage != nullptr);
         THROW_IF_FAILED(result.value.Result);
         THROW_HR_IF(E_UNEXPECTED, result.value.Status != WSLCComposeOperationStatusSucceeded);
         return result;

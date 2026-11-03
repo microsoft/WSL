@@ -27,6 +27,19 @@ class WSLCE2EComposeLifecycleTests
         return true;
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Compose_ReportsServiceValidationError)
+    {
+        const auto projectDirectory = std::filesystem::current_path() / ProjectName;
+        auto directoryCleanup = SetupTestDirectory(projectDirectory);
+        const auto composePath = projectDirectory / L"compose.yaml";
+        WriteTestFileContent(composePath, "services:\n  bad name:\n    image: alpine:latest\n");
+
+        const auto result = RunWslc(std::format(L"compose create \"{}\"", composePath.wstring()));
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(
+            result.StderrContainsSubstring(wsl::shared::Localization::MessageWslcComposeServiceNameInvalid("bad name")));
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Compose_Lifecycle_AcceptsFile)
     {
         const auto projectDirectory = std::filesystem::current_path() / ProjectName;
