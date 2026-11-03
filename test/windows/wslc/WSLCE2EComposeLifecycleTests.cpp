@@ -59,7 +59,7 @@ services:
 
         result = RunWslc(std::format(L"compose stop \"{}\"", composePath.wstring()));
         VERIFY_ARE_EQUAL(0u, result.ExitCode.value_or(1));
-        VERIFY_ARE_EQUAL(0, attach.Wait());
+        VERIFY_ARE_EQUAL(0, attach.Wait(120'000));
 
         auto up = RunWslcInteractive(std::format(L"compose up \"{}\"", composePath.wstring()));
         VERIFY_IS_TRUE(up.IsRunning());
@@ -67,7 +67,7 @@ services:
 
         result = RunWslc(std::format(L"compose stop \"{}\"", composePath.wstring()));
         VERIFY_ARE_EQUAL(0u, result.ExitCode.value_or(1));
-        VERIFY_ARE_EQUAL(0, up.Wait());
+        VERIFY_ARE_EQUAL(0, up.Wait(120'000));
     }
 
 private:

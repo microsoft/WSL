@@ -28,6 +28,8 @@ extern bool g_fastTestRun;
 
 namespace {
 
+constexpr DWORD c_waitTimeoutMs = 120'000;
+
 struct ComposeRequestStorage
 {
     ComposeRequestStorage(const std::filesystem::path& path, WSLCComposeAction action)
@@ -154,7 +156,7 @@ public:
         if (block)
         {
             m_blockedEvent.SetEvent();
-            m_continueEvent.wait();
+            RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_TIMEOUT), !m_continueEvent.wait(c_waitTimeoutMs));
         }
 
         return S_OK;
@@ -204,7 +206,7 @@ public:
 
     void WaitUntilBlocked()
     {
-        const DWORD result = WaitForSingleObject(m_blockedEvent.get(), 30'000);
+        const DWORD result = WaitForSingleObject(m_blockedEvent.get(), c_waitTimeoutMs);
         THROW_LAST_ERROR_IF(result == WAIT_FAILED);
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_TIMEOUT), result == WAIT_TIMEOUT);
         THROW_HR_IF(E_UNEXPECTED, result != WAIT_OBJECT_0);
@@ -233,7 +235,7 @@ private:
     wil::unique_event m_continueEvent;
 };
 
-void WaitForComposeCompletion(HANDLE completionEvent, HANDLE sessionProcess, DWORD timeout = INFINITE)
+void WaitForComposeCompletion(HANDLE completionEvent, HANDLE sessionProcess, DWORD timeout = c_waitTimeoutMs)
 {
     const HANDLE handles[] = {completionEvent, sessionProcess};
     const DWORD result = WaitForMultipleObjects(ARRAYSIZE(handles), handles, FALSE, timeout);
@@ -243,7 +245,7 @@ void WaitForComposeCompletion(HANDLE completionEvent, HANDLE sessionProcess, DWO
     THROW_HR_IF(E_UNEXPECTED, result != WAIT_OBJECT_0);
 }
 
-ComposeResult WaitForCompose(IWSLCSession& session, ComposeRequestStorage& request, IComposeProgressCallback* progressCallback = nullptr, DWORD timeout = INFINITE)
+ComposeResult WaitForCompose(IWSLCSession& session, ComposeRequestStorage& request, IComposeProgressCallback* progressCallback = nullptr, DWORD timeout = c_waitTimeoutMs)
 {
     wil::unique_handle sessionProcess;
     THROW_IF_FAILED(session.GetProcessHandle(&sessionProcess));
@@ -260,7 +262,7 @@ ComposeResult WaitForCompose(IWSLCSession& session, ComposeRequestStorage& reque
     return result;
 }
 
-ComposeResult ExecuteCompose(IWSLCSession& session, ComposeRequestStorage& request, IComposeProgressCallback* progressCallback = nullptr, DWORD timeout = INFINITE)
+ComposeResult ExecuteCompose(IWSLCSession& session, ComposeRequestStorage& request, IComposeProgressCallback* progressCallback = nullptr, DWORD timeout = c_waitTimeoutMs)
 {
     auto result = WaitForCompose(session, request, progressCallback, timeout);
     THROW_IF_FAILED(result.value.Result);
@@ -763,7 +765,7 @@ services:
 
         wil::unique_handle completionEvent;
         VERIFY_SUCCEEDED(operation->GetCompletionEvent(&completionEvent));
-        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(completionEvent.get(), 30'000));
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(completionEvent.get(), c_waitTimeoutMs));
 
         ComposeResult result;
         VERIFY_SUCCEEDED(operation->GetResult(&result.value));
@@ -828,11 +830,13 @@ services:
         wil::unique_handle completionEvent;
         VERIFY_SUCCEEDED(operation->GetCompletionEvent(&completionEvent));
         wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() { THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_RETRY), !std::filesystem::exists(markerPath)); }, 100ms, 30s);
+            [&]() { THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_RETRY), !std::filesystem::exists(markerPath)); },
+            100ms,
+            std::chrono::milliseconds{c_waitTimeoutMs});
         VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(completionEvent.get(), 0));
         VERIFY_SUCCEEDED(operation->Cancel());
 
-        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(completionEvent.get(), 30'000));
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(completionEvent.get(), c_waitTimeoutMs));
 
         ComposeResult result;
         VERIFY_SUCCEEDED(operation->GetResult(&result.value));
@@ -901,10 +905,12 @@ services:
         wil::unique_handle completionEvent;
         VERIFY_SUCCEEDED(operation->GetCompletionEvent(&completionEvent));
         wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() { THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_RETRY), !std::filesystem::exists(markerPath)); }, 100ms, 30s);
+            [&]() { THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_RETRY), !std::filesystem::exists(markerPath)); },
+            100ms,
+            std::chrono::milliseconds{c_waitTimeoutMs});
         VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(completionEvent.get(), 0));
         VERIFY_SUCCEEDED(operation->Cancel());
-        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(completionEvent.get(), 30'000));
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(completionEvent.get(), c_waitTimeoutMs));
 
         ComposeResult result;
         VERIFY_SUCCEEDED(operation->GetResult(&result.value));
@@ -982,7 +988,7 @@ services:
 
         wil::unique_handle completionEvent;
         VERIFY_SUCCEEDED(operation->GetCompletionEvent(&completionEvent));
-        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(completionEvent.get(), 30'000));
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(completionEvent.get(), c_waitTimeoutMs));
 
         ComposeResult result;
         VERIFY_SUCCEEDED(operation->GetResult(&result.value));
@@ -1301,7 +1307,7 @@ secrets:
 
             wil::unique_handle completionEvent;
             VERIFY_SUCCEEDED(operation->GetCompletionEvent(&completionEvent));
-            WaitForComposeCompletion(completionEvent.get(), sessionProcess.get(), 30'000);
+            WaitForComposeCompletion(completionEvent.get(), sessionProcess.get());
 
             ComposeResult first;
             ComposeResult second;
@@ -1364,7 +1370,7 @@ secrets:
 
         VERIFY_WIN32_BOOL_SUCCEEDED(TerminateProcess(sessionProcess.get(), ERROR_PROCESS_ABORTED));
         VERIFY_ARE_EQUAL(RPC_E_DISCONNECTED, wil::ResultFromException([&] {
-                             WaitForComposeCompletion(completionEvent.get(), sessionProcess.get(), 30'000);
+                             WaitForComposeCompletion(completionEvent.get(), sessionProcess.get());
                          }));
         VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(completionEvent.get(), 0));
         VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(defaultSessionProcess.get(), 0));
@@ -1420,14 +1426,14 @@ secrets:
         VERIFY_SUCCEEDED(queued->GetCompletionEvent(&queuedEvent));
 
         ComposeRequestStorage validateRequest{composePath, WSLCComposeActionValidate};
-        const auto validated = ExecuteCompose(*m_defaultSession, validateRequest, nullptr, 30'000);
+        const auto validated = ExecuteCompose(*m_defaultSession, validateRequest);
         VERIFY_ARE_EQUAL(projectKey, std::string{validated.value.ProjectKey});
         VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(queuedEvent.get(), 1'000));
         ComposeResult incomplete;
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_IO_INCOMPLETE), queued->GetResult(&incomplete.value));
 
         VERIFY_SUCCEEDED(queued->Cancel());
-        WaitForComposeCompletion(queuedEvent.get(), sessionProcess.get(), 30'000);
+        WaitForComposeCompletion(queuedEvent.get(), sessionProcess.get());
         ComposeResult cancelled;
         VERIFY_SUCCEEDED(queued->GetResult(&cancelled.value));
         VERIFY_ARE_EQUAL(WSLCComposeOperationStatusCancelled, cancelled.value.Status);
@@ -1437,7 +1443,7 @@ secrets:
         VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(creatingEvent.get(), 0));
 
         creatingProgress->Continue();
-        WaitForComposeCompletion(creatingEvent.get(), sessionProcess.get(), 30'000);
+        WaitForComposeCompletion(creatingEvent.get(), sessionProcess.get());
         ComposeResult created;
         VERIFY_SUCCEEDED(creating->GetResult(&created.value));
         VERIFY_SUCCEEDED(created.value.Result);
@@ -1484,7 +1490,7 @@ secrets:
 
         ComposeRequestStorage independentRequest{composePath, WSLCComposeActionCreate};
         independentRequest.SetProjectName(projectKeys[1]);
-        const auto independent = ExecuteCompose(*m_defaultSession, independentRequest, nullptr, 30'000);
+        const auto independent = ExecuteCompose(*m_defaultSession, independentRequest);
         VERIFY_ARE_EQUAL(projectKeys[1], std::string{independent.value.ProjectKey});
         VERIFY_ARE_EQUAL(1u, independent.value.AffectedContainersCount);
         VERIFY_ARE_EQUAL(projectKeys[1] + "-service-1", std::string{independent.value.AffectedContainers[0].Name});
@@ -1493,7 +1499,7 @@ secrets:
         progress->Continue();
         wil::unique_handle sessionProcess;
         VERIFY_SUCCEEDED(m_defaultSession->GetProcessHandle(&sessionProcess));
-        WaitForComposeCompletion(blockedEvent.get(), sessionProcess.get(), 30'000);
+        WaitForComposeCompletion(blockedEvent.get(), sessionProcess.get());
         ComposeResult result;
         VERIFY_SUCCEEDED(blocked->GetResult(&result.value));
         VERIFY_SUCCEEDED(result.value.Result);
