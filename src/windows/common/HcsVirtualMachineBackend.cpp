@@ -30,6 +30,8 @@ namespace {
 
 namespace schema = wsl::windows::common::hcs;
 
+constexpr DWORD c_vmTerminateTimeout = 30 * 1000;
+
 template <typename... Visitors>
 struct Overloaded : Visitors...
 {
@@ -685,6 +687,9 @@ void HcsVirtualMachineBackend::Shutdown()
             schema::TerminateComputeSystem(m_terminationSystem.get());
         }
         CATCH_LOG()
+
+        // The HCS operation can complete before OnExit has cached the exit reason.
+        m_exitEvent.wait(c_vmTerminateTimeout);
     }
 
     std::shared_ptr<GuestDeviceManager> guestDeviceManager;
@@ -733,7 +738,7 @@ VmGuestListener HcsVirtualMachineBackend::CreateGuestListener(GuestServicePort P
 wil::unique_socket HcsVirtualMachineBackend::ConnectGuest(GuestServicePort Port)
 {
     auto lock = m_lock.lock_shared();
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system || m_state == VmState::Stopped);
     return wsl::windows::common::hvsocket::Connect(m_configuration.Description.Identity.VmId, Port.Value);
 }
 
