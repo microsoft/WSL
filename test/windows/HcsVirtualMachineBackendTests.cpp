@@ -238,11 +238,29 @@ class HcsVirtualMachineBackendTests
         backend->RegisterTerminationCallback(
             [&](GUID) { callbackReasonResult = OperationResult([&] { backend->GetTerminationReason(); }); });
 
+        const auto startTime = std::chrono::steady_clock::now();
         backend->Terminate();
+        VERIFY_IS_TRUE(std::chrono::steady_clock::now() - startTime < 5s);
         VERIFY_IS_TRUE(terminationEvent.is_signaled());
         VERIFY_ARE_EQUAL(S_OK, callbackReasonResult);
         VERIFY_ARE_EQUAL(VmTerminationReason::Unknown, backend->GetTerminationReason().Reason);
         backend.reset();
+        VERIFY_IS_TRUE(terminationEvent.is_signaled());
+    }
+
+    WSL2_TEST_METHOD(FinalizesFailedStartWithoutExitNotification)
+    {
+        SKIP_TEST_ARM64();
+        auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        const auto terminationEvent = backend->GetTerminationEvent();
+        wsl::windows::common::hcs::RegisterCallback(backend->GetComputeSystemHandle(), [](HCS_EVENT*, void*) {}, nullptr);
+        wsl::windows::common::hcs::TerminateComputeSystem(backend->GetComputeSystemHandle());
+
+        VERIFY_FAILED(OperationResult([&] { backend->Start(); }));
+        VERIFY_IS_FALSE(terminationEvent.is_signaled());
+        const auto startTime = std::chrono::steady_clock::now();
+        backend.reset();
+        VERIFY_IS_TRUE(std::chrono::steady_clock::now() - startTime < 5s);
         VERIFY_IS_TRUE(terminationEvent.is_signaled());
     }
 

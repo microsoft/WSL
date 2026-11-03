@@ -3030,18 +3030,9 @@ std::filesystem::path GetInstalledWslToolsPath()
 {
     using namespace wsl::windows::common::wslutil;
 
-    if (const auto installPath = GetMsiPackagePath())
-    {
-        return std::filesystem::path{installPath.value()} / LXSS_TOOLS_DIRECTORY;
-    }
-
-    const winrt::Windows::Management::Deployment::PackageManager packageManager;
-    const auto packages = packageManager.FindPackagesForUser(L"", c_msixPackageFamilyName);
-    const auto iter = packages.First();
-    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), !iter.HasCurrent(), "WSL package is not installed");
-    const auto package = iter.Current();
-    LOG_HR_IF_MSG(E_UNEXPECTED, iter.MoveNext(), "More than one WSL package found for packageFamily=%ls", c_msixPackageFamilyName);
-    return std::filesystem::path{package.InstalledLocation().Path().c_str()} / LXSS_TOOLS_DIRECTORY;
+    const auto installPath = GetMsiPackagePath();
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), !installPath, "WSL MSI package is not installed");
+    return std::filesystem::path{installPath.value()} / LXSS_TOOLS_DIRECTORY;
 }
 
 std::filesystem::path GetTestImagePath(std::string_view imageName)

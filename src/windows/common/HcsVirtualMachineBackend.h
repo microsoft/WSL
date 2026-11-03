@@ -232,6 +232,8 @@ private:
     _Guarded_by_(m_lock) std::optional<VmGpuAttachment> m_gpu;
     _Guarded_by_(m_lock) VmState m_state = VmState::Unknown;
     _Guarded_by_(m_lock) bool m_cleanupStarted = false;
+    // Shutdown must check this without waiting for operations holding m_lock.
+    std::atomic<bool> m_started{false};
     // Serializes persistent memory additions. Shutdown drains them before closing the HCS handles.
     wil::srwlock m_persistentMemoryLock;
     _Guarded_by_(m_persistentMemoryLock) std::uint32_t m_nextPersistentMemoryIndex = 0;
