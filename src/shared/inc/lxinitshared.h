@@ -1706,18 +1706,11 @@ struct WSLC_LISTDIR
 struct WSLC_MOUNT_RESULT
 {
     static inline auto Type = LxMessageWSLCMountResult;
-    enum class LocalhostConfigurationFailure : uint32_t
-    {
-        None,
-        Hosts,
-        NameServiceSwitch,
-    };
 
     MESSAGE_HEADER Header{};
     int Result{};
-    LocalhostConfigurationFailure LocalhostFailure{};
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Result), "LocalhostFailure", static_cast<uint32_t>(LocalhostFailure));
+    PRETTY_PRINT(FIELD(Header), FIELD(Result));
 };
 
 struct WSLC_MOUNT

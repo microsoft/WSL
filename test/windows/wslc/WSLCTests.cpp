@@ -3675,6 +3675,14 @@ class WSLCTests
         VERIFY_SUCCEEDED(session->ListImages(nullptr, &images, images.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(0u, images.size());
 
+        auto result = RunCommand(session.get(), {"/bin/cat", "/etc/hosts"});
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_ARE_EQUAL("127.0.0.1\tlocalhost\n::1\tlocalhost ip6-localhost ip6-loopback\n", result.Output[1]);
+
+        result = RunCommand(session.get(), {"/bin/sh", "-c", "awk '$1 == \"hosts:\" {$1=$1; print}' /etc/nsswitch.conf"});
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_ARE_EQUAL("hosts: files dns\n", result.Output[1]);
+
         LoadTestImage(*session, "python:3.12-alpine");
         constexpr auto c_dnsSink = R"PY(
 import socket
@@ -3695,7 +3703,7 @@ print(f'DNS queries: {queries}', flush=True)
         std::array dnsHandles{dnsProcess.GetStdHandle(1), dnsProcess.GetStdHandle(2)};
         WaitForOutput(wsl::windows::common::io::HandleWrapper{dnsHandles[0].Get()}, "DNS ready\n");
 
-        auto result = RunCommand(
+        result = RunCommand(
             session.get(),
             {"/bin/sh", "-c", "printf 'nameserver 127.0.0.1\\noptions timeout:30 attempts:1\\n' > /etc/resolv.conf"});
         VERIFY_ARE_EQUAL(0, result.Code);

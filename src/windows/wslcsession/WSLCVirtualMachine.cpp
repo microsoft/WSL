@@ -365,6 +365,8 @@ void WSLCVirtualMachine::Initialize()
     const auto rootDevice = GetVhdDevicePath(0);
     Mount(m_initChannel, rootDevice.c_str(), "/mnt", m_rootVhdType.c_str(), "ro", WSLC_MOUNT::Chroot | WSLC_MOUNT::OverlayFs);
 
+    ConfigureLocalhost();
+
     const auto modulesDevice = GetVhdDevicePath(1);
     MountModules(m_initChannel, modulesDevice.c_str());
 
@@ -420,6 +422,28 @@ WSLCVirtualMachine::~WSLCVirtualMachine()
     {
         m_crashDumpThread.join();
     }
+}
+
+void WSLCVirtualMachine::ConfigureLocalhost()
+{
+    constexpr std::string_view c_hosts = "127.0.0.1\tlocalhost\n::1\tlocalhost ip6-localhost ip6-loopback\n";
+
+    // Linux <fcntl.h> flags for open().
+    constexpr int c_lxOWriteOnly = 0x1;
+    constexpr int c_lxOCreate = 0x40;
+    constexpr int c_lxOTruncate = 0x200;
+    constexpr int c_lxOCloseOnExec = 0x80000;
+    constexpr int c_lxONoFollow = 0x20000;
+
+    wsl::shared::MessageWriter<WSLC_WRITE_FILE> message;
+    message.WriteString(message->PathIndex, "/etc/hosts");
+    message->ContentLength = static_cast<unsigned int>(c_hosts.size());
+    gsl::copy(gsl::as_bytes(gsl::make_span(c_hosts.data(), c_hosts.size())), message.InsertBuffer(message->ContentIndex, c_hosts.size()));
+    message->OpenFlags = c_lxOWriteOnly | c_lxOCreate | c_lxOTruncate | c_lxOCloseOnExec | c_lxONoFollow;
+    message->Permissions = 0644;
+
+    const auto& response = m_initChannel.Transaction<WSLC_WRITE_FILE>(message.Span(), nullptr, m_initChannelTimeout);
+    CheckGuestHostsFileWriteResult(response.Result);
 }
 
 void WSLCVirtualMachine::ConfigureNetworking()
@@ -991,7 +1015,7 @@ void WSLCVirtualMachine::Mount(shared::SocketChannel& Channel, LPCSTR Source, LP
         TraceLoggingValue(Flags, "Flags"),
         TraceLoggingValue(response.Result, "Result"));
 
-    CheckGuestMountResult(response);
+    THROW_HR_IF(E_FAIL, response.Result != 0);
 }
 
 void WSLCVirtualMachine::MountModules(shared::SocketChannel& Channel, LPCSTR Source)
@@ -1003,7 +1027,7 @@ void WSLCVirtualMachine::MountModules(shared::SocketChannel& Channel, LPCSTR Sou
 
     WSL_LOG("WSLCMountModules", TraceLoggingValue(Source, "Source"), TraceLoggingValue(response.Result, "Result"));
 
-    CheckGuestMountResult(response);
+    THROW_HR_IF(E_FAIL, response.Result != 0);
 }
 
 void WSLCVirtualMachine::MountVirtioFsChild(shared::SocketChannel& Channel, LPCSTR Source, LPCSTR ChildName, LPCSTR Target, LPCSTR Options, ULONG Flags)
@@ -1027,7 +1051,7 @@ void WSLCVirtualMachine::MountVirtioFsChild(shared::SocketChannel& Channel, LPCS
         TraceLoggingValue(Flags, "Flags"),
         TraceLoggingValue(response.Result, "Result"));
 
-    CheckGuestMountResult(response);
+    THROW_HR_IF(E_FAIL, response.Result != 0);
 }
 
 int32_t WSLCVirtualMachine::ExpectClosedChannelOrError(wsl::shared::SocketChannel& Channel)

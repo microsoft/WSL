@@ -4,33 +4,15 @@
 
 #include "ExecutionContext.h"
 #include "Localization.h"
-#include "lxinitshared.h"
 
 namespace wsl::windows::service::wslc {
 
-inline void CheckGuestMountResult(const WSLC_MOUNT_RESULT& Response)
+inline void CheckGuestHostsFileWriteResult(int Result)
 {
-    if (Response.Result == 0)
+    if (Result != 0)
     {
-        return;
+        THROW_HR_WITH_USER_ERROR(E_FAIL, wsl::shared::Localization::MessageWslcLocalhostWriteFailed("/etc/hosts", Result));
     }
-
-    switch (Response.LocalhostFailure)
-    {
-    case WSLC_MOUNT_RESULT::LocalhostConfigurationFailure::Hosts:
-        THROW_HR_WITH_USER_ERROR(E_FAIL, wsl::shared::Localization::MessageWslcLocalhostInitFailed("/etc/hosts", Response.Result));
-        break;
-
-    case WSLC_MOUNT_RESULT::LocalhostConfigurationFailure::NameServiceSwitch:
-        THROW_HR_WITH_USER_ERROR(E_FAIL, wsl::shared::Localization::MessageWslcLocalhostInitFailed("/etc/nsswitch.conf", Response.Result));
-        break;
-
-    case WSLC_MOUNT_RESULT::LocalhostConfigurationFailure::None:
-        THROW_HR(E_FAIL);
-        break;
-    }
-
-    THROW_HR_MSG(E_UNEXPECTED, "Unexpected localhost configuration failure: %u", static_cast<uint32_t>(Response.LocalhostFailure));
 }
 
 template <typename GetExitCode>
