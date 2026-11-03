@@ -33,6 +33,8 @@ private:
     ComposeExecutionResult RunOperation(std::string& projectKey, std::optional<wsl::windows::common::Error>& primaryError);
     void ReportStatus(WSLCComposeStatus status);
     void ReportStatusNoThrow(WSLCComposeStatus status) noexcept;
+    void ReportFailureDiagnosticNoThrow(HRESULT result, std::wstring_view errorMessage) noexcept;
+    void ReportStreams(const ComposeExecutionResult& result);
     void ReportProgress(std::string_view operation, std::string_view resourceKey, ULONGLONG current, ULONGLONG total, std::string_view unit);
 
     WSLCSession& m_session;
