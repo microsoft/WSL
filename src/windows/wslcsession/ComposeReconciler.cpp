@@ -53,7 +53,7 @@ ComposeExecutionResult ComposeReconciler::Execute(
         break;
 
     case WSLCComposeActionAttach:
-        // The caller uses the observed container identities to establish attachment.
+        // Stream handoff follows final observation and release of the project lock.
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), containers.empty());
         break;
 

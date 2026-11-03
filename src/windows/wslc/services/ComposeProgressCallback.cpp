@@ -67,26 +67,33 @@ namespace {
         return resourceType.empty() ? resourceKeyValue : wsl::shared::Localization::MessageWslcComposeResource(resourceType, resourceKeyValue);
     }
 
-    common::io::HandleWrapper BorrowComposeStreamHandle(const WSLCHandle& handle)
+    common::io::HandleWrapper DuplicateComposeStreamHandle(const WSLCHandle& handle)
     {
-        // COM owns callback input handles through method return, so the relay must borrow them.
+        // Callback input handles expire on return; the relay retains owned duplicates.
         switch (handle.Type)
         {
         case WSLCHandleTypeFile:
             THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE), handle.Handle.File == nullptr || handle.Handle.File == INVALID_HANDLE_VALUE);
-            return common::io::HandleWrapper{handle.Handle.File};
+            return common::io::HandleWrapper{wil::unique_handle{common::wslutil::DuplicateHandle(handle.Handle.File, std::nullopt, FALSE)}};
 
         case WSLCHandleTypePipe:
             THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE), handle.Handle.Pipe == nullptr || handle.Handle.Pipe == INVALID_HANDLE_VALUE);
-            return common::io::HandleWrapper{handle.Handle.Pipe};
+            return common::io::HandleWrapper{wil::unique_handle{common::wslutil::DuplicateHandle(handle.Handle.Pipe, std::nullopt, FALSE)}};
 
         case WSLCHandleTypeSocket:
         {
             const auto socket = reinterpret_cast<SOCKET>(handle.Handle.Socket);
             THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE), socket == INVALID_SOCKET);
-            return common::io::HandleWrapper{socket};
+            WSAPROTOCOL_INFOW protocolInfo{};
+            const auto result = WSADuplicateSocketW(socket, GetCurrentProcessId(), &protocolInfo);
+            THROW_HR_IF(HRESULT_FROM_WIN32(WSAGetLastError()), result == SOCKET_ERROR);
+            wil::unique_socket duplicate{WSASocketW(
+                FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, &protocolInfo, 0, WSA_FLAG_OVERLAPPED | WSA_FLAG_NO_HANDLE_INHERIT)};
+            THROW_HR_IF(HRESULT_FROM_WIN32(WSAGetLastError()), !duplicate);
+            return common::io::HandleWrapper{std::move(duplicate)};
         }
 
+        case WSLCHandleTypeUnknown:
         default:
             THROW_HR_MSG(E_INVALIDARG, "Unsupported Compose stream handle type: %d", handle.Type);
         }
@@ -137,6 +144,11 @@ try
             m_terminal.Warn(L"{}\n", code);
             break;
         case WSLCComposeDiagnosticSeverityError:
+            // The command's failure renderer consumes operation_failed through the final result.
+            if (event->Value.Diagnostic.Code != nullptr && std::string_view{event->Value.Diagnostic.Code} == WSLC_COMPOSE_DIAGNOSTIC_OPERATION_FAILED)
+            {
+                break;
+            }
             m_terminal.Error(L"{}\n", code);
             break;
         default:
@@ -158,22 +170,32 @@ try
 {
     RETURN_HR_IF_NULL(E_POINTER, streams);
 
-    common::io::MultiHandleWait io;
     if (streams->Stdout.Type != WSLCHandleTypeUnknown)
     {
-        io.AddHandle(std::make_unique<common::io::RelayHandle<common::io::ReadHandle>>(
-            BorrowComposeStreamHandle(streams->Stdout), GetStdHandle(STD_OUTPUT_HANDLE)));
+        m_streamIo.AddHandle(std::make_unique<common::io::RelayHandle<common::io::ReadHandle>>(
+            DuplicateComposeStreamHandle(streams->Stdout), GetStdHandle(STD_OUTPUT_HANDLE)));
     }
 
     if (streams->Stderr.Type != WSLCHandleTypeUnknown)
     {
-        io.AddHandle(std::make_unique<common::io::RelayHandle<common::io::ReadHandle>>(
-            BorrowComposeStreamHandle(streams->Stderr), GetStdHandle(STD_ERROR_HANDLE)));
+        m_streamIo.AddHandle(std::make_unique<common::io::RelayHandle<common::io::ReadHandle>>(
+            DuplicateComposeStreamHandle(streams->Stderr), GetStdHandle(STD_ERROR_HANDLE)));
     }
 
-    io.Run({});
     return S_OK;
 }
 CATCH_RETURN();
+
+void ComposeProgressCallback::RelayStreams(HANDLE cancelEvent)
+{
+    if (cancelEvent != nullptr)
+    {
+        m_streamIo.AddHandle(
+            std::make_unique<common::io::EventHandle>(cancelEvent),
+            common::io::MultiHandleWait::CancelOnCompleted | common::io::MultiHandleWait::NeedNotComplete);
+    }
+
+    m_streamIo.Run({});
+}
 
 } // namespace wsl::windows::wslc::services

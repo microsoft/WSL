@@ -252,6 +252,10 @@ void WSLCComposeOperation::RunInitialized()
 
     if (FAILED(result))
     {
+        if (!cancelled)
+        {
+            ReportFailureDiagnosticNoThrow(progressCallback.get(), result, errorMessage);
+        }
         ReportStatusNoThrow(progressCallback.get(), cancelled ? WSLCComposeStatusCancelled : WSLCComposeStatusFailed);
     }
 
@@ -304,6 +308,19 @@ ComposeExecutionResult WSLCComposeOperation::RunOperation(
 
     auto result = m_session->m_composeReconciler.Execute(
         m_request.Action, desiredProject ? &*desiredProject : nullptr, projectKey, m_request.ActionOptions, m_cancelEvent.get(), progressReporter, primaryError);
+    switch (m_request.Action)
+    {
+    case WSLCComposeActionUp:
+    case WSLCComposeActionAttach:
+        ReportStreams(progressCallback, result);
+        break;
+    case WSLCComposeActionValidate:
+    case WSLCComposeActionCreate:
+    case WSLCComposeActionStart:
+    case WSLCComposeActionStop:
+    case WSLCComposeActionRemove:
+        break;
+    }
     ReportStatusNoThrow(progressCallback, WSLCComposeStatusSucceeded);
     return result;
 }
@@ -334,6 +351,73 @@ void WSLCComposeOperation::ReportStatusNoThrow(IComposeProgressCallback* progres
 {
     // Terminal notification ignores returned errors but still waits for the callback to return.
     LOG_IF_FAILED(wil::ResultFromException([&]() { ReportStatus(progressCallback, status); }));
+}
+
+void WSLCComposeOperation::ReportFailureDiagnosticNoThrow(
+    IComposeProgressCallback* progressCallback, HRESULT result, const std::optional<std::wstring>& errorMessage) noexcept
+{
+    if (progressCallback == nullptr)
+    {
+        return;
+    }
+
+    LOG_IF_FAILED(wil::ResultFromException([&]() {
+        const auto resultCode = std::format("0x{:08X}", static_cast<ULONG>(result));
+        const auto message = errorMessage.has_value() ? wsl::shared::string::WideToMultiByte(*errorMessage) : std::string{};
+        const std::array<LPCSTR, 2> arguments{resultCode.c_str(), message.c_str()};
+        WSLCComposeProgressEvent event{};
+        event.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
+        event.SequenceNumber = ++m_sequenceNumber;
+        event.Kind = WSLCComposeProgressEventKindDiagnostic;
+        event.Value.Diagnostic.Severity = WSLCComposeDiagnosticSeverityError;
+        event.Value.Diagnostic.Code = WSLC_COMPOSE_DIAGNOSTIC_OPERATION_FAILED;
+        event.Value.Diagnostic.Arguments = {.Values = arguments.data(), .Count = static_cast<ULONG>(arguments.size())};
+        if (m_request.Documents.has_value())
+        {
+            event.Value.Diagnostic.SourcePath = m_request.Documents->Documents.front().SourcePath.c_str();
+        }
+
+        auto callbackRegistration = m_session->RegisterUserCOMCallback();
+        THROW_IF_FAILED(progressCallback->OnProgress(&event));
+    }));
+}
+
+void WSLCComposeOperation::ReportStreams(IComposeProgressCallback* progressCallback, const ComposeExecutionResult& result)
+{
+    if (progressCallback == nullptr)
+    {
+        return;
+    }
+
+    // Attachment covers running project containers and succeeds when none are running.
+    // TODO: Align standalone attach with Docker Compose service selection and its error when no target is running.
+    // TODO: Align attached up with Docker Compose attachment timing and log fallback for exited containers.
+    for (const auto& entry : result.AffectedContainers)
+    {
+        CheckCancelled();
+        if (entry.State != WslcContainerStateRunning)
+        {
+            continue;
+        }
+
+        Microsoft::WRL::ComPtr<IWSLCContainer> container;
+        THROW_IF_FAILED(m_session->OpenContainer(entry.Id, &container));
+        wsl::windows::common::wslutil::COMOutputHandle stdinHandle;
+        wsl::windows::common::wslutil::COMOutputHandle stdoutHandle;
+        wsl::windows::common::wslutil::COMOutputHandle stderrHandle;
+        const HRESULT attachResult = container->Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle);
+        if (attachResult == WSLC_E_CONTAINER_NOT_RUNNING)
+        {
+            continue;
+        }
+        THROW_IF_FAILED(attachResult);
+
+        WSLCComposeStreams streams{};
+        streams.Stdout = stdoutHandle;
+        streams.Stderr = stderrHandle;
+        auto callbackRegistration = m_session->RegisterUserCOMCallback();
+        THROW_IF_FAILED(progressCallback->OnStreamsReady(&streams));
+    }
 }
 
 void WSLCComposeOperation::ReportProgress(

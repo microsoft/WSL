@@ -377,6 +377,27 @@ class WSLCCLITerminalUnitTests
         VERIFY_ARE_EQUAL(std::wstring{L"Removing Container project-web-1 (1/1)\n"}, cap.errPipe.captured());
     }
 
+    TEST_METHOD(ComposeProgressCallback_DiagnosticSeveritiesUseErrorChannel)
+    {
+        SplitCaptureTerminal cap;
+        auto callback = Microsoft::WRL::Make<services::ComposeProgressCallback>(cap.terminal, WSLCComposeActionValidate);
+        VERIFY_IS_NOT_NULL(callback.Get());
+
+        WSLCComposeProgressEvent event{};
+        event.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
+        event.Kind = WSLCComposeProgressEventKindDiagnostic;
+        event.Value.Diagnostic.Code = "diagnostic";
+        for (const auto severity : {WSLCComposeDiagnosticSeverityInfo, WSLCComposeDiagnosticSeverityWarning, WSLCComposeDiagnosticSeverityError})
+        {
+            ++event.SequenceNumber;
+            event.Value.Diagnostic.Severity = severity;
+            VERIFY_SUCCEEDED(callback->OnProgress(&event));
+        }
+
+        VERIFY_ARE_EQUAL(std::wstring{}, cap.outPipe.captured());
+        VERIFY_ARE_EQUAL(std::wstring{L"diagnostic\ndiagnostic\ndiagnostic\n"}, cap.errPipe.captured());
+    }
+
     TEST_METHOD(ComposeProgressCallback_StreamsReadyBorrowsPipeHandle)
     {
         SplitCaptureTerminal cap;
@@ -416,6 +437,7 @@ class WSLCCLITerminalUnitTests
         int socketType{};
         int socketTypeSize = sizeof(socketType);
         VERIFY_ARE_EQUAL(0, getsockopt(stream.get(), SOL_SOCKET, SO_TYPE, reinterpret_cast<char*>(&socketType), &socketTypeSize));
+        callback.Reset();
     }
 
     TEST_METHOD(Terminal_SetNoColorTogglesIsNoColor)

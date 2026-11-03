@@ -119,7 +119,7 @@ namespace {
 
         ComposeOperationResult() = default;
 
-        ComposeOperationResult(ComposeOperationResult&& other) noexcept : value(other.value)
+        ComposeOperationResult(ComposeOperationResult&& other) noexcept : value(other.value), callback(std::move(other.callback))
         {
             other.value = {};
         }
@@ -131,6 +131,7 @@ namespace {
         }
 
         WSLCComposeOperationResult value{};
+        Microsoft::WRL::ComPtr<ComposeProgressCallback> callback;
     };
 
     struct CompletedComposeOperation
@@ -234,6 +235,7 @@ namespace {
 
         CompletedComposeOperation completed{.ForceCancellationRequested = forceCancellationRequested};
         THROW_IF_FAILED(operation->GetResult(&completed.Result.value));
+        completed.Result.callback = std::move(callback);
         return completed;
     }
 
@@ -267,49 +269,9 @@ namespace {
 
     int AttachContainers(models::Session& session, const ComposeOperationResult& result, HANDLE cancelEvent)
     {
-        // Attachment covers running project containers and succeeds when none are running.
-        // TODO: Align standalone attach with Docker Compose service selection and its error when no target is running.
-        // TODO: Align attached up with Docker Compose attachment timing and log fallback for exited containers.
         [[maybe_unused]] auto operation = session.BeginContainerOperation();
-        common::io::MultiHandleWait io;
-
-        if (cancelEvent != nullptr)
-        {
-            io.AddHandle(
-                std::make_unique<common::io::EventHandle>(cancelEvent),
-                common::io::MultiHandleWait::CancelOnCompleted | common::io::MultiHandleWait::NeedNotComplete);
-        }
-
-        for (ULONG index = 0; index < result.value.AffectedContainersCount; ++index)
-        {
-            const auto& entry = result.value.AffectedContainers[index];
-            if (entry.State != WslcContainerStateRunning)
-            {
-                continue;
-            }
-
-            wil::com_ptr<IWSLCContainer> container;
-            THROW_IF_FAILED(session.Get()->OpenContainer(entry.Id, &container));
-
-            wsl::windows::common::wslutil::COMOutputHandle stdinHandle;
-            wsl::windows::common::wslutil::COMOutputHandle stdoutHandle;
-            wsl::windows::common::wslutil::COMOutputHandle stderrHandle;
-
-            const HRESULT attachResult = container->Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle);
-            if (attachResult == WSLC_E_CONTAINER_NOT_RUNNING)
-            {
-                continue;
-            }
-            THROW_IF_FAILED(attachResult);
-
-            io.AddHandle(std::make_unique<wsl::windows::common::io::RelayHandle<wsl::windows::common::io::ReadHandle>>(
-                stdoutHandle.Release(), GetStdHandle(STD_OUTPUT_HANDLE)));
-
-            io.AddHandle(std::make_unique<wsl::windows::common::io::RelayHandle<wsl::windows::common::io::ReadHandle>>(
-                stderrHandle.Release(), GetStdHandle(STD_ERROR_HANDLE)));
-        }
-
-        io.Run({});
+        THROW_HR_IF(E_UNEXPECTED, result.callback == nullptr);
+        result.callback->RelayStreams(cancelEvent);
         return 0;
     }
 

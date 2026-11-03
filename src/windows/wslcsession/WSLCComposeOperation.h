@@ -46,6 +46,8 @@ private:
     void CheckCancelled() const;
     void ReportStatus(IComposeProgressCallback* progressCallback, WSLCComposeStatus status);
     void ReportStatusNoThrow(IComposeProgressCallback* progressCallback, WSLCComposeStatus status) noexcept;
+    void ReportFailureDiagnosticNoThrow(IComposeProgressCallback* progressCallback, HRESULT result, const std::optional<std::wstring>& errorMessage) noexcept;
+    void ReportStreams(IComposeProgressCallback* progressCallback, const ComposeExecutionResult& result);
     void ReportProgress(
         IComposeProgressCallback* progressCallback,
         std::string_view operation,

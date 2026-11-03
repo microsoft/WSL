@@ -687,6 +687,7 @@ typedef enum _WSLCComposeProgressEventKind
 {
     WSLCComposeProgressEventKindStatus,
     WSLCComposeProgressEventKindProgress,
+    WSLCComposeProgressEventKindDiagnostic,
 } WSLCComposeProgressEventKind;
 
 typedef enum _WSLCComposeStatus
@@ -698,6 +699,15 @@ typedef enum _WSLCComposeStatus
     WSLCComposeStatusFailed,
     WSLCComposeStatusCancelled,
 } WSLCComposeStatus;
+
+typedef enum _WSLCComposeDiagnosticSeverity
+{
+    WSLCComposeDiagnosticSeverityInfo,
+    WSLCComposeDiagnosticSeverityWarning,
+    WSLCComposeDiagnosticSeverityError,
+} WSLCComposeDiagnosticSeverity;
+
+cpp_quote("#define WSLC_COMPOSE_DIAGNOSTIC_OPERATION_FAILED \"operation_failed\"")
 
 typedef struct _WSLCComposeStatusEvent
 {
@@ -713,6 +723,18 @@ typedef struct _WSLCComposeResourceProgressEvent
     [unique, string] LPCSTR Unit;
 } WSLCComposeResourceProgressEvent;
 
+typedef struct _WSLCComposeDiagnosticEvent
+{
+    WSLCComposeDiagnosticSeverity Severity;
+    [string] LPCSTR Code;
+    // operation_failed arguments contain the HRESULT in hexadecimal and the optional localized failure message.
+    WSLCStringArray Arguments;
+    [unique, string] LPCWSTR PropertyPath;
+    [unique, string] LPCWSTR SourcePath;
+    ULONG Line;
+    ULONG Column;
+} WSLCComposeDiagnosticEvent;
+
 typedef struct _WSLCComposeProgressEvent
 {
     ULONG SchemaVersion;
@@ -726,9 +748,19 @@ typedef struct _WSLCComposeProgressEvent
         WSLCComposeStatusEvent Status;
         [case(WSLCComposeProgressEventKindProgress)]
         WSLCComposeResourceProgressEvent Progress;
+        [case(WSLCComposeProgressEventKindDiagnostic)]
+        WSLCComposeDiagnosticEvent Diagnostic;
         [default];
     } Value;
 } WSLCComposeProgressEvent;
+
+typedef struct _WSLCComposeStreams
+{
+    BOOL Tty;
+    WSLCHandle Stdin;
+    WSLCHandle Stdout;
+    WSLCHandle Stderr;
+} WSLCComposeStreams;
 
 [
     uuid(308809E7-2EB6-4A48-99D9-C959054FDDA9),
@@ -739,8 +771,11 @@ interface IComposeProgressCallback : IUnknown
 {
     // Called synchronously on the operation worker, with sequence numbers starting at one.
     // Event data is borrowed for this call. Return promptly; resource callbacks can hold the project lock.
-    // A failing HRESULT aborts active work; failures delivering terminal status are logged.
+    // A failing HRESULT aborts active work; failures delivering terminal status or failure diagnostics are logged.
     HRESULT OnProgress([in] const WSLCComposeProgressEvent* Event);
+    // Up and Attach deliver one stream set per running container after reconciliation releases the project lock.
+    // Handles are borrowed for this call; retain owned duplicates and return promptly. Relay after operation completion.
+    HRESULT OnStreamsReady([in] const WSLCComposeStreams* Streams);
 }
 
 typedef enum _WSLCComposeOperationStatus
