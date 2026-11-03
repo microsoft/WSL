@@ -240,9 +240,22 @@
         ],
         "Fedora": [
             {
+                "Name": "FedoraLinux-45",
+                "FriendlyName": "Fedora Linux 45",
+                "Default": true,
+                "Amd64Url": {
+                    "Url": "https://download.fedoraproject.org/pub/fedora/linux/releases/45/Container/x86_64/images/Fedora-WSL-Base-45-1.4.x86_64.wsl",
+                    "Sha256": "d20e476140d4cb121b85b1ad2b8fd6bf9fc2750140a7212ad4051ae3c6bd1e23"
+                },
+                "Arm64Url": {
+                    "Url": "https://download.fedoraproject.org/pub/fedora/linux/releases/45/Container/aarch64/images/Fedora-WSL-Base-45-1.4.aarch64.wsl",
+                    "Sha256": "9a25779562113c10ce8f480857217d52f6a386cee2301752d2a34a320e8fd35c"
+                }
+            },
+            {
                 "Name": "FedoraLinux-44",
                 "FriendlyName": "Fedora Linux 44",
-                "Default": true,
+                "Default": false,
                 "Amd64Url": {
                     "Url": "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Container/x86_64/images/Fedora-WSL-Base-44-1.7.x86_64.wsl",
                     "Sha256": "2e5b153ba4b639952bf546be577fc19b832fe8944caa7de342b32f10da7d319a"
@@ -250,19 +263,6 @@
                 "Arm64Url": {
                     "Url": "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Container/aarch64/images/Fedora-WSL-Base-44-1.7.aarch64.wsl",
                     "Sha256": "1a3220262dc918b07d08410278205fb35e92c28a53455382028eea1a980476ee"
-                }
-            },
-            {
-                "Name": "FedoraLinux-43",
-                "FriendlyName": "Fedora Linux 43",
-                "Default": false,
-                "Amd64Url": {
-                    "Url": "https://download.fedoraproject.org/pub/fedora/linux/releases/43/Container/x86_64/images/Fedora-WSL-Base-43-1.6.x86_64.wsl",
-                    "Sha256": "220780af9cf225e9645313b4c7b0457a26a38a53285eb203b2ab6188d54d5b82"
-                },
-                "Arm64Url": {
-                    "Url": "https://download.fedoraproject.org/pub/fedora/linux/releases/43/Container/aarch64/images/Fedora-WSL-Base-43-1.6.aarch64.wsl",
-                    "Sha256": "7eef7a83260218d8c878b3c7bbdaf11772103145184d0c65df27557f4cd49548"
                 }
             }
         ],
