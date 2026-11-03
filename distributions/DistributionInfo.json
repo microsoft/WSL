@@ -256,11 +256,11 @@
                 "Default": true,
                 "Amd64Url": {
                     "Url": "https://osrelease.download.prss.microsoft.com/pr/download/a/AzureLinux-4-x86_64.wsl",
-                    "Sha256": "b57250d64ad37daf54d3147bfd1cc514d4d5ac1299901a335df46295704fda7f"
+                    "Sha256": "72475ebd5c2f985a34443b23365ae9cb9f4ebd5b8c6b12c96b98b5c28c7eed16"
                 },
                 "Arm64Url": {
                     "Url": "https://osrelease.download.prss.microsoft.com/pr/download/a/AzureLinux-4-aarch64.wsl",
-                    "Sha256": "2ecda754d3f07b69946cf9780ebee12e26207278287f1a4eebc29c899b742685"
+                    "Sha256": "a724b08b408a30b6d3a733ba93cbda70155c63d7d7c3934d2a23a5a5549a0070"
                 }
             }
         ]
