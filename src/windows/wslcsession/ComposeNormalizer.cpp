@@ -92,6 +92,7 @@ ComposeSpec ComposeNormalizer::Normalize(const ComposeDocuments& documents, cons
             !containerNames.insert(container.Name).second);
     }
 
+    std::ranges::sort(spec.Containers, {}, &ComposeContainerDefinition::ServiceName);
     return spec;
 }
 

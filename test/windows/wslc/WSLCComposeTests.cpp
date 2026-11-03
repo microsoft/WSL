@@ -713,8 +713,8 @@ class WSLCComposeTests
         if (defaultNames)
         {
             const std::vector<std::string> expectedNames{std::format("{}-client-1", projectKey), std::format("{}-server-1", projectKey)};
-            std::vector<std::string> actualNames{upResult.value.AffectedContainers[0].Name, upResult.value.AffectedContainers[1].Name};
-            std::ranges::sort(actualNames);
+            const std::vector<std::string> actualNames{
+                upResult.value.AffectedContainers[0].Name, upResult.value.AffectedContainers[1].Name};
             VERIFY_ARE_EQUAL(expectedNames, actualNames);
         }
 
@@ -782,6 +782,7 @@ services:
         const auto projectPath = std::filesystem::current_path() / std::format("compose-late-cancel-{}", GetCurrentProcessId());
         const auto composePath = projectPath / "compose.yaml";
         const auto markerPath = projectPath / "term-received";
+        const auto readyPath = projectPath / "ready";
         const auto projectKey = projectPath.filename().string();
         const auto containerName = std::format("{}-late-cancel-1", projectKey);
         auto cleanup = wil::scope_exit([&] {
@@ -796,14 +797,14 @@ services:
             std::filesystem::remove_all(projectPath, error);
         });
 
-        std::filesystem::create_directory(projectPath);
+        VERIFY_IS_TRUE(std::filesystem::create_directory(projectPath));
         {
             std::ofstream composeFile(composePath);
             composeFile << R"(
 services:
   late-cancel:
     image: alpine:latest
-    command: ["/bin/sh", "-c", "trap 'touch /work/term-received; sleep 30' TERM; while true; do sleep 1; done"]
+    command: ["/bin/sh", "-c", "trap 'touch /work/term-received; sleep 30' TERM; touch /work/ready; while true; do sleep 1; done"]
     volumes:
       - ./:/work
 )";
@@ -811,6 +812,10 @@ services:
 
         ComposeRequestStorage upRequest{composePath, WSLCComposeActionUp};
         const auto upResult = ExecuteCompose(*m_defaultSession, upRequest);
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() { THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_RETRY), !std::filesystem::exists(readyPath)); },
+            100ms,
+            std::chrono::milliseconds{c_waitTimeoutMs});
 
         ComposeRequestStorage stopRequest{std::string{upResult.value.ProjectKey}, WSLCComposeActionStop};
         stopRequest.SetStopTimeout(5);
@@ -853,6 +858,7 @@ services:
         const auto projectPath = std::filesystem::current_path() / std::format("compose-partial-cancel-{}", GetCurrentProcessId());
         const auto composePath = projectPath / "compose.yaml";
         const auto markerPath = projectPath / "term-received";
+        const auto readyPath = projectPath / "ready";
         const auto projectKey = projectPath.filename().string();
         const auto firstContainerName = std::format("{}-first-1", projectKey);
         const auto secondContainerName = std::format("{}-second-1", projectKey);
@@ -871,12 +877,12 @@ services:
             std::filesystem::remove_all(projectPath, error);
         });
 
-        std::filesystem::create_directory(projectPath);
+        VERIFY_IS_TRUE(std::filesystem::create_directory(projectPath));
         std::ofstream(composePath) << R"(
 services:
   first:
     image: alpine:latest
-    command: ["/bin/sh", "-c", "trap 'touch /work/term-received; sleep 30' TERM; while true; do sleep 1; done"]
+    command: ["/bin/sh", "-c", "trap 'touch /work/term-received; sleep 30' TERM; touch /work/ready; while true; do sleep 1; done"]
     volumes:
       - ./:/work
   second:
@@ -886,6 +892,10 @@ services:
 
         ComposeRequestStorage upRequest{composePath, WSLCComposeActionUp};
         const auto upResult = ExecuteCompose(*m_defaultSession, upRequest);
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() { THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_RETRY), !std::filesystem::exists(readyPath)); },
+            100ms,
+            std::chrono::milliseconds{c_waitTimeoutMs});
 
         ComposeRequestStorage stopRequest{std::string{upResult.value.ProjectKey}, WSLCComposeActionStop};
         stopRequest.SetStopTimeout(5);

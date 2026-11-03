@@ -2646,8 +2646,8 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeCo
     if (progressReporter)
     {
         progressReporter("create", networkName, 1, 1, "network");
-        checkCancelled();
     }
+    checkCancelled();
     THROW_IF_FAILED(CreateNetworkImpl(&networkOptions));
 
     // Docker Compose can leave partial resources after interruption; labels support rediscovery on the next invocation.
@@ -2718,8 +2718,8 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeCo
             if (progressReporter)
             {
                 progressReporter("pull", definition.Image, 1, 1, "image");
-                checkCancelled();
             }
+            checkCancelled();
             PullImageLockHeld(definition.Image.c_str(), nullptr, FALSE, nullptr);
             checkCancelled();
             container = launcher.Create(*this);
