@@ -753,6 +753,10 @@ void HandleMessageImpl(
                 if (Message.ForkType == WSLC_FORK::Process || Message.ForkType == WSLC_FORK::Pty)
                 {
                     Channel.Close();
+
+                    sigset_t signalMask{};
+                    sigemptyset(&signalMask);
+                    THROW_LAST_ERROR_IF(sigprocmask(SIG_SETMASK, &signalMask, nullptr) < 0);
                 }
 
                 if (Message.ForkType == WSLC_FORK::Thread)
@@ -811,10 +815,6 @@ void HandleMessageImpl(
 
             if (result == 0) // Child
             {
-                sigset_t SignalMask;
-                sigemptyset(&SignalMask);
-                THROW_LAST_ERROR_IF(sigprocmask(SIG_SETMASK, &SignalMask, nullptr) < 0);
-
                 try
                 {
                     childLogic();
