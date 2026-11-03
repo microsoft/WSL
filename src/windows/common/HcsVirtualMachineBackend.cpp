@@ -653,6 +653,7 @@ void HcsVirtualMachineBackend::Start()
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system);
         const auto settings = wsl::shared::ToJsonW(m_configuration.Settings);
         schema::StartComputeSystem(m_system.get(), settings.c_str());
+        m_started = true;
         m_state = VmState::Running;
         networkAdapters = std::move(m_pendingNetworkAdapters);
     }
@@ -688,8 +689,12 @@ void HcsVirtualMachineBackend::Shutdown()
         }
         CATCH_LOG()
 
-        // The HCS operation can complete before OnExit has cached the exit reason.
-        m_exitEvent.wait(c_vmTerminateTimeout);
+        // A failed start may not produce an exit callback. For a started VM, the HCS
+        // operation can complete before OnExit has cached the exit reason.
+        if (m_started)
+        {
+            m_exitEvent.wait(c_vmTerminateTimeout);
+        }
     }
 
     std::shared_ptr<GuestDeviceManager> guestDeviceManager;
