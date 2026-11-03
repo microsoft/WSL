@@ -678,10 +678,13 @@ void HcsVirtualMachineBackend::Shutdown()
     m_terminatingEvent.SetEvent();
 
     // Device-host operations can hold m_lock until HCS exits. Stop the VM before waiting for them.
-    // Failed termination must leave resources and host disk state intact for a retry.
     if (m_terminationSystem && !m_exitEvent.is_signaled())
     {
-        schema::TerminateComputeSystem(m_terminationSystem.get());
+        try
+        {
+            schema::TerminateComputeSystem(m_terminationSystem.get());
+        }
+        CATCH_LOG()
     }
 
     std::shared_ptr<GuestDeviceManager> guestDeviceManager;
@@ -703,7 +706,7 @@ void HcsVirtualMachineBackend::Shutdown()
         attachedDisks = std::move(m_attachedDisks);
     }
 
-    // AddPersistentMemory may still be unwinding a device-host call after HCS termination.
+    // Finish any persistent-memory addition before closing the compute-system handles.
     {
         auto persistentMemoryLock = m_persistentMemoryLock.lock_exclusive();
     }
@@ -711,6 +714,8 @@ void HcsVirtualMachineBackend::Shutdown()
     guestDeviceManager.reset();
 
     system.reset();
+    m_terminationSystem.reset();
+
     // Closing the system drains exit callbacks. If none arrived, publish completion with
     // the default Unknown reason rather than leaving termination waiters blocked.
     m_exitEvent.SetEvent();
