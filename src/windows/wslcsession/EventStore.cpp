@@ -248,16 +248,16 @@ std::optional<wsl::windows::common::wslc_schema::Event> EventStore::Get(
     std::optional<std::chrono::sys_seconds> Since,
     std::optional<std::chrono::sys_seconds> Until,
     const std::map<std::string, std::vector<std::string>>& Filters,
-    HANDLE CancelEvent)
+    HANDLE CancelEvent,
+    HANDLE CallerProcess)
 {
-    const auto callerProcess = wsl::windows::common::wslutil::OpenCallingProcess(SYNCHRONIZE);
     std::array<HANDLE, 2> handles{};
     size_t handleCount = 0;
 
     // Destroy the waits after releasing m_lock and before closing the process handle. Taking
     // m_lock in the callback prevents a notification being lost between the predicate and wait.
     std::array<wil::unique_threadpool_wait, 2> waits;
-    for (const auto handle : {CancelEvent, callerProcess.get()})
+    for (const auto handle : {CancelEvent, CallerProcess})
     {
         if (handle != nullptr)
         {
@@ -333,6 +333,10 @@ void EventStore::OnSessionTerminating()
     m_updated.notify_all();
 }
 
+EventStream::EventStream(wil::unique_event ReaderAvailable) : m_readerAvailable(std::move(ReaderAvailable))
+{
+}
+
 HRESULT EventStream::RuntimeClassInitialize(
     Microsoft::WRL::ComPtr<WSLCSession> Session,
     EventStore* Store,
@@ -354,8 +358,20 @@ try
     RETURN_HR_IF_NULL(E_POINTER, EventJson);
     *EventJson = nullptr;
 
-    std::lock_guard lock(m_lock);
-    const auto event = m_store->Get(m_nextSequenceNumber, m_since, m_until, m_filters, CancelEvent);
+    const auto callerProcess = wsl::windows::common::wslutil::OpenCallingProcess(SYNCHRONIZE);
+    std::vector<HANDLE> exitHandles;
+    for (const auto handle : {CancelEvent, callerProcess.get()})
+    {
+        if (handle != nullptr)
+        {
+            exitHandles.push_back(handle);
+        }
+    }
+
+    THROW_HR_IF(E_ABORT, !wsl::windows::common::relay::InterruptableWait(m_readerAvailable.get(), exitHandles));
+    auto releaseReader = m_readerAvailable.SetEvent_scope_exit();
+
+    const auto event = m_store->Get(m_nextSequenceNumber, m_since, m_until, m_filters, CancelEvent, callerProcess.get());
     if (!event.has_value())
     {
         return WSLC_E_EVENT_STREAM_FINISHED;

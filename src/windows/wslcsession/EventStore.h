@@ -40,7 +40,8 @@ public:
         std::optional<std::chrono::sys_seconds> Since,
         std::optional<std::chrono::sys_seconds> Until,
         const std::map<std::string, std::vector<std::string>>& Filters,
-        HANDLE CancelEvent);
+        HANDLE CancelEvent,
+        HANDLE CallerProcess);
 
     void OnSessionTerminating();
 
@@ -66,6 +67,10 @@ private:
 class EventStream : public common::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCEventStream, IFastRundown>
 {
 public:
+    EventStream() = default;
+    // ReaderAvailable must be a valid auto-reset event.
+    explicit EventStream(wil::unique_event ReaderAvailable);
+
     HRESULT RuntimeClassInitialize(
         Microsoft::WRL::ComPtr<WSLCSession> Session,
         EventStore* Store,
@@ -83,8 +88,9 @@ private:
     std::optional<std::chrono::sys_seconds> m_until;
     std::map<std::string, std::vector<std::string>> m_filters;
 
-    std::mutex m_lock;
-    _Guarded_by_(m_lock) std::optional<uint64_t> m_nextSequenceNumber;
+    wil::unique_event m_readerAvailable{wil::EventOptions::Signaled};
+    // Access is serialized by the m_readerAvailable auto-reset event.
+    std::optional<uint64_t> m_nextSequenceNumber;
 };
 
 } // namespace wsl::windows::service::wslc
