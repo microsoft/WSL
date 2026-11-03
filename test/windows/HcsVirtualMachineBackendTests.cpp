@@ -255,6 +255,48 @@ class HcsVirtualMachineBackendTests
         VERIFY_IS_TRUE(terminationEvent.is_signaled());
     }
 
+    WSL2_TEST_METHOD(TerminatesConcurrently)
+    {
+        SKIP_TEST_ARM64();
+        for (const bool start : {false, true})
+        {
+            std::atomic<int> notificationCount{0};
+            auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+            std::optional<decltype(StartGuest(*backend))> guest;
+            if (start)
+            {
+                guest.emplace(StartGuest(*backend));
+            }
+
+            backend->RegisterTerminationCallback([&](GUID) {
+                backend->Terminate();
+                ++notificationCount;
+            });
+
+            wil::unique_event terminate{wil::EventOptions::ManualReset};
+            std::vector<std::future<void>> terminations;
+            auto releaseOnExit = wil::scope_exit([&] { terminate.SetEvent(); });
+            for (int index = 0; index < 8; ++index)
+            {
+                terminations.emplace_back(std::async(std::launch::async, [&] {
+                    terminate.wait();
+                    backend->Terminate();
+                }));
+            }
+
+            terminate.SetEvent();
+            for (auto& termination : terminations)
+            {
+                termination.get();
+            }
+
+            VERIFY_IS_TRUE(backend->GetTerminationEvent().is_signaled());
+            VERIFY_ARE_EQUAL(VmState::Stopped, backend->GetState());
+            VERIFY_ARE_EQUAL(1, notificationCount.load());
+            VERIFY_ARE_EQUAL(c_invalidState, OperationResult([&] { backend->GetComputeSystemHandle(); }));
+        }
+    }
+
     WSL2_TEST_METHOD(FinalizesFailedStartWithoutExitNotification)
     {
         SKIP_TEST_ARM64();

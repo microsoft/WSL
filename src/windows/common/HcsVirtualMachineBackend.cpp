@@ -542,6 +542,7 @@ void HcsVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     const auto nextDiskId = configuration.NextDiskId;
     m_configuration = std::move(configuration);
     m_vmIdString = id;
+    auto shutdownLock = m_shutdownLock.lock_exclusive();
     auto lock = m_lock.lock_exclusive();
 
     // Track the boot disks before the compute system is created so that the host state changes made
@@ -678,6 +679,7 @@ void HcsVirtualMachineBackend::Terminate()
 
 void HcsVirtualMachineBackend::Shutdown()
 {
+    auto shutdownLock = m_shutdownLock.lock_exclusive();
     m_terminatingEvent.SetEvent();
 
     // Device-host operations can hold m_lock until HCS exits. Stop the VM before waiting for them.
