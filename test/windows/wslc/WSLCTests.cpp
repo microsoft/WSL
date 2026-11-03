@@ -4728,7 +4728,6 @@ class WSLCTests
     {
         for (const auto flags : {WSLCProcessFlagsNone, WSLCProcessFlagsTty})
         {
-            // Read the inherited mask directly; a shell may unblock signals during startup.
             WSLCProcessLauncher launcher("/bin/cat", {"/bin/cat", "/proc/self/status"}, {}, flags);
             auto process = launcher.Launch(*m_defaultSession);
             const auto result = process.WaitAndCaptureOutput(30 * 1000);
