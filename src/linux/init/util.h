@@ -302,6 +302,8 @@ int UtilSaveSignalHandlers(struct sigaction* SavedSignalActions);
 
 int UtilSetSignalHandlers(struct sigaction* SavedSignalActions, bool Ignore);
 
+int UtilClearSignalMask();
+
 void UtilSocketShutdown(int Fd, int How);
 
 bool UtilSizeTAdd(size_t Left, size_t Right, size_t* Out);

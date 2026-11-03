@@ -621,10 +621,7 @@ try
     //
 
     THROW_LAST_ERROR_IF(UtilSetSignalHandlers(g_SavedSignalActions, false) < 0);
-
-    sigset_t SignalMask;
-    sigemptyset(&SignalMask);
-    THROW_LAST_ERROR_IF(sigprocmask(SIG_SETMASK, &SignalMask, NULL) < 0);
+    THROW_LAST_ERROR_IF(UtilClearSignalMask() < 0);
 
     auto AddEnvironmentVariable = [&](const char* Name) {
         const auto Value = UtilGetEnvironmentVariable(Name);
@@ -1660,8 +1657,7 @@ Return Value:
         // Reset the signal masks.
         //
 
-        sigemptyset(&SignalMask);
-        Result = sigprocmask(SIG_SETMASK, &SignalMask, nullptr);
+        Result = UtilClearSignalMask();
         if (Result < 0)
         {
             LOG_ERROR("sigprocmask failed {}", errno);

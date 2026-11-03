@@ -2781,6 +2781,13 @@ Return Value:
     return 0;
 }
 
+int UtilClearSignalMask()
+{
+    sigset_t signalMask;
+    sigemptyset(&signalMask);
+    return sigprocmask(SIG_SETMASK, &signalMask, nullptr);
+}
+
 void UtilSetThreadName(const char* Name)
 {
     g_threadName = Name;
@@ -3512,10 +3519,7 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
             THROW_LAST_ERROR_IF(dup2(ProcessSocket.get(), STDOUT_FILENO) < 0);
 
             THROW_LAST_ERROR_IF(UtilSetSignalHandlers(g_SavedSignalActions, false) < 0);
-
-            sigset_t SignalMask;
-            sigemptyset(&SignalMask);
-            THROW_LAST_ERROR_IF(sigprocmask(SIG_SETMASK, &SignalMask, nullptr) < 0);
+            THROW_LAST_ERROR_IF(UtilClearSignalMask() < 0);
 
             execv(Path, (char* const*)(ArgumentArray.data()));
 

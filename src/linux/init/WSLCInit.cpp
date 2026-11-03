@@ -811,9 +811,7 @@ void HandleMessageImpl(
 
             if (result == 0) // Child
             {
-                sigset_t SignalMask;
-                sigemptyset(&SignalMask);
-                THROW_LAST_ERROR_IF(sigprocmask(SIG_SETMASK, &SignalMask, nullptr) < 0);
+                THROW_LAST_ERROR_IF(UtilClearSignalMask() < 0);
 
                 try
                 {
