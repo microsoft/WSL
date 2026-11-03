@@ -1154,7 +1154,7 @@ inline std::basic_string<TChar> UnescapeShell(const std::basic_string<TChar>& in
     return (quote == Quote::None) ? output : input;
 }
 
-inline bool IsValidRelativeLinuxPath(std::string_view Path)
+inline bool IsValidPluginRelativeCgroupPath(std::string_view Path)
 {
     if (Path.find('\0') != Path.npos)
     {

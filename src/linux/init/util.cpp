@@ -3508,7 +3508,7 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
                         // The subgroup must already exist, so it is not created here.
                         THROW_INVALID_ARG_IF(Message->PluginRelativeCgroupPathIndex < offsetof(CREATE_PROCESS_MESSAGE, Buffer));
                         const char* pluginRelativeCgroupPath = wsl::shared::string::FromSpan(Buffer, Message->PluginRelativeCgroupPathIndex);
-                        THROW_INVALID_ARG_IF(!wsl::shared::string::IsValidRelativeLinuxPath(pluginRelativeCgroupPath));
+                        THROW_INVALID_ARG_IF(!wsl::shared::string::IsValidPluginRelativeCgroupPath(pluginRelativeCgroupPath));
                         PluginCgroupPath = std::format("{}/{}", PluginCgroupPath, pluginRelativeCgroupPath);
                     }
                     else

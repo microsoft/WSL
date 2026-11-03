@@ -142,7 +142,7 @@ try
     *Socket = INVALID_SOCKET;
 
     RETURN_HR_IF(E_INVALIDARG, Path == nullptr || Arguments == nullptr || PluginRelativeCgroupPath == nullptr);
-    RETURN_HR_IF(E_INVALIDARG, !wsl::shared::string::IsValidRelativeLinuxPath(PluginRelativeCgroupPath));
+    RETURN_HR_IF(E_INVALIDARG, !wsl::shared::string::IsValidPluginRelativeCgroupPath(PluginRelativeCgroupPath));
 
     const auto pluginSession = g_pluginManager.FindPluginSession(Session);
     RETURN_HR_IF(RPC_E_DISCONNECTED, !pluginSession);
