@@ -848,6 +848,10 @@ Windows 版本: {}</value>
     <value>无效分发名称:“{}”。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageInvalidDistribution" xml:space="preserve">
+    <value>找到无效的分发注册“{}”，{}。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholders are the distribution's registry GUID and the error code.</comment>
+  </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>正在使用旧分发注册。请考虑改用基于 tar 的分发。</value>
     <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>

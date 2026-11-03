@@ -855,6 +855,10 @@ Pour plus d’informations sur Admin Protection, veuillez consulter https://aka.
     <value>Nom de distribution non valide : « {} ».</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageInvalidDistribution" xml:space="preserve">
+    <value>Found invalid distribution registration '{}', {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholders are the distribution's registry GUID and the error code.</comment>
+  </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>Utilisation de l’inscription de distribution héritée. Envisagez d’utiliser une distribution basée sur le tar à la place.</value>
     <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
