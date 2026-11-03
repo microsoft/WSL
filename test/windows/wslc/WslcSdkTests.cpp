@@ -222,6 +222,24 @@ ProcessOutput RunContainerAndCapture(
     return RunContainerAndCapture(session, containerSettings, timeout);
 }
 
+// Runs a shell script in a short-lived container attached to the given network and returns its stdout.
+std::string RunScriptOnNetwork(
+    WslcSession session, const char* network, const std::string& script, const char* image = "python:3.12-alpine")
+{
+    const char* argv[] = {"/bin/sh", "-c", script.c_str()};
+    WslcProcessSettings procSettings;
+    THROW_IF_FAILED(WslcInitProcessSettings(&procSettings));
+    THROW_IF_FAILED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+
+    const WslcContainerNetwork networks[] = {{network, nullptr, 0, nullptr, nullptr}};
+    WslcContainerSettings containerSettings;
+    THROW_IF_FAILED(WslcInitContainerSettings(image, &containerSettings));
+    THROW_IF_FAILED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+    THROW_IF_FAILED(WslcSetContainerSettingsNetworks(&containerSettings, networks, ARRAYSIZE(networks)));
+
+    return RunContainerAndCapture(session, containerSettings).stdoutOutput;
+}
+
 } // namespace
 
 class WslcSdkTests
@@ -926,22 +944,12 @@ class WslcSdkTests
             const auto serverIp = serverInspect.NetworkSettings.Networks.at(c_primaryNetwork).IPAddress;
             VERIFY_IS_FALSE(serverIp.empty());
 
-            const auto script = std::format(
-                "wget -q -O /dev/null http://web:8000/ && echo alias-ok; wget -q -O /dev/null http://{}:8000/ && echo ip-ok", serverIp);
-            const char* clientArgv[] = {"/bin/sh", "-c", script.c_str()};
-            WslcProcessSettings clientProcSettings;
-            VERIFY_SUCCEEDED(WslcInitProcessSettings(&clientProcSettings));
-            VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&clientProcSettings, clientArgv, ARRAYSIZE(clientArgv)));
-
-            const WslcContainerNetwork clientNetworks[] = {{c_primaryNetwork, nullptr, 0, nullptr, nullptr}};
-            WslcContainerSettings clientSettings;
-            VERIFY_SUCCEEDED(WslcInitContainerSettings("python:3.12-alpine", &clientSettings));
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&clientSettings, &clientProcSettings));
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworks(&clientSettings, clientNetworks, ARRAYSIZE(clientNetworks)));
-
-            const auto output = RunContainerAndCapture(m_defaultSession, clientSettings);
-            VERIFY_IS_TRUE(output.stdoutOutput.find("alias-ok") != std::string::npos);
-            VERIFY_IS_TRUE(output.stdoutOutput.find("ip-ok") != std::string::npos);
+            const auto output = RunScriptOnNetwork(
+                m_defaultSession,
+                c_primaryNetwork,
+                std::format("wget -q -O /dev/null http://web:8000/ && echo alias-ok; wget -q -O /dev/null http://{}:8000/ && echo ip-ok", serverIp));
+            VERIFY_IS_TRUE(output.find("alias-ok") != std::string::npos);
+            VERIFY_IS_TRUE(output.find("ip-ok") != std::string::npos);
         }
 
         // Positive: each network gets its own static IP.
@@ -1107,6 +1115,9 @@ class WslcSdkTests
             return container;
         };
 
+        // Pings the alias and the static IP from a peer container on the additional network.
+        const auto pingScript = std::format("ping -c 1 -W 5 cache && echo alias-ok; ping -c 1 -W 5 {} && echo ip-ok", c_additionalIp);
+
         const WslcContainerNetwork primary[] = {{c_primaryNetwork, nullptr, 0, nullptr, nullptr}};
 
         // Positive: connect a running container by name with aliases and a static IP, then disconnect by name.
@@ -1126,10 +1137,18 @@ class WslcSdkTests
             VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "cache") != endpoint.Aliases.end());
             VERIFY_ARE_EQUAL(std::string(c_additionalIp), endpoint.IPAddress);
 
+            auto output = RunScriptOnNetwork(m_defaultSession, c_additionalNetwork, pingScript);
+            VERIFY_IS_TRUE(output.find("alias-ok") != std::string::npos);
+            VERIFY_IS_TRUE(output.find("ip-ok") != std::string::npos);
+
             VERIFY_SUCCEEDED(WslcDisconnectContainerNetwork(container.get(), c_additionalNetwork, nullptr));
             inspectObject = inspect(container.get());
             VERIFY_IS_FALSE(inspectObject.NetworkSettings.Networks.contains(c_additionalNetwork));
             VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_primaryNetwork));
+
+            output = RunScriptOnNetwork(m_defaultSession, c_additionalNetwork, pingScript);
+            VERIFY_IS_TRUE(output.find("alias-ok") == std::string::npos);
+            VERIFY_IS_TRUE(output.find("ip-ok") == std::string::npos);
         }
 
         // Positive: connect a created container by ID and disconnect by ID prefix.
