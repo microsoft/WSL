@@ -1706,7 +1706,6 @@ struct WSLC_LISTDIR
 struct WSLC_MOUNT_RESULT
 {
     static inline auto Type = LxMessageWSLCMountResult;
-
     MESSAGE_HEADER Header{};
     int Result{};
 

@@ -16,7 +16,8 @@ Abstract:
 #include "WSLCSessionRuntime.h"
 #include "WSLCSession.h"
 #include "WSLCSessionDefaults.h"
-#include "WSLCStartup.h"
+#include "ExecutionContext.h"
+#include "Localization.h"
 
 using wsl::windows::service::wslc::WSLCSessionRuntime;
 
@@ -434,9 +435,31 @@ void WSLCSessionRuntime::StartVmLockHeld()
 void WSLCSessionRuntime::InitializeDockerRuntime(const std::filesystem::path& storagePath)
 {
     const auto exited = m_dockerdProcess->GetExitEvent();
-    WaitForDockerStartup(m_dockerdReadyEvent.get(), exited.get(), m_sessionTerminatingEvent.get(), m_settings->BootTimeoutMs, [&]() {
-        return m_dockerdProcess->GetExitCode();
-    });
+    const HANDLE handles[] = {m_sessionTerminatingEvent.get(), exited.get(), m_dockerdReadyEvent.get()};
+    const auto result = WaitForMultipleObjects(RTL_NUMBER_OF(handles), handles, FALSE, m_settings->BootTimeoutMs);
+    THROW_LAST_ERROR_IF(result == WAIT_FAILED);
+
+    switch (result)
+    {
+    case WAIT_OBJECT_0:
+        THROW_HR_MSG(E_ABORT, "Session terminated while waiting for Docker Engine to start");
+        break;
+
+    case WAIT_OBJECT_0 + 1:
+        THROW_HR_WITH_USER_ERROR(E_FAIL, wsl::shared::Localization::MessageWslcDockerExitedBeforeReady(m_dockerdProcess->GetExitCode()));
+        break;
+
+    case WAIT_OBJECT_0 + 2:
+        break;
+
+    case WAIT_TIMEOUT:
+        THROW_HR_WITH_USER_ERROR(
+            HRESULT_FROM_WIN32(ERROR_TIMEOUT), wsl::shared::Localization::MessageWslcDockerStartupTimedOut(m_settings->BootTimeoutMs));
+        break;
+
+    default:
+        THROW_HR_MSG(E_UNEXPECTED, "Unexpected Docker Engine startup wait result: %lu", result);
+    }
 
     [[maybe_unused]] auto [pid, ptyMaster, channel] = m_virtualMachine->Fork(WSLC_FORK::Thread);
 

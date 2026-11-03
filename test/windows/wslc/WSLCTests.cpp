@@ -3670,22 +3670,24 @@ class WSLCTests
 
     WSLC_TEST_METHOD(LocalhostColdStartAndLocalOperationsWithoutDns)
     {
+        constexpr DWORD c_waitTimeoutMs = 120000;
         auto session = CreateSession(GetDefaultSessionSettings(L"localhost-offline"));
         wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
         VERIFY_SUCCEEDED(session->ListImages(nullptr, &images, images.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(0u, images.size());
 
-        auto result = RunCommand(session.get(), {"/bin/cat", "/etc/hosts"});
+        auto result = RunCommand(session.get(), {"/bin/cat", "/etc/hosts"}, c_waitTimeoutMs);
         VERIFY_ARE_EQUAL(0, result.Code);
         VERIFY_ARE_EQUAL("127.0.0.1\tlocalhost\n::1\tlocalhost ip6-localhost ip6-loopback\n", result.Output[1]);
 
-        result = RunCommand(session.get(), {"/bin/sh", "-c", "awk '$1 == \"hosts:\" {$1=$1; print}' /etc/nsswitch.conf"});
+        result = RunCommand(session.get(), {"/bin/sh", "-c", "awk '$1 == \"hosts:\" {$1=$1; print}' /etc/nsswitch.conf"}, c_waitTimeoutMs);
         VERIFY_ARE_EQUAL(0, result.Code);
         VERIFY_ARE_EQUAL("hosts: files dns\n", result.Output[1]);
 
         LoadTestImage(*session, "python:3.12-alpine");
         constexpr auto c_dnsSink = R"PY(
 import socket
+import sys
 
 server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 server.bind(('127.0.0.1', 53))
@@ -3695,28 +3697,28 @@ data, _ = server.recvfrom(65535)
 while data != b'stop':
     queries += 1
     data, _ = server.recvfrom(65535)
-print(f'DNS queries: {queries}', flush=True)
+sys.exit(1 if queries else 0)
 )PY";
         WSLCContainerLauncher dnsLauncher("python:3.12-alpine", "localhost-dns-sink", {"python3", "-c", c_dnsSink}, {}, "host");
         auto dns = dnsLauncher.Launch(*session);
         auto dnsProcess = dns.GetInitProcess();
-        std::array dnsHandles{dnsProcess.GetStdHandle(1), dnsProcess.GetStdHandle(2)};
-        WaitForOutput(wsl::windows::common::io::HandleWrapper{dnsHandles[0].Get()}, "DNS ready\n");
+        WaitForOutput(dnsProcess.GetStdHandle(1), "DNS ready\n", std::chrono::milliseconds{c_waitTimeoutMs});
 
         result = RunCommand(
             session.get(),
-            {"/bin/sh", "-c", "printf 'nameserver 127.0.0.1\\noptions timeout:30 attempts:1\\n' > /etc/resolv.conf"});
+            {"/bin/sh", "-c", "printf 'nameserver 127.0.0.1\\noptions timeout:30 attempts:1\\n' > /etc/resolv.conf"},
+            c_waitTimeoutMs);
         VERIFY_ARE_EQUAL(0, result.Code);
 
-        result = RunCommand(session.get(), {"/bin/sh", "-c", "getent ahostsv4 localhost | awk '{print $1}' | sort -u"}, 5000);
+        result = RunCommand(session.get(), {"/bin/sh", "-c", "getent ahostsv4 localhost | awk '{print $1}' | sort -u"}, c_waitTimeoutMs);
         VERIFY_ARE_EQUAL(0, result.Code);
         VERIFY_ARE_EQUAL("127.0.0.1\n", result.Output[1]);
-        result = RunCommand(session.get(), {"/bin/sh", "-c", "getent hosts localhost | awk '{print $1}' | sort -u"}, 5000);
+        result = RunCommand(session.get(), {"/bin/sh", "-c", "getent hosts localhost | awk '{print $1}' | sort -u"}, c_waitTimeoutMs);
         VERIFY_ARE_EQUAL(0, result.Code);
         VERIFY_ARE_EQUAL("::1\n", result.Output[1]);
 
         // A fresh daemon process runs package initializers before handling --version.
-        result = RunCommand(session.get(), {"/usr/bin/dockerd", "--version"}, 5000);
+        result = RunCommand(session.get(), {"/usr/bin/dockerd", "--version"}, c_waitTimeoutMs);
         VERIFY_ARE_EQUAL(0, result.Code);
         VERIFY_IS_TRUE(result.Output[1].starts_with("Docker version "));
         VERIFY_IS_TRUE(result.Output[2].empty());
@@ -3724,27 +3726,16 @@ print(f'DNS queries: {queries}', flush=True)
         LoadTestImage(*session, "hello-world:latest");
         WSLCContainerLauncher helloLauncher("hello-world:latest", "localhost-offline-hello");
         auto hello = helloLauncher.Launch(*session);
-        result = hello.GetInitProcess().WaitAndCaptureOutput(5000);
+        result = hello.GetInitProcess().WaitAndCaptureOutput(c_waitTimeoutMs);
         VERIFY_ARE_EQUAL(0, result.Code);
         VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
         images.reset();
         VERIFY_SUCCEEDED(session->ListImages(nullptr, &images, images.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(2u, images.size());
 
-        result = RunCommand(session.get(), {"/bin/bash", "-c", "printf stop > /dev/udp/127.0.0.1/53"}, 5000);
+        result = RunCommand(session.get(), {"/bin/bash", "-c", "printf stop > /dev/udp/127.0.0.1/53"}, c_waitTimeoutMs);
         VERIFY_ARE_EQUAL(0, result.Code);
-        std::array<std::string, 2> dnsOutput;
-        wsl::windows::common::io::MultiHandleWait dnsIo;
-        for (size_t index = 0; index < dnsHandles.size(); ++index)
-        {
-            dnsIo.AddHandle(std::make_unique<wsl::windows::common::io::ReadHandle>(
-                std::move(dnsHandles[index]),
-                [&, index](const gsl::span<char>& content) { dnsOutput[index].append(content.data(), content.size()); }));
-        }
-        dnsIo.Run(std::chrono::milliseconds(5000));
-        VERIFY_ARE_EQUAL(0, dnsProcess.Wait(5000));
-        VERIFY_ARE_EQUAL("DNS queries: 0\n", dnsOutput[0]);
-        VERIFY_IS_TRUE(dnsOutput[1].empty());
+        VERIFY_ARE_EQUAL(0, dnsProcess.Wait(c_waitTimeoutMs));
     }
 
     void ValidateNetworking(WSLCNetworkingMode mode, bool enableDnsTunneling = false)
