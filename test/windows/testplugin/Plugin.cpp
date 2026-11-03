@@ -223,12 +223,52 @@ HRESULT OnVmStarted(const WSLSessionInformation* Session, const WSLVmCreationSet
     }
     else if (g_testType == PluginTestType::CgroupIsolation)
     {
-        const auto moduleName = std::filesystem::path(wil::GetModuleFileNameW(wil::GetModuleInstanceHandle()).get()).filename().string();
-        const char* arguments[] = {moduleName.c_str(), "3600", nullptr};
+        constexpr char setupScript[] = R"sh(
+cgroup=$(cut -d: -f3 /proc/self/cgroup)
+if test -d /sys/fs/cgroup/wsl-user; then
+    path=/sys/fs/cgroup$cgroup
+    mkdir -p "$path/workers/leaf"
+    echo 0 > "$path/workers/leaf/cgroup.procs"
+    echo +memory > "$path/cgroup.subtree_control"
+fi
+printf "%s" "$cgroup"
+)sh";
+        const char* setupArguments[] = {"/bin/sh", "-ec", setupScript, nullptr};
+        wil::unique_socket setupSocket;
+        RETURN_IF_FAILED(g_api->ExecuteBinary(Session->SessionId, setupArguments[0], setupArguments, &setupSocket));
+        const auto output = ReadFromSocket(setupSocket.get());
+        const std::string cgroup(output.begin(), output.end());
+        const auto key = OpenTestRegistryKey(KEY_READ);
+        const bool isolate = ReadDword(key.get(), nullptr, c_isolateDistroCgroup, 0) != 0;
+        RETURN_HR_IF(E_ABORT, isolate ? !StartsWith(cgroup, "/wsl-user/plugin-") : cgroup != "/");
+
+        const char* probeArguments[] = {"/bin/true", nullptr};
+        const char* invalidPaths[] = {nullptr, "", "/leaf", ".", "..", "workers/../leaf", "workers//leaf", "workers/leaf/"};
+        for (const auto invalidPath : invalidPaths)
+        {
+            wil::unique_socket socket;
+            const auto result = g_api->ExecuteBinaryInCgroup(Session->SessionId, probeArguments[0], probeArguments, invalidPath, &socket);
+            RETURN_HR_IF(E_ABORT, result != E_INVALIDARG || socket.is_valid());
+        }
+
+        if (isolate)
+        {
+            wil::unique_socket socket;
+            RETURN_HR_IF(E_ABORT, g_api->ExecuteBinary(Session->SessionId, probeArguments[0], probeArguments, &socket) != E_FAIL);
+            RETURN_HR_IF(
+                E_ABORT,
+                g_api->ExecuteBinaryInCgroup(Session->SessionId, probeArguments[0], probeArguments, "missing", &socket) != E_FAIL ||
+                    socket.is_valid());
+        }
+
+        const char* arguments[] = {"/bin/cat", "/proc/self/cgroup", nullptr};
+        const auto expectedCgroup = std::format("0::{}{}\n", cgroup, isolate ? "/workers/leaf" : "");
         for (int processIndex = 0; processIndex < 2; ++processIndex)
         {
             wil::unique_socket socket;
-            RETURN_IF_FAILED(g_api->ExecuteBinary(Session->SessionId, "/bin/sleep", arguments, &socket));
+            RETURN_IF_FAILED(g_api->ExecuteBinaryInCgroup(Session->SessionId, arguments[0], arguments, "workers/leaf", &socket));
+            const auto result = ReadFromSocket(socket.get());
+            RETURN_HR_IF(E_ABORT, std::string(result.begin(), result.end()) != expectedCgroup);
         }
     }
 

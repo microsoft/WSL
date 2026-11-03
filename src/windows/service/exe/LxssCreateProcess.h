@@ -68,7 +68,14 @@ public:
 
 public:
     static inline wil::unique_socket CreateLinuxProcess(
-        _In_ LPCSTR Path, _In_ LPCSTR* Arguments, const GUID& RuntimeId, wsl::shared::SocketChannel& channel, HANDLE terminatingEvent, DWORD Timeout, uint64_t PluginId = 0)
+        _In_ LPCSTR Path,
+        _In_ LPCSTR* Arguments,
+        const GUID& RuntimeId,
+        wsl::shared::SocketChannel& channel,
+        HANDLE terminatingEvent,
+        DWORD Timeout,
+        uint64_t PluginId = 0,
+        _In_opt_ LPCSTR PluginRelativeCgroupPath = nullptr)
     {
         size_t argumentCount = 0;
         while (Arguments[argumentCount] != nullptr)
@@ -80,6 +87,11 @@ public:
         message->PluginId = PluginId;
         message.WriteString(message->PathIndex, Path);
         message.WriteStringArray(message->CommandLineIndex, Arguments, argumentCount);
+        if (PluginRelativeCgroupPath != nullptr)
+        {
+            message.WriteString(message->PluginRelativeCgroupPathIndex, PluginRelativeCgroupPath);
+        }
+
         auto transaction = channel.StartTransaction(Timeout);
         transaction.Send<CREATE_PROCESS_MESSAGE>(message.Span());
 
@@ -90,7 +102,14 @@ public:
 
         auto processSocket = wsl::windows::common::hvsocket::Connect(RuntimeId, readResult(), terminatingEvent);
         const auto execResult = readResult();
-        THROW_HR_IF_MSG(E_FAIL, execResult != 0, "Failed to execute '%hs', error=%d", Path, execResult);
+        if (PluginRelativeCgroupPath != nullptr)
+        {
+            THROW_HR_IF_MSG(E_FAIL, execResult != 0, "Failed to execute '%hs', cgroup='%hs', error=%d", Path, PluginRelativeCgroupPath, execResult);
+        }
+        else
+        {
+            THROW_HR_IF_MSG(E_FAIL, execResult != 0, "Failed to execute '%hs', error=%d", Path, execResult);
+        }
 
         return processSocket;
     }

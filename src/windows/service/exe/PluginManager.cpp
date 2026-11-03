@@ -134,6 +134,33 @@ try
     return result;
 }
 CATCH_RETURN();
+
+HRESULT ExecuteBinaryInCgroup(WSLSessionId Session, LPCSTR Path, LPCSTR* Arguments, LPCSTR PluginRelativeCgroupPath, SOCKET* Socket)
+try
+{
+    RETURN_HR_IF(E_POINTER, Socket == nullptr);
+    *Socket = INVALID_SOCKET;
+
+    RETURN_HR_IF(E_INVALIDARG, Path == nullptr || Arguments == nullptr || PluginRelativeCgroupPath == nullptr);
+    RETURN_HR_IF(E_INVALIDARG, !wsl::shared::string::IsValidRelativeLinuxPath(PluginRelativeCgroupPath));
+
+    const auto pluginSession = g_pluginManager.FindPluginSession(Session);
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !pluginSession);
+
+    const auto session = FindSessionByCookie(pluginSession->sessionId);
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+
+    auto result = session->CreateLinuxProcess(nullptr, Path, Arguments, Socket, pluginSession->pluginId, PluginRelativeCgroupPath);
+
+    WSL_LOG(
+        "PluginExecuteBinaryInCgroupCall",
+        TraceLoggingValue(Path, "Path"),
+        TraceLoggingValue(PluginRelativeCgroupPath, "PluginRelativeCgroupPath"),
+        TraceLoggingValue(result, "Result"));
+
+    return result;
+}
+CATCH_RETURN();
 }
 
 namespace {
@@ -367,7 +394,8 @@ static constexpr WSLPluginAPIV1 ApiV1 = {
     &WSLCProcessGetFd,
     &WSLCProcessGetExitEvent,
     &WSLCProcessGetExitCode,
-    &WSLCReleaseProcess};
+    &WSLCReleaseProcess,
+    &ExecuteBinaryInCgroup};
 
 void PluginManager::LoadPlugins()
 {
