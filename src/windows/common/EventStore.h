@@ -17,8 +17,6 @@
 
 namespace wsl::windows::service::wslc {
 
-class WSLCSession;
-
 class EventStore
 {
 public:
@@ -27,7 +25,7 @@ public:
     void Record(std::string&& Type, std::string&& Action, const std::string& ActorId, std::map<std::string, std::string> ActorAttributes, std::int64_t TimeNano) noexcept;
 
     Microsoft::WRL::ComPtr<IWSLCEventStream> CreateStream(
-        Microsoft::WRL::ComPtr<WSLCSession> Session, int64_t SinceTime, int64_t UntilTime, std::map<std::string, std::vector<std::string>> Filters);
+        Microsoft::WRL::ComPtr<IWSLCSession> Session, int64_t SinceTime, int64_t UntilTime, std::map<std::string, std::vector<std::string>> Filters);
 
     // Returns the next event at or after SequenceNumber that falls within [Since, Until) and matches
     // Filters, advancing SequenceNumber past it. A nullopt SequenceNumber starts a fresh reader at the
@@ -72,7 +70,7 @@ public:
     explicit EventStream(wil::unique_event ReaderAvailable);
 
     HRESULT RuntimeClassInitialize(
-        Microsoft::WRL::ComPtr<WSLCSession> Session,
+        Microsoft::WRL::ComPtr<IWSLCSession> Session,
         EventStore* Store,
         int64_t SinceTime,
         int64_t UntilTime,
@@ -81,7 +79,7 @@ public:
     IFACEMETHOD(GetNext)(_In_opt_ HANDLE CancelEvent, _Outptr_result_z_ LPSTR* EventJson) override;
 
 private:
-    Microsoft::WRL::ComPtr<WSLCSession> m_session;
+    Microsoft::WRL::ComPtr<IWSLCSession> m_session;
     EventStore* m_store = nullptr;
 
     std::optional<std::chrono::sys_seconds> m_since;
