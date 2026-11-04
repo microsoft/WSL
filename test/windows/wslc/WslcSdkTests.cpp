@@ -1166,6 +1166,23 @@ class WslcSdkTests
             VERIFY_IS_FALSE(inspect(container.get()).NetworkSettings.Networks.contains(c_additionalNetwork));
         }
 
+        // Positive: connect and disconnect a created container, then start it without the removed network.
+        {
+            auto container = createContainer(primary, ARRAYSIZE(primary));
+
+            const WslcContainerNetwork network{c_additionalNetwork, nullptr, 0, nullptr, nullptr};
+            VERIFY_SUCCEEDED(WslcConnectContainerNetwork(container.get(), &network, nullptr));
+            VERIFY_IS_TRUE(inspect(container.get()).NetworkSettings.Networks.contains(c_additionalNetwork));
+
+            VERIFY_SUCCEEDED(WslcDisconnectContainerNetwork(container.get(), c_additionalNetwork, nullptr));
+            VERIFY_IS_FALSE(inspect(container.get()).NetworkSettings.Networks.contains(c_additionalNetwork));
+
+            VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_NONE, nullptr));
+            const auto inspectObject = inspect(container.get());
+            VERIFY_IS_FALSE(inspectObject.NetworkSettings.Networks.contains(c_additionalNetwork));
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_primaryNetwork));
+        }
+
         // Negative: the network does not exist.
         {
             auto container = createContainer(primary, ARRAYSIZE(primary));

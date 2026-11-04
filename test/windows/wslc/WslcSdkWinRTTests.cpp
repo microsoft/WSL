@@ -1193,6 +1193,23 @@ class WslcSdkWinRtTests
             VERIFY_IS_FALSE(inspectObject.NetworkSettings.Networks.contains(c_additionalNetwork));
         }
 
+        // Positive: a created container connects and disconnects, then starts without the removed network.
+        {
+            auto container = m_defaultSession.CreateContainer(makeSettings(true));
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+            container.ConnectNetwork(WSLCSDK::ContainerNetwork{additionalNetwork});
+            VERIFY_IS_TRUE(inspect(container).NetworkSettings.Networks.contains(c_additionalNetwork));
+
+            container.DisconnectNetwork(additionalNetwork);
+            VERIFY_IS_FALSE(inspect(container).NetworkSettings.Networks.contains(c_additionalNetwork));
+
+            container.Start();
+            const auto inspectObject = inspect(container);
+            VERIFY_IS_FALSE(inspectObject.NetworkSettings.Networks.contains(c_additionalNetwork));
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_primaryNetwork));
+        }
+
         // Negative: unknown networks, containers without networking, and invalid arguments.
         {
             auto container = m_defaultSession.CreateContainer(makeSettings(true));
