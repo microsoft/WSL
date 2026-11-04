@@ -30,12 +30,14 @@ inline constexpr size_t c_processExecutedFieldCount = 6;
 inline constexpr size_t c_processCreatedFieldCount = 6;
 
 // Input is Windows-enriched output of ApplyWindowsPolicy, never a raw guest record.
+// Projections preserve six insertions and trusted host/capture identities. Oversized observed text
+// is shortened before JSON escaping and marked [truncated]; both UTF-16 size limits include the final encoding.
 std::optional<SecurityEventPayload> ProjectProcessExecuted(const nlohmann::json& message, const AuditPolicy& policy);
 std::optional<SecurityEventPayload> ProjectProcessCreated(const nlohmann::json& message, const AuditPolicy& policy);
 std::optional<SecurityEventPayload> ProjectSecurityObservation(const nlohmann::json& message, const AuditPolicy& policy);
 
-// Diagnostic-only projection. EventSession rejects raw guest error frames; HRESULTs
-// are accepted only from direct Windows host error producers.
+// Diagnostic-only projection. EventSession sanitizes guest errors and drains their terminal counters
+// before reporting failure. HRESULTs are accepted only from direct Windows host error producers.
 std::optional<nlohmann::json> ProjectSecurityDiagnostic(const nlohmann::json& message, const AuditPolicy& policy);
 
 namespace security_detail {

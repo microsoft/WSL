@@ -73,7 +73,7 @@ Timing and collection%n
 Process and thread IDs are VM IDs; credentials are observed after execution.%n
 Not available means the value was not collected; it does not mean zero.%n
 Quoted text uses backslash escapes. Arguments are separated by commas, not reconstructed as a shell command.%n
-The optional [truncated] suffix describes incomplete recorded text, not an additional field.%n
+The optional [truncated] suffix describes text shortened during collection or to fit the Security log, not an additional field.%n
 The Linux event clock is monotonic, not UTC.
 .
 

@@ -108,6 +108,7 @@ public:
     void Finish() const;
     bool Ready() const;
     bool Stopped() const;
+    bool Failed() const;
 
 private:
     AuditPolicy m_policy;
@@ -120,6 +121,7 @@ private:
     uint64_t m_rootPidNamespace{};
     bool m_ready{};
     bool m_stopped{};
+    bool m_failed{};
 };
 
 using UniqueSocket = wil::unique_socket;

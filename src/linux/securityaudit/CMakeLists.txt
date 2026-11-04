@@ -12,7 +12,11 @@ if(NOT auditTarget STREQUAL "${LLVM_ARCH}-unknown-linux-musl")
 endif()
 
 set(SOURCES Collector.cpp)
-set(HEADERS Collector.h)
+set(HEADERS
+    Collector.h
+    ../../shared/securityaudit/Launch.h
+    ../../shared/securityaudit/Protocol.h
+    ../../shared/securityaudit/SecurityEvents.h)
 foreach(header event_defs.h ebpf_arch_macros.h ebpf_plugin_loader.h)
     list(APPEND HEADERS "${SECURITYAUDIT_SOURCE_DIR}/include/ebpf/${header}")
 endforeach()

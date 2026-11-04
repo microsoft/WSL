@@ -318,12 +318,14 @@ void NativeAudit::Collect(const std::shared_ptr<State>& state, UniqueSocket sock
     ConfigureSocket(socket.get());
     SendControl(socket.get(), Configuration(policy));
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(c_auditStartupTimeoutMs);
+    constexpr auto terminalTimeout = std::chrono::seconds(2);
+    std::optional<std::chrono::steady_clock::time_point> failureDeadline;
     NdjsonReceiver receiver;
     const auto acceptBytes = [&](std::string_view bytes) {
         receiver.Feed(bytes, [&](nlohmann::json message) {
             if (message.at("kind") == "container-context")
             {
-                THROW_HR_IF(E_INVALIDARG, !events.Ready() || events.Stopped());
+                THROW_HR_IF(E_INVALIDARG, !events.Ready() || events.Stopped() || events.Failed());
                 ApplyContainerInspection(*state, message);
                 return;
             }
@@ -344,6 +346,10 @@ void NativeAudit::Collect(const std::shared_ptr<State>& state, UniqueSocket sock
             events.SetContainers(std::move(containers));
             const bool ready = message.at("kind") == "ready";
             events.Accept(std::move(message));
+            if (events.Failed() && !events.Stopped() && !failureDeadline)
+            {
+                failureDeadline = std::chrono::steady_clock::now() + terminalTimeout;
+            }
             if (ready)
             {
                 ReportAuditStatus("startup-ready", S_OK);
@@ -352,7 +358,9 @@ void NativeAudit::Collect(const std::shared_ptr<State>& state, UniqueSocket sock
     };
     while (!state->stop.is_signaled())
     {
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_TIMEOUT), !events.Ready() && std::chrono::steady_clock::now() >= deadline);
+        const auto now = std::chrono::steady_clock::now();
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_TIMEOUT), !events.Ready() && !events.Failed() && now >= deadline);
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_TIMEOUT), failureDeadline && now >= *failureDeadline);
         if (!Read(socket.get(), acceptBytes) || events.Stopped())
         {
             receiver.Finish();
@@ -362,7 +370,7 @@ void NativeAudit::Collect(const std::shared_ptr<State>& state, UniqueSocket sock
         std::optional<ContainerIdentity> pending;
         {
             std::lock_guard lock(state->lock);
-            if (events.Ready() && !state->pendingContainers.empty())
+            if (events.Ready() && !events.Failed() && !state->pendingContainers.empty())
             {
                 pending = std::move(state->pendingContainers.begin()->second);
                 state->pendingContainers.erase(state->pendingContainers.begin());
@@ -382,7 +390,7 @@ void NativeAudit::Collect(const std::shared_ptr<State>& state, UniqueSocket sock
     try
     {
         SendControl(socket.get(), {{"version", c_protocolVersion}, {"kind", "stop"}});
-        const auto stopDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        const auto stopDeadline = std::chrono::steady_clock::now() + terminalTimeout;
         while (!events.Stopped() && std::chrono::steady_clock::now() < stopDeadline)
         {
             if (!Read(socket.get(), acceptBytes))
@@ -396,7 +404,7 @@ void NativeAudit::Collect(const std::shared_ptr<State>& state, UniqueSocket sock
     }
     catch (...)
     {
-        ReportAuditStatus("stopped-frame-unavailable", CurrentAuditFailure());
+        ReportAuditStatus(events.Stopped() ? "collector-failed" : "stopped-frame-unavailable", CurrentAuditFailure());
     }
 }
 

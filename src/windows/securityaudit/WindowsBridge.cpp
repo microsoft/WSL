@@ -273,11 +273,12 @@ nlohmann::json ApplyWindowsPolicy(
         const ContainerIdentity* match{};
         const auto mount = event.find("mountNamespace");
         const bool haveMount = mount != event.end() && mount->is_number_unsigned() && *mount != 0;
+        const auto timestamp = event.find("timestampNs");
+        const bool haveTimestamp = timestamp != event.end() && timestamp->is_number_unsigned();
         for (const auto& container : containers)
         {
             if (ns == 0 || ns != container.pidNamespace || container.mountNamespace == 0 ||
-                (container.observedAfterNs != 0 &&
-                 (!event.contains("timestampNs") || event["timestampNs"].get<uint64_t>() < container.observedAfterNs)) ||
+                (container.observedAfterNs != 0 && (!haveTimestamp || timestamp->get<uint64_t>() < container.observedAfterNs)) ||
                 (haveMount ? mount->get<uint64_t>() != container.mountNamespace : ns == rootPidNamespace))
             {
                 continue;
@@ -453,7 +454,7 @@ void EventSession::Accept(nlohmann::json message)
     auto control = nlohmann::json::object();
     if (kind == "ready")
     {
-        if (m_ready || !message.contains("pidNamespace") || !message["pidNamespace"].is_number_unsigned() ||
+        if (m_ready || m_failed || !message.contains("pidNamespace") || !message["pidNamespace"].is_number_unsigned() ||
             message["pidNamespace"].get<uint64_t>() == 0 || message["pidNamespace"].get<uint64_t>() > UINT32_MAX ||
             !message.contains("status") || !message["status"].is_string())
         {
@@ -476,9 +477,9 @@ void EventSession::Accept(nlohmann::json message)
     }
     else if (kind == "process" || kind == "security")
     {
-        if (!m_ready)
+        if (!m_ready || m_failed)
         {
-            throw std::invalid_argument("Process event before READY");
+            throw std::invalid_argument("Observation outside a running collector session");
         }
         auto event = ApplyWindowsPolicy(std::move(message), m_policy, m_host, m_distributions, m_containers, m_rootPidNamespace);
         if (!event.is_null())
@@ -490,17 +491,24 @@ void EventSession::Accept(nlohmann::json message)
     }
     else if (kind == "stopped")
     {
-        if (!m_ready || !message.contains("exitCode") || !message["exitCode"].is_number_unsigned() || message["exitCode"].get<uint64_t>() != 0)
+        if ((!m_ready && !m_failed) || !message.contains("exitCode") || !message["exitCode"].is_number_unsigned() ||
+            message["exitCode"].get<uint64_t>() > UINT32_MAX)
         {
-            throw std::invalid_argument("Collector stopped unsuccessfully or before READY");
+            throw std::invalid_argument("Invalid collector exit code or STOPPED before READY");
         }
         control = ValidateControlFields(message, false);
+        m_failed = m_failed || message["exitCode"].get<uint64_t>() != 0;
         m_stopped = true;
     }
     else if (kind == "error")
     {
-        // Do not relay untrusted error fields: they could contain sensitive argv.
-        throw std::runtime_error("Linux collector reported an explicit error; inspect its separately relayed stderr");
+        if (m_failed)
+        {
+            throw std::invalid_argument("Duplicate collector ERROR");
+        }
+        // Retain the failure, not guest text or claimed Windows error provenance.
+        m_failed = true;
+        control["source"] = "linux-collector";
     }
     else
     {
@@ -509,7 +517,7 @@ void EventSession::Accept(nlohmann::json message)
     // Only persist validated control fields, not arbitrary untrusted extensions.
     control["version"] = c_protocolVersion;
     control["kind"] = kind;
-    control["status"] = kind == "ready" ? message["status"] : nlohmann::json("complete");
+    control["status"] = kind == "ready" ? message["status"] : nlohmann::json(m_failed ? "failed" : "complete");
     control["receivedUtc"] = UtcNow();
     control["policySource"] = m_policy.source;
     control["captureSessionId"] = m_captureSessionId;
@@ -519,9 +527,13 @@ void EventSession::Accept(nlohmann::json message)
 void EventSession::Finish() const
 {
     std::lock_guard lock(m_lock);
-    if (!m_ready || !m_stopped)
+    if (!m_stopped || (!m_ready && !m_failed))
     {
         throw std::runtime_error("Collector stream ended without READY and STOPPED");
+    }
+    if (m_failed)
+    {
+        throw std::runtime_error("Collector reported an unsuccessful audit session");
     }
 }
 
@@ -535,6 +547,12 @@ bool EventSession::Stopped() const
 {
     std::lock_guard lock(m_lock);
     return m_stopped;
+}
+
+bool EventSession::Failed() const
+{
+    std::lock_guard lock(m_lock);
+    return m_failed;
 }
 
 } // namespace wsl::audit

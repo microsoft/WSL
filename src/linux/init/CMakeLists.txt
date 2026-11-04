@@ -26,6 +26,9 @@ set(SOURCES
 
 set(HEADERS
     ../inc/lxwil.h
+    ../securityaudit/Collector.h
+    ../../shared/securityaudit/Launch.h
+    ../../shared/securityaudit/Protocol.h
     binfmt.h
     common.h
     config.h

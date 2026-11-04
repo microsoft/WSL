@@ -14,6 +14,12 @@ namespace {
     using Json = nlohmann::json;
     using UniquePolicy = wil::unique_any<PAUDIT_POLICY_INFORMATION, decltype(&::AuditFree), ::AuditFree>;
 
+    class SecurityPayloadTooLarge : public std::length_error
+    {
+    public:
+        using std::length_error::length_error;
+    };
+
     enum class SecurityHostField : size_t
     {
         WindowsUserSid = 1,
@@ -101,6 +107,17 @@ namespace {
         return true;
     }
 
+    std::string CaptureSessionId(const Json& message)
+    {
+        const auto capture = Text(message, "captureSessionId", 38);
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            capture.size() != 38 || capture.front() != '{' || !IsGuid(capture) ||
+                capture == "{00000000-0000-0000-0000-000000000000}",
+            "Audit requires a Windows-generated capture session GUID.");
+        return capture;
+    }
+
     void ValidateUtc(std::string_view text)
     {
         THROW_HR_IF_MSG(
@@ -136,7 +153,49 @@ namespace {
         THROW_HR_IF_MSG(E_INVALIDARG, !SystemTimeToFileTime(&time, &fileTime), "Invalid receivedUtc calendar date.");
     }
 
-    std::wstring ReadableObservation(const Json& field)
+    size_t EscapedCharacters(std::wstring_view text)
+    {
+        return text.size() + 5 * static_cast<size_t>(std::count(text.begin(), text.end(), L'%'));
+    }
+
+    std::wstring JsonString(std::string_view text, size_t maximum, bool& truncated)
+    {
+        const auto wide = Wide(text);
+        const auto encode = [&](size_t count) {
+            if (count < wide.size() && count != 0 && IS_HIGH_SURROGATE(wide[count - 1]) && IS_LOW_SURROGATE(wide[count]))
+            {
+                --count;
+            }
+            return Wide(Json(ToUtf8(std::wstring_view(wide).substr(0, count))).dump());
+        };
+        auto result = encode(wide.size());
+        if (EscapedCharacters(result) <= maximum)
+        {
+            return result;
+        }
+        if (maximum < 2)
+        {
+            throw SecurityPayloadTooLarge("No room for a quoted audit value");
+        }
+        truncated = true;
+        size_t first{};
+        size_t last = wide.size();
+        while (first < last)
+        {
+            const auto middle = first + (last - first + 1) / 2;
+            if (EscapedCharacters(encode(middle)) <= maximum)
+            {
+                first = middle;
+            }
+            else
+            {
+                last = middle - 1;
+            }
+        }
+        return encode(first);
+    }
+
+    std::wstring ReadableObservation(const Json& field, size_t maximum, bool& truncated)
     {
         if (field.at("status") == "disabled_by_policy")
         {
@@ -157,26 +216,61 @@ namespace {
             {
                 Wide(item.get_ref<const std::string&>());
             }
-            const auto encoded = value.dump();
-            return Wide(std::string_view(encoded).substr(1, encoded.size() - 2));
+            std::wstring result;
+            size_t characters{};
+            for (const auto& item : value)
+            {
+                const size_t separator = result.empty() ? 0 : 1;
+                if (maximum - characters < separator + 2)
+                {
+                    truncated = true;
+                    break;
+                }
+                bool shortened{};
+                auto encoded = JsonString(item.get_ref<const std::string&>(), maximum - characters - separator, shortened);
+                characters += separator + EscapedCharacters(encoded);
+                if (separator != 0)
+                {
+                    result += L',';
+                }
+                result += encoded;
+                if (shortened)
+                {
+                    truncated = true;
+                    break;
+                }
+            }
+            return result;
         }
         if (value.is_string())
         {
-            Wide(value.get_ref<const std::string&>());
+            const auto& text = value.get_ref<const std::string&>();
+            return field.contains("clock") ? Wide(text) : JsonString(text, maximum, truncated);
         }
-        return field.contains("clock") ? Wide(value.get_ref<const std::string&>()) : Wide(value.dump());
+        return Wide(value.dump());
     }
 
-    std::wstring EscapeObservationPercents(std::wstring text)
+    std::wstring EscapeObservationPercents(std::wstring_view text)
     {
         // Event Log expands percent sequences inside insertions again; JSON escaping keeps the original text recoverable.
-        size_t offset{};
-        while ((offset = text.find(L'%', offset)) != std::wstring::npos)
+        if (EscapedCharacters(text) > c_maxSecurityFieldCharacters)
         {
-            text.replace(offset, 1, L"\\u0025");
-            offset += 6;
+            throw SecurityPayloadTooLarge("Escaped audit value exceeds its UTF-16 limit");
         }
-        return text;
+        std::wstring result;
+        result.reserve(EscapedCharacters(text));
+        for (const auto character : text)
+        {
+            if (character == L'%')
+            {
+                result += L"\\u0025";
+            }
+            else
+            {
+                result += character;
+            }
+        }
+        return result;
     }
 
     void ValidateProcessPayload(const SecurityEventPayload& payload)
@@ -185,18 +279,40 @@ namespace {
         size_t characters{};
         for (const auto& field : payload.fields)
         {
-            THROW_HR_IF_MSG(
-                E_INVALIDARG, field.size() > c_maxSecurityFieldCharacters, "Security audit field exceeds its UTF-16 limit.");
+            if (field.size() > c_maxSecurityFieldCharacters)
+            {
+                throw SecurityPayloadTooLarge("Security audit field exceeds its UTF-16 limit");
+            }
             characters += field.size() + 1;
         }
-        THROW_HR_IF_MSG(
-            E_INVALIDARG, characters > c_maxSecurityPayloadCharacters, "Security audit exceeds its UTF-16 payload limit.");
+        if (characters > c_maxSecurityPayloadCharacters)
+        {
+            throw SecurityPayloadTooLarge("Security audit exceeds its UTF-16 payload limit");
+        }
+    }
+
+    template <typename Project>
+    SecurityEventPayload ProjectWithinBudget(const Project& project)
+    {
+        for (size_t maximum = c_maxSecurityFieldCharacters;; maximum /= 2)
+        {
+            try
+            {
+                return project(maximum);
+            }
+            catch (const SecurityPayloadTooLarge&)
+            {
+                if (maximum == 2)
+                {
+                    throw;
+                }
+            }
+        }
     }
 
     void AppendAuditField(std::wstring& group, std::wstring_view label, std::wstring_view value, bool truncated = false)
     {
-        const auto encoded = EscapeObservationPercents(std::wstring(value));
-        THROW_HR_IF_MSG(E_INVALIDARG, encoded.size() > c_maxSecurityFieldCharacters, "Audit value exceeds its UTF-16 limit.");
+        const auto encoded = EscapeObservationPercents(value);
         group += L"    ";
         group += label;
         group += L": ";
@@ -215,6 +331,13 @@ namespace {
         std::wstring windows;
         AppendAuditField(windows, L"Distribution name", context.at(6));
         AppendAuditField(windows, L"Distribution ID", context.at(5));
+        AppendAuditField(windows, L"Windows user SID", context.at(1));
+        AppendAuditField(windows, L"Windows session ID", context.at(3));
+        AppendAuditField(windows, L"WSL session ID", message.contains("wslcSessionId") ? L"Not applicable" : context.at(2));
+        AppendAuditField(windows, L"Distribution attribution", context.at(4));
+        AppendAuditField(windows, L"Policy source", context.at(9));
+        AppendAuditField(timing, L"Capture session ID", context.at(7));
+        AppendAuditField(timing, L"Received UTC", context.at(8));
         if (message.contains("wslcSessionId"))
         {
             THROW_HR_IF(
@@ -261,7 +384,7 @@ namespace {
         std::wstring_view label;
     };
 
-    std::wstring ProcessGroup(const Json& data, std::initializer_list<ProcessDisplayField> fields)
+    std::wstring ProcessGroup(const Json& data, std::initializer_list<ProcessDisplayField> fields, size_t maximum)
     {
         std::wstring group;
         for (const auto& field : fields)
@@ -269,13 +392,11 @@ namespace {
             const auto& value = data.at(field.name);
             const bool decimalString =
                 std::string_view(field.name) == "cgroupId" || std::string_view(field.name) == "creatorCgroupId";
-            AppendAuditField(
-                group,
-                field.label,
-                decimalString && value.at("status") == "present" ? Wide(value.at("value").get_ref<const std::string&>())
-                : value.is_object()                              ? ReadableObservation(value)
-                                                                 : Wide(value.dump()),
-                value.is_object() && value.value("truncated", false));
+            bool truncated = value.is_object() && value.value("truncated", false);
+            const auto text = decimalString && value.at("status") == "present" ? Wide(value.at("value").get_ref<const std::string&>())
+                              : value.is_object() ? ReadableObservation(value, maximum, truncated)
+                                                  : Wide(value.dump());
+            AppendAuditField(group, field.label, text, truncated);
         }
         return group;
     }
@@ -381,12 +502,7 @@ static void SetProcessContext(SecurityEventPayload& result, const Json& message,
 {
     THROW_HR_IF(E_INVALIDARG, policy.source != "windows" && policy.source != "test-override");
     result.fields[0] = std::to_wstring(version);
-    const auto capture = Text(message, "captureSessionId", 38);
-    THROW_HR_IF_MSG(
-        E_INVALIDARG,
-        capture.size() != 38 || capture.front() != '{' || !IsGuid(capture) || capture == "{00000000-0000-0000-0000-000000000000}",
-        "Process audit requires a Windows-generated capture session GUID.");
-    result.fields[7] = Wide(capture);
+    result.fields[7] = Wide(CaptureSessionId(message));
     const auto received = Text(message, "receivedUtc", 30);
     ValidateUtc(received);
     result.fields[8] = Wide(received);
@@ -408,26 +524,29 @@ std::optional<SecurityEventPayload> ProjectProcessExecuted(const Json& message, 
     result.eventId = c_processExecutedEventId;
     ProjectHostFields(message, std::span(result.fields).first<7>());
     SetProcessContext(result, message, policy, AuditSchemaVersion(message, c_processExecutedSchemaVersion));
-    return GroupAuditPayload(
-        result.eventId,
-        result.fields,
-        ProcessGroup(
-            data,
-            {{"vmPid", L"Process ID"},
-             {"vmTid", L"Thread ID"},
-             {"vmParentPid", L"Parent process ID"},
-             {"namespacePid", L"Process ID in PID namespace"},
-             {"pidNamespace", L"PID namespace ID"},
-             {"mountNamespace", L"Mount namespace ID"},
-             {"networkNamespace", L"Network namespace ID"},
-             {"cgroupId", L"Cgroup ID"},
-             {"uid", L"User ID (UID)"},
-             {"euid", L"Effective user ID (EUID)"},
-             {"gid", L"Group ID (GID)"},
-             {"egid", L"Effective group ID (EGID)"}}),
-        ProcessGroup(data, {{"executable", L"Executable"}, {"cwd", L"Working directory"}, {"argv", L"Arguments (in order)"}}),
-        ProcessGroup(data, {{"linuxEventNs", L"Linux event clock (monotonic ns)"}}),
-        message);
+    return ProjectWithinBudget([&](size_t maximum) {
+        return GroupAuditPayload(
+            result.eventId,
+            result.fields,
+            ProcessGroup(
+                data,
+                {{"vmPid", L"Process ID"},
+                 {"vmTid", L"Thread ID"},
+                 {"vmParentPid", L"Parent process ID"},
+                 {"namespacePid", L"Process ID in PID namespace"},
+                 {"pidNamespace", L"PID namespace ID"},
+                 {"mountNamespace", L"Mount namespace ID"},
+                 {"networkNamespace", L"Network namespace ID"},
+                 {"cgroupId", L"Cgroup ID"},
+                 {"uid", L"User ID (UID)"},
+                 {"euid", L"Effective user ID (EUID)"},
+                 {"gid", L"Group ID (GID)"},
+                 {"egid", L"Effective group ID (EGID)"}},
+                maximum),
+            ProcessGroup(data, {{"executable", L"Executable"}, {"cwd", L"Working directory"}, {"argv", L"Arguments (in order)"}}, maximum),
+            ProcessGroup(data, {{"linuxEventNs", L"Linux event clock (monotonic ns)"}}, maximum),
+            message);
+    });
 }
 
 std::optional<SecurityEventPayload> ProjectProcessCreated(const Json& message, const AuditPolicy& policy)
@@ -441,25 +560,28 @@ std::optional<SecurityEventPayload> ProjectProcessCreated(const Json& message, c
     result.eventId = c_processCreatedEventId;
     ProjectHostFields(message, std::span(result.fields).first<7>());
     SetProcessContext(result, message, policy, AuditSchemaVersion(message, c_processCreatedSchemaVersion));
-    return GroupAuditPayload(
-        result.eventId,
-        result.fields,
-        ProcessGroup(
-            data,
-            {{"vmPid", L"Process ID (VM)"},
-             {"vmTid", L"Thread ID (VM)"},
-             {"namespacePid", L"Process ID in child PID namespace"},
-             {"pidNamespace", L"Child PID namespace ID"},
-             {"mountNamespace", L"Child mount namespace ID"},
-             {"networkNamespace", L"Child network namespace ID"},
-             {"creatorCgroupId", L"Creator cgroup ID"},
-             {"uid", L"User ID (UID)"},
-             {"euid", L"Effective user ID (EUID)"},
-             {"gid", L"Group ID (GID)"},
-             {"egid", L"Effective group ID (EGID)"}}),
-        ProcessGroup(data, {{"vmCreatorPid", L"Creator process ID (VM)"}}),
-        ProcessGroup(data, {{"linuxEventNs", L"Linux creation clock (monotonic ns)"}}),
-        message);
+    return ProjectWithinBudget([&](size_t maximum) {
+        return GroupAuditPayload(
+            result.eventId,
+            result.fields,
+            ProcessGroup(
+                data,
+                {{"vmPid", L"Process ID (VM)"},
+                 {"vmTid", L"Thread ID (VM)"},
+                 {"namespacePid", L"Process ID in child PID namespace"},
+                 {"pidNamespace", L"Child PID namespace ID"},
+                 {"mountNamespace", L"Child mount namespace ID"},
+                 {"networkNamespace", L"Child network namespace ID"},
+                 {"creatorCgroupId", L"Creator cgroup ID"},
+                 {"uid", L"User ID (UID)"},
+                 {"euid", L"Effective user ID (EUID)"},
+                 {"gid", L"Group ID (GID)"},
+                 {"egid", L"Effective group ID (EGID)"}},
+                maximum),
+            ProcessGroup(data, {{"vmCreatorPid", L"Creator process ID (VM)"}}, maximum),
+            ProcessGroup(data, {{"linuxEventNs", L"Linux creation clock (monotonic ns)"}}, maximum),
+            message);
+    });
 }
 
 std::optional<SecurityEventPayload> ProjectSecurityObservation(const Json& message, const AuditPolicy& policy)
@@ -481,38 +603,44 @@ std::optional<SecurityEventPayload> ProjectSecurityObservation(const Json& messa
     result.eventId = schema.eventId;
     ProjectHostFields(message, std::span(result.fields).first<7>());
     SetProcessContext(result, message, policy, AuditSchemaVersion(message, c_observationSchemaVersion));
-    const auto format = [&](const ObservationField& field) {
-        const auto& value = data.at(field.name);
-        if (value.at("status") == "not_applicable")
+    return ProjectWithinBudget([&](size_t maximum) {
+        const auto format = [&](const ObservationField& field, bool& truncated) {
+            const auto& value = data.at(field.name);
+            if (value.at("status") == "not_applicable")
+            {
+                return std::wstring(L"Not applicable");
+            }
+            if (value.at("status") == "unavailable")
+            {
+                return std::wstring(L"Not available");
+            }
+            if (field.type == ObservationType::Unsigned64 || field.type == ObservationType::Signed64)
+            {
+                return Wide(value.at("value").get_ref<const std::string&>());
+            }
+            return ReadableObservation(value, maximum, truncated);
+        };
+        std::wstring linux;
+        std::wstring details;
+        std::wstring timing;
+        AppendAuditField(details, L"Linux operation", Wide(schema.operation));
+        AppendAuditField(details, L"Linux outcome", Wide(data.at("outcome").get_ref<const std::string&>()));
+        for (const auto& field : ObservationCommonFields(operation))
         {
-            return std::wstring(L"Not applicable");
+            const std::string_view name = field.name;
+            auto& group = name == "result" ? details : name == "linuxEventNs" ? timing : linux;
+            bool truncated{};
+            const auto text = format(field, truncated);
+            AppendAuditField(group, Wide(field.label), text, truncated);
         }
-        if (value.at("status") == "unavailable")
+        for (const auto& field : fields)
         {
-            return std::wstring(L"Not available");
+            bool truncated{};
+            const auto text = format(field, truncated);
+            AppendAuditField(details, Wide(field.label), text, truncated);
         }
-        if (field.type == ObservationType::Unsigned64 || field.type == ObservationType::Signed64)
-        {
-            return Wide(value.at("value").get_ref<const std::string&>());
-        }
-        return ReadableObservation(value);
-    };
-    std::wstring linux;
-    std::wstring details;
-    std::wstring timing;
-    AppendAuditField(details, L"Linux operation", Wide(schema.operation));
-    AppendAuditField(details, L"Linux outcome", Wide(data.at("outcome").get_ref<const std::string&>()));
-    for (const auto& field : ObservationCommonFields(operation))
-    {
-        const std::string_view name = field.name;
-        auto& group = name == "result" ? details : name == "linuxEventNs" ? timing : linux;
-        AppendAuditField(group, Wide(field.label), format(field));
-    }
-    for (const auto& field : fields)
-    {
-        AppendAuditField(details, Wide(field.label), format(field));
-    }
-    return GroupAuditPayload(result.eventId, result.fields, std::move(linux), std::move(details), std::move(timing), message);
+        return GroupAuditPayload(result.eventId, result.fields, std::move(linux), std::move(details), std::move(timing), message);
+    });
 }
 
 std::optional<Json> ProjectSecurityDiagnostic(const Json& message, const AuditPolicy& policy)
@@ -556,13 +684,17 @@ std::optional<Json> ProjectSecurityDiagnostic(const Json& message, const AuditPo
         ValidateUtc(received);
         result["receivedUtc"] = received;
     }
+    if (message.contains("captureSessionId"))
+    {
+        result["captureSessionId"] = CaptureSessionId(message);
+    }
     if (message.contains("status"))
     {
         const auto status = Text(message, "status", 32);
         THROW_HR_IF_MSG(
             E_INVALIDARG,
             status != "awaiting-ready" && status != "policy-disabled" && status != "running" && status != "disabled" &&
-                status != "complete",
+                status != "complete" && status != "failed",
             "Invalid Security diagnostic lifecycle status.");
         result["status"] = status;
     }
@@ -625,6 +757,10 @@ std::optional<Json> ProjectSecurityDiagnostic(const Json& message, const AuditPo
     else if (kind == "error")
     {
         const auto source = message.find("source");
+        if (source != message.end() && *source == "linux-collector")
+        {
+            result["source"] = "linux-collector";
+        }
         if (source != message.end() && source->is_string() && (*source == "windows-host" || *source == "windows-plugin"))
         {
             result["source"] = *source;
@@ -890,8 +1026,17 @@ void WindowsSecuritySink::Write(const Json& message)
     }
     const bool security = message.value("kind", std::string{}) == "security";
     const bool created = security && message.value("operation", std::string{}) == "process-created";
-    auto payload = created ? ProjectProcessCreated(message, m_policy)
-                           : (security ? ProjectSecurityObservation(message, m_policy) : ProjectProcessExecuted(message, m_policy));
+    std::optional<SecurityEventPayload> payload;
+    try
+    {
+        payload = created ? ProjectProcessCreated(message, m_policy)
+                          : (security ? ProjectSecurityObservation(message, m_policy) : ProjectProcessExecuted(message, m_policy));
+    }
+    catch (const SecurityPayloadTooLarge&)
+    {
+        ReportAuditStatus("observation-exceeds-security-log-capacity", HRESULT_FROM_WIN32(ERROR_BUFFER_OVERFLOW));
+        return;
+    }
     if (!payload)
     {
         return;
