@@ -111,6 +111,7 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(WSLC_E_CONTAINER_DISABLED),
     X(WSLC_E_REGISTRY_BLOCKED_BY_POLICY),
     X(WSLC_E_CONTAINER_PREFIX_AMBIGUOUS),
+    X(WSLC_E_CAPABILITY_ADDITIONS_DISABLED),
     X(E_ACCESSDENIED),
     X_WIN32(ERROR_NOT_FOUND),
     X_WIN32(ERROR_VERSION_PARSE_ERROR),
@@ -180,6 +181,7 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(WSLC_E_SESSION_RESERVED),
     X(WSLC_E_INVALID_SESSION_NAME),
     X(WSLC_E_NETWORK_NOT_FOUND),
+    X(WSLC_E_NETWORK_PREFIX_AMBIGUOUS),
     X(WSLC_E_SESSION_NOT_FOUND),
     X(WSLC_E_VM_NOT_RUNNING),
     X(WSLC_E_CONTAINER_DELETED),
@@ -247,7 +249,8 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X_NT(STATUS_ACCESS_DENIED),
     X_NT(STATUS_CONNECTION_DISCONNECTED),
     X_NT(STATUS_INVALID_PARAMETER),
-    X_NT(STATUS_RETRY)};
+    X_NT(STATUS_RETRY),
+    X_WIN32(ERROR_INTERNAL_ERROR)};
 
 #undef X_NT
 #undef X_WIN32
@@ -469,6 +472,7 @@ std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
     auto filenameStem = std::filesystem::path(Filename).stem().wstring();
     auto filenameExtension = std::filesystem::path(Filename).extension().wstring();
     std::wstring filePath{};
+
     winrt::Windows::Storage::Streams::IRandomAccessStream outputStream{};
     for (int suffix = 1; outputStream == nullptr; suffix++)
     {

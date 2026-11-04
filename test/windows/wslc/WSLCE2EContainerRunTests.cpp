@@ -16,6 +16,7 @@ Abstract:
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
 #include "TestImageRegistry.h"
+#include "wslpolicies.h"
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
@@ -29,6 +30,7 @@ class WSLCE2EContainerRunTests
         TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         TestImageRegistry::Instance().EnsureLoaded(HelloWorldImage);
         TestImageRegistry::Instance().EnsureLoaded(PythonImage);
+        TestImageRegistry::Instance().EnsureLoaded(AlpineImage);
 
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName.c_str(), HostEnvVariableValue.c_str()));
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName2.c_str(), HostEnvVariableValue2.c_str()));
@@ -202,6 +204,30 @@ class WSLCE2EContainerRunTests
 
         // Run should be deleted on return so no retry.
         VerifyContainerIsNotListed(WslcContainerName);
+    }
+
+    // A foreground run returns at the first exit while the restart policy keeps restarting the container.
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_RestartAlways_Foreground)
+    {
+        auto result = RunWslc(std::format(
+            LR"(container run --restart always --name {} {} sh -c "echo run; sleep 2; exit 3")", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"run\n", .Stderr = L"", .ExitCode = 3});
+
+        VERIFY_ARE_EQUAL(std::string{"always"}, InspectContainer(WslcContainerName).HostConfig.RestartPolicy.Name);
+
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+        bool running = InspectContainer(WslcContainerName).State.Running;
+        while (!running && std::chrono::steady_clock::now() < deadline)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            running = InspectContainer(WslcContainerName).State.Running;
+        }
+
+        VERIFY_IS_TRUE(running);
+
+        result = RunWslc(std::format(L"container stop {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(InspectContainer(WslcContainerName).State.Running);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvOption)
@@ -828,6 +854,33 @@ class WSLCE2EContainerRunTests
         VerifyPseudoConsoleTtySize(session, columns, rows);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PseudoConsole_DetachSequenceIgnoresUnicodeLowBytes)
+    {
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto session = RunWslcInteractive(
+            std::format(L"container run -it --name {} {} cat", WslcContainerName, DebianImage.NameAndTag()),
+            ElevationType::Elevated,
+            PseudoConsole{120, 30});
+
+        // U+3010 and U+3011 have the same low bytes as the ctrl-p, ctrl-q detach sequence. They are written on
+        // their own so no other input follows them in the same read batch. The marker is written separately and
+        // is only relayed to the container if those characters did not trigger a detach.
+        const std::string unicodePair = "\xE3\x80\x90\xE3\x80\x91";
+        session.Write(unicodePair);
+        WaitForPseudoConsoleOutput(session, unicodePair);
+
+        const std::string marker = "wslc-detach-marker";
+        session.WriteLine(marker);
+        WaitForPseudoConsoleOutput(session, marker);
+        VERIFY_IS_TRUE(session.IsRunning(), L"wslc should not detach on characters whose low bytes match the detach sequence");
+        VERIFY_ARE_EQUAL(std::string::npos, session.GetStdoutData().find("[detached]"));
+
+        session.Write("\x10\x11");
+        WaitForPseudoConsoleOutput(session, "[detached]");
+        session.WaitForExit();
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Tmpfs)
     {
         auto result = RunWslc(std::format(
@@ -929,6 +982,20 @@ class WSLCE2EContainerRunTests
             RunWslc(std::format(L"container run --name {} --network host {} true", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"", .Stderr = wsl::shared::Localization::WSLCCLI_NetworkHostModeNotSupportedError() + L"\r\n", .ExitCode = 1});
         VerifyContainerIsNotListed(WslcContainerName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Network_HostById_Rejected)
+    {
+        const auto hostId = wsl::shared::string::MultiByteToWide(InspectNetwork(L"host").Id);
+
+        for (const auto& reference : {hostId, hostId.substr(0, 12)})
+        {
+            auto result = RunWslc(
+                std::format(L"container run --name {} --network {} {} true", WslcContainerName, reference, DebianImage.NameAndTag()));
+            result.Verify(
+                {.Stderr = FormatErrorMessage(std::format(L"Network not found: '{}'", reference), L"WSLC_E_NETWORK_NOT_FOUND"), .ExitCode = 1});
+            VerifyContainerIsNotListed(WslcContainerName);
+        }
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Network_UserDefinedNetwork)
@@ -1615,6 +1682,51 @@ with mmap.mmap(fd, 32 * 1024, flags=mmap.MAP_SHARED, prot=mmap.PROT_READ | mmap.
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Capabilities)
+    {
+        auto result = RunWslc(std::format(
+            L"container run --name {} --cap-add NET_ADMIN --cap-add SYS_TIME "
+            L"--cap-drop NET_RAW --cap-drop CHOWN {} cat /proc/self/status",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_ARE_EQUAL(static_cast<size_t>(2), inspect.HostConfig.CapAdd.size());
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("NET_ADMIN"); }));
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("SYS_TIME"); }));
+        VERIFY_ARE_EQUAL(2u, inspect.HostConfig.CapDrop.size());
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapDrop, [](const auto& capability) { return capability.ends_with("NET_RAW"); }));
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapDrop, [](const auto& capability) { return capability.ends_with("CHOWN"); }));
+
+        VERIFY_IS_TRUE(result.Stdout.has_value());
+        constexpr std::wstring_view c_prefix = L"CapEff:";
+        const auto start = result.Stdout->find(c_prefix);
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, start);
+        const auto effective = std::stoull(result.Stdout->substr(start + c_prefix.size()), nullptr, 16);
+        constexpr auto c_addedCapabilities = (1ull << 12) | (1ull << 25);  // NET_ADMIN, SYS_TIME
+        constexpr auto c_droppedCapabilities = (1ull << 13) | (1ull << 0); // NET_RAW, CHOWN
+        VERIFY_ARE_EQUAL(c_addedCapabilities, effective & c_addedCapabilities);
+        VERIFY_ARE_EQUAL(0ull, effective & c_droppedCapabilities);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_CapabilitiesBlockedByPolicy)
+    {
+        namespace policies = wsl::windows::policies;
+        RegistryKeyChange<DWORD> policy(HKEY_LOCAL_MACHINE, policies::c_registryKey, policies::c_allowWSLContainerPrivileged, 0);
+        const auto expectedError =
+            FormatErrorMessage(Localization::MessageWslcCapabilityAdditionsDisabled(), L"WSLC_E_CAPABILITY_ADDITIONS_DISABLED");
+
+        auto result =
+            RunWslc(std::format(L"container run --name {} --cap-add NET_ADMIN {} true", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"", .Stderr = expectedError, .ExitCode = 1});
+        VerifyContainerIsNotListed(WslcContainerName);
+    }
+
 private:
     void VerifyHostLoopback(std::string_view setting, std::string_view dnsName, bool forceTcp)
     {
@@ -1642,6 +1754,21 @@ private:
         auto result = RunWslc(std::format(
             L"container run {} --rm --name {} {} {}", forceTcp ? "--dns-option=use-vc" : "", WslcContainerName, PythonImage.NameAndTag(), command));
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        // Use alpine to validate that the AAAA record resolution logic is working correctly (since musl requires it).
+        // See: https://github.com/microsoft/WSL/issues/41769
+
+        command = std::format(
+            L"sh -c \"test $(grep -cw use-vc /etc/resolv.conf) -eq {} && "
+            L"wget -q -T 60 -O - http://{}:{}/\"",
+            forceTcp ? 1 : 0, // Validate that the DNS setting was applied.
+            std::string(dnsName),
+            HostLoopbackTestPort);
+
+        result = RunWslc(std::format(
+            L"container run {} --rm --name {} {} {}", forceTcp ? "--dns-option=use-vc" : "", WslcContainerName, AlpineImage.NameAndTag(), command));
+
+        result.Verify({.Stdout = L"host-loopback-ok", .Stderr = L"", .ExitCode = 0});
     }
 
     // Test container name
@@ -1658,6 +1785,7 @@ private:
     const TestImage& DebianImage = DebianTestImage();
     const TestImage& HelloWorldImage = HelloWorldTestImage();
     const TestImage& PythonImage = PythonTestImage();
+    const TestImage& AlpineImage = AlpineTestImage();
 
     // Test environment variable files
     std::filesystem::path EnvTestFile1;

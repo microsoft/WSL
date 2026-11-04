@@ -79,6 +79,9 @@ public:
         // permanent teardown the session is terminating, so a callback that resolves this session
         // (e.g. to create a process) fails cleanly instead of restarting the VM.
         std::function<void()> OnVmStopping;
+
+        // Fired for every Docker volume event, after WSLCVolumes has updated the volumes it tracks.
+        DockerEventTracker::VolumeEventCallback OnVolumeEvent;
     };
 
     struct SessionContext

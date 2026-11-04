@@ -28,6 +28,9 @@ public sealed class Session : IDisposable
     public void DeleteVhdVolume(string name);
     public AuthenticateResult Authenticate(Uri serverAddress, string username, string password);
     public IReadOnlyList<ImageInfo> GetImages();
+    public IReadOnlyList<NetworkInfo> GetNetworks();
+    public NetworkInfo CreateNetwork(NetworkSettings settings);
+    public void DeleteNetwork(string nameOrId);
     public void Dispose();
 }
 ```
@@ -225,6 +228,33 @@ foreach (var image in session.GetImages())
 {
     Console.WriteLine(image.Name);
 }
+```
+
+## Session.GetNetworks()
+
+Returns a snapshot of networks in the session.
+
+```csharp
+foreach (var network in session.GetNetworks())
+{
+    Console.WriteLine($"{network.Name} ({network.Driver})");
+}
+```
+
+## Session.CreateNetwork(NetworkSettings settings)
+
+Creates a bridge network in the session and returns it. Throws `HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS)` if a network with the same name exists.
+
+```csharp
+var network = session.CreateNetwork(new NetworkSettings("backend"));
+```
+
+## Session.DeleteNetwork(string nameOrId)
+
+Deletes a network from the session by name, full ID, or unique ID prefix. An exact ID match takes precedence over a name match, and a name match takes precedence over an ID prefix match. Throws `WSLC_E_NETWORK_NOT_FOUND` if no network matches, or `WSLC_E_NETWORK_PREFIX_AMBIGUOUS` if an ID prefix matches more than one network.
+
+```csharp
+session.DeleteNetwork("backend");
 ```
 
 ## Session.Terminated event

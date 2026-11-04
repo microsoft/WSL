@@ -854,6 +854,10 @@ Admin Protection에 대해 자세히 알아보려면 https://aka.ms/apdevguide�
     <value>잘못된 배포 이름: "{}".</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageInvalidDistribution" xml:space="preserve">
+    <value>잘못된 배포 등록 '{}'을(를) 찾았습니다. {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholders are the distribution's registry GUID and the error code.</comment>
+  </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>레거시 배포 등록을 사용하고 있습니다. tar 기반 배포를 대신 사용하는 것이 좋습니다.</value>
     <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
@@ -897,12 +901,20 @@ Admin Protection에 대해 자세히 알아보려면 https://aka.ms/apdevguide�
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>이 컴퓨터에서는 중첩 가상화가 지원되지 않습니다.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>중첩된 가상화 지원을 검색하지 못했습니다. 오류: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>주소가 '{}'인 네트워크 엔드포인트를 만들지 못했습니다. 할당된 새 주소: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToCreateNetwork" xml:space="preserve">
     <value>주소 범위가 '{}'인 가상 네트워크를 만들지 못했습니다. 범위가 '{}', {}인 새 네트워크를 만들었습니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
+    <value>WSL의 NAT 네트워크({})가 Docker의 기본 네트워크와 충돌합니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
@@ -924,6 +936,14 @@ NAT 네트워킹으로 대체합니다.</value>
   <data name="MessageMirroredNetworkingNotSupportedIpv6Disabled" xml:space="preserve">
     <value>호스트에서 지원하지 않는 방식으로 IPv6가 비활성화되어 있습니다(HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff).</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
+  </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>미러링 네트워킹에서 더 작은 동적 포트 범위({}개 포트 대신 {}개 포트)를 사용하고 있습니다. 이로 인해 동시 연결 수가 제한될 수 있습니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>미러된 네트워킹이 {}개의 TCP 및 UDP 포트에 있는 최소 연속 범위를 예약할 수 없습니다. Windows 포트 사용 및 제외를 확인합니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Hyper-V 방화벽은 지원되지 않습니다.</value>
@@ -1012,6 +1032,9 @@ NAT 네트워킹으로 대체합니다.</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>WSL 컨테이너가 컴퓨터 정책에 의해 비활성화되었습니다.</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>컴퓨터 정책에 따라 Linux 기능 추가를 사용할 수 없습니다.</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>컨테이너 이미지 레지스트리 '{}'이(가) 컴퓨터 정책에 의해 차단되었습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -1078,6 +1101,10 @@ NAT 네트워킹으로 대체합니다.</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>VHD가 현재 사용 중이므로 작업을 완료할 수 없습니다. WSL을 강제로 사용 중지하려면: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageDistributionTerminationTimeout" xml:space="preserve">
+    <value>배포 프로세스 {}이(가) {}밀리초 후에 종료되기를 기다리는 동안 시간이 초과되었습니다. 배포가 중지되었는지 확인하지 않고 계속합니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
     <value>압축은 .vhdx 파일에서만 지원됩니다.</value>
@@ -1222,6 +1249,10 @@ NAT 네트워킹으로 대체합니다.</value>
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
     <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. Using cgroup v2 instead. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
+  <data name="MessageWindowsInstallerBusy" xml:space="preserve">
+    <value>Windows Installer가 사용 중이므로 WSL 설치가 차단되었습니다. 다른 소프트웨어 설치가 완료될 때까지 기다린 후 다시 시도하십시오.</value>
+    <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>오류가 발생했습니다. 나중에 다시 시도하세요.</value>
@@ -2208,6 +2239,10 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>컨테이너 '{}'(이)가 실행 중이어서 제거할 수 없습니다. 제거하기 전에 컨테이너를 중지하거나 강제 제거(-f)를 사용하세요.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcCannotRemoveRestartingContainer" xml:space="preserve">
+    <value>컨테이너 '{}'이(가) 다시 시작 중이어서 제거할 수 없습니다. 제거하기 전에 컨테이너를 중지하거나 강제 제거(-f)를 사용하세요.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerNotRunning" xml:space="preserve">
     <value>컨테이너 '{}'(이)가 실행되고 있지 않습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2489,6 +2524,10 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>네트워크를 찾을 수 없음: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcNetworkPrefixAmbiguous" xml:space="preserve">
+    <value>여러 네트워크가 '{}'와 일치합니다. 더 긴 ID 또는 네트워크 이름을 사용하세요.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>지원되지 않는 네트워크 드라이버: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2522,6 +2561,10 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
     <value>잘못된 중지 시간 제한 값: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidSignal" xml:space="preserve">
+    <value>잘못된 신호 값: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
@@ -2681,14 +2724,6 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
     <value>컨테이너와 로컬 파일 시스템 간에 파일을 복사합니다.</value>
   </data>
-  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
-    <value>컨테이너와 로컬 파일 시스템 간에 파일을 복사합니다.
-사용법: wslc container cp [OPTIONS] SOURCE DEST
-  로컬에서 컨테이너로: wslc container cp LOCAL_PATH CONTAINER:PATH
-  컨테이너에서 로컬로: wslc container cp CONTAINER:PATH LOCAL_PATH
-  Stdin에서 컨테이너로: wslc container cp - CONTAINER:PATH</value>
-    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
-  </data>
   <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
     <value>원본: 로컬 경로, CONTAINER:PATH 또는 stdin의 경우 '-'</value>
     <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
@@ -2828,11 +2863,11 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>보낼 신호(기본값: 컨테이너의 구성된 STOPSIGNAL 또는 구성되지 않은 경우 SIGTERM)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>컨테이너 이벤트를 모니터링하세요.</value>
+  <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
+    <value>이벤트를 모니터링합니다.</value>
   </data>
-  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>컨테이너에서 실시간 이벤트를 모니터링합니다.</value>
+  <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
+    <value>컨테이너, 이미지, 네트워크 및 볼륨에서 실시간 이벤트를 모니터링합니다.</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
     <value>타임스탬프 이후 생성된 모든 이벤트 표시</value>
@@ -3295,6 +3330,10 @@ Windows 버전: {}</value>
     <value>'{}' 옵션은 지원되지 않습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
+    <value>'{}' 모드가 잘못되었습니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
     <value>탑재 대상이 필요합니다.</value>
   </data>
@@ -3645,6 +3684,12 @@ Windows 버전: {}</value>
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>컨테이너에 가상화 기능 노출</value>
   </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Linux 기능 추가(반복 가능)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Linux 기능 삭제(반복 가능)</value>
+  </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>컨테이너 내에서 실행 중인 명령에 전달할 인수</value>
   </data>
@@ -3662,6 +3707,10 @@ Windows 버전: {}</value>
   <data name="WSLCCLI_InvalidRestartPolicyError" xml:space="preserve">
     <value>잘못된 {} 값 '{}'입니다. 허용되는 값은 no, always, on-failure[:max-retries], unless-stopped입니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UnsupportedRestartPolicyError" xml:space="preserve">
+    <value>Restart policy '{}' is not supported. Supported values are no and always.</value>
+    <comment>{Locked="no"}{Locked="always"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
     <value>잘못된 {} 값: {}은(는) 인식할 수 있는 진행 유형이 아닙니다. 지원되는 진행 유형은 {}입니다.</value>
@@ -3704,7 +3753,7 @@ Windows 버전: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>이미지 '{}'을(를) 찾을 수 없습니다. 끌어오는 중</value>
+    <value>로컬에서 '{}' 이미지를 찾을 수 없음</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">
@@ -3784,6 +3833,9 @@ Windows 버전: {}</value>
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
     <value>네트워크 이름</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
+    <value>네트워크 이름 또는 ID</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>네트워크 ID만 표시</value>
@@ -3881,28 +3933,25 @@ Windows 버전: {}</value>
     <value>터미널로 컨테이너를 내보낼 수 없습니다. -o 옵션을 사용하거나 stdout을 리디렉션합니다.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>필요한 형식: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
+    <value>예상 형식: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
-  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>잘못된 볼륨 사양: '{}'. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
+    <value>잘못된 볼륨 사양: '{}'. {} {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>잘못된 볼륨 사양: '{}'. 호스트 경로는 비워 둘 수 없습니다. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
+    <value>볼륨 사양이 비어 있습니다.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
-    <value>잘못된 볼륨 사양: '{}'. 컨테이너 경로는 비워 둘 수 없습니다. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
+    <value>볼륨 사양에 콜론 사이의 빈 섹션이 있습니다.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
-    <value>잘못된 볼륨 사양: '{}'. 컨테이너 경로는 절대 경로여야 하며 '/'로 시작해야 합니다. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
+    <value>볼륨 사양에 콜론이 너무 많습니다.</value>
   </data>
-  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
-    <value>잘못된 볼륨 사양: '{}'. 호스트 경로 '{}'은(는) 유효한 Windows 경로가 아닙니다.</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
+    <value>호스트 경로 '{}'는 유효한 Windows 경로가 아닙니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
     <value>모든 개체 유형의 이름 또는 ID</value>
@@ -4135,6 +4184,9 @@ Windows 버전: {}</value>
   <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
     <value>플러그인 거부 후 컨테이너 '{}' 중지 실패</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcRestartPolicyConflictsWithRm" xml:space="preserve">
+    <value>다시 시작 정책은 컨테이너의 자동 제거와 결합할 수 없습니다.</value>
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>볼륨 '{}'에 대한 호스트 리소스를 해제하지 못했습니다.</value>

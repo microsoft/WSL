@@ -59,8 +59,9 @@ struct WSLCContainerMetadataV1
     std::string Image;
     std::vector<WSLCPortMapping> Ports;
     std::vector<WSLCVolumeMount> Volumes;
+    WSLCContainerRestartPolicy RestartPolicy{WSLCContainerRestartPolicyNo};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCContainerMetadataV1, Flags, InitProcessFlags, Image, Ports, Volumes);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCContainerMetadataV1, Flags, InitProcessFlags, Image, Ports, Volumes, RestartPolicy);
 };
 
 struct WSLCContainerMetadata

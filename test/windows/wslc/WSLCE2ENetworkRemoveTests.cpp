@@ -18,6 +18,7 @@ Abstract:
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
+using namespace wsl::shared::string;
 
 class WSLCE2ENetworkRemoveTests
 {
@@ -48,7 +49,7 @@ class WSLCE2ENetworkRemoveTests
     {
         auto result = RunWslc(L"network remove");
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'network-name'"));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'network'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Remove_Valid)
@@ -79,6 +80,30 @@ class WSLCE2ENetworkRemoveTests
 
         VerifyNetworkIsNotListed(TestNetworkName);
         VerifyNetworkIsNotListed(TestNetworkName2);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Network_Remove_ById)
+    {
+        auto result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto id = MultiByteToWide(InspectNetwork(TestNetworkName).Id);
+        result = RunWslc(std::format(L"network remove {}", id));
+        result.Verify({.Stdout = std::format(L"{}\r\n", id), .Stderr = L"", .ExitCode = 0});
+
+        VerifyNetworkIsNotListed(TestNetworkName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Network_Remove_ByIdPrefix)
+    {
+        auto result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto prefix = MultiByteToWide(InspectNetwork(TestNetworkName).Id.substr(0, 12));
+        result = RunWslc(std::format(L"network remove {}", prefix));
+        result.Verify({.Stdout = std::format(L"{}\r\n", prefix), .Stderr = L"", .ExitCode = 0});
+
+        VerifyNetworkIsNotListed(TestNetworkName);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Remove_NotFound)

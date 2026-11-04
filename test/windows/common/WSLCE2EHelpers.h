@@ -109,6 +109,15 @@ const TestImage& HelloWorldTestImage();
 const TestImage& PythonTestImage();
 const TestImage& InvalidTestImage();
 
+struct VmInfo
+{
+    std::wstring Id;
+    std::wstring Owner;
+};
+
+std::vector<VmInfo> ListVms();
+void KillVmByOwner(const std::wstring& owner);
+
 struct TestSession
 {
     static TestSession Create(const std::wstring& displayName, WSLCNetworkingMode networkingMode = WSLCNetworkingModeNone);

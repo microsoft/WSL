@@ -155,7 +155,7 @@ struct AbsolutePath
             return -1;
         }
 
-        if (PathIsRelative(input))
+        if (!std::filesystem::path(input).is_absolute())
         {
             std::error_code error;
             value = std::filesystem::absolute(input, error);

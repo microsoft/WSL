@@ -170,6 +170,8 @@ int WslInitWatcher(int Argc, char** Argv);
 
 int WslcGpuHookEntry();
 
+int WslcGpuStartHookEntry();
+
 void MountDistroCgroupNamespace(int CgroupNamespaceFd);
 
 int WslEntryPoint(int Argc, char* Argv[])
@@ -250,6 +252,10 @@ int WslEntryPoint(int Argc, char* Argv[])
         else if (strcmp(BaseName, LX_INIT_WSLC_GPU_HOOK) == 0)
         {
             ExitCode = WslcGpuHookEntry();
+        }
+        else if (strcmp(BaseName, LX_INIT_WSLC_GPU_START_HOOK) == 0)
+        {
+            ExitCode = WslcGpuStartHookEntry();
         }
         else
         {
@@ -626,10 +632,7 @@ try
     //
 
     THROW_LAST_ERROR_IF(UtilSetSignalHandlers(g_SavedSignalActions, false) < 0);
-
-    sigset_t SignalMask;
-    sigemptyset(&SignalMask);
-    THROW_LAST_ERROR_IF(sigprocmask(SIG_SETMASK, &SignalMask, NULL) < 0);
+    THROW_LAST_ERROR_IF(UtilClearSignalMask() < 0);
 
     auto AddEnvironmentVariable = [&](const char* Name) {
         const auto Value = UtilGetEnvironmentVariable(Name);
@@ -1665,8 +1668,7 @@ Return Value:
         // Reset the signal masks.
         //
 
-        sigemptyset(&SignalMask);
-        Result = sigprocmask(SIG_SETMASK, &SignalMask, nullptr);
+        Result = UtilClearSignalMask();
         if (Result < 0)
         {
             LOG_ERROR("sigprocmask failed {}", errno);
@@ -2451,7 +2453,7 @@ Return Value:
 
             if (Config.CgroupNamespace)
             {
-                THROW_LAST_ERROR_IF(UtilMoveSelfToDistroCgroup(CGROUP_MOUNTPOINT, "systemd") < 0);
+                THROW_LAST_ERROR_IF(UtilMoveSelfToCgroup(CGROUP_MOUNTPOINT, "systemd") < 0);
                 THROW_LAST_ERROR_IF(UtilEnterCgroupNamespace(Config.CgroupNamespace.get(), "systemd") < 0);
             }
 
@@ -2902,11 +2904,32 @@ try
     {
         THROW_LAST_ERROR_IF(UtilSetSignalHandlers(g_SavedSignalActions, false) < 0);
 
-        //
-        // systemctl poweroff is normally async but can block in rare cases.
-        // Run it in a thread so a stuck invocation can't prevent the fallback timeout below.
-        //
-        std::thread([]() { UtilExecCommandLine("systemctl poweroff", nullptr); }).detach();
+        UtilCreateChildProcess("poweroff", []() {
+            // Login setup can change SIGCHLD between the parent's reset and fork.
+            // Restore the signal mask too, since exec preserves it.
+            THROW_LAST_ERROR_IF(UtilSetSignalHandlers(g_SavedSignalActions, false) < 0);
+            THROW_LAST_ERROR_IF(UtilRestoreBlockedSignals() < 0);
+
+            execlp("systemctl", "systemctl", "poweroff", static_cast<char*>(nullptr));
+            LOG_ERROR("execlp(systemctl poweroff) failed {}", errno);
+        });
+
+        // Reap exited children so zombies do not block systemd shutdown.
+        std::thread([]() {
+            for (;;)
+            {
+                if (TEMP_FAILURE_RETRY(waitpid(-1, nullptr, 0)) < 0)
+                {
+                    if (errno != ECHILD)
+                    {
+                        LOG_ERROR("waitpid failed during shutdown {}", errno);
+                        return;
+                    }
+
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                }
+            }
+        }).detach();
 
         std::this_thread::sleep_for(std::chrono::milliseconds(Config.BootInitTimeout));
         LOG_ERROR("systemctl poweroff did not terminate the instance in {} ms, calling reboot(RB_POWER_OFF)", Config.BootInitTimeout);
@@ -3195,6 +3218,13 @@ Return Value:
     pid_t child;
     int status;
 
+    //
+    // N.B. This can run after a failed call has set errno but before the caller
+    //      reads it (e.g. in TEMP_FAILURE_RETRY), and the final waitpid() sets
+    //      errno to ECHILD when no children remain, so preserve it.
+    //
+
+    const int savedErrno = errno;
     while ((child = waitpid(-1, &status, WNOHANG)) > 0)
     {
         if (child == g_SessionGroup)
@@ -3203,6 +3233,7 @@ Return Value:
         }
     }
 
+    errno = savedErrno;
     return;
 }
 
@@ -3677,7 +3708,7 @@ void WaitForBootProcess(wsl::linux::WslDistributionConfig& Config)
                 [&]() {
                     std::string Output;
                     THROW_LAST_ERROR_IF(
-                        UtilExecCommandLine("systemctl is-system-running | grep -E \"running|degraded\"", &Output, {0}, false) < 0);
+                        UtilExecCommandLine("systemctl is-system-running 2>/dev/null | grep -E \"running|degraded\"", &Output, {0}, false) < 0);
                 },
                 std::chrono::milliseconds{250},
                 std::chrono::milliseconds{Config.BootInitTimeout});

@@ -34,6 +34,59 @@ class WSLCCLIRelativeTimeUnitTests
         return FormatElapsedSeconds(secondsAgo);
     }
 
+    TEST_METHOD(ParseTimestamp_PreservesFractionalSeconds)
+    {
+        for (const auto& value : {"1705314600.123456789", "2024-01-15T10:30:00.123456789Z", "2024-01-15T12:30:00.123456789+02:00"})
+        {
+            const auto parsed = ParseTimestamp(value);
+            VERIFY_ARE_EQUAL(1705314600LL, parsed.first);
+            VERIFY_ARE_EQUAL(123456789LL, parsed.second);
+        }
+        VERIFY_ARE_EQUAL(100000000LL, ParseTimestamp("1.1").second);
+        VERIFY_ARE_EQUAL(123456789LL, ParseTimestamp("1.1234567899").second);
+        VERIFY_ARE_EQUAL(-62135596800LL, ParseTimestamp("0001-01-01T00:00:00Z").first);
+        VERIFY_ARE_EQUAL(253402300799LL, ParseTimestamp("9999-12-31T23:59:59Z").first);
+        VERIFY_ARE_EQUAL(0LL, ParseTimestamp("0").first);
+    }
+
+    TEST_METHOD(ParseTimestamp_NormalizesNegativeFractionalSeconds)
+    {
+        using Parsed = std::pair<std::int64_t, std::int64_t>;
+        VERIFY_IS_TRUE((Parsed{-2, 500000000} == ParseTimestamp("-1.5")));
+        VERIFY_IS_TRUE((ParseTimestamp("1969-12-31T23:59:58.5Z") == ParseTimestamp("-1.5")));
+        VERIFY_IS_TRUE((Parsed{-1, 500000000} == ParseTimestamp("-0.5")));
+        VERIFY_IS_TRUE((Parsed{-1, 0} == ParseTimestamp("-1.0")));
+        VERIFY_IS_TRUE(
+            (Parsed{std::numeric_limits<std::int64_t>::min(), 0} == ParseTimestamp(std::to_string(std::numeric_limits<std::int64_t>::min()))));
+        VERIFY_THROWS_SPECIFIC(
+            ParseTimestamp(std::to_string(std::numeric_limits<std::int64_t>::min()) + ".5"),
+            wil::ResultException,
+            [](const wil::ResultException& e) { return e.GetErrorCode() == E_INVALIDARG; });
+    }
+
+    TEST_METHOD(ParseTimestamp_LargeNegativeDurationIsInTheFuture)
+    {
+        const auto before = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        const auto parsed = ParseTimestamp("-2500000h");
+        const auto after = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
+        constexpr std::int64_t c_offset = 2500000LL * 3600;
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(parsed.first, before + c_offset);
+        VERIFY_IS_LESS_THAN_OR_EQUAL(parsed.first, after + c_offset);
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(parsed.second, 0LL);
+        VERIFY_IS_LESS_THAN(parsed.second, 1000000000LL);
+
+        constexpr std::int64_t c_limitSeconds = 9223372036LL;
+        const auto limitBefore = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        const auto limit = ParseTimestamp("-9223372036.5s");
+        const auto limitAfter = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(limit.first, limitBefore + c_limitSeconds);
+        VERIFY_IS_LESS_THAN_OR_EQUAL(limit.first, limitAfter + c_limitSeconds + 1);
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(limit.second, 0LL);
+        VERIFY_IS_LESS_THAN(limit.second, 1000000000LL);
+    }
+
     TEST_METHOD(RelativeTime_ZeroTimestamp_ReturnsEmpty)
     {
         VERIFY_ARE_EQUAL(std::wstring{}, FormatRelativeTime(0));
