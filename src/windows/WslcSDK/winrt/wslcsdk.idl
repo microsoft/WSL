@@ -146,6 +146,7 @@ namespace Microsoft.WSL.Containers
     {
         ContainerNetwork(String name);
 
+        // Network name. A full network ID or unique ID prefix is also accepted.
         String Name;
         IVector<String> Aliases;
 

@@ -7,6 +7,7 @@ Connects a container to a network.
 - `ContainerNetwork(hstring name)`
   - `name` must be non-empty.
 - `Name()` / setter
+  - Network name. A full network ID or unique ID prefix is also accepted.
 - `Aliases()` / setter
   - Only supported on user-defined networks (not `bridge`, `host`, `none`, or `container:<name>`).
 - `IPv4Address()` / setter
