@@ -854,6 +854,10 @@ Admin Protection の詳細については、https://aka.ms/apdevguide をご覧�
     <value>無効なディストリビューション名: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageInvalidDistribution" xml:space="preserve">
+    <value>無効なディストリビューション登録 '{}' が見つかりました、{}。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholders are the distribution's registry GUID and the error code.</comment>
+  </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>レガシの配布登録を使用しています。代わりに tar ベースの配布を使用することを検討してください。</value>
     <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
@@ -907,6 +911,10 @@ Admin Protection の詳細については、https://aka.ms/apdevguide をご覧�
   </data>
   <data name="MessageFailedToCreateNetwork" xml:space="preserve">
     <value>アドレス範囲 '{}' を使用して仮想ネットワークを作成できませんでした。範囲 '{}'、{} を使用して新しいネットワークを作成しました</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
+    <value>WSL の NAT ネットワーク ({}) が Docker の既定のネットワークと競合しています</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
@@ -1094,6 +1102,10 @@ NAT ネットワークにフォールバックしています。</value>
     <value>VHD が現在使用中のため、操作を完了できませんでした。WSL の使用を強制的に停止するには: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
+  <data name="MessageDistributionTerminationTimeout" xml:space="preserve">
+    <value>ディストリビューション プロセス {} の終了を待機して {} ミリ秒後にタイムアウトしました。配布が停止したことを確認せずに続行します。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
     <value>圧縮は .vhdx ファイルでのみサポートされています。</value>
     <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
@@ -1237,6 +1249,10 @@ WSL を修復するには任意のキーを押すか、取り消すには CTRL-C
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
     <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. Using cgroup v2 instead. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
+  <data name="MessageWindowsInstallerBusy" xml:space="preserve">
+    <value>Windows インストーラーがビジー状態のため、WSL のインストールがブロックされています。他のソフトウェアのインストールが完了するまで待ってから、もう一度お試しください。</value>
+    <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>問題が発生しました。後でやり直してください。</value>
@@ -2063,6 +2079,25 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>ディストリビューションの実行を継続し、それらをホストしている WSL 仮想マシンがアイドル状態になった後に自動的にシャットダウンされないようにします。</value>
   </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
+    <value>Keep WSL distro VM always on</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
+    <value>Your WSL distro VM won't shut down when idle, so new shells start instantly. Uses more memory while WSL is running. This will take effect in your next WSL session.</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Keep WSL distro VM always on</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
+    <value>Couldn't change the keep-running setting</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
+    <value>Make sure .wslconfig isn't read-only, then try again.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
+    <value>これは、[オプション機能] の [WSL 設定] でいつでも変更できます。</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>タイムアウトのリセット</value>
   </data>
@@ -2415,10 +2450,6 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
      <value>必要なものが見つからないときに位置指定引数が見つかりました: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>'{}' にオプション名がありません</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
      <value>次の引数で始まる転送された引数を解決できませんでした: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2508,6 +2539,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>ネットワークが見つかりません: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcNetworkPrefixAmbiguous" xml:space="preserve">
+    <value>複数のネットワークが '{}' と一致します。長い ID またはネットワーク名を使用します。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>サポートされていないネットワーク ドライバー: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2544,7 +2579,7 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidSignal" xml:space="preserve">
-    <value>Invalid signal value: {}</value>
+    <value>無効なシグナル値: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
@@ -2843,11 +2878,11 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>送信するシグナル (既定値: コンテナーに構成された STOPSIGNAL、または構成されていない場合は SIGTERM)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>コンテナー イベントを監視します。</value>
+  <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
+    <value>イベントを監視します。</value>
   </data>
-  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>コンテナーのリアルタイム イベントを監視します。</value>
+  <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
+    <value>コンテナー、イメージ、ネットワーク、ボリュームからのリアルタイム イベントを監視します。</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
     <value>タイムスタンプ以降に作成されたすべてのイベントを表示する</value>
@@ -3814,6 +3849,9 @@ Windows バージョン: {}</value>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
     <value>ネットワーク名</value>
   </data>
+  <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
+    <value>ネットワーク名または ID</value>
+  </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>ネットワーク ID のみを表示</value>
   </data>
@@ -4179,6 +4217,18 @@ Windows バージョン: {}</value>
   </data>
   <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
     <value>ホストの信頼されたルート証明書を VM にインストールできませんでした: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
+    <value>WSLC は、ローカル ホスト名解決を初期化するための '{}' を書き込めませんでした (ゲスト エラー {})。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
+    <value>WSLC はゲスト VM を起動しましたが、Docker エンジンが {} ミリ秒以内に準備完了しませんでした。WSL 診断ログを収集して、スタートアップ エラーを調査します。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
+    <value>Docker エンジンは、WSLC ゲスト VM で準備が整う前にコード {} で終了しました。WSL 診断ログを収集して、スタートアップ エラーを調査します。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

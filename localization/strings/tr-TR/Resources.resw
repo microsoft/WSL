@@ -848,6 +848,10 @@ Admin Protection hakkında daha fazla bilgi için lütfen https://aka.ms/apdevgu
     <value>Geçersiz dağıtım adı: "{}".</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageInvalidDistribution" xml:space="preserve">
+    <value>Geçersiz dağıtım kaydı '{}' bulundu. {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholders are the distribution's registry GUID and the error code.</comment>
+  </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>Eski dağıtım kaydı kullanılıyor. Bunun yerine tar tabanlı bir dağıtım kullanmayı düşünün.</value>
     <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
@@ -901,6 +905,10 @@ Admin Protection hakkında daha fazla bilgi için lütfen https://aka.ms/apdevgu
   </data>
   <data name="MessageFailedToCreateNetwork" xml:space="preserve">
     <value>Adres aralığı '{}' olan sanal ağ oluşturulamadı, şu aralıkla yeni ağ oluşturuldu: '{}', {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
+    <value>WSL'nin NAT ağı ({}) Docker'ın varsayılan ağıyla çakışıyor</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
@@ -1088,6 +1096,10 @@ NAT ağ bağlantısına geri dönülüyor.</value>
     <value>İşlem tamamlanamadı çünkü VHD şu anda kullanımda. WSL'yi durmaya zorlamak için şu komutu kullanın: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
+  <data name="MessageDistributionTerminationTimeout" xml:space="preserve">
+    <value>{} dağıtım işleminden {} ms sonra çıkılması beklenirken zaman aşımı oluştu. Dağıtımın durdurulduğu onaylanmadan devam ediliyor.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
     <value>Sıkıştırma yalnızca .vhdx dosyalarında desteklenir.</value>
     <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
@@ -1231,6 +1243,10 @@ Kurtarma yönergelerine bakın: https://aka.ms/wsldiskmountrecovery</value>
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
     <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. Using cgroup v2 instead. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
+  <data name="MessageWindowsInstallerBusy" xml:space="preserve">
+    <value>Windows Installer meşgul olduğundan WSL yükleme engellendi. Diğer yazılım yüklemelerinin bitmesini bekleyin, sonra yeniden deneyin.</value>
+    <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Bir sorun oluştu. Daha sonra yeniden deneyin.</value>
@@ -2057,6 +2073,25 @@ Ayrıca VS Code'un içindeki komut paleti aracılığıyla daha fazla VS Code Re
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Dağıtımların ve bunları barındıran WSL sanal makinesinin, boşta kaldıktan sonra otomatik olarak kapatılmasını önleyin.</value>
   </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
+    <value>Keep WSL distro VM always on</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
+    <value>Your WSL distro VM won't shut down when idle, so new shells start instantly. Uses more memory while WSL is running. This will take effect in your next WSL session.</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Keep WSL distro VM always on</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
+    <value>Couldn't change the keep-running setting</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
+    <value>.wslconfig salt okunur olmadığından emin olun ve yeniden deneyin.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
+    <value>Bunu istediğiniz zaman WSL Ayarları'nda İsteğe Bağlı Özellikler altında değiştirebilirsiniz.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Zaman aşımını sıfırla</value>
   </data>
@@ -2409,10 +2444,6 @@ Kullanım:
      <value>Beklenmediği halde bir konumsal bağımsız değişken bulundu: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Şu konumda seçenek adı eksik: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
      <value>İletilen bağımsız değişkenler şu bağımsız değişkenden başlayarak çözümlenemedi: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2502,6 +2533,10 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Ağ bulunamadı: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcNetworkPrefixAmbiguous" xml:space="preserve">
+    <value>Birden çok ağ '{}' ile eşleşiyor; daha uzun bir kimlik veya ağ adı kullanın.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>Desteklenmeyen ağ sürücüsü: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2538,7 +2573,7 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidSignal" xml:space="preserve">
-    <value>Invalid signal value: {}</value>
+    <value>Geçersiz sinyal değeri: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
@@ -2837,11 +2872,11 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Gönderilecek sinyal (varsayılan: kapsayıcının yapılandırılmış STOPSIGNAL öğesi veya hiçbiri yapılandırılmamışsa SIGTERM)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>Kapsayıcı olaylarını izleyin.</value>
+  <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
+    <value>Olayları izleyin.</value>
   </data>
-  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>Kapsayıcılardan gerçek zamanlı olayları izleyin.</value>
+  <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
+    <value>Kapsayıcılardan, resimlerden, ağlardan ve birimlerden gerçek zamanlı olayları izleyin.</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
     <value>Zaman damgasından bu yana oluşturulan tüm olayları göster</value>
@@ -3683,7 +3718,7 @@ Windows sürümü: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_UnsupportedRestartPolicyError" xml:space="preserve">
-    <value>'{}' yeniden başlatma ilkesi nodesteklenmiyor. Desteklenen değerler no ve always.</value>
+    <value>Restart policy '{}' is not supported. Supported values are no and always.</value>
     <comment>{Locked="no"}{Locked="always"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
@@ -3807,6 +3842,9 @@ Windows sürümü: {}</value>
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
     <value>Ağ adı</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
+    <value>Ağ adı veya kimliği</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Yalnızca ağ kimliklerini görüntüle</value>
@@ -4157,7 +4195,7 @@ Windows sürümü: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcRestartPolicyConflictsWithRm" xml:space="preserve">
-    <value>A restart policy cannot be combined with automatic removal of the container.</value>
+    <value>Yeniden başlatma ilkesi, kapsayıcıyı otomatik olarak kaldırma özelliğiyle birlikte kullanılamaz.</value>
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>'{}' birimi için ana bilgisayar kaynakları serbest bırakılamadı</value>
@@ -4173,6 +4211,18 @@ Windows sürümü: {}</value>
   </data>
   <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
     <value>Ana bilgisayar güvenilen kök sertifikaları sanal makineye yüklenemedi: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
+    <value>WSLC, yerel ana bilgisayar adı çözümlemesini başlatmak için '{}' yazamadı (konuk hatası {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
+    <value>WSLC started the guest VM, but Docker Engine did not become ready within {} milliseconds. Collect WSL diagnostic logs to investigate the startup failure.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
+    <value>Docker Engine exited with code {} before becoming ready in the WSLC guest VM. Collect WSL diagnostic logs to investigate the startup failure.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

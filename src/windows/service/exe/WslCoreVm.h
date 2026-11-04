@@ -81,7 +81,7 @@ public:
 
     wil::unique_socket CreateListeningSocket() const;
 
-    wil::unique_socket CreateRootNamespaceProcess(_In_ LPCSTR Path, _In_ LPCSTR* Arguments);
+    wil::unique_socket CreateRootNamespaceProcess(_In_ LPCSTR Path, _In_ LPCSTR* Arguments, uint64_t PluginId = 0);
 
     std::pair<int, LX_MINI_MOUNT_STEP> DetachDisk(_In_opt_ PCWSTR Disk);
 

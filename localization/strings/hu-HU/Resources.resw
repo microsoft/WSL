@@ -848,6 +848,10 @@ A Admin Protection kapcsolatos további információért látogasson el a https:
     <value>Érvénytelen disztribúciónév: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageInvalidDistribution" xml:space="preserve">
+    <value>Érvénytelen terjesztési regisztrációt találtunk: {}, {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholders are the distribution's registry GUID and the error code.</comment>
+  </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>Örökölt disztribúciós regisztráció használata. Fontolja meg inkább tar-alapú disztribúció használatát.</value>
     <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
@@ -901,6 +905,10 @@ A Admin Protection kapcsolatos további információért látogasson el a https:
   </data>
   <data name="MessageFailedToCreateNetwork" xml:space="preserve">
     <value>Nem sikerült létrehozni a(z) {} címtartományú virtuális hálózatot, új hálózat létrehozva a következő tartománnyal: {}, {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
+    <value>A WSL NAT-hálózata ({}) ütközik a docker alapértelmezett hálózatával</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
@@ -1088,6 +1096,10 @@ Visszaállás NAT-hálózatkezelésre.</value>
     <value>A művelet nem fejeződhetett be, mert a VHD jelenleg használatban van. A WSL leállításának kényszerítéséhez használja ezt: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
+  <data name="MessageDistributionTerminationTimeout" xml:space="preserve">
+    <value>Időtúllépés történt, miközben arra vártunk, hogy a(z) {} elosztási folyamat {} ms elteltével kilépjen. Folytatás annak megerősítése nélkül, hogy az elosztás leállt.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
     <value>A tömörítés csak .vhdx fájlok esetén támogatott.</value>
     <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
@@ -1231,6 +1243,10 @@ Helyreállítási utasítások megtekintése a következőn: https://aka.ms/wsld
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
     <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. Using cgroup v2 instead. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
+  <data name="MessageWindowsInstallerBusy" xml:space="preserve">
+    <value>A WSL telepítése nem folytatható, mert a Windows Installer foglalt. Várja meg, amíg a többi szoftver telepítése befejeződik, majd próbálja újra.</value>
+    <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Hiba történt. Próbálkozzon újra később.</value>
@@ -2057,6 +2073,25 @@ A VS Code-ban található parancskatalógusban további VS Code Remote beállít
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Hagyja futni a disztribúciókat és az őket üzemeltető WSL virtuális gépet, hogy ne álljanak le automatikusan, miután egy ideig inaktívak voltak.</value>
   </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
+    <value>Keep WSL distro VM always on</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
+    <value>Your WSL distro VM won't shut down when idle, so new shells start instantly. Uses more memory while WSL is running. This will take effect in your next WSL session.</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Keep WSL distro VM always on</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
+    <value>Couldn't change the keep-running setting</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
+    <value>Győződjön meg arról, hogy .wslconfig nem írásvédett, majd próbálkozzon újra.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
+    <value>You can change this anytime in WSL Settings under Optional Features.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Időtúllépés alaphelyzetbe állítása</value>
   </data>
@@ -2218,7 +2253,7 @@ Usage:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcCannotRemoveRestartingContainer" xml:space="preserve">
-    <value>Container '{}' is restarting and cannot be removed. Either stop the container before removing or use forced remove (-f).</value>
+    <value>A(z) {} tároló újraindul, és nem távolítható el. Az eltávolítás előtt állítsa le a tárolót, vagy használja a kényszerített eltávolítást (-f).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotRunning" xml:space="preserve">
@@ -2409,10 +2444,6 @@ Usage:
      <value>Nem várt helyen pozícióhoz kötött argumentum található: {}</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Hiányzó opciónév a következőnél: „{}”</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
      <value>Nem sikerült feloldani a továbbított argumentumokat a következő argumentumtól kezdődően: {}</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2502,6 +2533,10 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <value>A hálózat nem található: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcNetworkPrefixAmbiguous" xml:space="preserve">
+    <value>A(z) '{}' több hálózatnak is megfelel; használjon hosszabb azonosítót, vagy adja meg a hálózat nevét.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>Nem támogatott hálózati illesztőprogram: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2538,7 +2573,7 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidSignal" xml:space="preserve">
-    <value>Invalid signal value: {}</value>
+    <value>Érvénytelen jelzésérték: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
@@ -2837,11 +2872,11 @@ Példa: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Küldendő jel (alapértelmezés: a tárolóhoz konfigurált STOPSIGNAL, vagy SIGTERM, ha nincs konfigurálva)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>Tárolóesemények figyelése.</value>
+  <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
+    <value>Események figyelése.</value>
   </data>
-  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>Valós idejű események figyelése a tárolókból.</value>
+  <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
+    <value>Tárolók, képek, hálózatok és kötetek valós idejű eseményeinek figyelése.</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
     <value>Az időbélyeg óta létrehozott összes esemény megjelenítése</value>
@@ -3808,6 +3843,9 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
     <value>Hálózat neve</value>
   </data>
+  <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
+    <value>Hálózat neve vagy azonosítója</value>
+  </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Csak a hálózati azonosítókat jelenítse meg</value>
   </data>
@@ -4157,7 +4195,7 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcRestartPolicyConflictsWithRm" xml:space="preserve">
-    <value>A restart policy cannot be combined with automatic removal of the container.</value>
+    <value>Az újraindítási házirend nem használható együtt a tároló automatikus eltávolításával.</value>
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>Nem sikerült felszabadítani a(z) {} kötet gazdagép-erőforrásait</value>
@@ -4173,6 +4211,18 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   </data>
   <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
     <value>Nem sikerült telepíteni a gazdagép megbízható főtanúsítványait a virtuális gépre: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
+    <value>WSLC could not write '{}' to initialize local hostname resolution (guest error {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
+    <value>WSLC started the guest VM, but Docker Engine did not become ready within {} milliseconds. Collect WSL diagnostic logs to investigate the startup failure.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
+    <value>Docker Engine exited with code {} before becoming ready in the WSLC guest VM. Collect WSL diagnostic logs to investigate the startup failure.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

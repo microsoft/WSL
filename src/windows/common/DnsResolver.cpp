@@ -14,42 +14,35 @@ std::optional<LxssDynamicFunction<decltype(DnsQueryRawResultFree)>> DnsResolver:
 
 HRESULT DnsResolver::LoadDnsResolverMethods() noexcept
 {
-    static wil::shared_hmodule dnsModule;
-    static DWORD loadError = ERROR_SUCCESS;
-    static std::once_flag dnsLoadFlag;
+    // Initialize the entire function table once; existing resolvers may be using it.
+    static const HRESULT result = []() -> HRESULT {
+        wil::shared_hmodule dnsModule{LoadLibraryEx(c_dnsModuleName, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32)};
+        RETURN_LAST_ERROR_IF_MSG(!dnsModule, "LoadLibraryEx %ls", c_dnsModuleName);
 
-    // Load DNS dll only once
-    std::call_once(dnsLoadFlag, [&]() {
-        dnsModule.reset(LoadLibraryEx(c_dnsModuleName, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32));
-        if (!dnsModule)
+        // Initialize dynamic functions for the DNS tunneling Windows APIs.
+        // using the non-throwing instance of LxssDynamicFunction as to not end up in the Error telemetry
+        LxssDynamicFunction<decltype(DnsQueryRaw)> local_dnsQueryRaw{DynamicFunctionErrorLogs::None};
+        RETURN_IF_FAILED_EXPECTED(local_dnsQueryRaw.load(dnsModule, "DnsQueryRaw"));
+        LxssDynamicFunction<decltype(DnsCancelQueryRaw)> local_dnsCancelQueryRaw{DynamicFunctionErrorLogs::None};
+        RETURN_IF_FAILED_EXPECTED(local_dnsCancelQueryRaw.load(dnsModule, "DnsCancelQueryRaw"));
+        LxssDynamicFunction<decltype(DnsQueryRawResultFree)> local_dnsQueryRawResultFree{DynamicFunctionErrorLogs::None};
+        RETURN_IF_FAILED_EXPECTED(local_dnsQueryRawResultFree.load(dnsModule, "DnsQueryRawResultFree"));
+
+        // Make a dummy call to the DNS APIs to verify if they are working. The APIs are going to be present
+        // on older Windows versions, where they can be turned on/off. If turned off, the APIs
+        // will be unusable and will return ERROR_CALL_NOT_IMPLEMENTED.
+        if (local_dnsQueryRaw(nullptr, nullptr) == ERROR_CALL_NOT_IMPLEMENTED)
         {
-            loadError = GetLastError();
+            RETURN_IF_WIN32_ERROR_EXPECTED(ERROR_CALL_NOT_IMPLEMENTED);
         }
-    });
 
-    RETURN_IF_WIN32_ERROR_MSG(loadError, "LoadLibraryEx %ls", c_dnsModuleName);
+        s_dnsQueryRaw.emplace(std::move(local_dnsQueryRaw));
+        s_dnsCancelQueryRaw.emplace(std::move(local_dnsCancelQueryRaw));
+        s_dnsQueryRawResultFree.emplace(std::move(local_dnsQueryRawResultFree));
+        return S_OK;
+    }();
 
-    // Initialize dynamic functions for the DNS tunneling Windows APIs.
-    // using the non-throwing instance of LxssDynamicFunction as to not end up in the Error telemetry
-    LxssDynamicFunction<decltype(DnsQueryRaw)> local_dnsQueryRaw{DynamicFunctionErrorLogs::None};
-    RETURN_IF_FAILED_EXPECTED(local_dnsQueryRaw.load(dnsModule, "DnsQueryRaw"));
-    LxssDynamicFunction<decltype(DnsCancelQueryRaw)> local_dnsCancelQueryRaw{DynamicFunctionErrorLogs::None};
-    RETURN_IF_FAILED_EXPECTED(local_dnsCancelQueryRaw.load(dnsModule, "DnsCancelQueryRaw"));
-    LxssDynamicFunction<decltype(DnsQueryRawResultFree)> local_dnsQueryRawResultFree{DynamicFunctionErrorLogs::None};
-    RETURN_IF_FAILED_EXPECTED(local_dnsQueryRawResultFree.load(dnsModule, "DnsQueryRawResultFree"));
-
-    // Make a dummy call to the DNS APIs to verify if they are working. The APIs are going to be present
-    // on older Windows versions, where they can be turned on/off. If turned off, the APIs
-    // will be unusable and will return ERROR_CALL_NOT_IMPLEMENTED.
-    if (local_dnsQueryRaw(nullptr, nullptr) == ERROR_CALL_NOT_IMPLEMENTED)
-    {
-        RETURN_IF_WIN32_ERROR_EXPECTED(ERROR_CALL_NOT_IMPLEMENTED);
-    }
-
-    s_dnsQueryRaw.emplace(std::move(local_dnsQueryRaw));
-    s_dnsCancelQueryRaw.emplace(std::move(local_dnsCancelQueryRaw));
-    s_dnsQueryRawResultFree.emplace(std::move(local_dnsQueryRawResultFree));
-    return S_OK;
+    return result;
 }
 
 DnsResolver::DnsResolver(wil::unique_socket&& dnsHvsocket, DnsResolverFlags flags) :
@@ -62,6 +55,9 @@ DnsResolver::DnsResolver(wil::unique_socket&& dnsHvsocket, DnsResolverFlags flag
 {
     // Initialize as signaled, as there are no requests yet
     m_allRequestsFinished.SetEvent();
+
+    // Manually stop in case the constructor throws.
+    auto stopOnFailure = wil::scope_exit([this] { Stop(); });
 
     // Read external interface constraint regkey
     const auto lxssKey = windows::common::registry::OpenLxssMachineKey(KEY_READ);
@@ -80,6 +76,9 @@ DnsResolver::DnsResolver(wil::unique_socket&& dnsHvsocket, DnsResolverFlags flag
         // Register for interface change notifications. Notifications are used to determine if the external interface constraint setting is applicable.
         THROW_IF_WIN32_ERROR(NotifyIpInterfaceChange(AF_UNSPEC, &DnsResolver::InterfaceChangeCallback, this, FALSE, &m_interfaceNotificationHandle));
     }
+
+    m_dnsChannel.Start();
+    stopOnFailure.release();
 }
 
 DnsResolver::~DnsResolver() noexcept
@@ -173,6 +172,12 @@ try
     // Wait for all requests to complete. At this point no new requests can be started since the object is stopped.
     // We are only waiting for existing requests to finish.
     m_allRequestsFinished.wait();
+
+    // The last query signals m_allRequestsFinished while m_dnsLock is held. Wait for that lock to be released before continuing.
+    // Otherwise ProcessDnsRequest() could release that lock after it's destroyed.
+    {
+        const std::lock_guard lock(m_dnsLock);
+    }
 
     // Stop the response queue first as it can make calls in m_dnsChannel
     m_dnsResponseQueue.cancel();

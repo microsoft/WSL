@@ -23,6 +23,7 @@ WslcSetSessionSettingsCpuCount
 WslcSetSessionSettingsMemory
 WslcSetSessionSettingsTimeout
 WslcSetSessionSettingsVhd
+WslcSetSessionSettingsHostLoopback
  
 WslcRegisterSessionCrashDumpCallback
 WslcReleaseCrashDumpSubscription

@@ -444,6 +444,8 @@ std::pair<wil::unique_handle, wil::unique_handle> CreateSubprocessPipe(
 
 std::pair<DWORD, DWORD> GetServiceState(SC_HANDLE service);
 
+bool WaitForServiceState(SC_HANDLE service, DWORD state, DWORD previousPid);
+
 DWORD
 LxsstuLaunchWsl(
     _In_opt_ LPCWSTR Arguments,

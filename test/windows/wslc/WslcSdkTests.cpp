@@ -1460,9 +1460,85 @@ class WslcSdkTests
             "c.getresponse().read()\";"
             "then echo enabled; else echo disabled; fi",
             c_hostLoopbackTestPort);
-        auto output = RunContainerAndCapture(m_defaultSession, "python:3.12-alpine", {"/bin/sh", "-c", command.c_str()});
+        auto output = RunContainerAndCapture(
+            m_defaultSession, "python:3.12-alpine", {"/bin/sh", "-c", command.c_str()}, WSLC_CONTAINER_FLAG_NONE, nullptr, 2min, WSLC_CONTAINER_NETWORKING_MODE_BRIDGED);
 
         VERIFY_ARE_EQUAL("disabled\n", output.stdoutOutput);
+    }
+
+    WSLC_TEST_METHOD(SessionHostLoopback)
+    {
+        constexpr uint16_t c_hostLoopbackTestPort = 1238;
+        constexpr auto c_hostLoopbackName = "wslc-sdk-loopback.internal";
+        constexpr auto c_sessionName = L"wslc-host-loopback-test";
+        constexpr auto c_image = "python:3.12-alpine";
+        const auto endpoint = std::format(L"http://127.0.0.1:{}/", c_hostLoopbackTestPort);
+        UniqueWebServer server(endpoint.c_str(), L"sdk-host-loopback-ok");
+        ExpectHttpResponse(endpoint.c_str(), HTTP_STATUS_OK, true);
+
+        const std::filesystem::path storage = m_storagePath / "wslc-host-loopback-storage";
+        auto cleanupStorage = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { std::filesystem::remove_all(storage); });
+
+        // Negative: null settings pointer must fail.
+        VERIFY_ARE_EQUAL(WslcSetSessionSettingsHostLoopback(nullptr, c_hostLoopbackName), E_POINTER);
+
+        // Positive: a custom hostname reaches the Windows host loopback on the first session start.
+        {
+            WslcSessionSettings sessionSettings;
+            VERIFY_SUCCEEDED(WslcInitSessionSettings(c_sessionName, storage.c_str(), &sessionSettings));
+            VERIFY_SUCCEEDED(WslcSetSessionSettingsHostLoopback(&sessionSettings, c_hostLoopbackName));
+
+            UniqueSession session;
+            VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &session, nullptr));
+            VERIFY_SUCCEEDED(WslcLoadSessionImageFromFile(session.get(), GetTestImagePath(c_image).c_str(), nullptr, nullptr));
+
+            const auto script = std::format(
+                "import http.client,socket;"
+                "a=socket.getaddrinfo('{}',{},socket.AF_INET,socket.SOCK_STREAM)[0][4];"
+                "c=http.client.HTTPConnection(*a,timeout=60);"
+                "c.request('GET','/');"
+                "print(c.getresponse().read().decode())",
+                c_hostLoopbackName,
+                c_hostLoopbackTestPort);
+            auto output = RunContainerAndCapture(
+                session.get(), c_image, {"python3", "-c", script.c_str()}, WSLC_CONTAINER_FLAG_NONE, nullptr, 2min, WSLC_CONTAINER_NETWORKING_MODE_BRIDGED);
+            VERIFY_ARE_EQUAL("sdk-host-loopback-ok\n", output.stdoutOutput);
+
+            // Use busybox wget to also validate resolution through musl.
+            const auto url = std::format("http://{}:{}/", c_hostLoopbackName, c_hostLoopbackTestPort);
+            output = RunContainerAndCapture(
+                session.get(), c_image, {"wget", "-q", "-T", "60", "-O", "-", url.c_str()}, WSLC_CONTAINER_FLAG_NONE, nullptr, 2min, WSLC_CONTAINER_NETWORKING_MODE_BRIDGED);
+            VERIFY_ARE_EQUAL("sdk-host-loopback-ok", output.stdoutOutput);
+
+            VERIFY_SUCCEEDED(WslcTerminateSession(session.get()));
+        }
+
+        // Positive: a null hostname disables host loopback.
+        const auto command = std::format(
+            "if python3 -c \"import http.client,socket;"
+            "a=socket.getaddrinfo('{}',{},socket.AF_INET,socket.SOCK_STREAM)[0][4];"
+            "c=http.client.HTTPConnection(*a,timeout=5);"
+            "c.request('GET','/');"
+            "c.getresponse().read()\";"
+            "then echo enabled; else echo disabled; fi",
+            c_hostLoopbackName,
+            c_hostLoopbackTestPort);
+
+        {
+            WslcSessionSettings sessionSettings;
+            VERIFY_SUCCEEDED(WslcInitSessionSettings(c_sessionName, storage.c_str(), &sessionSettings));
+            VERIFY_SUCCEEDED(WslcSetSessionSettingsHostLoopback(&sessionSettings, c_hostLoopbackName));
+            VERIFY_SUCCEEDED(WslcSetSessionSettingsHostLoopback(&sessionSettings, nullptr));
+
+            UniqueSession session;
+            VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &session, nullptr));
+
+            auto output = RunContainerAndCapture(
+                session.get(), c_image, {"/bin/sh", "-c", command.c_str()}, WSLC_CONTAINER_FLAG_NONE, nullptr, 2min, WSLC_CONTAINER_NETWORKING_MODE_BRIDGED);
+            VERIFY_ARE_EQUAL("disabled\n", output.stdoutOutput);
+
+            VERIFY_SUCCEEDED(WslcTerminateSession(session.get()));
+        }
     }
 
     WSLC_TEST_METHOD(ContainerPortMapping)

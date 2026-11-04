@@ -34,6 +34,7 @@ typedef struct WslcSessionOptionsInternal
 
     WslcVhdRequirements vhdRequirements;
     WslcSessionFeatureFlags featureFlags;
+    PCSTR hostLoopback; // null when host loopback is disabled
 } WslcSessionOptionsInternal;
 
 static_assert(sizeof(WslcSessionOptionsInternal) == WSLC_SESSION_OPTIONS_SIZE, "WSLC_SESSION_OPTIONS_INTERNAL size mismatch");

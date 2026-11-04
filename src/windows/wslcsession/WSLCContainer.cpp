@@ -954,8 +954,6 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_mappedPorts(std::move(ports)),
     m_labels(std::move(labels)),
     m_comWrapper(wil::MakeOrThrow<WSLCContainer>(wslcSession, m_id, m_name, InitialState, std::move(onDeleted))),
-    m_containerEvents(runtime.Events().RegisterContainerStateUpdates(
-        m_id, std::bind(&WSLCContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4))),
     m_eventStore(eventStore),
     m_state(InitialState),
     m_createdAt(CreatedAt),
@@ -1036,6 +1034,10 @@ void WSLCContainerImpl::Initialize()
 {
     // N.B. this must be done here because weak_from_this() is only valid after the constructor returns.
     m_comWrapper->Initialize(weak_from_this());
+
+    // N.B. This must be registered after all the fields are initialized, since callbacks can be invoked immediately after registration.
+    m_containerEvents = m_runtime.Events().RegisterContainerStateUpdates(
+        m_id, std::bind(&WSLCContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 }
 
 void WSLCContainerImpl::SetExitCode(int ExitCode) noexcept
@@ -1174,11 +1176,15 @@ wil::com_ptr<IWSLCProcess> WSLCContainerImpl::StartPhase(
         }
 
         // A valid pending restart has no competing owner. The scheduler must not wait on explicit operations.
-        THROW_HR_IF_MSG(E_UNEXPECTED, m_restart || m_transition, "Policy restart conflicts with an active operation: %hs", m_id.c_str());
+        THROW_HR_IF_MSG(
+            E_UNEXPECTED,
+            m_restart || m_transition || m_exitRequests.HasPendingRequests(),
+            "Policy restart conflicts with an active operation: %hs",
+            m_id.c_str());
     }
     else
     {
-        WaitForConflictingTransitionToComplete(lock, lifecycleLock, std::nullopt, !RestartPhase);
+        WaitForConflictingTransitionToComplete(lock, lifecycleLock, std::nullopt, !RestartPhase, true);
     }
 
     // A Delete() that raced a restart may have already moved the container to the Deleted state.
@@ -1364,7 +1370,11 @@ wil::com_ptr<IWSLCProcess> WSLCContainerImpl::StartPhase(
 }
 
 void WSLCContainerImpl::WaitForConflictingTransitionToComplete(
-    wil::rwlock_release_exclusive_scope_exit& lock, wil::rwlock_release_shared_scope_exit& lifecycleLock, std::optional<TransitionKind> kind, bool waitForRestart)
+    wil::rwlock_release_exclusive_scope_exit& lock,
+    wil::rwlock_release_shared_scope_exit& lifecycleLock,
+    std::optional<TransitionKind> kind,
+    bool waitForRestart,
+    bool waitForExitRequests)
 {
     while (true)
     {
@@ -1382,6 +1392,15 @@ void WSLCContainerImpl::WaitForConflictingTransitionToComplete(
             lock.reset();
             lifecycleLock.reset();
             WaitForTransitionCompletion(transition);
+        }
+        // Stop and kill requests address the container only by ID, so one issued for a run that already exited would
+        // reach the next one. A container that is still running is rejected by the caller instead.
+        else if (waitForExitRequests && m_state != WslcContainerStateRunning && m_exitRequests.HasPendingRequests())
+        {
+            const auto idle = m_exitRequests.IdleEvent();
+            lock.reset();
+            lifecycleLock.reset();
+            WaitForCompletionEvent(idle.get());
         }
         else
         {
@@ -1759,7 +1778,7 @@ void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds)
     ValidateSignal(Signal);
 
     bool wasRunning{};
-    auto restart = std::make_shared<RestartTransaction>();
+    auto restart = std::make_shared<WSLCRestartTransaction>();
 
     {
         auto lifecycleLock = m_lifecycleLock.lock_shared();
@@ -1789,15 +1808,7 @@ void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds)
             auto lock = m_lock.lock_exclusive();
 
             // CommitState() clears this once the start phase lands, so a later restart may already own it.
-            if (m_restart == restart)
-            {
-                m_restart.reset();
-            }
-
-            if (!succeeded)
-            {
-                transition = OnFailedRestartExclusiveLockHeld();
-            }
+            restart->CleanupIfOwned(m_restart, succeeded, [&]() { transition = OnFailedRestartExclusiveLockHeld(); });
         }
 
         if (transition)

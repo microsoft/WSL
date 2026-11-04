@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include "Common.h"
+#include "EventStore.h"
 #include "wslc.h"
 #include "wslccompat.h"
 #include "WSLCProcessLauncher.h"
@@ -3477,6 +3478,51 @@ class WSLCTests
         VERIFY_ARE_EQUAL(reason, WSLCVirtualMachineTerminationReasonShutdown);
     }
 
+    // Validate that a VM being terminated due the HCS service stopping is correctly reported to the caller.
+    WSLC_TEST_METHOD(HcsServiceDisconnect)
+    {
+        auto restoreSession = ResetTestSession();
+
+        const wil::unique_schandle manager{OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT)};
+        VERIFY_IS_NOT_NULL(manager);
+
+        const wil::unique_schandle service{OpenService(manager.get(), L"vmcompute", SERVICE_STOP | SERVICE_QUERY_STATUS | SERVICE_START)};
+        VERIFY_IS_NOT_NULL(service);
+
+        auto session = CreateSession(GetDefaultSessionSettings(L"hcs-service-disconnect-test"));
+        ExpectCommandResult(session.get(), {"/bin/true"}, 0);
+
+        wil::unique_handle terminationEvent;
+        VERIFY_SUCCEEDED(session->GetTerminationEvent(&terminationEvent));
+        VERIFY_ARE_EQUAL(WaitForSingleObject(terminationEvent.get(), 0), static_cast<DWORD>(WAIT_TIMEOUT));
+
+        const auto servicePid = GetServiceState(service.get()).second;
+        SERVICE_STATUS status{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(ControlService(service.get(), SERVICE_CONTROL_STOP, &status));
+        VERIFY_IS_TRUE(WaitForServiceState(service.get(), SERVICE_STOPPED, servicePid));
+
+        VERIFY_ARE_EQUAL(WaitForSingleObject(terminationEvent.get(), 60 * 1000), static_cast<DWORD>(WAIT_OBJECT_0));
+
+        WSLCVirtualMachineTerminationReason reason{};
+        wil::unique_cotaskmem_string details;
+        VERIFY_SUCCEEDED(session->GetTerminationReason(&reason, &details));
+        VERIFY_ARE_EQUAL(reason, WSLCVirtualMachineTerminationReasonUnknown);
+
+        WSLCSessionState state{};
+        VERIFY_SUCCEEDED(session->GetState(&state));
+        VERIFY_ARE_EQUAL(state, WSLCSessionStateTerminated);
+
+        if (!StartService(service.get(), 0, nullptr))
+        {
+            THROW_LAST_ERROR_IF(GetLastError() != ERROR_SERVICE_ALREADY_RUNNING);
+        }
+
+        VERIFY_IS_TRUE(WaitForServiceState(service.get(), SERVICE_RUNNING, 0));
+
+        auto recoveredSession = CreateSession(GetDefaultSessionSettings(L"hcs-service-recovery-test"));
+        ExpectCommandResult(recoveredSession.get(), {"/bin/true"}, 0);
+    }
+
     WSLC_TEST_METHOD(CrashDumpCallback)
     {
         struct Invocation
@@ -3666,6 +3712,76 @@ class WSLCTests
         writeTty("exit\n");
 
         VERIFY_IS_TRUE(process.GetExitEvent().wait(30 * 1000));
+    }
+
+    WSLC_TEST_METHOD(LocalhostColdStartAndLocalOperationsWithoutDns)
+    {
+        constexpr DWORD c_waitTimeoutMs = 120000;
+        auto session = CreateSession(GetDefaultSessionSettings(L"localhost-offline"));
+        wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
+        VERIFY_SUCCEEDED(session->ListImages(nullptr, &images, images.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(0u, images.size());
+
+        auto result = RunCommand(session.get(), {"/bin/cat", "/etc/hosts"}, c_waitTimeoutMs);
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_ARE_EQUAL("127.0.0.1\tlocalhost\n::1\tlocalhost ip6-localhost ip6-loopback\n", result.Output[1]);
+
+        result = RunCommand(session.get(), {"/bin/sh", "-c", "awk '$1 == \"hosts:\" {$1=$1; print}' /etc/nsswitch.conf"}, c_waitTimeoutMs);
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_ARE_EQUAL("hosts: files dns\n", result.Output[1]);
+
+        LoadTestImage(*session, "python:3.12-alpine");
+        constexpr auto c_dnsSink = R"PY(
+import socket
+import sys
+
+server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+server.bind(('127.0.0.1', 53))
+print('DNS ready', flush=True)
+queries = 0
+data, _ = server.recvfrom(65535)
+while data != b'stop':
+    queries += 1
+    data, _ = server.recvfrom(65535)
+sys.exit(1 if queries else 0)
+)PY";
+        WSLCContainerLauncher dnsLauncher("python:3.12-alpine", "localhost-dns-sink", {"python3", "-c", c_dnsSink}, {}, "host");
+        auto dns = dnsLauncher.Launch(*session);
+        auto dnsProcess = dns.GetInitProcess();
+        WaitForOutput(dnsProcess.GetStdHandle(1), "DNS ready\n", std::chrono::milliseconds{c_waitTimeoutMs});
+
+        result = RunCommand(
+            session.get(),
+            {"/bin/sh", "-c", "printf 'nameserver 127.0.0.1\\noptions timeout:30 attempts:1\\n' > /etc/resolv.conf"},
+            c_waitTimeoutMs);
+        VERIFY_ARE_EQUAL(0, result.Code);
+
+        result = RunCommand(session.get(), {"/bin/sh", "-c", "getent ahostsv4 localhost | awk '{print $1}' | sort -u"}, c_waitTimeoutMs);
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_ARE_EQUAL("127.0.0.1\n", result.Output[1]);
+        result = RunCommand(session.get(), {"/bin/sh", "-c", "getent hosts localhost | awk '{print $1}' | sort -u"}, c_waitTimeoutMs);
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_ARE_EQUAL("::1\n", result.Output[1]);
+
+        // A fresh daemon process runs package initializers before handling --version.
+        result = RunCommand(session.get(), {"/usr/bin/dockerd", "--version"}, c_waitTimeoutMs);
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_IS_TRUE(result.Output[1].starts_with("Docker version "));
+        VERIFY_IS_TRUE(result.Output[2].empty());
+
+        LoadTestImage(*session, "hello-world:latest");
+        WSLCContainerLauncher helloLauncher("hello-world:latest", "localhost-offline-hello");
+        auto hello = helloLauncher.Launch(*session);
+        result = hello.GetInitProcess().WaitAndCaptureOutput(c_waitTimeoutMs);
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+        images.reset();
+        VERIFY_SUCCEEDED(session->ListImages(nullptr, &images, images.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(2u, images.size());
+
+        result = RunCommand(session.get(), {"/bin/bash", "-c", "printf stop > /dev/udp/127.0.0.1/53"}, c_waitTimeoutMs);
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_ARE_EQUAL(0, dnsProcess.Wait(c_waitTimeoutMs));
     }
 
     void ValidateNetworking(WSLCNetworkingMode mode, bool enableDnsTunneling = false)
@@ -7651,6 +7767,15 @@ class WSLCTests
         return stream;
     }
 
+    std::vector<wsl::windows::common::wslc_schema::Event> ReadImageEventsThroughMarker(IWSLCEventStream* Stream)
+    {
+        std::vector<wsl::windows::common::wslc_schema::Event> events;
+        std::ranges::copy_if(ReadNetworkEventsThroughMarker(Stream), std::back_inserter(events), [](const auto& Event) {
+            return Event.Type == "image";
+        });
+        return events;
+    }
+
     static std::vector<std::string> EventActions(const std::vector<wsl::windows::common::wslc_schema::Event>& Events)
     {
         std::vector<std::string> actions;
@@ -8329,6 +8454,8 @@ class WSLCTests
 
         // Run a container through its create/start/kill/die lifecycle inside a bounded time window.
         const LONGLONG since = now();
+        const auto imageTagRepository = GenerateNetworkEventTestName("wslc-test-event-image");
+        const auto imageTag = imageTagRepository + ":v1";
         std::string id;
         {
             WSLCContainerLauncher launcher(c_imageName, c_containerName, {"sleep", "99999"});
@@ -8341,6 +8468,12 @@ class WSLCTests
             // Kill (rather than Stop) so Docker emits a 'kill' event ahead of the 'die' that stops it.
             VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
             VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
+        }
+
+        {
+            WSLCTagImageOptions tagOptions{.Image = c_imageName, .Repo = imageTagRepository.c_str(), .Tag = "v1"};
+            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
+            DeleteImage(imageTag, WSLCDeleteImageFlagsNoPrune);
         }
 
         const LONGLONG until = now() + 1;
@@ -8439,14 +8572,17 @@ class WSLCTests
             verifyEvents(DrainEventStream(stream.get()), id, {"create", "destroy"});
         }
 
-        // Image events are not recorded yet, so a 'type=image' filter excludes the container's
-        // events and leaves the stream empty.
+        // A 'type=image' filter includes image events and excludes the container's events.
         {
-            WSLCFilter filter{"type", "image"};
+            WSLCFilter filters[]{{"type", "image"}, {"image", imageTag.c_str()}};
             wil::com_ptr<IWSLCEventStream> stream;
-            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, &filter, 1, &stream));
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, filters, ARRAYSIZE(filters), &stream));
 
-            VERIFY_IS_TRUE(DrainEventStream(stream.get()).empty());
+            const auto events = DrainEventStream(stream.get());
+            VERIFY_ARE_EQUAL(static_cast<size_t>(1), events.size());
+            VERIFY_ARE_EQUAL("image", events[0].Type);
+            VERIFY_ARE_EQUAL("tag", events[0].Action);
+            VERIFY_ARE_EQUAL(imageTag, events[0].Actor.Attributes.at("name"));
         }
 
         // An unmatched container id yields an empty stream, and GetNext validates its out-pointer.
@@ -9511,6 +9647,295 @@ class WSLCTests
         VERIFY_ARE_EQUAL((std::vector<std::string>{"create", "destroy"}), EventActions(DrainEventStream(replayStream.get())));
     }
 
+    WSLC_TEST_METHOD(ImageEventStream)
+    {
+        const auto repository = GenerateNetworkEventTestName("wslc-test-image-events");
+        const auto image = repository + ":v1";
+        const auto aliasRepository = repository + "-alias";
+        const auto alias = aliasRepository + ":v1";
+
+        auto cleanup = wil::scope_exit([&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow(alias, WSLCDeleteImageFlagsNone).first);
+            LOG_IF_FAILED(DeleteImageNoThrow(image, WSLCDeleteImageFlagsNone).first);
+        });
+
+        auto stream = OpenEventStream({{"type", "network"}, {"type", "image"}});
+        ReadImageEventsThroughMarker(stream.get());
+
+        wil::unique_cotaskmem_ansistring imageId;
+        {
+            const auto imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
+            wil::unique_handle imageTarFileHandle{
+                CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+
+            LARGE_INTEGER fileSize{};
+            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+            VERIFY_SUCCEEDED(m_defaultSession->ImportImage(
+                ToCOMInputHandle(imageTarFileHandle.get()), image.c_str(), fileSize.QuadPart, nullptr, &imageId));
+        }
+
+        WSLCTagImageOptions tagOptions{.Image = image.c_str(), .Repo = aliasRepository.c_str(), .Tag = "v1"};
+        VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
+        DeleteImage(alias, WSLCDeleteImageFlagsNone);
+        DeleteImage(image, WSLCDeleteImageFlagsNone);
+        cleanup.release();
+
+        const auto events = ReadImageEventsThroughMarker(stream.get());
+        const std::vector<std::string> expectedActions{"tag", "import", "tag", "untag", "untag", "delete"};
+        VERIFY_ARE_EQUAL(expectedActions, EventActions(events));
+
+        const std::vector<std::string> expectedNames{image, imageId.get(), alias, imageId.get(), imageId.get(), imageId.get()};
+        for (size_t index = 0; index < events.size(); ++index)
+        {
+            VERIFY_ARE_EQUAL("image", events[index].Type);
+            VERIFY_ARE_EQUAL(std::string{imageId.get()}, events[index].Actor.ID);
+            VERIFY_ARE_EQUAL(expectedNames[index], events[index].Actor.Attributes.at("name"));
+        }
+
+        const auto since = events.front().timeNano / 1'000'000'000;
+        const auto until = events.back().timeNano / 1'000'000'000 + 1;
+        const auto matchingEvents = [&](const std::vector<WSLCFilter>& Filters) {
+            wil::com_ptr<IWSLCEventStream> replayStream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, Filters.data(), static_cast<ULONG>(Filters.size()), &replayStream));
+            return DrainEventStream(replayStream.get());
+        };
+
+        // The recorded events remain readable after the image is deleted.
+        VERIFY_ARE_EQUAL(expectedActions, EventActions(matchingEvents({{"image", imageId.get()}})));
+
+        const auto taggedEvents = matchingEvents({{"type", "image"}, {"image", image.c_str()}});
+        VERIFY_ARE_EQUAL(std::vector<std::string>{"tag"}, EventActions(taggedEvents));
+        VERIFY_ARE_EQUAL(image, taggedEvents[0].Actor.Attributes.at("name"));
+
+        VERIFY_ARE_EQUAL(std::vector<std::string>{"tag"}, EventActions(matchingEvents({{"image", repository.c_str()}})));
+        VERIFY_ARE_EQUAL(
+            (std::vector<std::string>{"untag", "untag"}),
+            EventActions(matchingEvents({{"image", imageId.get()}, {"event", "untag"}})));
+        VERIFY_IS_TRUE(matchingEvents({{"image", imageId.get()}, {"type", "container"}}).empty());
+    }
+
+    WSLC_TEST_METHOD(ImageArchiveEventStream)
+    {
+        const auto imageTar =
+            std::filesystem::current_path() / std::format("{}.tar", GenerateNetworkEventTestName("wslc-test-image-archive"));
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTar.c_str())); });
+
+        auto stream = OpenEventStream({{"type", "network"}, {"type", "image"}});
+        ReadImageEventsThroughMarker(stream.get());
+
+        {
+            wil::unique_handle imageTarFileHandle{
+                CreateFileW(imageTar.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+            VERIFY_SUCCEEDED(m_defaultSession->SaveImage(ToCOMInputHandle(imageTarFileHandle.get()), "hello-world:latest", nullptr, nullptr));
+        }
+
+        {
+            wil::unique_handle imageTarFileHandle{
+                CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+
+            LARGE_INTEGER fileSize{};
+            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(ToCOMInputHandle(imageTarFileHandle.get()), fileSize.QuadPart, nullptr, nullptr));
+        }
+
+        const auto events = ReadImageEventsThroughMarker(stream.get());
+        VERIFY_ARE_EQUAL((std::vector<std::string>{"save", "load"}), EventActions(events));
+        VERIFY_ARE_EQUAL(events[0].Actor.ID, events[1].Actor.ID);
+
+        for (const auto& event : events)
+        {
+            VERIFY_ARE_EQUAL(event.Actor.ID, event.Actor.Attributes.at("name"));
+        }
+    }
+
+    WSLC_TEST_METHOD(ImageRegistryEventStream)
+    {
+        auto [registryContainer, registryAddress] = StartLocalRegistry(*m_defaultSession);
+        auto auth = BuildRegistryAuthHeader("", "");
+
+        auto stream = OpenEventStream({{"type", "network"}, {"type", "image"}});
+        ReadImageEventsThroughMarker(stream.get());
+
+        const auto registryImage = PushImageToRegistry("hello-world:latest", registryAddress, auth);
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(DeleteImageNoThrow(registryImage, WSLCDeleteImageFlagsForce).first); });
+
+        VERIFY_SUCCEEDED(m_defaultSession->PullImage(registryImage.c_str(), nullptr, FALSE, nullptr, nullptr));
+        DeleteImage(registryImage, WSLCDeleteImageFlagsForce);
+        cleanup.release();
+
+        const auto events = ReadImageEventsThroughMarker(stream.get());
+        VERIFY_ARE_EQUAL((std::vector<std::string>{"tag", "push", "untag", "pull", "untag"}), EventActions(events));
+
+        const auto registryRepository = registryImage.substr(0, registryImage.rfind(':'));
+        VERIFY_ARE_EQUAL(registryImage, events[0].Actor.Attributes.at("name"));
+        VERIFY_ARE_EQUAL(events[0].Actor.ID, events[2].Actor.ID);
+        VERIFY_ARE_EQUAL(events[0].Actor.ID, events[4].Actor.ID);
+
+        for (const auto index : {1, 3})
+        {
+            VERIFY_ARE_EQUAL(registryImage, events[index].Actor.ID);
+            VERIFY_ARE_EQUAL(registryRepository, events[index].Actor.Attributes.at("name"));
+        }
+    }
+
+    WSLC_TEST_METHOD(ImagePruneEventStream)
+    {
+        const auto label = GenerateNetworkEventTestName("wslc-test-image-prune");
+        const auto image = label + ":latest";
+        const auto contextDir = std::filesystem::current_path() / label;
+
+        std::filesystem::create_directories(contextDir);
+        auto contextCleanup = wil::scope_exit([&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM hello-world:latest\n";
+            dockerfile << "LABEL " << label << "=yes\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, image.c_str()));
+        auto imageCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(DeleteImageNoThrow(image, WSLCDeleteImageFlagsForce).first); });
+
+        wil::unique_cotaskmem_ansistring inspectOutput;
+        VERIFY_SUCCEEDED(m_defaultSession->InspectImage(image.c_str(), &inspectOutput));
+        const auto imageId = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectImage>(inspectOutput.get()).Id;
+
+        auto stream = OpenEventStream({{"type", "network"}, {"type", "image"}});
+        ReadImageEventsThroughMarker(stream.get());
+
+        const auto pruneImages = [&](const std::vector<WSLCFilter>& Filters) {
+            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+            ULONGLONG spaceReclaimed = 0;
+            VERIFY_SUCCEEDED(m_defaultSession->PruneImages(
+                Filters.data(), static_cast<ULONG>(Filters.size()), deletedImages.addressof(), deletedImages.size_address<ULONG>(), &spaceReclaimed));
+            return std::make_pair(std::move(deletedImages), spaceReclaimed);
+        };
+
+        const auto noopLabel = std::format("{}=no", label);
+        auto [noopDeleted, noopReclaimed] = pruneImages({{"label", noopLabel.c_str()}, {"dangling", "false"}});
+        VERIFY_ARE_EQUAL(static_cast<size_t>(0), noopDeleted.size());
+        VERIFY_ARE_EQUAL(0ull, noopReclaimed);
+
+        const auto pruneLabel = std::format("{}=yes", label);
+        auto [deletedImages, spaceReclaimed] = pruneImages({{"label", pruneLabel.c_str()}, {"dangling", "false"}});
+        VERIFY_IS_TRUE(std::ranges::any_of(deletedImages, [&](const auto& DeletedImage) {
+            return DeletedImage.Type == WSLCDeletedImageTypeDeleted && DeletedImage.Image == imageId;
+        }));
+        ExpectImagePresent(*m_defaultSession, image.c_str(), false);
+        imageCleanup.release();
+
+        const auto events = ReadImageEventsThroughMarker(stream.get());
+        VERIFY_ARE_EQUAL((std::vector<std::string>{"prune", "untag", "delete", "prune"}), EventActions(events));
+
+        VERIFY_IS_TRUE(events[0].Actor.ID.empty());
+        VERIFY_ARE_EQUAL("0", events[0].Actor.Attributes.at("reclaimed"));
+
+        VERIFY_ARE_EQUAL(imageId, events[1].Actor.ID);
+        VERIFY_ARE_EQUAL(imageId, events[2].Actor.ID);
+
+        VERIFY_IS_TRUE(events[3].Actor.ID.empty());
+        VERIFY_ARE_EQUAL(std::to_string(spaceReclaimed), events[3].Actor.Attributes.at("reclaimed"));
+
+        // Each image event keeps the exact actor and time Docker reported for it.
+        const auto dockerOutput = ExpectCommandResult(
+                                      m_defaultSession.get(),
+                                      {"/usr/bin/docker",
+                                       "events",
+                                       "--since",
+                                       std::to_string(events[1].timeNano / 1'000'000'000),
+                                       "--until",
+                                       std::to_string(events[2].timeNano / 1'000'000'000 + 1),
+                                       "--filter",
+                                       "type=image",
+                                       "--filter",
+                                       "image=" + imageId,
+                                       "--filter",
+                                       "event=untag",
+                                       "--filter",
+                                       "event=delete",
+                                       "--format",
+                                       "{{json .}}"},
+                                      0)
+                                      .Output.at(1);
+
+        std::vector<std::string> dockerEvents;
+        for (const auto& line : wsl::shared::string::Split(dockerOutput, '\n'))
+        {
+            dockerEvents.push_back(wsl::shared::ToJson(wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(line.c_str())));
+        }
+
+        const std::vector<std::string> recordedEvents{wsl::shared::ToJson(events[1]), wsl::shared::ToJson(events[2])};
+        VERIFY_ARE_EQUAL(dockerEvents, recordedEvents);
+
+        // A label filter selects the events whose attributes carry the image label.
+        std::vector<std::string> labeledActions;
+        for (const auto& event : events)
+        {
+            if (event.Actor.Attributes.contains(label))
+            {
+                VERIFY_ARE_EQUAL("yes", event.Actor.Attributes.at(label));
+                labeledActions.push_back(event.Action);
+            }
+        }
+
+        VERIFY_IS_FALSE(labeledActions.empty());
+
+        wil::com_ptr<IWSLCEventStream> labelStream;
+        const WSLCFilter labelFilters[]{{"type", "image"}, {"label", pruneLabel.c_str()}, {"event", "untag"}, {"event", "delete"}};
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(
+            events[1].timeNano / 1'000'000'000, events[2].timeNano / 1'000'000'000 + 1, labelFilters, ARRAYSIZE(labelFilters), &labelStream));
+        VERIFY_ARE_EQUAL(labeledActions, EventActions(DrainEventStream(labelStream.get())));
+    }
+
+    WSLC_TEST_METHOD(ImageEventsSurviveVmRestart)
+    {
+        const auto repository = GenerateNetworkEventTestName("wslc-test-image-reconnect");
+        const auto image = repository + ":v1";
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(DeleteImageNoThrow(image, WSLCDeleteImageFlagsNoPrune).first); });
+
+        auto stream = OpenEventStream({{"type", "network"}, {"type", "image"}});
+        ReadImageEventsThroughMarker(stream.get());
+
+        WSLCTagImageOptions tagOptions{.Image = "debian:latest", .Repo = repository.c_str(), .Tag = "v1"};
+        VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
+
+        // Teardown stops the relay that delivers events, so the tag must land before the restart.
+        const auto tagEvents = ReadImageEventsThroughMarker(stream.get());
+        VERIFY_ARE_EQUAL(static_cast<size_t>(1), tagEvents.size());
+        VERIFY_ARE_EQUAL("tag", tagEvents[0].Action);
+        VERIFY_ARE_EQUAL(image, tagEvents[0].Actor.Attributes.at("name"));
+
+        BOOL wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(m_defaultSession->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_testSessionName));
+
+        // Listing restarts the VM.
+        ExpectImagePresent(*m_defaultSession, image.c_str());
+        VERIFY_IS_TRUE(IsVmRunning(c_testSessionName));
+
+        DeleteImage(image, WSLCDeleteImageFlagsNoPrune);
+        cleanup.release();
+
+        const auto untagEvents = ReadImageEventsThroughMarker(stream.get());
+        VERIFY_ARE_EQUAL(static_cast<size_t>(1), untagEvents.size());
+        VERIFY_ARE_EQUAL("untag", untagEvents[0].Action);
+        VERIFY_ARE_EQUAL(tagEvents[0].Actor.ID, untagEvents[0].Actor.ID);
+
+        WSLCFilter filter{"image", tagEvents[0].Actor.ID.c_str()};
+        wil::com_ptr<IWSLCEventStream> replayStream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(
+            tagEvents[0].timeNano / 1'000'000'000, untagEvents[0].timeNano / 1'000'000'000 + 1, &filter, 1, &replayStream));
+        VERIFY_ARE_EQUAL((std::vector<std::string>{"tag", "untag"}), EventActions(DrainEventStream(replayStream.get())));
+    }
+
     WSLC_TEST_METHOD(EventStreamReportsLostEvents)
     {
         // One more than the store's ring capacity, so the reader's next slot is guaranteed evicted.
@@ -9631,6 +10056,110 @@ class WSLCTests
         VERIFY_ARE_EQUAL(id, firstEvent.Actor.ID);
         VERIFY_ARE_EQUAL("kill", secondEvent.Action);
         VERIFY_ARE_EQUAL(id, secondEvent.Actor.ID);
+    }
+
+    static auto CreateEventStream(wsl::windows::service::wslc::EventStore& Store, const wil::unique_event& ReaderAvailable)
+    {
+        auto stream = wil::MakeOrThrow<wsl::windows::service::wslc::EventStream>(
+            wil::unique_event{wsl::windows::common::wslutil::DuplicateHandle(ReaderAvailable.get())});
+        VERIFY_SUCCEEDED(stream->RuntimeClassInitialize(nullptr, &Store, 0, 1, {}));
+        return stream;
+    }
+
+    WSLC_TEST_METHOD(EventStreamQueuedReaderCancellationAbortsWithoutReleasingGate)
+    {
+        for (const bool cancelBeforeRead : {false, true})
+        {
+            wsl::windows::service::wslc::EventStore store;
+            wil::unique_event readerAvailable{wil::EventOptions::Signaled};
+            auto stream = CreateEventStream(store, readerAvailable);
+
+            VERIFY_IS_TRUE(readerAvailable.wait(0));
+            auto releaseGate = readerAvailable.SetEvent_scope_exit();
+            wil::unique_event cancelEvent{wil::EventOptions::ManualReset};
+            wil::unique_event readerStarted{wil::EventOptions::ManualReset};
+            wil::unique_cotaskmem_ansistring eventJson;
+            std::promise<HRESULT> result;
+            auto future = result.get_future();
+            if (cancelBeforeRead)
+            {
+                cancelEvent.SetEvent();
+            }
+
+            std::thread reader([&]() {
+                readerStarted.SetEvent();
+                result.set_value(stream->GetNext(cancelEvent.get(), &eventJson));
+            });
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                cancelEvent.SetEvent();
+                releaseGate.reset();
+                FAIL_FAST_IF_MSG(
+                    WaitForSingleObject(reader.native_handle(), 10 * 1000) != WAIT_OBJECT_0,
+                    "event stream reader did not finish after gate release");
+                reader.join();
+            });
+
+            VERIFY_IS_TRUE(readerStarted.wait(10 * 1000));
+            if (!cancelBeforeRead)
+            {
+                VERIFY_IS_TRUE(future.wait_for(100ms) == std::future_status::timeout);
+                cancelEvent.SetEvent();
+            }
+
+            VERIFY_IS_TRUE(future.wait_for(10s) == std::future_status::ready);
+
+            VERIFY_ARE_EQUAL(E_ABORT, future.get());
+            VERIFY_IS_NULL(eventJson.get());
+            VERIFY_IS_FALSE(readerAvailable.wait(0));
+        }
+    }
+
+    WSLC_TEST_METHOD(EventStreamQueuedReaderWithoutCancellationWaitsForGate)
+    {
+        wsl::windows::service::wslc::EventStore store;
+        wil::unique_event readerAvailable{wil::EventOptions::Signaled};
+        auto stream = CreateEventStream(store, readerAvailable);
+
+        VERIFY_IS_TRUE(readerAvailable.wait(0));
+        auto releaseGate = readerAvailable.SetEvent_scope_exit();
+        wil::unique_event readerStarted{wil::EventOptions::ManualReset};
+        wil::unique_cotaskmem_ansistring eventJson;
+        std::promise<HRESULT> result;
+        auto future = result.get_future();
+        std::thread reader([&]() {
+            readerStarted.SetEvent();
+            result.set_value(stream->GetNext(nullptr, &eventJson));
+        });
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            releaseGate.reset();
+            FAIL_FAST_IF_MSG(
+                WaitForSingleObject(reader.native_handle(), 10 * 1000) != WAIT_OBJECT_0,
+                "event stream reader did not finish after gate release");
+            reader.join();
+        });
+
+        VERIFY_IS_TRUE(readerStarted.wait(10 * 1000));
+        VERIFY_IS_TRUE(future.wait_for(100ms) == std::future_status::timeout);
+        releaseGate.reset();
+
+        VERIFY_IS_TRUE(future.wait_for(10s) == std::future_status::ready);
+
+        VERIFY_ARE_EQUAL(WSLC_E_EVENT_STREAM_FINISHED, future.get());
+        VERIFY_IS_NULL(eventJson.get());
+        VERIFY_IS_TRUE(readerAvailable.wait(0));
+    }
+
+    WSLC_TEST_METHOD(EventStreamAbortedReadReleasesGate)
+    {
+        wsl::windows::service::wslc::EventStore store;
+        wil::unique_event readerAvailable{wil::EventOptions::Signaled};
+        auto stream = CreateEventStream(store, readerAvailable);
+
+        wil::unique_event cancelEvent{wil::EventOptions::ManualReset | wil::EventOptions::Signaled};
+        wil::unique_cotaskmem_ansistring eventJson;
+        VERIFY_ARE_EQUAL(E_ABORT, stream->GetNext(cancelEvent.get(), &eventJson));
+        VERIFY_IS_NULL(eventJson.get());
+        VERIFY_IS_TRUE(readerAvailable.wait(0));
     }
 
     WSLC_TEST_METHOD(EventStreamSessionTerminationAbortsReader)

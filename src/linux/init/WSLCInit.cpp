@@ -811,9 +811,7 @@ void HandleMessageImpl(
 
             if (result == 0) // Child
             {
-                sigset_t SignalMask;
-                sigemptyset(&SignalMask);
-                THROW_LAST_ERROR_IF(sigprocmask(SIG_SETMASK, &SignalMask, nullptr) < 0);
+                THROW_LAST_ERROR_IF(UtilClearSignalMask() < 0);
 
                 try
                 {
@@ -967,7 +965,13 @@ void HandleMountMessage(
 
             // Start the memory reduction thread now that procfs is in its final location.
             static std::once_flag memoryReductionFlag;
-            std::call_once(memoryReductionFlag, [] { StartMemoryReductionThread(LxMiniInitMemoryReclaimModeDropCache); });
+            std::call_once(memoryReductionFlag, [] {
+                try
+                {
+                    std::thread([] { RunMemoryReduction(LxMiniInitMemoryReclaimModeDropCache); }).detach();
+                }
+                CATCH_LOG()
+            });
         }
 
         response.Result = 0;
