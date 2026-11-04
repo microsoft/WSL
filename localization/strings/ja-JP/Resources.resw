@@ -2079,6 +2079,25 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>ディストリビューションの実行を継続し、それらをホストしている WSL 仮想マシンがアイドル状態になった後に自動的にシャットダウンされないようにします。</value>
   </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
+    <value>Keep WSL distro VM always on</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
+    <value>Your WSL distro VM won't shut down when idle, so new shells start instantly. Uses more memory while WSL is running. This will take effect in your next WSL session.</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Keep WSL distro VM always on</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
+    <value>Couldn't change the keep-running setting</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
+    <value>Make sure .wslconfig isn't read-only, then try again.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
+    <value>これは、[オプション機能] の [WSL 設定] でいつでも変更できます。</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>タイムアウトのリセット</value>
   </data>
@@ -2429,10 +2448,6 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
      <value>必要なものが見つからないときに位置指定引数が見つかりました: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>'{}' にオプション名がありません</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
@@ -4202,6 +4217,18 @@ Windows バージョン: {}</value>
   </data>
   <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
     <value>ホストの信頼されたルート証明書を VM にインストールできませんでした: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
+    <value>WSLC は、ローカル ホスト名解決を初期化するための '{}' を書き込めませんでした (ゲスト エラー {})。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
+    <value>WSLC はゲスト VM を起動しましたが、Docker エンジンが {} ミリ秒以内に準備完了しませんでした。WSL 診断ログを収集して、スタートアップ エラーを調査します。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
+    <value>Docker エンジンは、WSLC ゲスト VM で準備が整う前にコード {} で終了しました。WSL 診断ログを収集して、スタートアップ エラーを調査します。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

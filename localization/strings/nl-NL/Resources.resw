@@ -849,7 +849,7 @@ Ga voor meer informatie over Admin Protection naar https://aka.ms/apdevguide</va
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidDistribution" xml:space="preserve">
-    <value>Found invalid distribution registration '{}', {}.</value>
+    <value>Ongeldige distributieregistratie '{}' gevonden, {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholders are the distribution's registry GUID and the error code.</comment>
   </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
@@ -2073,6 +2073,25 @@ U hebt ook toegang tot meer externe VS Code-opties via het opdrachtpalet in VS C
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Zorg ervoor dat distributies worden uitgevoerd, zodat de virtuele WSL-machine die als host fungeert, niet automatisch wordt afgesloten nadat ze inactief zijn geweest.</value>
   </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
+    <value>Keep WSL distro VM always on</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
+    <value>Your WSL distro VM won't shut down when idle, so new shells start instantly. Uses more memory while WSL is running. This will take effect in your next WSL session.</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Keep WSL distro VM always on</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
+    <value>Couldn't change the keep-running setting</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
+    <value>Make sure .wslconfig isn't read-only, then try again.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
+    <value>You can change this anytime in WSL Settings under Optional Features.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Time-out voor opnieuw instellen</value>
   </data>
@@ -2423,10 +2442,6 @@ Gebruik:
   </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
      <value>Er is een positioneel argument gevonden, terwijl er geen werd verwacht: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Ontbrekende optienaam bij: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
@@ -4196,6 +4211,18 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   </data>
   <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
     <value>Kan de door de host vertrouwde basiscertificaten niet installeren in de VM: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
+    <value>WSLC could not write '{}' to initialize local hostname resolution (guest error {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
+    <value>WSLC heeft de gast-VM gestart, maar de Docker-engine is niet binnen {} milliseconden gereed. Diagnostische WSL-logboeken verzamelen om de opstartfout te onderzoeken.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
+    <value>Docker Engine is afgesloten met code {} voordat deze gereed is gemaakt in de WSLC-gast-VM. Diagnostische WSL-logboeken verzamelen om de opstartfout te onderzoeken.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

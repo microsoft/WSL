@@ -2073,6 +2073,25 @@ Windows 版本: {}</value>
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>防止正在运行的分发及托管它们的 WSL 虚拟机在空闲后被自动关闭。</value>
   </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
+    <value>始终保持 WSL 发行版 VM 运行</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
+    <value>WSL 发行版 VM 在空闲时不会关闭，因此新 shell 可以立即启动。WSL 运行时会占用更多内存。这将在你下次启动 WSL 会话时生效。</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>始终保持 WSL 发行版 VM 运行</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
+    <value>无法更改保持运行设置</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
+    <value>请确保 .wslconfig 不是只读的，然后重试。</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
+    <value>你可以随时在 WSL 设置的“可选功能”下更改此设置。</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>重置超时</value>
   </data>
@@ -2423,10 +2442,6 @@ Windows 版本: {}</value>
   </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
      <value>在未预期的情况下找到位置参数:“{}”</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>以下位置缺少选项名称:“{}”</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
@@ -4195,6 +4210,18 @@ Windows 版本: {}</value>
   </data>
   <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
     <value>未能将主机受信任的根证书安装到 VM 中： {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
+    <value>WSLC could not write '{}' to initialize local hostname resolution (guest error {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
+    <value>WSLC 已启动来宾 VM，但 Docker 引擎未在 {} 毫秒内准备就绪。收集 WSL 诊断日志以调查启动失败。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
+    <value>Docker 引擎在 WSLC 来宾 VM 中准备就绪之前已退出，代码为 {}。收集 WSL 诊断日志以调查启动失败。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>
