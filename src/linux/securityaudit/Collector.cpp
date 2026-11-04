@@ -1121,7 +1121,7 @@ DecodedRecord DecodeRecord(std::span<const std::byte> data, bool includeCommandL
             message["argv"] = std::move(arguments);
         }
         ValidateProcessEvent(message);
-        // Strict UTF-8 validation here prevents malformed kernel strings reaching the writer.
+        // Reject individual records that cannot be represented by the strict UTF-8 wire format.
         (void)EncodeMessage(message);
         return {DecodeStatus::Process, std::move(message), {}};
     }
@@ -1299,9 +1299,10 @@ int RunCollector(int inputFd, int outputFd)
             {
                 throw std::runtime_error("Audit protocol writer failed");
             }
-            if (delivery.invalidRecords != 0 || delivery.callbackFailures != 0)
+            // Record rejection is nonfatal; loss is still reported in the stopped counters.
+            if (delivery.callbackFailures != 0)
             {
-                throw std::runtime_error("Invalid eBPF records or event callback failure");
+                throw std::runtime_error("eBPF event callback failure");
             }
             const auto frame = input.Next(100);
             if (frame)
