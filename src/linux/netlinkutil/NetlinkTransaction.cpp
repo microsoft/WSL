@@ -14,7 +14,7 @@ void NetlinkTransaction::Execute(const std::function<void(const NetlinkResponse&
 
     std::vector<NetlinkResponse> responses;
     const auto* request = reinterpret_cast<const nlmsghdr*>(m_request.data());
-    const bool dump = (request->nlmsg_flags & NLM_F_DUMP) == NLM_F_DUMP;
+    const bool dump = m_channel.IsDumpRequest(*request);
 
     try
     {

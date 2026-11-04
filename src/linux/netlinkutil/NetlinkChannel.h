@@ -35,7 +35,9 @@ public:
 
     int SetInterfaceFlags(const std::string& name, int flags);
 
-    static NetlinkChannel FromFd(int fd);
+    static NetlinkChannel FromFd(int fd, int netlinkFamily = NETLINK_ROUTE);
+
+    bool IsDumpRequest(const nlmsghdr& request) const;
 
 private:
     struct Tag
@@ -47,6 +49,7 @@ private:
     NetlinkTransaction CreateTransactionImpl(std::vector<char>&& message, int type, int flags);
 
     wil::unique_fd m_socket;
+    int m_netlinkFamily = NETLINK_ROUTE;
 
     std::atomic<int> seqNumber;
 };

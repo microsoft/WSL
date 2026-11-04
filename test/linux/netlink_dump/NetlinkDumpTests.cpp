@@ -13,6 +13,13 @@ enum class Expected
     InvalidCompletion,
 };
 
+struct Request
+{
+    int family = NETLINK_SOCK_DIAG;
+    int type = SOCK_DIAG_BY_FAMILY;
+    int flags = NLM_F_DUMP;
+};
+
 template <typename T>
 void Append(std::vector<char>& buffer, uint16_t type, uint16_t flags, uint32_t sequence, const T& payload)
 {
@@ -32,14 +39,15 @@ bool Check(
     uint16_t doneFlags,
     int status,
     Expected expected,
-    bool dump = true,
+    Request parameters = {},
     bool acknowledgement = false,
     size_t donePayloadSize = sizeof(int),
     bool secondData = false)
 {
     int descriptors[2];
     THROW_LAST_ERROR_IF(socketpair(AF_UNIX, SOCK_DGRAM, 0, descriptors) < 0);
-    auto channel = NetlinkChannel::FromFd(descriptors[0]);
+    auto original = NetlinkChannel::FromFd(descriptors[0], parameters.family);
+    NetlinkChannel channel(std::move(original));
     const timeval timeout{5, 0};
     for (int descriptor : descriptors)
     {
@@ -59,7 +67,7 @@ bool Check(
         }
         else
         {
-            if (dump)
+            if (parameters.flags & NLM_F_DUMP)
             {
                 inet_diag_msg socket{};
                 socket.idiag_family = AF_INET;
@@ -84,7 +92,7 @@ bool Check(
     inet_diag_req_v2 request{};
     request.sdiag_family = AF_INET;
     request.sdiag_protocol = IPPROTO_TCP;
-    auto transaction = channel.CreateTransaction(request, SOCK_DIAG_BY_FAMILY, dump ? NLM_F_DUMP : 0);
+    auto transaction = channel.CreateTransaction(request, parameters.type, parameters.flags);
     bool complete = false;
     bool rejected = false;
     std::optional<int> error;
@@ -107,10 +115,10 @@ bool Check(
 }
 
 template <typename TRequest, typename TResponse>
-bool CheckKernelDump(const char* name, const TRequest& request, int requestType, int responseType)
+bool CheckKernelDump(const char* name, const TRequest& request, int requestType, int responseType, int flags = NLM_F_DUMP)
 {
     NetlinkChannel channel;
-    auto transaction = channel.CreateTransaction(request, requestType, NLM_F_DUMP);
+    auto transaction = channel.CreateTransaction(request, requestType, flags);
     size_t entries = 0;
     try
     {
@@ -134,19 +142,70 @@ int main()
     passed = Check("nonzero done status", NLM_F_MULTI, NLM_F_MULTI, -EINTR, Expected::Error) && passed;
     passed = Check("allocation failure done status", NLM_F_MULTI, NLM_F_MULTI, -ENOMEM, Expected::Error) && passed;
     passed = Check("successful zero-status dump", NLM_F_MULTI, NLM_F_MULTI, 0, Expected::Success) && passed;
-    passed = Check("successful acknowledgement", 0, 0, 0, Expected::Success, false, true) && passed;
-    passed = Check("empty custom do completion", 0, 0, 0, Expected::Success, false, false, 0) && passed;
-    passed = Check("missing dump completion status", NLM_F_MULTI, NLM_F_MULTI, 0, Expected::InvalidCompletion, true, false, 0) && passed;
+    passed = Check("successful acknowledgement", 0, 0, 0, Expected::Success, {.flags = 0}, true) && passed;
+    passed = Check("empty custom do completion", 0, 0, 0, Expected::Success, {.flags = 0}, false, 0) && passed;
+    passed = Check("missing dump completion status", NLM_F_MULTI, NLM_F_MULTI, 0, Expected::InvalidCompletion, {}, false, 0) && passed;
     passed =
-        Check("truncated dump completion status", NLM_F_MULTI, NLM_F_MULTI, 0, Expected::InvalidCompletion, true, false, sizeof(int) - 1) && passed;
-    passed = Check("normal error acknowledgement", 0, 0, -EINVAL, Expected::Error, false, true) && passed;
+        Check("truncated dump completion status", NLM_F_MULTI, NLM_F_MULTI, 0, Expected::InvalidCompletion, {}, false, sizeof(int) - 1) && passed;
+    passed = Check("normal error acknowledgement", 0, 0, -EINVAL, Expected::Error, {.flags = 0}, true) && passed;
     passed =
-        Check("interruption on second data message", NLM_F_MULTI | NLM_F_DUMP_INTR, NLM_F_MULTI, 0, Expected::Error, true, false, sizeof(int), true) &&
+        Check("interruption on second data message", NLM_F_MULTI | NLM_F_DUMP_INTR, NLM_F_MULTI, 0, Expected::Error, {}, false, sizeof(int), true) &&
         passed;
-    passed = Check("custom do completion payload", 0, 0, 123, Expected::Success, false) && passed;
+    passed = Check("custom do completion payload", 0, 0, 123, Expected::Success, {.flags = 0}) && passed;
+    for (int flags : {NLM_F_ROOT, NLM_F_MATCH})
+    {
+        const auto prefix = flags == NLM_F_ROOT ? "ROOT" : "MATCH";
+        const Request route{NETLINK_ROUTE, RTM_GETLINK, flags};
+        passed = Check(std::format("{} route interrupted data", prefix).c_str(), NLM_F_MULTI | NLM_F_DUMP_INTR, NLM_F_MULTI, 0, Expected::Error, route) &&
+                 passed;
+        passed = Check(std::format("{} route interrupted done", prefix).c_str(), NLM_F_MULTI, NLM_F_MULTI | NLM_F_DUMP_INTR, 0, Expected::Error, route) &&
+                 passed;
+        passed = Check(std::format("{} route failed done", prefix).c_str(), NLM_F_MULTI, NLM_F_MULTI, -ENOMEM, Expected::Error, route) && passed;
+        passed =
+            Check(std::format("{} route missing status", prefix).c_str(), NLM_F_MULTI, NLM_F_MULTI, 0, Expected::InvalidCompletion, route, false, 0) &&
+            passed;
+        passed =
+            Check(std::format("{} route truncated status", prefix).c_str(), NLM_F_MULTI, NLM_F_MULTI, 0, Expected::InvalidCompletion, route, false, sizeof(int) - 1) &&
+            passed;
+        passed = Check(std::format("{} route success", prefix).c_str(), NLM_F_MULTI, NLM_F_MULTI, 0, Expected::Success, route) && passed;
+        passed =
+            Check(std::format("{} socket interrupted data", prefix).c_str(), NLM_F_MULTI | NLM_F_DUMP_INTR, NLM_F_MULTI, 0, Expected::Error, {.flags = flags}) &&
+            passed;
+        passed = Check(std::format("{} socket failed done", prefix).c_str(), NLM_F_MULTI, NLM_F_MULTI, -ENOMEM, Expected::Error, {.flags = flags}) &&
+                 passed;
+    }
+    for (int flags : {NLM_F_REPLACE, NLM_F_EXCL, NLM_F_REPLACE | NLM_F_EXCL})
+    {
+        const Request create{NETLINK_ROUTE, RTM_NEWLINK, flags};
+        passed = Check(std::format("NEW flags {} empty completion", flags).c_str(), 0, 0, 0, Expected::Success, create, false, 0) && passed;
+        passed = Check(std::format("NEW flags {} custom completion", flags).c_str(), 0, 0, 123, Expected::Success, create) && passed;
+    }
+    passed = Check("generic ROOT do completion", 0, 0, 123, Expected::Success, {NETLINK_GENERIC, RTM_GETLINK, NLM_F_ROOT}) && passed;
+    passed = Check("generic MATCH do completion", 0, 0, 123, Expected::Success, {NETLINK_GENERIC, RTM_GETLINK, NLM_F_MATCH}) && passed;
+    passed = Check("generic dump with NEW-like family ID", NLM_F_MULTI, NLM_F_MULTI, -ENOMEM, Expected::Error, {NETLINK_GENERIC, RTM_NEWLINK, NLM_F_DUMP}) &&
+             passed;
+    for (int type : {TCPDIAG_GETSOCK, DCCPDIAG_GETSOCK})
+    {
+        passed = Check(
+                     std::format("legacy socket type {} ROOT dump", type).c_str(),
+                     NLM_F_MULTI,
+                     NLM_F_MULTI,
+                     -ENOMEM,
+                     Expected::Error,
+                     {NETLINK_SOCK_DIAG, type, NLM_F_ROOT}) &&
+                 passed;
+    }
+    passed = Check("socket destroy custom completion", 0, 0, 123, Expected::Success, {NETLINK_SOCK_DIAG, SOCK_DESTROY, NLM_F_DUMP}) && passed;
+    passed = Check("route delete custom completion", 0, 0, 123, Expected::Success, {NETLINK_ROUTE, RTM_DELLINK, NLM_F_DUMP}) && passed;
     ifinfomsg link{};
     link.ifi_family = AF_UNSPEC;
     passed = CheckKernelDump<ifinfomsg, ifinfomsg>("real interface dump", link, RTM_GETLINK, RTM_NEWLINK) && passed;
+    for (int flags : {NLM_F_ROOT, NLM_F_MATCH})
+    {
+        passed = CheckKernelDump<ifinfomsg, ifinfomsg>(
+                     flags == NLM_F_ROOT ? "real ROOT interface dump" : "real MATCH interface dump", link, RTM_GETLINK, RTM_NEWLINK, flags) &&
+                 passed;
+    }
     for (int family : {AF_INET, AF_INET6})
     {
         rtmsg route{};
