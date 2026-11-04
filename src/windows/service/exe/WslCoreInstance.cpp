@@ -560,6 +560,9 @@ void WslCoreInstance::Stop()
 
 void WslCoreInstance::RegisterPlan9ConnectionTarget(_In_ HANDLE userToken)
 {
+    std::lock_guard lock(m_lock);
+    THROW_HR_IF(HCS_E_TERMINATED, m_destroyingEvent.is_signaled());
+
     // If Plan 9 is running, add a connection target to the P9Rdr driver.
     if (m_plan9Port != LX_INIT_UTILITY_VM_INVALID_PORT)
     {
