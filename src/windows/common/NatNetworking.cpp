@@ -336,10 +336,14 @@ void NatNetworking::Initialize()
         //
         // Note: DNS suffix change notifications are used only if DNS tunneling is enabled. DNS behavior for NAT mode
         // without DNS tunneling remains unchanged
+
+        // Constructor rollback waits for callbacks that also acquire this lock.
+        lock.reset();
         m_dnsSuffixRegistryWatcher.emplace([this] {
             const auto watcher_lock = m_lock.lock_exclusive();
             UpdateDns();
         });
+        lock = m_lock.lock_exclusive();
     }
 
     // Update DNS information.
