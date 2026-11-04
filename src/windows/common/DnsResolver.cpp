@@ -291,6 +291,16 @@ try
 
     const std::lock_guard lock(m_dnsLock);
 
+    // Retire the request before releasing m_dnsLock, even if response processing throws.
+    const auto completeRequest = wil::scope_exit([this, requestId = queryContext->m_id] {
+        WI_VERIFY(m_dnsRequests.erase(requestId) == 1);
+
+        if (m_dnsRequests.empty())
+        {
+            m_allRequestsFinished.SetEvent();
+        }
+    });
+
     if (queryResults != nullptr)
     {
         WSL_LOG(
@@ -341,15 +351,6 @@ try
         m_dnsResponseQueue.submit([this, dnsResponse = std::move(dnsResponse), dnsClientIdentifier = queryContext->m_dnsClientIdentifier]() mutable {
             m_dnsChannel.SendDnsMessage(gsl::make_span(dnsResponse), dnsClientIdentifier);
         });
-    }
-
-    // Stop tracking this DNS request and delete the request context
-    WI_VERIFY(m_dnsRequests.erase(queryContext->m_id) == 1);
-
-    // Set event if all tracked requests have finished
-    if (m_dnsRequests.empty())
-    {
-        m_allRequestsFinished.SetEvent();
     }
 }
 CATCH_LOG()
