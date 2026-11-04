@@ -202,6 +202,8 @@ private:
     std::shared_ptr<LxssRunningInstance> CreateInstanceInternal(
         _In_ const GUID& InstanceId,
         _In_ const LXSS_DISTRO_CONFIGURATION& Configuration,
+        _In_ ULONG InitPort,
+        _In_ ULONG SystemDistroPort,
         _In_ DWORD ReceiveTimeout = 0,
         _In_ ULONG DefaultUid = LX_UID_ROOT,
         _In_ ULONG64 ClientLifetimeId = 0,

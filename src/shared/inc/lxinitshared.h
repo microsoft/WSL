@@ -363,7 +363,7 @@ typedef enum _LX_MESSAGE_TYPE
     LxMiniInitMessageWaitForPmemDevice,
     LxMiniInitMessageChildExit,
     LxMiniInitMountFolder,
-    LxMiniInitCreateInstancePid,
+    LxMiniInitMessageInstanceConnectionInfo,
     LxMiniInitTelemetryMessage,
     LxMinitWaitForPmemDeviceResult,
     LxMiniInitMessageResizeDistribution,
@@ -486,7 +486,7 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMiniInitMessageResizeDistribution)
         X(LxMiniInitMessageResizeDistributionResponse)
         X(LxMiniInitMountFolder)
-        X(LxMiniInitCreateInstancePid)
+        X(LxMiniInitMessageInstanceConnectionInfo)
         X(LxMinitWaitForPmemDeviceResult)
         X(LxProcessCrash)
         X(LxGnsMessageInterfaceConfiguration)
@@ -1292,6 +1292,7 @@ typedef struct _LX_MINI_INIT_MESSAGE
     unsigned int UserProfileOffset;
     unsigned int Flags;
     unsigned int ConnectPort;
+    unsigned int InitConnectionTimeout;
     GUID InstanceId;
     char Buffer[];
 
@@ -1307,6 +1308,7 @@ typedef struct _LX_MINI_INIT_MESSAGE
         STRING_FIELD(UserProfileOffset),
         FIELD(Flags),
         FIELD(ConnectPort),
+        FIELD(InitConnectionTimeout),
         FIELD(InstanceId));
 
 } LX_MINI_INIT_MESSAGE, *PLX_MINI_INIT_MESSAGE;
@@ -1626,6 +1628,17 @@ typedef enum _LX_MINI_CREATE_INSTANCE_STEP
     LxInitCreateInstanceStepRunTar = 0x4
 } LX_MINI_CREATE_INSTANCE_STEP,
     *PLX_MINI_CREATE_INSTANCE_STEP;
+
+typedef struct _LX_MINI_INIT_INSTANCE_CONNECTION_INFO
+{
+    static inline auto Type = LxMiniInitMessageInstanceConnectionInfo;
+
+    MESSAGE_HEADER Header;
+    uint32_t InitPort;
+    uint32_t SystemDistroPort;
+
+    PRETTY_PRINT(FIELD(Header), FIELD(InitPort), FIELD(SystemDistroPort));
+} LX_MINI_INIT_INSTANCE_CONNECTION_INFO, *PLX_MINI_INIT_INSTANCE_CONNECTION_INFO;
 
 typedef struct _LX_MINI_INIT_CREATE_INSTANCE_RESULT
 {
