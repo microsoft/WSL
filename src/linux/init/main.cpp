@@ -2815,10 +2815,8 @@ Return Value:
                 }
 
                 Step = LxMiniInitMountStepRmDir;
-                Result = rmdir(Target.c_str());
-                if (Result < 0)
+                if (rmdir(Target.c_str()) < 0)
                 {
-                    Result = -errno;
                     LOG_ERROR("rmdir({}) failed, {}", Target.c_str(), errno);
                 }
             }

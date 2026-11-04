@@ -179,10 +179,9 @@ try
         const std::lock_guard lock(m_dnsLock);
     }
 
-    // Stop the response queue first as it can make calls in m_dnsChannel
-    m_dnsResponseQueue.cancel();
-
+    // Cancel pending sends before waiting for the response queue to stop.
     m_dnsChannel.Stop();
+    m_dnsResponseQueue.cancel();
 
     // Stop interface change notifications
     m_interfaceNotificationHandle.reset();

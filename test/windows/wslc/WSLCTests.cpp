@@ -17,7 +17,6 @@ Abstract:
 #include "EventStore.h"
 #include "wslc.h"
 #include "wslccompat.h"
-#include "WSLCSession.h"
 #include "WSLCProcessLauncher.h"
 #include "WSLCContainerLauncher.h"
 #include "WSLCContainerEntry.h"
@@ -3479,6 +3478,51 @@ class WSLCTests
         VERIFY_ARE_EQUAL(reason, WSLCVirtualMachineTerminationReasonShutdown);
     }
 
+    // Validate that a VM being terminated due the HCS service stopping is correctly reported to the caller.
+    WSLC_TEST_METHOD(HcsServiceDisconnect)
+    {
+        auto restoreSession = ResetTestSession();
+
+        const wil::unique_schandle manager{OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT)};
+        VERIFY_IS_NOT_NULL(manager);
+
+        const wil::unique_schandle service{OpenService(manager.get(), L"vmcompute", SERVICE_STOP | SERVICE_QUERY_STATUS | SERVICE_START)};
+        VERIFY_IS_NOT_NULL(service);
+
+        auto session = CreateSession(GetDefaultSessionSettings(L"hcs-service-disconnect-test"));
+        ExpectCommandResult(session.get(), {"/bin/true"}, 0);
+
+        wil::unique_handle terminationEvent;
+        VERIFY_SUCCEEDED(session->GetTerminationEvent(&terminationEvent));
+        VERIFY_ARE_EQUAL(WaitForSingleObject(terminationEvent.get(), 0), static_cast<DWORD>(WAIT_TIMEOUT));
+
+        const auto servicePid = GetServiceState(service.get()).second;
+        SERVICE_STATUS status{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(ControlService(service.get(), SERVICE_CONTROL_STOP, &status));
+        VERIFY_IS_TRUE(WaitForServiceState(service.get(), SERVICE_STOPPED, servicePid));
+
+        VERIFY_ARE_EQUAL(WaitForSingleObject(terminationEvent.get(), 60 * 1000), static_cast<DWORD>(WAIT_OBJECT_0));
+
+        WSLCVirtualMachineTerminationReason reason{};
+        wil::unique_cotaskmem_string details;
+        VERIFY_SUCCEEDED(session->GetTerminationReason(&reason, &details));
+        VERIFY_ARE_EQUAL(reason, WSLCVirtualMachineTerminationReasonUnknown);
+
+        WSLCSessionState state{};
+        VERIFY_SUCCEEDED(session->GetState(&state));
+        VERIFY_ARE_EQUAL(state, WSLCSessionStateTerminated);
+
+        if (!StartService(service.get(), 0, nullptr))
+        {
+            THROW_LAST_ERROR_IF(GetLastError() != ERROR_SERVICE_ALREADY_RUNNING);
+        }
+
+        VERIFY_IS_TRUE(WaitForServiceState(service.get(), SERVICE_RUNNING, 0));
+
+        auto recoveredSession = CreateSession(GetDefaultSessionSettings(L"hcs-service-recovery-test"));
+        ExpectCommandResult(recoveredSession.get(), {"/bin/true"}, 0);
+    }
+
     WSLC_TEST_METHOD(CrashDumpCallback)
     {
         struct Invocation
@@ -3668,6 +3712,76 @@ class WSLCTests
         writeTty("exit\n");
 
         VERIFY_IS_TRUE(process.GetExitEvent().wait(30 * 1000));
+    }
+
+    WSLC_TEST_METHOD(LocalhostColdStartAndLocalOperationsWithoutDns)
+    {
+        constexpr DWORD c_waitTimeoutMs = 120000;
+        auto session = CreateSession(GetDefaultSessionSettings(L"localhost-offline"));
+        wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
+        VERIFY_SUCCEEDED(session->ListImages(nullptr, &images, images.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(0u, images.size());
+
+        auto result = RunCommand(session.get(), {"/bin/cat", "/etc/hosts"}, c_waitTimeoutMs);
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_ARE_EQUAL("127.0.0.1\tlocalhost\n::1\tlocalhost ip6-localhost ip6-loopback\n", result.Output[1]);
+
+        result = RunCommand(session.get(), {"/bin/sh", "-c", "awk '$1 == \"hosts:\" {$1=$1; print}' /etc/nsswitch.conf"}, c_waitTimeoutMs);
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_ARE_EQUAL("hosts: files dns\n", result.Output[1]);
+
+        LoadTestImage(*session, "python:3.12-alpine");
+        constexpr auto c_dnsSink = R"PY(
+import socket
+import sys
+
+server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+server.bind(('127.0.0.1', 53))
+print('DNS ready', flush=True)
+queries = 0
+data, _ = server.recvfrom(65535)
+while data != b'stop':
+    queries += 1
+    data, _ = server.recvfrom(65535)
+sys.exit(1 if queries else 0)
+)PY";
+        WSLCContainerLauncher dnsLauncher("python:3.12-alpine", "localhost-dns-sink", {"python3", "-c", c_dnsSink}, {}, "host");
+        auto dns = dnsLauncher.Launch(*session);
+        auto dnsProcess = dns.GetInitProcess();
+        WaitForOutput(dnsProcess.GetStdHandle(1), "DNS ready\n", std::chrono::milliseconds{c_waitTimeoutMs});
+
+        result = RunCommand(
+            session.get(),
+            {"/bin/sh", "-c", "printf 'nameserver 127.0.0.1\\noptions timeout:30 attempts:1\\n' > /etc/resolv.conf"},
+            c_waitTimeoutMs);
+        VERIFY_ARE_EQUAL(0, result.Code);
+
+        result = RunCommand(session.get(), {"/bin/sh", "-c", "getent ahostsv4 localhost | awk '{print $1}' | sort -u"}, c_waitTimeoutMs);
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_ARE_EQUAL("127.0.0.1\n", result.Output[1]);
+        result = RunCommand(session.get(), {"/bin/sh", "-c", "getent hosts localhost | awk '{print $1}' | sort -u"}, c_waitTimeoutMs);
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_ARE_EQUAL("::1\n", result.Output[1]);
+
+        // A fresh daemon process runs package initializers before handling --version.
+        result = RunCommand(session.get(), {"/usr/bin/dockerd", "--version"}, c_waitTimeoutMs);
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_IS_TRUE(result.Output[1].starts_with("Docker version "));
+        VERIFY_IS_TRUE(result.Output[2].empty());
+
+        LoadTestImage(*session, "hello-world:latest");
+        WSLCContainerLauncher helloLauncher("hello-world:latest", "localhost-offline-hello");
+        auto hello = helloLauncher.Launch(*session);
+        result = hello.GetInitProcess().WaitAndCaptureOutput(c_waitTimeoutMs);
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+        images.reset();
+        VERIFY_SUCCEEDED(session->ListImages(nullptr, &images, images.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(2u, images.size());
+
+        result = RunCommand(session.get(), {"/bin/bash", "-c", "printf stop > /dev/udp/127.0.0.1/53"}, c_waitTimeoutMs);
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_ARE_EQUAL(0, dnsProcess.Wait(c_waitTimeoutMs));
     }
 
     void ValidateNetworking(WSLCNetworkingMode mode, bool enableDnsTunneling = false)

@@ -4403,7 +4403,7 @@ try
     *Stream = nullptr;
 
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
-    auto stream = m_eventStore.CreateStream(Microsoft::WRL::ComPtr<WSLCSession>{this}, SinceTime, UntilTime, std::move(filters));
+    auto stream = m_eventStore.CreateStream(Microsoft::WRL::ComPtr<IWSLCSession>{this}, SinceTime, UntilTime, std::move(filters));
 
     *Stream = stream.Detach();
     return S_OK;

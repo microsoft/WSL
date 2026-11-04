@@ -2079,6 +2079,25 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>실행 중인 배포와 이를 호스팅하는 WSL 가상 머신이 유휴 상태가 된 후 자동으로 종료되지 않도록 합니다.</value>
   </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
+    <value>WSL 배포판 VM을 항상 켜두기</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
+    <value>WSL 배포판 VM은 유휴 상태일 때 종료되지 않으므로 새 셸이 즉시 시작됩니다. WSL이 실행되는 동안 더 많은 메모리를 사용합니다. 이 작업은 다음 WSL 세션에서 적용됩니다.</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>WSL 배포판 VM을 항상 켜두기</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
+    <value>계속 실행 설정을 변경할 수 없음</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
+    <value>.wslconfig 읽기 전용이 아닌지 확인한 후 다시 시도하세요.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
+    <value>선택적 기능의 WSL 설정에서 언제든지 변경할 수 있습니다.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>초기화 시간 제한</value>
   </data>
@@ -2429,10 +2448,6 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
      <value>필요한 항목이 없을 때 위치 인수를 찾음: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>'{}'에 옵션 이름이 없습니다.</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
@@ -4202,6 +4217,18 @@ Windows 버전: {}</value>
   </data>
   <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
     <value>호스트의 신뢰할 수 있는 루트 인증서를 VM에 설치하지 못함: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
+    <value>WSLC가 로컬 호스트 이름 확인을 초기화하기 위해 '{}'을(를) 쓸 수 없습니다(게스트 오류 {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
+    <value>WSLC가 게스트 VM을 시작했지만 Docker 엔진이 {}밀리초 내에 준비되지 않았습니다. WSL 진단 로그를 수집하여 시작 실패를 조사합니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
+    <value>Docker 엔진이 WSLC 게스트 VM에서 준비되기 전에 코드 {}(으)로 종료되었습니다. WSL 진단 로그를 수집하여 시작 실패를 조사합니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

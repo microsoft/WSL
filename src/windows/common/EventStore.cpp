@@ -2,8 +2,7 @@
 
 #include "precomp.h"
 #include "EventStore.h"
-#include "WSLCSession.h"
-#include "WSLCExecutionContext.h"
+#include "ExecutionContext.h"
 #include <chrono>
 
 using wsl::shared::Localization;
@@ -168,7 +167,7 @@ namespace {
 } // namespace
 
 Microsoft::WRL::ComPtr<IWSLCEventStream> EventStore::CreateStream(
-    Microsoft::WRL::ComPtr<WSLCSession> Session, int64_t SinceTime, int64_t UntilTime, std::map<std::string, std::vector<std::string>> Filters)
+    Microsoft::WRL::ComPtr<IWSLCSession> Session, int64_t SinceTime, int64_t UntilTime, std::map<std::string, std::vector<std::string>> Filters)
 {
     // Zero means unbounded on that end, so it never makes the window run backwards.
     THROW_HR_WITH_USER_ERROR_IF(
@@ -338,7 +337,7 @@ EventStream::EventStream(wil::unique_event ReaderAvailable) : m_readerAvailable(
 }
 
 HRESULT EventStream::RuntimeClassInitialize(
-    Microsoft::WRL::ComPtr<WSLCSession> Session,
+    Microsoft::WRL::ComPtr<IWSLCSession> Session,
     EventStore* Store,
     int64_t SinceTime,
     int64_t UntilTime,
