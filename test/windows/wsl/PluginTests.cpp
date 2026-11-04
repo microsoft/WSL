@@ -1120,10 +1120,13 @@ class PluginTests
 
             LoadTestImage(*session, "debian:latest");
 
-            // The init process exits on its own, so the stop callback runs on the event relay thread.
             wsl::windows::common::WSLCContainerLauncher launcher(
-                "debian:latest", "wslc-plugin-container-stopping-terminate", {"/bin/sh", "-c", "sleep 2"});
+                "debian:latest", "wslc-plugin-container-stopping-terminate", {"/bin/cat"}, {}, "host", WSLCProcessFlagsStdin);
             auto container = launcher.Launch(*session);
+            auto process = container.GetInitProcess();
+
+            // Close stdin after launch so the stop callback cannot block Launch().
+            process.GetStdHandle(0);
 
             VERIFY_IS_TRUE(entered.wait(30000));
 
@@ -1141,7 +1144,7 @@ class PluginTests
         }
 
         const auto ExpectedOutput = std::format(
-            LR"(Plugin loaded. TestMode=27
+            LR"(Plugin loaded. TestMode={1}
             WSLC Session created, name=plugin-wslc-container-stopping-terminate, id=*, pid=*, token=set, sid=set
             WSLC Image created, session=*, id=sha256:*, name=debian:latest
             WSLC Container started, session=*, id=*, name=*, image=debian:latest, state=*
@@ -1149,7 +1152,8 @@ class PluginTests
             WSLC Container stopping reentrant WSLCCreateProcess: {0:#x}
             WSLC Container stopping reentrant WSLCMountFolder: {0:#x}
             WSLC Session stopping, name=plugin-wslc-container-stopping-terminate, id=*)",
-            static_cast<uint32_t>(HRESULT_FROM_WIN32(ERROR_INVALID_STATE)));
+            static_cast<uint32_t>(HRESULT_FROM_WIN32(ERROR_INVALID_STATE)),
+            static_cast<DWORD>(PluginTestType::WslcContainerStoppingDuringTerminate));
 
         ValidateLogFile(ExpectedOutput.c_str());
     }
