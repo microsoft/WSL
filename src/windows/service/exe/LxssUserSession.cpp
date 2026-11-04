@@ -4759,14 +4759,13 @@ void LxssUserSessionImpl::OnUsbDeviceRemoved(const GUID& ReservationId)
     const auto entry = m_usbAttachments.find(ReservationId);
     if (entry != m_usbAttachments.end())
     {
+        auto eraseOnExit = wil::scope_exit([&]() { m_usbAttachments.erase(entry); });
         auto& attachment = entry->second;
         attachment.Requested = false;
         if (attachment.Attached)
         {
             m_utilityVm->DetachUsbDevice(attachment.Reservation.DeviceInstanceId);
         }
-
-        m_usbAttachments.erase(entry);
     }
 }
 
@@ -4780,8 +4779,12 @@ void LxssUserSessionImpl::_ReleaseUsbAttachment(const GUID& ReservationId, bool 
         attachment.Requested = false;
         if (attachment.Attached)
         {
-            m_utilityVm->DetachUsbDevice(attachment.Reservation.DeviceInstanceId);
-            attachment.Attached = false;
+            try
+            {
+                m_utilityVm->DetachUsbDevice(attachment.Reservation.DeviceInstanceId);
+                attachment.Attached = false;
+            }
+            CATCH_LOG()
         }
     }
 
@@ -4812,18 +4815,27 @@ void LxssUserSessionImpl::_ReplayUsbAttachments() noexcept
     for (auto entry = m_usbAttachments.begin(); entry != m_usbAttachments.end();)
     {
         auto& attachment = (entry++)->second;
+        const auto reservationId = attachment.Reservation.Id;
         try
         {
-            if (!attachment.Requested || !m_usbManager->IsValid(&m_userSid.Sid, attachment.Reservation.Id))
+            if (!attachment.Requested || !m_usbManager->IsValid(&m_userSid.Sid, reservationId))
             {
-                _ReleaseUsbAttachment(attachment.Reservation.Id);
+                _ReleaseUsbAttachment(reservationId);
                 continue;
             }
 
             m_utilityVm->AttachUsbDevice(attachment.Reservation.DeviceInstanceId);
             attachment.Attached = true;
-            m_usbManager->Commit(&m_userSid.Sid, attachment.Reservation.Id);
+            m_usbManager->Commit(&m_userSid.Sid, reservationId);
         }
-        CATCH_LOG()
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            try
+            {
+                _ReleaseUsbAttachment(reservationId);
+            }
+            CATCH_LOG_MSG("Failed to roll back USB attachment after replay failure")
+        }
     }
 }
