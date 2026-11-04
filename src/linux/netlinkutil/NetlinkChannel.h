@@ -35,7 +35,7 @@ public:
 
     int SetInterfaceFlags(const std::string& name, int flags);
 
-    static NetlinkChannel FromFd(int fd, int netlinkFamily = NETLINK_ROUTE);
+    static NetlinkChannel FromFd(int fd, int netlinkFamily);
 
     bool IsDumpRequest(const nlmsghdr& request) const;
 

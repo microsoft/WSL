@@ -115,9 +115,8 @@ bool Check(
 }
 
 template <typename TRequest, typename TResponse>
-bool CheckKernelDump(const char* name, const TRequest& request, int requestType, int responseType, int flags = NLM_F_DUMP)
+bool CheckKernelDump(const char* name, const TRequest& request, int requestType, int responseType, int flags = NLM_F_DUMP, NetlinkChannel channel = {})
 {
-    NetlinkChannel channel;
     auto transaction = channel.CreateTransaction(request, requestType, flags);
     size_t entries = 0;
     try
@@ -212,6 +211,29 @@ int main()
         route.rtm_family = family;
         passed = CheckKernelDump<rtmsg, rtmsg>(family == AF_INET ? "real IPv4 route dump" : "real IPv6 route dump", route, RTM_GETROUTE, RTM_NEWROUTE) &&
                  passed;
+    }
+    for (int family : {AF_INET, AF_INET6})
+    {
+        for (int protocol : {IPPROTO_TCP, IPPROTO_UDP})
+        {
+            wil::unique_fd descriptor{socket(AF_NETLINK, SOCK_RAW, NETLINK_SOCK_DIAG)};
+            THROW_LAST_ERROR_IF(!descriptor);
+            sockaddr_nl address{};
+            address.nl_family = AF_NETLINK;
+            THROW_LAST_ERROR_IF(bind(descriptor.get(), reinterpret_cast<sockaddr*>(&address), sizeof(address)) < 0);
+            inet_diag_req_v2 request{};
+            request.sdiag_family = family;
+            request.sdiag_protocol = protocol;
+            request.idiag_states = ~0u;
+            passed = CheckKernelDump<inet_diag_req_v2, inet_diag_msg>(
+                         std::format("wrapped socket family {} protocol {}", family, protocol).c_str(),
+                         request,
+                         SOCK_DIAG_BY_FAMILY,
+                         SOCK_DIAG_BY_FAMILY,
+                         NLM_F_DUMP,
+                         NetlinkChannel::FromFd(descriptor.release(), NETLINK_SOCK_DIAG)) &&
+                     passed;
+        }
     }
     return passed ? 0 : 1;
 }

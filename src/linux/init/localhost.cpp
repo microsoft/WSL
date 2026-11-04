@@ -497,7 +497,7 @@ int RunPortTracker(int Argc, char** Argv)
         return 1;
     }
 
-    auto channel = NetlinkChannel::FromFd(NetlinkSocketFd);
+    auto channel = NetlinkChannel::FromFd(NetlinkSocketFd, NETLINK_SOCK_DIAG);
 
     auto seccompDispatcher = std::make_shared<SecCompDispatcher>(BpfFd);
 
