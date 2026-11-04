@@ -1790,20 +1790,26 @@ class NetworkTests
 
     static void ResetWslNetwork()
     {
-        // N.B. This must be kept in sync with the network IDs in NatNetworking.cpp.
-        GUID natNetworkId;
-        if (!AreExperimentalNetworkingFeaturesSupported() || !IsHyperVFirewallSupported())
-        {
-            natNetworkId = {0xb95d0c5e, 0x57d4, 0x412b, {0xb5, 0x71, 0x18, 0xa8, 0x1a, 0x16, 0xe0, 0x05}};
-        }
-        else
-        {
-            natNetworkId = {0x790e58b4, 0x7939, 0x4434, {0x93, 0x58, 0x89, 0xae, 0x7d, 0xdb, 0xe8, 0x7e}};
-        }
-
+        const auto natNetworkId =
+            wsl::core::networking::GetNatNetworkId(AreExperimentalNetworkingFeaturesSupported() && IsHyperVFirewallSupported());
         wil::unique_cotaskmem_string error;
         const auto hr = HcnDeleteNetwork(natNetworkId, &error);
         VERIFY_SUCCEEDED(hr, error.get());
+    }
+
+    TEST_METHOD(AcceptableNatNetworkRanges)
+    {
+        for (const auto* range : {L"172.16.0.0/16", L"172.18.0.0/16", L"10.0.0.0/8"})
+        {
+            VERIFY_IS_TRUE(wsl::core::networking::IsAcceptableNetworkRange(range));
+        }
+
+        for (const auto* range : {L"172.17.0.0/16", L"172.17.16.0/20", L"172.16.0.0/12", L"0.0.0.0/0"})
+        {
+            VERIFY_IS_FALSE(wsl::core::networking::IsAcceptableNetworkRange(range));
+        }
+
+        VERIFY_THROWS(wsl::core::networking::IsAcceptableNetworkRange(L"InvalidRange"), wil::ResultException);
     }
 
     WSL2_TEST_METHOD(NatInvalidRange)
@@ -5570,6 +5576,78 @@ class MirroredTests
         // Verify WSL is actually running in NAT mode.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'nat'"), 0u);
     }
+
+    static std::vector<wil::unique_socket> FragmentHostPortRange(int Interval)
+    {
+        std::vector<wil::unique_socket> sockets;
+        for (int port = 1024; port <= UINT16_MAX; port += Interval)
+        {
+            wil::unique_socket hostSocket(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+            THROW_LAST_ERROR_IF(!hostSocket);
+
+            const int exclusive = 1;
+            THROW_LAST_ERROR_IF(
+                setsockopt(hostSocket.get(), SOL_SOCKET, SO_EXCLUSIVEADDRUSE, reinterpret_cast<const char*>(&exclusive), sizeof(exclusive)) ==
+                SOCKET_ERROR);
+
+            SOCKADDR_IN address{};
+            address.sin_family = AF_INET;
+            address.sin_port = htons(static_cast<uint16_t>(port));
+            address.sin_addr.s_addr = htonl(INADDR_ANY);
+            if (bind(hostSocket.get(), reinterpret_cast<const SOCKADDR*>(&address), sizeof(address)) == SOCKET_ERROR)
+            {
+                continue;
+            }
+
+            sockets.emplace_back(std::move(hostSocket));
+        }
+
+        return sockets;
+    }
+
+    WSL2_TEST_METHOD(EphemeralPortRangeFallback)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WslShutdown();
+
+        auto sockets = FragmentHostPortRange(1024);
+        auto shutdown = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [] { WslShutdown(); });
+
+        auto [networkingMode, warnings] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --networking-mode", 0);
+        VERIFY_ARE_EQUAL(wsl::shared::string::Trim(networkingMode), L"mirrored");
+        VERIFY_ARE_EQUAL(std::format(L"wsl: {}\r\n", wsl::shared::Localization::MessageMirroredNetworkingReducedPortRange(512, 4096)), warnings);
+
+        auto [range, rangeWarnings] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range", 0);
+        std::wistringstream rangeStream(range);
+        int rangeStart = 0;
+        int rangeEnd = 0;
+        VERIFY_IS_TRUE(static_cast<bool>(rangeStream >> rangeStart >> rangeEnd));
+        VERIFY_ARE_EQUAL(rangeEnd - rangeStart + 1, 512);
+    }
+
+    WSL2_TEST_METHOD(EphemeralPortRangeAllocationFailure)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WslShutdown();
+
+        auto sockets = FragmentHostPortRange(512);
+        auto shutdown = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [] { WslShutdown(); });
+
+        auto [networkingMode, warnings] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --networking-mode", 0);
+        VERIFY_ARE_EQUAL(wsl::shared::string::Trim(networkingMode), L"none");
+        const auto expectedWarnings = std::format(
+            L"wsl: {}\r\nwsl: {}wsl: {}\r\n",
+            wsl::shared::Localization::MessageMirroredNetworkingPortRangeAllocationFailed(512),
+            FormatErrorMessage(
+                L"An internal error occurred. ", L"CreateInstance/CreateVm/ConfigureNetworking/ERROR_INTERNAL_ERROR"),
+            wsl::shared::Localization::MessageNetworkInitializationFailedFallback2(
+                ToString(wsl::core::NetworkingMode::Mirrored), ToString(wsl::core::NetworkingMode::None)));
+        VERIFY_ARE_EQUAL(expectedWarnings, warnings);
+    }
 };
 
 class BridgedTests
@@ -5957,6 +6035,30 @@ class ConsommeTests
         auto revertEphemeralPortRange = SetTestEphemeralPortRange();
 
         NetworkTests::VerifyPortZeroRebindSucceeds();
+    }
+
+    WSL2_TEST_METHOD(MappedIpv4Forwarding)
+    {
+        CONSOMME_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        WslKeepAlive keepAlive;
+
+        constexpr uint16_t c_port = 1234;
+        for (const auto* address : {L"::ffff:127.0.0.1", L"::ffff:0.0.0.0"})
+        {
+            {
+                auto [guestProcess, read] =
+                    NetworkTests::BindGuestPort(std::format(L"TCP6-LISTEN:{},bind={},ipv6only=0", c_port, address), true);
+                // Note: expect failure.
+                NetworkTests::BindHostPort(c_port, SOCK_STREAM, IPPROTO_TCP, false, false, true);
+                NetworkTests::ValidateLocalhostRelayTraffic(AF_INET, read.get());
+            }
+
+            NetworkTests::VerifyNotBoundLoopback(c_port, false);
+            auto hostSocket = NetworkTests::BindHostPort(c_port, SOCK_STREAM, IPPROTO_TCP, true, false, false, std::chrono::minutes(2));
+            VERIFY_ARE_EQUAL(listen(hostSocket.get(), SOMAXCONN), 0);
+        }
     }
 
     WSL2_TEST_METHOD(HttpProxySimple)

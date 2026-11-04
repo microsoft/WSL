@@ -771,7 +771,7 @@ try
         TraceLoggingValue(static_cast<int>(Event->Type), "type"));
 
     auto* vm = reinterpret_cast<HcsVirtualMachine*>(Context);
-    if (Event->Type == HcsEventSystemExited)
+    if (Event->Type == HcsEventSystemExited || Event->Type == HcsEventServiceDisconnect)
     {
         vm->OnExit(Event);
     }
@@ -784,34 +784,36 @@ CATCH_LOG()
 
 void HcsVirtualMachine::OnExit(const HCS_EVENT* Event)
 {
-    const auto exitStatus = wsl::shared::FromJson<wsl::windows::common::hcs::SystemExitStatus>(Event->EventData);
-
-    auto reason = WSLCVirtualMachineTerminationReasonUnknown;
-
-    if (exitStatus.ExitType.has_value())
+    if (m_vmExitReported.exchange(true))
     {
-        switch (exitStatus.ExitType.value())
-        {
-        case hcs::NotificationType::ForcedExit:
-        case hcs::NotificationType::GracefulExit:
-            reason = WSLCVirtualMachineTerminationReasonShutdown;
-            break;
-        case hcs::NotificationType::UnexpectedExit:
-            reason = WSLCVirtualMachineTerminationReasonCrashed;
-            break;
-        default:
-            reason = WSLCVirtualMachineTerminationReasonUnknown;
-            break;
-        }
+        return;
     }
 
-    // Cache the termination reason and details before signaling the exit event. These fields are
-    // written once here (OnExit fires once and m_vmExitEvent is never reset) and published to readers
-    // by the SetEvent below; GetTerminationReason only reads them after observing the signaled event.
-    m_terminationReason = reason;
-    m_terminationDetails = Event->EventData;
+    auto signalExit = wil::scope_exit([&] { m_vmExitEvent.SetEvent(); });
 
-    m_vmExitEvent.SetEvent();
+    m_terminationDetails = Event->EventData != nullptr ? Event->EventData : L"";
+
+    if (Event->Type == HcsEventSystemExited && Event->EventData != nullptr)
+    {
+        const auto exitStatus = wsl::shared::FromJson<wsl::windows::common::hcs::SystemExitStatus>(Event->EventData);
+
+        if (exitStatus.ExitType.has_value())
+        {
+            switch (exitStatus.ExitType.value())
+            {
+            case hcs::NotificationType::ForcedExit:
+            case hcs::NotificationType::GracefulExit:
+                m_terminationReason = WSLCVirtualMachineTerminationReasonShutdown;
+                break;
+            case hcs::NotificationType::UnexpectedExit:
+                m_terminationReason = WSLCVirtualMachineTerminationReasonCrashed;
+                break;
+            default:
+                m_terminationReason = WSLCVirtualMachineTerminationReasonUnknown;
+                break;
+            }
+        }
+    }
 }
 
 HRESULT HcsVirtualMachine::GetTerminationReason(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details)

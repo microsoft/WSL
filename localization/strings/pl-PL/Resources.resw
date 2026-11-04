@@ -848,6 +848,10 @@ Więcej informacji na temat Admin Protection można znaleźć na stronie https:/
     <value>Nieprawidłowa nazwa dystrybucji: „{}”.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageInvalidDistribution" xml:space="preserve">
+    <value>Found invalid distribution registration '{}', {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholders are the distribution's registry GUID and the error code.</comment>
+  </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>Przy użyciu starszej rejestracji dystrybucji. Rozważ użycie dystrybucji opartej na tar.</value>
     <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
@@ -891,12 +895,20 @@ Więcej informacji na temat Admin Protection można znaleźć na stronie https:/
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>Wirtualizacja zagnieżdżona nie jest obsługiwana na tej maszynie.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>Nie można wykryć zagnieżdżonej obsługi wirtualizacji. Błąd: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Nie można utworzyć sieciowego punktu końcowego z adresem: „{}”. Przypisano nowy adres: „{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToCreateNetwork" xml:space="preserve">
     <value>Nie można utworzyć sieci wirtualnej z zakresem adresów: „{}”. Utworzono nową sieć z zakresem: „{}”, {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
+    <value>Sieć NAT podsystemu WSL ({}) koliduje z domyślną siecią platformy Docker</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
@@ -918,6 +930,14 @@ Powrót do sieci NAT.</value>
   <data name="MessageMirroredNetworkingNotSupportedIpv6Disabled" xml:space="preserve">
     <value>Protokół IPv6 na hoście został wyłączony w nieobsługiwany sposób (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
+  </data>
+  <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
+    <value>Sieć lustrzana korzysta z mniejszego zakresu portów efemerycznych ({} portów zamiast {}). Może to ograniczyć liczbę jednoczesnych połączeń.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
+    <value>Nie udało się zarezerwować minimalnego ciągłego zakresu {} portów TCP i UDP dla sieci lustrzanej. Sprawdź użycie portów i ich wykluczenia w systemie Windows.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Zapora funkcji Hyper-V nie jest obsługiwana</value>
@@ -1006,6 +1026,9 @@ Powrót do sieci NAT.</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>Kontener WSL jest wyłączony przez zasady komputera.</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>Dodatki funkcji systemu Linux są wyłączone przez zasady komputera.</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>Rejestr obrazów kontenerów „{}” jest zablokowany przez zasady komputera.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -1072,6 +1095,10 @@ Powrót do sieci NAT.</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>Nie można ukończyć operacji, ponieważ dysk VHD jest obecnie używany. Aby wymusić zatrzymanie używania protokołu WSL:  wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageDistributionTerminationTimeout" xml:space="preserve">
+    <value>Przekroczono limit czasu oczekiwania na zakończenie procesu dystrybucji {} po {} ms. Kontynuowanie bez potwierdzania, że dystrybucja została zatrzymana.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
     <value>Kompaktowanie jest obsługiwane tylko w przypadku plików .vhdx.</value>
@@ -1216,6 +1243,10 @@ Zobacz instrukcje odzyskiwania: https://aka.ms/wsldiskmountrecovery</value>
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
     <value>Cgroup v1 jest niezgodna z izolacją cgroup dla poszczególnych dystrybucji. Zamiast tego używana jest cgroup v2. Aby używać cgroup v1, ustaw wartość isolateDistroCgroup=false w sekcji [wsl2] w pliku .wslconfig, a następnie uruchom polecenie wsl --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
+  <data name="MessageWindowsInstallerBusy" xml:space="preserve">
+    <value>WSL instalacja jest zablokowana, ponieważ Instalator Windows jest zajęty. Poczekaj na zakończenie instalacji innego oprogramowania, a następnie ponów próbę.</value>
+    <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Wystąpił problem. Spróbuj ponownie później.</value>
@@ -2202,6 +2233,10 @@ Użycie:
     <value>Kontener "{}" jest uruchomiony i nie można go usunąć. Zatrzymaj kontener przed usunięciem lub użyj wymuszonego usunięcia (-f).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcCannotRemoveRestartingContainer" xml:space="preserve">
+    <value>Kontener "{}" jest uruchamiany ponownie i nie można go usunąć. Zatrzymaj kontener przed usunięciem lub użyj wymuszonego usunięcia (-f).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcContainerNotRunning" xml:space="preserve">
     <value>Kontener „{}” nie jest uruchomiony.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2483,6 +2518,10 @@ Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stron�
     <value>Nie znaleziono sieci: „{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcNetworkPrefixAmbiguous" xml:space="preserve">
+    <value>Wiele sieci pasuje do „{}”; użyj dłuższego identyfikatora lub nazwy sieciowa.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>Nieobsługiwany sterownik sieci: „{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2516,6 +2555,10 @@ Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stron�
   </data>
   <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
     <value>Nieprawidłowa wartość limitu czasu zatrzymania: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidSignal" xml:space="preserve">
+    <value>Nieprawidłowa wartość sygnału: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
@@ -2675,14 +2718,6 @@ Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stron�
   <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
     <value>Kopiuj pliki między kontenerem a lokalnym systemem plików.</value>
   </data>
-  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
-    <value>Kopiuj pliki między kontenerem a lokalnym systemem plików.
-Użycie: wslc container cp [OPTIONS] SOURCE DEST
-  Z lokalnego do kontenera: wslc container cp LOCAL_PATH CONTAINER:PATH
-  Z kontenera do lokalnego: wslc container cp CONTAINER:PATH LOCAL_PATH
-  Ze stdin do kontenera: wslc container cp - CONTAINER:PATH</value>
-    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
-  </data>
   <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
     <value>Źródło: ścieżka lokalna, CONTAINER:PATH lub „-” dla stdin</value>
     <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
@@ -2822,11 +2857,11 @@ Przykład: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Sygnał do wysłania (domyślnie: skonfigurowany dla kontenera sygnał STOPSIGNAL lub sygnał SIGTERM, jeśli żadnego nie skonfigurowano)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>Monitoruj zdarzenia kontenera.</value>
+  <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
+    <value>Monitoruj zdarzenia.</value>
   </data>
-  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>Monitoruj zdarzenia z kontenerów w czasie rzeczywistym.</value>
+  <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
+    <value>Monitoruj zdarzenia w czasie rzeczywistym z kontenerów, obrazów, sieci i woluminów.</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
     <value>Pokaż wszystkie zdarzenia utworzone od sygnatury czasowej</value>
@@ -3289,6 +3324,10 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <value>Opcja „{}” nie jest obsługiwana.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_MountInvalidModeError" xml:space="preserve">
+    <value>Nieprawidłowy tryb „{}”.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
     <value>Docelowy punkt instalacji jest wymagany.</value>
   </data>
@@ -3639,6 +3678,12 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>Udostępnij możliwości wirtualizacji kontenerowi</value>
   </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Dodaj możliwości systemu Linux (można powtarzać)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Usuń uprawnienia systemu Linux (można powtarzać)</value>
+  </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Argumenty do przekazania do polecenia wykonywanego wewnątrz kontenera</value>
   </data>
@@ -3656,6 +3701,10 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   <data name="WSLCCLI_InvalidRestartPolicyError" xml:space="preserve">
     <value>Nieprawidłowa wartość {} „{}”. Oczekiwano no, always, on-failure[:max-retries] lub unless-stopped.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UnsupportedRestartPolicyError" xml:space="preserve">
+    <value>Zasady ponownego uruchamiania „{}” nie są obsługiwane. Obsługiwane wartości to: no i always.</value>
+    <comment>{Locked="no"}{Locked="always"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
     <value>Nieprawidłowa wartość {}: {} nie jest rozpoznawanym typem postępu. Obsługiwane typy postępu to: {}.</value>
@@ -3698,7 +3747,7 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>Nie znaleziono obrazu „{}”, pobieranie</value>
+    <value>Nie można znaleźć obrazu „{}” lokalnie</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">
@@ -3778,6 +3827,9 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
     <value>Nazwa sieci</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
+    <value>Nazwa lub identyfikator sieciowy</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Wyświetlaj tylko identyfikatory sieci</value>
@@ -3875,28 +3927,25 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <value>Nie można wyeksportować kontenera do terminalu. Użyj opcji -o lub przekieruj stdout.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>Oczekiwany format: &lt;ścieżka hosta | nazwany wolumin&gt;:&lt;ścieżka kontenera&gt;[:tryb]</value>
+    <value>Oczekiwany format: [&lt;ścieżka hosta | nazwany wolumin&gt;:]&lt;ścieżka kontenera&gt;[:tryb]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
-  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>Nieprawidłowa specyfikacja woluminu: „{}”. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeInvalidSpecError" xml:space="preserve">
+    <value>Nieprawidłowa specyfikacja woluminu: „{}”. {} {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>Nieprawidłowe specyfikacje woluminu: "{}". Ścieżka hosta nie może być pusta. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySpecError" xml:space="preserve">
+    <value>Specyfikacja woluminu jest pusta.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
-    <value>Nieprawidłowe specyfikacje woluminu: "{}". Ścieżka kontenera nie może być pusta. {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeEmptySectionError" xml:space="preserve">
+    <value>Specyfikacja woluminu zawiera pustą sekcję między dwukropkami.</value>
   </data>
-  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
-    <value>Nieprawidłowe specyfikacje woluminu: "{}". Ścieżka kontenera musi być ścieżką bezwzględną (rozpoczynającą się od znaku "/"). {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeTooManyColonsError" xml:space="preserve">
+    <value>Specyfikacja wolumenu zawiera zbyt wiele dwukropków.</value>
   </data>
-  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
-    <value>Nieprawidłowa specyfikacja woluminu: „{}”. Ścieżka hosta „{}” nie jest prawidłową ścieżką systemu Windows.</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumeHostPathInvalidError" xml:space="preserve">
+    <value>Ścieżka hosta '{}' nie jest prawidłową ścieżką systemu Windows.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
     <value>Nazwa lub identyfikator dowolnego typu obiektu</value>
@@ -4129,6 +4178,9 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
     <value>Nie można zatrzymać kontenera „{}” po odrzuceniu wtyczki</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcRestartPolicyConflictsWithRm" xml:space="preserve">
+    <value>Zasad ponownego uruchamiania nie można łączyć z automatycznym usuwaniem kontenera.</value>
   </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>Nie można zwolnić zasobów hosta dla woluminu '{}'</value>

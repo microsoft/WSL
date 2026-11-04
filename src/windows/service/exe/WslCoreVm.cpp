@@ -75,6 +75,7 @@ RequiredExtraMmioSpaceForPmemFileInMb(_In_ PCWSTR FilePath)
 }
 
 wil::unique_hfile OpenVhdBackingFile(_In_ PCWSTR Path, _In_opt_ HANDLE UserToken)
+try
 {
     // User-owned VHDs may not grant the service identity access.
     wil::unique_token_reverter runAsUser;
@@ -83,11 +84,17 @@ wil::unique_hfile OpenVhdBackingFile(_In_ PCWSTR Path, _In_opt_ HANDLE UserToken
         runAsUser = wil::impersonate_token(UserToken);
     }
 
+    // Open the file with read-only access to validate that the user can actually read it.
     wil::unique_hfile file{CreateFileW(
-        Path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        Path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_NO_BUFFERING, nullptr)};
     THROW_LAST_ERROR_IF(!file);
 
     return file;
+}
+catch (...)
+{
+    const auto result = wil::ResultFromCaughtException();
+    THROW_HR_WITH_USER_ERROR(result, Localization::MessageFailedToAttachDisk(Path, wsl::windows::common::wslutil::GetSystemErrorString(result)));
 }
 
 bool IsBackingVolumeMounted(_In_ HANDLE File)
@@ -222,20 +229,29 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     }
     else
     {
-        if (!wsl::windows::common::filesystem::FileExists(m_vmConfig.KernelPath.c_str()))
+        const auto runAsUser = wil::impersonate_token(m_userToken.get());
+
+        wil::unique_hfile kernel{CreateFileW(
+            m_vmConfig.KernelPath.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+
+        if (!kernel)
         {
-            THROW_HR_WITH_USER_ERROR(
-                WSL_E_CUSTOM_KERNEL_NOT_FOUND,
-                Localization::MessageCustomKernelNotFound(
-                    wsl::windows::common::helpers::GetWslConfigPath(m_userToken.get()), m_vmConfig.KernelPath.c_str()));
+            const auto error = GetLastError();
+            if (error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND)
+            {
+                THROW_HR_WITH_USER_ERROR(
+                    WSL_E_CUSTOM_KERNEL_NOT_FOUND,
+                    Localization::MessageCustomKernelNotFound(
+                        wsl::windows::common::helpers::GetWslConfigPath(m_userToken.get()), m_vmConfig.KernelPath.c_str()));
+            }
+
+            THROW_WIN32_MSG(error, "Failed to open kernel: '%ls'", m_vmConfig.KernelPath.c_str());
         }
 
         // Direct boot is not supported on ARM64. Modify the rootfs directory to be a temporary directory that contains
         // copies of the initrd file and private kernel.
         if constexpr (wsl::shared::Arm64)
         {
-            auto impersonate = wil::impersonate_token(m_userToken.get());
-
             m_rootFsPath = m_tempPath / LXSS_ROOTFS_DIRECTORY;
             wil::CreateDirectoryDeep(m_rootFsPath.c_str());
             auto initRdPath = m_installPath / LXSS_TOOLS_DIRECTORY / LXSS_VM_MODE_INITRD_NAME;
@@ -268,6 +284,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     }
     else
     {
+        const auto runAsUser = wil::impersonate_token(m_userToken.get());
         if (!wsl::windows::common::filesystem::FileExists(m_vmConfig.KernelModulesPath.c_str()))
         {
             THROW_HR_WITH_USER_ERROR(
@@ -477,25 +494,30 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     {
         std::promise<bool> initialResult;
         m_drvfsInitialResult = initialResult.get_future();
-        auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
-        m_drvfsInitialThread =
-            std::thread([this, guestDeviceLock = std::move(guestDeviceLock), initialResult = std::move(initialResult)]() mutable {
+
+        std::promise<void> lockAcquired;
+        auto lockAcquiredFuture = lockAcquired.get_future();
+        m_drvfsInitialThread = std::thread([this, lockAcquired = std::move(lockAcquired), initialResult = std::move(initialResult)]() mutable {
+            auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
+            try
+            {
+                lockAcquired.set_value();
+                wsl::windows::common::wslutil::SetThreadDescription(L"InitializeDrvfs");
+                initialResult.set_value(InitializeDrvFsLockHeld(m_userToken.get()));
+            }
+            catch (...)
+            {
+                LOG_CAUGHT_EXCEPTION();
+
                 try
                 {
-                    wsl::windows::common::wslutil::SetThreadDescription(L"InitializeDrvfs");
-                    initialResult.set_value(InitializeDrvFsLockHeld(m_userToken.get()));
+                    initialResult.set_exception(std::current_exception());
                 }
-                catch (...)
-                {
-                    LOG_CAUGHT_EXCEPTION();
+                CATCH_LOG()
+            }
+        });
 
-                    try
-                    {
-                        initialResult.set_exception(std::current_exception());
-                    }
-                    CATCH_LOG()
-                }
-            });
+        lockAcquiredFuture.get();
     }
 
     // Mount the system distro.
@@ -635,8 +657,14 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::Consomme)
             {
-                wsl::core::ConsommeNetworkingFlags flags =
-                    wsl::core::ConsommeNetworkingFlags::Ipv6 | wsl::core::ConsommeNetworkingFlags::LoopbackClientIp;
+                const auto kernelModules = wsl::shared::string::Split(m_vmConfig.KernelModulesList, L',');
+                wsl::core::ConsommeNetworkingFlags flags = wsl::core::ConsommeNetworkingFlags::LoopbackClientIp;
+                // For CONFIG_IPV6=m, the module-list fallback assumes the user does not disable IPv6
+                // while also requesting that the ipv6 module be loaded.
+                WI_SetFlagIf(
+                    flags,
+                    wsl::core::ConsommeNetworkingFlags::Ipv6,
+                    m_ipv6Available || std::find(kernelModules.begin(), kernelModules.end(), L"ipv6") != kernelModules.end());
                 WI_SetFlagIf(flags, wsl::core::ConsommeNetworkingFlags::LocalhostRelay, m_vmConfig.EnableLocalhostRelay);
                 WI_SetFlagIf(flags, wsl::core::ConsommeNetworkingFlags::DnsTunneling, m_vmConfig.EnableDnsTunneling);
                 // NAT may have fallen back to Consomme after the early-config message; drop the unused DNS hvsocket.
@@ -1271,6 +1299,7 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
     message->MountDeviceType = LxMiniInitMountDeviceTypeLun;
     message->DeviceId = lun;
     message->Flags = flags;
+    message->InstanceId = InstanceId;
     message.WriteString(message->FsTypeOffset, "ext4");
     message.WriteString(message->MountOptionsOffset, "discard,errors=remount-ro,data=ordered");
     message.WriteString(message->VmIdOffset, m_machineId);
@@ -1361,9 +1390,16 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::DetachDisk(_In_opt_ PCWSTR Disk)
 
         if (disk.Type == DiskType::VHD)
         {
+            if (TargetPath == nullptr)
+            {
+                return true;
+            }
+
+            const auto runAsUser = wil::CoImpersonateClient();
+
             // N.B. std::filesystem::equivalent can throw if the path is malformed so use the noexcept variant.
             std::error_code error{};
-            return TargetPath == nullptr || std::filesystem::equivalent(disk.Path, TargetPath, error);
+            return std::filesystem::equivalent(disk.Path, TargetPath, error);
         }
         else if (disk.Type == DiskType::PassThrough)
         {
@@ -1531,6 +1567,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
     // Ensure the system distro exists and ends with a img or vhd file extension.
     if (privateSystemDistro)
     {
+        const auto runAsUser = wil::impersonate_token(m_userToken.get());
         if (wsl::windows::common::string::IsPathComponentEqual(m_vmConfig.SystemDistroPath.extension().native(), L".img"))
         {
             m_systemDistroDeviceType = LxMiniInitMountDeviceTypePmem;
@@ -1555,6 +1592,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
     // If using pmem for the system distro, add MMIO space for the device.
     if (m_systemDistroDeviceType == LxMiniInitMountDeviceTypePmem)
     {
+        const auto runAsUser = wil::impersonate_token(m_userToken.get());
         highMmioGapInMB += RequiredExtraMmioSpaceForPmemFileInMb(m_vmConfig.SystemDistroPath.c_str());
     }
 
@@ -1607,13 +1645,20 @@ std::wstring WslCoreVm::GenerateConfigJson()
                 m_vmConfig.EnableNestedVirtualization = false;
             }
 
-            vmSettings.ComputeTopology.Processor.ExposeVirtualizationExtensions = m_vmConfig.EnableNestedVirtualization;
             if (!m_vmConfig.EnableNestedVirtualization)
             {
                 EMIT_USER_WARNING(wsl::shared::Localization::MessageNestedVirtualizationNotSupported());
             }
         }
-        CATCH_LOG()
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            m_vmConfig.EnableNestedVirtualization = false;
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageNestedVirtualizationDetectionFailed(
+                wsl::windows::common::wslutil::ErrorCodeToString(wil::ResultFromCaughtException())));
+        }
+
+        vmSettings.ComputeTopology.Processor.ExposeVirtualizationExtensions = m_vmConfig.EnableNestedVirtualization;
     }
 
 #ifdef _AMD64_
@@ -1800,23 +1845,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
     // inherited ACLs; otherwise StartComputeSystem will surface E_ACCESSDENIED.
     auto attachDisk = [&](PCWSTR path, bool grantVmAccess) {
         auto lun = ReserveLun();
-        wil::unique_hfile backingFile;
-        try
-        {
-            backingFile = OpenVhdBackingFile(path, grantVmAccess ? m_userToken.get() : nullptr);
-        }
-        catch (...)
-        {
-            if (!grantVmAccess || wil::ResultFromCaughtException() != E_ACCESSDENIED)
-            {
-                throw;
-            }
-
-            LOG_CAUGHT_EXCEPTION();
-
-            // Custom VHDs may be accessible only to the service and VMWP.
-            backingFile = OpenVhdBackingFile(path, nullptr);
-        }
+        auto backingFile = OpenVhdBackingFile(path, grantVmAccess ? m_userToken.get() : nullptr);
 
         hcs::Attachment disk{};
         disk.Type = hcs::AttachmentType::VirtualDisk;
@@ -2125,12 +2154,12 @@ WslCoreVm::DiskMountResult WslCoreVm::MountDiskLockHeld(
     return {std::move(targetName), mountResult, step};
 }
 
-wil::unique_socket WslCoreVm::CreateRootNamespaceProcess(_In_ LPCSTR Path, _In_ LPCSTR* Arguments)
+wil::unique_socket WslCoreVm::CreateRootNamespaceProcess(_In_ LPCSTR Path, _In_ LPCSTR* Arguments, uint64_t PluginId)
 {
     auto lock = m_lock.lock_exclusive();
 
     return LxssCreateProcess::CreateLinuxProcess(
-        Path, Arguments, m_runtimeId, m_miniInitChannel, m_terminatingEvent.get(), m_vmConfig.DistributionStartTimeout);
+        Path, Arguments, m_runtimeId, m_miniInitChannel, m_terminatingEvent.get(), m_vmConfig.DistributionStartTimeout, PluginId);
 }
 
 void WslCoreVm::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR GuestPath, _In_ bool ReadOnly, _In_ LPCWSTR Name)
@@ -2277,7 +2306,10 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
         sharePath.push_back(L'\\');
     }
 
-    sharePath = wsl::windows::common::filesystem::GetCanonicalPath(sharePath).wstring();
+    {
+        const auto runAsUser = wil::impersonate_token(UserToken);
+        sharePath = wsl::windows::common::filesystem::GetCanonicalPath(sharePath).wstring();
+    }
 
     std::wstring effectiveOptions(Options);
 
@@ -2444,11 +2476,13 @@ void WslCoreVm::ReadGuestCapabilities()
     }
 
     m_seccompAvailable = info.SeccompAvailable;
+    m_ipv6Available = info.Ipv6Available;
     m_hvPciSwiotlbBase = info.HvPciSwiotlbBase;
     m_hvPciSwiotlbSize = info.HvPciSwiotlbSize;
     WSL_LOG(
         "GuestKernelInfo",
         TraceLoggingValue(m_seccompAvailable, "SeccompAvailable"),
+        TraceLoggingValue(m_ipv6Available, "Ipv6Available"),
         TraceLoggingValue(m_hvPciSwiotlbBase, "HvPciSwiotlbBase"),
         TraceLoggingValue(m_hvPciSwiotlbSize, "HvPciSwiotlbSize"),
         TraceLoggingValue(std::get<0>(m_kernelVersion), "Version"),
@@ -2485,7 +2519,8 @@ try
 }
 CATCH_LOG()
 
-void WslCoreVm::RegisterCallbacks(_In_ const std::function<void(ULONG)>& DistroExitCallback, _In_ const std::function<void(GUID)>& TerminationCallback)
+void WslCoreVm::RegisterCallbacks(
+    _In_ const std::function<void(const LX_MINI_INIT_CHILD_EXIT_MESSAGE&)>& DistroExitCallback, _In_ const std::function<void(GUID)>& TerminationCallback)
 {
     WSL_LOG(
         "WslCoreVm::RegisterCallbacks",
@@ -2519,8 +2554,11 @@ void WslCoreVm::RegisterCallbacks(_In_ const std::function<void(ULONG)>& DistroE
                         const auto* exitMessage = gslhelpers::try_get_struct<LX_MINI_INIT_CHILD_EXIT_MESSAGE>(message);
                         if (exitMessage)
                         {
-                            WSL_LOG("ProcessExited", TraceLoggingValue(exitMessage->ChildPid, "pid"));
-                            exitCallback(exitMessage->ChildPid);
+                            WSL_LOG(
+                                "ProcessExited",
+                                TraceLoggingValue(exitMessage->ChildPid, "pid"),
+                                TraceLoggingValue(exitMessage->InstanceId, "instanceId"));
+                            exitCallback(*exitMessage);
                         }
                     }
                     else
@@ -2544,11 +2582,7 @@ void WslCoreVm::RegisterCallbacks(_In_ const std::function<void(ULONG)>& DistroE
         }
         else
         {
-            // The VM has already been terminated, invoke the callback on a separate thread.
-            std::thread([terminationCallback = std::move(TerminationCallback), runtimeId = m_runtimeId]() {
-                wsl::windows::common::wslutil::SetThreadDescription(L"TerminationCallback");
-                terminationCallback(runtimeId);
-            }).detach();
+            TerminationCallback(m_runtimeId);
         }
     }
 

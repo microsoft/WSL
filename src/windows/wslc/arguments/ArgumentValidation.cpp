@@ -106,6 +106,10 @@ void Argument::Validate(ArgMap& execArgs) const
         CacheConverted<ArgType::Pull>(execArgs, m_name, validation::GetPullPolicyFromString);
         break;
 
+    case ArgType::Restart:
+        CacheConverted<ArgType::Restart>(execArgs, m_name, validation::GetRestartPolicyFromString);
+        break;
+
     case ArgType::Progress:
         CacheConverted<ArgType::Progress>(execArgs, m_name, validation::GetProgressModeFromString);
         break;
@@ -246,7 +250,8 @@ void Argument::Validate(ArgMap& execArgs) const
             }
             catch (const mount::MountException& ex)
             {
-                throw ArgumentException(ex.Reason());
+                throw ArgumentException(
+                    Localization::WSLCCLI_VolumeInvalidSpecError(value, ex.Reason(), Localization::WSLCCLI_VolumeFormatUsage()));
             }
         });
         break;

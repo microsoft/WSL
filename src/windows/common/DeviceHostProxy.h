@@ -5,11 +5,12 @@
 #include <windowsdefs.h>
 #include <WslDeviceHost.h>
 #include "hcs.hpp"
+#include "RuntimeClass.h"
 
 namespace wrl = Microsoft::WRL;
 
 class DeviceHostProxy
-    : public wrl::RuntimeClass<wrl::RuntimeClassFlags<wrl::RuntimeClassType::ClassicCom>, IVmDeviceHostSupport, IPlan9FileSystemHost, IWslDeviceHostCallback>
+    : public wsl::windows::common::RuntimeClass<wrl::RuntimeClassFlags<wrl::RuntimeClassType::ClassicCom>, IVmDeviceHostSupport, IPlan9FileSystemHost, IWslDeviceHostCallback>
 {
 public:
     DeviceHostProxy(const std::wstring& VmId, const GUID& RuntimeId, bool EnableTelemetry = true);
