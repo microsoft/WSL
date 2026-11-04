@@ -1056,10 +1056,25 @@ HRESULT LxssUserSessionImpl::EnumerateDistributions(_Out_ PULONG DistributionCou
     auto userDistributions(wil::make_unique_cotaskmem<LXSS_ENUMERATE_INFO[]>(numberOfDistributions));
 
     // Fill in information about each distribution.
+    ULONG validDistributionCount = 0;
     for (ULONG index = 0; index < numberOfDistributions; index += 1)
     {
+        LXSS_DISTRO_CONFIGURATION configuration{};
+        try
+        {
+            configuration = s_GetDistributionConfiguration(distributions[index]);
+            THROW_HR_IF(E_INVALIDARG, configuration.Name.size() > LX_INIT_DISTRO_NAME_MAX);
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
 
-        auto configuration = s_GetDistributionConfiguration(distributions[index]);
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageInvalidDistribution(
+                distributions[index].Id(), wsl::windows::common::wslutil::ErrorCodeToString(wil::ResultFromCaughtException())));
+
+            continue;
+        }
+
         auto state = static_cast<LxssDistributionState>(configuration.State);
 
         if (m_runningInstances.contains(distributions[index].Id()))
@@ -1078,7 +1093,7 @@ HRESULT LxssUserSessionImpl::EnumerateDistributions(_Out_ PULONG DistributionCou
             }
         }
 
-        const auto current = &userDistributions.get()[index];
+        const auto current = &userDistributions.get()[validDistributionCount];
         current->DistroGuid = distributions[index].Id();
         current->State = state;
         current->Version = WI_IsFlagSet(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE) ? LXSS_WSL_VERSION_2 : LXSS_WSL_VERSION_1;
@@ -1089,9 +1104,10 @@ HRESULT LxssUserSessionImpl::EnumerateDistributions(_Out_ PULONG DistributionCou
 
         memset(current->DistroName, 0, sizeof(current->DistroName));
         wcscpy_s(current->DistroName, RTL_NUMBER_OF(current->DistroName), configuration.Name.c_str());
+        validDistributionCount += 1;
     }
 
-    *DistributionCount = numberOfDistributions;
+    *DistributionCount = validDistributionCount;
     *Distributions = userDistributions.release();
     return S_OK;
 }
@@ -2109,7 +2125,13 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
 
             // Create a utility VM to create the tar file and output it via a
             // socket.
-            auto vmContext = _RunUtilityVmSetup(configuration, LxMiniInitMessageExport, 0, true);
+            LXSS_VM_MODE_SETUP_CONTEXT vmContext{};
+            bool setVersionDebug{};
+            {
+                std::lock_guard lock(m_instanceLock);
+                vmContext = _RunUtilityVmSetup(configuration, LxMiniInitMessageExport, 0, true);
+                setVersionDebug = m_utilityVm->GetConfig().SetVersionDebug;
+            }
 
             auto wsl1Pipe = wsl::windows::common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
 
@@ -2119,7 +2141,7 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
             // Add mounts for the rootfs and tools.
             auto mounts = _CreateSetupMounts(configuration);
 
-            if (m_utilityVm->GetConfig().SetVersionDebug)
+            if (setVersionDebug)
             {
                 commandLine += " -vv --totals";
             }
@@ -2155,26 +2177,32 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
         }
         else
         {
+            UINT64 vhdSizeBytes{};
+            bool enableSparseVhd{};
             {
                 std::lock_guard lock(m_instanceLock);
                 _CreateVm();
+                const auto& vmConfig = m_utilityVm->GetConfig();
+                vhdSizeBytes = vmConfig.VhdSizeBytes;
+                enableSparseVhd = vmConfig.EnableSparseVhd;
             }
 
             // Create a vhd to store the root filesystem.
             {
                 auto runAsUser = wil::impersonate_token(userToken.get());
-                wsl::core::filesystem::CreateVhd(
-                    configuration.VhdFilePath.c_str(),
-                    m_utilityVm->GetConfig().VhdSizeBytes,
-                    GetUserSid(),
-                    m_utilityVm->GetConfig().EnableSparseVhd,
-                    false);
+                wsl::core::filesystem::CreateVhd(configuration.VhdFilePath.c_str(), vhdSizeBytes, GetUserSid(), enableSparseVhd, false);
 
                 deleteFlags = LXSS_DELETE_DISTRO_FLAGS_VHD;
             }
 
             // Create a process in the utility VM to expand the tar file from a socket.
-            auto vmContext = _RunUtilityVmSetup(configuration, LxMiniInitMessageImport, 0, true);
+            LXSS_VM_MODE_SETUP_CONTEXT vmContext{};
+            bool setVersionDebug{};
+            {
+                std::lock_guard lock(m_instanceLock);
+                vmContext = _RunUtilityVmSetup(configuration, LxMiniInitMessageImport, 0, true);
+                setVersionDebug = m_utilityVm->GetConfig().SetVersionDebug;
+            }
 
             auto wsl1Pipe = wsl::windows::common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
 
@@ -2184,7 +2212,7 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
             // Add mounts for the rootfs and tools.
             auto mounts = _CreateSetupMounts(configuration);
 
-            if (m_utilityVm->GetConfig().SetVersionDebug)
+            if (setVersionDebug)
             {
                 commandLine += " -vv --totals";
             }

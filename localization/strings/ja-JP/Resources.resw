@@ -854,6 +854,10 @@ Admin Protection の詳細については、https://aka.ms/apdevguide をご覧�
     <value>無効なディストリビューション名: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageInvalidDistribution" xml:space="preserve">
+    <value>無効なディストリビューション登録 '{}' が見つかりました、{}。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholders are the distribution's registry GUID and the error code.</comment>
+  </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>レガシの配布登録を使用しています。代わりに tar ベースの配布を使用することを検討してください。</value>
     <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
@@ -2859,11 +2863,11 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>送信するシグナル (既定値: コンテナーに構成された STOPSIGNAL、または構成されていない場合は SIGTERM)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>コンテナー イベントを監視します。</value>
+  <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
+    <value>イベントを監視します。</value>
   </data>
-  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>コンテナーのリアルタイム イベントを監視します。</value>
+  <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
+    <value>コンテナー、イメージ、ネットワーク、ボリュームからのリアルタイム イベントを監視します。</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
     <value>タイムスタンプ以降に作成されたすべてのイベントを表示する</value>

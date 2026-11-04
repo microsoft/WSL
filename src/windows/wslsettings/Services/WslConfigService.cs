@@ -84,6 +84,14 @@ public class WslConfigService : IWslConfigService, IDisposable
         }
     }
 
+    public IWslConfigSetting GetSavedWslConfigSetting(WslConfigEntry wslConfigEntry)
+    {
+        lock (_wslCoreConfigInterfaceLockObj!)
+        {
+            return GetPersistedWslConfigSetting(wslConfigEntry, defaultSetting: false);
+        }
+    }
+
     public uint SetWslConfigSetting(IWslConfigSetting wslConfigSetting)
     {
         var settingManaged = wslConfigSetting as WslConfigSettingManaged;
@@ -216,6 +224,52 @@ public class WslConfigService : IWslConfigService, IDisposable
 
             // We entered with pending changes. Fire only if they're now empty (full success).
             pendingStateChanged = _pendingValues.Count == 0;
+        }
+
+        if (pendingStateChanged)
+        {
+            _onPendingChangesChangedHandler?.Invoke();
+        }
+        _onWslConfigChangedHandler?.Invoke();
+        return result;
+    }
+
+    public uint CommitWslConfigSetting(WslConfigEntry wslConfigEntry, object value)
+    {
+        uint result;
+        bool pendingStateChanged;
+
+        lock (_wslCoreConfigInterfaceLockObj!)
+        {
+            var hadPendingBefore = _pendingValues.Count > 0;
+
+            _wslConfigFileSystemWatcher!.EnableRaisingEvents = false;
+            try
+            {
+                var setting = GetPersistedWslConfigSetting(wslConfigEntry, defaultSetting: false);
+                try
+                {
+                    setting.SetValueDirect(value);
+                    result = WslCoreConfigInterface.SetWslConfigSetting(_wslConfig, setting.ConfigSetting);
+                }
+                finally
+                {
+                    setting.ConfigSetting.Dispose();
+                }
+
+                ReloadConfig_NoLock();
+
+                if (result == 0)
+                {
+                    _pendingValues.Remove(wslConfigEntry);
+                }
+            }
+            finally
+            {
+                _wslConfigFileSystemWatcher!.EnableRaisingEvents = true;
+            }
+
+            pendingStateChanged = hadPendingBefore != (_pendingValues.Count > 0);
         }
 
         if (pendingStateChanged)

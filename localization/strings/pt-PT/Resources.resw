@@ -848,6 +848,10 @@ Para mais informações sobre Admin Protection, visite https://aka.ms/apdevguide
     <value>Nome de distribuição inválido: "{}".</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageInvalidDistribution" xml:space="preserve">
+    <value>Found invalid distribution registration '{}', {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholders are the distribution's registry GUID and the error code.</comment>
+  </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>A utilizar o registo de distribuição legado. Em vez disso, considere utilizar uma distribuição baseada em tar.</value>
     <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
@@ -2853,11 +2857,11 @@ Exemplo: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Sinal a enviar (predefinição: o STOPSIGNAL configurado do contentor, ou SIGTERM se não estiver configurado)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>Monitorizar eventos de contentores.</value>
+  <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
+    <value>Monitorize eventos.</value>
   </data>
-  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>Monitorizar eventos em tempo real a partir de contentores.</value>
+  <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
+    <value>Monitorize eventos em tempo real a partir de contentores, imagens, redes e volumes.</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
     <value>Mostrar todos os eventos criados desde o carimbo de data/hora</value>
