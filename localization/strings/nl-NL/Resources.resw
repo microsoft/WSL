@@ -2074,23 +2074,23 @@ U hebt ook toegang tot meer externe VS Code-opties via het opdrachtpalet in VS C
     <value>Zorg ervoor dat distributies worden uitgevoerd, zodat de virtuele WSL-machine die als host fungeert, niet automatisch wordt afgesloten nadat ze inactief zijn geweest.</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>Virtuele machine van WSL-distributie altijd ingeschakeld houden</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
-    <value>Your WSL distro VM won't shut down when idle, so new shells start instantly. Uses more memory while WSL is running. This will take effect in your next WSL session.</value>
+    <value>De virtuele machine van je WSL-distributie wordt niet afgesloten wanneer deze niet wordt gebruikt, zodat nieuwe shells direct worden gestart. Gebruikt meer geheugen zolang WSL actief is. Dit wordt van kracht tijdens je volgende WSL-sessie.</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>Virtuele machine van WSL-distributie altijd ingeschakeld houden</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
-    <value>Couldn't change the keep-running setting</value>
+    <value>Kan de instelling voor actief houden niet wijzigen</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
-    <value>Make sure .wslconfig isn't read-only, then try again.</value>
+    <value>Zorg ervoor dat .wslconfig niet alleen-lezen is en probeer het opnieuw.</value>
     <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
-    <value>You can change this anytime in WSL Settings under Optional Features.</value>
+    <value>Je kunt dit op elk moment wijzigen in de WSL-instellingen onder Optionele functies.</value>
   </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Time-out voor opnieuw instellen</value>
@@ -4214,7 +4214,7 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
-    <value>WSLC could not write '{}' to initialize local hostname resolution (guest error {}).</value>
+    <value>WSLC kon '{}' niet schrijven om lokale hostnaamomzetting te initialiseren (gastfout {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">

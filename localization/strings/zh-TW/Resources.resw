@@ -4224,11 +4224,11 @@ Windows 版本：{}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
-    <value>WSLC started the guest VM, but Docker Engine did not become ready within {} milliseconds. Collect WSL diagnostic logs to investigate the startup failure.</value>
+    <value>WSLC 已啟動來賓 VM，但 Docker Engine 未在 {} 毫秒內準備就緒。請收集 WSL 診斷記錄，以調查啟動失敗的原因。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
-    <value>Docker Engine exited with code {} before becoming ready in the WSLC guest VM. Collect WSL diagnostic logs to investigate the startup failure.</value>
+    <value>Docker Engine 在 WSLC 來賓 VM 準備就緒前即以代碼 {} 結束。請收集 WSL 診斷記錄，以調查啟動失敗的原因。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

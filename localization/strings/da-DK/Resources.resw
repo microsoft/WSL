@@ -2074,16 +2074,16 @@ Du kan også få adgang til flere Fjernindstillinger for VS-kode via kommandopal
     <value>Bliv ved med at holde kørende distributioner og den virtuelle WSL-maskine, der er vært for dem, fra automatisk at blive lukket, når de har været inaktive.</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>Hold VM'en til WSL-distributionen kørende hele tiden</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
-    <value>Your WSL distro VM won't shut down when idle, so new shells start instantly. Uses more memory while WSL is running. This will take effect in your next WSL session.</value>
+    <value>Din WSL-distributions VM lukker ikke ned, når den er inaktiv, så nye shells starter med det samme. Det bruger mere hukommelse, mens WSL kører. Dette træder i kraft i din næste WSL-session.</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>Hold VM'en til WSL-distributionen kørende hele tiden</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
-    <value>Couldn't change the keep-running setting</value>
+    <value>Indstillingen for at holde den kørende kunne ikke ændres</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
     <value>Sørg for, at .wslconfig ikke er skrivebeskyttet, og prøv derefter igen.</value>

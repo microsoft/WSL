@@ -2080,19 +2080,19 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>ディストリビューションの実行を継続し、それらをホストしている WSL 仮想マシンがアイドル状態になった後に自動的にシャットダウンされないようにします。</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>WSL ディストリビューション VM を常にオンのままにする</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
-    <value>Your WSL distro VM won't shut down when idle, so new shells start instantly. Uses more memory while WSL is running. This will take effect in your next WSL session.</value>
+    <value>WSL ディストリビューション VM はアイドル状態ではシャットダウンされないため、新しいシェルがすぐに起動します。WSL の実行中はより多くのメモリを使用します。これは、次の WSL セッションで有効になります。</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>WSL ディストリビューション VM を常にオンのままにする</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
-    <value>Couldn't change the keep-running setting</value>
+    <value>継続実行設定を変更できませんでした</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
-    <value>Make sure .wslconfig isn't read-only, then try again.</value>
+    <value>.wslconfig が読み取り専用でないことを確認してから、もう一度やり直してください。</value>
     <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">

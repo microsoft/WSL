@@ -2074,23 +2074,23 @@ Du kan också komma åt fler VS Code-fjärralternativ via kommandopaletten inom 
     <value>Fortsätt att köra distributioner och den virtuella WSL-dator som är värd för dem från att stängas av automatiskt när de har varit inaktiva.</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>Håll WSL-distro-VM alltid på</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
-    <value>Your WSL distro VM won't shut down when idle, so new shells start instantly. Uses more memory while WSL is running. This will take effect in your next WSL session.</value>
+    <value>Din WSL-distro-VM stängs inte av vid inaktivitet, så nya skal startar direkt. Använder mer minne medan WSL körs. Detta börjar gälla i nästa WSL-session.</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>Håll WSL-distro-VM alltid på</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
-    <value>Couldn't change the keep-running setting</value>
+    <value>Det gick inte att ändra inställningen för att hålla igång</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
     <value>Kontrollera att .wslconfig inte är skrivskyddad och försök sedan igen.</value>
     <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
-    <value>You can change this anytime in WSL Settings under Optional Features.</value>
+    <value>Du kan ändra detta när som helst i WSL-inställningarna under Valfria funktioner.</value>
   </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Återställ tidsgräns</value>

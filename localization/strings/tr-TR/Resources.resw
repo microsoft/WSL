@@ -2074,16 +2074,16 @@ Ayrıca VS Code'un içindeki komut paleti aracılığıyla daha fazla VS Code Re
     <value>Dağıtımların ve bunları barındıran WSL sanal makinesinin, boşta kaldıktan sonra otomatik olarak kapatılmasını önleyin.</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>WSL dağıtım sanal makinesini her zaman açık tut</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
-    <value>Your WSL distro VM won't shut down when idle, so new shells start instantly. Uses more memory while WSL is running. This will take effect in your next WSL session.</value>
+    <value>WSL dağıtım sanal makineniz boşta kaldığında kapanmaz. Böylece yeni kabuklar anında başlatılır. WSL çalışırken daha fazla bellek kullanır. Bu, bir sonraki WSL oturumunuzda yürürlüğe girecek.</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>WSL dağıtım sanal makinesini her zaman açık tut</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
-    <value>Couldn't change the keep-running setting</value>
+    <value>Çalışır durumda tutma ayarı değiştirilemedi</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
     <value>.wslconfig salt okunur olmadığından emin olun ve yeniden deneyin.</value>
@@ -4218,11 +4218,11 @@ Windows sürümü: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
-    <value>WSLC started the guest VM, but Docker Engine did not become ready within {} milliseconds. Collect WSL diagnostic logs to investigate the startup failure.</value>
+    <value>WSLC konuk VM'sini başlattı ancak Docker Engine {} milisaniye içinde hazır duruma gelmedi. Başlatma hatasını araştırmak için WSL tanılama günlüklerini toplayın.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
-    <value>Docker Engine exited with code {} before becoming ready in the WSLC guest VM. Collect WSL diagnostic logs to investigate the startup failure.</value>
+    <value>Docker Engine'den, WSLC konuk VM'sinde hazır duruma gelmeden önce {} koduyla çıkıldı. Başlatma hatasını araştırmak için WSL tanılama günlüklerini toplayın.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

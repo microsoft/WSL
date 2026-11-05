@@ -2081,16 +2081,16 @@ Você também pode acessar mais opções do VS Code Remote através da paleta de
     <value>Evite que as distribuições em execução e a máquina virtual WSL que as hospeda sejam desligadas automaticamente depois de ficarem ociosas.</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>Manter a VM da distribuição do WSL sempre ativada</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
     <value>Sua VM de distribuição WSL não será desligada quando estiver ociosa, portanto, novos shells serão iniciados instantaneamente. Usa mais memória enquanto o WSL está em execução. Isso entrará em vigor na sua próxima sessão do WSL.</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>Manter a VM da distribuição do WSL sempre ativada</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
-    <value>Couldn't change the keep-running setting</value>
+    <value>Não foi possível alterar a configuração para manter em execução</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
     <value>Verifique se .wslconfig não é somente leitura e tente novamente.</value>
@@ -4225,7 +4225,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
-    <value>O WSLC iniciou a VM convidada, mas o Docker Engine não ficou pronto em {} milissegundos. Colete logs de diagnóstico do WSL para investigar a falha de inicialização.</value>
+    <value>O WSLC iniciou a VM convidada, mas o Docker Engine não ficou pronto dentro de {} milissegundos. Colete os logs de diagnóstico do WSL para investigar a falha na inicialização.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
