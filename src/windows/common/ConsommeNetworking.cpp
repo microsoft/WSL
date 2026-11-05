@@ -147,15 +147,24 @@ ConsommeNetworking::ConsommeNetworking(
 
 ConsommeNetworking::~ConsommeNetworking()
 {
-    // Unregister the network notification callback to prevent it from using the GNS channel.
-    m_networkNotifyHandle.reset();
-
     // Stop the GNS channel to unblock any stuck communications with the guest.
     m_gnsChannel.Stop();
+
+    // Unregister notification callbacks before destroying the state they access.
+    m_dnsSuffixRegistryWatcher.reset();
+    m_networkNotifyHandle.reset();
 }
 
 void ConsommeNetworking::Initialize()
 {
+    m_dnsSuffixRegistryWatcher.emplace([this]() noexcept {
+        try
+        {
+            RefreshGuestConnection();
+        }
+        CATCH_LOG()
+    });
+
     // Initialize adapter state.
     RefreshGuestConnection();
 
@@ -364,7 +373,8 @@ CATCH_RETURN()
 
 void ConsommeNetworking::RefreshGuestConnection()
 {
-    // Query current networking information before acquiring the lock.
+    // Serialize host queries and guest updates across notification callbacks.
+    auto lock = m_lock.lock_exclusive();
     auto networkSettings = GetHostEndpointSettings();
 
     auto defaultRouteIpv4 = networkSettings->GetBestGatewayAddressString(AF_INET);
@@ -414,9 +424,6 @@ void ConsommeNetworking::RefreshGuestConnection()
     const auto minMtu = GetMinimumConnectedInterfaceMtu();
     auto virtioNetConfig = BuildVirtioNetConfig(networkSettings, WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::Ipv6));
     auto nameservers = ToIpAddresses(currentDns);
-
-    // Acquire the lock and perform device updates.
-    auto lock = m_lock.lock_exclusive();
 
     // Add the virtio net adapter to the guest, or update its runtime configuration.
     if (!m_adapterId.has_value())
