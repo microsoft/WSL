@@ -391,7 +391,7 @@ STDAPI WslcDeleteContainer(_In_ WslcContainer container, _In_ WslcDeleteContaine
 //   - Returns WSLC_E_NETWORK_NOT_FOUND if no network matches network->name.
 //   - Returns WSLC_E_NETWORK_PREFIX_AMBIGUOUS if network->name is an ID prefix that matches more than one network.
 //   - Returns E_INVALIDARG if the container's networking mode does not support additional networks.
-//   - Returns WSLC_E_RUNTIME_UPDATE_NEEDED if the installed WSL runtime does not support this operation.
+//   - Requires WSL 3.1.0 or later; returns WSLC_E_RUNTIME_UPDATE_NEEDED on older runtimes.
 STDAPI WslcConnectContainerNetwork(_In_ WslcContainer container, _In_ const WslcContainerNetwork* network, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // Disconnects a created or running container from a session network.
@@ -412,7 +412,7 @@ STDAPI WslcConnectContainerNetwork(_In_ WslcContainer container, _In_ const Wslc
 // Notes:
 //   - Returns WSLC_E_NETWORK_NOT_FOUND if no network matches nameOrId.
 //   - Returns WSLC_E_NETWORK_PREFIX_AMBIGUOUS if nameOrId is an ID prefix that matches more than one network.
-//   - Returns WSLC_E_RUNTIME_UPDATE_NEEDED if the installed WSL runtime does not support this operation.
+//   - Requires WSL 3.1.0 or later; returns WSLC_E_RUNTIME_UPDATE_NEEDED on older runtimes.
 STDAPI WslcDisconnectContainerNetwork(_In_ WslcContainer container, _In_z_ PCSTR nameOrId, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // PROCESS DEFINITIONS

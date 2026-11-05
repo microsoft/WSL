@@ -1628,6 +1628,7 @@ try
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
     RETURN_HR_IF_NULL(E_POINTER, network);
     ValidateContainerNetwork(*network);
+    RETURN_HR_IF(WSLC_E_RUNTIME_UPDATE_NEEDED, internalType->container2 == nullptr);
 
     NetworkAddressBuffers addressBuffers{};
     const auto settings = ConvertNetworkSettings(*network, addressBuffers);
@@ -1637,7 +1638,6 @@ try
     connection.Settings = settings.empty() ? nullptr : settings.data();
     connection.SettingsCount = static_cast<ULONG>(settings.size());
 
-    RETURN_HR_IF(WSLC_E_RUNTIME_UPDATE_NEEDED, internalType->container2 == nullptr);
     return errorInfoWrapper.CaptureResult(internalType->container2->ConnectNetwork(&connection));
 }
 CATCH_RETURN();
