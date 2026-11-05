@@ -211,6 +211,11 @@ typedef HRESULT (*WSLPluginAPI_ExecuteBinaryInDistribution)(WSLSessionId Session
 // Must be called synchronously in either OnVMStarted() or OnDistributionStarted().
 typedef HRESULT (*WSLPluginAPI_PluginError)(LPCWSTR UserMessage);
 
+// Execute a program in the root namespace.
+// On success, 'Socket' is connected to stdin & stdout (stderr goes to dmesg) // 'Arguments' is expected to be NULL terminated
+// 'PluginRelativeCgroupPath' names an existing subgroup beneath the plugin's cgroup; ignored when cgroup isolation is disabled.
+typedef HRESULT (*WSLPluginAPI_ExecuteBinaryInCgroup)(WSLSessionId Session, LPCSTR Path, LPCSTR* Arguments, LPCSTR PluginRelativeCgroupPath, SOCKET* Socket);
+
 // Synchronous notifications sent to the plugin
 
 // Called when the VM has started.
@@ -271,6 +276,8 @@ struct WSLPluginAPIV1
     WSLCPluginAPI_ProcessGetExitEvent WSLCProcessGetExitEvent; // Introduced in 2.9.0
     WSLCPluginAPI_ProcessGetExitCode WSLCProcessGetExitCode;   // Introduced in 2.9.0
     WSLCPluginAPI_ReleaseProcess WSLCReleaseProcess;           // Introduced in 2.9.0
+
+    WSLPluginAPI_ExecuteBinaryInCgroup ExecuteBinaryInCgroup; // Introduced in 3.0.6
 };
 
 typedef HRESULT (*WSLPluginAPI_EntryPointV1)(const struct WSLPluginAPIV1* Api, struct WSLPluginHooksV1* Hooks);

@@ -1154,6 +1154,33 @@ inline std::basic_string<TChar> UnescapeShell(const std::basic_string<TChar>& in
     return (quote == Quote::None) ? output : input;
 }
 
+inline bool IsValidPluginRelativeCgroupPath(std::string_view Path)
+{
+    if (Path.find('\0') != Path.npos)
+    {
+        return false;
+    }
+
+    while (!Path.empty())
+    {
+        const auto separator = Path.find('/');
+        const auto component = Path.substr(0, separator);
+        if (component.empty() || component == "." || component == "..")
+        {
+            return false;
+        }
+
+        if (separator == Path.npos)
+        {
+            return true;
+        }
+
+        Path.remove_prefix(separator + 1);
+    }
+
+    return false;
+}
+
 } // namespace wsl::shared::string
 
 template <>

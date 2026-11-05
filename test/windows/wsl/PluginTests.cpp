@@ -1109,7 +1109,6 @@ class PluginTests
 
     WSL2_TEST_METHOD(CgroupIsolation)
     {
-        WslConfigChange isolatedConfig(LxssGenerateTestConfig({.vmIdleTimeout = -1, .isolateDistroCgroup = true}));
         StopWslService();
 
         const auto secondPlugin = std::filesystem::path(pluginDll).parent_path() / L"testplugin-isolation.dll";
@@ -1123,36 +1122,16 @@ class PluginTests
         });
         WriteString(key.get(), nullptr, L"TestPlugin-Isolated", secondPlugin.c_str());
 
-        ConfigurePlugin(PluginTestType::CgroupIsolation);
-        StartWsl(0);
-
-        constexpr char script[] = R"sh(
-{
-    sh -ec '
-        previous=
-        for plugin in testplugin testplugin-isolation; do
-            set -- $(pgrep -f "^$plugin[.]dll 3600$")
-            test "$#" -eq 2
-            cgroup=$(cat "/proc/$1/cgroup")
-            test "$cgroup" = "$(cat "/proc/$2/cgroup")"
-            printf "%s\n" "$cgroup" | grep -Eq "^0::/wsl-user/plugin-[0-9]+$"
-            test "$cgroup" != "$previous"
-            previous=$cgroup
-        done
-    ' && printf '\n%s%s\n' CGROUP_ PASS
-    busybox poweroff -f
-}
-)sh";
-
-        auto [inputRead, inputWrite] = CreateSubprocessPipe(true, false);
-        VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(inputWrite.get(), script, static_cast<DWORD>(sizeof(script) - 1), nullptr, nullptr));
-        inputWrite.reset();
-
-        auto commandLine = LxssGenerateWslCommandLine(L"--debug-shell");
-        const auto [output, error, exitCode] = LxsstuLaunchCommandAndCaptureOutputWithResult(commandLine.data(), inputRead.get());
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown --force"), 0L);
-        LogInfo("Debug shell output: %ls\n%ls", output.c_str(), error.c_str());
-        VERIFY_IS_TRUE(output.find(L"CGROUP_PASS") != std::wstring::npos);
+        for (const bool isolate : {true, false})
+        {
+            LogInfo("Testing plugin cgroups with isolation %d", isolate);
+            WslConfigChange isolatedConfig(LxssGenerateTestConfig({.vmIdleTimeout = -1, .isolateDistroCgroup = isolate}));
+            const auto testKey = OpenTestRegistryKey(KEY_SET_VALUE);
+            WriteDword(testKey.get(), nullptr, c_isolateDistroCgroup, isolate);
+            ConfigurePlugin(PluginTestType::CgroupIsolation);
+            StartWsl(0);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown --force"), 0L);
+        }
     }
 
     // This test must run last so it doesn't break test cases that depends on plugin signature.

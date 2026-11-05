@@ -3509,8 +3509,20 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
             {
                 if (access(WSL_USER_CGROUP_PATH, F_OK) == 0)
                 {
-                    const auto PluginCgroupPath = std::format("{}/plugin-{}", WSL_USER_CGROUP_PATH, Message->PluginId);
-                    THROW_LAST_ERROR_IF(UtilMkdir(PluginCgroupPath.c_str(), 0755) < 0);
+                    auto PluginCgroupPath = std::format("{}/plugin-{}", WSL_USER_CGROUP_PATH, Message->PluginId);
+                    if (Message->PluginRelativeCgroupPathIndex != 0)
+                    {
+                        // The subgroup must already exist, so it is not created here.
+                        THROW_INVALID_ARG_IF(Message->PluginRelativeCgroupPathIndex < offsetof(CREATE_PROCESS_MESSAGE, Buffer));
+                        const char* pluginRelativeCgroupPath = wsl::shared::string::FromSpan(Buffer, Message->PluginRelativeCgroupPathIndex);
+                        THROW_INVALID_ARG_IF(!wsl::shared::string::IsValidPluginRelativeCgroupPath(pluginRelativeCgroupPath));
+                        PluginCgroupPath = std::format("{}/{}", PluginCgroupPath, pluginRelativeCgroupPath);
+                    }
+                    else
+                    {
+                        THROW_LAST_ERROR_IF(UtilMkdir(PluginCgroupPath.c_str(), 0755) < 0);
+                    }
+
                     THROW_LAST_ERROR_IF(UtilMoveSelfToCgroup(PluginCgroupPath, "CreateChildProcess") < 0);
                 }
             }
