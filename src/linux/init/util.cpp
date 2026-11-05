@@ -1133,7 +1133,7 @@ try
     //
 
     std::vector<gsl::byte> Buffer;
-    auto Value = getenv(Name);
+    const char* Value = getenv(Name);
     if (Value == nullptr)
     {
         wsl::shared::SocketChannel channel{UtilConnectToInteropServer(), "InteropClient"};
@@ -1162,6 +1162,9 @@ try
         {
             LOG_ERROR("setenv({}, {}, 1) failed {}", Name, Value, errno);
         }
+
+        // N.B. 'Value' needs to be returned before 'channel' is destroyed.
+        return Value;
     }
 
     return Value;
