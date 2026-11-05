@@ -570,13 +570,13 @@ void ConsommeNetworking::UpdateDnsSettings(const networking::DnsInfo& dns)
         return;
     }
 
-    m_trackedDnsSettings = dns;
-
     hns::ModifyGuestEndpointSettingRequest<hns::DNS> notification{};
     notification.RequestType = hns::ModifyRequestType::Update;
     notification.ResourceType = hns::GuestEndpointResourceType::DNS;
     notification.Settings = networking::BuildDnsNotification(dns, m_dnsOptions);
     m_gnsChannel.SendHnsNotification(ToJsonW(notification).c_str(), m_adapterId.value());
+
+    m_trackedDnsSettings = dns;
 }
 
 void ConsommeNetworking::UpdateIpv4Address(const networking::EndpointIpAddress& ipAddress)
