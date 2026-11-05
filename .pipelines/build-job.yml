@@ -92,6 +92,12 @@ jobs:
           inputs:
             packageType: "sdk"
 
+      - task: UseDotNet@2
+        displayName: Install .NET 10 SDK for WSL Settings
+        inputs:
+          packageType: "sdk"
+          version: "10.0.403"
+
       - task: PowerShell@2
         displayName: Set trace logging configuration
         condition: ne('${{ parameters.traceLoggingConfig }}', '')
@@ -184,7 +190,7 @@ jobs:
                       $pattern = '${{ target.pattern }}'
                       $inputDir = "bin\$arch\Release"
                       $outputDir = "$(packageStagingDir)\$arch"
-                      New-Item -ItemType Directory -Path "$outputDir\wslsettings" -Force
+                      New-Item -ItemType Directory -Path "$outputDir\wslsettings-publish" -Force
                       foreach ($file in $pattern.Split(',')) {
                           $sourcePath = Join-Path $inputDir $file
                           if (Test-Path $sourcePath) {
@@ -289,12 +295,18 @@ jobs:
                   ]
 
       - powershell: |
-          $binFolder = ".\bin\${{ parameters.platform }}\Release"
+          $binFolder = (Resolve-Path ".\bin\${{ parameters.platform }}\Release").Path
           $pdbFolder = Join-Path $(ob_outputDirectory) "pdb\${{ parameters.platform }}\Release"
           mkdir $pdbFolder
           foreach ($filter in @("*.pdb", "*.debug"))
           {
-              foreach ($e in (Get-ChildItem -Recurse -Path $binFolder -Filter $filter)) {Move-Item -Path $e.fullname -Destination (Join-Path $pdbFolder $e.name)}
+              foreach ($symbolFile in (Get-ChildItem -Recurse -File -Path $binFolder -Filter $filter))
+              {
+                  $relativePath = $symbolFile.FullName.Substring($binFolder.Length + 1)
+                  $destination = Join-Path $pdbFolder $relativePath
+                  New-Item -ItemType Directory -Path (Split-Path -Path $destination) -Force | Out-Null
+                  Move-Item -LiteralPath $symbolFile.FullName -Destination $destination
+              }
           }
         displayName: Collect symbols (${{ parameters.platform }})
 

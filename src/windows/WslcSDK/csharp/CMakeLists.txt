@@ -1,7 +1,7 @@
 enable_language(CSharp)
 
 add_library(wslcsdkcs SHARED)
-configure_csharp_target(wslcsdkcs)
+configure_csharp_target(wslcsdkcs net8.0)
 
 set(WSLCSDK_WINMD "${CMAKE_CURRENT_BINARY_DIR}/../winrt/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE}/wslcsdk.winmd")
 
