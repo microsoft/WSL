@@ -855,7 +855,7 @@ Para obtener más información sobre Admin Protection, visite https://aka.ms/apd
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidDistribution" xml:space="preserve">
-    <value>Found invalid distribution registration '{}', {}.</value>
+    <value>Se encontró un registro de distribución no válido "{}", {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholders are the distribution's registry GUID and the error code.</comment>
   </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
@@ -2079,6 +2079,25 @@ También puedes acceder a más opciones remotas de VS Code mediante la paleta d
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Evitar que las distribuciones en ejecución y la máquina virtual WSL que las hospeda se apaguen automáticamente después de que hayan estado inactivas.</value>
   </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
+    <value>Keep WSL distro VM always on</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
+    <value>La VM de distribución WSL no se apagará cuando esté inactiva, por lo que los nuevos shells se iniciarán al instante. Usa más memoria mientras se ejecuta WSL. Esto surtirá efecto en la próxima sesión de WSL.</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Keep WSL distro VM always on</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
+    <value>Couldn't change the keep-running setting</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
+    <value>Make sure .wslconfig isn't read-only, then try again.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
+    <value>Puede cambiar esto en cualquier momento en Configuración de WSL en Características opcionales.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Restablecer tiempo de espera</value>
   </data>
@@ -2429,10 +2448,6 @@ Uso:
   </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
      <value>Se encontró un argumento posicional cuando no se esperaba ninguno: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Falta el nombre de opción en: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
@@ -4202,6 +4217,18 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   </data>
   <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
     <value>No se pudieron instalar certificados raíz de confianza de host en la máquina virtual: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
+    <value>WSLC no pudo escribir "{}" para inicializar la resolución del nombre de host local (error de invitado {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
+    <value>WSLC inició la VM invitada, pero el motor de Docker no estuvo listo en {} milisegundos. Recopile registros de diagnóstico de WSL para investigar el error de inicio.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
+    <value>El motor de Docker se cerró con el código {} antes de estar listo en la VM invitada de WSLC. Recopile registros de diagnóstico de WSL para investigar el error de inicio.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>
