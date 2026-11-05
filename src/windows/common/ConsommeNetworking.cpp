@@ -168,15 +168,20 @@ void ConsommeNetworking::Initialize()
     // Initialize adapter state.
     RefreshGuestConnection();
 
-    if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LocalhostRelay))
     {
-        SetupLoopbackDevice();
-    }
+        // Serialize loopback setup with DNS refresh callbacks sharing the GNS channel.
+        auto lock = m_lock.lock_exclusive();
 
-    if (!m_hostLoopback.empty())
-    {
-        THROW_HR_IF(E_UNEXPECTED, !WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LocalhostRelay));
-        SetupHostLoopback();
+        if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LocalhostRelay))
+        {
+            SetupLoopbackDevice();
+        }
+
+        if (!m_hostLoopback.empty())
+        {
+            THROW_HR_IF(E_UNEXPECTED, !WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LocalhostRelay));
+            SetupHostLoopback();
+        }
     }
 
     THROW_IF_WIN32_ERROR(NotifyNetworkConnectivityHintChange(&ConsommeNetworking::OnNetworkConnectivityChange, this, TRUE, &m_networkNotifyHandle));
