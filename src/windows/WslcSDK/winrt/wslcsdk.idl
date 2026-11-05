@@ -214,6 +214,7 @@ namespace Microsoft.WSL.Containers
         void Delete(DeleteContainerOption flags);
 
         // Network may be referenced by name, full ID, or unique ID prefix.
+        // Requires WSL 3.1.0 or later; fails with RuntimeUpdateNeeded on older runtimes.
         void ConnectNetwork(ContainerNetwork network);
         void DisconnectNetwork(String nameOrId);
 
