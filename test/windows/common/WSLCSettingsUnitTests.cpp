@@ -773,6 +773,105 @@ class WSLCCLISettingsUnitTests
             s.GetWarnings().front().Message);
         VERIFY_ARE_EQUAL(std::wstring(L"session.storagePath"), s.GetWarnings().front().SettingPath);
     }
+
+    // -----------------------------------------------------------------------
+    // session.registry
+    // -----------------------------------------------------------------------
+
+    // A list of absolute mirror URLs loads without warnings.
+    TEST_METHOD(Validation_RegistryMirrors_ValidValue)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  registry:\n"
+            "    mirrors:\n"
+            "      - https://mirror.example.com\n"
+            "      - http://mirror2.example.com:5000\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        const std::vector<std::string> expected{"https://mirror.example.com", "http://mirror2.example.com:5000"};
+        VERIFY_IS_TRUE(s.Get<Setting::SessionRegistryMirrors>() == expected);
+    }
+
+    // A mirror without an http(s) scheme is rejected: the default is used and an invalid-value warning emitted.
+    TEST_METHOD(Validation_RegistryMirrors_InvalidValue_UsesDefaultAndWarns)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  registry:\n"
+            "    mirrors:\n"
+            "      - mirror.example.com\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_IS_TRUE(s.Get<Setting::SessionRegistryMirrors>().empty());
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(
+            Loc::WSLCUserSettings_Warning_InvalidValue(L"session.registry.mirrors", s.SettingsFilePath().wstring(), 4),
+            s.GetWarnings().front().Message);
+        VERIFY_ARE_EQUAL(std::wstring(L"session.registry.mirrors"), s.GetWarnings().front().SettingPath);
+    }
+
+    // "default" is accepted for list settings too and leaves the built-in default in place.
+    TEST_METHOD(Validation_RegistryMirrors_DefaultString)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  registry:\n"
+            "    mirrors: default\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_IS_TRUE(s.Get<Setting::SessionRegistryMirrors>().empty());
+    }
+
+    // host, host:port and CIDR entries are all accepted for insecure registries.
+    TEST_METHOD(Validation_InsecureRegistries_ValidValue)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  registry:\n"
+            "    insecureRegistries:\n"
+            "      - registry.example.internal:5000\n"
+            "      - 10.0.0.0/8\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        const std::vector<std::string> expected{"registry.example.internal:5000", "10.0.0.0/8"};
+        VERIFY_IS_TRUE(s.Get<Setting::SessionRegistryInsecure>() == expected);
+    }
+
+    // A registry with a scheme is rejected: dockerd expects a bare host[:port] or CIDR.
+    TEST_METHOD(Validation_InsecureRegistries_SchemeRejected_UsesDefaultAndWarns)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  registry:\n"
+            "    insecureRegistries:\n"
+            "      - http://registry.example.internal:5000\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_IS_TRUE(s.Get<Setting::SessionRegistryInsecure>().empty());
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(
+            Loc::WSLCUserSettings_Warning_InvalidValue(L"session.registry.insecureRegistries", s.SettingsFilePath().wstring(), 4),
+            s.GetWarnings().front().Message);
+    }
 };
 
 } // namespace WSLCCLISettingsUnitTests

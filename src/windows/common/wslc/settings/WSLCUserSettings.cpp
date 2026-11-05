@@ -22,6 +22,7 @@ Abstract:
 #include <yaml-cpp/yaml.h>
 #pragma warning(pop)
 #include <algorithm>
+#include <cctype>
 #include <format>
 #include <fstream>
 #include <set>
@@ -64,10 +65,85 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  # Seconds an idle session VM stays running before it is torn down (default: 30)\n"
     "  # idleTimeout: default\n"
     "\n"
+    "  # Container registry configuration, merged into the session's /etc/docker/daemon.json.\n"
+    "  # Changes apply the next time the session starts.\n"
+    "  #   mirrors            - image pull mirrors, like \"registry-mirrors\" in daemon.json\n"
+    "  #   insecureRegistries - registries served over plain HTTP or with an untrusted certificate,\n"
+    "  #                        like \"insecure-registries\" in daemon.json\n"
+    "  # registry:\n"
+    "  #   mirrors:\n"
+    "  #     - https://mirror.example.com\n"
+    "  #   insecureRegistries:\n"
+    "  #     - registry.example.internal:5000\n"
+    "\n"
     "# Credential storage backend: \"wincred\" or \"file\" (default: wincred)\n"
     "# credentialStore: wincred\n";
 
 // Validate individual setting specializations
+namespace {
+
+    bool ContainsWhitespace(const std::string& value)
+    {
+        return value.find_first_of(" \t\r\n\f\v") != std::string::npos;
+    }
+
+    bool StartsWithIgnoreCase(std::string_view value, std::string_view prefix)
+    {
+        if (value.size() < prefix.size())
+        {
+            return false;
+        }
+
+        for (size_t i = 0; i < prefix.size(); i++)
+        {
+            if (std::tolower(static_cast<unsigned char>(value[i])) != std::tolower(static_cast<unsigned char>(prefix[i])))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // dockerd expects mirrors to be absolute http(s) URLs without a path or query.
+    bool IsValidRegistryMirror(const std::string& value)
+    {
+        if (value.empty() || ContainsWhitespace(value))
+        {
+            return false;
+        }
+
+        auto host = std::string_view{value};
+        if (StartsWithIgnoreCase(host, "https://"))
+        {
+            host.remove_prefix(8);
+        }
+        else if (StartsWithIgnoreCase(host, "http://"))
+        {
+            host.remove_prefix(7);
+        }
+        else
+        {
+            return false;
+        }
+
+        if (!host.empty() && host.back() == '/')
+        {
+            host.remove_suffix(1);
+        }
+
+        return !host.empty() && host.find_first_of("/?#") == std::string_view::npos;
+    }
+
+    // dockerd accepts "host", "host:port", an IP literal, or a CIDR block for insecure registries.
+    bool IsValidInsecureRegistry(const std::string& value)
+    {
+        return !value.empty() && !ContainsWhitespace(value) && value.find("://") == std::string::npos &&
+               value.find_first_of("\"'\\") == std::string::npos;
+    }
+
+} // namespace
+
 namespace details {
 
     std::optional<uint32_t> ParseSettingsMemoryValue(const std::string& value)
@@ -191,6 +267,32 @@ namespace details {
     WSLC_VALIDATE_SETTING(SessionIdleTimeout)
     {
         return value > 0 ? std::optional{value} : std::nullopt;
+    }
+
+    WSLC_VALIDATE_SETTING(SessionRegistryMirrors)
+    {
+        for (const auto& mirror : value)
+        {
+            if (!IsValidRegistryMirror(mirror))
+            {
+                return std::nullopt;
+            }
+        }
+
+        return value;
+    }
+
+    WSLC_VALIDATE_SETTING(SessionRegistryInsecure)
+    {
+        for (const auto& registry : value)
+        {
+            if (!IsValidInsecureRegistry(registry))
+            {
+                return std::nullopt;
+            }
+        }
+
+        return value;
     }
 
     WSLC_VALIDATE_SETTING(CredentialStore)
