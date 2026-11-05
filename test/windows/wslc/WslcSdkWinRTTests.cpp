@@ -1110,6 +1110,122 @@ class WslcSdkWinRtTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerNetworkConnectDisconnect)
+    {
+        constexpr auto c_primaryNetwork = "wslc-sdk-winrt-connect-primary";
+        constexpr auto c_additionalNetwork = "wslc-sdk-winrt-connect-additional";
+        constexpr auto c_additionalIp = L"10.231.55.10";
+        const winrt::hstring primaryNetwork = winrt::to_hstring(c_primaryNetwork);
+        const winrt::hstring additionalNetwork = winrt::to_hstring(c_additionalNetwork);
+
+        auto comSession = wil::com_query<IWSLCSession>(
+            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->GetSession());
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_primaryNetwork));
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_additionalNetwork));
+
+        auto createNetwork = [&](winrt::hstring const& name, const wchar_t* subnet) {
+            WSLCSDK::NetworkSettings settings{name};
+            settings.Subnet(winrt::Windows::Networking::HostName{subnet});
+            settings.SubnetPrefixLength(24);
+            return m_defaultSession.CreateNetwork(settings);
+        };
+
+        createNetwork(primaryNetwork, L"10.231.54.0");
+        auto cleanupPrimary = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_primaryNetwork)); });
+        const auto additional = createNetwork(additionalNetwork, L"10.231.55.0");
+        auto cleanupAdditional = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_additionalNetwork)); });
+
+        auto makeSettings = [&](bool withNetwork) {
+            auto procSettings = WSLCSDK::ProcessSettings();
+            procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
+            WSLCSDK::ContainerSettings containerSettings{L"debian:latest"};
+            containerSettings.InitProcess(procSettings);
+            if (withNetwork)
+            {
+                containerSettings.Networks().Append(WSLCSDK::ContainerNetwork{primaryNetwork});
+            }
+
+            return containerSettings;
+        };
+
+        auto inspect = [](WSLCSDK::Container const& container) {
+            return wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(
+                winrt::to_string(container.Inspect()).c_str());
+        };
+
+        // Positive: a running container connects by name with an alias and static IP, then disconnects by name.
+        {
+            auto container = m_defaultSession.CreateContainer(makeSettings(true));
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+            container.Start();
+
+            WSLCSDK::ContainerNetwork network{additionalNetwork};
+            network.Aliases().Append(L"cache");
+            network.IPv4Address(winrt::Windows::Networking::HostName{c_additionalIp});
+            container.ConnectNetwork(network);
+
+            auto inspectObject = inspect(container);
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_additionalNetwork));
+            const auto& endpoint = inspectObject.NetworkSettings.Networks.at(c_additionalNetwork);
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, std::string_view{"cache"}) != endpoint.Aliases.end());
+            VERIFY_ARE_EQUAL(winrt::to_string(c_additionalIp), endpoint.IPAddress);
+
+            container.DisconnectNetwork(additionalNetwork);
+            inspectObject = inspect(container);
+            VERIFY_IS_FALSE(inspectObject.NetworkSettings.Networks.contains(c_additionalNetwork));
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_primaryNetwork));
+        }
+
+        // Positive: a created container connects by ID and disconnects by ID prefix.
+        {
+            auto container = m_defaultSession.CreateContainer(makeSettings(true));
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+            const std::wstring id{additional.Id()};
+            container.ConnectNetwork(WSLCSDK::ContainerNetwork{winrt::hstring{id}});
+            container.Start();
+
+            auto inspectObject = inspect(container);
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_additionalNetwork));
+
+            container.DisconnectNetwork(winrt::hstring{id.substr(0, 12)});
+            inspectObject = inspect(container);
+            VERIFY_IS_FALSE(inspectObject.NetworkSettings.Networks.contains(c_additionalNetwork));
+        }
+
+        // Positive: a created container connects and disconnects, then starts without the removed network.
+        {
+            auto container = m_defaultSession.CreateContainer(makeSettings(true));
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+            container.ConnectNetwork(WSLCSDK::ContainerNetwork{additionalNetwork});
+            VERIFY_IS_TRUE(inspect(container).NetworkSettings.Networks.contains(c_additionalNetwork));
+
+            container.DisconnectNetwork(additionalNetwork);
+            VERIFY_IS_FALSE(inspect(container).NetworkSettings.Networks.contains(c_additionalNetwork));
+
+            container.Start();
+            const auto inspectObject = inspect(container);
+            VERIFY_IS_FALSE(inspectObject.NetworkSettings.Networks.contains(c_additionalNetwork));
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_primaryNetwork));
+        }
+
+        // Negative: unknown networks, containers without networking, and invalid arguments.
+        {
+            auto container = m_defaultSession.CreateContainer(makeSettings(true));
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+            VERIFY_THROWS_HR(container.ConnectNetwork(WSLCSDK::ContainerNetwork{L"wslc-sdk-winrt-missing"}), WSLC_E_NETWORK_NOT_FOUND);
+            VERIFY_THROWS_HR(container.DisconnectNetwork(L"wslc-sdk-winrt-missing"), WSLC_E_NETWORK_NOT_FOUND);
+            VERIFY_THROWS_HR(container.ConnectNetwork(nullptr), E_POINTER);
+            VERIFY_THROWS_HR(container.DisconnectNetwork(L""), E_INVALIDARG);
+
+            auto noNetwork = m_defaultSession.CreateContainer(makeSettings(false));
+            auto cleanupNoNetwork = DELETE_CONTAINER_ON_SCOPE_EXIT(noNetwork);
+            VERIFY_THROWS_HR(noNetwork.ConnectNetwork(WSLCSDK::ContainerNetwork{additionalNetwork}), E_INVALIDARG);
+        }
+    }
+
     // -----------------------------------------------------------------------
     // Container lifecycle tests
     // -----------------------------------------------------------------------

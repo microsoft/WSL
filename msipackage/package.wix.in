@@ -488,6 +488,14 @@
                     </RegistryKey>
                 </RegistryKey>
 
+                <!-- IWSLCCompatContainer2-->
+                <RegistryKey Root="HKCR" Key="Interface\{77165AA5-A4EA-4428-BF99-9C0775B6E0AA}">
+                    <RegistryValue Value="IWSLCCompatContainer2" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
                 <!-- IWSLCCompatSession-->
                 <RegistryKey Root="HKCR" Key="Interface\{DD7B2EF9-AA01-4F21-8A3A-29D394CBB579}">
                     <RegistryValue Value="IWSLCCompatSession" Type="string" />

@@ -213,7 +213,7 @@ typedef struct WslcContainerNamedVolume
 
 typedef struct WslcContainerNetwork
 {
-    _In_z_ PCSTR name; // Network name (e.g. "bridge" or a network created with WslcCreateSessionNetwork)
+    _In_z_ PCSTR name;                               // Network name. A full network ID or unique ID prefix is also accepted.
     _In_reads_opt_(aliasCount) const PCSTR* aliases; // DNS aliases for the container on this network; user-defined networks only
     _In_ uint32_t aliasCount;
     _In_opt_ const IN_ADDR* ipv4Address;  // Static IPv4 address for the container on this network; user-defined networks only
@@ -370,6 +370,50 @@ typedef enum WslcDeleteContainerFlags
 DEFINE_ENUM_FLAG_OPERATORS(WslcDeleteContainerFlags);
 
 STDAPI WslcDeleteContainer(_In_ WslcContainer container, _In_ WslcDeleteContainerFlags flags, _Outptr_opt_result_z_ PWSTR* errorMessage);
+
+// Connects a created or running container to a session network.
+//
+// Parameters:
+//   container
+//       A valid WslcContainer handle.
+//
+//   network
+//       The network to connect to. network->name may be a network name, full ID, or unique ID prefix. Aliases and static
+//       IP addresses are optional and are only supported on user-defined networks.
+//
+//   errorMessage
+//       Optional. On failure, receives a human-readable error message. May be null.
+//
+// Return Value:
+//   S_OK on success. Otherwise, an HRESULT error code indicating the reason for failure.
+//
+// Notes:
+//   - Returns WSLC_E_NETWORK_NOT_FOUND if no network matches network->name.
+//   - Returns WSLC_E_NETWORK_PREFIX_AMBIGUOUS if network->name is an ID prefix that matches more than one network.
+//   - Returns E_INVALIDARG if the container's networking mode does not support additional networks.
+//   - Returns WSLC_E_RUNTIME_UPDATE_NEEDED if the installed WSL runtime does not support this operation.
+STDAPI WslcConnectContainerNetwork(_In_ WslcContainer container, _In_ const WslcContainerNetwork* network, _Outptr_opt_result_z_ PWSTR* errorMessage);
+
+// Disconnects a created or running container from a session network.
+//
+// Parameters:
+//   container
+//       A valid WslcContainer handle.
+//
+//   nameOrId
+//       The name, full ID, or unique ID prefix of the network to disconnect from.
+//
+//   errorMessage
+//       Optional. On failure, receives a human-readable error message. May be null.
+//
+// Return Value:
+//   S_OK on success. Otherwise, an HRESULT error code indicating the reason for failure.
+//
+// Notes:
+//   - Returns WSLC_E_NETWORK_NOT_FOUND if no network matches nameOrId.
+//   - Returns WSLC_E_NETWORK_PREFIX_AMBIGUOUS if nameOrId is an ID prefix that matches more than one network.
+//   - Returns WSLC_E_RUNTIME_UPDATE_NEEDED if the installed WSL runtime does not support this operation.
+STDAPI WslcDisconnectContainerNetwork(_In_ WslcContainer container, _In_z_ PCSTR nameOrId, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // PROCESS DEFINITIONS
 STDAPI WslcInitProcessSettings(_Out_ WslcProcessSettings* processSettings);

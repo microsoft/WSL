@@ -146,6 +146,7 @@ namespace Microsoft.WSL.Containers
     {
         ContainerNetwork(String name);
 
+        // Network name. A full network ID or unique ID prefix is also accepted.
         String Name;
         IVector<String> Aliases;
 
@@ -211,6 +212,10 @@ namespace Microsoft.WSL.Containers
         void Start();
         void Stop(Signal signal, Windows.Foundation.TimeSpan timeout);
         void Delete(DeleteContainerOption flags);
+
+        // Network may be referenced by name, full ID, or unique ID prefix.
+        void ConnectNetwork(ContainerNetwork network);
+        void DisconnectNetwork(String nameOrId);
 
         Process CreateProcess(ProcessSettings newProcessSettings);
 
