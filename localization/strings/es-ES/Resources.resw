@@ -2080,19 +2080,19 @@ También puedes acceder a más opciones remotas de VS Code mediante la paleta d
     <value>Evitar que las distribuciones en ejecución y la máquina virtual WSL que las hospeda se apaguen automáticamente después de que hayan estado inactivas.</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>Mantener siempre encendida la máquina virtual de la distribución de WSL</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
     <value>La VM de distribución WSL no se apagará cuando esté inactiva, por lo que los nuevos shells se iniciarán al instante. Usa más memoria mientras se ejecuta WSL. Esto surtirá efecto en la próxima sesión de WSL.</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>Mantener siempre encendida la máquina virtual de la distribución de WSL</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
-    <value>Couldn't change the keep-running setting</value>
+    <value>No se ha podido cambiar la opción para mantener la máquina virtual en ejecución</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
-    <value>Make sure .wslconfig isn't read-only, then try again.</value>
+    <value>Comprueba que .wslconfig no sea de solo lectura y vuelve a intentarlo.</value>
     <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">

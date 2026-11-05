@@ -4213,7 +4213,7 @@ Windows 版本: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
-    <value>WSLC could not write '{}' to initialize local hostname resolution (guest error {}).</value>
+    <value>WSLC 无法写入“{}”来初始化本地主机名解析（来宾错误 {}）。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">

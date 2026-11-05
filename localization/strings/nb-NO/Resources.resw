@@ -2074,16 +2074,16 @@ Du kan også åpne flere eksterne alternativer for VS Code gjennom kommandopalet
     <value>Forhindre at distribusjoner som kjører, og den virtuelle WSL-maskinen som er vert for dem, avsluttes automatisk etter at de har vært inaktive.</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>Hold den virtuelle maskinen for WSL-distribusjonen alltid på</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
-    <value>Your WSL distro VM won't shut down when idle, so new shells start instantly. Uses more memory while WSL is running. This will take effect in your next WSL session.</value>
+    <value>Den virtuelle maskinen for WSL-distribusjonen slås ikke av når den er inaktiv, så nye skall starter umiddelbart. Bruker mer minne mens WSL kjører. Dette trer i kraft i neste WSL-økt.</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>Hold den virtuelle maskinen for WSL-distribusjonen alltid på</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
-    <value>Couldn't change the keep-running setting</value>
+    <value>Kan ikke endre innstillingen for å fortsette å kjøre</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
     <value>Kontroller at .wslconfig ikke er skrivebeskyttet, og prøv deretter på nytt.</value>
@@ -4214,7 +4214,7 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
-    <value>WSLC could not write '{}' to initialize local hostname resolution (guest error {}).</value>
+    <value>WSLC kunne ikke skrive «{}» for å klargjøre lokalt vertsnavnoppslag (gjestefeil {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
@@ -4222,7 +4222,7 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
-    <value>Docker Engine exited with code {} before becoming ready in the WSLC guest VM. Collect WSL diagnostic logs to investigate the startup failure.</value>
+    <value>Docker Engine avsluttet med koden {} før den var klar i WSCL-gjeste-VM-en. Innhent WSL-diagnoselogger for å undersøke oppstartsfeilen.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

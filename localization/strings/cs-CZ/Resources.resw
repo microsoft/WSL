@@ -2074,19 +2074,19 @@ K dalším možnostem VS Code Remote můžete přistupovat také prostřednictv�
     <value>Zabraňte automatickému vypnutí spuštěných distribucí a virtuálního počítače WSL, který je hostuje, když jsou nečinné.</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>Ponechat virtuální počítač distribuce WSL trvale spuštěný</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
-    <value>Your WSL distro VM won't shut down when idle, so new shells start instantly. Uses more memory while WSL is running. This will take effect in your next WSL session.</value>
+    <value>Virtuální počítač distribuce WSL se při nečinnosti nevypne, takže se nové prostředí shellu spustí okamžitě. Dokud WSL běží, spotřebovává více paměti. Změna se projeví při příští relaci WSL.</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>Ponechat virtuální počítač distribuce WSL trvale spuštěný</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
-    <value>Couldn't change the keep-running setting</value>
+    <value>Nepovedlo se změnit nastavení trvalého spuštění</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
-    <value>Make sure .wslconfig isn't read-only, then try again.</value>
+    <value>Zkontrolujte, jestli soubor .wslconfig není jen pro čtení, a zkuste to znovu.</value>
     <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
@@ -4214,15 +4214,15 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
-    <value>WSLC could not write '{}' to initialize local hostname resolution (guest error {}).</value>
+    <value>WSLC nemohl zapsat {} pro inicializaci místního překladu názvů hostitelů (chyba hostovaného systému {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
-    <value>WSLC started the guest VM, but Docker Engine did not become ready within {} milliseconds. Collect WSL diagnostic logs to investigate the startup failure.</value>
+    <value>WSLC spustil hostovaný virtuální počítač, ale Docker Engine nebyl připravený ani po {} milisekundách. Shromážděte diagnostické protokoly WSL a zjistěte příčinu chyby při spuštění.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
-    <value>Docker Engine exited with code {} before becoming ready in the WSLC guest VM. Collect WSL diagnostic logs to investigate the startup failure.</value>
+    <value>Docker Engine se ve virtuálním počítači hostovaného systému WSLC ukončil s kódem {}, než byl připravený. Shromážděte diagnostické protokoly WSL a zjistěte příčinu chyby při spuštění.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

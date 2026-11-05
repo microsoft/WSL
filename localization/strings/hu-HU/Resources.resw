@@ -2074,23 +2074,23 @@ A VS Code-ban található parancskatalógusban további VS Code Remote beállít
     <value>Hagyja futni a disztribúciókat és az őket üzemeltető WSL virtuális gépet, hogy ne álljanak le automatikusan, miután egy ideig inaktívak voltak.</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>A WSL-disztribúciós virtuális gép mindig legyen bekapcsolva</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
-    <value>Your WSL distro VM won't shut down when idle, so new shells start instantly. Uses more memory while WSL is running. This will take effect in your next WSL session.</value>
+    <value>A WSL-disztribúció virtuális gépe nem áll le tétlen állapotban, így az új rendszerhéjak azonnal elindulnak. Amíg a WSL fut, több memóriát használ. Ez a következő WSL-munkamenetben lép érvénybe.</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>A WSL-disztribúciós virtuális gép mindig legyen bekapcsolva</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
-    <value>Couldn't change the keep-running setting</value>
+    <value>Nem sikerült módosítani a futva tartási beállítást</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
     <value>Győződjön meg arról, hogy .wslconfig nem írásvédett, majd próbálkozzon újra.</value>
     <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
-    <value>You can change this anytime in WSL Settings under Optional Features.</value>
+    <value>Ezt bármikor módosíthatja a WSL beállításaiban, az Opcionális funkciók területen.</value>
   </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Időtúllépés alaphelyzetbe állítása</value>
@@ -4214,15 +4214,15 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
-    <value>WSLC could not write '{}' to initialize local hostname resolution (guest error {}).</value>
+    <value>A WSLC nem tudta kiírni a(z) {} értéket a helyi állomásnév-feloldás inicializálásához (vendéggéphiba: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
-    <value>WSLC started the guest VM, but Docker Engine did not become ready within {} milliseconds. Collect WSL diagnostic logs to investigate the startup failure.</value>
+    <value>A WSLC elindította a vendég virtuális gépet, de a Docker Engine {} ezredmásodpercen belül nem állt készen. Gyűjtse össze a WSL diagnosztikai naplóit az indítási hiba kivizsgálásához.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
-    <value>Docker Engine exited with code {} before becoming ready in the WSLC guest VM. Collect WSL diagnostic logs to investigate the startup failure.</value>
+    <value>A Docker Engine a(z) {} kilépési kóddal lépett ki, mielőtt készen állt volna a WSLC vendég virtuális gépén. Gyűjtse össze a WSL diagnosztikai naplóit az indítási hiba kivizsgálásához.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

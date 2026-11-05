@@ -2080,23 +2080,23 @@ Puoi anche accedere a più opzioni remote di VS Code tramite il riquadro comandi
     <value>Evita che le distribuzioni in esecuzione, e la macchina virtuale WSL che le ospita, vengano arrestate automaticamente dopo un periodo di inattività.</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>Mantieni sempre attiva la macchina virtuale della distribuzione WSL</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
-    <value>Your WSL distro VM won't shut down when idle, so new shells start instantly. Uses more memory while WSL is running. This will take effect in your next WSL session.</value>
+    <value>La macchina virtuale della distribuzione WSL non verrà arrestata quando è inattiva, quindi le nuove shell si avvieranno immediatamente. Utilizza più memoria durante l'esecuzione di WSL. Questa modifica entrerà in vigore nella prossima sessione di WSL.</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>Mantieni sempre attiva la macchina virtuale della distribuzione WSL</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
-    <value>Couldn't change the keep-running setting</value>
+    <value>Non è stato possibile modificare l'impostazione di mantenimento dell'esecuzione</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
     <value>Assicurati che .wslconfig non sia di sola lettura, quindi riprova.</value>
     <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
-    <value>You can change this anytime in WSL Settings under Optional Features.</value>
+    <value>Puoi modificare questa impostazione in qualsiasi momento in Impostazioni WSL, in Funzionalità facoltative.</value>
   </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Reimposta timeout</value>
