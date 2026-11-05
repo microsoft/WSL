@@ -23,6 +23,7 @@ Abstract:
 #include "wslservice.h"
 #include "registry.hpp"
 #include "helpers.hpp"
+#include "hcs.hpp"
 #include "lxinitshared.h"
 #include "svccomm.hpp"
 #include "relay.hpp"
@@ -2571,6 +2572,29 @@ Usage:
         auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"nproc --all");
         VERIFY_ARE_EQUAL(L"1\n", output);
         VERIFY_ARE_EQUAL(L"", warnings);
+    }
+
+    WSL2_TEST_METHOD(MemoryProfile)
+    {
+        const auto windowsVersion = wsl::windows::common::helpers::GetWindowsVersion();
+        const bool smallPagesSupported =
+            wsl::windows::common::hcs::IsSmallMemoryBackingPagesSupported(windowsVersion.BuildNumber, windowsVersion.UpdateBuildRevision);
+
+        for (const auto& setting : {L"", L"memoryProfile=density", L"memoryProfile=performance", L"memoryProfile=invalid"})
+        {
+            WslConfigChange config(LxssGenerateTestConfig() + L"\n[experimental]\n" + setting);
+            const auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/cmdline");
+            const int expectedOrder = std::wstring_view(setting) == L"memoryProfile=performance" || !smallPagesSupported ? 9 : 5;
+            VERIFY_IS_TRUE(output.find(std::format(L"page_reporting.page_reporting_order={}", expectedOrder)) != std::wstring::npos);
+            if (std::wstring_view(setting) == L"memoryProfile=invalid")
+            {
+                VERIFY_IS_TRUE(warnings.find(L"memoryProfile") != std::wstring::npos);
+            }
+            else
+            {
+                VERIFY_ARE_EQUAL(L"", warnings);
+            }
+        }
     }
 
     WSL2_TEST_METHOD(DmesgCollection)

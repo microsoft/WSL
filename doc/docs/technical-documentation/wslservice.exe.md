@@ -21,6 +21,27 @@ WslService manages the WSL2 Virtual Machine. The virtual machine management logi
 
 Once booted, WslService maintains an [hvsocket](https://learn.microsoft.com/virtualization/hyper-v-on-windows/user-guide/make-integration-service) with the Virtual Machine which it uses to send various commands to Linux processes (see [mini_init](mini_init.md) for more details). 
 
+### Memory profile
+
+To opt in to 2 MiB host backing pages for the WSL2 virtual machine, add the following to `%UserProfile%\.wslconfig`:
+
+```ini
+[experimental]
+memoryProfile=performance
+```
+
+Run `wsl --shutdown` before restarting WSL to apply the change. The setting accepts `density` (the default) and `performance`.
+The `density` profile preserves the existing memory-density optimization on supported Windows builds; `performance` requests 2 MiB host backing pages.
+Large backing pages may improve translation lookaside buffer (TLB) efficiency for memory-intensive workloads, but can increase host memory usage and allocation latency under memory pressure.
+This controls host backing pages, not Linux huge-page allocation. With the `performance` profile, page reporting uses 2 MiB granularity and the small-page fault-cluster overrides are omitted.
+
+WSLC C SDK clients can opt in independently by passing `WSLC_SESSION_FEATURE_FLAG_LARGE_MEMORY_BACKING_PAGES` to
+`WslcSetSessionSettingsFeatureFlags` before creating a session. COM clients can set `WslcFeatureFlagsLargeMemoryBackingPages`
+in `WSLCSessionSettings.FeatureFlags` or `WSLCCompatSessionSettings.FeatureFlags`.
+The `.wslconfig` setting does not configure WSLC sessions.
+The SDK flag requires WSL 3.1.0 or later; `WslcCreateSession` returns `WSLC_E_RUNTIME_UPDATE_NEEDED`
+on older runtimes, with a localized installed/required-version message.
+
 ## WSL2 Distributions 
 
 Once the virtual machine is running, WSL distributions can be started by calling `WslCoreVm::CreateInstance`. Each running distribution is represented by a `WslCoreInstance` (see `src/windows/service/exe/WslCoreInstance.cpp`).
