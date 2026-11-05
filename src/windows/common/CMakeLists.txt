@@ -180,9 +180,7 @@ add_dependencies(common wslserviceidl wsldevicehostidl localization wslservicemc
 
 target_precompile_headers(common PRIVATE precomp.h)
 set_target_properties(common PROPERTIES FOLDER windows)
-target_include_directories(common PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_BINARY_DIR}/../service/mc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
+target_include_directories(common PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/../service/mc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
 
 # common calls into HCS, HNS, the IP helper API, the VHD APIs, MSI, WinTrust and
 # the config file parser, so anything linking common needs those libraries too.
