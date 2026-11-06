@@ -525,11 +525,20 @@ GnsPortTracker::BindCall GnsPortTracker::GetCallInfo(uint64_t CallId, pid_t Pid,
 
         return ParseSocket(Arguments[0], Arguments[1], Arguments[2]);
     }
-    // Note: 32bit on x86_64 uses the __NR_socketcall with the first argument
-    // set to SYS_BIND/SYS_LISTEN to make bind()/listen() system calls and the
-    // second argument is a pointer to a block of memory containing the original arguments.
+    // The i386 ABI supports direct syscalls as well as socketcall, whose first argument
+    // is SYS_BIND/SYS_LISTEN and second points to the 32-bit argument block.
     else
     {
+        if (SysCallNumber == I386_NR_bind)
+        {
+            return ParseSocket(Arguments[0], static_cast<uint32_t>(Arguments[1]), static_cast<uint32_t>(Arguments[2]));
+        }
+
+        if (SysCallNumber == I386_NR_listen)
+        {
+            return ParseListen(Arguments[0]);
+        }
+
         if (Arguments[0] == SYS_LISTEN)
         {
             // Grab the first parameter (the socket fd).
