@@ -13,6 +13,7 @@ Abstract:
 --*/
 #include "precomp.h"
 #include "WSLCUserSettings.h"
+#include "WslCoreNetworkingSupport.h"
 #include "filesystem.hpp"
 #include "string.hpp"
 #include "wslutil.h"
@@ -22,6 +23,8 @@ Abstract:
 #include <yaml-cpp/yaml.h>
 #pragma warning(pop)
 #include <algorithm>
+#include <array>
+#include <charconv>
 #include <format>
 #include <fstream>
 #include <set>
@@ -64,10 +67,154 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  # Seconds an idle session VM stays running before it is torn down (default: 30)\n"
     "  # idleTimeout: default\n"
     "\n"
+    "  # Proxy used by the container engine for registry access, such as pull, push and build base images.\n"
+    "  # Changes apply after the session restarts. Non-HTTPS localhost and 127.0.0.1 proxies use hostLoopback.\n"
+    "  # For other loopback proxies, use the hostLoopback name; HTTPS proxies also need a certificate valid for it.\n"
+    "  # proxy:\n"
+    "  #   http: http://proxy.example.com:3128\n"
+    "  #   https: http://proxy.example.com:3128\n"
+    "  #   noProxy: localhost,127.0.0.1,.example.com\n"
+    "\n"
     "# Credential storage backend: \"wincred\" or \"file\" (default: wincred)\n"
     "# credentialStore: wincred\n";
 
 // Validate individual setting specializations
+namespace {
+
+    // Returns the offset and length of the host in a scheme://[user@]host[:port] proxy URL.
+    std::optional<std::pair<size_t, size_t>> FindProxyHost(std::string_view url)
+    {
+        const auto schemeEnd = url.find("://");
+        if (schemeEnd == std::string_view::npos || schemeEnd == 0)
+        {
+            return std::nullopt;
+        }
+
+        auto begin = schemeEnd + 3;
+        auto authorityEnd = url.find_first_of("/?#", begin);
+        if (authorityEnd == std::string_view::npos)
+        {
+            authorityEnd = url.size();
+        }
+
+        const auto at = url.substr(begin, authorityEnd - begin).rfind('@');
+        if (at != std::string_view::npos)
+        {
+            begin += at + 1;
+        }
+
+        size_t end{};
+        if (begin < authorityEnd && url[begin] == '[')
+        {
+            end = url.find(']', begin);
+            if (end == std::string_view::npos || end >= authorityEnd)
+            {
+                return std::nullopt;
+            }
+
+            end++;
+        }
+        else
+        {
+            end = std::min(url.find(':', begin), authorityEnd);
+        }
+
+        if (end <= begin)
+        {
+            return std::nullopt;
+        }
+
+        if (end < authorityEnd)
+        {
+            if (url[end] != ':')
+            {
+                return std::nullopt;
+            }
+
+            uint16_t port{};
+            const auto portBegin = url.data() + end + 1;
+            const auto portEnd = url.data() + authorityEnd;
+            const auto result = std::from_chars(portBegin, portEnd, port);
+            if (result.ec != std::errc{} || result.ptr != portEnd || port == 0)
+            {
+                return std::nullopt;
+            }
+        }
+
+        return std::make_pair(begin, end - begin);
+    }
+
+    std::optional<std::string> ValidateProxyUrl(const std::string& value)
+    {
+        constexpr std::array<std::string_view, 4> c_schemes{"http", "https", "socks5", "socks5h"};
+
+        if (std::ranges::any_of(value, [](char c) { return std::isspace(static_cast<unsigned char>(c)); }) || !FindProxyHost(value))
+        {
+            return std::nullopt;
+        }
+
+        const auto scheme = std::string_view{value}.substr(0, value.find("://"));
+        if (std::ranges::none_of(c_schemes, [&](auto s) { return wsl::shared::string::IsEqual(scheme, s, true); }))
+        {
+            return std::nullopt;
+        }
+
+        return value;
+    }
+
+} // namespace
+
+std::string ResolveProxyUrl(const std::string& Url, const std::string& HostLoopback)
+{
+    const auto host = FindProxyHost(Url);
+    if (HostLoopback.empty() || !host)
+    {
+        return Url;
+    }
+
+    const auto name = std::string_view{Url}.substr(host->first, host->second);
+    if (!wsl::shared::string::IsEqual(name, "localhost", true) && name != "127.0.0.1")
+    {
+        return Url;
+    }
+
+    const auto scheme = std::string_view{Url}.substr(0, Url.find("://"));
+    if (wsl::shared::string::IsEqual(scheme, "https", true))
+    {
+        return Url;
+    }
+
+    auto resolved = Url;
+    resolved.replace(host->first, host->second, HostLoopback);
+    return resolved;
+}
+
+bool IsLoopbackProxyUrl(const std::string& Url)
+{
+    const auto host = FindProxyHost(Url);
+    if (!host)
+    {
+        return false;
+    }
+
+    const auto name = Url.substr(host->first, host->second);
+    if (wsl::shared::string::IsEqual(name, "localhost", true))
+    {
+        return true;
+    }
+
+    SOCKADDR_INET address{};
+    if (name.front() == '[')
+    {
+        address.si_family = AF_INET6;
+        return inet_pton(AF_INET6, name.substr(1, name.size() - 2).c_str(), &address.Ipv6.sin6_addr) == 1 &&
+               wsl::core::networking::IsLoopbackIpAddress(address);
+    }
+
+    address.si_family = AF_INET;
+    return inet_pton(AF_INET, name.c_str(), &address.Ipv4.sin_addr) == 1 && wsl::core::networking::IsLoopbackIpAddress(address);
+}
+
 namespace details {
 
     std::optional<uint32_t> ParseSettingsMemoryValue(const std::string& value)
@@ -191,6 +338,21 @@ namespace details {
     WSLC_VALIDATE_SETTING(SessionIdleTimeout)
     {
         return value > 0 ? std::optional{value} : std::nullopt;
+    }
+
+    WSLC_VALIDATE_SETTING(SessionProxyHttp)
+    {
+        return ValidateProxyUrl(value);
+    }
+
+    WSLC_VALIDATE_SETTING(SessionProxyHttps)
+    {
+        return ValidateProxyUrl(value);
+    }
+
+    WSLC_VALIDATE_SETTING(SessionProxyNoProxy)
+    {
+        return !value.empty() ? std::optional{value} : std::nullopt;
     }
 
     WSLC_VALIDATE_SETTING(CredentialStore)

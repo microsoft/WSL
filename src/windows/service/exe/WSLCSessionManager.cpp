@@ -61,6 +61,9 @@ struct SessionSettings
     std::wstring DisplayName;
     std::wstring StoragePath;
     std::string HostLoopback;
+    std::string HttpProxy;
+    std::string HttpsProxy;
+    std::string NoProxy;
     WSLCSessionSettings Settings{};
 
     NON_COPYABLE(SessionSettings);
@@ -124,6 +127,18 @@ private:
         Settings.BootTimeoutMs = wsl::windows::wslc::DefaultBootTimeoutMs;
         Settings.IdleTimeoutSec = userSettings.Get<settings::Setting::SessionIdleTimeout>();
         Settings.NetworkingMode = userSettings.Get<settings::Setting::SessionNetworkingMode>();
+
+        // A localhost proxy is only reachable from the VM through the consomme host loopback name.
+        const auto proxyLoopback = Settings.NetworkingMode == WSLCNetworkingModeConsomme ? HostLoopback : std::string{};
+        const auto httpProxy = userSettings.Get<settings::Setting::SessionProxyHttp>();
+        const auto httpsProxy = userSettings.Get<settings::Setting::SessionProxyHttps>();
+        HttpProxy = settings::ResolveProxyUrl(httpProxy, proxyLoopback);
+        HttpsProxy = settings::ResolveProxyUrl(httpsProxy, proxyLoopback);
+
+        NoProxy = userSettings.Get<settings::Setting::SessionProxyNoProxy>();
+        Settings.HttpProxy = HttpProxy.empty() ? nullptr : HttpProxy.c_str();
+        Settings.HttpsProxy = HttpsProxy.empty() ? nullptr : HttpsProxy.c_str();
+        Settings.NoProxy = NoProxy.empty() ? nullptr : NoProxy.c_str();
 
         // TODO: Add a config setting to opt-out of GPU support.
         Settings.FeatureFlags = WslcFeatureFlagsGPU;
@@ -544,6 +559,9 @@ WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
     sessionSettings.StorageFlags = Settings->StorageFlags;
     sessionSettings.SwapSizeMb = Settings->MemoryMb;
     sessionSettings.IdleTimeoutSec = Settings->IdleTimeoutSec;
+    sessionSettings.HttpProxy = Settings->HttpProxy;
+    sessionSettings.HttpsProxy = Settings->HttpsProxy;
+    sessionSettings.NoProxy = Settings->NoProxy;
     return sessionSettings;
 }
 

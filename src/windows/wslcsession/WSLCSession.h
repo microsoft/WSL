@@ -410,7 +410,11 @@ private:
     void OnContainerdExited();
     void OnDockerdExited();
     ServiceRunningProcess StartProcess(
-        const std::string& Executable, const std::vector<std::string>& Args, PCSTR LogSource, std::function<void()>&& ExitCallback);
+        const std::string& Executable,
+        const std::vector<std::string>& Args,
+        PCSTR LogSource,
+        std::function<void()>&& ExitCallback,
+        const std::vector<std::string>& ExtraEnvironment = {});
     void InstallTrustedRootCertificates();
     void StartContainerd();
     void StartDockerd();
@@ -462,6 +466,9 @@ private:
     std::optional<std::wstring> m_settingsCreatorProcessName;
     std::optional<std::wstring> m_settingsStoragePath;
     std::optional<std::string> m_settingsRootVhdTypeOverride;
+    std::optional<std::string> m_settingsHttpProxy;
+    std::optional<std::string> m_settingsHttpsProxy;
+    std::optional<std::string> m_settingsNoProxy;
     std::vector<BYTE> m_userSid;
 
     WSLCFeatureFlags m_featureFlags{};
