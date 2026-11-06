@@ -38,7 +38,7 @@ public:
 
     void SetGuestNetworkServiceState(_In_ wsl::shared::hns::GuestNetworkServiceState State) const;
 
-    std::pair<uint16_t, uint16_t> AllocateEphemeralPortRange();
+    std::pair<uint16_t, uint16_t> AllocateEphemeralPortRange(uint32_t PortCount);
 
     int OnPortAllocationRequest(const SOCKADDR_INET& Address, _In_ int Protocol, _In_ bool Allocate) noexcept;
 
