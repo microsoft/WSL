@@ -23,15 +23,18 @@ public:
     SecCompDispatcher& operator=(const SecCompDispatcher&) = delete;
     SecCompDispatcher& operator=(SecCompDispatcher&&) = delete;
 
+    // Configure handlers before calling Start().
     void RegisterHandler(int SysCallNr, const std::function<int(seccomp_notif*)>& Handler);
     void UnregisterHandler(int SysCallNr);
+
+    void Start();
 
     bool ValidateCookie(uint64_t id) noexcept;
 
     std::optional<std::vector<gsl::byte>> ReadProcessMemory(uint64_t cookie, pid_t pid, size_t address, size_t length) noexcept;
 
 private:
-    void Run();
+    void Run(wil::unique_fd terminate);
 
     seccomp_notif_sizes m_notificationSizes;
     std::map<int, std::function<int(seccomp_notif*)>> m_handlers;
