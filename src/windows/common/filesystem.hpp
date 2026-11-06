@@ -140,6 +140,9 @@ void EnsureDirectoryWithAttributes(_In_ PCWSTR Path, _In_ ULONG Mode, _In_ ULONG
 
 bool FileExists(_In_ LPCWSTR Path);
 
+std::optional<int> GetSparseFileState(_In_ HANDLE File);
+std::optional<int> GetSparseFileState(_In_ PCWSTR Path);
+
 /// <summary>
 /// Resolves Path to an absolute, canonical form. The path is made absolute against the current
 /// directory first because std::filesystem::weakly_canonical does not reliably resolve a relative
