@@ -233,6 +233,8 @@ wsl::windows::common::relay::InterruptableWrite(
 void wsl::windows::common::relay::BidirectionalRelay(_In_ HANDLE LeftHandle, _In_ HANDLE RightHandle, _In_ size_t BufferSize, _In_ RelayFlags Flags)
 {
     io::MultiHandleWait ioWait;
+    const bool bothSockets = WI_IsFlagSet(Flags, RelayFlags::LeftIsSocket) && WI_IsFlagSet(Flags, RelayFlags::RightIsSocket);
+    const auto waitFlags = bothSockets ? io::MultiHandleWait::None : io::MultiHandleWait::CancelOnCompleted;
 
     auto addRelay = [&](HANDLE Input, HANDLE Output, bool OutputIsSocket) {
         std::unique_ptr<io::OverlappedIOHandle> relay;
@@ -245,7 +247,7 @@ void wsl::windows::common::relay::BidirectionalRelay(_In_ HANDLE LeftHandle, _In
             relay = std::make_unique<io::RelayHandle<io::ReadHandle>>(io::HandleWrapper{Input}, io::HandleWrapper{Output}, BufferSize);
         }
 
-        ioWait.AddHandle(std::move(relay));
+        ioWait.AddHandle(std::move(relay), waitFlags);
     };
 
     addRelay(LeftHandle, RightHandle, WI_IsFlagSet(Flags, RelayFlags::RightIsSocket));

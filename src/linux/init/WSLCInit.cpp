@@ -1069,7 +1069,7 @@ void HandleMessageImpl(
     // terminating this forked PortRelay process and tearing down the vsock accept listener.
     THROW_LAST_ERROR_IF(signal(SIGPIPE, SIG_IGN) == SIG_ERR);
 
-    RunLocalHostRelay(SocketAddress, ListenSocket.get());
+    RunLocalHostRelay(SocketAddress, std::move(ListenSocket));
 }
 
 void HandleMessageImpl(

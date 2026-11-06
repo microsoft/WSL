@@ -639,9 +639,9 @@ private:
 };
 } // namespace
 
-void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
+void RunLocalHostRelay(sockaddr_vm hvSocketAddress, wil::unique_fd listenSocket)
 {
-    SetNonBlocking(listenSocket);
+    SetNonBlocking(listenSocket.get());
 
     wil::unique_fd epollFd{epoll_create1(EPOLL_CLOEXEC)};
     THROW_LAST_ERROR_IF(!epollFd);
@@ -649,13 +649,13 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
     epoll_event listenerEvent{};
     listenerEvent.events = EPOLLIN;
     listenerEvent.data.u64 = c_listenerEventKey;
-    THROW_LAST_ERROR_IF(epoll_ctl(epollFd.get(), EPOLL_CTL_ADD, listenSocket, &listenerEvent) < 0);
+    THROW_LAST_ERROR_IF(epoll_ctl(epollFd.get(), EPOLL_CTL_ADD, listenSocket.get(), &listenerEvent) < 0);
 
     std::unordered_map<uint64_t, std::unique_ptr<RelayConnection>> connections;
     uint64_t nextConnectionId = 1;
     std::array<epoll_event, 64> events{};
 
-    for (;;)
+    while (listenSocket || !connections.empty())
     {
         const int eventCount = TEMP_FAILURE_RETRY(epoll_wait(epollFd.get(), events.data(), static_cast<int>(events.size()), -1));
         THROW_LAST_ERROR_IF(eventCount < 0);
@@ -665,12 +665,17 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
             const auto eventKey = events[index].data.u64;
             if (eventKey == c_listenerEventKey)
             {
+                if (!listenSocket)
+                {
+                    continue;
+                }
+
                 for (;;)
                 {
                     sockaddr_vm peerAddress = hvSocketAddress;
                     socklen_t peerAddressSize = sizeof(peerAddress);
                     wil::unique_fd relaySocket{accept4(
-                        listenSocket, reinterpret_cast<sockaddr*>(&peerAddress), &peerAddressSize, SOCK_NONBLOCK | SOCK_CLOEXEC)};
+                        listenSocket.get(), reinterpret_cast<sockaddr*>(&peerAddress), &peerAddressSize, SOCK_NONBLOCK | SOCK_CLOEXEC)};
                     if (!relaySocket)
                     {
                         const int error = errno;
@@ -685,7 +690,9 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
                         }
 
                         LOG_ERROR("accept4 failed, {}", error);
-                        THROW_ERRNO(error);
+                        epoll_ctl(epollFd.get(), EPOLL_CTL_DEL, listenSocket.get(), nullptr);
+                        listenSocket.reset();
+                        break;
                     }
 
                     THROW_ERRNO_IF(EOVERFLOW, nextConnectionId > c_connectionIdMask);
@@ -721,7 +728,15 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
 
         // Closing the uniquely owned sockets removes their epoll registrations after the final fd reference is closed.
         // Defer erasure until the full batch is processed because events already returned by epoll_wait() remain cached here.
-        std::erase_if(connections, [](const auto& entry) { return entry.second->Done(); });
+        for (int index = 0; index < eventCount; ++index)
+        {
+            const auto connectionId = events[index].data.u64 & c_connectionIdMask;
+            const auto connection = connections.find(connectionId);
+            if (connection != connections.end() && connection->second->Done())
+            {
+                connections.erase(connection);
+            }
+        }
     }
 }
 
@@ -746,10 +761,10 @@ try
     THROW_LAST_ERROR_IF(!listenSocket);
 
     // Create a thread to accept incoming connections from the host listener
-    std::thread([hvSocketAddress, listenSocket = std::move(listenSocket)]() {
+    std::thread([hvSocketAddress, listenSocket = std::move(listenSocket)]() mutable {
         try
         {
-            RunLocalHostRelay(hvSocketAddress, listenSocket.get());
+            RunLocalHostRelay(hvSocketAddress, std::move(listenSocket));
         }
         CATCH_LOG()
     }).detach();

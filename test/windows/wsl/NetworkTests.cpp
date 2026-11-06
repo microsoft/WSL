@@ -2975,20 +2975,31 @@ class NetworkTests
         const std::string payload(64 * 1024, 'x');
         size_t totalBytesSent = 0;
         bool sendBlocked = false;
-        const auto sendDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+        constexpr auto backpressureDuration = std::chrono::seconds(1);
+        auto lastSendTime = std::chrono::steady_clock::now();
+        const auto sendDeadline = lastSendTime + std::chrono::seconds(10);
         while (std::chrono::steady_clock::now() < sendDeadline)
         {
             const auto bytesSent = send(hostSocket.get(), payload.data(), static_cast<int>(payload.size()), 0);
             if (bytesSent > 0)
             {
                 totalBytesSent += static_cast<size_t>(bytesSent);
+                lastSendTime = std::chrono::steady_clock::now();
                 continue;
             }
 
             const auto error = WSAGetLastError();
             THROW_HR_IF(HRESULT_FROM_WIN32(error), error != WSAEWOULDBLOCK);
-            sendBlocked = true;
-            break;
+            if (std::chrono::steady_clock::now() - lastSendTime >= backpressureDuration)
+            {
+                sendBlocked = true;
+                break;
+            }
+
+            fd_set writableSockets{};
+            FD_SET(hostSocket.get(), &writableSockets);
+            timeval writeTimeout{0, 100'000};
+            VERIFY_ARE_NOT_EQUAL(select(0, nullptr, &writableSockets, nullptr, &writeTimeout), SOCKET_ERROR);
         }
         VERIFY_IS_TRUE(sendBlocked);
         VERIFY_IS_GREATER_THAN(totalBytesSent, size_t{0});
