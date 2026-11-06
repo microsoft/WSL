@@ -372,8 +372,8 @@ try
         in_addr addrV4{};
         if (SUCCEEDED_WIN32(RtlIpv4StringToAddressW(portRemoved.c_str(), true, &pStringEnd, &addrV4)))
         {
-            const bool consommeLoopbackSupported = configuration == wsl::core::NetworkingMode::Consomme && localhostRelayEnabled &&
-                                                   addrV4.s_addr == htonl(INADDR_LOOPBACK);
+            const bool consommeLoopbackSupported = configuration == wsl::core::NetworkingMode::Consomme &&
+                                                   localhostRelayEnabled && addrV4.s_addr == htonl(INADDR_LOOPBACK);
             if (IN4_IS_ADDR_LOOPBACK(&addrV4) && !consommeLoopbackSupported)
             {
                 return UnsupportedProxyReason::LoopbackNotSupported;
