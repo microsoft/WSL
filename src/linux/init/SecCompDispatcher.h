@@ -23,9 +23,7 @@ public:
     SecCompDispatcher& operator=(const SecCompDispatcher&) = delete;
     SecCompDispatcher& operator=(SecCompDispatcher&&) = delete;
 
-    // Configure handlers before calling Start().
     void RegisterHandler(int SysCallNr, const std::function<int(seccomp_notif*)>& Handler);
-    void UnregisterHandler(int SysCallNr);
 
     void Start();
 

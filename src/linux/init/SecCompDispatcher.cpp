@@ -180,12 +180,6 @@ void SecCompDispatcher::RegisterHandler(int SysCallNr, const std::function<int(s
     m_handlers[SysCallNr] = Handler;
 }
 
-void SecCompDispatcher::UnregisterHandler(int SysCallNr)
-{
-    assert(!m_worker.joinable());
-    m_handlers.erase(SysCallNr);
-}
-
 std::optional<std::vector<gsl::byte>> SecCompDispatcher::ReadProcessMemory(uint64_t Cookie, pid_t Pid, size_t Address, size_t Length) noexcept
 {
     try
