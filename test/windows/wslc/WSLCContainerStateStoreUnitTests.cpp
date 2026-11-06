@@ -145,9 +145,6 @@ class WSLCContainerStateStoreUnitTests
         m_files->ReadError = EIO;
         VerifyUnreadable(E_FAIL);
 
-        m_files->ReadError = EACCES;
-        VerifyUnreadable(E_ACCESSDENIED);
-
         m_files->ReadError = 0;
         m_files->ThrowError = HRESULT_FROM_WIN32(ERROR_BROKEN_PIPE);
         VerifyUnreadable(HRESULT_FROM_WIN32(ERROR_BROKEN_PIPE));
@@ -239,7 +236,7 @@ class WSLCContainerStateStoreUnitTests
         store.Mutate([](auto& state) { state.RestartCount = 5; });
 
         m_files->WriteError = ENOSPC;
-        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_DISK_FULL), store.Flush());
+        VERIFY_ARE_EQUAL(E_FAIL, store.Flush());
 
         m_files->WriteError = 0;
         m_files->ThrowError = HRESULT_FROM_WIN32(ERROR_BROKEN_PIPE);
@@ -258,7 +255,7 @@ class WSLCContainerStateStoreUnitTests
         m_files->Directories.clear();
 
         WSLCContainerStateStore store(WSLCContainerStateStore::ForNewContainer(m_files, m_id));
-        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), store.Flush());
+        VERIFY_ARE_EQUAL(E_FAIL, store.Flush());
         VERIFY_IS_FALSE(m_files->Files.contains(m_path));
     }
 

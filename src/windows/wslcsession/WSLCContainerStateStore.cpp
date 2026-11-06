@@ -31,24 +31,6 @@ constexpr size_t c_containerIdLength = 64;
 // Documents hold a handful of counters, so anything larger is not one of ours.
 constexpr size_t c_maxDocumentSize = 64 * 1024;
 
-HRESULT ErrnoToHresult(int Error) noexcept
-{
-    switch (Error)
-    {
-    case ENOENT:
-        return HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND);
-    case EACCES:
-    case EPERM:
-        return E_ACCESSDENIED;
-    case ENOSPC:
-        return HRESULT_FROM_WIN32(ERROR_DISK_FULL);
-    case EROFS:
-        return HRESULT_FROM_WIN32(ERROR_WRITE_PROTECT);
-    default:
-        return E_FAIL;
-    }
-}
-
 WSLCContainerStateLoadResult LoadFailure(WSLCContainerStateLoadStatus Status, HRESULT Error) noexcept
 {
     return {.Status = Status, .Error = Error};
@@ -85,12 +67,12 @@ try
     case 0:
         break;
     case ENOENT:
-        return LoadFailure(WSLCContainerStateLoadStatus::Missing, ErrnoToHresult(error));
+        return LoadFailure(WSLCContainerStateLoadStatus::Missing, HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));
     case EFBIG:
         return Corrupt(Path, "Document too large");
     default:
         WSL_LOG("ContainerStateUnreadable", TraceLoggingValue(Path.c_str(), "Path"), TraceLoggingValue(error, "Errno"));
-        return LoadFailure(WSLCContainerStateLoadStatus::Unreadable, ErrnoToHresult(error));
+        return LoadFailure(WSLCContainerStateLoadStatus::Unreadable, E_FAIL);
     }
 
     auto json = nlohmann::json::parse(content, nullptr, false);
@@ -117,7 +99,7 @@ HRESULT wsl::windows::service::wslc::WriteContainerState(IWSLCContainerStateFile
 try
 {
     const auto error = Files.Write(Path, wsl::shared::ToJson(State));
-    RETURN_HR_IF_MSG(ErrnoToHresult(error), error != 0, "Failed to write '%hs', errno: %d", Path.c_str(), error);
+    RETURN_HR_IF_MSG(E_FAIL, error != 0, "Failed to write '%hs', errno: %d", Path.c_str(), error);
 
     return S_OK;
 }
