@@ -26,6 +26,7 @@ Abstract:
 #include "winrt/Helpers.h"
 #include "winrt/ProcessCrashInformation.h"
 
+#include <ctxtcall.h>
 #include <winrt/Microsoft.WSL.Containers.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
@@ -448,6 +449,196 @@ class WslcSdkWinRtTests
         auto future = promise.get_future();
         VERIFY_ARE_EQUAL(future.wait_for(30s), std::future_status::ready);
         VERIFY_ARE_EQUAL(future.get(), WSLCSDK::SessionTerminationReason::Shutdown);
+    }
+
+    // A regression here deadlocks, so bound it with TAEF's TestTimeout (not enforced with /inproc).
+    TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(TerminationHandlerCloseIsRejected)
+    TEST_METHOD_PROPERTY(L"Ignore[not(@Version=2)]", L"true")
+    TEST_METHOD_PROPERTY(L"TestTimeout", L"0:5")
+    TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE()
+    TEST_METHOD(TerminationHandlerCloseIsRejected)
+    {
+        const std::filesystem::path extraStorage = m_storagePath / "wslc-winrt-termh-close-storage";
+
+        auto settings = WSLCSDK::SessionSettings(L"wslc-winrt-termh-close", extraStorage.wstring());
+        settings.Timeout(std::chrono::duration_cast<TimeSpan>(30s));
+
+        auto session = WSLCSDK::Session(settings);
+
+        auto tryClose = [&]() -> HRESULT {
+            try
+            {
+                session.Close();
+                return S_OK;
+            }
+            catch (winrt::hresult_error const& e)
+            {
+                return e.code();
+            }
+        };
+
+        // Negative: Close() must be rejected from every Terminated handler, since it would wait for the handler itself.
+        std::promise<HRESULT> firstHandlerResult;
+        std::promise<HRESULT> secondHandlerResult;
+        session.Terminated([&](WSLCSDK::SessionTerminationReason) { firstHandlerResult.set_value(tryClose()); });
+        session.Terminated([&](WSLCSDK::SessionTerminationReason) { secondHandlerResult.set_value(tryClose()); });
+
+        // Drain the handlers before the promises and tryClose they capture are destroyed, including on early test failure.
+        auto closeOnExit = SCOPE_CLEANUP(session.Close());
+
+        session.Start();
+        session.Terminate();
+
+        auto firstResult = firstHandlerResult.get_future();
+        auto secondResult = secondHandlerResult.get_future();
+        VERIFY_ARE_EQUAL(firstResult.wait_for(30s), std::future_status::ready);
+        VERIFY_ARE_EQUAL(secondResult.wait_for(30s), std::future_status::ready);
+        VERIFY_ARE_EQUAL(firstResult.get(), E_ILLEGAL_METHOD_CALL);
+        VERIFY_ARE_EQUAL(secondResult.get(), E_ILLEGAL_METHOD_CALL);
+
+        // Positive: The rejected Close() must not release anything, so the session remains open until closed outside the handler.
+        VERIFY_IS_NOT_NULL(WSLCSDK::implementation::GetHandle(session));
+        session.Close();
+        VERIFY_THROWS_HR(std::ignore = WSLCSDK::implementation::GetHandle(session), E_ILLEGAL_METHOD_CALL);
+    }
+
+    // A regression here deadlocks, so bound it with TAEF's TestTimeout (not enforced with /inproc).
+    TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(TerminationHandlerCloseFromStaCallIsRejected)
+    TEST_METHOD_PROPERTY(L"Ignore[not(@Version=2)]", L"true")
+    TEST_METHOD_PROPERTY(L"TestTimeout", L"0:5")
+    TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE()
+    TEST_METHOD(TerminationHandlerCloseFromStaCallIsRejected)
+    {
+        // Pump an STA so the handler can make a synchronous COM call into it, as a non-agile handler's proxy does.
+        wil::unique_event stopPumping{wil::EventOptions::ManualReset};
+        std::promise<wil::com_ptr<IContextCallback>> staContextPromise;
+        std::thread staThread([&]() {
+            try
+            {
+                auto coInit = wil::CoInitializeEx(COINIT_APARTMENTTHREADED);
+                wil::com_ptr<IContextCallback> context;
+                THROW_IF_FAILED(CoGetObjectContext(IID_PPV_ARGS(&context)));
+                staContextPromise.set_value(context);
+
+                DWORD index{};
+                LOG_IF_FAILED(CoWaitForMultipleHandles(0, INFINITE, 1, stopPumping.addressof(), &index));
+            }
+            catch (...)
+            {
+                staContextPromise.set_exception(std::current_exception());
+            }
+        });
+
+        auto stopStaThread = wil::scope_exit([&]() {
+            stopPumping.SetEvent();
+            staThread.join();
+        });
+
+        auto staContext = staContextPromise.get_future().get();
+
+        DWORD raisingThreadId = 0;
+        DWORD staThreadId = 0;
+        GUID raisingLogicalThreadId = GUID_NULL;
+        GUID staLogicalThreadId = GUID_NULL;
+        HRESULT raisingLogicalThreadIdResult = E_UNEXPECTED;
+        HRESULT staLogicalThreadIdResult = E_UNEXPECTED;
+        HRESULT staCloseResult = S_OK;
+
+        const std::filesystem::path extraStorage = m_storagePath / "wslc-winrt-termh-sta-storage";
+
+        auto settings = WSLCSDK::SessionSettings(L"wslc-winrt-termh-sta", extraStorage.wstring());
+        settings.Timeout(std::chrono::duration_cast<TimeSpan>(30s));
+
+        auto session = WSLCSDK::Session(settings);
+
+        std::function<void()> closeOnSta = [&]() {
+            staThreadId = GetCurrentThreadId();
+            staLogicalThreadIdResult = CoGetCurrentLogicalThreadId(&staLogicalThreadId);
+            try
+            {
+                session.Close();
+            }
+            catch (winrt::hresult_error const& e)
+            {
+                staCloseResult = e.code();
+            }
+        };
+
+        // Negative: Close() must be rejected on a thread serving a synchronous COM call made by the handler.
+        std::promise<HRESULT> handlerResult;
+        session.Terminated([&](WSLCSDK::SessionTerminationReason) {
+            raisingThreadId = GetCurrentThreadId();
+            raisingLogicalThreadIdResult = CoGetCurrentLogicalThreadId(&raisingLogicalThreadId);
+            ComCallData callData{};
+            callData.pUserDefined = &closeOnSta;
+            handlerResult.set_value(staContext->ContextCallback(
+                [](ComCallData* data) -> HRESULT {
+                    (*static_cast<std::function<void()>*>(data->pUserDefined))();
+                    return S_OK;
+                },
+                &callData,
+                IID_ICallbackWithNoReentrancyToApplicationSTA,
+                5,
+                nullptr));
+        });
+
+        // Drain the handler before the STA stops pumping and before the state it captures is destroyed.
+        auto closeOnExit = SCOPE_CLEANUP(session.Close());
+
+        session.Start();
+        session.Terminate();
+
+        auto result = handlerResult.get_future();
+        VERIFY_ARE_EQUAL(result.wait_for(30s), std::future_status::ready);
+        VERIFY_SUCCEEDED(result.get());
+        VERIFY_ARE_NOT_EQUAL(staThreadId, raisingThreadId);
+        VERIFY_SUCCEEDED(raisingLogicalThreadIdResult);
+        VERIFY_SUCCEEDED(staLogicalThreadIdResult);
+        VERIFY_IS_FALSE(IsEqualGUID(raisingLogicalThreadId, GUID_NULL));
+        VERIFY_IS_TRUE(IsEqualGUID(staLogicalThreadId, raisingLogicalThreadId));
+        VERIFY_ARE_EQUAL(staCloseResult, E_ILLEGAL_METHOD_CALL);
+
+        // Positive: The rejected Close() must not release anything.
+        VERIFY_IS_NOT_NULL(WSLCSDK::implementation::GetHandle(session));
+        session.Close();
+        VERIFY_THROWS_HR(std::ignore = WSLCSDK::implementation::GetHandle(session), E_ILLEGAL_METHOD_CALL);
+    }
+
+    WSLC_TEST_METHOD(CloseWaitsForTerminationHandler)
+    {
+        const std::filesystem::path extraStorage = m_storagePath / "wslc-winrt-termh-wait-storage";
+
+        auto settings = WSLCSDK::SessionSettings(L"wslc-winrt-termh-wait", extraStorage.wstring());
+        settings.Timeout(std::chrono::duration_cast<TimeSpan>(30s));
+
+        wil::unique_event handlerEntered{wil::EventOptions::ManualReset};
+        wil::unique_event releaseHandler{wil::EventOptions::ManualReset};
+        std::atomic<bool> handlerReturned{false};
+
+        auto session = WSLCSDK::Session(settings);
+        session.Terminated([&](WSLCSDK::SessionTerminationReason) {
+            handlerEntered.SetEvent();
+            releaseHandler.wait(60 * 1000);
+            handlerReturned = true;
+        });
+
+        session.Start();
+        session.Terminate();
+        VERIFY_IS_TRUE(handlerEntered.wait(30 * 1000));
+
+        // Positive: Close() from outside the handler must not return until the active handler has returned.
+        auto closeResult = std::async(std::launch::async, [&]() {
+            session.Close();
+            return handlerReturned.load();
+        });
+
+        auto releaseHandlerOnExit = wil::scope_exit([&]() { releaseHandler.SetEvent(); });
+
+        VERIFY_ARE_EQUAL(closeResult.wait_for(2s), std::future_status::timeout);
+
+        releaseHandler.SetEvent();
+        VERIFY_ARE_EQUAL(closeResult.wait_for(30s), std::future_status::ready);
+        VERIFY_IS_TRUE(closeResult.get());
     }
 
     WSLC_TEST_METHOD(ProcessCrashedEvent)
