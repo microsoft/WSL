@@ -27,7 +27,7 @@ namespace wsl::windows::wslc {
 std::vector<Argument> NetworkDisconnectCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::NetworkName, {.Required = true}),
+        Argument::Create(ArgType::NetworkNameOrId, {.Required = true}),
         Argument::Create(ArgType::ContainerId, {.Required = true}),
     };
 }

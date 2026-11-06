@@ -340,6 +340,17 @@ class MountTests
         // Unmount the disk
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount " + VhdDevice), (DWORD)0);
         WaitForDiskReady();
+
+        // Mount over a nonempty directory
+        keepAlive.Set();
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkdir " + mountTarget), (DWORD)0);
+        auto cleanup = wil::scope_exit([&]() { LxsstuLaunchWsl(L"rm -rf " + mountTarget); });
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"touch " + mountTarget + L"/canary"), (DWORD)0);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(mountCommand + L" --partition 1"), (DWORD)0);
+
+        // Validate that unmount succeeds even when mountpoint cleanup fails
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount " + VhdDevice), (DWORD)0);
+        WaitForDiskReady();
     }
 
     WSL2_TEST_METHOD(SpecifyInvalidMountName)

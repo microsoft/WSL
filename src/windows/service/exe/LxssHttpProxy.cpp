@@ -34,37 +34,50 @@ try
 {
     static wil::shared_hmodule winHttpModule;
     static std::once_flag winHttpLoadFlag;
+    static HRESULT loadResult = E_UNEXPECTED;
 
-    // Load Winhttp dll only once
     std::call_once(winHttpLoadFlag, [&]() {
-        winHttpModule.reset(LoadLibraryEx(c_winhttpModuleName, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32));
-        THROW_LAST_ERROR_IF(!winHttpModule);
+        loadResult = [&]() {
+            winHttpModule.reset(LoadLibraryEx(c_winhttpModuleName, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32));
+            RETURN_LAST_ERROR_IF(!winHttpModule);
+
+            // Initialize dynamic functions for the WinHttp Proxy OS APIs
+            // Not using the throwing constructor
+            // as failures should not show up in the Error logs as they can falsely flag failure to start the container
+            LxssDynamicFunction<decltype(RegisterProxyChangeNotification)> local_WinHttpRegisterProxyChangeNotification{
+                DynamicFunctionErrorLogs::None};
+
+            LxssDynamicFunction<decltype(UnregisterProxyChangeNotification)> local_WinHttpUnregisterProxyChangeNotification{
+                DynamicFunctionErrorLogs::None};
+
+            LxssDynamicFunction<decltype(GetProxySettingsEx)> local_WinHttpGetProxySettingsEx{DynamicFunctionErrorLogs::None};
+            LxssDynamicFunction<decltype(GetProxySettingsResultEx)> local_WinHttpGetProxySettingsResultEx{DynamicFunctionErrorLogs::None};
+            LxssDynamicFunction<decltype(FreeProxySettingsEx)> local_WinHttpFreeProxySettingsEx{DynamicFunctionErrorLogs::None};
+
+            // try to load each function - only save if all succeed
+            RETURN_IF_FAILED_EXPECTED(
+                local_WinHttpRegisterProxyChangeNotification.load(winHttpModule, "WinHttpRegisterProxyChangeNotification"));
+
+            RETURN_IF_FAILED_EXPECTED(
+                local_WinHttpUnregisterProxyChangeNotification.load(winHttpModule, "WinHttpUnregisterProxyChangeNotification"));
+
+            RETURN_IF_FAILED_EXPECTED(local_WinHttpGetProxySettingsEx.load(winHttpModule, "WinHttpGetProxySettingsEx"));
+
+            RETURN_IF_FAILED_EXPECTED(
+                local_WinHttpGetProxySettingsResultEx.load(winHttpModule, "WinHttpGetProxySettingsResultEx"));
+
+            RETURN_IF_FAILED_EXPECTED(local_WinHttpFreeProxySettingsEx.load(winHttpModule, "WinHttpFreeProxySettingsEx"));
+
+            s_WinHttpRegisterProxyChangeNotification.emplace(std::move(local_WinHttpRegisterProxyChangeNotification));
+            s_WinHttpUnregisterProxyChangeNotification.emplace(std::move(local_WinHttpUnregisterProxyChangeNotification));
+            s_WinHttpGetProxySettingsEx.emplace(std::move(local_WinHttpGetProxySettingsEx));
+            s_WinHttpGetProxySettingsResultEx.emplace(std::move(local_WinHttpGetProxySettingsResultEx));
+            s_WinHttpFreeProxySettingsEx.emplace(std::move(local_WinHttpFreeProxySettingsEx));
+            return S_OK;
+        }();
     });
 
-    // Initialize dynamic functions for the WinHttp Proxy OS APIs
-    // Not using the throwing constructor
-    // as failures should not show up in the Error logs as they can falsely flag failure to start the container
-    LxssDynamicFunction<decltype(RegisterProxyChangeNotification)> local_WinHttpRegisterProxyChangeNotification{DynamicFunctionErrorLogs::None};
-    LxssDynamicFunction<decltype(UnregisterProxyChangeNotification)> local_WinHttpUnregisterProxyChangeNotification{DynamicFunctionErrorLogs::None};
-    LxssDynamicFunction<decltype(GetProxySettingsEx)> local_WinHttpGetProxySettingsEx{DynamicFunctionErrorLogs::None};
-    LxssDynamicFunction<decltype(GetProxySettingsResultEx)> local_WinHttpGetProxySettingsResultEx{DynamicFunctionErrorLogs::None};
-    LxssDynamicFunction<decltype(FreeProxySettingsEx)> local_WinHttpFreeProxySettingsEx{DynamicFunctionErrorLogs::None};
-
-    // try to load each function - only save if all succeed
-    RETURN_IF_FAILED_EXPECTED(
-        local_WinHttpRegisterProxyChangeNotification.load(winHttpModule, "WinHttpRegisterProxyChangeNotification"));
-    RETURN_IF_FAILED_EXPECTED(
-        local_WinHttpUnregisterProxyChangeNotification.load(winHttpModule, "WinHttpUnregisterProxyChangeNotification"));
-    RETURN_IF_FAILED_EXPECTED(local_WinHttpGetProxySettingsEx.load(winHttpModule, "WinHttpGetProxySettingsEx"));
-    RETURN_IF_FAILED_EXPECTED(local_WinHttpGetProxySettingsResultEx.load(winHttpModule, "WinHttpGetProxySettingsResultEx"));
-    RETURN_IF_FAILED_EXPECTED(local_WinHttpFreeProxySettingsEx.load(winHttpModule, "WinHttpFreeProxySettingsEx"));
-
-    s_WinHttpRegisterProxyChangeNotification.emplace(std::move(local_WinHttpRegisterProxyChangeNotification));
-    s_WinHttpUnregisterProxyChangeNotification.emplace(std::move(local_WinHttpUnregisterProxyChangeNotification));
-    s_WinHttpGetProxySettingsEx.emplace(std::move(local_WinHttpGetProxySettingsEx));
-    s_WinHttpGetProxySettingsResultEx.emplace(std::move(local_WinHttpGetProxySettingsResultEx));
-    s_WinHttpFreeProxySettingsEx.emplace(std::move(local_WinHttpFreeProxySettingsEx));
-    return S_OK;
+    return loadResult;
 }
 CATCH_RETURN()
 

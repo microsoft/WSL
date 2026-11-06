@@ -151,6 +151,7 @@ protected:
     /// <summary>
     /// Creates a process in the instance.
     /// </summary>
+    _Requires_lock_held_(m_createProcessLock)
     wil::unique_handle _CreateLxProcess(
         _In_ const std::shared_ptr<LxssMessagePort>& MessagePort,
         _In_ const CreateLxProcessData& CreateProcessData,
@@ -219,6 +220,8 @@ private:
     _Guarded_by_(m_stateLock) bool m_initialized;
     _Guarded_by_(m_stateLock) bool m_running;
 
+    std::mutex m_createProcessLock;
+
     /// <summary>
     /// Provides iptables emulation support.
     /// </summary>
@@ -286,7 +289,7 @@ private:
     /// </summary>
     wsl::windows::common::redirector::ConnectionTargetManager m_redirectorConnectionTargets;
 
-    std::thread m_oobeThread;
+    _Guarded_by_(m_stateLock) std::thread m_oobeThread;
     wil::unique_event m_destroyingEvent{wil::EventOptions::ManualReset};
-    wil::unique_event m_oobeCompleteEvent;
+    _Guarded_by_(m_stateLock) wil::shared_event m_oobeCompleteEvent;
 };

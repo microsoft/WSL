@@ -17,11 +17,14 @@ Abstract:
 #include "PluginManager.h"
 #include "WslPluginApi.h"
 #include "LxssUserSessionFactory.h"
-#include "WSLCSessionManager.h"
+#include "WSLCSessionManagerFactory.h"
 
 using wsl::windows::common::Context;
 using wsl::windows::common::ExecutionContext;
 using wsl::windows::service::PluginManager;
+using wsl::windows::service::wslc::FindWslcSession;
+
+extern PluginManager g_pluginManager;
 
 constexpr auto c_pluginPath = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Lxss\\Plugins";
 
@@ -58,7 +61,10 @@ extern "C" {
 HRESULT MountFolder(WSLSessionId Session, LPCWSTR WindowsPath, LPCWSTR LinuxPath, BOOL ReadOnly, LPCWSTR Name)
 try
 {
-    const auto session = FindSessionByCookie(Session);
+    const auto pluginSession = g_pluginManager.FindPluginSession(Session);
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !pluginSession);
+
+    const auto session = FindSessionByCookie(pluginSession->sessionId);
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
     auto result = session->MountRootNamespaceFolder(WindowsPath, LinuxPath, ReadOnly, Name);
@@ -78,11 +84,13 @@ CATCH_RETURN();
 HRESULT ExecuteBinary(WSLSessionId Session, LPCSTR Path, LPCSTR* Arguments, SOCKET* Socket)
 try
 {
+    const auto pluginSession = g_pluginManager.FindPluginSession(Session);
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !pluginSession);
 
-    const auto session = FindSessionByCookie(Session);
+    const auto session = FindSessionByCookie(pluginSession->sessionId);
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
-    auto result = session->CreateLinuxProcess(nullptr, Path, Arguments, Socket);
+    auto result = session->CreateLinuxProcess(nullptr, Path, Arguments, Socket, pluginSession->pluginId);
 
     WSL_LOG("PluginExecuteBinaryCall", TraceLoggingValue(Path, "Path"), TraceLoggingValue(result, "Result"));
     return result;
@@ -113,7 +121,10 @@ try
 {
     THROW_HR_IF(E_INVALIDARG, Distro == nullptr);
 
-    const auto session = FindSessionByCookie(Session);
+    const auto pluginSession = g_pluginManager.FindPluginSession(Session);
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !pluginSession);
+
+    const auto session = FindSessionByCookie(pluginSession->sessionId);
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
     auto result = session->CreateLinuxProcess(Distro, Path, Arguments, Socket);
@@ -133,14 +144,6 @@ struct WslcProcessWrapper
     wil::com_ptr<IWSLCProcess> Process;
 };
 
-wil::com_ptr<IWSLCSession> ResolveWslcSession(WSLCSessionId Session)
-{
-    auto* mgr = wsl::windows::service::wslc::WSLCSessionManagerImpl::Instance();
-    THROW_HR_IF(RPC_E_DISCONNECTED, mgr == nullptr);
-
-    return mgr->FindSession(static_cast<ULONG>(Session));
-}
-
 } // namespace
 
 extern "C" {
@@ -151,7 +154,7 @@ try
     // TODO: Once plugins are out of proc, add logic to validate that the mountpoint isn't in use by another plugin.
     RETURN_HR_IF(E_POINTER, WindowsPath == nullptr || Mountpoint == nullptr);
 
-    auto session = ResolveWslcSession(Session);
+    auto session = FindWslcSession(static_cast<ULONG>(Session));
     auto result = session->MountWindowsFolder(WindowsPath, Mountpoint, ReadOnly, c_pluginAcquireVmLease);
 
     WSL_LOG(
@@ -172,7 +175,7 @@ try
     // TODO: Once plugins are out of proc, add logic to validate that the mountpoint is actually owned by the plugin.
     RETURN_HR_IF(E_POINTER, Mountpoint == nullptr);
 
-    auto session = ResolveWslcSession(Session);
+    auto session = FindWslcSession(static_cast<ULONG>(Session));
 
     auto result = session->UnmountWindowsFolder(Mountpoint, c_pluginAcquireVmLease);
 
@@ -197,7 +200,7 @@ try
         *Errno = 0;
     }
 
-    auto session = ResolveWslcSession(Session);
+    auto session = FindWslcSession(static_cast<ULONG>(Session));
 
     // Count NULL-terminated arrays.
     auto countArray = [](LPCSTR* arr) -> ULONG {
@@ -422,6 +425,7 @@ void PluginManager::LoadPlugin(LPCWSTR Name, LPCWSTR ModulePath)
 
     LoadedPlugin plugin{};
     plugin.name = Name;
+    plugin.id = m_nextPluginId++;
 
     plugin.module.reset(LoadLibrary(ModulePath));
     THROW_LAST_ERROR_IF_NULL(plugin.module);
@@ -447,7 +451,8 @@ void PluginManager::OnVmStarted(const WSLSessionInformation* Session, const WSLV
                 "PluginOnVmStartedCall", TraceLoggingValue(e.name.c_str(), "Plugin"), TraceLoggingValue(Session->UserSid, "Sid"));
 
             SlowOperationWatcher slowOperation{"PluginOnVmStarted"};
-            ThrowIfPluginError(e.hooks.OnVMStarted(Session, Settings), e.name.c_str());
+            const auto pluginSession = GetPluginSessionInformation(*Session, e.id);
+            ThrowIfPluginError(e.hooks.OnVMStarted(&pluginSession, Settings), e.name.c_str());
         }
     }
 }
@@ -463,7 +468,8 @@ void PluginManager::OnVmStopping(const WSLSessionInformation* Session) const
             WSL_LOG(
                 "PluginOnVmStoppingCall", TraceLoggingValue(e.name.c_str(), "Plugin"), TraceLoggingValue(Session->UserSid, "Sid"));
 
-            const auto result = e.hooks.OnVMStopping(Session);
+            const auto pluginSession = GetPluginSessionInformation(*Session, e.id);
+            const auto result = e.hooks.OnVMStopping(&pluginSession);
             LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
         }
     }
@@ -484,7 +490,8 @@ void PluginManager::OnDistributionStarted(const WSLSessionInformation* Session, 
                 TraceLoggingValue(Distribution->Id, "DistributionId"));
 
             SlowOperationWatcher slowOperation{"PluginOnDistributionStarted"};
-            ThrowIfPluginError(e.hooks.OnDistributionStarted(Session, Distribution), e.name.c_str());
+            const auto pluginSession = GetPluginSessionInformation(*Session, e.id);
+            ThrowIfPluginError(e.hooks.OnDistributionStarted(&pluginSession, Distribution), e.name.c_str());
         }
     }
 }
@@ -503,7 +510,8 @@ void PluginManager::OnDistributionStopping(const WSLSessionInformation* Session,
                 TraceLoggingValue(Session->UserSid, "Sid"),
                 TraceLoggingValue(Distribution->Id, "DistributionId"));
 
-            const auto result = e.hooks.OnDistributionStopping(Session, Distribution);
+            const auto pluginSession = GetPluginSessionInformation(*Session, e.id);
+            const auto result = e.hooks.OnDistributionStopping(&pluginSession, Distribution);
             LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
         }
     }
@@ -523,7 +531,8 @@ void PluginManager::OnDistributionRegistered(const WSLSessionInformation* Sessio
                 TraceLoggingValue(Session->UserSid, "Sid"),
                 TraceLoggingValue(Distribution->Id, "DistributionId"));
 
-            const auto result = e.hooks.OnDistributionRegistered(Session, Distribution);
+            const auto pluginSession = GetPluginSessionInformation(*Session, e.id);
+            const auto result = e.hooks.OnDistributionRegistered(&pluginSession, Distribution);
             LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
         }
     }
@@ -543,7 +552,8 @@ void PluginManager::OnDistributionUnregistered(const WSLSessionInformation* Sess
                 TraceLoggingValue(Session->UserSid, "Sid"),
                 TraceLoggingValue(Distribution->Id, "DistributionId"));
 
-            const auto result = e.hooks.OnDistributionUnregistered(Session, Distribution);
+            const auto pluginSession = GetPluginSessionInformation(*Session, e.id);
+            const auto result = e.hooks.OnDistributionUnregistered(&pluginSession, Distribution);
             LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
         }
     }
@@ -758,4 +768,40 @@ void PluginManager::OnWslcVmStopping(const WSLCSessionInformation* Session) cons
             LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
         }
     }
+}
+
+std::optional<PluginManager::PluginSession> PluginManager::FindPluginSession(WSLSessionId Session) const
+{
+    auto lock = m_sessionLock.lock_shared();
+    const auto found = m_sessions.find(Session);
+    if (found == m_sessions.end())
+    {
+        return std::nullopt;
+    }
+
+    return found->second;
+}
+
+void PluginManager::RemoveSession(WSLSessionId Session) noexcept
+{
+    auto lock = m_sessionLock.lock_exclusive();
+    std::erase_if(m_sessions, [Session](const auto& entry) { return entry.second.sessionId == Session; });
+}
+
+WSLSessionInformation PluginManager::GetPluginSessionInformation(const WSLSessionInformation& Session, uint64_t PluginId) const
+{
+    auto lock = m_sessionLock.lock_exclusive();
+    auto found = std::find_if(m_sessions.begin(), m_sessions.end(), [&](const auto& entry) {
+        return entry.second.sessionId == Session.SessionId && entry.second.pluginId == PluginId;
+    });
+
+    if (found == m_sessions.end())
+    {
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ARITHMETIC_OVERFLOW), m_nextSessionId > MAXDWORD);
+        found = m_sessions.emplace(static_cast<WSLSessionId>(m_nextSessionId++), PluginSession{Session.SessionId, PluginId}).first;
+    }
+
+    auto pluginSession = Session;
+    pluginSession.SessionId = found->first;
+    return pluginSession;
 }

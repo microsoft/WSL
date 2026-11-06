@@ -264,7 +264,7 @@ public:
         HandleWrapper&& Console,
         std::function<void(const gsl::span<char>& Buffer)>&& OnRead,
         std::function<void()>&& UpdateTerminalSize = []() {},
-        std::vector<char> DetachSequence = {},
+        std::vector<wchar_t> DetachSequence = {},
         std::function<void()>&& OnDetach = []() {});
 
     void Schedule() override;
@@ -275,9 +275,9 @@ private:
     HandleWrapper Console;
     std::function<void(const gsl::span<char>& Buffer)> OnRead;
     std::function<void()> UpdateTerminalSize;
-    std::vector<char> DetachSequence;
+    std::vector<wchar_t> DetachSequence;
     std::function<void()> OnDetach;
-    std::deque<char> CurrentSequence;
+    std::deque<wchar_t> CurrentSequence;
 };
 
 class WriteHandle : public OverlappedIOHandle
