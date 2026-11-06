@@ -198,6 +198,10 @@ public:
     void RemoveDirectory(_In_ const std::string& Path);
     std::vector<std::string> ListDirectory(_In_ const std::string& Path);
 
+    // Guest file operations return 0 or the guest errno, and throw if the VM can't be reached.
+    int WriteGuestFile(_In_ const std::string& Path, _In_ std::string_view Content, _In_ unsigned int Flags = 0);
+    int ReadGuestFile(_In_ const std::string& Path, _In_ size_t MaxSize, _Out_ std::string& Content);
+
     wil::unique_socket ConnectUnixSocket(_In_ const char* Path);
     std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(enum WSLC_FORK::ForkType Type);
 
