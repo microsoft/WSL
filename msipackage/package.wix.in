@@ -678,6 +678,12 @@
         <Binary Id="wslinstall.dll" SourceFile="${PACKAGE_INPUT_DIR}/wslinstall.dll" />
         <Binary Id="msixpackage" SourceFile="${PACKAGE_INPUT_DIR}/gluepackage.msix"/>
 
+        <CustomAction Id="InstallSecurityAudit.SetProperty" Property="InstallSecurityAudit" Value="[INSTALLDIR]wslservice.exe" />
+        <CustomAction Id="InstallSecurityAudit" Impersonate="no" BinaryRef="wslinstall.dll"
+            DllEntry="InstallSecurityAudit" Execute="deferred" Return="ignore" />
+        <CustomAction Id="UninstallSecurityAudit" Impersonate="no" BinaryRef="wslinstall.dll"
+            DllEntry="UninstallSecurityAudit" Execute="deferred" Return="ignore" />
+
         <CustomAction Id="ValidateInstall"
             Impersonate="no"
             BinaryRef="wslinstall.dll"
@@ -848,6 +854,9 @@
             <?endif?>
 
             <Custom Action="FinalizeInstall" After="PublishFeatures"/>
+            <Custom Action="InstallSecurityAudit.SetProperty" After="InstallFiles" Condition='NOT REMOVE~="ALL"' />
+            <Custom Action="InstallSecurityAudit" After="InstallSecurityAudit.SetProperty" Condition='NOT REMOVE~="ALL"' />
+            <Custom Action="UninstallSecurityAudit" Before="RemoveFiles" Condition='REMOVE~="ALL" AND NOT UPGRADINGPRODUCTCODE' />
             <?if "${OFFICIAL_BUILD}" != "TRUE" ?>
             <Custom Action="TestForceInstallFailure" After="FinalizeInstall" Condition='WSL_TEST_FORCE_INSTALL_FAILURE = 1 and (not UPGRADINGPRODUCTCODE)' />
             <?endif?>

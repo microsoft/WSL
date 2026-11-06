@@ -43,6 +43,7 @@ set(SOURCES
     registry.cpp
     relay.cpp
     RingBuffer.cpp
+    SecurityAudit.cpp
     socket.cpp
     string.cpp
     SubProcess.cpp
@@ -145,6 +146,7 @@ set(HEADERS
     registry.hpp
     relay.hpp
     RingBuffer.h
+    SecurityAudit.h
     socket.hpp
     string.hpp
     Stringify.h
@@ -188,7 +190,7 @@ target_include_directories(common PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/../service/
 # PUBLIC propagates them instead of making each consumer restate them.
 # yaml-cpp backs WSLCUserSettings, advapi32 the credential manager APIs used by
 # WinCredStorage, and Crypt32 the data protection APIs used by FileCredStorage.
-target_link_libraries(common PUBLIC ${HCS_LINK_LIBRARIES} ${MSI_LINK_LIBRARIES} VirtDisk.lib configfile yaml-cpp advapi32 Crypt32.lib)
+target_link_libraries(common PUBLIC ${HCS_LINK_LIBRARIES} ${MSI_LINK_LIBRARIES} VirtDisk.lib configfile yaml-cpp advapi32 Crypt32.lib Authz.lib)
 
 # WSLCUserSettings.cpp uses yaml-cpp headers.
 # The per-source include path and definition below only apply when the file is
