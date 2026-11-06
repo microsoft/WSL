@@ -8,10 +8,11 @@ Module Name:
 
 Abstract:
 
-    Mutable per-container state persisted in the session storage folder so it survives VM shutdown.
+    Mutable per-container state persisted inside the VM so it survives VM shutdown.
 
-    Each container owns at most one document at <session-storage>/containers/<container-id>.json. The
-    container metadata label records which storage the container uses (WSLCContainerStateStorage), so
+    Each container owns at most one document at /var/lib/docker/containers/<container-id>/wslc-state.json,
+    inside the per-container directory the container engine creates and removes along with the container.
+    The container metadata label records which storage the container uses (WSLCContainerStateStorage), so
     a missing document can be told apart from a container that never had one.
 
     Persistence contract:
@@ -21,10 +22,10 @@ Abstract:
     - Mutations only change in-memory state. Flush() writes the latest state and returns the result;
       the caller decides whether a failure is fatal. A failed flush leaves the state pending, so the
       next flush retries it even if no further mutation changed anything.
-    - Mutate() and Get() never perform I/O, so they may be called under the container's locks.
-      Flush() and Delete() perform I/O and must not be.
-    - Delete() is final: a flush that runs after it, or that was waiting on it, never recreates the
-      document.
+    - Mutate(), Get() and MarkDeleted() never perform I/O, so they may be called under the container's
+      locks. Flush() performs I/O and must not be.
+    - MarkDeleted() is final: no flush writes the document after it. Writes never create the document's
+      directory, so a flush racing the container's removal cannot recreate it either.
 
 --*/
 
@@ -32,12 +33,11 @@ Abstract:
 
 #include "JsonUtils.h"
 #include "WSLCContainerMetadata.h"
-#include <filesystem>
 #include <limits>
+#include <memory>
 #include <mutex>
-#include <optional>
 #include <string>
-#include <unordered_set>
+#include <string_view>
 
 namespace wsl::windows::service::wslc {
 
@@ -90,19 +90,24 @@ struct WSLCContainerStateLoadResult
     HRESULT Error = S_OK;
 };
 
-std::filesystem::path ContainerStatePath(const std::filesystem::path& Directory, const std::string& ContainerId);
+// Access to the files that hold container state. Methods return 0 or an errno, and throw if the files can't be reached.
+class IWSLCContainerStateFiles
+{
+public:
+    virtual ~IWSLCContainerStateFiles() = default;
 
-WSLCContainerStateLoadResult LoadContainerState(const std::filesystem::path& Path) noexcept;
+    // Fails with EFBIG if the file is larger than MaxSize.
+    virtual int Read(const std::string& Path, size_t MaxSize, std::string& Content) = 0;
 
-// Without ReplaceExisting, fails with ERROR_ALREADY_EXISTS instead of overwriting a document.
-HRESULT WriteContainerState(const std::filesystem::path& Path, const WSLCPersistedContainerState& State, bool ReplaceExisting) noexcept;
+    // Atomically replaces the file. Fails with ENOENT instead of creating a missing parent directory.
+    virtual int Write(const std::string& Path, std::string_view Content) = 0;
+};
 
-// A missing document is not an error.
-HRESULT DeleteContainerState(const std::filesystem::path& Path) noexcept;
+std::string ContainerStatePath(const std::string& ContainerId);
 
-// Removes documents and interrupted writes in Directory whose container ID is not in KnownContainerIds.
-// Must not run while a container in Directory can be created.
-void DeleteOrphanedContainerStates(const std::filesystem::path& Directory, const std::unordered_set<std::string>& KnownContainerIds) noexcept;
+WSLCContainerStateLoadResult LoadContainerState(IWSLCContainerStateFiles& Files, const std::string& Path) noexcept;
+
+HRESULT WriteContainerState(IWSLCContainerStateFiles& Files, const std::string& Path, const WSLCPersistedContainerState& State) noexcept;
 
 class WSLCContainerStateStore
 {
@@ -113,21 +118,20 @@ public:
     // Starting point of a store, resolved before the owning container is constructed.
     struct Initial
     {
-        std::optional<std::filesystem::path> Path;
+        std::shared_ptr<IWSLCContainerStateFiles> Files;
+        std::string Path;
         WSLCPersistedContainerState State;
-        bool DocumentExists = false;
         bool Pending = false;
 
         // Set when the document could not be loaded. The store then never writes it.
         HRESULT LoadError = S_OK;
     };
 
-    // For a container that was just created: the document is pending and must not already exist.
-    // Without a directory, the state is kept in memory only.
-    static Initial ForNewContainer(const std::optional<std::filesystem::path>& Directory, const std::string& ContainerId);
+    // For a container that was just created: the document is pending.
+    static Initial ForNewContainer(std::shared_ptr<IWSLCContainerStateFiles> Files, const std::string& ContainerId);
 
     // For a container that already exists.
-    static Initial ForExistingContainer(const std::optional<std::filesystem::path>& Directory, const std::string& ContainerId, WSLCContainerStateStorage Storage);
+    static Initial ForExistingContainer(std::shared_ptr<IWSLCContainerStateFiles> Files, const std::string& ContainerId, WSLCContainerStateStorage Storage);
 
     explicit WSLCContainerStateStore(Initial&& InitialState);
 
@@ -151,19 +155,20 @@ public:
     // Writes the current state if it has changed since the last successful write.
     HRESULT Flush() noexcept;
 
-    HRESULT Delete() noexcept;
+    // Called once the container is removed. Its document is removed along with it.
+    void MarkDeleted() noexcept;
 
 private:
-    // Serializes document I/O so writes and the delete land in the order they were requested.
+    // Serializes document writes so they land in the order they were requested.
     std::mutex m_ioLock;
 
     mutable std::mutex m_stateLock;
-    const std::optional<std::filesystem::path> m_path;
+    const std::shared_ptr<IWSLCContainerStateFiles> m_files;
+    const std::string m_path;
     const HRESULT m_loadError;
     _Guarded_by_(m_stateLock) WSLCPersistedContainerState m_state;
     _Guarded_by_(m_stateLock) std::uint64_t m_generation = 0;
     _Guarded_by_(m_stateLock) std::uint64_t m_persistedGeneration = 0;
-    _Guarded_by_(m_stateLock) bool m_documentExists = false;
     _Guarded_by_(m_stateLock) bool m_deleted = false;
 };
 

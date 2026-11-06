@@ -25,6 +25,7 @@ Abstract:
 #include "WSLCVolumes.h"
 #include "APICompat.h"
 #include "MountSpecParsing.h"
+#include "lxinitshared.h"
 #include <unordered_set>
 
 namespace apicompat = wsl::windows::common::apicompat;
@@ -39,8 +40,6 @@ using wsl::windows::common::io::ReadHandle;
 using wsl::windows::common::io::RelayHandle;
 using wsl::windows::service::wslc::CleanContainerName;
 using wsl::windows::service::wslc::ContainerPortMapping;
-using wsl::windows::service::wslc::ContainerStatePath;
-using wsl::windows::service::wslc::DeleteContainerState;
 using wsl::windows::service::wslc::DockerEventTracker;
 using wsl::windows::service::wslc::DockerHTTPClient;
 using wsl::windows::service::wslc::DockerHTTPException;
@@ -857,6 +856,34 @@ void ProcessNamedVolumes(const WSLCContainerOptions& containerOptions, wsl::wind
     }
 }
 
+// Callers hold a VM lease while flushing or loading, so this uses the VM directly.
+class GuestContainerStateFiles : public wsl::windows::service::wslc::IWSLCContainerStateFiles
+{
+public:
+    explicit GuestContainerStateFiles(wsl::windows::service::wslc::WSLCSessionRuntime& Runtime) : m_runtime(Runtime)
+    {
+    }
+
+    int Read(const std::string& Path, size_t MaxSize, std::string& Content) override
+    {
+        return Vm().ReadGuestFile(Path, MaxSize, Content);
+    }
+
+    int Write(const std::string& Path, std::string_view Content) override
+    {
+        return Vm().WriteGuestFile(Path, Content, WSLC_WRITE_FILE_FLAG_ATOMIC | WSLC_WRITE_FILE_FLAG_NO_CREATE_PARENTS);
+    }
+
+private:
+    WSLCVirtualMachine& Vm()
+    {
+        THROW_HR_IF(WSLC_E_VM_NOT_RUNNING, !m_runtime.HasVm());
+        return m_runtime.Vm();
+    }
+
+    wsl::windows::service::wslc::WSLCSessionRuntime& m_runtime;
+};
+
 } // namespace
 
 std::string wsl::windows::service::wslc::CleanContainerName(const std::string& name)
@@ -1520,16 +1547,6 @@ std::optional<std::map<std::string, std::string>> WSLCContainerImpl::GetEventAtt
 
 void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode, const std::map<std::string, std::string>& attributes, std::int64_t eventTimeNano) noexcept
 {
-    // Declared before the COM wrapper owners so the document is deleted after the wrapper is disconnected.
-    // Recovery removes the document if this fails.
-    bool deleted = false;
-    auto deleteState = wil::scope_exit([&]() {
-        if (deleted)
-        {
-            LOG_IF_FAILED_MSG(m_persistentState.Delete(), "Failed to delete the persisted state of container '%hs'", m_id.c_str());
-        }
-    });
-
     // Either owner may disconnect the COM wrapper, so both must outlive m_lock.
     unique_com_disconnect comWrapper;
     std::shared_ptr<StateTransition> transition;
@@ -1595,7 +1612,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
             {
                 CommitState(WslcContainerStateDeleted, eventTimeNano, attributes);
                 comWrapper = ReleaseResources();
-                deleted = true;
+                m_persistentState.MarkDeleted();
             }
 
             // Signal init exit after the state transition and resource cleanup so awaiters observe Deleted.
@@ -3157,8 +3174,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     metadata.Volumes = volumes;
     metadata.RestartPolicy = containerOptions.RestartPolicy;
 
-    const auto stateDirectory = wslcSession.ContainerStateDirectory();
-    metadata.StateStorage = stateDirectory.has_value() ? WSLCContainerStateStorage::HostFileV1 : WSLCContainerStateStorage::None;
+    metadata.StateStorage = WSLCContainerStateStorage::GuestFileV1;
 
     for (const auto& e : mappedPorts)
     {
@@ -3238,7 +3254,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     auto mergedLabels = StripInternalLabels(std::move(inspectData.Config.Labels));
     const auto createdAt = wsl::windows::common::timestamp::Rfc3339ToEpoch(inspectData.Created);
-    auto persistentState = WSLCContainerStateStore::ForNewContainer(stateDirectory, result.Id);
+    auto persistentState = WSLCContainerStateStore::ForNewContainer(std::make_shared<GuestContainerStateFiles>(runtime), result.Id);
 
     auto container = std::make_shared<WSLCContainerImpl>(
         wslcSession,
@@ -3262,8 +3278,14 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         std::move(persistentState));
 
     // The metadata label records that the document exists, so the container is not created without it.
-    THROW_IF_FAILED_MSG(
-        container->m_persistentState.Flush(), "Failed to save the persisted state of container '%hs'", container->m_id.c_str());
+    if (const auto flushResult = container->m_persistentState.Flush(); FAILED(flushResult))
+    {
+        THROW_HR_WITH_USER_ERROR_MSG(
+            flushResult,
+            Localization::MessageWslcContainerStateSaveFailed(wsl::shared::string::MultiByteToWide(container->m_id)),
+            "Failed to save the persisted state of container '%hs'",
+            container->m_id.c_str());
+    }
 
     container->Initialize();
 
@@ -3315,16 +3337,6 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         try
         {
             DockerClient.DeleteContainer(dockerContainer.Id, true, true);
-
-            // Recovery removes the document on the next session start if this fails.
-            if (const auto stateDirectory = wslcSession.ContainerStateDirectory())
-            {
-                LOG_IF_FAILED_MSG(
-                    DeleteContainerState(ContainerStatePath(stateDirectory.value(), dockerContainer.Id)),
-                    "Failed to delete the persisted state of container '%hs'",
-                    dockerContainer.Id.c_str());
-            }
-
             return nullptr;
         }
         catch (...)
@@ -3366,8 +3378,8 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     // Containers created before the image was persisted fall back to what Docker reports.
     std::string image = metadata.Image.empty() ? dockerContainer.Image : std::move(metadata.Image);
 
-    auto persistentState =
-        WSLCContainerStateStore::ForExistingContainer(wslcSession.ContainerStateDirectory(), dockerContainer.Id, metadata.StateStorage);
+    auto persistentState = WSLCContainerStateStore::ForExistingContainer(
+        std::make_shared<GuestContainerStateFiles>(runtime), dockerContainer.Id, metadata.StateStorage);
     if (FAILED(persistentState.LoadError))
     {
         LOG_HR_MSG(persistentState.LoadError, "Failed to load the persisted state of container '%hs'", dockerContainer.Id.c_str());

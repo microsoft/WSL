@@ -428,6 +428,8 @@ typedef enum _LX_MESSAGE_TYPE
     LxMiniInitMessageTrimDistribution,
     LxMiniInitMessageTrimDistributionResponse,
     LxMessageWSLCMountModules,
+    LxMessageWSLCReadFile,
+    LxMessageWSLCReadFileResult,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -547,6 +549,8 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMiniInitMessageTrimDistribution)
         X(LxMiniInitMessageTrimDistributionResponse)
         X(LxMessageWSLCMountModules)
+        X(LxMessageWSLCReadFile)
+        X(LxMessageWSLCReadFileResult)
 
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
@@ -2020,6 +2024,13 @@ struct WSLC_GET_GUEST_CAPABILITIES
     PRETTY_PRINT(FIELD(Header));
 };
 
+// Write to <path>.tmp, then rename it over <path> so readers see either the old or the new content.
+// The file and its directory are flushed to disk before the write completes.
+#define WSLC_WRITE_FILE_FLAG_ATOMIC 0x1
+
+// Fail with ENOENT instead of creating missing parent directories.
+#define WSLC_WRITE_FILE_FLAG_NO_CREATE_PARENTS 0x2
+
 struct WSLC_WRITE_FILE
 {
     static inline auto Type = LxMessageWSLCWriteFile;
@@ -2032,10 +2043,41 @@ struct WSLC_WRITE_FILE
     unsigned int ContentLength;
     int OpenFlags;
     int Permissions;
+    unsigned int Flags;
     char Buffer[];
 
     // Buffer content excluded from PRETTY_PRINT so callers can pass sensitive payloads.
-    PRETTY_PRINT(FIELD(Header), FIELD(OpenFlags), FIELD(Permissions));
+    PRETTY_PRINT(FIELD(Header), FIELD(OpenFlags), FIELD(Permissions), FIELD(Flags));
+};
+
+struct WSLC_READ_FILE_RESULT
+{
+    static inline auto Type = LxMessageWSLCReadFileResult;
+
+    DECLARE_MESSAGE_CTOR(WSLC_READ_FILE_RESULT);
+    MESSAGE_HEADER Header;
+    int Result{};
+    unsigned int ContentIndex{};
+    unsigned int ContentLength{};
+    char Buffer[];
+
+    // Buffer content excluded from PRETTY_PRINT so files can hold sensitive payloads.
+    PRETTY_PRINT(FIELD(Header), FIELD(Result), FIELD(ContentLength));
+};
+
+// Reads a regular file. Fails with EFBIG if the file is larger than MaxSize.
+struct WSLC_READ_FILE
+{
+    static inline auto Type = LxMessageWSLCReadFile;
+    using TResponse = WSLC_READ_FILE_RESULT;
+
+    DECLARE_MESSAGE_CTOR(WSLC_READ_FILE);
+    MESSAGE_HEADER Header;
+    unsigned int PathIndex;
+    unsigned int MaxSize;
+    char Buffer[];
+
+    PRETTY_PRINT(FIELD(Header), STRING_FIELD(PathIndex), FIELD(MaxSize));
 };
 
 typedef struct _LX_MINI_INIT_IMPORT_RESULT

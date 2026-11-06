@@ -58,8 +58,8 @@ enum class WSLCContainerStateStorage : std::uint32_t
     // The container predates persisted state; a missing document means default state.
     None = 0,
 
-    // A WSLCPersistedContainerState JSON document in the session's container state directory.
-    HostFileV1 = 1,
+    // A WSLCPersistedContainerState JSON document in the container's directory on the guest.
+    GuestFileV1 = 1,
 };
 
 struct WSLCContainerMetadataV1
