@@ -1020,19 +1020,20 @@ class NetworkTests
 
     static void VerifyDnsSuffixes()
     {
-        bool foundSuffix = false;
+        WslKeepAlive keepAlive;
 
         // Verify global DNS suffixes are reflected in Linux
         auto [outGlobal, errGlobal] = LxsstuLaunchPowershellAndCaptureOutput(
             L"Get-DnsClientGlobalSetting | Select-Object -Property SuffixSearchList | ForEach-Object {$_.SuffixSearchList}");
 
         const std::wstring separators = L" \n\t\r";
+        std::vector<std::wstring> quotedOriginalSuffixes;
 
         for (const auto& suffix : wsl::shared::string::SplitByMultipleSeparators(outGlobal, separators))
         {
             if (!suffix.empty())
             {
-                foundSuffix = true;
+                quotedOriginalSuffixes.emplace_back(std::format(L"'{}'", std::regex_replace(suffix, std::wregex(L"'"), L"''")));
                 // use grep -F as suffixes can contain '.'
                 VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"cat /etc/resolv.conf | grep search | grep -F " + suffix), static_cast<DWORD>(0));
             }
@@ -1046,28 +1047,39 @@ class NetworkTests
         {
             if (!suffix.empty())
             {
-                foundSuffix = true;
                 // use grep -F as suffixes can contain '.'
                 VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"cat /etc/resolv.conf | grep search | grep -F " + suffix), static_cast<DWORD>(0));
             }
         }
 
-        // No suffix was found - configure a dummy global suffix, verify it's reflected in Linux, then delete it
-        if (!foundSuffix)
-        {
-            LxsstuLaunchPowershellAndCaptureOutput(L"Set-DnsClientGlobalSetting -SuffixSearchList @('test.com')");
-            auto restoreGlobalSuffixes = wil::scope_exit(
-                [&] { LxsstuLaunchPowershellAndCaptureOutput(L"Set-DnsClientGlobalSetting -SuffixSearchList @()"); });
+        // Verify DNS suffix changes are reflected in Linux without restarting WSL
+        const auto restoreCommand = std::format(
+            L"Set-DnsClientGlobalSetting -SuffixSearchList @({}) -ErrorAction Stop", wsl::shared::string::Join(quotedOriginalSuffixes, L','));
+        auto restoreGlobalSuffixes =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { LxsstuLaunchPowershellAndCaptureOutput(restoreCommand); });
 
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+        GUID suffixId{};
+        VERIFY_SUCCEEDED(CoCreateGuid(&suffixId));
+        const auto testSuffix = std::format(
+            L"wsl-{}.invalid", wsl::shared::string::GuidToString<wchar_t>(suffixId, wsl::shared::string::GuidToStringFlags::None));
 
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"cat /etc/resolv.conf | grep search | grep -F test.com"), static_cast<DWORD>(0));
+        const auto verifySuffix = [&](bool present) {
+            VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+                [&] {
+                    const auto [contents, error] = LxsstuLaunchWslAndCaptureOutput(L"cat /etc/resolv.conf", 0);
+                    THROW_HR_IF(E_PENDING, (contents.find(testSuffix) != std::wstring::npos) != present);
+                },
+                std::chrono::milliseconds(100),
+                std::chrono::seconds(30)));
+        };
 
-            LxsstuLaunchPowershellAndCaptureOutput(L"Set-DnsClientGlobalSetting -SuffixSearchList @()");
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+        LxsstuLaunchPowershellAndCaptureOutput(
+            std::format(L"Set-DnsClientGlobalSetting -SuffixSearchList @('{}') -ErrorAction Stop", testSuffix));
+        verifySuffix(true);
 
-            VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(L"cat /etc/resolv.conf | grep search | grep -F test.com"), static_cast<DWORD>(0));
-        }
+        LxsstuLaunchPowershellAndCaptureOutput(restoreCommand);
+        restoreGlobalSuffixes.release();
+        verifySuffix(false);
     }
 
     static void VerifyEtcHosts()
@@ -6265,6 +6277,15 @@ class ConsommeTests
 
         VERIFY_ARE_NOT_EQUAL(
             LxsstuLaunchWsl(L"cat /etc/resolv.conf | grep nameserver | grep -F " + c_dnsTunnelingDefaultIp), static_cast<DWORD>(0));
+    }
+
+    WSL2_TEST_METHOD(DnsTunnelingVerifySuffixes)
+    {
+        CONSOMME_TEST_ONLY();
+        DNS_TUNNELING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .dnsTunneling = true}));
+        NetworkTests::VerifyDnsSuffixes();
     }
 };
 } // namespace NetworkTests
