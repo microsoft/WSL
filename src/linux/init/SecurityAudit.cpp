@@ -63,7 +63,7 @@ void PollError(void* context, int error)
 }
 } // namespace
 
-void RunSecurityAudit(int socket)
+int RunSecurityAudit(int socket)
 {
     AuditContext audit{wsl::shared::SocketChannel{wil::unique_fd{socket}, "SecurityAudit"}};
     THROW_LAST_ERROR_IF(signal(SIGPIPE, SIG_IGN) == SIG_ERR);
@@ -131,4 +131,5 @@ void RunSecurityAudit(int socket)
             break;
         }
     }
+    return audit.failed ? 1 : 0;
 }

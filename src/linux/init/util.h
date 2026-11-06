@@ -87,7 +87,8 @@ struct WslDistributionConfig;
 constexpr auto c_defaultRetryPeriod = std::chrono::milliseconds{10};
 constexpr auto c_defaultRetryTimeout = std::chrono::seconds{15};
 
-void RunSecurityAudit(int socket);
+inline constexpr char c_securityAuditName[] = "wsl-audit-collector";
+int RunSecurityAudit(int socket);
 
 class InteropServer
 {

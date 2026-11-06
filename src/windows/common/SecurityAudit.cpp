@@ -82,7 +82,7 @@ void EventSource::ProcessExecuted(uint32_t pid)
     parameter.Type = APT_String;
     parameter.String = text.data();
     AUDIT_PARAMS parameters{sizeof(AUDIT_PARAMS), APF_AuditSuccess, 1, &parameter};
-    THROW_IF_WIN32_BOOL_FALSE(AuthzReportSecurityEventFromParams(APF_AuditSuccess, m_provider.get(), MSG_PROCESS_EXECUTED, nullptr, &parameters));
+    THROW_IF_WIN32_BOOL_FALSE(AuthzReportSecurityEventFromParams(0, m_provider.get(), MSG_PROCESS_EXECUTED, nullptr, &parameters));
 }
 
 } // namespace wsl::windows::common::securityaudit

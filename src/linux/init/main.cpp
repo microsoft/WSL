@@ -3441,7 +3441,14 @@ try
             THROW_LAST_ERROR_IF(!socket);
             StartWorkerProcess(
                 "wsl-audit",
-                [fd = socket.get()] { RunSecurityAudit(fd); },
+                [fd = socket.get()] {
+                    THROW_LAST_ERROR_IF(dup2(g_LogFd, STDERR_FILENO) < 0);
+                    THROW_LAST_ERROR_IF(fcntl(STDERR_FILENO, F_SETFD, 0) < 0);
+                    THROW_LAST_ERROR_IF(fcntl(fd, F_SETFD, 0) < 0);
+                    const auto argument = std::to_string(fd);
+                    execl(LX_INIT_PATH, c_securityAuditName, argument.c_str(), nullptr);
+                    THROW_LAST_ERROR();
+                },
                 {STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO, g_LogFd, socket.get()});
         }
         CATCH_LOG();
