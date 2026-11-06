@@ -525,7 +525,7 @@ int RunPortTracker(int Argc, char** Argv)
     });
 #endif
 
-    seccompDispatcher->RegisterHandler(__NR_ioctl, [hvSocketChannel, seccompDispatcher](auto notification) -> int {
+    seccompDispatcher->RegisterHandler(__NR_ioctl, [&portTracker, seccompDispatcher](auto notification) -> int {
         LX_GNS_TUN_BRIDGE_REQUEST request{};
         request.Header.MessageType = LxGnsMessageIfStateChangeRequest;
         request.Header.MessageSize = sizeof(request);
@@ -539,7 +539,8 @@ int RunPortTracker(int Argc, char** Argv)
         auto& ifRequest = *reinterpret_cast<ifreq*>(ifreqMemory->data());
         memcpy(request.InterfaceName, ifRequest.ifr_ifrn.ifrn_name, sizeof(request.InterfaceName));
         request.InterfaceUp = ifRequest.ifr_ifru.ifru_flags & IFF_UP;
-        const auto& reply = hvSocketChannel->Transaction(request);
+        auto [channel, lock] = portTracker.GetLockedChannel();
+        const auto& reply = channel.Transaction(request);
 
         return reply.Result;
     });

@@ -9,6 +9,7 @@
 #include <NetlinkChannel.h>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <time.h>
 #include "util.h"
 #include <linux/seccomp.h>
@@ -34,6 +35,8 @@ public:
     void Run();
 
     int ProcessSecCompNotification(seccomp_notif* notification);
+
+    std::pair<wsl::shared::SocketChannel&, std::unique_lock<std::mutex>> GetLockedChannel();
 
     struct PortAllocation
     {
@@ -169,6 +172,7 @@ private:
 
     std::map<PortAllocation, std::optional<time_t>> m_allocatedPorts;
     std::shared_ptr<wsl::shared::SocketChannel> m_hvSocketChannel;
+    std::mutex m_hvSocketChannelMutex;
     NetlinkChannel m_channel;
 
     WaitableValue<TrackerEvent> m_eventQueue;

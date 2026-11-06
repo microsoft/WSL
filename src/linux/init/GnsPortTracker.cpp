@@ -303,6 +303,11 @@ void GnsPortTracker::ReconcileAllocatedPorts(const ActivePorts& Ports, time_t Ti
     }
 }
 
+std::pair<wsl::shared::SocketChannel&, std::unique_lock<std::mutex>> GnsPortTracker::GetLockedChannel()
+{
+    return {*m_hvSocketChannel, std::unique_lock<std::mutex>{m_hvSocketChannelMutex}};
+}
+
 int GnsPortTracker::RequestPort(const PortAllocation& Port, bool allocate)
 {
     LX_GNS_PORT_ALLOCATION_REQUEST request{};
@@ -316,7 +321,8 @@ int GnsPortTracker::RequestPort(const PortAllocation& Port, bool allocate)
     static_assert(sizeof(request.Address32) == sizeof(Port.Address.s6_addr32));
     memcpy(request.Address32, Port.Address.s6_addr32, sizeof(request.Address32));
 
-    const auto& response = m_hvSocketChannel->Transaction(request);
+    auto [channel, lock] = GetLockedChannel();
+    const auto& response = channel.Transaction(request);
 
     return response.Result;
 }
