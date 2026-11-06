@@ -37,6 +37,8 @@ struct SessionSettings : SessionSettingsT<SessionSettings>
     void VhdRequirements(winrt::Microsoft::WSL::Containers::VhdOptions const& value);
     bool EnableGpu();
     void EnableGpu(bool value);
+    hstring HostLoopback();
+    void HostLoopback(hstring const& value);
 
     WslcSessionSettings* ToStructPointer();
 
@@ -48,6 +50,7 @@ private:
     winrt::Windows::Foundation::IReference<winrt::Windows::Foundation::TimeSpan> m_timeout{nullptr};
     winrt::Microsoft::WSL::Containers::VhdOptions m_vhdRequirements{nullptr};
     WslcSessionFeatureFlags m_featureFlags{WSLC_SESSION_FEATURE_FLAG_NONE};
+    std::string m_hostLoopback;
 
     std::unique_ptr<WslcSessionSettings> m_sessionSettings;
 };

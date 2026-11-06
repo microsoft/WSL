@@ -22,11 +22,14 @@ Abstract:
 #include "WSLCVolumes.h"
 #include "WSLCSessionRuntime.h"
 #include "WSLCNetworkMetadata.h"
+#include "WSLCRestartScheduler.h"
 #include "DockerEventTracker.h"
 #include "DockerHTTPClient.h"
 #include "EventStore.h"
 #include "IORelay.h"
+#include "RuntimeClass.h"
 #include <atomic>
+#include <ctxtcall.h>
 #include <list>
 #include <optional>
 #include <unordered_map>
@@ -80,7 +83,7 @@ private:
 // lazily on first use and may be torn down when idle and recreated on demand.
 //
 class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLCSession
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCSession, IWSLCCompatSession, IFastRundown, ISupportErrorInfo>
+    : public common::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCSession, Microsoft::WRL::ChainInterfaces<IWSLCCompatSession2, IWSLCCompatSession>, IFastRundown, ISupportErrorInfo>
 {
     // WSLCContainer::Delete acquires a VmLease to keep the VM alive (and block idle
     // teardown) for the duration of a container deletion.
@@ -93,9 +96,7 @@ public:
 
     ~WSLCSession();
 
-    // Sets a callback invoked when this object is destroyed.
-    // Used by the COM server host to signal process exit.
-    void SetDestructionCallback(std::function<void()>&& callback);
+    void SetServiceReference(IWSLCSessionReference* Reference);
 
     // Type of m_crashDumpCallbacks. Exposed so CrashDumpSubscription can hold an iterator into
     // it as an O(1) registration handle.
@@ -204,10 +205,10 @@ public:
 
     // Network management.
     IFACEMETHOD(CreateNetwork)(_In_ const WSLCNetworkOptions* Options, _In_opt_ IWarningCallback* WarningCallback) override;
-    IFACEMETHOD(DeleteNetwork)(_In_ LPCSTR Name) override;
+    IFACEMETHOD(DeleteNetwork)(_In_ LPCSTR NetworkNameOrId) override;
     IFACEMETHOD(ListNetworks)
     (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters, _In_ ULONG FiltersCount, _Out_ LPSTR* Output) override;
-    IFACEMETHOD(InspectNetwork)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
+    IFACEMETHOD(InspectNetwork)(_In_ LPCSTR NetworkNameOrId, _Out_ LPSTR* Output) override;
     IFACEMETHOD(PruneNetworks)
     (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters, _In_ ULONG FiltersCount, _Out_ WSLCNetworkName** Networks, _Out_ ULONG* NetworksCount)
         override;
@@ -232,8 +233,8 @@ public:
     IFACEMETHOD(SetNetworkFaultsForTest)(_In_ BOOL FailCreateInspect) override;
 
     // IWSLCCompatSession - converts the WSLCCompat types to the wslc.idl types and forwards to the methods above.
-    // Methods that have an identical signature in both interfaces (Terminate, DeleteVolume, Authenticate,
-    // GetTerminationReason) are served by the single existing override and require no additional code here.
+    // Methods that have an identical signature in both interfaces (Terminate, DeleteVolume, DeleteNetwork,
+    // Authenticate, GetTerminationReason) are served by the single existing override and require no additional code here.
     IFACEMETHOD(PullImage)(
         _In_ LPCSTR Image,
         _In_opt_ LPCSTR RegistryAuthenticationInformation,
@@ -266,6 +267,14 @@ public:
     IFACEMETHOD(OpenContainer)(_In_ LPCSTR NameOrId, _Out_ IWSLCCompatContainer** Container) override;
     IFACEMETHOD(CreateVolume)(_In_ const WSLCCompatVolumeOptions* Options, _Out_ WSLCCompatVolumeInformation* VolumeInfo) override;
     IFACEMETHOD(RegisterCrashDumpCallback)(_In_ IWSLCCompatCrashDumpCallback* Callback, _Out_ IUnknown** Subscription) override;
+
+    // IWSLCCompatSession2
+    IFACEMETHOD(CreateContainer2)(
+        _In_ const WSLCCompatContainerOptions2* Options,
+        _In_opt_ IWSLCCompatWarningCallback* WarningCallback,
+        _Out_ IWSLCCompatContainer** Container) override;
+    IFACEMETHOD(ListNetworks)(_Out_ LPSTR* Output) override;
+    IFACEMETHOD(CreateNetwork)(_In_ LPCSTR Options, _In_opt_ IWSLCCompatWarningCallback* WarningCallback, _Out_ LPSTR* Network) override;
 
     common::io::MultiHandleWait CreateIOContext(HANDLE CancelHandle = nullptr);
 
@@ -300,12 +309,31 @@ public:
         return m_runtime;
     }
 
+    bool IsTerminating() const noexcept
+    {
+        return m_terminating.load();
+    }
+
+    // Runs Callback on the session's restart thread once Delay elapses. Dropped once the session terminates.
+    void ScheduleRestart(std::chrono::milliseconds Delay, std::function<void()>&& Callback)
+    {
+        m_restartScheduler.Schedule(Delay, std::move(Callback));
+    }
+
     // Creates an opaque activity token that holds a reference on this session's activity count for
     // its lifetime, deferring idle teardown of the VM until every outstanding token is released.
     // Used both for transient client operations (BeginContainerOperation) and to keep the VM alive
     // for the lifetime of a process whose wrapper a client may keep (root-namespace and exec'd
     // processes).
     Microsoft::WRL::ComPtr<IUnknown> CreateActivityToken();
+
+    // Resolves a network name, full ID, or unique ID prefix across all networks known to the engine.
+    // Throws WSLC_E_NETWORK_NOT_FOUND or WSLC_E_NETWORK_PREFIX_AMBIGUOUS. Callers must hold a VM lease.
+    ResolvedNetwork ResolveNetwork(const std::string& NetworkNameOrId);
+
+    // Built-in network names resolve to themselves, and exact names or IDs of session-managed networks resolve locally.
+    // Any other reference must look like an ID or ID prefix and is resolved by the engine.
+    __requires_lock_held(m_networksLock) ResolvedNetwork ResolveNetworkLockHeld(const std::string& NetworkNameOrId);
 
 private:
     ULONG m_id = 0;
@@ -354,6 +382,7 @@ private:
     // Docker network notifications are forwarded to the event store as they arrive; the session's
     // network state is committed independently by the mutators under m_networksLock.
     void OnNetworkEvent(const std::string& NetworkId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t TimeNano) noexcept;
+    void OnImageEvent(const std::string& ImageId, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t TimeNano) noexcept;
 
     // WSLCVolumes forwards every Docker volume notification to the event store after updating the volumes it tracks.
     void OnVolumeEvent(const std::string& VolumeName, const std::string& Action, const std::map<std::string, std::string>& Attributes, std::int64_t TimeNano) noexcept;
@@ -363,6 +392,9 @@ private:
 
     void Ext4Format(const std::string& Device);
     std::string InspectImageLockHeld(const std::string& Id);
+
+    // Inspects a network by name, full ID, or unique ID prefix across every network known to the engine.
+    common::docker_schema::Network InspectNetworkReference(const std::string& NetworkNameOrId);
     void OnContainerDeleted(const WSLCContainerImpl* Container);
 
     void OnCrashDumpWritten(const std::wstring& DumpPath, const std::string& ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp);
@@ -387,6 +419,10 @@ private:
         DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle, IImageLoadCallback* LoadCallback = nullptr);
     void RecoverExistingContainers();
     void RecoverExistingNetworks();
+
+    // Creates a managed network. When Network is set it receives the created network as a serialized
+    // NetworkListEntry, written only once the network is committed.
+    void CreateNetworkImpl(const WSLCNetworkOptions& Options, _Out_opt_ LPSTR* Network);
 
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent);
     // Returns the manifest digest each pulled tag resolved to, in the order the daemon reported them.
@@ -429,7 +465,8 @@ private:
     std::vector<BYTE> m_userSid;
 
     WSLCFeatureFlags m_featureFlags{};
-    std::function<void()> m_destructionCallback;
+    wil::com_ptr<IWSLCSessionReference> m_serviceReference;
+    wil::com_ptr<IContextCallback> m_serviceReferenceContext;
     std::atomic<bool> m_terminating{false};
 
     // Signals that the winning Terminate() call has finished, including cleanup or failure.
@@ -451,6 +488,9 @@ private:
     // N.B. Declared after everything OnNetworkEvent() touches so the callback is unregistered first.
     DockerEventTracker::EventTrackingReference m_networkEventTracking;
 
+    // N.B. Declared after everything OnImageEvent() touches so the callback is unregistered first.
+    DockerEventTracker::EventTrackingReference m_imageEventTracking;
+
     // N.B. Declared after everything OnContainerAction() touches so the callback is unregistered first.
     DockerEventTracker::EventTrackingReference m_containerActionTracking;
 
@@ -470,6 +510,13 @@ private:
     // thread is alive.
     mutable wil::srwlock m_crashDumpLock;
     _Guarded_by_(m_crashDumpLock) CrashDumpCallbackList m_crashDumpCallbacks;
+
+    // Restart policies apply to the containers found by the session's first VM bring-up, the
+    // equivalent of a Docker daemon start. Later bring-ups follow an idle teardown.
+    __guarded_by(m_containersLock) bool m_sessionStartRecoveryDone = false;
+
+    // N.B. Declared last so it is stopped before anything a restart callback touches is destroyed.
+    WSLCRestartScheduler m_restartScheduler;
 
     friend class WSLCSessionRuntime;
 };

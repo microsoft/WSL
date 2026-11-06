@@ -43,6 +43,8 @@ _(BuildLabel,       "label",                L"l",             Kind::Value,      
 _(BuildOutput,      "output",               L"o",             Kind::Value,      BuildOutput,  Localization::WSLCCLI_OutputArgDescription()) \
 _(BuildPull,        "pull",                 NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_BuildPullArgDescription()) \
 _(BuildTarget,      "target",               NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_BuildTargetArgDescription()) \
+_(CapAdd,           "cap-add",              NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_CapAddArgDescription()) \
+_(CapDrop,          "cap-drop",             NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_CapDropArgDescription()) \
 _(CIDFile,          "cidfile",              NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_CIDFileArgDescription()) \
 _(Command,          "command",              NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_CommandArgDescription()) \
 _(ContainerId,      "container-id",         NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_ContainerIdArgDescription()) \
@@ -102,6 +104,7 @@ _(Name,             "name",                NO_ALIAS,         Kind::Value,      N
 _(Network,          "network",              NO_ALIAS,         Kind::Value,      ParsedNetworkArgument, Localization::WSLCCLI_NetworkArgDescription()) \
 _(NetworkAlias,     "network-alias",        NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_NetworkAliasArgDescription()) \
 _(NetworkName,      "network-name",         NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_NetworkNameArgDescription()) \
+_(NetworkNameOrId,  "network",              NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_NetworkNameOrIdArgDescription()) \
 /*_(NoDNS,            "no-dns",               NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_NoDNSArgDescription())*/ \
 _(NoCache,          "no-cache",             NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_NoCacheArgDescription()) \
 _(NoColor,          "no-color",             NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_NoColorArgDescription()) \
@@ -120,6 +123,7 @@ _(PublishAll,       "publish-all",          L"P",             Kind::Flag,       
 _(Pull,             "pull",                 NO_ALIAS,         Kind::Value,      PullPolicy,   Localization::WSLCCLI_PullArgDescription()) \
 _(Quiet,            "quiet",                L"q",             Kind::Flag,       NoConversion, Localization::WSLCCLI_QuietArgDescription()) \
 _(Remove,           "rm",                   NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_RemoveArgDescription()) \
+_(Restart,          "restart",              NO_ALIAS,         Kind::Value,      RestartPolicy, Localization::WSLCCLI_RestartArgDescription()) \
 /*_(Scheme,           "scheme",               NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_SchemeArgDescription())*/ \
 _(Secret,           "secret",               NO_ALIAS,         Kind::Value,      BuildSecret,  Localization::WSLCCLI_SecretArgDescription()) \
 _(Server,           "server",               NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_LoginServerArgDescription()) \

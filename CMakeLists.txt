@@ -107,13 +107,13 @@ FetchContent_MakeAvailable(boost_headers)
 
 # Import modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
-find_package(IDL REQUIRED)
-find_package(LINUXBUILD REQUIRED)
-find_package(NUGET REQUIRED)
-find_package(VERSION REQUIRED)
-find_package(MC REQUIRED)
-find_package(Appx REQUIRED)
-find_package(CSharp REQUIRED)
+include(FindIDL)
+include(FindLINUXBUILD)
+include(findNuget)
+include(findVersion)
+include(FindMC)
+include(findAppx)
+include(FindCSharp)
 
 # Download nuget packages
 restore_nuget_packages()
@@ -165,7 +165,7 @@ set(WSLG_TS_PLUGIN_DLL "WSLDVCPlugin.dll")
 set(SUPPORTED_LANGS cs-CZ;da-DK;de-DE;en-GB;en-US;es-ES;fi-FI;fr-FR;hu-HU;it-IT;ja-JP;ko-KR;nb-NO;nl-NL;pl-PL;pt-BR;pt-PT;ru-RU;sv-SE;tr-TR;zh-CN;zh-TW)
 
 if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/UserConfig.cmake")
-    find_package(USER REQUIRED PATHS ${CMAKE_CURRENT_LIST_DIR})
+    include("${CMAKE_CURRENT_LIST_DIR}/UserConfig.cmake")
 endif()
 
 if (WSL_DEVICEHOST_BIN)

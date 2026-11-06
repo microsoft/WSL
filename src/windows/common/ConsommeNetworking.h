@@ -52,7 +52,7 @@ public:
 private:
     static void NETIOAPI_API_ OnNetworkConnectivityChange(PVOID context, NL_NETWORK_CONNECTIVITY_HINT hint);
 
-    uint16_t HandlePortNotification(const SOCKADDR_INET& addr, int protocol, uint16_t guestPort, bool allocate) const;
+    uint16_t HandlePortNotification(SOCKADDR_INET addr, int protocol, uint16_t guestPort, bool allocate) const;
     uint16_t ModifyOpenPorts(
         _In_ PCWSTR tag, _In_ const SOCKADDR_INET& hostAddress, _In_ uint16_t HostPort, _In_ uint16_t GuestPort, _In_ int protocol, _In_ bool isOpen) const;
     void RefreshGuestConnection();
@@ -88,8 +88,9 @@ private:
     std::wstring m_trackedDefaultRouteIpv6;
     networking::DnsInfo m_trackedDnsSettings{};
 
-    // Note: this field must be destroyed first to stop the callbacks before any other field is destroyed.
+    // Note: these fields must be destroyed first to stop the callbacks before any other field is destroyed.
     networking::unique_notify_handle m_networkNotifyHandle;
+    std::optional<networking::DnsSuffixRegistryWatcher> m_dnsSuffixRegistryWatcher;
 };
 
 } // namespace wsl::core

@@ -80,6 +80,14 @@ try
     dxg.path = "/dev/dxg";
     dxg.permissions = "rwm";
 
+    wsl::shared::cdi::DeviceNode drmCard{};
+    drmCard.path = "/dev/dri/card0";
+    drmCard.permissions = "rwm";
+
+    wsl::shared::cdi::DeviceNode drmRender{};
+    drmRender.path = "/dev/dri/renderD128";
+    drmRender.permissions = "rwm";
+
     wsl::shared::cdi::Mount libs{};
     libs.hostPath = LXSS_LIB_PATH;
     libs.containerPath = LXSS_LIB_PATH;
@@ -105,6 +113,8 @@ try
     wsl::shared::cdi::Device gpu{};
     gpu.name = "gpu";
     gpu.containerEdits.deviceNodes.push_back(std::move(dxg));
+    gpu.containerEdits.deviceNodes.push_back(std::move(drmCard));
+    gpu.containerEdits.deviceNodes.push_back(std::move(drmRender));
     gpu.containerEdits.mounts.push_back(std::move(libs));
     gpu.containerEdits.mounts.push_back(std::move(drivers));
     gpu.containerEdits.hooks.push_back(std::move(hook));
@@ -743,6 +753,8 @@ void HandleMessageImpl(
                 if (Message.ForkType == WSLC_FORK::Process || Message.ForkType == WSLC_FORK::Pty)
                 {
                     Channel.Close();
+
+                    THROW_LAST_ERROR_IF(UtilClearSignalMask() < 0);
                 }
 
                 if (Message.ForkType == WSLC_FORK::Thread)
@@ -801,10 +813,6 @@ void HandleMessageImpl(
 
             if (result == 0) // Child
             {
-                sigset_t SignalMask;
-                sigemptyset(&SignalMask);
-                THROW_LAST_ERROR_IF(sigprocmask(SIG_SETMASK, &SignalMask, nullptr) < 0);
-
                 try
                 {
                     childLogic();
@@ -957,7 +965,13 @@ void HandleMountMessage(
 
             // Start the memory reduction thread now that procfs is in its final location.
             static std::once_flag memoryReductionFlag;
-            std::call_once(memoryReductionFlag, [] { StartMemoryReductionThread(LxMiniInitMemoryReclaimModeDropCache); });
+            std::call_once(memoryReductionFlag, [] {
+                try
+                {
+                    std::thread([] { RunMemoryReduction(LxMiniInitMemoryReclaimModeDropCache); }).detach();
+                }
+                CATCH_LOG()
+            });
         }
 
         response.Result = 0;
