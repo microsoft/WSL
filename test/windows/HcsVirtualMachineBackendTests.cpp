@@ -567,8 +567,12 @@ class HcsVirtualMachineBackendTests
         auto attachBootDiskRequest = CreateDiskRequest(automaticPath);
         attachBootDiskRequest.ReadOnly = false;
         attachBootDiskRequest.UserDisk = true;
-        VERIFY_ARE_EQUAL(
-            WSL_E_DISK_ALREADY_ATTACHED, OperationResult([&] { backend->AttachDisk(attachBootDiskRequest); }));
+        VERIFY_ARE_EQUAL(WSL_E_DISK_ALREADY_ATTACHED, OperationResult([&] { backend->AttachDisk(attachBootDiskRequest); }));
+        attachBootDiskRequest.UserDisk = false;
+        const auto reusedBootDisk = backend->AttachDisk(attachBootDiskRequest);
+        VERIFY_ARE_EQUAL(bootDisks.at(L"automatic").Id.Value, reusedBootDisk.Id.Value);
+        VERIFY_ARE_EQUAL(bootDisks.at(L"automatic").GuestAddress.Lun, reusedBootDisk.GuestAddress.Lun);
+        VERIFY_IS_TRUE(reusedBootDisk.ReadOnly);
         backend->Terminate();
     }
 

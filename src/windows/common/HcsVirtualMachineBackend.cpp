@@ -870,16 +870,10 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
             return;
         }
 
-        if (passThrough)
+        if (passThrough || (Request.UserDisk && !found->second.UserDisk))
         {
             THROW_HR_WITH_USER_ERROR(WSL_E_DISK_ALREADY_ATTACHED, wsl::shared::Localization::MessageDiskAlreadyAttached(path.c_str()));
         }
-
-        THROW_HR_IF_MSG(
-            WSL_E_DISK_ALREADY_ATTACHED,
-            !found->second.UserDisk,
-            "%ls",
-            wsl::shared::Localization::MessageDiskAlreadyAttached(path.c_str()).c_str());
 
         // Prevent user from launching a distro vhd after manually mounting it; otherwise, return the attachment of the mounted disk.
         THROW_HR_IF(WSL_E_USER_VHD_ALREADY_ATTACHED, found->second.UserDisk);
