@@ -7,6 +7,7 @@
 #include <linux/sock_diag.h>
 #include <linux/inet_diag.h>
 #include <linux/net.h>
+#include <net/if.h>
 #include <sys/syscall.h>
 #include <sys/xattr.h>
 #include "common.h" // Needs to be included before sal.h before of __reserved macro
@@ -117,9 +118,15 @@ void GnsPortTracker::Run()
                     }
                     catch (const std::exception& e)
                     {
-                        GNS_LOG_ERROR("Failed to complete bind request, {}", e.what());
+                        GNS_LOG_ERROR("Failed to complete seccomp request, {}", e.what());
                     }
                 });
+
+                if (notification->data.nr == __NR_ioctl)
+                {
+                    result = HandleInterfaceStateChange(*notification);
+                    continue;
+                }
 
                 auto bindCall = ReadRequest(*notification);
                 if (bindCall.Request.has_value())
@@ -725,4 +732,23 @@ std::optional<GnsPortTracker::PortAllocation> GnsPortTracker::ResolvePortZeroBin
 std::ostream& operator<<(std::ostream& out, const GnsPortTracker::PortAllocation& entry)
 {
     return out << "Port=" << entry.Port << ", Family=" << entry.Family << ", Protocol=" << entry.Protocol;
+}
+
+int GnsPortTracker::HandleInterfaceStateChange(const seccomp_notif& Notification)
+{
+    LX_GNS_TUN_BRIDGE_REQUEST request{};
+    request.Header.MessageType = LxGnsMessageIfStateChangeRequest;
+    request.Header.MessageSize = sizeof(request);
+    auto ifreqMemory = m_seccompDispatcher->ReadProcessMemory(Notification.id, Notification.pid, Notification.data.args[2], sizeof(ifreq));
+    if (!ifreqMemory.has_value())
+    {
+        return -1;
+    }
+
+    const auto& ifRequest = *reinterpret_cast<const ifreq*>(ifreqMemory->data());
+    memcpy(request.InterfaceName, ifRequest.ifr_ifrn.ifrn_name, sizeof(request.InterfaceName));
+    request.InterfaceUp = ifRequest.ifr_ifru.ifru_flags & IFF_UP;
+    const auto& reply = m_hvSocketChannel->Transaction(request);
+
+    return reply.Result;
 }
