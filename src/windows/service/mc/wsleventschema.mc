@@ -14,3 +14,11 @@ Facility=Application
 Language=Neutral
 %1
 .
+
+MessageId=62010 SymbolicName=MSG_PROCESS_EXECUTED
+Severity=Success
+Facility=Application
+Language=Neutral
+A Linux program was executed successfully in WSL.
+Process ID (VM): %1
+.

@@ -260,6 +260,8 @@ private:
 
     void VirtioFsWorker(_In_ const wil::unique_socket& socket);
 
+    void SecurityAuditWorker(wil::unique_socket socket);
+
     std::vector<char> ProcessVirtioFsRequest(_In_ gsl::span<gsl::byte> Request);
 
     static std::string s_GetMountTargetName(_In_ PCWSTR Disk, _In_opt_ PCWSTR Name, _In_ int PartitionIndex);
@@ -331,6 +333,7 @@ private:
     std::thread m_distroExitThread;
     std::thread m_virtioFsThread;
     std::thread m_crashDumpCollectionThread;
+    std::thread m_securityAuditThread;
 
     wil::srwlock m_persistentMemoryLock;
     _Guarded_by_(m_persistentMemoryLock) ULONG m_nextPersistentMemoryId = 0;
