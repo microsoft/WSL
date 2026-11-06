@@ -391,7 +391,7 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
         NetworkingMode = defaultNetworkingMode;
     }
 
-    // Mirrored mode has Hyper-V Firewall always on - we ignore the local setting regardless in this case.
+    // Enforce firewall requirements for the effective networking mode after applying policy.
     if (NetworkingMode == wsl::core::NetworkingMode::Mirrored)
     {
         FirewallConfig.Enable();

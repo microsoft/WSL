@@ -72,7 +72,10 @@ NatNetworking::~NatNetworking()
     m_connectivityTelemetry.Reset();
 
     auto lock = g_endpointsInUseLock.lock_exclusive();
-    auto eraseRange = std::ranges::remove(g_endpointsInUse, m_endpoint.Id);
+
+    auto endpoint = std::move(m_endpoint);
+    auto eraseRange = std::ranges::remove(g_endpointsInUse, endpoint.Id);
+
     g_endpointsInUse.erase(eraseRange.begin(), eraseRange.end());
 }
 
@@ -216,9 +219,9 @@ void NatNetworking::Initialize()
         {
             // Enumerating and attaching the endpoints need to be an atomic operation between different users.
             // Keep the lock until endpoint is created.
-            // Its currently safe to take this lock while holding the member m_lock
-            // because g_endpointsInUseLock is only ever locked during the d'tor
+            // Lock order is m_lock then g_endpointsInUseLock; destruction only takes the global lock.
             auto endpointLock = g_endpointsInUseLock.lock_exclusive();
+            g_endpointsInUse.reserve(g_endpointsInUse.size() + 1);
 
             wil::unique_cotaskmem_string endpointsJson;
             wil::unique_cotaskmem_string endpointsError;
@@ -283,12 +286,16 @@ void NatNetworking::Initialize()
         PCSTR executionStep = "";
         try
         {
+            auto endpointLock = g_endpointsInUseLock.lock_exclusive();
+            g_endpointsInUse.reserve(g_endpointsInUse.size() + 1);
+
             // If no IP address was passed or if the endpoint couldn't be created / attached, create a new one without the IP address requirement.
             networking::EphemeralHcnEndpoint endpoint;
             executionStep = "HcnCreateEndpoint";
             std::tie(endpoint, endpointProperties) = CreateEndpoint(L"");
             executionStep = "AttachEndpoint";
             AttachEndpoint(std::move(endpoint), endpointProperties);
+            g_endpointsInUse.emplace_back(endpointProperties.ID);
         }
         catch (...)
         {
@@ -373,45 +380,18 @@ void NatNetworking::AttachEndpoint(wsl::core::networking::EphemeralHcnEndpoint&&
     // for mirrored endpoints, we will set the InstanceId to the InterfaceGuid of the host interface we mirror - as we add &
     // remove them dynamically for NAT endpoints, we will just set the InstanceId to the EndpointId
 
-    ModifySettingRequest<NetworkAdapter> networkRequest{};
-    networkRequest.ResourcePath = networking::c_networkAdapterPrefix + wsl::shared::string::GuidToString<wchar_t>(properties.ID);
-    networkRequest.RequestType = ModifyRequestType::Add;
-    networkRequest.Settings.EndpointId = properties.ID;
-    networkRequest.Settings.InstanceId = properties.ID;
+    const auto resourcePath = networking::c_networkAdapterPrefix + wsl::shared::string::GuidToString<wchar_t>(properties.ID);
+    wsl::windows::common::hcs::ModifyNetworkAdapter(
+        m_system,
+        resourcePath.c_str(),
+        ModifyRequestType::Add,
+        properties.ID,
+        properties.ID,
+        wsl::shared::string::ParseMacAddress(properties.MacAddress),
+        true);
 
-    networkRequest.Settings.MacAddress = wsl::shared::string::ParseMacAddress(properties.MacAddress);
-    auto retryCount = 0ul;
-    const auto hr = wsl::shared::retry::RetryWithTimeout<HRESULT>(
-        [&] {
-            HRESULT exceptionHr = wil::ResultFromException(
-                [&] { wsl::windows::common::hcs::ModifyComputeSystem(m_system, wsl::shared::ToJsonW(networkRequest).c_str()); });
-
-            WSL_LOG(
-                "NatNetworking::AttachEndpoint [ModifyComputeSystem(ModifyRequestType::Add)]",
-                TraceLoggingValue(properties.ID, "endpointId"),
-                TraceLoggingValue(exceptionHr, "hr"),
-                TraceLoggingValue(retryCount, "retryCount"));
-
-            ++retryCount;
-            return THROW_IF_FAILED(exceptionHr);
-        },
-        wsl::core::networking::AddEndpointRetryPeriod,
-        wsl::core::networking::AddEndpointRetryTimeout,
-        wsl::core::networking::AddEndpointRetryPredicate);
-
-    if (hr == HCN_E_ENDPOINT_ALREADY_ATTACHED)
-    {
-        WSL_LOG(
-            "NatNetworking::AttachEndpoint [Adding the endpoint returned HCN_E_ENDPOINT_ALREADY_ATTACHED - continuing]",
-            TraceLoggingValue(properties.ID, "endpointId"));
-    }
-    else if (FAILED(hr))
-    {
-        THROW_HR(hr);
-    }
-
-    m_endpoint = std::move(endpoint);
     m_networkSettings = GetEndpointSettings(properties);
+    m_endpoint = std::move(endpoint);
 }
 
 void NatNetworking::StartPortTracker(wil::unique_socket&& socket)
