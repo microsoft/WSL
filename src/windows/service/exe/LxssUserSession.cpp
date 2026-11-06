@@ -3172,8 +3172,9 @@ void LxssUserSessionImpl::_CreateVm()
 
         if (const auto tracker = m_httpProxyStateTracker)
         {
-            // this needs to be done after the VM has finished in case we fell back to NAT mode
-            tracker->ConfigureNetworkingMode(m_utilityVm->GetConfig().NetworkingMode);
+            // Use the actual networking configuration after any fallback.
+            const auto& vmConfig = m_utilityVm->GetConfig();
+            tracker->ConfigureNetworkingMode(vmConfig.NetworkingMode, vmConfig.EnableLocalhostRelay);
         }
 
         try
@@ -3601,8 +3602,8 @@ try
             {
                 try
                 {
-                    m_httpProxyStateTracker =
-                        std::make_shared<HttpProxyStateTracker>(config.InitialAutoProxyTimeout, userToken, config.NetworkingMode);
+                    m_httpProxyStateTracker = std::make_shared<HttpProxyStateTracker>(
+                        config.InitialAutoProxyTimeout, userToken, config.NetworkingMode, config.EnableLocalhostRelay);
                 }
                 catch (...)
                 {
@@ -4298,7 +4299,7 @@ try
             {
                 switch (proxySettings->UnsupportedProxyDropReason)
                 {
-                case UnsupportedProxyReason::LoopbackNotMirrored:
+                case UnsupportedProxyReason::LoopbackNotSupported:
                     EMIT_USER_WARNING(wsl::shared::Localization::MessageProxyLocalhostSettingsDropped());
                     break;
                 case UnsupportedProxyReason::Ipv6NotMirrored:

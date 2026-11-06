@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "computenetwork.h"
 #include "Common.h"
+#include "LxssHttpProxy.h"
 #include "wslpolicies.h"
 #include "hns_schema.h"
 #include "WslCoreNetworkEndpointSettings.h"
@@ -4232,6 +4233,40 @@ class NetworkTests
                                            : static_cast<int>(wsl::shared::conncheck::ConnCheckStatus::FailureSocketConnect);
         RunGns(ncsiDnsOnlyName, AdapterId, LxGnsMessageConnectTestRequest, testErrorCode);
     }
+
+    TEST_METHOD(HttpProxyRestoredAfterNatFallback)
+    {
+        WINHTTP_PROXY_TEST_ONLY();
+        VERIFY_SUCCEEDED(HttpProxyStateTracker::s_LoadWinHttpProxyMethods());
+
+        auto restoreProxySettings = wil::scope_exit([&] { ClearHttpProxySettings(true); });
+        SetHttpProxySettings(c_httpProxyLocalhostv4, c_httpProxyBypassString, L"", true);
+
+        wil::unique_handle userToken;
+        VERIFY_WIN32_BOOL_SUCCEEDED(OpenProcessToken(GetCurrentProcess(), TOKEN_DUPLICATE | TOKEN_QUERY, &userToken));
+        HttpProxyStateTracker tracker(10000, userToken.get(), wsl::core::NetworkingMode::Nat, true);
+
+        auto settings = tracker.WaitForInitialProxySettings();
+        VERIFY_IS_TRUE(settings.has_value());
+        VERIFY_IS_TRUE(settings->Proxy.empty());
+        VERIFY_IS_TRUE(settings->SecureProxy.empty());
+        VERIFY_IS_TRUE(settings->ProxyBypasses.empty());
+        VERIFY_IS_TRUE(settings->ProxyBypassesComma.empty());
+        VERIFY_IS_TRUE(settings->UnsupportedProxyDropReason == UnsupportedProxyReason::LoopbackNotSupported);
+
+        tracker.ConfigureNetworkingMode(wsl::core::NetworkingMode::Consomme, true);
+
+        settings = tracker.WaitForInitialProxySettings();
+        const auto expectedProxy = wsl::shared::string::WideToMultiByte(c_httpProxyLocalhostv4);
+        const auto expectedBypass = wsl::shared::string::WideToMultiByte(c_httpProxyBypassString);
+        VERIFY_IS_TRUE(settings.has_value());
+        VERIFY_ARE_EQUAL(expectedProxy, settings->Proxy);
+        VERIFY_ARE_EQUAL(expectedProxy, settings->SecureProxy);
+        VERIFY_ARE_EQUAL(size_t{1}, settings->ProxyBypasses.size());
+        VERIFY_ARE_EQUAL(expectedBypass, settings->ProxyBypasses.front());
+        VERIFY_ARE_EQUAL(expectedBypass, settings->ProxyBypassesComma);
+        VERIFY_IS_TRUE(settings->UnsupportedProxyDropReason == UnsupportedProxyReason::Supported);
+    }
 };
 
 class GnsCallbackResultTests
@@ -6080,6 +6115,22 @@ class ConsommeTests
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .autoProxy = true}));
         NetworkTests::VerifyHttpProxySimple();
+    }
+
+    WSL2_TEST_METHOD(HttpProxyLoopback)
+    {
+        CONSOMME_TEST_ONLY();
+        WINHTTP_PROXY_TEST_ONLY();
+
+        const auto config = LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .autoProxy = true});
+        auto restoreProxySettings = wil::scope_exit([&] { NetworkTests::ClearHttpProxySettings(true); });
+        NetworkTests::SetHttpProxySettings(NetworkTests::c_httpProxyLocalhostv4, L"", L"", true);
+
+        for (const bool localhostForwarding : {true, false})
+        {
+            m_config->Update(config + std::format(L"localhostForwarding={}\n", localhostForwarding));
+            NetworkTests::VerifyHttpProxyEnvVariables(localhostForwarding ? NetworkTests::c_httpProxyLocalhostv4 : L"", L"", L"");
+        }
     }
 
     WSL2_TEST_METHOD(ConfigurationV6)
