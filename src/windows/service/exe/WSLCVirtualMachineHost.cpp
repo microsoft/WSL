@@ -71,6 +71,17 @@ WSLCVirtualMachineHost::WSLCVirtualMachineHost(_In_ const WSLCSessionSettings* S
     THROW_HR_IF(E_INVALIDARG, !BackendFactory);
 
     const auto userToken = wil::shared_handle{wsl::windows::common::security::GetUserToken(TokenImpersonation).release()};
+    auto cleanupBootFilesOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+        if (!m_bootFilesPath.empty())
+        {
+            try
+            {
+                const auto runAsUser = wil::impersonate_token(userToken.get());
+                LOG_IF_FAILED(wil::RemoveDirectoryRecursiveNoThrow(m_bootFilesPath.c_str()));
+            }
+            CATCH_LOG()
+        }
+    });
     std::lock_guard lock(m_lock);
 
     GUID vmId{};
@@ -103,15 +114,30 @@ WSLCVirtualMachineHost::WSLCVirtualMachineHost(_In_ const WSLCSessionSettings* S
         Settings->DisplayName ? std::optional{SanitizeHostingProcessNameSuffix(Settings->DisplayName)} : std::nullopt;
 
     const auto basePath = wslutil::GetBasePath();
+    std::filesystem::path kernelPath;
 #ifdef WSL_KERNEL_PATH
-    request.Boot.KernelPath = WSL_KERNEL_PATH;
+    kernelPath = TEXT(WSL_KERNEL_PATH);
 #else
-    request.Boot.KernelPath = basePath / L"tools" / LXSS_VM_MODE_KERNEL_NAME;
+    kernelPath = basePath / L"tools" / LXSS_VM_MODE_KERNEL_NAME;
 #endif
+    request.Boot.KernelPath = kernelPath;
     request.Boot.Method = wsl::shared::Arm64 ? VmBootMethod::Uefi : VmBootMethod::LinuxDirect;
     if constexpr (!wsl::shared::Arm64)
     {
         request.Boot.InitrdPath = basePath / L"tools" / LXSS_VM_MODE_INITRD_NAME;
+    }
+    else
+    {
+        const auto vmIdString = wsl::shared::string::GuidToString<wchar_t>(vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
+        const auto runAsUser = wil::impersonate_token(userToken.get());
+        m_bootFilesPath = filesystem::GetTempFolderPath(userToken.get()) / L"wslc" / vmIdString;
+        wil::CreateDirectoryDeep(m_bootFilesPath.c_str());
+
+        const auto initrdPath = basePath / L"tools" / LXSS_VM_MODE_INITRD_NAME;
+        THROW_IF_WIN32_BOOL_FALSE(CopyFileW(initrdPath.c_str(), (m_bootFilesPath / LXSS_VM_MODE_INITRD_NAME).c_str(), TRUE));
+        const auto stagedKernelPath = m_bootFilesPath / LXSS_VM_MODE_KERNEL_NAME;
+        THROW_IF_WIN32_BOOL_FALSE(CopyFileW(kernelPath.c_str(), stagedKernelPath.c_str(), TRUE));
+        request.Boot.KernelPath = stagedKernelPath;
     }
 
     auto swiotlbSizeBytes = (FeatureEnabled(WslcFeatureFlagsVirtioFs) || m_networkingMode == WSLCNetworkingModeConsomme)
@@ -184,6 +210,7 @@ WSLCVirtualMachineHost::WSLCVirtualMachineHost(_In_ const WSLCSessionSettings* S
     }
 
     cleanupBackendOnFailure.release();
+    cleanupBootFilesOnFailure.release();
 }
 
 WSLCVirtualMachineHost::~WSLCVirtualMachineHost()
@@ -192,7 +219,17 @@ WSLCVirtualMachineHost::~WSLCVirtualMachineHost()
     const bool forceTerminate = !m_vmExitEvent.wait(30000);
     WSL_LOG("WSLCTerminateVm", TraceLoggingValue(forceTerminate, "forced"));
     m_networking.reset();
+    const auto userToken = m_backend ? m_backend->GetDescription().Identity.UserToken : wil::shared_handle{};
     m_backend.reset();
+    if (!m_bootFilesPath.empty())
+    {
+        try
+        {
+            const auto runAsUser = wil::impersonate_token(userToken.get());
+            LOG_IF_FAILED(wil::RemoveDirectoryRecursiveNoThrow(m_bootFilesPath.c_str()));
+        }
+        CATCH_LOG()
+    }
 }
 
 bool WSLCVirtualMachineHost::FeatureEnabled(WSLCFeatureFlags Value) const

@@ -875,6 +875,12 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
             THROW_HR_WITH_USER_ERROR(WSL_E_DISK_ALREADY_ATTACHED, wsl::shared::Localization::MessageDiskAlreadyAttached(path.c_str()));
         }
 
+        THROW_HR_IF_MSG(
+            WSL_E_DISK_ALREADY_ATTACHED,
+            !found->second.UserDisk,
+            "%ls",
+            wsl::shared::Localization::MessageDiskAlreadyAttached(path.c_str()).c_str());
+
         // Prevent user from launching a distro vhd after manually mounting it; otherwise, return the attachment of the mounted disk.
         THROW_HR_IF(WSL_E_USER_VHD_ALREADY_ATTACHED, found->second.UserDisk);
 
@@ -1729,11 +1735,12 @@ void HcsVirtualMachineBackend::RemoveDevice(VmDeviceId Device)
 
     const auto device = m_fileSystemDevices.find(Device.Value);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), device == m_fileSystemDevices.end());
+    // Callback-created virtio Plan 9 instances are owned for the VM lifetime.
+    THROW_HR_IF(c_notSupported, std::holds_alternative<VmPlan9VirtioDevice>(device->second.Transport));
     const auto hasShares =
         std::ranges::any_of(m_fileSystemShares, [&](const auto& entry) { return entry.second.Device.Value == Device.Value; });
     const bool unavailablePlan9 = device->second.State == VmFileSystemDeviceState::Unavailable &&
-                                  (std::holds_alternative<VmPlan9SocketDevice>(device->second.Transport) ||
-                                   std::holds_alternative<VmPlan9VirtioDevice>(device->second.Transport));
+                                  std::holds_alternative<VmPlan9SocketDevice>(device->second.Transport);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_BUSY), hasShares && !unavailablePlan9);
 
     if (unavailablePlan9)
@@ -1749,13 +1756,7 @@ void HcsVirtualMachineBackend::RemoveDevice(VmDeviceId Device)
                     m_guestDeviceManager->RemoveGuestDevice(device->second.GuestInstanceId.value());
                 }
             },
-            [&](const VmPlan9VirtioDevice& transport) {
-                if (device->second.GuestInstanceId)
-                {
-                    m_guestDeviceManager->RemoveGuestDevice(device->second.GuestInstanceId.value());
-                }
-                m_guestDeviceManager->RemoveRemoteFileSystem(transport.FileSystemClassId, transport.Tag);
-            },
+            [](const VmPlan9VirtioDevice&) { THROW_HR(c_notSupported); },
             [&](const VmPlan9SocketDevice&) {
                 if (device->second.Backend.Plan9Server)
                 {
@@ -2206,9 +2207,8 @@ void HcsVirtualMachineBackend::OnExit(const HCS_EVENT* Event)
         {
             auto terminationInformationLock = m_terminationInformationLock.lock_exclusive();
             m_terminationInformation = std::move(information);
+            m_exitEvent.SetEvent();
         }
-
-        m_exitEvent.SetEvent();
 
         // An exit without a prior termination request must cancel pending operations.
         if (!m_terminatingEvent.is_signaled())

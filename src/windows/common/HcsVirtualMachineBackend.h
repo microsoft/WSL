@@ -19,6 +19,10 @@ Abstract:
 #include "GuestDeviceManager.h"
 #include "hcs.hpp"
 
+namespace HcsVirtualMachineBackendTests {
+class HcsVirtualMachineBackendTests;
+}
+
 class HcsVirtualMachineBackend : public IVirtualMachineBackend
 {
 public:
@@ -73,6 +77,7 @@ public:
     void CreateDnsRecord(VmDeviceId Device, const VmDnsRecord& Record) override;
 
 private:
+    friend class HcsVirtualMachineBackendTests::HcsVirtualMachineBackendTests;
     friend struct HcsVirtualMachineBackendTestAccess;
 
     struct HcsDisk

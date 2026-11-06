@@ -288,6 +288,42 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(1, notificationCount);
     }
 
+    TEST_METHOD(PreservesFirstTerminationReason)
+    {
+        for (const auto exitType :
+             {wsl::windows::common::hcs::NotificationType::GracefulExit, wsl::windows::common::hcs::NotificationType::UnexpectedExit})
+        {
+            HcsVirtualMachineBackend backend;
+            backend.m_configuration.Description.Identity = CreateRequest().Identity;
+            wsl::windows::common::hcs::SystemExitStatus status{};
+            status.ExitType = exitType;
+            const auto details = wsl::shared::ToJsonW(status);
+            VmTerminationInformation callbackInformation;
+            int callbackCount = 0;
+            backend.RegisterTerminationCallback([&](GUID) {
+                callbackInformation = backend.GetTerminationReason();
+                ++callbackCount;
+            });
+
+            HCS_EVENT event{};
+            event.Type = HcsEventSystemExited;
+            event.EventData = details.c_str();
+            backend.OnExit(&event);
+            const auto expectedReason = exitType == wsl::windows::common::hcs::NotificationType::GracefulExit
+                                            ? VmTerminationReason::Shutdown
+                                            : VmTerminationReason::Crashed;
+            VERIFY_ARE_EQUAL(expectedReason, callbackInformation.Reason);
+            VERIFY_ARE_EQUAL(details, callbackInformation.Details);
+
+            event.Type = HcsEventServiceDisconnect;
+            event.EventData = L"service disconnected";
+            backend.OnExit(&event);
+            VERIFY_ARE_EQUAL(1, callbackCount);
+            VERIFY_ARE_EQUAL(expectedReason, backend.GetTerminationReason().Reason);
+            VERIFY_ARE_EQUAL(details, backend.GetTerminationReason().Details);
+        }
+    }
+
     WSL2_TEST_METHOD(SignalsTerminationWhenExitDataIsMalformed)
     {
         SKIP_TEST_ARM64();
@@ -528,6 +564,11 @@ class HcsVirtualMachineBackendTests
         const auto& bootDisks = backend->GetDescription().BootDisks;
         VERIFY_ARE_EQUAL(UINT32{253}, bootDisks.at(L"exact").GuestAddress.Lun);
         VERIFY_ARE_EQUAL(UINT32{0}, bootDisks.at(L"automatic").GuestAddress.Lun);
+        auto attachBootDiskRequest = CreateDiskRequest(automaticPath);
+        attachBootDiskRequest.ReadOnly = false;
+        attachBootDiskRequest.UserDisk = true;
+        VERIFY_ARE_EQUAL(
+            WSL_E_DISK_ALREADY_ATTACHED, OperationResult([&] { backend->AttachDisk(attachBootDiskRequest); }));
         backend->Terminate();
     }
 
@@ -1030,11 +1071,15 @@ class HcsVirtualMachineBackendTests
         const auto virtioShare = backend->AddFileSystemShare(virtioDeviceResult.Id, virtioRequest);
         VERIFY_ARE_EQUAL(std::wstring{L"plan9-virtio"}, std::get<VmPlan9VirtioShareAddress>(virtioShare.GuestAddress).Tag);
         VERIFY_IS_FALSE(virtioShare.ReadOnly);
+        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->RemoveDevice(virtioDeviceResult.Id); }));
         verifyPlan9NameCollisions(virtioDeviceResult.Id, virtioRequest);
         backend->RemoveFileSystemShare(virtioShare.Id);
         const auto replacementVirtioShare = backend->AddFileSystemShare(virtioDeviceResult.Id, virtioRequest);
         VERIFY_ARE_NOT_EQUAL(virtioShare.Id.Value, replacementVirtioShare.Id.Value);
         backend->RemoveFileSystemShare(replacementVirtioShare.Id);
+        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->RemoveDevice(virtioDeviceResult.Id); }));
+        const auto retainedVirtioShare = backend->AddFileSystemShare(virtioDeviceResult.Id, virtioRequest);
+        backend->RemoveFileSystemShare(retainedVirtioShare.Id);
 
         // A host path is required, and the options must match the device that serves them.
         VmFileSystemShareRequest pathless;

@@ -85,6 +85,7 @@ private:
     std::recursive_mutex m_lock;
 
     std::unique_ptr<IVirtualMachineBackend> m_backend;
+    std::filesystem::path m_bootFilesPath;
     ULONG m_bootTimeoutMs{};
 
     WSLCFeatureFlags m_featureFlags{};
