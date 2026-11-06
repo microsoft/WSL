@@ -1,0 +1,9 @@
+# S16_LE PCM ring source
+
+`S16LePcmRingSource` is a fixed-capacity, interleaved signed-16-bit PCM ring that implements the existing `PcmSource` interface. It allocates its storage at construction. Producer writes must contain whole frames and are all-or-nothing; when free capacity is insufficient, the newest batch is dropped and overflow event/frame counters increase.
+
+The producer captures `Generation()` before creating a PCM batch and passes that token to `TryWriteFrames`. `Reset()` clears queued frames and increments the generation while holding the ring lock. A batch written before reset is cleared; a write that arrives after reset with an older token is rejected. This prevents producer work that began before a stream lifecycle transition from reappearing after the transition.
+
+`ReadFrames` uses atomic published indices and performs no mutex operation, allocation, or wait. It returns false without consuming or changing the destination when a complete request is not queued, the indices violate the capacity bound, or its byte count is not an exact frame multiple. A producer write holds a mutex only for one bounded copy of at most the configured ring capacity; `Reset` serializes with producer writes and publication. `VirtioSoundDevice` serializes its one consumer and source resets under the device gate, which is the required ring lifecycle contract. The snapshot separates underflow, overflow, invalid calls, stale writes, index faults, and reset failures. A genuine source underflow is reported to the existing virtio backend as its normal IO_ERR/XRUN path; routine producer serialization cannot cause that result.
+
+Run the ring and fake-memory core integration tests through the standalone CMake/CTest suite documented in [README.md](README.md). These tests use generated samples and do not open a microphone. The Windows capture backend uses this ring; that runtime integration requires separate validation.

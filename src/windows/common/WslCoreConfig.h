@@ -27,9 +27,9 @@ Abstract:
         T_VALUE(c, EnableHostAddressLoopback), T_VALUE(c, EnableHostFileSystemAccess), T_VALUE(c, EnableIpv6), \
         T_VALUE(c, EnableLocalhostRelay), T_VALUE(c, EnableNestedVirtualization), T_VALUE(c, EnableSafeMode), \
         T_VALUE(c, EnableSparseVhd), T_VALUE(c, EnableVirtio), T_VALUE(c, EnableVirtio9p), T_VALUE(c, EnableVirtioFs), \
-        T_VALUE(c, EnableVirtioFsAggregateShares), T_ENUM(c, FirewallConfigPresence), T_VALUE(c, IsolateDistroCgroup), \
-        T_VALUE(c, KernelBootTimeout), T_SET(c, KernelCommandLine), T_VALUE(c, KernelDebugPort), T_STRING(c, KernelModulesList), \
-        T_SET(c, KernelModulesPath), T_SET(c, KernelPath), T_VALUE(c, LoadDefaultKernelModules), \
+        T_VALUE(c, EnableVirtioFsAggregateShares), T_VALUE(c, EnableVirtioSound), T_ENUM(c, FirewallConfigPresence), \
+        T_VALUE(c, IsolateDistroCgroup), T_VALUE(c, KernelBootTimeout), T_SET(c, KernelCommandLine), T_VALUE(c, KernelDebugPort), \
+        T_STRING(c, KernelModulesList), T_SET(c, KernelModulesPath), T_SET(c, KernelPath), T_VALUE(c, LoadDefaultKernelModules), \
         T_PRESENT(c, LoadKernelModulesPresence), T_VALUE(c, MaximumMemorySizeBytes), T_VALUE(c, MaximumProcessorCount), \
         T_ENUM(c, MemoryReclaim), T_VALUE(c, MemorySizeBytes), T_VALUE(c, MountDeviceTimeout), T_ENUM(c, NetworkingMode), \
         T_VALUE(c, ProcessorCount), T_SET(c, SwapFilePath), T_VALUE(c, SwapSizeBytes), T_VALUE(c, SwiotlbSizeBytes), \
@@ -295,6 +295,9 @@ namespace ConfigSetting {
         static constexpr auto SetVersionDebug = "experimental.setVersionDebug";
         static constexpr auto Swiotlb = "experimental.swiotlb";
         static constexpr auto VirtioFsAggregateShares = "experimental.virtioFsAggregateShares";
+        static constexpr auto VirtioSound = "experimental.virtioSound";
+        static constexpr auto VirtioSoundWindowsInput = "experimental.virtioSoundWindowsInput";
+        static constexpr auto VirtioSoundCaptureEndpoint = "experimental.virtioSoundCaptureEndpoint";
 
     } // namespace Experimental
 } // namespace ConfigSetting
@@ -331,6 +334,10 @@ struct Config
     bool EnableVirtio = !shared::Arm64 || windows::common::helpers::IsWindows11OrAbove();
     bool EnableVirtioFs = false;
     bool EnableVirtioFsAggregateShares = true;
+    bool EnableVirtioSound = false;
+    bool VirtioSoundWindowsInput = false;
+    // Explicit endpoint identifier; do not include it in telemetry or logs.
+    std::wstring VirtioSoundCaptureEndpoint;
     int KernelDebugPort = 0;
     bool EnableGpuSupport = true;
     bool EnableGuiApps = true;

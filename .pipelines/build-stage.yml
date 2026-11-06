@@ -15,6 +15,10 @@ parameters:
     type: boolean
     default: false
 
+  - name: enableExperimentalVirtioSound
+    type: boolean
+    default: false
+
   - name: traceLoggingConfig
     type: string
     default: ''
@@ -78,6 +82,7 @@ stages:
           isNightly: ${{ parameters.isNightly }}
           packageVersion: ${{ parameters.packageVersion }}
           traceLoggingConfig: ${{ parameters.traceLoggingConfig }}
+          enableExperimentalVirtioSound: ${{ parameters.enableExperimentalVirtioSound }}
           targets: ${{ parameters.targets }}
           pool: ${{ parameters.pool }}
           vsoOrg: ${{ parameters.vsoOrg }}
@@ -138,6 +143,7 @@ stages:
           isNightly: ${{ parameters.isNightly }}
           packageVersion: ${{ parameters.packageVersion }}
           traceLoggingConfig: ${{ parameters.traceLoggingConfig }}
+          enableExperimentalVirtioSound: ${{ parameters.enableExperimentalVirtioSound }}
           targets: ${{ parameters.targets }}
           pool: ${{ parameters.pool }}
           vsoOrg: ${{ parameters.vsoOrg }}

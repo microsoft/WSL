@@ -814,6 +814,10 @@ For more information on Admin Protection, please visit https://aka.ms/apdevguide
     <value>Invalid boolean value '{}' for key '{}' in {}:{}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageConfigVirtioSoundCaptureEndpoint" xml:space="preserve">
+    <value>virtioSoundWindowsInput requires an explicit virtioSoundCaptureEndpoint containing between 1 and 1024 characters.</value>
+    <comment>{Locked="virtioSoundWindowsInput"}{Locked="virtioSoundCaptureEndpoint"}Experimental configuration key names must not be translated. Do not include the endpoint identifier in this error.</comment>
+  </data>
   <data name="MessageConfigMacAddress" xml:space="preserve">
     <value>Invalid mac address '{}' for key '{}' in {}:{}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

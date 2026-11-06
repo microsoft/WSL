@@ -26,6 +26,9 @@ Abstract:
 #include "ConsommeNetworking.h"
 
 #include <TraceLoggingProvider.h>
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+#include "HdvHostProcess.hpp"
+#endif
 
 using msl::utilities::SafeInt;
 using wsl::windows::common::helpers::WindowsBuildNumbers;
@@ -56,6 +59,9 @@ using wsl::windows::common::Context;
 using wsl::windows::common::ExecutionContext;
 
 namespace {
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+constexpr GUID c_virtioSoundDeviceClassId{0xF1919B41, 0x6A33, 0x4C92, {0xA7, 0xF8, 0x39, 0x7E, 0xE4, 0xC5, 0xB1, 0xD2}};
+#endif
 INT64
 RequiredExtraMmioSpaceForPmemFileInMb(_In_ PCWSTR FilePath)
 {
@@ -364,6 +370,13 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         CATCH_LOG()
     }
 
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+    if (m_vmConfig.EnableVirtioSound)
+    {
+        THROW_IF_FAILED(CoCreateGuid(&m_virtioSoundInstanceId));
+    }
+#endif
+
     // Create the utility VM and store the runtime ID.
     std::wstring json = GenerateConfigJson();
     {
@@ -375,6 +388,27 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
     // Initialize the guest device manager.
     m_guestDeviceManager = std::make_shared<GuestDeviceManager>(m_machineId, m_runtimeId, m_vmConfig.EnableTelemetry);
+
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+    if (m_vmConfig.EnableVirtioSound)
+    {
+        try
+        {
+            m_hdvHostProcess = wsl::virtio_sound::process_host::HdvHostProcess::Create(
+                m_machineId,
+                m_virtioSoundInstanceId,
+                m_vmConfig.VirtioSoundWindowsInput ? m_restrictedToken.get() : nullptr,
+                m_vmConfig.VirtioSoundWindowsInput ? m_vmConfig.VirtioSoundCaptureEndpoint : std::wstring{});
+        }
+        catch (...)
+        {
+            m_hdvHostProcess.reset();
+            m_system.reset();
+            throw;
+        }
+    }
+    auto retireUnstartedVirtioSound = wil::scope_exit([&]() noexcept { m_hdvHostProcess.reset(); });
+#endif
 
     // Create a socket listening for connections from mini_init.
     m_listenSocket = wsl::windows::common::hvsocket::Listen(m_runtimeId, LX_INIT_UTILITY_VM_INIT_PORT);
@@ -392,6 +426,9 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     signalEarlyTermination.release();
 
     // Start the utility VM.
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+    retireUnstartedVirtioSound.release();
+#endif
     try
     {
         SlowOperationWatcher slowOperation{"HcsStartSystem"};
@@ -399,6 +436,10 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     }
     catch (...)
     {
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+        m_hdvHostProcess.reset();
+#endif
+
         // Reset m_system so we don't try to wait for termination in the destructor, since the VM isn't even running.
         m_system.reset();
         throw;
@@ -782,6 +823,10 @@ WslCoreVm::~WslCoreVm() noexcept
         m_terminatingEvent.SetEvent();
     }
 
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+    bool soundGuestStoppedConfirmed = false;
+#endif
+
     if (m_system)
     {
         bool unexpectedTerminate = m_vmExitEvent.is_signaled();
@@ -808,7 +853,21 @@ WslCoreVm::~WslCoreVm() noexcept
             }
         }
 
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+        soundGuestStoppedConfirmed = m_vmExitEvent.wait(UTILITY_VM_TERMINATE_TIMEOUT);
+        if (!soundGuestStoppedConfirmed && m_hdvHostProcess)
+        {
+            TraceLoggingWriteTagged(
+                activity,
+                "VirtioSoundHostEmergencyAbort",
+                TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES),
+                TelemetryPrivacyDataTag(PDT_ProductAndServicePerformance),
+                TraceLoggingValue(m_runtimeId, "vmId"),
+                TraceLoggingValue(false, "guestExitConfirmed"));
+        }
+#else
         m_vmExitEvent.wait(UTILITY_VM_TERMINATE_TIMEOUT);
+#endif
 
         TraceLoggingWriteTagged(
             activity,
@@ -840,6 +899,17 @@ WslCoreVm::~WslCoreVm() noexcept
         m_crashDumpCollectionThread.join();
     }
 
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+    if (m_hdvHostProcess)
+    {
+        if (soundGuestStoppedConfirmed)
+        {
+            m_hdvHostProcess->ConfirmGuestStopped();
+        }
+        // Unconfirmed exit uses the explicit job-abort path, never retirement.
+        m_hdvHostProcess.reset();
+    }
+#endif
     // Close the handle to the VM. This will wait for any outstanding callbacks.
     m_system.reset();
 
@@ -1897,6 +1967,20 @@ std::wstring WslCoreVm::GenerateConfigJson()
     vmSettings.Devices.HvSocket = std::move(hvSocketConfig);
 
     // N.B. Plan9 device is always added during serialization
+
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+    if (m_vmConfig.EnableVirtioSound)
+    {
+        // External HDV requires its host/device in the creation configuration.
+        // A FlexibleIov hot-add before the VM worker starts returns VM_E_INVALID_STATE.
+        hcs::FlexibleIoDevice soundDevice{};
+        soundDevice.EmulatorId = c_virtioSoundDeviceClassId;
+        soundDevice.HostingModel = hcs::FlexibleIoDeviceHostingModel::External;
+        const auto instanceId =
+            wsl::shared::string::GuidToString<char>(m_virtioSoundInstanceId, wsl::shared::string::GuidToStringFlags::None);
+        vmSettings.Devices.FlexibleIov.emplace(instanceId, std::move(soundDevice));
+    }
+#endif
 
     systemSettings.VirtualMachine = std::move(vmSettings);
     return wsl::shared::ToJsonW(systemSettings);

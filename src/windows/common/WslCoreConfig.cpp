@@ -128,7 +128,13 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         ConfigKey(ConfigSetting::Experimental::HostAddressLoopback, EnableHostAddressLoopback),
         ConfigKey(ConfigSetting::Experimental::SetVersionDebug, SetVersionDebug),
         ConfigKey(ConfigSetting::Experimental::Swiotlb, MemoryString(SwiotlbSizeBytes)),
-        ConfigKey(ConfigSetting::Experimental::VirtioFsAggregateShares, EnableVirtioFsAggregateShares)};
+        ConfigKey(ConfigSetting::Experimental::VirtioFsAggregateShares, EnableVirtioFsAggregateShares),
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+        ConfigKey(ConfigSetting::Experimental::VirtioSound, EnableVirtioSound),
+        ConfigKey(ConfigSetting::Experimental::VirtioSoundWindowsInput, VirtioSoundWindowsInput),
+        ConfigKey(ConfigSetting::Experimental::VirtioSoundCaptureEndpoint, VirtioSoundCaptureEndpoint),
+#endif
+    };
 
     wil::unique_file ConfigFile;
     if (ConfigFilePath != nullptr)
@@ -429,6 +435,7 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableHardwarePerformanceCounters, false);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableGpuSupport, false);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableVirtio, false);
+        VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableVirtioSound, false);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableGuiApps, false);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, SwapSizeBytes, 0);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, KernelPath, std::filesystem::path{});
@@ -442,6 +449,7 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
     {
         VALIDATE_CONFIG_OPTION(!EnableVirtio, EnableVirtio9p, false);
         VALIDATE_CONFIG_OPTION(!EnableVirtio, EnableVirtioFs, false);
+        VALIDATE_CONFIG_OPTION(!EnableVirtio, EnableVirtioSound, false);
         VALIDATE_CONFIG_OPTION(!EnableVirtio, SwiotlbSizeBytes, 0);
 
         if (NetworkingMode == NetworkingMode::Consomme)
@@ -450,6 +458,34 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
             EMIT_USER_WARNING(wsl::shared::Localization::MessageConsommeRequiresVirtio(ToString(NetworkingMode)));
         }
     }
+
+    if (!EnableVirtioSound)
+    {
+        VirtioSoundWindowsInput = false;
+        VirtioSoundCaptureEndpoint.clear();
+    }
+
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+    // The kernel module list is assembled before final feature validation.
+    // Add the transport only when sound remains enabled after SafeMode and
+    // virtio validation have applied their overrides.
+    if (EnableVirtioSound)
+    {
+        if (VirtioSoundWindowsInput && (VirtioSoundCaptureEndpoint.empty() || VirtioSoundCaptureEndpoint.size() > 1024))
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageConfigVirtioSoundCaptureEndpoint());
+        }
+        const auto kernelModules = wsl::shared::string::Split(KernelModulesList, L',');
+        if (std::find(kernelModules.begin(), kernelModules.end(), L"virtio_snd") == kernelModules.end())
+        {
+            if (!KernelModulesList.empty())
+            {
+                KernelModulesList += L',';
+            }
+            KernelModulesList += L"virtio_snd";
+        }
+    }
+#endif
 
     if (EnableVirtio9p)
     {
