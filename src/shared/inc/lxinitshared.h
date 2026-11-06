@@ -177,6 +177,15 @@ Abstract:
 #define LX_INIT_HVSOCKET_TIMEOUT_SECONDS (30)
 
 //
+// HvSocket buffer size for listening sockets that accept control and stdio connections.
+//
+// N.B. The kernel doubles this value and sizes accepted connections' rings from it,
+//      keeping each ring allocation at order 4 (the default needs order 7).
+//
+
+#define LX_INIT_HVSOCKET_LISTEN_BUFFER_SIZE (14336)
+
+//
 // The data for beginning a port listener.
 //
 
