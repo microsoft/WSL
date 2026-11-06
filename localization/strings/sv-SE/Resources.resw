@@ -848,6 +848,10 @@ Mer information om Admin Protection finns på https://aka.ms/apdevguide</value>
     <value>Ogiltigt distributionsnamn: "{}".</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageInvalidDistribution" xml:space="preserve">
+    <value>Hittade ogiltig distributionsregistrering “{}”, {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholders are the distribution's registry GUID and the error code.</comment>
+  </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>Använder äldre distributionsregistrering. Överväg att använda en tar-baserad distribution i stället.</value>
     <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
@@ -2069,6 +2073,25 @@ Du kan också komma åt fler VS Code-fjärralternativ via kommandopaletten inom 
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Fortsätt att köra distributioner och den virtuella WSL-dator som är värd för dem från att stängas av automatiskt när de har varit inaktiva.</value>
   </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
+    <value>Håll WSL-distro-VM alltid på</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
+    <value>Din WSL-distro-VM stängs inte av vid inaktivitet, så nya skal startar direkt. Använder mer minne medan WSL körs. Detta börjar gälla i nästa WSL-session.</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Håll WSL-distro-VM alltid på</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
+    <value>Det gick inte att ändra inställningen för att hålla igång</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
+    <value>Kontrollera att .wslconfig inte är skrivskyddad och försök sedan igen.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
+    <value>Du kan ändra detta när som helst i WSL-inställningarna under Valfria funktioner.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Återställ tidsgräns</value>
   </data>
@@ -2419,10 +2442,6 @@ Användning:
   </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
      <value>Hittade ett positionsargument när inget förväntades: "{}"</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Alternativnamnet saknas vid: ''{}''</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
@@ -2854,11 +2873,11 @@ Exempel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Signal att skicka (standard: containerns konfigurerade STOPSIGNAL eller SIGTERM om ingen har konfigurerats)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>Övervaka containerhändelser.</value>
+  <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
+    <value>Övervaka händelser.</value>
   </data>
-  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>Övervaka händelser i realtid från containrar.</value>
+  <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
+    <value>Övervaka realtidshändelser från containrar, avbildningar, nätverk och volymer.</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
     <value>Visa alla händelser som skapats sedan tidsstämpeln</value>
@@ -4193,6 +4212,18 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   </data>
   <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
     <value>Det gick inte att installera värdens betrodda rotcertifikat på den virtuella datorn: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
+    <value>WSLC kunde inte skriva “{}” för att initiera lokal värdnamnsupplösning (gästfel {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
+    <value>WSLC startade gäst-VM:en, men Docker Engine blev inte redo inom {} millisekunder. Samla in WSL-diagnostikloggar för att undersöka startfelet.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
+    <value>Docker Engine avslutades med kod {} innan den blev redo i WSLC-gäst-VM:en. Samla in WSL-diagnostikloggar för att undersöka startfelet.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

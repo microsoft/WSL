@@ -206,13 +206,15 @@ private:
 
     __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> StartTransition(TransitionKind kind, ContainerEvent expectedEvent);
 
-    // Returns with both locks held when no transition is active (or it matches kind) and, if waitForRestart,
-    // no restart is in flight either. Both conditions are re-checked every time the locks come back.
+    // Returns with both locks held when no transition is active (or it matches kind), if waitForRestart, no restart
+    // is in flight, and, if waitForExitRequests, no stop or kill request is in flight against an exited run. All
+    // conditions are re-checked every time the locks come back.
     void WaitForConflictingTransitionToComplete(
         wil::rwlock_release_exclusive_scope_exit& lock,
         wil::rwlock_release_shared_scope_exit& lifecycleLock,
         std::optional<TransitionKind> kind = std::nullopt,
-        bool waitForRestart = true);
+        bool waitForRestart = true,
+        bool waitForExitRequests = false);
 
     // Phases of Restart(). Identical to Start() and Stop() except that they do not stand down for the
     // restart they are part of. PolicyRestartToken identifies a start requested by the restart policy,
@@ -355,7 +357,7 @@ private:
 };
 
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLCContainer
-    : public common::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCContainer, IWSLCCompatContainer, IFastRundown, ISupportErrorInfo>,
+    : public common::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCContainer, Microsoft::WRL::ChainInterfaces<IWSLCCompatContainer2, IWSLCCompatContainer>, IFastRundown, ISupportErrorInfo>,
       public COMImplClass<WSLCContainerImpl, std::weak_ptr<WSLCContainerImpl>>
 {
 
@@ -393,6 +395,10 @@ public:
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLCCompatProcess** Process) override;
     IFACEMETHOD(Exec)(_In_ const WSLCCompatProcessOptions* Options, _Out_ IWSLCCompatProcess** Process) override;
     IFACEMETHOD(Inspect)(_Out_ LPSTR* Output) override;
+
+    // IWSLCCompatContainer2.
+    IFACEMETHOD(ConnectNetwork)(_In_ const WSLCCompatNetworkConnection* Network) override;
+    IFACEMETHOD(DisconnectNetwork)(_In_ LPCSTR NetworkNameOrId) override;
 
     IFACEMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);
 

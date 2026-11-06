@@ -8038,6 +8038,46 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         }
     }
 
+    TEST_METHOD(InvalidDistroRegistrationName)
+    {
+        const auto distroId = GetDistributionId(LXSS_DISTRO_NAME_TEST_L);
+        VERIFY_IS_TRUE(distroId.has_value());
+
+        const auto distroKey = OpenDistributionKey(LXSS_DISTRO_NAME_TEST_L);
+
+        RegistryKeyChange<std::wstring> nameChange(distroKey.get(), L"", L"DistributionName", LXSS_DISTRO_NAME_TEST_L);
+
+        wsl::windows::common::SvcComm service;
+        const auto originalDistributions = service.EnumerateDistributions();
+
+        for (const size_t length : {size_t{LX_INIT_DISTRO_NAME_MAX}, size_t{LX_INIT_DISTRO_NAME_MAX + 1}, size_t{4096}})
+        {
+            const std::wstring name(length, L'a');
+            nameChange.Set(name);
+
+            const auto distributions = service.EnumerateDistributions();
+            const bool validName = length <= LX_INIT_DISTRO_NAME_MAX;
+
+            VERIFY_ARE_EQUAL(originalDistributions.size() - (validName ? 0 : 1), distributions.size());
+
+            auto [output, error] = LxsstuLaunchWslAndCaptureOutput(L"--list --quiet");
+            if (validName)
+            {
+                VERIFY_IS_TRUE(output.find(name + L"\r\n") != std::wstring::npos);
+                VERIFY_ARE_EQUAL(error, L"");
+            }
+            else
+            {
+                VERIFY_IS_TRUE(output.find(name) == std::wstring::npos);
+                VERIFY_ARE_EQUAL(
+                    error,
+                    std::format(
+                        L"wsl: Found invalid distribution registration '{}', E_INVALIDARG.\r\n",
+                        wsl::shared::string::GuidToString<wchar_t>(distroId.value())));
+            }
+        }
+    }
+
     // Validate that a distribution can be unregistered even if its BasePath doesn't exist.
     // See https://github.com/microsoft/WSL/issues/13004
     TEST_METHOD(BrokenDistroUnregister)
@@ -9325,6 +9365,32 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         overwrittenBuffer.Insert("\nalpha\nbeta\n");
         VERIFY_ARE_EQUAL(std::string("pha\nbeta\n"), overwrittenBuffer.Get());
         verifyLines(overwrittenBuffer, 3, {"pha", "beta"});
+    }
+
+    TEST_METHOD(ListRunningDistributions)
+    {
+        constexpr auto c_stoppedDistroName = L"list-running-stopped";
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version {}", c_stoppedDistroName, g_testDistroPath, LxsstuVmMode() ? 2 : 1)), 0L);
+        auto cleanup = wil::scope_exit_log(
+            WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"--unregister {}", c_stoppedDistroName)); });
+
+        WslShutdown();
+
+        WslKeepAlive keepAlive(nullptr, LXSS_DISTRO_NAME_TEST_L);
+
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"--list --verbose");
+        VERIFY_IS_TRUE(out.find(LXSS_DISTRO_NAME_TEST_L) != std::wstring::npos);
+        VERIFY_IS_TRUE(out.find(c_stoppedDistroName) != std::wstring::npos);
+        VERIFY_ARE_EQUAL(err, L"");
+
+        for (const auto* commandLine : {L"--list --running --verbose", L"-l -v --running"})
+        {
+            std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(commandLine);
+            VERIFY_IS_TRUE(out.find(LXSS_DISTRO_NAME_TEST_L) != std::wstring::npos);
+            VERIFY_IS_TRUE(out.find(c_stoppedDistroName) == std::wstring::npos);
+            VERIFY_ARE_EQUAL(err, L"");
+        }
     }
 };
 } // namespace UnitTests

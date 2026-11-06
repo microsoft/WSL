@@ -472,6 +472,7 @@ std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
     auto filenameStem = std::filesystem::path(Filename).stem().wstring();
     auto filenameExtension = std::filesystem::path(Filename).extension().wstring();
     std::wstring filePath{};
+
     winrt::Windows::Storage::Streams::IRandomAccessStream outputStream{};
     for (int suffix = 1; outputStream == nullptr; suffix++)
     {

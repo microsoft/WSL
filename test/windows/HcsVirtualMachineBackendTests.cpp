@@ -9,6 +9,14 @@
 using namespace VirtualMachineBackendTestHelpers;
 using wsl::windows::common::socket::CancellableAccept;
 
+struct HcsVirtualMachineBackendTestAccess
+{
+    static void DispatchEvent(HcsVirtualMachineBackend& Backend, HCS_EVENT& Event)
+    {
+        HcsVirtualMachineBackend::OnSystemEvent(&Event, &Backend);
+    }
+};
+
 namespace {
 
 constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
@@ -253,6 +261,53 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(VmTerminationReason::Unknown, backend->GetTerminationReason().Reason);
         backend.reset();
         VERIFY_IS_TRUE(terminationEvent.is_signaled());
+    }
+
+    WSL2_TEST_METHOD(PreservesFirstTerminationNotification)
+    {
+        SKIP_TEST_ARM64();
+        int notificationCount = 0;
+        auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        wsl::windows::common::hcs::RegisterCallback(backend->GetComputeSystemHandle(), [](HCS_EVENT*, void*) {}, nullptr);
+        backend->RegisterTerminationCallback([&](GUID) { ++notificationCount; });
+
+        HCS_EVENT disconnect{};
+        disconnect.Type = HcsEventServiceDisconnect;
+        disconnect.EventData = L"service disconnected";
+        HcsVirtualMachineBackendTestAccess::DispatchEvent(*backend, disconnect);
+        VERIFY_IS_TRUE(backend->GetTerminationEvent().is_signaled());
+
+        HCS_EVENT exited{};
+        exited.Type = HcsEventSystemExited;
+        exited.EventData = L"{\"Status\":0,\"ExitType\":\"UnexpectedExit\"}";
+        HcsVirtualMachineBackendTestAccess::DispatchEvent(*backend, exited);
+
+        const auto information = backend->GetTerminationReason();
+        VERIFY_ARE_EQUAL(VmTerminationReason::Unknown, information.Reason);
+        VERIFY_ARE_EQUAL(std::wstring{L"service disconnected"}, information.Details);
+        VERIFY_ARE_EQUAL(1, notificationCount);
+    }
+
+    WSL2_TEST_METHOD(SignalsTerminationWhenExitDataIsMalformed)
+    {
+        SKIP_TEST_ARM64();
+        HRESULT callbackReasonResult = E_FAIL;
+        auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        wsl::windows::common::hcs::RegisterCallback(backend->GetComputeSystemHandle(), [](HCS_EVENT*, void*) {}, nullptr);
+        backend->RegisterTerminationCallback(
+            [&](GUID) { callbackReasonResult = OperationResult([&] { backend->GetTerminationReason(); }); });
+
+        HCS_EVENT exited{};
+        exited.Type = HcsEventSystemExited;
+        exited.EventData = L"{invalid";
+        HcsVirtualMachineBackendTestAccess::DispatchEvent(*backend, exited);
+
+        VERIFY_IS_TRUE(backend->GetTerminationEvent().is_signaled());
+        VERIFY_ARE_EQUAL(S_OK, callbackReasonResult);
+        VERIFY_ARE_EQUAL(VmState::Stopped, backend->GetState());
+        const auto information = backend->GetTerminationReason();
+        VERIFY_ARE_EQUAL(VmTerminationReason::Unknown, information.Reason);
+        VERIFY_ARE_EQUAL(std::wstring{L"{invalid"}, information.Details);
     }
 
     WSL2_TEST_METHOD(TerminatesConcurrently)

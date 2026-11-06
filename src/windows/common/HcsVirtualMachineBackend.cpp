@@ -2190,7 +2190,36 @@ void HcsVirtualMachineBackend::OnCrash(PCWSTR Details)
 
 void HcsVirtualMachineBackend::OnExit(const HCS_EVENT* Event)
 {
+    if (m_exitReported.exchange(true))
+    {
+        return;
+    }
+
     VmTerminationInformation information;
+    // Publish termination even if the HCS exit payload cannot be parsed.
+    auto completeExit = wil::scope_exit([&] {
+        {
+            auto lock = m_lock.lock_exclusive();
+            m_state = VmState::Stopped;
+        }
+
+        {
+            auto terminationInformationLock = m_terminationInformationLock.lock_exclusive();
+            m_terminationInformation = std::move(information);
+        }
+
+        m_exitEvent.SetEvent();
+
+        // An exit without a prior termination request must cancel pending operations.
+        if (!m_terminatingEvent.is_signaled())
+        {
+            WSL_LOG("AbnormalVmExit", TraceLoggingValue(Event->EventData, "Details"));
+            m_terminatingEvent.SetEvent();
+        }
+
+        NotifyTerminated(m_configuration.Description.Identity);
+    });
+
     if (Event->EventData != nullptr)
     {
         information.Details = Event->EventData;
@@ -2214,26 +2243,4 @@ void HcsVirtualMachineBackend::OnExit(const HCS_EVENT* Event)
             }
         }
     }
-
-    // Closing the system drains callbacks before their event and context are destroyed.
-    // An exit without a prior termination request must cancel pending operations.
-    {
-        auto lock = m_lock.lock_exclusive();
-        m_state = VmState::Stopped;
-    }
-
-    {
-        auto terminationInformationLock = m_terminationInformationLock.lock_exclusive();
-        m_terminationInformation = std::move(information);
-    }
-
-    m_exitEvent.SetEvent();
-
-    if (!m_terminatingEvent.is_signaled())
-    {
-        WSL_LOG("AbnormalVmExit", TraceLoggingValue(Event->EventData, "Details"));
-        m_terminatingEvent.SetEvent();
-    }
-
-    NotifyTerminated(m_configuration.Description.Identity);
 }

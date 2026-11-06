@@ -222,6 +222,24 @@ ProcessOutput RunContainerAndCapture(
     return RunContainerAndCapture(session, containerSettings, timeout);
 }
 
+// Runs a shell script in a short-lived container attached to the given network and returns its stdout.
+std::string RunScriptOnNetwork(
+    WslcSession session, const char* network, const std::string& script, const char* image = "python:3.12-alpine")
+{
+    const char* argv[] = {"/bin/sh", "-c", script.c_str()};
+    WslcProcessSettings procSettings;
+    THROW_IF_FAILED(WslcInitProcessSettings(&procSettings));
+    THROW_IF_FAILED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+
+    const WslcContainerNetwork networks[] = {{network, nullptr, 0, nullptr, nullptr}};
+    WslcContainerSettings containerSettings;
+    THROW_IF_FAILED(WslcInitContainerSettings(image, &containerSettings));
+    THROW_IF_FAILED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+    THROW_IF_FAILED(WslcSetContainerSettingsNetworks(&containerSettings, networks, ARRAYSIZE(networks)));
+
+    return RunContainerAndCapture(session, containerSettings).stdoutOutput;
+}
+
 } // namespace
 
 class WslcSdkTests
@@ -926,22 +944,12 @@ class WslcSdkTests
             const auto serverIp = serverInspect.NetworkSettings.Networks.at(c_primaryNetwork).IPAddress;
             VERIFY_IS_FALSE(serverIp.empty());
 
-            const auto script = std::format(
-                "wget -q -O /dev/null http://web:8000/ && echo alias-ok; wget -q -O /dev/null http://{}:8000/ && echo ip-ok", serverIp);
-            const char* clientArgv[] = {"/bin/sh", "-c", script.c_str()};
-            WslcProcessSettings clientProcSettings;
-            VERIFY_SUCCEEDED(WslcInitProcessSettings(&clientProcSettings));
-            VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&clientProcSettings, clientArgv, ARRAYSIZE(clientArgv)));
-
-            const WslcContainerNetwork clientNetworks[] = {{c_primaryNetwork, nullptr, 0, nullptr, nullptr}};
-            WslcContainerSettings clientSettings;
-            VERIFY_SUCCEEDED(WslcInitContainerSettings("python:3.12-alpine", &clientSettings));
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&clientSettings, &clientProcSettings));
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworks(&clientSettings, clientNetworks, ARRAYSIZE(clientNetworks)));
-
-            const auto output = RunContainerAndCapture(m_defaultSession, clientSettings);
-            VERIFY_IS_TRUE(output.stdoutOutput.find("alias-ok") != std::string::npos);
-            VERIFY_IS_TRUE(output.stdoutOutput.find("ip-ok") != std::string::npos);
+            const auto output = RunScriptOnNetwork(
+                m_defaultSession,
+                c_primaryNetwork,
+                std::format("wget -q -O /dev/null http://web:8000/ && echo alias-ok; wget -q -O /dev/null http://{}:8000/ && echo ip-ok", serverIp));
+            VERIFY_IS_TRUE(output.find("alias-ok") != std::string::npos);
+            VERIFY_IS_TRUE(output.find("ip-ok") != std::string::npos);
         }
 
         // Positive: each network gets its own static IP.
@@ -1055,6 +1063,169 @@ class WslcSdkTests
             const PCSTR nullAlias[] = {nullptr};
             const WslcContainerNetwork withNullAlias[] = {{c_primaryNetwork, nullAlias, ARRAYSIZE(nullAlias), nullptr, nullptr}};
             VERIFY_ARE_EQUAL(WslcSetContainerSettingsNetworks(&containerSettings, withNullAlias, ARRAYSIZE(withNullAlias)), E_INVALIDARG);
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerNetworkConnectDisconnect)
+    {
+        constexpr auto c_primaryNetwork = "wslc-sdk-connect-primary";
+        constexpr auto c_additionalNetwork = "wslc-sdk-connect-additional";
+        constexpr auto c_additionalIp = "10.231.53.10";
+
+        auto comSession = wil::com_query<IWSLCSession>(reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->GetSession());
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_primaryNetwork));
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_additionalNetwork));
+
+        auto createNetwork = [&](const char* name, const char* subnet, WslcNetworkInfo* info) {
+            WslcNetworkSettings settings{};
+            settings.name = name;
+            settings.ipv4PrefixLength = 24;
+            VERIFY_ARE_EQUAL(inet_pton(AF_INET, subnet, &settings.ipv4Subnet), 1);
+            VERIFY_SUCCEEDED(WslcCreateSessionNetwork(m_defaultSession, &settings, info, nullptr));
+        };
+
+        createNetwork(c_primaryNetwork, "10.231.52.0", nullptr);
+        auto cleanupPrimary = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_primaryNetwork)); });
+        WslcNetworkInfo additionalInfo{};
+        createNetwork(c_additionalNetwork, "10.231.53.0", &additionalInfo);
+        auto cleanupAdditional = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_additionalNetwork)); });
+
+        auto inspect = [](WslcContainer container) {
+            wil::unique_cotaskmem_ansistring inspectData;
+            VERIFY_SUCCEEDED(WslcInspectContainer(container, &inspectData));
+            return wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(inspectData.get());
+        };
+
+        auto createContainer = [&](const WslcContainerNetwork* networks, uint32_t count) {
+            const char* sleepArgv[] = {"/bin/sleep", "99"};
+            WslcProcessSettings procSettings;
+            VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, sleepArgv, ARRAYSIZE(sleepArgv)));
+
+            WslcContainerSettings containerSettings;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+            if (networks != nullptr)
+            {
+                VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworks(&containerSettings, networks, count));
+            }
+
+            UniqueContainer container;
+            VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+            return container;
+        };
+
+        // Pings the alias and the static IP from a peer container on the additional network.
+        const auto pingScript = std::format("ping -c 1 -W 5 cache && echo alias-ok; ping -c 1 -W 5 {} && echo ip-ok", c_additionalIp);
+
+        const WslcContainerNetwork primary[] = {{c_primaryNetwork, nullptr, 0, nullptr, nullptr}};
+
+        // Positive: connect a running container by name with aliases and a static IP, then disconnect by name.
+        {
+            auto container = createContainer(primary, ARRAYSIZE(primary));
+            VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_NONE, nullptr));
+
+            const PCSTR aliases[] = {"cache"};
+            IN_ADDR ipAddress{};
+            VERIFY_ARE_EQUAL(inet_pton(AF_INET, c_additionalIp, &ipAddress), 1);
+            const WslcContainerNetwork network{c_additionalNetwork, aliases, ARRAYSIZE(aliases), &ipAddress, nullptr};
+            VERIFY_SUCCEEDED(WslcConnectContainerNetwork(container.get(), &network, nullptr));
+
+            auto inspectObject = inspect(container.get());
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_additionalNetwork));
+            const auto& endpoint = inspectObject.NetworkSettings.Networks.at(c_additionalNetwork);
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "cache") != endpoint.Aliases.end());
+            VERIFY_ARE_EQUAL(std::string(c_additionalIp), endpoint.IPAddress);
+
+            auto output = RunScriptOnNetwork(m_defaultSession, c_additionalNetwork, pingScript);
+            VERIFY_IS_TRUE(output.find("alias-ok") != std::string::npos);
+            VERIFY_IS_TRUE(output.find("ip-ok") != std::string::npos);
+
+            VERIFY_SUCCEEDED(WslcDisconnectContainerNetwork(container.get(), c_additionalNetwork, nullptr));
+            inspectObject = inspect(container.get());
+            VERIFY_IS_FALSE(inspectObject.NetworkSettings.Networks.contains(c_additionalNetwork));
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_primaryNetwork));
+
+            output = RunScriptOnNetwork(m_defaultSession, c_additionalNetwork, pingScript);
+            VERIFY_IS_TRUE(output.find("alias-ok") == std::string::npos);
+            VERIFY_IS_TRUE(output.find("ip-ok") == std::string::npos);
+        }
+
+        // Positive: connect a created container by ID and disconnect by ID prefix.
+        {
+            auto container = createContainer(primary, ARRAYSIZE(primary));
+
+            const WslcContainerNetwork network{additionalInfo.id, nullptr, 0, nullptr, nullptr};
+            VERIFY_SUCCEEDED(WslcConnectContainerNetwork(container.get(), &network, nullptr));
+
+            VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_NONE, nullptr));
+            VERIFY_IS_TRUE(inspect(container.get()).NetworkSettings.Networks.contains(c_additionalNetwork));
+
+            const std::string prefix(additionalInfo.id, 12);
+            VERIFY_SUCCEEDED(WslcDisconnectContainerNetwork(container.get(), prefix.c_str(), nullptr));
+            VERIFY_IS_FALSE(inspect(container.get()).NetworkSettings.Networks.contains(c_additionalNetwork));
+        }
+
+        // Positive: connect and disconnect a created container, then start it without the removed network.
+        {
+            auto container = createContainer(primary, ARRAYSIZE(primary));
+
+            const WslcContainerNetwork network{c_additionalNetwork, nullptr, 0, nullptr, nullptr};
+            VERIFY_SUCCEEDED(WslcConnectContainerNetwork(container.get(), &network, nullptr));
+            VERIFY_IS_TRUE(inspect(container.get()).NetworkSettings.Networks.contains(c_additionalNetwork));
+
+            VERIFY_SUCCEEDED(WslcDisconnectContainerNetwork(container.get(), c_additionalNetwork, nullptr));
+            VERIFY_IS_FALSE(inspect(container.get()).NetworkSettings.Networks.contains(c_additionalNetwork));
+
+            VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_NONE, nullptr));
+            const auto inspectObject = inspect(container.get());
+            VERIFY_IS_FALSE(inspectObject.NetworkSettings.Networks.contains(c_additionalNetwork));
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_primaryNetwork));
+        }
+
+        // Negative: the network does not exist.
+        {
+            auto container = createContainer(primary, ARRAYSIZE(primary));
+
+            const WslcContainerNetwork network{"wslc-sdk-connect-missing", nullptr, 0, nullptr, nullptr};
+            wil::unique_cotaskmem_string errorMessage;
+            VERIFY_ARE_EQUAL(WslcConnectContainerNetwork(container.get(), &network, errorMessage.put()), WSLC_E_NETWORK_NOT_FOUND);
+            VERIFY_IS_NOT_NULL(errorMessage.get());
+
+            errorMessage.reset();
+            VERIFY_ARE_EQUAL(WslcDisconnectContainerNetwork(container.get(), "wslc-sdk-connect-missing", errorMessage.put()), WSLC_E_NETWORK_NOT_FOUND);
+            VERIFY_IS_NOT_NULL(errorMessage.get());
+        }
+
+        // Negative: containers without networking cannot join additional networks.
+        {
+            auto container = createContainer(nullptr, 0);
+
+            const WslcContainerNetwork network{c_additionalNetwork, nullptr, 0, nullptr, nullptr};
+            VERIFY_ARE_EQUAL(WslcConnectContainerNetwork(container.get(), &network, nullptr), E_INVALIDARG);
+        }
+
+        // Negative: invalid arguments.
+        {
+            auto container = createContainer(primary, ARRAYSIZE(primary));
+
+            VERIFY_ARE_EQUAL(WslcConnectContainerNetwork(container.get(), nullptr, nullptr), E_POINTER);
+
+            const WslcContainerNetwork nullName{nullptr, nullptr, 0, nullptr, nullptr};
+            VERIFY_ARE_EQUAL(WslcConnectContainerNetwork(container.get(), &nullName, nullptr), E_INVALIDARG);
+
+            const WslcContainerNetwork emptyName{"", nullptr, 0, nullptr, nullptr};
+            VERIFY_ARE_EQUAL(WslcConnectContainerNetwork(container.get(), &emptyName, nullptr), E_INVALIDARG);
+
+            const WslcContainerNetwork missingAliases{c_additionalNetwork, nullptr, 1, nullptr, nullptr};
+            VERIFY_ARE_EQUAL(WslcConnectContainerNetwork(container.get(), &missingAliases, nullptr), E_INVALIDARG);
+
+            const PCSTR aliases[] = {"web"};
+            const WslcContainerNetwork bridgeWithAliases{"bridge", aliases, ARRAYSIZE(aliases), nullptr, nullptr};
+            VERIFY_ARE_EQUAL(WslcConnectContainerNetwork(container.get(), &bridgeWithAliases, nullptr), E_INVALIDARG);
+
+            VERIFY_ARE_EQUAL(WslcDisconnectContainerNetwork(container.get(), nullptr, nullptr), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(WslcDisconnectContainerNetwork(container.get(), "", nullptr), E_INVALIDARG);
         }
     }
 
