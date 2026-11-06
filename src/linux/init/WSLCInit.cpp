@@ -1098,7 +1098,13 @@ int WriteFileAtomic(const std::filesystem::path& Path, const gsl::span<gsl::byte
     auto tmpPath = Path;
     tmpPath += ".tmp";
 
-    wil::unique_fd fd{open(tmpPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW | O_CLOEXEC, Permissions)};
+    // Always stage into a freshly created regular file. Opening a leftover FIFO or device would block or have side effects.
+    if (unlink(tmpPath.c_str()) < 0 && errno != ENOENT)
+    {
+        return errno;
+    }
+
+    wil::unique_fd fd{open(tmpPath.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, Permissions)};
     if (!fd)
     {
         return errno;
@@ -1172,7 +1178,8 @@ void HandleMessageImpl(
 
 int ReadFileWithLimit(const char* Path, size_t MaxSize, std::string& Content)
 {
-    wil::unique_fd fd{open(Path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)};
+    // O_NONBLOCK keeps a FIFO from blocking the open so the regular-file check below can reject it.
+    wil::unique_fd fd{open(Path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)};
     if (!fd)
     {
         return errno;
