@@ -104,7 +104,7 @@ public:
     // running VM, including one committed to stopping, and fails with WSLC_E_VM_NOT_RUNNING when there
     // is none. Waiting is not an option for the calls that matter -- a plugin reentering from its
     // OnWslcVmStopping handler is the reason the teardown is blocked, so it would deadlock against
-    // itself.
+    // itself. Once the session is terminating it fails with ERROR_INVALID_STATE instead of waiting.
     enum class VmLeasePolicy
     {
         Acquire,
