@@ -848,6 +848,10 @@ Lisätietoja Admin Protection saat osoitteesta https://aka.ms/apdevguide</value>
     <value>Virheellinen jakelunimi: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageInvalidDistribution" xml:space="preserve">
+    <value>Löytyi virheellinen jakelurekisteröinti "{}", {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholders are the distribution's registry GUID and the error code.</comment>
+  </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>Perinteistä jakelun rekisteröintiä käytetään. Harkitse sen sijaan tar-pohjaisen jakelun käyttöä.</value>
     <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
@@ -2069,6 +2073,25 @@ Voit käyttää myös muita VS Code Remote -asetuksia VS Coden komentovalikoiman
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Estä jakeluja ja niitä isännöivää WSL-virtuaalikonetta sammumasta automaattisesti niiden oltua käyttämättöminä.</value>
   </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
+    <value>Pidä WSL-jakelun virtuaalikone aina käynnissä</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
+    <value>WSL-jakelun virtuaalikone ei sammu, kun se on käyttämättömänä, joten uudet komentotulkit käynnistyvät heti. Tämä kuluttaa enemmän muistia WSL:n ollessa käynnissä. Asetus tulee voimaan seuraavassa WSL-istunnossa.</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Pidä WSL-jakelun virtuaalikone aina käynnissä</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
+    <value>Asetusta, jolla WSL-jakelun virtuaalikone pidetään käynnissä, ei voitu muuttaa</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
+    <value>Varmista, ettei .wslconfig ole vain luku -tilassa, ja yritä sitten uudelleen.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
+    <value>Voit muuttaa tätä milloin tahansa WSL-asetusten Valinnaiset ominaisuudet -kohdassa.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Palauta aikakatkaisu</value>
   </data>
@@ -2419,10 +2442,6 @@ Käyttö:
   </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
      <value>Löydettiin positioargumentti, kun yhtäkään ei odotettu: {}</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Asetuksen nimi puuttuu kohdasta: {}</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
@@ -2853,11 +2872,11 @@ Esimerkki: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Lähetettävä signaali (oletus: säilön määrittämä STOPSIGNAL tai SIGTERM, jos mitään ei ole määritetty)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>Valvo säilötapahtumia.</value>
+  <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
+    <value>Seuraa tapahtumia.</value>
   </data>
-  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>Valvo säilöjen reaaliaikaisia tapahtumia.</value>
+  <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
+    <value>Valvo reaaliaikaisia tapahtumia säilöistä, näköistiedostoista, verkoista ja asemista.</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
     <value>Näytä kaikki aikaleiman jälkeen luodut tapahtumat</value>
@@ -4192,6 +4211,18 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   </data>
   <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
     <value>Isännän luotettujen päävarmenteiden asentaminen epäonnistui virtuaalikoneeseen: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
+    <value>WSLC ei voinut kirjoittaa arvoa '{}' paikallisen isäntänimen selvityksen alustamista varten (vierasvirhe {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
+    <value>WSLC käynnisti vieras-VM:n, mutta Docker Engine ei ollut valmis {} millisekunnin kuluessa. Kerää WSL:n diagnostiikkalokit käynnistysongelman selvittämistä varten.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
+    <value>Docker Engine sulkeutui koodilla {} ennen kuin se oli valmis WSLC:n vieras-VM:ssä. Kerää WSL:n diagnostiikkalokit käynnistysongelman selvittämistä varten.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

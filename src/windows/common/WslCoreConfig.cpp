@@ -392,14 +392,14 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
     }
 
     // Mirrored mode has Hyper-V Firewall always on - we ignore the local setting regardless in this case.
-    if (NetworkingMode != wsl::core::NetworkingMode::Mirrored)
+    if (NetworkingMode == wsl::core::NetworkingMode::Mirrored)
     {
-        if (!FirewallConfig.Enabled() &&
-            !wsl::windows::policies::IsFeatureAllowed(key.get(), wsl::windows::policies::c_allowCustomFirewallUserSetting))
-        {
-            FirewallConfig.Enable();
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageSettingOverriddenByPolicy(L"wsl2.firewall"));
-        }
+        FirewallConfig.Enable();
+    }
+    else if (!FirewallConfig.Enabled() && !wsl::windows::policies::IsFeatureAllowed(key.get(), wsl::windows::policies::c_allowCustomFirewallUserSetting))
+    {
+        FirewallConfig.Enable();
+        EMIT_USER_WARNING(wsl::shared::Localization::MessageSettingOverriddenByPolicy(L"wsl2.firewall"));
     }
 
     // Due to an issue with Global Secure Access Client, do not use DNS tunneling if the service is present.

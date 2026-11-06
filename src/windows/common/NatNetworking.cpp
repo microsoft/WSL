@@ -59,11 +59,11 @@ NatNetworking::NatNetworking(
 
 NatNetworking::~NatNetworking()
 {
-    // Stop DNS suffix change notifications first, as those can call into the GNS channel.
-    m_dnsSuffixRegistryWatcher.reset();
-
-    // Unblock guest communications before draining network notification and telemetry callbacks.
+    // Unblock guest communications before draining any callbacks that use the GNS channel.
     m_gnsChannel.Stop();
+
+    // Stop and drain DNS suffix change notifications.
+    m_dnsSuffixRegistryWatcher.reset();
 
     // Drain network notifications before destroying the telemetry timer they can rearm.
     m_networkNotifyHandle.reset();
@@ -72,7 +72,10 @@ NatNetworking::~NatNetworking()
     m_connectivityTelemetry.Reset();
 
     auto lock = g_endpointsInUseLock.lock_exclusive();
-    auto eraseRange = std::ranges::remove(g_endpointsInUse, m_endpoint.Id);
+
+    auto endpoint = std::move(m_endpoint);
+    auto eraseRange = std::ranges::remove(g_endpointsInUse, endpoint.Id);
+
     g_endpointsInUse.erase(eraseRange.begin(), eraseRange.end());
 }
 
@@ -216,9 +219,9 @@ void NatNetworking::Initialize()
         {
             // Enumerating and attaching the endpoints need to be an atomic operation between different users.
             // Keep the lock until endpoint is created.
-            // Its currently safe to take this lock while holding the member m_lock
-            // because g_endpointsInUseLock is only ever locked during the d'tor
+            // Lock order is m_lock then g_endpointsInUseLock; destruction only takes the global lock.
             auto endpointLock = g_endpointsInUseLock.lock_exclusive();
+            g_endpointsInUse.reserve(g_endpointsInUse.size() + 1);
 
             wil::unique_cotaskmem_string endpointsJson;
             wil::unique_cotaskmem_string endpointsError;
@@ -283,12 +286,16 @@ void NatNetworking::Initialize()
         PCSTR executionStep = "";
         try
         {
+            auto endpointLock = g_endpointsInUseLock.lock_exclusive();
+            g_endpointsInUse.reserve(g_endpointsInUse.size() + 1);
+
             // If no IP address was passed or if the endpoint couldn't be created / attached, create a new one without the IP address requirement.
             networking::EphemeralHcnEndpoint endpoint;
             executionStep = "HcnCreateEndpoint";
             std::tie(endpoint, endpointProperties) = CreateEndpoint(L"");
             executionStep = "AttachEndpoint";
             AttachEndpoint(std::move(endpoint), endpointProperties);
+            g_endpointsInUse.emplace_back(endpointProperties.ID);
         }
         catch (...)
         {
@@ -336,10 +343,14 @@ void NatNetworking::Initialize()
         //
         // Note: DNS suffix change notifications are used only if DNS tunneling is enabled. DNS behavior for NAT mode
         // without DNS tunneling remains unchanged
+
+        // Constructor rollback waits for callbacks that also acquire this lock.
+        lock.reset();
         m_dnsSuffixRegistryWatcher.emplace([this] {
             const auto watcher_lock = m_lock.lock_exclusive();
             UpdateDns();
         });
+        lock = m_lock.lock_exclusive();
     }
 
     // Update DNS information.
@@ -379,8 +390,8 @@ void NatNetworking::AttachEndpoint(wsl::core::networking::EphemeralHcnEndpoint&&
         wsl::shared::string::ParseMacAddress(properties.MacAddress),
         true);
 
-    m_endpoint = std::move(endpoint);
     m_networkSettings = GetEndpointSettings(properties);
+    m_endpoint = std::move(endpoint);
 }
 
 void NatNetworking::StartPortTracker(wil::unique_socket&& socket)

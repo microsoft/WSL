@@ -331,6 +331,19 @@ HRESULT OnDistroStarted(const WSLSessionInformation* Session, const WSLDistribut
         const GUID guid{};
         g_logfile << "Invalid distro launch returned:  "
                   << g_api->ExecuteBinaryInDistribution(Session->SessionId, &guid, arguments[0], arguments.data(), &socket) << std::endl;
+
+        // Verify that plugin-launched processes do not inherit init's ignored SIGTERM disposition.
+        arguments = {"/bin/sh", "-c", "printf 'ready\\n'; kill -TERM $$; printf 'survived\\n'", nullptr};
+        socket.reset();
+        RETURN_IF_FAILED(g_api->ExecuteBinaryInDistribution(Session->SessionId, &Distribution->Id, arguments[0], arguments.data(), &socket));
+        output = ReadFromSocket(socket.get());
+        if (std::string(output.begin(), output.end()) != "ready\n")
+        {
+            g_logfile << "Unexpected output after SIGTERM: " << std::string(output.begin(), output.end()) << std::endl;
+            return E_ABORT;
+        }
+
+        g_logfile << "Process terminated by SIGTERM" << std::endl;
     }
 
     return S_OK;

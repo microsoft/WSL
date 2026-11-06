@@ -855,6 +855,10 @@
     <value>Недопустимое имя дистрибутива: "{}".</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageInvalidDistribution" xml:space="preserve">
+    <value>Обнаружена недопустимая регистрация дистрибутива "{}", {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholders are the distribution's registry GUID and the error code.</comment>
+  </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>Использование устаревшей регистрации распространения. Вместо этого рассмотрите возможность использования дистрибутива на основе tar.</value>
     <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
@@ -2076,6 +2080,25 @@
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Не допускайте автоматического завершения работы запущенных дистрибутивов и виртуальной машины WSL, на которой они размещены.</value>
   </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
+    <value>Держать виртуальную машину дистрибутива WSL всегда включенной</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
+    <value>Виртуальная машина дистрибутива WSL не будет завершать работу в режиме простоя, поэтому новые оболочки запускаются сразу. Использует больше памяти, пока выполняется WSL. Это вступит в силу в следующем сеансе WSL.</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Держать виртуальную машину дистрибутива WSL всегда включенной</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
+    <value>Не удалось изменить параметр постоянного выполнения</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
+    <value>Убедитесь, что файл .wslconfig не только для чтения, и повторите попытку.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
+    <value>Вы можете изменить это в любое время в параметрах WSL в разделе "Необязательные компоненты".</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Сброс времени ожидания</value>
   </data>
@@ -2426,10 +2449,6 @@
   </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
      <value>Найден позиционный аргумент, когда не ожидалось: "{}"</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Отсутствует имя параметра в: "{}"</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
@@ -2860,11 +2879,11 @@
     <value>Сигнал для отправки (по умолчанию — настроенный сигнал STOPSIGNAL контейнера или SIGTERM, если он не настроен)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>Мониторинг событий контейнера.</value>
+  <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
+    <value>Отслеживание событий.</value>
   </data>
-  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>Мониторинг событий контейнеров в реальном времени.</value>
+  <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
+    <value>Отслеживание событий в реальном времени в контейнерах, образах, сетях и томах.</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
     <value>Отображение всех событий, созданных с указанного времени</value>
@@ -4199,6 +4218,18 @@
   </data>
   <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
     <value>Не удалось установить доверенные корневые сертификаты узла на виртуальной машине: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
+    <value>WSLC не удалось записать '{}' для инициализации локального разрешения имени узла (ошибка гостевой системы {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
+    <value>WSLC запустил гостевую виртуальную машину, но Docker Engine не стал готов за {} мс. Соберите диагностические журналы WSL, чтобы исследовать сбой запуска.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
+    <value>Docker Engine завершил работу с кодом {} до готовности в гостевой виртуальной машине WSLC. Соберите диагностические журналы WSL, чтобы исследовать сбой запуска.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

@@ -230,6 +230,8 @@ public:
 private:
     void MapRelayPort(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort, _In_ bool Remove);
 
+    void ConfigureLocalhost();
+
     // Initial setup during Connect()
     void ConfigureNetworking();
 

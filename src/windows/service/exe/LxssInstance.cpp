@@ -453,6 +453,9 @@ void LxssInstance::Stop()
 
 void LxssInstance::RegisterPlan9ConnectionTarget(_In_ HANDLE userToken)
 {
+    std::lock_guard lock(m_stateLock);
+    THROW_HR_IF(E_ABORT, m_destroyingEvent.is_signaled());
+
     const auto path = m_configuration.BasePath / LXSS_PLAN9_UNIX_SOCKET;
     using unique_unicode_string = wil::unique_struct<UNICODE_STRING, decltype(RtlFreeUnicodeString), RtlFreeUnicodeString>;
     unique_unicode_string socketPath;

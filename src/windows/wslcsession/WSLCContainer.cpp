@@ -1176,11 +1176,15 @@ wil::com_ptr<IWSLCProcess> WSLCContainerImpl::StartPhase(
         }
 
         // A valid pending restart has no competing owner. The scheduler must not wait on explicit operations.
-        THROW_HR_IF_MSG(E_UNEXPECTED, m_restart || m_transition, "Policy restart conflicts with an active operation: %hs", m_id.c_str());
+        THROW_HR_IF_MSG(
+            E_UNEXPECTED,
+            m_restart || m_transition || m_exitRequests.HasPendingRequests(),
+            "Policy restart conflicts with an active operation: %hs",
+            m_id.c_str());
     }
     else
     {
-        WaitForConflictingTransitionToComplete(lock, lifecycleLock, std::nullopt, !RestartPhase);
+        WaitForConflictingTransitionToComplete(lock, lifecycleLock, std::nullopt, !RestartPhase, true);
     }
 
     // A Delete() that raced a restart may have already moved the container to the Deleted state.
@@ -1366,7 +1370,11 @@ wil::com_ptr<IWSLCProcess> WSLCContainerImpl::StartPhase(
 }
 
 void WSLCContainerImpl::WaitForConflictingTransitionToComplete(
-    wil::rwlock_release_exclusive_scope_exit& lock, wil::rwlock_release_shared_scope_exit& lifecycleLock, std::optional<TransitionKind> kind, bool waitForRestart)
+    wil::rwlock_release_exclusive_scope_exit& lock,
+    wil::rwlock_release_shared_scope_exit& lifecycleLock,
+    std::optional<TransitionKind> kind,
+    bool waitForRestart,
+    bool waitForExitRequests)
 {
     while (true)
     {
@@ -1384,6 +1392,15 @@ void WSLCContainerImpl::WaitForConflictingTransitionToComplete(
             lock.reset();
             lifecycleLock.reset();
             WaitForTransitionCompletion(transition);
+        }
+        // Stop and kill requests address the container only by ID, so one issued for a run that already exited would
+        // reach the next one. A container that is still running is rejected by the caller instead.
+        else if (waitForExitRequests && m_state != WslcContainerStateRunning && m_exitRequests.HasPendingRequests())
+        {
+            const auto idle = m_exitRequests.IdleEvent();
+            lock.reset();
+            lifecycleLock.reset();
+            WaitForCompletionEvent(idle.get());
         }
         else
         {
@@ -4167,7 +4184,7 @@ CATCH_RETURN();
 
 HRESULT WSLCContainer::InterfaceSupportsErrorInfo(REFIID riid)
 {
-    return riid == __uuidof(IWSLCContainer) || riid == __uuidof(IWSLCCompatContainer) ? S_OK : S_FALSE;
+    return riid == __uuidof(IWSLCContainer) || riid == __uuidof(IWSLCCompatContainer) || riid == __uuidof(IWSLCCompatContainer2) ? S_OK : S_FALSE;
 }
 
 HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags)
@@ -4210,5 +4227,34 @@ HRESULT WSLCContainer::Inspect(LPSTR* Output)
 try
 {
     return Inspect(FALSE, Output);
+}
+CATCH_RETURN();
+
+HRESULT WSLCContainer::ConnectNetwork(const WSLCCompatNetworkConnection* Network)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Network);
+    RETURN_HR_IF(E_INVALIDARG, Network->Settings == nullptr && Network->SettingsCount != 0);
+
+    std::vector<KeyValuePair> settings;
+    settings.reserve(Network->SettingsCount);
+    for (ULONG i = 0; i < Network->SettingsCount; ++i)
+    {
+        settings.push_back(apicompat::Convert(Network->Settings[i]));
+    }
+
+    WSLCNetworkConnectionOptions options{};
+    options.NetworkName = Network->NetworkName;
+    options.Settings = settings.empty() ? nullptr : settings.data();
+    options.SettingsCount = static_cast<ULONG>(settings.size());
+
+    return ConnectToNetwork(&options);
+}
+CATCH_RETURN();
+
+HRESULT WSLCContainer::DisconnectNetwork(LPCSTR NetworkNameOrId)
+try
+{
+    return DisconnectFromNetwork(NetworkNameOrId);
 }
 CATCH_RETURN();

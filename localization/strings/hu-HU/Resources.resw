@@ -848,6 +848,10 @@ A Admin Protection kapcsolatos további információért látogasson el a https:
     <value>Érvénytelen disztribúciónév: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageInvalidDistribution" xml:space="preserve">
+    <value>Érvénytelen terjesztési regisztrációt találtunk: {}, {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholders are the distribution's registry GUID and the error code.</comment>
+  </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>Örökölt disztribúciós regisztráció használata. Fontolja meg inkább tar-alapú disztribúció használatát.</value>
     <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
@@ -2069,6 +2073,25 @@ A VS Code-ban található parancskatalógusban további VS Code Remote beállít
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Hagyja futni a disztribúciókat és az őket üzemeltető WSL virtuális gépet, hogy ne álljanak le automatikusan, miután egy ideig inaktívak voltak.</value>
   </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
+    <value>A WSL-disztribúciós virtuális gép mindig legyen bekapcsolva</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
+    <value>A WSL-disztribúció virtuális gépe nem áll le tétlen állapotban, így az új rendszerhéjak azonnal elindulnak. Amíg a WSL fut, több memóriát használ. Ez a következő WSL-munkamenetben lép érvénybe.</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>A WSL-disztribúciós virtuális gép mindig legyen bekapcsolva</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
+    <value>Nem sikerült módosítani a futva tartási beállítást</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
+    <value>Győződjön meg arról, hogy .wslconfig nem írásvédett, majd próbálkozzon újra.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
+    <value>Ezt bármikor módosíthatja a WSL beállításaiban, az Opcionális funkciók területen.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Időtúllépés alaphelyzetbe állítása</value>
   </data>
@@ -2419,10 +2442,6 @@ Usage:
   </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
      <value>Nem várt helyen pozícióhoz kötött argumentum található: {}</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Hiányzó opciónév a következőnél: „{}”</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
@@ -2853,11 +2872,11 @@ Példa: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Küldendő jel (alapértelmezés: a tárolóhoz konfigurált STOPSIGNAL, vagy SIGTERM, ha nincs konfigurálva)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>Tárolóesemények figyelése.</value>
+  <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
+    <value>Események figyelése.</value>
   </data>
-  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>Valós idejű események figyelése a tárolókból.</value>
+  <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
+    <value>Tárolók, képek, hálózatok és kötetek valós idejű eseményeinek figyelése.</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
     <value>Az időbélyeg óta létrehozott összes esemény megjelenítése</value>
@@ -4192,6 +4211,18 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   </data>
   <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
     <value>Nem sikerült telepíteni a gazdagép megbízható főtanúsítványait a virtuális gépre: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
+    <value>A WSLC nem tudta kiírni a(z) {} értéket a helyi állomásnév-feloldás inicializálásához (vendéggéphiba: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
+    <value>A WSLC elindította a vendég virtuális gépet, de a Docker Engine {} ezredmásodpercen belül nem állt készen. Gyűjtse össze a WSL diagnosztikai naplóit az indítási hiba kivizsgálásához.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
+    <value>A Docker Engine a(z) {} kilépési kóddal lépett ki, mielőtt készen állt volna a WSLC vendég virtuális gépén. Gyűjtse össze a WSL diagnosztikai naplóit az indítási hiba kivizsgálásához.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>
