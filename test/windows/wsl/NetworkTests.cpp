@@ -6082,6 +6082,22 @@ class ConsommeTests
         NetworkTests::VerifyHttpProxySimple();
     }
 
+    WSL2_TEST_METHOD(HttpProxyLoopback)
+    {
+        CONSOMME_TEST_ONLY();
+        WINHTTP_PROXY_TEST_ONLY();
+
+        const auto config = LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .autoProxy = true});
+        auto restoreProxySettings = wil::scope_exit([&] { NetworkTests::ClearHttpProxySettings(true); });
+        NetworkTests::SetHttpProxySettings(NetworkTests::c_httpProxyLocalhostv4, L"", L"", true);
+
+        for (const bool localhostForwarding : {true, false})
+        {
+            m_config->Update(config + std::format(L"localhostForwarding={}\n", localhostForwarding));
+            NetworkTests::VerifyHttpProxyEnvVariables(localhostForwarding ? NetworkTests::c_httpProxyLocalhostv4 : L"", L"", L"");
+        }
+    }
+
     WSL2_TEST_METHOD(ConfigurationV6)
     {
         CONSOMME_TEST_ONLY();
