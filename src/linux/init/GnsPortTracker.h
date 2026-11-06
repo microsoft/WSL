@@ -167,6 +167,8 @@ private:
 
     void TrackPort(PortAllocation allocation);
 
+    int HandleInterfaceStateChange(const seccomp_notif& Notification);
+
     std::map<PortAllocation, std::optional<time_t>> m_allocatedPorts;
     std::shared_ptr<wsl::shared::SocketChannel> m_hvSocketChannel;
     NetlinkChannel m_channel;
