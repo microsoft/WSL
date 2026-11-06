@@ -105,7 +105,174 @@ namespace {
         return true;
     }
 
-    // dockerd expects mirrors to be absolute http(s) URLs without a path or query.
+    bool IsValidIpLiteral(std::string_view value)
+    {
+        const std::string text{value};
+
+        in_addr address4{};
+        if (inet_pton(AF_INET, text.c_str(), &address4) == 1)
+        {
+            return true;
+        }
+
+        in6_addr address6{};
+        return inet_pton(AF_INET6, text.c_str(), &address6) == 1;
+    }
+
+    // Matches the hostnames dockerd accepts for a registry endpoint: dot-separated labels of
+    // alphanumeric characters and hyphens, without leading or trailing hyphens.
+    bool IsValidHostname(std::string_view value)
+    {
+        if (value.empty() || value.size() > 253)
+        {
+            return false;
+        }
+
+        size_t labelStart = 0;
+        while (true)
+        {
+            const auto dot = value.find('.', labelStart);
+            const auto label = value.substr(labelStart, dot == std::string_view::npos ? std::string_view::npos : dot - labelStart);
+            if (label.empty() || label.size() > 63 || label.front() == '-' || label.back() == '-')
+            {
+                return false;
+            }
+
+            for (const auto character : label)
+            {
+                if (!std::isalnum(static_cast<unsigned char>(character)) && character != '-')
+                {
+                    return false;
+                }
+            }
+
+            if (dot == std::string_view::npos)
+            {
+                return true;
+            }
+
+            labelStart = dot + 1;
+        }
+    }
+
+    // dockerd parses the port with strconv.Atoi and rejects anything outside [0, 65535].
+    bool IsValidPort(std::string_view value)
+    {
+        const auto firstDigit = value.find_first_not_of('0');
+        if (firstDigit == std::string_view::npos)
+        {
+            // "0" and zero-padded variants are valid.
+            return !value.empty();
+        }
+
+        const auto digits = value.substr(firstDigit);
+        if (digits.size() > 5)
+        {
+            return false;
+        }
+
+        uint32_t port = 0;
+        for (const auto character : digits)
+        {
+            if (!std::isdigit(static_cast<unsigned char>(character)))
+            {
+                return false;
+            }
+
+            port = port * 10 + static_cast<uint32_t>(character - '0');
+        }
+
+        return port <= 65535;
+    }
+
+    // Accepts the endpoint forms dockerd supports: "host", "host:port", an IPv4/IPv6 literal,
+    // or a bracketed IPv6 literal with an optional port.
+    bool IsValidHostPort(std::string_view value)
+    {
+        if (value.empty())
+        {
+            return false;
+        }
+
+        if (value.front() == '[')
+        {
+            const auto closingBracket = value.find(']');
+            if (closingBracket == std::string_view::npos)
+            {
+                return false;
+            }
+
+            in6_addr address{};
+            const std::string literal{value.substr(1, closingBracket - 1)};
+            if (inet_pton(AF_INET6, literal.c_str(), &address) != 1)
+            {
+                return false;
+            }
+
+            const auto remainder = value.substr(closingBracket + 1);
+            return remainder.empty() || (remainder.front() == ':' && IsValidPort(remainder.substr(1)));
+        }
+
+        // A bare address literal can contain colons of its own (IPv6 without brackets).
+        if (IsValidIpLiteral(value))
+        {
+            return true;
+        }
+
+        const auto colon = value.rfind(':');
+        if (colon == std::string_view::npos)
+        {
+            return IsValidHostname(value);
+        }
+
+        return IsValidHostname(value.substr(0, colon)) && IsValidPort(value.substr(colon + 1));
+    }
+
+    // Accepts the CIDR blocks dockerd supports: "<ipv4>/<0-32>" or "<ipv6>/<0-128>".
+    bool IsValidCidr(std::string_view value)
+    {
+        const auto slash = value.rfind('/');
+        if (slash == std::string_view::npos || slash == 0 || slash + 1 == value.size())
+        {
+            return false;
+        }
+
+        const auto prefixText = value.substr(slash + 1);
+        if (prefixText.size() > 3)
+        {
+            return false;
+        }
+
+        uint32_t prefix = 0;
+        for (const auto character : prefixText)
+        {
+            if (!std::isdigit(static_cast<unsigned char>(character)))
+            {
+                return false;
+            }
+
+            prefix = prefix * 10 + static_cast<uint32_t>(character - '0');
+        }
+
+        const std::string address{value.substr(0, slash)};
+
+        in_addr address4{};
+        if (inet_pton(AF_INET, address.c_str(), &address4) == 1)
+        {
+            return prefix <= 32;
+        }
+
+        in6_addr address6{};
+        if (inet_pton(AF_INET6, address.c_str(), &address6) == 1)
+        {
+            return prefix <= 128;
+        }
+
+        return false;
+    }
+
+    // dockerd rejects the whole daemon.json (and refuses to start) when a mirror is not an absolute
+    // http(s) URL, so validate the same shape here and let the caller fall back to the default.
     bool IsValidRegistryMirror(const std::string& value)
     {
         if (value.empty() || ContainsWhitespace(value))
@@ -113,33 +280,52 @@ namespace {
             return false;
         }
 
-        auto host = std::string_view{value};
-        if (StartsWithIgnoreCase(host, "https://"))
+        auto authority = std::string_view{value};
+        if (StartsWithIgnoreCase(authority, "https://"))
         {
-            host.remove_prefix(8);
+            authority.remove_prefix(8);
         }
-        else if (StartsWithIgnoreCase(host, "http://"))
+        else if (StartsWithIgnoreCase(authority, "http://"))
         {
-            host.remove_prefix(7);
+            authority.remove_prefix(7);
         }
         else
         {
             return false;
         }
 
-        if (!host.empty() && host.back() == '/')
+        // dockerd rejects fragments, query strings and credentials in a mirror URI.
+        if (authority.find_first_of("?#@") != std::string_view::npos)
         {
-            host.remove_suffix(1);
+            return false;
         }
 
-        return !host.empty() && host.find_first_of("/?#") == std::string_view::npos;
+        if (!authority.empty() && authority.back() == '/')
+        {
+            authority.remove_suffix(1);
+        }
+
+        // Mirrors are registry roots: a path is not a valid endpoint.
+        return !authority.empty() && authority.find('/') == std::string_view::npos && IsValidHostPort(authority);
     }
 
-    // dockerd accepts "host", "host:port", an IP literal, or a CIDR block for insecure registries.
+    // dockerd validates insecure registries as "host", "host:port" or a CIDR block and refuses to
+    // start when one entry is malformed, so apply the same rules here.
     bool IsValidInsecureRegistry(const std::string& value)
     {
-        return !value.empty() && !ContainsWhitespace(value) && value.find("://") == std::string::npos &&
-               value.find_first_of("\"'\\") == std::string::npos;
+        if (value.empty() || ContainsWhitespace(value) || value.find("://") != std::string::npos ||
+            value.find_first_of("\"'\\") != std::string::npos)
+        {
+            return false;
+        }
+
+        // Anything with a '/' must be a CIDR block; dockerd rejects a path after a host.
+        if (value.find('/') != std::string::npos)
+        {
+            return IsValidCidr(value);
+        }
+
+        return IsValidHostPort(value);
     }
 
 } // namespace

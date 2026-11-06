@@ -872,6 +872,103 @@ class WSLCCLISettingsUnitTests
             Loc::WSLCUserSettings_Warning_InvalidValue(L"session.registry.insecureRegistries", s.SettingsFilePath().wstring(), 4),
             s.GetWarnings().front().Message);
     }
+
+    // Mirrors whose authority dockerd cannot parse are rejected instead of being handed to dockerd,
+    // which refuses to start when daemon.json contains one.
+    TEST_METHOD(Validation_RegistryMirrors_MalformedAuthority_UsesDefaultAndWarns)
+    {
+        const std::vector<std::string> invalidMirrors{
+            "https://mirror.example.com:abc",           // port is not a number
+            "https://mirror.example.com:99999",         // port is out of range
+            "https://[::1",                             // missing closing bracket
+            "https://user:password@mirror.example.com", // credentials are not allowed
+            "https://mirror.example.com/v2",            // a mirror is a registry root, not a path
+            "https://mirror.example.com?query",         // query strings are not allowed
+        };
+
+        for (const auto& mirror : invalidMirrors)
+        {
+            auto dir = UniqueTempDir();
+            WriteFile(dir / L"settings.yaml", "session:\n  registry:\n    mirrors:\n      - " + mirror + "\n");
+
+            UserSettingsTest s{dir};
+
+            VERIFY_IS_TRUE(
+                s.Get<Setting::SessionRegistryMirrors>().empty(),
+                WEX::Common::String().Format(L"%hs should have been rejected", mirror.c_str()));
+            VERIFY_ARE_EQUAL(
+                1u, s.GetWarnings().size(), WEX::Common::String().Format(L"%hs should have produced one warning", mirror.c_str()));
+            VERIFY_ARE_EQUAL(std::wstring(L"session.registry.mirrors"), s.GetWarnings().front().SettingPath);
+        }
+    }
+
+    // Bracketed IPv6 literals and explicit ports are valid mirror endpoints.
+    TEST_METHOD(Validation_RegistryMirrors_Ipv6AndPort_ValidValue)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  registry:\n"
+            "    mirrors:\n"
+            "      - https://[2001:db8::1]:5000\n"
+            "      - http://10.0.0.5:8080/\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        const std::vector<std::string> expected{"https://[2001:db8::1]:5000", "http://10.0.0.5:8080/"};
+        VERIFY_IS_TRUE(s.Get<Setting::SessionRegistryMirrors>() == expected);
+    }
+
+    // Insecure registries with a path, a non-numeric port or an out-of-range CIDR prefix are rejected:
+    // dockerd refuses to start when one of them is malformed.
+    TEST_METHOD(Validation_InsecureRegistries_MalformedAuthority_UsesDefaultAndWarns)
+    {
+        const std::vector<std::string> invalidRegistries{
+            "registry.local:abc",   // port is not a number
+            "registry.local:99999", // port is out of range
+            "registry.local/repo",  // a path is not a valid endpoint
+            "10.0.0.0/99",          // prefix length out of range
+            "-registry.local",      // leading hyphen is rejected by dockerd
+        };
+
+        for (const auto& registry : invalidRegistries)
+        {
+            auto dir = UniqueTempDir();
+            WriteFile(dir / L"settings.yaml", "session:\n  registry:\n    insecureRegistries:\n      - " + registry + "\n");
+
+            UserSettingsTest s{dir};
+
+            VERIFY_IS_TRUE(
+                s.Get<Setting::SessionRegistryInsecure>().empty(),
+                WEX::Common::String().Format(L"%hs should have been rejected", registry.c_str()));
+            VERIFY_ARE_EQUAL(
+                1u, s.GetWarnings().size(), WEX::Common::String().Format(L"%hs should have produced one warning", registry.c_str()));
+            VERIFY_ARE_EQUAL(std::wstring(L"session.registry.insecureRegistries"), s.GetWarnings().front().SettingPath);
+        }
+    }
+
+    // Bracketed IPv6 literals and both IPv4 and IPv6 CIDR blocks are valid insecure registries.
+    // Note: a bracketed entry has to be quoted in YAML, otherwise it is parsed as a flow sequence.
+    TEST_METHOD(Validation_InsecureRegistries_Ipv6AndCidr_ValidValue)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  registry:\n"
+            "    insecureRegistries:\n"
+            "      - \"[fd00::1]:5000\"\n"
+            "      - 10.0.0.0/8\n"
+            "      - fd00::/8\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        const std::vector<std::string> expected{"[fd00::1]:5000", "10.0.0.0/8", "fd00::/8"};
+        VERIFY_IS_TRUE(s.Get<Setting::SessionRegistryInsecure>() == expected);
+    }
 };
 
 } // namespace WSLCCLISettingsUnitTests
