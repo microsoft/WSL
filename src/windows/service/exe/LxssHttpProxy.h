@@ -116,6 +116,7 @@ struct HttpProxySettings
 
     std::string ToString() const;
     bool HasSettingsConfigured() const;
+    void AddToEnvironment(std::vector<std::string>& Environment) const;
 };
 
 class HttpProxyStateTracker
@@ -128,7 +129,7 @@ class HttpProxyStateTracker
     };
 
 public:
-    HttpProxyStateTracker(int ProxyTimeout, HANDLE UserToken, wsl::core::NetworkingMode configuration);
+    HttpProxyStateTracker(int ProxyTimeout, HANDLE UserToken, std::optional<wsl::core::NetworkingMode> Configuration = std::nullopt);
     ~HttpProxyStateTracker();
 
     HttpProxyStateTracker(const HttpProxyStateTracker&) = delete;
@@ -141,6 +142,8 @@ public:
     /// Otherwise, return the proxy settings.
     /// </summary>
     std::optional<HttpProxySettings> WaitForInitialProxySettings();
+
+    static UnsupportedProxyReason IsUnsupportedProxy(LPCWSTR proxyString, wsl::core::NetworkingMode mode) noexcept;
 
     /// <summary>
     /// This needs to be called after the VM is created so actual selected configuration is set.
@@ -191,7 +194,7 @@ private:
     /// <summary>
     /// Current network mode. Used to determine some cases when we should send toast notification.
     /// </summary>
-    _Guarded_by_(m_proxySettingsLock) wsl::core::NetworkingMode m_networkMode = wsl::core::NetworkingMode::Nat;
+    _Guarded_by_(m_proxySettingsLock) std::optional<wsl::core::NetworkingMode> m_networkMode;
 
     /// <summary>
     /// Indicates if we need to start another query after current one.
@@ -265,13 +268,6 @@ private:
     /// <param name="flags"> Flags used to verify the type of callback received. </param>
     /// <param name="pContext"> Pointer to ProxyStateTracker associated with callback. </param>
     static void CALLBACK s_OnProxyChange(_In_ ULONGLONG flags, _In_ void* pContext) noexcept;
-
-    /// <summary>
-    /// Determines if a proxy setting string is localhost.
-    /// </summary>
-    /// <param name="proxyString"> ProxyString to check if it is localhost. </param>
-    /// <param name="configuration"> Current network configuration. </param>
-    static UnsupportedProxyReason IsUnsupportedProxy(LPCWSTR proxyString, wsl::core::NetworkingMode mode) noexcept;
 
     /// <summary>
     /// Remove invalid proxy configurations depending on network mode.

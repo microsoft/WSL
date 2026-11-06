@@ -153,6 +153,30 @@ bool HttpProxySettings::HasSettingsConfigured() const
     return !(Proxy.empty() && SecureProxy.empty() && PacUrl.empty());
 }
 
+void HttpProxySettings::AddToEnvironment(std::vector<std::string>& Environment) const
+{
+    const auto addProxy = [&](std::string_view Value, std::string_view Lower, std::string_view Upper) {
+        if (!Value.empty())
+        {
+            Environment.emplace_back(std::format("{}={}", Lower, Value));
+            Environment.emplace_back(std::format("{}={}", Upper, Value));
+        }
+    };
+
+    addProxy(Proxy, c_httpProxyLower, c_httpProxyUpper);
+    addProxy(SecureProxy, c_httpsProxyLower, c_httpsProxyUpper);
+    addProxy(ProxyBypassesComma, c_proxyBypassLower, c_proxyBypassUpper);
+    if (!PacUrl.empty())
+    {
+        Environment.emplace_back(std::format("{}={}", c_pacProxy, PacUrl));
+        // PAC queries can supply only HTTP; preserve WSL's best-effort HTTPS fallback.
+        if (SecureProxy.empty())
+        {
+            addProxy(Proxy, c_httpsProxyLower, c_httpsProxyUpper);
+        }
+    }
+}
+
 void CALLBACK HttpProxyStateTracker::s_GetProxySettingsExCallback(
     _In_ HINTERNET resolver, _In_ DWORD_PTR context, _In_ DWORD internetStatus, _In_ PVOID statusInformation, _In_ DWORD) noexcept
 try
@@ -263,7 +287,10 @@ try
     {
         auto dataLock = m_proxySettingsLock.lock();
 
-        FilterProxySettingsByNetworkConfiguration(newProxySettings, m_networkMode);
+        if (m_networkMode)
+        {
+            FilterProxySettingsByNetworkConfiguration(newProxySettings, *m_networkMode);
+        }
 
         if (!AreProxyStringsIdentical(newProxySettings))
         {
@@ -271,7 +298,7 @@ try
             m_proxySettings = std::move(newProxySettings);
 
             // If there was a setting changes, and this is not the initial proxy query, notify the user to restart WSL to get new proxy changes.
-            if (m_initialProxyQueryCompleted.is_signaled())
+            if (m_networkMode && m_initialProxyQueryCompleted.is_signaled())
             {
                 notifications::DisplayProxyChangeNotification(m_localizedProxyChangeString);
             }
@@ -535,13 +562,17 @@ void HttpProxyStateTracker::QueryProxySettingsAsync()
     }
 }
 
-HttpProxyStateTracker::HttpProxyStateTracker(int ProxyTimeout, HANDLE UserToken, wsl::core::NetworkingMode mode) :
+HttpProxyStateTracker::HttpProxyStateTracker(int ProxyTimeout, HANDLE UserToken, std::optional<wsl::core::NetworkingMode> mode) :
     m_networkMode{mode},
     m_initialQueryTimeout{ProxyTimeout},
     m_localizedProxyChangeString{wsl::shared::Localization::MessageHttpProxyChangeDetected()}
 {
     THROW_IF_WIN32_BOOL_FALSE(::DuplicateTokenEx(UserToken, MAXIMUM_ALLOWED, nullptr, SecurityImpersonation, TokenImpersonation, &m_userToken));
-    THROW_IF_WIN32_ERROR(s_WinHttpRegisterProxyChangeNotification.value()(WINHTTP_PROXY_NOTIFY_CHANGE, s_OnProxyChange, this, &m_proxyRegistrationHandle));
+    if (mode)
+    {
+        THROW_IF_WIN32_ERROR(s_WinHttpRegisterProxyChangeNotification.value()(
+            WINHTTP_PROXY_NOTIFY_CHANGE, s_OnProxyChange, this, &m_proxyRegistrationHandle));
+    }
     m_callbackQueue.submit([this] { QueryProxySettingsAsync(); });
 }
 
