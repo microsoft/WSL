@@ -695,6 +695,13 @@
         <Binary Id="wslinstall.dll" SourceFile="${PACKAGE_INPUT_DIR}/wslinstall.dll" />
         <Binary Id="msixpackage" SourceFile="${PACKAGE_INPUT_DIR}/gluepackage.msix"/>
 
+        <CustomAction Id="CheckForRunningInstances"
+            BinaryRef="wslinstall.dll"
+            DllEntry="WslCheckForRunningInstances"
+            Return="check"
+            Execute="immediate"
+        />
+
         <CustomAction Id="ValidateInstall"
             Impersonate="no"
             BinaryRef="wslinstall.dll"
@@ -813,6 +820,8 @@
 
         <!-- See https://learn.microsoft.com/en-us/windows/win32/msi/examples-of-conditional-statement-syntax -->
         <InstallExecuteSequence>
+            <!-- Run before files-in-use handling and the old product's uninstall. -->
+            <Custom Action="CheckForRunningInstances" Before="InstallValidate" Condition='((not REMOVE~="ALL") or WIX_UPGRADE_DETECTED) and (not UPGRADINGPRODUCTCODE)' />
             <Custom Action="ValidateInstall" After="InstallInitialize" Condition="(not INSTALLED) and (not SKIPVALIDATION = 1)" />
 
             <!-- Must run before InstallServices or else we'll fail if wslservice already exists.
@@ -879,6 +888,11 @@
         <!-- Don't show a 'Modify' button in settings since there is nothing to modify -->
         <Property Id="ARPNOMODIFY" Value="yes" Secure="yes" />
         <Property Id="ARPSYSTEMCOMPONENT" Value="yes" Secure="yes" />
+
+        <!-- Test-only: allows tripping the guard for WSL being busy during installation -->
+        <?if "${OFFICIAL_BUILD}" != "TRUE" ?>
+            <Property Id="WSL_TEST_INSTALL_BUSY" Secure="yes" />
+        <?endif?>
 
         <!-- Setting REINSTALLMODE to AMUS will force all re-installed components to re-install all files, registry keys and shortcuts. 
         This is useful during downgrades since components with KeyPath set will not removed if their KeyPath points to valid file / registry key.

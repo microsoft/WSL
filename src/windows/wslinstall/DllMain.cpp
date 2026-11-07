@@ -824,6 +824,38 @@ extern "C" UINT __stdcall WslFinalizeInstallation(MSIHANDLE install)
     return NOERROR;
 }
 
+bool IsWslRunning(MSIHANDLE install)
+{
+    // TODO: Implement actual detection logic.
+    //       This is a placeholder for setting up the install cancellation first.
+#ifndef WSL_OFFICIAL_BUILD
+    return GetMsiProperty(install, L"WSL_TEST_INSTALL_BUSY") == L"1";
+#else
+    UNREFERENCED_PARAMETER(install);
+    return false;
+#endif
+}
+
+extern "C" UINT __stdcall WslCheckForRunningInstances(MSIHANDLE install)
+{
+    try
+    {
+        WSL_INSTALL_LOG("WslCheckForRunningInstances");
+
+        if (IsWslRunning(install))
+        {
+            WSL_INSTALL_LOG("WslInstallBlockedByRunningInstances");
+            // TODO: Validate the exit code from msiexec after this, and what DCAT does for it.
+            return ERROR_INSTALL_FAILURE;
+        }
+    }
+    CATCH_LOG();
+
+    // WSL is not running, or the detection failed.
+    // If detection fails, just assume we can continue with the installation.
+    return NOERROR;
+}
+
 extern "C" UINT __stdcall WslValidateInstallation(MSIHANDLE install)
 try
 {
