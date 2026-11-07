@@ -2005,6 +2005,19 @@ Arguments for managing Windows Subsystem for Linux:
         Unmounts and detaches a disk from all WSL2 distributions.
         Unmounts and detaches all disks if called without argument.
 
+    --usb --list [--verbose]
+      Lists physical USB devices. Include --verbose to display hardware IDs.
+      Port IDs are dot-separated topology paths: root hub number followed by each port number.
+      Moving a device or an upstream hub to a different port changes the path.
+
+    --usb --attach <port id>
+      Attaches a USB device to this user's WSL 2 virtual machine.
+      Requires administrator privileges.
+
+    --usb --detach <port id>
+      Returns this user's attached USB device to Windows.
+      Requires administrator privileges.
+
     --uninstall
         Uninstalls the Windows Subsystem for Linux package from this machine.
 

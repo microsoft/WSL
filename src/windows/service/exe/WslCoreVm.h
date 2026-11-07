@@ -134,6 +134,10 @@ public:
 
     void ValidateNetworkingMode();
 
+    void AttachUsbDevice(const std::wstring& DeviceInstanceId);
+
+    void DetachUsbDevice(const std::wstring& DeviceInstanceId);
+
 private:
     struct Mount
     {

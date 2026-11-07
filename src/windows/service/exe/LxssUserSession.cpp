@@ -20,6 +20,8 @@ Abstract:
 #include "notifications.h"
 #include "WslInstall.h"
 #include "WslCoreInstance.h"
+#include "UsbManager.h"
+#include "UsbUxdRegistry.h"
 #include "resource.h"
 #include <winrt\Windows.ApplicationModel.Background.h>
 #include <nlohmann\json.hpp>
@@ -42,6 +44,7 @@ constexpr auto c_shortIconName = L"shortcut.ico";
 #define LXSS_RELAY_BUFFER_SIZE (0x1000000)
 
 extern bool g_lxcoreInitialized;
+extern bool g_usbDisabledByPolicy;
 
 using namespace std::placeholders;
 using namespace Microsoft::WRL;
@@ -569,8 +572,71 @@ try
 }
 CATCH_RETURN()
 
-LxssUserSessionImpl::LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId, _Inout_ wsl::windows::service::PluginManager& pluginManager) :
-    m_sessionId(sessionId), m_pluginManager(pluginManager)
+HRESULT STDMETHODCALLTYPE LxssUserSession::EnumerateUsbDevices(_Out_ ULONG* DeviceCount, _Out_ WSL_USB_DEVICE** Devices, _Out_ LXSS_ERROR_INFO* Error)
+try
+{
+    ServiceExecutionContext context(Error);
+    RETURN_HR_IF_NULL(E_POINTER, DeviceCount);
+    RETURN_HR_IF_NULL(E_POINTER, Devices);
+    *DeviceCount = 0;
+    *Devices = nullptr;
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_ACCESS_DISABLED_BY_POLICY), wsl::shared::Localization::MessageUsbDisabledByPolicy(), g_usbDisabledByPolicy);
+    const auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+    const auto token = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    const auto user = wil::get_token_information<TOKEN_USER>(token.get());
+    RETURN_HR_IF(E_ACCESSDENIED, !EqualSid(user->User.Sid, session->GetUserSid()));
+    return session->EnumerateUsbDevices(DeviceCount, Devices);
+}
+CATCH_RETURN()
+
+HRESULT STDMETHODCALLTYPE LxssUserSession::AttachUsbDevice(_In_ LPCWSTR Port, _Out_ LXSS_ERROR_INFO* Error)
+try
+{
+    ServiceExecutionContext context(Error);
+    RETURN_HR_IF_NULL(E_INVALIDARG, Port);
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_ACCESS_DISABLED_BY_POLICY), wsl::shared::Localization::MessageUsbDisabledByPolicy(), g_usbDisabledByPolicy);
+    const auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+    const auto token = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    const auto user = wil::get_token_information<TOKEN_USER>(token.get());
+    RETURN_HR_IF(E_ACCESSDENIED, !EqualSid(user->User.Sid, session->GetUserSid()));
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED),
+        wsl::shared::Localization::MessageUsbElevationRequired(),
+        !wsl::windows::common::security::IsTokenElevated(token.get()));
+    return session->AttachUsbDevice(Port);
+}
+CATCH_RETURN()
+
+HRESULT STDMETHODCALLTYPE LxssUserSession::DetachUsbDevice(_In_ LPCWSTR Port, _Out_ LXSS_ERROR_INFO* Error)
+try
+{
+    ServiceExecutionContext context(Error);
+    RETURN_HR_IF_NULL(E_INVALIDARG, Port);
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_ACCESS_DISABLED_BY_POLICY), wsl::shared::Localization::MessageUsbDisabledByPolicy(), g_usbDisabledByPolicy);
+    const auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+    const auto token = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    const auto user = wil::get_token_information<TOKEN_USER>(token.get());
+    RETURN_HR_IF(E_ACCESSDENIED, !EqualSid(user->User.Sid, session->GetUserSid()));
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED),
+        wsl::shared::Localization::MessageUsbElevationRequired(),
+        !wsl::windows::common::security::IsTokenElevated(token.get()));
+    return session->DetachUsbDevice(Port);
+}
+CATCH_RETURN()
+
+LxssUserSessionImpl::LxssUserSessionImpl(
+    _In_ PSID userSid,
+    _In_ DWORD sessionId,
+    _Inout_ wsl::windows::service::PluginManager& pluginManager,
+    std::shared_ptr<wsl::windows::common::usb::Manager> usbManager) :
+    m_sessionId(sessionId), m_pluginManager(pluginManager), m_usbManager(std::move(usbManager))
 {
     THROW_IF_WIN32_BOOL_FALSE(::CopySid(sizeof(m_userSid), &m_userSid.Sid, userSid));
 
@@ -719,6 +785,11 @@ LxssUserSessionImpl::~LxssUserSessionImpl()
     }
 
     m_lifetimeManager.ClearCallbacks();
+
+    {
+        std::lock_guard lock(m_instanceLock);
+        _ReleaseUsbAttachments();
+    }
 
     // Ensure that if there are no running instances.
     WI_ASSERT(m_runningInstances.empty());
@@ -2345,6 +2416,7 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, ShutdownBeh
 
             // Terminate the utility VM.
             _VmTerminate();
+            _ReleaseUsbAttachments();
             resetVmTerminationCallback.reset();
 
             // Reset the proxy state.
@@ -2602,6 +2674,102 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid)
     }
 
     return result;
+}
+
+HRESULT LxssUserSessionImpl::EnumerateUsbDevices(_Out_ ULONG* DeviceCount, _Out_ WSL_USB_DEVICE** Devices)
+{
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+        wsl::shared::Localization::MessageUsbWindowsUpdateRequired(),
+        !wsl::windows::common::usb::UxdRegistry::IsSupported());
+    std::lock_guard lock(m_instanceLock);
+    THROW_HR_IF(CO_E_SERVER_STOPPING, m_disableNewInstanceCreation);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_READY), !m_usbManager);
+    const auto devices = m_usbManager->List(&m_userSid.Sid);
+    auto result = wil::make_unique_cotaskmem<WSL_USB_DEVICE[]>(devices.size());
+    auto cleanup = wil::scope_exit([&]() {
+        for (size_t index = 0; index < devices.size(); ++index)
+        {
+            CoTaskMemFree(result[index].Port);
+            CoTaskMemFree(result[index].Name);
+            CoTaskMemFree(result[index].HardwareId);
+        }
+    });
+    for (size_t index = 0; index < devices.size(); ++index)
+    {
+        result[index].Port = wil::make_cotaskmem_string(devices[index].Port.c_str()).release();
+        result[index].Name = wil::make_cotaskmem_string(devices[index].Name.c_str()).release();
+        result[index].HardwareId = wil::make_cotaskmem_string(devices[index].HardwareId.c_str()).release();
+        result[index].State = static_cast<WslUsbDeviceState>(devices[index].State);
+    }
+    cleanup.release();
+    *DeviceCount = gsl::narrow_cast<ULONG>(devices.size());
+    *Devices = result.release();
+    return S_OK;
+}
+
+HRESULT LxssUserSessionImpl::AttachUsbDevice(_In_ LPCWSTR Port)
+{
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+        wsl::shared::Localization::MessageUsbWindowsUpdateRequired(),
+        !wsl::windows::common::usb::UxdRegistry::IsSupported());
+    std::lock_guard lock(m_instanceLock);
+    THROW_HR_IF(CO_E_SERVER_STOPPING, m_disableNewInstanceCreation);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_READY), !m_usbManager);
+    const auto port = wsl::windows::common::usb::PortId{Port};
+    _CreateVm();
+
+    auto reservation = m_usbManager->Reserve(&m_userSid.Sid, port, [session = weak_from_this()](const GUID& reservationId) {
+        if (const auto owner = session.lock())
+        {
+            owner->OnUsbDeviceRemoved(reservationId);
+        }
+    });
+    const auto reservationId = reservation.Id;
+    auto releaseOnFailure =
+        wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { m_usbManager->Release(&m_userSid.Sid, reservationId); });
+    const auto [entry, inserted] = m_usbAttachments.emplace(reservationId, UsbAttachment{std::move(reservation)});
+    THROW_HR_IF(E_UNEXPECTED, !inserted);
+    releaseOnFailure.release();
+
+    try
+    {
+        m_utilityVm->AttachUsbDevice(entry->second.Reservation.DeviceInstanceId);
+        entry->second.Attached = true;
+        m_usbManager->Commit(&m_userSid.Sid, reservationId);
+        entry->second.Requested = true;
+    }
+    catch (...)
+    {
+        const auto error = wil::ResultFromCaughtException();
+        try
+        {
+            _ReleaseUsbAttachment(reservationId);
+        }
+        CATCH_LOG_MSG("Failed to roll back USB attachment after error 0x%08X", error)
+        THROW_HR(error);
+    }
+
+    return S_OK;
+}
+
+HRESULT LxssUserSessionImpl::DetachUsbDevice(_In_ LPCWSTR Port)
+{
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+        wsl::shared::Localization::MessageUsbWindowsUpdateRequired(),
+        !wsl::windows::common::usb::UxdRegistry::IsSupported());
+    std::lock_guard lock(m_instanceLock);
+    THROW_HR_IF(CO_E_SERVER_STOPPING, m_disableNewInstanceCreation);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_READY), !m_usbManager);
+    const auto port = wsl::windows::common::usb::PortId{Port};
+    const auto attachment =
+        std::ranges::find_if(m_usbAttachments, [&](const auto& entry) { return entry.second.Reservation.Port == port; });
+    const auto reservationId =
+        attachment == m_usbAttachments.end() ? m_usbManager->GetReservationId(&m_userSid.Sid, port) : attachment->first;
+    _ReleaseUsbAttachment(reservationId, true);
+    return S_OK;
 }
 
 _Requires_lock_not_held_(m_instanceLock)
@@ -3193,6 +3361,7 @@ void LxssUserSessionImpl::_CreateVm()
             }
 
             m_pluginManager.OnVmStarted(&m_session, &userSettings);
+            _ReplayUsbAttachments();
         }
         catch (...)
         {
@@ -4256,6 +4425,10 @@ void LxssUserSessionImpl::_VmTerminate()
     }
 
     m_utilityVm.reset();
+    for (auto& [reservationId, attachment] : m_usbAttachments)
+    {
+        attachment.Attached = false;
+    }
     m_vmId.store(GUID_NULL);
 
     // VM teardown cancels exit callbacks, so complete any remaining waiters after the VM has released its resources.
@@ -4579,3 +4752,90 @@ try
     session->TerminateByClientIdLockHeld(LXSS_CLIENT_ID_WILDCARD);
 }
 CATCH_LOG()
+
+void LxssUserSessionImpl::OnUsbDeviceRemoved(const GUID& ReservationId)
+{
+    std::lock_guard lock(m_instanceLock);
+    const auto entry = m_usbAttachments.find(ReservationId);
+    if (entry != m_usbAttachments.end())
+    {
+        auto eraseOnExit = wil::scope_exit([&]() { m_usbAttachments.erase(entry); });
+        auto& attachment = entry->second;
+        attachment.Requested = false;
+        if (attachment.Attached)
+        {
+            m_utilityVm->DetachUsbDevice(attachment.Reservation.DeviceInstanceId);
+        }
+    }
+}
+
+_Requires_lock_held_(m_instanceLock)
+void LxssUserSessionImpl::_ReleaseUsbAttachment(const GUID& ReservationId, bool WaitForReappearance)
+{
+    const auto entry = m_usbAttachments.find(ReservationId);
+    if (entry != m_usbAttachments.end())
+    {
+        auto& attachment = entry->second;
+        attachment.Requested = false;
+        if (attachment.Attached)
+        {
+            try
+            {
+                m_utilityVm->DetachUsbDevice(attachment.Reservation.DeviceInstanceId);
+                attachment.Attached = false;
+            }
+            CATCH_LOG()
+        }
+    }
+
+    m_usbManager->Release(&m_userSid.Sid, ReservationId, WaitForReappearance);
+    if (entry != m_usbAttachments.end())
+    {
+        m_usbAttachments.erase(entry);
+    }
+}
+
+_Requires_lock_held_(m_instanceLock)
+void LxssUserSessionImpl::_ReleaseUsbAttachments() noexcept
+{
+    for (auto entry = m_usbAttachments.begin(); entry != m_usbAttachments.end();)
+    {
+        const auto reservationId = (entry++)->first;
+        try
+        {
+            _ReleaseUsbAttachment(reservationId);
+        }
+        CATCH_LOG()
+    }
+}
+
+_Requires_lock_held_(m_instanceLock)
+void LxssUserSessionImpl::_ReplayUsbAttachments() noexcept
+{
+    for (auto entry = m_usbAttachments.begin(); entry != m_usbAttachments.end();)
+    {
+        auto& attachment = (entry++)->second;
+        const auto reservationId = attachment.Reservation.Id;
+        try
+        {
+            if (!attachment.Requested || !m_usbManager->IsValid(&m_userSid.Sid, reservationId))
+            {
+                _ReleaseUsbAttachment(reservationId);
+                continue;
+            }
+
+            m_utilityVm->AttachUsbDevice(attachment.Reservation.DeviceInstanceId);
+            attachment.Attached = true;
+            m_usbManager->Commit(&m_userSid.Sid, reservationId);
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            try
+            {
+                _ReleaseUsbAttachment(reservationId);
+            }
+            CATCH_LOG_MSG("Failed to roll back USB attachment after replay failure")
+        }
+    }
+}
