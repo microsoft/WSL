@@ -18,19 +18,23 @@ Abstract:
 #include "WslcsdkPrivate.h"
 #include "WSLCContainerLauncher.h"
 #include "wslutil.h"
+#include "wslc_schema.h"
+#include "wslpolicies.h"
 #include "WSLCE2EHelpers.h"
 
 #include "winrt/Session.h"
 #include "winrt/Helpers.h"
 #include "winrt/ProcessCrashInformation.h"
 
+#include <ctxtcall.h>
 #include <winrt/Microsoft.WSL.Containers.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Networking.h>
 #include <winrt/Windows.Storage.Streams.h>
 
-using namespace winrt::Windows::Foundation;
+using winrt::Windows::Foundation::TimeSpan;
+using winrt::Windows::Foundation::Uri;
 using namespace winrt::Windows::Foundation::Collections;
 using namespace winrt::Windows::Storage::Streams;
 using namespace std::chrono_literals;
@@ -261,8 +265,10 @@ class WslcSdkWinRtTests
         const std::string& username = {}, const std::string& password = {}, uint16_t port = 5000)
     {
         // Get the IWSLCSession COM object from the SDK session handle and delegate to the shared helper.
-        auto comSession =
-            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->session.query<IWSLCSession>();
+        wil::com_ptr<IWSLCSession> comSession;
+        VERIFY_SUCCEEDED(reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))
+                             ->GetSession()
+                             ->QueryInterface(IID_PPV_ARGS(comSession.put())));
         return WSLCE2ETests::StartLocalRegistry(*comSession, username, password, port);
     }
 
@@ -373,6 +379,56 @@ class WslcSdkWinRtTests
         }
     }
 
+    WSLC_TEST_METHOD(SessionHostLoopback)
+    {
+        constexpr uint16_t c_hostLoopbackTestPort = 1239;
+        constexpr auto c_hostLoopbackName = L"wslc-winrt-loopback.internal";
+        const auto endpoint = std::format(L"http://127.0.0.1:{}/", c_hostLoopbackTestPort);
+        UniqueWebServer server(endpoint.c_str(), L"winrt-host-loopback-ok");
+        ExpectHttpResponse(endpoint.c_str(), HTTP_STATUS_OK, true);
+
+        const std::filesystem::path storage = m_storagePath / "wslc-winrt-host-loopback-storage";
+        auto cleanupStorage = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { std::filesystem::remove_all(storage); });
+
+        auto settings = WSLCSDK::SessionSettings(L"wslc-winrt-host-loopback-test", storage.wstring());
+
+        // Host loopback is disabled by default.
+        VERIFY_ARE_EQUAL(settings.HostLoopback(), winrt::hstring{});
+
+        // The settings keep their own copy of the hostname, so a temporary string can be passed.
+        settings.HostLoopback(winrt::hstring{c_hostLoopbackName});
+        VERIFY_ARE_EQUAL(settings.HostLoopback(), winrt::hstring{c_hostLoopbackName});
+
+        auto session = WSLCSDK::Session(settings);
+        session.Start();
+
+        // Negative: the hostname cannot be changed once the session has started.
+        VERIFY_THROWS_HR(settings.HostLoopback(L""), E_ILLEGAL_STATE_CHANGE);
+
+        session.LoadImageAsync(GetTestImagePath("python:3.12-alpine").wstring()).get();
+
+        // Positive: the hostname reaches the Windows host loopback on the first session start.
+        {
+            const auto url = std::format(L"http://{}:{}/", c_hostLoopbackName, c_hostLoopbackTestPort);
+            const std::wstring_view commandLine[] = {L"wget", L"-q", L"-T", L"60", L"-O", L"-", url};
+
+            auto containerSettings = WSLCSDK::ContainerSettings(L"python:3.12-alpine");
+            containerSettings.InitProcess(MakeProcessSettings(commandLine));
+            containerSettings.NetworkingMode(WSLCSDK::ContainerNetworkingMode::Bridged);
+
+            auto container = session.CreateContainer(containerSettings);
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+            StartContainerAndWaitForInitProcessExit(container);
+            auto output = GetProcessOutput(container.InitProcess());
+
+            VERIFY_ARE_EQUAL(output.ExitCode, 0u);
+            VERIFY_ARE_EQUAL(output.StandardOutput, L"winrt-host-loopback-ok");
+        }
+
+        session.Terminate();
+    }
+
     WSLC_TEST_METHOD(TerminationHandler)
     {
         // Positive: Terminating the session must trigger a graceful shutdown and fire the event
@@ -393,6 +449,196 @@ class WslcSdkWinRtTests
         auto future = promise.get_future();
         VERIFY_ARE_EQUAL(future.wait_for(30s), std::future_status::ready);
         VERIFY_ARE_EQUAL(future.get(), WSLCSDK::SessionTerminationReason::Shutdown);
+    }
+
+    // A regression here deadlocks, so bound it with TAEF's TestTimeout (not enforced with /inproc).
+    TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(TerminationHandlerCloseIsRejected)
+    TEST_METHOD_PROPERTY(L"Ignore[not(@Version=2)]", L"true")
+    TEST_METHOD_PROPERTY(L"TestTimeout", L"0:5")
+    TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE()
+    TEST_METHOD(TerminationHandlerCloseIsRejected)
+    {
+        const std::filesystem::path extraStorage = m_storagePath / "wslc-winrt-termh-close-storage";
+
+        auto settings = WSLCSDK::SessionSettings(L"wslc-winrt-termh-close", extraStorage.wstring());
+        settings.Timeout(std::chrono::duration_cast<TimeSpan>(30s));
+
+        auto session = WSLCSDK::Session(settings);
+
+        auto tryClose = [&]() -> HRESULT {
+            try
+            {
+                session.Close();
+                return S_OK;
+            }
+            catch (winrt::hresult_error const& e)
+            {
+                return e.code();
+            }
+        };
+
+        // Negative: Close() must be rejected from every Terminated handler, since it would wait for the handler itself.
+        std::promise<HRESULT> firstHandlerResult;
+        std::promise<HRESULT> secondHandlerResult;
+        session.Terminated([&](WSLCSDK::SessionTerminationReason) { firstHandlerResult.set_value(tryClose()); });
+        session.Terminated([&](WSLCSDK::SessionTerminationReason) { secondHandlerResult.set_value(tryClose()); });
+
+        // Drain the handlers before the promises and tryClose they capture are destroyed, including on early test failure.
+        auto closeOnExit = SCOPE_CLEANUP(session.Close());
+
+        session.Start();
+        session.Terminate();
+
+        auto firstResult = firstHandlerResult.get_future();
+        auto secondResult = secondHandlerResult.get_future();
+        VERIFY_ARE_EQUAL(firstResult.wait_for(30s), std::future_status::ready);
+        VERIFY_ARE_EQUAL(secondResult.wait_for(30s), std::future_status::ready);
+        VERIFY_ARE_EQUAL(firstResult.get(), E_ILLEGAL_METHOD_CALL);
+        VERIFY_ARE_EQUAL(secondResult.get(), E_ILLEGAL_METHOD_CALL);
+
+        // Positive: The rejected Close() must not release anything, so the session remains open until closed outside the handler.
+        VERIFY_IS_NOT_NULL(WSLCSDK::implementation::GetHandle(session));
+        session.Close();
+        VERIFY_THROWS_HR(std::ignore = WSLCSDK::implementation::GetHandle(session), E_ILLEGAL_METHOD_CALL);
+    }
+
+    // A regression here deadlocks, so bound it with TAEF's TestTimeout (not enforced with /inproc).
+    TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(TerminationHandlerCloseFromStaCallIsRejected)
+    TEST_METHOD_PROPERTY(L"Ignore[not(@Version=2)]", L"true")
+    TEST_METHOD_PROPERTY(L"TestTimeout", L"0:5")
+    TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE()
+    TEST_METHOD(TerminationHandlerCloseFromStaCallIsRejected)
+    {
+        // Pump an STA so the handler can make a synchronous COM call into it, as a non-agile handler's proxy does.
+        wil::unique_event stopPumping{wil::EventOptions::ManualReset};
+        std::promise<wil::com_ptr<IContextCallback>> staContextPromise;
+        std::thread staThread([&]() {
+            try
+            {
+                auto coInit = wil::CoInitializeEx(COINIT_APARTMENTTHREADED);
+                wil::com_ptr<IContextCallback> context;
+                THROW_IF_FAILED(CoGetObjectContext(IID_PPV_ARGS(&context)));
+                staContextPromise.set_value(context);
+
+                DWORD index{};
+                LOG_IF_FAILED(CoWaitForMultipleHandles(0, INFINITE, 1, stopPumping.addressof(), &index));
+            }
+            catch (...)
+            {
+                staContextPromise.set_exception(std::current_exception());
+            }
+        });
+
+        auto stopStaThread = wil::scope_exit([&]() {
+            stopPumping.SetEvent();
+            staThread.join();
+        });
+
+        auto staContext = staContextPromise.get_future().get();
+
+        DWORD raisingThreadId = 0;
+        DWORD staThreadId = 0;
+        GUID raisingLogicalThreadId = GUID_NULL;
+        GUID staLogicalThreadId = GUID_NULL;
+        HRESULT raisingLogicalThreadIdResult = E_UNEXPECTED;
+        HRESULT staLogicalThreadIdResult = E_UNEXPECTED;
+        HRESULT staCloseResult = S_OK;
+
+        const std::filesystem::path extraStorage = m_storagePath / "wslc-winrt-termh-sta-storage";
+
+        auto settings = WSLCSDK::SessionSettings(L"wslc-winrt-termh-sta", extraStorage.wstring());
+        settings.Timeout(std::chrono::duration_cast<TimeSpan>(30s));
+
+        auto session = WSLCSDK::Session(settings);
+
+        std::function<void()> closeOnSta = [&]() {
+            staThreadId = GetCurrentThreadId();
+            staLogicalThreadIdResult = CoGetCurrentLogicalThreadId(&staLogicalThreadId);
+            try
+            {
+                session.Close();
+            }
+            catch (winrt::hresult_error const& e)
+            {
+                staCloseResult = e.code();
+            }
+        };
+
+        // Negative: Close() must be rejected on a thread serving a synchronous COM call made by the handler.
+        std::promise<HRESULT> handlerResult;
+        session.Terminated([&](WSLCSDK::SessionTerminationReason) {
+            raisingThreadId = GetCurrentThreadId();
+            raisingLogicalThreadIdResult = CoGetCurrentLogicalThreadId(&raisingLogicalThreadId);
+            ComCallData callData{};
+            callData.pUserDefined = &closeOnSta;
+            handlerResult.set_value(staContext->ContextCallback(
+                [](ComCallData* data) -> HRESULT {
+                    (*static_cast<std::function<void()>*>(data->pUserDefined))();
+                    return S_OK;
+                },
+                &callData,
+                IID_ICallbackWithNoReentrancyToApplicationSTA,
+                5,
+                nullptr));
+        });
+
+        // Drain the handler before the STA stops pumping and before the state it captures is destroyed.
+        auto closeOnExit = SCOPE_CLEANUP(session.Close());
+
+        session.Start();
+        session.Terminate();
+
+        auto result = handlerResult.get_future();
+        VERIFY_ARE_EQUAL(result.wait_for(30s), std::future_status::ready);
+        VERIFY_SUCCEEDED(result.get());
+        VERIFY_ARE_NOT_EQUAL(staThreadId, raisingThreadId);
+        VERIFY_SUCCEEDED(raisingLogicalThreadIdResult);
+        VERIFY_SUCCEEDED(staLogicalThreadIdResult);
+        VERIFY_IS_FALSE(IsEqualGUID(raisingLogicalThreadId, GUID_NULL));
+        VERIFY_IS_TRUE(IsEqualGUID(staLogicalThreadId, raisingLogicalThreadId));
+        VERIFY_ARE_EQUAL(staCloseResult, E_ILLEGAL_METHOD_CALL);
+
+        // Positive: The rejected Close() must not release anything.
+        VERIFY_IS_NOT_NULL(WSLCSDK::implementation::GetHandle(session));
+        session.Close();
+        VERIFY_THROWS_HR(std::ignore = WSLCSDK::implementation::GetHandle(session), E_ILLEGAL_METHOD_CALL);
+    }
+
+    WSLC_TEST_METHOD(CloseWaitsForTerminationHandler)
+    {
+        const std::filesystem::path extraStorage = m_storagePath / "wslc-winrt-termh-wait-storage";
+
+        auto settings = WSLCSDK::SessionSettings(L"wslc-winrt-termh-wait", extraStorage.wstring());
+        settings.Timeout(std::chrono::duration_cast<TimeSpan>(30s));
+
+        wil::unique_event handlerEntered{wil::EventOptions::ManualReset};
+        wil::unique_event releaseHandler{wil::EventOptions::ManualReset};
+        std::atomic<bool> handlerReturned{false};
+
+        auto session = WSLCSDK::Session(settings);
+        session.Terminated([&](WSLCSDK::SessionTerminationReason) {
+            handlerEntered.SetEvent();
+            releaseHandler.wait(60 * 1000);
+            handlerReturned = true;
+        });
+
+        session.Start();
+        session.Terminate();
+        VERIFY_IS_TRUE(handlerEntered.wait(30 * 1000));
+
+        // Positive: Close() from outside the handler must not return until the active handler has returned.
+        auto closeResult = std::async(std::launch::async, [&]() {
+            session.Close();
+            return handlerReturned.load();
+        });
+
+        auto releaseHandlerOnExit = wil::scope_exit([&]() { releaseHandler.SetEvent(); });
+
+        VERIFY_ARE_EQUAL(closeResult.wait_for(2s), std::future_status::timeout);
+
+        releaseHandler.SetEvent();
+        VERIFY_ARE_EQUAL(closeResult.wait_for(30s), std::future_status::ready);
+        VERIFY_IS_TRUE(closeResult.get());
     }
 
     WSLC_TEST_METHOD(ProcessCrashedEvent)
@@ -601,6 +847,573 @@ class WslcSdkWinRtTests
         // Negative: non-existent image name must throw.
         {
             VERIFY_THROWS_HR(m_defaultSession.DeleteImage(L"nonexistent:no-such-tag"), WSLC_E_IMAGE_NOT_FOUND);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Network tests
+    // -----------------------------------------------------------------------
+
+    WSLC_TEST_METHOD(NetworkList)
+    {
+        constexpr auto c_networkName = "wslc-sdk-winrt-list-network";
+        constexpr auto c_subnet = "10.231.46.0/24";
+        constexpr auto c_subnetAddress = L"10.231.46.0";
+        constexpr auto c_gateway = "10.231.46.1";
+        const winrt::hstring networkName = winrt::to_hstring(c_networkName);
+
+        auto comSession = wil::com_query<IWSLCSession>(
+            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->GetSession());
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName));
+
+        WSLCNetworkOptions options{};
+        options.Name = c_networkName;
+        options.Driver = "bridge";
+        options.Internal = TRUE;
+        options.Subnet = c_subnet;
+        options.Gateway = c_gateway;
+        VERIFY_SUCCEEDED(comSession->CreateNetwork(&options, nullptr));
+        auto cleanupNetwork = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName)); });
+
+        auto findNetwork = [](auto const& networks, winrt::hstring const& name) -> WSLCSDK::NetworkInfo {
+            for (auto const& network : networks)
+            {
+                if (network.Name() == name)
+                {
+                    return network;
+                }
+            }
+
+            return nullptr;
+        };
+
+        // Positive: the list includes the predefined bridge network and the created network with all fields.
+        {
+            const auto networks = m_defaultSession.GetNetworks();
+
+            const auto bridge = findNetwork(networks, L"bridge");
+            VERIFY_IS_NOT_NULL(bridge);
+            VERIFY_ARE_EQUAL(bridge.Driver(), winrt::hstring{L"bridge"});
+
+            const auto created = findNetwork(networks, networkName);
+            VERIFY_IS_NOT_NULL(created);
+            VERIFY_ARE_EQUAL(created.Id().size(), 64u);
+            VERIFY_ARE_EQUAL(created.Driver(), winrt::hstring{L"bridge"});
+            VERIFY_IS_GREATER_THAN(created.CreatedTimestamp().time_since_epoch().count(), 0ll);
+            VERIFY_ARE_EQUAL(created.Flags(), WSLCSDK::NetworkFlags::EnableIPv4 | WSLCSDK::NetworkFlags::Internal);
+            VERIFY_IS_NOT_NULL(created.IPv4Subnet());
+            VERIFY_ARE_EQUAL(created.IPv4Subnet().CanonicalName(), winrt::hstring{c_subnetAddress});
+            VERIFY_ARE_EQUAL(created.IPv4SubnetPrefixLength(), static_cast<uint8_t>(24));
+            VERIFY_IS_NOT_NULL(created.IPv4Gateway());
+            VERIFY_ARE_EQUAL(created.IPv4Gateway().CanonicalName(), winrt::to_hstring(c_gateway));
+            VERIFY_IS_NULL(created.IPv6Subnet());
+            VERIFY_ARE_EQUAL(created.IPv6SubnetPrefixLength(), static_cast<uint8_t>(0));
+            VERIFY_IS_NULL(created.IPv6Gateway());
+        }
+
+        // Positive: a deleted network is no longer listed.
+        {
+            VERIFY_SUCCEEDED(comSession->DeleteNetwork(c_networkName));
+            cleanupNetwork.release();
+
+            VERIFY_IS_NULL(findNetwork(m_defaultSession.GetNetworks(), networkName));
+        }
+    }
+
+    WSLC_TEST_METHOD(NetworkDelete)
+    {
+        constexpr auto c_networkName = "wslc-sdk-winrt-delete-network";
+        const winrt::hstring networkName = winrt::to_hstring(c_networkName);
+
+        auto comSession = wil::com_query<IWSLCSession>(
+            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->GetSession());
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName));
+
+        WSLCNetworkOptions options{};
+        options.Name = c_networkName;
+        options.Driver = "bridge";
+        VERIFY_SUCCEEDED(comSession->CreateNetwork(&options, nullptr));
+        auto cleanupNetwork = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName)); });
+
+        // Positive: the deleted network is no longer listed.
+        {
+            m_defaultSession.DeleteNetwork(networkName);
+            cleanupNetwork.release();
+
+            for (auto const& network : m_defaultSession.GetNetworks())
+            {
+                VERIFY_ARE_NOT_EQUAL(network.Name(), networkName);
+            }
+        }
+
+        // Negative: deleting a missing network fails.
+        {
+            VERIFY_THROWS_HR(m_defaultSession.DeleteNetwork(networkName), WSLC_E_NETWORK_NOT_FOUND);
+        }
+
+        // Negative: invalid arguments.
+        {
+            VERIFY_THROWS_HR(m_defaultSession.DeleteNetwork(L""), E_INVALIDARG);
+        }
+    }
+
+    WSLC_TEST_METHOD(NetworkDeleteById)
+    {
+        constexpr auto c_networkName = "wslc-sdk-winrt-delete-network-by-id";
+        const winrt::hstring networkName = winrt::to_hstring(c_networkName);
+
+        auto comSession = wil::com_query<IWSLCSession>(
+            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->GetSession());
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName));
+
+        auto findNetworkId = [&]() -> std::optional<winrt::hstring> {
+            for (auto const& network : m_defaultSession.GetNetworks())
+            {
+                if (network.Name() == networkName)
+                {
+                    return network.Id();
+                }
+            }
+
+            return std::nullopt;
+        };
+
+        auto createNetwork = [&]() {
+            WSLCNetworkOptions options{};
+            options.Name = c_networkName;
+            options.Driver = "bridge";
+            VERIFY_SUCCEEDED(comSession->CreateNetwork(&options, nullptr));
+            const auto id = findNetworkId();
+            VERIFY_IS_TRUE(id.has_value());
+            return id.value();
+        };
+
+        auto cleanupNetwork = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName)); });
+
+        // Positive: a network can be deleted by its full ID.
+        {
+            m_defaultSession.DeleteNetwork(createNetwork());
+            VERIFY_IS_FALSE(findNetworkId().has_value());
+        }
+
+        // Positive: a network can be deleted by a unique ID prefix.
+        {
+            const std::wstring id{createNetwork()};
+            m_defaultSession.DeleteNetwork(winrt::hstring{id.substr(0, 12)});
+            VERIFY_IS_FALSE(findNetworkId().has_value());
+        }
+    }
+
+    WSLC_TEST_METHOD(NetworkCreate)
+    {
+        constexpr auto c_networkName = "wslc-sdk-winrt-create-network";
+        constexpr auto c_subnet = L"10.231.48.0";
+        constexpr auto c_gateway = L"10.231.48.1";
+        const winrt::hstring networkName = winrt::to_hstring(c_networkName);
+
+        auto comSession = wil::com_query<IWSLCSession>(
+            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->GetSession());
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName));
+
+        // Positive: the created network is returned and listed with the requested settings.
+        {
+            WSLCSDK::NetworkSettings settings{networkName};
+            settings.Flags(WSLCSDK::NetworkFlags::Internal);
+            settings.Subnet(winrt::Windows::Networking::HostName{c_subnet});
+            settings.SubnetPrefixLength(24);
+            settings.Gateway(winrt::Windows::Networking::HostName{c_gateway});
+
+            const auto created = m_defaultSession.CreateNetwork(settings);
+            auto cleanupNetwork = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName)); });
+
+            VERIFY_ARE_EQUAL(created.Name(), networkName);
+            VERIFY_ARE_EQUAL(created.Id().size(), 64u);
+            VERIFY_ARE_EQUAL(created.Driver(), winrt::hstring{L"bridge"});
+            VERIFY_ARE_EQUAL(created.Flags(), WSLCSDK::NetworkFlags::EnableIPv4 | WSLCSDK::NetworkFlags::Internal);
+            VERIFY_IS_NOT_NULL(created.IPv4Subnet());
+            VERIFY_ARE_EQUAL(created.IPv4Subnet().CanonicalName(), winrt::hstring{c_subnet});
+            VERIFY_ARE_EQUAL(created.IPv4SubnetPrefixLength(), static_cast<uint8_t>(24));
+            VERIFY_IS_NOT_NULL(created.IPv4Gateway());
+            VERIFY_ARE_EQUAL(created.IPv4Gateway().CanonicalName(), winrt::hstring{c_gateway});
+
+            bool listed = false;
+            for (auto const& network : m_defaultSession.GetNetworks())
+            {
+                listed |= network.Id() == created.Id();
+            }
+
+            VERIFY_IS_TRUE(listed);
+
+            // Negative: settings cannot change after they have been applied.
+            VERIFY_THROWS_HR(settings.Flags(WSLCSDK::NetworkFlags::None), E_ILLEGAL_STATE_CHANGE);
+
+            // Negative: creating a duplicate network fails.
+            VERIFY_THROWS_HR(m_defaultSession.CreateNetwork(WSLCSDK::NetworkSettings{networkName}), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+        }
+
+        // Positive: a dual-stack network.
+        {
+            WSLCSDK::NetworkSettings settings{networkName};
+            settings.Flags(WSLCSDK::NetworkFlags::EnableIPv4 | WSLCSDK::NetworkFlags::EnableIPv6);
+            settings.Subnet(winrt::Windows::Networking::HostName{L"fd00:231:48::"});
+            settings.SubnetPrefixLength(64);
+
+            const auto created = m_defaultSession.CreateNetwork(settings);
+            auto cleanupNetwork = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_networkName)); });
+
+            VERIFY_ARE_EQUAL(created.Flags(), WSLCSDK::NetworkFlags::EnableIPv4 | WSLCSDK::NetworkFlags::EnableIPv6);
+            VERIFY_IS_NOT_NULL(created.IPv6Subnet());
+            VERIFY_ARE_EQUAL(created.IPv6SubnetPrefixLength(), static_cast<uint8_t>(64));
+        }
+
+        // Negative: IPv4 cannot be disabled.
+        {
+            WSLCSDK::NetworkSettings ipv6Only{networkName};
+            ipv6Only.Flags(WSLCSDK::NetworkFlags::EnableIPv6);
+            VERIFY_THROWS_HR(m_defaultSession.CreateNetwork(ipv6Only), E_NOTIMPL);
+        }
+
+        // Negative: invalid arguments.
+        {
+            VERIFY_THROWS_HR(m_defaultSession.CreateNetwork(nullptr), E_POINTER);
+            VERIFY_THROWS_HR(WSLCSDK::NetworkSettings{L""}, E_INVALIDARG);
+
+            WSLCSDK::NetworkSettings settings{networkName};
+            VERIFY_THROWS_HR(settings.Subnet(winrt::Windows::Networking::HostName{L"example.com"}), E_INVALIDARG);
+
+            settings.Subnet(winrt::Windows::Networking::HostName{c_subnet});
+            VERIFY_THROWS_HR(m_defaultSession.CreateNetwork(settings), E_INVALIDARG);
+
+            WSLCSDK::NetworkSettings disabledFamily{networkName};
+            disabledFamily.Subnet(winrt::Windows::Networking::HostName{L"fd00:231:48::"});
+            disabledFamily.SubnetPrefixLength(64);
+            VERIFY_THROWS_HR(m_defaultSession.CreateNetwork(disabledFamily), E_INVALIDARG);
+
+            WSLCSDK::NetworkSettings mismatched{networkName};
+            mismatched.Subnet(winrt::Windows::Networking::HostName{c_subnet});
+            mismatched.SubnetPrefixLength(24);
+            mismatched.Gateway(winrt::Windows::Networking::HostName{L"fd00::1"});
+            VERIFY_THROWS_HR(m_defaultSession.CreateNetwork(mismatched), E_INVALIDARG);
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerNetworks)
+    {
+        constexpr auto c_primaryNetwork = "wslc-sdk-winrt-container-primary";
+        constexpr auto c_additionalNetwork = "wslc-sdk-winrt-container-additional";
+        constexpr auto c_ipv6Network = "wslc-sdk-winrt-container-ipv6";
+        constexpr auto c_primaryIp = L"10.231.51.10";
+        constexpr auto c_additionalIp = L"10.231.52.10";
+        constexpr auto c_ipv6Ip = L"fd00:231:53::10";
+        const winrt::hstring primaryNetwork = winrt::to_hstring(c_primaryNetwork);
+        const winrt::hstring additionalNetwork = winrt::to_hstring(c_additionalNetwork);
+        const winrt::hstring ipv6Network = winrt::to_hstring(c_ipv6Network);
+
+        auto comSession = wil::com_query<IWSLCSession>(
+            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->GetSession());
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_primaryNetwork));
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_additionalNetwork));
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_ipv6Network));
+
+        auto createNetwork = [&](winrt::hstring const& name, const wchar_t* subnet) {
+            WSLCSDK::NetworkSettings settings{name};
+            settings.Subnet(winrt::Windows::Networking::HostName{subnet});
+            settings.SubnetPrefixLength(24);
+            m_defaultSession.CreateNetwork(settings);
+        };
+
+        createNetwork(primaryNetwork, L"10.231.51.0");
+        auto cleanupPrimary = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_primaryNetwork)); });
+        createNetwork(additionalNetwork, L"10.231.52.0");
+        auto cleanupAdditional = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_additionalNetwork)); });
+
+        {
+            WSLCSDK::NetworkSettings settings{ipv6Network};
+            settings.Flags(WSLCSDK::NetworkFlags::EnableIPv4 | WSLCSDK::NetworkFlags::EnableIPv6);
+            settings.Subnet(winrt::Windows::Networking::HostName{L"fd00:231:53::"});
+            settings.SubnetPrefixLength(64);
+            m_defaultSession.CreateNetwork(settings);
+        }
+        auto cleanupIpv6 = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_ipv6Network)); });
+
+        auto makeSettings = []() {
+            auto procSettings = WSLCSDK::ProcessSettings();
+            procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
+            WSLCSDK::ContainerSettings containerSettings{L"debian:latest"};
+            containerSettings.InitProcess(procSettings);
+            return containerSettings;
+        };
+
+        auto inspect = [](WSLCSDK::Container const& container) {
+            return wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(
+                winrt::to_string(container.Inspect()).c_str());
+        };
+
+        auto hasAlias = [](const wsl::windows::common::wslc_schema::InspectEndpointSettings& endpoint, std::string_view alias) {
+            return std::ranges::find(endpoint.Aliases, alias) != endpoint.Aliases.end();
+        };
+
+        // Positive: the container joins every network with its aliases, and the first network is primary.
+        {
+            WSLCSDK::ContainerNetwork primary{primaryNetwork};
+            primary.Aliases().Append(L"db");
+            primary.Aliases().Append(L"primary");
+            WSLCSDK::ContainerNetwork additional{additionalNetwork};
+            additional.Aliases(winrt::single_threaded_vector<winrt::hstring>({L"cache"}));
+
+            auto containerSettings = makeSettings();
+            containerSettings.Networks().Append(primary);
+            containerSettings.Networks().Append(additional);
+
+            auto container = m_defaultSession.CreateContainer(containerSettings);
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+            container.Start();
+
+            const auto inspectObject = inspect(container);
+            VERIFY_ARE_EQUAL(std::string(c_primaryNetwork), inspectObject.HostConfig.NetworkMode);
+            VERIFY_ARE_EQUAL(inspectObject.NetworkSettings.Networks.size(), size_t{2});
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_primaryNetwork));
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_additionalNetwork));
+
+            const auto& primaryEndpoint = inspectObject.NetworkSettings.Networks.at(c_primaryNetwork);
+            const auto& additionalEndpoint = inspectObject.NetworkSettings.Networks.at(c_additionalNetwork);
+            VERIFY_IS_TRUE(hasAlias(primaryEndpoint, "db"));
+            VERIFY_IS_TRUE(hasAlias(primaryEndpoint, "primary"));
+            VERIFY_IS_TRUE(hasAlias(additionalEndpoint, "cache"));
+
+            // Negative: networks cannot change after they have been applied.
+            VERIFY_THROWS_HR(primary.Aliases(winrt::single_threaded_vector<winrt::hstring>()), E_ILLEGAL_STATE_CHANGE);
+            VERIFY_THROWS_HR(containerSettings.Networks(winrt::single_threaded_vector<WSLCSDK::ContainerNetwork>()), E_ILLEGAL_STATE_CHANGE);
+        }
+
+        // Positive: each network gets its own static IP.
+        {
+            WSLCSDK::ContainerNetwork primary{primaryNetwork};
+            primary.IPv4Address(winrt::Windows::Networking::HostName{c_primaryIp});
+            WSLCSDK::ContainerNetwork additional{additionalNetwork};
+            additional.IPv4Address(winrt::Windows::Networking::HostName{c_additionalIp});
+            WSLCSDK::ContainerNetwork ipv6{ipv6Network};
+            ipv6.IPv6Address(winrt::Windows::Networking::HostName{c_ipv6Ip});
+
+            auto containerSettings = makeSettings();
+            containerSettings.Networks().Append(primary);
+            containerSettings.Networks().Append(additional);
+            containerSettings.Networks().Append(ipv6);
+
+            auto container = m_defaultSession.CreateContainer(containerSettings);
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+            container.Start();
+
+            const auto inspectObject = inspect(container);
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_primaryNetwork));
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_additionalNetwork));
+
+            const auto& primaryEndpoint = inspectObject.NetworkSettings.Networks.at(c_primaryNetwork);
+            VERIFY_IS_TRUE(primaryEndpoint.IPAMConfig.has_value());
+            VERIFY_ARE_EQUAL(winrt::to_string(c_primaryIp), primaryEndpoint.IPAMConfig->IPv4Address);
+            VERIFY_ARE_EQUAL(winrt::to_string(c_primaryIp), primaryEndpoint.IPAddress);
+
+            const auto& additionalEndpoint = inspectObject.NetworkSettings.Networks.at(c_additionalNetwork);
+            VERIFY_IS_TRUE(additionalEndpoint.IPAMConfig.has_value());
+            VERIFY_ARE_EQUAL(winrt::to_string(c_additionalIp), additionalEndpoint.IPAMConfig->IPv4Address);
+            VERIFY_ARE_EQUAL(winrt::to_string(c_additionalIp), additionalEndpoint.IPAddress);
+
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_ipv6Network));
+            const auto& ipv6Endpoint = inspectObject.NetworkSettings.Networks.at(c_ipv6Network);
+            VERIFY_IS_TRUE(ipv6Endpoint.IPAMConfig.has_value());
+            VERIFY_ARE_EQUAL(winrt::to_string(c_ipv6Ip), ipv6Endpoint.IPAMConfig->IPv6Address);
+
+            // Negative: the IPs cannot change after the network has been applied.
+            VERIFY_THROWS_HR(primary.IPv4Address(nullptr), E_ILLEGAL_STATE_CHANGE);
+            VERIFY_THROWS_HR(ipv6.IPv6Address(nullptr), E_ILLEGAL_STATE_CHANGE);
+        }
+
+        // Negative: invalid combinations are rejected at create time.
+        {
+            auto withMode = makeSettings();
+            withMode.Networks().Append(WSLCSDK::ContainerNetwork{primaryNetwork});
+            withMode.NetworkingMode(WSLCSDK::ContainerNetworkingMode::Bridged);
+            VERIFY_THROWS_HR(m_defaultSession.CreateContainer(withMode), E_INVALIDARG);
+
+            WSLCSDK::ContainerNetwork bridgeWithIp{L"bridge"};
+            bridgeWithIp.IPv4Address(winrt::Windows::Networking::HostName{c_primaryIp});
+            auto ipOnBridge = makeSettings();
+            ipOnBridge.Networks().Append(bridgeWithIp);
+            VERIFY_THROWS_HR(m_defaultSession.CreateContainer(ipOnBridge), E_INVALIDARG);
+
+            WSLCSDK::ContainerNetwork bridgeWithIpv6{L"bridge"};
+            bridgeWithIpv6.IPv6Address(winrt::Windows::Networking::HostName{c_ipv6Ip});
+            auto ipv6OnBridge = makeSettings();
+            ipv6OnBridge.Networks().Append(bridgeWithIpv6);
+            VERIFY_THROWS_HR(m_defaultSession.CreateContainer(ipv6OnBridge), E_INVALIDARG);
+
+            WSLCSDK::ContainerNetwork bridgeWithAlias{L"bridge"};
+            bridgeWithAlias.Aliases().Append(L"web");
+            auto aliasOnBridge = makeSettings();
+            aliasOnBridge.Networks().Append(bridgeWithAlias);
+            VERIFY_THROWS_HR(m_defaultSession.CreateContainer(aliasOnBridge), E_INVALIDARG);
+
+            // A failed conversion must not be cached and reused by a later call.
+            auto nullNetwork = makeSettings();
+            nullNetwork.Networks().Append(nullptr);
+            VERIFY_THROWS_HR(m_defaultSession.CreateContainer(nullNetwork), E_POINTER);
+            VERIFY_THROWS_HR(m_defaultSession.CreateContainer(nullNetwork), E_POINTER);
+        }
+
+        // Positive: settings can be reused after the caller releases the applied networks.
+        {
+            auto containerSettings = makeSettings();
+            {
+                WSLCSDK::ContainerNetwork primary{primaryNetwork};
+                primary.Aliases().Append(L"reused");
+                containerSettings.Networks().Append(primary);
+            }
+
+            auto first = m_defaultSession.CreateContainer(containerSettings);
+            auto cleanupFirst = DELETE_CONTAINER_ON_SCOPE_EXIT(first);
+
+            containerSettings.Networks().Clear();
+
+            auto second = m_defaultSession.CreateContainer(containerSettings);
+            auto cleanupSecond = DELETE_CONTAINER_ON_SCOPE_EXIT(second);
+            second.Start();
+
+            const auto inspectObject = inspect(second);
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_primaryNetwork));
+            VERIFY_IS_TRUE(hasAlias(inspectObject.NetworkSettings.Networks.at(c_primaryNetwork), "reused"));
+        }
+
+        // Negative: invalid property values.
+        {
+            VERIFY_THROWS_HR(WSLCSDK::ContainerNetwork{L""}, E_INVALIDARG);
+
+            WSLCSDK::ContainerNetwork network{primaryNetwork};
+            VERIFY_THROWS_HR(network.Name(L""), E_INVALIDARG);
+            VERIFY_THROWS_HR(network.Aliases(nullptr), E_POINTER);
+
+            VERIFY_THROWS_HR(network.IPv4Address(winrt::Windows::Networking::HostName{L"example.com"}), E_INVALIDARG);
+            VERIFY_THROWS_HR(network.IPv4Address(winrt::Windows::Networking::HostName{L"fd00::1"}), E_INVALIDARG);
+            VERIFY_THROWS_HR(network.IPv6Address(winrt::Windows::Networking::HostName{L"example.com"}), E_INVALIDARG);
+            VERIFY_THROWS_HR(network.IPv6Address(winrt::Windows::Networking::HostName{L"10.0.0.1"}), E_INVALIDARG);
+
+            WSLCSDK::ContainerSettings containerSettings{L"debian:latest"};
+            VERIFY_THROWS_HR(containerSettings.Networks(nullptr), E_POINTER);
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerNetworkConnectDisconnect)
+    {
+        constexpr auto c_primaryNetwork = "wslc-sdk-winrt-connect-primary";
+        constexpr auto c_additionalNetwork = "wslc-sdk-winrt-connect-additional";
+        constexpr auto c_additionalIp = L"10.231.55.10";
+        const winrt::hstring primaryNetwork = winrt::to_hstring(c_primaryNetwork);
+        const winrt::hstring additionalNetwork = winrt::to_hstring(c_additionalNetwork);
+
+        auto comSession = wil::com_query<IWSLCSession>(
+            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))->GetSession());
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_primaryNetwork));
+        LOG_IF_FAILED(comSession->DeleteNetwork(c_additionalNetwork));
+
+        auto createNetwork = [&](winrt::hstring const& name, const wchar_t* subnet) {
+            WSLCSDK::NetworkSettings settings{name};
+            settings.Subnet(winrt::Windows::Networking::HostName{subnet});
+            settings.SubnetPrefixLength(24);
+            return m_defaultSession.CreateNetwork(settings);
+        };
+
+        createNetwork(primaryNetwork, L"10.231.54.0");
+        auto cleanupPrimary = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_primaryNetwork)); });
+        const auto additional = createNetwork(additionalNetwork, L"10.231.55.0");
+        auto cleanupAdditional = wil::scope_exit([&]() { LOG_IF_FAILED(comSession->DeleteNetwork(c_additionalNetwork)); });
+
+        auto makeSettings = [&](bool withNetwork) {
+            auto procSettings = WSLCSDK::ProcessSettings();
+            procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
+            WSLCSDK::ContainerSettings containerSettings{L"debian:latest"};
+            containerSettings.InitProcess(procSettings);
+            if (withNetwork)
+            {
+                containerSettings.Networks().Append(WSLCSDK::ContainerNetwork{primaryNetwork});
+            }
+
+            return containerSettings;
+        };
+
+        auto inspect = [](WSLCSDK::Container const& container) {
+            return wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(
+                winrt::to_string(container.Inspect()).c_str());
+        };
+
+        // Positive: a running container connects by name with an alias and static IP, then disconnects by name.
+        {
+            auto container = m_defaultSession.CreateContainer(makeSettings(true));
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+            container.Start();
+
+            WSLCSDK::ContainerNetwork network{additionalNetwork};
+            network.Aliases().Append(L"cache");
+            network.IPv4Address(winrt::Windows::Networking::HostName{c_additionalIp});
+            container.ConnectNetwork(network);
+
+            auto inspectObject = inspect(container);
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_additionalNetwork));
+            const auto& endpoint = inspectObject.NetworkSettings.Networks.at(c_additionalNetwork);
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, std::string_view{"cache"}) != endpoint.Aliases.end());
+            VERIFY_ARE_EQUAL(winrt::to_string(c_additionalIp), endpoint.IPAddress);
+
+            container.DisconnectNetwork(additionalNetwork);
+            inspectObject = inspect(container);
+            VERIFY_IS_FALSE(inspectObject.NetworkSettings.Networks.contains(c_additionalNetwork));
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_primaryNetwork));
+        }
+
+        // Positive: a created container connects by ID and disconnects by ID prefix.
+        {
+            auto container = m_defaultSession.CreateContainer(makeSettings(true));
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+            const std::wstring id{additional.Id()};
+            container.ConnectNetwork(WSLCSDK::ContainerNetwork{winrt::hstring{id}});
+            container.Start();
+
+            auto inspectObject = inspect(container);
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_additionalNetwork));
+
+            container.DisconnectNetwork(winrt::hstring{id.substr(0, 12)});
+            inspectObject = inspect(container);
+            VERIFY_IS_FALSE(inspectObject.NetworkSettings.Networks.contains(c_additionalNetwork));
+        }
+
+        // Positive: a created container connects and disconnects, then starts without the removed network.
+        {
+            auto container = m_defaultSession.CreateContainer(makeSettings(true));
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+            container.ConnectNetwork(WSLCSDK::ContainerNetwork{additionalNetwork});
+            VERIFY_IS_TRUE(inspect(container).NetworkSettings.Networks.contains(c_additionalNetwork));
+
+            container.DisconnectNetwork(additionalNetwork);
+            VERIFY_IS_FALSE(inspect(container).NetworkSettings.Networks.contains(c_additionalNetwork));
+
+            container.Start();
+            const auto inspectObject = inspect(container);
+            VERIFY_IS_FALSE(inspectObject.NetworkSettings.Networks.contains(c_additionalNetwork));
+            VERIFY_IS_TRUE(inspectObject.NetworkSettings.Networks.contains(c_primaryNetwork));
+        }
+
+        // Negative: unknown networks, containers without networking, and invalid arguments.
+        {
+            auto container = m_defaultSession.CreateContainer(makeSettings(true));
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+            VERIFY_THROWS_HR(container.ConnectNetwork(WSLCSDK::ContainerNetwork{L"wslc-sdk-winrt-missing"}), WSLC_E_NETWORK_NOT_FOUND);
+            VERIFY_THROWS_HR(container.DisconnectNetwork(L"wslc-sdk-winrt-missing"), WSLC_E_NETWORK_NOT_FOUND);
+            VERIFY_THROWS_HR(container.ConnectNetwork(nullptr), E_POINTER);
+            VERIFY_THROWS_HR(container.DisconnectNetwork(L""), E_INVALIDARG);
+
+            auto noNetwork = m_defaultSession.CreateContainer(makeSettings(false));
+            auto cleanupNoNetwork = DELETE_CONTAINER_ON_SCOPE_EXIT(noNetwork);
+            VERIFY_THROWS_HR(noNetwork.ConnectNetwork(WSLCSDK::ContainerNetwork{additionalNetwork}), E_INVALIDARG);
         }
     }
 
@@ -943,7 +1756,11 @@ class WslcSdkWinRtTests
 
     WSLC_TEST_METHOD(ContainerInspect)
     {
-        auto container = m_defaultSession.CreateContainer(WSLCSDK::ContainerSettings(L"debian:latest"));
+        auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+        containerSettings.CapabilityAdditions(winrt::single_threaded_vector<winrt::hstring>({L"NET_ADMIN", L"SYS_TIME"}));
+        containerSettings.CapabilityDrops(winrt::single_threaded_vector<winrt::hstring>({L"NET_RAW", L"CHOWN"}));
+
+        auto container = m_defaultSession.CreateContainer(containerSettings);
         auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
         const auto inspectJson = container.Inspect();
@@ -952,8 +1769,18 @@ class WslcSdkWinRtTests
         const auto id = container.Id();
         VERIFY_IS_FALSE(id.empty());
 
-        // The inspect JSON must contain the container ID.
-        VERIFY_IS_TRUE(winrt::to_string(inspectJson).find(winrt::to_string(id)) != std::string::npos);
+        const auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(inspectJson.c_str());
+        VERIFY_ARE_EQUAL(winrt::to_string(id), inspect.Id);
+        VERIFY_ARE_EQUAL(2u, inspect.HostConfig.CapAdd.size());
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("NET_ADMIN"); }));
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("SYS_TIME"); }));
+        VERIFY_ARE_EQUAL(2u, inspect.HostConfig.CapDrop.size());
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapDrop, [](const auto& capability) { return capability.ends_with("NET_RAW"); }));
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapDrop, [](const auto& capability) { return capability.ends_with("CHOWN"); }));
 
         container.Delete(WSLCSDK::DeleteContainerOption::None);
         cleanup.release();
@@ -1026,6 +1853,31 @@ class WslcSdkWinRtTests
         StartContainerAndWaitForInitProcessExit(container);
         VERIFY_ARE_EQUAL(container.InitProcess().ExitCode(), 0);
         container.Delete(WSLCSDK::DeleteContainerOption::Force);
+    }
+
+    WSLC_TEST_METHOD(ContainerCapabilityAdditions)
+    {
+        auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+        containerSettings.CapabilityAdditions(winrt::single_threaded_vector<winrt::hstring>({L"NET_ADMIN"}));
+
+        auto container = m_defaultSession.CreateContainer(containerSettings);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+        const auto inspectJson = container.Inspect();
+        const auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(inspectJson.c_str());
+        VERIFY_ARE_EQUAL(1u, inspect.HostConfig.CapAdd.size());
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("NET_ADMIN"); }));
+    }
+
+    WSLC_TEST_METHOD(ContainerCapabilityAdditionsBlockedByPolicy)
+    {
+        namespace policies = wsl::windows::policies;
+        RegistryKeyChange<DWORD> policy(HKEY_LOCAL_MACHINE, policies::c_registryKey, policies::c_allowWSLContainerPrivileged, 0);
+
+        auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+        containerSettings.CapabilityAdditions(winrt::single_threaded_vector<winrt::hstring>({L"NET_ADMIN"}));
+        VERIFY_THROWS_HR(m_defaultSession.CreateContainer(containerSettings), static_cast<HRESULT>(WSLCSDK::Error::CapabilityAdditionsDisabled));
     }
 
     // -----------------------------------------------------------------------

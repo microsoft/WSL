@@ -335,7 +335,8 @@ wsl::windows::common::SvcComm::LaunchProcess(
     wil::unique_handle ControlSocket;
     wil::unique_handle InteropSocket;
 
-    if (GetFileType(GetStdHandle(STD_ERROR_HANDLE)) == FILE_TYPE_CHAR)
+    const auto errorHandleType = GetFileType(ErrorHandle);
+    if (errorHandleType == FILE_TYPE_CHAR || errorHandleType == FILE_TYPE_PIPE)
     {
         context.EnableInteractiveWarnings();
     }

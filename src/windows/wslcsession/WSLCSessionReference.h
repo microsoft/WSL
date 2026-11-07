@@ -17,13 +17,14 @@ Abstract:
 
     When OpenSession() is called:
     - If the session is still alive, it returns S_OK with a strong reference
-    - If the session has been released, it returns ERROR_OBJECT_NO_LONGER_EXISTS
+    - If the session has been released, the service reference is disconnected
     - If the session has been terminated, it returns ERROR_INVALID_STATE
 
 --*/
 
 #pragma once
 #include "wslc.h"
+#include "RuntimeClass.h"
 #include <wrl/implements.h>
 #include <wil/com.h>
 
@@ -32,7 +33,7 @@ namespace wsl::windows::service::wslc {
 class WSLCSession;
 
 class WSLCSessionReference
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCSessionReference, IFastRundown, Microsoft::WRL::FtmBase>
+    : public common::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCSessionReference, IFastRundown>
 {
 public:
     NON_COPYABLE(WSLCSessionReference);

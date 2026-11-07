@@ -92,13 +92,20 @@ protected:
             return pointer;
         }();
 
-        auto release = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() {
-            std::unique_lock lock{m_lock};
+        // The guard holds its own reference so the impl can't be destroyed while this thread is still a registered caller.
+        // Otherwise the impl destructor could block on a thread that is itself waiting in Disconnect() for this caller.
+        auto release = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, keepAlive = impl]() mutable {
+            {
+                std::unique_lock lock{m_lock};
 
-            auto removed = m_callers.erase(std::this_thread::get_id());
-            WI_ASSERT(removed == 1);
+                auto removed = m_callers.erase(std::this_thread::get_id());
+                WI_ASSERT(removed == 1);
 
-            m_cv.notify_one();
+                m_cv.notify_one();
+            }
+
+            // N.B. This must happen outside m_lock since the impl destructor may call Disconnect().
+            keepAlive = {};
         });
 
         return std::make_pair(std::move(release), std::move(impl));

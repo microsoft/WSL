@@ -207,18 +207,20 @@ void DockerExecProcessControl::OnContainerReleased() noexcept
     }
 }
 
-VMProcessControl::VMProcessControl(WSLCVirtualMachine& VirtualMachine, int Pid, wil::unique_socket&& TtyControl) :
-    m_pid(Pid), m_ttyControlChannel(std::move(TtyControl), "TtyControl", {VirtualMachine.TerminatingEvent()}), m_vm(&VirtualMachine)
+VMProcessControl::VMProcessControl(WSLCVirtualMachine& VirtualMachine, int Pid, wil::unique_socket&& TtyControl, std::weak_ptr<VMProcessRegistry> Registry) :
+    m_pid(Pid),
+    m_ttyControlChannel(std::move(TtyControl), "TtyControl", {VirtualMachine.TerminatingEvent()}),
+    m_vm(&VirtualMachine),
+    m_registry(std::move(Registry))
 {
 }
 
 VMProcessControl::~VMProcessControl()
 {
-    std::lock_guard lock{m_lock};
-
-    if (m_vm != nullptr)
+    if (auto registry = m_registry.lock())
     {
-        m_vm->OnProcessReleased(m_pid);
+        std::lock_guard lock{registry->Mutex};
+        std::erase_if(registry->Processes, [](const auto& process) { return process.expired(); });
     }
 }
 
@@ -234,6 +236,7 @@ void VMProcessControl::ResizeTty(ULONG Rows, ULONG Columns)
 {
     std::lock_guard lock{m_lock};
 
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_vm == nullptr || m_exitEvent.is_signaled());
     THROW_WIN32_IF(ERROR_INVALID_STATE, !m_ttyControlChannel.Connected());
     THROW_HR_IF(E_INVALIDARG, Rows == 0 || Columns == 0 || Rows > USHORT_MAX || Columns > USHORT_MAX);
 
@@ -264,6 +267,7 @@ void VMProcessControl::OnVmTerminated()
 {
     std::lock_guard lock{m_lock};
     m_vm = nullptr;
+    m_ttyControlChannel.Close();
 
     // Make sure that the process is in a terminated state, so users don't think that it might still be running.
     if (!m_exitEvent.is_signaled())

@@ -14,6 +14,11 @@ parameters:
   type: string
   default: ''
 
+- name: includePublishInManual
+  displayName: 'Include publishing stages in this manual run. Pipeline will fail at the end of the package stage.'
+  type: boolean
+  default: false
+
 trigger:
   tags:
     include: ['*.*.*']
@@ -21,6 +26,12 @@ trigger:
 variables:
   WindowsContainerImage: "onebranch.azurecr.io/windows/ltsc2022/vse2022:latest"
   WindowsHostVersion: '1ESWindows2022'
+  preventPublishing: ${{ and(eq(variables['Build.Reason'], 'Manual'), eq(parameters.includePublishInManual, true)) }}
+  includePublishingStages: >-
+    ${{ or(
+    and(eq(variables['Build.Reason'], 'Manual'), eq(parameters.includePublishInManual, true)),
+    and(ne(variables['Build.Reason'], 'Manual'), eq(parameters.testVersion, ''))
+    ) }}
 
 resources:
   repositories:
@@ -88,7 +99,7 @@ extends:
         packageVersion: ${{ iif(eq(parameters.testVersion, ''), variables['Build.SourceBranchName'], parameters.testVersion) }}
         bypassTests: ${{ parameters.bypassTests }}
 
-    - ${{ if eq(parameters.testVersion, '') }}:
+    - ${{ if eq(variables['includePublishingStages'], true) }}:
         - template: dcat-publish-stages.yml@self
           parameters:
             releaseEnvironment: Production

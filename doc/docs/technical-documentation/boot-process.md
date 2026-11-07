@@ -56,9 +56,9 @@ When [wslservice.exe](wslservice.exe.md) receives the CreateInstance() call via 
 
 To start a WSL2 distribution, [wslservice.exe](wslservice.exe.md) needs a virtual machine. If the virtual machine isn't already running, it will be created as part of the `CreateInstance()` call. 
 
-The WSL2 virtual machine is created via the [Host Compute System (HCS) service](https://learn.microsoft.com/virtualization/api/hcs/overview) (see `src/windows/service/exe/WslCoreVm.cpp`).
+The WSL2 virtual machine is created via the [Host Compute System (HCS) service](https://learn.microsoft.com/virtualization/api/hcs/overview). `src/windows/service/exe/WslCoreVm.cpp` owns WSL-specific policy and guest startup. It passes a `VmCreateRequest` to `HcsVirtualMachineBackend` (`src/windows/common/HcsVirtualMachineBackend.cpp`), which owns the HCS configuration and compute-system lifetime.
 
-To create a new virtual machine, [wslservice.exe](wslservice.exe.md) generates a JSON string, which describes the virtual machine configuration. This JSON is then passed to [HcsCreateComputeSystem()](https://learn.microsoft.com/virtualization/api/hcs/reference/hcscreatecomputesystem) to create a new virtual machine.
+To create a new virtual machine, the HCS backend generates a JSON string, which describes the virtual machine configuration. This JSON is then passed to [HcsCreateComputeSystem()](https://learn.microsoft.com/virtualization/api/hcs/reference/hcscreatecomputesystem) to create a new virtual machine.
 
 See `src/windows/common/hcs_schema.h` for more details on the HCS JSON schema.
 
@@ -83,7 +83,9 @@ When started, the virtual machine will boot into the provided kernel, and then e
 - An entropy buffer, to seed the virtual machine's entropy
 - Information about the GPU drivers shares to mount, if any
 - Whether [wslg](https://github.com/microsoft/wslg) is enabled
-- Whether to mount the bundled Linux kernel headers and perf tooling (shipped in the kernel artifacts VHD; headers are mounted at `/usr/src/linux-headers-$(uname -r)` with `/lib/modules/$(uname -r)/build` linked to them or bind mounted when it is an existing directory, and perf is mounted at `/usr/lib/linux-tools/$(uname -r)`, added to the default `$PATH` and, when the distribution ships its own `/usr/bin/perf`, bind mounted over it)
+- Whether to mount the bundled Linux kernel headers (shipped in the kernel artifacts VHD; headers are mounted at `/usr/src/linux-headers-$(uname -r)` with `/lib/modules/$(uname -r)/build` linked to them or bind mounted when it is an existing directory)
+
+WSL does not expose bundled perf tooling or modify the distribution's perf installation. Install perf through the distribution's package manager.
 
 After applying all the configuration requested by [wslservice.exe](wslservice.exe.md), the virtual machine is ready to start Linux distributions.
 

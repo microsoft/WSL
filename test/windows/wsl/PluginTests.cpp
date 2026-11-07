@@ -634,6 +634,7 @@ class PluginTests
                 Process created
                 Failed process launch returned:  -2147467259
                 Invalid distro launch returned:  -2147220717
+                Process terminated by SIGTERM
                 Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
                 VM Stopping)";
 
@@ -868,6 +869,43 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
+    // A container with the always restart policy that is rejected by a plugin is not restarted.
+    WSL2_TEST_METHOD(WslcContainerRejectedRestartPolicyAlways)
+    {
+        ConfigurePlugin(PluginTestType::WslcContainerRejected);
+
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-container-rejected-always");
+
+            LoadTestImage(*session, "debian:latest");
+
+            wsl::windows::common::WSLCContainerLauncher launcher(
+                "debian:latest", "wslc-plugin-rejected-always", {"/bin/sh", "-c", "sleep 99999"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+
+            auto [hr, container] = launcher.LaunchNoThrow(*session, WSLCContainerStartFlagsNone);
+            VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED));
+            VERIFY_IS_TRUE(container.has_value());
+
+            // The observation window exceeds several automatic restart backoff delays.
+            std::this_thread::sleep_for(std::chrono::seconds(3));
+            VERIFY_ARE_EQUAL(container->State(), WslcContainerStateCreated);
+            const auto inspect = container->Inspect();
+            VERIFY_IS_FALSE(inspect.State.Running);
+            VERIFY_ARE_EQUAL(std::string{"exited"}, inspect.State.Status);
+        }
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=20
+            WSLC Session created, name=plugin-wslc-container-rejected-always, id=*, pid=*, token=set, sid=set
+            WSLC Image created, session=*, id=sha256:*, name=debian:latest
+            WSLC Container started, session=*, id=*, name=*, image=debian:latest, state=*
+            OnWslcContainerStarted: ERROR_ACCESS_DENIED
+            WSLC Session stopping, name=plugin-wslc-container-rejected-always, id=*)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
     // Validates the VM-lifecycle hooks: OnWslcVmStarted fires each time the VM is (re)created and
     // OnWslcVmStopping each time it is torn down, decoupled from the once-per-session hooks. Also
     // proves the started hook can call back into the session (WSLCCreateProcess) without deadlocking.
@@ -1067,6 +1105,54 @@ class PluginTests
             WSLC Session stopping, name=plugin-wslc-vm-never-started, id=*)";
 
         ValidateLogFile(ExpectedOutput);
+    }
+
+    WSL2_TEST_METHOD(CgroupIsolation)
+    {
+        WslConfigChange isolatedConfig(LxssGenerateTestConfig({.vmIdleTimeout = -1, .isolateDistroCgroup = true}));
+        StopWslService();
+
+        const auto secondPlugin = std::filesystem::path(pluginDll).parent_path() / L"testplugin-isolation.dll";
+        std::filesystem::copy_file(pluginDll, secondPlugin, std::filesystem::copy_options::overwrite_existing);
+        const auto key =
+            CreateKey(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Lxss\\Plugins", KEY_SET_VALUE, nullptr, 0);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            StopWslService();
+            DeleteValue(key.get(), L"TestPlugin-Isolated");
+            std::filesystem::remove(secondPlugin);
+        });
+        WriteString(key.get(), nullptr, L"TestPlugin-Isolated", secondPlugin.c_str());
+
+        ConfigurePlugin(PluginTestType::CgroupIsolation);
+        StartWsl(0);
+
+        constexpr char script[] = R"sh(
+{
+    sh -ec '
+        previous=
+        for plugin in testplugin testplugin-isolation; do
+            set -- $(pgrep -f "^$plugin[.]dll 3600$")
+            test "$#" -eq 2
+            cgroup=$(cat "/proc/$1/cgroup")
+            test "$cgroup" = "$(cat "/proc/$2/cgroup")"
+            printf "%s\n" "$cgroup" | grep -Eq "^0::/wsl-user/plugin-[0-9]+$"
+            test "$cgroup" != "$previous"
+            previous=$cgroup
+        done
+    ' && printf '\n%s%s\n' CGROUP_ PASS
+    busybox poweroff -f
+}
+)sh";
+
+        auto [inputRead, inputWrite] = CreateSubprocessPipe(true, false);
+        VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(inputWrite.get(), script, static_cast<DWORD>(sizeof(script) - 1), nullptr, nullptr));
+        inputWrite.reset();
+
+        auto commandLine = LxssGenerateWslCommandLine(L"--debug-shell");
+        const auto [output, error, exitCode] = LxsstuLaunchCommandAndCaptureOutputWithResult(commandLine.data(), inputRead.get());
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown --force"), 0L);
+        LogInfo("Debug shell output: %ls\n%ls", output.c_str(), error.c_str());
+        VERIFY_IS_TRUE(output.find(L"CGROUP_PASS") != std::wstring::npos);
     }
 
     // This test must run last so it doesn't break test cases that depends on plugin signature.

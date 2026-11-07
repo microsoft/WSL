@@ -1029,16 +1029,14 @@ Return Value:
         LogError("Failed to create WER report, 0x%x", wil::ResultFromCaughtException());
     }
 
-    if (LxsstuVmMode())
+    // Dump guest processes in WSL1 & WSL2 mode, since some WSL1 tests use a WSL2 VM.
+    try
     {
-        try
-        {
-            DumpGuestProcesses();
-        }
-        catch (...)
-        {
-            LogError("Failed to dump guest processes, 0x%x", wil::ResultFromCaughtException());
-        }
+        DumpGuestProcesses();
+    }
+    catch (...)
+    {
+        LogError("Failed to dump guest processes, 0x%x", wil::ResultFromCaughtException());
     }
 
     try
@@ -1527,7 +1525,7 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         L"\n"
         L"mountDeviceTimeout=120000\n"
         L"kernelBootTimeout=120000\n"
-        L"distributionStartTimeout=120000\n"
+        L"distributionStartTimeout=14400000\n" // 4 hours. This is designed to trigger DumpGuestProcesses() if the tests get stuck.
         L"debugConsoleLogFile=" +
         EscapePath(Default.debugConsoleLogFile.value_or(kernelLogs)) +
         L"\n"
@@ -2865,7 +2863,7 @@ std::string EscapeString(const std::string& Input)
     return Output;
 }
 
-PartialHandleRead::PartialHandleRead(HANDLE Handle) : m_handle(Handle)
+PartialHandleRead::PartialHandleRead(wsl::windows::common::io::HandleWrapper Handle) : m_handle(std::move(Handle))
 {
     m_thread = std::thread(std::bind(&PartialHandleRead::Run, this));
 }
@@ -2956,7 +2954,7 @@ try
 
     while (!m_exitEvent.is_signaled())
     {
-        auto bytesRead = wsl::windows::common::relay::InterruptableRead(m_handle, gsl::make_span(buffer), {m_exitEvent.get()});
+        auto bytesRead = wsl::windows::common::relay::InterruptableRead(m_handle.Get(), gsl::make_span(buffer), {m_exitEvent.get()});
         if (bytesRead == 0)
         {
             break;
@@ -3024,6 +3022,15 @@ void WaitForOutput(wsl::windows::common::io::HandleWrapper handle, std::string_v
     wsl::windows::common::io::MultiHandleWait io;
     io.AddHandle(std::make_unique<ReadHandleWithTargetValue>(std::move(handle), targetValue));
     io.Run(timeout);
+}
+
+std::filesystem::path GetInstalledWslToolsPath()
+{
+    using namespace wsl::windows::common::wslutil;
+
+    const auto installPath = GetMsiPackagePath();
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), !installPath, "WSL MSI package is not installed");
+    return std::filesystem::path{installPath.value()} / LXSS_TOOLS_DIRECTORY;
 }
 
 std::filesystem::path GetTestImagePath(std::string_view imageName)

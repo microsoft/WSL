@@ -168,6 +168,8 @@ int WslInitWatcher(int Argc, char** Argv);
 
 int WslcGpuHookEntry();
 
+int WslcGpuStartHookEntry();
+
 void MountDistroCgroupNamespace(int CgroupNamespaceFd);
 
 int WslEntryPoint(int Argc, char* Argv[])
@@ -239,6 +241,10 @@ int WslEntryPoint(int Argc, char* Argv[])
         else if (strcmp(BaseName, LX_INIT_WSLC_GPU_HOOK) == 0)
         {
             ExitCode = WslcGpuHookEntry();
+        }
+        else if (strcmp(BaseName, LX_INIT_WSLC_GPU_START_HOOK) == 0)
+        {
+            ExitCode = WslcGpuStartHookEntry();
         }
         else
         {
@@ -615,10 +621,7 @@ try
     //
 
     THROW_LAST_ERROR_IF(UtilSetSignalHandlers(g_SavedSignalActions, false) < 0);
-
-    sigset_t SignalMask;
-    sigemptyset(&SignalMask);
-    THROW_LAST_ERROR_IF(sigprocmask(SIG_SETMASK, &SignalMask, NULL) < 0);
+    THROW_LAST_ERROR_IF(UtilClearSignalMask() < 0);
 
     auto AddEnvironmentVariable = [&](const char* Name) {
         const auto Value = UtilGetEnvironmentVariable(Name);
@@ -1654,8 +1657,7 @@ Return Value:
         // Reset the signal masks.
         //
 
-        sigemptyset(&SignalMask);
-        Result = sigprocmask(SIG_SETMASK, &SignalMask, nullptr);
+        Result = UtilClearSignalMask();
         if (Result < 0)
         {
             LOG_ERROR("sigprocmask failed {}", errno);
@@ -2440,7 +2442,7 @@ Return Value:
 
             if (Config.CgroupNamespace)
             {
-                THROW_LAST_ERROR_IF(UtilMoveSelfToDistroCgroup(CGROUP_MOUNTPOINT, "systemd") < 0);
+                THROW_LAST_ERROR_IF(UtilMoveSelfToCgroup(CGROUP_MOUNTPOINT, "systemd") < 0);
                 THROW_LAST_ERROR_IF(UtilEnterCgroupNamespace(Config.CgroupNamespace.get(), "systemd") < 0);
             }
 
@@ -3205,6 +3207,13 @@ Return Value:
     pid_t child;
     int status;
 
+    //
+    // N.B. This can run after a failed call has set errno but before the caller
+    //      reads it (e.g. in TEMP_FAILURE_RETRY), and the final waitpid() sets
+    //      errno to ECHILD when no children remain, so preserve it.
+    //
+
+    const int savedErrno = errno;
     while ((child = waitpid(-1, &status, WNOHANG)) > 0)
     {
         if (child == g_SessionGroup)
@@ -3213,6 +3222,7 @@ Return Value:
         }
     }
 
+    errno = savedErrno;
     return;
 }
 

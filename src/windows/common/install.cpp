@@ -257,6 +257,7 @@ int wsl::windows::common::install::CallMsiPackage()
         catch (...)
         {
             LOG_CAUGHT_EXCEPTION();
+            const auto installError = wil::ResultFromCaughtException();
 
             // GetMsiPackagePath() will generate a user error if the registry access fails.
             // Save the error from GetMsiPackagePath() to return a proper 'install failed' message.
@@ -267,12 +268,15 @@ int wsl::windows::common::install::CallMsiPackage()
             msiPath = GetMsiPackagePath();
             if (!msiPath.has_value())
             {
+                if (installError == HRESULT_FROM_WIN32(ERROR_INSTALL_ALREADY_RUNNING))
+                {
+                    THROW_HR_WITH_USER_ERROR(installError, wsl::shared::Localization::MessageWindowsInstallerBusy());
+                }
                 // Offer to directly install the MSI package if the MsixInstaller logic fails
                 // This can trigger a UAC so only do it
-                if (IsInteractiveConsole())
+                else if (IsInteractiveConsole())
                 {
-                    auto errorCode = savedError.has_value() ? ErrorToString(savedError.value()).Code
-                                                            : ErrorCodeToString(wil::ResultFromCaughtException());
+                    auto errorCode = savedError.has_value() ? ErrorToString(savedError.value()).Code : ErrorCodeToString(installError);
 
                     EMIT_USER_WARNING(wsl::shared::Localization::MessageInstallationCorrupted(errorCode));
 

@@ -16,6 +16,7 @@ Abstract:
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
 #include "TestImageRegistry.h"
+#include "wslpolicies.h"
 #include <fstream>
 #include <wil/network.h>
 #include <wil/resource.h>
@@ -97,7 +98,7 @@ class WSLCE2EContainerCreateTests
 
         auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, reference));
 
-        const auto expectedError = std::format(L"Image '{}' not found, pulling\r\n", reference) +
+        const auto expectedError = std::format(L"Unable to find image '{}' locally\r\n", reference) +
                                    FormatErrorMessage(
                                        std::format(L"manifest for {} not found: manifest unknown: manifest unknown", reference),
                                        L"WSLC_E_IMAGE_NOT_FOUND");
@@ -1208,6 +1209,25 @@ class WSLCE2EContainerCreateTests
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Network_HostById_Rejected)
+    {
+        const auto hostId = wsl::shared::string::MultiByteToWide(InspectNetwork(L"host").Id);
+
+        for (const auto& reference : {hostId, hostId.substr(0, 12)})
+        {
+            auto result = RunWslc(std::format(
+                L"container create --name {} --network {} {} true", WslcContainerName, reference, DebianImage.NameAndTag()));
+            result.Verify(
+                {.Stderr = FormatErrorMessage(std::format(L"Network not found: '{}'", reference), L"WSLC_E_NETWORK_NOT_FOUND"), .ExitCode = 1});
+            VerifyContainerIsNotListed(WslcContainerName);
+        }
+
+        auto result = RunWslc(std::format(
+            L"container create --name {} --network bridge --network {} {} true", WslcContainerName, hostId, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = FormatErrorMessage(std::format(L"Network not found: '{}'", hostId), L"WSLC_E_NETWORK_NOT_FOUND"), .ExitCode = 1});
+        VerifyContainerIsNotListed(WslcContainerName);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Network_UserDefinedNetwork)
     {
         auto result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName));
@@ -1220,6 +1240,18 @@ class WSLCE2EContainerCreateTests
 
         const auto inspect = InspectContainer(WslcContainerName);
         VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(TestNetworkName), inspect.HostConfig.NetworkMode);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Network_BridgeById)
+    {
+        const auto bridgeId = wsl::shared::string::MultiByteToWide(InspectNetwork(L"bridge").Id);
+
+        auto result = RunWslc(
+            std::format(L"container create --name {} --network {} {} true", WslcContainerName, bridgeId, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_ARE_EQUAL(std::string("bridge"), inspect.HostConfig.NetworkMode);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Network_EmptyValue_Rejected)
@@ -1781,6 +1813,40 @@ while True:
         const auto [udpIpv4, udpIpv6] = getDualStackHostPorts("9090/udp");
         SendUdpAndReceive(udpIpv4, "hello", "HELLO", AF_INET);
         SendUdpAndReceive(udpIpv6, "hello", "HELLO", AF_INET6);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Capabilities)
+    {
+        auto result = RunWslc(std::format(
+            L"container create --name {} --cap-add NET_ADMIN --cap-add SYS_TIME --cap-drop NET_RAW --cap-drop CHOWN {} true",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_ARE_EQUAL(static_cast<size_t>(2), inspect.HostConfig.CapAdd.size());
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("NET_ADMIN"); }));
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("SYS_TIME"); }));
+        VERIFY_ARE_EQUAL(2u, inspect.HostConfig.CapDrop.size());
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapDrop, [](const auto& capability) { return capability.ends_with("NET_RAW"); }));
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapDrop, [](const auto& capability) { return capability.ends_with("CHOWN"); }));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_CapabilitiesBlockedByPolicy)
+    {
+        namespace policies = wsl::windows::policies;
+        RegistryKeyChange<DWORD> policy(HKEY_LOCAL_MACHINE, policies::c_registryKey, policies::c_allowWSLContainerPrivileged, 0);
+        const auto expectedError =
+            FormatErrorMessage(Localization::MessageWslcCapabilityAdditionsDisabled(), L"WSLC_E_CAPABILITY_ADDITIONS_DISABLED");
+
+        auto result =
+            RunWslc(std::format(L"container create --name {} --cap-add NET_ADMIN {} true", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"", .Stderr = expectedError, .ExitCode = 1});
+        VerifyContainerIsNotListed(WslcContainerName);
     }
 
 private:

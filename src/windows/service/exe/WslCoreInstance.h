@@ -93,6 +93,8 @@ public:
 
     GUID GetDistributionId() const override;
 
+    GUID GetInstanceId() const;
+
     std::shared_ptr<LxssPort> GetInitPort() override;
 
     std::shared_ptr<LxssRunningInstance> GetSystemDistro();
@@ -142,5 +144,5 @@ private:
     HANDLE m_jobObject{};
     std::thread m_oobeThread;
     wil::unique_event m_destroyingEvent{wil::EventOptions::ManualReset};
-    wil::unique_event m_oobeCompleteEvent;
+    _Guarded_by_(m_lock) wil::shared_event m_oobeCompleteEvent;
 };
