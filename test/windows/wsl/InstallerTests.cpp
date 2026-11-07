@@ -753,6 +753,53 @@ class InstallerTests
         VERIFY_IS_LESS_THAN(removeExistingProducts, installFinalize, L"RemoveExistingProducts must precede InstallFinalize");
     }
 
+    TEST_METHOD(MsiRunningInstanceGuardPrecedesShutdown)
+    {
+        unique_msi_handle database;
+        THROW_IF_WIN32_ERROR(MsiOpenDatabaseW(m_msiPath.c_str(), MSIDBOPEN_READONLY, &database));
+
+        const auto guard = GetMsiSequenceNumber(database.get(), L"CheckForRunningInstances");
+        VERIFY_IS_GREATER_THAN(guard, 0);
+        VERIFY_IS_LESS_THAN(guard, GetMsiSequenceNumber(database.get(), L"InstallValidate"));
+        VERIFY_IS_LESS_THAN(guard, GetMsiSequenceNumber(database.get(), L"RemoveExistingProducts"));
+        VERIFY_IS_LESS_THAN(guard, GetMsiSequenceNumber(database.get(), L"StopServices"));
+    }
+
+    TEST_METHOD(MsiRunningInstanceGuard)
+    {
+#ifdef WSL_OFFICIAL_BUILD
+        WEX::Logging::Log::Comment(L"TestSkipped: This test case requires the test-only WSL_TEST_INSTALL_BUSY property");
+        return;
+#else
+        auto restore = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { InstallMsi(); });
+
+        UninstallMsi();
+        InstallGitHubRelease(L"2.0.2");
+
+        VERIFY_IS_TRUE(IsMsiPackageInstalled());
+        const auto previousProductCode = GetMsiProductCode();
+        const auto previousVersion = wsl::windows::common::registry::ReadString(m_lxssKey.get(), L"MSI", L"Version", L"");
+        VERIFY_IS_FALSE(previousVersion.empty());
+
+        const auto runUpgrade = [this](LPCWSTR busy) {
+            PrepareForMsiOperation();
+            return RunMsiExec(std::format(L"/qn /norestart /i \"{}\" WSL_TEST_INSTALL_BUSY={} /L*V {}", m_msiPath, busy, GenerateMsiLogPath()));
+        };
+
+        VERIFY_ARE_EQUAL(ERROR_INSTALL_FAILURE, runUpgrade(L"1"));
+        VERIFY_IS_TRUE(IsMsiPackageInstalled());
+        VERIFY_ARE_EQUAL(previousProductCode, GetMsiProductCode());
+        ValidatePackageInstalledProperly(previousVersion.c_str());
+
+        const auto exitCode = runUpgrade(L"0");
+        VERIFY_IS_TRUE(exitCode == ERROR_SUCCESS || exitCode == ERROR_SUCCESS_REBOOT_REQUIRED);
+        VERIFY_IS_TRUE(IsMsiPackageInstalled());
+        VERIFY_ARE_NOT_EQUAL(previousProductCode, GetMsiProductCode());
+        ValidatePackageInstalledProperly();
+        restore.release();
+#endif
+    }
+
     TEST_METHOD(MsiUpgradeFailureRestoresFiles)
     {
 #ifdef WSL_OFFICIAL_BUILD
