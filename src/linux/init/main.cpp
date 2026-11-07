@@ -3093,31 +3093,42 @@ try
             const auto Message = gslhelpers::try_get_struct<LX_MINI_INIT_MESSAGE>(Buffer);
             THROW_ERRNO_IF(EINVAL, !Message);
 
-            wsl::shared::SocketChannel Channel{UtilConnectVsock(LX_INIT_UTILITY_VM_INIT_PORT, false), "Init"};
-            if (Channel.Socket() < 0)
-            {
-                return -1;
-            }
+            sockaddr_vm initAddress{};
+            wil::unique_fd initListenSocket{UtilListenVsockAnyPort(&initAddress, 1)};
+            THROW_LAST_ERROR_IF(!initListenSocket);
 
-            wil::unique_fd SystemDistroSocketFd{};
+            sockaddr_vm systemDistroAddress{};
+            wil::unique_fd systemDistroListenSocket{};
             if (Message->Flags & LxMiniInitMessageFlagLaunchSystemDistro && Config.EnableGuiApps)
             {
-                SystemDistroSocketFd = UtilConnectVsock(LX_INIT_UTILITY_VM_INIT_PORT, false);
-                if (!SystemDistroSocketFd)
-                {
-                    return -1;
-                }
+                systemDistroListenSocket.reset(UtilListenVsockAnyPort(&systemDistroAddress, 1));
+                THROW_LAST_ERROR_IF(!systemDistroListenSocket);
             }
+
+            LX_MINI_INIT_INSTANCE_CONNECTION_INFO connectionInfo{};
+            connectionInfo.Header.MessageType = LxMiniInitMessageInstanceConnectionInfo;
+            connectionInfo.Header.MessageSize = sizeof(connectionInfo);
+            connectionInfo.InitPort = initAddress.svm_port;
+            connectionInfo.SystemDistroPort = systemDistroAddress.svm_port;
+            Transaction.Send(connectionInfo);
 
             auto ChildPid = UtilCreateChildProcess(
                 "LaunchDistro",
-                [Type, Message, Buffer, Channel = std::move(Channel), SystemDistroSocketFd = std::move(SystemDistroSocketFd), &Config]() mutable {
+                [Type, Message, Buffer, initListenSocket = std::move(initListenSocket), systemDistroListenSocket = std::move(systemDistroListenSocket), &Config]() mutable {
                     //
                     // Restore the default signal flags so anything blocked by mini_init doesn't get
                     // inherited by init and session leaders.
                     //
 
                     THROW_LAST_ERROR_IF(UtilRestoreBlockedSignals() < 0);
+
+                    wsl::shared::SocketChannel Channel{
+                        UtilAcceptVsockFromHost(initListenSocket.get(), Message->InitConnectionTimeout), "Init"};
+                    wil::unique_fd SystemDistroSocketFd{};
+                    if (systemDistroListenSocket)
+                    {
+                        SystemDistroSocketFd = UtilAcceptVsockFromHost(systemDistroListenSocket.get(), Message->InitConnectionTimeout);
+                    }
 
                     if (Type == LxMiniInitMessageLaunchInit)
                     {

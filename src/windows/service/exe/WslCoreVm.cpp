@@ -1208,6 +1208,7 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
     message->MountDeviceType = LxMiniInitMountDeviceTypeLun;
     message->DeviceId = lun;
     message->Flags = flags;
+    message->InitConnectionTimeout = m_vmConfig.KernelBootTimeout;
     message->InstanceId = InstanceId;
     message.WriteString(message->FsTypeOffset, "ext4");
     message.WriteString(message->MountOptionsOffset, "discard,errors=remount-ro,data=ordered");
@@ -1216,16 +1217,27 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
     message.WriteString(message->SharedMemoryRootOffset, sharedMemoryRoot);
     message.WriteString(message->InstallPathOffset, installPath);
     message.WriteString(message->UserProfileOffset, userProfile);
-    auto transaction = m_miniInitChannel.StartTransaction();
+    auto transaction = m_miniInitChannel.StartTransaction(m_vmConfig.KernelBootTimeout);
     transaction.Send<LX_MINI_INIT_MESSAGE>(message.Span());
+    const auto& connectionInfo = transaction.Receive<LX_MINI_INIT_INSTANCE_CONNECTION_INFO>();
 
     return CreateInstanceInternal(
-        InstanceId, Configuration, ReceiveTimeout, DefaultUid, ClientLifetimeId, WI_IsFlagSet(flags, LxMiniInitMessageFlagLaunchSystemDistro), ConnectPort);
+        InstanceId,
+        Configuration,
+        connectionInfo.InitPort,
+        connectionInfo.SystemDistroPort,
+        ReceiveTimeout,
+        DefaultUid,
+        ClientLifetimeId,
+        WI_IsFlagSet(flags, LxMiniInitMessageFlagLaunchSystemDistro),
+        ConnectPort);
 }
 
 std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstanceInternal(
     _In_ const GUID& InstanceId,
     _In_ const LXSS_DISTRO_CONFIGURATION& Configuration,
+    _In_ ULONG InitPort,
+    _In_ ULONG SystemDistroPort,
     _In_ DWORD ReceiveTimeout,
     _In_ ULONG DefaultUid,
     _In_ ULONG64 ClientLifetimeId,
@@ -1241,7 +1253,7 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstanceInternal(
 
     // Establish a communication channel with the init daemon.
     SlowOperationWatcher slowOperation{"WaitForInitDaemonConnect"};
-    auto initSocket = AcceptConnection(ReceiveTimeout);
+    auto initSocket = wsl::windows::common::hvsocket::Connect(m_runtimeId, InitPort, m_terminatingEvent.get(), m_vmConfig.KernelBootTimeout);
     slowOperation.Reset();
 
     // If the system distro is enabled, establish a communication channel with its init daemon.
@@ -1249,7 +1261,8 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstanceInternal(
     if (LaunchSystemDistro)
     {
         WI_ASSERT(m_vmConfig.EnableGuiApps);
-        systemDistroSocket = AcceptConnection(ReceiveTimeout);
+        systemDistroSocket =
+            wsl::windows::common::hvsocket::Connect(m_runtimeId, SystemDistroPort, m_terminatingEvent.get(), m_vmConfig.KernelBootTimeout);
     }
 
     // Set feature flags for the instance.
