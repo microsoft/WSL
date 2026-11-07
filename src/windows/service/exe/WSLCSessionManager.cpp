@@ -31,6 +31,8 @@ Abstract:
 #include "HcsVirtualMachine.h"
 #include "WSLCUserSettings.h"
 #include "WSLCSessionDefaults.h"
+#include "wslc/WSLCProxy.h"
+#include "LxssHttpProxy.h"
 #include "WSLCPluginNotifier.h"
 #include "PluginManager.h"
 #include "ExecutionContext.h"
@@ -51,8 +53,38 @@ using wsl::windows::service::wslc::WSLCVirtualMachineFactory;
 namespace wslutil = wsl::windows::common::wslutil;
 namespace apicompat = wsl::windows::common::apicompat;
 namespace settings = wsl::windows::wslc::settings;
+namespace WRL = Microsoft::WRL;
 
 namespace {
+
+class DeferredWarningCallback : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, IWarningCallback, IFastRundown>
+{
+public:
+    HRESULT OnWarning(LPCWSTR Message) override
+    try
+    {
+        RETURN_HR_IF_NULL(E_POINTER, Message);
+        auto lock = m_lock.lock_exclusive();
+        RETURN_HR_IF(RPC_E_DISCONNECTED, m_closed);
+        m_warnings.emplace_back(Message);
+        return S_OK;
+    }
+    CATCH_RETURN();
+
+    std::vector<std::wstring> Close()
+    {
+        auto lock = m_lock.lock_exclusive();
+        m_closed = true;
+        std::vector<std::wstring> warnings;
+        warnings.swap(m_warnings);
+        return warnings;
+    }
+
+private:
+    wil::srwlock m_lock;
+    _Guarded_by_(m_lock) bool m_closed = false;
+    _Guarded_by_(m_lock) std::vector<std::wstring> m_warnings;
+};
 
 // Session settings built server-side from the caller's settings.yaml.
 struct SessionSettings
@@ -60,9 +92,6 @@ struct SessionSettings
     std::wstring DisplayName;
     std::wstring StoragePath;
     std::string HostLoopback;
-    std::string HttpProxy;
-    std::string HttpsProxy;
-    std::string NoProxy;
     WSLCSessionSettings Settings{};
 
     NON_COPYABLE(SessionSettings);
@@ -127,18 +156,6 @@ private:
         Settings.IdleTimeoutSec = userSettings.Get<settings::Setting::SessionIdleTimeout>();
         Settings.NetworkingMode = userSettings.Get<settings::Setting::SessionNetworkingMode>();
 
-        // A localhost proxy is only reachable from the VM through the consomme host loopback name.
-        const auto proxyLoopback = Settings.NetworkingMode == WSLCNetworkingModeConsomme ? HostLoopback : std::string{};
-        const auto httpProxy = userSettings.Get<settings::Setting::SessionProxyHttp>();
-        const auto httpsProxy = userSettings.Get<settings::Setting::SessionProxyHttps>();
-        HttpProxy = settings::ResolveProxyUrl(httpProxy, proxyLoopback);
-        HttpsProxy = settings::ResolveProxyUrl(httpsProxy, proxyLoopback);
-
-        NoProxy = userSettings.Get<settings::Setting::SessionProxyNoProxy>();
-        Settings.HttpProxy = HttpProxy.empty() ? nullptr : HttpProxy.c_str();
-        Settings.HttpsProxy = HttpsProxy.empty() ? nullptr : HttpsProxy.c_str();
-        Settings.NoProxy = NoProxy.empty() ? nullptr : NoProxy.c_str();
-
         // TODO: Add a config setting to opt-out of GPU support.
         Settings.FeatureFlags = WslcFeatureFlagsGPU;
         WI_SetFlagIf(Settings.FeatureFlags, WslcFeatureFlagsDnsTunneling, userSettings.Get<settings::Setting::SessionDnsTunneling>());
@@ -190,7 +207,11 @@ try
 CATCH_LOG()
 
 void WSLCSessionManagerImpl::CreateSession(
-    _In_ const WSLCSessionSettings* Settings, _In_ WSLCSessionFlags Flags, _In_opt_ IWarningCallback* WarningCallback, _Out_ IWSLCSession** WslcSession)
+    _In_ const WSLCSessionSettings* Settings,
+    _In_ WSLCSessionFlags Flags,
+    _In_opt_ const WSLCStringArray* ProxyEnvironment,
+    _In_opt_ IWarningCallback* WarningCallback,
+    _Out_ IWSLCSession** WslcSession)
 {
     THROW_HR_IF_NULL(E_POINTER, WslcSession);
 
@@ -225,7 +246,7 @@ void WSLCSessionManagerImpl::CreateSession(
         resolvedDisplayName = Settings->DisplayName;
     }
 
-    std::lock_guard lock(m_wslcSessionsLock);
+    std::unique_lock lock(m_wslcSessionsLock);
 
     // Check for an existing session first.
     auto result = ForEachSession<HRESULT>([&](auto& entry, const wil::com_ptr<IWSLCSession>& session) noexcept -> std::optional<HRESULT> {
@@ -260,6 +281,7 @@ void WSLCSessionManagerImpl::CreateSession(
     }
 
     std::wstring callerFileName;
+    const auto deferredWarnings = wil::MakeOrThrow<DeferredWarningCallback>();
 
     HRESULT creationResult = wil::ResultFromException([&]() {
         // Get caller info.
@@ -303,11 +325,57 @@ void WSLCSessionManagerImpl::CreateSession(
         THROW_IF_FAILED(factory->GetProcessHandle(hostProcess.put()));
         wil::unique_handle sessionJob = CreateSessionProcessJob(hostProcess.get());
 
-        const auto sessionSettings = CreateSessionSettings(sessionId, callerFileName.c_str(), Settings, resolvedDisplayName.c_str());
+        std::vector<std::string> proxyEnvironment;
+        if (ProxyEnvironment != nullptr)
+        {
+            THROW_HR_IF(E_INVALIDARG, ProxyEnvironment->Count != 0 && ProxyEnvironment->Values == nullptr);
+            for (const auto* entry : wil::make_range(ProxyEnvironment->Values, ProxyEnvironment->Count))
+            {
+                THROW_HR_IF(E_INVALIDARG, entry == nullptr || !wsl::windows::wslc::IsProxyEnvironmentVariable(entry));
+                proxyEnvironment.emplace_back(entry);
+            }
+        }
+
+        std::vector<std::string> windowsProxyEnvironment;
+        LOG_IF_FAILED(wil::ResultFromException([&] {
+            THROW_IF_FAILED(HttpProxyStateTracker::s_LoadWinHttpProxyMethods());
+            HttpProxyStateTracker tracker{1000, userToken.get()};
+            if (auto proxy = tracker.WaitForInitialProxySettings())
+            {
+                for (auto* url : {&proxy->Proxy, &proxy->SecureProxy})
+                {
+                    if (Settings->NetworkingMode == WSLCNetworkingModeConsomme && Settings->HostLoopback != nullptr)
+                    {
+                        *url = wsl::windows::wslc::ResolveProxyUrl(*url, Settings->HostLoopback);
+                    }
+                    const bool unsupported = Settings->NetworkingMode == WSLCNetworkingModeNAT
+                                                 ? HttpProxyStateTracker::IsUnsupportedProxy(
+                                                       wsl::shared::string::MultiByteToWide(*url).c_str(),
+                                                       wsl::core::NetworkingMode::Nat) != UnsupportedProxyReason::Supported
+                                                 : wsl::windows::wslc::IsLoopbackProxyUrl(*url);
+                    if (unsupported)
+                    {
+                        url->clear();
+                    }
+                }
+                proxy->AddToEnvironment(windowsProxyEnvironment);
+            }
+        }));
+
+        wsl::windows::wslc::AddProxyEnvironmentDefaults(proxyEnvironment, windowsProxyEnvironment);
+        if (Settings->NetworkingMode == WSLCNetworkingModeConsomme && Settings->HostLoopback != nullptr)
+        {
+            wsl::windows::wslc::ResolveProxyEnvironmentLoopback(proxyEnvironment, Settings->HostLoopback);
+        }
+
+        std::vector<LPCSTR> proxyValues;
+        std::ranges::transform(proxyEnvironment, std::back_inserter(proxyValues), [](const auto& entry) { return entry.c_str(); });
+        auto sessionSettings = CreateSessionSettings(sessionId, callerFileName.c_str(), Settings, resolvedDisplayName.c_str());
+        sessionSettings.ProxyEnvironment = {proxyValues.data(), static_cast<ULONG>(proxyValues.size())};
         wil::com_ptr<IWSLCSession> session;
         wil::com_ptr<IWSLCSessionReference> serviceRef;
-        const auto factoryHr =
-            factory->CreateSession(&sessionSettings, vmFactory.Get(), notifier.Get(), WarningCallback, &session, &serviceRef);
+        const auto factoryHr = factory->CreateSession(
+            &sessionSettings, vmFactory.Get(), notifier.Get(), WarningCallback != nullptr ? deferredWarnings.Get() : nullptr, &session, &serviceRef);
         if (FAILED(factoryHr))
         {
             if (auto comError = wslutil::GetCOMErrorInfo(); comError && comError->Message)
@@ -388,6 +456,15 @@ void WSLCSessionManagerImpl::CreateSession(
         TraceLoggingKeyword(MICROSOFT_KEYWORD_CRITICAL_DATA),
         TraceLoggingValue(callerFileName.c_str(), "CallerFileName"),
         TraceLoggingLevel(WINEVENT_LEVEL_INFO));
+
+    const auto warnings = deferredWarnings->Close();
+    lock.unlock();
+
+    // Client callbacks may reenter the manager on another thread.
+    for (const auto& warning : warnings)
+    {
+        LOG_IF_FAILED(WarningCallback->OnWarning(warning.c_str()));
+    }
 
     THROW_IF_FAILED_MSG(creationResult, "Failed to create session: %ls", resolvedDisplayName.c_str());
 }
@@ -474,14 +551,18 @@ void WSLCSessionManagerImpl::ListSessions(_Out_ WSLCSessionListEntry** Sessions,
 }
 
 void WSLCSessionManagerImpl::EnterSession(
-    _In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, _In_opt_ IWarningCallback* WarningCallback, _Out_ IWSLCSession** WslcSession)
+    _In_ LPCWSTR DisplayName,
+    _In_ LPCWSTR StoragePath,
+    _In_opt_ const WSLCStringArray* ProxyEnvironment,
+    _In_opt_ IWarningCallback* WarningCallback,
+    _Out_ IWSLCSession** WslcSession)
 {
     THROW_HR_IF(E_POINTER, DisplayName == nullptr || StoragePath == nullptr);
     THROW_HR_IF(E_INVALIDARG, DisplayName[0] == L'\0' || StoragePath[0] == L'\0');
 
     const auto callerToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     auto sessionSettings = SessionSettings::Custom(callerToken.get(), DisplayName, StoragePath, WSLCSessionStorageFlagsNoCreate);
-    CreateSession(&sessionSettings.Settings, WSLCSessionFlagsNone, WarningCallback, WslcSession);
+    CreateSession(&sessionSettings.Settings, WSLCSessionFlagsNone, ProxyEnvironment, WarningCallback, WslcSession);
 }
 
 WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
@@ -500,9 +581,6 @@ WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
     sessionSettings.StorageFlags = Settings->StorageFlags;
     sessionSettings.SwapSizeMb = Settings->MemoryMb;
     sessionSettings.IdleTimeoutSec = Settings->IdleTimeoutSec;
-    sessionSettings.HttpProxy = Settings->HttpProxy;
-    sessionSettings.HttpsProxy = Settings->HttpsProxy;
-    sessionSettings.NoProxy = Settings->NoProxy;
     return sessionSettings;
 }
 
@@ -621,20 +699,25 @@ try
 CATCH_RETURN();
 
 HRESULT WSLCSessionManager::CreateSession(
-    const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWarningCallback* WarningCallback, IWSLCSession** WslcSession)
+    const WSLCSessionSettings* WslcSessionSettings,
+    WSLCSessionFlags Flags,
+    const WSLCStringArray* ProxyEnvironment,
+    IWarningCallback* WarningCallback,
+    IWSLCSession** WslcSession)
 try
 {
     COMServiceExecutionContext context;
 
-    return CallImpl(&WSLCSessionManagerImpl::CreateSession, WslcSessionSettings, Flags, WarningCallback, WslcSession);
+    return CallImpl(&WSLCSessionManagerImpl::CreateSession, WslcSessionSettings, Flags, ProxyEnvironment, WarningCallback, WslcSession);
 }
 CATCH_RETURN();
 
-HRESULT WSLCSessionManager::EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWarningCallback* WarningCallback, IWSLCSession** WslcSession)
+HRESULT WSLCSessionManager::EnterSession(
+    _In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, const WSLCStringArray* ProxyEnvironment, IWarningCallback* WarningCallback, IWSLCSession** WslcSession)
 {
     COMServiceExecutionContext context;
 
-    return CallImpl(&WSLCSessionManagerImpl::EnterSession, DisplayName, StoragePath, WarningCallback, WslcSession);
+    return CallImpl(&WSLCSessionManagerImpl::EnterSession, DisplayName, StoragePath, ProxyEnvironment, WarningCallback, WslcSession);
 }
 
 HRESULT WSLCSessionManager::ListSessions(_Out_ WSLCSessionListEntry** Sessions, _Out_ ULONG* SessionsCount)
@@ -688,12 +771,12 @@ try
     Microsoft::WRL::ComPtr<IWSLCSession> session;
     if (Settings == nullptr)
     {
-        RETURN_IF_FAILED(CreateSession(static_cast<const WSLCSessionSettings*>(nullptr), Flags, warning.Get(), &session));
+        RETURN_IF_FAILED(CreateSession(static_cast<const WSLCSessionSettings*>(nullptr), Flags, nullptr, warning.Get(), &session));
     }
     else
     {
         const auto settings = apicompat::Convert(*Settings);
-        RETURN_IF_FAILED(CreateSession(settings.Get(), Flags, warning.Get(), &session));
+        RETURN_IF_FAILED(CreateSession(settings.Get(), Flags, nullptr, warning.Get(), &session));
     }
 
     RETURN_HR_IF_NULL(E_UNEXPECTED, session);

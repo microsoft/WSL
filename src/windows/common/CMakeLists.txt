@@ -65,6 +65,7 @@ set(SOURCES
     WslTelemetry.cpp
     wslutil.cpp
     install.cpp
+    wslc/WSLCProxy.cpp
     wslc/settings/WSLCUserSettings.cpp
     notifications.cpp)
 
@@ -166,6 +167,7 @@ set(HEADERS
     WslTelemetry.h
     wslutil.h
     wslc/EnumVariantMap.h
+    wslc/WSLCProxy.h
     wslc/settings/WSLCUserSettings.h
     wslc/WSLCSessionDefaults.h
     )

@@ -300,6 +300,11 @@ public:
         return m_runtime;
     }
 
+    const std::vector<std::string>& ProxyEnvironment() const noexcept
+    {
+        return m_proxyEnvironment;
+    }
+
     // Creates an opaque activity token that holds a reference on this session's activity count for
     // its lifetime, deferring idle teardown of the VM until every outstanding token is released.
     // Used both for transient client operations (BeginContainerOperation) and to keep the VM alive
@@ -430,9 +435,8 @@ private:
     std::optional<std::wstring> m_settingsCreatorProcessName;
     std::optional<std::wstring> m_settingsStoragePath;
     std::optional<std::string> m_settingsRootVhdTypeOverride;
-    std::optional<std::string> m_settingsHttpProxy;
-    std::optional<std::string> m_settingsHttpsProxy;
-    std::optional<std::string> m_settingsNoProxy;
+    std::vector<std::string> m_proxyEnvironment;
+    std::vector<LPCSTR> m_proxyEnvironmentValues;
     std::vector<BYTE> m_userSid;
 
     WSLCFeatureFlags m_featureFlags{};

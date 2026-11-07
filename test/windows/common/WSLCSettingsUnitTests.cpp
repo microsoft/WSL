@@ -17,11 +17,13 @@ Abstract:
 #include "Common.h"
 #include "WSLCCLITestHelpers.h"
 #include "WSLCUserSettings.h"
+#include "wslc/WSLCProxy.h"
 
 #include <atomic>
 #include <fstream>
 
 using namespace wsl::windows::wslc::settings;
+using namespace wsl::windows::wslc;
 using namespace WSLCTestHelpers;
 using namespace WEX::Logging;
 using namespace WEX::Common;
@@ -626,72 +628,75 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionHostLoopback>());
     }
 
-    // -----------------------------------------------------------------------
-    // session.proxy
-    // -----------------------------------------------------------------------
-
-    TEST_METHOD(Validation_Proxy_ValidValues)
+    TEST_METHOD(ProxyEnvironment_CapturesCallerOverridesAndEmptyValues)
     {
-        auto dir = UniqueTempDir();
-        WriteFile(
-            dir / L"settings.yaml",
-            "session:\n"
-            "  proxy:\n"
-            "    http: http://user:pass@proxy.example.com:3128\n"
-            "    https: socks5h://[::1]:1080\n"
-            "    noProxy: localhost,.example.com\n");
-
-        UserSettingsTest s{dir};
-
-        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
-        VERIFY_ARE_EQUAL(std::string("http://user:pass@proxy.example.com:3128"), s.Get<Setting::SessionProxyHttp>());
-        VERIFY_ARE_EQUAL(std::string("socks5h://[::1]:1080"), s.Get<Setting::SessionProxyHttps>());
-        VERIFY_ARE_EQUAL(std::string("localhost,.example.com"), s.Get<Setting::SessionProxyNoProxy>());
+        ScopedEnvVariable http{L"Http_Proxy", L"http://manual:8080"};
+        ScopedEnvVariable https{L"HTTPS_PROXY", L""};
+        ScopedEnvVariable noProxy{L"NO_PROXY", L".manual.invalid"};
+        const auto environment = GetProxyEnvironment();
+        const std::set<std::string> actual{environment.begin(), environment.end()};
+        const std::set<std::string> expected{
+            "http_proxy=http://manual:8080",
+            "HTTP_PROXY=http://manual:8080",
+            "https_proxy=",
+            "HTTPS_PROXY=",
+            "no_proxy=.manual.invalid",
+            "NO_PROXY=.manual.invalid"};
+        VERIFY_IS_TRUE(actual == expected);
     }
 
-    TEST_METHOD(Validation_Proxy_InvalidValues_UseDefaultAndWarn)
+    TEST_METHOD(ProxyEnvironment_ExplicitCasingOverridesBothDefaults)
     {
-        for (const auto* value :
-             {"proxy.example.com:3128",
-              "ftp://proxy.example.com",
-              "http://",
-              "http://user@:3128",
-              "http://proxy example.com",
-              "http://proxy.example.com:not-a-port",
-              "http://proxy.example.com:65536",
-              "http://proxy.example.com:0",
-              "http://proxy.example.com:",
-              "http://proxy.example.com:-1",
-              "http://proxy.example.com:3128:80",
-              "http://[::1]garbage",
-              "http://[::1]:invalid",
-              "https://[::1]:65536"})
+        const std::vector<std::string> defaults{
+            "http_proxy=http://windows:3128",
+            "HTTP_PROXY=http://windows:3128",
+            "https_proxy=http://windows:3128",
+            "HTTPS_PROXY=http://windows:3128",
+            "no_proxy=.example.com",
+            "NO_PROXY=.example.com"};
+        for (const auto* name : {"HTTP_PROXY", "http_proxy"})
         {
-            auto dir = UniqueTempDir();
-            WriteFile(dir / L"settings.yaml", std::format("session:\n  proxy:\n    http: '{0}'\n    https: '{0}'\n", value));
-
-            UserSettingsTest s{dir};
-
-            VERIFY_ARE_EQUAL(2u, s.GetWarnings().size());
-            VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionProxyHttp>());
-            VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionProxyHttps>());
+            std::vector<std::string> environment{std::format("{}=http://manual:8080", name), "PATH=/bin"};
+            AddProxyEnvironmentDefaults(environment, defaults);
+            const std::vector<std::string> expected{
+                std::format("{}=http://manual:8080", name),
+                "PATH=/bin",
+                "https_proxy=http://windows:3128",
+                "HTTPS_PROXY=http://windows:3128",
+                "no_proxy=.example.com",
+                "NO_PROXY=.example.com"};
+            VERIFY_IS_TRUE(environment == expected);
         }
     }
 
-    TEST_METHOD(Validation_Proxy_PortBoundaries)
+    TEST_METHOD(ProxyEnvironment_EmptyAndConflictingExplicitValuesWin)
     {
-        for (const auto* value :
-             {"http://proxy.example.com", "http://proxy.example.com:1", "http://[::1]:65535/", "https://proxy.example.com:65535"})
-        {
-            auto dir = UniqueTempDir();
-            WriteFile(dir / L"settings.yaml", std::format("session:\n  proxy:\n    http: {0}\n    https: {0}\n", value));
+        std::vector<std::string> environment{
+            "HTTP_PROXY=", "https_proxy=http://lower:8080", "HTTPS_PROXY=http://upper:8080", "no_proxy="};
+        const auto expected = environment;
+        AddProxyEnvironmentDefaults(
+            environment,
+            {"http_proxy=http://windows:3128",
+             "HTTP_PROXY=http://windows:3128",
+             "https_proxy=http://windows:3128",
+             "HTTPS_PROXY=http://windows:3128",
+             "no_proxy=.example.com",
+             "NO_PROXY=.example.com"});
+        VERIFY_IS_TRUE(environment == expected);
+    }
 
-            UserSettingsTest s{dir};
-
-            VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
-            VERIFY_ARE_EQUAL(std::string(value), s.Get<Setting::SessionProxyHttp>());
-            VERIFY_ARE_EQUAL(std::string(value), s.Get<Setting::SessionProxyHttps>());
-        }
+    TEST_METHOD(ProxyEnvironment_DefaultsAndLoopback)
+    {
+        std::vector<std::string> environment{"PATH=/bin"};
+        AddProxyEnvironmentDefaults(
+            environment, {"HTTP_PROXY=http://localhost:3128", "http_proxy=http://localhost:3128", "NO_PROXY=localhost"});
+        ResolveProxyEnvironmentLoopback(environment, "host.wslc.internal");
+        const std::vector<std::string> expected{
+            "PATH=/bin",
+            "HTTP_PROXY=http://host.wslc.internal:3128",
+            "http_proxy=http://host.wslc.internal:3128",
+            "NO_PROXY=localhost"};
+        VERIFY_IS_TRUE(environment == expected);
     }
 
     TEST_METHOD(ResolveProxyUrl_RewritesOnlyLocalhost)
@@ -719,6 +724,19 @@ class WSLCCLISettingsUnitTests
         VERIFY_IS_FALSE(IsLoopbackProxyUrl("http://proxy.example.com:3128"));
         VERIFY_IS_FALSE(IsLoopbackProxyUrl("http://localhost.example.com"));
         VERIFY_IS_FALSE(IsLoopbackProxyUrl("http://[2001:db8::1]:3128"));
+    }
+
+    TEST_METHOD(ProxyEnvironment_MappedLoopbackClassification)
+    {
+        for (const auto* url :
+             {"http://[::ffff:127.0.0.1]:3128", "https://[::ffff:7f00:1]:3128", "http://[::ffff:127.0.0.2]:3128"})
+        {
+            VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl(url, "host.wslc.internal")));
+        }
+        for (const auto* url : {"http://[::ffff:192.0.2.1]:3128", "http://[::ffff:c000:201]:3128"})
+        {
+            VERIFY_IS_FALSE(IsLoopbackProxyUrl(url));
+        }
     }
 
     // -----------------------------------------------------------------------

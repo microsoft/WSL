@@ -25,6 +25,7 @@ Abstract:
 #include "wslpolicies.h"
 #include "APICompat.h"
 #include "WSLCContainerEntry.h"
+#include "wslc/WSLCProxy.h"
 #include <WSLCUserSettings.h>
 
 using namespace wsl::windows::common;
@@ -227,23 +228,6 @@ std::string GenerateContainerName(int retry)
     return name;
 }
 
-std::vector<std::string> CreateProxyEnvironment(const WSLCSessionInitSettings& Settings)
-{
-    std::vector<std::string> environment;
-    auto addProxy = [&](LPCSTR Value, std::string_view Upper, std::string_view Lower) {
-        if (Value != nullptr)
-        {
-            environment.emplace_back(std::format("{}={}", Upper, Value));
-            environment.emplace_back(std::format("{}={}", Lower, Value));
-        }
-    };
-
-    addProxy(Settings.HttpProxy, "HTTP_PROXY", "http_proxy");
-    addProxy(Settings.HttpsProxy, "HTTPS_PROXY", "https_proxy");
-    addProxy(Settings.NoProxy, "NO_PROXY", "no_proxy");
-    return environment;
-}
-
 } // namespace
 
 namespace wsl::windows::service::wslc {
@@ -398,9 +382,17 @@ try
     // failures are streamed to the CLI.
     WSLCExecutionContext warningContext(this, WarningCallback);
 
-    const auto isLoopbackProxy = [](LPCSTR proxy) { return proxy != nullptr && settings::IsLoopbackProxyUrl(proxy); };
+    RETURN_HR_IF(E_INVALIDARG, Settings->ProxyEnvironment.Count != 0 && Settings->ProxyEnvironment.Values == nullptr);
+    const auto isLoopbackProxy = [](LPCSTR entry) {
+        THROW_HR_IF_NULL(E_INVALIDARG, entry);
+        const std::string_view value{entry};
+        const auto equals = value.find('=');
+        const auto name = value.substr(0, equals);
+        return (wsl::shared::string::IsEqual(name, "http_proxy", true) || wsl::shared::string::IsEqual(name, "https_proxy", true)) &&
+               wsl::windows::wslc::IsLoopbackProxyUrl(std::string{value.substr(equals + 1)});
+    };
     if (Settings->NetworkingMode == WSLCNetworkingModeConsomme &&
-        (isLoopbackProxy(Settings->HttpProxy) || isLoopbackProxy(Settings->HttpsProxy)))
+        std::ranges::any_of(wil::make_range(Settings->ProxyEnvironment.Values, Settings->ProxyEnvironment.Count), isLoopbackProxy))
     {
         EMIT_USER_WARNING(Localization::WSLCProxyLoopbackNotReachable());
     }
@@ -579,14 +571,15 @@ void WSLCSession::PersistSettings(const WSLCSessionInitSettings& Settings, PSID 
         m_settings.RootVhdTypeOverride = nullptr;
     }
 
-    auto persistString = [](LPCSTR Value, std::optional<std::string>& Storage, LPCSTR& Field) {
-        Storage = Value != nullptr ? std::optional<std::string>{Value} : std::nullopt;
-        Field = Storage ? Storage->c_str() : nullptr;
-    };
+    for (const auto* entry : wil::make_range(Settings.ProxyEnvironment.Values, Settings.ProxyEnvironment.Count))
+    {
+        THROW_HR_IF_NULL(E_INVALIDARG, entry);
+        m_proxyEnvironment.emplace_back(entry);
+    }
 
-    persistString(Settings.HttpProxy, m_settingsHttpProxy, m_settings.HttpProxy);
-    persistString(Settings.HttpsProxy, m_settingsHttpsProxy, m_settings.HttpsProxy);
-    persistString(Settings.NoProxy, m_settingsNoProxy, m_settings.NoProxy);
+    std::ranges::transform(
+        m_proxyEnvironment, std::back_inserter(m_proxyEnvironmentValues), [](const auto& entry) { return entry.c_str(); });
+    m_settings.ProxyEnvironment = {m_proxyEnvironmentValues.data(), static_cast<ULONG>(m_proxyEnvironmentValues.size())};
 
     THROW_HR_IF(E_UNEXPECTED, UserSid == nullptr);
 
@@ -812,10 +805,8 @@ void WSLCSession::StartDockerd()
         args.emplace_back("--debug");
     }
 
-    // Proxy values go through the environment because process arguments are logged and may contain credentials.
-    const auto environment = CreateProxyEnvironment(m_settings);
-
-    m_runtime.SetDockerdProcess(StartProcess("/usr/bin/dockerd", args, "dockerd", std::bind(&WSLCSession::OnDockerdExited, this), environment));
+    m_runtime.SetDockerdProcess(
+        StartProcess("/usr/bin/dockerd", args, "dockerd", std::bind(&WSLCSession::OnDockerdExited, this), m_proxyEnvironment));
     WSL_LOG("DockerdStarted");
 }
 
@@ -1132,7 +1123,7 @@ try
     mountedPaths.reserve(static_cast<size_t>(3) + Options->Secrets.Count);
 
     // The buildx auth provider fetches registry tokens in the client process, separately from dockerd.
-    auto buildEnv = CreateProxyEnvironment(m_settings);
+    auto buildEnv = m_proxyEnvironment;
 
     if (policyState == WSLCVirtualMachine::BuildKitPolicyState::Configured)
     {

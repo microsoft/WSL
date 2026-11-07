@@ -677,7 +677,7 @@ class PluginTests
 
         auto manager = OpenWslcSessionManager();
         wil::com_ptr<IWSLCSession> session;
-        VERIFY_SUCCEEDED(manager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session));
+        VERIFY_SUCCEEDED(manager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, nullptr, &session));
         wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
         WSLCSessionState state{};
@@ -828,7 +828,7 @@ class PluginTests
 
         auto manager = OpenWslcSessionManager();
         wil::com_ptr<IWSLCSession> session;
-        const auto hr = manager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session);
+        const auto hr = manager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, nullptr, &session);
         ValidateCOMErrorMessageContains(L"A fatal error was returned by plugin 'TestPlugin'");
         VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED));
 

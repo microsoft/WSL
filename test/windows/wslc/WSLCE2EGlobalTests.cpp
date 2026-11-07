@@ -403,7 +403,7 @@ class WSLCE2EGlobalTests
             settings.MaximumStorageSizeMb = 4096;
 
             wil::com_ptr<IWSLCSession> session;
-            HRESULT hr = sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session);
+            HRESULT hr = sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, nullptr, &session);
             VERIFY_ARE_EQUAL(hr, WSLC_E_SESSION_RESERVED);
         }
 
@@ -422,7 +422,7 @@ class WSLCE2EGlobalTests
             settings.MaximumStorageSizeMb = 4096;
 
             wil::com_ptr<IWSLCSession> session;
-            HRESULT hr = sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session);
+            HRESULT hr = sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, nullptr, &session);
             VERIFY_ARE_EQUAL(hr, WSLC_E_SESSION_RESERVED);
         }
 
@@ -447,10 +447,10 @@ class WSLCE2EGlobalTests
             settings.MaximumStorageSizeMb = 4096;
 
             wil::com_ptr<IWSLCSession> session;
-            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session), WSLC_E_SESSION_RESERVED);
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, nullptr, &session), WSLC_E_SESSION_RESERVED);
 
             settings.DisplayName = L"Wslc-Cli-Admin";
-            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session), WSLC_E_SESSION_RESERVED);
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, nullptr, &session), WSLC_E_SESSION_RESERVED);
         }
     }
 

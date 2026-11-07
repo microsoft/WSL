@@ -17,6 +17,7 @@ Abstract:
 #include "ConsoleService.h"
 #include "JsonUtils.h"
 #include "WarningCallback.h"
+#include "wslc/WSLCProxy.h"
 #include "wslc_schema.h"
 
 #include <wslc.h>
@@ -117,11 +118,15 @@ Session SessionService::OpenOrCreateDefaultSession(Terminal& terminal)
 {
     WarningCallback warningCallback(terminal);
     auto manager = CreateSessionManager();
+    const auto proxyEnvironment = GetProxyEnvironment();
+    std::vector<LPCSTR> proxyValues;
+    std::ranges::transform(proxyEnvironment, std::back_inserter(proxyValues), [](const auto& entry) { return entry.c_str(); });
+    const WSLCStringArray proxyOverrides{proxyValues.data(), static_cast<ULONG>(proxyValues.size())};
 
     // Null Settings = default session with server-determined name and settings. The warning callback
     // is consumed during CreateSession (session initialization); it is not retained afterwards.
     wil::com_ptr<IWSLCSession> session;
-    THROW_IF_FAILED(manager->CreateSession(nullptr, WSLCSessionFlagsNone, &warningCallback, &session));
+    THROW_IF_FAILED(manager->CreateSession(nullptr, WSLCSessionFlagsNone, &proxyOverrides, &warningCallback, &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
     return Session(std::move(session));
@@ -188,9 +193,13 @@ int SessionService::Enter(Terminal& terminal, const std::wstring& storagePath, c
 
     WarningCallback warningCallback(terminal);
     auto sessionManager = CreateSessionManager();
+    const auto proxyEnvironment = GetProxyEnvironment();
+    std::vector<LPCSTR> proxyValues;
+    std::ranges::transform(proxyEnvironment, std::back_inserter(proxyValues), [](const auto& entry) { return entry.c_str(); });
+    const WSLCStringArray proxyOverrides{proxyValues.data(), static_cast<ULONG>(proxyValues.size())};
 
     wil::com_ptr<IWSLCSession> session;
-    THROW_IF_FAILED(sessionManager->EnterSession(displayName.c_str(), storagePath.c_str(), &warningCallback, &session));
+    THROW_IF_FAILED(sessionManager->EnterSession(displayName.c_str(), storagePath.c_str(), &proxyOverrides, &warningCallback, &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
     terminal.Info(L"{}\n", Localization::MessageWslcCreatedSession(displayName));
 

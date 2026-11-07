@@ -25,6 +25,7 @@ Abstract:
 #include "WSLCVolumes.h"
 #include "APICompat.h"
 #include "MountSpecParsing.h"
+#include "wslc/WSLCProxy.h"
 #include <unordered_set>
 
 namespace apicompat = wsl::windows::common::apicompat;
@@ -2398,6 +2399,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     }
 
     request.Env = StringArrayToVector(containerOptions.InitProcessOptions.Environment);
+    wsl::windows::wslc::AddProxyEnvironmentDefaults(request.Env, wslcSession.ProxyEnvironment());
 
     if (containerOptions.StopSignal != WSLCSignalNone)
     {
