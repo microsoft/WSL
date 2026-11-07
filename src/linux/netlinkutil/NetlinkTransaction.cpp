@@ -13,6 +13,8 @@ void NetlinkTransaction::Execute(const std::function<void(const NetlinkResponse&
     m_channel.SendMessage(m_request);
 
     std::vector<NetlinkResponse> responses;
+    const auto* request = reinterpret_cast<const nlmsghdr*>(m_request.data());
+    const bool dump = m_channel.IsDumpRequest(*request);
 
     try
     {
@@ -25,7 +27,7 @@ void NetlinkTransaction::Execute(const std::function<void(const NetlinkResponse&
                 continue;
             }
             responses.emplace_back(std::move(response));
-            responses.back().ThrowIfErrorFound();
+            responses.back().ThrowIfErrorFound(dump);
 
             routine(responses.back());
         } while (responses.empty() || (responses.back().MultiMessage() && !responses.back().Done()));

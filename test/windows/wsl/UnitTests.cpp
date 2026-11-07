@@ -1045,6 +1045,20 @@ class UnitTests
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests netlink", L"Netlink"));
     }
 
+    WSL2_TEST_METHOD(NetlinkDumpRegressions)
+    {
+        const auto binary = std::filesystem::path(wil::GetModuleFileNameW<std::wstring>(wil::GetModuleInstanceHandle())).parent_path() /
+                            L"netlink_dump_tests";
+        VERIFY_IS_TRUE(std::filesystem::exists(binary));
+        auto path = LxsstuLaunchWslAndCaptureOutput(std::format(L"--exec wslpath -u \"{}\"", binary.wstring())).first;
+        while (!path.empty() && (path.back() == L'\n' || path.back() == L'\r'))
+        {
+            path.pop_back();
+        }
+        VERIFY_IS_FALSE(path.empty());
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--exec \"{}\"", path)), 0u);
+    }
+
     WSL1_TEST_METHOD(Random)
     {
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests random", L"random"));
