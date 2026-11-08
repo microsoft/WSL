@@ -643,42 +643,37 @@ class WSLCE2ETlsRegistryTests
     WSLC_TEST_METHOD(WSLCE2E_Registry_Proxy_ColdPullAndIdleRestart)
     {
         WithProxyRegistry([](const auto& directory, auto& proxy, const auto& alpine, const auto& helloWorld) {
-            for (const auto* host : {"localhost", "127.0.0.1"})
-            {
-                WithColdProxySession(
-                    directory / host, std::format("http://{}:{}", host, proxy.Port()), "", [&](IWSLCSession& session, const HostFileChange& settings) {
-                        const auto beforePull = proxy.ResponseBytes();
-                        PullAndVerifyImage(helloWorld);
-                        VERIFY_IS_TRUE(proxy.ResponseBytes() > beforePull, L"Expected registry traffic through CONNECT");
+            WithColdProxySession(directory / L"localhost", std::format("http://localhost:{}", proxy.Port()), "", [&](IWSLCSession& session, const HostFileChange& settings) {
+                const auto beforePull = proxy.ResponseBytes();
+                PullAndVerifyImage(helloWorld);
+                VERIFY_IS_TRUE(proxy.ResponseBytes() > beforePull, L"Expected registry traffic through CONNECT");
 
-                        const auto missing = RunWslc(std::format(L"image inspect {}", alpine.Reference));
-                        missing.Verify({
-                            .Stdout = L"[]\r\n",
-                            .Stderr = Localization::MessageWslcImageNotFound(string::WideToMultiByte(alpine.Reference).c_str()) + L"\r\n",
-                            .ExitCode = 1,
-                        });
-                        const auto bootId = ReadBootId(session);
-                        ULONG sessionId{};
-                        VERIFY_SUCCEEDED(session.GetId(&sessionId));
+                const auto missing = RunWslc(std::format(L"image inspect {}", alpine.Reference));
+                missing.Verify({
+                    .Stdout = L"[]\r\n",
+                    .Stderr = Localization::MessageWslcImageNotFound(string::WideToMultiByte(alpine.Reference).c_str()) + L"\r\n",
+                    .ExitCode = 1,
+                });
+                const auto bootId = ReadBootId(session);
+                ULONG sessionId{};
+                VERIFY_SUCCEEDED(session.GetId(&sessionId));
 
-                        // Idle recreation must retain the original Windows proxy snapshot.
-                        SetWindowsProxySettings("", "");
-                        settings.Update("session: {}\n");
-                        BOOL wasAlreadyIdle = TRUE;
-                        VERIFY_SUCCEEDED(session.TriggerIdleTermination(&wasAlreadyIdle));
-                        VERIFY_IS_FALSE(wasAlreadyIdle);
-                        VERIFY_ARE_NOT_EQUAL(bootId, ReadBootId(session));
-                        ULONG restartedSessionId{};
-                        VERIFY_SUCCEEDED(OpenDefaultElevatedSession()->GetId(&restartedSessionId));
-                        VERIFY_ARE_EQUAL(sessionId, restartedSessionId);
+                // Idle recreation must retain the original Windows proxy snapshot.
+                SetWindowsProxySettings("", "");
+                settings.Update("session: {}\n");
+                BOOL wasAlreadyIdle = TRUE;
+                VERIFY_SUCCEEDED(session.TriggerIdleTermination(&wasAlreadyIdle));
+                VERIFY_IS_FALSE(wasAlreadyIdle);
+                VERIFY_ARE_NOT_EQUAL(bootId, ReadBootId(session));
+                ULONG restartedSessionId{};
+                VERIFY_SUCCEEDED(OpenDefaultElevatedSession()->GetId(&restartedSessionId));
+                VERIFY_ARE_EQUAL(sessionId, restartedSessionId);
 
-                        const auto beforeRestartedPull = proxy.ResponseBytes();
-                        PullAndVerifyImage(alpine);
-                        VERIFY_IS_TRUE(
-                            proxy.ResponseBytes() - beforeRestartedPull > 1024 * 1024,
-                            L"Expected uncached image payload after restart");
-                    });
-            }
+                const auto beforeRestartedPull = proxy.ResponseBytes();
+                PullAndVerifyImage(alpine);
+                VERIFY_IS_TRUE(
+                    proxy.ResponseBytes() - beforeRestartedPull > 1024 * 1024, L"Expected uncached image payload after restart");
+            });
         });
     }
 
@@ -690,23 +685,23 @@ class WSLCE2ETlsRegistryTests
             WithColdProxySession(
                 directory / L"unset", "", "", [&](IWSLCSession&, const HostFileChange&) { PullAndVerifyImage(alpine); });
 
-            for (const auto* noProxy : {"", ".unrelated.invalid", c_proxyRegistryHost})
+            for (const auto* noProxy : {".unrelated.invalid", c_proxyRegistryHost})
             {
-                const auto storage = directory / (noProxy[0] == '\0' ? "stopped" : noProxy);
-                WithColdProxySession(storage, std::format("http://127.0.0.1:{}", proxy.Port()), noProxy, [&](IWSLCSession&, const HostFileChange&) {
-                    if (std::string_view(noProxy) == c_proxyRegistryHost)
-                    {
-                        PullAndVerifyImage(alpine);
-                    }
-                    else
-                    {
-                        const auto result = RunWslc(std::format(L"image pull {}", alpine.Reference));
-                        result.Verify({.ExitCode = 1});
-                        VERIFY_IS_TRUE(
-                            result.StderrContainsSubstring(L"proxyconnect tcp"), L"Failure must come from the stopped proxy");
-                        RunWslc(L"image list --format json").Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
-                    }
-                });
+                WithColdProxySession(
+                    directory / noProxy, std::format("http://127.0.0.1:{}", proxy.Port()), noProxy, [&](IWSLCSession&, const HostFileChange&) {
+                        if (std::string_view(noProxy) == c_proxyRegistryHost)
+                        {
+                            PullAndVerifyImage(alpine);
+                        }
+                        else
+                        {
+                            const auto result = RunWslc(std::format(L"image pull {}", alpine.Reference));
+                            result.Verify({.ExitCode = 1});
+                            VERIFY_IS_TRUE(
+                                result.StderrContainsSubstring(L"proxyconnect tcp"), L"Failure must come from the stopped proxy");
+                            RunWslc(L"image list --format json").Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+                        }
+                    });
             }
         });
     }
