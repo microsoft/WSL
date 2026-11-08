@@ -726,6 +726,39 @@ class WSLCCLISettingsUnitTests
         VERIFY_IS_FALSE(IsLoopbackProxyUrl("http://[2001:db8::1]:3128"));
     }
 
+    TEST_METHOD(ProxyEnvironment_SchemelessLoopback)
+    {
+        constexpr auto loopback = "host.wslc.internal";
+        for (const auto* host : {"localhost", "LocalHost", "127.0.0.1"})
+        {
+            VERIFY_ARE_EQUAL(std::string(loopback), ResolveProxyUrl(host, loopback));
+            VERIFY_ARE_EQUAL(std::format("{}:3128", loopback), ResolveProxyUrl(std::format("{}:3128", host), loopback));
+            VERIFY_IS_TRUE(IsLoopbackProxyUrl(host));
+            VERIFY_IS_TRUE(IsLoopbackProxyUrl(std::format("{}:3128", host)));
+        }
+        VERIFY_ARE_EQUAL(std::string("u:p@host.wslc.internal:3128"), ResolveProxyUrl("u:p@localhost:3128", loopback));
+        VERIFY_ARE_EQUAL(std::string("localhost:3128"), ResolveProxyUrl("localhost:3128", ""));
+
+        for (const auto* url : {"[::1]:3128", "[::ffff:127.0.0.1]:3128", "127.0.0.2:3128"})
+        {
+            VERIFY_ARE_EQUAL(std::string(url), ResolveProxyUrl(url, loopback));
+            VERIFY_IS_TRUE(IsLoopbackProxyUrl(url));
+        }
+        for (const auto* url :
+             {"",
+              "://localhost:3128",
+              "localhost:",
+              "localhost:0",
+              "localhost:65536",
+              "localhost:abc",
+              "[::1",
+              "localhost.example.com:3128"})
+        {
+            VERIFY_ARE_EQUAL(std::string(url), ResolveProxyUrl(url, loopback));
+            VERIFY_IS_FALSE(IsLoopbackProxyUrl(url));
+        }
+    }
+
     TEST_METHOD(ProxyEnvironment_MappedLoopbackClassification)
     {
         for (const auto* url :

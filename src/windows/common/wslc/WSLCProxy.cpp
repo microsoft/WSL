@@ -24,12 +24,12 @@ namespace {
     std::optional<std::pair<size_t, size_t>> FindProxyHost(std::string_view url)
     {
         const auto schemeEnd = url.find("://");
-        if (schemeEnd == std::string_view::npos || schemeEnd == 0)
+        if (schemeEnd == 0)
         {
             return std::nullopt;
         }
 
-        auto begin = schemeEnd + 3;
+        auto begin = schemeEnd == std::string_view::npos ? 0 : schemeEnd + 3;
         auto authorityEnd = url.find_first_of("/?#", begin);
         if (authorityEnd == std::string_view::npos)
         {

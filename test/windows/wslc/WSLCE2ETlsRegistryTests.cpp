@@ -555,8 +555,8 @@ class WSLCE2ETlsRegistryTests
                 const auto* https = upper ? L"HTTPS_PROXY" : L"https_proxy";
                 const auto* noProxy = upper ? L"NO_PROXY" : L"no_proxy";
                 const auto environment = RunWslcAndGetStdoutLineSet(std::format(
-                    L"container run --rm -e {}=http://manual.proxy.invalid:8080 -e {}= -e {}= {} env", http, https, noProxy, image.NameAndTag()));
-                VERIFY_IS_TRUE(environment.contains(std::format(L"{}=http://manual.proxy.invalid:8080", http)));
+                    L"container run --rm -e {}=127.0.0.1:8080 -e {}= -e {}= {} env", http, https, noProxy, image.NameAndTag()));
+                VERIFY_IS_TRUE(environment.contains(std::format(L"{}=127.0.0.1:8080", http)));
                 VERIFY_IS_TRUE(environment.contains(std::format(L"{}=", https)));
                 VERIFY_IS_TRUE(environment.contains(std::format(L"{}=", noProxy)));
                 for (const auto& entry : environment)
@@ -573,22 +573,26 @@ class WSLCE2ETlsRegistryTests
         WithProxyRegistry([](const auto& directory, auto& proxy, const auto& alpine, const auto&) {
             RecordingConnectProxy windowsProxy;
             windowsProxy.Stop();
-            const auto manual = std::format(L"http://127.0.0.1:{}", proxy.Port());
-            WithColdProxySession(
-                directory / L"override",
-                std::format("http://127.0.0.1:{}", windowsProxy.Port()),
-                c_proxyRegistryHost,
-                [&](IWSLCSession&, const HostFileChange&) {
-                    const auto before = proxy.ResponseBytes();
-                    PullAndVerifyImage(alpine);
-                    VERIFY_IS_TRUE(
-                        proxy.ResponseBytes() > before, L"Caller environment must override Windows proxy and bypass settings");
-                    const auto environment = RunWslcAndGetStdoutLineSet(std::format(L"container run --rm {} env", alpine.Reference));
-                    const auto expected = std::format(L"https_proxy=http://host.wslc.internal:{}", proxy.Port());
-                    VERIFY_IS_TRUE(environment.contains(expected));
-                    VERIFY_IS_TRUE(environment.contains(L"NO_PROXY=.unrelated.invalid"));
-                },
-                {{L"https_proxy", manual}, {L"no_proxy", L".unrelated.invalid"}});
+            for (const bool withScheme : {true, false})
+            {
+                const auto* scheme = withScheme ? L"http://" : L"";
+                const auto manual = std::format(L"{}127.0.0.1:{}", scheme, proxy.Port());
+                WithColdProxySession(
+                    directory / (withScheme ? L"override" : L"shorthand"),
+                    std::format("http://127.0.0.1:{}", windowsProxy.Port()),
+                    c_proxyRegistryHost,
+                    [&](IWSLCSession&, const HostFileChange&) {
+                        const auto before = proxy.ResponseBytes();
+                        PullAndVerifyImage(alpine);
+                        VERIFY_IS_TRUE(
+                            proxy.ResponseBytes() > before, L"Caller environment must override Windows proxy and bypass settings");
+                        const auto environment = RunWslcAndGetStdoutLineSet(std::format(L"container run --rm {} env", alpine.Reference));
+                        const auto expected = std::format(L"https_proxy={}host.wslc.internal:{}", scheme, proxy.Port());
+                        VERIFY_IS_TRUE(environment.contains(expected));
+                        VERIFY_IS_TRUE(environment.contains(L"NO_PROXY=.unrelated.invalid"));
+                    },
+                    {{L"https_proxy", manual}, {L"no_proxy", L".unrelated.invalid"}});
+            }
         });
     }
 
