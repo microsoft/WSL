@@ -9191,6 +9191,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             "https_proxy=malformed-synthetic-password",
             "no_proxy=private.example",
             "HtTp_PrOxY=synthetic-mixed-case",
+            "WSL_PAC_URL=https://pac.example.com/proxy.pac?token=synthetic-pac-token",
             "HTTP_PROXY_EXTRA=visible",
             "HTTPS_PROXY=",
             "HTTP_PROXY"};
@@ -9204,7 +9205,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             std::string::npos,
             output.find("EnvironmentIndex = PATH=/usr/bin:/bin,HTTP_PROXY=<redacted>,HTTPS_PROXY=<redacted>,NO_PROXY=<redacted>,"
                         "http_proxy=<redacted>,https_proxy=<redacted>,no_proxy=<redacted>,HtTp_PrOxY=<redacted>,"
-                        "HTTP_PROXY_EXTRA=visible,HTTPS_PROXY=,HTTP_PROXY\n"));
+                        "WSL_PAC_URL=<redacted>,HTTP_PROXY_EXTRA=visible,HTTPS_PROXY=,HTTP_PROXY\n"));
         VERIFY_ARE_EQUAL(std::string::npos, output.find("synthetic-"));
         VERIFY_ARE_EQUAL(std::string::npos, output.find("private.example"));
         VERIFY_IS_TRUE(std::ranges::equal(originalMessage, message.Span()));

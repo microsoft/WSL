@@ -406,7 +406,7 @@ namespace {
             VERIFY_IS_TRUE(SetEnvironmentVariableW(name.c_str(), value.c_str()));
         }
 
-        auto clearProxy = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [] { SetWindowsProxySettings("", ""); });
+        ScopedWindowsProxySettings originalSettings;
         SetWindowsProxySettings(proxy, bypasses);
         EnsureSessionIsTerminated();
         auto terminate = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [] { EnsureSessionIsTerminated(); });
@@ -534,8 +534,32 @@ class WSLCE2ETlsRegistryTests
 {
     WSLC_TEST_CLASS(WSLCE2ETlsRegistryTests)
 
+    WSLC_TEST_METHOD(WSLCE2E_Proxy_RestoresWindowsSettingsOnFailure)
+    {
+        WINHTTP_PROXY_TEST_ONLY();
+        ScopedWindowsProxySettings originalSettings;
+        LxsstuLaunchPowershellAndCaptureOutput(
+            L"Set-WinhttpProxy -SettingScope User -Proxy 'http=original.proxy.invalid:3128;https=secure.proxy.invalid:3129' "
+            L"-ProxyBypass '<local>;*.original.invalid' -AutoconfigUrl 'http://127.0.0.1:9/original.pac?token=synthetic' "
+            L"-AutoDetect");
+        const auto expected = LxsstuLaunchPowershellAndCaptureOutput(L"netsh winhttp show advproxy").first;
+        const auto directory = std::filesystem::current_path() / std::format(L"wslc-proxy-restore-{}", GetCurrentProcessId());
+        auto cleanup = SetupTestDirectory(directory);
+
+        VERIFY_ARE_EQUAL(E_ABORT, wil::ResultFromException([&]() {
+                             WithColdProxySession(
+                                 directory / L"consumer",
+                                 "http://windows.proxy.invalid:3128",
+                                 ".windows.invalid",
+                                 [&](IWSLCSession&, const HostFileChange&) { THROW_HR(E_ABORT); });
+                         }));
+
+        VERIFY_ARE_EQUAL(expected, LxsstuLaunchPowershellAndCaptureOutput(L"netsh winhttp show advproxy").first);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Proxy_ContainerEnvironment)
     {
+        WINHTTP_PROXY_TEST_ONLY();
         const auto directory = std::filesystem::current_path() / std::format(L"wslc-proxy-env-{}", GetCurrentProcessId());
         auto cleanup = SetupTestDirectory(directory);
         WithColdProxySession(directory / L"consumer", "http://windows.proxy.invalid:3128", ".windows.invalid", [&](IWSLCSession&, const HostFileChange&) {
@@ -570,6 +594,7 @@ class WSLCE2ETlsRegistryTests
 
     WSLC_TEST_METHOD(WSLCE2E_Registry_Proxy_EnvironmentOverride)
     {
+        WINHTTP_PROXY_TEST_ONLY();
         WithProxyRegistry([](const auto& directory, auto& proxy, const auto& alpine, const auto&) {
             RecordingConnectProxy windowsProxy;
             windowsProxy.Stop();
@@ -598,6 +623,7 @@ class WSLCE2ETlsRegistryTests
 
     WSLC_TEST_METHOD(WSLCE2E_Registry_Proxy_BuildTokenAuthentication)
     {
+        WINHTTP_PROXY_TEST_ONLY();
         WithProxyRegistry(
             [](const auto& directory, auto& proxy, const auto& alpine, const auto&) {
                 const auto context = directory / L"context";
@@ -646,6 +672,7 @@ class WSLCE2ETlsRegistryTests
 
     WSLC_TEST_METHOD(WSLCE2E_Registry_Proxy_ColdPullAndIdleRestart)
     {
+        WINHTTP_PROXY_TEST_ONLY();
         WithProxyRegistry([](const auto& directory, auto& proxy, const auto& alpine, const auto& helloWorld) {
             WithColdProxySession(directory / L"localhost", std::format("http://localhost:{}", proxy.Port()), "", [&](IWSLCSession& session, const HostFileChange& settings) {
                 const auto beforePull = proxy.ResponseBytes();
@@ -683,6 +710,7 @@ class WSLCE2ETlsRegistryTests
 
     WSLC_TEST_METHOD(WSLCE2E_Registry_Proxy_NoProxy)
     {
+        WINHTTP_PROXY_TEST_ONLY();
         WithProxyRegistry([](const auto& directory, auto& proxy, const auto& alpine, const auto&) {
             proxy.Stop();
 

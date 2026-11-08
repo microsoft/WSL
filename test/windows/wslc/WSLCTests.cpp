@@ -17863,10 +17863,7 @@ sys.exit(1 if queries else 0)
 
     void VerifyWindowsProxyDefaults(WSLCNetworkingMode NetworkingMode, const std::string& Host, bool Supported = false)
     {
-        auto clearProxy = wil::scope_exit([&]() {
-            LxsstuLaunchPowershellAndCaptureOutput(
-                L"Set-WinhttpProxy -SettingScope User -Proxy \\\"\\\" -ProxyBypass \\\"\\\" -AutoconfigUrl \\\"\\\"");
-        });
+        ScopedWindowsProxySettings originalSettings;
         const auto proxy = std::format("http://{}:3128", Host);
         LxsstuLaunchPowershellAndCaptureOutput(
             std::format(L"Set-WinhttpProxy -SettingScope User -Proxy \\\"{}\\\" -ProxyBypass \\\".windows.invalid\\\" -AutoconfigUrl \\\"\\\"", wsl::shared::string::MultiByteToWide(proxy)));
@@ -17937,21 +17934,40 @@ sys.exit(1 if queries else 0)
         }
     }
 
+    WSLC_TEST_METHOD(WindowsProxySettingsRestored)
+    {
+        SKIP_TEST_SERVER();
+        WINHTTP_PROXY_TEST_ONLY();
+        ScopedWindowsProxySettings originalSettings;
+        LxsstuLaunchPowershellAndCaptureOutput(
+            L"Set-WinhttpProxy -SettingScope User -Proxy 'http=original.proxy.invalid:3128;https=secure.proxy.invalid:3129' "
+            L"-ProxyBypass '<local>;*.original.invalid' -AutoconfigUrl 'http://127.0.0.1:9/original.pac?token=synthetic' "
+            L"-AutoDetect");
+        const auto expected = LxsstuLaunchPowershellAndCaptureOutput(L"netsh winhttp show advproxy").first;
+
+        VerifyWindowsProxyDefaults(WSLCNetworkingModeConsomme, "192.0.2.1", true);
+
+        VERIFY_ARE_EQUAL(expected, LxsstuLaunchPowershellAndCaptureOutput(L"netsh winhttp show advproxy").first);
+    }
+
     WSLC_TEST_METHOD(WindowsProxyLoopbackDefaultsNAT)
     {
         SKIP_TEST_SERVER();
+        WINHTTP_PROXY_TEST_ONLY();
         VerifyWindowsProxyDefaults(WSLCNetworkingModeNAT, "127.0.0.1");
     }
 
     WSLC_TEST_METHOD(WindowsProxyLoopbackDefaultsWithoutHostLoopback)
     {
         SKIP_TEST_SERVER();
+        WINHTTP_PROXY_TEST_ONLY();
         VerifyWindowsProxyDefaults(WSLCNetworkingModeConsomme, "127.0.0.1");
     }
 
     WSLC_TEST_METHOD(WindowsProxyIpv6DefaultsNAT)
     {
         SKIP_TEST_SERVER();
+        WINHTTP_PROXY_TEST_ONLY();
         VerifyWindowsProxyDefaults(WSLCNetworkingModeNAT, "[2001:db8::1]");
         VerifyWindowsProxyDefaults(WSLCNetworkingModeNAT, "192.0.2.1", true);
     }
@@ -17959,12 +17975,14 @@ sys.exit(1 if queries else 0)
     WSLC_TEST_METHOD(WindowsProxyIpv6DefaultsConsomme)
     {
         SKIP_TEST_SERVER();
+        WINHTTP_PROXY_TEST_ONLY();
         VerifyWindowsProxyDefaults(WSLCNetworkingModeConsomme, "[2001:db8::1]", true);
     }
 
     WSLC_TEST_METHOD(WindowsProxyMappedLoopbackDefaultsConsomme)
     {
         SKIP_TEST_SERVER();
+        WINHTTP_PROXY_TEST_ONLY();
         VerifyWindowsProxyDefaults(WSLCNetworkingModeConsomme, "[::ffff:127.0.0.1]");
         VerifyWindowsProxyDefaults(WSLCNetworkingModeConsomme, "[::ffff:7f00:1]");
         VerifyWindowsProxyDefaults(WSLCNetworkingModeConsomme, "[::ffff:192.0.2.1]", true);

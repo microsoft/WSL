@@ -226,12 +226,15 @@ try
 
     if (SUCCEEDED_WIN32(error))
     {
-        WSL_LOG(
-            "s_GetProxySettingsExCallback-Results",
-            TraceLoggingValue(proxySettings.pcwszProxy, "pcwszProxy"),
-            TraceLoggingValue(proxySettings.pcwszSecureProxy, "pcwszSecureProxy"),
-            TraceLoggingValue(proxySettings.pcwszAutoconfigUrl, "pcwszAutoconfigUrl"),
-            TraceLoggingValue(proxySettings.cProxyBypasses, "cProxyBypasses"));
+        if (proxyTracker->m_logProxySettings)
+        {
+            WSL_LOG(
+                "s_GetProxySettingsExCallback-Results",
+                TraceLoggingValue(proxySettings.pcwszProxy, "pcwszProxy"),
+                TraceLoggingValue(proxySettings.pcwszSecureProxy, "pcwszSecureProxy"),
+                TraceLoggingValue(proxySettings.pcwszAutoconfigUrl, "pcwszAutoconfigUrl"),
+                TraceLoggingValue(proxySettings.cProxyBypasses, "cProxyBypasses"));
+        }
     }
     else
     {
@@ -294,7 +297,10 @@ try
 
         if (!AreProxyStringsIdentical(newProxySettings))
         {
-            LogHttpProxySettings(newProxySettings);
+            if (m_logProxySettings)
+            {
+                LogHttpProxySettings(newProxySettings);
+            }
             m_proxySettings = std::move(newProxySettings);
 
             // If there was a setting changes, and this is not the initial proxy query, notify the user to restart WSL to get new proxy changes.
@@ -564,6 +570,7 @@ void HttpProxyStateTracker::QueryProxySettingsAsync()
 
 HttpProxyStateTracker::HttpProxyStateTracker(int ProxyTimeout, HANDLE UserToken, std::optional<wsl::core::NetworkingMode> mode) :
     m_networkMode{mode},
+    m_logProxySettings{mode.has_value()},
     m_initialQueryTimeout{ProxyTimeout},
     m_localizedProxyChangeString{wsl::shared::Localization::MessageHttpProxyChangeDetected()}
 {

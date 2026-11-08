@@ -147,8 +147,8 @@ inline void PrettyPrint(std::stringstream& Out, const T& Value)
                 }
 
                 const std::string_view name{value.data(), separator};
-                if (wsl::shared::string::IsEqual(name, "HTTP_PROXY", true) ||
-                    wsl::shared::string::IsEqual(name, "HTTPS_PROXY", true) || wsl::shared::string::IsEqual(name, "NO_PROXY", true))
+                if (wsl::shared::string::IsEqual(name, "HTTP_PROXY", true) || wsl::shared::string::IsEqual(name, "HTTPS_PROXY", true) ||
+                    wsl::shared::string::IsEqual(name, "NO_PROXY", true) || wsl::shared::string::IsEqual(name, "WSL_PAC_URL", true))
                 {
                     value.replace(separator + 1, std::string::npos, "<redacted>");
                 }

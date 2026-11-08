@@ -196,6 +196,8 @@ private:
     /// </summary>
     _Guarded_by_(m_proxySettingsLock) std::optional<wsl::core::NetworkingMode> m_networkMode;
 
+    const bool m_logProxySettings;
+
     /// <summary>
     /// Indicates if we need to start another query after current one.
     /// </summary>

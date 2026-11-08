@@ -22,6 +22,7 @@ Abstract:
 #include <werapi.h>
 #include <Dbghelp.h>
 #include <winsafer.h>
+#include <winhttp.h>
 
 using namespace WEX::Logging;
 using namespace WEX::Common;
@@ -2412,6 +2413,36 @@ Return Value:
     VERIFY_IS_TRUE(SetStdHandle(STD_ERROR_HANDLE, handles.second));
 }
 
+bool TryLoadWinhttpProxyMethods() noexcept
+{
+    constexpr auto winhttpModuleName = L"Winhttp.dll";
+    const wil::shared_hmodule winhttpModule{LoadLibraryEx(winhttpModuleName, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32)};
+    if (!winhttpModule)
+    {
+        return false;
+    }
+
+    try
+    {
+        // Attempt to find the functions for the Winhttp proxy APIs.
+        static LxssDynamicFunction<decltype(WinHttpRegisterProxyChangeNotification)> WinHttpRegisterProxyChangeNotification{
+            winhttpModule, "WinHttpRegisterProxyChangeNotification"};
+        static LxssDynamicFunction<decltype(WinHttpUnregisterProxyChangeNotification)> WinHttpUnregisterProxyChangeNotification{
+            winhttpModule, "WinHttpUnregisterProxyChangeNotification"};
+        static LxssDynamicFunction<decltype(WinHttpGetProxySettingsEx)> WinHttpGetProxySettingsEx{
+            winhttpModule, "WinHttpGetProxySettingsEx"};
+        static LxssDynamicFunction<decltype(WinHttpGetProxySettingsResultEx)> WinHttpGetProxySettingsResultEx{
+            winhttpModule, "WinHttpGetProxySettingsResultEx"};
+        static LxssDynamicFunction<decltype(WinHttpFreeProxySettingsEx)> WinHttpFreeProxySettingsEx{
+            winhttpModule, "WinHttpFreeProxySettingsEx"};
+    }
+    catch (...)
+    {
+        return false;
+    }
+    return true;
+}
+
 bool TryLoadDnsResolverMethods() noexcept
 {
     constexpr auto c_dnsModuleName = L"dnsapi.dll";
@@ -2627,6 +2658,34 @@ void ScopedEnvVariable::Set(const std::wstring& Value)
 void ScopedEnvVariable::Clear()
 {
     VERIFY_IS_TRUE(SetEnvironmentVariableW(m_name.c_str(), nullptr));
+}
+
+ScopedWindowsProxySettings::ScopedWindowsProxySettings()
+{
+    INTERNET_PER_CONN_OPTIONW options[]{
+        {INTERNET_PER_CONN_FLAGS_UI}, {INTERNET_PER_CONN_PROXY_SERVER}, {INTERNET_PER_CONN_PROXY_BYPASS}, {INTERNET_PER_CONN_AUTOCONFIG_URL}};
+    INTERNET_PER_CONN_OPTION_LISTW list{sizeof(list), nullptr, ARRAYSIZE(options), 0, options};
+    DWORD size = sizeof(list);
+    const auto result =
+        InternetQueryOptionW(nullptr, INTERNET_OPTION_PER_CONNECTION_OPTION, &list, &size) ? S_OK : HRESULT_FROM_WIN32(GetLastError());
+    m_proxy.reset(options[1].Value.pszValue);
+    m_bypasses.reset(options[2].Value.pszValue);
+    m_autoconfigUrl.reset(options[3].Value.pszValue);
+    THROW_IF_FAILED(result);
+    m_flags = options[0].Value.dwValue;
+}
+
+ScopedWindowsProxySettings::~ScopedWindowsProxySettings()
+{
+    INTERNET_PER_CONN_OPTIONW options[]{
+        {INTERNET_PER_CONN_FLAGS, {.dwValue = m_flags}},
+        {INTERNET_PER_CONN_PROXY_SERVER, {.pszValue = static_cast<PWSTR>(m_proxy.get())}},
+        {INTERNET_PER_CONN_PROXY_BYPASS, {.pszValue = static_cast<PWSTR>(m_bypasses.get())}},
+        {INTERNET_PER_CONN_AUTOCONFIG_URL, {.pszValue = static_cast<PWSTR>(m_autoconfigUrl.get())}}};
+    INTERNET_PER_CONN_OPTION_LISTW list{sizeof(list), nullptr, ARRAYSIZE(options), 0, options};
+    LOG_IF_WIN32_BOOL_FALSE(InternetSetOptionW(nullptr, INTERNET_OPTION_PER_CONNECTION_OPTION, &list, sizeof(list)));
+    LOG_IF_WIN32_BOOL_FALSE(InternetSetOptionW(nullptr, INTERNET_OPTION_SETTINGS_CHANGED, nullptr, 0));
+    LOG_IF_WIN32_BOOL_FALSE(InternetSetOptionW(nullptr, INTERNET_OPTION_REFRESH, nullptr, 0));
 }
 
 UniqueWebServer::UniqueWebServer(LPCWSTR Endpoint, LPCWSTR Content, UINT StatusCode)
