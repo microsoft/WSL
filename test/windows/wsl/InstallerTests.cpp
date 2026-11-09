@@ -367,8 +367,9 @@ class InstallerTests
             VERIFY_ARE_EQUAL(state, static_cast<DWORD>(SERVICE_RUNNING));
             VERIFY_ARE_NOT_EQUAL(pid, 0u);
 
+            const auto privilegeState = wsl::windows::common::security::AcquirePrivilege(SE_DEBUG_NAME);
             const wil::unique_handle process{OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid)};
-            VERIFY_IS_NOT_NULL(process);
+            THROW_LAST_ERROR_IF_NULL(process);
 
             PROCESS_MITIGATION_DYNAMIC_CODE_POLICY dynamicCodePolicy{};
 
