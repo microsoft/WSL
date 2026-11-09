@@ -833,9 +833,8 @@ WSLCSessionRuntime::VmLease::VmLease(WSLCSessionRuntime& Runtime, VmLeasePolicy 
 
         if (Policy == VmLeasePolicy::ExistingOnly)
         {
-            m_lock = LockSharedUnlessTerminating(m_runtime->m_lock, m_runtime->m_sessionTerminatingEvent, c_existingOnlyLockRetryMs, [this]() {
-                return m_runtime->m_terminating->load() || m_runtime->m_sessionTerminatedEvent.is_signaled();
-            });
+            m_lock = LockSharedUnlessTerminating(
+                m_runtime->m_lock, m_runtime->m_sessionTerminatingEvent, c_existingOnlyLockRetryMs, *m_runtime->m_terminating);
         }
         else
         {
