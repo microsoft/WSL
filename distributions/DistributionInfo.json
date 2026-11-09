@@ -279,8 +279,8 @@
         ],
         "AzureLinux": [
             {
-                "Name": "AzureLinux-4.0",
-                "FriendlyName": "Azure Linux 4.0",
+                "Name": "AzureLinux-4",
+                "FriendlyName": "Azure Linux 4",
                 "Default": true,
                 "Amd64Url": {
                     "Url": "https://osrelease.download.prss.microsoft.com/pr/download/a/AzureLinux-4-x86_64.wsl",
