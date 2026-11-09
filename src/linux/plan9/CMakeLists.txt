@@ -26,6 +26,7 @@ set(HEADERS
     p9xattr.h
     p9defs.h
     p9protohelpers.h
+    p9validate.h
     p9await.h
     p9errors.h
     result_macros.h

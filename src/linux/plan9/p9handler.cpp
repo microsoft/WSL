@@ -1,5 +1,6 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 #include "precomp.h"
+#include <linux/limits.h>
 #include "p9protohelpers.h"
 #include "p9errors.h"
 #include "p9defs.h"
@@ -7,6 +8,7 @@
 #include "p9tracelogginghelper.h"
 #include "p9log.h"
 #include "p9data.h"
+#include "p9validate.h"
 #include "p9await.h"
 #include "p9fid.h"
 #include "p9handler.h"
@@ -178,7 +180,7 @@ private:
         TraceLogMessage(message);
     }
 
-    Task<LX_INT> HandleMessage(MessageType messageType, SpanReader& reader, MessageResponse& response)
+    Task<LX_INT> HandleMessage(MessageType messageType, UINT16 messageTag, SpanReader& reader, MessageResponse& response)
     {
         // Handle async operations.
         switch (messageType)
@@ -190,7 +192,7 @@ private:
             co_return co_await HandleWrite(reader, response);
 
         case MessageType::Tflush:
-            co_return co_await HandleFlush(reader);
+            co_return co_await HandleFlush(reader, messageTag);
 
         default:
             // Default label prevents warning in clang.
@@ -782,7 +784,7 @@ private:
         }
 
         auto [returnType, returnStart, returnLength, returnProcId, returnClientId] = result.Get();
-        response.EnsureSize(MessageType::Rgetlock, 0, m_NegotiatedSize);
+        response.EnsureSize(MessageType::Rgetlock, gsl::narrow<UINT32>(returnClientId.size()), m_NegotiatedSize);
         response.Writer.U8(static_cast<UINT8>(returnType));
         response.Writer.U64(returnStart);
         response.Writer.U64(returnLength);
@@ -822,6 +824,11 @@ private:
         auto name = reader.String();
         const auto size = reader.U64();
         const auto flags = reader.U32();
+
+        if (size > XATTR_SIZE_MAX)
+        {
+            return LX_E2BIG;
+        }
 
         const auto entry = LookupFid(fid);
 
@@ -1124,9 +1131,15 @@ private:
     }
 
     // Cancel an outstanding request.
-    Task<LX_INT> HandleFlush(SpanReader& reader)
+    Task<LX_INT> HandleFlush(SpanReader& reader, UINT16 messageTag)
     {
         const auto oldTag = reader.U16();
+        if (oldTag == messageTag)
+        {
+            // A self-flush cannot wait for its own completion.
+            co_return 0;
+        }
+
         std::unique_ptr<RequestInfo> waitRequest;
 
         {
@@ -1245,36 +1258,45 @@ private:
     // Process a Plan 9 message, and write the response to the specified buffer.
     Task<void> ProcessMessage(SpanReader& reader, MessageResponse& response)
     {
-        const auto messageSize = reader.U32(); // message size, already validated
+        const auto messageSize = reader.U32();
         auto messageType = reader.U8();
         const auto messageTag = reader.U16();
         const SpanWriter errorWriter{response.Writer};
 
         LX_INT error{};
 
-        if (const auto minimumMessageSize = GetMessageSize(static_cast<MessageType>(messageType));
-            minimumMessageSize != 0 && messageSize < minimumMessageSize)
+        try
         {
-            error = LX_EINVAL;
+            if (messageSize < HeaderSize || messageSize > reader.Size())
+            {
+                error = LX_EINVAL;
+            }
+            else
+            {
+                const auto message = reader.Span().subspan(0, messageSize);
+                if (!ValidateMessageStructure(static_cast<MessageType>(messageType), message))
+                {
+                    error = LX_EINVAL;
+                }
+                else
+                {
+                    LogMessage(message);
+                    SpanReader declaredReader{message};
+                    declaredReader.Read(HeaderSize);
+                    error = co_await HandleMessage(static_cast<MessageType>(messageType), messageTag, declaredReader, response);
+                }
+            }
         }
-        else
+        catch (...)
         {
-            try
-            {
-                LogMessage(reader.Span());
-
-                error = co_await HandleMessage(static_cast<MessageType>(messageType), reader, response);
-            }
-            catch (...)
-            {
-                LOG_CAUGHT_EXCEPTION();
-                error = util::LinuxErrorFromCaughtException();
-            }
+            LOG_CAUGHT_EXCEPTION();
+            error = util::LinuxErrorFromCaughtException();
         }
 
         if (error != 0)
         {
             response.Writer = errorWriter;
+            response.EnsureSize(MessageType::Rlerror, 0, m_NegotiatedSize);
             response.Writer.U32(static_cast<UINT32>(-error));
             messageType = static_cast<UINT8>(MessageType::Tlerror);
         }
@@ -1286,6 +1308,12 @@ private:
     // Process a message received from virtio.
     void ProcessMessageAsync(std::vector<gsl::byte>&& message, size_t responseSize, HandlerCallback&& callback) override
     {
+        if (message.size() < HeaderSize || responseSize < HeaderSize)
+        {
+            callback({});
+            return;
+        }
+
         // Register the request so Tflush can wait on it if needed.
         const auto tag = SpanReader{gsl::make_span(message).subspan(TagOffset)}.U16();
         RequestTracker request{m_Requests, tag};
