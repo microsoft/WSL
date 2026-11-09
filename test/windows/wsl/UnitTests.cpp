@@ -9392,5 +9392,14 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             VERIFY_ARE_EQUAL(err, L"");
         }
     }
+
+    WSL2_TEST_METHOD(ExecSearchPath)
+    {
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(L"rm -f /usr/sbin/wsl-exec-path-test"); });
+        LxsstuLaunchWsl(
+            L"printf '#!/bin/sh\\nprintf found\\n' > /usr/sbin/wsl-exec-path-test && chmod +x /usr/sbin/wsl-exec-path-test");
+
+        VerifyOutput(L"--exec wsl-exec-path-test", L"found");
+    }
 };
 } // namespace UnitTests
