@@ -21,6 +21,11 @@ Task<Expected<UINT32>> XAttr::Read(UINT64 offset, gsl::span<gsl::byte> buffer)
         co_return LxError{LX_EINVAL};
     }
 
+    if (buffer.empty())
+    {
+        co_return 0;
+    }
+
     auto result = GetValue(buffer);
     if (!result)
     {
