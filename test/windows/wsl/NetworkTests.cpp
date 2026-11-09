@@ -2416,7 +2416,7 @@ class NetworkTests
             uint16_t selectedPort{};
             if (bindSocket)
             {
-                auto availablePort = BindHostPort(0, SOCK_STREAM, IPPROTO_TCP, true, false, true);
+                auto availablePort = BindHostPort(0, SOCK_DGRAM, IPPROTO_UDP, true);
                 SOCKADDR_IN availableAddress{};
                 int addressLength = sizeof(availableAddress);
                 VERIFY_ARE_EQUAL(getsockname(availablePort.get(), reinterpret_cast<SOCKADDR*>(&availableAddress), &addressLength), 0);
@@ -2440,6 +2440,8 @@ class NetworkTests
             if (bindSocket)
             {
                 VERIFY_ARE_EQUAL(port, selectedPort);
+                BindHostPort(port, SOCK_DGRAM, IPPROTO_UDP, false);
+                continue;
             }
 
             const auto connectToGuest = [&]() {
@@ -6263,6 +6265,7 @@ class ConsommeTests
         CONSOMME_TEST_ONLY();
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        auto revertEphemeralPortRange = SetTestEphemeralPortRange();
         NetworkTests::VerifyI386PortIsTracked(false);
     }
 

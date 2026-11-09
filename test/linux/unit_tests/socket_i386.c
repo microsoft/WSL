@@ -21,6 +21,7 @@
 
 #define AF_INET 2
 #define SOCK_STREAM 1
+#define SOCK_DGRAM 2
 #define INADDR_ANY 0
 #define POLLIN 1
 #define EINTR 4
@@ -151,7 +152,7 @@ __attribute__((noreturn, used)) void Entry(const unsigned long* stack)
         Exit(EXIT_USAGE);
     }
 
-    int descriptor = (int)Socketcall(SYS_SOCKET, AF_INET, SOCK_STREAM, 0);
+    int descriptor = (int)Socketcall(SYS_SOCKET, AF_INET, bindSocket ? SOCK_DGRAM : SOCK_STREAM, 0);
     struct SocketAddress address = {AF_INET, (unsigned short)((port >> 8) | (port << 8)), INADDR_ANY, {0}};
     if (bindSocket)
     {
@@ -159,12 +160,18 @@ __attribute__((noreturn, used)) void Entry(const unsigned long* stack)
             legacy ? Socketcall(SYS_BIND, descriptor, (long)&address, sizeof(address))
                    : Syscall(I386_NR_bind, descriptor, (long)&address, sizeof(address)));
     }
-    Check(legacy ? Socketcall(SYS_LISTEN, descriptor, LISTEN_BACKLOG, 0) : Syscall(I386_NR_listen, descriptor, LISTEN_BACKLOG, 0));
+    else
+    {
+        Check(legacy ? Socketcall(SYS_LISTEN, descriptor, LISTEN_BACKLOG, 0) : Syscall(I386_NR_listen, descriptor, LISTEN_BACKLOG, 0));
+    }
 
     unsigned int addressLength = sizeof(address);
     Socketcall(SYS_GETSOCKNAME, descriptor, (long)&address, (long)&addressLength);
     Write(&address.port, sizeof(address.port));
     WaitForInput(descriptor);
-    Socketcall(SYS_ACCEPT, descriptor, 0, 0);
+    if (!bindSocket)
+    {
+        Socketcall(SYS_ACCEPT, descriptor, 0, 0);
+    }
     Exit(EXIT_SUCCESS);
 }
