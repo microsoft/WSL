@@ -203,20 +203,29 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     }
     else
     {
-        if (!wsl::windows::common::filesystem::FileExists(m_vmConfig.KernelPath.c_str()))
+        const auto runAsUser = wil::impersonate_token(m_userToken.get());
+
+        wil::unique_hfile kernel{CreateFileW(
+            m_vmConfig.KernelPath.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+
+        if (!kernel)
         {
-            THROW_HR_WITH_USER_ERROR(
-                WSL_E_CUSTOM_KERNEL_NOT_FOUND,
-                Localization::MessageCustomKernelNotFound(
-                    wsl::windows::common::helpers::GetWslConfigPath(m_userToken.get()), m_vmConfig.KernelPath.c_str()));
+            const auto error = GetLastError();
+            if (error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND)
+            {
+                THROW_HR_WITH_USER_ERROR(
+                    WSL_E_CUSTOM_KERNEL_NOT_FOUND,
+                    Localization::MessageCustomKernelNotFound(
+                        wsl::windows::common::helpers::GetWslConfigPath(m_userToken.get()), m_vmConfig.KernelPath.c_str()));
+            }
+
+            THROW_WIN32_MSG(error, "Failed to open kernel: '%ls'", m_vmConfig.KernelPath.c_str());
         }
 
         // Direct boot is not supported on ARM64. Modify the rootfs directory to be a temporary directory that contains
         // copies of the initrd file and private kernel.
         if constexpr (wsl::shared::Arm64)
         {
-            auto impersonate = wil::impersonate_token(m_userToken.get());
-
             m_rootFsPath = m_tempPath / LXSS_ROOTFS_DIRECTORY;
             wil::CreateDirectoryDeep(m_rootFsPath.c_str());
             auto initRdPath = m_installPath / LXSS_TOOLS_DIRECTORY / LXSS_VM_MODE_INITRD_NAME;
@@ -249,6 +258,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     }
     else
     {
+        const auto runAsUser = wil::impersonate_token(m_userToken.get());
         if (!wsl::windows::common::filesystem::FileExists(m_vmConfig.KernelModulesPath.c_str()))
         {
             THROW_HR_WITH_USER_ERROR(
@@ -364,8 +374,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
     if (m_vmConfig.MaxCrashDumpCount >= 0)
     {
-        m_crashDumpListener = m_backend->CreateGuestListener(GuestServicePort{LX_INIT_UTILITY_VM_CRASH_DUMP_PORT});
-        m_crashDumpCollectionThread = std::thread{&WslCoreVm::CollectCrashDumps, this, m_crashDumpListener.value()};
+        auto listener = m_backend->CreateGuestListener(GuestServicePort{LX_INIT_UTILITY_VM_CRASH_DUMP_PORT});
+        m_crashDumpCollectionThread = std::thread{&WslCoreVm::CollectCrashDumps, this, std::move(listener)};
     }
 
     // Register before starting so an early exit cannot be missed.
@@ -775,22 +785,6 @@ WslCoreVm::~WslCoreVm() noexcept
 
     if (m_backend)
     {
-        auto closeListener = [&](const VmGuestListener& listener) {
-            if (listener.Id.Value != 0)
-            {
-                LOG_IF_FAILED(wil::ResultFromException([&] { m_backend->CloseGuestListener(listener.Id); }));
-            }
-        };
-        closeListener(m_guestListener);
-        if (m_crashDumpListener)
-        {
-            closeListener(m_crashDumpListener.value());
-        }
-        if (m_virtioFsListener)
-        {
-            closeListener(m_virtioFsListener.value());
-        }
-
         bool unexpectedTerminate = m_vmExitEvent.is_signaled();
         bool forcedTerminate = false;
 
@@ -855,6 +849,8 @@ WslCoreVm::~WslCoreVm() noexcept
         m_crashDumpCollectionThread.join();
     }
 
+    m_guestListener = VmGuestListener{};
+
     if (m_pluginPlan9Server)
     {
         LOG_IF_FAILED(m_pluginPlan9Server->Teardown());
@@ -905,7 +901,10 @@ WslCoreVm::~WslCoreVm() noexcept
 
 wil::unique_socket WslCoreVm::AcceptConnection(_In_ DWORD ReceiveTimeout, _In_ const std::source_location& Location) const
 {
-    auto socket = m_guestListener.Accept(m_vmConfig.KernelBootTimeout, Location);
+    auto socket = wsl::windows::common::socket::CancellableAccept(
+                      m_guestListener.Socket.get(), m_vmConfig.KernelBootTimeout, m_terminatingEvent.get(), Location)
+                      .value_or(wil::unique_socket{});
+    THROW_HR_IF(E_ABORT, !socket);
 
     if (ReceiveTimeout != 0)
     {
@@ -1038,28 +1037,20 @@ ULONG WslCoreVm::AttachDiskLockHeld(
         }
         else
         {
-            const std::filesystem::path path{Disk};
-            VmDiskFormat format;
-            if (wsl::windows::common::string::IsPathComponentEqual(path.extension().native(), wsl::windows::common::wslutil::c_vhdFileExtension))
-            {
-                format = VmDiskFormat::Vhd;
-            }
-            else
-            {
-                THROW_HR_IF(
-                    E_INVALIDARG,
-                    !wsl::windows::common::string::IsPathComponentEqual(path.extension().native(), wsl::windows::common::wslutil::c_vhdxFileExtension));
-                format = VmDiskFormat::Vhdx;
-            }
-
-            request.Source = VmVirtualDiskSource{path, format};
+            request.Source = VmVirtualDiskSource{Disk};
         }
         request.ReadOnly = WI_IsFlagSet(Flags, MountFlags::ReadOnly);
         request.UserDisk = IsUserDisk;
         request.DeviceTimeout = std::chrono::milliseconds{m_vmConfig.MountDeviceTimeout};
         if (Lun)
         {
-            request.Placement = VmScsiPlacement{{0, Lun.value()}};
+            // Restored LUNs are preferences, unlike exact backend placements.
+            const auto attachedDisks = m_backend->GetAttachedDisks();
+            if (std::ranges::none_of(
+                    attachedDisks, [&](const VmDiskAttachment& disk) { return disk.GuestAddress.Lun == Lun.value(); }))
+            {
+                request.Placement = VmScsiPlacement{{0, Lun.value()}};
+            }
         }
         if (UserToken)
         {
@@ -1090,7 +1081,12 @@ void WslCoreVm::CollectCrashDumps(VmGuestListener Listener) const
     {
         try
         {
-            auto socket = Listener.Accept();
+            auto socket =
+                wsl::windows::common::socket::CancellableAccept(Listener.Socket.get(), INFINITE, m_terminatingEvent.get()).value_or(wil::unique_socket{});
+            if (!socket)
+            {
+                break;
+            }
 
             DWORD receiveTimeout = m_vmConfig.KernelBootTimeout;
             THROW_LAST_ERROR_IF(setsockopt(socket.get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&receiveTimeout, sizeof(receiveTimeout)) == SOCKET_ERROR);
@@ -1294,8 +1290,15 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::DetachDisk(_In_opt_ PCWSTR Disk)
 
         if (!disk.PassThrough)
         {
+            if (TargetPath == nullptr)
+            {
+                return true;
+            }
+
+            const auto runAsUser = wil::CoImpersonateClient();
+
             std::error_code error{};
-            return TargetPath == nullptr || std::filesystem::equivalent(disk.Path, TargetPath, error);
+            return std::filesystem::equivalent(disk.Path, TargetPath, error);
         }
 
         return TargetPath == nullptr || wsl::windows::common::string::IsPathComponentEqual(disk.Path, TargetPath);
@@ -1419,6 +1422,7 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
 
     if (privateSystemDistro)
     {
+        const auto runAsUser = wil::impersonate_token(m_userToken.get());
         if (wsl::windows::common::string::IsPathComponentEqual(m_vmConfig.SystemDistroPath.extension().native(), L".img"))
         {
             m_systemDistroDeviceType = LxMiniInitMountDeviceTypePmem;
@@ -1441,6 +1445,7 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
     }
     if (m_systemDistroDeviceType == LxMiniInitMountDeviceTypePmem)
     {
+        const auto runAsUser = wil::impersonate_token(m_userToken.get());
         highMmioGapInMB += RequiredExtraMmioSpaceForPmemFileInMb(m_vmConfig.SystemDistroPath.c_str());
     }
     request.Mmio.HighWindowSizeBytes = static_cast<std::uint64_t>(highMmioGapInMB) * _1MB;
@@ -1527,7 +1532,7 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
     auto addBootDisk = [&](std::wstring key, const std::filesystem::path& path, bool grantHostAccess) {
         VmBootDiskRequest disk{};
         disk.Key = std::move(key);
-        disk.Disk.Source = VmVirtualDiskSource{path, VmDiskFormat::Vhd};
+        disk.Disk.Source = VmVirtualDiskSource{path};
         disk.Disk.ReadOnly = true;
         disk.Disk.DeviceTimeout = std::chrono::milliseconds{m_vmConfig.MountDeviceTimeout};
         disk.GrantHostAccess = grantHostAccess;
@@ -1851,12 +1856,14 @@ void WslCoreVm::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR Gue
 ULONG
 WslCoreVm::MountFileAsPersistentMemory(_In_ PCWSTR FilePath, _In_ bool ReadOnly)
 {
+    auto persistentMemoryLock = m_persistentMemoryLock.lock_exclusive();
     VmPersistentMemoryRequest request{};
     request.Path = FilePath;
     request.ReadOnly = ReadOnly;
     request.UserToken = m_userToken;
-    request.WaitForGuestDevice = [this](std::uint32_t index) { WaitForPmemDeviceInVm(index); };
-    return m_backend->AddPersistentMemory(request).Index;
+    const auto device = m_backend->AddPersistentMemory(request);
+    WaitForPmemDeviceInVm(device.Index);
+    return device.Index;
 }
 
 void WslCoreVm::WaitForPmemDeviceInVm(_In_ ULONG PmemId)
@@ -1906,8 +1913,13 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
     WI_ASSERT(Admin == wsl::windows::common::security::IsTokenElevated(UserToken));
 
     // Ensure that the path has a trailing path separator.
-    std::wstring sharePath = NormalizeSharePath(Path);
+    std::wstring sharePath;
     const auto mountOptions = ParseVirtioFsMountOptions(Options);
+
+    {
+        const auto runAsUser = wil::impersonate_token(UserToken);
+        sharePath = NormalizeSharePath(Path);
+    }
 
     bool created = false;
     auto share = m_backend->GetFileSystemShare([&](const VmFileSystemShare& candidate) {
@@ -2122,8 +2134,8 @@ void WslCoreVm::RegisterCallbacks(_In_ const std::function<void(ULONG)>& DistroE
     if (m_vmConfig.EnableHostFileSystemAccess && m_vmConfig.EnableVirtioFs)
     {
         // Create a thread listening for handling virtiofs requests.
-        m_virtioFsListener = m_backend->CreateGuestListener(GuestServicePort{LX_INIT_UTILITY_VM_VIRTIOFS_PORT});
-        m_virtioFsThread = std::thread(&WslCoreVm::VirtioFsWorker, this, m_virtioFsListener.value());
+        auto listener = m_backend->CreateGuestListener(GuestServicePort{LX_INIT_UTILITY_VM_VIRTIOFS_PORT});
+        m_virtioFsThread = std::thread(&WslCoreVm::VirtioFsWorker, this, std::move(listener));
     }
 }
 
@@ -2300,8 +2312,7 @@ try
     wsl::windows::common::wslutil::SetThreadDescription(L"VirtioFs - Worker");
 
     io::MultiHandleWait io;
-
-    io.AddHandle(std::make_unique<io::AcceptHandle>(Listener.Socket(), false, [this, &io](wil::unique_socket&& socket) {
+    io.AddHandle(std::make_unique<io::AcceptHandle>(Listener.Socket.get(), false, [this, &io](wil::unique_socket&& socket) {
         auto channel = std::make_shared<wsl::shared::SocketChannel>(std::move(socket), "VirtioFs");
         auto buffer = std::make_shared<std::vector<gsl::byte>>();
         auto pendingBytes = std::make_shared<std::vector<gsl::byte>>();

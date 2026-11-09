@@ -7,10 +7,10 @@
 #include "VirtualMachineBackendTestHelpers.h"
 
 using namespace VirtualMachineBackendTestHelpers;
+using wsl::windows::common::socket::CancellableAccept;
 
 namespace {
 
-constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
 constexpr HRESULT c_invalidState = HRESULT_FROM_WIN32(ERROR_INVALID_STATE);
 
 std::filesystem::path CreateTestDirectory()
@@ -69,30 +69,12 @@ wil::unique_handle GetElevatedTestToken()
 VmDiskRequest CreateDiskRequest(const std::filesystem::path& Path, std::optional<UINT32> Lun = std::nullopt)
 {
     VmDiskRequest request;
-    request.Source = VmVirtualDiskSource{Path, VmDiskFormat::Vhdx};
+    request.Source = VmVirtualDiskSource{Path};
     if (Lun)
     {
         request.Placement = VmScsiPlacement{{0, Lun.value()}};
     }
 
-    return request;
-}
-
-VmNetworkAdapterRequest CreateNetworkRequest()
-{
-    VmNetworkAdapterRequest request;
-    request.Tag = L"eth0";
-    VmUserModeNatNetwork configuration;
-    configuration.Configuration.clientIp.value = htonl(0x0a000002);
-    constexpr std::array<BYTE, 6> clientMac{0x00, 0x15, 0x5d, 0x01, 0x02, 0x03};
-    std::copy(clientMac.begin(), clientMac.end(), std::begin(configuration.Configuration.clientMac.bytes));
-    configuration.Configuration.gatewayIp.value = htonl(0x0a000001);
-    constexpr std::array<BYTE, 6> gatewayMac{0x52, 0x55, 0x0a, 0x00, 0x00, 0x01};
-    std::copy(gatewayMac.begin(), gatewayMac.end(), std::begin(configuration.Configuration.gatewayMac.bytes));
-    constexpr std::array<BYTE, 6> gatewayMacIpv6{0x52, 0x55, 0x0a, 0x00, 0x01, 0x02};
-    std::copy(gatewayMacIpv6.begin(), gatewayMacIpv6.end(), std::begin(configuration.Configuration.gatewayMacIpv6.bytes));
-    configuration.Configuration.netmask.value = htonl(0xffffff00);
-    request.Configuration = configuration;
     return request;
 }
 
@@ -111,7 +93,8 @@ namespace HcsVirtualMachineBackendTests {
 
 class HcsVirtualMachineBackendTests
 {
-    WSL_TEST_CLASS(HcsVirtualMachineBackendTests)
+    // Device-host COM proxies can remain loaded until process exit; isolate them from installer tests.
+    WSL_TEST_CLASS_WITH_PROPERTIES(HcsVirtualMachineBackendTests, TEST_CLASS_PROPERTY(L"IsolationLevel", L"Class"))
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
@@ -122,15 +105,7 @@ class HcsVirtualMachineBackendTests
 
     TEST_CLASS_CLEANUP(TestClassCleanup)
     {
-        const auto module = GetModuleHandleW(L"wsldevicehostproxystub.dll");
-        if (module)
-        {
-            const auto canUnload = reinterpret_cast<HRESULT(STDAPICALLTYPE*)()>(GetProcAddress(module, "DllCanUnloadNow"));
-            VERIFY_IS_NOT_NULL(canUnload);
-            LogInfo("Device-host proxy unload status before COM cleanup: 0x%08x", canUnload());
-        }
         CoFreeUnusedLibrariesEx(0, 0);
-        VERIFY_IS_NULL(GetModuleHandleW(L"wsldevicehostproxystub.dll"));
         VERIFY_ARE_EQUAL(0, WSACleanup());
         return true;
     }
@@ -148,7 +123,13 @@ class HcsVirtualMachineBackendTests
         VERIFY_IS_TRUE(std::holds_alternative<VmVirtioFsShareAddress>(result.GuestAddress));
     }
 
-    TEST_METHOD(PreservesCallerIdentityAndBootInputs)
+    TEST_METHOD(LeavesVirtualDiskFileNamesToBackend)
+    {
+        const auto request = CreateDiskRequest(L"C:\\images\\modules.img");
+        VERIFY_ARE_EQUAL(std::wstring{L"C:\\images\\modules.img"}, wsl::windows::common::vm::validation::ValidateDiskSource(request));
+    }
+
+    WSL2_TEST_METHOD(PreservesCallerIdentityAndBootInputs)
     {
         SKIP_TEST_ARM64();
         auto request = CreateRunnableRequest();
@@ -201,10 +182,226 @@ class HcsVirtualMachineBackendTests
         backend->Terminate();
     }
 
-    TEST_METHOD(BootsAndTerminates)
+    WSL2_TEST_METHOD(BootsAndTerminates)
     {
         SKIP_TEST_ARM64();
         VerifyBootsAndTerminates(HcsVirtualMachineBackend::Create(CreateRunnableRequest()));
+    }
+
+    WSL2_TEST_METHOD(SignalsTerminationOnlyAfterVmExit)
+    {
+        SKIP_TEST_ARM64();
+        auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        auto guest = StartGuest(*backend);
+        const auto terminationEvent = backend->GetTerminationEvent();
+        const auto listener = backend->CreateGuestListener({12345});
+        auto socketUser = std::async(std::launch::async, [&] {
+            const auto accepted = CancellableAccept(listener.Socket.get(), INFINITE, terminationEvent.get());
+            THROW_HR_IF(E_UNEXPECTED, accepted.has_value());
+            return backend->GetTerminationReason();
+        });
+        auto stopBackend = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { backend->Terminate(); });
+
+        VERIFY_IS_TRUE(socketUser.wait_for(100ms) == std::future_status::timeout);
+        backend->Terminate();
+        VERIFY_ARE_EQUAL(VmTerminationReason::Shutdown, socketUser.get().Reason);
+        VERIFY_IS_TRUE(terminationEvent.is_signaled());
+        VERIFY_ARE_EQUAL(VmTerminationReason::Shutdown, backend->GetTerminationReason().Reason);
+    }
+
+    WSL2_TEST_METHOD(CompletesTerminationWithoutExitNotification)
+    {
+        SKIP_TEST_ARM64();
+        auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        const auto terminationEvent = backend->GetTerminationEvent();
+        wsl::windows::common::hcs::RegisterCallback(backend->GetComputeSystemHandle(), [](HCS_EVENT*, void*) {}, nullptr);
+        HRESULT callbackReasonResult = E_FAIL;
+        backend->RegisterTerminationCallback(
+            [&](GUID) { callbackReasonResult = OperationResult([&] { backend->GetTerminationReason(); }); });
+
+        const auto startTime = std::chrono::steady_clock::now();
+        backend->Terminate();
+        VERIFY_IS_TRUE(std::chrono::steady_clock::now() - startTime < 5s);
+        VERIFY_IS_TRUE(terminationEvent.is_signaled());
+        VERIFY_ARE_EQUAL(S_OK, callbackReasonResult);
+        VERIFY_ARE_EQUAL(VmTerminationReason::Unknown, backend->GetTerminationReason().Reason);
+        backend.reset();
+        VERIFY_IS_TRUE(terminationEvent.is_signaled());
+    }
+
+    WSL2_TEST_METHOD(TerminatesConcurrently)
+    {
+        SKIP_TEST_ARM64();
+        for (const bool start : {false, true})
+        {
+            std::atomic<int> notificationCount{0};
+            auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+            std::optional<decltype(StartGuest(*backend))> guest;
+            if (start)
+            {
+                guest.emplace(StartGuest(*backend));
+            }
+
+            backend->RegisterTerminationCallback([&](GUID) {
+                backend->Terminate();
+                ++notificationCount;
+            });
+
+            wil::unique_event terminate{wil::EventOptions::ManualReset};
+            std::vector<std::future<void>> terminations;
+            auto releaseOnExit = wil::scope_exit([&] { terminate.SetEvent(); });
+            for (int index = 0; index < 8; ++index)
+            {
+                terminations.emplace_back(std::async(std::launch::async, [&] {
+                    terminate.wait();
+                    backend->Terminate();
+                }));
+            }
+
+            terminate.SetEvent();
+            for (auto& termination : terminations)
+            {
+                termination.get();
+            }
+
+            VERIFY_IS_TRUE(backend->GetTerminationEvent().is_signaled());
+            VERIFY_ARE_EQUAL(VmState::Stopped, backend->GetState());
+            VERIFY_ARE_EQUAL(1, notificationCount.load());
+            VERIFY_ARE_EQUAL(c_invalidState, OperationResult([&] { backend->GetComputeSystemHandle(); }));
+        }
+    }
+
+    WSL2_TEST_METHOD(FinalizesFailedStartWithoutExitNotification)
+    {
+        SKIP_TEST_ARM64();
+        auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        const auto terminationEvent = backend->GetTerminationEvent();
+        wsl::windows::common::hcs::RegisterCallback(backend->GetComputeSystemHandle(), [](HCS_EVENT*, void*) {}, nullptr);
+        wsl::windows::common::hcs::TerminateComputeSystem(backend->GetComputeSystemHandle());
+
+        VERIFY_FAILED(OperationResult([&] { backend->Start(); }));
+        VERIFY_IS_FALSE(terminationEvent.is_signaled());
+        const auto startTime = std::chrono::steady_clock::now();
+        backend.reset();
+        VERIFY_IS_TRUE(std::chrono::steady_clock::now() - startTime < 5s);
+        VERIFY_IS_TRUE(terminationEvent.is_signaled());
+    }
+
+    WSL2_TEST_METHOD(TerminatesBeforeDrainingBackendOperations)
+    {
+        SKIP_TEST_ARM64();
+        const auto request = CreateRunnableRequest();
+        auto backend = HcsVirtualMachineBackend::Create(request);
+        auto guest = StartGuest(*backend);
+        backend->CreateFileSystemDevice({VmVirtioFsDevice{L"shutdown-test", VmVirtioFsLayout::SingleShare}});
+
+        wil::unique_event vmExited{wil::EventOptions::ManualReset};
+        wil::unique_event operationStarted{wil::EventOptions::ManualReset};
+        wil::unique_event releaseOperation{wil::EventOptions::ManualReset};
+        const auto vmId = wsl::shared::string::GuidToString<wchar_t>(request.Identity.VmId, wsl::shared::string::GuidToStringFlags::None);
+        auto monitor = wsl::windows::common::hcs::OpenComputeSystem(vmId.c_str(), GENERIC_ALL);
+        wsl::windows::common::hcs::RegisterCallback(
+            monitor.get(),
+            [](HCS_EVENT* event, void* context) {
+                if (event->Type == HcsEventSystemExited)
+                {
+                    LOG_IF_WIN32_BOOL_FALSE(SetEvent(context));
+                }
+            },
+            vmExited.get());
+
+        std::future<void> termination;
+        auto operation = std::async(std::launch::async, [&] {
+            backend->GetFileSystemDevice([&](const VmFileSystemDevice&) {
+                operationStarted.SetEvent();
+                releaseOperation.wait();
+                return true;
+            });
+        });
+        auto releaseOnExit = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { releaseOperation.SetEvent(); });
+
+        VERIFY_IS_TRUE(operationStarted.wait(30 * 1000));
+        termination = std::async(std::launch::async, [&] { backend->Terminate(); });
+        VERIFY_IS_TRUE(vmExited.wait(30 * 1000));
+        releaseOperation.SetEvent();
+        operation.get();
+        termination.get();
+        VERIFY_IS_TRUE(backend->GetTerminationEvent().is_signaled());
+    }
+
+    WSL2_TEST_METHOD(DestroysGuestListenersBeforeRebinding)
+    {
+        SKIP_TEST_ARM64();
+        auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        {
+            const auto listener = backend->CreateGuestListener({LX_INIT_UTILITY_VM_INIT_PORT});
+        }
+
+        {
+            const auto replacement = backend->CreateGuestListener({LX_INIT_UTILITY_VM_INIT_PORT});
+        }
+
+        auto guest = StartGuest(*backend);
+        backend->Terminate();
+    }
+
+    WSL2_TEST_METHOD(TransfersGuestListenerOwnership)
+    {
+        SKIP_TEST_ARM64();
+        auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        VmGuestListener owner;
+        {
+            auto listener = backend->CreateGuestListener({12345});
+            auto movedListener = std::move(listener);
+            owner = std::move(movedListener);
+        }
+
+        int accepting{};
+        int size = sizeof(accepting);
+        VERIFY_ARE_EQUAL(0, getsockopt(owner.Socket.get(), SOL_SOCKET, SO_ACCEPTCONN, reinterpret_cast<char*>(&accepting), &size));
+        VERIFY_ARE_EQUAL(1, accepting);
+        owner = backend->CreateGuestListener({12346});
+        const auto replacement = backend->CreateGuestListener({12345});
+    }
+
+    WSL2_TEST_METHOD(CancelsGuestAcceptBeforeDestroyingListener)
+    {
+        SKIP_TEST_ARM64();
+        auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        wil::unique_event cancellationEvent{wil::EventOptions::ManualReset};
+        auto listener = backend->CreateGuestListener({LX_INIT_UTILITY_VM_INIT_PORT});
+        auto accept = std::async(
+            std::launch::async, [&] { return CancellableAccept(listener.Socket.get(), INFINITE, cancellationEvent.get()); });
+        auto cancelAccept = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { cancellationEvent.SetEvent(); });
+
+        VERIFY_IS_TRUE(accept.wait_for(100ms) == std::future_status::timeout);
+        cancellationEvent.SetEvent();
+        VERIFY_IS_FALSE(accept.get().has_value());
+        int accepting{};
+        int size = sizeof(accepting);
+        VERIFY_ARE_EQUAL(0, getsockopt(listener.Socket.get(), SOL_SOCKET, SO_ACCEPTCONN, reinterpret_cast<char*>(&accepting), &size));
+        VERIFY_ARE_EQUAL(1, accepting);
+        listener = VmGuestListener{};
+
+        const auto replacement = backend->CreateGuestListener({LX_INIT_UTILITY_VM_INIT_PORT});
+    }
+
+    WSL2_TEST_METHOD(RejectsGuestListenersAfterSpontaneousExit)
+    {
+        SKIP_TEST_ARM64();
+        auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
+        auto guest = StartGuest(*backend);
+        const auto terminationEvent = backend->GetTerminationEvent();
+        const auto listener = backend->CreateGuestListener({12345});
+        auto accept = std::async(
+            std::launch::async, [&] { return CancellableAccept(listener.Socket.get(), INFINITE, terminationEvent.get()); });
+        auto stopBackend = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { backend->Terminate(); });
+
+        VERIFY_IS_TRUE(accept.wait_for(100ms) == std::future_status::timeout);
+        wsl::windows::common::hcs::TerminateComputeSystem(backend->GetComputeSystemHandle());
+        VERIFY_IS_TRUE(terminationEvent.wait(30 * 1000));
+        VERIFY_IS_FALSE(accept.get().has_value());
+        VERIFY_ARE_EQUAL(c_invalidState, OperationResult([&] { backend->CreateGuestListener({12345}); }));
     }
 
     TEST_METHOD(WritesCrashLogToPrecomputedPath)
@@ -227,7 +424,7 @@ class HcsVirtualMachineBackendTests
         VERIFY_IS_TRUE(WI_IsFlagSet(GetFileAttributesW(path.c_str()), FILE_ATTRIBUTE_TEMPORARY));
     }
 
-    TEST_METHOD(AllocatesFirstFreeBootDiskLun)
+    WSL2_TEST_METHOD(AllocatesFirstFreeBootDiskLun)
     {
         SKIP_TEST_ARM64();
         const auto directory = CreateTestDirectory();
@@ -261,7 +458,8 @@ class HcsVirtualMachineBackendTests
         CreateVhd(firstPath);
 
         const auto firstDaclAces = GetDaclAces(firstPath);
-        auto request = CreateRunnableRequest();
+        auto request = CreateRequest();
+        request.Boot.InitrdPath.clear();
         request.Identity.UserToken = wil::shared_handle{GetElevatedTestToken().release()};
         VmBootDiskRequest first;
         first.Key = L"first";
@@ -273,11 +471,12 @@ class HcsVirtualMachineBackendTests
         invalid.GrantHostAccess = true;
         request.BootDisks = {std::move(first), std::move(invalid)};
 
-        VERIFY_ARE_NOT_EQUAL(S_OK, OperationResult([&] { HcsVirtualMachineBackend::Create(request); }));
+        VERIFY_ARE_EQUAL(
+            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] { HcsVirtualMachineBackend::Create(request); }));
         VERIFY_ARE_EQUAL(firstDaclAces, GetDaclAces(firstPath));
     }
 
-    TEST_METHOD(ManagesDiskPlacementsAndLifetime)
+    WSL2_TEST_METHOD(ManagesDiskPlacementsAndLifetime)
     {
         SKIP_TEST_ARM64();
         const auto directory = CreateTestDirectory();
@@ -332,7 +531,7 @@ class HcsVirtualMachineBackendTests
         backend->Terminate();
     }
 
-    TEST_METHOD(KeepsDiskIdsVmScopedAndEnforcesPlacementBounds)
+    WSL2_TEST_METHOD(KeepsDiskIdsVmScopedAndEnforcesPlacementBounds)
     {
         SKIP_TEST_ARM64();
         const auto directory = CreateTestDirectory();
@@ -366,12 +565,12 @@ class HcsVirtualMachineBackendTests
 
     TEST_METHOD(RejectsInvalidIdentity)
     {
-        auto request = CreateRunnableRequest();
+        auto request = CreateRequest();
         request.Identity.VmId = GUID_NULL;
         VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { HcsVirtualMachineBackend::Create(request); }));
     }
 
-    TEST_METHOD(DefersNetworkAdapterCreationUntilVmStarts)
+    WSL2_TEST_METHOD(DefersNetworkAdapterCreationUntilVmStarts)
     {
         SKIP_TEST_ARM64();
         auto request = CreateRunnableRequest();
@@ -382,7 +581,7 @@ class HcsVirtualMachineBackendTests
         backend->Terminate();
     }
 
-    TEST_METHOD(ReusesDuplicateNetworkAdapterRequests)
+    WSL2_TEST_METHOD(RejectsDuplicateNetworkAdapterRequests)
     {
         SKIP_TEST_ARM64();
         auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
@@ -390,21 +589,21 @@ class HcsVirtualMachineBackendTests
 
         const auto request = CreateNetworkRequest();
         const auto first = backend->AddNetworkAdapter(request);
-        const auto duplicate = backend->AddNetworkAdapter(request);
-        VERIFY_ARE_EQUAL(first.Id.Value, duplicate.Id.Value);
-        VERIFY_ARE_EQUAL(first.Tag, duplicate.Tag);
-        VERIFY_IS_TRUE(first.GuestInstanceId == duplicate.GuestInstanceId);
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddNetworkAdapter(request); }));
+        auto conflictingRequest = request;
+        std::get<VmUserModeNatNetwork>(conflictingRequest.Configuration).Configuration.clientIp.value = htonl(0x0a000003);
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddNetworkAdapter(conflictingRequest); }));
         const auto description = backend->GetDescription();
         VERIFY_ARE_EQUAL(size_t{1}, description.NetworkAdapters.size());
         VERIFY_ARE_EQUAL(first.Id.Value, description.NetworkAdapters.at(request.Tag).Id.Value);
 
         backend->RemoveNetworkAdapter(first.Id);
-        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->RemoveNetworkAdapter(duplicate.Id); }));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->RemoveNetworkAdapter(first.Id); }));
         VERIFY_IS_TRUE(backend->GetDescription().NetworkAdapters.empty());
         backend->Terminate();
     }
 
-    TEST_METHOD(KeepsOtherVmDeviceHostsAlive)
+    WSL2_TEST_METHOD(KeepsOtherVmDeviceHostsAlive)
     {
         SKIP_TEST_ARM64();
         const auto directory = CreateTestDirectory();
@@ -429,16 +628,18 @@ class HcsVirtualMachineBackendTests
         second->Terminate();
     }
 
-    TEST_METHOD(NotifiesTerminationCallbacksWithoutHoldingBackendLock)
+    WSL2_TEST_METHOD(NotifiesTerminationCallbacksWithoutHoldingBackendLock)
     {
         SKIP_TEST_ARM64();
         auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
         wil::unique_event callbackEvent{wil::EventOptions::ManualReset};
         GUID callbackVmId{};
         HRESULT callbackResult = S_OK;
+        HRESULT reentrantTerminateResult = E_FAIL;
         backend->RegisterTerminationCallback([&](GUID VmId) {
             callbackVmId = VmId;
             callbackResult = OperationResult([&] { backend->ConnectGuest({}); });
+            reentrantTerminateResult = OperationResult([&] { backend->Terminate(); });
             callbackEvent.SetEvent();
         });
 
@@ -446,6 +647,7 @@ class HcsVirtualMachineBackendTests
         VERIFY_IS_TRUE(callbackEvent.wait(30 * 1000));
         VERIFY_IS_TRUE(IsEqualGUID(backend->GetDescription().Identity.VmId, callbackVmId));
         VERIFY_ARE_EQUAL(c_invalidState, callbackResult);
+        VERIFY_ARE_EQUAL(S_OK, reentrantTerminateResult);
 
         auto lateBackend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
         lateBackend->Terminate();
@@ -460,7 +662,7 @@ class HcsVirtualMachineBackendTests
         VERIFY_IS_TRUE(IsEqualGUID(lateBackend->GetDescription().Identity.VmId, lateCallbackVmId));
     }
 
-    TEST_METHOD(RejectsUnsupportedResourceOperations)
+    WSL2_TEST_METHOD(RejectsUnsupportedResourceOperations)
     {
         SKIP_TEST_ARM64();
         auto backend = HcsVirtualMachineBackend::Create(CreateRunnableRequest());
@@ -497,7 +699,7 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), OperationResult([&] { backend->GetGuestDeviceManager(); }));
     }
 
-    TEST_METHOD(SharesHostDirectoriesPerElevationLevel)
+    WSL2_TEST_METHOD(SharesHostDirectoriesPerElevationLevel)
     {
         SKIP_TEST_ARM64();
         const auto directory = CreateTestDirectory();
@@ -514,6 +716,8 @@ class HcsVirtualMachineBackendTests
             L"drvfs-admin", VmVirtioFsLayout::Aggregate, VmVirtioFsShareOptions{{}, wil::shared_handle{GetElevatedTestToken().release()}}}});
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Serving, userDevice.State);
         VERIFY_IS_TRUE(userDevice.GuestInstanceId.has_value());
+        VERIFY_IS_FALSE(userDevice.Elevated);
+        VERIFY_IS_TRUE(adminDevice.Elevated);
         VERIFY_ARE_NOT_EQUAL(userDevice.Id.Value, adminDevice.Id.Value);
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Serving, backend->GetFileSystemDeviceStatus(userDevice.Id).State);
 
@@ -599,6 +803,7 @@ class HcsVirtualMachineBackendTests
                     L"drvfs-single-options", VmVirtioFsLayout::SingleShare, VmVirtioFsShareOptions{{{L"dax", L""}}}}});
             }));
         const auto singleShare = backend->AddFileSystemShare(singleShareDevice.Id, request);
+        VERIFY_IS_FALSE(singleShare.Elevated);
         VERIFY_IS_FALSE(std::get<VmVirtioFsShareAddress>(singleShare.GuestAddress).ChildName.has_value());
         VERIFY_ARE_EQUAL(singleShare.Id.Value, backend->AddFileSystemShare(singleShareDevice.Id, request).Id.Value);
         auto singleShareTokenRequest = request;
@@ -621,11 +826,14 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_NOT_EQUAL(singleShare.Id.Value, replacementSingleShare.Id.Value);
         backend->RemoveFileSystemShare(replacementSingleShare.Id);
         const auto tokenShare = backend->AddFileSystemShare(singleShareDevice.Id, singleShareTokenRequest);
+        VERIFY_IS_TRUE(tokenShare.Elevated);
+        VERIFY_IS_TRUE(backend->GetFileSystemDeviceStatus(singleShareDevice.Id).Elevated);
         VERIFY_ARE_EQUAL(tokenShare.Id.Value, backend->AddFileSystemShare(singleShareDevice.Id, singleShareTokenRequest).Id.Value);
         auto equivalentTokenRequest = request;
         equivalentTokenRequest.UserToken = std::get<VmVirtioFsShareOptions>(singleShareTokenRequest.Options).UserToken;
         VERIFY_ARE_EQUAL(tokenShare.Id.Value, backend->AddFileSystemShare(singleShareDevice.Id, equivalentTokenRequest).Id.Value);
         backend->RemoveFileSystemShare(tokenShare.Id);
+        VERIFY_IS_FALSE(backend->GetFileSystemDeviceStatus(singleShareDevice.Id).Elevated);
         backend->RemoveDevice(singleShareDevice.Id);
         VERIFY_ARE_EQUAL(
             HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->GetFileSystemDeviceStatus(singleShareDevice.Id); }));
@@ -635,6 +843,7 @@ class HcsVirtualMachineBackendTests
         // second identity, so a share token is rejected rather than silently ignored.
         const auto adminShare = backend->AddFileSystemShare(adminDevice.Id, request);
         VERIFY_ARE_EQUAL(adminDevice.Id.Value, adminShare.Device.Value);
+        VERIFY_IS_TRUE(adminShare.Elevated);
         VERIFY_ARE_NOT_EQUAL(share.Id.Value, adminShare.Id.Value);
         VERIFY_ARE_EQUAL(std::wstring{L"drvfs-admin"}, std::get<VmVirtioFsShareAddress>(adminShare.GuestAddress).Tag);
         VERIFY_ARE_EQUAL(share.EffectiveHostPath.native(), adminShare.EffectiveHostPath.native());
@@ -656,6 +865,11 @@ class HcsVirtualMachineBackendTests
                          }));
         const auto socketDeviceResult = backend->CreateFileSystemDevice({socketDevice});
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Serving, socketDeviceResult.State);
+        VmFileSystemDeviceRequest elevatedSocketDeviceRequest{};
+        elevatedSocketDeviceRequest.Transport = VmPlan9SocketDevice{GuestServicePort{12346}, createPlan9Server};
+        elevatedSocketDeviceRequest.UserToken = wil::shared_handle{GetElevatedTestToken().release()};
+        const auto elevatedSocketDevice = backend->CreateFileSystemDevice(elevatedSocketDeviceRequest);
+        VERIFY_IS_TRUE(elevatedSocketDevice.Elevated);
         VmFileSystemShareRequest socketRequest;
         socketRequest.HostPath = directory;
         socketRequest.Options = VmPlan9ShareOptions{};
@@ -708,6 +922,13 @@ class HcsVirtualMachineBackendTests
         const auto duplicateSocketShare = backend->AddFileSystemShare(socketDeviceResult.Id, socketRequest);
         VERIFY_ARE_EQUAL(socketShare.Id.Value, duplicateSocketShare.Id.Value);
         verifyPlan9NameCollisions(socketDeviceResult.Id, socketRequest);
+        auto inheritedIdentityRequest = socketRequest;
+        inheritedIdentityRequest.Name = L"inherited-identity";
+        const auto inheritedIdentityShare = backend->AddFileSystemShare(elevatedSocketDevice.Id, inheritedIdentityRequest);
+        VERIFY_IS_TRUE(inheritedIdentityShare.Elevated);
+        VERIFY_ARE_EQUAL(
+            inheritedIdentityShare.Id.Value, backend->AddFileSystemShare(elevatedSocketDevice.Id, inheritedIdentityRequest).Id.Value);
+        backend->RemoveFileSystemShare(inheritedIdentityShare.Id);
 
         // A Plan 9 device keeps serving after one of its shares is removed, so the share can be added again.
         backend->RemoveFileSystemShare(socketShare.Id);
@@ -730,6 +951,13 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(UINT64{8 * c_mib}, sharedMemory.SizeBytes);
         VERIFY_ARE_EQUAL(std::wstring{L"test-memory"}, sharedMemory.Tag);
         VERIFY_IS_FALSE(IsEqualGUID(GUID_NULL, sharedMemory.GuestInstanceId));
+        {
+            auto impersonate = wil::impersonate_token(backend->GetDescription().Identity.UserToken.get());
+            const auto mappingName = L"Local\\" + sharedMemory.ObjectPath + L"\\test-section";
+            wil::unique_handle mapping{CreateFileMappingW(
+                INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, static_cast<DWORD>(sharedMemory.SizeBytes), mappingName.c_str())};
+            VERIFY_IS_NOT_NULL(mapping.get());
+        }
         backend->RemoveDevice(sharedMemory.Id);
 
         VmPlan9VirtioDevice virtioDevice{L"plan9-virtio"};

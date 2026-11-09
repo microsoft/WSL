@@ -10,32 +10,12 @@ using namespace VirtualMachineBackendTestHelpers;
 
 namespace {
 
-constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
-
 VmBootDiskRequest CreateDisk(std::wstring Key)
 {
     VmBootDiskRequest disk;
     disk.Key = std::move(Key);
-    disk.Disk.Source = VmVirtualDiskSource{L"C:\\images\\disk.vhdx", VmDiskFormat::Vhdx};
+    disk.Disk.Source = VmVirtualDiskSource{L"C:\\images\\disk.vhdx"};
     return disk;
-}
-
-VmNetworkAdapterRequest CreateNetworkRequest()
-{
-    VmNetworkAdapterRequest request;
-    request.Tag = L"eth0";
-    VmUserModeNatNetwork configuration;
-    configuration.Configuration.clientIp.value = htonl(0x0a000002);
-    constexpr std::array<BYTE, 6> clientMac{0x00, 0x15, 0x5d, 0x01, 0x02, 0x03};
-    std::copy(clientMac.begin(), clientMac.end(), std::begin(configuration.Configuration.clientMac.bytes));
-    configuration.Configuration.gatewayIp.value = htonl(0x0a000001);
-    constexpr std::array<BYTE, 6> gatewayMac{0x52, 0x55, 0x0a, 0x00, 0x00, 0x01};
-    std::copy(gatewayMac.begin(), gatewayMac.end(), std::begin(configuration.Configuration.gatewayMac.bytes));
-    constexpr std::array<BYTE, 6> gatewayMacIpv6{0x52, 0x55, 0x0a, 0x00, 0x01, 0x02};
-    std::copy(gatewayMacIpv6.begin(), gatewayMacIpv6.end(), std::begin(configuration.Configuration.gatewayMacIpv6.bytes));
-    configuration.Configuration.netmask.value = htonl(0xffffff00);
-    request.Configuration = configuration;
-    return request;
 }
 
 std::uint16_t ReserveTcpPort()
@@ -136,6 +116,15 @@ class OpenVmmVirtualMachineBackendTests
         highestPlacementRequest.BootDisks.push_back(CreateDisk(L"highest"));
         highestPlacementRequest.BootDisks[0].Disk.Placement = VmScsiPlacement{{0, 253}};
         VERIFY_ARE_EQUAL(UINT32{253}, ValidateCreateRequest(highestPlacementRequest).BootDisks.at(L"highest").GuestAddress.Lun);
+    }
+
+    TEST_METHOD(LeavesVirtualDiskFileNamesToBackend)
+    {
+        SKIP_TEST_ARM64();
+        auto request = CreateRequest();
+        request.BootDisks.push_back(CreateDisk(L"modules"));
+        request.BootDisks[0].Disk.Source = VmVirtualDiskSource{L"C:\\images\\modules.img"};
+        VERIFY_ARE_EQUAL(std::wstring{L"C:\\images\\modules.img"}, ValidateCreateRequest(request).BootDisks.at(L"modules").Path);
     }
 
     TEST_METHOD(DescribesCreationTimeNetworking)
@@ -334,20 +323,26 @@ class OpenVmmVirtualMachineBackendTests
         backend->Terminate();
     }
 
-    TEST_METHOD(ManagesGuestListenerLifetime)
+    WSL2_TEST_METHOD(ManagesGuestListenerLifetime)
     {
         SKIP_TEST_ARM64();
         auto backend = OpenVmmVirtualMachineBackend::Create(CreateRunnableRequest());
-        const auto listener = backend->CreateGuestListener({50000});
-        VERIFY_ARE_EQUAL(
-            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] { backend->CreateGuestListener(listener.Port); }));
+        constexpr GuestServicePort port{50000};
+        auto listener = backend->CreateGuestListener(port);
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] { backend->CreateGuestListener(port); }));
 
-        backend->CloseGuestListener(listener.Id);
-        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->CloseGuestListener(listener.Id); }));
-        const auto replacement = backend->CreateGuestListener(listener.Port);
-        VERIFY_ARE_NOT_EQUAL(listener.Id.Value, replacement.Id.Value);
-        backend->CloseGuestListener(replacement.Id);
+        auto moved = std::move(listener);
+        VERIFY_IS_FALSE(listener.Socket.is_valid());
+        VERIFY_IS_TRUE(moved.Socket.is_valid());
+        listener = VmGuestListener{};
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] { backend->CreateGuestListener(port); }));
+
+        moved = VmGuestListener{};
+        auto replacement = backend->CreateGuestListener(port);
+        VERIFY_IS_TRUE(replacement.Socket.is_valid());
         backend->Terminate();
+        VERIFY_IS_TRUE(replacement.Socket.is_valid());
+        replacement = VmGuestListener{};
     }
 
     TEST_METHOD(CapabilitiesReflectVmServiceProtocol)

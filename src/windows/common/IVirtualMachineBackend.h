@@ -56,8 +56,6 @@ struct VmInstanceId
     wil::shared_handle UserToken{};
 };
 
-struct VmGuestListenerState;
-
 template <typename Tag>
 struct VmResourceId
 {
@@ -68,13 +66,11 @@ struct VmResourceId
 struct VmDiskTag;
 struct VmDeviceTag;
 struct VmShareTag;
-struct VmListenerTag;
 struct VmPortBindingTag;
 
 using VmDiskId = VmResourceId<VmDiskTag>;
 using VmDeviceId = VmResourceId<VmDeviceTag>;
 using VmShareId = VmResourceId<VmShareTag>;
-using VmListenerId = VmResourceId<VmListenerTag>;
 using VmPortBindingId = VmResourceId<VmPortBindingTag>;
 
 // Backends own the extended resource; API methods return only its description by value.
@@ -146,21 +142,17 @@ struct GuestServicePort
     std::uint32_t Value = 0;
 };
 
+// Cancel and finish socket users before replacing or destroying the listener.
 struct VmGuestListener
 {
-    VmListenerId Id;
-    GuestServicePort Port;
-    std::shared_ptr<VmGuestListenerState> State;
+    VmGuestListener() = default;
+    explicit VmGuestListener(wil::unique_socket ListenerSocket) noexcept;
+    NON_COPYABLE(VmGuestListener);
+    DEFAULT_MOVABLE(VmGuestListener);
 
-    wil::unique_socket Accept(DWORD Timeout = INFINITE, const std::source_location& Location = std::source_location::current()) const;
-    SOCKET Socket() const;
-};
-
-struct VmGuestListenerState
-{
-    VmGuestListener Listener;
+    // Keep an AF_UNIX socket path alive until after the socket is closed.
+    wil::unique_hfile SocketFile;
     wil::unique_socket Socket;
-    wil::unique_event CancellationEvent{wil::EventOptions::ManualReset};
 };
 
 struct VmProcessorRequest
@@ -246,16 +238,10 @@ struct VmScsiAddress
 
 using VmGuestDiskAddress = VmScsiAddress;
 
-enum class VmDiskFormat
-{
-    Vhd,
-    Vhdx
-};
-
+// The path is passed to the backend as-is; its filename is not validated.
 struct VmVirtualDiskSource
 {
     std::filesystem::path Path;
-    VmDiskFormat Format = VmDiskFormat::Vhdx;
 };
 
 struct VmPhysicalDiskSource
@@ -579,13 +565,6 @@ struct VmFileSystemShare
 using VmFileSystemDevicePredicate = std::function<bool(const VmFileSystemDevice&)>;
 using VmFileSystemSharePredicate = std::function<bool(const VmFileSystemShare&)>;
 
-// Invoked with the index of a newly added persistent memory device while the backend still
-// serializes persistent memory additions. Callers that name devices after the order in which the
-// guest enumerated them (/dev/pmem<index>) use this to wait for the device to appear before the
-// next one is added. The device is already added and tracked when this runs, so throwing fails
-// AddPersistentMemory without reusing the device's index.
-using VmPersistentMemoryReadyCallback = std::function<void(std::uint32_t DeviceIndex)>;
-
 struct VmPersistentMemoryRequest
 {
     std::filesystem::path Path;
@@ -593,7 +572,6 @@ struct VmPersistentMemoryRequest
     // Token whose identity is used to reach the backing file. The VM identity token is used when
     // this is unset.
     std::optional<wil::shared_handle> UserToken;
-    VmPersistentMemoryReadyCallback WaitForGuestDevice;
 };
 
 struct VmPersistentMemoryDevice
@@ -682,7 +660,7 @@ public:
     virtual VmState GetState() const = 0;
     // Returns the cached reason and backend-specific details after exit; fails before the VM has exited.
     virtual VmTerminationInformation GetTerminationReason() const = 0;
-    // Shared events remain valid after the backend is destroyed.
+    // Signals after exit information is available. Shared events remain valid after the backend is destroyed.
     virtual wil::shared_event GetTerminationEvent() const = 0;
     // Signals when the backend has identified a VM crash, which can precede termination.
     virtual wil::shared_event GetCrashEvent() const = 0;
@@ -694,7 +672,6 @@ public:
 
     virtual VmGuestListener CreateGuestListener(GuestServicePort Port) = 0;
     virtual wil::unique_socket ConnectGuest(GuestServicePort Port) = 0;
-    virtual void CloseGuestListener(VmListenerId Listener) = 0;
 
     virtual VmDiskAttachment AttachDisk(const VmDiskRequest& Request) = 0;
     virtual std::vector<VmDiskAttachment> GetAttachedDisks() const = 0;
@@ -702,7 +679,8 @@ public:
 
     /// <summary>
     /// Exposes a host file to the guest as a persistent memory device. Additions are serialized so
-    /// that devices are enumerated by the guest in the order they were added.
+    /// that devices are enumerated by the guest in the order they were added. Callers that need to
+    /// wait for guest enumeration must do so after this method returns.
     /// </summary>
     virtual VmPersistentMemoryDevice AddPersistentMemory(const VmPersistentMemoryRequest& Request) = 0;
 
@@ -730,29 +708,12 @@ public:
     virtual void CreateDnsRecord(VmDeviceId Device, const VmDnsRecord& Record) = 0;
 
 protected:
-    // Protects all mutable backend state, including the base listener registry. Callers must
-    // release it before performing blocking I/O or waiting for a callback.
+    // Protects mutable backend state. Release it before blocking I/O or waiting for callbacks.
     mutable wil::srwlock m_lock;
 
-    // These helpers require m_lock to be held exclusively. ConfigureGuestListener runs while
-    // m_lock is held and must not re-enter another listener helper.
-    VmGuestListener RegisterGuestListenerLocked(const VmInstanceId& Identity, GuestServicePort Port);
-    std::shared_ptr<VmGuestListenerState> RemoveGuestListenerLocked(VmListenerId Listener, const VmInstanceId& Identity);
-    void CloseGuestListenersLocked(const VmInstanceId& Identity) noexcept;
     void NotifyTerminated(const VmInstanceId& Identity) noexcept;
 
-    /// <summary>
-    /// Cancels pending accepts without dropping the listeners. Backends call this when the VM exits
-    /// without a termination request, so that callers blocked on the guest do not wait forever.
-    /// </summary>
-    /// <remarks>Acquires m_lock, so it must not be called while the lock is held.</remarks>
-    void CancelGuestListeners() noexcept;
-
 private:
-    virtual std::shared_ptr<VmGuestListenerState> ConfigureGuestListener(const VmGuestListener& Listener) = 0;
-
-    _Guarded_by_(m_lock) std::map<std::uint64_t, std::shared_ptr<VmGuestListenerState>> m_guestListeners;
-    _Guarded_by_(m_lock) std::uint64_t m_nextListenerId = 1;
     wil::srwlock m_terminationCallbackLock;
     _Guarded_by_(m_terminationCallbackLock) bool m_terminated = false;
     _Guarded_by_(m_terminationCallbackLock) GUID m_terminatedVmId {};

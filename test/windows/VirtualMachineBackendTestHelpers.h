@@ -5,10 +5,12 @@
 #include "Common.h"
 #include "IVirtualMachineBackend.h"
 #include "SocketChannel.h"
+#include "socket.hpp"
 
 namespace VirtualMachineBackendTestHelpers {
 
 constexpr UINT64 c_mib = 1024 * 1024;
+constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
 
 inline VmCreateRequest CreateRequest()
 {
@@ -26,24 +28,49 @@ inline VmCreateRequest CreateRequest()
 inline VmCreateRequest CreateRunnableRequest()
 {
     auto request = CreateRequest();
-    const auto basePath = wsl::windows::common::wslutil::GetBasePath();
-    request.Boot.KernelPath = basePath / L"kernel";
-    request.Boot.InitrdPath = basePath / LXSS_VM_MODE_INITRD_NAME;
+    const auto toolsPath = GetInstalledWslToolsPath();
+#ifdef WSL_DEV_INSTALL_PATH
+    request.Boot.KernelPath = std::filesystem::path{WSL_DEV_INSTALL_PATH} / L"kernel";
+#else
+    request.Boot.KernelPath = toolsPath / L"kernel";
+#endif
+    request.Boot.InitrdPath = toolsPath / LXSS_VM_MODE_INITRD_NAME;
     request.Boot.KernelCommandLine = TEXT(WSL_ROOT_INIT_ENV) L"=1 panic=-1";
+    return request;
+}
+
+inline VmNetworkAdapterRequest CreateNetworkRequest()
+{
+    VmNetworkAdapterRequest request;
+    request.Tag = L"eth0";
+    VmUserModeNatNetwork configuration;
+    configuration.Configuration.clientIp.value = htonl(0x0a000002);
+    constexpr std::array<BYTE, 6> clientMac{0x00, 0x15, 0x5d, 0x01, 0x02, 0x03};
+    std::copy(clientMac.begin(), clientMac.end(), std::begin(configuration.Configuration.clientMac.bytes));
+    configuration.Configuration.gatewayIp.value = htonl(0x0a000001);
+    constexpr std::array<BYTE, 6> gatewayMac{0x52, 0x55, 0x0a, 0x00, 0x00, 0x01};
+    std::copy(gatewayMac.begin(), gatewayMac.end(), std::begin(configuration.Configuration.gatewayMac.bytes));
+    constexpr std::array<BYTE, 6> gatewayMacIpv6{0x52, 0x55, 0x0a, 0x00, 0x01, 0x02};
+    std::copy(gatewayMacIpv6.begin(), gatewayMacIpv6.end(), std::begin(configuration.Configuration.gatewayMacIpv6.bytes));
+    configuration.Configuration.netmask.value = htonl(0xffffff00);
+    request.Configuration = configuration;
     return request;
 }
 
 inline std::pair<wsl::shared::SocketChannel, wil::unique_socket> StartGuest(IVirtualMachineBackend& Backend)
 {
     const auto listener = Backend.CreateGuestListener({LX_INIT_UTILITY_VM_INIT_PORT});
-    auto closeListener = wil::scope_exit([&] { Backend.CloseGuestListener(listener.Id); });
+    const auto terminationEvent = Backend.GetTerminationEvent();
     Backend.Start();
 
     // Keep both channels open so mini_init can wait for configuration instead of exiting.
-    wsl::shared::SocketChannel channel{listener.Accept(30 * 1000), "BackendTest"};
+    auto socket = wsl::windows::common::socket::CancellableAccept(listener.Socket.get(), 30 * 1000, terminationEvent.get());
+    THROW_HR_IF(E_ABORT, !socket);
+    wsl::shared::SocketChannel channel{std::move(*socket), "BackendTest"};
     channel.ReceiveMessage<LX_INIT_GUEST_CAPABILITIES>(nullptr, 30 * 1000);
-    auto notifications = listener.Accept(30 * 1000);
-    return {std::move(channel), std::move(notifications)};
+    auto notifications = wsl::windows::common::socket::CancellableAccept(listener.Socket.get(), 30 * 1000, terminationEvent.get());
+    THROW_HR_IF(E_ABORT, !notifications);
+    return {std::move(channel), std::move(*notifications)};
 }
 
 template <typename Callback>

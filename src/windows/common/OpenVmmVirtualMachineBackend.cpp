@@ -73,17 +73,6 @@ SOCKADDR_UN GetUnixSocketAddress(const std::filesystem::path& Path)
 
 } // namespace
 
-OpenVmmVirtualMachineBackend::GuestListener::~GuestListener() noexcept
-{
-    Socket.reset();
-    SocketFile.reset();
-}
-
-std::optional<wil::unique_socket> OpenVmmVirtualMachineBackend::GuestListener::Accept()
-{
-    return wsl::windows::common::socket::CancellableAccept(Socket.get(), INFINITE, CancellationEvent.get());
-}
-
 VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmCreateRequest& Request)
 {
     THROW_HR_IF(E_INVALIDARG, IsEqualGUID(Request.Identity.VmId, GUID_NULL));
@@ -200,10 +189,6 @@ OpenVmmVirtualMachineBackend::~OpenVmmVirtualMachineBackend() noexcept
 {
     const auto startTimeMs = GetTickCount64();
     WSL_LOG("OpenVmmDestroyVmBegin", TraceLoggingValue(m_description.Identity.VmId, "vmId"));
-    {
-        auto lock = m_lock.lock_exclusive();
-        CloseGuestListenersLocked(m_description.Identity);
-    }
     if (m_vm && WaitForSingleObject(m_process.get(), 0) == WAIT_TIMEOUT)
     {
         LOG_IF_FAILED(WslOpenVmmVmTeardown(m_vm.get()));
@@ -415,7 +400,6 @@ void OpenVmmVirtualMachineBackend::OnProcessExit(DWORD ExitCode) noexcept
         m_state = VmState::Stopped;
         m_terminationInformation.Reason = ExitCode == ERROR_SUCCESS ? VmTerminationReason::Shutdown : VmTerminationReason::Crashed;
         m_terminationInformation.Details = std::format(L"OpenVMM process exited with code {}", ExitCode);
-        CloseGuestListenersLocked(m_description.Identity);
     }
     if (ExitCode != ERROR_SUCCESS)
     {
@@ -534,38 +518,38 @@ void OpenVmmVirtualMachineBackend::Terminate()
     m_fileSystemDevices.clear();
     m_portBindings.clear();
     m_networkAdapters.clear();
-    CloseGuestListenersLocked(m_description.Identity);
     WSL_LOG(
         "OpenVmmTerminateVmEnd",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
         TraceLoggingValue(GetTickCount64() - startTimeMs, "durationMs"));
 }
 
-std::shared_ptr<VmGuestListenerState> OpenVmmVirtualMachineBackend::ConfigureGuestListener(const VmGuestListener& Listener)
+VmGuestListener OpenVmmVirtualMachineBackend::CreateGuestListener(GuestServicePort Port)
 {
+    auto lock = m_lock.lock_exclusive();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm || m_state == VmState::Stopped);
     WSL_LOG(
         "OpenVmmCreateGuestListenerBegin",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
-        TraceLoggingValue(Listener.Port.Value, "port"));
+        TraceLoggingValue(Port.Value, "port"));
 
-    auto listener = std::make_shared<GuestListener>();
-    listener->Listener = Listener;
-    const auto path = GetVsockListenerPath(m_fileSystemResources.VsockPath, Listener.Port);
-    DeleteOwnedFile(path);
+    VmGuestListener listener;
+    const auto path = GetVsockListenerPath(m_fileSystemResources.VsockPath, Port);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES);
 
-    listener->Socket.reset(::socket(AF_UNIX, SOCK_STREAM, 0));
-    THROW_WIN32_IF(static_cast<DWORD>(WSAGetLastError()), !listener->Socket);
+    listener.Socket.reset(::socket(AF_UNIX, SOCK_STREAM, 0));
+    THROW_WIN32_IF(static_cast<DWORD>(WSAGetLastError()), !listener.Socket);
 
     const auto address = GetUnixSocketAddress(path);
 
     THROW_WIN32_IF(
         static_cast<DWORD>(WSAGetLastError()),
-        bind(listener->Socket.get(), reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR);
+        bind(listener.Socket.get(), reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR);
     auto bindCleanup = wil::scope_exit([&] {
-        listener->Socket.reset();
+        listener.Socket.reset();
         DeleteOwnedFile(path);
     });
-    listener->SocketFile.reset(CreateFileW(
+    listener.SocketFile.reset(CreateFileW(
         path.c_str(),
         DELETE | GENERIC_READ,
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
@@ -573,23 +557,15 @@ std::shared_ptr<VmGuestListenerState> OpenVmmVirtualMachineBackend::ConfigureGue
         OPEN_EXISTING,
         FILE_FLAG_DELETE_ON_CLOSE | FILE_FLAG_OPEN_REPARSE_POINT,
         nullptr));
-    THROW_LAST_ERROR_IF(!listener->SocketFile);
+    THROW_LAST_ERROR_IF(!listener.SocketFile);
     bindCleanup.release();
-    THROW_WIN32_IF(static_cast<DWORD>(WSAGetLastError()), listen(listener->Socket.get(), SOMAXCONN) == SOCKET_ERROR);
+    THROW_WIN32_IF(static_cast<DWORD>(WSAGetLastError()), listen(listener.Socket.get(), SOMAXCONN) == SOCKET_ERROR);
 
     WSL_LOG(
         "OpenVmmCreateGuestListenerEnd",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
-        TraceLoggingValue(listener->Listener.Id.Value, "listenerId"),
-        TraceLoggingValue(Listener.Port.Value, "port"));
+        TraceLoggingValue(Port.Value, "port"));
     return listener;
-}
-
-VmGuestListener OpenVmmVirtualMachineBackend::CreateGuestListener(GuestServicePort Port)
-{
-    auto lock = m_lock.lock_exclusive();
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
-    return RegisterGuestListenerLocked(m_description.Identity, Port);
 }
 
 wil::unique_socket OpenVmmVirtualMachineBackend::ConnectGuest(GuestServicePort Port)
@@ -640,13 +616,6 @@ wil::unique_socket OpenVmmVirtualMachineBackend::ConnectGuest(GuestServicePort P
         TraceLoggingValue(Port.Value, "port"),
         TraceLoggingValue(GetTickCount64() - startTimeMs, "durationMs"));
     return socket;
-}
-
-void OpenVmmVirtualMachineBackend::CloseGuestListener(VmListenerId Listener)
-{
-    auto lock = m_lock.lock_exclusive();
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
-    RemoveGuestListenerLocked(Listener, m_description.Identity);
 }
 
 VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& Request)

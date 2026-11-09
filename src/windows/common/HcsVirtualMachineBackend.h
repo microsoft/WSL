@@ -46,7 +46,6 @@ public:
 
     VmGuestListener CreateGuestListener(GuestServicePort Port) override;
     wil::unique_socket ConnectGuest(GuestServicePort Port) override;
-    void CloseGuestListener(VmListenerId Listener) override;
 
     VmDiskAttachment AttachDisk(const VmDiskRequest& Request) override;
     std::vector<VmDiskAttachment> GetAttachedDisks() const override;
@@ -136,7 +135,6 @@ private:
     void OnCrash(PCWSTR Details);
     void OnExit(const HCS_EVENT* Event);
     void CleanupAttachedDisks(std::map<std::uint64_t, AttachedDisk>&& Disks) noexcept;
-    std::shared_ptr<VmGuestListenerState> ConfigureGuestListener(const VmGuestListener& Listener) override;
 
     _Requires_lock_held_(m_lock)
     void CloseGuestDevicesLocked() noexcept;
@@ -167,7 +165,7 @@ private:
     /// Resolves the token used to reach a host path, returning the first of Tokens that is set and
     /// falling back to the identity that created the VM. Callers list Tokens most specific first.
     /// </summary>
-    wil::shared_handle ResolveUserToken(std::initializer_list<std::reference_wrapper<const wil::shared_handle>> Tokens) const;
+    wil::shared_handle ResolveUserToken(const std::vector<wil::shared_handle>& Tokens) const;
 
     /// <summary>
     /// Adds a share to a Plan 9 device and returns the name the guest uses to reach it.
@@ -202,13 +200,15 @@ private:
     _Requires_lock_held_(m_lock)
     void CloseNetworkAdaptersLocked() noexcept;
 
+    void Shutdown();
+
     NON_COPYABLE(HcsVirtualMachineBackend);
     NON_MOVABLE(HcsVirtualMachineBackend);
 
     VmConfiguration m_configuration;
     std::wstring m_vmIdString;
     wil::shared_event m_terminatingEvent{wil::EventOptions::ManualReset};
-    wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
+    wil::shared_event m_exitEvent{wil::EventOptions::ManualReset};
     wil::shared_event m_vmCrashEvent{wil::EventOptions::ManualReset};
     std::optional<VmCrashCaptureRequest> m_crashCapture;
     // Paths are fixed during initialization, before HCS callbacks are registered.
@@ -219,6 +219,10 @@ private:
     _Guarded_by_(m_crashInformationLock) bool m_vmSavedStateCaptured = false;
     mutable wil::srwlock m_terminationInformationLock;
     _Guarded_by_(m_terminationInformationLock) VmTerminationInformation m_terminationInformation;
+    // Serializes shutdown without blocking the exit callback's access to m_lock.
+    wil::srwlock m_shutdownLock;
+    // A separate handle lets shutdown terminate HCS without waiting for m_lock.
+    _Guarded_by_(m_shutdownLock) wsl::windows::common::hcs::unique_hcs_system m_terminationSystem;
     // Closing the system drains callbacks before their event and context are destroyed.
     _Guarded_by_(m_lock) wsl::windows::common::hcs::unique_hcs_system m_system;
     _Guarded_by_(m_lock) std::map<std::uint64_t, AttachedDisk> m_attachedDisks;
@@ -229,8 +233,10 @@ private:
     _Guarded_by_(m_lock) std::map<std::uint64_t, VmSharedMemoryDevice> m_sharedMemoryDevices;
     _Guarded_by_(m_lock) std::optional<VmGpuAttachment> m_gpu;
     _Guarded_by_(m_lock) VmState m_state = VmState::Unknown;
-    // Serializes persistent memory additions, including the caller's wait for the device to appear
-    // in the guest. Acquired before m_lock, which is released while the wait runs.
+    _Guarded_by_(m_lock) bool m_cleanupStarted = false;
+    // Shutdown must check this without waiting for operations holding m_lock.
+    std::atomic<bool> m_started{false};
+    // Serializes persistent memory additions. Shutdown drains them before closing the HCS handles.
     wil::srwlock m_persistentMemoryLock;
     _Guarded_by_(m_persistentMemoryLock) std::uint32_t m_nextPersistentMemoryIndex = 0;
     _Guarded_by_(m_lock) std::map<std::uint64_t, FileSystemShare> m_fileSystemShares;

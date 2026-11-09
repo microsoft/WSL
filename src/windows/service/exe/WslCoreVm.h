@@ -219,6 +219,7 @@ private:
     _Guarded_by_(m_guestDeviceLock) std::future<bool> m_drvfsInitialResult;
     _Guarded_by_(m_guestDeviceLock) wil::unique_handle m_drvfsToken;
     _Guarded_by_(m_guestDeviceLock) wil::unique_handle m_adminDrvfsToken;
+    wil::srwlock m_persistentMemoryLock;
     wil::srwlock m_lock;
     _Guarded_by_(m_lock) wil::com_ptr<IPlan9FileSystem> m_pluginPlan9Server;
     _Guarded_by_(m_lock) wil::unique_event m_terminatingEvent { wil::EventOptions::ManualReset };
@@ -250,8 +251,6 @@ private:
     ULONG m_kernelModulesDeviceId = ULONG_MAX;
     std::unique_ptr<IVirtualMachineBackend> m_backend;
     VmGuestListener m_guestListener;
-    std::optional<VmGuestListener> m_crashDumpListener;
-    std::optional<VmGuestListener> m_virtioFsListener;
     std::function<void(GUID)> m_onExit;
     wsl::shared::SocketChannel m_miniInitChannel;
     wil::unique_socket m_notifyChannel;
