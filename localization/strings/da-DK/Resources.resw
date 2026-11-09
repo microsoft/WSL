@@ -958,7 +958,7 @@ Går tilbage til NAT-netværk.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
-    <value>Der blev registreret en localhost-proxykonfiguration, men den blev ikke spejlet til WSL. WSL i NAT-tilstand understøtter ikke localhost-proxyer.</value>
+    <value>A localhost proxy configuration was detected but not mirrored into WSL. This proxy address is not supported by the current networking configuration.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">

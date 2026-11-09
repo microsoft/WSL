@@ -958,7 +958,7 @@ Powrót do sieci NAT.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
-    <value>Wykryto konfigurację serwera proxy hosta lokalnego, ale nie została ona zdublowana w podsystemie WSL. Podsystem WSL w trybie NAT nie obsługuje serwerów proxy hosta lokalnego.</value>
+    <value>A localhost proxy configuration was detected but not mirrored into WSL. This proxy address is not supported by the current networking configuration.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">

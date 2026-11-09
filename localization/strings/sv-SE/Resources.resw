@@ -958,7 +958,7 @@ Mer information om Admin Protection finns på https://aka.ms/apdevguide</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
-    <value>En konfiguration för localhost-proxy upptäcktes men speglades inte i WSL. WSL i NAT-läge stöder inte localhost-proxys.</value>
+    <value>A localhost proxy configuration was detected but not mirrored into WSL. This proxy address is not supported by the current networking configuration.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">

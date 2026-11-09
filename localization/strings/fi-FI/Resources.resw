@@ -958,7 +958,7 @@ Palataan nat-verkkopalveluun.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
-    <value>Havaittiin localhost-välityspalvelimen määritys, mutta sitä ei peilattu WSL:ään. WSL NAT-tilassa ei tue localhost-välityspalvelimia.</value>
+    <value>A localhost proxy configuration was detected but not mirrored into WSL. This proxy address is not supported by the current networking configuration.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">

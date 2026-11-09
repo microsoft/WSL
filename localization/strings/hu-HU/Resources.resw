@@ -958,7 +958,7 @@ Visszaállás NAT-hálózatkezelésre.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
-    <value>A rendszer localhost-proxykonfigurációt észlelt, de nem tükrözte a WSL-be. A NAT módban futó WSL nem támogatja a localhost proxykat.</value>
+    <value>A localhost proxy configuration was detected but not mirrored into WSL. This proxy address is not supported by the current networking configuration.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
