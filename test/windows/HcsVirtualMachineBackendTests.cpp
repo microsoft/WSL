@@ -11,7 +11,6 @@ using wsl::windows::common::socket::CancellableAccept;
 
 namespace {
 
-constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
 constexpr HRESULT c_invalidState = HRESULT_FROM_WIN32(ERROR_INVALID_STATE);
 
 std::filesystem::path CreateTestDirectory()
@@ -76,24 +75,6 @@ VmDiskRequest CreateDiskRequest(const std::filesystem::path& Path, std::optional
         request.Placement = VmScsiPlacement{{0, Lun.value()}};
     }
 
-    return request;
-}
-
-VmNetworkAdapterRequest CreateNetworkRequest()
-{
-    VmNetworkAdapterRequest request;
-    request.Tag = L"eth0";
-    VmUserModeNatNetwork configuration;
-    configuration.Configuration.clientIp.value = htonl(0x0a000002);
-    constexpr std::array<BYTE, 6> clientMac{0x00, 0x15, 0x5d, 0x01, 0x02, 0x03};
-    std::copy(clientMac.begin(), clientMac.end(), std::begin(configuration.Configuration.clientMac.bytes));
-    configuration.Configuration.gatewayIp.value = htonl(0x0a000001);
-    constexpr std::array<BYTE, 6> gatewayMac{0x52, 0x55, 0x0a, 0x00, 0x00, 0x01};
-    std::copy(gatewayMac.begin(), gatewayMac.end(), std::begin(configuration.Configuration.gatewayMac.bytes));
-    constexpr std::array<BYTE, 6> gatewayMacIpv6{0x52, 0x55, 0x0a, 0x00, 0x01, 0x02};
-    std::copy(gatewayMacIpv6.begin(), gatewayMacIpv6.end(), std::begin(configuration.Configuration.gatewayMacIpv6.bytes));
-    configuration.Configuration.netmask.value = htonl(0xffffff00);
-    request.Configuration = configuration;
     return request;
 }
 
