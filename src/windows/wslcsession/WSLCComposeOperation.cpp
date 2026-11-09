@@ -232,7 +232,7 @@ void WSLCComposeOperation::ReportFailureDiagnosticNoThrow(HRESULT result, std::w
 
     LOG_IF_FAILED(wil::ResultFromException([&]() {
         const auto resultCode = std::format("0x{:08X}", static_cast<ULONG>(result));
-        const auto message = wsl::shared::string::WideToMultiByte(errorMessage);
+        const auto message = wsl::shared::string::WideToMultiByte(std::wstring{errorMessage});
         const std::array<LPCSTR, 2> arguments{resultCode.c_str(), message.c_str()};
         WSLCComposeDiagnosticEvent diagnostic{};
         diagnostic.Severity = WSLCComposeDiagnosticSeverityError;
