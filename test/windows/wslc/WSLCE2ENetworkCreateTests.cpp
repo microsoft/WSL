@@ -109,8 +109,8 @@ class WSLCE2ENetworkCreateTests
     {
         auto result = RunWslc(std::format(L"network create --driver invalid_driver {}", TestNetworkName));
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(
-            std::format(L"Unsupported network driver: 'invalid_driver'\r\nError code: E_INVALIDARG")));
+        VERIFY_IS_TRUE(
+            result.StderrContainsSubstring(std::format(L"Unsupported network driver: 'invalid_driver'\r\nError code: E_INVALIDARG")));
 
         VerifyNetworkIsNotListed(TestNetworkName);
     }
@@ -172,8 +172,13 @@ class WSLCE2ENetworkCreateTests
             L"c.close()",
             Ipv6TestPort);
 
-        result = RunWslc(std::format(
-            L"container run -d --network {} --name {} {} python3 -u -c \"{}\"", TestNetworkName, ServerContainerName, PythonImage.NameAndTag(), serverScript));
+        result = RunWslc(
+            std::format(
+                L"container run -d --network {} --name {} {} python3 -u -c \"{}\"",
+                TestNetworkName,
+                ServerContainerName,
+                PythonImage.NameAndTag(),
+                serverScript));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         WaitForContainerOutput(ServerContainerName, "SERVER READY");
 
@@ -206,8 +211,8 @@ class WSLCE2ENetworkCreateTests
             string::MultiByteToWide(serverAddress),
             Ipv6TestPort);
 
-        result = RunWslc(std::format(
-            L"container run --rm --network {} --name {} {} {}", TestNetworkName, ClientContainerName, PythonImage.NameAndTag(), clientCommand));
+        result = RunWslc(
+            std::format(L"container run --rm --network {} --name {} {} {}", TestNetworkName, ClientContainerName, PythonImage.NameAndTag(), clientCommand));
         result.Verify({.Stdout = L"ipv6-ok\n", .Stderr = L"", .ExitCode = 0});
     }
 

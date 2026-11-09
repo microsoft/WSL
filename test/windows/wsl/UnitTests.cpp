@@ -352,7 +352,8 @@ class UnitTests
     WSL2_TEST_METHOD(SystemdBinfmtIsRestored)
     {
         // Override WSL's binfmt interpreter
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkdir -p /usr/lib/binfmt.d && echo ':WSLInterop:M::MZ::/bin/echo:PF' > /usr/lib/binfmt.d/dummy.conf"), 0L);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"mkdir -p /usr/lib/binfmt.d && echo ':WSLInterop:M::MZ::/bin/echo:PF' > /usr/lib/binfmt.d/dummy.conf"), 0L);
 
         auto cleanupBinfmt = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
             LxsstuLaunchWsl(L"rm /usr/lib/binfmt.d/dummy.conf");
@@ -407,14 +408,16 @@ class UnitTests
             for (const bool failStartup : {false, true})
             {
                 VERIFY_ARE_EQUAL(
-                    LxsstuLaunchWsl(std::format(
-                        L"printf '[Service]\\nExecStart=\\nExecStart=/bin/{}\\n' > {} && systemctl daemon-reload",
-                        failStartup ? L"false" : L"true",
-                        overridePath)),
+                    LxsstuLaunchWsl(
+                        std::format(
+                            L"printf '[Service]\\nExecStart=\\nExecStart=/bin/{}\\n' > {} && systemctl daemon-reload",
+                            failStartup ? L"false" : L"true",
+                            overridePath)),
                     0u);
                 VERIFY_ARE_EQUAL(
-                    LxsstuLaunchWsl(L"echo -1 > /proc/sys/fs/binfmt_misc/WSLInterop && "
-                                    L"echo ':WSLInterop:M::MZ::/bin/echo:PF' > /proc/sys/fs/binfmt_misc/register"),
+                    LxsstuLaunchWsl(
+                        L"echo -1 > /proc/sys/fs/binfmt_misc/WSLInterop && "
+                        L"echo ':WSLInterop:M::MZ::/bin/echo:PF' > /proc/sys/fs/binfmt_misc/register"),
                     0u);
 
                 VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl restart systemd-binfmt.service"), failStartup ? 1u : 0u);
@@ -660,8 +663,7 @@ class UnitTests
                 LxsstuLaunchWsl(std::format(L"-d {} -- sh -c \"systemctl is-system-running | grep -Eq 'running|degraded'\"", peerDistroName)), 0L);
 
             VERIFY_ARE_EQUAL(
-                LxsstuLaunchWsl(std::format(
-                    L"sh -c 'mkdir -p {0} && mount -t tmpfs -o size=4M mount-guard-test {0} && echo survived > {0}/marker'", mountPoint)),
+                LxsstuLaunchWsl(std::format(L"sh -c 'mkdir -p {0} && mount -t tmpfs -o size=4M mount-guard-test {0} && echo survived > {0}/marker'", mountPoint)),
                 0L);
             auto cleanupMount = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 LxsstuLaunchWsl(std::format(L"sh -c 'umount {0} 2>/dev/null || true; rmdir {0} 2>/dev/null || true'", mountPoint));
@@ -3440,20 +3442,23 @@ EOF
                 wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(volumeVhdPath.c_str())); });
 
             const auto volumeSize = std::filesystem::file_size(std::filesystem::path(absolutePath) / L"ext4.vhdx") + _1GB;
-            LxsstuLaunchPowershellAndCaptureOutput(std::format(
-                L"$ErrorActionPreference = 'Stop'; New-VHD -Path '{}' -Dynamic -SizeBytes {} | Out-Null", volumeVhdPath.wstring(), volumeSize));
+            LxsstuLaunchPowershellAndCaptureOutput(
+                std::format(
+                    L"$ErrorActionPreference = 'Stop'; New-VHD -Path '{}' -Dynamic -SizeBytes {} | Out-Null", volumeVhdPath.wstring(), volumeSize));
 
             auto unmountVolume = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-                LxsstuLaunchPowershellAndCaptureOutput(std::format(
-                    L"$ErrorActionPreference = 'Stop'; if ((Get-VHD -Path '{0}').Attached) {{ Dismount-VHD -Path '{0}' }}",
-                    volumeVhdPath.wstring()));
+                LxsstuLaunchPowershellAndCaptureOutput(
+                    std::format(
+                        L"$ErrorActionPreference = 'Stop'; if ((Get-VHD -Path '{0}').Attached) {{ Dismount-VHD -Path '{0}' }}",
+                        volumeVhdPath.wstring()));
             });
 
-            auto [driveLetter, _] = LxsstuLaunchPowershellAndCaptureOutput(std::format(
-                L"$ErrorActionPreference = 'Stop'; Mount-VHD -Path '{}' -PassThru | Get-Disk | "
-                L"Initialize-Disk -PartitionStyle GPT -PassThru | New-Partition -UseMaximumSize -AssignDriveLetter | "
-                L"Format-Volume -FileSystem NTFS -Confirm:$false -Force | Select-Object -ExpandProperty DriveLetter",
-                volumeVhdPath.wstring()));
+            auto [driveLetter, _] = LxsstuLaunchPowershellAndCaptureOutput(
+                std::format(
+                    L"$ErrorActionPreference = 'Stop'; Mount-VHD -Path '{}' -PassThru | Get-Disk | "
+                    L"Initialize-Disk -PartitionStyle GPT -PassThru | New-Partition -UseMaximumSize -AssignDriveLetter | "
+                    L"Format-Volume -FileSystem NTFS -Confirm:$false -Force | Select-Object -ExpandProperty DriveLetter",
+                    volumeVhdPath.wstring()));
             Trim(driveLetter);
             VERIFY_ARE_EQUAL(size_t{1}, driveLetter.size());
 
@@ -3894,10 +3899,11 @@ EOF
         constexpr auto minimumCompactionDelta = 32ull * 1024 * 1024;
         const auto sizeBeforeWrite = getVhdSizeOnDisk(vhdPath);
 
-        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(
-            L"-d {} -u root -- sh -c 'mkdir -p /root/vhdx-compact-test && "
-            L"dd if=/dev/zero bs=1M count=128 2>/dev/null | base64 -w 0 > /root/vhdx-compact-test/nonzero.bin && sync'",
-            name));
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(
+            std::format(
+                L"-d {} -u root -- sh -c 'mkdir -p /root/vhdx-compact-test && "
+                L"dd if=/dev/zero bs=1M count=128 2>/dev/null | base64 -w 0 > /root/vhdx-compact-test/nonzero.bin && sync'",
+                name));
         VERIFY_ARE_EQUAL(err, L"");
         WslShutdown();
 
@@ -7866,8 +7872,11 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         std::filesystem::create_directories(directory);
 
         const auto modulesPath = directory / L"modules.vhdx";
-        LxsstuLaunchPowershellAndCaptureOutput(std::format(
-            L"Convert-VHD -Path '{}' -DestinationPath '{}' -VHDType Dynamic", (toolsPath / L"artifacts.vhd").native(), modulesPath.native()));
+        LxsstuLaunchPowershellAndCaptureOutput(
+            std::format(
+                L"Convert-VHD -Path '{}' -DestinationPath '{}' -VHDType Dynamic",
+                (toolsPath / L"artifacts.vhd").native(),
+                modulesPath.native()));
         VERIFY_IS_TRUE(std::filesystem::exists(modulesPath));
 
         WslConfigChange config{LxssGenerateTestConfig({.kernel = (toolsPath / L"kernel").native(), .kernelModules = modulesPath.native()})};
@@ -9041,12 +9050,13 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                 WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(L"-u root rmdir /sys/fs/cgroup/wsl-test-workload"); });
 
             VERIFY_ARE_EQUAL(
-                LxsstuLaunchWsl(L"-u root /bin/sh -c \"echo 67108864 > /sys/fs/cgroup/wsl-test-workload/memory.max && "
-                                L"echo '100000 100000' > /sys/fs/cgroup/wsl-test-workload/cpu.max && "
-                                L"echo 0 > /sys/fs/cgroup/wsl-test-workload/cgroup.procs && "
-                                L"grep -qx 67108864 /sys/fs/cgroup/wsl-test-workload/memory.max && "
-                                L"grep -qx '100000 100000' /sys/fs/cgroup/wsl-test-workload/cpu.max && "
-                                L"grep -qx '0::/wsl-test-workload' /proc/self/cgroup\""),
+                LxsstuLaunchWsl(
+                    L"-u root /bin/sh -c \"echo 67108864 > /sys/fs/cgroup/wsl-test-workload/memory.max && "
+                    L"echo '100000 100000' > /sys/fs/cgroup/wsl-test-workload/cpu.max && "
+                    L"echo 0 > /sys/fs/cgroup/wsl-test-workload/cgroup.procs && "
+                    L"grep -qx 67108864 /sys/fs/cgroup/wsl-test-workload/memory.max && "
+                    L"grep -qx '100000 100000' /sys/fs/cgroup/wsl-test-workload/cpu.max && "
+                    L"grep -qx '0::/wsl-test-workload' /proc/self/cgroup\""),
                 0L);
         }
 

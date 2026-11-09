@@ -59,8 +59,8 @@ class WSLCE2EContainerLogsTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Logs_Details)
     {
-        auto result = RunWslc(std::format(
-            L"container run --name {} {} sh -c \"echo detail1 && echo detail2\"", WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(L"container run --name {} {} sh -c \"echo detail1 && echo detail2\"", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"detail1\ndetail2\n", .Stderr = L"", .ExitCode = 0});
 
         auto plain = RunWslc(std::format(L"container logs {}", WslcContainerName));

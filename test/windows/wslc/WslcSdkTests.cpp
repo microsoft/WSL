@@ -2052,15 +2052,19 @@ class WslcSdkTests
 
         VERIFY_ARE_EQUAL(containerId, inspectObject.Id);
         VERIFY_ARE_EQUAL(2u, inspectObject.HostConfig.CapAdd.size());
-        VERIFY_IS_TRUE(std::ranges::any_of(
-            inspectObject.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("NET_ADMIN"); }));
-        VERIFY_IS_TRUE(std::ranges::any_of(
-            inspectObject.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("SYS_TIME"); }));
+        VERIFY_IS_TRUE(std::ranges::any_of(inspectObject.HostConfig.CapAdd, [](const auto& capability) {
+            return capability.ends_with("NET_ADMIN");
+        }));
+        VERIFY_IS_TRUE(std::ranges::any_of(inspectObject.HostConfig.CapAdd, [](const auto& capability) {
+            return capability.ends_with("SYS_TIME");
+        }));
         VERIFY_ARE_EQUAL(2u, inspectObject.HostConfig.CapDrop.size());
-        VERIFY_IS_TRUE(std::ranges::any_of(
-            inspectObject.HostConfig.CapDrop, [](const auto& capability) { return capability.ends_with("NET_RAW"); }));
-        VERIFY_IS_TRUE(std::ranges::any_of(
-            inspectObject.HostConfig.CapDrop, [](const auto& capability) { return capability.ends_with("CHOWN"); }));
+        VERIFY_IS_TRUE(std::ranges::any_of(inspectObject.HostConfig.CapDrop, [](const auto& capability) {
+            return capability.ends_with("NET_RAW");
+        }));
+        VERIFY_IS_TRUE(std::ranges::any_of(inspectObject.HostConfig.CapDrop, [](const auto& capability) {
+            return capability.ends_with("CHOWN");
+        }));
     }
 
     WSLC_TEST_METHOD(ContainerExec)

@@ -673,13 +673,14 @@ class WSLCCLICommandUnitTests
                 auto [nameIt, nameInserted] = seenNames.emplace(name, arg.Type());
                 if (!nameInserted)
                 {
-                    VERIFY_FAIL(std::format(
-                                    L"Command '{}' has duplicate name '--{}' (ArgType '{}' conflicts with ArgType '{}')",
-                                    commandFullName,
-                                    name,
-                                    ArgTypeName(arg.Type()),
-                                    ArgTypeName(nameIt->second))
-                                    .c_str());
+                    VERIFY_FAIL(
+                        std::format(
+                            L"Command '{}' has duplicate name '--{}' (ArgType '{}' conflicts with ArgType '{}')",
+                            commandFullName,
+                            name,
+                            ArgTypeName(arg.Type()),
+                            ArgTypeName(nameIt->second))
+                            .c_str());
                 }
 
                 // Check alias collision between distinct ArgTypes; skip empty aliases (NO_ALIAS).
@@ -689,13 +690,14 @@ class WSLCCLICommandUnitTests
                     auto [aliasIt, aliasInserted] = seenAliases.emplace(alias, arg.Type());
                     if (!aliasInserted)
                     {
-                        VERIFY_FAIL(std::format(
-                                        L"Command '{}' has duplicate alias '-{}' (ArgType '{}' conflicts with ArgType '{}')",
-                                        commandFullName,
-                                        alias,
-                                        ArgTypeName(arg.Type()),
-                                        ArgTypeName(aliasIt->second))
-                                        .c_str());
+                        VERIFY_FAIL(
+                            std::format(
+                                L"Command '{}' has duplicate alias '-{}' (ArgType '{}' conflicts with ArgType '{}')",
+                                commandFullName,
+                                alias,
+                                ArgTypeName(arg.Type()),
+                                ArgTypeName(aliasIt->second))
+                                .c_str());
                     }
                 }
             }
@@ -770,10 +772,11 @@ class WSLCCLICommandUnitTests
 
             for (const auto& subcommand : command.GetCommands())
             {
-                pending.emplace_back(PendingCommand{
-                    .Command = std::cref(*subcommand),
-                    .InheritedGlobals = current.InheritedGlobals,
-                });
+                pending.emplace_back(
+                    PendingCommand{
+                        .Command = std::cref(*subcommand),
+                        .InheritedGlobals = current.InheritedGlobals,
+                    });
             }
         }
     }

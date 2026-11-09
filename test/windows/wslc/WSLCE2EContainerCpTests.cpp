@@ -670,10 +670,12 @@ class WSLCE2EContainerCpTests
 
         // The link target is relative, so it only resolves against the directory holding the link.
         // Read against the container root it would name a path that does not exist.
-        auto execResult = RunWslc(std::format(
-            L"container exec {} sh -c \"mkdir -p /tmp/linkdir; echo relative-link-target > /tmp/linkdir/linktarget.txt; ln -s "
-            L"linktarget.txt /tmp/linkdir/thelink.txt\"",
-            WslcContainerName));
+        auto execResult = RunWslc(
+            std::format(
+                L"container exec {} sh -c \"mkdir -p /tmp/linkdir; echo relative-link-target > /tmp/linkdir/linktarget.txt; ln "
+                L"-s "
+                L"linktarget.txt /tmp/linkdir/thelink.txt\"",
+                WslcContainerName));
         execResult.Verify({.ExitCode = 0});
 
         auto downloadDir = std::filesystem::current_path() / L"wslc-cp-follow-link-relative-test";
@@ -779,11 +781,12 @@ class WSLCE2EContainerCpTests
             TarPath)
             .Verify({.Stderr = L"", .ExitCode = 0});
 
-        RunWslc(std::format(
-                    L"container create --name {} --mount \"type=bind,source={},target=/data\" {} sleep infinity",
-                    WslcContainerName,
-                    hostDir.wstring(),
-                    DebianImage.NameAndTag()))
+        RunWslc(
+            std::format(
+                L"container create --name {} --mount \"type=bind,source={},target=/data\" {} sleep infinity",
+                WslcContainerName,
+                hostDir.wstring(),
+                DebianImage.NameAndTag()))
             .Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto copyCommand = std::format(L"container cp -a=false - {}:/", WslcContainerName);
@@ -808,11 +811,12 @@ class WSLCE2EContainerCpTests
         std::filesystem::create_directories(hostDir);
         auto cleanupDir = wil::scope_exit([&] { std::filesystem::remove_all(hostDir); });
 
-        auto runResult = RunWslc(std::format(
-            L"container run --name {} --volume \"{}:/data\" {} sh -c \"echo stopped-content > /tmp/stopped.txt\"",
-            WslcContainerName,
-            hostDir.wstring(),
-            DebianImage.NameAndTag()));
+        auto runResult = RunWslc(
+            std::format(
+                L"container run --name {} --volume \"{}:/data\" {} sh -c \"echo stopped-content > /tmp/stopped.txt\"",
+                WslcContainerName,
+                hostDir.wstring(),
+                DebianImage.NameAndTag()));
         runResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         auto downloadDir = std::filesystem::current_path() / L"wslc-cp-bind-stopped-download";
@@ -850,10 +854,11 @@ class WSLCE2EContainerCpTests
             RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         runResult.Verify({.Stderr = L"", .ExitCode = 0});
 
-        auto execResult = RunWslc(std::format(
-            L"container exec {} sh -c \"echo stdout-dest-test > /tmp/stdoutfile.txt; mkdir -p /tmp/srcdir; echo inner > "
-            L"/tmp/srcdir/inner.txt\"",
-            WslcContainerName));
+        auto execResult = RunWslc(
+            std::format(
+                L"container exec {} sh -c \"echo stdout-dest-test > /tmp/stdoutfile.txt; mkdir -p /tmp/srcdir; echo inner > "
+                L"/tmp/srcdir/inner.txt\"",
+                WslcContainerName));
         execResult.Verify({.ExitCode = 0});
 
         auto workDir = std::filesystem::current_path() / L"wslc-cp-file-dest-behavior";

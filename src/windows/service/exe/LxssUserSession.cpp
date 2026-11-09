@@ -1022,8 +1022,9 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
             return;
         }
 
-        LOG_IF_FAILED(wil::ResultFromException(
-            WI_DIAGNOSTICS_INFO, [&]() { registration.Write(Property::BasePath, distro.BasePath.c_str()); }));
+        LOG_IF_FAILED(wil::ResultFromException(WI_DIAGNOSTICS_INFO, [&]() {
+            registration.Write(Property::BasePath, distro.BasePath.c_str());
+        }));
     });
 
     registration.Write(Property::BasePath, Location);
@@ -1069,8 +1070,9 @@ HRESULT LxssUserSessionImpl::EnumerateDistributions(_Out_ PULONG DistributionCou
         {
             LOG_CAUGHT_EXCEPTION();
 
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageInvalidDistribution(
-                distributions[index].Id(), wsl::windows::common::wslutil::ErrorCodeToString(wil::ResultFromCaughtException())));
+            EMIT_USER_WARNING(
+                wsl::shared::Localization::MessageInvalidDistribution(
+                    distributions[index].Id(), wsl::windows::common::wslutil::ErrorCodeToString(wil::ResultFromCaughtException())));
 
             continue;
         }

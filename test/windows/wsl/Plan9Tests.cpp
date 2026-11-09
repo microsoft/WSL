@@ -511,8 +511,8 @@ class Plan9Tests
 
         VERIFY_ARE_EQUAL(
             0u,
-            LxsstuLaunchWsl(std::format(
-                L"cd /data/p9_test && ln '{0}' '{1}' && printf '%s' '{2}' > '{3}' && mv -f '{3}' '{0}'", c_fileName, c_originalFileName, c_replacementData, c_replacementFileName)));
+            LxsstuLaunchWsl(
+                std::format(L"cd /data/p9_test && ln '{0}' '{1}' && printf '%s' '{2}' > '{3}' && mv -f '{3}' '{0}'", c_fileName, c_originalFileName, c_replacementData, c_replacementFileName)));
 
         LARGE_INTEGER size{};
         size.QuadPart = c_truncatedSize;

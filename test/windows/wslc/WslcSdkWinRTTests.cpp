@@ -266,9 +266,10 @@ class WslcSdkWinRtTests
     {
         // Get the IWSLCSession COM object from the SDK session handle and delegate to the shared helper.
         wil::com_ptr<IWSLCSession> comSession;
-        VERIFY_SUCCEEDED(reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))
-                             ->GetSession()
-                             ->QueryInterface(IID_PPV_ARGS(comSession.put())));
+        VERIFY_SUCCEEDED(
+            reinterpret_cast<WslcSessionImpl*>(WSLCSDK::implementation::GetHandle(m_defaultSession))
+                ->GetSession()
+                ->QueryInterface(IID_PPV_ARGS(comSession.put())));
         return WSLCE2ETests::StartLocalRegistry(*comSession, username, password, port);
     }
 
