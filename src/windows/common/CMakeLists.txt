@@ -63,6 +63,8 @@ set(SOURCES
     WslCoreNetworkingSupport.cpp
     WslInstall.cpp
     WslSecurity.cpp
+    VirtualMachineBackend.cpp
+    HcsVirtualMachineBackend.cpp
     SlowOperationWatcher.cpp
     WslTelemetry.cpp
     wslutil.cpp
@@ -168,6 +170,8 @@ set(HEADERS
     WslCoreNetworkingSupport.h
     WslInstall.h
     WslSecurity.h
+    IVirtualMachineBackend.h
+    HcsVirtualMachineBackend.h
     SlowOperationWatcher.h
     WslTelemetry.h
     wslutil.h

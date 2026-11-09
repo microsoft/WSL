@@ -20,6 +20,7 @@ Abstract:
 // Forward declare types to avoid pulling in excessive number of headers.
 using IP_ADDRESS_PREFIX = struct _IP_ADDRESS_PREFIX;
 using SOCKADDR_INET = union _SOCKADDR_INET;
+struct IpAddress;
 
 namespace wsl::windows::common::string {
 
@@ -53,6 +54,8 @@ std::wstring_view StripLeadingWhitespace(_In_ std::wstring_view String);
 std::wstring_view StripQuotes(_In_ std::wstring_view String);
 
 std::string IpPrefixAddressToString(const IP_ADDRESS_PREFIX& ipAddressPrefix);
+std::string IpAddressToString(const IpAddress& ipAddress);
+std::wstring IpAddressToWstring(const IpAddress& ipAddress, uint32_t scopeId = 0);
 std::string SockAddrInetToString(const SOCKADDR_INET& sockAddrInet);
 std::wstring SockAddrInetToWstring(const SOCKADDR_INET& sockAddrInet);
 std::wstring IntegerIpv4ToWstring(const uint32_t ipAddress);
