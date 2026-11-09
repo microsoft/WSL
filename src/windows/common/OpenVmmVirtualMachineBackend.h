@@ -48,7 +48,6 @@ public:
 
     VmGuestListener CreateGuestListener(GuestServicePort Port) override;
     wil::unique_socket ConnectGuest(GuestServicePort Port) override;
-    void CloseGuestListener(VmListenerId Listener) override;
 
     VmDiskAttachment AttachDisk(const VmDiskRequest& Request) override;
     std::vector<VmDiskAttachment> GetAttachedDisks() const override;
@@ -86,16 +85,6 @@ private:
 
     static void DestroyVm(WslOpenVmmVm* Vm) noexcept;
     using UniqueVm = wil::unique_any<WslOpenVmmVm*, decltype(&DestroyVm), DestroyVm>;
-
-    std::shared_ptr<VmGuestListenerState> ConfigureGuestListener(const VmGuestListener& Listener) override;
-
-    struct GuestListener : VmGuestListenerState
-    {
-        ~GuestListener() noexcept;
-        std::optional<wil::unique_socket> Accept();
-
-        wil::unique_hfile SocketFile;
-    };
 
     struct OpenVmmFileSystemDevice
     {

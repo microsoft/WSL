@@ -150,6 +150,8 @@ struct VmGuestListener
     NON_COPYABLE(VmGuestListener);
     DEFAULT_MOVABLE(VmGuestListener);
 
+    // Keep an AF_UNIX socket path alive until after the socket is closed.
+    wil::unique_hfile SocketFile;
     wil::unique_socket Socket;
 };
 
