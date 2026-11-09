@@ -138,40 +138,8 @@ namespace {
             request.ActionOptions.Type = WSLCComposeActionOptionsTypeNone;
         }
 
-        wil::unique_handle sessionProcess;
-        THROW_IF_FAILED(session.Get()->GetProcessHandle(&sessionProcess));
-
-        wil::com_ptr<IComposeOperation> operation;
-        THROW_IF_FAILED(session.Get()->BeginComposeOperation(&request, nullptr, &operation));
-
-        wil::unique_handle completionEvent;
-        THROW_IF_FAILED(operation->GetCompletionEvent(&completionEvent));
-
-        const std::array<HANDLE, 3> handles{completionEvent.get(), sessionProcess.get(), cancelEvent};
-        DWORD handleCount = cancelEvent != nullptr ? 3 : 2;
-        bool completed = false;
-        while (!completed)
-        {
-            const DWORD waitResult = WaitForMultipleObjects(handleCount, handles.data(), FALSE, INFINITE);
-            THROW_LAST_ERROR_IF(waitResult == WAIT_FAILED);
-            THROW_HR_IF(E_UNEXPECTED, waitResult < WAIT_OBJECT_0 || waitResult >= WAIT_OBJECT_0 + handleCount);
-            switch (waitResult - WAIT_OBJECT_0)
-            {
-            case 0:
-                completed = true;
-                break;
-            case 1:
-                THROW_HR(RPC_E_DISCONNECTED);
-            case 2:
-                THROW_IF_FAILED(operation->Cancel());
-                handleCount = 2;
-                break;
-            default:
-                THROW_HR(E_UNEXPECTED);
-            }
-        }
         ComposeOperationResult result;
-        THROW_IF_FAILED(operation->GetResult(&result.value));
+        THROW_IF_FAILED(session.Get()->ExecuteComposeOperation(&request, nullptr, cancelEvent, &result.value));
         THROW_HR_WITH_USER_ERROR_IF(
             result.value.Result, result.value.ErrorMessage, FAILED(result.value.Result) && result.value.ErrorMessage != nullptr);
         THROW_IF_FAILED(result.value.Result);
