@@ -2467,18 +2467,20 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::BeginComposeOperation(const WSLCComposeOperationRequest* request, IComposeProgressCallback* progressCallback, IComposeOperation** operation)
+HRESULT WSLCSession::ExecuteComposeOperation(
+    const WSLCComposeOperationRequest* request, IComposeProgressCallback* progressCallback, HANDLE cancelEvent, WSLCComposeOperationResult* result)
 try
 {
     WSLCExecutionContext context(this);
+    RETURN_HR_IF_NULL(E_POINTER, result);
+    *result = {};
     RETURN_HR_IF_NULL(E_POINTER, request);
-    RETURN_HR_IF_NULL(E_POINTER, operation);
-    *operation = nullptr;
 
-    Microsoft::WRL::ComPtr<IComposeProgressCallback> callback = progressCallback;
-    Microsoft::WRL::ComPtr<WSLCComposeOperation> composeOperation;
-    RETURN_IF_FAILED(Microsoft::WRL::MakeAndInitialize<WSLCComposeOperation>(&composeOperation, this, request, std::move(callback)));
-    return composeOperation.CopyTo(operation);
+    // Shutdown drains the invocation even while it has no VM lease or outgoing callback RPC.
+    auto callRegistration = RegisterUserCOMCallback();
+    WSLCComposeOperation operation(*this, *request, progressCallback, cancelEvent);
+    operation.Execute(*result);
+    return S_OK;
 }
 CATCH_RETURN();
 
@@ -2486,7 +2488,6 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::DiscoverCompose
 {
     const std::string projectKeyValue{projectKey};
     auto lease = AcquireLease();
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 
     const std::map<std::string, std::vector<std::string>> filters{
         {"label",
@@ -2495,12 +2496,8 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::DiscoverCompose
          }},
     };
 
-    std::vector<docker_schema::ContainerInfo> dockerContainers;
-    try
-    {
-        dockerContainers = m_runtime.Docker().ListContainers(true, -1, filters);
-    }
-    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to discover compose project containers");
+    // Discovery needs typed labels and recovery of uncached containers.
+    const auto dockerContainers = ListDockerContainers(true, -1, filters);
 
     struct ComposeContainer
     {
@@ -2554,6 +2551,10 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::DiscoverCompose
         {
             auto container = WSLCContainerImpl::Open(
                 dockerContainer, *this, m_runtime, m_pluginNotifier.get(), std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1), m_eventStore);
+            if (!container)
+            {
+                continue;
+            }
             existing = m_containers.emplace(container->ID(), std::move(container)).first;
         }
 
@@ -2585,26 +2586,19 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::DiscoverCompose
 
 std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeContainers(const ComposeSpec& spec)
 {
-    wil::unique_event cancelEvent;
-    cancelEvent.create(wil::EventOptions::ManualReset);
-    return CreateComposeContainers(spec, cancelEvent.get(), {});
+    const ComposeCancellation cancellation(m_sessionTerminatingEvent.get(), nullptr);
+    return CreateComposeContainers(spec, cancellation, {});
 }
 
 std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeContainers(
-    const ComposeSpec& spec, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter)
+    const ComposeSpec& spec, const ComposeCancellation& cancellation, const ComposeProgressReporter& progressReporter)
 {
     // Record cancellation at checkpoints so cleanup follows the operation's failure cause.
     bool cancellationObserved = false;
     const auto checkCancelled = [&]() {
-        THROW_HR_IF_NULL(E_POINTER, cancelEvent);
-        const auto waitResult = WaitForSingleObject(cancelEvent, 0);
-        THROW_LAST_ERROR_IF(waitResult == WAIT_FAILED);
-        THROW_HR_IF(E_UNEXPECTED, waitResult != WAIT_OBJECT_0 && waitResult != WAIT_TIMEOUT);
-        if (waitResult == WAIT_OBJECT_0)
-        {
-            cancellationObserved = true;
-            THROW_HR(HRESULT_FROM_WIN32(ERROR_CANCELLED));
-        }
+        const auto result = wil::ResultFromException([&]() { cancellation.Check(); });
+        cancellationObserved = result == HRESULT_FROM_WIN32(ERROR_CANCELLED);
+        THROW_IF_FAILED(result);
     };
 
     checkCancelled();
@@ -3069,6 +3063,17 @@ try
 }
 CATCH_RETURN();
 
+std::vector<docker_schema::ContainerInfo> WSLCSession::ListDockerContainers(
+    bool all, int limit, const std::map<std::string, std::vector<std::string>>& filters, bool size)
+{
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
+    try
+    {
+        return m_runtime.Docker().ListContainers(all, limit, filters, size);
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list containers");
+}
+
 HRESULT WSLCSession::ListContainers(
     const WSLCListContainersOptions* Options, WSLCContainerEntry** Containers, ULONG* Count, WSLCContainerPortMapping** Ports, ULONG* PortsCount)
 try
@@ -3106,14 +3111,7 @@ try
     }
 
     auto lock = AcquireLease();
-    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
-
-    std::vector<docker_schema::ContainerInfo> dockerContainers;
-    try
-    {
-        dockerContainers = m_runtime.Docker().ListContainers(all, limit, filters, size);
-    }
-    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list containers");
+    const auto dockerContainers = ListDockerContainers(all, limit, filters, size);
 
     std::lock_guard containersLock{m_containersLock};
 
@@ -3961,15 +3959,22 @@ try
             CancelUserHandleIO();
         }
 
+        bool callbacksDrained;
         {
             std::lock_guard comLock(m_userCOMCallbacksLock);
 
             // Cancel any pending outgoing COM callback calls (e.g. IProgressCallback::OnProgress)
             // to unblock operations waiting for cross-process COM responses.
             CancelUserCOMCallbacks();
+            callbacksDrained = m_userCOMCallbackThreads.empty();
         }
 
-        sessionLock = m_runtime.TryLockExclusive();
+        // A registered thread can enter its outgoing RPC after CoCancelCall found no active call.
+        // Keep cancelling until every registration is released, without holding the runtime lock.
+        if (callbacksDrained)
+        {
+            sessionLock = m_runtime.TryLockExclusive();
+        }
         retrying = true;
     }
 
@@ -4433,8 +4438,7 @@ UserCOMCallback WSLCSession::RegisterUserCOMCallback()
 
     // Don't allow new COM calls if the session is terminating.
     // N.B. This check must happen under m_userCOMCallbacksLock to synchronize with Terminate().
-    THROW_HR_IF_MSG(
-        E_ABORT, m_sessionTerminatingEvent.is_signaled(), "Refusing to make a COM callback while the session is terminating.");
+    THROW_HR_IF_MSG(E_ABORT, m_terminating.load(), "Refusing to make a COM callback while the session is terminating.");
 
     THROW_IF_FAILED(CoEnableCallCancellation(nullptr));
 
@@ -4585,6 +4589,11 @@ void WSLCSession::RecoverExistingContainers()
         {
             auto container = WSLCContainerImpl::Open(
                 dockerContainer, *this, m_runtime, m_pluginNotifier.get(), std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1), m_eventStore);
+
+            if (!container)
+            {
+                continue;
+            }
 
             auto [it, inserted] = m_containers.emplace(container->ID(), std::move(container));
             WI_ASSERT(inserted);

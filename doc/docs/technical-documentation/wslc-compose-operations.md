@@ -5,15 +5,15 @@ The internal native COM API is defined in
 `WSLCComposeOperation`, and `ComposeReconciler` in `src\windows\wslcsession`.
 None of these Compose interfaces is published in the public WSLC SDK.
 
-An operation captures one invocation's inputs, interprets them in the session
-process, and executes against the session's Docker resources. Its lifetime and
-result belong to that process. There is no durable operation identifier,
+An invocation captures its inputs, interprets them in the session process, and
+executes against the session's Docker resources. The native call remains pending
+through execution, callback delivery, and cleanup. There is no durable operation identifier,
 reconnection protocol, or persisted execution plan.
 
 ## Purpose and contract boundary
 
-An operation captures inputs and exposes progress, completion, cooperative
-cancellation, and a final result for one invocation. Document interpretation
+The synchronous native API accepts inputs, an optional progress callback, and an
+optional cancellation event, then returns a final result. Document interpretation
 precedes resource execution. The reconciler serializes project discovery,
 mutation, and final observation.
 
@@ -22,44 +22,37 @@ mutation, and final observation.
 1. Prepare a `WSLCComposeOperationRequest` using `WSLC_COMPOSE_SCHEMA_VERSION`.
    Select captured documents or an existing normalized project key and supply
    the action's matching options variant.
-2. Call `IWSLCSession::BeginComposeOperation` with an optional progress callback.
-   The call validates the request envelope, copies the inputs needed by the
-   worker, and starts execution. Request buffers can be released when it returns.
-   Callback delivery can start before the call returns.
-3. Call `IComposeOperation::GetCompletionEvent` and own the returned handle with
-   normal handle RAII. It is a `SYNCHRONIZE`-only duplicate of a manual-reset event.
-4. Obtain the session's process handle with `IWSLCSession::GetProcessHandle`,
-   which includes `SYNCHRONIZE` access. Wait for either completion or process
-   exit. To request cancellation, call `Cancel` and continue waiting on both
-   handles.
-5. After completion, call `GetResult`. Check both the method's HRESULT and
-   `WSLCComposeOperationResult::Result`; successful retrieval can return a failed
-   or cancelled operation. `ErrorMessage` carries an optional localized failure
-   description. Free both `ErrorMessage` and `AffectedContainers` with
-   `CoTaskMemFree`, including on repeated result retrieval.
+2. Call `IWSLCSession::ExecuteComposeOperation` with the request, an optional
+   progress callback, an optional manual-reset cancellation event, and result
+   storage. Keep the request buffers valid until the method returns.
+3. If the caller must remain responsive, make the call on a COM-initialized
+   background thread. Marshal COM interfaces when crossing apartments.
+   The input or I/O coordinator can signal the cancellation event independently;
+   it must keep the call's resources alive until the call returns.
+4. Check the method's HRESULT first. On `S_OK`, check
+   `WSLCComposeOperationResult::Result`, which carries the execution HRESULT.
+   `ErrorMessage` carries an optional localized failure description. Free both
+   `ErrorMessage` and `AffectedContainers` with `CoTaskMemFree`.
 
-`BeginComposeOperation` reports invalid request envelopes synchronously.
-Document interpretation, resource discovery, and execution failures are
-reported through the operation result.
+Invalid request envelopes fail the method. Interpretation, discovery, execution,
+and observed cancellation are reported in the terminal result. A transport
+failure or service-process exit means the execution outcome is unknown; it
+does not establish cancellation or rollback, and must not trigger an automatic
+retry.
 
-The duplicated completion event can remain unsignaled after the session process
-exits. Process exit or a failed result-retrieval RPC means the execution outcome
-is unknown; it does not establish cancellation or rollback. Callers must not
-wait indefinitely on completion alone or automatically retry the operation.
+The executor is call-scoped. There is no remote operation object, separate
+completion event, or result-retrieval RPC. Returning successfully ends callback
+delivery for that invocation.
 
-`GetResult` is nonblocking and returns
-`HRESULT_FROM_WIN32(ERROR_IO_INCOMPLETE)` before completion. After completion,
-each successful retrieval copies the same stored result into caller-owned
-storage, allocating fresh message and container storage when present.
-The completion event signals after result publication and callback teardown.
-
-The service worker retains both the native operation and its owning session through execution.
-Releasing the client's operation interface does not request cancellation.
+`SchemaVersion` identifies the accepted internal payload revision. The CLI and
+service ship in lockstep; this field does not negotiate independently deployed
+versions or make incompatible COM layout changes safe. Persisted resource
+metadata has its own version and validation.
 
 ## Captured inputs and project identity
 
 Document content is the original byte sequence, including any byte-order mark
-used by yaml-cpp for encoding detection. The worker parses those captured bytes;
+used by yaml-cpp for encoding detection. The service parses those captured bytes;
 it does not reopen the Compose source file.
 
 `SourcePath` supplies diagnostic context, and its parent directory resolves
@@ -87,7 +80,7 @@ The supported document input contains exactly one document.
 | `Up` | Documents | Remove discovered containers, replace the default network, create containers, and start them. |
 | `Start` | Documents or project key | Start discovered containers, accepting containers that are already running. |
 | `Attach` | Documents or project key | Return discovered container identities. The operation does not establish terminal streams. |
-| `Stop` | Documents or project key | Stop discovered containers with `SIGTERM` and the supplied per-container timeout, accepting containers that are already stopped. |
+| `Stop` | Documents or project key | Stop discovered containers with their configured default signal and the supplied per-container timeout, accepting containers that are already stopped. |
 
 `Stop` requires `WSLCComposeActionOptionsTypeStop` and a timeout no greater than
 `LONG_MAX`. All other actions require `WSLCComposeActionOptionsTypeNone`.
@@ -97,8 +90,10 @@ the first such failure and its error details; cancellation or a callback failure
 can interrupt the loop.
 
 Execution holds a per-project lock from discovery through final observation.
-Lock acquisition polls for cancellation. Interpretation happens before acquiring
-that lock, and `Validate` completes without acquiring it.
+Lock acquisition waits on the project mutex, caller cancellation, session
+termination, and caller-process exit. Abandoned mutexes fail execution, and
+recursive acquisition rejects nested project execution. Interpretation happens
+before acquiring that lock, and `Validate` completes without acquiring it.
 
 The lock coordinates operations using this reconciler. Direct Docker operations
 have independent synchronization.
@@ -112,6 +107,16 @@ identities, and duplicate service/container-number pairs fail discovery.
 Containers are ordered by service name and numeric container number for execution
 and results.
 
+Discovery and public container listing share typed Docker enumeration. Discovery
+also validates raw labels and recovers uncached containers; the public listing
+formats labels for display and omits uncached containers. Recovery rechecks
+existence and state after subscribing to container events. A container deleted
+after enumeration is not published as a recovered container.
+
+Results contain the container's image reference, matching public container
+listing. Read-only wrapper properties remain accessible after deletion, so a
+successful Stop of an auto-remove container reports its `Deleted` state.
+
 The reconciler does not compare configuration hashes, reconcile orphans, or
 provide transactional rollback.
 `Up` is destructive, and a failure can leave the project partially or fully
@@ -123,15 +128,14 @@ Multiple operations can be submitted concurrently. Within one session, operation
 on the same project wait for its execution lock; operations on different projects
 have independent locks. `Validate` does not acquire a project lock.
 
-The global interface table marshals the callback into the worker's COM apartment.
-Native calls are synchronous and serialized on that worker. Native sequence
+Callbacks are synchronous and serialized on the incoming execution thread. Sequence
 numbers start at one for each operation. Native callback payloads are borrowed
 for the duration of a call.
 
 Callbacks must return promptly and must not wait for operation completion.
 Resource callbacks run while the project lock is held, so waiting for another
 operation on the same project can deadlock. Clients must service their callback
-apartment while waiting for completion.
+apartment while the native call is pending.
 
 For example, operation A holds the project lock and calls `OnProgress`. If that
 callback starts operation B on the same project and waits for B to complete, B
@@ -143,9 +147,10 @@ enqueue progress and return; completion waits belong outside the callback.
 An STA client must also dispatch incoming COM calls while waiting. A blocking
 wait that prevents callback delivery can stall even a single operation.
 
-Status events describe validation, planning, execution, and the terminal
-outcome. These are coarse phase notifications: `Executing` can be delivered
-before the worker waits for the project lock.
+Status events describe validation, execution, and the terminal outcome.
+`Executing` is a coarse phase notification delivered before the project-lock
+wait; it is not evidence that mutation has started. This prototype does not
+construct a reconciliation plan or emit a planning phase.
 
 Resource progress is emitted before the associated work. `Current` is the
 resource's one-based ordinal within an operation group, and `Total` is that
@@ -157,20 +162,27 @@ Terminal status delivery is best effort; its failure is logged and preserves
 the execution outcome. Best effort applies to returned errors, not callback
 duration. A stalled resource callback holds the project lock and delays
 cancellation checkpoints; a stalled terminal callback delays completion. The
-native completion event signals after callback teardown and result publication.
+native call returns after callback delivery and result construction.
 
 The engine emits status and resource-progress events. `Attach` returns a
 container snapshot for caller-side attachment.
 
 ## Cancellation and partial state
 
-`IComposeOperation::Cancel` is idempotent and requests cooperative cancellation.
-The worker observes it while acquiring the project lock and between resource
+Signaling the caller's manual-reset event requests cooperative cancellation.
+The service observes it while acquiring the project lock and between resource
 operations. It does not interrupt an in-flight Docker or container call, and a
 late cancellation request can leave a successful result.
 
-The completion event signals only after work completes, including after a
-cancellation request.
+Session termination and caller-process exit are also cancellation sources.
+Session shutdown prevents new callback registrations and repeatedly cancels
+outgoing callbacks until registered callbacks and Compose invocations drain.
+This drain is independent of obtaining the runtime lock: an invocation can be
+between callbacks or hold no VM lease. User cancellation alone does not interrupt
+a stalled progress callback; callbacks must return promptly.
+
+Cancellation is a request, not completion. The native method remains pending
+until its work and cleanup finish.
 
 Observed cancellation produces `WSLCComposeOperationStatusCancelled` and
 `HRESULT_FROM_WIN32(ERROR_CANCELLED)`. A successful late-cancellation outcome
@@ -184,16 +196,33 @@ execution. It is not a mutation journal or an inventory of partial changes after
 failure or cancellation. The project key can also be empty if interpretation
 failed. Callers must rediscover resources before making recovery decisions.
 
-`ErrorMessage` preserves the worker's localized failure description across the
-asynchronous boundary, including when no progress callback is supplied or a
+`ErrorMessage` preserves the service's localized failure description in the
+result, including when no progress callback is supplied or a
 terminal callback fails. It is independent of the caller thread's COM error
 information.
+
+## Interactive callers and future SDK projection
+
+The service owns command policy and its terminal outcome regardless of the
+client's threading model. A future attached-command implementation can keep the
+native call pending while handing off streams incrementally. The client must
+consume those streams concurrently with execution, using a synchronized handoff
+to its I/O coordinator. A stream callback must return promptly and must not run
+the relay itself. Service completion and client output draining are separate
+milestones, and project mutation locks must not span indefinite attachment.
+
+This prototype's `Attach` only returns container identities. It does not implement
+full attached-command lifetime, force-cancellation escalation, or parallel
+resource scheduling. These capabilities are independent of whether the native
+entry point is synchronous. A future public SDK can project the call through
+standard WinRT async interfaces with explicit cancellation bridging.
 
 ## Regression coverage
 
 `test\windows\wslc\WSLCComposeTests.cpp` covers request validation, discovery,
 resource ordering, error details, session-process exit, project concurrency,
-cancellation checkpoints, late cancellation, and partial state.
+cancellation checkpoints, late cancellation, partial state, callback shutdown,
+deletion during Up, and auto-remove Stop.
 `WSLCE2EComposeLifecycleTests.cpp` covers the CLI lifecycle.
 
 Build the full Windows project before running the focused suite:

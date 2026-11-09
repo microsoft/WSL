@@ -2831,8 +2831,6 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         "Cannot open WSLC container %hs: missing WSLC metadata label",
         dockerContainer.Id.c_str());
 
-    WI_ASSERT(dockerContainer.State != ContainerState::Running);
-
     auto metadata = ParseContainerMetadata(metadataIt->second.c_str());
     auto labels = StripInternalLabels(dockerContainer.Labels);
 
@@ -2888,13 +2886,34 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
 
     container->Initialize();
 
-    // Restore the state change timestamp from Docker inspect data.
+    // The event subscription is active before inspection, so later transitions remain observable.
+    auto lock = container->m_lock.lock_exclusive();
+    common::docker_schema::InspectContainer inspectData;
     try
     {
-        auto inspectData = DockerClient.InspectContainer(dockerContainer.Id);
-        auto state = DockerStateToWSLCState(dockerContainer.State);
+        inspectData = DockerClient.InspectContainer(dockerContainer.Id);
+    }
+    catch (const DockerHTTPException& error)
+    {
+        if (error.StatusCode() == 404)
+        {
+            return {};
+        }
 
-        if (state == WslcContainerStateCreated)
+        throw;
+    }
+
+    if (container->m_state == WslcContainerStateDeleted)
+    {
+        return {};
+    }
+
+    container->m_state = DockerStateToWSLCState(nlohmann::json(inspectData.State.Status).get<ContainerState>());
+    container->UpdateActivityHoldLockHeld();
+
+    try
+    {
+        if (container->m_state == WslcContainerStateCreated)
         {
             // A created-but-never-started container has no StartedAt/FinishedAt; its state last
             // changed when it was created.
@@ -2902,7 +2921,8 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         }
         else
         {
-            const auto& timestamp = (state == WslcContainerStateRunning) ? inspectData.State.StartedAt : inspectData.State.FinishedAt;
+            const auto& timestamp =
+                (container->m_state == WslcContainerStateRunning) ? inspectData.State.StartedAt : inspectData.State.FinishedAt;
 
             if (!timestamp.empty() && timestamp != c_unsetTimestamp)
             {
@@ -3182,7 +3202,7 @@ __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::
         // so callers can still query state/process after the impl is gone.
         {
             std::lock_guard processesLock{m_processesLock};
-            m_comWrapper->CacheState(m_id, m_name, m_state, m_initProcess);
+            m_comWrapper->CacheState(m_id, m_name, m_image, m_state, m_initProcess);
         }
     }
 
@@ -3431,7 +3451,8 @@ try
 }
 CATCH_RETURN();
 
-void WSLCContainer::CacheState(const std::string& id, const std::string& name, WSLCContainerState state, const Microsoft::WRL::ComPtr<IWSLCProcess>& initProcess) noexcept
+void WSLCContainer::CacheState(
+    const std::string& id, const std::string& name, const std::string& image, WSLCContainerState state, const Microsoft::WRL::ComPtr<IWSLCProcess>& initProcess) noexcept
 try
 {
     auto cacheLock = m_cacheLock.lock_exclusive();
@@ -3441,6 +3462,7 @@ try
 
     m_cachedId = id;
     m_cachedName = name;
+    m_cachedImage = image;
     m_cachedState = state;
     m_cachedInitProcess = initProcess;
 }
@@ -3550,6 +3572,26 @@ try
     }
 
     return hr;
+}
+CATCH_RETURN();
+
+HRESULT WSLCContainer::GetImage(LPSTR* Image)
+try
+{
+    WSLCExecutionContext context(&m_session);
+    RETURN_HR_IF_NULL(E_POINTER, Image);
+    *Image = nullptr;
+
+    const auto result = wil::ResultFromException([&]() {
+        auto [lock, impl] = LockImpl();
+        *Image = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(impl->Image().c_str()).release();
+    });
+    RETURN_HR_IF(result, result != RPC_E_DISCONNECTED);
+
+    auto cacheLock = m_cacheLock.lock_shared();
+    RETURN_HR_IF(result, !m_cachedImage.has_value());
+    *Image = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(m_cachedImage->c_str()).release();
+    return S_OK;
 }
 CATCH_RETURN();
 

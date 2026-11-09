@@ -7,138 +7,32 @@
 
 namespace wsl::windows::service::wslc {
 
-WSLCComposeOperation::~WSLCComposeOperation()
+WSLCComposeOperation::WSLCComposeOperation(
+    WSLCSession& session, const WSLCComposeOperationRequest& request, IComposeProgressCallback* progressCallback, HANDLE cancelEvent) :
+    m_session(session),
+    m_request(CaptureRequest(request)),
+    m_progressCallback(progressCallback),
+    m_cancellation(session.m_sessionTerminatingEvent.get(), cancelEvent)
 {
-    if (m_cancelEvent)
-    {
-        m_cancelEvent.SetEvent();
-    }
-
-    if (m_worker.joinable())
-    {
-        if (m_worker.get_id() == std::this_thread::get_id())
-        {
-            // Releasing the worker's final reference can run destruction on the worker itself.
-            m_worker.detach();
-        }
-        else
-        {
-            m_worker.join();
-        }
-    }
-
-    if (m_progressCallbackGitCookie != 0)
-    {
-        LOG_IF_FAILED(m_git->RevokeInterfaceFromGlobal(m_progressCallbackGitCookie));
-    }
-}
-
-HRESULT WSLCComposeOperation::RuntimeClassInitialize(
-    WSLCSession* session, const WSLCComposeOperationRequest* request, Microsoft::WRL::ComPtr<IComposeProgressCallback> progressCallback)
-try
-{
-    RETURN_HR_IF_NULL(E_INVALIDARG, session);
-    RETURN_HR_IF_NULL(E_POINTER, request);
-
-    // The worker owns its input snapshot after the incoming COM call releases its request buffers.
-    m_request = CaptureRequest(*request);
-    m_session = session;
-    m_sessionLifetime = session;
-    if (progressCallback != nullptr)
-    {
-        // The global interface table marshals the callback into the worker's COM apartment.
-        m_git = session->m_git;
-        THROW_IF_FAILED(m_git->RegisterInterfaceInGlobal(progressCallback.Get(), __uuidof(IComposeProgressCallback), &m_progressCallbackGitCookie));
-    }
-
-    m_cancelEvent.create(wil::EventOptions::ManualReset);
-    m_completionEvent.create(wil::EventOptions::ManualReset);
-
-    // The worker holds a reference through Run even if the client releases its operation interface.
-    AddRef();
-    try
-    {
-        m_worker = std::thread([this]() {
-            Run();
-            Release();
-        });
-    }
-    catch (...)
-    {
-        Release();
-        throw;
-    }
-
-    return S_OK;
-}
-CATCH_RETURN();
-
-HRESULT WSLCComposeOperation::GetCompletionEvent(HANDLE* event)
-try
-{
-    RETURN_HR_IF_NULL(E_POINTER, event);
-    *event = wsl::windows::common::wslutil::DuplicateHandle(m_completionEvent.get(), SYNCHRONIZE, FALSE);
-    return S_OK;
-}
-CATCH_RETURN();
-
-HRESULT WSLCComposeOperation::Cancel()
-{
-    m_cancelEvent.SetEvent();
-    return S_OK;
-}
-
-HRESULT WSLCComposeOperation::GetResult(WSLCComposeOperationResult* result)
-try
-{
-    RETURN_HR_IF_NULL(E_POINTER, result);
-    *result = {};
-    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_IO_INCOMPLETE), !m_completionEvent.is_signaled());
-
-    std::lock_guard resultLock(m_resultLock);
-    result->SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
-    result->Status = m_status;
-    result->Result = m_resultCode;
-    THROW_HR_IF(E_UNEXPECTED, strcpy_s(result->ProjectKey, m_projectKey.c_str()) != 0);
-
-    wil::unique_cotaskmem_string errorMessage;
-    if (m_errorMessage.has_value())
-    {
-        errorMessage = wil::make_unique_string<wil::unique_cotaskmem_string>(m_errorMessage->c_str());
-    }
-
-    if (!m_affectedContainers.empty())
-    {
-        THROW_HR_IF(E_UNEXPECTED, m_affectedContainers.size() > ULONG_MAX);
-        const auto affectedContainersCount = static_cast<ULONG>(m_affectedContainers.size());
-        auto containers = wil::make_unique_cotaskmem<WSLCContainerEntry[]>(affectedContainersCount);
-        std::ranges::copy(m_affectedContainers, containers.get());
-        result->AffectedContainers = containers.release();
-        result->AffectedContainersCount = affectedContainersCount;
-    }
-
-    result->ErrorMessage = errorMessage.release();
-    return S_OK;
-}
-CATCH_RETURN();
-
-HRESULT WSLCComposeOperation::InterfaceSupportsErrorInfo(REFIID interfaceId)
-{
-    return interfaceId == __uuidof(IComposeOperation) ? S_OK : S_FALSE;
 }
 
 WSLCComposeOperation::Request WSLCComposeOperation::CaptureRequest(const WSLCComposeOperationRequest& request)
 {
     THROW_HR_IF(E_INVALIDARG, request.SchemaVersion != WSLC_COMPOSE_SCHEMA_VERSION);
-    THROW_HR_IF(E_INVALIDARG, request.Action < WSLCComposeActionValidate || request.Action > WSLCComposeActionStop);
-
-    if (request.Action == WSLCComposeActionStop)
+    switch (request.Action)
     {
+    case WSLCComposeActionStop:
         THROW_HR_IF(E_INVALIDARG, request.ActionOptions.Type != WSLCComposeActionOptionsTypeStop);
-    }
-    else
-    {
+        break;
+    case WSLCComposeActionValidate:
+    case WSLCComposeActionCreate:
+    case WSLCComposeActionUp:
+    case WSLCComposeActionStart:
+    case WSLCComposeActionAttach:
         THROW_HR_IF(E_INVALIDARG, request.ActionOptions.Type != WSLCComposeActionOptionsTypeNone);
+        break;
+    default:
+        THROW_HR(E_INVALIDARG);
     }
 
     struct Request result;
@@ -200,122 +94,95 @@ WSLCComposeOperation::Request WSLCComposeOperation::CaptureRequest(const WSLCCom
     return result;
 }
 
-void WSLCComposeOperation::Run() noexcept
+void WSLCComposeOperation::Execute(WSLCComposeOperationResult& output)
 {
-    // Initialization failures also publish a terminal result before releasing waiters.
-    auto signalCompletion = wil::scope_exit([&]() { m_completionEvent.SetEvent(); });
-    const HRESULT result = wil::ResultFromException([&]() { RunInitialized(); });
-    if (FAILED(result))
-    {
-        std::lock_guard resultLock(m_resultLock);
-        m_resultCode = result;
-        m_status = WSLCComposeOperationStatusFailed;
-    }
-}
-
-void WSLCComposeOperation::RunInitialized()
-{
-    const auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
-    WSLCExecutionContext context(m_session);
-
-    wil::com_ptr<IComposeProgressCallback> progressCallback;
-    auto revokeProgressCallback = wil::scope_exit([&]() {
-        if (m_progressCallbackGitCookie != 0)
-        {
-            LOG_IF_FAILED(m_git->RevokeInterfaceFromGlobal(m_progressCallbackGitCookie));
-            m_progressCallbackGitCookie = 0;
-        }
-    });
+    WSLCExecutionContext context(&m_session);
 
     ComposeExecutionResult executionResult;
     std::string projectKey;
     std::optional<wsl::windows::common::Error> primaryError;
-    const HRESULT result = wil::ResultFromException([&]() {
-        if (m_progressCallbackGitCookie != 0)
-        {
-            THROW_IF_FAILED(m_git->GetInterfaceFromGlobal(
-                m_progressCallbackGitCookie, __uuidof(IComposeProgressCallback), progressCallback.put_void()));
-        }
-
-        executionResult = RunOperation(progressCallback.get(), projectKey, primaryError);
-    });
+    const HRESULT result = wil::ResultFromException([&]() { executionResult = RunOperation(projectKey, primaryError); });
     // The execution outcome determines cancellation; a request after the final checkpoint can leave successful work.
     const bool cancelled = result == HRESULT_FROM_WIN32(ERROR_CANCELLED);
 
-    std::optional<std::wstring> errorMessage;
+    wil::unique_cotaskmem_string errorMessage;
     const auto& error = primaryError.has_value() && primaryError->Code == result ? primaryError : context.ReportedError();
-    if (FAILED(result) && error.has_value() && error->Code == result)
+    if (FAILED(result) && error.has_value() && error->Code == result && error->Message.has_value())
     {
-        // COM error information is thread-local; result retrieval needs an owned copy of the worker's message.
-        LOG_IF_FAILED(wil::ResultFromException([&]() { errorMessage = error->Message; }));
+        // Terminal callbacks can replace thread-local COM error information.
+        errorMessage = wil::make_cotaskmem_string(error->Message->c_str());
     }
 
     if (FAILED(result))
     {
-        ReportStatusNoThrow(progressCallback.get(), cancelled ? WSLCComposeStatusCancelled : WSLCComposeStatusFailed);
+        ReportStatusNoThrow(cancelled ? WSLCComposeStatusCancelled : WSLCComposeStatusFailed);
     }
 
-    std::lock_guard resultLock(m_resultLock);
-    m_resultCode = cancelled ? HRESULT_FROM_WIN32(ERROR_CANCELLED) : result;
-    m_errorMessage = std::move(errorMessage);
-    m_status = cancelled           ? WSLCComposeOperationStatusCancelled
-               : SUCCEEDED(result) ? WSLCComposeOperationStatusSucceeded
-                                   : WSLCComposeOperationStatusFailed;
-    m_projectKey = std::move(projectKey);
-    m_affectedContainers = std::move(executionResult.AffectedContainers);
+    WSLCComposeOperationResult completed{};
+    completed.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
+    completed.Result = result;
+    completed.Status = cancelled           ? WSLCComposeOperationStatusCancelled
+                       : SUCCEEDED(result) ? WSLCComposeOperationStatusSucceeded
+                                           : WSLCComposeOperationStatusFailed;
+    THROW_HR_IF(E_UNEXPECTED, strcpy_s(completed.ProjectKey, projectKey.c_str()) != 0);
+    if (!executionResult.AffectedContainers.empty())
+    {
+        completed.AffectedContainersCount = gsl::narrow<ULONG>(executionResult.AffectedContainers.size());
+        auto containers = wil::make_unique_cotaskmem<WSLCContainerEntry[]>(completed.AffectedContainersCount);
+        std::ranges::copy(executionResult.AffectedContainers, containers.get());
+        completed.AffectedContainers = containers.release();
+    }
+
+    completed.ErrorMessage = errorMessage.release();
+    output = completed;
 }
 
-ComposeExecutionResult WSLCComposeOperation::RunOperation(
-    IComposeProgressCallback* progressCallback, std::string& projectKey, std::optional<wsl::windows::common::Error>& primaryError)
+ComposeExecutionResult WSLCComposeOperation::RunOperation(std::string& projectKey, std::optional<wsl::windows::common::Error>& primaryError)
 {
-    ReportStatus(progressCallback, WSLCComposeStatusValidating);
-    CheckCancelled();
+    m_cancellation.Check();
+    ReportStatus(WSLCComposeStatusValidating);
+    m_cancellation.Check();
 
     std::optional<ComposeSpec> desiredProject;
-    if (m_request.ProjectType == WSLCComposeProjectTypeDocuments)
+    switch (m_request.ProjectType)
     {
+    case WSLCComposeProjectTypeDocuments:
         desiredProject = ComposeNormalizer::Normalize(*m_request.Documents, {});
         projectKey = desiredProject->ProjectName;
-    }
-    else
-    {
+        break;
+    case WSLCComposeProjectTypeProjectKey:
         projectKey = ComposeNormalizer::ValidateProjectKey(m_request.ProjectKey);
+        break;
+    default:
+        THROW_HR(E_UNEXPECTED);
     }
 
-    CheckCancelled();
+    m_cancellation.Check();
     if (m_request.Action == WSLCComposeActionValidate)
     {
-        ReportStatusNoThrow(progressCallback, WSLCComposeStatusSucceeded);
+        ReportStatusNoThrow(WSLCComposeStatusSucceeded);
         return {};
     }
 
-    ReportStatus(progressCallback, WSLCComposeStatusPlanning);
-    CheckCancelled();
-    ReportStatus(progressCallback, WSLCComposeStatusExecuting);
+    ReportStatus(WSLCComposeStatusExecuting);
 
     ComposeProgressReporter progressReporter;
-    if (progressCallback != nullptr)
+    if (m_progressCallback)
     {
-        progressReporter = [this, progressCallback](
-                               std::string_view operation, std::string_view resourceKey, ULONGLONG current, ULONGLONG total, std::string_view unit) {
-            ReportProgress(progressCallback, operation, resourceKey, current, total, unit);
+        progressReporter = [this](std::string_view operation, std::string_view resourceKey, ULONGLONG current, ULONGLONG total, std::string_view unit) {
+            ReportProgress(operation, resourceKey, current, total, unit);
         };
     }
 
-    auto result = m_session->m_composeReconciler.Execute(
-        m_request.Action, desiredProject ? &*desiredProject : nullptr, projectKey, m_request.ActionOptions, m_cancelEvent.get(), progressReporter, primaryError);
-    ReportStatusNoThrow(progressCallback, WSLCComposeStatusSucceeded);
+    auto result = m_session.m_composeReconciler.Execute(
+        m_request.Action, desiredProject, projectKey, m_request.ActionOptions, m_cancellation, progressReporter, primaryError);
+    ReportStatusNoThrow(WSLCComposeStatusSucceeded);
     return result;
 }
 
-void WSLCComposeOperation::CheckCancelled() const
+void WSLCComposeOperation::ReportStatus(WSLCComposeStatus status)
 {
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_CANCELLED), m_cancelEvent.is_signaled());
-}
-
-void WSLCComposeOperation::ReportStatus(IComposeProgressCallback* progressCallback, WSLCComposeStatus status)
-{
-    if (progressCallback == nullptr)
+    if (!m_progressCallback)
     {
         return;
     }
@@ -326,20 +193,19 @@ void WSLCComposeOperation::ReportStatus(IComposeProgressCallback* progressCallba
     event.Kind = WSLCComposeProgressEventKindStatus;
     event.Value.Status.Status = status;
 
-    auto callbackRegistration = m_session->RegisterUserCOMCallback();
-    THROW_IF_FAILED(progressCallback->OnProgress(&event));
+    auto callbackRegistration = m_session.RegisterUserCOMCallback();
+    THROW_IF_FAILED(m_progressCallback->OnProgress(&event));
 }
 
-void WSLCComposeOperation::ReportStatusNoThrow(IComposeProgressCallback* progressCallback, WSLCComposeStatus status) noexcept
+void WSLCComposeOperation::ReportStatusNoThrow(WSLCComposeStatus status) noexcept
 {
     // Terminal notification ignores returned errors but still waits for the callback to return.
-    LOG_IF_FAILED(wil::ResultFromException([&]() { ReportStatus(progressCallback, status); }));
+    LOG_IF_FAILED(wil::ResultFromException([&]() { ReportStatus(status); }));
 }
 
-void WSLCComposeOperation::ReportProgress(
-    IComposeProgressCallback* progressCallback, std::string_view operation, std::string_view resourceKey, ULONGLONG current, ULONGLONG total, std::string_view unit)
+void WSLCComposeOperation::ReportProgress(std::string_view operation, std::string_view resourceKey, ULONGLONG current, ULONGLONG total, std::string_view unit)
 {
-    if (progressCallback == nullptr)
+    if (!m_progressCallback)
     {
         return;
     }
@@ -360,8 +226,8 @@ void WSLCComposeOperation::ReportProgress(
 
     // A stalled resource callback holds the project lock and delays cancellation checkpoints and completion.
     // TODO: Decouple observer delivery from execution and completion.
-    auto callbackRegistration = m_session->RegisterUserCOMCallback();
-    THROW_IF_FAILED(progressCallback->OnProgress(&event));
+    auto callbackRegistration = m_session.RegisterUserCOMCallback();
+    THROW_IF_FAILED(m_progressCallback->OnProgress(&event));
 }
 
 } // namespace wsl::windows::service::wslc

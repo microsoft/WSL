@@ -177,8 +177,11 @@ public:
     IFACEMETHOD(OpenContainer)(_In_ LPCSTR Id, _In_ IWSLCContainer** Container) override;
     IFACEMETHOD(BeginContainerOperation)(_Outptr_ IUnknown** Operation) override;
     IFACEMETHOD(CreateComposeSession)(_In_ LPCWSTR Path, _Out_ IWSLCComposeSession** ComposeSession) override;
-    IFACEMETHOD(BeginComposeOperation)(
-        _In_ const WSLCComposeOperationRequest* request, _In_opt_ IComposeProgressCallback* progressCallback, _Out_ IComposeOperation** operation) override;
+    IFACEMETHOD(ExecuteComposeOperation)(
+        _In_ const WSLCComposeOperationRequest* request,
+        _In_opt_ IComposeProgressCallback* progressCallback,
+        _In_opt_ HANDLE cancelEvent,
+        _Out_ WSLCComposeOperationResult* result) override;
     IFACEMETHOD(ListContainers)(
         _In_opt_ const WSLCListContainersOptions* Options,
         _Out_ WSLCContainerEntry** Containers,
@@ -403,10 +406,12 @@ private:
         DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle, IImageLoadCallback* LoadCallback = nullptr);
     void RecoverExistingContainers();
     void RecoverExistingNetworks();
+    std::vector<common::docker_schema::ContainerInfo> ListDockerContainers(
+        bool all, int limit, const std::map<std::string, std::vector<std::string>>& filters, bool size = false);
     std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> DiscoverComposeContainers(std::string_view projectKey);
     std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> CreateComposeContainers(const ComposeSpec& spec);
     std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> CreateComposeContainers(
-        const ComposeSpec& spec, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter);
+        const ComposeSpec& spec, const ComposeCancellation& cancellation, const ComposeProgressReporter& progressReporter);
 
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent);
     // Returns the manifest digest each pulled tag resolved to, in the order the daemon reported them.
@@ -478,7 +483,7 @@ private:
     std::mutex m_userHandlesLock;
     __guarded_by(m_userHandlesLock) std::vector<HANDLE> m_userHandles;
 
-    // Threads currently inside an outgoing COM callback (e.g. IProgressCallback::OnProgress).
+    // Registered outgoing callbacks and Compose invocations, including gaps before callback RPC entry.
     std::recursive_mutex m_userCOMCallbacksLock;
     __guarded_by(m_userCOMCallbacksLock) std::map<DWORD, int> m_userCOMCallbackThreads;
 

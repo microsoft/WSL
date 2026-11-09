@@ -581,6 +581,8 @@ interface IWSLCContainer : IUnknown
     HRESULT Logs([in] WSLCLogsFlags Flags, [out] WSLCHandle* Stdout, [out] WSLCHandle* Stderr, [in] LONGLONG Since, [in] LONGLONG Until, [in] ULONGLONG Tail);
     HRESULT GetId([out, string] WSLCContainerId Id);
     HRESULT GetName([out, string] LPSTR* Name);
+    // Returns the image reference used to create the container, including after deletion.
+    HRESULT GetImage([out, string] LPSTR* Image);
     HRESULT GetLabels([out, size_is(, *Count)] WSLCLabelInformation** Labels, [out] ULONG* Count);
     HRESULT Kill([in] WSLCSignal Signal);
     HRESULT Stats([out] LPSTR* Output);
@@ -592,7 +594,7 @@ interface IWSLCContainer : IUnknown
     HRESULT Restart([in] WSLCSignal Signal, [in] LONG TimeoutSeconds, [in, unique] IWarningCallback* WarningCallback);
 }
 
-// Transient Compose operation API within one WSLC session.
+// Call-scoped Compose execution within one WSLC session.
 // See doc\docs\technical-documentation\wslc-compose-operations.md for the lifecycle and supported behavior.
 typedef enum _WSLCComposeAction
 {
@@ -622,6 +624,7 @@ typedef struct _WSLCComposeDocument
 
 typedef struct _WSLCComposeDocuments
 {
+    // Internal payload revision; clients and the service ship in lockstep.
     ULONG SchemaVersion;
     // Supplies the default project name when ExplicitProjectName is absent.
     [string] LPCWSTR ProjectDirectory;
@@ -691,7 +694,6 @@ typedef enum _WSLCComposeProgressEventKind
 typedef enum _WSLCComposeStatus
 {
     WSLCComposeStatusValidating,
-    WSLCComposeStatusPlanning,
     WSLCComposeStatusExecuting,
     WSLCComposeStatusSucceeded,
     WSLCComposeStatusFailed,
@@ -736,7 +738,7 @@ typedef struct _WSLCComposeProgressEvent
 ]
 interface IComposeProgressCallback : IUnknown
 {
-    // Called synchronously on the operation worker, with sequence numbers starting at one.
+    // Called synchronously during ExecuteComposeOperation, with sequence numbers starting at one.
     // Event data is borrowed for this call. Return promptly; resource callbacks can hold the project lock.
     // A failing HRESULT aborts active work; failures delivering terminal status are logged.
     HRESULT OnProgress([in] const WSLCComposeProgressEvent* Event);
@@ -756,7 +758,7 @@ typedef struct _WSLCComposeOperationResult
     ULONG SchemaVersion;
     WSLCComposeOperationStatus Status;
     HRESULT Result;
-    // Optional localized failure description captured on the worker.
+    // Optional localized failure description owned by the caller.
     [unique, string] LPWSTR ErrorMessage;
     WSLCComposeProjectKey ProjectKey;
     // Observed containers from successful execution. Failed or cancelled operations require resource rediscovery.
@@ -776,26 +778,6 @@ interface IWSLCComposeSession : IUnknown
     HRESULT Start();
     HRESULT Attach();
     HRESULT Stop([in] ULONG Timeout);
-}
-
-[
-    uuid(A1CB6BE6-B11D-44D5-A92E-EA3B6ECD74A6),
-    pointer_default(unique),
-    object
-]
-interface IComposeOperation : IUnknown
-{
-    // Returns a caller-owned, SYNCHRONIZE-only duplicate of the manual-reset completion event.
-    // The event signals after the result is finalized and callback delivery has finished.
-    // Also wait on the session process handle; process exit can leave this event unsignaled.
-    HRESULT GetCompletionEvent([out, system_handle(sh_event)] HANDLE* Event);
-    // Requests idempotent cooperative cancellation and returns without waiting for completion.
-    // Checkpoints observe cancellation; completed mutations remain visible and late requests can leave the operation successful.
-    HRESULT Cancel();
-    // Returns HRESULT_FROM_WIN32(ERROR_IO_INCOMPLETE) until completion, then S_OK on successful retrieval.
-    // Result->Result carries the operation HRESULT. Each call allocates fresh ErrorMessage and
-    // AffectedContainers storage that the caller frees with CoTaskMemFree.
-    HRESULT GetResult([out] WSLCComposeOperationResult* Result);
 }
 
 typedef struct _WSLCDeletedImageInformation
@@ -1051,14 +1033,16 @@ interface IWSLCSession : IUnknown
 
     HRESULT CreateComposeSession([in] LPCWSTR Path, [out] IWSLCComposeSession** ComposeSession);
 
-    // Captures request buffers before returning; the caller can then release them.
-    // Envelope errors fail this call. Interpretation and execution errors are retrieved through GetResult.
-    // The worker retains the operation and session through completion. Cancellation is requested through Cancel.
-    // ProgressCallback is optional, and callbacks can begin before this method returns.
-    HRESULT BeginComposeOperation(
+    // Executes synchronously, including callback delivery and cleanup. Request buffers remain valid until return.
+    // Envelope/transport failures fail the method; S_OK supplies a terminal result, whose Result carries the execution HRESULT.
+    // The caller frees Result->ErrorMessage and Result->AffectedContainers with CoTaskMemFree.
+    // CancelEvent is an optional manual-reset event. Cancellation is cooperative; completed mutations remain visible.
+    // Callers needing responsive input or stream handling execute this method on a separate COM-initialized thread.
+    HRESULT ExecuteComposeOperation(
         [in] const WSLCComposeOperationRequest* Request,
         [in, unique] IComposeProgressCallback* ProgressCallback,
-        [out] IComposeOperation** Operation);
+        [in, unique, system_handle(sh_event)] HANDLE CancelEvent,
+        [out] WSLCComposeOperationResult* Result);
     // Used only for testing. Fails the next CreateNetwork after dockerd created the network, so the
     // rollback path can be exercised.
     HRESULT SetNetworkFaultsForTest([in] BOOL FailCreateInspect);

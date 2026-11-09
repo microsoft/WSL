@@ -6,50 +6,84 @@
 
 namespace wsl::windows::service::wslc {
 
+ComposeCancellation::ComposeCancellation(HANDLE sessionTerminatingEvent, HANDLE cancelEvent) :
+    m_callerProcess(wsl::windows::common::wslutil::OpenCallingProcess(SYNCHRONIZE)), m_handles{sessionTerminatingEvent}
+{
+    for (const auto handle : {cancelEvent, m_callerProcess.get()})
+    {
+        if (handle != nullptr)
+        {
+            m_handles.push_back(handle);
+        }
+    }
+}
+
+void ComposeCancellation::Check() const
+{
+    const auto result = WaitForMultipleObjects(gsl::narrow<DWORD>(m_handles.size()), m_handles.data(), FALSE, 0);
+    THROW_LAST_ERROR_IF(result == WAIT_FAILED);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_CANCELLED), result < WAIT_OBJECT_0 + m_handles.size());
+    THROW_HR_IF(E_UNEXPECTED, result != WAIT_TIMEOUT);
+}
+
+wil::mutex_release_scope_exit ComposeCancellation::AcquireMutex(HANDLE mutex) const
+{
+    auto handles = m_handles;
+    handles.push_back(mutex);
+    const auto index = gsl::narrow<DWORD>(handles.size() - 1);
+    const auto result = WaitForMultipleObjects(gsl::narrow<DWORD>(handles.size()), handles.data(), FALSE, INFINITE);
+    THROW_LAST_ERROR_IF(result == WAIT_FAILED);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_CANCELLED), result < WAIT_OBJECT_0 + index);
+    THROW_HR_IF(E_UNEXPECTED, result != WAIT_OBJECT_0 + index && result != WAIT_ABANDONED_0 + index);
+
+    auto lock = wil::ReleaseMutex_scope_exit(mutex);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ABANDONED_WAIT_0), result == WAIT_ABANDONED_0 + index);
+    Check();
+    return lock;
+}
+
 ComposeReconciler::ComposeReconciler(WSLCSession& session) noexcept : m_session(session)
 {
 }
 
 ComposeExecutionResult ComposeReconciler::Execute(
     WSLCComposeAction action,
-    const ComposeSpec* desiredProject,
+    const std::optional<ComposeSpec>& desiredProject,
     std::string_view projectKey,
     const WSLCComposeActionOptions& actionOptions,
-    HANDLE cancelEvent,
+    const ComposeCancellation& cancellation,
     const ComposeProgressReporter& progressReporter,
     std::optional<wsl::windows::common::Error>& primaryError)
 {
-    CheckCancelled(cancelEvent);
+    cancellation.Check();
     auto projectLockEntry = ResolveProjectLock(projectKey);
-    // Serialize discovery, mutation, and final observation; timed waits keep lock acquisition cancellable.
-    std::unique_lock projectLock(projectLockEntry->Lock, std::defer_lock);
-    while (!projectLock.try_lock_for(std::chrono::milliseconds{100}))
-    {
-        CheckCancelled(cancelEvent);
-    }
-    CheckCancelled(cancelEvent);
+    auto projectLock = cancellation.AcquireMutex(projectLockEntry->Lock.get());
+    // Kernel mutexes are recursive; nested execution must not interleave project mutations.
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_BUSY), projectLockEntry->Active);
+    projectLockEntry->Active = true;
+    auto clearActive = wil::scope_exit([&]() { projectLockEntry->Active = false; });
     auto containers = m_session.DiscoverComposeContainers(projectKey);
-    CheckCancelled(cancelEvent);
+    cancellation.Check();
 
     switch (action)
     {
     case WSLCComposeActionCreate:
-        THROW_HR_IF_NULL(E_INVALIDARG, desiredProject);
+        THROW_HR_IF(E_INVALIDARG, !desiredProject.has_value());
         // Create reuses a nonempty discovered set as the project's existing resources.
         if (containers.empty())
         {
-            containers = Create(*desiredProject, cancelEvent, progressReporter);
+            containers = Create(*desiredProject, cancellation, progressReporter);
         }
         break;
 
     case WSLCComposeActionUp:
-        THROW_HR_IF_NULL(E_INVALIDARG, desiredProject);
-        containers = Up(*desiredProject, std::move(containers), cancelEvent, progressReporter);
+        THROW_HR_IF(E_INVALIDARG, !desiredProject.has_value());
+        containers = Up(*desiredProject, std::move(containers), cancellation, progressReporter);
         break;
 
     case WSLCComposeActionStart:
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), containers.empty());
-        Start(containers, cancelEvent, progressReporter);
+        Start(containers, cancellation, progressReporter);
         break;
 
     case WSLCComposeActionAttach:
@@ -59,9 +93,10 @@ ComposeExecutionResult ComposeReconciler::Execute(
 
     case WSLCComposeActionStop:
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), containers.empty());
-        Stop(containers, actionOptions.Value.Stop.TimeoutSeconds, cancelEvent, progressReporter, primaryError);
+        Stop(containers, actionOptions.Value.Stop.TimeoutSeconds, cancellation, progressReporter, primaryError);
         break;
 
+    case WSLCComposeActionValidate:
     default:
         THROW_HR(E_INVALIDARG);
     }
@@ -102,61 +137,70 @@ std::vector<WSLCContainerEntry> ComposeReconciler::ObserveContainers(const std::
         THROW_IF_FAILED(container->GetState(&entry.State));
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(entry.Name, name.get()) != 0);
 
-        wil::unique_cotaskmem_ansistring inspect;
-        THROW_IF_FAILED(container->Inspect(FALSE, &inspect));
-        const auto json = nlohmann::json::parse(inspect.get());
-        const auto image = json.value("Image", std::string{});
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(entry.Image, image.c_str()) != 0);
+        wil::unique_cotaskmem_ansistring image;
+        THROW_IF_FAILED(container->GetImage(&image));
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(entry.Image, image.get()) != 0);
         result.emplace_back(entry);
     }
 
     return result;
 }
 
-std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> ComposeReconciler::Create(const ComposeSpec& project, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter)
+std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> ComposeReconciler::Create(
+    const ComposeSpec& project, const ComposeCancellation& cancellation, const ComposeProgressReporter& progressReporter)
 {
-    return m_session.CreateComposeContainers(project, cancelEvent, progressReporter);
+    return m_session.CreateComposeContainers(project, cancellation, progressReporter);
 }
 
 std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> ComposeReconciler::Up(
-    const ComposeSpec& project, std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> containers, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter)
+    const ComposeSpec& project,
+    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> containers,
+    const ComposeCancellation& cancellation,
+    const ComposeProgressReporter& progressReporter)
 {
     // Up removes current containers before creating replacements. CreateComposeContainers deletes the default network,
     // so failures can leave the project partially or fully absent.
     for (size_t index = 0; index < containers.size(); ++index)
     {
-        CheckCancelled(cancelEvent);
+        cancellation.Check();
         const auto& container = containers[index];
         if (progressReporter)
         {
             wil::unique_cotaskmem_ansistring name;
             THROW_IF_FAILED(container->GetName(&name));
             progressReporter("remove", name.get(), index + 1, containers.size(), "container");
-            CheckCancelled(cancelEvent);
+            cancellation.Check();
         }
 
         const HRESULT result = container->Delete(WSLCDeleteFlagsForce);
+        if (result == RPC_E_DISCONNECTED)
+        {
+            // A disconnected wrapper retains its terminal state; disconnection alone does not establish deletion.
+            WSLCContainerState state{};
+            THROW_IF_FAILED(container->GetState(&state));
+            THROW_HR_IF(result, state != WslcContainerStateDeleted);
+        }
         THROW_IF_FAILED_EXCEPT(result, RPC_E_DISCONNECTED);
     }
 
-    CheckCancelled(cancelEvent);
-    auto result = m_session.CreateComposeContainers(project, cancelEvent, progressReporter);
-    Start(result, cancelEvent, progressReporter);
+    cancellation.Check();
+    auto result = m_session.CreateComposeContainers(project, cancellation, progressReporter);
+    Start(result, cancellation, progressReporter);
     return result;
 }
 
-void ComposeReconciler::Start(const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter)
+void ComposeReconciler::Start(const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers, const ComposeCancellation& cancellation, const ComposeProgressReporter& progressReporter)
 {
     for (size_t index = 0; index < containers.size(); ++index)
     {
-        CheckCancelled(cancelEvent);
+        cancellation.Check();
         const auto& container = containers[index];
         if (progressReporter)
         {
             wil::unique_cotaskmem_ansistring name;
             THROW_IF_FAILED(container->GetName(&name));
             progressReporter("start", name.get(), index + 1, containers.size(), "container");
-            CheckCancelled(cancelEvent);
+            cancellation.Check();
         }
 
         const HRESULT result = container->Start(WSLCContainerStartFlagsNone, nullptr, nullptr);
@@ -168,7 +212,7 @@ void ComposeReconciler::Start(const std::vector<Microsoft::WRL::ComPtr<IWSLCCont
 void ComposeReconciler::Stop(
     const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers,
     ULONG timeout,
-    HANDLE cancelEvent,
+    const ComposeCancellation& cancellation,
     const ComposeProgressReporter& progressReporter,
     std::optional<wsl::windows::common::Error>& primaryError)
 {
@@ -178,17 +222,17 @@ void ComposeReconciler::Stop(
     HRESULT firstFailure = S_OK;
     for (size_t index = 0; index < containers.size(); ++index)
     {
-        CheckCancelled(cancelEvent);
+        cancellation.Check();
         const auto& container = containers[index];
         if (progressReporter)
         {
             wil::unique_cotaskmem_ansistring name;
             THROW_IF_FAILED(container->GetName(&name));
             progressReporter("stop", name.get(), index + 1, containers.size(), "container");
-            CheckCancelled(cancelEvent);
+            cancellation.Check();
         }
 
-        const HRESULT result = container->Stop(WSLCSignalSIGTERM, static_cast<LONG>(timeout));
+        const HRESULT result = container->Stop(WSLCSignalNone, static_cast<LONG>(timeout));
         // Docker Compose stop accepts containers that are already stopped.
         if (FAILED(result) && result != WSLC_E_CONTAINER_NOT_RUNNING && SUCCEEDED(firstFailure))
         {
@@ -203,15 +247,6 @@ void ComposeReconciler::Stop(
     }
 
     THROW_IF_FAILED(firstFailure);
-}
-
-void ComposeReconciler::CheckCancelled(HANDLE cancelEvent)
-{
-    THROW_HR_IF_NULL(E_POINTER, cancelEvent);
-    const auto waitResult = WaitForSingleObject(cancelEvent, 0);
-    THROW_LAST_ERROR_IF(waitResult == WAIT_FAILED);
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_CANCELLED), waitResult == WAIT_OBJECT_0);
-    THROW_HR_IF(E_UNEXPECTED, waitResult != WAIT_TIMEOUT);
 }
 
 } // namespace wsl::windows::service::wslc

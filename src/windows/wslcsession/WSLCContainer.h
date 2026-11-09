@@ -151,6 +151,7 @@ public:
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         EventStore& eventStore);
 
+    // Returns empty if the container disappears before recovery completes.
     static std::shared_ptr<WSLCContainerImpl> Open(
         const common::docker_schema::ContainerInfo& DockerContainer,
         WSLCSession& wslcSession,
@@ -332,6 +333,7 @@ public:
     IFACEMETHOD(Logs)(_In_ WSLCLogsFlags Flags, _Out_ WSLCHandle* Stdout, _Out_ WSLCHandle* Stderr, _In_ LONGLONG Since, _In_ LONGLONG Until, _In_ ULONGLONG Tail) override;
     IFACEMETHOD(GetId)(_Out_ WSLCContainerId Id) override;
     IFACEMETHOD(GetName)(_Out_ LPSTR* Name) override;
+    IFACEMETHOD(GetImage)(_Out_ LPSTR* Image) override;
     IFACEMETHOD(GetLabels)(_Out_ WSLCLabelInformation** Labels, _Out_ ULONG* Count) override;
     IFACEMETHOD(Stats)(_Out_ LPSTR* Output) override;
     IFACEMETHOD(ConnectToNetwork)(_In_ const WSLCNetworkConnectionOptions* Options) override;
@@ -347,7 +349,12 @@ public:
 
     // Cache read-only properties so they remain accessible after the impl is disconnected.
     // Called from WSLCContainerImpl::PrepareDisconnectComWrapper() while m_lock is held exclusively.
-    void CacheState(const std::string& id, const std::string& name, WSLCContainerState state, const Microsoft::WRL::ComPtr<IWSLCProcess>& initProcess) noexcept;
+    void CacheState(
+        const std::string& id,
+        const std::string& name,
+        const std::string& image,
+        WSLCContainerState state,
+        const Microsoft::WRL::ComPtr<IWSLCProcess>& initProcess) noexcept;
 
 private:
     WSLCSession& m_session;
@@ -358,6 +365,7 @@ private:
     mutable wil::srwlock m_cacheLock;
     _Guarded_by_(m_cacheLock) std::optional<std::string> m_cachedId;
     _Guarded_by_(m_cacheLock) std::optional<std::string> m_cachedName;
+    _Guarded_by_(m_cacheLock) std::optional<std::string> m_cachedImage;
     _Guarded_by_(m_cacheLock) std::optional<WSLCContainerState> m_cachedState;
     _Guarded_by_(m_cacheLock) Microsoft::WRL::ComPtr<IWSLCProcess> m_cachedInitProcess;
 };
