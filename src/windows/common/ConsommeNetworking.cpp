@@ -147,27 +147,41 @@ ConsommeNetworking::ConsommeNetworking(
 
 ConsommeNetworking::~ConsommeNetworking()
 {
-    // Unregister the network notification callback to prevent it from using the GNS channel.
-    m_networkNotifyHandle.reset();
-
     // Stop the GNS channel to unblock any stuck communications with the guest.
     m_gnsChannel.Stop();
+
+    // Unregister notification callbacks before destroying the state they access.
+    m_dnsSuffixRegistryWatcher.reset();
+    m_networkNotifyHandle.reset();
 }
 
 void ConsommeNetworking::Initialize()
 {
+    m_dnsSuffixRegistryWatcher.emplace([this]() noexcept {
+        try
+        {
+            RefreshGuestConnection();
+        }
+        CATCH_LOG()
+    });
+
     // Initialize adapter state.
     RefreshGuestConnection();
 
-    if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LocalhostRelay))
     {
-        SetupLoopbackDevice();
-    }
+        // Serialize loopback setup with DNS refresh callbacks sharing the GNS channel.
+        auto lock = m_lock.lock_exclusive();
 
-    if (!m_hostLoopback.empty())
-    {
-        THROW_HR_IF(E_UNEXPECTED, !WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LocalhostRelay));
-        SetupHostLoopback();
+        if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LocalhostRelay))
+        {
+            SetupLoopbackDevice();
+        }
+
+        if (!m_hostLoopback.empty())
+        {
+            THROW_HR_IF(E_UNEXPECTED, !WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LocalhostRelay));
+            SetupHostLoopback();
+        }
     }
 
     THROW_IF_WIN32_ERROR(NotifyNetworkConnectivityHintChange(&ConsommeNetworking::OnNetworkConnectivityChange, this, TRUE, &m_networkNotifyHandle));
@@ -364,7 +378,8 @@ CATCH_RETURN()
 
 void ConsommeNetworking::RefreshGuestConnection()
 {
-    // Query current networking information before acquiring the lock.
+    // Serialize host queries and guest updates across notification callbacks.
+    auto lock = m_lock.lock_exclusive();
     auto networkSettings = GetHostEndpointSettings();
 
     auto defaultRouteIpv4 = networkSettings->GetBestGatewayAddressString(AF_INET);
@@ -414,9 +429,6 @@ void ConsommeNetworking::RefreshGuestConnection()
     const auto minMtu = GetMinimumConnectedInterfaceMtu();
     auto virtioNetConfig = BuildVirtioNetConfig(networkSettings, WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::Ipv6));
     auto nameservers = ToIpAddresses(currentDns);
-
-    // Acquire the lock and perform device updates.
-    auto lock = m_lock.lock_exclusive();
 
     // Add the virtio net adapter to the guest, or update its runtime configuration.
     if (!m_adapterId.has_value())
@@ -471,9 +483,7 @@ void ConsommeNetworking::SetupHostLoopback()
     uint32_t addressBytes{};
     std::memcpy(&addressBytes, &virtualAddress.bytes[0], sizeof(addressBytes));
 
-    std::string virtualAddressString(INET_ADDRSTRLEN, '\0');
-    RtlIpv4AddressToStringA(reinterpret_cast<const IN_ADDR*>(&virtualAddress.bytes[0]), virtualAddressString.data());
-    virtualAddressString.resize(std::strlen(virtualAddressString.data()));
+    const auto virtualAddressString = wsl::windows::common::string::IpAddressToString(virtualAddress);
 
     const auto eth0 = m_guestDeviceManager->GetVirtioNetDevice(c_eth0DeviceName);
     THROW_IF_FAILED(eth0->CreateDNSRecord(DnsRecordType_A, m_hostLoopback.c_str(), virtualAddressString.c_str()));
@@ -558,13 +568,13 @@ void ConsommeNetworking::UpdateDnsSettings(const networking::DnsInfo& dns)
         return;
     }
 
-    m_trackedDnsSettings = dns;
-
     hns::ModifyGuestEndpointSettingRequest<hns::DNS> notification{};
     notification.RequestType = hns::ModifyRequestType::Update;
     notification.ResourceType = hns::GuestEndpointResourceType::DNS;
     notification.Settings = networking::BuildDnsNotification(dns, m_dnsOptions);
     m_gnsChannel.SendHnsNotification(ToJsonW(notification).c_str(), m_adapterId.value());
+
+    m_trackedDnsSettings = dns;
 }
 
 void ConsommeNetworking::UpdateIpv4Address(const networking::EndpointIpAddress& ipAddress)

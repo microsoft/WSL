@@ -16,6 +16,7 @@ Abstract:
 #include "Container.h"
 #include "Microsoft.WSL.Containers.Container.g.cpp"
 #include "ContainerSettings.h"
+#include "ContainerNetwork.h"
 #include "Process.h"
 #include "ProcessSettings.h"
 
@@ -105,6 +106,31 @@ void Container::Delete(winrt::Microsoft::WSL::Containers::DeleteContainerOption 
 {
     wil::unique_cotaskmem_string errorMessage;
     auto hr = WslcDeleteContainer(ToHandle(), static_cast<WslcDeleteContainerFlags>(flags), errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
+}
+
+void Container::ConnectNetwork(winrt::Microsoft::WSL::Containers::ContainerNetwork const& network)
+{
+    if (!network)
+    {
+        throw winrt::hresult_error(E_POINTER, L"Network cannot be null");
+    }
+
+    const auto networkStruct = GetStruct(network);
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcConnectContainerNetwork(ToHandle(), &networkStruct, errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
+}
+
+void Container::DisconnectNetwork(hstring const& nameOrId)
+{
+    if (nameOrId.empty())
+    {
+        throw winrt::hresult_invalid_argument(L"Network name or ID cannot be empty");
+    }
+
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcDisconnectContainerNetwork(ToHandle(), winrt::to_string(nameOrId).c_str(), errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
 }
 
