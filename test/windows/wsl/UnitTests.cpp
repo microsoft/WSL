@@ -9422,9 +9422,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
 
         auto cleanup = wil::scope_exit([&]() {
             leftPeer.reset();
-            leftRelay.reset();
             rightPeer.reset();
-            rightRelay.reset();
             if (relayThread.joinable())
             {
                 relayThread.join();
@@ -9441,6 +9439,77 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_ARE_EQUAL(shutdown(rightPeer.get(), SD_SEND), 0);
 
         VERIFY_ARE_EQUAL(ReadToString(leftPeer.get()), response);
+
+        relayThread.join();
+        VERIFY_ARE_EQUAL(relayResult, S_OK);
+        cleanup.release();
+    }
+
+    TEST_METHOD(BidirectionalRelayFullDuplexUnderBackpressure)
+    {
+        namespace io = wsl::windows::common::io;
+
+        auto [leftPeer, leftRelay] = MakeSocketPair();
+        auto [rightPeer, rightRelay] = MakeSocketPair();
+
+        for (const auto socket : {leftPeer.get(), leftRelay.get(), rightPeer.get(), rightRelay.get()})
+        {
+            for (const auto option : {SO_SNDBUF, SO_RCVBUF})
+            {
+                const int socketBufferSize = option == SO_SNDBUF ? 0 : 16 * 1024;
+                VERIFY_ARE_EQUAL(
+                    setsockopt(socket, SOL_SOCKET, option, reinterpret_cast<const char*>(&socketBufferSize), sizeof(socketBufferSize)), 0);
+            }
+        }
+
+        constexpr size_t payloadSize = 1024 * 1024;
+        const std::vector<char> leftPayload(payloadSize, 'L');
+        const std::vector<char> rightPayload(payloadSize, 'R');
+
+        HRESULT relayResult = S_OK;
+        std::thread relayThread;
+        auto cleanup = wil::scope_exit([&]() {
+            leftPeer.reset();
+            rightPeer.reset();
+            if (relayThread.joinable())
+            {
+                relayThread.join();
+            }
+        });
+
+        auto startWrite = [](SOCKET peer, const std::vector<char>& payload) {
+            auto onComplete = [peer]() { LOG_LAST_ERROR_IF(shutdown(peer, SD_SEND) == SOCKET_ERROR); };
+            auto writer = std::make_unique<io::WriteHandle>(io::HandleWrapper{peer, std::move(onComplete)}, payload);
+            writer->Schedule();
+            VERIFY_ARE_EQUAL(writer->GetState(), io::IOHandleStatus::Pending);
+            return writer;
+        };
+
+        auto leftWrite = startWrite(leftPeer.get(), leftPayload);
+        auto rightWrite = startWrite(rightPeer.get(), rightPayload);
+
+        relayThread = std::thread([&]() {
+            relayResult = wil::ResultFromException(
+                [&]() { wsl::windows::common::relay::SocketRelay(leftRelay.get(), rightRelay.get(), 64 * 1024); });
+        });
+
+        auto receivePayload = [](SOCKET peer, const std::vector<char>& expected, std::unique_ptr<io::WriteHandle>&& writer) {
+            std::vector<char> received;
+            io::MultiHandleWait ioWait;
+            ioWait.AddHandle(std::move(writer));
+            ioWait.AddHandle(std::make_unique<io::ReadHandle>(io::HandleWrapper{peer}, [&](const gsl::span<char>& buffer) {
+                VERIFY_IS_LESS_THAN_OR_EQUAL(received.size() + buffer.size(), expected.size());
+                received.insert(received.end(), buffer.begin(), buffer.end());
+            }));
+
+            VERIFY_IS_TRUE(ioWait.Run(std::chrono::seconds(10)));
+            VERIFY_ARE_EQUAL(received.size(), expected.size());
+            VERIFY_IS_TRUE(received == expected);
+        };
+
+        receivePayload(leftPeer.get(), rightPayload, std::move(rightWrite));
+        VERIFY_ARE_EQUAL(WaitForSingleObject(leftWrite->GetHandle(), 0), WAIT_TIMEOUT);
+        receivePayload(rightPeer.get(), leftPayload, std::move(leftWrite));
 
         relayThread.join();
         VERIFY_ARE_EQUAL(relayResult, S_OK);
