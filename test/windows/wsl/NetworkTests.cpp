@@ -2506,6 +2506,48 @@ class NetworkTests
             std::chrono::minutes(2)));
     }
 
+    static void VerifyInterfaceStateIoctlDuringPortRelease()
+    {
+        WslKeepAlive keepAlive;
+
+        auto [guestProcess, read] = BindGuestPort(L"TCP4-LISTEN:1234", true);
+        guestProcess.reset();
+
+        const wil::unique_socket hostSocket(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+        VERIFY_IS_TRUE(!!hostSocket);
+
+        SOCKADDR_IN address{};
+        address.sin_family = AF_INET;
+        address.sin_port = htons(1234);
+
+        constexpr auto* ioctlCommand =
+            L"-u root timeout -s KILL 10s perl -MSocket -e '"
+            L"socket(my $control,AF_INET,SOCK_DGRAM,0) or die \"socket: $!\\n\";"
+            L"my $request=pack(\"a16x24\",\"lo\");"
+            L"ioctl($control,0x8913,$request) or die \"SIOCGIFFLAGS: $!\\n\";"
+            L"my $flags=unpack(\"S\",substr($request,16,2));"
+            L"ioctl($control,0x8914,$request) or die \"SIOCSIFFLAGS: $!\\n\";"
+            L"ioctl($control,0x8913,$request) or die \"SIOCGIFFLAGS: $!\\n\";"
+            L"unpack(\"S\",substr($request,16,2))==$flags or die \"Interface flags changed\\n\";"
+            L"'";
+
+        // Best-effort race coverage: ioctl transactions must overlap asynchronous port release to reproduce the bug.
+        int bindError = 0;
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                bindError = 0;
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(ioctlCommand), 0L);
+                if (bind(hostSocket.get(), reinterpret_cast<SOCKADDR*>(&address), sizeof(address)) == SOCKET_ERROR)
+                {
+                    bindError = WSAGetLastError();
+                    THROW_HR(HRESULT_FROM_WIN32(bindError));
+                }
+            },
+            std::chrono::seconds(1),
+            std::chrono::minutes(2),
+            [&]() { return bindError == WSAEADDRINUSE || bindError == WSAEACCES; }));
+    }
+
     static void VerifyPortZeroBindFromThreadIsTracked(bool verifyRelease = true)
     {
         WslKeepAlive keepAlive;
@@ -4634,6 +4676,16 @@ class MirroredTests
         VERIFY_IS_TRUE(bound);
     }
 
+    WSL2_TEST_METHOD(InterfaceStateIoctlDuringPortRelease)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        NetworkTests::VerifyInterfaceStateIoctlDuringPortRelease();
+    }
+
     WSL2_TEST_METHOD(HostPortCantBeBoundByGuest)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
@@ -5962,6 +6014,15 @@ class ConsommeTests
             },
             std::chrono::seconds(1),
             std::chrono::minutes(2));
+    }
+
+    WSL2_TEST_METHOD(InterfaceStateIoctlDuringPortRelease)
+    {
+        CONSOMME_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+
+        NetworkTests::VerifyInterfaceStateIoctlDuringPortRelease();
     }
 
     WSL2_TEST_METHOD(LoopbackGuestToHost)
