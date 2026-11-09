@@ -440,6 +440,8 @@ namespace {
             c_registryIp, directory, tokenAuthentication ? L"*.proxy.invalid" : string::MultiByteToWide(registryHost));
         TrustedRootCertificate trustedCa{*certificate.get()};
 
+        ScopedWindowsProxySettings originalSettings;
+        SetWindowsProxySettings("", "");
         auto producer = TestSession::Create(name, WSLCNetworkingModeConsomme);
         auto [registry, address] =
             StartLocalRegistry(producer.Session(), "", "", c_proxyRegistryPort, directory.wstring(), !tokenAuthentication);
@@ -711,6 +713,10 @@ class WSLCE2ETlsRegistryTests
     WSLC_TEST_METHOD(WSLCE2E_Registry_Proxy_NoProxy)
     {
         WINHTTP_PROXY_TEST_ONLY();
+        ScopedWindowsProxySettings originalSettings;
+        SetWindowsProxySettings("http://windows.proxy.invalid:3128", "*.unrelated.invalid");
+        const auto expected = LxsstuLaunchPowershellAndCaptureOutput(L"netsh winhttp show advproxy").first;
+
         WithProxyRegistry([](const auto& directory, auto& proxy, const auto& alpine, const auto&) {
             proxy.Stop();
 
@@ -736,6 +742,8 @@ class WSLCE2ETlsRegistryTests
                     });
             }
         });
+
+        VERIFY_ARE_EQUAL(expected, LxsstuLaunchPowershellAndCaptureOutput(L"netsh winhttp show advproxy").first);
     }
 
     // Verifies registry SSL trust end to end: a push to a registry serving a private-CA cert fails
