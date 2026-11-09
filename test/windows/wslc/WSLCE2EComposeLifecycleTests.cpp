@@ -135,17 +135,54 @@ services:
         VERIFY_WIN32_BOOL_SUCCEEDED(CreateSymbolicLinkW(linkPath.c_str(), composePath.c_str(), 0));
 
         auto result = RunWslc(std::format(L"compose create \"{}\"", linkPath.wstring()));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
+        result.Verify(
+            {.Stderr = std::format(L"Creating Network {}_default (1/1)\r\nCreating Container {} (1/1)\r\n", ProjectName, ContainerName),
+             .ExitCode = 0});
         VERIFY_ARE_EQUAL(WideToMultiByte(ProjectName), InspectContainer(ContainerName).Config.Labels.at("com.microsoft.wslc.compose.project"));
 
         result = RunWslc(std::format(L"compose start \"{}\"", composePath.wstring()));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = std::format(L"Starting Container {} (1/1)\r\n", ContainerName), .ExitCode = 0});
         result = RunWslc(std::format(L"container exec {} cat /work/marker.txt", ContainerName));
         result.Verify({.Stdout = L"target-directory\n", .Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"compose stop \"{}\"", linkPath.wstring()));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = std::format(L"Stopping Container {} (1/1)\r\n", ContainerName), .ExitCode = 0});
         VERIFY_IS_FALSE(InspectContainer(ContainerName).State.Running);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Compose_UpInterruptEscalatesDuringNativeStop)
+    {
+        const auto projectDirectory = std::filesystem::current_path() / ProjectName;
+        auto directoryCleanup = SetupTestDirectory(projectDirectory);
+        auto resourceCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { Cleanup(); });
+        const auto composePath = projectDirectory / L"compose.yaml";
+        WriteTestFileContent(
+            composePath,
+            std::format(
+                R"(
+services:
+  owned:
+    name: {}
+    image: {}
+    command: ["/bin/sh", "-c", "trap '' TERM; while :; do echo compose-cancel-ready; sleep 1; done"]
+)",
+                WideToMultiByte(ContainerName),
+                WideToMultiByte(AlpineTestImage().NameAndTag())));
+
+        auto up = RunWslcInteractive(
+            std::format(L"compose up \"{}\"", composePath.wstring()), ElevationType::Elevated, std::nullopt, ProcessGroup::Create);
+        up.ExpectStdout("compose-cancel-ready\n");
+        up.ExpectStderr(WideToMultiByte(std::format(
+            L"Creating Network {}_default (1/1)\r\nCreating Container {} (1/1)\r\nStarting Container {} (1/1)\r\n", ProjectName, ContainerName, ContainerName)));
+
+        up.SendCtrlBreak();
+        up.ExpectStderr(WideToMultiByte(std::format(
+            L"\r\n{}\r\nStopping Container {} (1/1)\r\n", wsl::shared::Localization::WSLCCLI_ComposeGracefullyStopping(), ContainerName)));
+        up.SendCtrlBreak();
+        up.ExpectStderr(WideToMultiByte(std::format(L"Killing Container {} (1/1)\r\n", ContainerName)));
+        VERIFY_ARE_EQUAL(0, up.Wait(120'000));
+        VERIFY_ARE_EQUAL(128 + WSLCSignalSIGKILL, InspectContainer(ContainerName).State.ExitCode);
+        VerifyComposeProjectStatus(ProjectName, L"exited(1)");
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Compose_Attach_SkipsInactiveContainers)
