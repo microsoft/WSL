@@ -237,17 +237,17 @@ void wsl::windows::common::relay::BidirectionalRelay(_In_ HANDLE LeftHandle, _In
     const auto waitFlags = bothSockets ? io::MultiHandleWait::None : io::MultiHandleWait::CancelOnCompleted;
 
     auto addRelay = [&](HANDLE Input, HANDLE Output, bool OutputIsSocket) {
-        std::unique_ptr<io::OverlappedIOHandle> relay;
-        if (OutputIsSocket)
-        {
-            relay = std::make_unique<io::HalfCloseRelayHandle>(io::HandleWrapper{Input}, reinterpret_cast<SOCKET>(Output), BufferSize);
-        }
-        else
-        {
-            relay = std::make_unique<io::RelayHandle<io::ReadHandle>>(io::HandleWrapper{Input}, io::HandleWrapper{Output}, BufferSize);
-        }
+        auto onInputComplete = [Output, OutputIsSocket]() {
+            if (OutputIsSocket)
+            {
+                LOG_LAST_ERROR_IF(shutdown(reinterpret_cast<SOCKET>(Output), SD_SEND) == SOCKET_ERROR);
+            }
+        };
 
-        ioWait.AddHandle(std::move(relay), waitFlags);
+        ioWait.AddHandle(
+            std::make_unique<io::RelayHandle<io::ReadHandle>>(
+                io::HandleWrapper{Input, std::move(onInputComplete)}, io::HandleWrapper{Output}, BufferSize),
+            waitFlags);
     };
 
     addRelay(LeftHandle, RightHandle, WI_IsFlagSet(Flags, RelayFlags::RightIsSocket));

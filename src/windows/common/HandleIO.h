@@ -491,21 +491,6 @@ private:
     size_t RemainingBytes = 0;
 };
 
-class HalfCloseRelayHandle : public RelayHandle<ReadHandle>
-{
-public:
-    NON_COPYABLE(HalfCloseRelayHandle);
-    NON_MOVABLE(HalfCloseRelayHandle);
-
-    HalfCloseRelayHandle(HandleWrapper&& Input, SOCKET OutputSocket, size_t BufferSize = LX_RELAY_BUFFER_SIZE);
-
-    void Schedule() override;
-
-private:
-    SOCKET m_shutdownSocket;
-    bool m_shutdownDone = false;
-};
-
 class MultiHandleWait
 {
 public:
