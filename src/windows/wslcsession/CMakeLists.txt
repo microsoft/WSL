@@ -26,7 +26,6 @@ set(SOURCES
     # Supporting classes
     DockerEventTracker.cpp
     DockerHTTPClient.cpp
-    EventStore.cpp
     IORelay.cpp
     OptionParser.cpp
     ServiceProcessLauncher.cpp
@@ -36,12 +35,13 @@ set(SOURCES
 set(HEADERS
     DockerEventTracker.h
     DockerHTTPClient.h
-    EventStore.h
     IORelay.h
     OptionParser.h
     ServiceProcessLauncher.h
     WSLCContainer.h
     WSLCContainerMetadata.h
+    WSLCExitRequestState.h
+    WSLCRestartTransaction.h
     WindowsCertStore.h
     WSLCProcess.h
     WSLCProcessControl.h

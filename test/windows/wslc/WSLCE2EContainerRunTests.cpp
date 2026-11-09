@@ -206,6 +206,30 @@ class WSLCE2EContainerRunTests
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
+    // A foreground run returns at the first exit while the restart policy keeps restarting the container.
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_RestartAlways_Foreground)
+    {
+        auto result = RunWslc(std::format(
+            LR"(container run --restart always --name {} {} sh -c "echo run; sleep 2; exit 3")", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"run\n", .Stderr = L"", .ExitCode = 3});
+
+        VERIFY_ARE_EQUAL(std::string{"always"}, InspectContainer(WslcContainerName).HostConfig.RestartPolicy.Name);
+
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+        bool running = InspectContainer(WslcContainerName).State.Running;
+        while (!running && std::chrono::steady_clock::now() < deadline)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            running = InspectContainer(WslcContainerName).State.Running;
+        }
+
+        VERIFY_IS_TRUE(running);
+
+        result = RunWslc(std::format(L"container stop {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(InspectContainer(WslcContainerName).State.Running);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvOption)
     {
         VerifyContainerIsNotListed(WslcContainerName);
@@ -960,6 +984,20 @@ class WSLCE2EContainerRunTests
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Network_HostById_Rejected)
+    {
+        const auto hostId = wsl::shared::string::MultiByteToWide(InspectNetwork(L"host").Id);
+
+        for (const auto& reference : {hostId, hostId.substr(0, 12)})
+        {
+            auto result = RunWslc(
+                std::format(L"container run --name {} --network {} {} true", WslcContainerName, reference, DebianImage.NameAndTag()));
+            result.Verify(
+                {.Stderr = FormatErrorMessage(std::format(L"Network not found: '{}'", reference), L"WSLC_E_NETWORK_NOT_FOUND"), .ExitCode = 1});
+            VerifyContainerIsNotListed(WslcContainerName);
+        }
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Network_UserDefinedNetwork)
     {
         auto result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName));
@@ -1250,6 +1288,33 @@ with mmap.mmap(fd, 32 * 1024, flags=mmap.MAP_SHARED, prot=mmap.PROT_READ | mmap.
         VERIFY_IS_TRUE(std::filesystem::exists(EnvTestFile1));
         VERIFY_ARE_EQUAL(32ull * 1024, std::filesystem::file_size(EnvTestFile1));
         VERIFY_ARE_EQUAL(L'W', ReadFileContent(EnvTestFile1.wstring())[0]);
+    }
+
+    // Validates that fsync and fdatasync succeed on a directory in a virtiofs bind mount (#42129).
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_Bind_VirtioFs_DirectorySync_Success)
+    {
+        const auto hostDirectory = EnvTestFile1.parent_path();
+
+        constexpr auto directorySyncScript =
+            LR"PY(
+import os
+
+with open('/proc/mounts', encoding='utf-8') as mounts_file:
+    mounts = (line.split() for line in mounts_file)
+    if not any(fields[1:3] == ['/data', 'virtiofs'] for fields in mounts):
+        raise RuntimeError('/data is not mounted as virtiofs')
+
+fd = os.open('/data', os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+try:
+    os.fsync(fd)
+    os.fdatasync(fd)
+finally:
+    os.close(fd)
+)PY";
+
+        auto result = RunWslc(std::format(
+            L"container run --rm --volume \"{}:/data\" {} python3 -c \"{}\"", hostDirectory.wstring(), PythonImage.NameAndTag(), directorySyncScript));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Mount_Volume_Success)

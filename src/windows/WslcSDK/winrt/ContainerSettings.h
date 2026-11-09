@@ -16,6 +16,7 @@ Abstract:
 #include "Microsoft.WSL.Containers.ContainerSettings.g.h"
 #include "ProcessSettings.h"
 #include "Helpers.h"
+#include <winrt/Windows.Networking.h>
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
 struct ContainerSettings : ContainerSettingsT<ContainerSettings>
@@ -47,6 +48,8 @@ struct ContainerSettings : ContainerSettingsT<ContainerSettings>
     void Volumes(winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerVolume> const& value);
     winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerNamedVolume> NamedVolumes();
     void NamedVolumes(winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerNamedVolume> const& value);
+    winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerNetwork> Networks();
+    void Networks(winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerNetwork> const& value);
     winrt::Windows::Foundation::Collections::IVector<hstring> CapabilityAdditions();
     void CapabilityAdditions(winrt::Windows::Foundation::Collections::IVector<hstring> const& value);
     winrt::Windows::Foundation::Collections::IVector<hstring> CapabilityDrops();
@@ -68,6 +71,8 @@ private:
         winrt::single_threaded_vector<winrt::Microsoft::WSL::Containers::ContainerVolume>()};
     winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerNamedVolume> m_namedVolumes{
         winrt::single_threaded_vector<winrt::Microsoft::WSL::Containers::ContainerNamedVolume>()};
+    winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerNetwork> m_networks{
+        winrt::single_threaded_vector<winrt::Microsoft::WSL::Containers::ContainerNetwork>()};
     winrt::Windows::Foundation::Collections::IVector<hstring> m_capabilityAdditions{winrt::single_threaded_vector<hstring>()};
     winrt::Windows::Foundation::Collections::IVector<hstring> m_capabilityDrops{winrt::single_threaded_vector<hstring>()};
 
@@ -75,6 +80,8 @@ private:
     std::vector<WslcContainerPortMapping> m_portMappingsStructs;
     std::vector<WslcContainerVolume> m_volumesStructs;
     std::vector<WslcContainerNamedVolume> m_namedVolumesStructs;
+    std::vector<winrt::Microsoft::WSL::Containers::ContainerNetwork> m_appliedNetworks;
+    std::vector<WslcContainerNetwork> m_networksStructs;
     std::vector<std::string> m_capabilityAdditionStrings;
     std::vector<PCSTR> m_capabilityAdditionPointers;
     std::vector<std::string> m_capabilityDropStrings;

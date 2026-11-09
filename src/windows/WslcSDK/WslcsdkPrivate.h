@@ -34,6 +34,7 @@ typedef struct WslcSessionOptionsInternal
 
     WslcVhdRequirements vhdRequirements;
     WslcSessionFeatureFlags featureFlags;
+    PCSTR hostLoopback; // null when host loopback is disabled
 } WslcSessionOptionsInternal;
 
 static_assert(sizeof(WslcSessionOptionsInternal) == WSLC_SESSION_OPTIONS_SIZE, "WSLC_SESSION_OPTIONS_INTERNAL size mismatch");
@@ -87,12 +88,14 @@ typedef struct WslcContainerOptionsInternal
     const WslcContainerNamedVolume* namedVolumes;
     uint32_t namedVolumesCount;
     const WslcContainerProcessOptionsInternal* initProcessOptions;
-    PCSTR networkMode;
+    PCSTR networkMode; // null when not explicitly set
     WslcContainerFlags containerFlags;
     PCSTR const* capabilityAdditions;
     uint32_t capabilityAdditionsCount;
     PCSTR const* capabilityDrops;
     uint32_t capabilityDropsCount;
+    const WslcContainerNetwork* networks;
+    uint32_t networksCount;
 
 } WslcContainerOptionsInternal;
 
@@ -152,6 +155,8 @@ WslcCrashDumpSubscriptionImpl* GetInternalType(WslcCrashDumpSubscription handle)
 struct WslcContainerImpl
 {
     wil::com_ptr<IWSLCCompatContainer> container;
+    // Aliases container when the runtime implements IWSLCCompatContainer2.
+    IWSLCCompatContainer2* container2 = nullptr;
     WslcContainerProcessIOCallbackOptions ioCallbackOptions{};
     std::atomic<std::shared_ptr<IOCallback>> ioCallbacks;
 };

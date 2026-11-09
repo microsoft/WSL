@@ -546,6 +546,7 @@ int RunPortTracker(int Argc, char** Argv)
 
     try
     {
+        seccompDispatcher->Start();
         portTracker.Run();
     }
     catch (const std::exception& e)

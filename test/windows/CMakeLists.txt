@@ -12,7 +12,10 @@ add_compile_definitions(INLINE_TEST_METHOD_MARKUP)
 
 add_library(wsltests SHARED ${SOURCES} ${HEADERS})
 
-target_sources(wsltests PRIVATE HcsVirtualMachineBackendTests.cpp OpenVmmVirtualMachineBackendTests.cpp)
+target_sources(wsltests PRIVATE
+    HcsVirtualMachineBackendTests.cpp
+    OpenVmmVirtualMachineBackendTests.cpp
+    ${CMAKE_SOURCE_DIR}/src/windows/service/exe/LxssHttpProxy.cpp)
 add_dependencies(wsltests initramfs)
 
 add_custom_command(
@@ -52,7 +55,9 @@ target_link_libraries(wsltests
                       Dbghelp.lib
                       sfc.lib
                       Crypt32.lib
-                      Ncrypt.lib)
+                      Ncrypt.lib
+                      Winhttp.lib
+                      Synchronization.lib)
 
 add_dependencies(wsltests wslserviceidl wslclib wslc wslcsdk wslcsdkwinrtidl)
 add_subdirectory(testplugin)

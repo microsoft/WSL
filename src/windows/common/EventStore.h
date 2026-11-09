@@ -17,8 +17,6 @@
 
 namespace wsl::windows::service::wslc {
 
-class WSLCSession;
-
 class EventStore
 {
 public:
@@ -27,7 +25,7 @@ public:
     void Record(std::string&& Type, std::string&& Action, const std::string& ActorId, std::map<std::string, std::string> ActorAttributes, std::int64_t TimeNano) noexcept;
 
     Microsoft::WRL::ComPtr<IWSLCEventStream> CreateStream(
-        Microsoft::WRL::ComPtr<WSLCSession> Session, int64_t SinceTime, int64_t UntilTime, std::map<std::string, std::vector<std::string>> Filters);
+        Microsoft::WRL::ComPtr<IWSLCSession> Session, int64_t SinceTime, int64_t UntilTime, std::map<std::string, std::vector<std::string>> Filters);
 
     // Returns the next event at or after SequenceNumber that falls within [Since, Until) and matches
     // Filters, advancing SequenceNumber past it. A nullopt SequenceNumber starts a fresh reader at the
@@ -40,7 +38,8 @@ public:
         std::optional<std::chrono::sys_seconds> Since,
         std::optional<std::chrono::sys_seconds> Until,
         const std::map<std::string, std::vector<std::string>>& Filters,
-        HANDLE CancelEvent);
+        HANDLE CancelEvent,
+        HANDLE CallerProcess);
 
     void OnSessionTerminating();
 
@@ -66,8 +65,12 @@ private:
 class EventStream : public common::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCEventStream, IFastRundown>
 {
 public:
+    EventStream() = default;
+    // ReaderAvailable must be a valid auto-reset event.
+    explicit EventStream(wil::unique_event ReaderAvailable);
+
     HRESULT RuntimeClassInitialize(
-        Microsoft::WRL::ComPtr<WSLCSession> Session,
+        Microsoft::WRL::ComPtr<IWSLCSession> Session,
         EventStore* Store,
         int64_t SinceTime,
         int64_t UntilTime,
@@ -76,15 +79,16 @@ public:
     IFACEMETHOD(GetNext)(_In_opt_ HANDLE CancelEvent, _Outptr_result_z_ LPSTR* EventJson) override;
 
 private:
-    Microsoft::WRL::ComPtr<WSLCSession> m_session;
+    Microsoft::WRL::ComPtr<IWSLCSession> m_session;
     EventStore* m_store = nullptr;
 
     std::optional<std::chrono::sys_seconds> m_since;
     std::optional<std::chrono::sys_seconds> m_until;
     std::map<std::string, std::vector<std::string>> m_filters;
 
-    std::mutex m_lock;
-    _Guarded_by_(m_lock) std::optional<uint64_t> m_nextSequenceNumber;
+    wil::unique_event m_readerAvailable{wil::EventOptions::Signaled};
+    // Access is serialized by the m_readerAvailable auto-reset event.
+    std::optional<uint64_t> m_nextSequenceNumber;
 };
 
 } // namespace wsl::windows::service::wslc
