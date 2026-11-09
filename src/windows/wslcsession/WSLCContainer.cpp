@@ -856,34 +856,6 @@ void ProcessNamedVolumes(const WSLCContainerOptions& containerOptions, wsl::wind
     }
 }
 
-// Callers hold a VM lease while flushing or loading, so this uses the VM directly.
-class GuestContainerStateFiles : public wsl::windows::service::wslc::IWSLCContainerStateFiles
-{
-public:
-    explicit GuestContainerStateFiles(wsl::windows::service::wslc::WSLCSessionRuntime& Runtime) : m_runtime(Runtime)
-    {
-    }
-
-    int Read(const std::string& Path, size_t MaxSize, std::string& Content) override
-    {
-        return Vm().ReadGuestFile(Path, MaxSize, Content);
-    }
-
-    int Write(const std::string& Path, std::string_view Content) override
-    {
-        return Vm().WriteGuestFile(Path, Content, WSLC_WRITE_FILE_FLAG_ATOMIC | WSLC_WRITE_FILE_FLAG_NO_CREATE_PARENTS);
-    }
-
-private:
-    WSLCVirtualMachine& Vm()
-    {
-        THROW_HR_IF(WSLC_E_VM_NOT_RUNNING, !m_runtime.HasVm());
-        return m_runtime.Vm();
-    }
-
-    wsl::windows::service::wslc::WSLCSessionRuntime& m_runtime;
-};
-
 } // namespace
 
 std::string wsl::windows::service::wslc::CleanContainerName(const std::string& name)
@@ -1191,7 +1163,6 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
 
 wil::com_ptr<IWSLCProcess> WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions)
 {
-    auto persist = wil::scope_exit([this]() { PersistState(); });
     return StartPhase(Flags, StartOptions, false);
 }
 
@@ -1271,16 +1242,22 @@ wil::com_ptr<IWSLCProcess> WSLCContainerImpl::StartPhase(
     }
 
     // Acceptance transfers lifecycle authority after argument validation and attachment preparation.
+    HRESULT persistResult{};
     if (PolicyRestartToken.has_value())
     {
         m_policyRestartPending = false;
-        m_persistentState.Mutate([](auto& state) { state.RestartCount++; });
+        persistResult = m_persistentState.Update([](auto& state) { state.RestartCount++; });
     }
     else
     {
         CancelPolicyRestartLockHeld();
         m_restartBackoff.Reset();
-        m_persistentState.Mutate([](auto& state) { state.RestartCount = 0; });
+        persistResult = m_persistentState.Update([](auto& state) { state.RestartCount = 0; });
+    }
+
+    if (FAILED(persistResult))
+    {
+        ReportStateSaveFailure(persistResult);
     }
 
     // Acceptance invalidates predecessor responses even if resource preparation fails.
@@ -1612,7 +1589,6 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
             {
                 CommitState(WslcContainerStateDeleted, eventTimeNano, attributes);
                 comWrapper = ReleaseResources();
-                m_persistentState.MarkDeleted();
             }
 
             // Signal init exit after the state transition and resource cleanup so awaiters observe Deleted.
@@ -1854,8 +1830,6 @@ void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds)
         }
     });
 
-    auto persist = wil::scope_exit([this]() { PersistState(); });
-
     if (wasRunning)
     {
         StopPhase(Signal, TimeoutSeconds, false, true);
@@ -2065,7 +2039,6 @@ try
 
     WSL_LOG("ContainerPolicyRestart", TraceLoggingValue(m_id.c_str(), "Id"), TraceLoggingValue(Token, "Token"));
 
-    auto persist = wil::scope_exit([this]() { PersistState(); });
     StartPhase(WSLCContainerStartFlagsNone, nullptr, false, Token);
 }
 catch (...)
@@ -3254,7 +3227,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     auto mergedLabels = StripInternalLabels(std::move(inspectData.Config.Labels));
     const auto createdAt = wsl::windows::common::timestamp::Rfc3339ToEpoch(inspectData.Created);
-    auto persistentState = WSLCContainerStateStore::ForNewContainer(std::make_shared<GuestContainerStateFiles>(runtime), result.Id);
+    auto persistentState = WSLCContainerStateStore::ForNewContainer(runtime, result.Id);
 
     auto container = std::make_shared<WSLCContainerImpl>(
         wslcSession,
@@ -3276,16 +3249,6 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         containerOptions.Flags,
         containerOptions.RestartPolicy,
         std::move(persistentState));
-
-    // The metadata label records that the document exists, so the container is not created without it.
-    if (const auto flushResult = container->m_persistentState.Flush(); FAILED(flushResult))
-    {
-        THROW_HR_WITH_USER_ERROR_MSG(
-            flushResult,
-            Localization::MessageWslcContainerStateSaveFailed(wsl::shared::string::MultiByteToWide(container->m_id)),
-            "Failed to save the persisted state of container '%hs'",
-            container->m_id.c_str());
-    }
 
     container->Initialize();
 
@@ -3378,8 +3341,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     // Containers created before the image was persisted fall back to what Docker reports.
     std::string image = metadata.Image.empty() ? dockerContainer.Image : std::move(metadata.Image);
 
-    auto persistentState = WSLCContainerStateStore::ForExistingContainer(
-        std::make_shared<GuestContainerStateFiles>(runtime), dockerContainer.Id, metadata.StateStorage);
+    auto persistentState = WSLCContainerStateStore::ForExistingContainer(runtime, dockerContainer.Id, metadata.StateStorage);
     if (FAILED(persistentState.LoadError))
     {
         LOG_HR_MSG(persistentState.LoadError, "Failed to load the persisted state of container '%hs'", dockerContainer.Id.c_str());
@@ -3447,16 +3409,10 @@ const std::string& WSLCContainerImpl::ID() const noexcept
     return m_id;
 }
 
-void WSLCContainerImpl::PersistState() noexcept
+void WSLCContainerImpl::ReportStateSaveFailure(HRESULT Result) noexcept
 try
 {
-    const auto result = m_persistentState.Flush();
-    if (SUCCEEDED(result))
-    {
-        return;
-    }
-
-    LOG_HR_MSG(result, "Failed to save the persisted state of container '%hs'", m_id.c_str());
+    LOG_HR_MSG(Result, "Failed to save the persisted state of container '%hs'", m_id.c_str());
     EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcContainerStateSaveFailed(wsl::shared::string::MultiByteToWide(m_id)));
 }
 CATCH_LOG()

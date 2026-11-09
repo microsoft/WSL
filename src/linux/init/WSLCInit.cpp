@@ -1095,22 +1095,30 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, wsl::shared::Transac
 
 int WriteFileAtomic(const std::filesystem::path& Path, const gsl::span<gsl::byte>& Content, int Permissions)
 {
-    auto tmpPath = Path;
-    tmpPath += ".tmp";
-
-    // Always stage into a freshly created regular file. Opening a leftover FIFO or device would block or have side effects.
-    if (unlink(tmpPath.c_str()) < 0 && errno != ENOENT)
+    // Every step goes through the same directory fd so the staging file and the rename target can't diverge.
+    wil::unique_fd directory{open(Path.parent_path().c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC)};
+    if (!directory)
     {
         return errno;
     }
 
-    wil::unique_fd fd{open(tmpPath.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, Permissions)};
+    const auto name = Path.filename();
+    auto tmpName = name;
+    tmpName += ".tmp";
+
+    // Always stage into a freshly created regular file. Opening a leftover FIFO or device would block or have side effects.
+    if (unlinkat(directory.get(), tmpName.c_str(), 0) < 0 && errno != ENOENT)
+    {
+        return errno;
+    }
+
+    wil::unique_fd fd{openat(directory.get(), tmpName.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, Permissions)};
     if (!fd)
     {
         return errno;
     }
 
-    auto removeTmp = wil::scope_exit([&]() { unlink(tmpPath.c_str()); });
+    auto removeTmp = wil::scope_exit([&]() { unlinkat(directory.get(), tmpName.c_str(), 0); });
 
     if (UtilWriteBuffer(fd.get(), Content) != static_cast<ssize_t>(Content.size()) || fsync(fd.get()) < 0)
     {
@@ -1119,7 +1127,7 @@ int WriteFileAtomic(const std::filesystem::path& Path, const gsl::span<gsl::byte
 
     fd.reset();
 
-    if (rename(tmpPath.c_str(), Path.c_str()) < 0)
+    if (renameat(directory.get(), tmpName.c_str(), directory.get(), name.c_str()) < 0)
     {
         return errno;
     }
@@ -1127,8 +1135,7 @@ int WriteFileAtomic(const std::filesystem::path& Path, const gsl::span<gsl::byte
     removeTmp.release();
 
     // The rename is only durable once the directory entry is flushed.
-    wil::unique_fd directory{open(Path.parent_path().c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC)};
-    if (!directory || fsync(directory.get()) < 0)
+    if (fsync(directory.get()) < 0)
     {
         return errno;
     }
@@ -1149,14 +1156,14 @@ void HandleMessageImpl(
     const auto* path = wsl::shared::string::FromSpan(Buffer, Message.PathIndex);
     const auto content = Buffer.subspan(Message.ContentIndex, Message.ContentLength);
 
-    if (WI_IsFlagClear(Message.Flags, WSLC_WRITE_FILE_FLAG_NO_CREATE_PARENTS) && UtilMkdirPath(path, 0755, true) < 0)
+    if (WI_IsFlagClear(Message.Flags, WSLCWriteFileFlagsNoCreateParents) && UtilMkdirPath(path, 0755, true) < 0)
     {
         Transaction.SendResultMessage<int32_t>(errno);
         return;
     }
 
     // Atomic writes always create or replace the target, so OpenFlags does not apply.
-    if (WI_IsFlagSet(Message.Flags, WSLC_WRITE_FILE_FLAG_ATOMIC))
+    if (WI_IsFlagSet(Message.Flags, WSLCWriteFileFlagsAtomic))
     {
         Transaction.SendResultMessage<int32_t>(WriteFileAtomic(path, content, Message.Permissions));
         return;

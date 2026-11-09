@@ -26,7 +26,6 @@ Abstract:
 #include "WSLCE2EHelpers.h"
 #include "HttpHeaderEndDetector.h"
 #include "WSLCSessionDefaults.h"
-#include "../../../src/windows/wslcsession/WSLCContainerStateStore.h"
 #include <nlohmann/json.hpp>
 
 using namespace std::chrono;
@@ -8408,7 +8407,7 @@ sys.exit(1 if queries else 0)
 
     static std::string ContainerStatePath(const std::string& ContainerId)
     {
-        return wsl::windows::service::wslc::ContainerStatePath(ContainerId);
+        return std::format("/var/lib/docker/containers/{}/wslc-state.json", ContainerId);
     }
 
     static std::optional<std::string> TryReadGuestFile(IWSLCSession* Session, const std::string& Path)
@@ -8522,8 +8521,11 @@ sys.exit(1 if queries else 0)
         constexpr auto c_sessionName = L"persistent-state-session-test";
         std::string createdStatePath;
         std::string corruptStatePath;
+        std::string oversizedStatePath;
+        std::string missingStatePath;
         std::string runningStatePath;
         const std::string corruptContent = "{\"RestartCount\":";
+        constexpr size_t c_oversizedLength = 64 * 1024 + 1;
 
         {
             auto session = CreateSession(GetDefaultSessionSettings(c_sessionName, true));
@@ -8538,6 +8540,16 @@ sys.exit(1 if queries else 0)
             corrupt.SetDeleteOnClose(false);
             corruptStatePath = ContainerStatePath(corrupt.Id());
 
+            WSLCContainerLauncher oversizedLauncher("debian:latest", "test-persistent-state-oversized", {"sleep", "99999"});
+            auto oversized = oversizedLauncher.Create(*session);
+            oversized.SetDeleteOnClose(false);
+            oversizedStatePath = ContainerStatePath(oversized.Id());
+
+            WSLCContainerLauncher missingLauncher("debian:latest", "test-persistent-state-missing", {"sleep", "99999"});
+            auto missing = missingLauncher.Create(*session);
+            missing.SetDeleteOnClose(false);
+            missingStatePath = ContainerStatePath(missing.Id());
+
             WSLCContainerLauncher runningLauncher("debian:latest", "test-persistent-state-running", {"sleep", "99999"});
             runningLauncher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
             auto running = runningLauncher.Launch(*session, WSLCContainerStartFlagsNone);
@@ -8549,11 +8561,20 @@ sys.exit(1 if queries else 0)
             // Simulate state recorded by an earlier session and a damaged document.
             WriteGuestFile(session.get(), createdStatePath, nlohmann::json{{"RestartCount", 5}}.dump());
             WriteGuestFile(session.get(), corruptStatePath, corruptContent);
+            auto result = ExpectCommandResult(
+                session.get(),
+                {"/bin/sh", "-c", std::format("head -c {} /dev/zero | tr '\\0' ' ' > '{}' && sync", c_oversizedLength, oversizedStatePath)},
+                0);
+            VERIFY_ARE_EQUAL(0, result.Code);
+            result = ExpectCommandResult(session.get(), {"/bin/sh", "-c", std::format("rm -f '{}' && sync", missingStatePath)}, 0);
+            VERIFY_ARE_EQUAL(0, result.Code);
         }
 
         auto session = CreateSession(GetDefaultSessionSettings(c_sessionName, true));
         auto created = OpenContainer(session.get(), "test-persistent-state-created");
         auto corrupt = OpenContainer(session.get(), "test-persistent-state-corrupt");
+        auto oversized = OpenContainer(session.get(), "test-persistent-state-oversized");
+        auto missing = OpenContainer(session.get(), "test-persistent-state-missing");
         auto running = OpenContainer(session.get(), "test-persistent-state-running");
 
         VERIFY_ARE_EQUAL(5u, created.Inspect().RestartCount);
@@ -8563,6 +8584,19 @@ sys.exit(1 if queries else 0)
         VERIFY_SUCCEEDED(corrupt.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
         VERIFY_SUCCEEDED(corrupt.Get().Stop(WSLCSignalSIGKILL, 0));
         VERIFY_ARE_EQUAL(corruptContent, TryReadGuestFile(session.get(), corruptStatePath).value_or(""));
+
+        // An oversized document is treated as damaged.
+        VERIFY_ARE_EQUAL(0u, oversized.Inspect().RestartCount);
+        VERIFY_SUCCEEDED(oversized.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+        VERIFY_SUCCEEDED(oversized.Get().Stop(WSLCSignalSIGKILL, 0));
+        auto oversizedSize = ExpectCommandResult(session.get(), {"/bin/sh", "-c", std::format("wc -c < '{}'", oversizedStatePath)}, 0);
+        VERIFY_ARE_EQUAL(std::format("{}\n", c_oversizedLength), oversizedSize.Output[1]);
+
+        // A document that is expected but missing is never recreated.
+        VERIFY_ARE_EQUAL(0u, missing.Inspect().RestartCount);
+        VERIFY_SUCCEEDED(missing.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+        VERIFY_SUCCEEDED(missing.Get().Stop(WSLCSignalSIGKILL, 0));
+        VERIFY_IS_FALSE(GuestFileExists(session.get(), missingStatePath));
 
         // The policy start performed when the session starts counts as a restart.
         WaitForContainerState(running, WslcContainerStateRunning);
@@ -8576,6 +8610,13 @@ sys.exit(1 if queries else 0)
         corrupt.SetDeleteOnClose(false);
         VERIFY_SUCCEEDED(corrupt.Get().Delete(WSLCDeleteFlagsNone));
         VERIFY_IS_FALSE(GuestFileExists(session.get(), corruptStatePath));
+
+        oversized.SetDeleteOnClose(false);
+        VERIFY_SUCCEEDED(oversized.Get().Delete(WSLCDeleteFlagsNone));
+        VERIFY_IS_FALSE(GuestFileExists(session.get(), oversizedStatePath));
+
+        missing.SetDeleteOnClose(false);
+        VERIFY_SUCCEEDED(missing.Get().Delete(WSLCDeleteFlagsNone));
     }
 
     WSLC_TEST_METHOD(EventStream)

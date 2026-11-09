@@ -234,8 +234,8 @@ private:
     void RunPolicyRestart(std::uint64_t Token) noexcept;
     void OnPolicyRestartFailed(std::uint64_t Token) noexcept;
 
-    // Saves pending persisted state, warning the caller on failure. Must not be called with m_lock held.
-    void PersistState() noexcept;
+    // Logs a failure to save the persisted state and warns the caller.
+    void ReportStateSaveFailure(HRESULT Result) noexcept;
 
     // Undoes what the phases left half-done: releases the resources the stop phase held back and
     // requests the auto-delete OnStopped() deferred, returning that delete's transition.

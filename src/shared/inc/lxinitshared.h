@@ -2024,12 +2024,17 @@ struct WSLC_GET_GUEST_CAPABILITIES
     PRETTY_PRINT(FIELD(Header));
 };
 
-// Write to <path>.tmp, then rename it over <path> so readers see either the old or the new content.
-// The file and its directory are flushed to disk before the write completes.
-#define WSLC_WRITE_FILE_FLAG_ATOMIC 0x1
+typedef enum _WSLC_WRITE_FILE_FLAGS
+{
+    WSLCWriteFileFlagsNone = 0,
 
-// Fail with ENOENT instead of creating missing parent directories.
-#define WSLC_WRITE_FILE_FLAG_NO_CREATE_PARENTS 0x2
+    // Write to <path>.tmp, then rename it over <path> so readers see either the old or the new content.
+    // The file and its directory are flushed to disk before the write completes.
+    WSLCWriteFileFlagsAtomic = 0x1,
+
+    // Fail with ENOENT instead of creating missing parent directories.
+    WSLCWriteFileFlagsNoCreateParents = 0x2,
+} WSLC_WRITE_FILE_FLAGS;
 
 struct WSLC_WRITE_FILE
 {
