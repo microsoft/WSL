@@ -10,7 +10,7 @@ using namespace VirtualMachineBackendTestHelpers;
 
 namespace {
 
-constexpr HRESULT c_notSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+constexpr HRESULT c_openVmmNotSupported = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
 
 VmBootDiskRequest CreateDisk(std::wstring Key)
 {
@@ -20,7 +20,7 @@ VmBootDiskRequest CreateDisk(std::wstring Key)
     return disk;
 }
 
-VmNetworkAdapterRequest CreateNetworkRequest()
+VmNetworkAdapterRequest CreateOpenVmmNetworkRequest()
 {
     VmNetworkAdapterRequest request;
     request.Tag = L"eth0";
@@ -115,10 +115,10 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_IS_FALSE(disk.ReadOnly);
 
         request.Mmio.HighWindowSizeBytes = c_mib;
-        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+        VERIFY_ARE_EQUAL(c_openVmmNotSupported, DescribeResult(request));
         request.Mmio = {};
         request.Memory.SmallPageBacking = VmFeatureRequest::Required;
-        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+        VERIFY_ARE_EQUAL(c_openVmmNotSupported, DescribeResult(request));
     }
 
     TEST_METHOD(ReservesExactPlacementsBeforeAutomaticDisks)
@@ -152,7 +152,7 @@ class OpenVmmVirtualMachineBackendTests
         SKIP_TEST_ARM64();
         auto request = CreateRequest();
         VERIFY_IS_TRUE(ValidateCreateRequest(request).NetworkAdapters.empty());
-        request.NetworkAdapters.push_back(CreateNetworkRequest());
+        request.NetworkAdapters.push_back(CreateOpenVmmNetworkRequest());
         const auto description = ValidateCreateRequest(request);
         VERIFY_ARE_EQUAL(size_t{1}, description.NetworkAdapters.size());
         const auto& adapter = description.NetworkAdapters.at(L"eth0");
@@ -204,13 +204,13 @@ class OpenVmmVirtualMachineBackendTests
         for (const UINT32 lun : {UINT32{254}, UINT32_MAX})
         {
             disk.Placement = VmScsiPlacement{{0, lun}};
-            VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+            VERIFY_ARE_EQUAL(c_openVmmNotSupported, DescribeResult(request));
         }
 
         for (const UINT32 lun : {UINT32{0}, UINT32{254}, UINT32_MAX})
         {
             disk.Placement = VmScsiPlacement{{1, lun}};
-            VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+            VERIFY_ARE_EQUAL(c_openVmmNotSupported, DescribeResult(request));
         }
 
         disk.Placement = VmScsiPlacement{{0, 253}};
@@ -240,7 +240,7 @@ class OpenVmmVirtualMachineBackendTests
     {
         SKIP_TEST_ARM64();
         auto request = CreateRunnableRequest();
-        const auto networkRequest = CreateNetworkRequest();
+        const auto networkRequest = CreateOpenVmmNetworkRequest();
         request.NetworkAdapters.push_back(networkRequest);
 
         GUID directoryId{};
@@ -252,16 +252,18 @@ class OpenVmmVirtualMachineBackendTests
         auto removeShareDirectory = wil::scope_exit([&] { LOG_IF_WIN32_BOOL_FALSE(RemoveDirectoryW(sharePath.c_str())); });
 
         auto backend = OpenVmmVirtualMachineBackend::Create(request);
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->CreateFileSystemDevice({VmPlan9SocketDevice{{50000}}}); }));
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->CreateFileSystemDevice({VmPlan9VirtioDevice{L"plan9"}}); }));
+        VERIFY_ARE_EQUAL(
+            c_openVmmNotSupported, OperationResult([&] { backend->CreateFileSystemDevice({VmPlan9SocketDevice{{50000}}}); }));
+        VERIFY_ARE_EQUAL(
+            c_openVmmNotSupported, OperationResult([&] { backend->CreateFileSystemDevice({VmPlan9VirtioDevice{L"plan9"}}); }));
         VmFileSystemDeviceRequest fileSystemRequest{VmVirtioFsDevice{L"test-share", VmVirtioFsLayout::Aggregate}};
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->CreateFileSystemDevice(fileSystemRequest); }));
+        VERIFY_ARE_EQUAL(c_openVmmNotSupported, OperationResult([&] { backend->CreateFileSystemDevice(fileSystemRequest); }));
         auto& fileSystemTransport = std::get<VmVirtioFsDevice>(fileSystemRequest.Transport);
         fileSystemTransport.Layout = VmVirtioFsLayout::SingleShare;
         fileSystemRequest.UserToken = request.Identity.UserToken;
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->CreateFileSystemDevice(fileSystemRequest); }));
+        VERIFY_ARE_EQUAL(c_openVmmNotSupported, OperationResult([&] { backend->CreateFileSystemDevice(fileSystemRequest); }));
         fileSystemRequest.UserToken.emplace();
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->CreateFileSystemDevice(fileSystemRequest); }));
+        VERIFY_ARE_EQUAL(c_openVmmNotSupported, OperationResult([&] { backend->CreateFileSystemDevice(fileSystemRequest); }));
         fileSystemRequest.UserToken.reset();
         const auto fileSystemDevice = backend->CreateFileSystemDevice(fileSystemRequest);
         VERIFY_ARE_EQUAL(UINT64{2}, fileSystemDevice.Id.Value);
@@ -275,11 +277,13 @@ class OpenVmmVirtualMachineBackendTests
         VmFileSystemShareRequest shareRequest;
         shareRequest.HostPath = sharePath;
         shareRequest.Options = VmPlan9ShareOptions{};
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest); }));
+        VERIFY_ARE_EQUAL(
+            c_openVmmNotSupported, OperationResult([&] { backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest); }));
         shareRequest.Options = VmVirtioFsShareOptions{};
         auto& shareOptions = std::get<VmVirtioFsShareOptions>(shareRequest.Options);
         shareOptions.MountOptions.emplace(L"unsupported", L"");
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest); }));
+        VERIFY_ARE_EQUAL(
+            c_openVmmNotSupported, OperationResult([&] { backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest); }));
         shareOptions.MountOptions.clear();
         const auto share = backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest);
         const auto servingDevice = backend->GetFileSystemDeviceStatus(fileSystemDevice.Id);
@@ -311,7 +315,7 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(
             std::get<VmUserModeNatNetwork>(networkRequest.Configuration).Configuration.clientIp.value,
             std::get<VmUserModeNatNetwork>(network.EffectiveConfiguration).Configuration.clientIp.value);
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AddNetworkAdapter(networkRequest); }));
+        VERIFY_ARE_EQUAL(c_openVmmNotSupported, OperationResult([&] { backend->AddNetworkAdapter(networkRequest); }));
 
         // Consomme processes port requests once the guest has initialized its network queues.
         auto guest = StartGuest(*backend);
@@ -333,7 +337,7 @@ class OpenVmmVirtualMachineBackendTests
 
         auto dynamicBinding = bindingRequest;
         dynamicBinding.HostPort = 0;
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->BindPort(network.Id, dynamicBinding); }));
+        VERIFY_ARE_EQUAL(c_openVmmNotSupported, OperationResult([&] { backend->BindPort(network.Id, dynamicBinding); }));
         backend->UnbindPort(binding.Id);
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->UnbindPort(binding.Id); }));
 
