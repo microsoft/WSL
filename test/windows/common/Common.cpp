@@ -3235,7 +3235,7 @@ std::wstring FormatErrorMessage(std::wstring_view message, std::wstring_view err
     return std::format(
         L"{}\r\nError code: {}\r\n"
         L"If this error was unexpected, please consider searching for existing issues or filing a new issue at "
-        L"https://github.com/microsoft/WSL/issues.\r\n",
+        L"https://github.com/microsoft/WSL/issues\r\n",
         message,
         errorCode);
 }
