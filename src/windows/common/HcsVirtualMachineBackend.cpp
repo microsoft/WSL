@@ -1450,8 +1450,6 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
                 const auto* options = std::get_if<VmVirtioFsShareOptions>(&Request.Options);
                 THROW_HR_IF_MSG(E_INVALIDARG, !options, "A virtio-fs device requires virtio-fs share options");
 
-                hostPath = NormalizeSharePath(Request.HostPath);
-
                 auto shareOptions = options->MountOptions;
                 if (Request.ReadOnly)
                 {
@@ -1484,6 +1482,11 @@ VmFileSystemShare HcsVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device
                     {
                         shareUserToken = userToken;
                     }
+                }
+
+                {
+                    const auto runAsUser = wil::impersonate_token(shareUserToken.get());
+                    hostPath = NormalizeSharePath(Request.HostPath);
                 }
 
                 // Repeating a request for the same path and options reuses the existing share so that

@@ -203,20 +203,29 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     }
     else
     {
-        if (!wsl::windows::common::filesystem::FileExists(m_vmConfig.KernelPath.c_str()))
+        const auto runAsUser = wil::impersonate_token(m_userToken.get());
+
+        wil::unique_hfile kernel{CreateFileW(
+            m_vmConfig.KernelPath.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+
+        if (!kernel)
         {
-            THROW_HR_WITH_USER_ERROR(
-                WSL_E_CUSTOM_KERNEL_NOT_FOUND,
-                Localization::MessageCustomKernelNotFound(
-                    wsl::windows::common::helpers::GetWslConfigPath(m_userToken.get()), m_vmConfig.KernelPath.c_str()));
+            const auto error = GetLastError();
+            if (error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND)
+            {
+                THROW_HR_WITH_USER_ERROR(
+                    WSL_E_CUSTOM_KERNEL_NOT_FOUND,
+                    Localization::MessageCustomKernelNotFound(
+                        wsl::windows::common::helpers::GetWslConfigPath(m_userToken.get()), m_vmConfig.KernelPath.c_str()));
+            }
+
+            THROW_WIN32_MSG(error, "Failed to open kernel: '%ls'", m_vmConfig.KernelPath.c_str());
         }
 
         // Direct boot is not supported on ARM64. Modify the rootfs directory to be a temporary directory that contains
         // copies of the initrd file and private kernel.
         if constexpr (wsl::shared::Arm64)
         {
-            auto impersonate = wil::impersonate_token(m_userToken.get());
-
             m_rootFsPath = m_tempPath / LXSS_ROOTFS_DIRECTORY;
             wil::CreateDirectoryDeep(m_rootFsPath.c_str());
             auto initRdPath = m_installPath / LXSS_TOOLS_DIRECTORY / LXSS_VM_MODE_INITRD_NAME;
@@ -249,6 +258,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     }
     else
     {
+        const auto runAsUser = wil::impersonate_token(m_userToken.get());
         if (!wsl::windows::common::filesystem::FileExists(m_vmConfig.KernelModulesPath.c_str()))
         {
             THROW_HR_WITH_USER_ERROR(
@@ -1280,8 +1290,15 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::DetachDisk(_In_opt_ PCWSTR Disk)
 
         if (!disk.PassThrough)
         {
+            if (TargetPath == nullptr)
+            {
+                return true;
+            }
+
+            const auto runAsUser = wil::CoImpersonateClient();
+
             std::error_code error{};
-            return TargetPath == nullptr || std::filesystem::equivalent(disk.Path, TargetPath, error);
+            return std::filesystem::equivalent(disk.Path, TargetPath, error);
         }
 
         return TargetPath == nullptr || wsl::windows::common::string::IsPathComponentEqual(disk.Path, TargetPath);
@@ -1405,6 +1422,7 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
 
     if (privateSystemDistro)
     {
+        const auto runAsUser = wil::impersonate_token(m_userToken.get());
         if (wsl::windows::common::string::IsPathComponentEqual(m_vmConfig.SystemDistroPath.extension().native(), L".img"))
         {
             m_systemDistroDeviceType = LxMiniInitMountDeviceTypePmem;
@@ -1427,6 +1445,7 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
     }
     if (m_systemDistroDeviceType == LxMiniInitMountDeviceTypePmem)
     {
+        const auto runAsUser = wil::impersonate_token(m_userToken.get());
         highMmioGapInMB += RequiredExtraMmioSpaceForPmemFileInMb(m_vmConfig.SystemDistroPath.c_str());
     }
     request.Mmio.HighWindowSizeBytes = static_cast<std::uint64_t>(highMmioGapInMB) * _1MB;
@@ -1894,8 +1913,13 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
     WI_ASSERT(Admin == wsl::windows::common::security::IsTokenElevated(UserToken));
 
     // Ensure that the path has a trailing path separator.
-    std::wstring sharePath = NormalizeSharePath(Path);
+    std::wstring sharePath;
     const auto mountOptions = ParseVirtioFsMountOptions(Options);
+
+    {
+        const auto runAsUser = wil::impersonate_token(UserToken);
+        sharePath = NormalizeSharePath(Path);
+    }
 
     bool created = false;
     auto share = m_backend->GetFileSystemShare([&](const VmFileSystemShare& candidate) {
