@@ -289,6 +289,41 @@ class Plan9ProtocolTests
         VERIFY_IS_TRUE(std::ranges::equal(c_versionResponse, version));
     }
 
+    WSL2_TEST_METHOD(MutuallyReferentialFlushesComplete)
+    {
+        auto server = ConnectToServer();
+        const auto socket = server.client.get();
+        const DWORD timeout = 5000;
+        VERIFY_ARE_EQUAL(setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout)), 0);
+
+        for (const uint16_t count : {uint16_t{2}, uint16_t{3}})
+        {
+            std::vector<uint8_t> requests;
+            std::vector<std::vector<uint8_t>> expected;
+            for (uint16_t tag = 1; tag <= count; ++tag)
+            {
+                std::vector<uint8_t> payload;
+                AppendU16(payload, tag == count ? 1 : tag + 1);
+                const auto request = MakePlan9Message(Plan9MessageType::Tflush, std::move(payload), tag);
+                requests.insert(requests.end(), request.begin(), request.end());
+                expected.push_back(MakePlan9Message(Plan9MessageType::Rflush, {}, tag));
+            }
+
+            SendAll(socket, requests);
+            std::vector<std::vector<uint8_t>> responses;
+            for (uint16_t index = 0; index < count; ++index)
+            {
+                responses.push_back(ReceivePlan9Message(socket));
+            }
+
+            std::ranges::sort(responses);
+            VERIFY_IS_TRUE(responses == expected);
+        }
+
+        const auto version = SendMessageAndExpectResponse(socket, c_versionRequest, Plan9MessageType::Rversion);
+        VERIFY_IS_TRUE(std::ranges::equal(c_versionResponse, version));
+    }
+
     WSL2_TEST_METHOD(GetLockIncludesClientIdInResponseSize)
     {
         auto server = ConnectToOpenedServer();
