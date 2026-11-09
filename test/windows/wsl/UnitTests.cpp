@@ -5790,13 +5790,13 @@ VERSION_ID="Invalid|Format"
                 DistroFileChange distributionconf(L"/etc/wsl-distribution.conf", false);
                 distributionconf.SetContent(Manifest);
                 WslShutdown();
-                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--export test_distro {} --format vhd", VhdName)), 0L);
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--export test_distro \"{}\" --format vhd", VhdName)), 0L);
             };
 
             auto InstallFromVhd =
                 [](LPCWSTR DistroName, LPCWSTR VhdName, int ExpectedExitCode = 0, LPCWSTR ExpectedOutput = nullptr, LPCWSTR ExpectedWarnings = nullptr) {
                     auto [out, err] =
-                        LxsstuLaunchWslAndCaptureOutput(std::format(L"--import-in-place {} {}", DistroName, VhdName), ExpectedExitCode);
+                        LxsstuLaunchWslAndCaptureOutput(std::format(L"--import-in-place {} \"{}\"", DistroName, VhdName), ExpectedExitCode);
 
                     if (ExpectedOutput != nullptr)
                     {
@@ -5809,16 +5809,30 @@ VERSION_ID="Invalid|Format"
                     }
                 };
 
+            GUID runId{};
+            VERIFY_SUCCEEDED(CoCreateGuid(&runId));
+            const auto importDirectory = std::filesystem::temp_directory_path() /
+                                         std::format(L"wsl-import-in-place-{}", wsl::shared::string::GuidToString<wchar_t>(runId));
+            VERIFY_IS_TRUE(std::filesystem::create_directory(importDirectory));
+            auto cleanupDirectory =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(importDirectory); });
+
+            const auto siblingDirectories = {importDirectory / LXSS_ROOTFS_DIRECTORY, importDirectory / LXSS_TEMP_DIRECTORY};
+            for (const auto& directory : siblingDirectories)
+            {
+                VERIFY_IS_TRUE(std::filesystem::create_directory(directory));
+            }
+
             const auto distroName = L"distro-import-in-place";
-            const auto vhdName = L"distro-import-in-place.vhdx";
+            const auto vhdPath = importDirectory / L"distro-import-in-place.vhdx";
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 LxsstuLaunchWsl(std::format(L"--unregister {}", distroName).c_str());
-                DeleteFileW(vhdName);
+                DeleteFileW(vhdPath.c_str());
             });
 
-            CreateVhdFromManifest(L"", vhdName);
+            CreateVhdFromManifest(L"", vhdPath.c_str());
 
-            InstallFromVhd(distroName, vhdName);
+            InstallFromVhd(distroName, vhdPath.c_str());
             ValidateDistributionStarts(distroName);
 
             // Validate that the distribution was installed under the right name
@@ -5834,7 +5848,14 @@ VERSION_ID="Invalid|Format"
             auto [json, profile_path] = ValidateDistributionTerminalProfile(distroName, true);
 
             VERIFY_IS_TRUE(std::filesystem::exists(profile_path));
-            cleanup.reset();
+            VERIFY_ARE_EQUAL(0L, LxsstuLaunchWsl(std::format(L"--unregister {}", distroName)));
+            cleanup.release();
+
+            VERIFY_IS_FALSE(std::filesystem::exists(vhdPath));
+            for (const auto& directory : siblingDirectories)
+            {
+                VERIFY_IS_TRUE(std::filesystem::is_directory(directory));
+            }
 
             // Terminal profile should be removed when the distribution is unregistered.
             VERIFY_IS_FALSE(std::filesystem::exists(profile_path));
