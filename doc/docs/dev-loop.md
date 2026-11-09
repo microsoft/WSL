@@ -26,7 +26,7 @@ winget configure -f .config/configuration.vsEnterprise.winget      # Enterprise
 
 If you prefer to install prerequisites manually:
 
-- CMake >= 3.25
+- CMake >= 4.2
     - Can be installed with `winget install Kitware.CMake`
 - Visual Studio 2026 with the required components:
     - Use VS Installer → More → Import configuration and select [`.vsconfig`](https://github.com/microsoft/WSL/blob/master/.vsconfig)

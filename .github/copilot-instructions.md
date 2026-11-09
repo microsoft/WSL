@@ -201,7 +201,7 @@ When adding settings to `src/shared/configfile/`:
 - Many validation and development tasks CAN be performed on Linux (documentation, formatting, Python validation scripts)
 
 ### Windows Build Requirements
-- CMake >= 3.25 (`winget install Kitware.CMake`)
+- CMake >= 4.2 (`winget install Kitware.CMake`)
 - Visual Studio with these components:
   - Windows SDK 26100
   - MSBuild
@@ -396,7 +396,7 @@ debugConsole=true
 
 ### Windows (Full Development)
 1. Install Visual Studio with required components (listed above)
-2. Install CMake 3.25+
+2. Install CMake 4.2+
 3. Enable Developer Mode
 4. Clone repository
 5. Run `cmake .` to generate solution
