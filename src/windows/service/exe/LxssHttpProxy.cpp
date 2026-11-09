@@ -290,9 +290,10 @@ try
     {
         auto dataLock = m_proxySettingsLock.lock();
 
+        m_unfilteredProxySettings = newProxySettings;
         if (m_networkMode)
         {
-            FilterProxySettingsByNetworkConfiguration(newProxySettings, *m_networkMode);
+            FilterProxySettingsByNetworkConfiguration(newProxySettings, *m_networkMode, m_localhostRelayEnabled);
         }
 
         if (!AreProxyStringsIdentical(newProxySettings))
@@ -348,7 +349,7 @@ try
 }
 CATCH_LOG()
 
-UnsupportedProxyReason HttpProxyStateTracker::IsUnsupportedProxy(LPCWSTR proxyString, wsl::core::NetworkingMode configuration) noexcept
+UnsupportedProxyReason HttpProxyStateTracker::IsUnsupportedProxy(LPCWSTR proxyString, wsl::core::NetworkingMode configuration, bool localhostRelayEnabled) noexcept
 try
 {
     if (!proxyString)
@@ -399,22 +400,23 @@ try
         return UnsupportedProxyReason::Supported;
     }
 
-    // v4 loopback is only supported in mirrored mode
     if (configuration != wsl::core::NetworkingMode::Mirrored)
     {
         in_addr addrV4{};
         if (SUCCEEDED_WIN32(RtlIpv4StringToAddressW(portRemoved.c_str(), true, &pStringEnd, &addrV4)))
         {
-            if (IN4_IS_ADDR_LOOPBACK(&addrV4))
+            const bool consommeLoopbackSupported = configuration == wsl::core::NetworkingMode::Consomme &&
+                                                   localhostRelayEnabled && addrV4.s_addr == htonl(INADDR_LOOPBACK);
+            if (IN4_IS_ADDR_LOOPBACK(&addrV4) && !consommeLoopbackSupported)
             {
-                return UnsupportedProxyReason::LoopbackNotMirrored;
+                return UnsupportedProxyReason::LoopbackNotSupported;
             }
             return UnsupportedProxyReason::Supported;
         }
 
         if (wsl::shared::string::IsEqual(portRemoved, c_loopback, true) || wsl::shared::string::IsEqual(portRemoved, c_localhost, true))
         {
-            return UnsupportedProxyReason::LoopbackNotMirrored;
+            return UnsupportedProxyReason::LoopbackNotSupported;
         }
 
         DWORD size = 0;
@@ -438,7 +440,7 @@ try
 
         if (wsl::shared::string::IsEqual(computerName, portRemoved, true))
         {
-            return UnsupportedProxyReason::LoopbackNotMirrored;
+            return UnsupportedProxyReason::LoopbackNotSupported;
         }
     }
     return UnsupportedProxyReason::Supported;
@@ -449,11 +451,13 @@ catch (...)
     return UnsupportedProxyReason::UnsupportedError;
 }
 
-void HttpProxyStateTracker::FilterProxySettingsByNetworkConfiguration(HttpProxySettings& settings, wsl::core::NetworkingMode mode) noexcept
+void HttpProxyStateTracker::FilterProxySettingsByNetworkConfiguration(HttpProxySettings& settings, wsl::core::NetworkingMode mode, bool localhostRelayEnabled) noexcept
 try
 {
-    const auto proxySupportState = IsUnsupportedProxy(wsl::shared::string::MultiByteToWide(settings.Proxy).c_str(), mode);
-    const auto secureProxySupportState = IsUnsupportedProxy(wsl::shared::string::MultiByteToWide(settings.SecureProxy).c_str(), mode);
+    const auto proxySupportState =
+        IsUnsupportedProxy(wsl::shared::string::MultiByteToWide(settings.Proxy).c_str(), mode, localhostRelayEnabled);
+    const auto secureProxySupportState =
+        IsUnsupportedProxy(wsl::shared::string::MultiByteToWide(settings.SecureProxy).c_str(), mode, localhostRelayEnabled);
     if (proxySupportState != UnsupportedProxyReason::Supported)
     {
         settings.Proxy.clear();
@@ -568,9 +572,10 @@ void HttpProxyStateTracker::QueryProxySettingsAsync()
     }
 }
 
-HttpProxyStateTracker::HttpProxyStateTracker(int ProxyTimeout, HANDLE UserToken, std::optional<wsl::core::NetworkingMode> mode) :
+HttpProxyStateTracker::HttpProxyStateTracker(int ProxyTimeout, HANDLE UserToken, std::optional<wsl::core::NetworkingMode> mode, bool localhostRelayEnabled) :
     m_networkMode{mode},
     m_logProxySettings{mode.has_value()},
+    m_localhostRelayEnabled{localhostRelayEnabled},
     m_initialQueryTimeout{ProxyTimeout},
     m_localizedProxyChangeString{wsl::shared::Localization::MessageHttpProxyChangeDetected()}
 {
@@ -620,13 +625,17 @@ std::optional<HttpProxySettings> HttpProxyStateTracker::WaitForInitialProxySetti
     return m_proxySettings;
 }
 
-void HttpProxyStateTracker::ConfigureNetworkingMode(wsl::core::NetworkingMode mode) noexcept
+void HttpProxyStateTracker::ConfigureNetworkingMode(wsl::core::NetworkingMode mode, bool localhostRelayEnabled) noexcept
+try
 {
     auto lock = m_proxySettingsLock.lock();
-    // if we fall back to NAT mode need to strip bad settings
-    if (m_proxySettings.has_value() && mode != m_networkMode)
+    if (m_unfilteredProxySettings.has_value() && (mode != m_networkMode || localhostRelayEnabled != m_localhostRelayEnabled))
     {
-        FilterProxySettingsByNetworkConfiguration(m_proxySettings.value(), mode);
+        auto proxySettings = m_unfilteredProxySettings.value();
+        FilterProxySettingsByNetworkConfiguration(proxySettings, mode, localhostRelayEnabled);
+        m_proxySettings = std::move(proxySettings);
     }
     m_networkMode = mode;
+    m_localhostRelayEnabled = localhostRelayEnabled;
 }
+CATCH_LOG()

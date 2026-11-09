@@ -73,7 +73,7 @@ FreeProxySettingsEx(_In_ WINHTTP_PROXY_SETTINGS_TYPE ProxySettingsType, _In_ PVO
 enum class UnsupportedProxyReason
 {
     Supported,
-    LoopbackNotMirrored,
+    LoopbackNotSupported,
     Ipv6NotMirrored,
     LoopbackV6,
     UnsupportedError
@@ -85,8 +85,8 @@ constexpr auto ToString(UnsupportedProxyReason config) noexcept
     {
     case UnsupportedProxyReason::Supported:
         return "Supported";
-    case UnsupportedProxyReason::LoopbackNotMirrored:
-        return "LoopbackNotMirrored";
+    case UnsupportedProxyReason::LoopbackNotSupported:
+        return "LoopbackNotSupported";
     case UnsupportedProxyReason::Ipv6NotMirrored:
         return "Ipv6NotMirrored";
     case UnsupportedProxyReason::LoopbackV6:
@@ -129,7 +129,7 @@ class HttpProxyStateTracker
     };
 
 public:
-    HttpProxyStateTracker(int ProxyTimeout, HANDLE UserToken, std::optional<wsl::core::NetworkingMode> Configuration = std::nullopt);
+    HttpProxyStateTracker(int ProxyTimeout, HANDLE UserToken, std::optional<wsl::core::NetworkingMode> Configuration = std::nullopt, bool localhostRelayEnabled = false);
     ~HttpProxyStateTracker();
 
     HttpProxyStateTracker(const HttpProxyStateTracker&) = delete;
@@ -143,12 +143,12 @@ public:
     /// </summary>
     std::optional<HttpProxySettings> WaitForInitialProxySettings();
 
-    static UnsupportedProxyReason IsUnsupportedProxy(LPCWSTR proxyString, wsl::core::NetworkingMode mode) noexcept;
+    static UnsupportedProxyReason IsUnsupportedProxy(LPCWSTR proxyString, wsl::core::NetworkingMode mode, bool localhostRelayEnabled = false) noexcept;
 
     /// <summary>
     /// This needs to be called after the VM is created so actual selected configuration is set.
     /// </summary>
-    void ConfigureNetworkingMode(wsl::core::NetworkingMode mode) noexcept;
+    void ConfigureNetworkingMode(wsl::core::NetworkingMode mode, bool localhostRelayEnabled) noexcept;
 
     /// <summary>
     /// Loads necessary WinHttpProxy APIs into static dynamic functions from DLL if they exist.
@@ -187,6 +187,11 @@ private:
     wil::critical_section m_proxySettingsLock{};
 
     /// <summary>
+    /// Unfiltered WinHTTP settings retained for refiltering when the network configuration changes.
+    /// </summary>
+    _Guarded_by_(m_proxySettingsLock) std::optional<HttpProxySettings> m_unfilteredProxySettings {};
+
+    /// <summary>
     /// Current http proxy settings. If no queries have completed it is std::nullopt.
     /// </summary>
     _Guarded_by_(m_proxySettingsLock) std::optional<HttpProxySettings> m_proxySettings {};
@@ -197,6 +202,11 @@ private:
     _Guarded_by_(m_proxySettingsLock) std::optional<wsl::core::NetworkingMode> m_networkMode;
 
     const bool m_logProxySettings;
+
+    /// <summary>
+    /// Whether localhost relay is enabled in the current network configuration.
+    /// </summary>
+    _Guarded_by_(m_proxySettingsLock) bool m_localhostRelayEnabled = false;
 
     /// <summary>
     /// Indicates if we need to start another query after current one.
@@ -275,6 +285,7 @@ private:
     /// Remove invalid proxy configurations depending on network mode.
     /// </summary>
     /// <param name="settings"> HttpProxySettings to be filtered. </param>
-    /// <param name="configuration"> Current network configuration. </param>
-    static void FilterProxySettingsByNetworkConfiguration(HttpProxySettings& settings, wsl::core::NetworkingMode mode) noexcept;
+    /// <param name="mode"> Current networking mode. </param>
+    /// <param name="localhostRelayEnabled"> Whether localhost relay is enabled in the current network configuration. </param>
+    static void FilterProxySettingsByNetworkConfiguration(HttpProxySettings& settings, wsl::core::NetworkingMode mode, bool localhostRelayEnabled) noexcept;
 };
