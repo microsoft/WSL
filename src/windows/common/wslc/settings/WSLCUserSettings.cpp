@@ -67,6 +67,7 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "# Credential storage backend: \"wincred\" or \"file\" (default: wincred)\n"
     "# credentialStore: wincred\n";
 
+// Validate individual setting specializations
 namespace details {
 
     std::optional<uint32_t> ParseSettingsMemoryValue(const std::string& value)

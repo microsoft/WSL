@@ -26,7 +26,6 @@ Abstract:
 #include "APICompat.h"
 #include "WSLCContainerEntry.h"
 #include "wslc/WSLCProxy.h"
-#include <WSLCUserSettings.h>
 
 using namespace wsl::windows::common;
 using io::MultiHandleWait;
@@ -39,7 +38,6 @@ using wsl::windows::service::wslc::UserHandle;
 using wsl::windows::service::wslc::WSLCExecutionContext;
 using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
-namespace settings = wsl::windows::wslc::settings;
 
 constexpr auto c_containerdSocket = "/run/containerd/containerd.sock";
 constexpr auto c_storageVhdFilename = wsl::windows::wslc::DefaultStorageVhdName;

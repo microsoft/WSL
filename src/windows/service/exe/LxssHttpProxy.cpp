@@ -158,6 +158,7 @@ void HttpProxySettings::AddToEnvironment(std::vector<std::string>& Environment) 
     const auto addProxy = [&](std::string_view Value, std::string_view Lower, std::string_view Upper) {
         if (!Value.empty())
         {
+            // Note that we add both lower and uppercase as some Linux apps use upper, others lower.
             Environment.emplace_back(std::format("{}={}", Lower, Value));
             Environment.emplace_back(std::format("{}={}", Upper, Value));
         }
@@ -168,7 +169,10 @@ void HttpProxySettings::AddToEnvironment(std::vector<std::string>& Environment) 
     addProxy(ProxyBypassesComma, c_proxyBypassLower, c_proxyBypassUpper);
     if (!PacUrl.empty())
     {
+        // We only add uppercase as there is no standard environment variable for PAC proxies.
+        // This at least makes the PAC url available to the user in case they wish to use it.
         Environment.emplace_back(std::format("{}={}", c_pacProxy, PacUrl));
+
         // PAC queries can supply only HTTP; preserve WSL's best-effort HTTPS fallback.
         if (SecureProxy.empty())
         {

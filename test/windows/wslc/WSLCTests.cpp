@@ -17988,6 +17988,7 @@ sys.exit(1 if queries else 0)
         VerifyWindowsProxyDefaults(WSLCNetworkingModeConsomme, "[::ffff:192.0.2.1]", true);
     }
 
+    // Helper: COM callback that captures all warnings received.
     class CapturingWarningCallback
         : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWarningCallback, IFastRundown>
     {

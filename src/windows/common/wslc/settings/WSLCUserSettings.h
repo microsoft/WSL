@@ -107,7 +107,7 @@ namespace details {
     DEFINE_SETTING_MAPPING(SessionStoragePath,       std::string, std::string,         std::string{},                 "session.storagePath")
     DEFINE_SETTING_MAPPING(SessionIdleTimeout,       uint32_t,    uint32_t,            30,                            "session.idleTimeout")
 
-    #undef DEFINE_SETTING_MAPPING
+#undef DEFINE_SETTING_MAPPING
     // clang-format on
 
 } // namespace details

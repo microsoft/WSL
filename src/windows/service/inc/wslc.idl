@@ -565,6 +565,7 @@ typedef struct _WSLCSessionSettings {
     WSLCHandle DmesgOutput;
     WSLCSessionStorageFlags StorageFlags;
     ULONG IdleTimeoutSec;
+
     // Below options are used for debugging purposes only.
     [unique] LPCWSTR RootVhdOverride;
     [unique] LPCSTR RootVhdTypeOverride;

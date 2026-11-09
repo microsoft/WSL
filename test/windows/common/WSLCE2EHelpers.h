@@ -256,7 +256,9 @@ void VerifyPseudoConsoleTtySize(WSLCInteractiveSession& session, SHORT columns, 
 void WaitForPseudoConsoleOutput(
     const WSLCInteractiveSession& session, const std::string& expected, std::chrono::seconds timeout = std::chrono::seconds(60));
 
-// Returns the registry container and its address; TLS uses bridge networking with optional Windows loopback publication.
+// Starts a local registry container using the COM API and returns the running container (holds it
+// alive) plus the registry address. Host network for plain http, bridge network for tls enabled.
+// TLS can optionally publish its port to Windows loopback.
 std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(
     IWSLCSession& session,
     const std::string& username = "",

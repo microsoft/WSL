@@ -2424,7 +2424,7 @@ bool TryLoadWinhttpProxyMethods() noexcept
 
     try
     {
-        // Attempt to find the functions for the Winhttp proxy APIs.
+        // attempt to find the functions for the Winhttp proxy APIs.
         static LxssDynamicFunction<decltype(WinHttpRegisterProxyChangeNotification)> WinHttpRegisterProxyChangeNotification{
             winhttpModule, "WinHttpRegisterProxyChangeNotification"};
         static LxssDynamicFunction<decltype(WinHttpUnregisterProxyChangeNotification)> WinHttpUnregisterProxyChangeNotification{

@@ -129,7 +129,7 @@ class HttpProxyStateTracker
     };
 
 public:
-    HttpProxyStateTracker(int ProxyTimeout, HANDLE UserToken, std::optional<wsl::core::NetworkingMode> Configuration = std::nullopt, bool localhostRelayEnabled = false);
+    HttpProxyStateTracker(int ProxyTimeout, HANDLE UserToken, std::optional<wsl::core::NetworkingMode> configuration = std::nullopt, bool localhostRelayEnabled = false);
     ~HttpProxyStateTracker();
 
     HttpProxyStateTracker(const HttpProxyStateTracker&) = delete;
@@ -143,6 +143,12 @@ public:
     /// </summary>
     std::optional<HttpProxySettings> WaitForInitialProxySettings();
 
+    /// <summary>
+    /// Determines if a proxy setting string is localhost.
+    /// </summary>
+    /// <param name="proxyString"> ProxyString to check if it is localhost. </param>
+    /// <param name="mode"> Current networking mode. </param>
+    /// <param name="localhostRelayEnabled"> Whether localhost relay is enabled in the current network configuration. </param>
     static UnsupportedProxyReason IsUnsupportedProxy(LPCWSTR proxyString, wsl::core::NetworkingMode mode, bool localhostRelayEnabled = false) noexcept;
 
     /// <summary>
