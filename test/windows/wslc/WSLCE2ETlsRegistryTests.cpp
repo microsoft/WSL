@@ -16,6 +16,7 @@ Abstract:
 #include "Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "WSLCSessionDefaults.h"
 #include "TestImageRegistry.h"
 #include <atomic>
 #include <wslutil.h>
@@ -568,34 +569,96 @@ class WSLCE2ETlsRegistryTests
         WINHTTP_PROXY_TEST_ONLY();
         const auto directory = std::filesystem::current_path() / std::format(L"wslc-proxy-env-{}", GetCurrentProcessId());
         auto cleanup = SetupTestDirectory(directory);
-        WithColdProxySession(directory / L"consumer", "http://windows.proxy.invalid:3128", ".windows.invalid", [&](IWSLCSession&, const HostFileChange&) {
-            const auto& image = AlpineTestImage();
-            RunWslcAndVerify(std::format(L"image load --input \"{}\"", image.Path.wstring()), {.Stderr = L"", .ExitCode = 0});
-            const auto defaults = RunWslcAndGetStdoutLineSet(std::format(L"container run --rm {} env", image.NameAndTag()));
-            for (const auto* name : {L"http_proxy", L"HTTP_PROXY", L"https_proxy", L"HTTPS_PROXY"})
-            {
-                VERIFY_IS_TRUE(defaults.contains(std::format(L"{}=http://windows.proxy.invalid:3128", name)));
-            }
-            VERIFY_IS_TRUE(defaults.contains(L"no_proxy=.windows.invalid"));
-            VERIFY_IS_TRUE(defaults.contains(L"NO_PROXY=.windows.invalid"));
+        WithColdProxySession(
+            directory / L"consumer",
+            "http://windows.proxy.invalid:3128",
+            ".windows.invalid",
+            [&](IWSLCSession&, const HostFileChange&) {
+                const auto& image = AlpineTestImage();
+                RunWslcAndVerify(std::format(L"image load --input \"{}\"", image.Path.wstring()), {.Stderr = L"", .ExitCode = 0});
+                const auto defaults = RunWslcAndGetStdoutLineSet(std::format(L"container run --rm {} env", image.NameAndTag()));
+                for (const auto* name : {L"http_proxy", L"HTTP_PROXY", L"https_proxy", L"HTTPS_PROXY"})
+                {
+                    VERIFY_IS_TRUE(defaults.contains(std::format(L"{}=http://windows.proxy.invalid:3128", name)));
+                }
+                VERIFY_IS_TRUE(defaults.contains(L"no_proxy=.windows.invalid"));
+                VERIFY_IS_TRUE(defaults.contains(L"NO_PROXY=.windows.invalid"));
 
-            for (const bool upper : {false, true})
-            {
-                const auto* http = upper ? L"HTTP_PROXY" : L"http_proxy";
-                const auto* https = upper ? L"HTTPS_PROXY" : L"https_proxy";
-                const auto* noProxy = upper ? L"NO_PROXY" : L"no_proxy";
-                const auto environment = RunWslcAndGetStdoutLineSet(std::format(
-                    L"container run --rm -e {}=127.0.0.1:8080 -e {}= -e {}= {} env", http, https, noProxy, image.NameAndTag()));
-                VERIFY_IS_TRUE(environment.contains(std::format(L"{}=127.0.0.1:8080", http)));
-                VERIFY_IS_TRUE(environment.contains(std::format(L"{}=", https)));
-                VERIFY_IS_TRUE(environment.contains(std::format(L"{}=", noProxy)));
-                for (const auto& entry : environment)
+                for (const bool upper : {false, true})
+                {
+                    const auto* http = upper ? L"HTTP_PROXY" : L"http_proxy";
+                    const auto* https = upper ? L"HTTPS_PROXY" : L"https_proxy";
+                    const auto* noProxy = upper ? L"NO_PROXY" : L"no_proxy";
+                    const auto environment = RunWslcAndGetStdoutLineSet(std::format(
+                        L"container run --rm -e {}=127.0.0.1:8080 -e {}= -e {}= {} env", http, https, noProxy, image.NameAndTag()));
+                    VERIFY_IS_TRUE(environment.contains(std::format(L"{}=127.0.0.1:8080", http)));
+                    VERIFY_IS_TRUE(environment.contains(std::format(L"{}=", https)));
+                    VERIFY_IS_TRUE(environment.contains(std::format(L"{}=", noProxy)));
+                    for (const auto& entry : environment)
+                    {
+                        VERIFY_IS_TRUE(entry.find(L"windows.proxy.invalid") == std::wstring::npos);
+                        VERIFY_IS_TRUE(entry.find(L".windows.invalid") == std::wstring::npos);
+                    }
+                }
+
+                const auto imported =
+                    RunWslcAndGetStdoutLineSet(std::format(L"container run --rm -e http_proxy -e no_proxy {} env", image.NameAndTag()));
+                VERIFY_IS_TRUE(imported.contains(L"http_proxy=http://caller.proxy.invalid:8080"));
+                VERIFY_IS_TRUE(imported.contains(L"no_proxy=.caller.invalid"));
+                VERIFY_IS_TRUE(imported.contains(L"HTTPS_PROXY=http://windows.proxy.invalid:3128"));
+                VERIFY_IS_FALSE(imported.contains(L"HTTP_PROXY=http://windows.proxy.invalid:3128"));
+                VERIFY_IS_FALSE(imported.contains(L"NO_PROXY=.windows.invalid"));
+
+                const auto envFile = directory / L"proxy.env";
+                WriteTestFileContent(envFile, "HTTP_PROXY=http://file.proxy.invalid:8080\nhttps_proxy=\nNO_PROXY=.file.invalid\n");
+                const auto fromFile = RunWslcAndGetStdoutLineSet(
+                    std::format(L"container run --rm --env-file \"{}\" {} env", envFile.wstring(), image.NameAndTag()));
+                VERIFY_IS_TRUE(fromFile.contains(L"HTTP_PROXY=http://file.proxy.invalid:8080"));
+                VERIFY_IS_TRUE(fromFile.contains(L"https_proxy="));
+                VERIFY_IS_TRUE(fromFile.contains(L"NO_PROXY=.file.invalid"));
+                for (const auto& entry : fromFile)
                 {
                     VERIFY_IS_TRUE(entry.find(L"windows.proxy.invalid") == std::wstring::npos);
                     VERIFY_IS_TRUE(entry.find(L".windows.invalid") == std::wstring::npos);
                 }
-            }
-        });
+            },
+            {{L"Http_Proxy", L"http://caller.proxy.invalid:8080"}, {L"HTTPS_PROXY", L""}, {L"NO_PROXY", L".caller.invalid"}});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Proxy_SessionEnterIgnoresCallerEnvironment)
+    {
+        WINHTTP_PROXY_TEST_ONLY();
+        const auto directory = std::filesystem::current_path() / std::format(L"wslc-proxy-enter-{}", GetCurrentProcessId());
+        auto cleanup = SetupTestDirectory(directory);
+        const auto storagePath = directory / L"consumer";
+        WithColdProxySession(
+            storagePath,
+            "http://windows.proxy.invalid:3128",
+            ".windows.invalid",
+            [&](IWSLCSession& defaultSession, const HostFileChange&) {
+                const auto& image = AlpineTestImage();
+                RunWslcAndVerify(std::format(L"image load --input \"{}\"", image.Path.wstring()), {.Stderr = L"", .ExitCode = 0});
+                wil::unique_cotaskmem_string defaultName;
+                VERIFY_SUCCEEDED(defaultSession.GetDisplayName(defaultName.put()));
+                const auto defaultStoragePath = storagePath / wsl::windows::wslc::DefaultStorageSubPath / defaultName.get();
+                EnsureSessionIsTerminated();
+
+                constexpr auto sessionName = L"wslc-proxy-enter";
+                auto terminate = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { EnsureSessionIsTerminated(sessionName); });
+                auto session =
+                    RunWslcInteractive(std::format(L"system session enter \"{}\" --name {}", defaultStoragePath.wstring(), sessionName));
+                session.ExpectStdout(VT::SESSION_PROMPT);
+                const auto environment =
+                    RunWslcAndGetStdoutLineSet(std::format(L"--session {} container run --rm {} env", sessionName, image.NameAndTag()));
+                for (const auto* name : {L"http_proxy", L"HTTP_PROXY", L"https_proxy", L"HTTPS_PROXY"})
+                {
+                    VERIFY_IS_TRUE(environment.contains(std::format(L"{}=http://windows.proxy.invalid:3128", name)));
+                }
+                VERIFY_IS_TRUE(environment.contains(L"no_proxy=.windows.invalid"));
+                VERIFY_IS_TRUE(environment.contains(L"NO_PROXY=.windows.invalid"));
+                VERIFY_ARE_EQUAL(0, session.Exit());
+            },
+            {{L"HTTP_PROXY", L"http://caller.proxy.invalid:8080"}, {L"https_proxy", L""}, {L"NO_PROXY", L".caller.invalid"}});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Proxy_ContainerEnvironmentRefresh)
@@ -645,46 +708,43 @@ class WSLCE2ETlsRegistryTests
         });
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Registry_Proxy_EnvironmentOverride)
+    WSLC_TEST_METHOD(WSLCE2E_Registry_Proxy_IgnoresCallerEnvironment)
     {
         WINHTTP_PROXY_TEST_ONLY();
         WithProxyRegistry([](const auto& directory, auto& proxy, const auto& alpine, const auto&) {
-            RecordingConnectProxy windowsProxy;
-            windowsProxy.Stop();
-            for (const bool withScheme : {true, false})
-            {
-                const auto* scheme = withScheme ? L"http://" : L"";
-                const auto manual = std::format(L"{}127.0.0.1:{}", scheme, proxy.Port());
-                WithColdProxySession(
-                    directory / (withScheme ? L"override" : L"shorthand"),
-                    std::format("http://127.0.0.1:{}", windowsProxy.Port()),
-                    c_proxyRegistryHost,
-                    [&](IWSLCSession&, const HostFileChange&) {
-                        const auto before = proxy.ResponseBytes();
-                        PullAndVerifyImage(alpine);
-                        VERIFY_IS_TRUE(
-                            proxy.ResponseBytes() > before, L"Caller environment must override Windows proxy and bypass settings");
-                        for (const bool configured : {true, false})
+            WithColdProxySession(
+                directory / L"consumer",
+                std::format("http://127.0.0.1:{}", proxy.Port()),
+                ".windows.invalid",
+                [&](IWSLCSession&, const HostFileChange&) {
+                    const auto before = proxy.ResponseBytes();
+                    PullAndVerifyImage(alpine);
+                    VERIFY_IS_TRUE(
+                        proxy.ResponseBytes() > before,
+                        L"Windows proxy settings must take precedence over the caller environment");
+                    for (const bool configured : {true, false})
+                    {
+                        SetWindowsProxySettings(configured ? "http://changed.proxy.invalid:3129" : "", configured ? ".changed.invalid" : "");
+                        const auto environment = RunWslcAndGetStdoutLineSet(std::format(L"container run --rm {} env", alpine.Reference));
+                        for (const auto* name :
+                             {L"http_proxy", L"HTTP_PROXY", L"https_proxy", L"HTTPS_PROXY", L"no_proxy", L"NO_PROXY"})
                         {
-                            SetWindowsProxySettings(configured ? "http://changed.proxy.invalid:3129" : "", configured ? ".changed.invalid" : "");
-                            const auto environment =
-                                RunWslcAndGetStdoutLineSet(std::format(L"container run --rm {} env", alpine.Reference));
-                            const auto expected = std::format(L"https_proxy={}host.wslc.internal:{}", scheme, proxy.Port());
-                            VERIFY_IS_TRUE(environment.contains(expected));
-                            VERIFY_IS_TRUE(environment.contains(L"NO_PROXY=.unrelated.invalid"));
                             if (configured)
                             {
-                                VERIFY_IS_TRUE(environment.contains(L"http_proxy=http://changed.proxy.invalid:3129"));
+                                const auto* value = _wcsicmp(name, L"no_proxy") == 0 ? L".changed.invalid" : L"http://changed.proxy.invalid:3129";
+                                VERIFY_IS_TRUE(environment.contains(std::format(L"{}={}", name, value)));
                             }
                             else
                             {
                                 VERIFY_IS_FALSE(std::ranges::any_of(
-                                    environment, [](const auto& entry) { return entry.starts_with(L"http_proxy="); }));
+                                    environment, [&](const auto& entry) { return entry.starts_with(std::format(L"{}=", name)); }));
                             }
                         }
-                    },
-                    {{L"https_proxy", manual}, {L"no_proxy", L".unrelated.invalid"}});
-            }
+                    }
+                },
+                {{L"HTTP_PROXY", L"http://caller.proxy.invalid:8080"},
+                 {L"https_proxy", L"http://secure.caller.proxy.invalid:8081"},
+                 {L"NO_PROXY", string::MultiByteToWide(c_proxyRegistryHost)}});
         });
     }
 

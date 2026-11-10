@@ -3,7 +3,6 @@
 #include "precomp.h"
 #include "WSLCProxy.h"
 #include "WslCoreNetworkingSupport.h"
-#include "helpers.hpp"
 #include "stringshared.h"
 #include <array>
 #include <charconv>
@@ -90,34 +89,6 @@ bool IsProxyEnvironmentVariable(std::string_view Entry)
     return Entry.find('=') != std::string_view::npos && std::ranges::any_of(c_proxyNames, [&](const auto& names) {
                return wsl::shared::string::IsEqual(EnvironmentName(Entry), names.first, true);
            });
-}
-
-std::vector<std::string> GetProxyEnvironment()
-{
-    const wsl::windows::common::helpers::unique_environment_strings environment{GetEnvironmentStringsW()};
-    THROW_LAST_ERROR_IF_NULL(environment);
-
-    std::vector<std::string> result;
-    for (auto entry = environment.get(); *entry != L'\0'; entry += wcslen(entry) + 1)
-    {
-        const auto value = wsl::shared::string::WideToMultiByte(entry);
-        if (!IsProxyEnvironmentVariable(value))
-        {
-            continue;
-        }
-
-        const auto setting = std::string_view{value}.substr(value.find('=') + 1);
-        for (const auto& [lower, upper] : c_proxyNames)
-        {
-            if (wsl::shared::string::IsEqual(EnvironmentName(value), lower, true))
-            {
-                result.emplace_back(std::format("{}={}", lower, setting));
-                result.emplace_back(std::format("{}={}", upper, setting));
-            }
-        }
-    }
-
-    return result;
 }
 
 void AddProxyEnvironmentDefaults(std::vector<std::string>& Environment, const std::vector<std::string>& Defaults)

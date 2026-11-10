@@ -628,23 +628,6 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionHostLoopback>());
     }
 
-    TEST_METHOD(ProxyEnvironment_CapturesCallerOverridesAndEmptyValues)
-    {
-        ScopedEnvVariable http{L"Http_Proxy", L"http://manual:8080"};
-        ScopedEnvVariable https{L"HTTPS_PROXY", L""};
-        ScopedEnvVariable noProxy{L"NO_PROXY", L".manual.invalid"};
-        const auto environment = GetProxyEnvironment();
-        const std::set<std::string> actual{environment.begin(), environment.end()};
-        const std::set<std::string> expected{
-            "http_proxy=http://manual:8080",
-            "HTTP_PROXY=http://manual:8080",
-            "https_proxy=",
-            "HTTPS_PROXY=",
-            "no_proxy=.manual.invalid",
-            "NO_PROXY=.manual.invalid"};
-        VERIFY_IS_TRUE(actual == expected);
-    }
-
     TEST_METHOD(ProxyEnvironment_ExplicitCasingOverridesBothDefaults)
     {
         const std::vector<std::string> defaults{
