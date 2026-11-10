@@ -3010,6 +3010,12 @@ class WslcSdkWinRtTests
         wil::unique_event resumeCallback{wil::EventOptions::ManualReset};
         wil::unique_event processDestroyed{wil::EventOptions::ManualReset};
 
+        // Release the container while the events are still alive.
+        auto releaseOpened = wil::scope_exit([&]() {
+            resumeCallback.SetEvent();
+            opened = nullptr;
+        });
+
         {
             auto initProcess = opened.InitProcess();
 
