@@ -32,8 +32,7 @@ public:
         GUID EmulatorId{};
     };
 
-    static std::unique_ptr<HcsVirtualMachineBackend> Create(
-        const VmCreateRequest& Request, const std::optional<ExternalDevice>& Device = std::nullopt);
+    static std::unique_ptr<HcsVirtualMachineBackend> Create(const VmCreateRequest& Request, const std::optional<ExternalDevice>& Device = std::nullopt);
     static VmPlatformCapabilities QueryCapabilities();
 
     // N.B. Transitional escape hatches for WSL networking implementations that still operate

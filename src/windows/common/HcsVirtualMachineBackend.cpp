@@ -292,8 +292,7 @@ VmEffectiveBoot ConfigureBoot(const VmLinuxBootRequest& Request, schema::Chipset
 
 } // namespace
 
-HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfiguration(
-    const VmCreateRequest& Request, const std::optional<ExternalDevice>& Device)
+HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfiguration(const VmCreateRequest& Request, const std::optional<ExternalDevice>& Device)
 {
     auto signalEarlyTermination = wil::scope_exit([&] { m_terminatingEvent.SetEvent(); });
 
@@ -311,8 +310,7 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
         schema::FlexibleIoDevice externalDevice{};
         externalDevice.EmulatorId = Device->EmulatorId;
         externalDevice.HostingModel = schema::FlexibleIoDeviceHostingModel::External;
-        const auto instanceId =
-            wsl::shared::string::GuidToString<char>(Device->InstanceId, wsl::shared::string::GuidToStringFlags::None);
+        const auto instanceId = wsl::shared::string::GuidToString<char>(Device->InstanceId, wsl::shared::string::GuidToStringFlags::None);
         configuration.Settings.VirtualMachine.Devices.FlexibleIov.emplace(instanceId, std::move(externalDevice));
     }
     auto& description = configuration.Description;
@@ -483,8 +481,7 @@ HcsVirtualMachineBackend::~HcsVirtualMachineBackend() noexcept
         TraceLoggingValue(m_terminationInformation.Details.c_str(), "exitDetails"));
 }
 
-std::unique_ptr<HcsVirtualMachineBackend> HcsVirtualMachineBackend::Create(
-    const VmCreateRequest& Request, const std::optional<ExternalDevice>& Device)
+std::unique_ptr<HcsVirtualMachineBackend> HcsVirtualMachineBackend::Create(const VmCreateRequest& Request, const std::optional<ExternalDevice>& Device)
 {
     auto newInstance = std::unique_ptr<HcsVirtualMachineBackend>{new HcsVirtualMachineBackend{}};
     try

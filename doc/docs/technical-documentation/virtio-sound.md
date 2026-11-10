@@ -39,8 +39,8 @@ not a per-application permission prompt.
 ## Process and data path
 
 `WslCoreVm` passes the external device identity to `HcsVirtualMachineBackend`,
-which describes the FlexibleIov device in the initial VM creation schema
-and starts a VM-owned child of the service before starting the VM. The child
+which describes the FlexibleIov device in the initial VM creation schema.
+`WslCoreVm` starts a VM-owned child of the service before starting the VM. The child
 hosts the HDV callbacks, the virtio PCI device, and the control/event/TX/RX
 virtqueues. The default source generates a deterministic 48 kHz, stereo S16_LE
 ramp. This tests the actual guest driver and device path without an endpoint.
