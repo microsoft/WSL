@@ -213,7 +213,7 @@ private:
 
     void VirtioFsWorker(VmGuestListener Listener);
 
-    void SecurityAuditWorker(wil::unique_socket socket);
+    void SecurityAuditWorker(wil::unique_socket socket, bool includeCommandLine);
 
     std::vector<char> ProcessVirtioFsRequest(_In_ gsl::span<gsl::byte> Request);
 

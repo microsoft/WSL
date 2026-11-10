@@ -39,6 +39,7 @@ set(SOURCES
     MountSpecParsing.cpp
     NatNetworking.cpp
     notifications.cpp
+    securityaudit/ProcessExecutionAudit.cpp
     Redirector.cpp
     registry.cpp
     relay.cpp
@@ -144,6 +145,7 @@ set(HEADERS
     NatNetworking.h
     notifications.h
     precomp.h
+    securityaudit/ProcessExecutionAudit.h
     Redirector.h
     registry.hpp
     relay.hpp

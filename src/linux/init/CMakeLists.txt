@@ -17,6 +17,7 @@ set(SOURCES
     telemetry.cpp
     timezone.cpp
     SecCompDispatcher.cpp
+    securityaudit/ProcessExecutionAudit.cpp
     SecurityAudit.cpp
     util.cpp
     WslDistributionConfig.cpp
@@ -42,6 +43,7 @@ set(HEADERS
     telemetry.h
     timezone.h
     SecCompDispatcher.h
+    securityaudit/ProcessExecutionAudit.h
     util.h
     WslDistributionConfig.h
     wslinfo.h
@@ -52,7 +54,10 @@ list(APPEND HEADERS
     "${AUDIT_PAYLOAD_DIRECTORY}/event_defs.h"
     "${AUDIT_PAYLOAD_DIRECTORY}/ebpf_plugin_loader.h"
     "${AUDIT_PAYLOAD_DIRECTORY}/ebpf_arch_macros.h")
-set(LINUX_CXXFLAGS ${LINUX_CXXFLAGS} -I "${CMAKE_CURRENT_LIST_DIR}/../netlinkutil" -I "${AUDIT_PAYLOAD_DIRECTORY}")
+set(LINUX_CXXFLAGS ${LINUX_CXXFLAGS}
+    -I "${CMAKE_CURRENT_LIST_DIR}"
+    -I "${CMAKE_CURRENT_LIST_DIR}/../netlinkutil"
+    -I "${AUDIT_PAYLOAD_DIRECTORY}")
 set(INIT_LIBRARIES ${COMMON_LINUX_LINK_LIBRARIES} netlinkutil plan9 mountutil configfile)
 foreach(library ebpf_loader bpf elf eu z)
     list(APPEND INIT_LIBRARIES "${SECURITYAUDIT_SOURCE_DIR}/runtimes/linux-musl-${TARGET_PLATFORM}/native/lib${library}.a")

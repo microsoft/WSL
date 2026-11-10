@@ -12,3 +12,11 @@ Facility=Audit
 Language=Neutral
 %2%n%3 %1
 .
+
+;// Insertion 1 remains the raw VM PID; insertion 3 is versioned JSON event data.
+MessageId=62012 SymbolicName=MSG_PROCESS_EXECUTED_DETAILS
+Severity=Success
+Facility=Audit
+Language=Neutral
+%2%n%3
+.

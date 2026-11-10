@@ -27,6 +27,7 @@ Abstract:
 #include "DnsResolver.h"
 #include "ConsommeNetworking.h"
 #include "SecurityAudit.h"
+#include "securityaudit/ProcessExecutionAudit.h"
 
 #include <TraceLoggingProvider.h>
 
@@ -759,15 +760,16 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
     try
     {
-        if (securityaudit::Enabled())
+        if (securityaudit::ProcessExecutionEnabled())
         {
             LX_MINI_INIT_START_SECURITY_AUDIT audit{};
             audit.Header.MessageType = audit.Type;
             audit.Header.MessageSize = sizeof(audit);
+            audit.IncludeCommandLine = securityaudit::IncludeProcessCommandLine();
             auto auditTransaction = m_miniInitChannel.StartTransaction();
             auditTransaction.Send(audit);
             auto socket = AcceptConnection(m_vmConfig.KernelBootTimeout);
-            m_securityAuditThread = std::thread(&WslCoreVm::SecurityAuditWorker, this, std::move(socket));
+            m_securityAuditThread = std::thread(&WslCoreVm::SecurityAuditWorker, this, std::move(socket), audit.IncludeCommandLine != 0);
         }
     }
     CATCH_LOG();
@@ -2337,7 +2339,7 @@ void WslCoreVm::VerifyPlan9Servers()
     }
 }
 
-void WslCoreVm::SecurityAuditWorker(wil::unique_socket socket)
+void WslCoreVm::SecurityAuditWorker(wil::unique_socket socket, bool includeCommandLine)
 try
 {
     auto self = wil::run_as_self();
@@ -2345,9 +2347,29 @@ try
     wsl::shared::SocketChannel channel{std::move(socket), "SecurityAudit", {m_terminatingEvent.get()}};
     for (;;)
     {
-        const auto& event = channel.ReceiveMessage<LX_INIT_PROCESS_EXECUTED>();
-        THROW_HR_IF(E_INVALIDARG, event.Header.MessageSize != sizeof(event));
-        source.ProcessExecuted(event.Pid);
+        gsl::span<gsl::byte> bytes;
+        const auto& header = channel.ReceiveMessage<MESSAGE_HEADER>(&bytes);
+        if (header.MessageType == LxInitMessageProcessExecuted)
+        {
+            const auto* event = gslhelpers::try_get_struct<LX_INIT_PROCESS_EXECUTED>(bytes);
+            THROW_HR_IF(E_INVALIDARG, !event || bytes.size() != sizeof(*event));
+            securityaudit::ReportProcessExecution(source, event->Pid);
+            continue;
+        }
+        THROW_HR_IF(E_INVALIDARG, header.MessageType != LxInitMessageProcessExecutedDetails);
+        std::wstring details;
+        try
+        {
+            details = securityaudit::FormatProcessExecution(bytes, includeCommandLine);
+        }
+        catch (const wil::ResultException& error)
+        {
+            THROW_HR_IF(error.GetErrorCode(), error.GetErrorCode() != E_INVALIDARG);
+            LOG_CAUGHT_EXCEPTION();
+            continue;
+        }
+        const auto* event = gslhelpers::try_get_struct<LX_INIT_PROCESS_EXECUTED_DETAILS>(bytes);
+        securityaudit::ReportProcessExecutionDetails(source, event->Pid, details);
     }
 }
 catch (...)

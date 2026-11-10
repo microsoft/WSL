@@ -3,6 +3,7 @@
 #include "common.h"
 #include "util.h"
 #include "SocketChannel.h"
+#include "securityaudit/ProcessExecutionAudit.h"
 #include <arpa/inet.h>
 #include <atomic>
 #include <netpacket/packet.h>
@@ -19,6 +20,7 @@ struct AuditContext
     wsl::shared::SocketChannel channel;
     std::mutex lock;
     std::atomic<bool> failed{};
+    bool includeCommandLine = false;
 };
 
 void ProcessEvent(void* context, int, void* data, unsigned int size)
@@ -41,16 +43,12 @@ void ProcessEvent(void* context, int, void* data, unsigned int size)
         {
             return;
         }
-        THROW_ERRNO_IF(EINVAL, size != sizeof(event_exec_process_s));
-        event_exec_process_s event{};
-        memcpy(&event, data, sizeof(event));
-        THROW_ERRNO_IF(EINVAL, event.end.code_bytes_end != CODE_BYTES || event.base.pid == 0);
-
-        LX_INIT_PROCESS_EXECUTED message{};
-        message.Header.MessageType = message.Type;
-        message.Header.MessageSize = sizeof(message);
-        message.Pid = event.base.pid;
-        audit.channel.SendMessage(message);
+        auto message = wsl::linux::securityaudit::DecodeProcessExecution(
+            gsl::span<const gsl::byte>{static_cast<const gsl::byte*>(data), size}, audit.includeCommandLine);
+        if (message)
+        {
+            audit.channel.SendMessage<LX_INIT_PROCESS_EXECUTED_DETAILS>(message->Span());
+        }
     }
     catch (...)
     {
@@ -71,9 +69,10 @@ void PollError(void* context, int error)
 }
 } // namespace
 
-int RunSecurityAudit(int socket)
+int RunSecurityAudit(int socket, bool includeCommandLine)
 {
     AuditContext audit{wsl::shared::SocketChannel{wil::unique_fd{socket}, "SecurityAudit"}};
+    audit.includeCommandLine = includeCommandLine;
     THROW_LAST_ERROR_IF(signal(SIGPIPE, SIG_IGN) == SIG_ERR);
     // Keep mount changes local to this worker, independent of mini-init and distributions.
     THROW_LAST_ERROR_IF(unshare(CLONE_NEWNS) < 0);
@@ -101,8 +100,8 @@ int RunSecurityAudit(int socket)
     const syscall_config syscalls[] = {{__NR_execve, true}};
     const auto info = ebpf_plugin_start(
         "/wsl-security-audit",
-        PERF_FEATURES_BTF | FEATURE_RINGBUFF | FEATURE_ENRICHMENT_AT_SOURCE | FEATURE_RUNTIME_MAP_FLIGHTING,
-        FEATURE_SYSCALL_EXTENDED_DATA,
+        PERF_FEATURES_BTF | FEATURE_RINGBUFF | FEATURE_ENRICHMENT_AT_SOURCE | FEATURE_RUNTIME_MAP_FLIGHTING | FEATURE_PID_NS_ID_QUERY,
+        FEATURE_SYSCALL_EXTENDED_DATA | FEATURE_CONTAINER_RUNTIME_METADATA,
         syscalls,
         1,
         nullptr,
@@ -124,7 +123,7 @@ int RunSecurityAudit(int socket)
         LOG_ERROR("eBPF polling startup failed: {}, {}", result, error.data());
         THROW_ERRNO(EIO);
     }
-    LOG_INFO("Security audit collecting ProcessExecuted PID");
+    LOG_INFO("Security audit collecting ProcessExecuted fields; command line enabled: {}", includeCommandLine);
 
     while (!audit.failed)
     {

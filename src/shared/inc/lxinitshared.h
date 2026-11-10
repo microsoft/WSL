@@ -430,6 +430,7 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageWSLCMountModules,
     LxMiniInitMessageStartSecurityAudit,
     LxInitMessageProcessExecuted,
+    LxInitMessageProcessExecutedDetails,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -551,6 +552,7 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageWSLCMountModules)
         X(LxMiniInitMessageStartSecurityAudit)
         X(LxInitMessageProcessExecuted)
+        X(LxInitMessageProcessExecutedDetails)
 
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
@@ -1545,8 +1547,9 @@ struct LX_MINI_INIT_START_SECURITY_AUDIT
 {
     static inline auto Type = LxMiniInitMessageStartSecurityAudit;
     MESSAGE_HEADER Header;
+    uint32_t IncludeCommandLine;
 
-    PRETTY_PRINT(FIELD(Header));
+    PRETTY_PRINT(FIELD(Header), FIELD(IncludeCommandLine));
 };
 
 struct LX_INIT_PROCESS_EXECUTED
@@ -1557,6 +1560,42 @@ struct LX_INIT_PROCESS_EXECUTED
 
     PRETTY_PRINT(FIELD(Header), FIELD(Pid));
 };
+
+enum LX_PROCESS_EXECUTION_FLAGS : uint32_t
+{
+    LxProcessExecutablePathTruncated = 1,
+    LxProcessCwdTruncated = 2,
+    LxProcessArgvTruncated = 4
+};
+
+struct LX_INIT_PROCESS_EXECUTED_DETAILS
+{
+    static inline auto Type = LxInitMessageProcessExecutedDetails;
+    MESSAGE_HEADER Header;
+    uint64_t TimestampNs;
+    uint32_t Pid;
+    uint32_t Tid;
+    uint32_t Ppid;
+    uint32_t PidNamespace;
+    uint32_t MountNamespace;
+    uint32_t NetworkNamespace;
+    uint32_t Uid;
+    uint32_t Euid;
+    uint32_t Gid;
+    uint32_t Egid;
+    uint32_t Flags;
+    uint32_t ExecutablePathOffset;
+    uint32_t ExecutableOffset;
+    uint32_t CwdOffset;
+    uint32_t ArgvOffset;
+    uint32_t ArgvBytes;
+    char Buffer[0];
+
+    // Keep paths and command lines out of socket diagnostic traces.
+    PRETTY_PRINT(FIELD(Header), FIELD(Pid), FIELD(Tid), FIELD(Flags));
+};
+
+static_assert(offsetof(LX_INIT_PROCESS_EXECUTED_DETAILS, Buffer) == sizeof(LX_INIT_PROCESS_EXECUTED_DETAILS));
 
 typedef struct _LX_MINI_INIT_MOUNT_FOLDER_MESSAGE
 {
