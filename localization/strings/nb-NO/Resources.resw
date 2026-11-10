@@ -848,6 +848,10 @@ Hvis du vil ha mer informasjon om Admin Protection, kan du gå til https://aka.m
     <value>Ugyldig distribusjonsnavn: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageInvalidDistribution" xml:space="preserve">
+    <value>Fant ugyldig distribusjonsregistrering «{}», {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholders are the distribution's registry GUID and the error code.</comment>
+  </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>Bruker eldre distribusjonsregistrering. Vurder å bruke en tar-basert distribusjon i stedet.</value>
     <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
@@ -891,12 +895,20 @@ Hvis du vil ha mer informasjon om Admin Protection, kan du gå til https://aka.m
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>Nestet virtualisering støttes ikke på denne maskinen.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>Kan ikke oppdage støtte for nestet virtualisering, feil: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Kan ikke opprette et nettverksendepunkt med adressen {}, tilordnet ny adresse: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToCreateNetwork" xml:space="preserve">
     <value>Kan ikke opprette virtuelt nettverk med adresseområde: {}, opprettet nytt nettverk med området: {}, {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
+    <value>WSLs NAT-nettverk ({}) er i konflikt med dockers standardnettverk</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
@@ -1014,6 +1026,9 @@ Faller tilbake til NAT-nettverk.</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>WSL-beholderen er deaktivert av datamaskinpolicyen.</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>Tillegg til Linux-funksjonalitet er deaktivert av datamaskinpolicyen.</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>Beholderbilderegisteret «{}» er blokkert av datamaskinpolicyen.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -1080,6 +1095,10 @@ Faller tilbake til NAT-nettverk.</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>Operasjonen kan ikke fullføres fordi VHD-en er i bruk. Slik tvinger du WSL til å stoppe: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageDistributionTerminationTimeout" xml:space="preserve">
+    <value>Tidsavbrudd under venting på at distribusjonsprosessen {} skal avsluttes etter {} ms. Fortsetter uten å bekrefte at distribusjonen er stoppet.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
     <value>Komprimering støttes bare på .vhdx-filer.</value>
@@ -1224,6 +1243,10 @@ Se gjenopprettingsinstruksjoner om: https://aka.ms/wsldiskmountrecovery</value>
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
     <value>Cgroup v1 er ikke kompatibel med cgroup-isolasjon per distribusjon. Bruker cgroup v2 i stedet. Hvis du vil bruke cgroup v1, angir du isolateDistroCgroup=false under [wsl2] i .wslconfig, og kjører deretter wsl --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
+  <data name="MessageWindowsInstallerBusy" xml:space="preserve">
+    <value>WSL installasjonen er blokkert fordi Windows Installer er opptatt. Vent til andre programvareinstallasjoner er fullført, og prøv på nytt.</value>
+    <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Noe gikk galt. Prøv på nytt senere.</value>
@@ -2050,6 +2073,25 @@ Du kan også åpne flere eksterne alternativer for VS Code gjennom kommandopalet
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Forhindre at distribusjoner som kjører, og den virtuelle WSL-maskinen som er vert for dem, avsluttes automatisk etter at de har vært inaktive.</value>
   </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
+    <value>Hold den virtuelle maskinen for WSL-distribusjonen alltid på</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
+    <value>Den virtuelle maskinen for WSL-distribusjonen slås ikke av når den er inaktiv, så nye skall starter umiddelbart. Bruker mer minne mens WSL kjører. Dette trer i kraft i neste WSL-økt.</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Hold den virtuelle maskinen for WSL-distribusjonen alltid på</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
+    <value>Kan ikke endre innstillingen for å fortsette å kjøre</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
+    <value>Kontroller at .wslconfig ikke er skrivebeskyttet, og prøv deretter på nytt.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
+    <value>Du kan endre dette når som helst i WSL-innstillinger under Valgfrie funksjoner.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Tilbakestill tidsavbrudd</value>
   </data>
@@ -2208,6 +2250,10 @@ Bruk:
   </data>
   <data name="MessageWslcCannotRemoveRunningContainer" xml:space="preserve">
     <value>Beholderen {} kjører og kan ikke fjernes. Stopp beholderen før du fjerner den eller bruker tvungen fjerning (-f).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcCannotRemoveRestartingContainer" xml:space="preserve">
+    <value>Beholderen {} starter på nytt og kan ikke fjernes. Stopp beholderen før du fjerner den eller bruker tvungen fjerning (-f).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotRunning" xml:space="preserve">
@@ -2398,10 +2444,6 @@ Bruk:
      <value>Fant et plasseringsargument når det ikke var forventet: «{}»</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Mangler alternativnavn på: {}</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
      <value>Kunne ikke løse videresendte argumenter med start på argument: «{}»</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2491,6 +2533,10 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
     <value>Finner ikke nettverk: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcNetworkPrefixAmbiguous" xml:space="preserve">
+    <value>Flere nettverk samsvarer med {}; bruke en lengre ID eller nettverksnavnet.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>Nettverksdriver støttes ikke: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2524,6 +2570,10 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
   </data>
   <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
     <value>Ugyldig verdi for stopptidsavbrudd: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidSignal" xml:space="preserve">
+    <value>Ugyldig signalverdi: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
@@ -2822,11 +2872,11 @@ Eksempel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Signal som skal sendes (standard: beholderens konfigurerte STOPSIGNAL, eller SIGTERM hvis ingen er konfigurert)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>Overvåk beholderhendelser.</value>
+  <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
+    <value>Overvåk hendelser.</value>
   </data>
-  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>Overvåk hendelser i sanntid fra beholdere.</value>
+  <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
+    <value>Overvåk hendelser i sanntid fra beholdere, avbildninger, nettverk og volumer.</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
     <value>Vis alle hendelser opprettet siden tidsstempelet</value>
@@ -3643,6 +3693,12 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>Eksponer virtualiseringsfunksjoner for beholderen</value>
   </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Legg til Linux-funksjoner (kan gjentas)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Fjern Linux-funksjoner (kan gjentas)</value>
+  </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Argumenter som skal sendes til kommandoen som kjøres inne i beholderen</value>
   </data>
@@ -3660,6 +3716,10 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   <data name="WSLCCLI_InvalidRestartPolicyError" xml:space="preserve">
     <value>Ugyldig {}-verdi «{}». Forventet no, always, on-failure[:max-retries] eller unless-stopped.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UnsupportedRestartPolicyError" xml:space="preserve">
+    <value>Restart policy '{}' is not supported. Supported values are no and always.</value>
+    <comment>{Locked="no"}{Locked="always"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
     <value>Ugyldig {}-verdi: {} er ikke en gjenkjent fremdriftstype. Støttede fremdriftstyper er: {}.</value>
@@ -3702,7 +3762,7 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>Finner ikke avbildningen «{}», henter</value>
+    <value>Finner ikke bildet '{}' lokalt</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">
@@ -3782,6 +3842,9 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
     <value>Nettverksnavn</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
+    <value>Nettverksnavn eller ID</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Bare vis nettverks-ID-er</value>
@@ -4131,6 +4194,9 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Kan ikke stoppe beholderen {} etter avvisning av programtillegg</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcRestartPolicyConflictsWithRm" xml:space="preserve">
+    <value>En omstartspolicy kan ikke kombineres med automatisk fjerning av beholderen.</value>
+  </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>Kan ikke frigi vertsressurser for volum {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -4145,6 +4211,18 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   </data>
   <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
     <value>Kan ikke installere vertsklarerte rotsertifikater i VM: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
+    <value>WSLC kunne ikke skrive «{}» for å klargjøre lokalt vertsnavnoppslag (gjestefeil {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
+    <value>WSLC startet den virtuelle gjestemaskinen, men Docker-motoren ble ikke klar innen {} millisekunder. Samle WSL-diagnoselogger for å undersøke oppstartsfeilen.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
+    <value>Docker Engine avsluttet med koden {} før den var klar i WSCL-gjeste-VM-en. Innhent WSL-diagnoselogger for å undersøke oppstartsfeilen.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

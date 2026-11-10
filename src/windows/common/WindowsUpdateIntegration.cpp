@@ -44,6 +44,11 @@ namespace anon {
 
         IFACEMETHOD(Invoke)(IDownloadJob*, IDownloadProgressChangedCallbackArgs* callbackArgs) override
         {
+            if (!m_progress)
+            {
+                return S_OK;
+            }
+
             wil::com_ptr<IDownloadProgress> progress;
             RETURN_IF_FAILED(callbackArgs->get_Progress(&progress));
 
@@ -89,6 +94,11 @@ namespace anon {
 
         IFACEMETHOD(Invoke)(IInstallationJob*, IInstallationProgressChangedCallbackArgs* callbackArgs) override
         {
+            if (!m_progress)
+            {
+                return S_OK;
+            }
+
             wil::com_ptr<IInstallationProgress> progress;
             RETURN_IF_FAILED(callbackArgs->get_Progress(&progress));
 
@@ -284,11 +294,8 @@ void WindowsUpdateContext::DownloadUpdates(const std::function<void(uint32_t)>& 
 
     THROW_IF_FAILED(updateDownloader->put_Updates(toDownload.get()));
 
-    Microsoft::WRL::ComPtr<anon::DownloadProgressChangedCallback> downloadProgress;
-    if (progress)
-    {
-        downloadProgress = wil::MakeOrThrow<anon::DownloadProgressChangedCallback>(progress);
-    }
+    // WUA requires a progress callback even when the caller does not request progress.
+    auto downloadProgress = wil::MakeOrThrow<anon::DownloadProgressChangedCallback>(progress);
     auto downloadCompleted = wil::MakeOrThrow<anon::DownloadCompletedCallback>();
     wil::com_ptr<IDownloadJob> downloadJob;
 
@@ -313,11 +320,7 @@ void WindowsUpdateContext::InstallUpdates(const std::function<void(uint32_t)>& p
 
     THROW_IF_FAILED(updateInstaller->put_Updates(m_updates.get()));
 
-    Microsoft::WRL::ComPtr<anon::InstallationProgressChangedCallback> installationProgress;
-    if (progress)
-    {
-        installationProgress = wil::MakeOrThrow<anon::InstallationProgressChangedCallback>(progress);
-    }
+    auto installationProgress = wil::MakeOrThrow<anon::InstallationProgressChangedCallback>(progress);
     auto installationCompleted = wil::MakeOrThrow<anon::InstallationCompletedCallback>();
     wil::com_ptr<IInstallationJob> installationJob;
 

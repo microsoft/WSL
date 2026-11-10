@@ -902,7 +902,7 @@ wsl::windows::common::io::ReadConsoleHandle::ReadConsoleHandle(
     HandleWrapper&& Console,
     std::function<void(const gsl::span<char>& Buffer)>&& OnRead,
     std::function<void()>&& UpdateTerminalSize,
-    std::vector<char> DetachSequence,
+    std::vector<wchar_t> DetachSequence,
     std::function<void()>&& OnDetach) :
     Console(std::move(Console)),
     OnRead(std::move(OnRead)),
@@ -1123,7 +1123,7 @@ void wsl::windows::common::io::ReadConsoleHandle::Collect()
                         CurrentSequence.pop_front();
                     }
 
-                    CurrentSequence.push_back(CurrentInputRecord->Event.KeyEvent.uChar.AsciiChar);
+                    CurrentSequence.push_back(CurrentInputRecord->Event.KeyEvent.uChar.UnicodeChar);
                 }
 
                 //

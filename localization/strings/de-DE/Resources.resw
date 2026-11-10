@@ -854,6 +854,10 @@ Weitere Informationen zu Admin Protection finden Sie unter https://aka.ms/apdevg
     <value>Ungültiger Distributionsname: „{}“.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageInvalidDistribution" xml:space="preserve">
+    <value>Ungültige Verteilungsregistrierung „{}“, {} gefunden.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholders are the distribution's registry GUID and the error code.</comment>
+  </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>Es wird die Legacy-Verteilungsregistrierung verwendet. Erwägen Sie, stattdessen eine tar-basierte Distribution zu verwenden.</value>
     <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
@@ -897,12 +901,20 @@ Weitere Informationen zu Admin Protection finden Sie unter https://aka.ms/apdevg
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>Geschachtelte Virtualisierung wird auf diesem Computer nicht unterstützt.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>Fehler beim Ermitteln der Unterstützung für geschachtelte Virtualisierung, Fehler: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Fehler beim Erstellen des Netzwerkendpunkts mit folgender Adresse: "{}", zugewiesene neue Adresse: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToCreateNetwork" xml:space="preserve">
     <value>Fehler beim Erstellen des virtuellen Netzwerks mit dem Adressbereich "{}". Es wurde ein neues Netzwerk mit folgendem Bereich erstellt: "{}", {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
+    <value>Das NAT-Netzwerk von WSL ({}) steht im Konflikt mit dem Standardnetzwerk von Docker</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
@@ -1020,6 +1032,9 @@ Fallback auf NAT-Netzwerk.</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>Der WSL-Container ist durch die Computerrichtlinie deaktiviert.</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>Hinzugefügte Linux-Funktionen werden durch die Computerrichtlinie deaktiviert.</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>Die Container-Image-Registry „{}“ wird durch die Computerrichtlinie blockiert.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -1086,6 +1101,10 @@ Fallback auf NAT-Netzwerk.</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>Der Vorgang konnte nicht abgeschlossen werden, da die VHD zurzeit verwendet wird. So erzwingen Sie, dass WSL die Verwendung beendet: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageDistributionTerminationTimeout" xml:space="preserve">
+    <value>Timeout beim Warten auf die Beendigung des Verteilungsprozesses {} nach {} ms. Der Vorgang wird fortgesetzt, ohne zu bestätigen, dass die Verteilung beendet wurde.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
     <value>Die Komprimierung wird nur für .vhdx-Dateien unterstützt.</value>
@@ -1230,6 +1249,10 @@ Anweisungen zur Wiederherstellung finden Sie unter: https://aka.ms/wsldiskmountr
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
     <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. Using cgroup v2 instead. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
+  <data name="MessageWindowsInstallerBusy" xml:space="preserve">
+    <value>WSL Installation ist blockiert, weil Windows Installer ausgelastet ist. Warten Sie, bis andere Softwareinstallationen abgeschlossen sind, und versuchen Sie es dann erneut.</value>
+    <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Da hat etwas nicht geklappt, versuchen Sie es später noch einmal.</value>
@@ -2056,6 +2079,25 @@ Sie können auch über die Befehlspalette in VS Code selbst auf weitere VS Code 
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Verhindern Sie, dass ausgeführte Distributionen und die WSL-VM, auf der sie ausgeführt werden, nach einer Leerlaufzeit automatisch heruntergefahren werden.</value>
   </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
+    <value>VM der WSL-Distribution immer eingeschaltet lassen</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
+    <value>Die VM Ihrer WSL-Distribution wird im Leerlauf nicht heruntergefahren, sodass neue Shells sofort gestartet werden. Verwendet mehr Arbeitsspeicher, während WSL ausgeführt wird. Die Einstellung wird in Ihrer nächsten WSL-Sitzung wirksam.</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>VM der WSL-Distribution immer eingeschaltet lassen</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
+    <value>Die Einstellung zum Aktivhalten konnte nicht geändert werden</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
+    <value>Stellen Sie sicher, dass .wslconfig nicht schreibgeschützt ist, und versuchen Sie es dann erneut.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
+    <value>Sie können dies jederzeit in den WSL-Einstellungen unter "Optionale Features" ändern.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Timeout zurücksetzen</value>
   </data>
@@ -2214,6 +2256,10 @@ Verwendung:
   </data>
   <data name="MessageWslcCannotRemoveRunningContainer" xml:space="preserve">
     <value>Der Container "{}" wird ausgeführt und kann nicht entfernt werden. Beenden Sie entweder den Container vor dem Entfernen, oder erzwingen Sie das Entfernen (-f).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcCannotRemoveRestartingContainer" xml:space="preserve">
+    <value>Der Container "{}" wird neu gestartet und kann nicht entfernt werden. Beenden Sie entweder den Container vor dem Entfernen, oder erzwingen Sie das Entfernen (-f).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotRunning" xml:space="preserve">
@@ -2404,10 +2450,6 @@ Verwendung:
      <value>Ein positionelles Argument wurde gefunden, obwohl keines erwartet wurde: „{}“</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Fehlender Optionsname unter: „{}“</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
      <value>Fehler beim Auflösen weitergeleiteter Argumente, beginnend mit argument: "{}".</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2497,6 +2539,10 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <value>Netzwerk nicht gefunden: „{}“</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcNetworkPrefixAmbiguous" xml:space="preserve">
+    <value>Mehrere Netzwerke stimmen mit "{}" überein; Verwenden Sie eine längere ID oder den Netzwerknamen.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>Nicht unterstützter Netzwerktreiber: „{}“</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2530,6 +2576,10 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
   </data>
   <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
     <value>Ungültiger Wert für das Stopp-Timeout: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidSignal" xml:space="preserve">
+    <value>Ungültiger Signalwert: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
@@ -2828,11 +2878,11 @@ Beispiel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Zu sendendes Signal (Standard: das konfigurierte STOPSIGNAL des Containers oder SIGTERM, wenn keines konfiguriert ist)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>Containerereignisse überwachen.</value>
+  <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
+    <value>Ereignisse überwachen.</value>
   </data>
-  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>Echtzeitereignisse aus Containern überwachen.</value>
+  <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
+    <value>Überwachen Sie Ereignisse in Echtzeit aus Containern, Images, Netzwerken und Volumes.</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
     <value>Alle Ereignisse anzeigen, die seit dem Zeitstempel erstellt wurden</value>
@@ -3649,6 +3699,12 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>Virtualisierungsfunktionen für den Container verfügbar machen</value>
   </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Linux-Funktionen hinzufügen (wiederholbar)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Linux-Funktionen ablegen (wiederholbar)</value>
+  </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Argumente, die an den Befehl übergeben werden, der innerhalb des Containers ausgeführt wird</value>
   </data>
@@ -3666,6 +3722,10 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_InvalidRestartPolicyError" xml:space="preserve">
     <value>Ungültiger {} Wert „{}“. „Erwartet“, „nein“, „immer“, „bei Fehler [:max-wiederholungsversuche]“ oder „sofern nicht gestoppt“.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UnsupportedRestartPolicyError" xml:space="preserve">
+    <value>Restart policy '{}' is not supported. Supported values are no and always.</value>
+    <comment>{Locked="no"}{Locked="always"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
     <value>Ungültiger {}-Wert: {} ist kein bekannter Fortschrittstyp. Unterstützte Fortschrittstypen sind: {}.</value>
@@ -3708,7 +3768,7 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>Image „{}“ nicht gefunden, wird abgerufen</value>
+    <value>Das Bild „{}“ konnte lokal nicht gefunden werden</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">
@@ -3788,6 +3848,9 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
     <value>Netzwerkname</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
+    <value>Netzwerkname oder -ID</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Nur Netzwerk-IDs anzeigen</value>
@@ -4137,6 +4200,9 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Fehler beim Beenden des Containers „{}“ nach der Ablehnung des Plug-Ins</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcRestartPolicyConflictsWithRm" xml:space="preserve">
+    <value>Eine Neustartrichtlinie kann nicht mit der automatischen Entfernung des Containers kombiniert werden.</value>
+  </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>Fehler beim Freigeben der Hostressourcen für Volume '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -4151,6 +4217,18 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   </data>
   <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
     <value>Fehler beim Installieren der vertrauenswürdigen Hoststammzertifikate auf der VM: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
+    <value>WSLC konnte "{}" nicht schreiben, um die Auflösung des lokalen Hostnamens zu initialisieren (Gastfehler {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
+    <value>WSLC hat die Gast-VM gestartet, aber die Docker-Engine war nicht innerhalb von {} Millisekunden bereit. Sammeln Sie WSL-Diagnoseprotokolle, um den Startfehler zu untersuchen.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
+    <value>Die Docker-Engine wurde mit dem Code "{}" beendet, bevor sie in der WSLC-Gast-VM bereit war. Sammeln Sie WSL-Diagnoseprotokolle, um den Startfehler zu untersuchen.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

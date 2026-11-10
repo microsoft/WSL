@@ -569,10 +569,7 @@ Return Value:
 
     wsl::linux::WslDistributionConfig Config{CONFIG_FILE};
 
-    if (getenv(LX_WSL2_SYSTEM_DISTRO_SHARE_ENV) != nullptr)
-    {
-        Config.GuiAppsEnabled = true;
-    }
+    Config.GuiAppsEnabled = getenv(LX_WSL2_SYSTEM_DISTRO_SHARE_ENV) != nullptr;
 
     //
     // Initialize the static entries.
@@ -2973,7 +2970,7 @@ try
 
         if (Config.CgroupNamespace)
         {
-            if (UtilMoveSelfToDistroCgroup(CGROUP_MOUNTPOINT WSL_USER_NON_SYSTEMD_CGROUP_DIR, "login") < 0 ||
+            if (UtilMoveSelfToCgroup(CGROUP_MOUNTPOINT WSL_USER_NON_SYSTEMD_CGROUP_DIR, "login") < 0 ||
                 UtilEnterCgroupNamespace(Config.CgroupNamespace.get(), "login") < 0)
             {
                 _exit(1);

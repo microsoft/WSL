@@ -848,6 +848,10 @@ Ga voor meer informatie over Admin Protection naar https://aka.ms/apdevguide</va
     <value>Ongeldige distributienaam: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageInvalidDistribution" xml:space="preserve">
+    <value>Ongeldige distributieregistratie '{}' gevonden, {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholders are the distribution's registry GUID and the error code.</comment>
+  </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>Verouderde distributieregistratie wordt gebruikt. Overweeg in plaats daarvan een op tar gebaseerde distributie te gebruiken.</value>
     <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
@@ -891,12 +895,20 @@ Ga voor meer informatie over Admin Protection naar https://aka.ms/apdevguide</va
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>Geneste virtualisatie wordt niet ondersteund op deze computer.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>Geneste virtualisatieondersteuning is niet gedetecteerd, fout: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Kan het netwerkeindpunt met het adres {} niet maken, er is een nieuw adres toegewezen: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToCreateNetwork" xml:space="preserve">
     <value>Kan geen virtueel netwerk maken met adresbereik: {}, nieuw netwerk gemaakt met bereik: {}, {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
+    <value>Het NAT-netwerk van WSL ({}) conflicteert met het standaardnetwerk van Docker</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
@@ -920,7 +932,7 @@ Terugvallen op NAT-netwerken.</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
   <data name="MessageMirroredNetworkingReducedPortRange" xml:space="preserve">
-    <value>Mirrored networking is using a smaller ephemeral port range ({} ports instead of {}). This may limit the number of simultaneous connections.</value>
+    <value>Gespiegelde netwerken gebruiken een kleiner bereik voor tijdelijke poorten ({} poorten in plaats van {}). Dit kan het aantal gelijktijdige verbindingen beperken.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageMirroredNetworkingPortRangeAllocationFailed" xml:space="preserve">
@@ -1014,6 +1026,9 @@ Terugvallen op NAT-netwerken.</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>WSL-container is uitgeschakeld door het computerbeleid.</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>Toevoegingen van Linux-mogelijkheden zijn uitgeschakeld door het computerbeleid.</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>Het containerinstallatiekopieregister {} wordt geblokkeerd door het computerbeleid.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -1080,6 +1095,10 @@ Terugvallen op NAT-netwerken.</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>De bewerking kan niet worden voltooid omdat de VHD momenteel in gebruik is. Stoppen van WSL forceren: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageDistributionTerminationTimeout" xml:space="preserve">
+    <value>Er is een time-out opgetreden tijdens het wachten op het afsluiten van het distributieproces {} na {} ms. Doorgaan zonder te bevestigen dat de distributie is gestopt.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
     <value>Compactie wordt alleen ondersteund op .vhdx-bestanden.</value>
@@ -1224,6 +1243,10 @@ Zie de herstelinstructies voor: https://aka.ms/wsldiskmountrecovery</value>
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
     <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. Using cgroup v2 instead. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
+  <data name="MessageWindowsInstallerBusy" xml:space="preserve">
+    <value>WSL installatie is geblokkeerd omdat Windows Installer bezig is. Wacht totdat andere software-installaties zijn voltooid en probeer het opnieuw.</value>
+    <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Er is iets foutgegaan. Probeer het later opnieuw.</value>
@@ -2050,6 +2073,25 @@ U hebt ook toegang tot meer externe VS Code-opties via het opdrachtpalet in VS C
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Zorg ervoor dat distributies worden uitgevoerd, zodat de virtuele WSL-machine die als host fungeert, niet automatisch wordt afgesloten nadat ze inactief zijn geweest.</value>
   </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
+    <value>Virtuele machine van WSL-distributie altijd ingeschakeld houden</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
+    <value>De virtuele machine van je WSL-distributie wordt niet afgesloten wanneer deze niet wordt gebruikt, zodat nieuwe shells direct worden gestart. Gebruikt meer geheugen zolang WSL actief is. Dit wordt van kracht tijdens je volgende WSL-sessie.</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Virtuele machine van WSL-distributie altijd ingeschakeld houden</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
+    <value>Kan de instelling voor actief houden niet wijzigen</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
+    <value>Zorg ervoor dat .wslconfig niet alleen-lezen is en probeer het opnieuw.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
+    <value>Je kunt dit op elk moment wijzigen in de WSL-instellingen onder Optionele functies.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Time-out voor opnieuw instellen</value>
   </data>
@@ -2208,6 +2250,10 @@ Gebruik:
   </data>
   <data name="MessageWslcCannotRemoveRunningContainer" xml:space="preserve">
     <value>De container {} is actief en kan niet worden verwijderd. Stop de container voordat u deze verwijdert of gebruik geforceerd verwijderen (-f).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcCannotRemoveRestartingContainer" xml:space="preserve">
+    <value>De container {} wordt opnieuw opgestart en kan niet worden verwijderd. Stop de container voordat u deze verwijdert of gebruik geforceerd verwijderen (-f).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotRunning" xml:space="preserve">
@@ -2398,10 +2444,6 @@ Gebruik:
      <value>Er is een positioneel argument gevonden, terwijl er geen werd verwacht: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Ontbrekende optienaam bij: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
      <value>Kan doorgestuurde argumenten niet omzetten, te beginnen bij argument: {}</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2491,6 +2533,10 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
     <value>Netwerk niet gevonden: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcNetworkPrefixAmbiguous" xml:space="preserve">
+    <value>Meerdere netwerken komen overeen met {}; gebruik een langere id of de netwerknaam.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>Niet-ondersteund netwerkstuurprogramma: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2524,6 +2570,10 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
   </data>
   <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
     <value>Ongeldige time-outwaarde voor stoppen: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidSignal" xml:space="preserve">
+    <value>Ongeldige signaalwaarde: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
@@ -2822,11 +2872,11 @@ Voorbeeld: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Signaal dat moet worden verzonden (standaard: de geconfigureerde STOPSIGNAL van de container of SIGTERM als er geen is geconfigureerd)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>Containergebeurtenissen bewaken.</value>
+  <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
+    <value>Gebeurtenissen bewaken.</value>
   </data>
-  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>Realtime gebeurtenissen van containers bewaken.</value>
+  <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
+    <value>Bewaak realtimegebeurtenissen van containers, installatiekopieën, netwerken en volumes.</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
     <value>Alle gebeurtenissen weergeven die sinds het tijdstempel zijn gemaakt</value>
@@ -3643,6 +3693,12 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>Virtualisatiemogelijkheden zichtbaar maken voor de container</value>
   </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Linux-mogelijkheden toevoegen (herhaalbaar)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Linux-mogelijkheden verwijderen (herhaalbaar)</value>
+  </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Argumenten om door te geven aan de opdracht die binnen de container wordt uitgevoerd</value>
   </data>
@@ -3660,6 +3716,10 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_InvalidRestartPolicyError" xml:space="preserve">
     <value>{} waarde {} is ongeldig. Verwacht nee, altijd, on-failure[:max-retries] of unless-stopped.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UnsupportedRestartPolicyError" xml:space="preserve">
+    <value>Het beleid {} voor opnieuw opstarten wordt noniet ondersteund. Ondersteunde waarden zijn no en always.</value>
+    <comment>{Locked="no"}{Locked="always"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
     <value>Ongeldige {}-waarde: {} is geen herkend voortgangstype. Ondersteunde voortgangstypen zijn: {}.</value>
@@ -3702,7 +3762,7 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>Afbeelding {} niet gevonden, wordt opgehaald</value>
+    <value>Kan afbeelding '{}' niet lokaal vinden</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">
@@ -3782,6 +3842,9 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
     <value>Netwerknaam</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
+    <value>Netwerknaam of -id</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Toon alleen netwerk-id's</value>
@@ -4131,6 +4194,9 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Kan de container '{}' niet stoppen na afwijzing van de invoegtoepassing</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcRestartPolicyConflictsWithRm" xml:space="preserve">
+    <value>Een beleid voor opnieuw opstarten kan niet worden gecombineerd met het automatisch verwijderen van de container.</value>
+  </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>Kan de hostresources voor volume '{}' niet vrijgeven</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -4145,6 +4211,18 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   </data>
   <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
     <value>Kan de door de host vertrouwde basiscertificaten niet installeren in de VM: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
+    <value>WSLC kon '{}' niet schrijven om lokale hostnaamomzetting te initialiseren (gastfout {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
+    <value>WSLC heeft de gast-VM gestart, maar de Docker-engine is niet binnen {} milliseconden gereed. Diagnostische WSL-logboeken verzamelen om de opstartfout te onderzoeken.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
+    <value>Docker Engine is afgesloten met code {} voordat deze gereed is gemaakt in de WSLC-gast-VM. Diagnostische WSL-logboeken verzamelen om de opstartfout te onderzoeken.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

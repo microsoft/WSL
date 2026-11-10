@@ -397,15 +397,15 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
         NetworkingMode = defaultNetworkingMode;
     }
 
-    // Mirrored mode has Hyper-V Firewall always on - we ignore the local setting regardless in this case.
-    if (NetworkingMode != wsl::core::NetworkingMode::Mirrored)
+    // Enforce firewall requirements for the effective networking mode after applying policy.
+    if (NetworkingMode == wsl::core::NetworkingMode::Mirrored)
     {
-        if (!FirewallConfig.Enabled() &&
-            !wsl::windows::policies::IsFeatureAllowed(key.get(), wsl::windows::policies::c_allowCustomFirewallUserSetting))
-        {
-            FirewallConfig.Enable();
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageSettingOverriddenByPolicy(L"wsl2.firewall"));
-        }
+        FirewallConfig.Enable();
+    }
+    else if (!FirewallConfig.Enabled() && !wsl::windows::policies::IsFeatureAllowed(key.get(), wsl::windows::policies::c_allowCustomFirewallUserSetting))
+    {
+        FirewallConfig.Enable();
+        EMIT_USER_WARNING(wsl::shared::Localization::MessageSettingOverriddenByPolicy(L"wsl2.firewall"));
     }
 
     // Due to an issue with Global Secure Access Client, do not use DNS tunneling if the service is present.
@@ -536,24 +536,6 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
         }
         CATCH_LOG()
     }
-}
-
-GUID wsl::core::Config::NatNetworkId() const noexcept
-{
-    // Identifier for the WSL virtual network: {b95d0c5e-57d4-412b-b571-18a81a16e005}
-    static constexpr GUID c_networkId = {0xb95d0c5e, 0x57d4, 0x412b, {0xb5, 0x71, 0x18, 0xa8, 0x1a, 0x16, 0xe0, 0x05}};
-
-    // Identifier for the WSL virtual network with Hyper-v firewall enabled: {790e58b4-7939-4434-9358-89ae7ddbe87e}
-    static constexpr GUID c_networkWithFirewallId = {0x790e58b4, 0x7939, 0x4434, {0x93, 0x58, 0x89, 0xae, 0x7d, 0xdb, 0xe8, 0x7e}};
-
-    return FirewallConfig.Enabled() ? c_networkWithFirewallId : c_networkId;
-}
-
-LPCWSTR wsl::core::Config::NatNetworkName() const noexcept
-{
-    static constexpr auto c_networkName = L"WSL";
-    static constexpr auto c_networkWithFirewallName = L"WSL (Hyper-V firewall)";
-    return FirewallConfig.Enabled() ? c_networkWithFirewallName : c_networkName;
 }
 
 void wsl::core::FirewallConfiguration::Enable() noexcept

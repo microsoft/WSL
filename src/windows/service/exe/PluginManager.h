@@ -15,6 +15,8 @@ Abstract:
 #pragma once
 
 #include <wil/resource.h>
+#include <map>
+#include <optional>
 #include <string>
 #include <vector>
 #include "WslPluginApi.h"
@@ -27,6 +29,12 @@ public:
     {
         std::wstring plugin;
         HRESULT error;
+    };
+
+    struct PluginSession
+    {
+        WSLSessionId sessionId;
+        uint64_t pluginId;
     };
 
     PluginManager() = default;
@@ -59,19 +67,28 @@ public:
 
     void ThrowIfFatalPluginError() const;
 
+    std::optional<PluginSession> FindPluginSession(WSLSessionId Session) const;
+    void RemoveSession(WSLSessionId Session) noexcept;
+
 private:
     void LoadPlugin(LPCWSTR Name, LPCWSTR Path);
     static void ThrowIfPluginError(HRESULT Result, LPCWSTR Plugin);
+    WSLSessionInformation GetPluginSessionInformation(const WSLSessionInformation& Session, uint64_t PluginId) const;
 
     struct LoadedPlugin
     {
         wil::unique_hmodule module;
         std::wstring name;
+        uint64_t id;
         WSLPluginHooksV1 hooks{};
     };
 
     std::vector<LoadedPlugin> m_plugins;
     std::optional<PluginError> m_pluginError;
+    uint64_t m_nextPluginId = 1;
+    mutable wil::srwlock m_sessionLock;
+    _Guarded_by_(m_sessionLock) mutable std::map<WSLSessionId, PluginSession> m_sessions;
+    _Guarded_by_(m_sessionLock) mutable uint64_t m_nextSessionId = 1;
 };
 
 } // namespace wsl::windows::service

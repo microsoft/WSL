@@ -31,9 +31,6 @@ using helpers::WindowsBuildNumbers;
 using wsl::windows::service::wslc::HcsVirtualMachine;
 
 constexpr auto MAX_VM_CRASH_FILES = 3;
-constexpr auto SAVED_STATE_FILE_EXTENSION = L".vmrs";
-constexpr auto SAVED_STATE_FILE_PREFIX = L"saved-state-";
-
 namespace {
 
 SOCKADDR_INET CreateListenAddress(LPCSTR Address, uint16_t HostPort)
@@ -346,18 +343,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     // Add GPU to the VM if requested
     if (FeatureEnabled(WslcFeatureFlagsGPU))
     {
-        hcs::ModifySettingRequest<hcs::GpuConfiguration> gpuRequest{};
-        gpuRequest.ResourcePath = L"VirtualMachine/ComputeTopology/Gpu";
-        gpuRequest.RequestType = hcs::ModifyRequestType::Update;
-        gpuRequest.Settings.AssignmentMode = hcs::GpuAssignmentMode::Mirror;
-        gpuRequest.Settings.AllowVendorExtension = true;
-        if (wsl::windows::common::hcs::IsDisableVgpuSettingsSupported())
-        {
-            gpuRequest.Settings.DisableGdiAcceleration = true;
-            gpuRequest.Settings.DisablePresentation = true;
-        }
-
-        hcs::ModifyComputeSystem(m_computeSystem.get(), wsl::shared::ToJsonW(gpuRequest).c_str());
+        hcs::AddMirroredGpu(m_computeSystem.get());
     }
 
     unregisterOnFailure.release();
@@ -771,7 +757,7 @@ try
         TraceLoggingValue(static_cast<int>(Event->Type), "type"));
 
     auto* vm = reinterpret_cast<HcsVirtualMachine*>(Context);
-    if (Event->Type == HcsEventSystemExited)
+    if (Event->Type == HcsEventSystemExited || Event->Type == HcsEventServiceDisconnect)
     {
         vm->OnExit(Event);
     }
@@ -784,34 +770,36 @@ CATCH_LOG()
 
 void HcsVirtualMachine::OnExit(const HCS_EVENT* Event)
 {
-    const auto exitStatus = wsl::shared::FromJson<wsl::windows::common::hcs::SystemExitStatus>(Event->EventData);
-
-    auto reason = WSLCVirtualMachineTerminationReasonUnknown;
-
-    if (exitStatus.ExitType.has_value())
+    if (m_vmExitReported.exchange(true))
     {
-        switch (exitStatus.ExitType.value())
-        {
-        case hcs::NotificationType::ForcedExit:
-        case hcs::NotificationType::GracefulExit:
-            reason = WSLCVirtualMachineTerminationReasonShutdown;
-            break;
-        case hcs::NotificationType::UnexpectedExit:
-            reason = WSLCVirtualMachineTerminationReasonCrashed;
-            break;
-        default:
-            reason = WSLCVirtualMachineTerminationReasonUnknown;
-            break;
-        }
+        return;
     }
 
-    // Cache the termination reason and details before signaling the exit event. These fields are
-    // written once here (OnExit fires once and m_vmExitEvent is never reset) and published to readers
-    // by the SetEvent below; GetTerminationReason only reads them after observing the signaled event.
-    m_terminationReason = reason;
-    m_terminationDetails = Event->EventData;
+    auto signalExit = wil::scope_exit([&] { m_vmExitEvent.SetEvent(); });
 
-    m_vmExitEvent.SetEvent();
+    m_terminationDetails = Event->EventData != nullptr ? Event->EventData : L"";
+
+    if (Event->Type == HcsEventSystemExited && Event->EventData != nullptr)
+    {
+        const auto exitStatus = wsl::shared::FromJson<wsl::windows::common::hcs::SystemExitStatus>(Event->EventData);
+
+        if (exitStatus.ExitType.has_value())
+        {
+            switch (exitStatus.ExitType.value())
+            {
+            case hcs::NotificationType::ForcedExit:
+            case hcs::NotificationType::GracefulExit:
+                m_terminationReason = WSLCVirtualMachineTerminationReasonShutdown;
+                break;
+            case hcs::NotificationType::UnexpectedExit:
+                m_terminationReason = WSLCVirtualMachineTerminationReasonCrashed;
+                break;
+            default:
+                m_terminationReason = WSLCVirtualMachineTerminationReasonUnknown;
+                break;
+            }
+        }
+    }
 }
 
 HRESULT HcsVirtualMachine::GetTerminationReason(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details)
@@ -871,31 +859,12 @@ std::filesystem::path HcsVirtualMachine::GetCrashDumpFolder()
 
 void HcsVirtualMachine::CreateVmSavedStateFile(HANDLE InUserToken)
 {
-    auto runAsUser = wil::impersonate_token(InUserToken);
-
-    const auto filename = std::format(L"saved-state-{}-{}.vmrs", std::time(nullptr), m_vmIdString);
-    auto savedStateFile = m_crashDumpFolder / filename;
-
-    wsl::windows::common::filesystem::EnsureDirectory(m_crashDumpFolder.c_str());
-
-    wil::unique_handle file{CreateFileW(savedStateFile.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY, nullptr)};
-    THROW_LAST_ERROR_IF(!file);
-
-    hcs::GrantVmAccess(m_vmIdString.c_str(), savedStateFile.c_str());
-    m_vmSavedStateFile = savedStateFile;
+    m_vmSavedStateFile = hcs::CreateVmSavedStateFile(m_crashDumpFolder, m_vmId, InUserToken);
 }
 
 void HcsVirtualMachine::EnforceVmSavedStateFileLimit()
 {
-    auto runAsUser = wil::impersonate_token(m_userToken.get());
-
-    auto pred = [](const auto& e) {
-        return WI_IsFlagSet(GetFileAttributes(e.path().c_str()), FILE_ATTRIBUTE_TEMPORARY) && e.path().has_extension() &&
-               e.path().extension() == SAVED_STATE_FILE_EXTENSION && e.path().has_filename() &&
-               e.path().filename().wstring().find(SAVED_STATE_FILE_PREFIX) == 0 && e.file_size() > 0;
-    };
-
-    wsl::windows::common::wslutil::EnforceFileLimit(m_crashDumpFolder.c_str(), MAX_VM_CRASH_FILES + 1, pred);
+    hcs::EnforceVmSavedStateFileLimit(m_crashDumpFolder, MAX_VM_CRASH_FILES + 1, m_userToken.get());
 }
 
 void HcsVirtualMachine::WriteCrashLog(const std::wstring& crashLog)

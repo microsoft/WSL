@@ -10,6 +10,7 @@ set(SOURCES
     Dmesg.cpp
     DnsResolver.cpp
     DnsTunnelingChannel.cpp
+    EventStore.cpp
     ExecutionContext.cpp
     filesystem.cpp
     GnsChannel.cpp
@@ -52,6 +53,7 @@ set(SOURCES
     WSLCContainerLauncher.cpp
     ConsommeNetworking.cpp
     WSLCProcessLauncher.cpp
+    WSLCRestartScheduler.cpp
     WslClient.cpp
     WslCoreConfig.cpp
     WslCoreFilesystem.cpp
@@ -61,6 +63,8 @@ set(SOURCES
     WslCoreNetworkingSupport.cpp
     WslInstall.cpp
     WslSecurity.cpp
+    VirtualMachineBackend.cpp
+    HcsVirtualMachineBackend.cpp
     SlowOperationWatcher.cpp
     WslTelemetry.cpp
     wslutil.cpp
@@ -76,6 +80,7 @@ set(HEADERS
     ../inc/lxssbusclient.h
     ../inc/lxssclient.h
     ../inc/LxssDynamicFunction.h
+    ../inc/RegistryWatcher.h
     ../inc/traceloggingconfig.h
     ../inc/wdk.h
     ../inc/wsl.h
@@ -100,6 +105,7 @@ set(HEADERS
     ConsoleProgressIndicator.h
     ConsoleState.h
     COMImplClass.h
+    RuntimeClass.h
     wslc/models/ContainerModel.h
     DeviceHostProxy.h
     disk.hpp
@@ -107,6 +113,7 @@ set(HEADERS
     Dmesg.h
     DnsResolver.h
     DnsTunnelingChannel.h
+    EventStore.h
     ExecutionContext.h
     filesystem.hpp
     GnsChannel.h
@@ -152,6 +159,7 @@ set(HEADERS
     WSLCContainerEntry.h
     ConsommeNetworking.h
     WSLCProcessLauncher.h
+    WSLCRestartScheduler.h
     WslClient.h
     WslCoreConfig.h
     WslCoreFilesystem.h
@@ -162,6 +170,8 @@ set(HEADERS
     WslCoreNetworkingSupport.h
     WslInstall.h
     WslSecurity.h
+    IVirtualMachineBackend.h
+    HcsVirtualMachineBackend.h
     SlowOperationWatcher.h
     WslTelemetry.h
     wslutil.h

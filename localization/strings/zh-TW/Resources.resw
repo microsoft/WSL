@@ -854,6 +854,10 @@ Windows 版本： {}</value>
     <value>發佈名稱無效: "{}"。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageInvalidDistribution" xml:space="preserve">
+    <value>找到無效的發佈註冊 '{}'，{}。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholders are the distribution's registry GUID and the error code.</comment>
+  </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>使用舊版散發註冊。請考慮改用 tar 型發佈。</value>
     <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
@@ -897,12 +901,20 @@ Windows 版本： {}</value>
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>此電腦不支援巢狀虛擬化。</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>無法偵測巢狀虛擬化支援，錯誤： {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>無法建立位址為 '{}'、已指派新位址為 '{}' 的網络端點</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToCreateNetwork" xml:space="preserve">
     <value>無法建立位址範圍為 『{}』 的虛擬網路，已建立範圍為 『{}』、{} 的新網路</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
+    <value>WSL 的 NAT 網路 ({}) 與 Docker 的預設網路衝突</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
@@ -1020,6 +1032,9 @@ Windows 版本： {}</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>此電腦的原則已停用 WSL 容器。</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>電腦原則已停用 Linux 功能新增。</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>容器映像登錄 '{}' 已由電腦原則封鎖。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -1086,6 +1101,10 @@ Windows 版本： {}</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>無法完成作業，因為 VHD 目前正在使用中。若要強制 WSL 停止使用： wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageDistributionTerminationTimeout" xml:space="preserve">
+    <value>等待發佈流程 {} 結束時逾時 (已等待 {} 毫秒)。在未確認發佈已停止的情況下繼續執行。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
     <value>只有 .vhdx 檔案支援壓縮。</value>
@@ -1230,6 +1249,10 @@ Windows 版本： {}</value>
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
     <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. Using cgroup v2 instead. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
+  <data name="MessageWindowsInstallerBusy" xml:space="preserve">
+    <value>由於 Windows Installer 忙碌中，WSL 安裝已封鎖。請等候其他軟體安裝完成，之後再重試。</value>
+    <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>發生錯誤。請稍後再試一次。</value>
@@ -2056,6 +2079,25 @@ Windows 版本： {}</value>
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>防止正在執行的發行版及其所託管的 WSL 虛擬機器在閒置後自動關閉。</value>
   </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
+    <value>讓 WSL distro VM 一律保持開啟</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
+    <value>您的 WSL distro VM 在閒置時不會關機，因此新的殼層會立即啟動。WSL 執行期間會使用更多記憶體。此設定會在您下次啟動 WSL 工作階段時生效。</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>讓 WSL distro VM 一律保持開啟</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
+    <value>無法變更持續執行設定</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
+    <value>請確定 .wslconfig 不是唯讀，然後再試一次。</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
+    <value>您可以隨時在 WSL 設定的「選用功能」下變更此設定。</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>重設逾時</value>
   </data>
@@ -2214,6 +2256,10 @@ Windows 版本： {}</value>
   </data>
   <data name="MessageWslcCannotRemoveRunningContainer" xml:space="preserve">
     <value>容器 '{}' 正在執行，無法移除。請先停止容器再移除，或使用強制移除 (-f)。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcCannotRemoveRestartingContainer" xml:space="preserve">
+    <value>容器 '{}' 正在重新啟動，無法移除。請先停止容器再移除，或使用強制移除 (-f)。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotRunning" xml:space="preserve">
@@ -2404,10 +2450,6 @@ Windows 版本： {}</value>
      <value>在未預期的情況下找到位置引數: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>遺失選項名稱位置於: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
      <value>無法解析從參數 '{}' 開始的轉發參數</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2497,6 +2539,10 @@ Windows 版本： {}</value>
     <value>找不到網路: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcNetworkPrefixAmbiguous" xml:space="preserve">
+    <value>有多個網路符合 '{}'; 請使用較長的識別碼或網路名稱。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>不支援的網路驅動程式: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2530,6 +2576,10 @@ Windows 版本： {}</value>
   </data>
   <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
     <value>停止逾時值無效: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidSignal" xml:space="preserve">
+    <value>無效的訊號值: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
@@ -2828,11 +2878,11 @@ Windows 版本： {}</value>
     <value>要傳送的信號 (預設: 容器所設定的 STOPSIGNAL，或若未設定則為 SIGTERM)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>監視容器事件。</value>
+  <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
+    <value>監視事件。</value>
   </data>
-  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>監視容器中的即時事件。</value>
+  <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
+    <value>監視來自容器、映像、網路和磁碟區的即時事件。</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
     <value>顯示自該時間戳記以來建立的所有事件</value>
@@ -3649,6 +3699,12 @@ Windows 版本：{}</value>
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>將虛擬化功能公開給容器</value>
   </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>新增 Linux 功能 (可重複)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>置放 Linux 功能 (可重複)</value>
+  </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>傳遞給容器內執行指令的參數</value>
   </data>
@@ -3666,6 +3722,10 @@ Windows 版本：{}</value>
   <data name="WSLCCLI_InvalidRestartPolicyError" xml:space="preserve">
     <value>無效的 {} 值 '{}'。預期值為 no、always、on-failure[:max-retries] 或 unless-stopped。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UnsupportedRestartPolicyError" xml:space="preserve">
+    <value>Restart policy '{}' is not supported. Supported values are no and always.</value>
+    <comment>{Locked="no"}{Locked="always"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
     <value>無效的 {} 值: {} 不是可辨識的進度類型。支援的進度類型為: {}。</value>
@@ -3708,7 +3768,7 @@ Windows 版本：{}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>找不到映像 '{}'，正在提取</value>
+    <value>無法在本機找到影像 '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">
@@ -3788,6 +3848,9 @@ Windows 版本：{}</value>
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
     <value>網路名稱</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
+    <value>網路名稱或識別碼</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>只顯示網路識別碼</value>
@@ -4137,6 +4200,9 @@ Windows 版本：{}</value>
     <value>無法在外掛程式拒絕後停止容器 '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcRestartPolicyConflictsWithRm" xml:space="preserve">
+    <value>重新啟動原則不得與容器的自動移除功能併用。</value>
+  </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>無法釋放磁碟區 '{}' 的主機資源</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -4151,6 +4217,18 @@ Windows 版本：{}</value>
   </data>
   <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
     <value>無法將主機信任的根憑證安裝到 VM： {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
+    <value>WSLC 無法寫入 '{}' 來初始化本機主機名稱解析，(客體錯誤 {})。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
+    <value>WSLC 已啟動來賓 VM，但 Docker Engine 未在 {} 毫秒內準備就緒。請收集 WSL 診斷記錄，以調查啟動失敗的原因。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
+    <value>Docker Engine 在 WSLC 來賓 VM 準備就緒前即以代碼 {} 結束。請收集 WSL 診斷記錄，以調查啟動失敗的原因。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

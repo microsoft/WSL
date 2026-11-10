@@ -21,6 +21,7 @@ Abstract:
 #include "GuestDeviceManager.h"
 #include "Dmesg.h"
 #include "INetworkingEngine.h"
+#include "RuntimeClass.h"
 #include "WslCoreConfig.h"
 #include <filesystem>
 #include <map>
@@ -32,7 +33,7 @@ Abstract:
 namespace wsl::windows::service::wslc {
 
 class HcsVirtualMachine
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCVirtualMachine, IFastRundown>
+    : public common::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCVirtualMachine, IFastRundown>
 {
 public:
     HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings);
@@ -108,11 +109,11 @@ private:
     std::atomic<bool> m_vmSavedStateCaptured = false;
     std::atomic<bool> m_crashLogCaptured = false;
 
-    // Termination reason and details, cached in OnExit before m_vmExitEvent is signaled and never
     // modified afterward. Publication relies on the event: readers (GetTerminationReason) only access
     // these after observing m_vmExitEvent signaled, so no lock is needed. Keeping them lock-free also
     // avoids contending for m_lock from the HCS exit callback, which the destructor holds while the
     // callback is drained.
+    std::atomic<bool> m_vmExitReported = false;
     WSLCVirtualMachineTerminationReason m_terminationReason{WSLCVirtualMachineTerminationReasonUnknown};
     std::wstring m_terminationDetails;
 };
@@ -125,7 +126,7 @@ private:
 // was idle-terminated, without the SYSTEM service holding a VM up front.
 //
 class WSLCVirtualMachineFactory
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCVirtualMachineFactory, IFastRundown>
+    : public common::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCVirtualMachineFactory, IFastRundown>
 {
 public:
     explicit WSLCVirtualMachineFactory(_In_ const WSLCSessionSettings* Settings);

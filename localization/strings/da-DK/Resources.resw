@@ -848,6 +848,10 @@ Du kan få flere oplysninger om Admin Protection ved at besøge https://aka.ms/a
     <value>Ugyldigt distributionsnavn: "{}".</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageInvalidDistribution" xml:space="preserve">
+    <value>Der blev fundet en ugyldig distributionsregistrering "{}", {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholders are the distribution's registry GUID and the error code.</comment>
+  </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
     <value>Bruger ældre distributionsregistrering. Overvej at bruge en tar-baseret distribution i stedet.</value>
     <comment>{Locked="tar"}"tar" is a file archive format name and should not be translated.</comment>
@@ -891,12 +895,20 @@ Du kan få flere oplysninger om Admin Protection ved at besøge https://aka.ms/a
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>Indlejret virtualisering understøttes ikke på denne maskine.</value>
   </data>
+  <data name="MessageNestedVirtualizationDetectionFailed" xml:space="preserve">
+    <value>Understøttelse af indlejret virtualisering blev ikke registreret, fejl: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Der kunne ikke oprettes et netværksslutpunkt med adressen: '{}', tildelt ny adresse: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToCreateNetwork" xml:space="preserve">
     <value>Virtuelt netværk med adresseområde: '{}' blev ikke oprettet. Der blev oprettet et nyt netværk med området: '{}', {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNatNetworkDockerCollision" xml:space="preserve">
+    <value>WSL's NAT-netværk ({}) er i konflikt med dockers standardnetværk</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSafeModeEnabled" xml:space="preserve">
@@ -1014,6 +1026,9 @@ Går tilbage til NAT-netværk.</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>WSL-objektbeholderen er deaktiveret af computerpolitikken.</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>Tilføjelser af Linux-funktioner deaktiveres af computerpolitikken.</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>Registreringsdatabasen for objektbeholderafbildningen '{}' er blokeret af computerpolitikken.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -1080,6 +1095,10 @@ Går tilbage til NAT-netværk.</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>Handlingen kunne ikke fuldføres, fordi VHD'en i øjeblikket er i brug. For at tvinge WSL til at stoppe skal du bruge: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageDistributionTerminationTimeout" xml:space="preserve">
+    <value>Der opstod timeout, mens der blev ventet på, at distributionsprocessen {} skulle afsluttes efter {} ms. Fortsætter uden at bekræfte, at distributionen er stoppet.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
     <value>Komprimering understøttes kun for .vhdx-filer.</value>
@@ -1224,6 +1243,10 @@ Se genoprettelsesinstruktioner på: https://aka.ms/wsldiskmountrecovery</value>
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
     <value>Cgroup v1 er ikke kompatibel med cgroup-isolation pr. distribution. Der bruges cgroup v2 i stedet. Hvis du vil bruge cgroup v1, skal du angive isolateDistroCgroup=false under [wsl2] i .wslconfig og derefter køre wsl --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="cgroup v2"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
+  <data name="MessageWindowsInstallerBusy" xml:space="preserve">
+    <value>WSL installation er blokeret, fordi Windows Installer er optaget. Vent, indtil andre softwareinstallationer er afsluttet, og prøv derefter igen.</value>
+    <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Noget gik galt. Prøv igen senere.</value>
@@ -2050,6 +2073,25 @@ Du kan også få adgang til flere Fjernindstillinger for VS-kode via kommandopal
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Bliv ved med at holde kørende distributioner og den virtuelle WSL-maskine, der er vært for dem, fra automatisk at blive lukket, når de har været inaktive.</value>
   </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
+    <value>Hold VM'en til WSL-distributionen kørende hele tiden</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
+    <value>Din WSL-distributions VM lukker ikke ned, når den er inaktiv, så nye shells starter med det samme. Det bruger mere hukommelse, mens WSL kører. Dette træder i kraft i din næste WSL-session.</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Hold VM'en til WSL-distributionen kørende hele tiden</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
+    <value>Indstillingen for at holde den kørende kunne ikke ændres</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
+    <value>Sørg for, at .wslconfig ikke er skrivebeskyttet, og prøv derefter igen.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
+    <value>Du kan ændre dette når som helst i WSL-indstillinger under Valgfrie funktioner.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Nulstil timeout</value>
   </data>
@@ -2208,6 +2250,10 @@ Brug:
   </data>
   <data name="MessageWslcCannotRemoveRunningContainer" xml:space="preserve">
     <value>Objektbeholderen '{}' kører og kan ikke fjernes. Stop enten beholderen, før du fjerner den, eller brug tvungen fjernelse (-f).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcCannotRemoveRestartingContainer" xml:space="preserve">
+    <value>Objektbeholderen '{}' genstarter og kan ikke fjernes. Stop enten beholderen, før du fjerner den, eller brug tvungen fjernelse (-f).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotRunning" xml:space="preserve">
@@ -2398,10 +2444,6 @@ Brug:
      <value>Der blev fundet et positionsargument, hvor ingen var forventet: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Manglende indstillingsnavn ved: "{}"</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
      <value>Videresendte argumenter kunne ikke fortolkes med start ved argumentet: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2491,6 +2533,10 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
     <value>Netværket blev ikke fundet: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcNetworkPrefixAmbiguous" xml:space="preserve">
+    <value>Flere netværk matcher '{}'; brug et længere id eller netværksnavnet.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
     <value>Ikke-understøttet netværksdriver: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2524,6 +2570,10 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
   </data>
   <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
     <value>Ugyldig værdi for stop-timeout: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidSignal" xml:space="preserve">
+    <value>Ugyldig signalværdi: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
@@ -2822,11 +2872,11 @@ Eksempel: tar -cf - filer | wslc container cp - CONTAINER:/path</value>
     <value>Signal, der skal sendes (standard: objektbeholderens konfigurerede STOPSIGNAL eller SIGTERM, hvis der ikke er konfigureret nogen)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>Overvåg objektbeholderhændelser.</value>
+  <data name="WSLCCLI_SystemEventsDesc" xml:space="preserve">
+    <value>Overvåg hændelser.</value>
   </data>
-  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>Overvåg hændelser i realtid fra objektbeholdere.</value>
+  <data name="WSLCCLI_SystemEventsLongDesc" xml:space="preserve">
+    <value>Overvåg hændelser i realtid fra objektbeholdere, afbildninger, netværk og diskenheder.</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
     <value>Vis alle hændelser, der er oprettet siden tidsstemplet</value>
@@ -3643,6 +3693,12 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>Fremvis virtualiseringsegenskaber for objektbeholderen</value>
   </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Tilføj Linux-funktioner (kan gentages)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Fjern Linux-funktioner (kan gentages)</value>
+  </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Argumenter, der skal overføres til den kommando, der udføres inde i objektbeholderen</value>
   </data>
@@ -3660,6 +3716,10 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_InvalidRestartPolicyError" xml:space="preserve">
     <value>Ugyldig {}-værdi '{}'. Forventede nej, altid, ved fejl[:max-genforsøg] eller medmindre det er stoppet.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UnsupportedRestartPolicyError" xml:space="preserve">
+    <value>Genstartspolitikken '{}' understøttes noikke. Understøttede værdier er no og always.</value>
+    <comment>{Locked="no"}{Locked="always"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
     <value>Ugyldig {}-værdi: {} er ikke en genkendt statustype. Understøttede statustyper er: {}.</value>
@@ -3702,7 +3762,7 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>Billedet '{}' blev ikke fundet, henter</value>
+    <value>Billedet '{}' blev ikke fundet lokalt</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">
@@ -3782,6 +3842,9 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   </data>
   <data name="WSLCCLI_NetworkNameArgDescription" xml:space="preserve">
     <value>Netværksnavn</value>
+  </data>
+  <data name="WSLCCLI_NetworkNameOrIdArgDescription" xml:space="preserve">
+    <value>Netværksnavn eller -id</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
     <value>Vis kun netværks-id'er</value>
@@ -4131,6 +4194,9 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Beholderen '{}' kunne ikke stoppes efter afvisning af plug-in</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcRestartPolicyConflictsWithRm" xml:space="preserve">
+    <value>En genstartspolitik kan ikke kombineres med automatisk fjernelse af objektbeholderen.</value>
+  </data>
   <data name="MessageWslcVolumeReleaseFailed" xml:space="preserve">
     <value>Værtsressourcer for diskenheden '{}' kunne ikke frigives</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -4145,6 +4211,18 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   </data>
   <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
     <value>Værtens rodcertifikater, der er tillid til, blev ikke installeret i VM: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
+    <value>WSLC kunne ikke skrive '{}' til initialisering af lokal værtsnavnsfortolkning (gæstefejl {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
+    <value>WSLC startede gæste-VM'en, men Docker Engine blev ikke klar inden for {} millisekunder. Indsaml WSL-diagnosticeringslogfiler for at undersøge startfejlen.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
+    <value>Docker-programmet blev afsluttet med koden {}, før det blev klar i WSLC-gæste-VM'en. Indsaml WSL-diagnosticeringslogfiler for at undersøge startfejlen.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>
