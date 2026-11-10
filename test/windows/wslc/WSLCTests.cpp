@@ -4838,6 +4838,20 @@ sys.exit(1 if queries else 0)
         ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "echo OK"}, 0);
     }
 
+    WSLC_TEST_METHOD(RootNamespaceProcessSignalMask)
+    {
+        for (const auto flags : {WSLCProcessFlagsNone, WSLCProcessFlagsTty})
+        {
+            WSLCProcessLauncher launcher("/bin/cat", {"/bin/cat", "/proc/self/status"}, {}, flags);
+            auto process = launcher.Launch(*m_defaultSession);
+            const auto result = process.WaitAndCaptureOutput(30 * 1000);
+
+            VERIFY_ARE_EQUAL(0, result.Code);
+            const auto& output = result.Output.at(flags == WSLCProcessFlagsTty ? WSLCFDTty : WSLCFDStdout);
+            VERIFY_IS_TRUE(output.find("SigBlk:\t0000000000000000") != std::string::npos);
+        }
+    }
+
     WSLC_TEST_METHOD(CreateRootNamespaceProcess)
     {
         // Reject invalid process flags.

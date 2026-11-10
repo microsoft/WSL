@@ -155,6 +155,8 @@ WslcCrashDumpSubscriptionImpl* GetInternalType(WslcCrashDumpSubscription handle)
 struct WslcContainerImpl
 {
     wil::com_ptr<IWSLCCompatContainer> container;
+    // Aliases container when the runtime implements IWSLCCompatContainer2.
+    IWSLCCompatContainer2* container2 = nullptr;
     WslcContainerProcessIOCallbackOptions ioCallbackOptions{};
     std::atomic<std::shared_ptr<IOCallback>> ioCallbacks;
 };

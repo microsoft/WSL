@@ -874,7 +874,10 @@ try
     // Launch the process.
     //
 
-    execvpe(Filename, const_cast<char**>(CommandLine.data()), const_cast<char**>(Common->Environment.Variables().data()));
+    auto environment = Common->Environment.Variables();
+    environ = const_cast<char**>(environment.data());
+
+    execvpe(Filename, const_cast<char**>(CommandLine.data()), environ);
     FATAL_ERROR("execvpe({}) failed: {}", Filename, strerror(errno));
 
     return;

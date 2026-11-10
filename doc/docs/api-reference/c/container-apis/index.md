@@ -27,4 +27,6 @@
 - [WslcGetContainerState](wslcgetcontainerstate.md)
 - [WslcStopContainer](wslcstopcontainer.md)
 - [WslcDeleteContainer](wslcdeletecontainer.md)
+- [WslcConnectContainerNetwork](wslcconnectcontainernetwork.md)
+- [WslcDisconnectContainerNetwork](wslcdisconnectcontainernetwork.md)
 - [WslcReleaseContainer](wslcreleasecontainer.md)

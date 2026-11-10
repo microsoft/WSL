@@ -4184,7 +4184,7 @@ CATCH_RETURN();
 
 HRESULT WSLCContainer::InterfaceSupportsErrorInfo(REFIID riid)
 {
-    return riid == __uuidof(IWSLCContainer) || riid == __uuidof(IWSLCCompatContainer) ? S_OK : S_FALSE;
+    return riid == __uuidof(IWSLCContainer) || riid == __uuidof(IWSLCCompatContainer) || riid == __uuidof(IWSLCCompatContainer2) ? S_OK : S_FALSE;
 }
 
 HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags)
@@ -4227,5 +4227,34 @@ HRESULT WSLCContainer::Inspect(LPSTR* Output)
 try
 {
     return Inspect(FALSE, Output);
+}
+CATCH_RETURN();
+
+HRESULT WSLCContainer::ConnectNetwork(const WSLCCompatNetworkConnection* Network)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Network);
+    RETURN_HR_IF(E_INVALIDARG, Network->Settings == nullptr && Network->SettingsCount != 0);
+
+    std::vector<KeyValuePair> settings;
+    settings.reserve(Network->SettingsCount);
+    for (ULONG i = 0; i < Network->SettingsCount; ++i)
+    {
+        settings.push_back(apicompat::Convert(Network->Settings[i]));
+    }
+
+    WSLCNetworkConnectionOptions options{};
+    options.NetworkName = Network->NetworkName;
+    options.Settings = settings.empty() ? nullptr : settings.data();
+    options.SettingsCount = static_cast<ULONG>(settings.size());
+
+    return ConnectToNetwork(&options);
+}
+CATCH_RETURN();
+
+HRESULT WSLCContainer::DisconnectNetwork(LPCSTR NetworkNameOrId)
+try
+{
+    return DisconnectFromNetwork(NetworkNameOrId);
 }
 CATCH_RETURN();

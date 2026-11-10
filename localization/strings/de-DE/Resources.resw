@@ -2080,16 +2080,16 @@ Sie können auch über die Befehlspalette in VS Code selbst auf weitere VS Code 
     <value>Verhindern Sie, dass ausgeführte Distributionen und die WSL-VM, auf der sie ausgeführt werden, nach einer Leerlaufzeit automatisch heruntergefahren werden.</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>VM der WSL-Distribution immer eingeschaltet lassen</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
-    <value>Your WSL distro VM won't shut down when idle, so new shells start instantly. Uses more memory while WSL is running. This will take effect in your next WSL session.</value>
+    <value>Die VM Ihrer WSL-Distribution wird im Leerlauf nicht heruntergefahren, sodass neue Shells sofort gestartet werden. Verwendet mehr Arbeitsspeicher, während WSL ausgeführt wird. Die Einstellung wird in Ihrer nächsten WSL-Sitzung wirksam.</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>VM der WSL-Distribution immer eingeschaltet lassen</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
-    <value>Couldn't change the keep-running setting</value>
+    <value>Die Einstellung zum Aktivhalten konnte nicht geändert werden</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
     <value>Stellen Sie sicher, dass .wslconfig nicht schreibgeschützt ist, und versuchen Sie es dann erneut.</value>

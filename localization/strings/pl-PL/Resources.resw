@@ -2074,23 +2074,23 @@ Możesz również uzyskać dostęp do większej liczby opcji zdalnych programu V
     <value>Zapobiegaj automatycznemu wyłączaniu uruchomionych dystrybucji oraz maszyny wirtualnej WSL, na której są one uruchomione, po okresie bezczynności.</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>Utrzymuj maszynę wirtualną dystrybucji WSL zawsze włączoną</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
-    <value>Your WSL distro VM won't shut down when idle, so new shells start instantly. Uses more memory while WSL is running. This will take effect in your next WSL session.</value>
+    <value>Maszyna wirtualna dystrybucji WSL nie zostanie zamknięte w stanie bezczynnym, więc nowe powłoki uruchamiają się natychmiast. Zużywa więcej pamięci podczas działania WSL. Zacznie to obowiązywać podczas następnej sesji WSL.</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Keep WSL distro VM always on</value>
+    <value>Utrzymuj maszynę wirtualną dystrybucji WSL zawsze włączoną</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
-    <value>Couldn't change the keep-running setting</value>
+    <value>Nie można zmienić ustawienia ciągłego działania</value>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
     <value>Upewnij się, że .wslconfig nie jest tylko do odczytu, a następnie spróbuj ponownie.</value>
     <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
-    <value>You can change this anytime in WSL Settings under Optional Features.</value>
+    <value>Możesz to zmienić w dowolnym momencie w ustawieniach WSL w sekcji Funkcje opcjonalne.</value>
   </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Limit czasu resetowania</value>
@@ -4214,15 +4214,15 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
-    <value>WSLC could not write '{}' to initialize local hostname resolution (guest error {}).</value>
+    <value>WSLC nie mógł zapisać „{}”, aby zainicjować lokalne rozpoznawanie nazw hostów (błąd gościa {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
-    <value>WSLC started the guest VM, but Docker Engine did not become ready within {} milliseconds. Collect WSL diagnostic logs to investigate the startup failure.</value>
+    <value>WSLC uruchomił gościnną maszynę wirtualną, ale aparat platformy Docker nie uzyskał gotowości w ciągu {} ms. Zbierz dzienniki diagnostyczne WSL, aby zbadać błąd uruchamiania.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
-    <value>Docker Engine exited with code {} before becoming ready in the WSLC guest VM. Collect WSL diagnostic logs to investigate the startup failure.</value>
+    <value>Aparat platformy Docker zakończył działanie z kodem {}, zanim uzyskał gotowość w gościnnej maszynie wirtualnej WSLC. Zbierz dzienniki diagnostyczne WSL, aby zbadać błąd uruchamiania.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

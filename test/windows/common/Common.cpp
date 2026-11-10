@@ -3024,6 +3024,15 @@ void WaitForOutput(wsl::windows::common::io::HandleWrapper handle, std::string_v
     io.Run(timeout);
 }
 
+std::filesystem::path GetInstalledWslToolsPath()
+{
+    using namespace wsl::windows::common::wslutil;
+
+    const auto installPath = GetMsiPackagePath();
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), !installPath, "WSL MSI package is not installed");
+    return std::filesystem::path{installPath.value()} / LXSS_TOOLS_DIRECTORY;
+}
+
 std::filesystem::path GetTestImagePath(std::string_view imageName)
 {
     std::filesystem::path result = std::filesystem::path{g_testDataPath};
@@ -3226,7 +3235,7 @@ std::wstring FormatErrorMessage(std::wstring_view message, std::wstring_view err
     return std::format(
         L"{}\r\nError code: {}\r\n"
         L"If this error was unexpected, please consider searching for existing issues or filing a new issue at "
-        L"https://github.com/microsoft/WSL/issues.\r\n",
+        L"https://github.com/microsoft/WSL/issues\r\n",
         message,
         errorCode);
 }
