@@ -5809,10 +5809,7 @@ VERSION_ID="Invalid|Format"
                     }
                 };
 
-            GUID runId{};
-            VERIFY_SUCCEEDED(CoCreateGuid(&runId));
-            const auto importDirectory = std::filesystem::temp_directory_path() /
-                                         std::format(L"wsl-import-in-place-{}", wsl::shared::string::GuidToString<wchar_t>(runId));
+            const auto importDirectory = std::filesystem::current_path() / L"wsl-import-in-place";
             VERIFY_IS_TRUE(std::filesystem::create_directory(importDirectory));
             auto cleanupDirectory =
                 wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(importDirectory); });
