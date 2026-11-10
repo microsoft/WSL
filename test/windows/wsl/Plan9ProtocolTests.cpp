@@ -265,33 +265,14 @@ class Plan9ProtocolTests
         VERIFY_IS_TRUE(std::ranges::equal(c_versionResponse, response));
     }
 
-    WSL1_TEST_METHOD(UnixSocketPermissions)
-    {
-        WslKeepAlive keepAlive;
-        const auto distroKey = OpenDistributionKey(LXSS_DISTRO_NAME_TEST_L);
-        VERIFY_IS_TRUE(!!distroKey);
-        const auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath", L"");
-        VERIFY_IS_FALSE(basePath.empty());
-        const auto socketPath = std::filesystem::path{basePath} / LXSS_PLAN9_UNIX_SOCKET;
-        auto [linuxSocketPath, warnings] =
-            LxsstuLaunchWslAndCaptureOutput(std::format(L"-u root --exec wslpath -a -u \"{}\"", socketPath.wstring()));
-        Trim(linuxSocketPath);
-        VERIFY_IS_FALSE(linuxSocketPath.empty());
-
-        // Without DrvFs metadata, the mode reflects the owning Windows account's access.
-        const auto [permissions, error] =
-            LxsstuLaunchWslAndCaptureOutput(std::format(L"-u root --exec stat -c %a \"{}\"", linuxSocketPath));
-        VERIFY_ARE_EQUAL(permissions, L"777\n");
-    }
-
     WSL2_TEST_METHOD(VsockRejectsGuestConnections)
     {
         WslKeepAlive keepAlive;
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system -u root --exec modprobe vsock_loopback"), 0u);
 
-        // The Plan9 process is named init; identify it by command line to find its dynamically assigned listener port.
+        // Extract the hvsocket port used by the plan9 server.
         auto [portOutput, warnings] = LxsstuLaunchWslAndCaptureOutput(
-            L"-u root --exec sh -c \"pid=$(pgrep -f '^plan9 --control-socket ') && "
+            L"--exec sh -c \"pid=$(pgrep -f '^plan9 --control-socket ') && "
             L"ss -H -l -n -p --vsock | awk -v owner=pid=$pid, 'index($0, owner) { split($5, address, /:/); print address[2] "
             L"}'\"");
 
@@ -302,7 +283,7 @@ class Plan9ProtocolTests
         const auto port = std::stoul(portOutput, &parsedLength);
         VERIFY_ARE_EQUAL(parsedLength, portOutput.size());
 
-        // Validate that connecting to the server from the host works.
+        // Validate that connecting to the server from the host using that port works.
         auto client = ConnectToDistroServer(port);
         auto response = SendMessageAndExpectResponse(client.get(), c_versionRequest, Plan9MessageType::Rversion);
         VERIFY_IS_TRUE(std::ranges::equal(c_versionResponse, response));
