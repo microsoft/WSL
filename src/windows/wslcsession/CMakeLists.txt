@@ -8,6 +8,7 @@ set(SOURCES
     WSLCSessionReference.cpp
 
     # Session and container implementation
+    ComposeCancellation.cpp
     ComposeNormalizer.cpp
     ComposeReconciler.cpp
     ComposeSpec.cpp
@@ -40,6 +41,7 @@ set(SOURCES
     )
 
 set(HEADERS
+    ComposeCancellation.h
     ComposeNormalizer.h
     ComposeReconciler.h
     ComposeSpec.h

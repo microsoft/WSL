@@ -19,8 +19,8 @@ mutation, and final observation.
 
 ## Calling the internal API
 
-1. Prepare a `WSLCComposeOperationRequest` using `WSLC_COMPOSE_SCHEMA_VERSION`.
-   Select captured documents or an existing normalized project key and supply
+1. Prepare a `WSLCComposeOperationRequest`.
+   Select a captured `WSLCComposeDocumentCollection` or an existing normalized project key and supply
    the action's matching options variant.
 2. Call `IWSLCSession::ExecuteComposeOperation` with the request, an optional
    progress callback, an optional manual-reset cancellation event, and result
@@ -44,10 +44,9 @@ The executor is call-scoped. There is no remote operation object, separate
 completion event, or result-retrieval RPC. Returning successfully ends callback
 delivery for that invocation.
 
-`SchemaVersion` identifies the accepted internal payload revision. The CLI and
-service ship in lockstep; this field does not negotiate independently deployed
-versions or make incompatible COM layout changes safe. Persisted resource
-metadata has its own version and validation.
+The CLI and service ship in lockstep. Changes to these internal COM layouts
+require updating both sides together; there is no payload-version negotiation.
+Persisted resource metadata has its own version and validation.
 
 ## Captured inputs and project identity
 
@@ -86,8 +85,8 @@ The supported document input contains exactly one document.
 `LONG_MAX`. All other actions require `WSLCComposeActionOptionsTypeNone`.
 `Start`, `Attach`, and `Stop` fail with `ERROR_NOT_FOUND` when no containers match.
 Stop attempts the remaining containers after a container stop failure and retains
-the first such failure and its error details; cancellation or a callback failure
-can interrupt the loop.
+the first such failure and its error details; cancellation can interrupt the loop.
+Progress observer failures do not interrupt execution.
 
 Execution holds a per-project lock from discovery through final observation.
 Lock acquisition waits on the project mutex, caller cancellation, session
@@ -147,7 +146,11 @@ enqueue progress and return; completion waits belong outside the callback.
 An STA client must also dispatch incoming COM calls while waiting. A blocking
 wait that prevents callback delivery can stall even a single operation.
 
-Status events describe validation, execution, and the terminal outcome.
+Status events describe the phase or terminal outcome of the whole invocation:
+validation, execution, success, failure, or cancellation. Resource progress
+events describe individual work within `Executing`, such as creating a network
+or starting a container. They do not transition the invocation's status.
+Both are observer notifications; the synchronous result is authoritative.
 `Executing` is a coarse phase notification delivered before the project-lock
 wait; it is not evidence that mutation has started. This prototype does not
 construct a reconciliation plan or emit a planning phase.
@@ -157,9 +160,9 @@ resource's one-based ordinal within an operation group, and `Total` is that
 group's resource count. A `1/1` event announces work; it does not certify that the
 resource operation completed or measure image-download bytes.
 
-A callback failure during active work aborts execution with that HRESULT.
-Terminal status delivery is best effort; its failure is logged and preserves
-the execution outcome. Best effort applies to returned errors, not callback
+Callback HRESULT failures and caught callback exceptions are logged and do not
+abort execution or replace its outcome. Clients request cancellation through the
+cancellation event, not through the callback's return value. Best effort applies to returned errors, not callback
 duration. A stalled resource callback holds the project lock and delays
 cancellation checkpoints; a stalled terminal callback delays completion. The
 native call returns after callback delivery and result construction.
@@ -221,7 +224,7 @@ standard WinRT async interfaces with explicit cancellation bridging.
 
 `test\windows\wslc\WSLCComposeTests.cpp` covers request validation, discovery,
 resource ordering, error details, session-process exit, project concurrency,
-cancellation checkpoints, late cancellation, partial state, callback shutdown,
+cancellation checkpoints, late cancellation, partial state, nonfatal observer failures, callback shutdown,
 deletion during Up, and auto-remove Stop.
 `WSLCE2EComposeLifecycleTests.cpp` covers the CLI lifecycle.
 

@@ -46,12 +46,10 @@ struct ComposeRequestStorage
         document.Content = reinterpret_cast<const byte*>(content.data());
         document.ContentSize = gsl::narrow<ULONG>(content.size());
 
-        documents.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
         documents.ProjectDirectory = projectDirectory.c_str();
         documents.Documents = &document;
         documents.DocumentCount = 1;
 
-        request.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
         request.Action = action;
         request.Project.Type = WSLCComposeProjectTypeDocuments;
         request.Project.Value.Documents = &documents;
@@ -60,7 +58,6 @@ struct ComposeRequestStorage
 
     ComposeRequestStorage(std::string projectKeyValue, WSLCComposeAction action) : projectKey(std::move(projectKeyValue))
     {
-        request.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
         request.Action = action;
         request.Project.Type = WSLCComposeProjectTypeProjectKey;
         request.Project.Value.ProjectKey = projectKey.c_str();
@@ -85,7 +82,7 @@ struct ComposeRequestStorage
     std::string projectKey;
     std::string explicitProjectName;
     WSLCComposeDocument document{};
-    WSLCComposeDocuments documents{};
+    WSLCComposeDocumentCollection documents{};
     WSLCComposeOperationRequest request{};
 };
 
@@ -130,8 +127,10 @@ public:
         RETURN_HR_IF_NULL(E_POINTER, event);
 
         bool block = false;
+        HRESULT result{};
         {
             std::lock_guard lock(m_lock);
+            result = m_result;
             m_orderValid = m_orderValid && event->SequenceNumber == ++m_eventCount;
             switch (event->Kind)
             {
@@ -163,9 +162,15 @@ public:
             RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_TIMEOUT), !m_continueEvent.wait(c_waitTimeoutMs));
         }
 
-        return S_OK;
+        return result;
     }
     CATCH_RETURN();
+
+    void SetResult(HRESULT result)
+    {
+        std::lock_guard lock(m_lock);
+        m_result = result;
+    }
 
     std::vector<WSLCComposeStatus> Statuses() const
     {
@@ -236,6 +241,7 @@ private:
     std::vector<WSLCComposeStatus> m_statuses;
     std::vector<Progress> m_progress;
     bool m_orderValid{true};
+    HRESULT m_result{S_OK};
     wil::unique_event m_blockedEvent;
     wil::unique_event m_continueEvent;
 };
@@ -397,6 +403,7 @@ class WSLCComposeTests
         ComposeRequestStorage createRequest{composePath, WSLCComposeActionCreate};
         auto progress = Microsoft::WRL::Make<TestComposeProgressCallback>(false, std::nullopt, true);
         VERIFY_IS_NOT_NULL(progress.Get());
+        progress->SetResult(E_FAIL);
         const auto createResult = ExecuteCompose(*m_defaultSession, createRequest, progress.Get());
         VERIFY_IS_NULL(createResult.value.ErrorMessage);
         VERIFY_ARE_EQUAL(2u, createResult.value.AffectedContainersCount);
@@ -1371,6 +1378,7 @@ secrets:
             ComposeRequestStorage request{composePath, WSLCComposeActionValidate};
             auto progress = Microsoft::WRL::Make<TestComposeProgressCallback>(false, std::nullopt, true);
             VERIFY_IS_NOT_NULL(progress.Get());
+            progress->SetResult(E_FAIL);
             const auto result = WaitForCompose(*m_defaultSession, request, failingObserver ? progress.Get() : nullptr);
             VERIFY_ARE_EQUAL(WSLCComposeOperationStatusFailed, result.value.Status);
             VERIFY_ARE_EQUAL(E_INVALIDARG, result.value.Result);
@@ -1450,7 +1458,8 @@ secrets:
         });
 
         const auto result = call.TakeResult();
-        VERIFY_ARE_EQUAL(RPC_E_CALL_CANCELED, result.value.Result);
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_CANCELLED), result.value.Result);
+        VERIFY_ARE_EQUAL(WSLCComposeOperationStatusCancelled, result.value.Status);
         VERIFY_IS_TRUE(terminated.wait(c_waitTimeoutMs));
         VERIFY_SUCCEEDED(terminateResult);
     }
@@ -1588,11 +1597,6 @@ secrets:
 
         ComposeRequestStorage request{composePath, WSLCComposeActionValidate};
         ComposeResult rejected;
-        request.documents.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION + 1;
-        VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->ExecuteComposeOperation(&request.request, nullptr, nullptr, &rejected.value));
-        VERIFY_IS_NULL(rejected.value.AffectedContainers);
-
-        request.documents.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
         request.document.ContentSize = 0;
         VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->ExecuteComposeOperation(&request.request, nullptr, nullptr, &rejected.value));
         VERIFY_IS_NULL(rejected.value.AffectedContainers);

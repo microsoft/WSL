@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "ComposeCancellation.h"
 #include "ComposeSpec.h"
 #include "ExecutionContext.h"
 #include "wslc.h"
@@ -13,22 +14,6 @@
 namespace wsl::windows::service::wslc {
 
 class WSLCSession;
-
-// Cancellation sources are retained for the incoming call, including its original caller process.
-class ComposeCancellation
-{
-public:
-    NON_COPYABLE(ComposeCancellation);
-    NON_MOVABLE(ComposeCancellation);
-
-    ComposeCancellation(HANDLE sessionTerminatingEvent, HANDLE cancelEvent);
-    void Check() const;
-    wil::mutex_release_scope_exit AcquireMutex(HANDLE mutex) const;
-
-private:
-    wil::unique_handle m_callerProcess;
-    std::vector<HANDLE> m_handles;
-};
 
 struct ComposeExecutionResult
 {

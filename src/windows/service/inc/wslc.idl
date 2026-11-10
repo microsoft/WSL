@@ -36,7 +36,6 @@ cpp_quote("#endif")
 #define WSLC_EPHEMERAL_PORT 0
 #define WSLC_MAX_SAVE_IMAGES_COUNT 256
 #define WSLC_MAX_COMPOSE_PROJECT_NAME_LENGTH 255
-#define WSLC_COMPOSE_SCHEMA_VERSION 1
 
 cpp_quote("#define WSLC_MAX_CONTAINER_NAME_LENGTH 255")
 cpp_quote("#define WSLC_MAX_IMAGE_NAME_LENGTH 255")
@@ -49,7 +48,6 @@ cpp_quote("#define WSLC_MAX_BINDING_ADDRESS_LENGTH 45")
 cpp_quote("#define WSLC_MAX_SAVE_IMAGES_COUNT 256")
 cpp_quote("#define WSLC_EPHEMERAL_PORT 0")
 cpp_quote("#define WSLC_MAX_COMPOSE_PROJECT_NAME_LENGTH 255")
-cpp_quote("#define WSLC_COMPOSE_SCHEMA_VERSION 1")
 cpp_quote("#define WSLC_STOP_TIMEOUT_DEFAULT LONG_MIN") // Pass to Stop() to use the default container stop timeout
 cpp_quote("#define WSLC_STOP_TIMEOUT_NONE -1") // Wait forever for the container to stop.
 
@@ -622,16 +620,14 @@ typedef struct _WSLCComposeDocument
     ULONG ContentSize;
 } WSLCComposeDocument;
 
-typedef struct _WSLCComposeDocuments
+typedef struct _WSLCComposeDocumentCollection
 {
-    // Internal payload revision; clients and the service ship in lockstep.
-    ULONG SchemaVersion;
     // Supplies the default project name when ExplicitProjectName is absent.
     [string] LPCWSTR ProjectDirectory;
     [unique, string] LPCSTR ExplicitProjectName;
     [unique, size_is(DocumentCount)] const WSLCComposeDocument* Documents;
     ULONG DocumentCount;
-} WSLCComposeDocuments;
+} WSLCComposeDocumentCollection;
 
 typedef struct _WSLCComposeProject
 {
@@ -643,7 +639,7 @@ typedef struct _WSLCComposeProject
     union
     {
         [case(WSLCComposeProjectTypeDocuments)]
-        [unique] const WSLCComposeDocuments* Documents;
+        [unique] const WSLCComposeDocumentCollection* Documents;
         [case(WSLCComposeProjectTypeProjectKey)]
         [unique, string] LPCSTR ProjectKey;
         [default];
@@ -679,7 +675,6 @@ typedef struct _WSLCComposeActionOptions
 
 typedef struct _WSLCComposeOperationRequest
 {
-    ULONG SchemaVersion;
     WSLCComposeAction Action;
     WSLCComposeProject Project;
     WSLCComposeActionOptions ActionOptions;
@@ -687,7 +682,9 @@ typedef struct _WSLCComposeOperationRequest
 
 typedef enum _WSLCComposeProgressEventKind
 {
+    // Phase or terminal outcome of the whole invocation.
     WSLCComposeProgressEventKindStatus,
+    // Resource work within Executing; does not change the invocation status.
     WSLCComposeProgressEventKindProgress,
 } WSLCComposeProgressEventKind;
 
@@ -716,7 +713,6 @@ typedef struct _WSLCComposeResourceProgressEvent
 
 typedef struct _WSLCComposeProgressEvent
 {
-    ULONG SchemaVersion;
     ULONGLONG SequenceNumber;
     WSLCComposeProgressEventKind Kind;
 
@@ -740,7 +736,7 @@ interface IComposeProgressCallback : IUnknown
 {
     // Called synchronously during ExecuteComposeOperation, with sequence numbers starting at one.
     // Event data is borrowed for this call. Return promptly; resource callbacks can hold the project lock.
-    // A failing HRESULT aborts active work; failures delivering terminal status are logged.
+    // Observer failures are logged and do not change the operation outcome. Cancellation uses the caller's event.
     HRESULT OnProgress([in] const WSLCComposeProgressEvent* Event);
 }
 
@@ -755,7 +751,6 @@ typedef char WSLCComposeProjectKey[WSLC_MAX_COMPOSE_PROJECT_NAME_LENGTH + 1];
 
 typedef struct _WSLCComposeOperationResult
 {
-    ULONG SchemaVersion;
     WSLCComposeOperationStatus Status;
     HRESULT Result;
     // Optional localized failure description owned by the caller.

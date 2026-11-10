@@ -18,7 +18,6 @@ WSLCComposeOperation::WSLCComposeOperation(
 
 WSLCComposeOperation::Request WSLCComposeOperation::CaptureRequest(const WSLCComposeOperationRequest& request)
 {
-    THROW_HR_IF(E_INVALIDARG, request.SchemaVersion != WSLC_COMPOSE_SCHEMA_VERSION);
     switch (request.Action)
     {
     case WSLCComposeActionStop:
@@ -46,7 +45,6 @@ WSLCComposeOperation::Request WSLCComposeOperation::CaptureRequest(const WSLCCom
     {
         THROW_HR_IF_NULL(E_POINTER, request.Project.Value.Documents);
         const auto& source = *request.Project.Value.Documents;
-        THROW_HR_IF(E_INVALIDARG, source.SchemaVersion != WSLC_COMPOSE_SCHEMA_VERSION);
         THROW_HR_IF_NULL(E_POINTER, source.ProjectDirectory);
         THROW_HR_IF(E_INVALIDARG, source.DocumentCount == 0);
         THROW_HR_IF_NULL(E_POINTER, source.Documents);
@@ -119,7 +117,6 @@ void WSLCComposeOperation::Execute(WSLCComposeOperationResult& output)
     }
 
     WSLCComposeOperationResult completed{};
-    completed.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
     completed.Result = result;
     completed.Status = cancelled           ? WSLCComposeOperationStatusCancelled
                        : SUCCEEDED(result) ? WSLCComposeOperationStatusSucceeded
@@ -188,13 +185,16 @@ void WSLCComposeOperation::ReportStatus(WSLCComposeStatus status)
     }
 
     WSLCComposeProgressEvent event{};
-    event.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
     event.SequenceNumber = ++m_sequenceNumber;
     event.Kind = WSLCComposeProgressEventKindStatus;
     event.Value.Status.Status = status;
 
     auto callbackRegistration = m_session.RegisterUserCOMCallback();
-    THROW_IF_FAILED(m_progressCallback->OnProgress(&event));
+    try
+    {
+        LOG_IF_FAILED(m_progressCallback->OnProgress(&event));
+    }
+    CATCH_LOG();
 }
 
 void WSLCComposeOperation::ReportStatusNoThrow(WSLCComposeStatus status) noexcept
@@ -215,7 +215,6 @@ void WSLCComposeOperation::ReportProgress(std::string_view operation, std::strin
     const std::string unitValue{unit};
 
     WSLCComposeProgressEvent event{};
-    event.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
     event.SequenceNumber = ++m_sequenceNumber;
     event.Kind = WSLCComposeProgressEventKindProgress;
     event.Value.Progress.Operation = operationValue.c_str();
@@ -227,7 +226,11 @@ void WSLCComposeOperation::ReportProgress(std::string_view operation, std::strin
     // A stalled resource callback holds the project lock and delays cancellation checkpoints and completion.
     // TODO: Decouple observer delivery from execution and completion.
     auto callbackRegistration = m_session.RegisterUserCOMCallback();
-    THROW_IF_FAILED(m_progressCallback->OnProgress(&event));
+    try
+    {
+        LOG_IF_FAILED(m_progressCallback->OnProgress(&event));
+    }
+    CATCH_LOG();
 }
 
 } // namespace wsl::windows::service::wslc
