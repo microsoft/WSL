@@ -90,31 +90,44 @@ namespace {
         }
     }
 
+    // Parses the command's global options and resolves the next subcommand. A '--' ends this
+    // command's options but can still be followed directly by a subcommand, e.g.
+    // 'wslc container -- list -a'. When no subcommand follows, endOfOptions tells the command's
+    // own parse that every later token is positional.
     std::optional<std::reference_wrapper<const Command>> ParseGlobalArgumentsAndFindSubcommand(
-        InvocationCursor& invocation, CLIExecutionContext& context, const Command& command)
+        InvocationCursor& invocation, CLIExecutionContext& context, const Command& command, bool& endOfOptions)
     {
         ApplyEnvironmentOptions(context.Args, command.GetScopedArguments(Scope::Global));
 
-        auto globalArguments = command.GetScopedArguments(Scope::Global, Flags::None);
-        command.ParseArguments(
+        const bool separatorConsumed = command.ParseArguments(
             invocation,
             context.Args,
-            globalArguments,
+            command.GetScopedArguments(Scope::Global, Flags::None),
             /*optionsOnly*/ true,
             /*stopOnUnknown*/ true);
+
         command.ValidateArguments(context.Args, command.GetScopedArguments(Scope::Global));
 
         auto subcommand = command.FindSubCommand(invocation);
-        if (!subcommand)
+        if (subcommand)
         {
-            const auto currentArgument = invocation.begin();
-            if (currentArgument != invocation.end() && !currentArgument->empty() && currentArgument->front() == WSLC_CLI_ARG_ID_CHAR)
-            {
-                ThrowIfMisplacedGlobalOption(*currentArgument, command);
-            }
+            return subcommand;
         }
 
-        return subcommand;
+        if (separatorConsumed)
+        {
+            // A command with subcommands only defines help and version, so they stay usable after the separator.
+            endOfOptions = command.GetCommands().empty();
+            return {};
+        }
+
+        const auto currentArgument = invocation.begin();
+        if (currentArgument != invocation.end() && !currentArgument->empty() && currentArgument->front() == WSLC_CLI_ARG_ID_CHAR)
+        {
+            ThrowIfMisplacedGlobalOption(*currentArgument, command);
+        }
+
+        return {};
     }
 } // namespace
 
@@ -175,11 +188,12 @@ void CommandInvocation::ApplyRootEnvironmentOptions(argument::ArgMap& arguments)
 
 void CommandInvocation::ParseCommandLine(CLIExecutionContext& context)
 {
-    auto subcommand = ParseGlobalArgumentsAndFindSubcommand(m_cursor, context, Selected());
+    bool endOfOptions = false;
+    auto subcommand = ParseGlobalArgumentsAndFindSubcommand(m_cursor, context, Selected(), endOfOptions);
     while (subcommand)
     {
         Select(subcommand->get());
-        subcommand = ParseGlobalArgumentsAndFindSubcommand(m_cursor, context, Selected());
+        subcommand = ParseGlobalArgumentsAndFindSubcommand(m_cursor, context, Selected(), endOfOptions);
     }
 
     try
@@ -191,7 +205,8 @@ void CommandInvocation::ParseCommandLine(CLIExecutionContext& context)
             Selected().GetScopedArguments(Scope::Command, Flags::None),
             /*optionsOnly*/ false,
             /*stopOnUnknown*/ false,
-            GetInheritedGlobalArguments(Selected()));
+            GetInheritedGlobalArguments(Selected()),
+            endOfOptions);
     }
     catch (const ArgumentException& exception)
     {

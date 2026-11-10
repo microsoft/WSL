@@ -12,6 +12,7 @@ nav:
   - wslccontainerstate.md
   - wslcsignal.md
   - wslcdeletecontainerflags.md
+  - wslcnetworkflags.md
   - wslcprocessiohandle.md
   - wslcprocessflags.md
   - wslcprocessstate.md

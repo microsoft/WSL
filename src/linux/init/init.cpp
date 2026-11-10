@@ -621,10 +621,7 @@ try
     //
 
     THROW_LAST_ERROR_IF(UtilSetSignalHandlers(g_SavedSignalActions, false) < 0);
-
-    sigset_t SignalMask;
-    sigemptyset(&SignalMask);
-    THROW_LAST_ERROR_IF(sigprocmask(SIG_SETMASK, &SignalMask, NULL) < 0);
+    THROW_LAST_ERROR_IF(UtilClearSignalMask() < 0);
 
     auto AddEnvironmentVariable = [&](const char* Name) {
         const auto Value = UtilGetEnvironmentVariable(Name);
@@ -877,7 +874,10 @@ try
     // Launch the process.
     //
 
-    execvpe(Filename, const_cast<char**>(CommandLine.data()), const_cast<char**>(Common->Environment.Variables().data()));
+    auto environment = Common->Environment.Variables();
+    environ = const_cast<char**>(environment.data());
+
+    execvpe(Filename, const_cast<char**>(CommandLine.data()), environ);
     FATAL_ERROR("execvpe({}) failed: {}", Filename, strerror(errno));
 
     return;
@@ -1660,8 +1660,7 @@ Return Value:
         // Reset the signal masks.
         //
 
-        sigemptyset(&SignalMask);
-        Result = sigprocmask(SIG_SETMASK, &SignalMask, nullptr);
+        Result = UtilClearSignalMask();
         if (Result < 0)
         {
             LOG_ERROR("sigprocmask failed {}", errno);
@@ -2446,7 +2445,7 @@ Return Value:
 
             if (Config.CgroupNamespace)
             {
-                THROW_LAST_ERROR_IF(UtilMoveSelfToDistroCgroup(CGROUP_MOUNTPOINT, "systemd") < 0);
+                THROW_LAST_ERROR_IF(UtilMoveSelfToCgroup(CGROUP_MOUNTPOINT, "systemd") < 0);
                 THROW_LAST_ERROR_IF(UtilEnterCgroupNamespace(Config.CgroupNamespace.get(), "systemd") < 0);
             }
 
@@ -3211,6 +3210,13 @@ Return Value:
     pid_t child;
     int status;
 
+    //
+    // N.B. This can run after a failed call has set errno but before the caller
+    //      reads it (e.g. in TEMP_FAILURE_RETRY), and the final waitpid() sets
+    //      errno to ECHILD when no children remain, so preserve it.
+    //
+
+    const int savedErrno = errno;
     while ((child = waitpid(-1, &status, WNOHANG)) > 0)
     {
         if (child == g_SessionGroup)
@@ -3219,6 +3225,7 @@ Return Value:
         }
     }
 
+    errno = savedErrno;
     return;
 }
 

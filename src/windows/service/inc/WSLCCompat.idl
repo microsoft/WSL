@@ -200,6 +200,18 @@ typedef struct _WSLCCompatContainerOptions
     ULONG UlimitsCount;
 } WSLCCompatContainerOptions;
 
+typedef struct _WSLCCompatContainerOptions2
+{
+    WSLCCompatContainerOptions Base;
+    WSLCCompatStringArray CapAdd;
+    WSLCCompatStringArray CapDrop;
+
+    // Endpoint settings for the primary network (Base.ContainerNetwork.NetworkMode).
+    // Duplicate keys are allowed (e.g., multiple "Aliases" entries).
+    [unique, size_is(PrimaryNetworkSettingsCount)] const WSLCCompatKeyValuePair* PrimaryNetworkSettings;
+    ULONG PrimaryNetworkSettingsCount;
+} WSLCCompatContainerOptions2;
+
 typedef char WSLCCompatContainerId[WSLCCompat_CONTAINER_ID_LENGTH + 1];
 
 typedef [system_handle(sh_file)] HANDLE WSLCCompatFileHandle;
@@ -254,6 +266,14 @@ typedef struct _WSLCCompatSessionSettings {
     [unique] LPCSTR RootVhdTypeOverride;
 } WSLCCompatSessionSettings;
 
+typedef struct _WSLCCompatSessionSettings2
+{
+    WSLCCompatSessionSettings Base;
+
+    // Hostname that resolves to the Windows host loopback interface. Null disables host loopback.
+    [unique] LPCSTR HostLoopback;
+} WSLCCompatSessionSettings2;
+
 [
     uuid(8C3C91FA-D550-41B9-AD9D-23DCBF96F549),
     pointer_default(unique),
@@ -269,6 +289,18 @@ interface IWSLCCompatContainer : IUnknown
     HRESULT Exec([in, ref] const WSLCCompatProcessOptions* Options, [out] IWSLCCompatProcess** Process);
     HRESULT Inspect([out] LPSTR* Output);
     HRESULT GetId([out, string] WSLCCompatContainerId Id);
+}
+
+[
+    uuid(77165AA5-A4EA-4428-BF99-9C0775B6E0AA),
+    pointer_default(unique),
+    object
+]
+interface IWSLCCompatContainer2 : IWSLCCompatContainer
+{
+    // Network.NetworkName and NetworkNameOrId accept a network name, ID, or unique ID prefix.
+    HRESULT ConnectNetwork([in] const WSLCCompatNetworkConnection* Network);
+    HRESULT DisconnectNetwork([in] LPCSTR NetworkNameOrId);
 }
 
 typedef struct _WSLCCompatDeletedImageInformation
@@ -350,6 +382,23 @@ interface IWSLCCompatSession : IUnknown
 }
 
 [
+    uuid(EB761F0D-8C17-4D6D-9FF9-84086A81C5A3),
+    pointer_default(unique),
+    object
+]
+interface IWSLCCompatSession2 : IWSLCCompatSession
+{
+    HRESULT CreateContainer2([in] const WSLCCompatContainerOptions2* Options, [in, unique] IWSLCCompatWarningCallback* WarningCallback, [out] IWSLCCompatContainer** Container);
+
+    // Returns a JSON array of wslc_schema::NetworkListEntry.
+    HRESULT ListNetworks([out] LPSTR* Output);
+    HRESULT DeleteNetwork([in] LPCSTR NetworkNameOrId);
+
+    // Options is a JSON wslc_schema::CreateNetworkOptions; Network receives a JSON wslc_schema::NetworkListEntry.
+    HRESULT CreateNetwork([in] LPCSTR Options, [in, unique] IWSLCCompatWarningCallback* WarningCallback, [out] LPSTR* Network);
+}
+
+[
     uuid(279F2047-DA35-45A3-B671-AFD2302D5D16),
     pointer_default(unique),
     object
@@ -361,4 +410,14 @@ interface IWSLCCompatSessionManager : IUnknown
 
     // Session management.
     HRESULT CreateSession([in, unique] const WSLCCompatSessionSettings* Settings, WSLCSessionFlags Flags, [in, unique] IWSLCCompatWarningCallback* WarningCallback, [out] IWSLCCompatSession** Session);
+}
+
+[
+    uuid(9D80997B-8969-47F3-826C-58E286A59D7E),
+    pointer_default(unique),
+    object
+]
+interface IWSLCCompatSessionManager2 : IWSLCCompatSessionManager
+{
+    HRESULT CreateSession2([in] const WSLCCompatSessionSettings2* Settings, WSLCSessionFlags Flags, [in, unique] IWSLCCompatWarningCallback* WarningCallback, [out] IWSLCCompatSession** Session);
 }

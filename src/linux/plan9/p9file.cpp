@@ -188,8 +188,12 @@ File::File(std::shared_ptr<const Root> root) : m_Root{root}
 }
 
 // Copies a file. This does not clone the open file state, just the name and metadata.
-File::File(const File& file) : m_FileName{file.m_FileName}, m_Root{file.m_Root}, m_Qid{file.m_Qid}, m_Device{file.m_Device}
+File::File(const File& file) : m_Root{file.m_Root}
 {
+    std::shared_lock<std::shared_mutex> lock{file.m_Lock};
+    m_FileName = file.m_FileName;
+    m_Qid = file.m_Qid;
+    m_Device = file.m_Device;
 }
 
 // Updates the path to a child file entry in a directory. Must be called with a newly
@@ -376,7 +380,7 @@ LX_INT File::SetAttr(UINT32 valid, const StatResult& stat)
     {
         // Open the file to truncate because truncate will always follow symlinks and there is no
         // ftruncateat.
-        auto file = OpenFile(O_WRONLY);
+        auto file = m_File ? util::Reopen(m_File.get(), O_WRONLY) : OpenFile(O_WRONLY);
         if (!file)
         {
             return file.Error();
@@ -1124,8 +1128,6 @@ LX_INT File::Access(AccessFlags flags)
 
 std::shared_ptr<Fid> File::Clone() const
 {
-    // Requires the lock to protect the file name.
-    std::shared_lock<std::shared_mutex> lock{m_Lock};
     return std::make_shared<File>(*this);
 }
 
