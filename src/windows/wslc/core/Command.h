@@ -113,19 +113,22 @@ struct Command
 
     std::optional<std::reference_wrapper<const Command>> FindSubCommand(InvocationCursor& invocation) const;
 
-    // optionsOnly:          stop before the first positional token.
+    // optionsOnly:          stop before the first positional token, or just after a '--'.
     // stopOnUnknown:        stop before the first unknown option
     //                       token instead of throwing. Note: applies per-token; a
     //                       bundled short chain (e.g. "-Dv") whose leading alias
     //                       is recognized is treated as claimed, and an unknown
     //                       alias later in the chain still throws.
-    void ParseArguments(
+    // endOfOptions:         start as if a '--' was already consumed.
+    // Returns whether a '--' has ended option parsing.
+    bool ParseArguments(
         InvocationCursor& invocation,
         ArgMap& target,
         std::vector<Argument> definedArgs,
         bool optionsOnly = false,
         bool stopOnUnknown = false,
-        std::vector<Argument> inheritedGlobalArgs = {}) const;
+        std::vector<Argument> inheritedGlobalArgs = {},
+        bool endOfOptions = false) const;
 
     void ParseArguments(InvocationCursor& invocation, ArgMap& target) const
     {

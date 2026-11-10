@@ -43,6 +43,7 @@ void RunningWSLCContainer::Reset()
     }
 
     m_container.reset();
+    m_startedProcess.reset();
 }
 
 WSLCContainerState RunningWSLCContainer::State()
@@ -58,6 +59,25 @@ ClientRunningWSLCProcess RunningWSLCContainer::GetInitProcess()
     THROW_IF_FAILED(m_container->GetInitProcess(&process));
 
     return ClientRunningWSLCProcess{std::move(process), m_flags};
+}
+
+ClientRunningWSLCProcess RunningWSLCContainer::GetStartedProcess()
+{
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_startedProcess);
+    auto process = m_startedProcess;
+    return ClientRunningWSLCProcess{std::move(process), m_flags};
+}
+
+HRESULT RunningWSLCContainer::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, IWarningCallback* WarningCallback)
+{
+    wil::com_ptr<IWSLCProcess> process;
+    const auto result = m_container->StartWithProcess(Flags, StartOptions, WarningCallback, &process);
+    if (SUCCEEDED(result))
+    {
+        m_startedProcess = std::move(process);
+    }
+
+    return result;
 }
 
 void RunningWSLCContainer::SetDeleteOnClose(bool deleteOnClose)
@@ -132,6 +152,11 @@ void WSLCContainerLauncher::SetDefaultStopSignal(WSLCSignal Signal)
 void WSLCContainerLauncher::SetStopTimeout(LONG Timeout)
 {
     m_stopTimeout = Timeout;
+}
+
+void WSLCContainerLauncher::SetRestartPolicy(WSLCContainerRestartPolicy Policy)
+{
+    m_restartPolicy = Policy;
 }
 
 void WSLCContainerLauncher::SetShmSize(int64_t ShmSize)
@@ -355,7 +380,7 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::L
     startOptions.TtyRows = m_rows;
     startOptions.TtyColumns = m_columns;
 
-    result = container.value().Get().Start(Flags, &startOptions, WarningCallback);
+    result = container.value().Start(Flags, &startOptions, WarningCallback);
 
     return std::make_pair(result, std::move(container));
 }
@@ -382,6 +407,7 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     options.Ports = m_ports.data();
     options.PortsCount = static_cast<ULONG>(m_ports.size());
     options.StopSignal = m_stopSignal;
+    options.RestartPolicy = m_restartPolicy;
     options.Flags = m_containerFlags;
     if (m_stopTimeout.has_value())
     {

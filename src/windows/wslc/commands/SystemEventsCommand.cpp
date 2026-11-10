@@ -33,12 +33,12 @@ std::vector<Argument> SystemEventsCommand::GetArguments() const
 
 std::wstring SystemEventsCommand::ShortDescription() const
 {
-    return Localization::WSLCCLI_EventsDesc();
+    return Localization::WSLCCLI_SystemEventsDesc();
 }
 
 std::wstring SystemEventsCommand::LongDescription() const
 {
-    return Localization::WSLCCLI_EventsLongDesc();
+    return Localization::WSLCCLI_SystemEventsLongDesc();
 }
 
 void SystemEventsCommand::ExecuteInternal(CLIExecutionContext& context) const

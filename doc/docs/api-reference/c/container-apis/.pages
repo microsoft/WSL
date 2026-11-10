@@ -14,6 +14,7 @@ nav:
   - wslcsetcontainersettingsportmappings.md
   - wslcsetcontainersettingsvolumes.md
   - wslcsetcontainersettingsnamedvolumes.md
+  - wslcsetcontainersettingsnetworks.md
   - wslcsetcontainersettingscapabilityadditions.md
   - wslcsetcontainersettingscapabilitydrops.md
   - wslcsetcontainerinitprocessiocallbacks.md
@@ -24,4 +25,6 @@ nav:
   - wslcgetcontainerstate.md
   - wslcstopcontainer.md
   - wslcdeletecontainer.md
+  - wslcconnectcontainernetwork.md
+  - wslcdisconnectcontainernetwork.md
   - wslcreleasecontainer.md

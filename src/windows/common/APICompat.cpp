@@ -348,6 +348,11 @@ ContainerOptionsConversion::ContainerOptionsConversion(const WSLCCompatContainer
 {
     m_value.CapAdd = Convert(Options.CapAdd);
     m_value.CapDrop = Convert(Options.CapDrop);
+
+    THROW_HR_IF(E_INVALIDARG, Options.PrimaryNetworkSettingsCount > 0 && Options.PrimaryNetworkSettings == nullptr);
+    m_primaryNetworkSettings = ConvertArray<KeyValuePair>(Options.PrimaryNetworkSettings, Options.PrimaryNetworkSettingsCount);
+    m_value.ContainerNetwork.Settings = m_primaryNetworkSettings.empty() ? nullptr : m_primaryNetworkSettings.data();
+    m_value.ContainerNetwork.SettingsCount = Options.PrimaryNetworkSettingsCount;
 }
 
 ListImagesOptionsConversion::ListImagesOptionsConversion(const WSLCCompatListImagesOptions& Options)
@@ -388,6 +393,12 @@ SessionSettingsConversion::SessionSettingsConversion(const WSLCCompatSessionSett
     m_value.StorageFlags = Settings.StorageFlags;
     m_value.RootVhdOverride = Settings.RootVhdOverride;
     m_value.RootVhdTypeOverride = Settings.RootVhdTypeOverride;
+}
+
+SessionSettingsConversion::SessionSettingsConversion(const WSLCCompatSessionSettings2& Settings) :
+    SessionSettingsConversion(Settings.Base)
+{
+    m_value.HostLoopback = Settings.HostLoopback;
 }
 
 //
