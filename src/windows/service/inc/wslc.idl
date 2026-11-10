@@ -680,14 +680,6 @@ typedef struct _WSLCComposeOperationRequest
     WSLCComposeActionOptions ActionOptions;
 } WSLCComposeOperationRequest;
 
-typedef enum _WSLCComposeProgressEventKind
-{
-    // Phase or terminal outcome of the whole invocation.
-    WSLCComposeProgressEventKindStatus,
-    // Resource work within Executing; does not change the invocation status.
-    WSLCComposeProgressEventKindProgress,
-} WSLCComposeProgressEventKind;
-
 typedef enum _WSLCComposeStatus
 {
     WSLCComposeStatusValidating,
@@ -697,15 +689,11 @@ typedef enum _WSLCComposeStatus
     WSLCComposeStatusCancelled,
 } WSLCComposeStatus;
 
-typedef struct _WSLCComposeStatusEvent
-{
-    WSLCComposeStatus Status;
-} WSLCComposeStatusEvent;
-
 typedef struct _WSLCComposeResourceProgressEvent
 {
     [string] LPCSTR Operation;
     [unique, string] LPCSTR ResourceKey;
+    // Current is the one-based resource ordinal; notifications precede the associated work.
     ULONGLONG Current;
     ULONGLONG Total;
     [unique, string] LPCSTR Unit;
@@ -714,17 +702,10 @@ typedef struct _WSLCComposeResourceProgressEvent
 typedef struct _WSLCComposeProgressEvent
 {
     ULONGLONG SequenceNumber;
-    WSLCComposeProgressEventKind Kind;
-
-    [switch_type(WSLCComposeProgressEventKind), switch_is(Kind)]
-    union
-    {
-        [case(WSLCComposeProgressEventKindStatus)]
-        WSLCComposeStatusEvent Status;
-        [case(WSLCComposeProgressEventKindProgress)]
-        WSLCComposeResourceProgressEvent Progress;
-        [default];
-    } Value;
+    // Phase or terminal outcome of the whole invocation, present on every notification.
+    WSLCComposeStatus Status;
+    // Present for granular progress where applicable.
+    [unique] const WSLCComposeResourceProgressEvent* Progress;
 } WSLCComposeProgressEvent;
 
 [

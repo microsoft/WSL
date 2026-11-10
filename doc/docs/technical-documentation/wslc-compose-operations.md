@@ -146,13 +146,26 @@ enqueue progress and return; completion waits belong outside the callback.
 An STA client must also dispatch incoming COM calls while waiting. A blocking
 wait that prevents callback delivery can stall even a single operation.
 
-Status events describe the phase or terminal outcome of the whole invocation:
-validation, execution, success, failure, or cancellation. Resource progress
-events describe individual work within `Executing`, such as creating a network
-or starting a container. They do not transition the invocation's status.
-Both are observer notifications; the synchronous result is authoritative.
-`Executing` is a coarse phase notification delivered before the project-lock
-wait; it is not evidence that mutation has started. This prototype does not
+Every `WSLCComposeProgressEvent` carries the whole invocation's current `Status`
+and an optional `Progress` payload. `Status` describes the invocation's phase or
+outcome. `Progress` provides granular detail where applicable, such as creating
+a network or starting a container, and is null when no granular details apply.
+Multiple progress notifications can carry the same status without reporting a
+phase transition. All notifications are advisory; the synchronous result is
+authoritative.
+
+For example, creating a new one-container project emits:
+
+| Status | Progress |
+|---|---|
+| `Validating` | Null |
+| `Executing` | Null |
+| `Executing` | Creating the default network, ordinal 1 of 1 |
+| `Executing` | Creating the container, ordinal 1 of 1 |
+| `Succeeded` | Null |
+
+The initial `Executing` notification is delivered before the project-lock
+wait; it is not evidence that mutation has started. The engine does not
 construct a reconciliation plan or emit a planning phase.
 
 Resource progress is emitted before the associated work. `Current` is the
@@ -167,8 +180,7 @@ duration. A stalled resource callback holds the project lock and delays
 cancellation checkpoints; a stalled terminal callback delays completion. The
 native call returns after callback delivery and result construction.
 
-The engine emits status and resource-progress events. `Attach` returns a
-container snapshot for caller-side attachment.
+`Attach` returns a container snapshot for caller-side attachment.
 
 ## Cancellation and partial state
 
@@ -214,7 +226,7 @@ to its I/O coordinator. A stream callback must return promptly and must not run
 the relay itself. Service completion and client output draining are separate
 milestones, and project mutation locks must not span indefinite attachment.
 
-This prototype's `Attach` only returns container identities. It does not implement
+`Attach` only returns container identities. The engine does not implement
 full attached-command lifetime, force-cancellation escalation, or parallel
 resource scheduling. These capabilities are independent of whether the native
 entry point is synchronous. A future public SDK can project the call through

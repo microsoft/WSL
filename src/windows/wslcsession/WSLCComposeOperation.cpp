@@ -186,8 +186,7 @@ void WSLCComposeOperation::ReportStatus(WSLCComposeStatus status)
 
     WSLCComposeProgressEvent event{};
     event.SequenceNumber = ++m_sequenceNumber;
-    event.Kind = WSLCComposeProgressEventKindStatus;
-    event.Value.Status.Status = status;
+    event.Status = status;
 
     auto callbackRegistration = m_session.RegisterUserCOMCallback();
     try
@@ -214,14 +213,18 @@ void WSLCComposeOperation::ReportProgress(std::string_view operation, std::strin
     const std::string resourceKeyValue{resourceKey};
     const std::string unitValue{unit};
 
+    const WSLCComposeResourceProgressEvent progress{
+        .Operation = operationValue.c_str(),
+        .ResourceKey = resourceKeyValue.c_str(),
+        .Current = current,
+        .Total = total,
+        .Unit = unitValue.c_str(),
+    };
+
     WSLCComposeProgressEvent event{};
     event.SequenceNumber = ++m_sequenceNumber;
-    event.Kind = WSLCComposeProgressEventKindProgress;
-    event.Value.Progress.Operation = operationValue.c_str();
-    event.Value.Progress.ResourceKey = resourceKeyValue.c_str();
-    event.Value.Progress.Current = current;
-    event.Value.Progress.Total = total;
-    event.Value.Progress.Unit = unitValue.c_str();
+    event.Status = WSLCComposeStatusExecuting;
+    event.Progress = &progress;
 
     // A stalled resource callback holds the project lock and delays cancellation checkpoints and completion.
     // TODO: Decouple observer delivery from execution and completion.

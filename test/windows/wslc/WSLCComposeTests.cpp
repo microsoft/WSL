@@ -132,28 +132,27 @@ public:
             std::lock_guard lock(m_lock);
             result = m_result;
             m_orderValid = m_orderValid && event->SequenceNumber == ++m_eventCount;
-            switch (event->Kind)
+            m_statuses.emplace_back(event->Status);
+            if (event->Progress != nullptr)
             {
-            case WSLCComposeProgressEventKindStatus:
-                m_statuses.emplace_back(event->Value.Status.Status);
-                RETURN_HR_IF(
-                    RPC_E_DISCONNECTED,
-                    m_failOnTerminal && (event->Value.Status.Status == WSLCComposeStatusSucceeded || event->Value.Status.Status == WSLCComposeStatusFailed ||
-                                         event->Value.Status.Status == WSLCComposeStatusCancelled));
-                block = m_blockExecuting && event->Value.Status.Status == m_blockedStatus;
-                break;
-            case WSLCComposeProgressEventKindProgress:
                 m_progress.emplace_back(
-                    event->Value.Progress.Operation,
-                    event->Value.Progress.ResourceKey,
-                    event->Value.Progress.Current,
-                    event->Value.Progress.Total,
-                    event->Value.Progress.Unit);
+                    event->Status,
+                    event->Progress->Operation,
+                    event->Progress->ResourceKey,
+                    event->Progress->Current,
+                    event->Progress->Total,
+                    event->Progress->Unit);
                 block = m_blockProgress.has_value() && Describe(m_progress.back()) == *m_blockProgress;
-                break;
-            default:
-                RETURN_HR(E_INVALIDARG);
             }
+            else
+            {
+                block = m_blockExecuting && event->Status == m_blockedStatus;
+            }
+
+            RETURN_HR_IF(
+                RPC_E_DISCONNECTED,
+                m_failOnTerminal && (event->Status == WSLCComposeStatusSucceeded || event->Status == WSLCComposeStatusFailed ||
+                                     event->Status == WSLCComposeStatusCancelled));
         }
 
         if (block)
@@ -180,6 +179,7 @@ public:
 
     struct Progress
     {
+        WSLCComposeStatus Status;
         std::string Operation;
         std::string ResourceKey;
         ULONGLONG Current;
@@ -400,6 +400,15 @@ class WSLCComposeTests
                            "    command: [\"/bin/sh\", \"-c\", \"while true; do echo secondary; sleep 1; done\"]\n";
         }
 
+        ComposeRequestStorage validateRequest{composePath, WSLCComposeActionValidate};
+        auto validateProgress = Microsoft::WRL::Make<TestComposeProgressCallback>();
+        VERIFY_IS_NOT_NULL(validateProgress.Get());
+        ExecuteCompose(*m_defaultSession, validateRequest, validateProgress.Get());
+        VERIFY_IS_TRUE(validateProgress->OrderValid());
+        VERIFY_ARE_EQUAL(
+            std::vector<WSLCComposeStatus>({WSLCComposeStatusValidating, WSLCComposeStatusSucceeded}), validateProgress->Statuses());
+        VERIFY_IS_TRUE(validateProgress->ProgressEvents().empty());
+
         ComposeRequestStorage createRequest{composePath, WSLCComposeActionCreate};
         auto progress = Microsoft::WRL::Make<TestComposeProgressCallback>(false, std::nullopt, true);
         VERIFY_IS_NOT_NULL(progress.Get());
@@ -411,7 +420,8 @@ class WSLCComposeTests
         VERIFY_ARE_EQUAL(WslcContainerStateCreated, createResult.value.AffectedContainers[0].State);
         VERIFY_IS_TRUE(progress->OrderValid());
         VERIFY_ARE_EQUAL(
-            std::vector<WSLCComposeStatus>({WSLCComposeStatusValidating, WSLCComposeStatusExecuting, WSLCComposeStatusSucceeded}),
+            std::vector<WSLCComposeStatus>(
+                {WSLCComposeStatusValidating, WSLCComposeStatusExecuting, WSLCComposeStatusExecuting, WSLCComposeStatusExecuting, WSLCComposeStatusExecuting, WSLCComposeStatusSucceeded}),
             progress->Statuses());
         VERIFY_ARE_EQUAL(
             std::vector<std::string>(
@@ -419,6 +429,10 @@ class WSLCComposeTests
                  "container:create:wslc-compose-basic:1/2",
                  "container:create:wslc-compose-secondary:2/2"}),
             progress->ProgressDescriptions());
+        for (const auto& resourceProgress : progress->ProgressEvents())
+        {
+            VERIFY_ARE_EQUAL(WSLCComposeStatusExecuting, resourceProgress.Status);
+        }
 
         wil::com_ptr<IWSLCContainer> basicContainer;
         VERIFY_SUCCEEDED(m_defaultSession->OpenContainer("wslc-compose-basic", &basicContainer));
@@ -1389,6 +1403,7 @@ secrets:
             {
                 VERIFY_IS_TRUE(progress->OrderValid());
                 VERIFY_ARE_EQUAL(std::vector<WSLCComposeStatus>({WSLCComposeStatusValidating, WSLCComposeStatusFailed}), progress->Statuses());
+                VERIFY_IS_TRUE(progress->ProgressEvents().empty());
             }
         }
     }
@@ -1477,6 +1492,7 @@ secrets:
         VERIFY_ARE_EQUAL(WSLCComposeOperationStatusCancelled, result.value.Status);
         VERIFY_ARE_EQUAL(0u, result.value.AffectedContainersCount);
         VERIFY_ARE_EQUAL(std::vector<WSLCComposeStatus>{WSLCComposeStatusCancelled}, progress->Statuses());
+        VERIFY_IS_TRUE(progress->ProgressEvents().empty());
     }
 
     TEST_METHOD(ComposeSameProjectSerializesAndQueuedOperationCanCancel)
