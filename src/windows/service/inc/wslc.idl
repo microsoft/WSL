@@ -726,7 +726,8 @@ typedef struct _WSLCSessionInitSettings
     WSLCFeatureFlags FeatureFlags;
     [unique] LPCSTR RootVhdTypeOverride;
     ULONG IdleTimeoutSec;
-    WSLCStringArray ProxyEnvironment;
+    [unique] LPCSTR HostLoopback;
+    WSLCStringArray ProxyEnvironmentOverrides;
 } WSLCSessionInitSettings;
 
 [

@@ -26,6 +26,7 @@ Abstract:
 #include "APICompat.h"
 #include "WSLCContainerEntry.h"
 #include "wslc/WSLCProxy.h"
+#include "LxssHttpProxy.h"
 
 using namespace wsl::windows::common;
 using io::MultiHandleWait;
@@ -381,7 +382,7 @@ try
     // failures are streamed to the CLI.
     WSLCExecutionContext warningContext(this, WarningCallback);
 
-    RETURN_HR_IF(E_INVALIDARG, Settings->ProxyEnvironment.Count != 0 && Settings->ProxyEnvironment.Values == nullptr);
+    RETURN_HR_IF(E_INVALIDARG, Settings->ProxyEnvironmentOverrides.Count != 0 && Settings->ProxyEnvironmentOverrides.Values == nullptr);
     const auto isLoopbackProxy = [](LPCSTR entry) {
         THROW_HR_IF_NULL(E_INVALIDARG, entry);
         const std::string_view value{entry};
@@ -391,7 +392,7 @@ try
                wsl::windows::wslc::IsLoopbackProxyUrl(std::string{value.substr(equals + 1)});
     };
     if (Settings->NetworkingMode == WSLCNetworkingModeConsomme &&
-        std::ranges::any_of(wil::make_range(Settings->ProxyEnvironment.Values, Settings->ProxyEnvironment.Count), isLoopbackProxy))
+        std::ranges::any_of(wil::make_range(Settings->ProxyEnvironmentOverrides.Values, Settings->ProxyEnvironmentOverrides.Count), isLoopbackProxy))
     {
         EMIT_USER_WARNING(Localization::WSLCProxyLoopbackNotReachable());
     }
@@ -578,21 +579,68 @@ void WSLCSession::PersistSettings(const WSLCSessionInitSettings& Settings, PSID 
         m_settings.RootVhdTypeOverride = nullptr;
     }
 
-    for (const auto* entry : wil::make_range(Settings.ProxyEnvironment.Values, Settings.ProxyEnvironment.Count))
+    if (Settings.HostLoopback != nullptr)
     {
-        THROW_HR_IF_NULL(E_INVALIDARG, entry);
-        m_proxyEnvironment.emplace_back(entry);
+        m_settingsHostLoopback = Settings.HostLoopback;
+        m_settings.HostLoopback = m_settingsHostLoopback->c_str();
+    }
+    else
+    {
+        m_settings.HostLoopback = nullptr;
     }
 
-    std::ranges::transform(
-        m_proxyEnvironment, std::back_inserter(m_proxyEnvironmentValues), [](const auto& entry) { return entry.c_str(); });
-    m_settings.ProxyEnvironment = {m_proxyEnvironmentValues.data(), static_cast<ULONG>(m_proxyEnvironmentValues.size())};
+    for (const auto* entry : wil::make_range(Settings.ProxyEnvironmentOverrides.Values, Settings.ProxyEnvironmentOverrides.Count))
+    {
+        THROW_HR_IF_NULL(E_INVALIDARG, entry);
+        m_proxyEnvironmentOverrides.emplace_back(entry);
+    }
+
+    std::ranges::transform(m_proxyEnvironmentOverrides, std::back_inserter(m_proxyEnvironmentOverrideValues), [](const auto& entry) {
+        return entry.c_str();
+    });
+    m_settings.ProxyEnvironmentOverrides = {
+        m_proxyEnvironmentOverrideValues.data(), static_cast<ULONG>(m_proxyEnvironmentOverrideValues.size())};
 
     THROW_HR_IF(E_UNEXPECTED, UserSid == nullptr);
 
     const auto length = GetLengthSid(UserSid);
     const auto* bytes = reinterpret_cast<const BYTE*>(UserSid);
     m_userSid.assign(bytes, bytes + length);
+}
+
+std::vector<std::string> WSLCSession::GetProxyEnvironment() const
+{
+    std::vector<std::string> windowsProxyEnvironment;
+    LOG_IF_FAILED(wil::ResultFromException([&] {
+        THROW_IF_FAILED(HttpProxyStateTracker::s_LoadWinHttpProxyMethods());
+        wil::unique_handle userToken;
+        THROW_IF_WIN32_BOOL_FALSE(OpenProcessToken(GetCurrentProcess(), TOKEN_DUPLICATE | TOKEN_QUERY, &userToken));
+        HttpProxyStateTracker tracker{1000, userToken.get()};
+        if (auto proxy = tracker.WaitForInitialProxySettings())
+        {
+            for (auto* url : {&proxy->Proxy, &proxy->SecureProxy})
+            {
+                if (m_settings.NetworkingMode == WSLCNetworkingModeConsomme && m_settings.HostLoopback != nullptr)
+                {
+                    *url = wsl::windows::wslc::ResolveProxyUrl(*url, m_settings.HostLoopback);
+                }
+                const bool unsupported = m_settings.NetworkingMode == WSLCNetworkingModeNAT
+                                             ? HttpProxyStateTracker::IsUnsupportedProxy(
+                                                   wsl::shared::string::MultiByteToWide(*url).c_str(),
+                                                   wsl::core::NetworkingMode::Nat) != UnsupportedProxyReason::Supported
+                                             : wsl::windows::wslc::IsLoopbackProxyUrl(*url);
+                if (unsupported)
+                {
+                    url->clear();
+                }
+            }
+            proxy->AddToEnvironment(windowsProxyEnvironment);
+        }
+    }));
+
+    auto environment = m_proxyEnvironmentOverrides;
+    wsl::windows::wslc::AddProxyEnvironmentDefaults(environment, windowsProxyEnvironment);
+    return environment;
 }
 
 WSLCSession::VmLease WSLCSession::AcquireLease(WSLCSessionRuntime::VmLeasePolicy Policy)
@@ -826,7 +874,7 @@ void WSLCSession::StartDockerd()
     }
 
     m_runtime.SetDockerdProcess(
-        StartProcess("/usr/bin/dockerd", args, "dockerd", std::bind(&WSLCSession::OnDockerdExited, this), m_proxyEnvironment));
+        StartProcess("/usr/bin/dockerd", args, "dockerd", std::bind(&WSLCSession::OnDockerdExited, this), GetProxyEnvironment()));
     WSL_LOG("DockerdStarted");
 }
 
@@ -1142,8 +1190,7 @@ try
     // one parent directory per file secret are mounted.
     mountedPaths.reserve(static_cast<size_t>(3) + Options->Secrets.Count);
 
-    // The buildx auth provider fetches registry tokens in the client process, separately from dockerd.
-    auto buildEnv = m_proxyEnvironment;
+    std::vector<std::string> buildEnv;
 
     if (policyState == WSLCVirtualMachine::BuildKitPolicyState::Configured)
     {
@@ -1365,6 +1412,8 @@ try
 
     WSL_LOG("BuildImageStart", TraceLoggingValue(wsl::shared::string::Join(buildArgs, ' ').c_str(), "Command"));
 
+    // The buildx auth provider fetches registry tokens in the client process, separately from dockerd.
+    wsl::windows::wslc::AddProxyEnvironmentDefaults(buildEnv, GetProxyEnvironment());
     ServiceProcessLauncher buildLauncher(buildArgs[0], buildArgs, buildEnv, WSLCProcessFlagsStdin);
     auto buildProcess = buildLauncher.Launch(runtime.Vm());
 

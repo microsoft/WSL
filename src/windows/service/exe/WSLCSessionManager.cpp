@@ -32,7 +32,6 @@ Abstract:
 #include "WSLCUserSettings.h"
 #include "WSLCSessionDefaults.h"
 #include "wslc/WSLCProxy.h"
-#include "LxssHttpProxy.h"
 #include "WSLCPluginNotifier.h"
 #include "PluginManager.h"
 #include "ExecutionContext.h"
@@ -364,33 +363,6 @@ void WSLCSessionManagerImpl::CreateSession(
             }
         }
 
-        std::vector<std::string> windowsProxyEnvironment;
-        LOG_IF_FAILED(wil::ResultFromException([&] {
-            THROW_IF_FAILED(HttpProxyStateTracker::s_LoadWinHttpProxyMethods());
-            HttpProxyStateTracker tracker{1000, userToken.get()};
-            if (auto proxy = tracker.WaitForInitialProxySettings())
-            {
-                for (auto* url : {&proxy->Proxy, &proxy->SecureProxy})
-                {
-                    if (Settings->NetworkingMode == WSLCNetworkingModeConsomme && Settings->HostLoopback != nullptr)
-                    {
-                        *url = wsl::windows::wslc::ResolveProxyUrl(*url, Settings->HostLoopback);
-                    }
-                    const bool unsupported = Settings->NetworkingMode == WSLCNetworkingModeNAT
-                                                 ? HttpProxyStateTracker::IsUnsupportedProxy(
-                                                       wsl::shared::string::MultiByteToWide(*url).c_str(),
-                                                       wsl::core::NetworkingMode::Nat) != UnsupportedProxyReason::Supported
-                                                 : wsl::windows::wslc::IsLoopbackProxyUrl(*url);
-                    if (unsupported)
-                    {
-                        url->clear();
-                    }
-                }
-                proxy->AddToEnvironment(windowsProxyEnvironment);
-            }
-        }));
-
-        wsl::windows::wslc::AddProxyEnvironmentDefaults(proxyEnvironment, windowsProxyEnvironment);
         if (Settings->NetworkingMode == WSLCNetworkingModeConsomme && Settings->HostLoopback != nullptr)
         {
             wsl::windows::wslc::ResolveProxyEnvironmentLoopback(proxyEnvironment, Settings->HostLoopback);
@@ -399,7 +371,7 @@ void WSLCSessionManagerImpl::CreateSession(
         std::vector<LPCSTR> proxyValues;
         std::ranges::transform(proxyEnvironment, std::back_inserter(proxyValues), [](const auto& entry) { return entry.c_str(); });
         auto sessionSettings = CreateSessionSettings(sessionId, callerFileName.c_str(), Settings, resolvedDisplayName.c_str());
-        sessionSettings.ProxyEnvironment = {proxyValues.data(), static_cast<ULONG>(proxyValues.size())};
+        sessionSettings.ProxyEnvironmentOverrides = {proxyValues.data(), static_cast<ULONG>(proxyValues.size())};
         wil::com_ptr<IWSLCSession> session;
         wil::com_ptr<IWSLCSessionReference> serviceRef;
         const auto factoryHr =
@@ -600,6 +572,7 @@ WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
     sessionSettings.StorageFlags = Settings->StorageFlags;
     sessionSettings.SwapSizeMb = Settings->MemoryMb;
     sessionSettings.IdleTimeoutSec = Settings->IdleTimeoutSec;
+    sessionSettings.HostLoopback = Settings->HostLoopback;
     return sessionSettings;
 }
 

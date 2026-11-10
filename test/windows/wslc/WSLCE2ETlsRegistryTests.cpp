@@ -463,24 +463,28 @@ namespace {
         std::optional<wsl::windows::common::RunningWSLCContainer> tokenRegistry;
         if (tokenAuthentication)
         {
+            WriteTestFileContent(directory / L"registry-auth-token", "wslc-proxy-test-token");
             WriteTestFileContent(directory / L"registry-auth.py", R"py(import contextlib
 import http.client
 import http.server
+import pathlib
 import ssl
 import sys
 
 upstream, realm, port = sys.argv[1:]
 tls = ssl.create_default_context(cafile="/test/server.crt")
-token = "wslc-proxy-test-token"
 
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
+        token = pathlib.Path("/test/registry-auth-token").read_text()
         if self.path.split("?", 1)[0] == "/token":
             body = ('{"token":"' + token + '","expires_in":300}').encode()
             status, headers = 200, {"Content-Type": "application/json"}
         elif self.headers.get("Authorization") != "Bearer " + token:
             body = b""
             status, headers = 401, {"WWW-Authenticate": f'Bearer realm="{realm}",service="wslc-proxy-test"'}
+            if self.headers.get("Authorization"):
+                headers["WWW-Authenticate"] += ',error="invalid_token"'
         else:
             with contextlib.closing(http.client.HTTPSConnection(upstream, context=tls, timeout=30)) as connection:
                 connection.request(self.command, self.path, headers={"Accept": self.headers.get("Accept", "*/*")})
@@ -594,6 +598,53 @@ class WSLCE2ETlsRegistryTests
         });
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Proxy_ContainerEnvironmentRefresh)
+    {
+        WINHTTP_PROXY_TEST_ONLY();
+        const auto directory = std::filesystem::current_path() / std::format(L"wslc-proxy-refresh-{}", GetCurrentProcessId());
+        auto cleanup = SetupTestDirectory(directory);
+        WithColdProxySession(directory / L"consumer", "http://windows.proxy.invalid:3128", ".windows.invalid", [&](IWSLCSession& session, const HostFileChange&) {
+            const auto& image = AlpineTestImage();
+            RunWslcAndVerify(std::format(L"image load --input \"{}\"", image.Path.wstring()), {.Stderr = L"", .ExitCode = 0});
+            RunWslcAndVerify(std::format(L"container create --name original-proxy {} env", image.NameAndTag()), {.Stderr = L"", .ExitCode = 0});
+            const auto bootId = ReadBootId(session);
+            ULONG sessionId{};
+            VERIFY_SUCCEEDED(session.GetId(&sessionId));
+
+            for (const bool configured : {true, false})
+            {
+                SetWindowsProxySettings(configured ? "http://changed.proxy.invalid:3129" : "", configured ? ".changed.invalid" : "");
+                const auto environment = RunWslcAndGetStdoutLineSet(std::format(L"container run --rm {} env", image.NameAndTag()));
+                for (const auto* name : {L"http_proxy", L"HTTP_PROXY", L"https_proxy", L"HTTPS_PROXY", L"no_proxy", L"NO_PROXY"})
+                {
+                    if (configured)
+                    {
+                        const auto* value = _wcsicmp(name, L"no_proxy") == 0 ? L".changed.invalid" : L"http://changed.proxy.invalid:3129";
+                        VERIFY_IS_TRUE(environment.contains(std::format(L"{}={}", name, value)));
+                    }
+                    else
+                    {
+                        VERIFY_IS_FALSE(std::ranges::any_of(
+                            environment, [&](const auto& entry) { return entry.starts_with(std::format(L"{}=", name)); }));
+                    }
+                }
+
+                ULONG currentSessionId{};
+                VERIFY_SUCCEEDED(OpenDefaultElevatedSession()->GetId(&currentSessionId));
+                VERIFY_ARE_EQUAL(sessionId, currentSessionId);
+                VERIFY_ARE_EQUAL(bootId, ReadBootId(session));
+            }
+
+            const auto originalEnvironment = RunWslcAndGetStdoutLineSet(L"container start --attach original-proxy");
+            for (const auto* name : {L"http_proxy", L"HTTP_PROXY", L"https_proxy", L"HTTPS_PROXY"})
+            {
+                VERIFY_IS_TRUE(originalEnvironment.contains(std::format(L"{}=http://windows.proxy.invalid:3128", name)));
+            }
+            VERIFY_IS_TRUE(originalEnvironment.contains(L"no_proxy=.windows.invalid"));
+            VERIFY_IS_TRUE(originalEnvironment.contains(L"NO_PROXY=.windows.invalid"));
+        });
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Registry_Proxy_EnvironmentOverride)
     {
         WINHTTP_PROXY_TEST_ONLY();
@@ -613,10 +664,24 @@ class WSLCE2ETlsRegistryTests
                         PullAndVerifyImage(alpine);
                         VERIFY_IS_TRUE(
                             proxy.ResponseBytes() > before, L"Caller environment must override Windows proxy and bypass settings");
-                        const auto environment = RunWslcAndGetStdoutLineSet(std::format(L"container run --rm {} env", alpine.Reference));
-                        const auto expected = std::format(L"https_proxy={}host.wslc.internal:{}", scheme, proxy.Port());
-                        VERIFY_IS_TRUE(environment.contains(expected));
-                        VERIFY_IS_TRUE(environment.contains(L"NO_PROXY=.unrelated.invalid"));
+                        for (const bool configured : {true, false})
+                        {
+                            SetWindowsProxySettings(configured ? "http://changed.proxy.invalid:3129" : "", configured ? ".changed.invalid" : "");
+                            const auto environment =
+                                RunWslcAndGetStdoutLineSet(std::format(L"container run --rm {} env", alpine.Reference));
+                            const auto expected = std::format(L"https_proxy={}host.wslc.internal:{}", scheme, proxy.Port());
+                            VERIFY_IS_TRUE(environment.contains(expected));
+                            VERIFY_IS_TRUE(environment.contains(L"NO_PROXY=.unrelated.invalid"));
+                            if (configured)
+                            {
+                                VERIFY_IS_TRUE(environment.contains(L"http_proxy=http://changed.proxy.invalid:3129"));
+                            }
+                            else
+                            {
+                                VERIFY_IS_FALSE(std::ranges::any_of(
+                                    environment, [](const auto& entry) { return entry.starts_with(L"http_proxy="); }));
+                            }
+                        }
                     },
                     {{L"https_proxy", manual}, {L"no_proxy", L".unrelated.invalid"}});
             }
@@ -644,10 +709,12 @@ class WSLCE2ETlsRegistryTests
                         directory / (bypassToken ? L"bypass" : L"proxied"),
                         std::format("http://localhost:{}", proxy.Port()),
                         bypassToken ? c_proxyTokenHost : ".unrelated.invalid",
-                        [&](IWSLCSession&, const HostFileChange&) {
+                        [&](IWSLCSession& session, const HostFileChange&) {
+                            const auto bootId = ReadBootId(session);
                             const auto before = proxy.TokenConnections();
-                            const auto result =
-                                RunWslc(std::format(L"build \"{}\" --pull --no-cache -t wslc-proxy-build:latest", context.wstring()));
+                            const auto command =
+                                std::format(L"build \"{}\" --pull --no-cache -t wslc-proxy-build:latest", context.wstring());
+                            const auto result = RunWslc(command);
                             result.Dump();
                             if (bypassToken)
                             {
@@ -665,6 +732,29 @@ class WSLCE2ETlsRegistryTests
                                 RunWslcAndVerify(
                                     L"container run --rm wslc-proxy-build:latest cat /proxy-test",
                                     {.Stdout = L"buildx-proxy-ok\n", .Stderr = L"", .ExitCode = 0});
+
+                                RecordingConnectProxy changedProxy{true};
+                                SetWindowsProxySettings(
+                                    std::format("http://localhost:{}", changedProxy.Port()), ".unrelated.invalid");
+                                // Revoke the cached bearer token so the next buildx process must fetch another.
+                                WriteTestFileContent(directory / L"registry-auth-token", "wslc-proxy-changed-token");
+                                const auto originalTokenConnections = proxy.TokenConnections();
+                                const auto changed = RunWslc(command);
+                                changed.Dump();
+                                changed.Verify({.ExitCode = 0});
+                                VERIFY_IS_TRUE(changedProxy.TokenConnections() > 0, L"New buildx must use the changed proxy");
+                                VERIFY_ARE_EQUAL(originalTokenConnections, proxy.TokenConnections());
+
+                                const auto changedTokenConnections = changedProxy.TokenConnections();
+                                SetWindowsProxySettings("", "");
+                                WriteTestFileContent(directory / L"registry-auth-token", "wslc-proxy-cleared-token");
+                                const auto cleared = RunWslc(command);
+                                cleared.Dump();
+                                cleared.Verify({.ExitCode = 1});
+                                VERIFY_IS_TRUE(cleared.StderrContainsSubstring(L"failed to fetch anonymous token"));
+                                VERIFY_ARE_EQUAL(originalTokenConnections, proxy.TokenConnections());
+                                VERIFY_ARE_EQUAL(changedTokenConnections, changedProxy.TokenConnections());
+                                VERIFY_ARE_EQUAL(bootId, ReadBootId(session));
                             }
                         });
                 }
@@ -676,37 +766,53 @@ class WSLCE2ETlsRegistryTests
     {
         WINHTTP_PROXY_TEST_ONLY();
         WithProxyRegistry([](const auto& directory, auto& proxy, const auto& alpine, const auto& helloWorld) {
-            WithColdProxySession(directory / L"localhost", std::format("http://localhost:{}", proxy.Port()), "", [&](IWSLCSession& session, const HostFileChange& settings) {
-                const auto beforePull = proxy.ResponseBytes();
-                PullAndVerifyImage(helloWorld);
-                VERIFY_IS_TRUE(proxy.ResponseBytes() > beforePull, L"Expected registry traffic through CONNECT");
+            WithColdProxySession(
+                directory / L"localhost", std::format("http://localhost:{}", proxy.Port()), "", [&](IWSLCSession& session, const HostFileChange& settings) {
+                    const auto beforePull = proxy.ResponseBytes();
+                    PullAndVerifyImage(helloWorld);
+                    VERIFY_IS_TRUE(proxy.ResponseBytes() > beforePull, L"Expected registry traffic through CONNECT");
 
-                const auto missing = RunWslc(std::format(L"image inspect {}", alpine.Reference));
-                missing.Verify({
-                    .Stdout = L"[]\r\n",
-                    .Stderr = Localization::MessageWslcImageNotFound(string::WideToMultiByte(alpine.Reference).c_str()) + L"\r\n",
-                    .ExitCode = 1,
+                    const auto missing = RunWslc(std::format(L"image inspect {}", alpine.Reference));
+                    missing.Verify({
+                        .Stdout = L"[]\r\n",
+                        .Stderr = Localization::MessageWslcImageNotFound(string::WideToMultiByte(alpine.Reference).c_str()) + L"\r\n",
+                        .ExitCode = 1,
+                    });
+                    const auto bootId = ReadBootId(session);
+                    ULONG sessionId{};
+                    VERIFY_SUCCEEDED(session.GetId(&sessionId));
+
+                    RecordingConnectProxy changedProxy;
+                    SetWindowsProxySettings(std::format("http://localhost:{}", changedProxy.Port()), "");
+                    proxy.Stop();
+                    settings.Update("session: {}\n");
+                    BOOL wasAlreadyIdle = TRUE;
+                    VERIFY_SUCCEEDED(session.TriggerIdleTermination(&wasAlreadyIdle));
+                    VERIFY_IS_FALSE(wasAlreadyIdle);
+                    VERIFY_ARE_NOT_EQUAL(bootId, ReadBootId(session));
+                    ULONG restartedSessionId{};
+                    VERIFY_SUCCEEDED(OpenDefaultElevatedSession()->GetId(&restartedSessionId));
+                    VERIFY_ARE_EQUAL(sessionId, restartedSessionId);
+
+                    const auto beforeRestartedPull = changedProxy.ResponseBytes();
+                    PullAndVerifyImage(alpine);
+                    VERIFY_IS_TRUE(
+                        changedProxy.ResponseBytes() - beforeRestartedPull > 1024 * 1024,
+                        L"Expected uncached image payload through the changed proxy");
+
+                    RunWslcAndVerify(std::format(L"image rm {}", alpine.Reference), {.Stderr = L"", .ExitCode = 0});
+                    const auto restartedBootId = ReadBootId(session);
+                    SetWindowsProxySettings("", "");
+                    changedProxy.Stop();
+                    VERIFY_SUCCEEDED(session.TriggerIdleTermination(&wasAlreadyIdle));
+                    VERIFY_IS_FALSE(wasAlreadyIdle);
+                    VERIFY_ARE_NOT_EQUAL(restartedBootId, ReadBootId(session));
+                    VERIFY_SUCCEEDED(OpenDefaultElevatedSession()->GetId(&restartedSessionId));
+                    VERIFY_ARE_EQUAL(sessionId, restartedSessionId);
+                    const auto beforeDirectPull = changedProxy.ResponseBytes();
+                    PullAndVerifyImage(alpine);
+                    VERIFY_ARE_EQUAL(beforeDirectPull, changedProxy.ResponseBytes());
                 });
-                const auto bootId = ReadBootId(session);
-                ULONG sessionId{};
-                VERIFY_SUCCEEDED(session.GetId(&sessionId));
-
-                // Idle recreation must retain the original Windows proxy snapshot.
-                SetWindowsProxySettings("", "");
-                settings.Update("session: {}\n");
-                BOOL wasAlreadyIdle = TRUE;
-                VERIFY_SUCCEEDED(session.TriggerIdleTermination(&wasAlreadyIdle));
-                VERIFY_IS_FALSE(wasAlreadyIdle);
-                VERIFY_ARE_NOT_EQUAL(bootId, ReadBootId(session));
-                ULONG restartedSessionId{};
-                VERIFY_SUCCEEDED(OpenDefaultElevatedSession()->GetId(&restartedSessionId));
-                VERIFY_ARE_EQUAL(sessionId, restartedSessionId);
-
-                const auto beforeRestartedPull = proxy.ResponseBytes();
-                PullAndVerifyImage(alpine);
-                VERIFY_IS_TRUE(
-                    proxy.ResponseBytes() - beforeRestartedPull > 1024 * 1024, L"Expected uncached image payload after restart");
-            });
         });
     }
 

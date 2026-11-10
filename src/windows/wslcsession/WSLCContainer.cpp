@@ -2771,7 +2771,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     }
 
     request.Env = StringArrayToVector(containerOptions.InitProcessOptions.Environment);
-    wsl::windows::wslc::AddProxyEnvironmentDefaults(request.Env, wslcSession.ProxyEnvironment());
+    wsl::windows::wslc::AddProxyEnvironmentDefaults(request.Env, wslcSession.GetProxyEnvironment());
 
     if (containerOptions.StopSignal != WSLCSignalNone)
     {

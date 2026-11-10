@@ -309,10 +309,7 @@ public:
         return m_runtime;
     }
 
-    const std::vector<std::string>& ProxyEnvironment() const noexcept
-    {
-        return m_proxyEnvironment;
-    }
+    std::vector<std::string> GetProxyEnvironment() const;
 
     bool IsTerminating() const noexcept
     {
@@ -471,8 +468,9 @@ private:
     std::optional<std::wstring> m_settingsCreatorProcessName;
     std::optional<std::wstring> m_settingsStoragePath;
     std::optional<std::string> m_settingsRootVhdTypeOverride;
-    std::vector<std::string> m_proxyEnvironment;
-    std::vector<LPCSTR> m_proxyEnvironmentValues;
+    std::optional<std::string> m_settingsHostLoopback;
+    std::vector<std::string> m_proxyEnvironmentOverrides;
+    std::vector<LPCSTR> m_proxyEnvironmentOverrideValues;
     std::vector<BYTE> m_userSid;
 
     WSLCFeatureFlags m_featureFlags{};
