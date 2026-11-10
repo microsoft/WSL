@@ -2,6 +2,7 @@
 
 #include "precomp.h"
 #include "Common.h"
+#include "hvsocket.hpp"
 #include "p9defs.h"
 
 namespace Plan9ProtocolTests {
@@ -101,6 +102,14 @@ namespace {
             }
         }
     };
+
+    wil::unique_socket ConnectToDistroServer(ULONG port)
+    {
+        const auto [output, error] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --vm-id -n");
+        const auto vmId = wsl::shared::string::ToGuid(output);
+        VERIFY_IS_TRUE(vmId.has_value());
+        return wsl::windows::common::hvsocket::Connect(vmId.value(), port, nullptr, 5000);
+    }
 
     Plan9Server ConnectToServer()
     {
@@ -253,6 +262,66 @@ class Plan9ProtocolTests
         auto server = ConnectToServer();
 
         const auto response = SendMessageAndExpectResponse(server.client.get(), c_versionRequest, Plan9MessageType::Rversion);
+        VERIFY_IS_TRUE(std::ranges::equal(c_versionResponse, response));
+    }
+
+    WSL1_TEST_METHOD(UnixSocketPermissions)
+    {
+        WslKeepAlive keepAlive;
+        const auto distroKey = OpenDistributionKey(LXSS_DISTRO_NAME_TEST_L);
+        VERIFY_IS_TRUE(!!distroKey);
+        const auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath", L"");
+        VERIFY_IS_FALSE(basePath.empty());
+        const auto socketPath = std::filesystem::path{basePath} / LXSS_PLAN9_UNIX_SOCKET;
+        auto [linuxSocketPath, warnings] =
+            LxsstuLaunchWslAndCaptureOutput(std::format(L"-u root --exec wslpath -a -u \"{}\"", socketPath.wstring()));
+        Trim(linuxSocketPath);
+        VERIFY_IS_FALSE(linuxSocketPath.empty());
+
+        // Without DrvFs metadata, the mode reflects the owning Windows account's access.
+        const auto [permissions, error] =
+            LxsstuLaunchWslAndCaptureOutput(std::format(L"-u root --exec stat -c %a \"{}\"", linuxSocketPath));
+        VERIFY_ARE_EQUAL(permissions, L"777\n");
+    }
+
+    WSL2_TEST_METHOD(VsockRejectsGuestConnections)
+    {
+        WslKeepAlive keepAlive;
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system -u root --exec modprobe vsock_loopback"), 0u);
+
+        // The Plan9 process is named init; identify it by command line to find its dynamically assigned listener port.
+        auto [portOutput, warnings] = LxsstuLaunchWslAndCaptureOutput(
+            L"-u root --exec sh -c \"pid=$(pgrep -f '^plan9 --control-socket ') && "
+            L"ss -H -l -n -p --vsock | awk -v owner=pid=$pid, 'index($0, owner) { split($5, address, /:/); print address[2] "
+            L"}'\"");
+
+        Trim(portOutput);
+        VERIFY_IS_FALSE(portOutput.empty());
+
+        size_t parsedLength{};
+        const auto port = std::stoul(portOutput, &parsedLength);
+        VERIFY_ARE_EQUAL(parsedLength, portOutput.size());
+
+        // Validate that connecting to the server from the host works.
+        auto client = ConnectToDistroServer(port);
+        auto response = SendMessageAndExpectResponse(client.get(), c_versionRequest, Plan9MessageType::Rversion);
+        VERIFY_IS_TRUE(std::ranges::equal(c_versionResponse, response));
+
+        for (int attempt = 0; attempt < 2; ++attempt)
+        {
+            auto commandLine = LxssGenerateWslCommandLine(
+                std::format(L"-u root --exec timeout 10 socat -d -d -u VSOCK-CONNECT:1:{} STDOUT", port).c_str());
+
+            const auto [output, error, exitCode] = LxsstuLaunchCommandAndCaptureOutputWithResult(commandLine.data());
+            VERIFY_IS_TRUE(error.find(L"successfully connected") != std::wstring::npos);
+            VERIFY_IS_TRUE(exitCode == 0 || (exitCode == 1 && error.find(L"Connection reset by peer") != std::wstring::npos));
+            VERIFY_IS_TRUE(output.empty());
+        }
+
+        // Validate that the server still accepts clients after a rejected connection.
+        client.reset();
+        client = ConnectToDistroServer(port);
+        response = SendMessageAndExpectResponse(client.get(), c_versionRequest, Plan9MessageType::Rversion);
         VERIFY_IS_TRUE(std::ranges::equal(c_versionResponse, response));
     }
 
