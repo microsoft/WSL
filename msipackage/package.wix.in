@@ -297,7 +297,7 @@
                 <RegistryKey Root="HKLM"
                     Key="SYSTEM\CurrentControlSet\Services\EventLog\Security\Microsoft-Windows-WSL-SecurityAudit">
                     <RegistryValue Id="SecurityAuditMessageFile" Name="EventMessageFile"
-                        Type="expandable" Value="[#wslservice.exe]" />
+                        Type="expandable" Value="[#wsl.exe]" />
                     <!-- AUTHZ_ALLOW_MULTIPLE_SOURCE_INSTANCES -->
                     <RegistryValue Id="SecurityAuditSourceFlags" Name="EventSourceFlags" Type="integer" Value="1" />
                 </RegistryKey>
