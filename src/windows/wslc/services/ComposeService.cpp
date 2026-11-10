@@ -72,7 +72,6 @@ namespace {
             document.Content = reinterpret_cast<const byte*>(content.data());
             document.ContentSize = contentSize;
 
-            documents.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
             documents.ProjectDirectory = projectDirectory.c_str();
             documents.Documents = &document;
             documents.DocumentCount = 1;
@@ -82,7 +81,7 @@ namespace {
         std::filesystem::path projectDirectory;
         std::vector<char> content;
         WSLCComposeDocument document{};
-        WSLCComposeDocuments documents{};
+        WSLCComposeDocumentCollection documents{};
     };
 
     struct ComposeOperationResult
@@ -114,7 +113,6 @@ namespace {
     {
         std::optional<CapturedComposeDocuments> captured;
         WSLCComposeOperationRequest request{};
-        request.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
         request.Action = action;
         if (const auto* path = std::get_if<std::filesystem::path>(&project.Value))
         {
