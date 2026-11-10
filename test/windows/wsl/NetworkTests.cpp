@@ -6075,7 +6075,7 @@ class ConsommeTests
 
         // Validate the binding addresses that the guest doesn't have fails.
         {
-            const auto [output, error] = LxsstuLaunchWslAndCaptureOutput(L"socat TCP4-LISTEN:1236,bind=192.168.2.2 STDOUT", 1);
+            const auto [output, error] = LxsstuLaunchWslAndCaptureOutput(L"socat TCP4-LISTEN:1236,bind=1.1.1.1 STDOUT", 1);
             VERIFY_IS_TRUE(output.empty());
             VERIFY_ARE_NOT_EQUAL(error.find(L"Cannot assign requested address"), std::wstring::npos);
         }
