@@ -2435,8 +2435,6 @@ try
     *projects = nullptr;
     *count = 0;
 
-    THROW_HR_IF(E_INVALIDARG, options->SchemaVersion != WSLC_COMPOSE_SCHEMA_VERSION);
-
     auto lease = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 
@@ -2486,7 +2484,6 @@ try
         auto [entry, inserted] = projectSummaries.try_emplace(projectKey);
         if (inserted)
         {
-            entry->second.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
             THROW_HR_IF(E_UNEXPECTED, strcpy_s(entry->second.ProjectKey, projectKey.c_str()) != 0);
         }
 

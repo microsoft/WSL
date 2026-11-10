@@ -745,13 +745,11 @@ typedef struct _WSLCComposeOperationResult
 
 typedef struct _WSLCComposeProjectListOptions
 {
-    ULONG SchemaVersion;
     BOOL All;
 } WSLCComposeProjectListOptions;
 
 typedef struct _WSLCComposeProjectSummary
 {
-    ULONG SchemaVersion;
     WSLCComposeProjectKey ProjectKey;
     ULONG CreatedContainersCount;
     ULONG RunningContainersCount;
