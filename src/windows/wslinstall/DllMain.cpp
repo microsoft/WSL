@@ -825,17 +825,6 @@ extern "C" UINT __stdcall WslFinalizeInstallation(MSIHANDLE install)
     return NOERROR;
 }
 
-extern "C" UINT __stdcall InstallSecurityAudit(MSIHANDLE install)
-{
-    try
-    {
-        WSL_INSTALL_LOG("InstallSecurityAudit");
-        wsl::windows::common::securityaudit::Install(GetMsiProperty(install, L"CustomActionData").c_str());
-    }
-    CATCH_LOG();
-    return NOERROR;
-}
-
 extern "C" UINT __stdcall UninstallSecurityAudit(MSIHANDLE install)
 {
     try

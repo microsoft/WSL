@@ -42,24 +42,16 @@ bool Enabled()
            (policy.get()[1].AuditingInformation & POLICY_AUDIT_EVENT_SUCCESS) != 0;
 }
 
-void Install(PCWSTR messageFile)
-{
-    auto token = Authority(SE_SECURITY_NAME);
-    auto impersonation = wil::impersonate_token(token.get());
-    std::wstring name(c_source);
-    std::wstring path(messageFile);
-    AUTHZ_SOURCE_SCHEMA_REGISTRATION registration{};
-    registration.dwFlags = AUTHZ_ALLOW_MULTIPLE_SOURCE_INSTANCES;
-    registration.szEventSourceName = name.data();
-    registration.szEventMessageFile = path.data();
-    THROW_IF_WIN32_BOOL_FALSE(AuthzInstallSecurityEventSource(0, &registration));
-}
-
 void Uninstall()
 {
     auto token = Authority(SE_SECURITY_NAME);
     auto impersonation = wil::impersonate_token(token.get());
-    THROW_IF_WIN32_BOOL_FALSE(AuthzUninstallSecurityEventSource(0, c_source));
+    if (!AuthzUninstallSecurityEventSource(0, c_source))
+    {
+        // MSI normally removes the values and the empty key before this commit cleanup.
+        const auto error = GetLastError();
+        THROW_WIN32_IF(error, error != ERROR_FILE_NOT_FOUND && error != ERROR_PATH_NOT_FOUND);
+    }
 }
 
 EventSource::EventSource() : m_token(Authority(SE_AUDIT_NAME))

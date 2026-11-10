@@ -294,6 +294,14 @@
                      which would fail the install. -->
                 <ServiceControl Id="StopService" Stop="both" Remove="uninstall" Name="WSLService" Wait="yes" />
 
+                <RegistryKey Root="HKLM"
+                    Key="SYSTEM\CurrentControlSet\Services\EventLog\Security\Microsoft-Windows-WSL-SecurityAudit">
+                    <RegistryValue Id="SecurityAuditMessageFile" Name="EventMessageFile"
+                        Type="expandable" Value="[#wslservice.exe]" />
+                    <!-- AUTHZ_ALLOW_MULTIPLE_SOURCE_INSTANCES -->
+                    <RegistryValue Id="SecurityAuditSourceFlags" Name="EventSourceFlags" Type="integer" Value="1" />
+                </RegistryKey>
+
                 <File Id="wsldevicehost.dll" Source="${WSL_DEVICE_HOST_DLL_PATH}" />
 
                 <!-- WSLC COM app - activated through WSLService -->
@@ -678,11 +686,8 @@
         <Binary Id="wslinstall.dll" SourceFile="${PACKAGE_INPUT_DIR}/wslinstall.dll" />
         <Binary Id="msixpackage" SourceFile="${PACKAGE_INPUT_DIR}/gluepackage.msix"/>
 
-        <CustomAction Id="InstallSecurityAudit.SetProperty" Property="InstallSecurityAudit" Value="[INSTALLDIR]wslservice.exe" />
-        <CustomAction Id="InstallSecurityAudit" Impersonate="no" BinaryRef="wslinstall.dll"
-            DllEntry="InstallSecurityAudit" Execute="deferred" Return="ignore" />
         <CustomAction Id="UninstallSecurityAudit" Impersonate="no" BinaryRef="wslinstall.dll"
-            DllEntry="UninstallSecurityAudit" Execute="deferred" Return="ignore" />
+            DllEntry="UninstallSecurityAudit" Execute="commit" Return="ignore" />
 
         <CustomAction Id="ValidateInstall"
             Impersonate="no"
@@ -854,8 +859,7 @@
             <?endif?>
 
             <Custom Action="FinalizeInstall" After="PublishFeatures"/>
-            <Custom Action="InstallSecurityAudit.SetProperty" After="InstallFiles" Condition='NOT REMOVE~="ALL"' />
-            <Custom Action="InstallSecurityAudit" After="InstallSecurityAudit.SetProperty" Condition='NOT REMOVE~="ALL"' />
+            <!-- Remove any legacy source metadata only after a successful full uninstall. -->
             <Custom Action="UninstallSecurityAudit" Before="RemoveFiles" Condition='REMOVE~="ALL" AND NOT UPGRADINGPRODUCTCODE' />
             <?if "${OFFICIAL_BUILD}" != "TRUE" ?>
             <Custom Action="TestForceInstallFailure" After="FinalizeInstall" Condition='WSL_TEST_FORCE_INSTALL_FAILURE = 1 and (not UPGRADINGPRODUCTCODE)' />

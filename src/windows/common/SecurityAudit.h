@@ -8,7 +8,6 @@
 namespace wsl::windows::common::securityaudit {
 
 bool Enabled();
-void Install(PCWSTR messageFile);
 void Uninstall();
 
 class EventSource
