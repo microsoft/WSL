@@ -359,7 +359,7 @@ void WSLCSessionManagerImpl::CreateSession(
             for (const auto* entry : wil::make_range(ProxyEnvironment->Values, ProxyEnvironment->Count))
             {
                 THROW_HR_IF(E_INVALIDARG, entry == nullptr || !wsl::windows::wslc::IsProxyEnvironmentVariable(entry));
-                proxyEnvironment.emplace_back(entry);
+                proxyEnvironment.emplace_back(wsl::windows::wslc::CanonicalizeProxyEnvironmentVariable(entry));
             }
         }
 

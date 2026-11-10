@@ -628,6 +628,27 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionHostLoopback>());
     }
 
+    TEST_METHOD(ProxyEnvironment_CanonicalizesMixedCaseNames)
+    {
+        const std::vector<std::pair<std::string, std::string>> cases{
+            {"Http_Proxy=http://Proxy.Example:8080", "http_proxy=http://Proxy.Example:8080"},
+            {"hTtPs_PrOxY=https://Proxy.Example:8443", "https_proxy=https://Proxy.Example:8443"},
+            {"No_PrOxY=LocalHost,.Example.COM", "no_proxy=LocalHost,.Example.COM"},
+            {"Http_Proxy=", "http_proxy="},
+            {"hTtPs_PrOxY=", "https_proxy="},
+            {"No_PrOxY=", "no_proxy="},
+            {"HTTP_PROXY=http://upper:8080", "HTTP_PROXY=http://upper:8080"},
+            {"HTTPS_PROXY=", "HTTPS_PROXY="},
+            {"NO_PROXY=.upper.example", "NO_PROXY=.upper.example"},
+            {"http_proxy=http://lower:8080", "http_proxy=http://lower:8080"},
+            {"https_proxy=", "https_proxy="},
+            {"no_proxy=.lower.example", "no_proxy=.lower.example"}};
+        for (const auto& [entry, expected] : cases)
+        {
+            VERIFY_ARE_EQUAL(expected, CanonicalizeProxyEnvironmentVariable(entry));
+        }
+    }
+
     TEST_METHOD(ProxyEnvironment_ExplicitCasingOverridesBothDefaults)
     {
         const std::vector<std::string> defaults{

@@ -91,6 +91,23 @@ bool IsProxyEnvironmentVariable(std::string_view Entry)
            });
 }
 
+std::string CanonicalizeProxyEnvironmentVariable(std::string_view Entry)
+{
+    std::string result{Entry};
+    const auto name = EnvironmentName(Entry);
+    // Preserve canonical casing so explicit upper/lowercase overrides remain distinct.
+    for (const auto& names : c_proxyNames)
+    {
+        if (name != names.second && wsl::shared::string::IsEqual(name, names.first, true))
+        {
+            result.replace(0, name.size(), names.first);
+            break;
+        }
+    }
+
+    return result;
+}
+
 void AddProxyEnvironmentDefaults(std::vector<std::string>& Environment, const std::vector<std::string>& Defaults)
 {
     // Either explicit casing, including an empty value, suppresses both default casings.
