@@ -154,9 +154,10 @@ void WSLCContainerLauncher::SetStopTimeout(LONG Timeout)
     m_stopTimeout = Timeout;
 }
 
-void WSLCContainerLauncher::SetRestartPolicy(WSLCContainerRestartPolicy Policy)
+void WSLCContainerLauncher::SetRestartPolicy(WSLCContainerRestartPolicy Policy, ULONG MaximumRetryCount)
 {
     m_restartPolicy = Policy;
+    m_restartPolicyMaximumRetryCount = MaximumRetryCount;
 }
 
 void WSLCContainerLauncher::SetShmSize(int64_t ShmSize)
@@ -408,6 +409,7 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     options.PortsCount = static_cast<ULONG>(m_ports.size());
     options.StopSignal = m_stopSignal;
     options.RestartPolicy = m_restartPolicy;
+    options.RestartPolicyMaximumRetryCount = m_restartPolicyMaximumRetryCount;
     options.Flags = m_containerFlags;
     if (m_stopTimeout.has_value())
     {

@@ -7883,16 +7883,45 @@ sys.exit(1 if queries else 0)
             ValidateCOMErrorMessage(wsl::shared::Localization::MessageWslcRestartPolicyConflictsWithRm());
         }
 
-        // Policies that need persisted lifecycle state are not supported.
-        for (const auto policy : {WSLCContainerRestartPolicyOnFailure, WSLCContainerRestartPolicyUnlessStopped})
         {
-            WSLCContainerLauncher launcher("debian:latest", "test-restart-policy-unsupported", {"sleep", "99999"});
-            launcher.SetRestartPolicy(policy);
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-policy-inspect-on-failure", {"sleep", "99999"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyOnFailure, 3);
+            auto container = launcher.Create(*m_defaultSession);
+
+            const auto inspect = container.Inspect();
+            VERIFY_ARE_EQUAL(std::string{"on-failure"}, inspect.HostConfig.RestartPolicy.Name);
+            VERIFY_ARE_EQUAL(3, inspect.HostConfig.RestartPolicy.MaximumRetryCount);
+        }
+
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-policy-inspect-unless-stopped", {"sleep", "99999"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyUnlessStopped);
+            auto container = launcher.Create(*m_defaultSession);
+
+            const auto inspect = container.Inspect();
+            VERIFY_ARE_EQUAL(std::string{"unless-stopped"}, inspect.HostConfig.RestartPolicy.Name);
+            VERIFY_ARE_EQUAL(0, inspect.HostConfig.RestartPolicy.MaximumRetryCount);
+        }
+
+        // A maximum retry count is only valid with the on-failure policy.
+        for (const auto policy : {WSLCContainerRestartPolicyNo, WSLCContainerRestartPolicyAlways, WSLCContainerRestartPolicyUnlessStopped})
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-policy-invalid-count", {"sleep", "99999"});
+            launcher.SetRestartPolicy(policy, 1);
             auto [hr, container] = launcher.CreateNoThrow(*m_defaultSession);
-            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), hr);
+            VERIFY_ARE_EQUAL(E_INVALIDARG, hr);
 
             wil::com_ptr<IWSLCContainer> notFound;
-            VERIFY_ARE_EQUAL(WSLC_E_CONTAINER_NOT_FOUND, m_defaultSession->OpenContainer("test-restart-policy-unsupported", &notFound));
+            VERIFY_ARE_EQUAL(WSLC_E_CONTAINER_NOT_FOUND, m_defaultSession->OpenContainer("test-restart-policy-invalid-count", &notFound));
+        }
+
+        for (const auto policy : {WSLCContainerRestartPolicyOnFailure, WSLCContainerRestartPolicyUnlessStopped})
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-policy-rm-policy", {"sleep", "99999"});
+            launcher.SetRestartPolicy(policy);
+            launcher.SetContainerFlags(WSLCContainerFlagsRm);
+            auto [hr, container] = launcher.CreateNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(E_INVALIDARG, hr);
         }
 
         // Unknown policy values are rejected.
@@ -8417,6 +8446,134 @@ sys.exit(1 if queries else 0)
         VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
         VERIFY_IS_FALSE(wasAlreadyIdle);
         VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
+    }
+
+    WSLC_TEST_METHOD(ContainerRestartPolicyOnFailure)
+    {
+        // A successful exit is not restarted.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-on-failure-success", {"sh", "-c", "echo run; exit 0"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyOnFailure);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+            WaitForContainerRuns(container, 1);
+            WaitForContainerState(container, WslcContainerStateExited);
+            VerifyContainerStaysDown(container);
+            VERIFY_ARE_EQUAL(1u, CountContainerRuns(container));
+            VERIFY_ARE_EQUAL(0u, container.Inspect().RestartCount);
+        }
+
+        // A failing container is restarted until the maximum retry count is reached.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-on-failure-max", {"sh", "-c", "echo run; exit 1"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyOnFailure, 2);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+            WaitForContainerRuns(container, 3);
+            WaitForContainerState(container, WslcContainerStateExited);
+            VerifyContainerStaysDown(container);
+            VERIFY_ARE_EQUAL(3u, CountContainerRuns(container));
+            VERIFY_ARE_EQUAL(2u, container.Inspect().RestartCount);
+
+            // An explicit start resets the retry budget.
+            VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+            WaitForContainerRuns(container, 6);
+            WaitForContainerState(container, WslcContainerStateExited);
+            VerifyContainerStaysDown(container);
+            VERIFY_ARE_EQUAL(6u, CountContainerRuns(container));
+            VERIFY_ARE_EQUAL(2u, container.Inspect().RestartCount);
+        }
+
+        // Without a maximum retry count, a failing container is restarted until it is stopped.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-on-failure-unlimited", {"sh", "-c", "echo run; exit 1"});
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyOnFailure);
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+            WaitForContainerRuns(container, 4);
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            VerifyContainerStaysDown(container);
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerRestartPolicyUnlessStopped)
+    {
+        // Any exit is restarted, including a successful one.
+        WSLCContainerLauncher launcher("debian:latest", "test-restart-unless-stopped", {"sh", "-c", "echo run; exit 0"});
+        launcher.SetRestartPolicy(WSLCContainerRestartPolicyUnlessStopped);
+        auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+        WaitForContainerRuns(container, 3);
+
+        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+        VerifyContainerStaysDown(container);
+
+        // An explicit start resumes automatic restarts.
+        const auto runs = CountContainerRuns(container);
+        VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+        WaitForContainerRuns(container, runs + 2);
+        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+        VerifyContainerStaysDown(container);
+    }
+
+    // On a session start, unless-stopped containers are started unless they were stopped by the user, and
+    // on-failure containers are started only if their last run failed.
+    WSLC_TEST_METHOD(ContainerRestartPolicySessionStart)
+    {
+        auto restore = ResetTestSession(); // Required to access the storage folder.
+
+        constexpr auto c_sessionName = L"restart-policy-session-start-test";
+
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(c_sessionName, true));
+
+            WSLCContainerLauncher runningLauncher("debian:latest", "test-unless-stopped-session-running", {"sleep", "99999"});
+            runningLauncher.SetRestartPolicy(WSLCContainerRestartPolicyUnlessStopped);
+            auto running = runningLauncher.Launch(*session, WSLCContainerStartFlagsNone);
+            running.SetDeleteOnClose(false);
+
+            WSLCContainerLauncher stoppedLauncher("debian:latest", "test-unless-stopped-session-stopped", {"sleep", "99999"});
+            stoppedLauncher.SetRestartPolicy(WSLCContainerRestartPolicyUnlessStopped);
+            auto stopped = stoppedLauncher.Launch(*session, WSLCContainerStartFlagsNone);
+            stopped.SetDeleteOnClose(false);
+            VERIFY_SUCCEEDED(stopped.Get().Stop(WSLCSignalSIGKILL, 0));
+
+            WSLCContainerLauncher createdLauncher("debian:latest", "test-unless-stopped-session-created", {"sleep", "99999"});
+            createdLauncher.SetRestartPolicy(WSLCContainerRestartPolicyUnlessStopped);
+            auto created = createdLauncher.Create(*session);
+            created.SetDeleteOnClose(false);
+
+            WSLCContainerLauncher successLauncher(
+                "debian:latest", "test-on-failure-session-success", {"sh", "-c", "echo run; exit 0"});
+            successLauncher.SetRestartPolicy(WSLCContainerRestartPolicyOnFailure);
+            auto success = successLauncher.Launch(*session, WSLCContainerStartFlagsNone);
+            success.SetDeleteOnClose(false);
+            WaitForContainerRuns(success, 1);
+            WaitForContainerState(success, WslcContainerStateExited);
+
+            WSLCContainerLauncher failureLauncher(
+                "debian:latest", "test-on-failure-session-failure", {"sh", "-c", "echo run; exit 1"});
+            failureLauncher.SetRestartPolicy(WSLCContainerRestartPolicyOnFailure, 1);
+            auto failure = failureLauncher.Launch(*session, WSLCContainerStartFlagsNone);
+            failure.SetDeleteOnClose(false);
+            WaitForContainerRuns(failure, 2);
+            WaitForContainerState(failure, WslcContainerStateExited);
+            VerifyContainerStaysDown(failure);
+        }
+
+        auto session = CreateSession(GetDefaultSessionSettings(c_sessionName, true));
+
+        auto running = OpenContainer(session.get(), "test-unless-stopped-session-running");
+        auto stopped = OpenContainer(session.get(), "test-unless-stopped-session-stopped");
+        auto created = OpenContainer(session.get(), "test-unless-stopped-session-created");
+        auto success = OpenContainer(session.get(), "test-on-failure-session-success");
+        auto failure = OpenContainer(session.get(), "test-on-failure-session-failure");
+
+        WaitForContainerState(running, WslcContainerStateRunning);
+        VERIFY_ARE_EQUAL(std::string{"unless-stopped"}, running.Inspect().HostConfig.RestartPolicy.Name);
+        VERIFY_ARE_EQUAL(WslcContainerStateCreated, created.State());
+        VERIFY_ARE_EQUAL(1, failure.Inspect().HostConfig.RestartPolicy.MaximumRetryCount);
+
+        // The retry budget of an on-failure container is spent across sessions.
+        VerifyContainerStaysDown(stopped);
+        VerifyContainerStaysDown(success);
+        VerifyContainerStaysDown(failure);
     }
 
     static std::string ContainerStatePath(const std::string& ContainerId)

@@ -378,6 +378,7 @@ typedef struct _WSLCContainerOptions
     WSLCStringArray CapAdd;
     WSLCStringArray CapDrop;
     WSLCContainerRestartPolicy RestartPolicy;
+    ULONG RestartPolicyMaximumRetryCount; // Only valid with WSLCContainerRestartPolicyOnFailure. 0 means unlimited.
 } WSLCContainerOptions;
 
 typedef char WSLCContainerId[WSLC_CONTAINER_ID_LENGTH + 1] ;

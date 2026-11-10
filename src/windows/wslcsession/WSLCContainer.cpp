@@ -574,10 +574,26 @@ std::map<std::string, std::string> StripInternalLabels(std::optional<std::map<st
     return StripInternalLabels(std::move(labels).value_or(std::map<std::string, std::string>{}));
 }
 
+// Returns whether the policy restarts the container under any circumstances.
+bool PolicyCanRestart(WSLCContainerRestartPolicy Policy)
+{
+    switch (Policy)
+    {
+    case WSLCContainerRestartPolicyNo:
+        return false;
+
+    case WSLCContainerRestartPolicyAlways:
+    case WSLCContainerRestartPolicyOnFailure:
+    case WSLCContainerRestartPolicyUnlessStopped:
+        return true;
+    }
+
+    THROW_HR_MSG(E_INVALIDARG, "Invalid restart policy: %i", static_cast<int>(Policy));
+}
+
 // Single decision point for restart policies: returns whether the policy restarts the container when a run ends
-// without a user stop, and when its session starts. Throws ERROR_NOT_SUPPORTED for policies that require
-// persisted lifecycle state.
-bool PolicyRestartsContainer(WSLCContainerRestartPolicy Policy)
+// without a pending user stop, and when its session starts.
+bool PolicyRestartsContainer(WSLCContainerRestartPolicy Policy, ULONG MaximumRetryCount, int ExitCode, bool ManuallyStopped, std::uint32_t RestartCount)
 {
     switch (Policy)
     {
@@ -587,9 +603,12 @@ bool PolicyRestartsContainer(WSLCContainerRestartPolicy Policy)
     case WSLCContainerRestartPolicyAlways:
         return true;
 
-    case WSLCContainerRestartPolicyOnFailure:
     case WSLCContainerRestartPolicyUnlessStopped:
-        THROW_HR_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Unsupported restart policy: %i", static_cast<int>(Policy));
+        return !ManuallyStopped;
+
+    case WSLCContainerRestartPolicyOnFailure:
+        // A maximum retry count of 0 means the number of restarts is unlimited.
+        return ExitCode != 0 && (MaximumRetryCount == 0 || RestartCount < MaximumRetryCount);
     }
 
     THROW_HR_MSG(E_INVALIDARG, "Invalid restart policy: %i", static_cast<int>(Policy));
@@ -597,16 +616,23 @@ bool PolicyRestartsContainer(WSLCContainerRestartPolicy Policy)
 
 void ValidateRestartPolicy(const WSLCContainerOptions& containerOptions)
 {
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        containerOptions.RestartPolicyMaximumRetryCount != 0 && containerOptions.RestartPolicy != WSLCContainerRestartPolicyOnFailure,
+        "A maximum retry count is only valid with the on-failure restart policy (policy: %i, count: %lu)",
+        static_cast<int>(containerOptions.RestartPolicy),
+        containerOptions.RestartPolicyMaximumRetryCount);
+
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG,
         Localization::MessageWslcRestartPolicyConflictsWithRm(),
-        PolicyRestartsContainer(containerOptions.RestartPolicy) && WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsRm));
+        PolicyCanRestart(containerOptions.RestartPolicy) && WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsRm));
 }
 
 WSLCContainerRestartPolicy RestartPolicyFromMetadata(WSLCContainerRestartPolicy Policy, const std::string& Id) noexcept
 try
 {
-    PolicyRestartsContainer(Policy);
+    PolicyCanRestart(Policy);
     return Policy;
 }
 catch (...)
@@ -945,6 +971,7 @@ WSLCContainerImpl::WSLCContainerImpl(
     WSLCProcessFlags InitProcessFlags,
     WSLCContainerFlags ContainerFlags,
     WSLCContainerRestartPolicy RestartPolicy,
+    ULONG RestartMaximumRetryCount,
     const WSLCPersistedContainerState& PersistentState,
     HRESULT PersistentStateLoadError) :
     m_wslcSession(wslcSession),
@@ -965,6 +992,7 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_initProcessFlags(InitProcessFlags),
     m_containerFlags(ContainerFlags),
     m_restartPolicy(RestartPolicy),
+    m_restartMaximumRetryCount(RestartMaximumRetryCount),
     m_persistentState(runtime, m_id, PersistentState, PersistentStateLoadError)
 {
     // Acquire the activity hold up front for a container recovered in the running state, so it keeps
@@ -1253,7 +1281,10 @@ wil::com_ptr<IWSLCProcess> WSLCContainerImpl::StartPhase(
     {
         CancelPolicyRestartLockHeld();
         m_restartBackoff.Reset();
-        persistResult = m_persistentState.Update([](auto& state) { state.RestartCount = 0; });
+        persistResult = m_persistentState.Update([](auto& state) {
+            state.RestartCount = 0;
+            state.ManuallyStopped = false;
+        });
     }
 
     if (FAILED(persistResult))
@@ -1642,6 +1673,7 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
         if (m_policyRestartPending)
         {
             CancelPolicyRestartLockHeld();
+            PersistManuallyStoppedLockHeld();
             return;
         }
 
@@ -1697,9 +1729,14 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
 
                 if (m_exitRequests.CompleteRequest(runIteration, requestSucceeded))
                 {
+                    if (requestSucceeded)
+                    {
+                        PersistManuallyStoppedLockHeld();
+                    }
+
                     // An exit observed during the request waits for its outcome before applying the policy.
                     if (m_state == WslcContainerStateExited && !m_exitRequests.SuppressesRestart() &&
-                        PolicyRestartsContainer(m_restartPolicy) && !m_restart && !m_transition && !m_wslcSession.IsTerminating())
+                        PolicyRestartsContainerLockHeld(m_lastExitCode) && !m_restart && !m_transition && !m_wslcSession.IsTerminating())
                     {
                         SchedulePolicyRestartLockHeld(m_restartBackoff.NextDelay());
                     }
@@ -1886,6 +1923,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
     }
 
     SetExitCode(exitCode);
+    m_lastExitCode = exitCode;
 
     // Notify plugin manager that the container is stopping. Errors are ignored.
     if (m_state == WslcContainerStateRunning)
@@ -1907,7 +1945,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
 
     // Only the end of a run applies the restart policy, never a duplicate or late exit event.
     const bool policyRestart =
-        PolicyRestartsContainer(m_restartPolicy) && m_state == WslcContainerStateRunning && !m_exitRequests.SuppressesRestart() &&
+        PolicyRestartsContainerLockHeld(exitCode) && m_state == WslcContainerStateRunning && !m_exitRequests.SuppressesRestart() &&
         !m_restart && !(transition && transition->ExpectedEvent == ContainerEvent::Destroy) && !m_wslcSession.IsTerminating();
 
     if (policyRestart)
@@ -1968,7 +2006,7 @@ void WSLCContainerImpl::OnSessionStart()
     auto lock = m_lock.lock_exclusive();
 
     // A container that never started is not subject to its restart policy.
-    if (!PolicyRestartsContainer(m_restartPolicy) || m_state != WslcContainerStateExited || m_policyRestartPending)
+    if (!PolicyRestartsContainerLockHeld(m_lastExitCode) || m_state != WslcContainerStateExited || m_policyRestartPending)
     {
         return;
     }
@@ -2124,7 +2162,7 @@ bool WSLCContainerImpl::TryPrune()
     auto lock = m_lock.lock_exclusive();
 
     if ((m_state != WslcContainerStateCreated && m_state != WslcContainerStateExited) || m_transition || m_restart ||
-        m_policyRestartPending || (PolicyRestartsContainer(m_restartPolicy) && m_exitRequests.HasPendingRequests()))
+        m_policyRestartPending || (PolicyCanRestart(m_restartPolicy) && m_exitRequests.HasPendingRequests()))
     {
         return false;
     }
@@ -2154,7 +2192,7 @@ __requires_exclusive_lock_held(m_lock) bool WSLCContainerImpl::RequestDeleteExcl
     THROW_HR_WITH_USER_ERROR_IF(
         WSLC_E_CONTAINER_IS_RUNNING,
         Localization::MessageWslcCannotRemoveRestartingContainer(m_id),
-        (m_policyRestartPending || (PolicyRestartsContainer(m_restartPolicy) && m_exitRequests.HasPendingRequests())) &&
+        (m_policyRestartPending || (PolicyCanRestart(m_restartPolicy) && m_exitRequests.HasPendingRequests())) &&
             WI_IsFlagClear(Flags, WSLCDeleteFlagsForce));
 
     THROW_HR_IF_MSG(
@@ -2587,6 +2625,7 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     wslcInspect.HostConfig.Memory = dockerInspect.HostConfig.Memory;
     wslcInspect.HostConfig.NanoCpus = dockerInspect.HostConfig.NanoCpus;
     wslcInspect.HostConfig.RestartPolicy.Name = RestartPolicyName(m_restartPolicy);
+    wslcInspect.HostConfig.RestartPolicy.MaximumRetryCount = m_restartMaximumRetryCount;
 
     if (dockerInspect.HostConfig.Ulimits.has_value())
     {
@@ -3147,6 +3186,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     metadata.Image = containerOptions.Image;
     metadata.Volumes = volumes;
     metadata.RestartPolicy = containerOptions.RestartPolicy;
+    metadata.RestartPolicyMaximumRetryCount = containerOptions.RestartPolicyMaximumRetryCount;
 
     metadata.StateStorage = WSLCContainerStateStorage::GuestFileV1;
 
@@ -3249,6 +3289,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         containerOptions.InitProcessOptions.Flags,
         containerOptions.Flags,
         containerOptions.RestartPolicy,
+        containerOptions.RestartPolicyMaximumRetryCount,
         persistentState,
         S_OK);
 
@@ -3377,16 +3418,22 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         metadata.InitProcessFlags,
         metadata.Flags,
         RestartPolicyFromMetadata(metadata.RestartPolicy, dockerContainer.Id),
+        metadata.RestartPolicyMaximumRetryCount,
         persistentState,
         persistentStateLoadError);
 
     container->Initialize();
 
-    // Restore the state change timestamp from Docker inspect data.
+    // Restore the state change timestamp and the last exit code from Docker inspect data.
     try
     {
         auto inspectData = DockerClient.InspectContainer(dockerContainer.Id);
         auto state = DockerStateToWSLCState(dockerContainer.State);
+
+        {
+            auto lock = container->m_lock.lock_exclusive();
+            container->m_lastExitCode = inspectData.State.ExitCode;
+        }
 
         if (state == WslcContainerStateCreated)
         {
@@ -3426,6 +3473,26 @@ try
     EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcContainerStateSaveFailed(wsl::shared::string::MultiByteToWide(m_id)));
 }
 CATCH_LOG()
+
+void WSLCContainerImpl::PersistManuallyStoppedLockHeld() noexcept
+{
+    if (m_wslcSession.IsTerminating())
+    {
+        return;
+    }
+
+    const auto result = m_persistentState.Update([](auto& state) { state.ManuallyStopped = true; });
+    if (FAILED(result))
+    {
+        ReportStateSaveFailure(result);
+    }
+}
+
+bool WSLCContainerImpl::PolicyRestartsContainerLockHeld(int ExitCode) const
+{
+    const auto state = m_persistentState.Get();
+    return PolicyRestartsContainer(m_restartPolicy, m_restartMaximumRetryCount, ExitCode, state.ManuallyStopped, state.RestartCount);
+}
 
 void WSLCContainerImpl::Inspect(BOOL Size, LPSTR* Output) const
 {
@@ -3749,7 +3816,7 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::UpdateActivityHoldLockHeld(
     const bool active =
         m_state != WslcContainerStateDeleted &&
         ((m_state == WslcContainerStateRunning) || m_policyRestartPending ||
-         (m_state == WslcContainerStateExited && PolicyRestartsContainer(m_restartPolicy) && m_exitRequests.HasPendingRequests()));
+         (m_state == WslcContainerStateExited && PolicyCanRestart(m_restartPolicy) && m_exitRequests.HasPendingRequests()));
     if (active && !m_activityHold)
     {
         m_activityHold = ActivityRef(m_wslcSession.Runtime().IdleStateShared());
