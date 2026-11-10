@@ -964,7 +964,7 @@ NAT ネットワークにフォールバックしています。</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
-    <value>ローカルホスト プロキシ構成が検出されましたが、WSL にミラーリングされませんでした。NAT モードの WSL は、ローカルホスト プロキシをサポートしません。</value>
+    <value>ローカルホスト プロキシ構成が検出されましたが、WSL にミラーリングされませんでした。このプロキシ アドレスは、現在のネットワーク構成ではサポートされていません。</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
@@ -1204,7 +1204,7 @@ WSL を修復するには任意のキーを押すか、取り消すには CTRL-C
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
 エラー コード: {}
-このエラーが予期しないものである場合は、既存の問題を検索するか、https://github.com/microsoft/WSL/issues で新しい問題を提出することを検討してください。</value>
+このエラーが予期しないものである場合は、既存の問題を検索するか、https://github.com/microsoft/WSL/issues で新しい問題を提出することを検討してください</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">

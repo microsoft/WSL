@@ -964,7 +964,7 @@ Fallback alla rete NAT.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
-    <value>È stata rilevata una configurazione proxy localhost ma non è stato eseguito il mirroring in WSL. WSL in modalità NAT non supporta i proxy localhost.</value>
+    <value>È stata rilevata una configurazione proxy localhost ma non è stato eseguito il mirroring in WSL. L'indirizzo del proxy non è supportato dalla configurazione di rete corrente.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
@@ -1204,7 +1204,7 @@ Questo prompt smetterà di essere visualizzato tra 60 secondi.</value>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
 Codice errore: {}
-Se si tratta di un errore imprevisto, provare a cercare i problemi esistenti o a segnalare un nuovo problema all'indirizzo https://github.com/microsoft/WSL/issues.</value>
+Se si tratta di un errore imprevisto, provare a cercare i problemi esistenti o a segnalare un nuovo problema all'indirizzo https://github.com/microsoft/WSL/issues</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">
