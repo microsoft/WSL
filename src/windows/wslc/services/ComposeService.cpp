@@ -202,7 +202,6 @@ namespace {
 std::vector<models::ComposeProjectInformation> ComposeService::List(models::Session& session, bool all)
 {
     WSLCComposeProjectListOptions options{};
-    options.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
     options.All = all;
 
     wil::unique_cotaskmem_array_ptr<WSLCComposeProjectSummary> projects;
@@ -212,7 +211,6 @@ std::vector<models::ComposeProjectInformation> ComposeService::List(models::Sess
     result.reserve(projects.size());
     for (const auto& project : projects)
     {
-        THROW_HR_IF(E_UNEXPECTED, project.SchemaVersion != WSLC_COMPOSE_SCHEMA_VERSION);
         result.emplace_back(project.ProjectKey, FormatProjectStatus(project));
     }
 
