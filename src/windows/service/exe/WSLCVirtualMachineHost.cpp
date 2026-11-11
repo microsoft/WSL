@@ -126,7 +126,7 @@ WSLCVirtualMachineHost::WSLCVirtualMachineHost(_In_ const WSLCSessionSettings* S
     {
         request.Boot.InitrdPath = basePath / L"tools" / LXSS_VM_MODE_INITRD_NAME;
     }
-    else
+    else if (kernelPath.parent_path() != basePath / L"tools")
     {
         const auto vmIdString = wsl::shared::string::GuidToString<wchar_t>(vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
         const auto runAsUser = wil::impersonate_token(userToken.get());
