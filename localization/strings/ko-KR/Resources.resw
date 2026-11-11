@@ -964,7 +964,7 @@ NAT 네트워킹으로 대체합니다.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
-    <value>localhost 프록시 구성이 검색되었지만 WSL로 미러링되지 않았습니다. NAT 모드의 WSL은 localhost 프록시를 지원하지 않습니다.</value>
+    <value>localhost 프록시 구성이 감지되었지만 WSL로 미러링되지 않았습니다. 이 프록시 주소는 현재 네트워크 구성에서 지원되지 않습니다.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">

@@ -256,6 +256,27 @@ class Plan9ProtocolTests
         VERIFY_IS_TRUE(std::ranges::equal(c_versionResponse, response));
     }
 
+    WSL2_TEST_METHOD(AttachRejectsInvalidUid)
+    {
+        auto server = ConnectToServer();
+        SendMessageAndExpectResponse(server.client.get(), c_versionRequest, Plan9MessageType::Rversion);
+
+        for (const auto* username : {"", "root"})
+        {
+            std::vector<uint8_t> payload;
+            AppendU32(payload, 1);
+            AppendU32(payload, UINT32_MAX);
+            AppendString(payload, username);
+            AppendString(payload, "");
+            AppendU32(payload, UINT32_MAX);
+
+            const auto response = SendMessageAndExpectResponse(
+                server.client.get(), MakePlan9Message(Plan9MessageType::Tattach, std::move(payload)), Plan9MessageType::Rlerror);
+
+            VERIFY_IS_TRUE(std::ranges::equal(c_invalidArgumentResponse, response));
+        }
+    }
+
     WSL2_TEST_METHOD(XattrCommitsUseAttachedCredentials)
     {
         ULONG uid{};

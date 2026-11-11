@@ -958,7 +958,7 @@ Palataan nat-verkkopalveluun.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
-    <value>Havaittiin localhost-välityspalvelimen määritys, mutta sitä ei peilattu WSL:ään. WSL NAT-tilassa ei tue localhost-välityspalvelimia.</value>
+    <value>Havaittiin localhost-välityspalvelimen määritys, mutta sitä ei peilattu WSL:ään. Tätä välityspalvelimen osoitetta ei tueta nykyisissä verkkoasetuksissa.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
@@ -1198,7 +1198,7 @@ Tämä kehote aikakatkaistiin 60 sekunnin kuluttua.</value>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
 Virhekoodi: {}
-Jos tämä virhe oli odottamaton, harkitse olemassa olevien ongelmien etsimistä tai uuden ongelman kirjaamista https://github.com/microsoft/WSL/issues.</value>
+Jos tämä virhe oli odottamaton, harkitse olemassa olevien ongelmien etsimistä tai uuden ongelman kirjaamista https://github.com/microsoft/WSL/issues</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">

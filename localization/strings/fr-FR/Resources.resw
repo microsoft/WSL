@@ -965,7 +965,7 @@ Retour à la mise en réseau NAT.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
-    <value>Une configuration de proxy localhost a été détectée, mais n’a pas été mise en miroir dans WSL. WSL en mode NAT ne prend pas en charge les proxys localhost.</value>
+    <value>Une configuration de proxy localhost a été détectée, mais n’a pas été mise en miroir dans WSL. Cette adresse de proxy n’est pas prise en charge par la configuration réseau actuelle.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
@@ -1205,7 +1205,7 @@ Cette invite expirera dans 60 secondes.</value>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
 Code d’erreur : {}
-Si cette erreur était inattendue, recherchez des problèmes existants ou signalez un nouveau problème sur https://github.com/microsoft/WSL/issues.</value>
+Si cette erreur était inattendue, envisagez de rechercher des problèmes existants ou de soumettre un nouveau problème sur https://github.com/microsoft/WSL/issues</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">

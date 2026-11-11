@@ -958,7 +958,7 @@ NAT ağ bağlantısına geri dönülüyor.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
-    <value>Bir localhost proxy yapılandırması algılandı ancak WSL'ye yansıtılmadı. NAT modundaki WSL, localhost proxy'lerini desteklemez.</value>
+    <value>Bir localhost ara sunucu yapılandırması algılandı ancak WSL'ye yansıtılmadı. Bu ara sunucu adresi geçerli ağ yapılandırması tarafından desteklenmiyor.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
