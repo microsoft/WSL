@@ -705,7 +705,15 @@ void WSLCVirtualMachine::WriteGuestFile(const std::string& Path, std::string_vie
     std::lock_guard lock{m_lock};
     const auto& response = m_initChannel.Transaction<WSLC_WRITE_FILE>(message.Span(), nullptr, m_initChannelTimeout);
 
-    THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to write '%hs', init returned: %d", Path.c_str(), response.Result);
+    if (response.Result != 0)
+    {
+        THROW_HR_WITH_USER_ERROR_MSG(
+            E_FAIL,
+            wsl::shared::Localization::MessageWslcGuestFileWriteFailed(wsl::shared::string::MultiByteToWide(Path), response.Result),
+            "Failed to write '%hs', init returned: %d",
+            Path.c_str(),
+            response.Result);
+    }
 }
 
 std::string WSLCVirtualMachine::ReadGuestFile(const std::string& Path, size_t MaxSize)
