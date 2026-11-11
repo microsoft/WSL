@@ -958,7 +958,7 @@ Návrat k sítím NAT.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
-    <value>Byla zjištěna konfigurace proxy serveru localhost, ale nebyla zrcadlena do WSL. WSL v režimu NAT nepodporuje proxy localhost.</value>
+    <value>Byla zjištěna konfigurace proxy serveru localhost, ale nebyla zrcadlena do WSL. Tato adresa proxy není podporována aktuální konfigurací sítě.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">

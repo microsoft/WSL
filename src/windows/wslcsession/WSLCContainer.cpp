@@ -26,6 +26,7 @@ Abstract:
 #include "APICompat.h"
 #include "MountSpecParsing.h"
 #include "wslc/WSLCProxy.h"
+#include "lxinitshared.h"
 #include <unordered_set>
 
 namespace apicompat = wsl::windows::common::apicompat;
@@ -55,6 +56,8 @@ using wsl::windows::service::wslc::WSLCContainerImpl;
 using wsl::windows::service::wslc::WSLCContainerMetadata;
 using wsl::windows::service::wslc::WSLCContainerMetadataLabel;
 using wsl::windows::service::wslc::WSLCContainerMetadataV1;
+using wsl::windows::service::wslc::WSLCContainerStateStorage;
+using wsl::windows::service::wslc::WSLCContainerStateStore;
 using wsl::windows::service::wslc::WSLCExecutionContext;
 using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
@@ -942,7 +945,9 @@ WSLCContainerImpl::WSLCContainerImpl(
     std::int64_t CreatedAt,
     WSLCProcessFlags InitProcessFlags,
     WSLCContainerFlags ContainerFlags,
-    WSLCContainerRestartPolicy RestartPolicy) :
+    WSLCContainerRestartPolicy RestartPolicy,
+    const WSLCPersistedContainerState& PersistentState,
+    HRESULT PersistentStateLoadError) :
     m_wslcSession(wslcSession),
     m_pluginNotifier(pluginNotifier),
     m_runtime(runtime),
@@ -960,7 +965,8 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_createdAt(CreatedAt),
     m_initProcessFlags(InitProcessFlags),
     m_containerFlags(ContainerFlags),
-    m_restartPolicy(RestartPolicy)
+    m_restartPolicy(RestartPolicy),
+    m_persistentState(runtime, m_id, PersistentState, PersistentStateLoadError)
 {
     // Acquire the activity hold up front for a container recovered in the running state, so it keeps
     // the VM alive even before any client opens its wrapper. A merely-created (never-started)
@@ -1238,14 +1244,22 @@ wil::com_ptr<IWSLCProcess> WSLCContainerImpl::StartPhase(
     }
 
     // Acceptance transfers lifecycle authority after argument validation and attachment preparation.
+    HRESULT persistResult{};
     if (PolicyRestartToken.has_value())
     {
         m_policyRestartPending = false;
+        persistResult = m_persistentState.Update([](auto& state) { state.RestartCount++; });
     }
     else
     {
         CancelPolicyRestartLockHeld();
         m_restartBackoff.Reset();
+        persistResult = m_persistentState.Update([](auto& state) { state.RestartCount = 0; });
+    }
+
+    if (FAILED(persistResult))
+    {
+        ReportStateSaveFailure(persistResult);
     }
 
     // Acceptance invalidates predecessor responses even if resource preparation fails.
@@ -2544,6 +2558,7 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     wslcInspect.Image = dockerInspect.Image;
     wslcInspect.SizeRw = dockerInspect.SizeRw;
     wslcInspect.SizeRootFs = dockerInspect.SizeRootFs;
+    wslcInspect.RestartCount = m_persistentState.Get().RestartCount;
 
     // Map container state.
     wslcInspect.State.Status = dockerInspect.State.Status;
@@ -3135,6 +3150,8 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     metadata.Volumes = volumes;
     metadata.RestartPolicy = containerOptions.RestartPolicy;
 
+    metadata.StateStorage = WSLCContainerStateStorage::GuestFileV1;
+
     for (const auto& e : mappedPorts)
     {
         metadata.Ports.emplace_back(e.Serialize());
@@ -3213,6 +3230,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     auto mergedLabels = StripInternalLabels(std::move(inspectData.Config.Labels));
     const auto createdAt = wsl::windows::common::timestamp::Rfc3339ToEpoch(inspectData.Created);
+    auto persistentState = WSLCContainerStateStore::ForNewContainer(runtime, result.Id);
 
     auto container = std::make_shared<WSLCContainerImpl>(
         wslcSession,
@@ -3232,7 +3250,9 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         createdAt,
         containerOptions.InitProcessOptions.Flags,
         containerOptions.Flags,
-        containerOptions.RestartPolicy);
+        containerOptions.RestartPolicy,
+        persistentState,
+        S_OK);
 
     container->Initialize();
 
@@ -3325,6 +3345,21 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     // Containers created before the image was persisted fall back to what Docker reports.
     std::string image = metadata.Image.empty() ? dockerContainer.Image : std::move(metadata.Image);
 
+    // The persisted state is diagnostic, so failing to load it never blocks the container.
+    WSLCPersistedContainerState persistentState;
+    HRESULT persistentStateLoadError = S_OK;
+    try
+    {
+        persistentState = WSLCContainerStateStore::ForExistingContainer(runtime, dockerContainer.Id, metadata.StateStorage);
+    }
+    catch (...)
+    {
+        persistentStateLoadError = wil::ResultFromCaughtException();
+        LOG_HR_MSG(persistentStateLoadError, "Failed to load the persisted state of container '%hs'", dockerContainer.Id.c_str());
+        EMIT_USER_WARNING(
+            wsl::shared::Localization::MessageWslcContainerStateLoadFailed(wsl::shared::string::MultiByteToWide(dockerContainer.Id)));
+    }
+
     auto container = std::make_shared<WSLCContainerImpl>(
         wslcSession,
         runtime,
@@ -3343,7 +3378,9 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         dockerContainer.Created,
         metadata.InitProcessFlags,
         metadata.Flags,
-        RestartPolicyFromMetadata(metadata.RestartPolicy, dockerContainer.Id));
+        RestartPolicyFromMetadata(metadata.RestartPolicy, dockerContainer.Id),
+        persistentState,
+        persistentStateLoadError);
 
     container->Initialize();
 
@@ -3383,6 +3420,14 @@ const std::string& WSLCContainerImpl::ID() const noexcept
 {
     return m_id;
 }
+
+void WSLCContainerImpl::ReportStateSaveFailure(HRESULT Result) noexcept
+try
+{
+    LOG_HR_MSG(Result, "Failed to save the persisted state of container '%hs'", m_id.c_str());
+    EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcContainerStateSaveFailed(wsl::shared::string::MultiByteToWide(m_id)));
+}
+CATCH_LOG()
 
 void WSLCContainerImpl::Inspect(BOOL Size, LPSTR* Output) const
 {

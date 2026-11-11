@@ -958,7 +958,7 @@ Faller tilbake til NAT-nettverk.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
-    <value>En localhost-proxykonfigurasjon ble oppdaget, men ikke avspeilet i Windows Subsystem for Linux. Windows Subsystem for Linux i NAT-modus støtter ikke localhost-proxyer.</value>
+    <value>En localhost-proxykonfigurasjon ble oppdaget, men ikke avspeilet i Windows Subsystem for Linux. Denne proxyadressen støttes ikke av den gjeldende nettverkskonfigurasjonen.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
@@ -1198,7 +1198,7 @@ Denne meldingen blir tidsavbrutt om 60 sekunder.</value>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
 Feilkode: {}
-Hvis denne feilen var uventet, bør du vurdere å søke etter eksisterende problemer eller sende inn en ny sak på https://github.com/microsoft/WSL/issues.</value>
+Hvis denne feilen var uventet, kan du vurdere å søke etter eksisterende problemer eller sende inn en ny sak på https://github.com/microsoft/WSL/issues</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">
