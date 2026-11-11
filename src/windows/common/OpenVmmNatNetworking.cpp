@@ -145,7 +145,29 @@ void OpenVmmNatNetworking::StartPortTracker(wil::unique_socket&& Socket)
     m_gnsPortTrackerChannel.emplace(
         std::move(Socket),
         [this](const SOCKADDR_INET& addr, int protocol, bool allocate) {
-            return wil::ResultFromException([&]() { HandlePortNotification(addr, protocol, allocate); });
+            const auto result = wil::ResultFromException([&]() { HandlePortNotification(addr, protocol, allocate); });
+            LOG_IF_FAILED_MSG(
+                result,
+                "Port mapping failed: address=%hs port=%u protocol=%d allocate=%d",
+                wsl::windows::common::string::SockAddrInetToString(addr).c_str(),
+                INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&addr)),
+                protocol,
+                allocate);
+
+            switch (result)
+            {
+            case S_OK:
+                return 0;
+
+            case HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS):
+            case HRESULT_FROM_WIN32(WSAEADDRINUSE):
+            case E_ACCESSDENIED:
+            case HRESULT_FROM_WIN32(WSAEACCES):
+                return -LX_EADDRINUSE;
+
+            default:
+                return -LX_EINVAL;
+            }
         },
         [](const std::string&, bool) {});
 }

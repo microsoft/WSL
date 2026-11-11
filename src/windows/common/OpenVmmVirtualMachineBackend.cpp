@@ -548,8 +548,6 @@ VmPlatformCapabilities OpenVmmVirtualMachineBackend::QueryCapabilities()
     capabilities.Backend = BackendKind::OpenVmm;
     for (const auto feature :
          {VmFeature::SerialConsole,
-          VmFeature::HighMmio,
-          VmFeature::PersistentMemory,
           VmFeature::VirtioFsFileBacked,
           VmFeature::UserModeNatNetwork,
           VmFeature::TcpPortBinding,

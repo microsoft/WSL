@@ -112,10 +112,8 @@ enum class VmFeature
     DeferredMemoryCommit,
     ColdDiscard,
     SmallPageMemory,
-    HighMmio,
     HostingProcessNameSuffix,
     PhysicalDisk,
-    PersistentMemory,
     GuestDmaWindow,
     SerialConsole,
     VirtioFsFileBacked,
@@ -128,7 +126,7 @@ enum class VmFeature
     Count
 };
 
-static_assert(static_cast<size_t>(VmFeature::Count) == 20);
+static_assert(static_cast<size_t>(VmFeature::Count) == 18);
 
 struct VmPlatformCapabilities
 {

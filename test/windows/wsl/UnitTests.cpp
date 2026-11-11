@@ -282,6 +282,7 @@ class UnitTests
         }
 
         // Validate user sessions state with gui apps enabled.
+        if (!LxsstuOpenVmmMode())
         {
             config.Update(LxssGenerateTestConfig({.guiApplications = true}));
 
@@ -2667,28 +2668,32 @@ Usage:
     WSL2_TEST_METHOD(GuiApplications)
     {
         auto validateEnvironment = [&](bool systemdEnabled) {
-            WslConfigChange configChange(LxssGenerateTestConfig({.guiApplications = true}));
+            const bool guiApplicationsEnabled = !LxsstuOpenVmmMode();
+            WslConfigChange configChange(LxssGenerateTestConfig({.guiApplications = guiApplicationsEnabled}));
 
-            // Validate that running the system distro works.
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system true"), 0L);
+            if (guiApplicationsEnabled)
+            {
+                // Validate that running the system distro works.
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system true"), 0L);
 
-            // Validate that $DISPLAY and $WAYLAND_DISPLAY are set
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"env | grep DISPLAY="), 0L);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"env | grep WAYLAND_DISPLAY="), 0L);
+                // Validate that $DISPLAY and $WAYLAND_DISPLAY are set
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"env | grep DISPLAY="), 0L);
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"env | grep WAYLAND_DISPLAY="), 0L);
 
-            // Validate the X11 socket is in the expected location and that we can connect to it.
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /tmp/.X11-unix"), 0L);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"socat - UNIX-CONNECT:/tmp/.X11-unix/X0 < /dev/null"), 0L);
+                // Validate the X11 socket is in the expected location and that we can connect to it.
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /tmp/.X11-unix"), 0L);
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"socat - UNIX-CONNECT:/tmp/.X11-unix/X0 < /dev/null"), 0L);
 
-            // Validate that distro-provided tmpfiles rules cannot modify the read-only X11 mount.
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -f /run/tmpfiles.d/x11.conf"), 0L);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemd-tmpfiles --create --boot x11.conf"), 0L);
+                // Validate that distro-provided tmpfiles rules cannot modify the read-only X11 mount.
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -f /run/tmpfiles.d/x11.conf"), 0L);
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemd-tmpfiles --create --boot x11.conf"), 0L);
 
-            // Validate the runtime dir exists and the wayland-0 socket is in the expected location.
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"env | grep XDG_RUNTIME_DIR="), 0L);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d $XDG_RUNTIME_DIR"), 0L);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -S $XDG_RUNTIME_DIR/wayland-0"), 0L);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"socat - UNIX-CONNECT:$XDG_RUNTIME_DIR/wayland-0 < /dev/null"), 0L);
+                // Validate the runtime dir exists and the wayland-0 socket is in the expected location.
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"env | grep XDG_RUNTIME_DIR="), 0L);
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d $XDG_RUNTIME_DIR"), 0L);
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -S $XDG_RUNTIME_DIR/wayland-0"), 0L);
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"socat - UNIX-CONNECT:$XDG_RUNTIME_DIR/wayland-0 < /dev/null"), 0L);
+            }
 
             // Validate that WSLg can be disabled.
             configChange.Update(LxssGenerateTestConfig({.guiApplications = false}));
@@ -2773,7 +2778,8 @@ Usage:
     {
         DistroFileChange wslConf(L"/etc/wsl.conf", false);
         wslConf.SetContent(L"[boot]\nsystemd=true\n");
-        WslConfigChange config{LxssGenerateTestConfig({.guiApplications = true})};
+        const bool guiApplicationsEnabled = !LxsstuOpenVmmMode();
+        WslConfigChange config{LxssGenerateTestConfig({.guiApplications = guiApplicationsEnabled})};
 
         auto validateSocketExists = [](bool exists) {
             LxsstuLaunchWsl(L"ls -a /tmp/.X11-unix/");
@@ -2781,6 +2787,7 @@ Usage:
         };
 
         // Validate that wslg.service restores the socket if it's deleted.
+        if (guiApplicationsEnabled)
         {
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -f /run/systemd/generator/wslg.service"), 0L);
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -e /run/systemd/generator/default.target.wants/wslg.service"), 0L);
@@ -7731,8 +7738,9 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         ValidateOutput(
             L"echo ok",
             FormatErrorMessage(
-                wsl::shared::Localization::MessageFailedToAttachDisk(vhdPath, GetSystemErrorString(E_ACCESSDENIED)),
-                L"Wsl/Service/CreateInstance/CreateVm/E_ACCESSDENIED"),
+                LxsstuOpenVmmMode() ? GetSystemErrorString(E_ACCESSDENIED)
+                                    : wsl::shared::Localization::MessageFailedToAttachDisk(vhdPath, GetSystemErrorString(E_ACCESSDENIED)),
+                LxsstuOpenVmmMode() ? L"Wsl/Service/CreateInstance/CreateVm/OpenVMM/E_ACCESSDENIED" : L"Wsl/Service/CreateInstance/CreateVm/E_ACCESSDENIED"),
             L"");
     }
 
@@ -7835,8 +7843,11 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                     VERIFY_ARE_EQUAL(
                         out,
                         FormatErrorMessage(
-                            wsl::shared::Localization::MessageFailedToAttachDisk(path.wstring(), GetSystemErrorString(E_ACCESSDENIED)),
-                            L"Wsl/Service/CreateInstance/CreateVm/E_ACCESSDENIED"));
+                            LxsstuOpenVmmMode()
+                                ? GetSystemErrorString(E_ACCESSDENIED)
+                                : wsl::shared::Localization::MessageFailedToAttachDisk(path.wstring(), GetSystemErrorString(E_ACCESSDENIED)),
+                            LxsstuOpenVmmMode() ? L"Wsl/Service/CreateInstance/CreateVm/OpenVMM/E_ACCESSDENIED"
+                                                : L"Wsl/Service/CreateInstance/CreateVm/E_ACCESSDENIED"));
                 }
             }
         }

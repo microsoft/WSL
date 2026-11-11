@@ -168,7 +168,6 @@ class HcsVirtualMachineBackendTests
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::MemoryOvercommit)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::DeferredMemoryCommit)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::ColdDiscard)));
-        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::HighMmio)));
         VERIFY_ARE_EQUAL(
             wsl::windows::common::helpers::IsVmemmSuffixSupported(),
             capabilities.Features.test(static_cast<size_t>(VmFeature::HostingProcessNameSuffix)));

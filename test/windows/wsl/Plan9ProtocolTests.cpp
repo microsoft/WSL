@@ -228,7 +228,8 @@ class Plan9ProtocolTests
         VERIFY_ARE_EQUAL(LxsstuInitialize(FALSE), TRUE);
         if (LxsstuVmMode())
         {
-            m_config.emplace(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+            const auto networkingMode = LxsstuOpenVmmMode() ? wsl::core::NetworkingMode::Nat : wsl::core::NetworkingMode::Consomme;
+            m_config.emplace(LxssGenerateTestConfig({.networkingMode = networkingMode}));
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"-u root ln -sf /init /plan9"), 0u);
         }
 

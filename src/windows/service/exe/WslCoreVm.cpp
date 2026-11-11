@@ -1584,22 +1584,18 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId, BackendKind 
                 !wsl::windows::common::filesystem::FileExists(m_vmConfig.SystemDistroPath.c_str()));
     }
 
-    SafeInt<INT64> highMmioGapInMB = 0;
-    if (backendCapabilities.Features.test(static_cast<size_t>(VmFeature::HighMmio)))
+    SafeInt<INT64> highMmioGapInMB = DEFAULT_HIGH_MMIO_GAP_IN_MB;
+    if (m_vmConfig.EnableGuiApps && m_vmConfig.EnableVirtio)
     {
-        highMmioGapInMB = DEFAULT_HIGH_MMIO_GAP_IN_MB;
-        if (m_vmConfig.EnableGuiApps && m_vmConfig.EnableVirtio)
-        {
-            highMmioGapInMB += WSLG_SHARED_MEMORY_SIZE_MB + EXTRA_MMIO_SIZE_PER_VIRTIOFS_DEVICE_IN_MB;
-        }
-        if (m_systemDistroDeviceType == LxMiniInitMountDeviceTypePmem)
-        {
-            const auto runAsUser = wil::impersonate_token(m_userToken.get());
-            highMmioGapInMB += RequiredExtraMmioSpaceForPmemFileInMb(m_vmConfig.SystemDistroPath.c_str());
-        }
-        request.Mmio.HighWindowSizeBytes = static_cast<std::uint64_t>(highMmioGapInMB) * _1MB;
-        request.Mmio.MaximumGuestAddressBits = 36;
+        highMmioGapInMB += WSLG_SHARED_MEMORY_SIZE_MB + EXTRA_MMIO_SIZE_PER_VIRTIOFS_DEVICE_IN_MB;
     }
+    if (m_systemDistroDeviceType == LxMiniInitMountDeviceTypePmem)
+    {
+        const auto runAsUser = wil::impersonate_token(m_userToken.get());
+        highMmioGapInMB += RequiredExtraMmioSpaceForPmemFileInMb(m_vmConfig.SystemDistroPath.c_str());
+    }
+    request.Mmio.HighWindowSizeBytes = static_cast<std::uint64_t>(highMmioGapInMB) * _1MB;
+    request.Mmio.MaximumGuestAddressBits = 36;
 
     WSL_LOG(
         "InitializeSystemDistro",

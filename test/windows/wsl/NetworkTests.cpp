@@ -5982,11 +5982,11 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .kernelCommandLine = L"ipv6.disable=1"}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode(), .kernelCommandLine = L"ipv6.disable=1"}));
 
         auto [networkingMode, warnings] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --networking-mode", 0);
         VERIFY_IS_TRUE(warnings.empty());
-        VERIFY_ARE_EQUAL(wsl::shared::string::Trim(networkingMode), L"consomme");
+        VERIFY_ARE_EQUAL(wsl::shared::string::Trim(networkingMode), LxsstuOpenVmmMode() ? L"nat" : L"consomme");
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /proc/sys/net/ipv6"), 1L);
 
         const auto state = NetworkTests::GetInterfaceState(L"eth0");
@@ -6143,7 +6143,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
         WslKeepAlive keepAlive;
 
         constexpr uint16_t c_port = 1234;
@@ -6177,13 +6177,13 @@ class ConsommeTests
         CONSOMME_TEST_ONLY();
         WINHTTP_PROXY_TEST_ONLY();
 
-        const auto config = LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .autoProxy = true});
         auto restoreProxySettings = wil::scope_exit([&] { NetworkTests::ClearHttpProxySettings(true); });
         NetworkTests::SetHttpProxySettings(NetworkTests::c_httpProxyLocalhostv4, L"", L"", true);
 
         for (const bool localhostForwarding : {true, false})
         {
-            m_config->Update(config + std::format(L"localhostForwarding={}\n", localhostForwarding));
+            m_config->Update(LxssGenerateTestConfig(
+                {.networkingMode = ConsommeMode(), .localhostForwarding = localhostForwarding, .autoProxy = true}));
             NetworkTests::VerifyHttpProxyEnvVariables(localhostForwarding ? NetworkTests::c_httpProxyLocalhostv4 : L"", L"", L"");
         }
     }
@@ -6390,7 +6390,7 @@ class ConsommeTests
         CONSOMME_TEST_ONLY();
         DNS_TUNNELING_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .dnsTunneling = true}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode(), .dnsTunneling = true}));
         NetworkTests::VerifyDnsSuffixes();
     }
 };
