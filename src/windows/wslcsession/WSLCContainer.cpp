@@ -1673,7 +1673,11 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
         if (m_policyRestartPending)
         {
             CancelPolicyRestartLockHeld();
-            PersistManuallyStoppedLockHeld();
+            if (!m_wslcSession.IsTerminating())
+            {
+                PersistManuallyStoppedLockHeld();
+            }
+
             return;
         }
 
@@ -1721,6 +1725,10 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
             // In-flight requests suppress an exit before Docker responds. Only successful requests retain that intent.
             const auto runIteration = m_exitRequests.BeginRequest();
             bool requestSucceeded = false;
+
+            // Decided when the request is issued, so a session termination that begins while it is in flight
+            // does not discard the manual stop.
+            const bool manualStop = !m_wslcSession.IsTerminating();
             auto requestCleanup = wil::scope_exit([&]() {
                 if (!lock)
                 {
@@ -1729,7 +1737,7 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
 
                 if (m_exitRequests.CompleteRequest(runIteration, requestSucceeded))
                 {
-                    if (requestSucceeded)
+                    if (requestSucceeded && manualStop)
                     {
                         PersistManuallyStoppedLockHeld();
                     }
@@ -3476,7 +3484,9 @@ CATCH_LOG()
 
 void WSLCContainerImpl::PersistManuallyStoppedLockHeld() noexcept
 {
-    if (m_wslcSession.IsTerminating())
+    // Only the unless-stopped policy reads this state. Skipping the other policies also covers --rm containers,
+    // which may already be deleted by the time a stop request completes.
+    if (m_restartPolicy != WSLCContainerRestartPolicyUnlessStopped)
     {
         return;
     }

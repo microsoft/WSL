@@ -239,7 +239,7 @@ private:
     // Logs a failure to save the persisted state and warns the caller.
     void ReportStateSaveFailure(HRESULT Result) noexcept;
 
-    // Records that a stop or kill request ended the container, unless the session is terminating.
+    // Records that a stop or kill request ended the container. Callers skip requests issued by session termination.
     __requires_exclusive_lock_held(m_lock) void PersistManuallyStoppedLockHeld() noexcept;
 
     // Evaluates the restart policy for a run that ended with ExitCode against the persisted lifecycle state.

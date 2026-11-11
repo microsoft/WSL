@@ -8519,6 +8519,7 @@ sys.exit(1 if queries else 0)
         auto restore = ResetTestSession(); // Required to access the storage folder.
 
         constexpr auto c_sessionName = L"restart-policy-session-start-test";
+        size_t retryRuns = 0;
 
         {
             auto session = CreateSession(GetDefaultSessionSettings(c_sessionName, true));
@@ -8555,6 +8556,14 @@ sys.exit(1 if queries else 0)
             WaitForContainerRuns(failure, 2);
             WaitForContainerState(failure, WslcContainerStateExited);
             VerifyContainerStaysDown(failure);
+
+            // The session ends while this container is between runs or waiting for its automatic restart.
+            WSLCContainerLauncher retryLauncher(
+                "debian:latest", "test-on-failure-session-retry", {"sh", "-c", "echo run; exit 1"});
+            retryLauncher.SetRestartPolicy(WSLCContainerRestartPolicyOnFailure);
+            auto retry = retryLauncher.Launch(*session, WSLCContainerStartFlagsNone);
+            retry.SetDeleteOnClose(false);
+            retryRuns = WaitForContainerRuns(retry, 2);
         }
 
         auto session = CreateSession(GetDefaultSessionSettings(c_sessionName, true));
@@ -8564,6 +8573,7 @@ sys.exit(1 if queries else 0)
         auto created = OpenContainer(session.get(), "test-unless-stopped-session-created");
         auto success = OpenContainer(session.get(), "test-on-failure-session-success");
         auto failure = OpenContainer(session.get(), "test-on-failure-session-failure");
+        auto retry = OpenContainer(session.get(), "test-on-failure-session-retry");
 
         WaitForContainerState(running, WslcContainerStateRunning);
         VERIFY_ARE_EQUAL(std::string{"unless-stopped"}, running.Inspect().HostConfig.RestartPolicy.Name);
@@ -8574,6 +8584,10 @@ sys.exit(1 if queries else 0)
         VerifyContainerStaysDown(stopped);
         VerifyContainerStaysDown(success);
         VerifyContainerStaysDown(failure);
+
+        // An on-failure container whose last run failed resumes its restarts.
+        WaitForContainerRuns(retry, retryRuns + 1);
+        VERIFY_SUCCEEDED(retry.Get().Stop(WSLCSignalSIGKILL, 0));
     }
 
     static std::string ContainerStatePath(const std::string& ContainerId)
