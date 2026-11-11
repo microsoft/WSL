@@ -263,6 +263,21 @@ class Plan9ProtocolTests
         VERIFY_IS_TRUE(std::ranges::equal(c_versionResponse, response));
     }
 
+    WSL2_TEST_METHOD(UnknownMessageTypesRejected)
+    {
+        auto server = ConnectToServer();
+
+        for (const uint8_t type : {0, 10, 254, 255})
+        {
+            const auto response = SendMessageAndExpectResponse(
+                server.client.get(), MakePlan9Message(static_cast<Plan9MessageType>(type), {}), Plan9MessageType::Rlerror);
+            VERIFY_IS_TRUE(std::ranges::equal(c_invalidArgumentResponse, response));
+        }
+
+        const auto response = SendMessageAndExpectResponse(server.client.get(), c_versionRequest, Plan9MessageType::Rversion);
+        VERIFY_IS_TRUE(std::ranges::equal(c_versionResponse, response));
+    }
+
     WSL2_TEST_METHOD(SelfReferentialFlushCompletes)
     {
         auto server = ConnectToServer();

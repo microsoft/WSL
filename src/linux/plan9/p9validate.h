@@ -1132,7 +1132,7 @@ inline bool ValidateMessageStructure(MessageType messageType, gsl::span<const gs
     }
 
     default:
-        return true;
+        return false;
     }
 }
 
