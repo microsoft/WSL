@@ -35,6 +35,20 @@ std::wstring NormalizeSharePath(_In_ const std::filesystem::path& Path);
 //
 void AddPlan9SharePath(_In_ const wil::com_ptr<IPlan9FileSystem>& Server, _In_ PCWSTR AccessName, _In_ PCWSTR Path, _In_ UINT32 Flags);
 
+struct DirectoryObjectLifetime
+{
+    std::wstring Path;
+    // Directory objects are temporary, even if they have children, so need to keep
+    // any created handles open in order for the directory to remain accessible.
+    std::vector<wil::unique_handle> HierarchyLifetimes;
+};
+
+//
+// Creates \Sessions\<session>\BaseNamedObjects\WSL\<MachineId>\<RelativeRootPath> as the user, for a section-backed
+// virtio-fs device.
+//
+DirectoryObjectLifetime CreateSectionObjectRoot(_In_ std::wstring_view MachineId, _In_ std::wstring_view RelativeRootPath, _In_ HANDLE UserToken);
+
 //
 // Provides synchronized access to guest device operations.
 //
@@ -78,16 +92,6 @@ public:
     void RemoveGuestDevice(_In_ const GUID& InstanceId);
 
 private:
-    struct DirectoryObjectLifetime
-    {
-        std::wstring Path;
-        // Directory objects are temporary, even if they have children, so need to keep
-        // any created handles open in order for the directory to remain accessible.
-        std::vector<wil::unique_handle> HierarchyLifetimes;
-    };
-
-    DirectoryObjectLifetime CreateSectionObjectRoot(_In_ std::wstring_view RelativeRootPath, _In_ HANDLE UserToken) const;
-
     wil::srwlock m_lock;
     std::wstring m_machineId;
     wil::com_ptr<DeviceHostProxy> m_deviceHostSupport;

@@ -907,7 +907,7 @@ class NetworkTests
               L"fc00::1"}});
     }
 
-    WSL2_TEST_METHOD(MacAddressChangeAndBack)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(MacAddressChangeAndBack)
     {
         const auto originalMac = GetMacAddress();
 
@@ -1137,10 +1137,21 @@ class NetworkTests
 
         WslConfigChange config(LxssGenerateTestConfig({.dnsTunneling = true}));
 
-        VerifyDnsTunneling(c_dnsTunnelingDefaultIp);
+        // OpenVMM NAT resolves DNS through Consomme, which serves DNS on the gateway address.
+        if (LxsstuOpenVmmMode())
+        {
+            const auto state = GetInterfaceState(L"eth0");
+            VERIFY_IS_TRUE(state.Gateway.has_value());
+            VerifyDnsTunneling(state.Gateway.value());
+        }
+        else
+        {
+            VerifyDnsTunneling(c_dnsTunnelingDefaultIp);
+        }
     }
 
-    WSL2_TEST_METHOD(NatDnsTunnelingWithSpecificIp)
+    // OpenVMM NAT always serves DNS on the Consomme gateway address.
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatDnsTunnelingWithSpecificIp)
     {
         DNS_TUNNELING_TEST_ONLY();
 
@@ -1705,6 +1716,10 @@ class NetworkTests
     */
     WSL2_TEST_METHOD(LoopbackGetRoute)
     {
+        // OpenVMM configures loopback routing at boot when localhost forwarding is enabled.
+        WslConfigChange config(LxssGenerateTestConfig({.localhostForwarding = false}));
+        AdapterId = NetworkTests::QueryAdapterId();
+
         // Verify that before configurations are applied, the route chosen for 127.0.0.1 tcp/udp uses the local routing table
         const bool loopbackTcpUsesLocalTable =
             LxsstuLaunchWsl(L"ip route get from 127.0.0.1 127.0.0.1 ipproto tcp | grep local") == (DWORD)0;
@@ -1825,7 +1840,9 @@ class NetworkTests
         VERIFY_THROWS(wsl::core::networking::IsAcceptableNetworkRange(L"InvalidRange"), wil::ResultException);
     }
 
-    WSL2_TEST_METHOD(NatInvalidRange)
+    // TODO: OpenVMM NAT doesn't use an HNS network, so these tests are skipped there. OpenVMM needs equivalent behavior
+    // for the persisted NAT network range, gateway and address (including the fallback when they're invalid).
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatInvalidRange)
     {
         WslConfigChange config(LxssGenerateTestConfig());
         WriteNatConfiguration(L"InvalidRange", {}, {L"delete"});
@@ -1846,7 +1863,7 @@ class NetworkTests
         VERIFY_ARE_EQUAL(state.Gateway.value_or(L""), networkConfiguration.gatewayIpAddress);
     }
 
-    WSL2_TEST_METHOD(NatInvalidGateway)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatInvalidGateway)
     {
         WslConfigChange config(LxssGenerateTestConfig());
         WriteNatConfiguration({}, L"InvalidGateway", {});
@@ -1867,7 +1884,7 @@ class NetworkTests
         VERIFY_ARE_EQUAL(state.Gateway.value_or(L""), networkConfiguration.gatewayIpAddress);
     }
 
-    WSL2_TEST_METHOD(NatInvalidAddress)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatInvalidAddress)
     {
         WslConfigChange config(LxssGenerateTestConfig());
 
@@ -2003,6 +2020,12 @@ class NetworkTests
         int networkingModeVal = 0;
         WEX::TestExecution::TestData::TryGetValue(L"NetConfig", networkingModeVal);
         auto networkingMode = static_cast<wsl::core::NetworkingMode>(networkingModeVal);
+        if (LxsstuOpenVmmMode() && networkingMode != wsl::core::NetworkingMode::Nat)
+        {
+            LogSkipped("OpenVMM only supports NAT networking");
+            return;
+        }
+
         switch (networkingMode)
         {
         case wsl::core::NetworkingMode::Bridged:
@@ -2810,13 +2833,30 @@ class NetworkTests
 
         {
             // Validate that the guest received the correct data.
+            // N.B. Poll the pipe so lost traffic fails the test instead of blocking forever.
             std::string content(strlen(buffer), '\0');
 
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::minutes(1);
             DWORD totalRead{};
             while (totalRead < content.size())
             {
+                DWORD available{};
+                VERIFY_IS_TRUE(PeekNamedPipe(read, nullptr, 0, nullptr, &available, nullptr));
+                if (available == 0)
+                {
+                    if (std::chrono::steady_clock::now() > deadline)
+                    {
+                        LogError("Timed out waiting for the guest to receive relayed data");
+                        VERIFY_FAIL();
+                    }
+
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    continue;
+                }
+
                 DWORD bytesRead{};
-                VERIFY_IS_TRUE(ReadFile(read, content.data() + totalRead, static_cast<DWORD>(content.size()) - totalRead, &bytesRead, nullptr));
+                const DWORD toRead = std::min(available, static_cast<DWORD>(content.size()) - totalRead);
+                VERIFY_IS_TRUE(ReadFile(read, content.data() + totalRead, toRead, &bytesRead, nullptr));
                 LogInfo("Read %lu bytes", bytesRead);
 
                 totalRead += bytesRead;
@@ -2838,7 +2878,15 @@ class NetworkTests
         WslKeepAlive keepAlive;
 
         ValidateLocalhostRelayTraffic(AF_INET);
-        ValidateLocalhostRelayTraffic(AF_INET6);
+        if (LxsstuOpenVmmMode())
+        {
+            // Linux drops inbound packets addressed to ::1 on non-loopback interfaces, so OpenVMM NAT can't relay IPv6 loopback.
+            LogInfo("Skipping IPv6 loopback forwarding on OpenVMM NAT");
+        }
+        else
+        {
+            ValidateLocalhostRelayTraffic(AF_INET6);
+        }
     }
 
     WSL2_TEST_METHOD(NatLocalhostRelayDualStack)
@@ -2944,7 +2992,8 @@ class NetworkTests
         VERIFY_ARE_NOT_EQUAL(warnings.find(L"starting data transfer loop"), std::string::npos);
     }
 
-    WSL2_TEST_METHOD(NatNonRootNamespaceEphemeralBind)
+    // Requires GUI applications, which OpenVMM doesn't support yet.
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatNonRootNamespaceEphemeralBind)
     {
         // Because the test creates a new network namespace, the resolv.conf from the root network namespace
         // is copied in the resolv.conf of the new network namespace. The DNS tunneling listener running in the root namespace
@@ -3152,7 +3201,7 @@ class NetworkTests
         AddFirewallRuleAndValidateTraffic(hyperVBlockRule, expectedConnectivity);
     }
 
-    WSL2_TEST_METHOD(NatFirewallRulesExpectedBlock)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatFirewallRulesExpectedBlock)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig({.firewall = true}));
@@ -3161,7 +3210,7 @@ class NetworkTests
         FirewallRuleBlockedTests(FirewallTestConnectivity::Blocked);
     }
 
-    WSL2_TEST_METHOD(NatFirewallRulesExpectedBlockFirewallDisabled)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatFirewallRulesExpectedBlockFirewallDisabled)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         SKIP_TEST_UNSTABLE();
@@ -3172,7 +3221,7 @@ class NetworkTests
         FirewallRuleBlockedTests(FirewallTestConnectivity::Allowed);
     }
 
-    WSL2_TEST_METHOD(NatFirewallRulesExpectedBlockFirewallDisabledByPolicy)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatFirewallRulesExpectedBlockFirewallDisabledByPolicy)
     {
         HYPERV_FIREWALL_TEST_ONLY();
 
@@ -3212,7 +3261,7 @@ class NetworkTests
         AddFirewallRuleAndValidateTraffic(allowHyperVRule, expectedConnectivity);
     }
 
-    WSL2_TEST_METHOD(NatFirewallRulesExpectedAllow)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatFirewallRulesExpectedAllow)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig({.firewall = true}));
@@ -3221,7 +3270,7 @@ class NetworkTests
         FirewallRuleAllowedTests(FirewallTestConnectivity::Allowed);
     }
 
-    WSL2_TEST_METHOD(NatFirewallRulesExpectedAllowFirewallDisabled)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatFirewallRulesExpectedAllowFirewallDisabled)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         SKIP_TEST_UNSTABLE();
@@ -3299,7 +3348,7 @@ class NetworkTests
             blockRule, isHyperVFirewallEnabled ? FirewallTestConnectivity::Blocked : FirewallTestConnectivity::Allowed);
     }
 
-    WSL2_TEST_METHOD(NatFirewallRulesEnabledSetting)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatFirewallRulesEnabledSetting)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig({.firewall = true}));
@@ -3308,7 +3357,7 @@ class NetworkTests
         FirewallSettingEnabledTests(true);
     }
 
-    WSL2_TEST_METHOD(NatFirewallRulesEnabledSettingFirewallDisabled)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatFirewallRulesEnabledSettingFirewallDisabled)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         SKIP_TEST_UNSTABLE();
@@ -4301,7 +4350,7 @@ class GnsCallbackResultTests
 
 class MirroredTests
 {
-    WSL_TEST_CLASS(MirroredTests)
+    OPENVMM_UNSUPPORTED_TEST_CLASS(MirroredTests)
 
     std::optional<WslConfigChange> m_config;
     GUID AdapterId;
@@ -5699,7 +5748,7 @@ class MirroredTests
 
 class BridgedTests
 {
-    WSL_TEST_CLASS(BridgedTests)
+    OPENVMM_UNSUPPORTED_TEST_CLASS(BridgedTests)
 
     std::optional<WslConfigChange> m_config;
 
@@ -5830,6 +5879,12 @@ class ConsommeTests
 {
     WSL_TEST_CLASS(ConsommeTests)
 
+    // OpenVMM doesn't support the Consomme networking mode, but its NAT mode is backed by Consomme.
+    static wsl::core::NetworkingMode ConsommeMode()
+    {
+        return LxsstuOpenVmmMode() ? wsl::core::NetworkingMode::Nat : wsl::core::NetworkingMode::Consomme;
+    }
+
     std::optional<WslConfigChange> m_config;
 
     TEST_CLASS_SETUP(TestClassSetup)
@@ -5841,7 +5896,7 @@ class ConsommeTests
 
         if (LxsstuVmMode())
         {
-            m_config.emplace(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+            m_config.emplace(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
         }
 
         return true;
@@ -5860,7 +5915,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         // Verify that we have a working connection
         NetworkTests::GuestClient(L"tcp-connect:bing.com:80");
@@ -5870,7 +5925,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         if (!NetworkTests::HostHasInternetConnectivity(AF_INET))
         {
@@ -5885,7 +5940,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         if (!NetworkTests::HostHasInternetConnectivity(AF_INET6))
         {
@@ -5902,7 +5957,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         const auto state = NetworkTests::GetInterfaceState(L"eth0");
         VERIFY_IS_FALSE(state.V4Addresses.empty());
@@ -5952,7 +6007,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         // eth0 should have wsldevicehost's default client MAC. Update if that default changes.
         VERIFY_ARE_EQUAL(GetMacAddress(L"eth0"), std::wstring(L"00:00:00:00:01:00"));
@@ -5962,7 +6017,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         // Make sure the VM doesn't time out
         WslKeepAlive keepAlive;
@@ -6003,7 +6058,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         // Verify guest can connect to host on loopback (TCP only, UDP not supported)
         NetworkTests::VerifyLoopbackGuestToHost(L"127.0.0.1", IPPROTO_TCP);
@@ -6017,7 +6072,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         auto tcpPort = NetworkTests::BindGuestPort(L"TCP4-LISTEN:1234", true);
         auto udpPort = NetworkTests::BindGuestPort(L"UDP4-LISTEN:1234", true);
@@ -6027,7 +6082,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         auto udpPort = NetworkTests::BindHostPort(2345, SOCK_DGRAM, IPPROTO_UDP, true);
         auto tcpPort = NetworkTests::BindGuestPort(L"TCP4-LISTEN:2345", true);
@@ -6053,7 +6108,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         auto revertEphemeralPortRange = SetTestEphemeralPortRange();
 
@@ -6066,7 +6121,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         auto revertEphemeralPortRange = SetTestEphemeralPortRange();
 
@@ -6077,7 +6132,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         auto revertEphemeralPortRange = SetTestEphemeralPortRange();
 
@@ -6113,7 +6168,7 @@ class ConsommeTests
         CONSOMME_TEST_ONLY();
         WINHTTP_PROXY_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .autoProxy = true}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode(), .autoProxy = true}));
         NetworkTests::VerifyHttpProxySimple();
     }
 
@@ -6137,7 +6192,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         if (!NetworkTests::HostHasInternetConnectivity(AF_INET6))
         {
@@ -6213,7 +6268,7 @@ class ConsommeTests
         CONSOMME_TEST_ONLY();
         WINDOWS_11_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         // Make sure the VM doesn't time out
         WslKeepAlive keepAlive;
@@ -6241,7 +6296,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         if (!NetworkTests::HostHasInternetConnectivity(AF_INET6))
         {
@@ -6266,7 +6321,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .dnsTunneling = false}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode(), .dnsTunneling = false}));
         NetworkTests::VerifyDnsResolutionBasic();
     }
 
@@ -6274,7 +6329,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .dnsTunneling = false}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode(), .dnsTunneling = false}));
         NetworkTests::VerifyDnsResolutionDig();
     }
 
@@ -6282,7 +6337,7 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .dnsTunneling = false}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode(), .dnsTunneling = false}));
         NetworkTests::VerifyDnsResolutionRecordTypes();
     }
 
@@ -6291,7 +6346,7 @@ class ConsommeTests
         CONSOMME_TEST_ONLY();
         DNS_TUNNELING_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .dnsTunneling = true}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode(), .dnsTunneling = true}));
         NetworkTests::VerifyDnsResolutionBasic();
     }
 
@@ -6300,7 +6355,7 @@ class ConsommeTests
         CONSOMME_TEST_ONLY();
         DNS_TUNNELING_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .dnsTunneling = true}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode(), .dnsTunneling = true}));
         NetworkTests::VerifyDnsResolutionDig();
     }
 
@@ -6309,7 +6364,7 @@ class ConsommeTests
         CONSOMME_TEST_ONLY();
         DNS_TUNNELING_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .dnsTunneling = true}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode(), .dnsTunneling = true}));
         NetworkTests::VerifyDnsResolutionRecordTypes();
     }
 
@@ -6319,7 +6374,7 @@ class ConsommeTests
         CONSOMME_TEST_ONLY();
         DNS_TUNNELING_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .dnsTunneling = true}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode(), .dnsTunneling = true}));
 
         const auto state = NetworkTests::GetInterfaceState(L"eth0");
         VERIFY_IS_TRUE(state.Gateway.has_value());

@@ -169,6 +169,20 @@ if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/UserConfig.cmake")
     include("${CMAKE_CURRENT_LIST_DIR}/UserConfig.cmake")
 endif()
 
+set(WSL_OPENVMM_ROOT "" CACHE PATH "Local OpenVMM package directory containing bin/<platform>, lib/<platform>, and include")
+if (WSL_OPENVMM_ROOT)
+    get_filename_component(WSL_OPENVMM_SOURCE_DIR "${WSL_OPENVMM_ROOT}" ABSOLUTE)
+    foreach(artifact
+        "bin/${TARGET_PLATFORM}/openvmm.exe"
+        "bin/${TARGET_PLATFORM}/wslopenvmm.dll"
+        "lib/${TARGET_PLATFORM}/wslopenvmm.dll.lib"
+        "include/wslopenvmm.h")
+        if (NOT EXISTS "${WSL_OPENVMM_SOURCE_DIR}/${artifact}")
+            message(FATAL_ERROR "Local OpenVMM artifact not found: ${WSL_OPENVMM_SOURCE_DIR}/${artifact}")
+        endif()
+    endforeach()
+endif()
+
 if (WSL_DEVICEHOST_BIN)
     set(WSL_VIRTIO_NET_IDL_PATH "${WSL_DEVICEHOST_BIN}/WslDeviceHost.idl")
     set(WSL_DEVICE_HOST_DLL_PATH "${WSL_DEVICEHOST_BIN}/wsldevicehost.dll")
@@ -277,9 +291,13 @@ if (NOT WSL_DEVICEHOST_BIN)
     file(CREATE_LINK ${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.pdb ${BIN}/wsldevicehost.pdb)
 endif()
 
-# OpenVMM binaries are packaged directly from NuGet; retain PDBs for symbol publishing.
+# OpenVMM binaries are packaged directly from their source directory; retain available PDBs for symbol publishing.
 foreach(binary openvmm.pdb wslopenvmm.pdb)
-    file(CREATE_LINK "${WSL_OPENVMM_SOURCE_DIR}/bin/${TARGET_PLATFORM}/${binary}" "${BIN}/${binary}")
+    if (NOT WSL_OPENVMM_ROOT OR EXISTS "${WSL_OPENVMM_SOURCE_DIR}/bin/${TARGET_PLATFORM}/${binary}")
+        file(CREATE_LINK "${WSL_OPENVMM_SOURCE_DIR}/bin/${TARGET_PLATFORM}/${binary}" "${BIN}/${binary}")
+    else()
+        file(REMOVE "${BIN}/${binary}")
+    endif()
 endforeach()
 
 add_library(wslopenvmm_client SHARED IMPORTED GLOBAL)

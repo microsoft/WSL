@@ -29,10 +29,10 @@ GuestTelemetryLogger::~GuestTelemetryLogger()
     }
 }
 
-std::shared_ptr<GuestTelemetryLogger> GuestTelemetryLogger::Create(GUID VmId, const wil::unique_event& ExitEvent)
+std::shared_ptr<GuestTelemetryLogger> GuestTelemetryLogger::Create(GUID VmId, const wil::unique_event& ExitEvent, PSID PipeClientSid)
 {
     auto logger = std::shared_ptr<GuestTelemetryLogger>(new GuestTelemetryLogger(VmId));
-    logger->Start(ExitEvent);
+    logger->Start(ExitEvent, PipeClientSid);
     return logger;
 }
 
@@ -41,16 +41,12 @@ LPCWSTR GuestTelemetryLogger::GetPipeName() const
     return m_pipeName.c_str();
 }
 
-void GuestTelemetryLogger::Start(const wil::unique_event& ExitEvent)
+void GuestTelemetryLogger::Start(const wil::unique_event& ExitEvent, PSID PipeClientSid)
 {
     THROW_HR_IF(E_UNEXPECTED, !m_pipeName.empty());
 
     m_pipeName = wsl::windows::common::helpers::GetUniquePipeName();
-    wil::unique_hfile pipe(CreateNamedPipeW(
-        m_pipeName.c_str(), (PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED), (PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT), 1, LX_RELAY_BUFFER_SIZE, LX_RELAY_BUFFER_SIZE, 0, nullptr));
-
-    THROW_LAST_ERROR_IF(!pipe);
-
+    auto pipe = wsl::windows::common::helpers::CreatePipeServer(m_pipeName.c_str(), PipeClientSid);
     wil::unique_handle exitEvent(wsl::windows::common::wslutil::DuplicateHandle(ExitEvent.get()));
     m_thread = std::thread([this, Pipe = std::move(pipe), ExitEvent = std::move(exitEvent)]() {
         try

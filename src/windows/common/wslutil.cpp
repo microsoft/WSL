@@ -295,12 +295,12 @@ static const std::map<Context, LPCWSTR> g_contextStrings{
     X(CallMsi),
     X(Install),
     X(HCS),
+    X(OpenVMM),
     X(HNS),
     X(ReadDistroConfig),
     X(MoveDistro),
     X(VerifyChecksum),
-    X(WslC),
-    X(OpenVmm)};
+    X(WslC)};
 
 #undef X
 

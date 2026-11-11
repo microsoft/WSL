@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include "GuestConnector.h"
 #include "helpers.hpp"
 #include "Stringify.h"
 #include "svccomm.hpp"
@@ -146,7 +147,7 @@ private:
     _In_opt_ HANDLE InteropHandle,
     _In_opt_ HANDLE EventHandle,
     _In_opt_ HANDLE ParentHandle,
-    _In_opt_ LPCGUID VmId,
+    _In_opt_ const wsl::windows::common::GuestConnector* Connector,
     _In_opt_ HANDLE UserToken,
     _In_opt_ HANDLE JobObject = nullptr)
 {
@@ -158,7 +159,12 @@ private:
     // Format the command line.
     ProcessLauncher launcher((path / L"wslhost.exe").c_str());
     launcher.AddGuidOption(wslhost::distro_id_option, DistroId);
-    launcher.AddGuidOption(wslhost::vm_id_option, VmId);
+    if (Connector)
+    {
+        const auto serialized = Connector->Serialize();
+        launcher.AddOption(wslhost::guest_connection_option, std::format(L"\"{}\"", serialized).c_str());
+    }
+
     launcher.AddHandleOption(wslhost::handle_option, InteropHandle);
     launcher.AddHandleOption(wslhost::event_option, EventHandle);
     launcher.AddHandleOption(wslhost::parent_option, ParentHandle);
@@ -296,6 +302,34 @@ wil::unique_handle wsl::windows::common::helpers::CreateKillOnCloseJob()
     THROW_IF_WIN32_BOOL_FALSE(SetInformationJobObject(job.get(), JobObjectExtendedLimitInformation, &jobInfo, sizeof(jobInfo)));
 
     return job;
+}
+
+wil::unique_hfile wsl::windows::common::helpers::CreatePipeServer(_In_ LPCWSTR PipeName, _In_opt_ PSID ClientSid)
+{
+    wil::unique_hlocal_security_descriptor securityDescriptor;
+    SECURITY_ATTRIBUTES attributes{sizeof(attributes), nullptr, FALSE};
+    if (ClientSid != nullptr)
+    {
+        const auto sid = wslutil::SidToString(ClientSid);
+        const auto sddl = std::format(L"D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;{})", sid.get());
+        THROW_IF_WIN32_BOOL_FALSE(
+            ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.c_str(), SDDL_REVISION_1, &securityDescriptor, nullptr));
+
+        attributes.lpSecurityDescriptor = securityDescriptor.get();
+    }
+
+    wil::unique_hfile pipe{CreateNamedPipeW(
+        PipeName,
+        (PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED),
+        (PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT),
+        1,
+        LX_RELAY_BUFFER_SIZE,
+        LX_RELAY_BUFFER_SIZE,
+        0,
+        ClientSid != nullptr ? &attributes : nullptr)};
+
+    THROW_LAST_ERROR_IF(!pipe);
+    return pipe;
 }
 
 std::vector<gsl::byte> wsl::windows::common::helpers::GenerateConfigurationMessage(
@@ -609,25 +643,17 @@ void wsl::windows::common::helpers::LaunchDebugConsole(
     _In_ HANDLE InteropHandle,
     _In_opt_ HANDLE EventHandle,
     _In_opt_ HANDLE ParentHandle,
-    _In_opt_ LPCGUID VmId,
+    _In_opt_ const GuestConnector* Connector,
     _In_opt_ HANDLE UserToken,
     _In_opt_ HANDLE JobObject)
 {
-    return LaunchWslHost(DistroId, InteropHandle, EventHandle, ParentHandle, VmId, UserToken, JobObject);
+    return LaunchWslHost(DistroId, InteropHandle, EventHandle, ParentHandle, Connector, UserToken, JobObject);
 }
 
 void wsl::windows::common::helpers::LaunchKdRelay(
-    _In_ LPCWSTR PipeName, _In_ HANDLE UserToken, _In_ int Port, _In_ HANDLE ExitEvent, _In_ bool DisableTelemetry, _In_opt_ HANDLE JobObject)
+    _In_ LPCWSTR PipeName, _In_ HANDLE UserToken, _In_ int Port, _In_ HANDLE ExitEvent, _In_ bool DisableTelemetry, _In_opt_ HANDLE JobObject, _In_opt_ PSID PipeClientSid)
 {
-    // Create a new pipe server. The pipe should be:
-    //     Bi-directional: PIPE_ACCESS_DUPLEX
-    //     Asynchronous: FILE_FLAG_OVERLAPPED
-    //     Raw: PIPE_TYPE_BYTE | PIPE_READMODE_BYTE
-    //     Blocking: PIPE_WAIT
-    const wil::unique_hfile pipe{CreateNamedPipeW(
-        PipeName, (PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED), (PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT), 1, LX_RELAY_BUFFER_SIZE, LX_RELAY_BUFFER_SIZE, 0, nullptr)};
-
-    THROW_LAST_ERROR_IF(!pipe);
+    const auto pipe = CreatePipeServer(PipeName, PipeClientSid);
 
     LaunchWslRelayFlags flags = LaunchWslRelayFlags::ConnectPipe;
     WI_SetFlagIf(flags, LaunchWslRelayFlags::DisableTelemetry, DisableTelemetry);

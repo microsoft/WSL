@@ -5,7 +5,13 @@ parameters:
   - name: version
     type: string
 
+  - name: backend
+    type: string
+
   - name: image
+    type: string
+
+  - name: test_map_suffix
     type: string
 
   - name: run
@@ -20,8 +26,8 @@ parameters:
     default: ''
 
 jobs:
-  - job: test_${{ parameters.branch }}_${{ parameters.version }}
-    displayName: "${{ parameters.version }} tests - ${{ parameters.branch }}${{ iif(parameters.server, ' (server)', '') }}"
+  - job: test_${{ parameters.branch }}_${{ parameters.version }}_${{ parameters.backend }}
+    displayName: "${{ parameters.version }} ${{ parameters.backend }} tests - ${{ parameters.branch }}${{ iif(parameters.server, ' (server)', '') }}"
     dependsOn: []
     condition: and(succeeded(), eq('${{ parameters.run }}', true))
     variables:
@@ -37,12 +43,12 @@ jobs:
       pool: ${{ parameters.pool }}
     steps:
       - task: CloudTestServerBuildTask@2
-        displayName: "${{ parameters.version }} tests - ${{ parameters.branch }}${{ iif(parameters.server, ' (server)', '') }}"
+        displayName: "${{ parameters.version }} ${{ parameters.backend }} tests - ${{ parameters.branch }}${{ iif(parameters.server, ' (server)', '') }}"
         inputs:
-          displayName: "${{ parameters.version }} tests - ${{ parameters.branch }}${{ iif(parameters.server, ' (server)', '') }}"
+          displayName: "${{ parameters.version }} ${{ parameters.backend }} tests - ${{ parameters.branch }}${{ iif(parameters.server, ' (server)', '') }}"
           connectedServiceName: "CloudTest-PROD"
           cloudTestTenant: "wsl"
-          testMapLocation: 'testbin\x64\cloudtest\wsl-test-image-${{ parameters.image }}-${{ parameters.version}}\TestMap.xml'
+          testMapLocation: 'testbin\x64\cloudtest\wsl-test-image-${{ parameters.image }}-${{ parameters.test_map_suffix}}\TestMap.xml'
           pipelineArtifactName: "drop_wsl_build"
           pipelineArtifactBuildUrl: '$(System.TaskDefinitionsUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)'
           buildDropArtifactName: ""

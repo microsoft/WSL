@@ -100,6 +100,11 @@ VmGuestListener::VmGuestListener(wil::unique_socket ListenerSocket) noexcept : S
 {
 }
 
+BackendKind SelectVirtualMachineBackendKind(bool EnableOpenVmm) noexcept
+{
+    return EnableOpenVmm ? BackendKind::OpenVmm : BackendKind::Hcs;
+}
+
 std::unique_ptr<IVirtualMachineBackend> CreateVirtualMachineBackend(BackendKind Kind, const VmCreateRequest& Request)
 {
     switch (Kind)

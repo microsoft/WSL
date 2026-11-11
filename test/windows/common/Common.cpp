@@ -478,6 +478,14 @@ Return Value:
     return g_VmMode;
 }
 
+// Returns true when the tests run with /p:OpenVmm=1, i.e. against the OpenVMM backend instead of HCS.
+bool LxsstuOpenVmmMode()
+{
+    WEX::Common::String openVmmArg;
+    WEX::TestExecution::RuntimeParameters::TryGetValue(L"OpenVmm", openVmmArg);
+    return !openVmmArg.IsEmpty() && openVmmArg != L"0";
+}
+
 // LxsstuLaunchPowershellAndCaptureOutput
 
 std::pair<std::wstring, std::wstring> LxsstuLaunchPowershellAndCaptureOutput(_In_ const std::wstring& Cmd, _In_ int ExpectedExitCode)
@@ -1517,6 +1525,16 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         return value;
     };
 
+    // Run with /p:OpenVmm=1 to exercise the OpenVMM backend instead of HCS. OpenVMM doesn't support GPU,
+    // nested virtualization, virtio-9p/Plan9 or aggregate virtio-fs shares, so defaults are adjusted unless a test overrides them.
+    const bool openVmm = LxsstuOpenVmmMode();
+    if (openVmm)
+    {
+        Default.drvFsMode = Default.drvFsMode.value_or(DrvFsMode::VirtioFs);
+        Default.virtioFsAggregateShares = Default.virtioFsAggregateShares.value_or(false);
+        Default.nestedVirtualization = Default.nestedVirtualization.value_or(false);
+    }
+
     std::wstring newConfig =
         L"[wsl2]\n"
         L"crashDumpFolder=" +
@@ -1532,6 +1550,7 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         L"telemetry=false\n" +
         boolOptionToString(L"safeMode", Default.safeMode, false) + boolOptionToString(L"guiApplications", Default.guiApplications, true) +
         boolOptionToString(L"earlyBootLogging", Default.earlyBootLogging, false) +
+        boolOptionToString(L"localhostForwarding", Default.localhostForwarding, true) +
         networkingModeToString(Default.networkingMode) + drvFsModeToString(Default.drvFsMode);
 
     if (Default.kernel.has_value())
@@ -1638,6 +1657,16 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         newConfig += L"\n[experimental]\n";
         newConfig += boolOptionToString(L"virtioFsAggregateShares", Default.virtioFsAggregateShares, true);
         newConfig += L"[wsl2]\n";
+    }
+
+    if (openVmm)
+    {
+        newConfig += L"\ngpuSupport=false\n\n[experimental]\nopenVmm=true\n[wsl2]\n";
+    }
+
+    if (Default.nestedVirtualization.has_value())
+    {
+        newConfig += boolOptionToString(L"nestedVirtualization", Default.nestedVirtualization, false);
     }
 
     // TODO: Remove once SetVersion() truncated archive error is root caused.
@@ -2541,23 +2570,24 @@ std::wstring GetBlockDeviceInWsl(ULONGLONG SizeBytes)
     bool done = false;
     while (true)
     {
-        for (wchar_t name = 'a'; name < 'z'; name++)
+        for (const std::wstring_view prefix : {L"sd", L"vd"})
         {
-            std::wstring cmd = L"-u root blockdev --getsize64 /dev/sd";
-            cmd += name;
-
-            std::wstring out;
-            try
+            for (wchar_t name = 'a'; name < 'z'; name++)
             {
-                out = LxsstuLaunchWslAndCaptureOutput(cmd.data()).first;
-            }
-            CATCH_LOG()
+                const auto device = std::format(L"/dev/{}{}", prefix, name);
+                const auto cmd = L"-u root blockdev --getsize64 " + device;
+                std::wstring out;
+                try
+                {
+                    out = LxsstuLaunchWslAndCaptureOutput(cmd.data()).first;
+                }
+                CATCH_LOG()
 
-            Trim(out);
-
-            if (out == expectedSize)
-            {
-                return std::wstring(L"/dev/sd") + name;
+                Trim(out);
+                if (out == expectedSize)
+                {
+                    return device;
+                }
             }
         }
 

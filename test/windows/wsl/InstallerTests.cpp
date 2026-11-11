@@ -41,7 +41,7 @@ class InstallerTests
     wil::unique_hfile nulDevice{CreateFileW(
         L"nul", GENERIC_READ, (FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE), nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
 
-    WSL_TEST_CLASS(InstallerTests)
+    BACKEND_AGNOSTIC_TEST_CLASS(InstallerTests)
 
     TEST_CLASS_SETUP(TestClassSetup)
     {

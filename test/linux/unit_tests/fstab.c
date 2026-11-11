@@ -15,8 +15,20 @@ Abstract:
 #include "lxtcommon.h"
 #include "unittests.h"
 #include <libmount/libmount.h>
+#include <limits.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
+#include <strings.h>
+#include <unistd.h>
 
 #define LXT_NAME "fstab"
+
+//
+// Init records the Windows path backing each virtiofs tag as a symlink in this directory.
+//
+
+#define FSTAB_VIRTIOFS_TAG_DIR "/run/wsl/virtiofs"
 
 LXT_VARIATION_HANDLER FsTabTestMount;
 
@@ -53,6 +65,63 @@ Return Value:
 ErrorExit:
     LxtUninitialize();
     return !LXT_SUCCESS(Result);
+}
+
+static bool FsTabIsVirtioFsDriveC(const char* Source, const char* Root)
+
+/*++
+
+Routine Description:
+
+    This routine determines whether a virtiofs mount is backed by C:.
+
+Arguments:
+
+    Source - Supplies the mount source (the virtiofs tag).
+
+    Root - Supplies the mount root.
+
+Return Value:
+
+    true if the mount is backed by C:, false otherwise.
+
+--*/
+
+{
+    char LinkPath[PATH_MAX];
+    char MappingName[PATH_MAX];
+    ssize_t Size;
+    char Target[PATH_MAX];
+
+    if (Source == NULL)
+    {
+        return false;
+    }
+
+    //
+    // Aggregate devices use the drvfs or drvfsa tag and expose each share as a
+    // child directory, so the mapping name is the first component of the root.
+    //
+
+    if (((strcmp(Source, "drvfs") == 0) || (strcmp(Source, "drvfsa") == 0)) && (Root != NULL) && (Root[0] == '/'))
+    {
+        snprintf(MappingName, sizeof(MappingName), "%s", Root + 1);
+        MappingName[strcspn(MappingName, "/")] = '\0';
+    }
+    else
+    {
+        snprintf(MappingName, sizeof(MappingName), "%s", Source);
+    }
+
+    snprintf(LinkPath, sizeof(LinkPath), "%s/%s", FSTAB_VIRTIOFS_TAG_DIR, MappingName);
+    Size = readlink(LinkPath, Target, sizeof(Target) - 1);
+    if (Size < 0)
+    {
+        return false;
+    }
+
+    Target[Size] = '\0';
+    return strncasecmp(Target, "C:", 2) == 0;
 }
 
 int FsTabTestMount(PLXT_ARGS Args)
@@ -126,7 +195,7 @@ Return Value:
         else if (strcmp(FsType, "virtiofs") == 0)
         {
             Source = mnt_fs_get_source(FileSystem);
-            if (strcasestr(Source, "drvfsaC") == Source)
+            if (FsTabIsVirtioFsDriveC(Source, mnt_fs_get_root(FileSystem)))
             {
                 LxtCheckTrue(!Found);
                 LxtCheckStringEqual(Options, "rw");

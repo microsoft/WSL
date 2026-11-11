@@ -54,18 +54,6 @@ std::wstring GetDaclAces(const std::filesystem::path& Path)
     return firstAce == std::wstring::npos ? std::wstring{} : dacl.substr(firstAce);
 }
 
-// Tests require elevation, so the test process token is the elevated counterpart of
-// GetNonElevatedToken() and stands in for an administrator's DrvFs share.
-wil::unique_handle GetElevatedTestToken()
-{
-    wil::unique_handle token;
-    THROW_IF_WIN32_BOOL_FALSE(OpenProcessToken(GetCurrentProcess(), TOKEN_ALL_ACCESS, &token));
-    wil::unique_handle impersonationToken;
-    THROW_IF_WIN32_BOOL_FALSE(
-        DuplicateTokenEx(token.get(), TOKEN_ALL_ACCESS, nullptr, SecurityImpersonation, TokenImpersonation, &impersonationToken));
-    return impersonationToken;
-}
-
 VmDiskRequest CreateDiskRequest(const std::filesystem::path& Path, std::optional<UINT32> Lun = std::nullopt)
 {
     VmDiskRequest request;
@@ -94,7 +82,9 @@ namespace HcsVirtualMachineBackendTests {
 class HcsVirtualMachineBackendTests
 {
     // Device-host COM proxies can remain loaded until process exit; isolate them from installer tests.
-    WSL_TEST_CLASS_WITH_PROPERTIES(HcsVirtualMachineBackendTests, TEST_CLASS_PROPERTY(L"IsolationLevel", L"Class"))
+    WSL_TEST_CLASS_WITH_PROPERTIES(
+        HcsVirtualMachineBackendTests,
+        TEST_CLASS_PROPERTY(L"IsolationLevel", L"Class") TEST_CLASS_PROPERTY(L"TestCategory", L"BackendAgnostic"))
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
@@ -108,6 +98,12 @@ class HcsVirtualMachineBackendTests
         CoFreeUnusedLibrariesEx(0, 0);
         VERIFY_ARE_EQUAL(0, WSACleanup());
         return true;
+    }
+
+    TEST_METHOD(SelectsBackendFromExperimentalFlag)
+    {
+        VERIFY_ARE_EQUAL(BackendKind::Hcs, SelectVirtualMachineBackendKind(false));
+        VERIFY_ARE_EQUAL(BackendKind::OpenVmm, SelectVirtualMachineBackendKind(true));
     }
 
     TEST_METHOD(FileSystemRequestsDefaultToVirtioFs)
@@ -169,11 +165,14 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(request.Boot.KernelCommandLine, description.Boot.KernelCommandLine);
         const auto capabilities = backend->GetCapabilities();
         VERIFY_ARE_EQUAL(BackendKind::Hcs, capabilities.Backend);
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::MemoryOvercommit)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::DeferredMemoryCommit)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::ColdDiscard)));
+        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::HighMmio)));
         VERIFY_ARE_EQUAL(
-            wsl::windows::common::helpers::IsWindows11OrAbove(),
-            capabilities.Features.test(static_cast<size_t>(VmFeature::SavedStateOnCrash)));
+            wsl::windows::common::helpers::IsVmemmSuffixSupported(),
+            capabilities.Features.test(static_cast<size_t>(VmFeature::HostingProcessNameSuffix)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::SerialConsole)));
-        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::VirtioConsole)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::VirtioFsFileBacked)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::UserModeNatNetwork)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::TcpPortBinding)));

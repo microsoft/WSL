@@ -155,7 +155,7 @@ void GuestDeviceManager::RemoveRemoteFileSystem(_In_ REFCLSID clsid, _In_ std::w
 GUID GuestDeviceManager::AddSharedMemoryDevice(_In_ PCWSTR Tag, _In_ PCWSTR Path, _In_ UINT32 SizeMb, _In_ HANDLE UserToken)
 {
     auto guestDeviceLock = m_lock.lock_exclusive();
-    auto objectLifetime = CreateSectionObjectRoot(Path, UserToken);
+    auto objectLifetime = CreateSectionObjectRoot(m_machineId, Path, UserToken);
 
     const auto instanceId =
         m_deviceHostSupport->AddVirtiofsDevice(UserToken, Tag, objectLifetime.Path, VirtiofsShareKind_SectionBacked, SizeMb, L"");
@@ -165,7 +165,7 @@ GUID GuestDeviceManager::AddSharedMemoryDevice(_In_ PCWSTR Tag, _In_ PCWSTR Path
     return instanceId;
 }
 
-GuestDeviceManager::DirectoryObjectLifetime GuestDeviceManager::CreateSectionObjectRoot(_In_ std::wstring_view RelativeRootPath, _In_ HANDLE UserToken) const
+DirectoryObjectLifetime CreateSectionObjectRoot(_In_ std::wstring_view MachineId, _In_ std::wstring_view RelativeRootPath, _In_ HANDLE UserToken)
 {
     auto revert = wil::impersonate_token(UserToken);
     DWORD sessionId;
@@ -178,7 +178,7 @@ GuestDeviceManager::DirectoryObjectLifetime GuestDeviceManager::CreateSectionObj
     {
         sectionPathBuilder << L"\\Sessions\\" << sessionId;
     }
-    sectionPathBuilder << L"\\BaseNamedObjects\\WSL\\" << m_machineId << L"\\" << RelativeRootPath;
+    sectionPathBuilder << L"\\BaseNamedObjects\\WSL\\" << MachineId << L"\\" << RelativeRootPath;
     auto sectionPath = sectionPathBuilder.str();
 
     UNICODE_STRING ntPath{};

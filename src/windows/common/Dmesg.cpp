@@ -43,23 +43,26 @@ DmesgCollector::~DmesgCollector()
 }
 
 std::shared_ptr<DmesgCollector> DmesgCollector::Create(
-    GUID VmId, HANDLE ExitEvent, bool EnableTelemetry, bool EnableDebugConsole, const std::wstring& Com1PipeName, bool EnableEarlyBootConsole, wil::unique_handle&& OutputHandle)
+    GUID VmId,
+    HANDLE ExitEvent,
+    bool EnableTelemetry,
+    bool EnableDebugConsole,
+    const std::wstring& Com1PipeName,
+    bool EnableEarlyBootConsole,
+    wil::unique_handle&& OutputHandle,
+    PSID ConsolePipeClientSid)
 {
     auto dmesgCollector = std::shared_ptr<DmesgCollector>(
         new DmesgCollector(VmId, ExitEvent, EnableTelemetry, EnableDebugConsole, Com1PipeName, std::move(OutputHandle)));
 
-    dmesgCollector->Start(EnableEarlyBootConsole);
+    dmesgCollector->Start(EnableEarlyBootConsole, ConsolePipeClientSid);
     return dmesgCollector;
 }
 
-std::pair<std::wstring, wil::unique_hfile> DmesgCollector::CreateConsolePipe()
+std::pair<std::wstring, wil::unique_hfile> DmesgCollector::CreateConsolePipe(PSID ClientSid)
 {
     std::wstring pipeName = wsl::windows::common::helpers::GetUniquePipeName();
-    wil::unique_hfile pipe(CreateNamedPipeW(
-        pipeName.c_str(), (PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED), (PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT), 1, LX_RELAY_BUFFER_SIZE, LX_RELAY_BUFFER_SIZE, 0, nullptr));
-
-    THROW_LAST_ERROR_IF(!pipe);
-
+    auto pipe = wsl::windows::common::helpers::CreatePipeServer(pipeName.c_str(), ClientSid);
     return {std::move(pipeName), std::move(pipe)};
 }
 
@@ -195,7 +198,7 @@ void DmesgCollector::ProcessInput(InputSource Source, const gsl::span<char>& Inp
     }
 }
 
-void DmesgCollector::Start(bool EnableEarlyBootConsole)
+void DmesgCollector::Start(bool EnableEarlyBootConsole, PSID ConsolePipeClientSid)
 {
     if (!m_com1PipeName.empty())
     {
@@ -226,10 +229,10 @@ void DmesgCollector::Start(bool EnableEarlyBootConsole)
 
     if (EnableEarlyBootConsole)
     {
-        std::tie(m_earlyConsoleName, m_earlyConsolePipe) = CreateConsolePipe();
+        std::tie(m_earlyConsoleName, m_earlyConsolePipe) = CreateConsolePipe(ConsolePipeClientSid);
     }
 
-    std::tie(m_virtioConsoleName, m_virtioConsolePipe) = CreateConsolePipe();
+    std::tie(m_virtioConsoleName, m_virtioConsolePipe) = CreateConsolePipe(ConsolePipeClientSid);
 
     m_thread = std::thread([this]() { Run(); });
 }
