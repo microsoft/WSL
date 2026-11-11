@@ -9425,5 +9425,44 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
 
         VerifyOutput(L"--exec wsl-exec-path-test", L"found");
     }
+
+    WSL2_TEST_METHOD(MissingWindowsStdinDeliversEof)
+    {
+        const auto installPath = wsl::windows::common::wslutil::GetMsiPackagePath();
+        const auto wslPath = installPath.value() + L"wsl.exe";
+
+        for (const auto stdinHandle : {static_cast<HANDLE>(nullptr), INVALID_HANDLE_VALUE})
+        {
+            auto [stdoutRead, stdoutWrite] = CreateSubprocessPipe(false, true);
+            auto [stderrRead, stderrWrite] = CreateSubprocessPipe(false, true);
+            auto commandLine = std::format(L"\"{}\" --exec /bin/sh -c \"cat && printf stdout && printf stderr >&2 && exit 42\"", wslPath);
+
+            STARTUPINFOW startupInfo{};
+            startupInfo.cb = sizeof(startupInfo);
+            startupInfo.dwFlags = STARTF_USESTDHANDLES;
+            startupInfo.hStdInput = stdinHandle;
+            startupInfo.hStdOutput = stdoutWrite.get();
+            startupInfo.hStdError = stderrWrite.get();
+
+            wil::unique_process_information processInfo;
+            VERIFY_WIN32_BOOL_SUCCEEDED(CreateProcessW(
+                wslPath.c_str(), commandLine.data(), nullptr, nullptr, TRUE, DETACHED_PROCESS, nullptr, nullptr, &startupInfo, &processInfo));
+            auto cleanup = wil::scope_exit_log(
+                WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(TerminateProcess(processInfo.hProcess, 1)); });
+
+            stdoutWrite.reset();
+            stderrWrite.reset();
+            VERIFY_ARE_EQUAL(WAIT_OBJECT_0, WaitForSingleObject(processInfo.hProcess, 30000));
+            cleanup.release();
+            VERIFY_ARE_EQUAL(42u, wsl::windows::common::SubProcess::GetExitCode(processInfo.hProcess, 0));
+
+            std::array<char, 32> buffer{};
+            DWORD bytesRead{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(ReadFile(stdoutRead.get(), buffer.data(), static_cast<DWORD>(buffer.size()), &bytesRead, nullptr));
+            VERIFY_ARE_EQUAL(std::string("stdout"), std::string(buffer.data(), bytesRead));
+            VERIFY_WIN32_BOOL_SUCCEEDED(ReadFile(stderrRead.get(), buffer.data(), static_cast<DWORD>(buffer.size()), &bytesRead, nullptr));
+            VERIFY_ARE_EQUAL(std::string("stderr"), std::string(buffer.data(), bytesRead));
+        }
+    }
 };
 } // namespace UnitTests
