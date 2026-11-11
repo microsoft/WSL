@@ -1248,6 +1248,10 @@ See recovery instructions on: https://aka.ms/wsldiskmountrecovery</value>
     <value>WSL installation is blocked because Windows Installer is busy. Wait for other software installations to finish, then retry.</value>
     <comment>{Locked="WSL"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageRootSchedulerProcessorGroups" xml:space="preserve">
+    <value>This system has multiple processor groups and uses the Hyper-V root scheduler, which may limit the CPU cores available to WSL. Consider switching to the core scheduler. Please see https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/manage/manage-hyper-v-scheduler-types for details.</value>
+    <comment>{Locked="Hyper-V"}{Locked="WSL"}{Locked="root"}{Locked="core"}{Locked="https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/manage/manage-hyper-v-scheduler-types"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Something went wrong. Try again later.</value>
   </data>

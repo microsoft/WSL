@@ -28,6 +28,7 @@ Abstract:
 #include "ConsommeNetworking.h"
 
 #include <TraceLoggingProvider.h>
+#include <winevt.h>
 
 using msl::utilities::SafeInt;
 using wsl::windows::common::helpers::WindowsBuildNumbers;
@@ -74,6 +75,55 @@ RequiredExtraMmioSpaceForPmemFileInMb(_In_ PCWSTR FilePath)
 
     // Convert from bytes to megabytes. Ensure that we don't truncate a 512kb file to 0mb.
     return std::max(fileSizeBytes.QuadPart / static_cast<INT64>(_1MB), 1i64);
+}
+
+void WarnIfProcessorGroupsAreLimited()
+{
+    try
+    {
+        const auto groupCount = GetActiveProcessorGroupCount();
+        THROW_LAST_ERROR_IF(groupCount == 0);
+        if (groupCount == 1)
+        {
+            return;
+        }
+
+        // https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/manage/manage-hyper-v-scheduler-types#determine-the-current-scheduler-type
+        using unique_evt_handle = wil::unique_any<EVT_HANDLE, decltype(&EvtClose), EvtClose>;
+        constexpr auto query = L"*[System[Provider[@Name='Microsoft-Windows-Hyper-V-Hypervisor'] and EventID=2]]";
+        const unique_evt_handle events{EvtQuery(nullptr, L"System", query, EvtQueryChannelPath | EvtQueryReverseDirection)};
+        THROW_LAST_ERROR_IF(!events);
+
+        unique_evt_handle event;
+        DWORD returned{};
+        if (!EvtNext(events.get(), 1, &event, 1000, 0, &returned))
+        {
+            const auto error = GetLastError();
+            if (error == ERROR_NO_MORE_ITEMS)
+            {
+                return;
+            }
+
+            THROW_WIN32(error);
+        }
+
+        PCWSTR valuePath = L"Event/EventData/Data[@Name='SchedulerType']";
+        const unique_evt_handle context{EvtCreateRenderContext(1, &valuePath, EvtRenderContextValues)};
+        THROW_LAST_ERROR_IF(!context);
+
+        EVT_VARIANT schedulerType{};
+        DWORD bufferUsed{};
+        DWORD propertyCount{};
+        THROW_IF_WIN32_BOOL_FALSE(EvtRender(
+            context.get(), event.get(), EvtRenderEventValues, sizeof(schedulerType), &schedulerType, &bufferUsed, &propertyCount));
+
+        // 4: Root scheduler.
+        if (propertyCount == 1 && schedulerType.Type == EvtVarTypeHexInt32 && schedulerType.UInt32Val == 4)
+        {
+            EMIT_USER_WARNING(Localization::MessageRootSchedulerProcessorGroups());
+        }
+    }
+    CATCH_LOG();
 }
 } // namespace
 
@@ -406,6 +456,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
         throw;
     }
+
+    WarnIfProcessorGroupsAreLimited();
 
     // Add GPUs to the utility VM.
     if (m_vmConfig.EnableGpuSupport)

@@ -73,6 +73,7 @@ target_link_libraries(wslservice
                       legacy_stdio_definitions
                       VirtDisk.lib
                       Winhttp.lib
+                      Wevtapi.lib
                       Synchronization.lib
                       yaml-cpp)
 
