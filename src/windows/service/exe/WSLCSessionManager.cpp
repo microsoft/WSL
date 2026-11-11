@@ -40,8 +40,6 @@ Abstract:
 #include "APICompat.h"
 #include "Localization.h"
 #include "HcsVirtualMachineBackend.h"
-#include "NatNetworking.h"
-#include "ConsommeNetworking.h"
 
 extern wsl::windows::service::PluginManager g_pluginManager;
 
@@ -56,85 +54,6 @@ namespace apicompat = wsl::windows::common::apicompat;
 namespace settings = wsl::windows::wslc::settings;
 
 namespace {
-
-wsl::windows::service::wslc::WSLCVirtualMachineBackendFactory CreateHcsVirtualMachineFactory()
-{
-    return [](const VmCreateRequest& request) {
-        auto backend = HcsVirtualMachineBackend::Create(request);
-        auto* hcsBackend = backend.get();
-
-        wsl::windows::service::wslc::WSLCVirtualMachineResources resources{};
-        resources.Backend = std::move(backend);
-        resources.NetworkingFactory = [hcsBackend](
-                                          IVirtualMachineBackend&,
-                                          const wsl::windows::service::wslc::WSLCNetworkingRequest& networkingRequest,
-                                          wsl::core::GnsChannel&& gnsChannel,
-                                          wil::unique_socket&& dnsSocket,
-                                          HANDLE userToken) {
-            using namespace wsl::windows::service::wslc;
-
-            THROW_HR_IF(E_INVALIDARG, networkingRequest.Mode != WSLCNetworkingModeNAT && networkingRequest.Mode != WSLCNetworkingModeConsomme);
-
-            WSLCNetworking networking{};
-            if (networkingRequest.Mode == WSLCNetworkingModeNAT)
-            {
-                networking.Config = std::make_unique<wsl::core::Config>(nullptr);
-                if (!wsl::core::NatNetworking::IsHyperVFirewallSupported(*networking.Config))
-                {
-                    networking.Config->FirewallConfig.reset();
-                }
-
-                if (networkingRequest.EnableDnsTunneling)
-                {
-                    networking.Config->EnableDnsTunneling = true;
-                    in_addr address{};
-                    WI_VERIFY(inet_pton(AF_INET, LX_INIT_DNS_TUNNELING_IP_ADDRESS, &address) == 1);
-                    networking.Config->DnsTunnelingIpAddress = address.S_un.S_addr;
-                }
-
-                networking.Engine = std::make_unique<wsl::core::NatNetworking>(
-                    hcsBackend->GetComputeSystemHandle(),
-                    wsl::core::NatNetworking::CreateNetwork(*networking.Config),
-                    std::move(gnsChannel),
-                    *networking.Config,
-                    std::move(dnsSocket),
-                    nullptr);
-            }
-            else
-            {
-                auto flags = wsl::core::ConsommeNetworkingFlags::Ipv6;
-                if (networkingRequest.EnableDnsTunneling)
-                {
-                    WI_SetFlag(flags, wsl::core::ConsommeNetworkingFlags::DnsTunneling);
-                }
-
-                if (networkingRequest.EnableLocalhostRelay)
-                {
-                    WI_SetFlag(flags, wsl::core::ConsommeNetworkingFlags::LocalhostRelay);
-                }
-
-                auto consomme = std::make_unique<wsl::core::ConsommeNetworking>(
-                    std::move(gnsChannel),
-                    flags,
-                    nullptr,
-                    networkingRequest.HostLoopback.c_str(),
-                    hcsBackend->GetGuestDeviceManager(),
-                    wil::shared_handle{wslutil::DuplicateHandle(userToken)});
-                auto* consommePtr = consomme.get();
-                networking.Engine = std::move(consomme);
-                networking.MapPort = [consommePtr](const SOCKADDR_INET& listenAddress, USHORT guestPort, int protocol, USHORT* allocatedHostPort) {
-                    return consommePtr->MapPort(listenAddress, guestPort, protocol, allocatedHostPort);
-                };
-                networking.UnmapPort = [consommePtr](const SOCKADDR_INET& listenAddress, USHORT guestPort, int protocol) {
-                    return consommePtr->UnmapPort(listenAddress, guestPort, protocol);
-                };
-            }
-
-            return networking;
-        };
-        return resources;
-    };
-}
 
 // Session settings built server-side from the caller's settings.yaml.
 struct SessionSettings
@@ -420,7 +339,7 @@ void WSLCSessionManagerImpl::CreateSession(
 
         // Create the VM factory in the SYSTEM service (privileged). The per-user session
         // uses it to create VMs on demand and recreate them after idle-termination.
-        auto vmFactory = Microsoft::WRL::Make<WSLCVirtualMachineFactory>(Settings, CreateHcsVirtualMachineFactory());
+        auto vmFactory = Microsoft::WRL::Make<WSLCVirtualMachineFactory>(Settings, HcsVirtualMachineBackend::Create);
 
         // Launch per-user COM server factory and add it to a fresh per-session job object for crash cleanup.
         auto factory = wslutil::CreateComServerAsUser<IWSLCSessionFactory>(__uuidof(WSLCSessionFactory), userToken.get());

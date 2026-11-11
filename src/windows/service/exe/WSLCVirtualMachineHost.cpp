@@ -20,6 +20,10 @@ Abstract:
 #include "wslutil.h"
 #include "lxinitshared.h"
 #include "DnsResolver.h"
+#include "GnsChannel.h"
+#include "HcsVirtualMachineBackend.h"
+#include "NatNetworking.h"
+#include "ConsommeNetworking.h"
 #include "string.hpp"
 
 using namespace wsl::windows::common;
@@ -194,12 +198,9 @@ WSLCVirtualMachineHost::WSLCVirtualMachineHost(_In_ const WSLCSessionSettings* S
     addBootDisk(L"root", rootVhdPath, Settings->RootVhdOverride != nullptr);
     addBootDisk(L"kernel-modules", kernelModulesPath, false);
 
-    auto resources = BackendFactory(request);
-    m_backend = std::move(resources.Backend);
+    m_backend = BackendFactory(request);
     auto cleanupBackendOnFailure = wil::scope_exit([&] { m_backend.reset(); });
-    m_networkingFactory = std::move(resources.NetworkingFactory);
     THROW_IF_NULL_ALLOC(m_backend);
-    THROW_HR_IF(E_INVALIDARG, !m_networkingFactory);
     m_backend->RegisterTerminationCallback([this](GUID) { m_vmExitEvent.SetEvent(); });
 
     m_guestListener = m_backend->CreateGuestListener(GuestServicePort{LX_INIT_UTILITY_VM_INIT_PORT});
@@ -218,8 +219,17 @@ WSLCVirtualMachineHost::~WSLCVirtualMachineHost()
     // The guest normally exits after the session closes its mini_init channel.
     const bool forceTerminate = !m_vmExitEvent.wait(30000);
     WSL_LOG("WSLCTerminateVm", TraceLoggingValue(forceTerminate, "forced"));
-    m_networking.reset();
-    const auto userToken = m_backend ? m_backend->GetDescription().Identity.UserToken : wil::shared_handle{};
+    if (forceTerminate)
+    {
+        try
+        {
+            m_backend->Terminate();
+        }
+        CATCH_LOG()
+    }
+
+    m_networkingEngine.reset();
+    const auto userToken = m_backend->GetDescription().Identity.UserToken;
     m_backend.reset();
     if (!m_bootFilesPath.empty())
     {
@@ -263,7 +273,7 @@ HRESULT WSLCVirtualMachineHost::ConfigureNetworking(_In_ HANDLE GnsSocket, _In_o
 try
 {
     std::lock_guard lock(m_lock);
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED), m_networking.has_value());
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED), m_networkingEngine != nullptr);
 
     if (m_networkingMode == WSLCNetworkingModeNone)
     {
@@ -295,39 +305,54 @@ try
     }
 
     const auto description = m_backend->GetDescription();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), description.Backend != BackendKind::Hcs);
+
+    // The existing networking engines still need HCS and GuestDeviceManager, as in WslCoreVm.
+    auto& hcsBackend = static_cast<HcsVirtualMachineBackend&>(*m_backend);
     if (m_networkingMode == WSLCNetworkingModeNAT)
     {
-        WSLCNetworkingRequest request{};
-        request.Mode = WSLCNetworkingModeNAT;
-        request.EnableDnsTunneling = FeatureEnabled(WslcFeatureFlagsDnsTunneling);
-        m_networking = m_networkingFactory(
-            *m_backend,
-            request,
+        m_natConfig.emplace(nullptr);
+        if (!wsl::core::NatNetworking::IsHyperVFirewallSupported(*m_natConfig))
+        {
+            m_natConfig->FirewallConfig.reset();
+        }
+
+        if (FeatureEnabled(WslcFeatureFlagsDnsTunneling))
+        {
+            m_natConfig->EnableDnsTunneling = true;
+            in_addr address{};
+            WI_VERIFY(inet_pton(AF_INET, LX_INIT_DNS_TUNNELING_IP_ADDRESS, &address) == 1);
+            m_natConfig->DnsTunnelingIpAddress = address.S_un.S_addr;
+        }
+
+        m_networkingEngine = std::make_unique<wsl::core::NatNetworking>(
+            hcsBackend.GetComputeSystemHandle(),
+            wsl::core::NatNetworking::CreateNetwork(*m_natConfig),
             wsl::core::GnsChannel(std::move(gnsSocketHandle)),
+            *m_natConfig,
             std::move(dnsSocketHandle),
-            description.Identity.UserToken.get());
+            nullptr);
     }
     else if (m_networkingMode == WSLCNetworkingModeConsomme)
     {
-        WSLCNetworkingRequest request{};
-        request.Mode = WSLCNetworkingModeConsomme;
-        request.EnableDnsTunneling = FeatureEnabled(WslcFeatureFlagsDnsTunneling);
-        request.EnableLocalhostRelay = !FeatureEnabled(WslcFeatureFlagsPortRelayWslRelay);
-        request.HostLoopback = m_hostLoopback;
-        m_networking = m_networkingFactory(
-            *m_backend,
-            request,
+        auto flags = wsl::core::ConsommeNetworkingFlags::Ipv6;
+        WI_SetFlagIf(flags, wsl::core::ConsommeNetworkingFlags::DnsTunneling, FeatureEnabled(WslcFeatureFlagsDnsTunneling));
+        WI_SetFlagIf(flags, wsl::core::ConsommeNetworkingFlags::LocalhostRelay, !FeatureEnabled(WslcFeatureFlagsPortRelayWslRelay));
+
+        m_networkingEngine = std::make_unique<wsl::core::ConsommeNetworking>(
             wsl::core::GnsChannel(std::move(gnsSocketHandle)),
-            std::move(dnsSocketHandle),
-            description.Identity.UserToken.get());
+            flags,
+            nullptr,
+            m_hostLoopback.c_str(),
+            hcsBackend.GetGuestDeviceManager(),
+            description.Identity.UserToken);
     }
     else
     {
         THROW_HR_MSG(E_INVALIDARG, "Invalid networking mode: %lu", m_networkingMode);
     }
 
-    THROW_IF_NULL_ALLOC(m_networking->Engine);
-    m_networking->Engine->Initialize();
+    m_networkingEngine->Initialize();
 
     return S_OK;
 }
@@ -500,8 +525,10 @@ try
 
     std::lock_guard lock(m_lock);
 
-    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), !m_networking.has_value() || !m_networking->MapPort);
-    return m_networking->MapPort(CreateListenAddress(ListenAddress, HostPort), GuestPort, Protocol, AllocatedHostPort);
+    RETURN_HR_IF(
+        HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), !m_networkingEngine || m_networkingMode != WSLCNetworkingModeConsomme);
+    const auto& consomme = static_cast<wsl::core::ConsommeNetworking&>(*m_networkingEngine);
+    return consomme.MapPort(CreateListenAddress(ListenAddress, HostPort), GuestPort, Protocol, AllocatedHostPort);
 }
 CATCH_RETURN()
 
@@ -512,8 +539,10 @@ try
 
     std::lock_guard lock(m_lock);
 
-    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), !m_networking.has_value() || !m_networking->UnmapPort);
-    return m_networking->UnmapPort(CreateListenAddress(ListenAddress, HostPort), GuestPort, Protocol);
+    RETURN_HR_IF(
+        HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), !m_networkingEngine || m_networkingMode != WSLCNetworkingModeConsomme);
+    const auto& consomme = static_cast<wsl::core::ConsommeNetworking&>(*m_networkingEngine);
+    return consomme.UnmapPort(CreateListenAddress(ListenAddress, HostPort), GuestPort, Protocol);
 }
 CATCH_RETURN()
 

@@ -18,7 +18,6 @@ Abstract:
 #include "wslc.h"
 #include "IVirtualMachineBackend.h"
 #include "Dmesg.h"
-#include "GnsChannel.h"
 #include "INetworkingEngine.h"
 #include "RuntimeClass.h"
 #include "WslCoreConfig.h"
@@ -29,32 +28,7 @@ Abstract:
 
 namespace wsl::windows::service::wslc {
 
-struct WSLCNetworkingRequest
-{
-    WSLCNetworkingMode Mode = WSLCNetworkingModeNAT;
-    bool EnableDnsTunneling = false;
-    bool EnableLocalhostRelay = false;
-    std::string HostLoopback;
-};
-
-struct WSLCNetworking
-{
-    std::unique_ptr<wsl::core::Config> Config;
-    std::unique_ptr<wsl::core::INetworkingEngine> Engine;
-    std::function<HRESULT(const SOCKADDR_INET&, USHORT, int, _Out_ USHORT*)> MapPort;
-    std::function<HRESULT(const SOCKADDR_INET&, USHORT, int)> UnmapPort;
-};
-
-using WSLCNetworkingFactory =
-    std::function<WSLCNetworking(IVirtualMachineBackend&, const WSLCNetworkingRequest&, wsl::core::GnsChannel&&, wil::unique_socket&&, HANDLE)>;
-
-struct WSLCVirtualMachineResources
-{
-    std::unique_ptr<IVirtualMachineBackend> Backend;
-    WSLCNetworkingFactory NetworkingFactory;
-};
-
-using WSLCVirtualMachineBackendFactory = std::function<WSLCVirtualMachineResources(const VmCreateRequest&)>;
+using WSLCVirtualMachineBackendFactory = std::function<std::unique_ptr<IVirtualMachineBackend>(const VmCreateRequest&)>;
 
 class WSLCVirtualMachineHost
     : public common::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCVirtualMachine, IFastRundown>
@@ -97,8 +71,8 @@ private:
     VmGuestListener m_guestListener;
     wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};
     std::shared_ptr<DmesgCollector> m_dmesgCollector;
-    std::optional<WSLCNetworking> m_networking;
-    WSLCNetworkingFactory m_networkingFactory;
+    std::optional<wsl::core::Config> m_natConfig;
+    std::unique_ptr<wsl::core::INetworkingEngine> m_networkingEngine;
 };
 
 //

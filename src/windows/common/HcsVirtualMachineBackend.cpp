@@ -870,6 +870,8 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
             return;
         }
 
+        // A user attach must not reuse a VM-managed disk: its LUN may be used for formatting,
+        // and detaching it would remove a disk the VM still needs.
         if (passThrough || (Request.UserDisk && !found->second.UserDisk))
         {
             THROW_HR_WITH_USER_ERROR(WSL_E_DISK_ALREADY_ATTACHED, wsl::shared::Localization::MessageDiskAlreadyAttached(path.c_str()));
