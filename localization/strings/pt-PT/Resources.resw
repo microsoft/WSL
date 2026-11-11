@@ -958,7 +958,7 @@ A reverter para a rede NAT.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
-    <value>Foi detetada uma configuração de proxy de localhost, mas não foi espelhada no WSL. O WSL no modo NAT não suporta proxies de localhost.</value>
+    <value>Foi detetada uma configuração de proxy de localhost, mas não foi espelhada no WSL. Este endereço de proxy não é suportado pela configuração de rede atual.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
@@ -1198,7 +1198,7 @@ Este pedido excederá o tempo limite dentro de 60 segundos.</value>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
 Código de erro: {}
-Se este erro foi inesperado, considere procurar problemas existentes ou arquivar um novo problema no https://github.com/microsoft/WSL/issues.</value>
+Se este erro foi inesperado, considere procurar por problemas existentes ou registrar um novo problema em https://github.com/microsoft/WSL/issues</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">
