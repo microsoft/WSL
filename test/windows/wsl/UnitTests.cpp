@@ -9401,5 +9401,48 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
 
         VerifyOutput(L"--exec wsl-exec-path-test", L"found");
     }
+
+    WSL2_TEST_METHOD(ClosedStdinPreservesOutputAndExitStatus)
+    {
+        using wsl::windows::common::SubProcess;
+        constexpr DWORD c_timeout = 30 * 1000;
+        constexpr auto c_command =
+            L"--exec /bin/bash -c \"set -e; read -r -t 30 initial; exec 0<&-; echo ready; "
+            L"sleep 1; echo stdout; echo stderr >&2; exit 42\"";
+
+        auto [input, write] = CreateSubprocessPipe(true, false);
+        auto [outputRead, outputWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+        auto [errorRead, errorWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+        wsl::windows::common::helpers::SetHandleInheritable(outputWrite.get());
+        wsl::windows::common::helpers::SetHandleInheritable(errorWrite.get());
+        PartialHandleRead outputReader{std::move(outputRead)};
+        PartialHandleRead errorReader{std::move(errorRead)};
+
+        SubProcess process(nullptr, LxssGenerateWslCommandLine(c_command).c_str());
+        process.SetStdHandles(input.get(), outputWrite.get(), errorWrite.get());
+        const auto handle = process.Start();
+        input.reset();
+        outputWrite.reset();
+        errorWrite.reset();
+        auto cleanup = wil::scope_exit([&]() { write.reset(); });
+
+        auto writeInput = [&](std::string_view data) {
+            DWORD written{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(write.get(), data.data(), static_cast<DWORD>(data.size()), &written, nullptr));
+            VERIFY_ARE_EQUAL(data.size(), written);
+        };
+
+        writeInput("initial\n");
+        outputReader.ExpectConsume("ready\n");
+        writeInput("extra\n");
+        write.reset();
+
+        VERIFY_ARE_EQUAL(42u, SubProcess::GetExitCode(handle.get(), c_timeout));
+        outputReader.ExpectClosed(c_timeout);
+        errorReader.ExpectClosed(c_timeout);
+        VERIFY_ARE_EQUAL(outputReader.GetData(), "stdout\n");
+        VERIFY_ARE_EQUAL(errorReader.GetData(), "stderr\n");
+        cleanup.release();
+    }
 };
 } // namespace UnitTests
