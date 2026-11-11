@@ -88,8 +88,9 @@ private:
     std::wstring m_trackedDefaultRouteIpv6;
     networking::DnsInfo m_trackedDnsSettings{};
 
-    // Note: this field must be destroyed first to stop the callbacks before any other field is destroyed.
+    // Note: these fields must be destroyed first to stop the callbacks before any other field is destroyed.
     networking::unique_notify_handle m_networkNotifyHandle;
+    std::optional<networking::DnsSuffixRegistryWatcher> m_dnsSuffixRegistryWatcher;
 };
 
 } // namespace wsl::core

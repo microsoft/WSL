@@ -73,25 +73,25 @@
                 "FriendlyName": "openSUSE Tumbleweed",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20260724.0/openSUSE-Tumbleweed-20260723.x86_64-3.101-Build3.101.wsl",
-                    "Sha256": "0xf25d304c4e359af8dfdbba61d31eb8899b16e6008d3d8cd903ccaef253a76f22"
+                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20261103.0/openSUSE-Tumbleweed-20261102.x86_64-3.329-Build3.329.wsl",
+                    "Sha256": "0x8dc758983be62edd24ff55f5f0c99df211925b48d73b33765acc01b1967ce314"
                 },
                 "Arm64Url": {
-                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20260724.0/openSUSE-Tumbleweed-20260723.aarch64-4.86-Build4.86.wsl",
-                    "Sha256": "0xcab2a1a28b673e9078a4f1dce0f559f04db60a83dc664105ce49dd91d5b86a4b"
+                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20261103.0/openSUSE-Tumbleweed-20261102.aarch64-4.273-Build4.273.wsl",
+                    "Sha256": "0x66997b5b1376ee488c1ea5ead74f841224f3fa00c42167ef5763fecd23adb01a"
                 }
             },
             {
-                "Name": "openSUSE-Leap-16.0",
-                "FriendlyName": "openSUSE Leap 16.0",
+                "Name": "openSUSE-Leap-16.1",
+                "FriendlyName": "openSUSE Leap 16.1",
                 "Default": false,
                 "Amd64Url": {
-                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20251001.0/openSUSE-Leap-16.0-16.0.x86_64-22.57-Build22.57.wsl",
-                    "Sha256": "0x0d1faa095153beee0a9b5089b0f9aa3d2aec95e2cdcffdeeff84dd54c48b8393"
+                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20261103.0/openSUSE-Leap-16.1-16.1.x86_64-26.34-Build26.34.wsl",
+                    "Sha256": "0xf37cb553c0eef8727585c4b52e6b4013fe95a31e2ea24da9cf15881026f09dba"
                 },
                 "Arm64Url": {
-                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20251001.0/openSUSE-Leap-16.0-16.0.aarch64-22.57-Build22.57.wsl",
-                    "Sha256": "0x91bcdc7e9f42d7a60a4464ad867d91243aaaecab7b3a057039f77a989daac51e"
+                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20261103.0/openSUSE-Leap-16.1-16.1.aarch64-26.34-Build26.34.wsl",
+                    "Sha256": "0x15e7b13350875719ac743c541112f71707307bbe308fdf87629ac23edfd8160d"
                 }
             }
         ],
@@ -240,9 +240,22 @@
         ],
         "Fedora": [
             {
+                "Name": "FedoraLinux-45",
+                "FriendlyName": "Fedora Linux 45",
+                "Default": true,
+                "Amd64Url": {
+                    "Url": "https://download.fedoraproject.org/pub/fedora/linux/releases/45/Container/x86_64/images/Fedora-WSL-Base-45-1.4.x86_64.wsl",
+                    "Sha256": "d20e476140d4cb121b85b1ad2b8fd6bf9fc2750140a7212ad4051ae3c6bd1e23"
+                },
+                "Arm64Url": {
+                    "Url": "https://download.fedoraproject.org/pub/fedora/linux/releases/45/Container/aarch64/images/Fedora-WSL-Base-45-1.4.aarch64.wsl",
+                    "Sha256": "9a25779562113c10ce8f480857217d52f6a386cee2301752d2a34a320e8fd35c"
+                }
+            },
+            {
                 "Name": "FedoraLinux-44",
                 "FriendlyName": "Fedora Linux 44",
-                "Default": true,
+                "Default": false,
                 "Amd64Url": {
                     "Url": "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Container/x86_64/images/Fedora-WSL-Base-44-1.7.x86_64.wsl",
                     "Sha256": "2e5b153ba4b639952bf546be577fc19b832fe8944caa7de342b32f10da7d319a"
@@ -250,19 +263,6 @@
                 "Arm64Url": {
                     "Url": "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Container/aarch64/images/Fedora-WSL-Base-44-1.7.aarch64.wsl",
                     "Sha256": "1a3220262dc918b07d08410278205fb35e92c28a53455382028eea1a980476ee"
-                }
-            },
-            {
-                "Name": "FedoraLinux-43",
-                "FriendlyName": "Fedora Linux 43",
-                "Default": false,
-                "Amd64Url": {
-                    "Url": "https://download.fedoraproject.org/pub/fedora/linux/releases/43/Container/x86_64/images/Fedora-WSL-Base-43-1.6.x86_64.wsl",
-                    "Sha256": "220780af9cf225e9645313b4c7b0457a26a38a53285eb203b2ab6188d54d5b82"
-                },
-                "Arm64Url": {
-                    "Url": "https://download.fedoraproject.org/pub/fedora/linux/releases/43/Container/aarch64/images/Fedora-WSL-Base-43-1.6.aarch64.wsl",
-                    "Sha256": "7eef7a83260218d8c878b3c7bbdaf11772103145184d0c65df27557f4cd49548"
                 }
             }
         ],
@@ -356,8 +356,8 @@
             "StoreAppId": "9MSSK2ZXXN11",
             "Amd64": true,
             "Arm64": true,
-            "Amd64PackageUrl": "https://github.com/openSUSE/WSL-instarball/releases/download/v20260724.0/openSUSE-Tumbleweed-20260723-WSL.x86_64-26204.10.458.0-Build10.458.appx",
-            "Arm64PackageUrl": "https://github.com/openSUSE/WSL-instarball/releases/download/v20260724.0/openSUSE-Tumbleweed-20260723-WSL.aarch64-26204.10.358.0-Build10.358.appx",
+            "Amd64PackageUrl": "https://github.com/openSUSE/WSL-instarball/releases/download/v20261103.0/openSUSE-Tumbleweed-20261102-WSL.x86_64-26306.10.763.0-Build10.763.appx",
+            "Arm64PackageUrl": "https://github.com/openSUSE/WSL-instarball/releases/download/v20261103.0/openSUSE-Tumbleweed-20261102-WSL.aarch64-26306.10.579.0-Build10.579.appx",
             "PackageFamilyName": "46932SUSE.openSUSETumbleweed_022rs5jcyhyac"
         }
     ]

@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "computenetwork.h"
 #include "Common.h"
+#include "LxssHttpProxy.h"
 #include "wslpolicies.h"
 #include "hns_schema.h"
 #include "WslCoreNetworkEndpointSettings.h"
@@ -1020,19 +1021,20 @@ class NetworkTests
 
     static void VerifyDnsSuffixes()
     {
-        bool foundSuffix = false;
+        WslKeepAlive keepAlive;
 
         // Verify global DNS suffixes are reflected in Linux
         auto [outGlobal, errGlobal] = LxsstuLaunchPowershellAndCaptureOutput(
             L"Get-DnsClientGlobalSetting | Select-Object -Property SuffixSearchList | ForEach-Object {$_.SuffixSearchList}");
 
         const std::wstring separators = L" \n\t\r";
+        std::vector<std::wstring> quotedOriginalSuffixes;
 
         for (const auto& suffix : wsl::shared::string::SplitByMultipleSeparators(outGlobal, separators))
         {
             if (!suffix.empty())
             {
-                foundSuffix = true;
+                quotedOriginalSuffixes.emplace_back(std::format(L"'{}'", std::regex_replace(suffix, std::wregex(L"'"), L"''")));
                 // use grep -F as suffixes can contain '.'
                 VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"cat /etc/resolv.conf | grep search | grep -F " + suffix), static_cast<DWORD>(0));
             }
@@ -1046,28 +1048,39 @@ class NetworkTests
         {
             if (!suffix.empty())
             {
-                foundSuffix = true;
                 // use grep -F as suffixes can contain '.'
                 VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"cat /etc/resolv.conf | grep search | grep -F " + suffix), static_cast<DWORD>(0));
             }
         }
 
-        // No suffix was found - configure a dummy global suffix, verify it's reflected in Linux, then delete it
-        if (!foundSuffix)
-        {
-            LxsstuLaunchPowershellAndCaptureOutput(L"Set-DnsClientGlobalSetting -SuffixSearchList @('test.com')");
-            auto restoreGlobalSuffixes = wil::scope_exit(
-                [&] { LxsstuLaunchPowershellAndCaptureOutput(L"Set-DnsClientGlobalSetting -SuffixSearchList @()"); });
+        // Verify DNS suffix changes are reflected in Linux without restarting WSL
+        const auto restoreCommand = std::format(
+            L"Set-DnsClientGlobalSetting -SuffixSearchList @({}) -ErrorAction Stop", wsl::shared::string::Join(quotedOriginalSuffixes, L','));
+        auto restoreGlobalSuffixes =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { LxsstuLaunchPowershellAndCaptureOutput(restoreCommand); });
 
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+        GUID suffixId{};
+        VERIFY_SUCCEEDED(CoCreateGuid(&suffixId));
+        const auto testSuffix = std::format(
+            L"wsl-{}.invalid", wsl::shared::string::GuidToString<wchar_t>(suffixId, wsl::shared::string::GuidToStringFlags::None));
 
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"cat /etc/resolv.conf | grep search | grep -F test.com"), static_cast<DWORD>(0));
+        const auto verifySuffix = [&](bool present) {
+            VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+                [&] {
+                    const auto [contents, error] = LxsstuLaunchWslAndCaptureOutput(L"cat /etc/resolv.conf", 0);
+                    THROW_HR_IF(E_PENDING, (contents.find(testSuffix) != std::wstring::npos) != present);
+                },
+                std::chrono::milliseconds(100),
+                std::chrono::seconds(30)));
+        };
 
-            LxsstuLaunchPowershellAndCaptureOutput(L"Set-DnsClientGlobalSetting -SuffixSearchList @()");
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+        LxsstuLaunchPowershellAndCaptureOutput(
+            std::format(L"Set-DnsClientGlobalSetting -SuffixSearchList @('{}') -ErrorAction Stop", testSuffix));
+        verifySuffix(true);
 
-            VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(L"cat /etc/resolv.conf | grep search | grep -F test.com"), static_cast<DWORD>(0));
-        }
+        LxsstuLaunchPowershellAndCaptureOutput(restoreCommand);
+        restoreGlobalSuffixes.release();
+        verifySuffix(false);
     }
 
     static void VerifyEtcHosts()
@@ -4220,6 +4233,40 @@ class NetworkTests
                                            : static_cast<int>(wsl::shared::conncheck::ConnCheckStatus::FailureSocketConnect);
         RunGns(ncsiDnsOnlyName, AdapterId, LxGnsMessageConnectTestRequest, testErrorCode);
     }
+
+    TEST_METHOD(HttpProxyRestoredAfterNatFallback)
+    {
+        WINHTTP_PROXY_TEST_ONLY();
+        VERIFY_SUCCEEDED(HttpProxyStateTracker::s_LoadWinHttpProxyMethods());
+
+        auto restoreProxySettings = wil::scope_exit([&] { ClearHttpProxySettings(true); });
+        SetHttpProxySettings(c_httpProxyLocalhostv4, c_httpProxyBypassString, L"", true);
+
+        wil::unique_handle userToken;
+        VERIFY_WIN32_BOOL_SUCCEEDED(OpenProcessToken(GetCurrentProcess(), TOKEN_DUPLICATE | TOKEN_QUERY, &userToken));
+        HttpProxyStateTracker tracker(10000, userToken.get(), wsl::core::NetworkingMode::Nat, true);
+
+        auto settings = tracker.WaitForInitialProxySettings();
+        VERIFY_IS_TRUE(settings.has_value());
+        VERIFY_IS_TRUE(settings->Proxy.empty());
+        VERIFY_IS_TRUE(settings->SecureProxy.empty());
+        VERIFY_IS_TRUE(settings->ProxyBypasses.empty());
+        VERIFY_IS_TRUE(settings->ProxyBypassesComma.empty());
+        VERIFY_IS_TRUE(settings->UnsupportedProxyDropReason == UnsupportedProxyReason::LoopbackNotSupported);
+
+        tracker.ConfigureNetworkingMode(wsl::core::NetworkingMode::Consomme, true);
+
+        settings = tracker.WaitForInitialProxySettings();
+        const auto expectedProxy = wsl::shared::string::WideToMultiByte(c_httpProxyLocalhostv4);
+        const auto expectedBypass = wsl::shared::string::WideToMultiByte(c_httpProxyBypassString);
+        VERIFY_IS_TRUE(settings.has_value());
+        VERIFY_ARE_EQUAL(expectedProxy, settings->Proxy);
+        VERIFY_ARE_EQUAL(expectedProxy, settings->SecureProxy);
+        VERIFY_ARE_EQUAL(size_t{1}, settings->ProxyBypasses.size());
+        VERIFY_ARE_EQUAL(expectedBypass, settings->ProxyBypasses.front());
+        VERIFY_ARE_EQUAL(expectedBypass, settings->ProxyBypassesComma);
+        VERIFY_IS_TRUE(settings->UnsupportedProxyDropReason == UnsupportedProxyReason::Supported);
+    }
 };
 
 class GnsCallbackResultTests
@@ -6070,6 +6117,22 @@ class ConsommeTests
         NetworkTests::VerifyHttpProxySimple();
     }
 
+    WSL2_TEST_METHOD(HttpProxyLoopback)
+    {
+        CONSOMME_TEST_ONLY();
+        WINHTTP_PROXY_TEST_ONLY();
+
+        const auto config = LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .autoProxy = true});
+        auto restoreProxySettings = wil::scope_exit([&] { NetworkTests::ClearHttpProxySettings(true); });
+        NetworkTests::SetHttpProxySettings(NetworkTests::c_httpProxyLocalhostv4, L"", L"", true);
+
+        for (const bool localhostForwarding : {true, false})
+        {
+            m_config->Update(config + std::format(L"localhostForwarding={}\n", localhostForwarding));
+            NetworkTests::VerifyHttpProxyEnvVariables(localhostForwarding ? NetworkTests::c_httpProxyLocalhostv4 : L"", L"", L"");
+        }
+    }
+
     WSL2_TEST_METHOD(ConfigurationV6)
     {
         CONSOMME_TEST_ONLY();
@@ -6265,6 +6328,15 @@ class ConsommeTests
 
         VERIFY_ARE_NOT_EQUAL(
             LxsstuLaunchWsl(L"cat /etc/resolv.conf | grep nameserver | grep -F " + c_dnsTunnelingDefaultIp), static_cast<DWORD>(0));
+    }
+
+    WSL2_TEST_METHOD(DnsTunnelingVerifySuffixes)
+    {
+        CONSOMME_TEST_ONLY();
+        DNS_TUNNELING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .dnsTunneling = true}));
+        NetworkTests::VerifyDnsSuffixes();
     }
 };
 } // namespace NetworkTests

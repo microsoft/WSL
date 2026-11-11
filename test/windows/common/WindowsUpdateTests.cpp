@@ -485,6 +485,7 @@ struct MockUpdateDownloader : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WR
 
     wil::com_ptr_nothrow<MockDownloadResult> downloadResult = wil::MakeOrThrow<MockDownloadResult>();
     wil::com_ptr<IUpdateCollection> capturedCollection;
+    wil::com_ptr<IDownloadProgressChangedCallback> capturedProgressCallback;
     bool beginDownloadCalled = false;
 
     STDMETHOD(put_Updates)(IUpdateCollection* value) override
@@ -493,8 +494,10 @@ struct MockUpdateDownloader : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WR
         return S_OK;
     }
 
-    STDMETHOD(BeginDownload)(IUnknown*, IUnknown* completedCallback, VARIANT, IDownloadJob** retval) override
+    STDMETHOD(BeginDownload)(IUnknown* progressCallback, IUnknown* completedCallback, VARIANT, IDownloadJob** retval) override
     {
+        RETURN_HR_IF_NULL(E_POINTER, progressCallback);
+        RETURN_IF_FAILED(progressCallback->QueryInterface(IID_PPV_ARGS(&capturedProgressCallback)));
         beginDownloadCalled = true;
         *retval = wil::MakeOrThrow<MockDownloadJob>().Detach();
         if (completedCallback)
@@ -618,6 +621,7 @@ struct MockUpdateInstaller : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL
 
     wil::com_ptr_nothrow<MockInstallationResult> installResult = wil::MakeOrThrow<MockInstallationResult>();
     wil::com_ptr<IUpdateCollection> capturedCollection;
+    wil::com_ptr<IInstallationProgressChangedCallback> capturedProgressCallback;
     bool beginInstallCalled = false;
 
     STDMETHOD(put_Updates)(IUpdateCollection* value) override
@@ -626,8 +630,10 @@ struct MockUpdateInstaller : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL
         return S_OK;
     }
 
-    STDMETHOD(BeginInstall)(IUnknown*, IUnknown* completedCallback, VARIANT, IInstallationJob** retval) override
+    STDMETHOD(BeginInstall)(IUnknown* progressCallback, IUnknown* completedCallback, VARIANT, IInstallationJob** retval) override
     {
+        RETURN_HR_IF_NULL(E_POINTER, progressCallback);
+        RETURN_IF_FAILED(progressCallback->QueryInterface(IID_PPV_ARGS(&capturedProgressCallback)));
         beginInstallCalled = true;
         *retval = wil::MakeOrThrow<MockInstallationJob>().Detach();
         if (completedCallback)
@@ -1038,13 +1044,19 @@ class WindowsUpdateTests
 
     TEST_METHOD(RunUpdateFlow_NoProgress_DoesNotCrash)
     {
-        // Verifies that passing no progress callback does not crash.
         auto factory = std::make_unique<MockWindowsUpdateClassFactory>();
-        AddMockUpdate(factory->session->searcher->searchResult->updates.get(), VARIANT_TRUE);
+        const auto& downloader = factory->session->downloader;
+        const auto& installer = factory->session->installer;
+        AddMockUpdate(factory->session->searcher->searchResult->updates.get(), VARIANT_FALSE);
 
         WindowsUpdateContext ctx(std::move(factory));
 
-        // Should complete without crashing even with no progress callback.
         ctx.RunUpdateFlow(WindowsUpdateContext::UpdateOptions::None);
+        VERIFY_IS_TRUE(downloader->beginDownloadCalled);
+        VERIFY_IS_TRUE(installer->beginInstallCalled);
+        VERIFY_IS_NOT_NULL(downloader->capturedProgressCallback.get());
+        VERIFY_IS_NOT_NULL(installer->capturedProgressCallback.get());
+        VERIFY_SUCCEEDED(downloader->capturedProgressCallback->Invoke(nullptr, nullptr));
+        VERIFY_SUCCEEDED(installer->capturedProgressCallback->Invoke(nullptr, nullptr));
     }
 };
