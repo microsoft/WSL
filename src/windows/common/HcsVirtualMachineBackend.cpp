@@ -292,7 +292,7 @@ VmEffectiveBoot ConfigureBoot(const VmLinuxBootRequest& Request, schema::Chipset
 
 } // namespace
 
-HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfiguration(const VmCreateRequest& Request)
+HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfiguration(const VmCreateRequest& Request, const std::optional<ExternalDevice>& Device)
 {
     auto signalEarlyTermination = wil::scope_exit([&] { m_terminatingEvent.SetEvent(); });
 
@@ -304,6 +304,15 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
     configuration.Settings.SchemaVersion.Major = 2;
     configuration.Settings.SchemaVersion.Minor = wsl::windows::common::helpers::IsWindows11OrAbove() ? 7 : 3;
     configuration.Settings.VirtualMachine.StopOnReset = true;
+    if (Device)
+    {
+        THROW_HR_IF(E_INVALIDARG, IsEqualGUID(Device->InstanceId, GUID_NULL) || IsEqualGUID(Device->EmulatorId, GUID_NULL));
+        schema::FlexibleIoDevice externalDevice{};
+        externalDevice.EmulatorId = Device->EmulatorId;
+        externalDevice.HostingModel = schema::FlexibleIoDeviceHostingModel::External;
+        const auto instanceId = wsl::shared::string::GuidToString<char>(Device->InstanceId, wsl::shared::string::GuidToStringFlags::None);
+        configuration.Settings.VirtualMachine.Devices.FlexibleIov.emplace(instanceId, std::move(externalDevice));
+    }
     auto& description = configuration.Description;
     description.Identity = Request.Identity;
     description.Backend = BackendKind::Hcs;
@@ -472,7 +481,7 @@ HcsVirtualMachineBackend::~HcsVirtualMachineBackend() noexcept
         TraceLoggingValue(m_terminationInformation.Details.c_str(), "exitDetails"));
 }
 
-std::unique_ptr<HcsVirtualMachineBackend> HcsVirtualMachineBackend::Create(const VmCreateRequest& Request)
+std::unique_ptr<HcsVirtualMachineBackend> HcsVirtualMachineBackend::Create(const VmCreateRequest& Request, const std::optional<ExternalDevice>& Device)
 {
     auto newInstance = std::unique_ptr<HcsVirtualMachineBackend>{new HcsVirtualMachineBackend{}};
     try
@@ -491,7 +500,7 @@ std::unique_ptr<HcsVirtualMachineBackend> HcsVirtualMachineBackend::Create(const
         const auto startTimeMs = GetTickCount64();
         WSL_LOG_TELEMETRY("CreateVmBegin", PDT_ProductAndServicePerformance, TraceLoggingValue(Request.Identity.VmId, "vmId"));
 
-        newInstance->Initialize(Request);
+        newInstance->Initialize(Request, Device);
 
         WSL_LOG_TELEMETRY(
             "CreateVmEnd",
@@ -533,9 +542,9 @@ std::unique_ptr<HcsVirtualMachineBackend> HcsVirtualMachineBackend::Create(const
     return newInstance;
 }
 
-void HcsVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
+void HcsVirtualMachineBackend::Initialize(const VmCreateRequest& Request, const std::optional<ExternalDevice>& Device)
 {
-    auto configuration = BuildConfiguration(Request);
+    auto configuration = BuildConfiguration(Request, Device);
     const auto id = wsl::shared::string::GuidToString<wchar_t>(Request.Identity.VmId, wsl::shared::string::GuidToStringFlags::None);
     const auto settings = wsl::shared::ToJsonW(configuration.Settings);
     auto bootDisks = std::move(configuration.BootDisks);

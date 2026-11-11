@@ -32,6 +32,9 @@
                 <File Id="container.exe" Name="container.exe" Source="${PACKAGE_INPUT_DIR}/wslc.exe" />
                 <File Id="wslhost.exe" Name="wslhost.exe" Source="${PACKAGE_INPUT_DIR}/wslhost.exe" />
                 <File Id="wslrelay.exe" Name="wslrelay.exe" Source="${PACKAGE_INPUT_DIR}/wslrelay.exe" />
+                <?if "${WSL_SOUND_WORKER_PACKAGE}" = "true" ?>
+                    <File Id="wsl_audio_worker.exe" Name="wsl-audio-worker.exe" Source="${PACKAGE_INPUT_DIR}/wsl-audio-worker.exe" />
+                <?endif?>
                 <File Id="wslserviceproxystub.dll" Name="wslserviceproxystub.dll" Source="${PACKAGE_INPUT_DIR}/wslserviceproxystub.dll" />
                 <File Id="wsldevicehostproxystub.dll" Name="wsldevicehostproxystub.dll" Source="${PACKAGE_INPUT_DIR}/wsldevicehostproxystub.dll" />
                 <File Id="wsldeps.dll" Name="wsldeps.dll" Source="${PACKAGE_INPUT_DIR}/wsldeps.dll" />

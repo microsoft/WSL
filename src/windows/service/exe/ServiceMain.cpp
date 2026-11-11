@@ -20,6 +20,9 @@ Abstract:
 #include "LxssUserSessionFactory.h"
 #include "WSLCSessionManagerFactory.h"
 #include <ctime>
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+#include "HdvHostProcess.hpp"
+#endif
 
 using namespace wsl::windows::common::registry;
 using namespace wsl::windows::common::string;
@@ -324,8 +327,14 @@ try
 }
 CATCH_LOG()
 
-int __cdecl wmain()
+int __cdecl wmain(int argc, wchar_t** argv)
 {
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+    if (argc > 1 && wcscmp(argv[1], L"--virtio-sound-host") == 0)
+    {
+        return wsl::virtio_sound::process_host::Run(argc, argv);
+    }
+#endif
     WslService::ProcessMain();
     return 0;
 }

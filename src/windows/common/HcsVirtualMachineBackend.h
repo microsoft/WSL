@@ -19,12 +19,24 @@ Abstract:
 #include "GuestDeviceManager.h"
 #include "hcs.hpp"
 
+namespace HcsExternalDeviceConfigurationTests {
+class HcsExternalDeviceConfigurationTests;
+}
+
 class HcsVirtualMachineBackend : public IVirtualMachineBackend
 {
 public:
     ~HcsVirtualMachineBackend() noexcept override;
 
-    static std::unique_ptr<HcsVirtualMachineBackend> Create(const VmCreateRequest& Request);
+    // HCS-specific external devices must be in the initial compute-system configuration.
+    // Their host process lifetime remains with the caller; this does not transfer HDV ownership.
+    struct ExternalDevice
+    {
+        GUID InstanceId{};
+        GUID EmulatorId{};
+    };
+
+    static std::unique_ptr<HcsVirtualMachineBackend> Create(const VmCreateRequest& Request, const std::optional<ExternalDevice>& Device = std::nullopt);
     static VmPlatformCapabilities QueryCapabilities();
 
     // N.B. Transitional escape hatches for WSL networking implementations that still operate
@@ -73,6 +85,9 @@ public:
     void CreateDnsRecord(VmDeviceId Device, const VmDnsRecord& Record) override;
 
 private:
+    // Exercise the complete initial configuration without creating an HCS VM.
+    friend class HcsExternalDeviceConfigurationTests::HcsExternalDeviceConfigurationTests;
+
     struct HcsDisk
     {
         wsl::windows::common::disk::DiskStateFlags Flags{};
@@ -129,8 +144,8 @@ private:
     using NetworkAdapter = VmResource<VmNetworkAttachment, HcsNetworkAdapter>;
 
     HcsVirtualMachineBackend();
-    void Initialize(const VmCreateRequest& Request);
-    VmConfiguration BuildConfiguration(const VmCreateRequest& Request);
+    void Initialize(const VmCreateRequest& Request, const std::optional<ExternalDevice>& Device);
+    VmConfiguration BuildConfiguration(const VmCreateRequest& Request, const std::optional<ExternalDevice>& Device);
     static void CALLBACK OnSystemEvent(HCS_EVENT* Event, void* Context) noexcept;
     void OnCrash(PCWSTR Details);
     void OnExit(const HCS_EVENT* Event);

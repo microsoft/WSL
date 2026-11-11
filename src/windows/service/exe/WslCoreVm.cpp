@@ -28,6 +28,9 @@ Abstract:
 #include "ConsommeNetworking.h"
 
 #include <TraceLoggingProvider.h>
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+#include "HdvHostProcess.hpp"
+#endif
 
 using msl::utilities::SafeInt;
 using wsl::windows::common::helpers::WindowsBuildNumbers;
@@ -58,6 +61,9 @@ using wsl::windows::common::Context;
 using wsl::windows::common::ExecutionContext;
 
 namespace {
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+constexpr GUID c_virtioSoundDeviceClassId{0xF1919B41, 0x6A33, 0x4C92, {0xA7, 0xF8, 0x39, 0x7E, 0xE4, 0xC5, 0xB1, 0xD2}};
+#endif
 INT64
 RequiredExtraMmioSpaceForPmemFileInMb(_In_ PCWSTR FilePath)
 {
@@ -341,13 +347,42 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     // Create the utility VM through the backend. WslCoreVm owns WSL protocol and product policy;
     // the backend owns HCS configuration and the compute-system lifetime.
     auto backendRequest = GenerateBackendRequest(VmId);
+    std::optional<HcsVirtualMachineBackend::ExternalDevice> externalDevice;
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+    if (m_vmConfig.EnableVirtioSound)
+    {
+        THROW_IF_FAILED(CoCreateGuid(&m_virtioSoundInstanceId));
+        externalDevice = HcsVirtualMachineBackend::ExternalDevice{m_virtioSoundInstanceId, c_virtioSoundDeviceClassId};
+    }
+#endif
     {
         SlowOperationWatcher slowOperation{"HcsCreateSystem"};
-        m_backend = HcsVirtualMachineBackend::Create(backendRequest);
+        m_backend = HcsVirtualMachineBackend::Create(backendRequest, externalDevice);
     }
     m_vmCrashEvent = m_backend->GetCrashEvent();
     m_runtimeId = m_backend->GetDescription().Identity.VmId;
     WI_ASSERT(IsEqualGUID(VmId, m_runtimeId));
+
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+    if (m_vmConfig.EnableVirtioSound)
+    {
+        try
+        {
+            m_hdvHostProcess = wsl::virtio_sound::process_host::HdvHostProcess::Create(
+                m_machineId,
+                m_virtioSoundInstanceId,
+                m_vmConfig.VirtioSoundWindowsInput ? m_restrictedToken.get() : nullptr,
+                m_vmConfig.VirtioSoundWindowsInput ? m_vmConfig.VirtioSoundCaptureEndpoint : std::wstring{});
+        }
+        catch (...)
+        {
+            m_hdvHostProcess.reset();
+            m_backend.reset();
+            throw;
+        }
+    }
+    auto retireUnstartedVirtioSound = wil::scope_exit([&]() noexcept { m_hdvHostProcess.reset(); });
+#endif
 
     const auto& description = m_backend->GetDescription();
     if (m_vmConfig.EnableNestedVirtualization && !description.Processor.NestedVirtualization)
@@ -380,6 +415,9 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     signalEarlyTermination.release();
 
     // Start the utility VM.
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+    retireUnstartedVirtioSound.release();
+#endif
     try
     {
         SlowOperationWatcher slowOperation{"HcsStartSystem"};
@@ -388,6 +426,9 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     catch (...)
     {
         const auto hr = wil::ResultFromCaughtException();
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+        m_hdvHostProcess.reset();
+#endif
         auto resetBackend = wil::scope_exit([&] { m_backend.reset(); });
         if ((hr == HRESULT_FROM_WIN32(WSAENOTCONN) || hr == HRESULT_FROM_WIN32(WSAECONNRESET) || hr == HRESULT_FROM_WIN32(WSAETIMEDOUT)) &&
             m_vmCrashEvent.wait(1000))
@@ -785,6 +826,10 @@ WslCoreVm::~WslCoreVm() noexcept
         m_terminatingEvent.SetEvent();
     }
 
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+    bool soundGuestStoppedConfirmed = false;
+#endif
+
     if (m_backend)
     {
         bool unexpectedTerminate = m_vmExitEvent.is_signaled();
@@ -811,7 +856,21 @@ WslCoreVm::~WslCoreVm() noexcept
             }
         }
 
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+        soundGuestStoppedConfirmed = m_vmExitEvent.wait(UTILITY_VM_TERMINATE_TIMEOUT);
+        if (!soundGuestStoppedConfirmed && m_hdvHostProcess)
+        {
+            TraceLoggingWriteTagged(
+                activity,
+                "VirtioSoundHostEmergencyAbort",
+                TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES),
+                TelemetryPrivacyDataTag(PDT_ProductAndServicePerformance),
+                TraceLoggingValue(m_runtimeId, "vmId"),
+                TraceLoggingValue(false, "guestExitConfirmed"));
+        }
+#else
         m_vmExitEvent.wait(UTILITY_VM_TERMINATE_TIMEOUT);
+#endif
 
         VmTerminationInformation termination;
         {
@@ -851,6 +910,17 @@ WslCoreVm::~WslCoreVm() noexcept
         m_crashDumpCollectionThread.join();
     }
 
+#if defined(WSL_ENABLE_EXPERIMENTAL_VIRTIO_SOUND)
+    if (m_hdvHostProcess)
+    {
+        if (soundGuestStoppedConfirmed)
+        {
+            m_hdvHostProcess->ConfirmGuestStopped();
+        }
+        // Unconfirmed exit uses the explicit job-abort path, never retirement.
+        m_hdvHostProcess.reset();
+    }
+#endif
     m_guestListener = VmGuestListener{};
 
     if (m_pluginPlan9Server)
