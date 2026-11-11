@@ -22,33 +22,41 @@ struct AuditContext
 };
 
 void ProcessEvent(void* context, int, void* data, unsigned int size)
-try
 {
     auto& audit = *static_cast<AuditContext*>(context);
-    THROW_ERRNO_IF(EINVAL, !data || size < sizeof(event_begin_s));
-    event_begin_s header{};
-    memcpy(&header, data, sizeof(header));
-    THROW_ERRNO_IF(EINVAL, header.code_bytes_start != CODE_BYTES || header.version != VERSION || header.size != size);
-    if (header.event_type != event_type_exec_process)
+    std::unique_lock lock(audit.lock, std::defer_lock);
+    try
     {
-        return;
-    }
-    THROW_ERRNO_IF(EINVAL, size != sizeof(event_exec_process_s));
-    event_exec_process_s event{};
-    memcpy(&event, data, sizeof(event));
-    THROW_ERRNO_IF(EINVAL, event.end.code_bytes_end != CODE_BYTES || event.base.pid == 0);
+        lock.lock();
+        if (audit.failed)
+        {
+            return;
+        }
 
-    LX_INIT_PROCESS_EXECUTED message{};
-    message.Header.MessageType = message.Type;
-    message.Header.MessageSize = sizeof(message);
-    message.Pid = event.base.pid;
-    std::lock_guard lock(audit.lock);
-    audit.channel.SendMessage(message);
-}
-catch (...)
-{
-    LOG_CAUGHT_EXCEPTION();
-    static_cast<AuditContext*>(context)->failed = true;
+        THROW_ERRNO_IF(EINVAL, !data || size < sizeof(event_begin_s));
+        event_begin_s header{};
+        memcpy(&header, data, sizeof(header));
+        THROW_ERRNO_IF(EINVAL, header.code_bytes_start != CODE_BYTES || header.version != VERSION || header.size != size);
+        if (header.event_type != event_type_exec_process)
+        {
+            return;
+        }
+        THROW_ERRNO_IF(EINVAL, size != sizeof(event_exec_process_s));
+        event_exec_process_s event{};
+        memcpy(&event, data, sizeof(event));
+        THROW_ERRNO_IF(EINVAL, event.end.code_bytes_end != CODE_BYTES || event.base.pid == 0);
+
+        LX_INIT_PROCESS_EXECUTED message{};
+        message.Header.MessageType = message.Type;
+        message.Header.MessageSize = sizeof(message);
+        message.Pid = event.base.pid;
+        audit.channel.SendMessage(message);
+    }
+    catch (...)
+    {
+        audit.failed = true;
+        LOG_CAUGHT_EXCEPTION();
+    }
 }
 
 void EventsLost(void*, int, unsigned long long count)
@@ -58,8 +66,8 @@ void EventsLost(void*, int, unsigned long long count)
 
 void PollError(void* context, int error)
 {
-    LOG_ERROR("Security audit polling failed: {}", error);
     static_cast<AuditContext*>(context)->failed = true;
+    LOG_ERROR("Security audit polling failed: {}", error);
 }
 } // namespace
 
@@ -77,11 +85,8 @@ int RunSecurityAudit(int socket)
         THROW_LAST_ERROR_IF(mount("tracefs", "/sys/kernel/tracing", "tracefs", MS_NOSUID | MS_NODEV | MS_NOEXEC, nullptr) < 0);
     }
     THROW_LAST_ERROR_IF(access("/sys/kernel/btf/vmlinux", R_OK) < 0);
-    const timeval sendTimeout{2, 0};
-    THROW_LAST_ERROR_IF(setsockopt(socket, SOL_SOCKET, SO_SNDTIMEO, &sendTimeout, sizeof(sendTimeout)) < 0);
-
     auto cleanup = wil::scope_exit([&] {
-        // Unblock a callback before closing the SDK, which joins the polling thread.
+        // Sends remain blocking to tolerate backpressure. Unblock callbacks before the SDK joins its polling thread.
         if (shutdown(socket, SHUT_RDWR) < 0 && errno != ENOTCONN)
         {
             LOG_ERROR("Security audit socket shutdown failed: {}", errno);
