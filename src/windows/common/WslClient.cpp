@@ -1879,6 +1879,8 @@ int wsl::windows::common::WslClient::Main(_In_ LPCWSTR commandLine)
         wsl::windows::common::wslutil::InitializeWil();
         WslTraceLoggingInitialize(LxssTelemetryProvider, !wsl::shared::OfficialBuild);
 
+        wsl::windows::common::wslutil::ConfigureCrashHandler();
+
         // Set CRT encoding.
         const char* encoding = getenv("WSL_UTF8");
         if (encoding != nullptr && strcmp(encoding, "1") == 0)
