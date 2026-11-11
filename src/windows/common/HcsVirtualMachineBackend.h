@@ -19,6 +19,10 @@ Abstract:
 #include "GuestDeviceManager.h"
 #include "hcs.hpp"
 
+namespace HcsExternalDeviceConfigurationTests {
+class HcsExternalDeviceConfigurationTests;
+}
+
 class HcsVirtualMachineBackend : public IVirtualMachineBackend
 {
 public:
@@ -81,6 +85,9 @@ public:
     void CreateDnsRecord(VmDeviceId Device, const VmDnsRecord& Record) override;
 
 private:
+    // Exercise the complete initial configuration without creating an HCS VM.
+    friend class HcsExternalDeviceConfigurationTests::HcsExternalDeviceConfigurationTests;
+
     struct HcsDisk
     {
         wsl::windows::common::disk::DiskStateFlags Flags{};
