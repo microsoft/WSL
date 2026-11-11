@@ -134,12 +134,12 @@
                 }
             },
             {
-                "Name": "SUSE-Linux-Enterprise-16.0",
-                "FriendlyName": "SUSE Linux Enterprise 16.0",
+                "Name": "SUSE-Linux-Enterprise-16.1",
+                "FriendlyName": "SUSE Linux Enterprise 16.1",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20260805.0/SUSE-Linux-Enterprise-16.0-16.0.x86_64-1.131-Build1.131.wsl",
-                    "Sha256": "0xc80dce10e2f7fd0bc0b4e7f3e489c36c60159f3a4a32adb74a36d0a4924b1460"
+                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20261110.0/SUSE-Linux-Enterprise-16.1-16.1.x86_64-4.73-Build4.73.wsl",
+                    "Sha256": "0x7f248a1c02d82b5331a188cf52524a68a1d3047dc8a86cb568af6bb23dee79c3"
                 }
             }
         ],
