@@ -7211,21 +7211,24 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             VERIFY_ARE_EQUAL(e, L"");
         }
 
+        for (const auto* firstValue : {L"--flag", L"-f", L"--", L"-", L"value"})
         {
-            ArgumentParser parser(L"--a b -- --c", entryPoint, 0);
-            std::wstring a;
-            std::wstring c;
-            std::wstring e;
-            std::wstring pos;
-            parser.AddArgument(a, L"--a");
-            parser.AddArgument(e, L"--e");
-            parser.AddPositionalArgument(pos, 0);
+            ArgumentParser parser(std::format(L"--option value -- {} next-value", firstValue), entryPoint, 0);
+            std::wstring option;
+            bool flag{};
+            std::wstring first;
+            std::wstring second;
+            parser.AddArgument(option, L"--option");
+            parser.AddArgument(flag, L"--flag", 'f');
+            parser.AddPositionalArgument(first, 0);
+            parser.AddPositionalArgument(second, 1);
 
             parse(parser);
 
-            VERIFY_ARE_EQUAL(a, L"b");
-            VERIFY_ARE_EQUAL(pos, L"--c");
-            VERIFY_ARE_EQUAL(e, L"");
+            VERIFY_ARE_EQUAL(option, L"value");
+            VERIFY_IS_FALSE(flag);
+            VERIFY_ARE_EQUAL(first, firstValue);
+            VERIFY_ARE_EQUAL(second, L"next-value");
         }
 
         {
@@ -7359,16 +7362,19 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         }
 
         {
-            ArgumentParser parser(L"--foo -", entryPoint, 0);
+            ArgumentParser parser(L"--foo - next-value", entryPoint, 0);
             bool a{};
             std::wstring pos;
+            std::wstring nextPos;
 
             parser.AddArgument(a, L"--foo");
             parser.AddPositionalArgument(pos, 0);
+            parser.AddPositionalArgument(nextPos, 1);
 
             parse(parser);
             VERIFY_IS_TRUE(a);
             VERIFY_ARE_EQUAL(pos, L"-");
+            VERIFY_ARE_EQUAL(nextPos, L"next-value");
         }
     }
 
