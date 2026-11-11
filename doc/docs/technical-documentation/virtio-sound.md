@@ -106,7 +106,7 @@ start/stop. A container test should open the same guest card with only `/dev/snd
 mapped. Physical validation must additionally exercise the real worker startup,
 selected endpoint, device loss, clock pacing, underrun, and cleanup.
 
-The standalone [ALSA capture probe](../../../tools/test/virtio-sound-alsa-probe/README.md)
+The standalone [ALSA capture probe](https://github.com/microsoft/WSL/blob/master/tools/test/virtio-sound-alsa-probe/README.md)
 is an independent example for reading an explicitly selected guest ALSA device.
 Its mock checks do not validate physical capture or device mapping under WSL;
 those remain pending.
