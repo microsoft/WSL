@@ -436,11 +436,7 @@ void WSLCVirtualMachine::ConfigureLocalhost()
 {
     constexpr std::string_view c_hosts = "127.0.0.1\tlocalhost\n::1\tlocalhost ip6-localhost ip6-loopback\n";
 
-    const auto result = WriteGuestFile("/etc/hosts", c_hosts);
-    if (result != 0)
-    {
-        THROW_HR_WITH_USER_ERROR(E_FAIL, wsl::shared::Localization::MessageWslcLocalhostWriteFailed("/etc/hosts", result));
-    }
+    WriteGuestFile("/etc/hosts", c_hosts);
 }
 
 void WSLCVirtualMachine::ConfigureNetworking()
@@ -546,8 +542,7 @@ void WSLCVirtualMachine::ConfigureBuildKitPolicy()
 
     const auto policyJson = BuildBuildKitSourcePolicyJson(hosts);
 
-    const auto result = WriteGuestFile(c_buildKitPolicyPath, policyJson);
-    THROW_HR_IF_MSG(E_FAIL, result != 0, "Guest failed to write %hs: %d", c_buildKitPolicyPath, result);
+    WriteGuestFile(c_buildKitPolicyPath, policyJson);
 
     m_buildKitPolicyState = BuildKitPolicyState::Configured;
 }
@@ -697,7 +692,7 @@ std::vector<std::string> WSLCVirtualMachine::ListDirectory(const std::string& Pa
     return wsl::shared::string::ArrayFromSpan(responseSpan, response.EntriesIndex);
 }
 
-int WSLCVirtualMachine::WriteGuestFile(const std::string& Path, std::string_view Content, unsigned int Flags)
+void WSLCVirtualMachine::WriteGuestFile(const std::string& Path, std::string_view Content, unsigned int Flags)
 {
     wsl::shared::MessageWriter<WSLC_WRITE_FILE> message;
     message.WriteString(message->PathIndex, Path);
@@ -708,7 +703,9 @@ int WSLCVirtualMachine::WriteGuestFile(const std::string& Path, std::string_view
     message->Flags = Flags;
 
     std::lock_guard lock{m_lock};
-    return m_initChannel.Transaction<WSLC_WRITE_FILE>(message.Span(), nullptr, m_initChannelTimeout).Result;
+    const auto& response = m_initChannel.Transaction<WSLC_WRITE_FILE>(message.Span(), nullptr, m_initChannelTimeout);
+
+    THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to write '%hs', init returned: %d", Path.c_str(), response.Result);
 }
 
 std::string WSLCVirtualMachine::ReadGuestFile(const std::string& Path, size_t MaxSize)
