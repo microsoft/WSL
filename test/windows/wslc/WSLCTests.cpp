@@ -8407,7 +8407,7 @@ sys.exit(1 if queries else 0)
 
     static std::string ContainerStatePath(const std::string& ContainerId)
     {
-        return std::format("/var/lib/docker/containers/{}/wslc-state.json", ContainerId);
+        return std::format("/var/lib/docker/containers/{}/wslc-container-state.json", ContainerId);
     }
 
     static std::optional<std::string> TryReadGuestFile(IWSLCSession* Session, const std::string& Path)

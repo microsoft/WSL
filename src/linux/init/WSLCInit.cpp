@@ -1249,7 +1249,7 @@ void HandleMessageImpl(
         writer->Result = ReadFileWithLimit(path, Message.MaxSize, content);
         if (writer->Result == 0)
         {
-            auto output = writer.InsertBuffer(writer->ContentIndex, content.size(), writer->ContentLength);
+            auto output = writer.InsertBuffer(writer->ContentIndex, content.size());
             gsl::copy(gsl::as_bytes(gsl::make_span(content)), output);
         }
     }

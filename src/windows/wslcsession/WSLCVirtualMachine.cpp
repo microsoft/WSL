@@ -711,7 +711,7 @@ int WSLCVirtualMachine::WriteGuestFile(const std::string& Path, std::string_view
     return m_initChannel.Transaction<WSLC_WRITE_FILE>(message.Span(), nullptr, m_initChannelTimeout).Result;
 }
 
-int WSLCVirtualMachine::ReadGuestFile(const std::string& Path, size_t MaxSize, std::string& Content)
+std::string WSLCVirtualMachine::ReadGuestFile(const std::string& Path, size_t MaxSize)
 {
     wsl::shared::MessageWriter<WSLC_READ_FILE> message;
     message.WriteString(message->PathIndex, Path);
@@ -721,20 +721,15 @@ int WSLCVirtualMachine::ReadGuestFile(const std::string& Path, size_t MaxSize, s
 
     gsl::span<gsl::byte> responseSpan;
     const auto& response = m_initChannel.Transaction<WSLC_READ_FILE>(message.Span(), &responseSpan, m_initChannelTimeout);
-    if (response.Result != 0)
-    {
-        return response.Result;
-    }
 
-    THROW_HR_IF_MSG(
-        E_UNEXPECTED,
-        response.ContentIndex > responseSpan.size() || response.ContentLength > responseSpan.size() - response.ContentIndex,
-        "Invalid read response for '%hs'",
-        Path.c_str());
+    THROW_WIN32_IF_MSG(ERROR_FILE_NOT_FOUND, response.Result == ENOENT, "File not found: '%hs'", Path.c_str());
+    THROW_WIN32_IF_MSG(ERROR_FILE_TOO_LARGE, response.Result == EFBIG, "'%hs' is larger than %zu bytes", Path.c_str(), MaxSize);
+    THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to read '%hs', init returned: %d", Path.c_str(), response.Result);
+    THROW_HR_IF_MSG(E_UNEXPECTED, response.ContentIndex > responseSpan.size(), "Invalid read response for '%hs'", Path.c_str());
 
-    const auto content = responseSpan.subspan(response.ContentIndex, response.ContentLength);
-    Content.assign(reinterpret_cast<const char*>(content.data()), content.size());
-    return 0;
+    // The content fills the rest of the message.
+    const auto content = responseSpan.subspan(response.ContentIndex);
+    return {reinterpret_cast<const char*>(content.data()), content.size()};
 }
 
 void WSLCVirtualMachine::Unmount(_In_ const char* Path)

@@ -25,36 +25,10 @@ using wsl::windows::service::wslc::WSLCVirtualMachine;
 
 namespace {
 
-constexpr auto c_documentName = "wslc-state.json";
+constexpr auto c_documentName = "wslc-container-state.json";
 
 // Documents hold a handful of counters, so anything larger is not one of ours.
 constexpr size_t c_maxDocumentSize = 64 * 1024;
-
-enum class LoadStatus
-{
-    Loaded,
-    Missing,
-    Corrupt,
-    Unreadable,
-};
-
-struct LoadResult
-{
-    LoadStatus Status{};
-    WSLCPersistedContainerState State;
-    HRESULT Error = S_OK;
-};
-
-LoadResult LoadFailure(LoadStatus Status, HRESULT Error) noexcept
-{
-    return {.Status = Status, .Error = Error};
-}
-
-LoadResult Corrupt(const std::string& Path, const char* Reason) noexcept
-{
-    WSL_LOG("ContainerStateCorrupt", TraceLoggingValue(Path.c_str(), "Path"), TraceLoggingValue(Reason, "Reason"));
-    return LoadFailure(LoadStatus::Corrupt, HRESULT_FROM_WIN32(ERROR_FILE_CORRUPT));
-}
 
 std::string ContainerStatePath(const std::string& ContainerId)
 {
@@ -68,41 +42,10 @@ WSLCVirtualMachine& Vm(WSLCSessionRuntime& Runtime)
     return Runtime.Vm();
 }
 
-LoadResult LoadContainerState(WSLCSessionRuntime& Runtime, const std::string& Path) noexcept
-try
+WSLCPersistedContainerState LoadContainerState(WSLCSessionRuntime& Runtime, const std::string& Path)
 {
-    std::string content;
-    const auto error = Vm(Runtime).ReadGuestFile(Path, c_maxDocumentSize, content);
-    switch (error)
-    {
-    case 0:
-        break;
-    case ENOENT:
-        return LoadFailure(LoadStatus::Missing, HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));
-    case EFBIG:
-        return Corrupt(Path, "Document too large");
-    default:
-        WSL_LOG("ContainerStateUnreadable", TraceLoggingValue(Path.c_str(), "Path"), TraceLoggingValue(error, "Errno"));
-        return LoadFailure(LoadStatus::Unreadable, E_FAIL);
-    }
-
-    try
-    {
-        return {.Status = LoadStatus::Loaded, .State = wsl::shared::FromJson<WSLCPersistedContainerState>(content.begin(), content.end())};
-    }
-    catch (const wil::ResultException& e)
-    {
-        if (e.GetErrorCode() != WSL_E_INVALID_JSON)
-        {
-            throw;
-        }
-
-        return Corrupt(Path, "Invalid JSON");
-    }
-}
-catch (...)
-{
-    return LoadFailure(LoadStatus::Unreadable, wil::ResultFromCaughtException());
+    const auto content = Vm(Runtime).ReadGuestFile(Path, c_maxDocumentSize);
+    return wsl::shared::FromJson<WSLCPersistedContainerState>(content.begin(), content.end());
 }
 
 HRESULT WriteContainerState(WSLCSessionRuntime& Runtime, const std::string& Path, const WSLCPersistedContainerState& State) noexcept
@@ -118,12 +61,12 @@ CATCH_RETURN()
 
 } // namespace
 
-WSLCContainerStateStore::Initial WSLCContainerStateStore::ForNewContainer(WSLCSessionRuntime& Runtime, const std::string& ContainerId)
+WSLCPersistedContainerState WSLCContainerStateStore::ForNewContainer(WSLCSessionRuntime& Runtime, const std::string& ContainerId)
 {
-    Initial initial{.Runtime = Runtime, .Path = ContainerStatePath(ContainerId)};
+    WSLCPersistedContainerState state;
 
     // The metadata label records that the document exists, so the container is not created without it.
-    if (const auto result = WriteContainerState(initial.Runtime, initial.Path, initial.State); FAILED(result))
+    if (const auto result = WriteContainerState(Runtime, ContainerStatePath(ContainerId), state); FAILED(result))
     {
         THROW_HR_WITH_USER_ERROR_MSG(
             result,
@@ -132,49 +75,41 @@ WSLCContainerStateStore::Initial WSLCContainerStateStore::ForNewContainer(WSLCSe
             ContainerId.c_str());
     }
 
-    return initial;
+    return state;
 }
 
-WSLCContainerStateStore::Initial WSLCContainerStateStore::ForExistingContainer(WSLCSessionRuntime& Runtime, const std::string& ContainerId, WSLCContainerStateStorage Storage)
+WSLCPersistedContainerState WSLCContainerStateStore::ForExistingContainer(WSLCSessionRuntime& Runtime, const std::string& ContainerId, WSLCContainerStateStorage Storage)
 {
-    Initial initial{.Runtime = Runtime, .Path = ContainerStatePath(ContainerId)};
-
-    bool missingMeansDefault{};
+    const auto path = ContainerStatePath(ContainerId);
     switch (Storage)
     {
     case WSLCContainerStateStorage::None:
-        missingMeansDefault = true;
-        break;
+        // The container predates persisted state, so its document only exists once its state has been written.
+        try
+        {
+            return LoadContainerState(Runtime, path);
+        }
+        catch (const wil::ResultException& e)
+        {
+            if (e.GetErrorCode() != HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND))
+            {
+                throw;
+            }
+
+            return {};
+        }
 
     case WSLCContainerStateStorage::GuestFileV1:
-        missingMeansDefault = false;
-        break;
+        return LoadContainerState(Runtime, path);
 
     default:
-        initial.LoadError = HRESULT_FROM_WIN32(ERROR_UNSUPPORTED_TYPE);
-        return initial;
+        THROW_HR_MSG(HRESULT_FROM_WIN32(ERROR_UNSUPPORTED_TYPE), "Unsupported state storage: %d", static_cast<int>(Storage));
     }
-
-    const auto result = LoadContainerState(initial.Runtime, initial.Path);
-    if (result.Status == LoadStatus::Loaded)
-    {
-        initial.State = result.State;
-        return initial;
-    }
-
-    if (result.Status != LoadStatus::Missing || !missingMeansDefault)
-    {
-        initial.LoadError = result.Error;
-    }
-
-    return initial;
 }
 
-WSLCContainerStateStore::WSLCContainerStateStore(Initial&& InitialState) :
-    m_runtime(InitialState.Runtime),
-    m_path(std::move(InitialState.Path)),
-    m_loadError(InitialState.LoadError),
-    m_state(InitialState.State)
+WSLCContainerStateStore::WSLCContainerStateStore(
+    WSLCSessionRuntime& Runtime, const std::string& ContainerId, const WSLCPersistedContainerState& State, HRESULT LoadError) :
+    m_runtime(Runtime), m_path(ContainerStatePath(ContainerId)), m_loadError(LoadError), m_state(State)
 {
 }
 

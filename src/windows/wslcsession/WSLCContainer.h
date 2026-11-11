@@ -98,7 +98,8 @@ public:
         WSLCProcessFlags InitProcessFlags,
         WSLCContainerFlags ContainerFlags,
         WSLCContainerRestartPolicy RestartPolicy,
-        WSLCContainerStateStore::Initial&& PersistentState);
+        const WSLCPersistedContainerState& PersistentState,
+        HRESULT PersistentStateLoadError);
 
     ~WSLCContainerImpl();
 

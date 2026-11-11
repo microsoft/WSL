@@ -10,8 +10,9 @@ Abstract:
 
     Mutable per-container state persisted inside the VM so it survives VM shutdown.
 
-    Each container owns at most one document at /var/lib/docker/containers/<container-id>/wslc-state.json,
-    inside the per-container directory the container engine creates and removes along with the container.
+    Each container owns at most one document at
+    /var/lib/docker/containers/<container-id>/wslc-container-state.json, inside the per-container
+    directory the container engine creates and removes along with the container.
     The container metadata label records which storage the container uses (WSLCContainerStateStorage), so
     a missing document can be told apart from a container that never had one.
 
@@ -62,24 +63,14 @@ public:
     NON_COPYABLE(WSLCContainerStateStore);
     NON_MOVABLE(WSLCContainerStateStore);
 
-    // Starting point of a store, resolved before the owning container is constructed.
-    struct Initial
-    {
-        WSLCSessionRuntime& Runtime;
-        std::string Path;
-        WSLCPersistedContainerState State;
+    // Writes the initial document of a container that was just created, and returns its state.
+    static WSLCPersistedContainerState ForNewContainer(WSLCSessionRuntime& Runtime, const std::string& ContainerId);
 
-        // Set when the document could not be loaded. The store then never writes it.
-        HRESULT LoadError = S_OK;
-    };
+    // Loads the state of a container that already exists. Throws if the document can't be loaded.
+    static WSLCPersistedContainerState ForExistingContainer(WSLCSessionRuntime& Runtime, const std::string& ContainerId, WSLCContainerStateStorage Storage);
 
-    // For a container that was just created: writes its initial document.
-    static Initial ForNewContainer(WSLCSessionRuntime& Runtime, const std::string& ContainerId);
-
-    // For a container that already exists.
-    static Initial ForExistingContainer(WSLCSessionRuntime& Runtime, const std::string& ContainerId, WSLCContainerStateStorage Storage);
-
-    explicit WSLCContainerStateStore(Initial&& InitialState);
+    // LoadError is set when the document could not be loaded. The store then never writes it.
+    WSLCContainerStateStore(WSLCSessionRuntime& Runtime, const std::string& ContainerId, const WSLCPersistedContainerState& State, HRESULT LoadError);
 
     WSLCPersistedContainerState Get() const;
 

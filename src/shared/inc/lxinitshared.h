@@ -2063,11 +2063,10 @@ struct WSLC_READ_FILE_RESULT
     MESSAGE_HEADER Header;
     int Result{};
     unsigned int ContentIndex{};
-    unsigned int ContentLength{};
     char Buffer[];
 
     // Buffer content excluded from PRETTY_PRINT so files can hold sensitive payloads.
-    PRETTY_PRINT(FIELD(Header), FIELD(Result), FIELD(ContentLength));
+    PRETTY_PRINT(FIELD(Header), FIELD(Result));
 };
 
 // Reads a regular file. Fails with EFBIG if the file is larger than MaxSize.

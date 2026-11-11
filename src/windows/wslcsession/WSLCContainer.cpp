@@ -945,7 +945,8 @@ WSLCContainerImpl::WSLCContainerImpl(
     WSLCProcessFlags InitProcessFlags,
     WSLCContainerFlags ContainerFlags,
     WSLCContainerRestartPolicy RestartPolicy,
-    WSLCContainerStateStore::Initial&& PersistentState) :
+    const WSLCPersistedContainerState& PersistentState,
+    HRESULT PersistentStateLoadError) :
     m_wslcSession(wslcSession),
     m_pluginNotifier(pluginNotifier),
     m_runtime(runtime),
@@ -964,7 +965,7 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_initProcessFlags(InitProcessFlags),
     m_containerFlags(ContainerFlags),
     m_restartPolicy(RestartPolicy),
-    m_persistentState(std::move(PersistentState))
+    m_persistentState(runtime, m_id, PersistentState, PersistentStateLoadError)
 {
     // Acquire the activity hold up front for a container recovered in the running state, so it keeps
     // the VM alive even before any client opens its wrapper. A merely-created (never-started)
@@ -3248,7 +3249,8 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         containerOptions.InitProcessOptions.Flags,
         containerOptions.Flags,
         containerOptions.RestartPolicy,
-        std::move(persistentState));
+        persistentState,
+        S_OK);
 
     container->Initialize();
 
@@ -3341,10 +3343,17 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     // Containers created before the image was persisted fall back to what Docker reports.
     std::string image = metadata.Image.empty() ? dockerContainer.Image : std::move(metadata.Image);
 
-    auto persistentState = WSLCContainerStateStore::ForExistingContainer(runtime, dockerContainer.Id, metadata.StateStorage);
-    if (FAILED(persistentState.LoadError))
+    // The persisted state is diagnostic, so failing to load it never blocks the container.
+    WSLCPersistedContainerState persistentState;
+    HRESULT persistentStateLoadError = S_OK;
+    try
     {
-        LOG_HR_MSG(persistentState.LoadError, "Failed to load the persisted state of container '%hs'", dockerContainer.Id.c_str());
+        persistentState = WSLCContainerStateStore::ForExistingContainer(runtime, dockerContainer.Id, metadata.StateStorage);
+    }
+    catch (...)
+    {
+        persistentStateLoadError = wil::ResultFromCaughtException();
+        LOG_HR_MSG(persistentStateLoadError, "Failed to load the persisted state of container '%hs'", dockerContainer.Id.c_str());
         EMIT_USER_WARNING(
             wsl::shared::Localization::MessageWslcContainerStateLoadFailed(wsl::shared::string::MultiByteToWide(dockerContainer.Id)));
     }
@@ -3368,7 +3377,8 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         metadata.InitProcessFlags,
         metadata.Flags,
         RestartPolicyFromMetadata(metadata.RestartPolicy, dockerContainer.Id),
-        std::move(persistentState));
+        persistentState,
+        persistentStateLoadError);
 
     container->Initialize();
 
