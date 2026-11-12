@@ -647,6 +647,29 @@ class WSLCCLIParserUnitTests
         }
     }
 
+    // '=' after a value alias is a separator only when a value follows it; otherwise it is the value.
+    // The long form keeps '--name=' as an empty value.
+    TEST_METHOD(Value_AliasTrailingEquals)
+    {
+        std::vector<Argument> defs = {Argument::Create(ArgType::Env), Argument::Create(ArgType::Quiet)};
+
+        auto verifyEnv = [&](const wchar_t* cmd, const wchar_t* expected, bool quiet) {
+            Log::Comment(String().Format(L"Testing: %ls", cmd));
+            auto args = ParseFlags(cmd, defs);
+            VERIFY_ARE_EQUAL(1u, args.Count(ArgType::Env));
+            VERIFY_ARE_EQUAL(std::wstring(expected), args.GetValue<ArgType::Env>());
+            VERIFY_ARE_EQUAL(quiet, args.Contains(ArgType::Quiet));
+        };
+
+        verifyEnv(L"wslc -e=", L"=", false);
+        verifyEnv(L"wslc -e==", L"=", false);
+        verifyEnv(L"wslc -e=value", L"value", false);
+        verifyEnv(L"wslc -qe=", L"=", true);
+        verifyEnv(L"wslc -qe==", L"=", true);
+        verifyEnv(L"wslc -qe=value", L"value", true);
+        verifyEnv(L"wslc --env=", L"", false);
+    }
+
     // Alias forms honor adjoined booleans just like the long name.
     TEST_METHOD(Flag_AliasAdjoinedBoolean)
     {

@@ -404,13 +404,14 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
 
     // A value alias consumes the rest of the token as its value: '-aVALUE' or '-a=VALUE'.
     // With nothing left in the token, the value is the next argument.
+    // '=' is only a separator when followed by a value, so '-a=' yields the value '='.
     auto processValueAlias = [this, &currArg](const Argument& arg, size_t valuePos) -> State {
         if (valuePos >= currArg.length())
         {
             return {arg.Type(), currArg};
         }
 
-        if (currArg[valuePos] == WSLC_CLI_ARG_SPLIT_CHAR)
+        if (currArg[valuePos] == WSLC_CLI_ARG_SPLIT_CHAR && valuePos + 1 < currArg.length())
         {
             ++valuePos;
         }
