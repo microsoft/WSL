@@ -615,6 +615,38 @@ class WSLCCLIParserUnitTests
         VERIFY_ARE_EQUAL(std::wstring(L"cont1"), args.GetValue<ArgType::ObjectId>());
     }
 
+    // A value alias takes the rest of its token as the value: '-n5' is equivalent to '-n=5' and
+    // '-n 5', including when the value alias ends a chain of flag aliases.
+    TEST_METHOD(Value_AliasAttachedValue)
+    {
+        std::vector<Argument> defs = {Argument::Create(ArgType::Tail), Argument::Create(ArgType::Quiet)};
+
+        for (const auto* cmd : {L"wslc -n5", L"wslc -n=5", L"wslc -n 5", L"wslc -qn5", L"wslc -qn=5", L"wslc -qn 5"})
+        {
+            Log::Comment(String().Format(L"Testing: %ls", cmd));
+            auto args = ParseFlags(cmd, defs);
+            VERIFY_ARE_EQUAL(1u, args.Count(ArgType::Tail));
+            VERIFY_ARE_EQUAL(5ull, args.GetValue<ArgType::Tail>());
+            VERIFY_ARE_EQUAL(std::wstring_view{cmd}.starts_with(L"wslc -q"), args.Contains(ArgType::Quiet));
+        }
+
+        // Only a single '=' directly after the alias is a separator; any later '=' belongs to the value.
+        std::vector<Argument> envDefs = {Argument::Create(ArgType::Env)};
+        VERIFY_ARE_EQUAL(std::wstring(L"FOO=bar"), ParseFlags(L"wslc -eFOO=bar", envDefs).GetValue<ArgType::Env>());
+        VERIFY_ARE_EQUAL(std::wstring(L"FOO=bar"), ParseFlags(L"wslc -e=FOO=bar", envDefs).GetValue<ArgType::Env>());
+        VERIFY_ARE_EQUAL(std::wstring(L"=FOO"), ParseFlags(L"wslc -e==FOO", envDefs).GetValue<ArgType::Env>());
+
+        // The attached value is never parsed as more aliases, even when it matches a defined flag alias.
+        std::vector<Argument> envQuietDefs = {Argument::Create(ArgType::Env), Argument::Create(ArgType::Quiet)};
+        for (const auto* cmd : {L"wslc -eq", L"wslc -e=q"})
+        {
+            Log::Comment(String().Format(L"Testing: %ls", cmd));
+            auto args = ParseFlags(cmd, envQuietDefs);
+            VERIFY_ARE_EQUAL(std::wstring(L"q"), args.GetValue<ArgType::Env>());
+            VERIFY_IS_FALSE(args.Contains(ArgType::Quiet));
+        }
+    }
+
     // Alias forms honor adjoined booleans just like the long name.
     TEST_METHOD(Flag_AliasAdjoinedBoolean)
     {
