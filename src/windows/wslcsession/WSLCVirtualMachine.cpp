@@ -685,6 +685,8 @@ std::vector<std::string> WSLCVirtualMachine::ListDirectory(const std::string& Pa
     message.WriteString(Path);
 
     gsl::span<gsl::byte> responseSpan;
+
+    std::lock_guard lock{m_lock};
     const auto& response = m_initChannel.Transaction<WSLC_LISTDIR>(message.Span(), &responseSpan, m_initChannelTimeout);
 
     THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to list directory '%hs', init returned: %d", Path.c_str(), response.Result);
