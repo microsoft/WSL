@@ -3,25 +3,18 @@
 #include "precomp.h"
 #include "UsbManager.h"
 #include "stringshared.h"
-#include <nlohmann/json.hpp>
 #include <usbiodef.h>
 
 namespace wsl::windows::common::usb {
 
+using wsl::shared::string::GuidToString;
 using wsl::shared::string::IsEqual;
-using wsl::shared::string::MultiByteToWide;
-using wsl::shared::string::WideToMultiByte;
 
 namespace {
 
     constexpr wchar_t c_journalPath[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Lxss\\Usb";
     constexpr DWORD c_readyTimeoutMs = 30000;
     constexpr DWORD c_reappearanceTimeoutMs = 5000;
-
-    std::wstring GetJournalRecordName(const UxdReservationIdentity& Value)
-    {
-        return wsl::shared::string::GuidToString<wchar_t>(Value.Id);
-    }
 
     wil::unique_hkey CreateJournalKey()
     {
@@ -61,11 +54,28 @@ try
     }
     THROW_IF_FAILED(result);
 
-    for (auto& record : LoadReservationRecords(journal.get()))
+    UxdRegistry uxdRegistry;
+    const auto inventory = Inventory::Enumerate();
+    for (const auto& [name, type] : registry::EnumValues(journal.get()))
     {
         try
         {
-            ReleaseReservation(record, journal.get());
+            UxdReservationIdentity identity;
+            THROW_IF_FAILED(CLSIDFromString(name.c_str(), &identity.Id));
+            THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_DATA), type != REG_DWORD || IsEqualGUID(identity.Id, GUID_NULL));
+            if (const auto reservation = uxdRegistry.FindReservation(identity.Id))
+            {
+                if (uxdRegistry.RemoveReservation(*reservation) && std::ranges::any_of(inventory.Hubs, [&](const auto& hub) {
+                        return IsEqual(hub.InstanceId, reservation->HubInstanceId, true);
+                    }))
+                {
+                    CyclePort(reservation->HubInstanceId, reservation->Port);
+                }
+            }
+            uxdRegistry.RemoveMapping(identity);
+            uxdRegistry.Flush();
+            THROW_IF_WIN32_ERROR(RegDeleteValueW(journal.get(), name.c_str()));
+            THROW_IF_WIN32_ERROR(RegFlushKey(journal.get()));
         }
         CATCH_LOG()
     }
@@ -125,11 +135,6 @@ void Manager::Start()
     }
 
     m_journal = CreateJournalKey();
-
-    {
-        auto lock = m_lock.lock_exclusive();
-        m_records = LoadReservationRecords(m_journal.get());
-    }
 
     NotificationHandle interfaceNotification;
     NotificationHandle instanceNotification;
@@ -295,50 +300,6 @@ try
 }
 CATCH_LOG()
 
-std::list<Manager::Record> Manager::LoadReservationRecords(HKEY Journal)
-{
-    // Restore ownership metadata for cleanup, without reactivating attachments.
-    std::list<Record> records;
-    for (const auto& [name, type] : registry::EnumValues(Journal))
-    {
-        try
-        {
-            THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_DATA), type != REG_SZ);
-            Record record;
-            THROW_IF_FAILED(CLSIDFromString(name.c_str(), &record.Reservation.Id));
-            THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_DATA), IsEqualGUID(record.Reservation.Id, GUID_NULL));
-
-            const auto json = nlohmann::json::parse(WideToMultiByte(registry::ReadString(Journal, nullptr, name.c_str())));
-            record.Reservation.HubInstanceId = MultiByteToWide(json.at("Hub").get<std::string>());
-            record.Reservation.Port = json.at("Port").get<uint32_t>();
-            record.OwnerSid = MultiByteToWide(json.at("OwnerSid").get<std::string>());
-
-            records.push_back(std::move(record));
-        }
-        CATCH_LOG()
-    }
-    return records;
-}
-
-void Manager::PersistReservationRecord(const Record& Value)
-{
-    const nlohmann::json record{
-        {"Hub", WideToMultiByte(Value.Reservation.HubInstanceId)},
-        {"Port", Value.Reservation.Port},
-        {"OwnerSid", WideToMultiByte(Value.OwnerSid)}};
-
-    const auto text = MultiByteToWide(record.dump());
-    THROW_IF_WIN32_ERROR(RegSetValueExW(
-        m_journal.get(),
-        GetJournalRecordName(Value.Reservation).c_str(),
-        0,
-        REG_SZ,
-        reinterpret_cast<const BYTE*>(text.c_str()),
-        gsl::narrow_cast<DWORD>((text.size() + 1) * sizeof(wchar_t))));
-
-    THROW_IF_WIN32_ERROR(RegFlushKey(m_journal.get()));
-}
-
 bool Manager::ReleaseReservation(Record& Value, HKEY Journal)
 {
     // Stop reporting the reservation as active before restoring Windows ownership.
@@ -363,7 +324,7 @@ bool Manager::ReleaseReservation(Record& Value, HKEY Journal)
     uxdRegistry.RemoveMapping(Value.Reservation);
     uxdRegistry.Flush();
 
-    const auto error = RegDeleteValueW(Journal, GetJournalRecordName(Value.Reservation).c_str());
+    const auto error = RegDeleteValueW(Journal, GuidToString<wchar_t>(Value.Reservation.Id).c_str());
     THROW_IF_WIN32_ERROR(error == ERROR_FILE_NOT_FOUND ? ERROR_SUCCESS : error);
     THROW_IF_WIN32_ERROR(RegFlushKey(Journal));
     return cycled;
@@ -541,7 +502,8 @@ DeviceReservation Manager::Reserve(PSID UserSid, const PortId& Port, RemovalCall
     bool persisted = false;
     try
     {
-        PersistReservationRecord(*record);
+        registry::WriteDword(m_journal.get(), nullptr, GuidToString<wchar_t>(identity.Id).c_str(), 1);
+        THROW_IF_WIN32_ERROR(RegFlushKey(m_journal.get()));
         persisted = true;
         m_registry.CreateMapping(identity);
         m_registry.PublishReservation(identity);
