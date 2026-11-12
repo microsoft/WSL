@@ -70,7 +70,7 @@ class OpenVmmVirtualMachineBackendTests
         const auto& error = context.ReportedError().value();
         VERIFY_ARE_EQUAL(E_INVALIDARG, error.Code);
         VERIFY_IS_TRUE(WI_IsFlagSet(error.Context, Context::CreateVm));
-        VERIFY_IS_TRUE(WI_IsFlagSet(error.Context, Context::OpenVmm));
+        VERIFY_IS_TRUE(WI_IsFlagSet(error.Context, Context::OpenVMM));
     }
 
     TEST_METHOD(PreservesCallerIdentityAndBootInputs)
@@ -214,6 +214,32 @@ class OpenVmmVirtualMachineBackendTests
     {
         SKIP_TEST_ARM64();
         VerifyBootsAndTerminates(OpenVmmVirtualMachineBackend::Create(CreateRunnableRequest()));
+    }
+
+    TEST_METHOD(DrainsResourcesBeforeNotifyingTermination)
+    {
+        SKIP_TEST_ARM64();
+        auto backend = OpenVmmVirtualMachineBackend::Create(CreateRunnableRequest());
+        const auto device = backend->CreateFileSystemDevice({VmVirtioFsDevice{L"shutdown-test", VmVirtioFsLayout::SingleShare}});
+        const auto terminationEvent = backend->GetTerminationEvent();
+        wil::unique_event callbackEvent{wil::EventOptions::ManualReset};
+        HRESULT reentrantResult = E_FAIL;
+        bool resourcesReleased = false;
+        backend->RegisterTerminationCallback([&](GUID) {
+            reentrantResult = OperationResult([&] { backend->Terminate(); });
+            resourcesReleased =
+                !backend->GetFileSystemDevice([&](const auto& entry) { return entry.Id.Value == device.Id.Value; }).has_value();
+            callbackEvent.SetEvent();
+        });
+
+        backend->Terminate();
+        VERIFY_IS_TRUE(callbackEvent.wait(30 * 1000));
+        VERIFY_ARE_EQUAL(S_OK, reentrantResult);
+        VERIFY_IS_TRUE(resourcesReleased);
+        VERIFY_IS_TRUE(terminationEvent.is_signaled());
+        VERIFY_ARE_EQUAL(VmState::Stopped, backend->GetState());
+        VERIFY_ARE_EQUAL(S_OK, OperationResult([&] { backend->Terminate(); }));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), OperationResult([&] { backend->Start(); }));
     }
 
     TEST_METHOD(ManagesFileSystemNetworkAndPortResources)

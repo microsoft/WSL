@@ -1903,14 +1903,14 @@ try
 
     // Ensure VM exists and attach the VHD.
     _CreateVm();
-    const auto lun = m_utilityVm->AttachDisk(vhdPath.c_str(), WslCoreVm::DiskType::VHD, {}, true, userToken.get());
+    const auto disk = m_utilityVm->AttachDisk(vhdPath.c_str(), WslCoreVm::DiskType::VHD, {}, true, userToken.get());
 
     // Resize the underlying filesystem.
     //
     // N.B. Passing zero as the size causes the resize to consume all available space on the block device.
     {
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { m_utilityVm->EjectVhd(vhdPath.c_str()); });
-        m_utilityVm->ResizeDistribution(lun, OutputHandle, resizingLarger ? 0 : NewSize);
+        m_utilityVm->ResizeDistribution(disk, OutputHandle, resizingLarger ? 0 : NewSize);
     }
 
     // If shrinking the VHD, resize the underlying VHD file. This is only supported for .vhdx files.
@@ -1968,9 +1968,9 @@ try
         try
         {
             _CreateVm();
-            const auto lun = m_utilityVm->AttachDisk(vhdPath.c_str(), WslCoreVm::DiskType::VHD, {}, true, userToken.get());
+            const auto disk = m_utilityVm->AttachDisk(vhdPath.c_str(), WslCoreVm::DiskType::VHD, {}, true, userToken.get());
             auto ejectVhd = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { m_utilityVm->EjectVhd(vhdPath.c_str()); });
-            m_utilityVm->TrimDistribution(lun);
+            m_utilityVm->TrimDistribution(disk);
         }
         CATCH_LOG();
     }
