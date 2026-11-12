@@ -4184,6 +4184,14 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Non è possibile ripristinare il timestamp per il contenitore '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerStateLoadFailed" xml:space="preserve">
+    <value>Non è stato possibile caricare lo stato persistente del contenitore '{}'. Le modifiche apportate al suo stato non verranno salvate.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStateSaveFailed" xml:space="preserve">
+    <value>Non è stato possibile salvare lo stato persistente del contenitore '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>Non è possibile analizzare lo stato di importazione dell'immagine</value>
     <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
@@ -4219,8 +4227,8 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Non è stato possibile installare i certificati radice trusted dell'host nella macchina virtuale: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
-    <value>WSLC non è riuscito a scrivere '{}' per inizializzare la risoluzione del nome host locale (errore guest {}).</value>
+  <data name="MessageWslcGuestFileWriteFailed" xml:space="preserve">
+    <value>WSLC non è riuscito a scrivere '{}' nel guest (errore guest {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">

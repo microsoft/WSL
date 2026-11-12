@@ -4178,6 +4178,14 @@ Windows sürümü: {}</value>
     <value>'{}' kapsayıcısı için zaman damgası geri yüklenemedi</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerStateLoadFailed" xml:space="preserve">
+    <value>Kapsayıcı “{}” için kalıcı durum yüklenemedi. Durumunda yapılan değişiklikler kaydedilmez.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStateSaveFailed" xml:space="preserve">
+    <value>Kapsayıcı “{}” için kalıcı durum kaydedilemedi.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>Görüntü içeri aktarma ilerleme durumu ayrıştırılamadı</value>
     <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
@@ -4213,8 +4221,8 @@ Windows sürümü: {}</value>
     <value>Ana bilgisayar güvenilen kök sertifikaları sanal makineye yüklenemedi: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
-    <value>WSLC, yerel ana bilgisayar adı çözümlemesini başlatmak için '{}' yazamadı (konuk hatası {}).</value>
+  <data name="MessageWslcGuestFileWriteFailed" xml:space="preserve">
+    <value>WSLC konuğa '{}' yazamadı (konuk hatası {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">

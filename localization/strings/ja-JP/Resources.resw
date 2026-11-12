@@ -4184,6 +4184,14 @@ Windows バージョン: {}</value>
     <value>コンテナー '{}' のタイムスタンプを復元できませんでした</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerStateLoadFailed" xml:space="preserve">
+    <value>コンテナー '{}' の永続化された状態を読み込めませんでした。その状態に対する変更は保存されません。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStateSaveFailed" xml:space="preserve">
+    <value>コンテナー '{}' の永続化された状態を保存できませんでした</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>イメージのインポート進行状況の解析に失敗しました</value>
     <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
@@ -4219,8 +4227,8 @@ Windows バージョン: {}</value>
     <value>ホストの信頼されたルート証明書を VM にインストールできませんでした: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
-    <value>WSLC は、ローカル ホスト名解決を初期化するための '{}' を書き込めませんでした (ゲスト エラー {})。</value>
+  <data name="MessageWslcGuestFileWriteFailed" xml:space="preserve">
+    <value>WSLC はゲストに '{}' を書き込めませんでした (ゲスト エラー {})。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
