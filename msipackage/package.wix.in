@@ -294,14 +294,6 @@
                      which would fail the install. -->
                 <ServiceControl Id="StopService" Stop="both" Remove="uninstall" Name="WSLService" Wait="yes" />
 
-                <RegistryKey Root="HKLM"
-                    Key="SYSTEM\CurrentControlSet\Services\EventLog\Security\Microsoft-Windows-WSL-SecurityAudit">
-                    <RegistryValue Id="SecurityAuditMessageFile" Name="EventMessageFile"
-                        Type="expandable" Value="[#wsl.exe]" />
-                    <!-- AUTHZ_ALLOW_MULTIPLE_SOURCE_INSTANCES -->
-                    <RegistryValue Id="SecurityAuditSourceFlags" Name="EventSourceFlags" Type="integer" Value="1" />
-                </RegistryKey>
-
                 <File Id="wsldevicehost.dll" Source="${WSL_DEVICE_HOST_DLL_PATH}" />
 
                 <!-- WSLC COM app - activated through WSLService -->
@@ -867,7 +859,7 @@
             <?endif?>
 
             <Custom Action="FinalizeInstall" After="PublishFeatures"/>
-            <!-- Remove any legacy source metadata only after a successful full uninstall. -->
+            <!-- The audit worker installs its event source on demand. Clean it up only after a successful full uninstall. -->
             <Custom Action="UninstallSecurityAudit" Before="RemoveFiles" Condition='REMOVE~="ALL" AND NOT UPGRADINGPRODUCTCODE' />
             <?if "${OFFICIAL_BUILD}" != "TRUE" ?>
             <Custom Action="TestForceInstallFailure" After="FinalizeInstall" Condition='WSL_TEST_FORCE_INSTALL_FAILURE = 1 and (not UPGRADINGPRODUCTCODE)' />
