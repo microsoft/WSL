@@ -621,6 +621,29 @@ class WSLCE2ETlsRegistryTests
                     VERIFY_IS_TRUE(entry.find(L"windows.proxy.invalid") == std::wstring::npos);
                     VERIFY_IS_TRUE(entry.find(L".windows.invalid") == std::wstring::npos);
                 }
+
+                WriteTestFileContent(
+                    envFile,
+                    "Http_Proxy=http://Manual.Proxy:8080\nhTtPs_PrOxY=\nNo_PrOxY=LocalHost,.Manual.Example\nCustom_Name=VaLuE\n");
+                for (const auto& options :
+                     {std::wstring{L"-e Http_Proxy=http://Manual.Proxy:8080 -e hTtPs_PrOxY= "
+                                   L"-e No_PrOxY=LocalHost,.Manual.Example -e Custom_Name=VaLuE"},
+                      std::format(L"--env-file \"{}\"", envFile.wstring())})
+                {
+                    const auto environment =
+                        RunWslcAndGetStdoutLineSet(std::format(L"container run --rm {} {} env", options, image.NameAndTag()));
+                    VERIFY_IS_TRUE(environment.contains(L"http_proxy=http://Manual.Proxy:8080"));
+                    VERIFY_IS_TRUE(environment.contains(L"https_proxy="));
+                    VERIFY_IS_TRUE(environment.contains(L"no_proxy=LocalHost,.Manual.Example"));
+                    VERIFY_IS_TRUE(environment.contains(L"Custom_Name=VaLuE"));
+                    for (const auto* name :
+                         {L"HTTP_PROXY", L"HTTPS_PROXY", L"NO_PROXY", L"Http_Proxy", L"hTtPs_PrOxY", L"No_PrOxY"})
+                    {
+                        const auto prefix = std::format(L"{}=", name);
+                        VERIFY_IS_FALSE(
+                            std::ranges::any_of(environment, [&](const auto& entry) { return entry.starts_with(prefix); }));
+                    }
+                }
             },
             {{L"Http_Proxy", L"http://caller.proxy.invalid:8080"}, {L"HTTPS_PROXY", L""}, {L"NO_PROXY", L".caller.invalid"}});
     }
