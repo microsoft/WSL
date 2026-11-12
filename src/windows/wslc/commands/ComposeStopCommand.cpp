@@ -23,7 +23,7 @@ using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 
-std::vector<Argument> ComposeStopCommand::GetArguments() const
+std::vector<Argument> ComposeStopCommand::GetComposeArguments() const
 {
     return {
         Argument::Create(ArgType::Path, {.Required = true, .Desc = Localization::WSLCCLI_ComposePathArgDescription()}),
@@ -43,7 +43,7 @@ std::wstring ComposeStopCommand::LongDescription() const
 
 void ComposeStopCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << ResolveSession << StopCompose;
+    context << ValidateComposeOptions << ResolveSession << StopCompose;
 }
 
 } // namespace wsl::windows::wslc

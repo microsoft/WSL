@@ -118,6 +118,12 @@ void Argument::Validate(ArgMap& execArgs) const
         CacheConverted<ArgType::StopSignal>(execArgs, m_name, validation::GetWSLCSignalFromString);
         break;
 
+    case ArgType::ComposeParallel:
+        CacheConverted<ArgType::ComposeParallel>(execArgs, m_name, [](const std::wstring& value, const std::wstring& name) {
+            return validation::GetIntegerFromString<int>(value, name);
+        });
+        break;
+
     case ArgType::StopTimeout:
         CacheConverted<ArgType::StopTimeout>(execArgs, m_name, [](const std::wstring& value, const std::wstring& name) {
             return validation::GetIntegerFromString<int>(value, name);
