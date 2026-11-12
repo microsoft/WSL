@@ -23,13 +23,6 @@ using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 
-std::vector<Argument> ComposeAttachCommand::GetArguments() const
-{
-    return {
-        Argument::Create(ArgType::ComposeDryRun),
-    };
-}
-
 std::wstring ComposeAttachCommand::ShortDescription() const
 {
     return Localization::WSLCCLI_ComposeAttachDesc();

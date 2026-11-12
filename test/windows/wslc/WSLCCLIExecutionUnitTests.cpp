@@ -836,17 +836,17 @@ class WSLCCLIExecutionUnitTests
         CLIExecutionContext context;
         CommandInvocation invocation{
             std::make_unique<RootCommand>(),
-            std::vector<std::wstring>{L"compose", L"-p", L"proj", L"-f", L"a.yml", L"--file", L"b.yml", L"--dry-run", L"up"}};
+            std::vector<std::wstring>{L"compose", L"-p", L"proj", L"-f", L"a.yml", L"--file", L"b.yml", L"-f", L"a.yml", L"up"}};
 
-        VERIFY_THROWS_SPECIFIC(invocation.ParseCommandLine(context), wil::ResultException, [](const wil::ResultException& e) {
-            return e.GetErrorCode() == E_NOTIMPL;
-        });
+        invocation.ParseCommandLine(context);
 
         VERIFY_ARE_EQUAL(std::wstring{L"up"}, invocation.Selected().Name());
         VERIFY_ARE_EQUAL(std::wstring{L"proj"}, context.Args.GetValue<ArgType::ComposeProjectName>());
-        VERIFY_ARE_EQUAL(2u, context.Args.GetAllValues<ArgType::ComposeFile>().size());
-        VERIFY_IS_TRUE(context.Args.GetValue<ArgType::ComposeGlobalDryRun>());
-        VERIFY_IS_FALSE(context.Args.Contains(ArgType::ComposeDryRun));
+        const auto files = context.Args.GetAllValues<ArgType::ComposeFile>();
+        VERIFY_ARE_EQUAL(3u, files.size());
+        VERIFY_ARE_EQUAL(std::wstring{L"a.yml"}, files[0]);
+        VERIFY_ARE_EQUAL(std::wstring{L"b.yml"}, files[1]);
+        VERIFY_ARE_EQUAL(std::wstring{L"a.yml"}, files[2]);
     }
 
     TEST_METHOD(ComposeGlobalArguments_AfterSubcommandIsMisplaced)
@@ -866,64 +866,6 @@ class WSLCCLIExecutionUnitTests
                 wsl::shared::Localization::WSLCCLI_MisplacedInheritedGlobalOptionError(L"--project-name", L"wslc compose", L"up"),
                 exception.Message());
         }
-    }
-
-    TEST_METHOD(ComposeDryRun_AcceptedAfterSubcommand)
-    {
-        CLIExecutionContext context;
-        CommandInvocation invocation{std::make_unique<RootCommand>(), std::vector<std::wstring>{L"compose", L"up", L"--dry-run"}};
-
-        VERIFY_THROWS_SPECIFIC(invocation.ParseCommandLine(context), wil::ResultException, [](const wil::ResultException& e) {
-            return e.GetErrorCode() == E_NOTIMPL;
-        });
-
-        VERIFY_IS_TRUE(context.Args.GetValue<ArgType::ComposeDryRun>());
-        VERIFY_IS_FALSE(context.Args.Contains(ArgType::ComposeGlobalDryRun));
-    }
-
-    TEST_METHOD(ComposeParallel_RejectsNonInteger)
-    {
-        CLIExecutionContext context;
-        CommandInvocation invocation{
-            std::make_unique<RootCommand>(), std::vector<std::wstring>{L"compose", L"--parallel", L"bad", L"up"}};
-
-        VERIFY_THROWS_SPECIFIC(invocation.ParseCommandLine(context), ArgumentException, [](const auto&) { return true; });
-    }
-
-    TEST_METHOD(ComposeOptions_NotImplementedFailDuringParse)
-    {
-        const std::vector<std::vector<std::wstring>> commandLines = {
-            {L"compose", L"--all-resources", L"up"},
-            {L"compose", L"--ansi", L"never", L"create"},
-            {L"compose", L"--compatibility", L"start"},
-            {L"compose", L"--dry-run", L"stop"},
-            {L"compose", L"--env-file", L".env", L"attach"},
-            {L"compose", L"--parallel", L"2", L"up"},
-            {L"compose", L"--profile", L"dev", L"up"},
-            {L"compose", L"--progress", L"plain", L"up"},
-            {L"compose", L"up", L"--dry-run"},
-        };
-
-        for (const auto& commandLine : commandLines)
-        {
-            CLIExecutionContext context;
-            CommandInvocation invocation{std::make_unique<RootCommand>(), std::vector<std::wstring>{commandLine}};
-
-            VERIFY_THROWS_SPECIFIC(invocation.ParseCommandLine(context), wil::ResultException, [](const wil::ResultException& e) {
-                return e.GetErrorCode() == E_NOTIMPL;
-            });
-        }
-    }
-
-    TEST_METHOD(ComposeOptions_HelpSkipsNotImplemented)
-    {
-        CLIExecutionContext context;
-        CommandInvocation invocation{
-            std::make_unique<RootCommand>(),
-            std::vector<std::wstring>{L"compose", L"--profile", L"dev", L"up", L"--dry-run", L"--help"}};
-
-        invocation.ParseCommandLine(context);
-        invocation.Execute(context);
     }
 
     TEST_METHOD(ComposeProject_DiscoversFileInParentDirectory)
