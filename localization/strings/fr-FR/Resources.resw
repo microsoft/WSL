@@ -4185,6 +4185,14 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Échec de la restauration de l’horodatage du conteneur '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerStateLoadFailed" xml:space="preserve">
+    <value>Échec du chargement de l’état persistant du conteneur « {} ». Les modifications apportées à son état ne seront pas enregistrées.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStateSaveFailed" xml:space="preserve">
+    <value>Échec de l’enregistrement de l’état persistant du conteneur « {} »</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>Échec de l’analyse de la progression de l’importation d’image</value>
     <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
@@ -4220,8 +4228,8 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Échec de l’installation des certificats racines approuvés de l’hôte dans la machine virtuelle : {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
-    <value>WSLC n’a pas pu écrire « {} » pour initialiser la résolution du nom d’hôte local (erreur d’invité {}).</value>
+  <data name="MessageWslcGuestFileWriteFailed" xml:space="preserve">
+    <value>WSLC n’a pas pu écrire « {} » dans l’invité (erreur d’invité {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">

@@ -4184,6 +4184,14 @@ Windows 版本：{}</value>
     <value>無法還原容器 '{}' 的時間戳記</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerStateLoadFailed" xml:space="preserve">
+    <value>無法載入容器 '{}' 的保存狀態。將不會儲存其狀態的變更。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStateSaveFailed" xml:space="preserve">
+    <value>無法儲存容器 '{}' 的保存狀態</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>無法剖析映像匯入進度</value>
     <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
@@ -4219,8 +4227,8 @@ Windows 版本：{}</value>
     <value>無法將主機信任的根憑證安裝到 VM： {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
-    <value>WSLC 無法寫入 '{}' 來初始化本機主機名稱解析，(客體錯誤 {})。</value>
+  <data name="MessageWslcGuestFileWriteFailed" xml:space="preserve">
+    <value>WSLC 無法在來賓環境中寫入 '{}'(來賓錯誤 {})。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
