@@ -88,6 +88,8 @@ To deploy on a Hyper-V virtual machine, you can use `powershell tools\deploy\dep
 
 ## Running tests
 
+Before running tests, build the entire project with `cmake --build . -- -m` so that all required binaries and packages are up to date. Run `test.bat` from an elevated terminal (Administrator).
+
 To run unit tests, run: `bin\<platform>\<target>\test.bat`. There's quite a lot of tests so you probably don't want to run everything. Here's a reasonable subset:
 `bin\<platform>\<target>\test.bat /name:*UnitTest*`
 
