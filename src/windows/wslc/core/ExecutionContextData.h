@@ -13,6 +13,7 @@ Abstract:
 --*/
 #pragma once
 #include "EnumVariantMap.h"
+#include "ComposeModel.h"
 #include "ContainerModel.h"
 #include "ImageModel.h"
 #include "NetworkModel.h"
@@ -47,6 +48,7 @@ enum class Data : size_t
     ConfirmMessage,
     Table,
     Json,
+    ComposeProject,
 
     Max
 };
@@ -68,6 +70,7 @@ namespace details {
     DEFINE_DATA_MAPPING(ConfirmMessage, std::wstring);
     DEFINE_DATA_MAPPING(Table, wsl::windows::cli::table::TableData);
     DEFINE_DATA_MAPPING(Json, std::vector<std::wstring>);
+    DEFINE_DATA_MAPPING(ComposeProject, wsl::windows::wslc::models::ComposeProject);
 } // namespace details
 
 struct DataMap : wsl::windows::wslc::EnumBasedVariantMap<Data, wsl::windows::wslc::execution::details::DataMapping>

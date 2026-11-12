@@ -34,7 +34,7 @@ class WSLCE2EComposeLifecycleTests
         const auto composePath = projectDirectory / L"compose.yaml";
         WriteTestFileContent(composePath, "services:\n  bad name:\n    image: alpine:latest\n");
 
-        const auto result = RunWslc(std::format(L"compose create \"{}\"", composePath.wstring()));
+        const auto result = RunWslc(std::format(L"compose -f \"{}\" create", composePath.wstring()));
         result.Verify({.Stdout = L"", .ExitCode = 1});
         VERIFY_IS_TRUE(
             result.StderrContainsSubstring(wsl::shared::Localization::MessageWslcComposeServiceNameInvalid("bad name")));
@@ -60,25 +60,25 @@ services:
                 WideToMultiByte(ContainerName),
                 WideToMultiByte(AlpineTestImage().NameAndTag())));
 
-        auto result = RunWslc(std::format(L"compose create \"{}\"", composePath.wstring()));
+        auto result = RunWslc(std::format(L"compose -f \"{}\" create", composePath.wstring()));
         VERIFY_ARE_EQUAL(0u, result.ExitCode.value_or(1));
 
-        result = RunWslc(std::format(L"compose start \"{}\"", composePath.wstring()));
+        result = RunWslc(std::format(L"compose -f \"{}\" start", composePath.wstring()));
         VERIFY_ARE_EQUAL(0u, result.ExitCode.value_or(1));
 
-        auto attach = RunWslcInteractive(std::format(L"compose attach \"{}\"", composePath.wstring()));
+        auto attach = RunWslcInteractive(std::format(L"compose -f \"{}\" attach", composePath.wstring()));
         VERIFY_IS_TRUE(attach.IsRunning());
         attach.ExpectStdout("compose-lifecycle\n");
 
-        result = RunWslc(std::format(L"compose stop \"{}\"", composePath.wstring()));
+        result = RunWslc(std::format(L"compose -f \"{}\" stop", composePath.wstring()));
         VERIFY_ARE_EQUAL(0u, result.ExitCode.value_or(1));
         VERIFY_ARE_EQUAL(0, attach.Wait(120'000));
 
-        auto up = RunWslcInteractive(std::format(L"compose up \"{}\"", composePath.wstring()));
+        auto up = RunWslcInteractive(std::format(L"compose -f \"{}\" up", composePath.wstring()));
         VERIFY_IS_TRUE(up.IsRunning());
         up.ExpectStdout("compose-lifecycle\n");
 
-        result = RunWslc(std::format(L"compose stop \"{}\"", composePath.wstring()));
+        result = RunWslc(std::format(L"compose -f \"{}\" stop", composePath.wstring()));
         VERIFY_ARE_EQUAL(0u, result.ExitCode.value_or(1));
         VERIFY_ARE_EQUAL(0, up.Wait(120'000));
     }

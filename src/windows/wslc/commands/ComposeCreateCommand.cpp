@@ -26,7 +26,6 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ComposeCreateCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::Path, {.Required = true, .Desc = Localization::WSLCCLI_ComposePathArgDescription()}),
         Argument::Create(ArgType::ComposeDryRun),
     };
 }
@@ -43,7 +42,7 @@ std::wstring ComposeCreateCommand::LongDescription() const
 
 void ComposeCreateCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << ResolveSession << CreateCompose;
+    context << ResolveComposeProject(ComposeProjectSelection::Files) << ResolveSession << CreateCompose;
 }
 
 } // namespace wsl::windows::wslc

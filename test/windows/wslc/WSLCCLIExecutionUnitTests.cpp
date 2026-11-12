@@ -23,6 +23,7 @@ Abstract:
 #include "Invocation.h"
 #include "RootCommand.h"
 #include "ArgumentValidation.h"
+#include "ComposeTasks.h"
 #include "ContainerCommand.h"
 #include "ContainerTasks.h"
 
@@ -36,6 +37,69 @@ using namespace WEX::TestExecution;
 
 namespace WSLCCLIExecutionUnitTests {
 namespace {
+    class ScopedTempDirectory
+    {
+    public:
+        ScopedTempDirectory()
+        {
+            m_path = std::filesystem::temp_directory_path() /
+                     (L"wslc_ut_compose_" + std::to_wstring(GetCurrentProcessId()) + L"_" + std::to_wstring(++s_counter));
+            std::filesystem::remove_all(m_path);
+            std::filesystem::create_directories(m_path);
+        }
+
+        ~ScopedTempDirectory()
+        {
+            std::error_code error;
+            std::filesystem::remove_all(m_path, error);
+        }
+
+        NON_COPYABLE(ScopedTempDirectory);
+        NON_MOVABLE(ScopedTempDirectory);
+
+        const std::filesystem::path& Path() const
+        {
+            return m_path;
+        }
+
+        std::filesystem::path AddFile(const std::filesystem::path& relativePath) const
+        {
+            auto path = m_path / relativePath;
+            std::filesystem::create_directories(path.parent_path());
+            std::ofstream file(path);
+            THROW_HR_IF(E_FAIL, !file.is_open());
+            return path;
+        }
+
+    private:
+        std::filesystem::path m_path;
+        static inline int s_counter = 0;
+    };
+
+    wsl::windows::wslc::models::ComposeProject ResolveProject(
+        std::vector<std::wstring> commandLine, task::ComposeProjectSelection selection, const std::filesystem::path& currentDirectory)
+    {
+        CLIExecutionContext context;
+        CommandInvocation invocation{std::make_unique<RootCommand>(), std::move(commandLine)};
+        invocation.ParseCommandLine(context);
+        return task::ResolveComposeProjectFromArgs(context.Args, selection, currentDirectory);
+    }
+
+    const wsl::windows::wslc::models::ComposeProjectFiles& ProjectFiles(const wsl::windows::wslc::models::ComposeProject& project)
+    {
+        const auto* files = std::get_if<wsl::windows::wslc::models::ComposeProjectFiles>(&project.Value);
+        THROW_HR_IF(E_UNEXPECTED, files == nullptr);
+        return *files;
+    }
+
+    void VerifyResolveFails(std::vector<std::wstring> commandLine, task::ComposeProjectSelection selection, const std::filesystem::path& currentDirectory, HRESULT expected)
+    {
+        VERIFY_THROWS_SPECIFIC(
+            ResolveProject(std::move(commandLine), selection, currentDirectory),
+            wil::ResultException,
+            [expected](const wil::ResultException& e) { return e.GetErrorCode() == expected; });
+    }
+
     struct TestUpCommand final : Command
     {
         TestUpCommand(const std::wstring& parent) : Command(L"up", parent)
@@ -772,8 +836,7 @@ class WSLCCLIExecutionUnitTests
         CLIExecutionContext context;
         CommandInvocation invocation{
             std::make_unique<RootCommand>(),
-            std::vector<std::wstring>{
-                L"compose", L"-p", L"proj", L"-f", L"a.yml", L"--file", L"b.yml", L"--dry-run", L"up", L"compose.yml"}};
+            std::vector<std::wstring>{L"compose", L"-p", L"proj", L"-f", L"a.yml", L"--file", L"b.yml", L"--dry-run", L"up"}};
 
         VERIFY_THROWS_SPECIFIC(invocation.ParseCommandLine(context), wil::ResultException, [](const wil::ResultException& e) {
             return e.GetErrorCode() == E_NOTIMPL;
@@ -790,8 +853,7 @@ class WSLCCLIExecutionUnitTests
     {
         CLIExecutionContext context;
         CommandInvocation invocation{
-            std::make_unique<RootCommand>(),
-            std::vector<std::wstring>{L"compose", L"up", L"--project-name", L"proj", L"compose.yml"}};
+            std::make_unique<RootCommand>(), std::vector<std::wstring>{L"compose", L"up", L"--project-name", L"proj"}};
 
         try
         {
@@ -809,8 +871,7 @@ class WSLCCLIExecutionUnitTests
     TEST_METHOD(ComposeDryRun_AcceptedAfterSubcommand)
     {
         CLIExecutionContext context;
-        CommandInvocation invocation{
-            std::make_unique<RootCommand>(), std::vector<std::wstring>{L"compose", L"up", L"--dry-run", L"compose.yml"}};
+        CommandInvocation invocation{std::make_unique<RootCommand>(), std::vector<std::wstring>{L"compose", L"up", L"--dry-run"}};
 
         VERIFY_THROWS_SPECIFIC(invocation.ParseCommandLine(context), wil::ResultException, [](const wil::ResultException& e) {
             return e.GetErrorCode() == E_NOTIMPL;
@@ -824,7 +885,7 @@ class WSLCCLIExecutionUnitTests
     {
         CLIExecutionContext context;
         CommandInvocation invocation{
-            std::make_unique<RootCommand>(), std::vector<std::wstring>{L"compose", L"--parallel", L"bad", L"up", L"compose.yml"}};
+            std::make_unique<RootCommand>(), std::vector<std::wstring>{L"compose", L"--parallel", L"bad", L"up"}};
 
         VERIFY_THROWS_SPECIFIC(invocation.ParseCommandLine(context), ArgumentException, [](const auto&) { return true; });
     }
@@ -832,18 +893,15 @@ class WSLCCLIExecutionUnitTests
     TEST_METHOD(ComposeOptions_NotImplementedFailDuringParse)
     {
         const std::vector<std::vector<std::wstring>> commandLines = {
-            {L"compose", L"--all-resources", L"up", L"compose.yml"},
-            {L"compose", L"--ansi", L"never", L"create", L"compose.yml"},
-            {L"compose", L"--compatibility", L"start", L"compose.yml"},
-            {L"compose", L"--dry-run", L"stop", L"compose.yml"},
-            {L"compose", L"--env-file", L".env", L"attach", L"compose.yml"},
-            {L"compose", L"-f", L"compose.yml", L"up", L"compose.yml"},
-            {L"compose", L"--parallel", L"2", L"up", L"compose.yml"},
-            {L"compose", L"--profile", L"dev", L"up", L"compose.yml"},
-            {L"compose", L"--progress", L"plain", L"up", L"compose.yml"},
-            {L"compose", L"--project-directory", L"dir", L"up", L"compose.yml"},
-            {L"compose", L"-p", L"proj", L"up", L"compose.yml"},
-            {L"compose", L"up", L"--dry-run", L"compose.yml"},
+            {L"compose", L"--all-resources", L"up"},
+            {L"compose", L"--ansi", L"never", L"create"},
+            {L"compose", L"--compatibility", L"start"},
+            {L"compose", L"--dry-run", L"stop"},
+            {L"compose", L"--env-file", L".env", L"attach"},
+            {L"compose", L"--parallel", L"2", L"up"},
+            {L"compose", L"--profile", L"dev", L"up"},
+            {L"compose", L"--progress", L"plain", L"up"},
+            {L"compose", L"up", L"--dry-run"},
         };
 
         for (const auto& commandLine : commandLines)
@@ -868,7 +926,144 @@ class WSLCCLIExecutionUnitTests
         invocation.Execute(context);
     }
 
+    TEST_METHOD(ComposeProject_DiscoversFileInParentDirectory)
+    {
+        ScopedTempDirectory directory;
+        const auto composeFile = directory.AddFile(L"compose.yaml");
+        directory.AddFile(L"docker-compose.yml");
+        const auto workingDirectory = directory.Path() / L"sub" / L"deeper";
+        std::filesystem::create_directories(workingDirectory);
+
+        const auto project = ResolveProject({L"compose", L"up"}, task::ComposeProjectSelection::Files, workingDirectory);
+
+        const auto& files = ProjectFiles(project);
+        VERIFY_ARE_EQUAL(1u, files.Files.size());
+        VERIFY_ARE_EQUAL(composeFile.wstring(), files.Files[0].wstring());
+        VERIFY_ARE_EQUAL(directory.Path().wstring(), files.ProjectDirectory.wstring());
+        VERIFY_IS_FALSE(files.ProjectName.has_value());
+    }
+
+    TEST_METHOD(ComposeProject_DiscoveryFailures)
+    {
+        ScopedTempDirectory directory;
+        VerifyResolveFails({L"compose", L"up"}, task::ComposeProjectSelection::Files, directory.Path(), HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));
+    }
+
+    TEST_METHOD(ComposeProject_DiscoversOverrideFile)
+    {
+        ScopedTempDirectory directory;
+        const auto composeFile = directory.AddFile(L"compose.yml");
+        const auto overrideFile = directory.AddFile(L"compose.override.yml");
+
+        const auto project = ResolveProject({L"compose", L"up"}, task::ComposeProjectSelection::Files, directory.Path());
+
+        const auto& files = ProjectFiles(project);
+        VERIFY_ARE_EQUAL(2u, files.Files.size());
+        VERIFY_ARE_EQUAL(composeFile.wstring(), files.Files[0].wstring());
+        VERIFY_ARE_EQUAL(overrideFile.wstring(), files.Files[1].wstring());
+    }
+
+    TEST_METHOD(ComposeProject_ExplicitFileResolvesAgainstCurrentDirectory)
+    {
+        ScopedTempDirectory directory;
+
+        const auto project =
+            ResolveProject({L"compose", L"-f", L"sub\\app.yml", L"create"}, task::ComposeProjectSelection::Files, directory.Path());
+
+        const auto& files = ProjectFiles(project);
+        VERIFY_ARE_EQUAL(1u, files.Files.size());
+        VERIFY_ARE_EQUAL((directory.Path() / L"sub" / L"app.yml").wstring(), files.Files[0].wstring());
+        VERIFY_ARE_EQUAL((directory.Path() / L"sub").wstring(), files.ProjectDirectory.wstring());
+    }
+
+    TEST_METHOD(ComposeProject_ProjectDirectory)
+    {
+        ScopedTempDirectory directory;
+        const auto composeFile = directory.AddFile(L"project\\compose.yml");
+        const auto projectDirectory = directory.Path() / L"project";
+        const auto otherDirectory = directory.Path() / L"other";
+        std::filesystem::create_directories(otherDirectory);
+
+        auto project = ResolveProject(
+            {L"compose", L"--project-directory", L"..\\project\\", L"up"}, task::ComposeProjectSelection::Files, otherDirectory);
+
+        VERIFY_ARE_EQUAL(composeFile.wstring(), ProjectFiles(project).Files[0].wstring());
+        VERIFY_ARE_EQUAL(projectDirectory.wstring(), ProjectFiles(project).ProjectDirectory.wstring());
+
+        project = ResolveProject(
+            {L"compose", L"--project-directory", L"project", L"-f", L"other\\app.yml", L"up"},
+            task::ComposeProjectSelection::Files,
+            directory.Path());
+
+        VERIFY_ARE_EQUAL((otherDirectory / L"app.yml").wstring(), ProjectFiles(project).Files[0].wstring());
+        VERIFY_ARE_EQUAL(projectDirectory.wstring(), ProjectFiles(project).ProjectDirectory.wstring());
+    }
+
+    TEST_METHOD(ComposeProject_StdinFileNotImplemented)
+    {
+        ScopedTempDirectory directory;
+        VerifyResolveFails({L"compose", L"-f", L"-", L"up"}, task::ComposeProjectSelection::Files, directory.Path(), E_NOTIMPL);
+    }
+
+    TEST_METHOD(ComposeProject_MultipleFilesPreserveOrder)
+    {
+        ScopedTempDirectory directory;
+
+        const auto project = ResolveProject(
+            {L"compose", L"-f", L"b.yml", L"-f", L"sub\\a.yml", L"up"}, task::ComposeProjectSelection::Files, directory.Path());
+
+        const auto& files = ProjectFiles(project);
+        VERIFY_ARE_EQUAL(2u, files.Files.size());
+        VERIFY_ARE_EQUAL((directory.Path() / L"b.yml").wstring(), files.Files[0].wstring());
+        VERIFY_ARE_EQUAL((directory.Path() / L"sub" / L"a.yml").wstring(), files.Files[1].wstring());
+        VERIFY_ARE_EQUAL(directory.Path().wstring(), files.ProjectDirectory.wstring());
+    }
+
+    TEST_METHOD(ComposeProject_NameSelection)
+    {
+        ScopedTempDirectory directory;
+        directory.AddFile(L"compose.yml");
+
+        auto project =
+            ResolveProject({L"compose", L"-p", L"proj", L"attach"}, task::ComposeProjectSelection::NamePreferred, directory.Path());
+        VERIFY_ARE_EQUAL(std::string{"proj"}, std::get<std::string>(project.Value));
+
+        project = ResolveProject(
+            {L"compose", L"-p", L"proj", L"-f", L"compose.yml", L"attach"},
+            task::ComposeProjectSelection::NamePreferred,
+            directory.Path());
+        VERIFY_ARE_EQUAL(std::string{"proj"}, std::get<std::string>(project.Value));
+
+        project =
+            ResolveProject({L"compose", L"-p", L"proj", L"start"}, task::ComposeProjectSelection::NameWithoutFiles, directory.Path());
+        VERIFY_ARE_EQUAL(std::string{"proj"}, std::get<std::string>(project.Value));
+
+        project = ResolveProject(
+            {L"compose", L"-p", L"proj", L"-f", L"compose.yml", L"stop"},
+            task::ComposeProjectSelection::NameWithoutFiles,
+            directory.Path());
+        VERIFY_ARE_EQUAL(std::string{"proj"}, ProjectFiles(project).ProjectName.value());
+
+        project = ResolveProject({L"compose", L"-p", L"proj", L"up"}, task::ComposeProjectSelection::Files, directory.Path());
+        VERIFY_ARE_EQUAL(std::string{"proj"}, ProjectFiles(project).ProjectName.value());
+
+        project = ResolveProject({L"compose", L"-p", L"", L"attach"}, task::ComposeProjectSelection::NamePreferred, directory.Path());
+        VERIFY_IS_FALSE(ProjectFiles(project).ProjectName.has_value());
+    }
+
+    TEST_METHOD(ComposeProject_InvalidName)
+    {
+        ScopedTempDirectory directory;
+        directory.AddFile(L"compose.yml");
+
+        for (const auto& name : {std::wstring{L"Proj"}, std::wstring{L"_proj"}, std::wstring{L"pro.j"}, std::wstring(256, L'a')})
+        {
+            VerifyResolveFails({L"compose", L"-p", name, L"up"}, task::ComposeProjectSelection::Files, directory.Path(), E_INVALIDARG);
+        }
+    }
+
     TEST_METHOD(ScopedGlobalArguments_ValidatesEveryOwnerOnSelectedPath)
+
     {
         size_t rootValidationCount = 0;
         size_t leafValidationCount = 0;
