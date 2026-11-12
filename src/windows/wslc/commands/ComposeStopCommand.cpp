@@ -27,7 +27,6 @@ std::vector<Argument> ComposeStopCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::Time),
-        Argument::Create(ArgType::ComposeDryRun),
     };
 }
 
