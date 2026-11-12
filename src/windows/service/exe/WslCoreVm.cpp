@@ -2339,6 +2339,25 @@ void WslCoreVm::VerifyPlan9Servers()
     }
 }
 
+void WslCoreVm::RegisterAuditDistribution(const WSLDistributionInformation& Distribution)
+{
+    if (!m_securityAuditThread.joinable())
+    {
+        return;
+    }
+
+    THROW_HR_IF(E_INVALIDARG, Distribution.PidNamespace == 0 || Distribution.Id == GUID{} || !Distribution.Name || !*Distribution.Name);
+    auto lock = m_auditDistributionLock.lock_exclusive();
+    m_auditDistributions.insert_or_assign(
+        Distribution.PidNamespace, securityaudit::ProcessExecutionDistribution{Distribution.Id, Distribution.Name});
+}
+
+void WslCoreVm::UnregisterAuditDistribution(uint64_t PidNamespace)
+{
+    auto lock = m_auditDistributionLock.lock_exclusive();
+    m_auditDistributions.erase(PidNamespace);
+}
+
 void WslCoreVm::SecurityAuditWorker(wil::unique_socket socket, bool includeCommandLine)
 try
 {
@@ -2360,7 +2379,17 @@ try
         std::wstring details;
         try
         {
-            details = securityaudit::FormatProcessExecution(bytes, includeCommandLine);
+            const auto* event = gslhelpers::try_get_struct<LX_INIT_PROCESS_EXECUTED_DETAILS>(bytes);
+            THROW_HR_IF(E_INVALIDARG, !event);
+            std::optional<securityaudit::ProcessExecutionDistribution> distribution;
+            {
+                auto lock = m_auditDistributionLock.lock_shared();
+                if (const auto found = m_auditDistributions.find(event->PidNamespace); found != m_auditDistributions.end())
+                {
+                    distribution = found->second;
+                }
+            }
+            details = securityaudit::FormatProcessExecution(bytes, includeCommandLine, distribution ? &*distribution : nullptr);
         }
         catch (const wil::ResultException& error)
         {

@@ -30,6 +30,7 @@ Abstract:
 #include "INetworkingEngine.h"
 #include "SocketChannel.h"
 #include "DeviceHostProxy.h"
+#include "securityaudit/ProcessExecutionAudit.h"
 
 #define UTILITY_VM_SHUTDOWN_TIMEOUT (30 * 1000)
 #define UTILITY_VM_TERMINATE_TIMEOUT (30 * 1000)
@@ -119,6 +120,10 @@ public:
     void RegisterCallbacks(
         _In_ const std::function<void(const LX_MINI_INIT_CHILD_EXIT_MESSAGE&)>& DistroExitCallback = {},
         _In_ const std::function<void(GUID)>& TerminationCallback = {});
+
+    void RegisterAuditDistribution(const WSLDistributionInformation& Distribution);
+
+    void UnregisterAuditDistribution(uint64_t PidNamespace);
 
     void ResizeDistribution(_In_ ULONG Lun, _In_ HANDLE OutputHandle, _In_ ULONG64 NewSize);
 
@@ -279,6 +284,9 @@ private:
     std::thread m_virtioFsThread;
     std::thread m_crashDumpCollectionThread;
     std::thread m_securityAuditThread;
+    // Teardown joins the audit worker while holding the main VM/session locks.
+    wil::srwlock m_auditDistributionLock;
+    _Guarded_by_(m_auditDistributionLock) std::map<uint64_t, wsl::windows::common::securityaudit::ProcessExecutionDistribution> m_auditDistributions;
 
     std::unique_ptr<wsl::core::INetworkingEngine> m_networkingEngine;
 

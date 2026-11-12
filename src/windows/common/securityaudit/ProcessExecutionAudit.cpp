@@ -30,7 +30,7 @@ bool IncludeProcessCommandLine()
     return value == 1;
 }
 
-std::wstring FormatProcessExecution(gsl::span<gsl::byte> bytes, bool includeCommandLine)
+std::wstring FormatProcessExecution(gsl::span<gsl::byte> bytes, bool includeCommandLine, const ProcessExecutionDistribution* distribution)
 {
     using Json = nlohmann::json;
     const auto* event = gslhelpers::try_get_struct<LX_INIT_PROCESS_EXECUTED_DETAILS>(bytes);
@@ -39,6 +39,11 @@ std::wstring FormatProcessExecution(gsl::span<gsl::byte> bytes, bool includeComm
         !event || bytes.size() > 32 * 1024 || event->Header.MessageSize != bytes.size() ||
             event->Header.MessageType != event->Type || event->Pid == 0 || (event->Flags & ~7U) != 0);
     Json data{{"schemaVersion", 1}, {"pid", event->Pid}};
+    if (distribution != nullptr)
+    {
+        data["distroId"] = wsl::shared::string::GuidToString<char>(distribution->Id);
+        data["distro"] = wsl::shared::string::WideToMultiByte(distribution->Name);
+    }
     const auto number = [&](const char* name, uint32_t value, uint32_t unavailable = 0) {
         if (value != unavailable)
         {
